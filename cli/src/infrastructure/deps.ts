@@ -448,6 +448,11 @@ export async function createDeps(
   );
   const assetProvider = new BundledAssetProviderAdapter();
   const jsonSchemaValidator = new AjvSchemaValidatorAdapter();
+  // force:true is safe here: outDir is always builtMarketplaceDir(), an aidd-owned
+  // disposable cache under .aidd/cache/built/, never a user-owned directory. A
+  // collision only means "the cache from a previous build already exists" — the
+  // whole point of a rebuild. The real user --force (framework.ts) is unrelated
+  // and already threaded correctly for the direct `framework build --flat` path.
   const frameworkBuildFor: FrameworkBuildFor = (target, mode, outDir) =>
     createFrameworkBuildUseCase(
       { fs, assetProvider, logger },
