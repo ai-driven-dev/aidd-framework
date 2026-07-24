@@ -1,7 +1,9 @@
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { FrameworkBuildUseCase } from "../../../../src/application/use-cases/framework/framework-build-use-case.js";
+import { FrameworkBuildUseCase } from "../../../../src/application/use-cases/framework/framework-build-use-case.js";
+import { FlatBuildStrategy } from "../../../../src/application/use-cases/framework/strategies/flat-build-strategy.js";
+import { buildCopilotFlatContract } from "../../../../src/application/use-cases/framework/strategies/tool-contracts.js";
 import {
   EnsureBuiltMarketplaceUseCase,
   type FrameworkBuildFor,
@@ -12,10 +14,46 @@ import type {
 } from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
 import { Marketplace } from "../../../../src/domain/models/marketplace.js";
 import { builtMarketplaceDir } from "../../../../src/domain/models/paths.js";
+import type { AssetProvider } from "../../../../src/domain/ports/asset-provider.js";
+import type { JsonSchemaValidator } from "../../../../src/domain/ports/json-schema-validator.js";
 import type { VersionReader } from "../../../../src/domain/ports/version-reader.js";
+import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
+import { seedFromDirectory } from "../../../helpers/ports/seed-from-directory.js";
 
 const PROJECT = "/proj";
+const FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework");
+const PLUGIN = "aidd-test";
+
+const MINIMAL_MANIFEST_SCHEMA = {
+  type: "object",
+  required: ["name"],
+  properties: { name: { type: "string" } },
+};
+
+function noopValidator(): JsonSchemaValidator {
+  return { validate: () => undefined };
+}
+
+function stubAssetProvider(): AssetProvider {
+  return {
+    loadConfigAsset: () => {
+      throw new Error("not used");
+    },
+    loadDefaultMarketplace: () => {
+      throw new Error("not used");
+    },
+    loadSchema: (name) => (name === "plugin-manifest" ? MINIMAL_MANIFEST_SCHEMA : {}),
+  };
+}
+
+function makeIsDirectory(memFs: InMemoryFileAdapter): (path: string) => Promise<boolean> {
+  return async (path: string): Promise<boolean> => {
+    if (memFs.has(path)) return false;
+    const prefix = path.endsWith("/") ? path : `${path}/`;
+    return memFs.listAll().some((k) => k.startsWith(prefix));
+  };
+}
 
 function makeMarketplace(): Marketplace {
   return Marketplace.create({
@@ -175,5 +213,61 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
     await uc.execute(opts);
     await uc.execute(opts);
     expect(builds).toBe(1);
+  });
+});
+
+// BUG-E2-01: deps.ts hardcodes force:true for this rebuild path because outDir is always
+// builtMarketplaceDir() — an aidd-owned disposable cache, never a user-owned directory. A
+// collision here only means "the cache from a previous build already exists" and should be
+// overwritten, not treated as a destructive overwrite of user data. This pins that decision
+// with a real FlatBuildStrategy (not the fake buildFor stub used above), so it fails if
+// force is ever flipped to false here, or if outDir stops being cache-only.
+describe("force behavior at the cache-rebuild path (BUG-E2-01)", () => {
+  it("overwrites a colliding file already present in the build cache instead of throwing FlatTargetExistsError", async () => {
+    const memFs = new InMemoryFileAdapter();
+    await seedFromDirectory(memFs, FIXTURE_DIR, { useAbsolutePaths: true });
+
+    const builtDir = builtMarketplaceDir(PROJECT, "aidd-framework", "copilot");
+    const agentPath = `${builtDir}/.github/agents/${PLUGIN}-code-reviewer.agent.md`;
+    memFs.setFile(agentPath, "stale cache content from a previous build");
+
+    const realBuildFor: FrameworkBuildFor = (_target, _mode, outDir) => {
+      const validator = noopValidator();
+      const assetProvider = stubAssetProvider();
+      const strategy = new FlatBuildStrategy(
+        memFs,
+        validator,
+        assetProvider,
+        buildCopilotFlatContract(),
+        true, // force:true — mirrors deps.ts wiring for every *:flat target
+        outDir,
+        makeIsDirectory(memFs),
+        new CapturingLogger()
+      );
+      return new FrameworkBuildUseCase(
+        memFs,
+        validator,
+        assetProvider,
+        new CapturingLogger(),
+        strategy
+      );
+    };
+
+    const uc = new EnsureBuiltMarketplaceUseCase(
+      memFs,
+      fakeResolve(FIXTURE_DIR, "1.0.0"),
+      realBuildFor,
+      fakeVersion("5.0.0")
+    );
+
+    const result = await uc.execute({
+      projectRoot: PROJECT,
+      marketplace: makeMarketplace(),
+      target: "copilot",
+      mode: "flat",
+    });
+
+    expect(result.rebuilt).toBe(true);
+    expect(memFs.getFile(agentPath)).not.toBe("stale cache content from a previous build");
   });
 });
