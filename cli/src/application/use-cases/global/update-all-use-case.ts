@@ -1,21 +1,14 @@
 import { Manifest } from "../../../domain/models/manifest.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { VersionReader } from "../../../domain/ports/version-reader.js";
 import type { ToolId } from "../../../domain/tools/registry.js";
-import type { InstallIdeConfigUseCase } from "../install/install-ide-config-use-case.js";
-import type { InstallRuntimeConfigUseCase } from "../install/install-runtime-config-use-case.js";
 import type { MarketplaceRefreshUseCase } from "../marketplace/marketplace-refresh-use-case.js";
 import type { PluginUpdateUseCase } from "../plugin/plugin-update-use-case.js";
-import {
-  BulkConflictState,
-  type ResolveUpdateDecisionUseCase,
-} from "../shared/resolve-update-decision-use-case.js";
-import {
-  type GlobalExecutionError,
+import { BulkConflictState } from "../shared/resolve-update-decision-use-case.js";
+import type {
+  GlobalExecutionError,
   UpdateOneToolUseCase,
 } from "../shared/update-one-tool-use-case.js";
-import type { SyncConflictResolverUseCase } from "../sync/sync-conflict-resolver-use-case.js";
 
 export type { GlobalExecutionError };
 
@@ -33,27 +26,13 @@ export interface UpdateAllResult {
 }
 
 export class UpdateAllUseCase {
-  private readonly updateOneToolUseCase: UpdateOneToolUseCase;
-
   constructor(
     private readonly manifestRepo: ManifestRepository,
     private readonly versionReader: VersionReader,
-    installRuntimeConfigUseCase: InstallRuntimeConfigUseCase,
-    installIdeConfigUseCase: InstallIdeConfigUseCase,
     private readonly pluginUpdateUseCase: PluginUpdateUseCase,
     private readonly marketplaceRefreshUseCase: MarketplaceRefreshUseCase,
-    conflictResolver: SyncConflictResolverUseCase,
-    decisionUseCase: ResolveUpdateDecisionUseCase,
-    fs: FileReader
-  ) {
-    this.updateOneToolUseCase = new UpdateOneToolUseCase(
-      installRuntimeConfigUseCase,
-      installIdeConfigUseCase,
-      conflictResolver,
-      decisionUseCase,
-      fs
-    );
-  }
+    private readonly updateOneToolUseCase: UpdateOneToolUseCase
+  ) {}
 
   async execute(input: UpdateAllInput): Promise<UpdateAllResult> {
     const { projectRoot, userForce, interactive } = input;

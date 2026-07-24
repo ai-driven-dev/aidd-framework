@@ -623,18 +623,12 @@ export async function createDeps(
     builtMaterializationDeps
   );
   const uninstallUseCase = new UninstallUseCase(fs, manifestRepo, logger);
-  const statusAllUseCase = new StatusAllUseCase(fs, manifestRepo, hasher);
+  const statusAllUseCase = new StatusAllUseCase(statusUseCase);
   const restoreAllUseCase = new RestoreAllUseCase(
-    fs,
     manifestRepo,
-    hasher,
-    logger,
-    platform,
     prompter,
-    pluginFetcher,
-    pluginDistributionReader,
-    assetProvider,
-    builtMaterializationDeps
+    statusUseCase,
+    restoreUseCase
   );
   const resolveUpdateDecisionUseCase = new ResolveUpdateDecisionUseCase(prompter);
   const updateOneToolUseCase = new UpdateOneToolUseCase(
@@ -647,13 +641,9 @@ export async function createDeps(
   const updateAllUseCase = new UpdateAllUseCase(
     manifestRepo,
     currentVersionProvider,
-    installRuntimeConfigUseCase,
-    installIdeConfigUseCase,
     pluginUpdateUseCase,
     marketplaceRefreshUseCase,
-    syncConflictResolverUseCase,
-    resolveUpdateDecisionUseCase,
-    fs
+    updateOneToolUseCase
   );
   const updateAiToolsUseCase = new UpdateAiToolsUseCase(
     manifestRepo,

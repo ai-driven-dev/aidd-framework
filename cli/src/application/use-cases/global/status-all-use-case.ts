@@ -1,7 +1,4 @@
-import type { FileReader } from "../../../domain/ports/file-reader.js";
-import type { Hasher } from "../../../domain/ports/hasher.js";
-import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
-import { StatusUseCase } from "../status-use-case.js";
+import type { StatusUseCase } from "../status-use-case.js";
 import type { GlobalExecutionError } from "./update-all-use-case.js";
 
 type StatusReport = Awaited<ReturnType<StatusUseCase["execute"]>>;
@@ -14,17 +11,12 @@ export interface StatusAllResult {
 }
 
 export class StatusAllUseCase {
-  constructor(
-    private readonly fs: FileReader,
-    private readonly manifestRepo: ManifestRepository,
-    private readonly hasher: Hasher
-  ) {}
+  constructor(private readonly statusUseCase: StatusUseCase) {}
 
   async execute(projectRoot: string): Promise<StatusAllResult> {
     const errors: GlobalExecutionError[] = [];
-    const useCase = new StatusUseCase(this.fs, this.manifestRepo, this.hasher);
     const [aiTools, ideTools, plugins] = await this.collectCategoryReports(
-      useCase,
+      this.statusUseCase,
       projectRoot,
       errors
     );
