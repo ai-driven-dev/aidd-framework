@@ -4,8 +4,8 @@ import type { PluginsCapability } from "../../../domain/capabilities/plugins-cap
 import type { Manifest } from "../../../domain/models/manifest.js";
 import { DOCS_DIR, PLUGIN_CACHE_SUBDIR } from "../../../domain/models/paths.js";
 import { Plugin } from "../../../domain/models/plugin.js";
+import { PluginContentTranslator } from "../../../domain/models/plugin-content-translator.js";
 import type { PluginDistribution } from "../../../domain/models/plugin-distribution.js";
-import { PluginTranslator } from "../../../domain/models/plugin-translator.js";
 import { compareSemver } from "../../../domain/models/semver.js";
 import type { AiToolId } from "../../../domain/models/tool-ids.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
@@ -127,7 +127,7 @@ export class PluginUpdateUseCase {
       );
       return;
     }
-    const { files: newFiles, componentPaths } = new PluginTranslator(
+    const { files: newFiles, componentPaths } = new PluginContentTranslator(
       this.hasher
     ).translateWithComponentPaths(dist, toolConfig, docsDir);
     const isLocalMarketplace = plugin.source.kind === "local" && plugin.marketplace !== undefined;

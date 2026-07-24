@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { FileHash } from "../../../src/domain/models/file.js";
+import { PluginContentTranslator } from "../../../src/domain/models/plugin-content-translator.js";
 import {
   type PluginComponentFile,
   PluginDistribution,
 } from "../../../src/domain/models/plugin-distribution.js";
-import { PluginTranslator } from "../../../src/domain/models/plugin-translator.js";
 import { claude } from "../../../src/domain/tools/ai/claude.js";
 import { codex } from "../../../src/domain/tools/ai/codex.js";
 import { copilot } from "../../../src/domain/tools/ai/copilot.js";
@@ -14,7 +14,7 @@ import { vscodeToolConfig } from "../../../src/domain/tools/ide/vscode.js";
 import type { ToolConfig } from "../../../src/domain/tools/registry.js";
 
 const stubHasher = { hash: (_content: string) => new FileHash("a".repeat(32)) };
-const translator = new PluginTranslator(stubHasher);
+const translator = new PluginContentTranslator(stubHasher);
 
 const greetContent = `---
 name: aidd:04:greet
@@ -80,7 +80,7 @@ function pathsFor(tool: ToolConfig, dist = makeDist()): string[] {
   return translator.translate(dist, tool, "").map((f) => f.relativePath);
 }
 
-describe("PluginTranslator.translate()", () => {
+describe("PluginContentTranslator.translate()", () => {
   describe("claude target", () => {
     it("emits all components claude supports under .claude/plugins/sample-plugin/", () => {
       const paths = pathsFor(claude);
@@ -286,7 +286,7 @@ describe("cross-format matrix (source × target)", () => {
   }
 });
 
-describe("PluginTranslator.detectFlatCollisions()", () => {
+describe("PluginContentTranslator.detectFlatCollisions()", () => {
   it("reports no collision when plugins use different plugin names", () => {
     const dist1 = makeDist({ manifest: { name: "plugin-a", version: "1.0.0" } });
     const dist2 = makeDist({ manifest: { name: "plugin-b", version: "1.0.0" } });

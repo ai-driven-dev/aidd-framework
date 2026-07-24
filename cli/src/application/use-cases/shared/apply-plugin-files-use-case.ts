@@ -2,8 +2,8 @@ import { join } from "node:path";
 import type { PluginsCapability } from "../../../domain/capabilities/plugins-capability.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Plugin } from "../../../domain/models/plugin.js";
+import { PluginContentTranslator } from "../../../domain/models/plugin-content-translator.js";
 import type { PluginDistribution } from "../../../domain/models/plugin-distribution.js";
-import { PluginTranslator } from "../../../domain/models/plugin-translator.js";
 import type { AiToolId } from "../../../domain/models/tool-ids.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
@@ -93,7 +93,7 @@ export class ApplyPluginFilesUseCase {
     options: ApplyPluginFilesOptions
   ): Promise<number> {
     const { toolId, plugin, toolConfig, projectRoot, manifest, docsDir, fileFilter } = options;
-    const files = new PluginTranslator(this.hasher).translate(dist, toolConfig, docsDir);
+    const files = new PluginContentTranslator(this.hasher).translate(dist, toolConfig, docsDir);
     let restored = 0;
     for (const f of files) {
       if (fileFilter !== null && fileFilter !== undefined && !fileFilter(f.relativePath)) continue;

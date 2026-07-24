@@ -61,8 +61,8 @@ import { mergeCodexConfigToml } from "../../../../domain/tools/ai/codex.js";
 import { transformMcpToOpencode } from "../../../../domain/tools/ai/opencode.js";
 import type { PluginPresence, ToolBuildContract } from "../../../../domain/tools/build-contract.js";
 import {
+  buildClaudeStyleCatalogEntry,
   buildClaudeStyleMarketplace,
-  buildClaudeStyleMarketplaceEntry,
   buildCodexMarketplace,
   buildCodexMarketplaceEntry,
   resolveDescription,
@@ -106,7 +106,7 @@ async function buildClaudeStyleEntry(
   const args = [fs, name, srcEntry, outDir, manifestRelative] as const;
   const version = await resolveVersion(...args);
   const description = await resolveDescription(...args);
-  return buildClaudeStyleMarketplaceEntry(
+  return buildClaudeStyleCatalogEntry(
     name,
     description,
     version,
