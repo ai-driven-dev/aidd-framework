@@ -1,40 +1,34 @@
 ---
 name: 01-brainstorm
-description: Clarify a vague idea through deep questioning until it is precise enough to act on. Use when the user surfaces a half-formed idea or under-specified request, or asks to brainstorm or refine. Not for scanning an artifact for gaps or writing code.
-argument-hint: capture | probe | integrate | finalize
+description: Clarify a vague product or technical intent through natural discovery. Use when the user has a half-formed idea, ambiguous request, or asks to brainstorm, discover, refine, or clarify. Not for artifact gap scans, planning, or code.
+argument-hint: idea
 ---
-
 # Brainstorm
 
-Turns a vague idea into a precise one through a deep, natural conversation. Each round asks pointed questions, follows the threads the answers open, and challenges assumptions, until the idea is clear enough to act on. It digs, it does not tick boxes.
+```mermaid
+flowchart LR
+  capture --> probe --> integrate
+  integrate -->|"open fork"| probe
+  integrate -->|"clear enough"| finalize
+  finalize -->|"user wants more"| probe
+```
 
 ## Actions
 
-| #   | Action      | Role                                                       | Input               |
-| --- | ----------- | --------------------------------------------------------- | ------------------- |
-| 01  | `capture`   | Restate the idea and read its altitude                     | the user's idea     |
-| 02  | `probe`     | Ask pointed questions, follow the open thread, challenge    | the idea so far     |
-| 03  | `integrate` | Fold answers in, judge if real ambiguity remains           | answers + the idea  |
-| 04  | `finalize`  | Consolidate, flag open assumptions, offer to persist       | the clarified idea  |
+Run the flow above. Read only the next action's file before running it.
 
-Run `capture`, loop `probe → integrate` until the idea is clear, then `finalize`. Before running an action, read its file in `actions/`, not only the table or assets.
+| Action | Does |
+| ------ | ---- |
+| capture | restate the idea and pick what matters next |
+| probe | ask the next useful questions |
+| integrate | fold answers and decide whether to continue |
+| finalize | produce the approved refined idea |
 
 ## Transversal rules
 
-- Clarify the idea, never build it. Surface the leaning and its tradeoff when the facts point one way, but do not lock a solution, write a plan, or produce code.
-- Stay tool-agnostic. Refine the idea on its own terms. Never write a `plugin:skill` identifier, name the capability in plain words instead (the project's rule-writing, its planning step), never the skill that provides it. How it gets built is the next step's job, not brainstorm's.
-- Work at the user's altitude, functional or technical, and probe at that grain, never one level finer.
-- Follow the thread. Pull on what each answer opens, especially a fork where two materially different builds are still possible, rather than cycling fixed topics. Depth over breadth.
-- Challenge assumptions and surface limit cases as they appear, do not save them for the end.
-- Ask a focused set of pointed questions, several when they share the thread, never a question already answered, never a flat checklist. Keep it a conversation.
-- Keep going until the idea is clear or the user stops. Never stop on a count.
-- Flag every open assumption, never present a guess as settled.
-- Wait for the user after every question and at approval.
-
-## References
-
-- `references/probing.md`: how to read altitude, follow threads, the probing tactics, and when to stop.
-
-## Assets
-
-- `assets/question-angles.md`: concrete question prompts to draw from when probing.
+- Clarify intent, never plan, build, or code.
+- Ask only questions that can change what gets built.
+- Flag assumptions as assumptions.
+- State a leaning and its tradeoff when facts already point one way.
+- Hide process words: no density, coverage, nodes, completeness, matrix, or frame unless the user asks for an audit.
+- Wait after questions, approval, and persistence choices.

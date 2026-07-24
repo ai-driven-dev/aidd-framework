@@ -1,21 +1,30 @@
 # 03 - Integrate
 
-Fold the answers in, then judge whether the idea is clear or still hiding ambiguity.
+Fold answers and decide whether to continue.
+
+## Goal
+
+Keep the clarified idea current and make the loop decision explicit.
 
 ## Input
 
-The user's answers and the idea so far.
-
-## Output
-
-The updated idea, a leaning when the facts now point one way, and a judgment to keep probing or to finalize.
+The user's answers, idea so far, and assumptions.
 
 ## Process
 
-1. **Fold in.** Absorb the answers into the bullets. Tighten what they sharpened.
-2. **Lean when it points.** When the clarified facts favor one option, say the leaning and its tradeoff. Keep finer-grain how-to as a flagged assumption, not a commitment.
-3. **Judge the ambiguity.** Decide whether a competent reader could still build two materially different things from what we have. If yes, there is a live thread, hand back to `02-probe`. If no real ambiguity remains, or the user is satisfied, move to `04-finalize`. There is no round count, the idea is done when it is clear, not on a timer.
+1. **Fold.** Update the idea with the user's answer. If it conflicts with something already settled, confirm which stands before folding.
+2. **Lean.** State a leaning and tradeoff when facts converge, even unprompted.
+3. **Track.** Move assumptions to settled, open, or deferred.
+4. **Check.** Apply [readiness](../references/readiness.md) silently to find any remaining fork.
+5. **Decide.** Continue probing when one remains or the user asks for more; otherwise finalize.
+
+## Output
+
+The updated idea, assumptions, and next action.
 
 ## Test
 
-- The idea reflects the answers, a leaning is stated when the facts point, and the keep-probing-or-finalize judgment rests on whether real ambiguity remains, not on a count.
+- Every new fact is reflected in the idea or assumptions.
+- The continue/finalize decision names the remaining gap, or says none remains.
+- User-facing text does not expose process labels unless asked.
+- A leaning and tradeoff is stated when facts converge, or none did.
