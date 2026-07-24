@@ -69,7 +69,7 @@
     "@inquirer/prompts": "^7.0.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
-    "commander": "^12.0.0",
+    "commander": "^15.0.0",
     "simple-git": "^3.36.0",
     "smol-toml": "^1.6.1"
   },
