@@ -1,6 +1,8 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { PluginAddUseCase } from "../../../src/application/use-cases/plugin/plugin-add-use-case.js";
 import { RestoreUseCase } from "../../../src/application/use-cases/restore/restore-use-case.js";
+import { PluginDistributionReaderAdapter } from "../../../src/infrastructure/adapters/plugin-distribution-reader-adapter.js";
 import {
   buildUnitDeps,
   FIXTURE_DIR,
@@ -8,10 +10,36 @@ import {
   initProject,
   installTool,
 } from "../../helpers/ports/build-unit-deps.js";
+import { fakeEnsureBuiltMarketplace } from "../../helpers/ports/fake-ensure-built-marketplace.js";
 import { FakePlatform } from "../../helpers/ports/fake-platform.js";
 import { KeepPrompter, OverwritePrompter } from "../../helpers/ports/scripted-prompter.js";
+import { seedFromDirectory } from "../../helpers/ports/seed-from-directory.js";
 
 const PROJECT_ROOT = "/test-project";
+const PLUGIN_FIXTURE = join(process.cwd(), "tests/fixtures/plugins/claude-format/sample-plugin");
+
+async function installPlugin(
+  deps: Awaited<ReturnType<typeof buildUnitDeps>>,
+  toolId: "claude" | "codex"
+): Promise<void> {
+  await seedFromDirectory(deps.fs, PLUGIN_FIXTURE, { useAbsolutePaths: true });
+  const pluginReader = new PluginDistributionReaderAdapter(deps.fs);
+  await new PluginAddUseCase(
+    deps.fs,
+    deps.manifestRepo,
+    deps.pluginFetcher,
+    pluginReader,
+    deps.hasher,
+    deps.logger,
+    deps.marketplaceRegistry,
+    fakeEnsureBuiltMarketplace()
+  ).execute({
+    source: { kind: "local", path: PLUGIN_FIXTURE },
+    toolIds: [toolId],
+    projectRoot: PROJECT_ROOT,
+    interactive: false,
+  });
+}
 
 /** RecordingPrompter for tracking resolveConflict calls */
 class RecordingPrompter extends OverwritePrompter {
@@ -161,6 +189,79 @@ describe("restore", () => {
     const parsedVscode = JSON.parse(vscodeContent) as Record<string, unknown>;
     expect(parsedVscode["editor.formatOnSave"]).toBe(true);
     expect(cursorContent).toBe('{"modified": true}');
+  });
+
+  it("toolIds filter also scopes plugin restore — does not leak to other AI tools (BUG-E3-02 / A2)", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initProject(deps, PROJECT_ROOT);
+    await installTool(deps, PROJECT_ROOT, "claude");
+    await installTool(deps, PROJECT_ROOT, "codex");
+    await installPlugin(deps, "claude");
+    await installPlugin(deps, "codex");
+
+    const claudePluginFile = join(PROJECT_ROOT, ".claude/plugins/sample-plugin/commands/greet.md");
+    const codexPluginFile = join(PROJECT_ROOT, ".codex/plugins/sample-plugin/commands/greet.md");
+    await deps.fs.writeFile(claudePluginFile, "CORRUPTED CLAUDE");
+    await deps.fs.writeFile(codexPluginFile, "CORRUPTED CODEX");
+
+    await makeRestoreUseCase(deps).execute({
+      frameworkPath: FIXTURE_DIR,
+      version: "test",
+      docsDir: "aidd_docs",
+      projectRoot: PROJECT_ROOT,
+      toolIds: ["claude"],
+      force: true,
+    });
+
+    expect(deps.fs.getFile(claudePluginFile)).not.toBe("CORRUPTED CLAUDE");
+    expect(deps.fs.getFile(codexPluginFile)).toBe("CORRUPTED CODEX");
+  });
+
+  it("ide restore never touches AI plugin files, scoped or unscoped (BUG-E3-02 / A2) — IDE_TOOL_IDS has a single member so this covers both", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initProject(deps, PROJECT_ROOT);
+    await installTool(deps, PROJECT_ROOT, "vscode");
+    await installTool(deps, PROJECT_ROOT, "claude");
+    await installPlugin(deps, "claude");
+
+    const claudePluginFile = join(PROJECT_ROOT, ".claude/plugins/sample-plugin/commands/greet.md");
+    await deps.fs.writeFile(claudePluginFile, "CORRUPTED CLAUDE");
+
+    await makeRestoreUseCase(deps).execute({
+      frameworkPath: FIXTURE_DIR,
+      version: "test",
+      docsDir: "aidd_docs",
+      projectRoot: PROJECT_ROOT,
+      toolIds: ["vscode"],
+      force: true,
+    });
+
+    expect(deps.fs.getFile(claudePluginFile)).toBe("CORRUPTED CLAUDE");
+  });
+
+  it("unscoped restore still restores every installed AI tool's plugins (no regression)", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initProject(deps, PROJECT_ROOT);
+    await installTool(deps, PROJECT_ROOT, "claude");
+    await installTool(deps, PROJECT_ROOT, "codex");
+    await installPlugin(deps, "claude");
+    await installPlugin(deps, "codex");
+
+    const claudePluginFile = join(PROJECT_ROOT, ".claude/plugins/sample-plugin/commands/greet.md");
+    const codexPluginFile = join(PROJECT_ROOT, ".codex/plugins/sample-plugin/commands/greet.md");
+    await deps.fs.writeFile(claudePluginFile, "CORRUPTED CLAUDE");
+    await deps.fs.writeFile(codexPluginFile, "CORRUPTED CODEX");
+
+    await makeRestoreUseCase(deps).execute({
+      frameworkPath: FIXTURE_DIR,
+      version: "test",
+      docsDir: "aidd_docs",
+      projectRoot: PROJECT_ROOT,
+      force: true,
+    });
+
+    expect(deps.fs.getFile(claudePluginFile)).not.toBe("CORRUPTED CLAUDE");
+    expect(deps.fs.getFile(codexPluginFile)).not.toBe("CORRUPTED CODEX");
   });
 
   it("does not remove untracked files in tool directory", async () => {

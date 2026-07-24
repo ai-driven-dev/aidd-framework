@@ -1,5 +1,4 @@
 import { DOCS_DIR } from "../../../domain/models/paths.js";
-import type { AiToolId } from "../../../domain/models/tool-ids.js";
 import type { AssetProvider } from "../../../domain/ports/asset-provider.js";
 import type { FileMerger } from "../../../domain/ports/file-merger.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
@@ -12,7 +11,6 @@ import type { PluginDistributionReader } from "../../../domain/ports/plugin-dist
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
 import { NoManifestError } from "../../errors.js";
-import { RestorePluginUseCase } from "../restore/restore-plugin-use-case.js";
 import { RestoreUseCase } from "../restore/restore-use-case.js";
 import type { BuiltMaterializationDeps } from "../shared/apply-plugin-files-use-case.js";
 import { StatusUseCase } from "../status-use-case.js";
@@ -54,12 +52,11 @@ export class RestoreAllUseCase {
       manifest,
       errors
     );
-    const pluginNames = await this.restoreAllPlugins(projectRoot, manifest, errors);
 
     return {
       totalRestored: restoreResult.totalRestored,
       totalKept: restoreResult.totalKept,
-      pluginNamesRestored: pluginNames,
+      pluginNamesRestored: restoreResult.restoredPluginNames,
       errors,
     };
   }
@@ -96,7 +93,7 @@ export class RestoreAllUseCase {
     interactive: boolean,
     manifest: Awaited<ReturnType<ManifestRepository["load"]>>,
     errors: GlobalExecutionError[]
-  ): Promise<{ totalRestored: number; totalKept: number }> {
+  ): Promise<{ totalRestored: number; totalKept: number; restoredPluginNames: string[] }> {
     try {
       const restoreUseCase = new RestoreUseCase(
         this.fs,
@@ -110,7 +107,7 @@ export class RestoreAllUseCase {
         this.assetProvider,
         this.builtDeps
       );
-      if (manifest === null) return { totalRestored: 0, totalKept: 0 };
+      if (manifest === null) return { totalRestored: 0, totalKept: 0, restoredPluginNames: [] };
       const result = await restoreUseCase.execute({
         version,
         docsDir: DOCS_DIR,
@@ -120,54 +117,17 @@ export class RestoreAllUseCase {
         interactive,
         manifest,
       });
-      return { totalRestored: result.totalRestored, totalKept: result.totalKept };
+      return {
+        totalRestored: result.totalRestored,
+        totalKept: result.totalKept,
+        restoredPluginNames: result.restoredPluginNames,
+      };
     } catch (err) {
       errors.push({
         scope: "config-restore",
         message: err instanceof Error ? err.message : String(err),
       });
-      return { totalRestored: 0, totalKept: 0 };
+      return { totalRestored: 0, totalKept: 0, restoredPluginNames: [] };
     }
-  }
-
-  private async restoreAllPlugins(
-    projectRoot: string,
-    manifest: NonNullable<Awaited<ReturnType<ManifestRepository["load"]>>>,
-    errors: GlobalExecutionError[]
-  ): Promise<string[]> {
-    const restored: string[] = [];
-    const restorePluginUseCase = new RestorePluginUseCase(
-      this.fs,
-      this.manifestRepo,
-      this.pluginFetcher,
-      this.pluginDistributionReader,
-      this.hasher,
-      this.builtDeps
-    );
-    const allPluginNames = this.collectAllPluginNames(manifest);
-    for (const name of allPluginNames) {
-      try {
-        await restorePluginUseCase.execute({ pluginName: name, projectRoot });
-        restored.push(name);
-      } catch (err) {
-        errors.push({
-          scope: `plugin:${name}`,
-          message: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
-    return restored;
-  }
-
-  private collectAllPluginNames(
-    manifest: NonNullable<Awaited<ReturnType<ManifestRepository["load"]>>>
-  ): string[] {
-    const names = new Set<string>();
-    for (const toolId of manifest.getInstalledToolIds()) {
-      for (const plugin of manifest.getPlugins(toolId as AiToolId)) {
-        names.add(plugin.name);
-      }
-    }
-    return [...names];
   }
 }
