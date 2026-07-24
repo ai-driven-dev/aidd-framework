@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { FileHash } from "../../../src/domain/models/file.js";
+import { PluginContentTranslator } from "../../../src/domain/models/plugin-content-translator.js";
 import { PluginDistribution } from "../../../src/domain/models/plugin-distribution.js";
 import { OPENCODE_HOOKS_SKIP_REASON } from "../../../src/domain/models/plugin-translation-skip.js";
-import { PluginTranslator } from "../../../src/domain/models/plugin-translator.js";
 import { cursor } from "../../../src/domain/tools/ai/cursor.js";
 import { opencode } from "../../../src/domain/tools/ai/opencode.js";
 
 const stubHasher = { hash: (_content: string) => new FileHash("a".repeat(32)) };
-const translator = new PluginTranslator(stubHasher);
+const translator = new PluginContentTranslator(stubHasher);
 
 const HOOKS_CONTENT = JSON.stringify({
   hooks: { PreToolUse: [{ hooks: [{ type: "command", command: "node ./hooks/pre.js" }] }] },
@@ -49,7 +49,7 @@ function buildDistWithHooks(name = "test-plugin"): PluginDistribution {
   });
 }
 
-describe("PluginTranslator skip list", () => {
+describe("PluginContentTranslator skip list", () => {
   describe("flat mode (opencode)", () => {
     it("returns empty skipped list when plugin has no hooks or mcp", () => {
       const dist = buildDistWithNoHooksMcp();

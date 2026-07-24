@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { PluginPresenceFlags } from "../../../../src/application/use-cases/framework/strategies/marketplace-strategy-helpers.js";
 import {
+  buildClaudeStyleCatalogEntry,
   buildClaudeStyleMarketplace,
-  buildClaudeStyleMarketplaceEntry,
   synthesizeClaudeStyleManifest,
 } from "../../../../src/application/use-cases/framework/strategies/marketplace-strategy-helpers.js";
 
@@ -223,9 +223,9 @@ describe("buildClaudeStyleMarketplace", () => {
   });
 });
 
-describe("buildClaudeStyleMarketplaceEntry", () => {
+describe("buildClaudeStyleCatalogEntry", () => {
   it("builds entry with name, source, description, version", () => {
-    const entry = buildClaudeStyleMarketplaceEntry("aidd-dev", "AI Dev plugin", "1.0.0", undefined);
+    const entry = buildClaudeStyleCatalogEntry("aidd-dev", "AI Dev plugin", "1.0.0", undefined);
     expect(entry.name).toBe("aidd-dev");
     expect(entry.source).toBe("./plugins/aidd-dev");
     expect(entry.description).toBe("AI Dev plugin");
@@ -233,7 +233,7 @@ describe("buildClaudeStyleMarketplaceEntry", () => {
   });
 
   it("passes through strict and recommended when present", () => {
-    const entry = buildClaudeStyleMarketplaceEntry("aidd-dev", "desc", "1.0.0", {
+    const entry = buildClaudeStyleCatalogEntry("aidd-dev", "desc", "1.0.0", {
       strict: true,
       recommended: false,
     });
@@ -242,13 +242,13 @@ describe("buildClaudeStyleMarketplaceEntry", () => {
   });
 
   it("omits strict and recommended when absent", () => {
-    const entry = buildClaudeStyleMarketplaceEntry("aidd-dev", "desc", "1.0.0", undefined);
+    const entry = buildClaudeStyleCatalogEntry("aidd-dev", "desc", "1.0.0", undefined);
     expect(entry.strict).toBeUndefined();
     expect(entry.recommended).toBeUndefined();
   });
 
   it("only includes strict when it is boolean (not string/number)", () => {
-    const entry = buildClaudeStyleMarketplaceEntry("aidd-dev", "desc", "1.0.0", { strict: true });
+    const entry = buildClaudeStyleCatalogEntry("aidd-dev", "desc", "1.0.0", { strict: true });
     expect(typeof entry.strict).toBe("boolean");
   });
 });

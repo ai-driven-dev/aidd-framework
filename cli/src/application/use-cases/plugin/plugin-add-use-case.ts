@@ -9,10 +9,10 @@ import {
 import type { Manifest } from "../../../domain/models/manifest.js";
 import { DOCS_DIR, PLUGIN_CACHE_SUBDIR } from "../../../domain/models/paths.js";
 import { Plugin } from "../../../domain/models/plugin.js";
+import { PluginContentTranslator } from "../../../domain/models/plugin-content-translator.js";
 import type { PluginDistribution } from "../../../domain/models/plugin-distribution.js";
 import type { PluginSource } from "../../../domain/models/plugin-source.js";
 import type { ReadonlySkipList } from "../../../domain/models/plugin-translation-skip.js";
-import { PluginTranslator } from "../../../domain/models/plugin-translator.js";
 import type { AiToolId } from "../../../domain/models/tool-ids.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
@@ -273,7 +273,7 @@ export class PluginAddUseCase {
         previousMcpEntries
       );
     }
-    const { files, componentPaths, skipped } = new PluginTranslator(
+    const { files, componentPaths, skipped } = new PluginContentTranslator(
       this.hasher
     ).translateWithComponentPaths(dist, toolConfig, docsDir);
     if (files.length === 0) return { skipped };

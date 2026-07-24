@@ -6,13 +6,13 @@ import { mergeOpencodeMcp } from "../../../../domain/formats/opencode-mcp-merge.
 import type { InstallationFile } from "../../../../domain/models/file.js";
 import type { Manifest } from "../../../../domain/models/manifest.js";
 import { Plugin } from "../../../../domain/models/plugin.js";
+import { PluginContentTranslator } from "../../../../domain/models/plugin-content-translator.js";
 import type { PluginDistribution } from "../../../../domain/models/plugin-distribution.js";
 import type { PluginSource } from "../../../../domain/models/plugin-source.js";
 import type {
   PluginTranslationSkip,
   ReadonlySkipList,
 } from "../../../../domain/models/plugin-translation-skip.js";
-import { PluginTranslator as PluginTranslatorHelper } from "../../../../domain/models/plugin-translator.js";
 import type { AiToolId } from "../../../../domain/models/tool-ids.js";
 import type { FileReader } from "../../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../../domain/ports/file-writer.js";
@@ -85,7 +85,7 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
     if (pluginsCap.mode === "native" && pluginsCap.installScope !== "user") {
       throw new CursorProjectScopeUnsupportedError();
     }
-    const { files, componentPaths, skipped } = new PluginTranslatorHelper(
+    const { files, componentPaths, skipped } = new PluginContentTranslator(
       this.hasher
     ).translateWithComponentPaths(dist, toolConfig, docsDir);
     const baseDir = this.resolveBaseDir(pluginsCap, projectRoot);
