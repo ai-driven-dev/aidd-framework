@@ -1,21 +1,29 @@
 # 01 - Capture
 
-Restate the idea in plain bullets and read the level it sits at.
+Restate the idea and pick what matters next.
+
+## Goal
+
+Start from the user's words without turning them into a solution.
 
 ## Input
 
 The user's idea, however vague, at any level.
 
-## Output
-
-The idea restated as short bullets, plus a read of its altitude, then a handoff to probing.
-
 ## Process
 
-1. **Restate.** Parse the idea into short, non-technical bullets. Capture what the user means, never commit a solution.
-2. **Read the altitude.** Note whether the idea is functional, technical, or mixed, and the grain the user is thinking at. This sets the level to probe at, never finer. See `@../references/probing.md`.
-3. **Open.** Hand to `02-probe` to begin the questioning.
+1. **Require.** If no idea is present, ask for one and wait.
+2. **Restate.** Capture the idea in short bullets, preserving uncertainty.
+3. **Scan.** Apply [interview depth](../references/interview-depth.md) and [discovery map](../references/discovery-map.md) silently.
+4. **Open.** Hand the highest-impact open point to probe.
+
+## Output
+
+The idea so far and first open point.
 
 ## Test
 
-- The output restates the idea as bullets, names its altitude, and commits no solution.
+- The first open point is known before probing.
+- With no idea, the action asks for one and stops.
+- User-facing text does not expose process labels.
+- No solution, plan, or code is committed.

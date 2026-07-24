@@ -40,9 +40,15 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `actions` | [02-probe.md](skills/01-brainstorm/actions/02-probe.md) | - |
 | `actions` | [03-integrate.md](skills/01-brainstorm/actions/03-integrate.md) | - |
 | `actions` | [04-finalize.md](skills/01-brainstorm/actions/04-finalize.md) | - |
-| `assets` | [question-angles.md](skills/01-brainstorm/assets/question-angles.md) | - |
+| `assets` | [discovery-brief.md](skills/01-brainstorm/assets/discovery-brief.md) | - |
+| `references` | [completion-options.md](skills/01-brainstorm/references/completion-options.md) | - |
+| `references` | [discovery-map.md](skills/01-brainstorm/references/discovery-map.md) | - |
+| `references` | [interview-depth.md](skills/01-brainstorm/references/interview-depth.md) | - |
+| `references` | [persistence.md](skills/01-brainstorm/references/persistence.md) | - |
 | `references` | [probing.md](skills/01-brainstorm/references/probing.md) | - |
-| `-` | [SKILL.md](skills/01-brainstorm/SKILL.md) | `Clarify a vague idea through deep questioning until it is precise enough to act on. Use when the user surfaces a half-formed idea or under-specified request, or asks to brainstorm or refine. Not for scanning an artifact for gaps or writing code.` |
+| `references` | [question-angles.md](skills/01-brainstorm/references/question-angles.md) | - |
+| `references` | [readiness.md](skills/01-brainstorm/references/readiness.md) | - |
+| `-` | [SKILL.md](skills/01-brainstorm/SKILL.md) | `Clarify a vague product or technical intent through natural discovery. Use when the user has a half-formed idea, ambiguous request, or asks to brainstorm, discover, refine, or clarify. Not for artifact gap scans, planning, or code.` |
 
 #### `skills/02-challenge`
 

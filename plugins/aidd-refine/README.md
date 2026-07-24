@@ -14,7 +14,7 @@ Five skills that refine inputs and outputs through reflection: clarify vague req
 
 | Bracket ID | Skill      | Description                                                                                                                                                                                   |
 | ---------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [5.1]      | [brainstorm](skills/01-brainstorm/SKILL.md) | Clarify a vague request through a bounded loop of targeted questions over six clarity dimensions, converging until the request is precise or the user is satisfied.                            |
+| [5.1]      | [brainstorm](skills/01-brainstorm/SKILL.md) | Clarify a vague product or technical intent through natural discovery, converging until the idea is precise enough to act on.                            |
 | [5.2]      | [challenge](skills/02-challenge/SKILL.md)  | Rethink prior work to verify correctness against an agreed plan, classifying findings with a confidence score.                                                                                |
 | [5.3]      | [condense](skills/03-condense/SKILL.md)   | Toggle terse output mode with intensity levels so prose drops fluff while code, errors, and warnings stay verbatim.                                                                           |
 | [5.4]      | [shadow-areas](skills/04-shadow-areas/SKILL.md) | Analytical scan of a written artifact for blind spots: each gap is classified by category and severity, paired with a direct-question probe.                                              |
