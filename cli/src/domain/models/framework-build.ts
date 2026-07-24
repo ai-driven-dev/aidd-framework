@@ -6,6 +6,33 @@ export type FrameworkBuildTarget = "claude" | "cursor" | "copilot" | "codex" | "
 /** Output layout discriminant: marketplace dist (Mode A) vs direct workspace inject (Mode B flat). */
 export type FrameworkBuildMode = "marketplace" | "flat";
 
+export interface FrameworkBuildTargetMode {
+  readonly target: FrameworkBuildTarget;
+  readonly mode: FrameworkBuildMode;
+}
+
+/**
+ * Every target/mode combination the build pipeline supports — the single source of truth
+ * for "which target:mode pairs exist". Infrastructure wiring (deps.ts's build registry)
+ * must not diverge from this list; commands read it here, not through infrastructure.
+ */
+export const FRAMEWORK_BUILD_TARGET_MODES: readonly FrameworkBuildTargetMode[] = [
+  { target: "claude", mode: "marketplace" },
+  { target: "claude", mode: "flat" },
+  { target: "cursor", mode: "marketplace" },
+  { target: "cursor", mode: "flat" },
+  { target: "copilot", mode: "marketplace" },
+  { target: "copilot", mode: "flat" },
+  { target: "codex", mode: "marketplace" },
+  { target: "codex", mode: "flat" },
+  { target: "opencode", mode: "flat" },
+];
+
+/** Every target with at least one supported build mode, derived from FRAMEWORK_BUILD_TARGET_MODES. */
+export const SUPPORTED_BUILD_TARGETS: readonly FrameworkBuildTarget[] = [
+  ...new Set(FRAMEWORK_BUILD_TARGET_MODES.map((entry) => entry.target)),
+];
+
 export interface FrameworkBuildOptions {
   readonly sourceDir: string;
   readonly outDir: string;
