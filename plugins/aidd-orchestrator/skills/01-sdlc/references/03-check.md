@@ -6,7 +6,7 @@ Review the candidate in a fresh context and route the verdict.
 ---
 title: Check independently
 ---
-flowchart TB
+flowchart LR
   CandidateSha[["$candidate_sha"]]
   Checker(["@aidd-dev:checker"])
   Review["/aidd-dev:05-review"]

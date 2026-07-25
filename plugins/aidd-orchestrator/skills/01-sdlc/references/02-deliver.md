@@ -6,7 +6,7 @@ Produce a validated candidate from the contract.
 ---
 title: Deliver the candidate
 ---
-flowchart TB
+flowchart LR
   Contract[["$contract"]]
   Sdlc["/aidd-orchestrator:01-sdlc"]
   Plan["/aidd-dev:01-plan"]

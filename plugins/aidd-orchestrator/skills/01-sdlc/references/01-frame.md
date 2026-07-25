@@ -6,7 +6,7 @@ Decide whether the source is ready for planning.
 ---
 title: Frame the delivery contract
 ---
-flowchart TB
+flowchart LR
   Source[["$source"]]
   Sdlc["/aidd-orchestrator:01-sdlc"]
   TicketDecision{"Ticket reference?"}
