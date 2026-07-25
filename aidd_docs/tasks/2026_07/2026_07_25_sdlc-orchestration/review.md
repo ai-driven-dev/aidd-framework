@@ -41,7 +41,7 @@
 ### Phase 5 — Keep the protocol autonomous and readable
 
 - [x] Make autonomy the default and define the narrow conditions that still require user authority — `plugins/aidd-orchestrator/skills/01-sdlc/SKILL.md:10`
-- [x] Keep the top-level router to Frame, Deliver, and Check without duplicating delegated gates — `plugins/aidd-orchestrator/skills/01-sdlc/SKILL.md:37`
+- [x] Keep the top-level router to Frame, Deliver, and Check without representing the already-invoked SDLC as a node — `plugins/aidd-orchestrator/skills/01-sdlc/SKILL.md:36`
 - [x] State the expected behavior before each routing diagram — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:3`
 - [x] Keep all four diagrams top-down, grouped by stage, and visually distinguish skills, agents, artifacts, and zones — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:13`
 - [x] Keep orchestration protocols in references rather than restoring an executable action tree — `docs/ARCHITECTURE.md:144`
