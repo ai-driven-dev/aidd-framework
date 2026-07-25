@@ -10,7 +10,7 @@ Commit the validated candidate through `/aidd-vcs:01-commit`. Run the required E
 ---
 title: Deliver the candidate
 ---
-flowchart LR
+flowchart TD
   subgraph Build["Build the candidate"]
     direction TB
     Contract["$contract"]

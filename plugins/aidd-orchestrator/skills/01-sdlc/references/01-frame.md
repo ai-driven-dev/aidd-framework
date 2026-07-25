@@ -8,21 +8,32 @@ Own contract readiness. Retrieve an attached ticket through `/aidd-pm:01-ticket-
 ---
 title: Frame the delivery contract
 ---
-flowchart LR
-  Source["$source"]
-  ChallengeFindings["$challenge_findings"]
-  Sdlc["/aidd-orchestrator:01-sdlc"]
-  TicketDecision{"Is a ticket attached?"}
-  Ticket["/aidd-pm:01-ticket-info"]
-  TicketArtifact["$ticket"]
-  ContractDecision{"Are the contract requirements fulfilled?"}
-  Contract["$contract"]
-  ScopeDecision{"Is the scope ambiguous?"}
-  Brainstorm["/aidd-refine:01-brainstorm"]
-  ClarifiedScope["$clarified_scope"]
-  Spec["/aidd-pm:04-spec"]
-  SpecArtifact["$spec"]
-  Deliver["02 Deliver"]
+flowchart TD
+  subgraph CollectStage["Collect the source"]
+    direction TB
+    Source["$source"]
+    ChallengeFindings["$challenge_findings"]
+    Sdlc["/aidd-orchestrator:01-sdlc"]
+    TicketDecision{"Is a ticket attached?"}
+    Ticket["/aidd-pm:01-ticket-info"]
+    TicketArtifact["$ticket"]
+  end
+
+  subgraph AssessStage["Assess the contract"]
+    direction TB
+    ContractDecision{"Are the contract requirements fulfilled?"}
+    Contract["$contract"]
+    Deliver["02 Deliver"]
+  end
+
+  subgraph ClarifyStage["Frame missing requirements"]
+    direction TB
+    ScopeDecision{"Is the scope ambiguous?"}
+    Brainstorm["/aidd-refine:01-brainstorm"]
+    ClarifiedScope["$clarified_scope"]
+    Spec["/aidd-pm:04-spec"]
+    SpecArtifact["$spec"]
+  end
 
   Source --> Sdlc
   ChallengeFindings -- "Use these findings when reframing." --> Sdlc

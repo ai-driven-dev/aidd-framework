@@ -10,7 +10,7 @@ Route need gaps to Frame and dispatch independent implementation findings throug
 ---
 title: Check and challenge independently
 ---
-flowchart LR
+flowchart TD
   subgraph ReviewStage["Review independently"]
     direction TB
     Contract["$contract"]

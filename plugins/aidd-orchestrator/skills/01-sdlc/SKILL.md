@@ -15,14 +15,25 @@ Keep planning in the orchestrator, implementation in `@aidd-dev:executor`, and i
 ---
 title: SDLC orchestration
 ---
-flowchart LR
-  Request["$request"]
-  Sdlc["/aidd-orchestrator:01-sdlc"]
-  Ready{"Are the contract requirements fulfilled?"}
-  Frame["01 Frame"]
-  Deliver["02 Deliver"]
-  Check["03 Check"]
-  PullRequest["$pull_request"]
+flowchart TD
+  subgraph FrameStage["01 Frame"]
+    direction TB
+    Request["$request"]
+    Sdlc["/aidd-orchestrator:01-sdlc"]
+    Ready{"Are the contract requirements fulfilled?"}
+    Frame["01 Frame"]
+  end
+
+  subgraph DeliverStage["02 Deliver"]
+    direction TB
+    Deliver["02 Deliver"]
+  end
+
+  subgraph CheckStage["03 Check"]
+    direction TB
+    Check["03 Check"]
+    PullRequest["$pull_request"]
+  end
 
   Request --> Sdlc
   Sdlc --> Ready
@@ -30,8 +41,6 @@ flowchart LR
   Ready -- "Yes, deliver it." --> Deliver
   Frame --> Deliver
   Deliver --> Check
-  Check -- "Reframe the contract." --> Frame
-  Check -- "Iterate on findings." --> Deliver
   Check -- "Ship the candidate." --> PullRequest
 
   classDef skill fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A,stroke-width:2px
