@@ -4,13 +4,19 @@
 
 Orchestration plugin for the AI-Driven Development framework.
 
-> Status: stable for use case `async-dev`; other use cases on the roadmap are experimental.
+> Status: stable for synchronous SDLC and `async-dev`.
 
-First time? Install with `/plugin install aidd-orchestrator@aidd-framework`, then run `aidd-orchestrator:00-async-dev` with `action=setup` (or just describe what you want; the router decides). New to the framework? See the [quick start](../../README.md#-quick-start).
+First time? Install with `/plugin install aidd-orchestrator@aidd-framework`, then run `aidd-orchestrator:01-sdlc`. For async automation, run `aidd-orchestrator:00-async-dev` with `action=setup`. New to the framework? See the [quick start](../../README.md#-quick-start).
 
 Composes capabilities into deterministic, auditable flows. Each skill is one orchestration brick; several use cases coexist inside the same plugin.
 
 ## Skills
+
+### Use case: `sdlc`
+
+| Bracket ID | Skill | Description |
+|------------|-------|-------------|
+| [6.1] | [sdlc](skills/01-sdlc/SKILL.md) | Synchronous code-shipping pipeline: spec, plan, implement, review, commit, PR. |
 
 ### Use case: `async-dev`
 

@@ -12,9 +12,10 @@ The plan path and its phase paths, plus the decisions you made and any you could
 
 ## Process
 
-1. **Author.** Run `aidd-dev:01-plan` end to end in your own context. You own the plan: it is the contract the executor may not rewrite, so you write it, never a worker. Never inline a raw ticket or spec as the plan body.
-2. **Capture.** Read the plan path, the phase paths, and the decisions the plan records.
-3. **Return.** Surface them for the next step.
+1. **Discover.** Find the phased implementation planning capability at runtime by description.
+2. **Author.** Run that capability end to end in your own context. You own the plan: it is the contract the executor may not rewrite, so you write it, never a worker. Never inline a raw ticket or spec as the plan body.
+3. **Capture.** Read the plan path, the phase paths, and the decisions the plan records.
+4. **Return.** Surface them for the next step.
 
 ## Test
 

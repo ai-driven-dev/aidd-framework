@@ -40,9 +40,9 @@ Skills are grouped into plugins by domain. Install only the plugins you need.
 | aidd-context      | Bootstrap, project init, generation of context artifacts (skills, agents, rules, commands, hooks, plugins, marketplaces), mermaid diagrams, learn, discovery | `02-project-memory`, `03-context-generate`, `09-mermaid`      |
 | aidd-refine       | Meta-cognition: brainstorm, challenge prior work, condensed communication mode     | `01-brainstorm`, `02-challenge`, `03-condense`              |
 | aidd-pm           | Product management: ticket info, user stories, Product Briefs, PRD, spec, spikes     | `01-ticket-info`, `02-user-stories`, `03-prd`, `04-spec`, `05-spike`, `06-product-brief` |
-| aidd-dev          | Code transformation: Dev SDLC orchestrator, plan, implement, assert, audit, review, test, refactor, debug, for-sure | `00-sdlc`, `01-plan`, `02-implement`, `05-review`, `06-test` |
+| aidd-dev          | Code transformation: plan, implement, assert, audit, review, test, refactor, debug, for-sure | `01-plan`, `02-implement`, `05-review`, `06-test` |
 | aidd-vcs          | VCS workflows: commit, pull/merge request, release tag, issue creation             | `01-commit`, `02-pull-request`, `04-issue-create`           |
-| aidd-orchestrator | Async orchestration of the SDLC on labeled issues (optional, extra)                | `00-async-dev` (router with setup / run / review sub-flows) |
+| aidd-orchestrator | Synchronous SDLC orchestration and optional async issue-to-PR automation | `00-async-dev`, `01-sdlc` |
 
 > See the [CATALOG](../docs/CATALOG.md) for the exhaustive list of skills and actions.
 
@@ -102,7 +102,8 @@ AIDD is delivered as a plugin marketplace. Pick what you need; do not install ev
 | ------------ | ------------------------------------------------------------------------------------------------------------------- |
 | aidd-context | 00-onboard, 01-bootstrap, 02-project-memory, 03-context-generate, 09-mermaid, 10-learn, 11-explore                    |
 | aidd-refine  | 01-brainstorm, 02-challenge, 03-condense, 04-shadow-areas, 05-fact-check                                            |
-| aidd-dev     | 00-sdlc, 01-plan, 02-implement, 03-assert, 04-audit, 05-review, 06-test, 07-refactor, 08-debug, 09-for-sure         |
+| aidd-dev     | 01-plan, 02-implement, 03-assert, 04-audit, 05-review, 06-test, 07-refactor, 08-debug, 09-for-sure, 10-todo       |
+| aidd-orchestrator | 00-async-dev, 01-sdlc                                                                                         |
 | aidd-vcs     | 01-commit, 02-pull-request, 03-release-tag, 04-issue-create                                                         |
 | aidd-pm      | 01-ticket-info, 02-user-stories, 03-prd, 04-spec, 05-spike, 06-product-brief                                      |
 
@@ -123,15 +124,13 @@ A typical change cycles through skills from several plugins. The order below is 
 9. **Ship**: `aidd-vcs:01-commit`, `aidd-vcs:02-pull-request`, then `aidd-vcs:03-release-tag` when the work is in production. File issues with `aidd-vcs:04-issue-create`.
 10. **Refactor and maintain**: `aidd-dev:07-refactor` for performance or security, `aidd-dev:04-audit` for technical-debt sweeps, `aidd-dev:08-debug` to reproduce and fix bugs.
 
-When you want the whole synchronous pipeline run in one go (spec, plan, implementation, finalize), invoke `aidd-dev:00-sdlc`.
+When you want the whole synchronous pipeline run in one go (spec, plan, implementation, finalize), invoke `aidd-orchestrator:01-sdlc`.
 
 ---
 
 ## Optional: Async Automation
 
-Beyond the synchronous path above, `aidd-orchestrator` runs the SDLC asynchronously on labeled issues (webhook or cron). This is extra: most projects do not need it. Use only when you want the AI to pick up `to-implement` issues without a human pressing a key.
-
-Inside the synchronous path, `aidd-dev:00-sdlc` is the Dev SDLC orchestrator that drives spec, plan, implementation, finalize in one go when you want the whole pipeline at once.
+Beyond the synchronous path above, `aidd-orchestrator:00-async-dev` runs the SDLC asynchronously on labeled issues (webhook or cron). This capability is optional. Use it only when you want the AI to pick up `to-implement` issues without a human pressing a key.
 
 ---
 

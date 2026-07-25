@@ -34,11 +34,10 @@ Bootstrap, project init, context-artifact generation, diagrams, learning, and ex
 
 ## 💻 aidd-dev
 
-The development SDLC: plan, implement, assert, audit, review, test, refactor, debug, for-sure, todo. Standalone Browser QA records short web evidence.
+Code transformation: plan, implement, assert, audit, review, test, refactor, debug, for-sure, todo. Standalone Browser QA records short web evidence.
 
 | Skill           | Role                                                                       | Actions                                                                         |
 | --------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `00-sdlc`       | Pure orchestrator driving the full dev flow end to end                     | `01-spec`, `02-plan`, `03-implement`, `04-review`, `05-ship`                     |
 | `01-plan`       | Turn a request, ticket, or file into a phased implementation plan: gather, explore, wireframe, plan | `01-gather`, `02-explore`, `03-wireframe`, `04-plan`          |
 | `02-implement`  | Execute a plan phase by phase until 100% complete                          | `01-implement`                                                                   |
 | `03-assert`     | Assert features work - general, architecture, frontend UI                  | `01-assert`, `02-assert-architecture`, `03-assert-frontend`                      |
@@ -90,11 +89,12 @@ Version-control workflows: repo init, commit, pull/merge request, release tag, i
 
 ## 🎼 aidd-orchestrator
 
-Optional. Runs the SDLC asynchronously on labeled issues (webhook or cron). Most projects do not need it.
+Runs synchronous feature delivery and optional async issue automation.
 
-| Skill            | Role                                                  | Sub-flows                 |
-| ---------------- | ----------------------------------------------------- | ------------------------- |
-| `00-async-dev`   | Single entry point for the async-dev pipeline         | `setup`, `run`, `review`  |
+| Skill            | Role                                                  | Actions / sub-flows                                      |
+| ---------------- | ----------------------------------------------------- | -------------------------------------------------------- |
+| `00-async-dev`   | Single entry point for the async-dev pipeline         | `setup`, `run`, `review`                                 |
+| `01-sdlc`        | Drive the full development flow end to end            | `01-spec`, `02-plan`, `03-implement`, `04-review`, `05-ship` |
 
 ## 🎨 aidd-ui
 

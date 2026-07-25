@@ -27,7 +27,7 @@ _(Already tested on `Legacy` codebases)_
 The **AI-Driven Dev Framework** installs a working SDLC (Software Development Life Cycle) into your AI coding tool — **skills, agents, commands, rules** — that turns a rough idea into a reviewed, shipped pull request:
 
 ```text
-/aidd-dev:00-sdlc "add rate limiting to the /login endpoint"
+/aidd-orchestrator:01-sdlc "add rate limiting to the /login endpoint"
 → spec → plan → implement → review → ship (commit + PR opened)
 ```
 
@@ -182,7 +182,7 @@ Three ways in — pick one:
 | --- | --- | --- |
 | 🧭 **Guided onboarding** | `/aidd-context:00-onboard` | First time, or unsure what to run — it inspects the project and routes you. |
 | 🧠 **Project memory** | `/aidd-context:02-project-memory` | Build the project memory bank by hand. |
-| ⚙️ **Feature flow** | `/aidd-dev:00-sdlc` | Ship a feature end to end (plan → implement → review → PR). |
+| ⚙️ **Feature flow** | `/aidd-orchestrator:01-sdlc` | Ship a feature end to end (plan → implement → review → PR). |
 
 The full loop, and how onboarding sets it up:
 
@@ -228,9 +228,9 @@ Project init, memory bank, context-artifact generation, diagrams, learning, expl
 
 ### ⚙️ [aidd-dev](plugins/aidd-dev/README.md)
 
-`12 skills` · stable
+`11 skills` · stable
 
-SDLC loop: plan, implement, assert, audit, review, test, refactor, debug. Standalone Browser QA records short web evidence.
+Code transformation: plan, implement, assert, audit, review, test, refactor, debug. Standalone Browser QA records short web evidence.
 
 </td>
 <td width="33%" valign="top">
@@ -266,9 +266,9 @@ Brainstorm, challenge, condense, shadow-areas, fact-check.
 
 ### 🎼 [aidd-orchestrator](plugins/aidd-orchestrator/README.md)
 
-`1 skill` · stable
+`2 skills` · stable
 
-Async dev: label an issue → get a PR.
+Synchronous feature flow and async issue-to-PR automation.
 
 </td>
 </tr>

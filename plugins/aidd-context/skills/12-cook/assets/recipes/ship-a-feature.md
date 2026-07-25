@@ -70,7 +70,7 @@ The pull-request step opens the PR.
 /aidd-vcs:02-pull-request
 ```
 
-> One command for the whole loop: `/aidd-dev:00-sdlc` runs plan → implement → review → ship.
+> One command for the whole loop: `/aidd-orchestrator:01-sdlc` runs plan → implement → review → ship.
 
 ## Verify
 

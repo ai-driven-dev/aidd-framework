@@ -24,4 +24,4 @@
 
 ## Run it
 
-`[1]` walk with me, step by step · `[2]` hand the whole flow to `aidd-dev:00-sdlc`
+`[1]` walk with me, step by step · `[2]` hand the whole flow to `aidd-orchestrator:01-sdlc`
