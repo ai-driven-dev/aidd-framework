@@ -1,29 +1,34 @@
-# 02 - Architecture audit
+# 02 - Architecture
 
-Read-only audit of the `architecture` pillar, conformance to documented architecture, module coupling, and layer or boundary violations. Reports findings, never edits code.
+Audit current boundaries, dependency direction, ownership, and decision quality. Read-only.
 
 ## Input
 
-An optional scope, a directory or file glob. Defaults to the entire codebase.
+Current architecture sources, memory, code structure, and the decision analysis from `11-decisions.md` when this pillar is composed.
 
 ## Output
 
-The `architecture` findings, written to `architecture.md` in the run's audit folder.
+`05-architecture-and-decisions.md`, following `../assets/audit-template.md` with a `## Decision register`.
+
+## Questions
+
+- Where does code diverge from an explicitly current boundary or dependency direction?
+- Which module owns unrelated responsibilities or leaks internal details?
+- Which choice solves one observed case but leaves the problem class intact?
+- Which consequential choice is inferred, weakly supported, or hard to reverse?
 
 ## Process
 
-1. **Scope.** Default to the full codebase when no scope is given. Otherwise restrict scanning to the provided glob or directory.
-2. **Scan.** Read the architecture documents already in context (`aidd_docs/memory`, ADRs, C4 diagrams). Stay in this pillar: intra-file craftsmanship belongs to `01-code-quality`, runtime cost to `05-performance`, CVEs to `04-dependencies`.
-   - **Conformance**: map the actual code structure against the documented modules, layers, and C4 boundaries. Flag any divergence from the stated architecture.
-   - **Coupling**: identify modules that import from layers they should not depend on, a wrong dependency direction or a circular reference across bounded contexts.
-   - **God-modules**: detect modules with an abnormally large surface area, too many exports or responsibilities, that signal architectural erosion.
-   - When ADRs or C4 diagrams are absent, note "no architecture docs found, conformance check skipped" in `Coverage > Skipped` and limit the scan to observable coupling heuristics.
-3. **Rate.** Give each finding a severity and an effort per the `@../assets/audit-template.md` legend, with a concrete `file:line`. The category is always `architecture`.
-4. **Write.** Fill `@../assets/audit-template.md` into the pillar file: the Findings table (one row per issue, severity-first), the ranked Top actions, and the Coverage section. In a full run, also add the rows to the merged `report.md` in the same folder. Emit the report and stop.
+1. Read the audit contract, question protocol, and Architecture and decisions pack.
+2. Use only explicitly current architecture records. Ignore old plans and historical task reports.
+3. Map observable modules, imports, public surfaces, data flow, and ownership.
+4. Compare declared intent with implementation. When no current declaration exists, audit observable coupling without inventing a desired architecture.
+5. Apply the generality gate and inspect contradictory evidence.
+6. Group symptoms by architectural cause and report at most five findings.
 
 ## Test
 
-- The output file exists at the reported path.
-- It has the `## Findings`, `## Top actions`, and `## Coverage` sections.
-- Every Findings row carries a severity, category `architecture`, a concrete `file:line`, and an effort.
-- Coverage lists `architecture` as scanned, and no code was changed.
+- Every conformance finding cites both intended boundary and implementation evidence.
+- Inferred intent is labelled and cannot produce a conformance finding by itself.
+- The decision register records provenance, confidence, generality, reversibility, and evidence.
+- `05-architecture-and-decisions.md` contains at most five root findings.

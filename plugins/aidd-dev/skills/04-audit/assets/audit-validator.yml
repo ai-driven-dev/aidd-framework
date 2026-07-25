@@ -1,0 +1,171 @@
+required_frontmatter:
+  - audit
+  - chapter
+  - status
+  - owner
+  - last_verified
+  - sources
+  - depends_on
+
+status_values:
+  - complete
+  - partial
+  - skipped
+  - stale
+
+document_sections:
+  summary:
+    required:
+      - Verdict
+      - Highest-leverage findings
+      - Highest-leverage actions
+      - Contents
+      - Boundaries
+  scope:
+    required:
+      - Target
+      - Normative sources
+      - Exclusions
+      - Budget
+      - Runtime policy
+      - Independence
+      - System map
+  pillar:
+    required:
+      - Verdict
+      - Findings
+      - Confirmed strengths
+      - Disputes
+      - Unknowns
+      - Coverage
+    optional:
+      - Rule control matrix
+      - Decision register
+      - Automation candidates
+  challenge:
+    required:
+      - Independence
+      - Decisions
+      - Rejected candidates
+      - Disputes
+      - Coverage
+  synthesis:
+    required:
+      - Root causes
+      - Isolated findings
+      - Rejected clusters
+  actions:
+    required:
+      - Action sequence
+      - Deferred
+      - Order rationale
+  coverage:
+    required:
+      - Scanned
+      - Skipped
+      - Unknowns
+      - Freshness
+      - Runtime and independence
+      - 80/20 boundary
+
+finding_required_fields:
+  - Priority
+  - Question
+  - Criterion
+  - Evidence kind
+  - Evidence
+  - Observation
+  - Interpretation
+  - Impact
+  - Likelihood
+  - Reach
+  - Confidence
+  - Reproduction
+  - Falsification
+  - Next action
+  - Effort
+  - Automation
+
+finding_field_values:
+  Priority:
+    - P0
+    - P1
+    - P2
+  Evidence kind:
+    - code
+    - configuration
+    - test
+    - command
+    - artifact
+    - runtime
+    - history
+    - normative
+  Likelihood:
+    - high
+    - medium
+    - low
+  Reach:
+    - local
+    - module
+    - system
+    - user-base
+  Confidence:
+    - high
+    - medium
+  Effort:
+    - S
+    - M
+    - L
+
+structured_sections:
+  Rule control matrix:
+    required_columns:
+      - Control ID
+      - Rule
+      - Source
+      - Scope
+      - Precedence
+      - Letter
+      - Spirit
+      - Status
+      - Evidence
+    status_values:
+      - pass
+      - partial
+      - fail
+      - unknown
+      - disputed
+  Decision register:
+    required_columns:
+      - Decision ID
+      - Choice
+      - Provenance
+      - Confidence
+      - Alternatives
+      - Assumptions
+      - Generality
+      - Reversibility
+      - Evidence
+      - Verdict
+  Automation candidates:
+    required_columns:
+      - Candidate ID
+      - Finding
+      - Recurrence
+      - Current cost
+      - Enforcement layer
+      - Leverage
+      - False-positive risk
+      - Maintenance cost
+      - Owner
+
+finding_limits:
+  default_maximum: 5
+  rules: all_active_rules
+
+forbidden:
+  - unsupported_finding
+  - cosmetic_nit
+  - historical_plan_as_normative_without_user_override
+  - general_e2e_without_critical_escalation
+  - application_source_edit

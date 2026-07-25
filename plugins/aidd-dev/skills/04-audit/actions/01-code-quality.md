@@ -1,28 +1,33 @@
-# 01 - Code-quality audit
+# 01 - Code hotspots
 
-Read-only audit of the `code-quality` pillar, clean-code craftsmanship and tech debt. Reports findings, never edits code.
+Find the few code structures that impose disproportionate correctness or change cost. Read-only.
 
 ## Input
 
-An optional scope, a directory or file glob. Defaults to the entire codebase.
+Target, optional scope, and resolved sources from `01-scope-and-system-map.md`.
 
 ## Output
 
-The `code-quality` findings, written to `code-quality.md` in the run's audit folder.
+`06-code-hotspots.md`, following `../assets/audit-template.md`.
+
+## Questions
+
+- Which files or functions are abnormal relative to project siblings in size, complexity, churn, dependencies, or responsibility?
+- Which duplicated paths, dead branches, vestigial flags, or swallowed errors create material risk?
+- Which abstraction makes a common change touch unrelated areas?
+- What feels clever rather than clear, and does evidence show a consequence?
 
 ## Process
 
-1. **Scope.** Default to the full codebase when no scope is given. Otherwise restrict scanning to the provided glob or directory.
-2. **Scan.** Cover the two lenses below, using the project's conventions and coding rules already in context. Stay in this pillar: coupling belongs to `02-architecture`, runtime cost to `05-performance`, coverage to `06-tests`, CVEs to `04-dependencies`.
-   - **Clean code**: naming clarity, single-responsibility and SOLID, DRY (copy-pasted logic, re-implemented stdlib helpers), readability, abstraction level, magic numbers, dead or misleading comments, code smells.
-   - **Tech debt**: dead and unreachable code, unused exports, types, and helpers, stale TODOs, vestigial flags, cyclomatic complexity and file, function, or component length above project thresholds, nesting depth, error handling caught at the wrong boundary or silently swallowed.
-   - Use a dedicated tool when available, for example an unused-export finder. Never assert dead code without evidence.
-3. **Rate.** Give each finding a severity and an effort per the `@../assets/audit-template.md` legend, with a concrete `file:line`. The category is always `code-quality`.
-4. **Write.** Fill `@../assets/audit-template.md` into the pillar file: the Findings table (one row per issue, severity-first), the ranked Top actions, and the Coverage section. In a full run, also add the rows to the merged `report.md` in the same folder. Emit the report and stop.
+1. Read `../references/audit-contract.md`, `../references/question-protocol.md`, and the Code hotspots pack in `../references/question-packs.md`.
+2. Build a cheap hotspot map with repository search and available static tools. Prefer relative outliers over universal line-count thresholds.
+3. Inspect call sites, imports, error paths, and current change surfaces for the strongest leads.
+4. Falsify each lead: a large generated table or cohesive module is not a finding merely because it is large.
+5. Report at most five verified root problems. Architecture coupling belongs to `02`; runtime cost belongs to `05`.
 
 ## Test
 
-- The output file exists at the reported path.
-- It has the `## Findings`, `## Top actions`, and `## Coverage` sections.
-- Every Findings row carries a severity, category `code-quality`, a concrete `file:line`, and an effort.
-- Coverage lists `code-quality` as scanned, and no code was changed.
+- Every finding proves a material consequence beyond file size or personal style.
+- No dead code is asserted without call-site or tooling evidence.
+- `06-code-hotspots.md` has the required sections and at most five findings.
+- Application files are unchanged.

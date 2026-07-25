@@ -87,15 +87,29 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 
 | Group | File | Description |
 |-------|------|---|
+| `actions` | [00-core.md](skills/04-audit/actions/00-core.md) | - |
 | `actions` | [01-code-quality.md](skills/04-audit/actions/01-code-quality.md) | - |
 | `actions` | [02-architecture.md](skills/04-audit/actions/02-architecture.md) | - |
 | `actions` | [03-security.md](skills/04-audit/actions/03-security.md) | - |
-| `actions` | [04-dependencies.md](skills/04-audit/actions/04-dependencies.md) | - |
 | `actions` | [05-performance.md](skills/04-audit/actions/05-performance.md) | - |
 | `actions` | [06-tests.md](skills/04-audit/actions/06-tests.md) | - |
-| `actions` | [07-ui.md](skills/04-audit/actions/07-ui.md) | - |
-| `assets` | [audit-template.md](skills/04-audit/assets/audit-template.md) | `Codebase audit report template` |
-| `-` | [SKILL.md](skills/04-audit/SKILL.md) | `Audit a codebase read-only across seven quality pillars into one ranked report. Use when the user wants to assess, health-check, or audit a codebase or one pillar. Not for fixing findings, reviewing a change, or checking a feature works.` |
+| `actions` | [08-north-star.md](skills/04-audit/actions/08-north-star.md) | - |
+| `actions` | [09-rules-and-principles.md](skills/04-audit/actions/09-rules-and-principles.md) | - |
+| `actions` | [10-memory-and-documentation.md](skills/04-audit/actions/10-memory-and-documentation.md) | - |
+| `actions` | [11-decisions.md](skills/04-audit/actions/11-decisions.md) | - |
+| `actions` | [12-automation.md](skills/04-audit/actions/12-automation.md) | - |
+| `assets` | [audit-actions-template.md](skills/04-audit/assets/audit-actions-template.md) | - |
+| `assets` | [audit-challenge-template.md](skills/04-audit/assets/audit-challenge-template.md) | - |
+| `assets` | [audit-coverage-template.md](skills/04-audit/assets/audit-coverage-template.md) | - |
+| `assets` | [audit-index-template.md](skills/04-audit/assets/audit-index-template.md) | - |
+| `assets` | [audit-scope-template.md](skills/04-audit/assets/audit-scope-template.md) | - |
+| `assets` | [audit-synthesis-template.md](skills/04-audit/assets/audit-synthesis-template.md) | - |
+| `assets` | [audit-template.md](skills/04-audit/assets/audit-template.md) | - |
+| `references` | [audit-contract.md](skills/04-audit/references/audit-contract.md) | `Runtime inputs, source policy, invariants, and completion rules for question-led audits.` |
+| `references` | [question-packs.md](skills/04-audit/references/question-packs.md) | `High-leverage questions and evidence targets for the nine core audit pillars.` |
+| `references` | [question-protocol.md](skills/04-audit/references/question-protocol.md) | `Converts introspective audit questions into falsifiable, evidence-gated conclusions.` |
+| `references` | [report-contract.md](skills/04-audit/references/report-contract.md) | `Ordered audit folder, chapter ownership, finding identity, freshness, and synthesis rules.` |
+| `-` | [SKILL.md](skills/04-audit/SKILL.md) | `Audit current code through a nine-pillar 80/20 core covering North Stars, active rules, memory, architecture and decisions, code hotspots, test value, security, performance, and automation. Use for a broad codebase health-check or one named core pillar. Question-led, static-first, read-only, and evidence-gated.` |
 
 #### `skills/05-review`
 

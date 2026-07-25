@@ -18,7 +18,7 @@ Covers the full SDLC coding loop: orchestrator, planning, implementation, assert
 | [2.1] | [plan](skills/01-plan/SKILL.md) | Turn a request, ticket, or file into a phased implementation plan, gathering the source first and optionally wireframing a screen before planning. |
 | [2.2] | [implement](skills/02-implement/SKILL.md) | Execute an implementation plan phase by phase, recipe-style, iterating until 100% completeness. |
 | [2.3] | [assert](skills/03-assert/SKILL.md) | Assert features work as intended - general assertions, architecture conformance, and frontend UI validation. |
-| [2.4] | [audit](skills/04-audit/SKILL.md) | Perform deep codebase analysis to identify technical debt, dead code, and improvement opportunities. |
+| [2.4] | [audit](skills/04-audit/SKILL.md) | Run a question-led, static-first nine-pillar core audit of current code against North Stars, active rules, memory, architectural decisions, test value, and high-leverage risks. |
 | [2.5] | [review](skills/05-review/SKILL.md) | Review a diff along three axes: code quality, feature behavior against the plan, and relevancy (fit to the need, declared-rule conformance, no rot). |
 | [2.6] | [test](skills/06-test/SKILL.md) | Write and iterate on tests until they pass, and validate user journeys end-to-end in the browser. |
 | [2.7] | [refactor](skills/07-refactor/SKILL.md) | Optimize code for performance and fix security vulnerabilities following OWASP guidelines. |

@@ -1,31 +1,37 @@
-# 06 - Tests audit
+# 06 - Test value
 
-Read-only audit of the `tests` pillar, coverage gaps, test quality, and suite health. Reports findings, never edits code.
+Audit whether tests protect meaningful risks at a proportionate cost. Coverage percentage is not the goal. Read-only.
 
 ## Input
 
-An optional scope, a directory or file glob. Defaults to the entire codebase.
+Test code, production behavior, fixtures, mocks, test configuration, CI history, and existing coverage or timing artifacts.
 
 ## Output
 
-The `tests` findings, written to `tests.md` in the run's audit folder.
+`07-tests-value.md`, following `../assets/audit-template.md`.
+
+## Questions
+
+- Which user or system risk does each important test group protect?
+- What plausible regression would make it fail?
+- Which tests can stay green while the claimed behavior is broken?
+- Which tests duplicate cheaper protection or cost more than their unique signal?
+- Which critical behavior has no effective witness?
 
 ## Process
 
-1. **Scope.** Default to the full codebase when no scope is given. Otherwise restrict scanning to the provided glob or directory.
-2. **Scan.** Prefer a coverage report when available. Stay in this pillar: whether a feature behaves correctly is a separate concern, runtime cost belongs to `05-performance`.
-   - **Critical-path coverage gaps**: identify code paths (auth flows, data mutations, error handling) with no test. Use a coverage report when available, degrade to static inspection of test-file presence when absent.
-   - **Tests asserting implementation, not behavior**: flag tests coupled to internal method names, private state, or implementation details rather than observable outputs.
-   - **Flaky tests**: flag tests that use arbitrary `sleep` calls, rely on timing, or have known intermittent failures recorded in CI history or inline comments.
-   - **Skipped tests without a reason**: flag `skip`, `xit`, `xfail`, `.todo`, or equivalent markers that lack an explanatory comment or issue reference.
-   - **Test pyramid imbalance**: flag suites with disproportionately many end-to-end or integration tests and few unit tests, raising maintenance cost and slowing feedback.
-   - When no coverage tool is available, record "no coverage tool, static inspection only" in `Coverage > Skipped` and limit findings to structurally observable issues. Do not invent coverage numbers.
-3. **Rate.** Give each finding a severity and an effort per the `@../assets/audit-template.md` legend, with a concrete `file:line`. The category is always `tests`.
-4. **Write.** Fill `@../assets/audit-template.md` into the pillar file: the Findings table (one row per issue, severity-first), the ranked Top actions, and the Coverage section. In a full run, also add the rows to the merged `report.md` in the same folder. Emit the report and stop.
+1. Read the audit contract, question protocol, and Test value pack.
+2. Start from critical code paths and risks, then map the tests that claim to protect them.
+3. Inspect assertions, mocks, fixtures, timing dependencies, skips, snapshots, and overlap. Do not classify from filenames alone.
+4. Classify material groups as `protective`, `redundant`, `brittle`, `ceremonial`, or `misleading`.
+5. Compare signal with runtime, flake, fixture complexity, duplication, and maintenance cost.
+6. Recommend `delete` only when no distinct protected risk remains beyond a cheaper test. Otherwise prefer `keep`, `rewrite`, `merge`, or `unknown`.
+7. Do not run E2E. Use existing CI, coverage, timing, and flake evidence; do not generate new coverage by default.
+8. Report at most five highest-leverage findings.
 
 ## Test
 
-- The output file exists at the reported path.
-- It has the `## Findings`, `## Top actions`, and `## Coverage` sections.
-- Every Findings row carries a severity, category `tests`, a concrete `file:line`, and an effort.
-- Coverage lists `tests` as scanned, and no code was changed.
+- Every finding names protected risk, plausible regression, signal failure, and cost.
+- Coverage percentage alone never produces a finding.
+- A delete recommendation proves the absence of unique protection.
+- Critical untested behavior cites the production path and missing effective witness.

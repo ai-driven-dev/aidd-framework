@@ -1,32 +1,35 @@
-# 03 - Security audit
+# 03 - Security and data
 
-Read-only audit of the `security` pillar, OWASP top risks and code-level security weaknesses. Reports findings, never edits code.
+Find material trust-boundary, authorization, privacy, and data-integrity failures. Read-only.
 
 ## Input
 
-An optional scope, a directory or file glob. Defaults to the entire codebase.
+Target code, configuration, schemas, persistence paths, manifests, lockfiles, existing scanner output, and declared trust assumptions.
 
 ## Output
 
-The `security` findings, written to `security.md` in the run's audit folder.
+`08-security-and-data.md`, following `../assets/audit-template.md`.
+
+## Questions
+
+- Where does untrusted data cross a boundary without validation, sanitisation, or authorization?
+- Which path can disclose, corrupt, overwrite, or silently lose data?
+- Which security property exists only by convention?
+- Which default broadens access or weakens isolation?
+- Which direct dependency creates a material, evidenced trust or supply-chain risk?
 
 ## Process
 
-1. **Scope.** Default to the full codebase when no scope is given. Otherwise restrict scanning to the provided glob or directory.
-2. **Scan.** Use static code analysis. Stay in this pillar: known-CVE and vulnerable-dependency findings belong to `04-dependencies`, coupling to `02-architecture`.
-   - **Input validation at trust boundaries**: check that every external input (HTTP requests, env vars, file paths, user-supplied data) is validated or sanitised before use.
-   - **Authn/authz gates**: verify authentication and authorisation checks are enforced consistently at every protected route or operation.
-   - **Secrets in code**: flag hardcoded credentials, API keys, tokens, or passwords anywhere in the scanned files.
-   - **Injection risks**: SQL, command, XSS, LDAP, or template injection. Identify concatenated or unescaped values passed to interpreters.
-   - **Unsafe deserialization**: flag `eval`, unsafe YAML/pickle/JSON reviver patterns, or object deserialization from untrusted sources.
-   - **Insecure defaults**: missing TLS enforcement, overly permissive CORS, disabled security headers, debug flags left on in non-dev code.
-   - Use a static-analysis tool when available. Flag only findings supported by code evidence, never inferred from naming alone.
-3. **Rate.** Give each finding a severity and an effort per the `@../assets/audit-template.md` legend, with a concrete `file:line`. The category is always `security`.
-4. **Write.** Fill `@../assets/audit-template.md` into the pillar file: the Findings table (one row per issue, severity-first), the ranked Top actions, and the Coverage section. In a full run, also add the rows to the merged `report.md` in the same folder. Emit the report and stop.
+1. Read the audit contract, question protocol, and Security and data pack.
+2. Trace external inputs through validation, authorization, persistence, serialization, and output.
+3. Inspect secrets, injection sinks, unsafe deserialization, CORS/TLS/security defaults, and destructive operations where relevant.
+4. Use existing static-security or dependency-scanner output when available. Do not perform a general dependency inventory or guess current CVEs, versions, provenance, or licences.
+5. Attempt to falsify exploitability and impact. Names or theoretical patterns alone remain unknown.
+6. Report at most five highest-risk findings.
 
 ## Test
 
-- The output file exists at the reported path.
-- It has the `## Findings`, `## Top actions`, and `## Coverage` sections.
-- Every Findings row carries a severity, category `security`, a concrete `file:line`, and an effort.
-- Coverage lists `security` as scanned, and no code was changed.
+- Every finding names the trust boundary, evidence, plausible consequence, and contradictory evidence checked.
+- No secret value is copied into the report; cite only its location and kind.
+- Dependency findings cite authoritative current evidence and a material affected path.
+- Application files are unchanged.
