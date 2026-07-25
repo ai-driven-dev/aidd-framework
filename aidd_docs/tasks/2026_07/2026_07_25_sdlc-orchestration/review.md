@@ -43,7 +43,7 @@
 - [x] Make autonomy the default and define the narrow conditions that still require user authority — `plugins/aidd-orchestrator/skills/01-sdlc/SKILL.md:10`
 - [x] Continue until validation, independent review, challenge, clean branch, and draft PR gates all hold — `plugins/aidd-orchestrator/skills/01-sdlc/SKILL.md:12`
 - [x] State behavioral invariants before each diagram without repeating the routing below it — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:3`
-- [x] Keep all four diagrams LR, grouped by stage, and visually distinguish skills, agents, artifacts, decisions, and zones — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:13`
+- [x] Keep all four diagrams top-down, grouped by stage, and visually distinguish skills, agents, artifacts, decisions, and zones — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:13`
 - [x] Document orchestrator-authorized bounded Todo fan-out without permitting agent delegation chains — `docs/ARCHITECTURE.md:155`
 - [x] Describe specification as conditional and expose the challenge gate in public documentation — `README.md:37`
 
