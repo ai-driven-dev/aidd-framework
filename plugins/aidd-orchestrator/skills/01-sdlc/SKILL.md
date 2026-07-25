@@ -1,6 +1,6 @@
 ---
 name: 01-sdlc
-description: Orchestrates a request from framing to a draft pull request, isolating implementation and review in specialized agents. Use when the user wants to deliver a change end to end. Not for running a single development step.
+description: Autonomously orchestrates a request from framing to a draft pull request, isolating implementation, independent review, and final outcome challenge. Use when the user wants to deliver a change end to end. Not for running one development step.
 ---
 
 # Skill: sdlc
@@ -24,6 +24,7 @@ flowchart LR
   Ready -- "Yes, deliver it." --> Deliver
   Frame --> Deliver
   Deliver --> Check
+  Check -- "Reframe the contract." --> Frame
   Check -- "Iterate on findings." --> Deliver
   Check -- "Ship the candidate." --> PullRequest
 
@@ -52,6 +53,8 @@ Read only the current zone's reference before delegating it.
 
 - Own routing and verify every handoff against the current reference.
 - Treat the canonical plugin addresses in the references as the responsibility map. Verify that each named provider is installed before calling it.
+- Work autonomously by default. Make every reversible in-scope decision without asking; ask only when product authority is missing or an external action requires approval.
+- Decide in this order: contract and acceptance criteria, project rules, correctness and security, simplicity, then speed.
 - Run planning in the orchestrator context. Isolate implementation in `executor` and independent review in `checker`.
-- Mode: default `interactive`, pausing for approval at each step; switch to `auto` only when the caller says so, then decide alone and never ask.
-- Stop on `blocked`. Loop `check → deliver` on `iterate`.
+- Continue until the branch is clean, every applicable validation is green, the current SHA has passed independent review and the confidence challenge, and a draft pull request exists.
+- Stop on `blocked` only after exhausting safe in-scope alternatives. Route contract gaps to `frame` and implementation gaps to `deliver`.

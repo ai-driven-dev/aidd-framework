@@ -8,6 +8,7 @@ title: Frame the delivery contract
 ---
 flowchart LR
   Source["$source"]
+  ChallengeFindings["$challenge_findings"]
   Sdlc["/aidd-orchestrator:01-sdlc"]
   TicketDecision{"Is a ticket attached?"}
   Ticket["/aidd-pm:01-ticket-info"]
@@ -22,6 +23,7 @@ flowchart LR
   Deliver["02 Deliver"]
 
   Source --> Sdlc
+  ChallengeFindings -- "Use these findings when reframing." --> Sdlc
   Sdlc --> TicketDecision
   TicketDecision -- "Yes, retrieve it." --> Ticket
   Ticket --> TicketArtifact
@@ -43,11 +45,12 @@ flowchart LR
   classDef zone fill:#F1F5F9,stroke:#64748B,color:#0F172A,stroke-width:2px
 
   class Sdlc,Ticket,Brainstorm,Spec skill
-  class Source,TicketArtifact,Contract,ClarifiedScope,SpecArtifact artifact
+  class Source,ChallengeFindings,TicketArtifact,Contract,ClarifiedScope,SpecArtifact artifact
   class TicketDecision,ContractDecision,ScopeDecision decision
   class Deliver zone
 ```
 
 - `/aidd-orchestrator:01-sdlc` owns the readiness decision.
 - A ready contract has an explicit objective and observable acceptance criteria.
+- When the confidence challenge exposes a need gap, use `$challenge_findings` to refine the contract before planning again.
 - Return `$contract` or `$spec` to `02-deliver`.

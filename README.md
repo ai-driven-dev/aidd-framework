@@ -28,7 +28,7 @@ The **AI-Driven Dev Framework** installs a working SDLC (Software Development Li
 
 ```text
 /aidd-orchestrator:01-sdlc "add rate limiting to the /login endpoint"
-→ spec → plan → implement → review → ship (commit + PR opened)
+→ frame when needed → plan → implement → validate → review → challenge → ship
 ```
 
 Why not just write your own commands? → [FAQ](docs/FAQ.md#-why-aidd-instead-of-your-own-skills).
@@ -182,7 +182,7 @@ Three ways in — pick one:
 | --- | --- | --- |
 | 🧭 **Guided onboarding** | `/aidd-context:00-onboard` | First time, or unsure what to run — it inspects the project and routes you. |
 | 🧠 **Project memory** | `/aidd-context:02-project-memory` | Build the project memory bank by hand. |
-| ⚙️ **Feature flow** | `/aidd-orchestrator:01-sdlc` | Ship a feature end to end (plan → implement → review → PR). |
+| ⚙️ **Feature flow** | `/aidd-orchestrator:01-sdlc` | Autonomously ship a feature end to end (frame → deliver → check → PR). |
 
 The full loop, and how onboarding sets it up:
 

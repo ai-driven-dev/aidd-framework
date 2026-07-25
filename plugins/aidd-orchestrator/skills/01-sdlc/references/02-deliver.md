@@ -7,25 +7,37 @@ Produce a validated candidate from the contract.
 title: Deliver the candidate
 ---
 flowchart LR
-  Contract["$contract"]
-  Sdlc["/aidd-orchestrator:01-sdlc"]
-  Plan["/aidd-dev:01-plan"]
-  PlanArtifact["$plan"]
-  Executor(["@aidd-dev:executor"])
-  Implement["/aidd-dev:02-implement"]
-  Candidate["$candidate"]
-  AssertCode["/aidd-dev:03-assert"]
-  AssertReport["$assert_report"]
-  ArchitectureDecision{"Is architecture documentation available?"}
-  AssertArchitecture["/aidd-dev:03-assert"]
-  ArchitectureReport["$architecture_report"]
-  CommitDecision{"Are there uncommitted changes?"}
-  Commit["/aidd-vcs:01-commit"]
-  CommitSha["$commit_sha"]
-  JourneyDecision{"Is an end-to-end user journey required?"}
-  Test["/aidd-dev:06-test"]
-  JourneyReport["$journey_report"]
-  CandidateSha["$candidate_sha"]
+  subgraph Build["Build the candidate"]
+    direction TB
+    Contract["$contract"]
+    Sdlc["/aidd-orchestrator:01-sdlc"]
+    Plan["/aidd-dev:01-plan"]
+    PlanArtifact["$plan"]
+    Executor(["@aidd-dev:executor"])
+    Implement["/aidd-dev:02-implement"]
+    Candidate["$candidate"]
+  end
+
+  subgraph Validate["Validate the candidate"]
+    direction TB
+    AssertCode["/aidd-dev:03-assert"]
+    AssertionsPassed{"Did all assertions pass?"}
+    ArchitectureDecision{"Is architecture documentation available?"}
+    AssertArchitecture["/aidd-dev:03-assert"]
+    ArchitecturePassed{"Does the candidate conform to the documented architecture?"}
+  end
+
+  subgraph Finalize["Finalize the candidate"]
+    direction TB
+    CommitDecision{"Are there uncommitted changes?"}
+    Commit["/aidd-vcs:01-commit"]
+    JourneyDecision{"Is an end-to-end user journey required?"}
+    Test["/aidd-dev:06-test"]
+    JourneyPassed{"Did the end-to-end user journey pass?"}
+    CandidateSha["$candidate_sha"]
+  end
+
+  Repair["02 Deliver"]
   Check["03 Check"]
 
   Contract --> Sdlc
@@ -35,19 +47,21 @@ flowchart LR
   Executor --> Implement
   Implement --> Candidate
   Candidate -- "Run the assertions." --> AssertCode
-  AssertCode --> AssertReport
-  AssertReport --> ArchitectureDecision
+  AssertCode --> AssertionsPassed
+  AssertionsPassed -- "No, repair and validate the candidate again." --> Repair
+  AssertionsPassed -- "Yes, continue." --> ArchitectureDecision
   ArchitectureDecision -- "Yes, run assert-architecture." --> AssertArchitecture
-  AssertArchitecture --> ArchitectureReport
-  ArchitectureReport --> CommitDecision
+  AssertArchitecture --> ArchitecturePassed
+  ArchitecturePassed -- "No, repair and validate the candidate again." --> Repair
+  ArchitecturePassed -- "Yes, continue." --> CommitDecision
   ArchitectureDecision -- "No, continue." --> CommitDecision
   CommitDecision -- "Yes, commit the candidate." --> Commit
-  Commit --> CommitSha
-  CommitSha --> JourneyDecision
+  Commit --> JourneyDecision
   CommitDecision -- "No, continue." --> JourneyDecision
   JourneyDecision -- "Yes, run test-journey." --> Test
-  Test --> JourneyReport
-  JourneyReport --> CandidateSha
+  Test --> JourneyPassed
+  JourneyPassed -- "No, repair and validate the candidate again." --> Repair
+  JourneyPassed -- "Yes, continue." --> CandidateSha
   JourneyDecision -- "No, continue." --> CandidateSha
   CandidateSha --> Check
 
@@ -59,13 +73,14 @@ flowchart LR
 
   class Sdlc,Plan,Implement,AssertCode,AssertArchitecture,Commit,Test skill
   class Executor agent
-  class Contract,PlanArtifact,Candidate,AssertReport,ArchitectureReport,CommitSha,JourneyReport,CandidateSha artifact
-  class ArchitectureDecision,CommitDecision,JourneyDecision decision
-  class Check zone
+  class Contract,PlanArtifact,Candidate,CandidateSha artifact
+  class AssertionsPassed,ArchitectureDecision,ArchitecturePassed,CommitDecision,JourneyDecision,JourneyPassed decision
+  class Repair,Check zone
 ```
 
 - `/aidd-orchestrator:01-sdlc` owns `$plan`; `@aidd-dev:executor` never rewrites it.
 - `@aidd-dev:executor` implements and self-validates. It does not perform the independent review.
 - `@aidd-dev:executor` runs `assert-architecture` through `/aidd-dev:03-assert` when architecture documentation applies.
-- Run E2E only after implementation, assertions, and commits are complete. A failure re-enters delivery before one final E2E run.
+- Any failed assertion, architecture check, or E2E journey returns to `@aidd-dev:executor`, then every applicable gate runs again.
+- Run E2E only after implementation, assertions, and commits are complete.
 - Return only a clean candidate with green validation to `03-check`.
