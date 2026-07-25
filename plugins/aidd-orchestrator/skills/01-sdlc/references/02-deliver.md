@@ -1,6 +1,10 @@
 # 02 - Deliver
 
-Produce a validated candidate from the contract.
+## Behavior
+
+Own the plan in `/aidd-orchestrator:01-sdlc` and delegate implementation to `@aidd-dev:executor`. The executor never rewrites the plan. Require the executor to implement and self-validate without performing the independent review. Run coding assertions, then architecture assertions through `/aidd-dev:03-assert` when architecture documentation applies. A failed assertion, architecture check, or E2E journey re-enters Deliver and reruns every applicable gate.
+
+Commit the validated candidate through `/aidd-vcs:01-commit`. Run the required E2E journey through `/aidd-dev:06-test` as the final delivery gate. Send only a clean candidate with green validation to Check.
 
 ```mermaid
 ---
@@ -77,10 +81,3 @@ flowchart LR
   class AssertionsPassed,ArchitectureDecision,ArchitecturePassed,CommitDecision,JourneyDecision,JourneyPassed decision
   class Repair,Check zone
 ```
-
-- `/aidd-orchestrator:01-sdlc` owns `$plan`; `@aidd-dev:executor` never rewrites it.
-- `@aidd-dev:executor` implements and self-validates. It does not perform the independent review.
-- `@aidd-dev:executor` runs `assert-architecture` through `/aidd-dev:03-assert` when architecture documentation applies.
-- Any failed assertion, architecture check, or E2E journey returns to `@aidd-dev:executor`, then every applicable gate runs again.
-- Run E2E only after implementation, assertions, and commits are complete.
-- Return only a clean candidate with green validation to `03-check`.

@@ -1,6 +1,8 @@
 # 01 - Frame
 
-Decide whether the source is ready for planning.
+## Behavior
+
+Own contract readiness. Retrieve an attached ticket through `/aidd-pm:01-ticket-info` before deciding whether the source has an explicit objective and observable acceptance criteria. Send a planning-ready contract directly to Deliver without requiring a specification. When the scope is ambiguous, run `/aidd-refine:01-brainstorm` before `/aidd-pm:04-spec`. Use challenge findings to repair a need gap before planning again.
 
 ```mermaid
 ---
@@ -49,8 +51,3 @@ flowchart LR
   class TicketDecision,ContractDecision,ScopeDecision decision
   class Deliver zone
 ```
-
-- `/aidd-orchestrator:01-sdlc` owns the readiness decision.
-- A ready contract has an explicit objective and observable acceptance criteria.
-- When the confidence challenge exposes a need gap, use `$challenge_findings` to refine the contract before planning again.
-- Return `$contract` or `$spec` to `02-deliver`.

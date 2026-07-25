@@ -1,6 +1,10 @@
 # 03 - Check
 
-Review the candidate, challenge the real outcome in a fresh context, and route the verdict.
+## Behavior
+
+Give a fresh `@aidd-dev:checker` the contract, plan, candidate SHA, and every validation report for `/aidd-dev:05-review`. After a green review, use a second fresh checker to run `/aidd-refine:02-challenge` and answer the three confidence questions from evidence. Both checker contexts remain read-only and never implement fixes. Treat `No` and `Uncertain` identically.
+
+Route need gaps to Frame and dispatch independent implementation findings through `/aidd-dev:10-todo`, one `@aidd-dev:executor` per finding. Re-enter Deliver to integrate, validate, commit, and run the final E2E gate. Open the draft pull request only after verifying that the reviewed SHA is still current.
 
 ```mermaid
 ---
@@ -91,12 +95,3 @@ flowchart LR
   class ReviewVerdict,Proud,Confident,Satisfied,ContractGap,CurrentSha decision
   class Frame,Deliver,Check zone
 ```
-
-- Give the review checker `$contract`, `$plan`, `$candidate_sha`, and every applicable validation report.
-- The review checker and confidence checker are fresh and read-only; neither participated in implementation.
-- Any blocking review finding returns `iterate`.
-- After a green review, the confidence checker runs `/aidd-refine:02-challenge` against all evidence and answers the three questions independently.
-- Every answer requires evidence. `No` or `Uncertain` returns `$challenge_findings`; need gaps go to `01-frame`, other gaps go through Todo to `02-deliver`.
-- Dispatch only independent findings through `/aidd-dev:10-todo`, one `@aidd-dev:executor` per finding in parallel.
-- Re-enter `02-deliver` to integrate, validate, commit, and run the final E2E gate.
-- Only `/aidd-orchestrator:01-sdlc` calls `/aidd-vcs:02-pull-request` after verifying the reviewed SHA.
