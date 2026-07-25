@@ -16,36 +16,37 @@
 
 ### Phase 2 — Frame the contract
 
-- [x] Retrieve an attached ticket before evaluating readiness — `plugins/aidd-orchestrator/skills/01-sdlc/references/01-frame.md:29`
-- [x] Skip specification when the source already has an objective and observable acceptance criteria — `plugins/aidd-orchestrator/skills/01-sdlc/references/01-frame.md:34`
-- [x] Use canonical brainstorm and spec providers only when framing is required — `plugins/aidd-orchestrator/skills/01-sdlc/references/01-frame.md:36`
+- [x] Enter Frame with `$source` only and resolve a referenced ticket as part of that source — `plugins/aidd-orchestrator/skills/01-sdlc/references/01-frame.md:5`
+- [x] Send a planning-ready source directly to Deliver without mandatory framing work — `plugins/aidd-orchestrator/skills/01-sdlc/references/01-frame.md:36`
+- [x] Call canonical brainstorm and spec providers only for the missing behavior they own — `plugins/aidd-orchestrator/skills/01-sdlc/references/01-frame.md:37`
 
 ### Phase 3 — Deliver the candidate
 
-- [x] Produce a self-contained human-readable plan and delegate implementation to `@aidd-dev:executor` — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:5`
-- [x] Route failed coding assertions back through delivery — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:55`
-- [x] Run architecture assertions through `/aidd-dev:03-assert` when architecture documentation applies — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:57`
-- [x] Commit the validated candidate through `/aidd-vcs:01-commit` — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:62`
-- [x] Run the required E2E journey last and reject a failing journey — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:65`
+- [x] Produce a proportional plan autonomously and delegate it to one `@aidd-dev:executor` — `plugins/aidd-dev/skills/01-plan/actions/04-plan.md:19`
+- [x] Let implementation and assertion skills own their validation and repair loops — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:5`
+- [x] Include architecture conformance through `/aidd-dev:03-assert` when architecture is documented — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:5`
+- [x] Run the required E2E journey last and return a failure to the executor — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:44`
+- [x] Commit and push validated work through `/aidd-vcs:01-commit` before Check — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:7`
 
 ### Phase 4 — Check independently
 
-- [x] Give a fresh checker the contract, plan, committed candidate, and validation reports — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:56`
-- [x] Run `/aidd-dev:05-review` independently from implementation — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:60`
-- [x] Challenge the reviewed outcome in a second fresh checker context — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:65`
-- [x] Gate completion on pride, confidence, and end-to-end user satisfaction — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:68`
-- [x] Route contract gaps to Frame and parallelize independent implementation findings through Todo executors — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:71`
-- [x] Review the candidate again when it changed before opening the draft pull request — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:81`
+- [x] Give one fresh checker the contract, plan, committed candidate, and validation reports — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:44`
+- [x] Run `/aidd-dev:05-review`, then `/aidd-refine:02-challenge` in the same independent context — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:48`
+- [x] Keep pride, confidence, and end-to-end satisfaction gates inside the challenge skill — `plugins/aidd-refine/skills/02-challenge/actions/01-challenge.md:18`
+- [x] Use product and contract findings as the next Frame source — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:54`
+- [x] Parallelize independent implementation findings through Todo and keep dependent repairs together — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:55`
+- [x] Re-enter Check after every repaired candidate and open the draft PR only without actionable findings — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:7`
 - [x] Declare every checker capability with its canonical slash address — `plugins/aidd-dev/agents/checker.md:44`
 
 ### Phase 5 — Keep the protocol autonomous and readable
 
 - [x] Make autonomy the default and define the narrow conditions that still require user authority — `plugins/aidd-orchestrator/skills/01-sdlc/SKILL.md:10`
-- [x] Continue until validation, independent review, challenge, clean branch, and draft PR gates all hold — `plugins/aidd-orchestrator/skills/01-sdlc/SKILL.md:12`
-- [x] State behavioral invariants before each diagram without repeating the routing below it — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:3`
-- [x] Keep all four diagrams top-down, grouped by stage, and visually distinguish skills, agents, artifacts, decisions, and zones — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:13`
+- [x] Keep the top-level router to Frame, Deliver, and Check without duplicating delegated gates — `plugins/aidd-orchestrator/skills/01-sdlc/SKILL.md:37`
+- [x] State the expected behavior before each routing diagram — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:3`
+- [x] Keep all four diagrams top-down, grouped by stage, and visually distinguish skills, agents, artifacts, and zones — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:13`
+- [x] Keep orchestration protocols in references rather than restoring an executable action tree — `docs/ARCHITECTURE.md:144`
 - [x] Document orchestrator-authorized bounded Todo fan-out without permitting agent delegation chains — `docs/ARCHITECTURE.md:155`
-- [x] Describe specification as conditional and expose the challenge gate in public documentation — `README.md:37`
+- [x] Resolve every canonical provider and agent address used by the SDLC protocol — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:65`
 
 ## Findings
 
@@ -56,6 +57,6 @@ None.
 | Metric        | Value |
 | ------------- | ----- |
 | Verified      | 100% (24/24) |
-| Files checked | All 32 changed files in `origin/next...working-tree`; five Mermaid diagrams rendered; five flat distributions built |
+| Files checked | All 35 changed files in `origin/next...working-tree`; four SDLC Mermaid diagrams rendered; five flat distributions built |
 | Unchecked     | none |
 | Unplanned     | none |
