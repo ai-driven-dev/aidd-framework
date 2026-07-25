@@ -7,38 +7,38 @@ Review the candidate in a fresh context and route the verdict.
 title: Check independently
 ---
 sequenceDiagram
-  participant Orchestrator
-  participant Checker
-  participant Review as Review capability
-  participant Todo as Todo capability
-  participant ExecutorA as Executor
-  participant ExecutorN as Executor
-  participant PullRequest as Pull request capability
+  participant Sdlc as /sdlc
+  participant Checker as @checker
+  participant Review as /review
+  participant Todo as /todo
+  participant ExecutorA as @executor A
+  participant ExecutorN as @executor N
+  participant PullRequest as /pull-request
 
-  Orchestrator->>Checker: Review contract, plan, and SHA
-  Checker->>Review: Review current diff
-  Review-->>Checker: review.md and verdict
-  Checker-->>Orchestrator: Ship or iterate
+  Sdlc->>Checker: Review $contract, $plan, and $candidate_sha
+  Checker->>Review: Review $candidate_diff
+  Review-->>Checker: $review and $verdict
+  Checker-->>Sdlc: $verdict
   alt Iterate
-    Orchestrator->>Todo: Dispatch independent findings
+    Sdlc->>Todo: Dispatch $findings
     par Finding A
-      Todo->>ExecutorA: Implement finding
+      Todo->>ExecutorA: Implement $finding_a
     and Finding N
-      Todo->>ExecutorN: Implement finding
+      Todo->>ExecutorN: Implement $finding_n
     end
-    ExecutorA-->>Todo: Fix result
-    ExecutorN-->>Todo: Fix result
-    Todo-->>Orchestrator: Consolidated results
-    Orchestrator->>Orchestrator: Route results to 02 deliver
+    ExecutorA-->>Todo: $fix_a
+    ExecutorN-->>Todo: $fix_n
+    Todo-->>Sdlc: $fixes
+    Sdlc->>Sdlc: Route $fixes to 02 deliver
   else Ship
-    Orchestrator->>Orchestrator: Verify reviewed SHA is current
-    Orchestrator->>PullRequest: Open draft request
-    PullRequest-->>Orchestrator: Pull request URL
+    Sdlc->>Sdlc: Verify $reviewed_sha is current
+    Sdlc->>PullRequest: Open draft for $reviewed_sha
+    PullRequest-->>Sdlc: $pull_request_url
   end
 ```
 
-- The checker is fresh and read-only.
+- `@checker` is fresh and read-only.
 - Any blocking review finding returns `iterate`.
-- Dispatch only independent findings through the todo capability, one executor per finding in parallel.
+- Dispatch only independent findings through `/todo`, one `@executor` per finding in parallel.
 - Re-enter `02-deliver` to integrate, validate, commit, and run the final E2E gate.
-- Only the orchestrator opens the pull request after verifying the reviewed SHA.
+- Only `/sdlc` calls `/pull-request` after verifying the reviewed SHA.

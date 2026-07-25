@@ -7,33 +7,38 @@ Produce a validated candidate from the contract.
 title: Deliver the candidate
 ---
 sequenceDiagram
-  participant Orchestrator
-  participant Plan as Planning capability
-  participant Executor
-  participant Implement as Implementation capability
-  participant Assert as Assertion capability
-  participant Commit as Commit capability
-  participant Test as E2E test capability
+  participant Sdlc as /sdlc
+  participant Plan as /plan
+  participant Executor as @executor
+  participant Implement as /implement
+  participant Assert as /assert
+  participant Commit as /commit
+  participant Test as /test
 
-  Orchestrator->>Plan: Build plan from contract
-  Plan-->>Orchestrator: plan.md
-  Orchestrator->>Executor: Deliver plan and findings
-  Executor->>Implement: Implement plan or fixes
-  Implement-->>Executor: Candidate
-  Executor->>Assert: Validate candidate
-  Assert-->>Executor: Verdict
-  opt Delivery leaves uncommitted changes
-    Executor->>Commit: Commit remaining changes
-    Commit-->>Executor: Commit SHA
+  Sdlc->>Plan: Build $plan from $contract
+  Plan-->>Sdlc: $plan
+  Sdlc->>Executor: Deliver $plan and $findings
+  Executor->>Implement: Implement $plan or $fixes
+  Implement-->>Executor: $candidate
+  Executor->>Assert: Validate $candidate
+  Assert-->>Executor: $assert_report
+  opt $architecture exists
+    Executor->>Assert: Validate $candidate against $architecture
+    Assert-->>Executor: $architecture_report
   end
-  opt User journey is required
-    Executor->>Test: Run final E2E journey
-    Test-->>Executor: Journey report
+  opt $candidate has uncommitted changes
+    Executor->>Commit: Commit $candidate
+    Commit-->>Executor: $commit_sha
   end
-  Executor-->>Orchestrator: Clean candidate SHA
+  opt $journey is required
+    Executor->>Test: Run final E2E for $journey
+    Test-->>Executor: $journey_report
+  end
+  Executor-->>Sdlc: $candidate_sha
 ```
 
-- The orchestrator owns `plan.md`; the executor never rewrites it.
-- The executor implements and self-validates. It does not perform the independent review.
+- `/sdlc` owns `$plan`; `@executor` never rewrites it.
+- `@executor` implements and self-validates. It does not perform the independent review.
+- `@executor` runs the architecture facet of `/assert` when architecture documentation applies.
 - Run E2E only after implementation, assertions, and commits are complete. A failure re-enters delivery before one final E2E run.
 - Return only a clean candidate with green validation to `03-check`.

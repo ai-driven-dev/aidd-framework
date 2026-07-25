@@ -10,12 +10,12 @@ description: Orchestrates a request from framing to a draft pull request, isolat
 title: SDLC orchestration
 ---
 flowchart LR
-  Request["Request"]
-  Ready{"Ready contract?"}
+  Request["$request"]
+  Ready{"$contract ready?"}
   Frame["01 Frame"]
   Deliver["02 Deliver"]
   Check["03 Check"]
-  PullRequest["Draft pull request"]
+  PullRequest["$pull_request"]
 
   Request --> Ready
   Ready -- "no" --> Frame

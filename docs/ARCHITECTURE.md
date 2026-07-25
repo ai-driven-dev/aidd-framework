@@ -125,22 +125,23 @@ A skill's `SKILL.md` is a manifest plus a router. Claude Code loads the SKILL.md
 title: skill router pattern
 ---
 flowchart LR
-  User["User: 'Use skill aidd-X:NN-name'"]
-  Skill["SKILL.md (router)"]
-  Action["Recipe action"]
-  Protocol["Reference protocol"]
-  Agent["Agent running a capability"]
+  User["User: '/skill-name'"]
+  Skill["/skill-name"]
+  Action1["actions/01-step.md"]
+  Action2["actions/02-step.md"]
+  ActionN["actions/NN-step.md"]
   Out["Outputs: files, labels, PRs, audit logs"]
 
   User --> Skill
-  Skill -->|"domain work"| Action
-  Skill -->|"orchestration zone"| Protocol
-  Protocol --> Agent
-  Action --> Out
-  Agent --> Out
+  Skill -->|"choose 1..N"| Action1
+  Skill -->|"choose 1..N"| Action2
+  Skill -->|"choose 1..N"| ActionN
+  Action1 --> Out
+  Action2 --> Out
+  ActionN --> Out
 ```
 
-Recipe skills route to self-contained actions with inputs, outputs, process steps, and tests. Orchestrators with no domain logic may instead route through numbered reference protocols that define handoffs and delegate the work to capabilities discovered at runtime.
+Recipe skills route to self-contained actions with inputs, outputs, process steps, and tests. An orchestrator with no domain logic may instead route through numbered reference protocols that define handoffs and delegate the work to capabilities discovered at runtime.
 
 ## 🤖 Skills and agents
 
