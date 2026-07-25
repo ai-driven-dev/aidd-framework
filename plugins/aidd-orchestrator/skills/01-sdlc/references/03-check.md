@@ -17,7 +17,6 @@ flowchart TD
     Plan["$plan"]
     CommittedCandidate["$committed_candidate"]
     ValidationReports["$validation_reports"]
-    Sdlc["/aidd-orchestrator:01-sdlc"]
     Checker(["@aidd-dev:checker"])
     Review["/aidd-dev:05-review"]
   end
@@ -41,11 +40,10 @@ flowchart TD
     PullRequestUrl["$pull_request_url"]
   end
 
-  Contract --> Sdlc
-  Plan --> Sdlc
-  CommittedCandidate --> Sdlc
-  ValidationReports --> Sdlc
-  Sdlc -- "At Check entry, spawn one fresh checker." --> Checker
+  Contract --> Checker
+  Plan --> Checker
+  CommittedCandidate --> Checker
+  ValidationReports --> Checker
   Checker --> Review
   Review -- "Return actionable review findings." --> Findings
   Review -- "When the review clears, challenge the outcome." --> Challenge
@@ -62,7 +60,7 @@ flowchart TD
   classDef artifact fill:#DCFCE7,stroke:#16A34A,color:#14532D,stroke-width:2px
   classDef zone fill:#F1F5F9,stroke:#64748B,color:#0F172A,stroke-width:2px
 
-  class Review,Sdlc,Challenge,Todo,PullRequest skill
+  class Review,Challenge,Todo,PullRequest skill
   class Checker agent
   class Contract,Plan,CommittedCandidate,ValidationReports,Findings,PullRequestUrl artifact
   class Frame,Deliver zone

@@ -14,7 +14,6 @@ flowchart TD
   subgraph PlanStage["Plan the delivery"]
     direction TB
     Contract["$contract"]
-    Sdlc["/aidd-orchestrator:01-sdlc"]
     Plan["/aidd-dev:01-plan"]
     PlanArtifact["$plan"]
   end
@@ -34,8 +33,7 @@ flowchart TD
     Check["03 Check"]
   end
 
-  Contract --> Sdlc
-  Sdlc --> Plan
+  Contract --> Plan
   Plan --> PlanArtifact
   PlanArtifact --> Executor
   Executor --> Implement
@@ -52,7 +50,7 @@ flowchart TD
   classDef artifact fill:#DCFCE7,stroke:#16A34A,color:#14532D,stroke-width:2px
   classDef zone fill:#F1F5F9,stroke:#64748B,color:#0F172A,stroke-width:2px
 
-  class Sdlc,Plan,Implement,Assert,Test,Commit skill
+  class Plan,Implement,Assert,Test,Commit skill
   class Executor agent
   class Contract,PlanArtifact,CommittedCandidate artifact
   class Check zone

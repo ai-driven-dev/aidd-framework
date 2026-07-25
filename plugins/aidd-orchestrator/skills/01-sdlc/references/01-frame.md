@@ -12,7 +12,6 @@ flowchart TD
   subgraph SourceStage["Resolve the source"]
     direction TB
     Source["$source"]
-    Sdlc["/aidd-orchestrator:01-sdlc"]
     Ticket["/aidd-pm:01-ticket-info"]
     ResolvedSource["$resolved_source"]
   end
@@ -29,9 +28,8 @@ flowchart TD
     Deliver["02 Deliver"]
   end
 
-  Source --> Sdlc
-  Sdlc -- "When the source references a ticket, resolve it." --> Ticket
-  Sdlc -- "Otherwise, use the source as provided." --> ResolvedSource
+  Source -- "When the source references a ticket, resolve it." --> Ticket
+  Source -- "Otherwise, use the source as provided." --> ResolvedSource
   Ticket --> ResolvedSource
   ResolvedSource -- "When it is planning-ready, continue directly." --> Contract
   ResolvedSource -- "When intent can change what is built, clarify it." --> Brainstorm
@@ -44,7 +42,7 @@ flowchart TD
   classDef artifact fill:#DCFCE7,stroke:#16A34A,color:#14532D,stroke-width:2px
   classDef zone fill:#F1F5F9,stroke:#64748B,color:#0F172A,stroke-width:2px
 
-  class Sdlc,Ticket,Brainstorm,Spec skill
+  class Ticket,Brainstorm,Spec skill
   class Source,ResolvedSource,Contract artifact
   class Deliver zone
 ```

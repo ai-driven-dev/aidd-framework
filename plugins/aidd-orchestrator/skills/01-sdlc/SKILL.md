@@ -19,7 +19,6 @@ flowchart TD
   subgraph FrameStage["01 Frame"]
     direction TB
     Request["$request"]
-    Sdlc["/aidd-orchestrator:01-sdlc"]
     Frame["01 Frame"]
   end
 
@@ -34,17 +33,14 @@ flowchart TD
     PullRequest["$pull_request"]
   end
 
-  Request --> Sdlc
-  Sdlc --> Frame
+  Request --> Frame
   Frame --> Deliver
   Deliver --> Check
   Check --> PullRequest
 
-  classDef skill fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A,stroke-width:2px
   classDef artifact fill:#DCFCE7,stroke:#16A34A,color:#14532D,stroke-width:2px
   classDef zone fill:#F1F5F9,stroke:#64748B,color:#0F172A,stroke-width:2px
 
-  class Sdlc skill
   class Request,PullRequest artifact
   class Frame,Deliver,Check zone
 ```
