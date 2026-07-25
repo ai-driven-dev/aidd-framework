@@ -7,9 +7,9 @@ description: Autonomously orchestrates a request from framing to a draft pull re
 
 ## Behavior
 
-Own every routing decision. Verify each handoff against the current reference. Treat canonical addresses as the responsibility map and verify that each provider is installed before calling it. Work autonomously, making reversible in-scope decisions without asking and requesting input only when product authority or external approval is missing. Decide from contract and acceptance criteria, project rules, correctness and security, simplicity, then speed.
+Run autonomously from the request to a draft pull request. Read only the current zone reference. Make reversible in-scope decisions without asking. Ask only when a product decision or external approval is required. Verify that every named provider is installed before calling it.
 
-Keep planning in the orchestrator, implementation in `@aidd-dev:executor`, and independent judgment in fresh `@aidd-dev:checker` instances. Continue until the branch is clean, every applicable validation is green, the current SHA has passed review and challenge, and a draft pull request exists. Exhaust safe alternatives before returning `blocked`. Route contract gaps to Frame and implementation gaps to Deliver.
+Spawn specialized agents for isolated work. Parallelize independent work when it is faster. Give each agent one focused task that a smaller model can execute. Continue until the candidate is validated, independently reviewed, challenged, and attached to a draft pull request.
 
 ```mermaid
 ---

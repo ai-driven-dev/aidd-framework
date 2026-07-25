@@ -2,7 +2,7 @@
 
 ## Behavior
 
-Own contract readiness. Retrieve an attached ticket through `/aidd-pm:01-ticket-info` before deciding whether the source has an explicit objective and observable acceptance criteria. Send a planning-ready contract directly to Deliver without requiring a specification. When the scope is ambiguous, run `/aidd-refine:01-brainstorm` before `/aidd-pm:04-spec`. Use challenge findings to repair a need gap before planning again.
+Produce a planning-ready contract with an explicit objective and observable acceptance criteria. Use the attached ticket when one exists. Skip the specification when the source is already clear. Otherwise clarify ambiguous scope before writing it. Use challenge findings to repair a need gap.
 
 ```mermaid
 ---

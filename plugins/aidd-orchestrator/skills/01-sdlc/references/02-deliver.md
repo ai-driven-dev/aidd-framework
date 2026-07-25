@@ -2,9 +2,9 @@
 
 ## Behavior
 
-Own the plan in `/aidd-orchestrator:01-sdlc` and delegate implementation to `@aidd-dev:executor`. The executor never rewrites the plan. Require the executor to implement and self-validate without performing the independent review. Run coding assertions, then architecture assertions through `/aidd-dev:03-assert` when architecture documentation applies. A failed assertion, architecture check, or E2E journey re-enters Deliver and reruns every applicable gate.
+Create a self-contained plan that a human can follow. Keep it proportional to the scope. The executor implements the plan without rewriting it. Use focused checks while repairing the candidate, then run every applicable assertion before completion. Check architecture only when architecture documentation exists.
 
-Commit the validated candidate through `/aidd-vcs:01-commit`. Run the required E2E journey through `/aidd-dev:06-test` as the final delivery gate. Send only a clean candidate with green validation to Check.
+Commit the validated candidate. Run the required E2E journey last. Send only a clean candidate with green validation to Check.
 
 ```mermaid
 ---
@@ -38,7 +38,7 @@ flowchart TD
     JourneyDecision{"Is an end-to-end user journey required?"}
     Test["/aidd-dev:06-test"]
     JourneyPassed{"Did the end-to-end user journey pass?"}
-    CandidateSha["$candidate_sha"]
+    CommittedCandidate["$committed_candidate"]
   end
 
   Repair["02 Deliver"]
@@ -65,9 +65,9 @@ flowchart TD
   JourneyDecision -- "Yes, run test-journey." --> Test
   Test --> JourneyPassed
   JourneyPassed -- "No, repair and validate the candidate again." --> Repair
-  JourneyPassed -- "Yes, continue." --> CandidateSha
-  JourneyDecision -- "No, continue." --> CandidateSha
-  CandidateSha --> Check
+  JourneyPassed -- "Yes, continue." --> CommittedCandidate
+  JourneyDecision -- "No, continue." --> CommittedCandidate
+  CommittedCandidate --> Check
 
   classDef skill fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A,stroke-width:2px
   classDef agent fill:#F3E8FF,stroke:#9333EA,color:#581C87,stroke-width:2px
@@ -77,7 +77,7 @@ flowchart TD
 
   class Sdlc,Plan,Implement,AssertCode,AssertArchitecture,Commit,Test skill
   class Executor agent
-  class Contract,PlanArtifact,Candidate,CandidateSha artifact
+  class Contract,PlanArtifact,Candidate,CommittedCandidate artifact
   class AssertionsPassed,ArchitectureDecision,ArchitecturePassed,CommitDecision,JourneyDecision,JourneyPassed decision
   class Repair,Check zone
 ```

@@ -2,9 +2,9 @@
 
 ## Behavior
 
-Give a fresh `@aidd-dev:checker` the contract, plan, candidate SHA, and every validation report for `/aidd-dev:05-review`. After a green review, use a second fresh checker to run `/aidd-refine:02-challenge` and answer the three confidence questions from evidence. Both checker contexts remain read-only and never implement fixes. Treat `No` and `Uncertain` identically.
+Use a fresh checker to review the candidate against the contract, plan, and validation evidence. After a green review, use another fresh checker to challenge the real outcome with the three confidence questions. Both checkers stay read-only.
 
-Route need gaps to Frame and dispatch independent implementation findings through `/aidd-dev:10-todo`, one `@aidd-dev:executor` per finding. Re-enter Deliver to integrate, validate, commit, and run the final E2E gate. Open the draft pull request only after verifying that the reviewed SHA is still current.
+Route need gaps to Frame. Dispatch independent implementation findings in parallel through Todo, one executor per finding. Keep dependent fixes together. Re-enter Deliver after every fix. If the candidate changed since the review, review it again. Otherwise open the draft pull request.
 
 ```mermaid
 ---
@@ -15,7 +15,7 @@ flowchart TD
     direction TB
     Contract["$contract"]
     Plan["$plan"]
-    CandidateSha["$candidate_sha"]
+    CommittedCandidate["$committed_candidate"]
     ValidationReports["$validation_reports"]
     ReviewChecker(["@aidd-dev:checker"])
     Review["/aidd-dev:05-review"]
@@ -47,7 +47,7 @@ flowchart TD
 
   subgraph ShipStage["Ship the reviewed candidate"]
     direction TB
-    CurrentSha{"Is the reviewed SHA still current?"}
+    CandidateChanged{"Has the candidate changed since the review?"}
     Check["03 Check"]
     PullRequest["/aidd-vcs:02-pull-request"]
     PullRequestUrl["$pull_request_url"]
@@ -55,7 +55,7 @@ flowchart TD
 
   Contract --> ReviewChecker
   Plan --> ReviewChecker
-  CandidateSha --> ReviewChecker
+  CommittedCandidate --> ReviewChecker
   ValidationReports --> ReviewChecker
   ReviewChecker --> Review
   Review --> ReviewArtifact
@@ -78,9 +78,9 @@ flowchart TD
   ExecutorFirst --> Fixes
   ExecutorLast --> Fixes
   Fixes --> Deliver
-  Satisfied -- "Yes, verify the reviewed SHA." --> CurrentSha
-  CurrentSha -- "No, check the current candidate again." --> Check
-  CurrentSha -- "Yes, open the draft pull request." --> PullRequest
+  Satisfied -- "Yes, confirm the candidate." --> CandidateChanged
+  CandidateChanged -- "Yes, review it again." --> Check
+  CandidateChanged -- "No, open the draft pull request." --> PullRequest
   PullRequest --> PullRequestUrl
 
   classDef skill fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A,stroke-width:2px
@@ -91,7 +91,7 @@ flowchart TD
 
   class Review,Sdlc,Challenge,Todo,PullRequest skill
   class ReviewChecker,ConfidenceChecker,ExecutorFirst,ExecutorLast agent
-  class Contract,Plan,CandidateSha,ValidationReports,ReviewArtifact,ChallengeFindings,Fixes,PullRequestUrl artifact
-  class ReviewVerdict,Proud,Confident,Satisfied,ContractGap,CurrentSha decision
+  class Contract,Plan,CommittedCandidate,ValidationReports,ReviewArtifact,ChallengeFindings,Fixes,PullRequestUrl artifact
+  class ReviewVerdict,Proud,Confident,Satisfied,ContractGap,CandidateChanged decision
   class Frame,Deliver,Check zone
 ```
