@@ -22,7 +22,7 @@
 
 ### Phase 3 — Deliver the candidate
 
-- [x] Keep planning in the orchestrator and implementation in `@aidd-dev:executor` — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:48`
+- [x] Produce a self-contained human-readable plan and delegate implementation to `@aidd-dev:executor` — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:5`
 - [x] Route failed coding assertions back through delivery — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:55`
 - [x] Run architecture assertions through `/aidd-dev:03-assert` when architecture documentation applies — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:57`
 - [x] Commit the validated candidate through `/aidd-vcs:01-commit` — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:62`
@@ -30,12 +30,12 @@
 
 ### Phase 4 — Check independently
 
-- [x] Give a fresh checker the contract, plan, candidate SHA, and validation reports — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:56`
+- [x] Give a fresh checker the contract, plan, committed candidate, and validation reports — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:56`
 - [x] Run `/aidd-dev:05-review` independently from implementation — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:60`
 - [x] Challenge the reviewed outcome in a second fresh checker context — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:65`
 - [x] Gate completion on pride, confidence, and end-to-end user satisfaction — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:68`
-- [x] Route contract gaps to Frame and independent implementation findings through Todo executors — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:71`
-- [x] Verify the reviewed SHA before opening the draft pull request — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:81`
+- [x] Route contract gaps to Frame and parallelize independent implementation findings through Todo executors — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:71`
+- [x] Review the candidate again when it changed before opening the draft pull request — `plugins/aidd-orchestrator/skills/01-sdlc/references/03-check.md:81`
 - [x] Declare every checker capability with its canonical slash address — `plugins/aidd-dev/agents/checker.md:44`
 
 ### Phase 5 — Keep the protocol autonomous and readable
