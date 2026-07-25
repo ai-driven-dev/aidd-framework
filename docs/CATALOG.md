@@ -94,7 +94,7 @@ Runs synchronous feature delivery and optional async issue automation.
 | Skill            | Role                                                  | Protocols                |
 | ---------------- | ----------------------------------------------------- | ------------------------ |
 | `00-async-dev`   | Single entry point for the async-dev pipeline         | `setup`, `run`, `review` |
-| `01-sdlc`        | Drive the full development flow end to end            | `frame`, `deliver`, `check` |
+| `01-sdlc`        | Autonomously drive the full development flow end to end | `frame`, `deliver`, `check` |
 
 ## 🎨 aidd-ui
 

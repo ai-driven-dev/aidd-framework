@@ -124,7 +124,7 @@ A typical change cycles through skills from several plugins. The order below is 
 9. **Ship**: `aidd-vcs:01-commit`, `aidd-vcs:02-pull-request`, then `aidd-vcs:03-release-tag` when the work is in production. File issues with `aidd-vcs:04-issue-create`.
 10. **Refactor and maintain**: `aidd-dev:07-refactor` for performance or security, `aidd-dev:04-audit` for technical-debt sweeps, `aidd-dev:08-debug` to reproduce and fix bugs.
 
-When you want the whole synchronous pipeline run in one go (spec, plan, implementation, finalize), invoke `aidd-orchestrator:01-sdlc`.
+When you want the whole synchronous pipeline run autonomously in one go (frame when needed, plan, implementation, validation, independent review, outcome challenge, finalize), invoke `aidd-orchestrator:01-sdlc`.
 
 ---
 

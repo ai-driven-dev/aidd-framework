@@ -16,7 +16,7 @@ Composes capabilities into deterministic, auditable flows. Each skill is one orc
 
 | Bracket ID | Skill | Description |
 |------------|-------|-------------|
-| [6.1] | [sdlc](skills/01-sdlc/SKILL.md) | Synchronous orchestration through framing, delivery, independent review, and PR creation. |
+| [6.1] | [sdlc](skills/01-sdlc/SKILL.md) | Autonomous orchestration through framing, delivery, independent review, outcome challenge, and PR creation. |
 
 ### Use case: `async-dev`
 
