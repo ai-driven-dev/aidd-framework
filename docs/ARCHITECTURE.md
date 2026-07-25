@@ -159,9 +159,9 @@ Composition rules:
 
 ## 🔗 Cross-plugin orthogonality
 
-Plugins never reference each other by name — **orchestrators included**. When skill A needs a capability skill B owns, it discovers a candidate at runtime through description matching, never a hardcoded `aidd-<plugin>:…` address. This keeps the marketplace forkable, the plugins swappable, and the docs maintainable.
+Recipe plugins never hardcode a sibling provider. They discover cross-plugin capabilities at runtime through description matching. An orchestration reference may show the current provider with its canonical `/plugin:folder` or `@plugin:agent` address when the document maps responsibilities; the orchestrator must verify that provider is installed before calling it.
 
-The rule is social (PR template checklist), not yet mechanically enforced — a lefthook grep for cross-plugin literals would catch violations (an orchestrator hardcoding a sibling skill name still slips through today).
+This distinction keeps recipe plugins swappable while making orchestration handoffs explicit and auditable.
 
 ## 🔎 See also
 

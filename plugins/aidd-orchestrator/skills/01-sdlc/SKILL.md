@@ -11,7 +11,7 @@ title: SDLC orchestration
 ---
 flowchart LR
   Request["$request"]
-  Ready{"$contract ready?"}
+  Ready{"Contract ready?"}
   Frame["01 Frame"]
   Deliver["02 Deliver"]
   Check["03 Check"]
@@ -39,7 +39,7 @@ Read only the current zone's reference before delegating it.
 ## Transversal rules
 
 - Own routing and verify every handoff against the current reference.
-- Discover cross-plugin capabilities by description, never by plugin name.
+- Treat the canonical plugin addresses in the references as the responsibility map. Verify that each named provider is installed before calling it.
 - Run planning in the orchestrator context. Isolate implementation in `executor` and independent review in `checker`.
 - Mode: default `interactive`, pausing for approval at each step; switch to `auto` only when the caller says so, then decide alone and never ask.
 - Stop on `blocked`. Loop `check → deliver` on `iterate`.
