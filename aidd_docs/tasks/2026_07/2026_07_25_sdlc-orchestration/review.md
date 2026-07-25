@@ -23,7 +23,7 @@
 ### Phase 3 — Deliver the candidate
 
 - [x] Produce a proportional plan autonomously and delegate it to one `@aidd-dev:executor` — `plugins/aidd-dev/skills/01-plan/actions/04-plan.md:19`
-- [x] Let implementation and assertion skills own their validation and repair loops — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:5`
+- [x] Let the executor own validation repair loops and invoke `/aidd-dev:08-debug` when the cause is unclear — `plugins/aidd-dev/agents/executor.md:16`
 - [x] Include architecture conformance through `/aidd-dev:03-assert` when architecture is documented — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:5`
 - [x] Run the required E2E journey last and return a failure to the executor — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:44`
 - [x] Commit and push validated work through `/aidd-vcs:01-commit` before Check — `plugins/aidd-orchestrator/skills/01-sdlc/references/02-deliver.md:7`
