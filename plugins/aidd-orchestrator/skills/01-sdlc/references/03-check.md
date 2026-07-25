@@ -7,28 +7,28 @@ Review the candidate in a fresh context and route the verdict.
 title: Check independently
 ---
 flowchart LR
-  CandidateSha[["$candidate_sha"]]
+  CandidateSha["$candidate_sha"]
   Checker(["@aidd-dev:checker"])
   Review["/aidd-dev:05-review"]
-  ReviewArtifact[["$review · $verdict"]]
+  ReviewArtifact["$review · $verdict"]
   Sdlc["/aidd-orchestrator:01-sdlc"]
-  Verdict{"Verdict?"}
+  Verdict{"What is the review verdict?"}
   Todo["/aidd-dev:10-todo"]
   ExecutorFirst(["@aidd-dev:executor"])
   ExecutorLast(["@aidd-dev:executor"])
-  FixFirst[["$fix_a"]]
-  FixLast[["$fix_n"]]
-  Fixes[["$fixes"]]
+  FixFirst["$fix_a"]
+  FixLast["$fix_n"]
+  Fixes["$fixes"]
   Deliver["02 Deliver"]
   PullRequest["/aidd-vcs:02-pull-request"]
-  PullRequestUrl[["$pull_request_url"]]
+  PullRequestUrl["$pull_request_url"]
 
   CandidateSha --> Checker
   Checker --> Review
   Review --> ReviewArtifact
   ReviewArtifact --> Sdlc
   Sdlc --> Verdict
-  Verdict -- "iterate" --> Todo
+  Verdict -- "Iterate on findings." --> Todo
   Todo --> ExecutorFirst
   Todo --> ExecutorLast
   ExecutorFirst --> FixFirst
@@ -36,7 +36,7 @@ flowchart LR
   FixFirst --> Fixes
   FixLast --> Fixes
   Fixes --> Deliver
-  Verdict -- "ship" --> PullRequest
+  Verdict -- "Ship the candidate." --> PullRequest
   PullRequest --> PullRequestUrl
 
   classDef skill fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A,stroke-width:2px

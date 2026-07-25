@@ -7,33 +7,33 @@ Decide whether the source is ready for planning.
 title: Frame the delivery contract
 ---
 flowchart LR
-  Source[["$source"]]
+  Source["$source"]
   Sdlc["/aidd-orchestrator:01-sdlc"]
-  TicketDecision{"Ticket reference?"}
+  TicketDecision{"Is a ticket attached?"}
   Ticket["/aidd-pm:01-ticket-info"]
-  TicketArtifact[["$ticket"]]
-  ContractDecision{"Contract ready?"}
-  Contract[["$contract"]]
-  ScopeDecision{"Scope ambiguous?"}
+  TicketArtifact["$ticket"]
+  ContractDecision{"Are the contract requirements fulfilled?"}
+  Contract["$contract"]
+  ScopeDecision{"Is the scope ambiguous?"}
   Brainstorm["/aidd-refine:01-brainstorm"]
-  ClarifiedScope[["$clarified_scope"]]
+  ClarifiedScope["$clarified_scope"]
   Spec["/aidd-pm:04-spec"]
-  SpecArtifact[["$spec"]]
+  SpecArtifact["$spec"]
   Deliver["02 Deliver"]
 
   Source --> Sdlc
   Sdlc --> TicketDecision
-  TicketDecision -- "yes" --> Ticket
+  TicketDecision -- "Yes, retrieve it." --> Ticket
   Ticket --> TicketArtifact
   TicketArtifact --> ContractDecision
-  TicketDecision -- "no" --> ContractDecision
-  ContractDecision -- "yes" --> Contract
+  TicketDecision -- "No, use the source." --> ContractDecision
+  ContractDecision -- "Yes, continue." --> Contract
   Contract --> Deliver
-  ContractDecision -- "no" --> ScopeDecision
-  ScopeDecision -- "yes" --> Brainstorm
+  ContractDecision -- "No, frame it." --> ScopeDecision
+  ScopeDecision -- "Yes, clarify it." --> Brainstorm
   Brainstorm --> ClarifiedScope
   ClarifiedScope --> Spec
-  ScopeDecision -- "no" --> Spec
+  ScopeDecision -- "No, write the specification." --> Spec
   Spec --> SpecArtifact
   SpecArtifact --> Deliver
 

@@ -7,25 +7,25 @@ Produce a validated candidate from the contract.
 title: Deliver the candidate
 ---
 flowchart LR
-  Contract[["$contract"]]
+  Contract["$contract"]
   Sdlc["/aidd-orchestrator:01-sdlc"]
   Plan["/aidd-dev:01-plan"]
-  PlanArtifact[["$plan"]]
+  PlanArtifact["$plan"]
   Executor(["@aidd-dev:executor"])
   Implement["/aidd-dev:02-implement"]
-  Candidate[["$candidate"]]
+  Candidate["$candidate"]
   AssertCode["/aidd-dev:03-assert"]
-  AssertReport[["$assert_report"]]
-  ArchitectureDecision{"Architecture documentation?"}
+  AssertReport["$assert_report"]
+  ArchitectureDecision{"Is architecture documentation available?"}
   AssertArchitecture["/aidd-dev:03-assert"]
-  ArchitectureReport[["$architecture_report"]]
-  CommitDecision{"Uncommitted changes?"}
+  ArchitectureReport["$architecture_report"]
+  CommitDecision{"Are there uncommitted changes?"}
   Commit["/aidd-vcs:01-commit"]
-  CommitSha[["$commit_sha"]]
-  JourneyDecision{"User journey?"}
+  CommitSha["$commit_sha"]
+  JourneyDecision{"Is an end-to-end user journey required?"}
   Test["/aidd-dev:06-test"]
-  JourneyReport[["$journey_report"]]
-  CandidateSha[["$candidate_sha"]]
+  JourneyReport["$journey_report"]
+  CandidateSha["$candidate_sha"]
   Check["03 Check"]
 
   Contract --> Sdlc
@@ -34,21 +34,21 @@ flowchart LR
   PlanArtifact --> Executor
   Executor --> Implement
   Implement --> Candidate
-  Candidate -- "validate" --> AssertCode
+  Candidate -- "Run the assertions." --> AssertCode
   AssertCode --> AssertReport
   AssertReport --> ArchitectureDecision
-  ArchitectureDecision -- "yes, run assert-architecture" --> AssertArchitecture
+  ArchitectureDecision -- "Yes, run assert-architecture." --> AssertArchitecture
   AssertArchitecture --> ArchitectureReport
   ArchitectureReport --> CommitDecision
-  ArchitectureDecision -- "no" --> CommitDecision
-  CommitDecision -- "yes" --> Commit
+  ArchitectureDecision -- "No, continue." --> CommitDecision
+  CommitDecision -- "Yes, commit the candidate." --> Commit
   Commit --> CommitSha
   CommitSha --> JourneyDecision
-  CommitDecision -- "no" --> JourneyDecision
-  JourneyDecision -- "yes, run test-journey" --> Test
+  CommitDecision -- "No, continue." --> JourneyDecision
+  JourneyDecision -- "Yes, run test-journey." --> Test
   Test --> JourneyReport
   JourneyReport --> CandidateSha
-  JourneyDecision -- "no" --> CandidateSha
+  JourneyDecision -- "No, continue." --> CandidateSha
   CandidateSha --> Check
 
   classDef skill fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A,stroke-width:2px
