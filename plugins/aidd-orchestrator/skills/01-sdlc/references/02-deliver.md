@@ -2,82 +2,58 @@
 
 ## Behavior
 
-Create a self-contained plan that a human can follow. Keep it proportional to the scope. The executor implements the plan without rewriting it. Use focused checks while repairing the candidate, then run every applicable assertion before completion. Check architecture only when architecture documentation exists.
+Turn the contract into a proportional plan, then give one executor the plan. The executor implements it and calls the validation skills, which own their checks and repair loops. Include architecture conformance whenever the project documents architecture. Run a required end-to-end journey after every other validation.
 
-Commit the validated candidate. Run the required E2E journey last. Send only a clean candidate with green validation to Check.
+Commit and push the validated work through the commit skill. Send only the clean committed candidate to Check.
 
 ```mermaid
 ---
 title: Deliver the candidate
 ---
 flowchart TD
-  subgraph Build["Build the candidate"]
+  subgraph PlanStage["Plan the delivery"]
     direction TB
     Contract["$contract"]
     Sdlc["/aidd-orchestrator:01-sdlc"]
     Plan["/aidd-dev:01-plan"]
     PlanArtifact["$plan"]
+  end
+
+  subgraph ExecuteStage["Execute and validate the plan"]
+    direction TB
     Executor(["@aidd-dev:executor"])
     Implement["/aidd-dev:02-implement"]
-    Candidate["$candidate"]
-  end
-
-  subgraph Validate["Validate the candidate"]
-    direction TB
-    AssertCode["/aidd-dev:03-assert"]
-    AssertionsPassed{"Did all assertions pass?"}
-    ArchitectureDecision{"Is architecture documentation available?"}
-    AssertArchitecture["/aidd-dev:03-assert"]
-    ArchitecturePassed{"Does the candidate conform to the documented architecture?"}
-  end
-
-  subgraph Finalize["Finalize the candidate"]
-    direction TB
-    CommitDecision{"Are there uncommitted changes?"}
-    Commit["/aidd-vcs:01-commit"]
-    JourneyDecision{"Is an end-to-end user journey required?"}
+    Assert["/aidd-dev:03-assert"]
     Test["/aidd-dev:06-test"]
-    JourneyPassed{"Did the end-to-end user journey pass?"}
-    CommittedCandidate["$committed_candidate"]
+    Commit["/aidd-vcs:01-commit"]
   end
 
-  Repair["02 Deliver"]
-  Check["03 Check"]
+  subgraph HandoffStage["Hand off the candidate"]
+    direction TB
+    CommittedCandidate["$committed_candidate"]
+    Check["03 Check"]
+  end
 
   Contract --> Sdlc
   Sdlc --> Plan
   Plan --> PlanArtifact
   PlanArtifact --> Executor
   Executor --> Implement
-  Implement --> Candidate
-  Candidate -- "Run the assertions." --> AssertCode
-  AssertCode --> AssertionsPassed
-  AssertionsPassed -- "No, repair and validate the candidate again." --> Repair
-  AssertionsPassed -- "Yes, continue." --> ArchitectureDecision
-  ArchitectureDecision -- "Yes, run assert-architecture." --> AssertArchitecture
-  AssertArchitecture --> ArchitecturePassed
-  ArchitecturePassed -- "No, repair and validate the candidate again." --> Repair
-  ArchitecturePassed -- "Yes, continue." --> CommitDecision
-  ArchitectureDecision -- "No, continue." --> CommitDecision
-  CommitDecision -- "Yes, commit the candidate." --> Commit
-  Commit --> JourneyDecision
-  CommitDecision -- "No, continue." --> JourneyDecision
-  JourneyDecision -- "Yes, run test-journey." --> Test
-  Test --> JourneyPassed
-  JourneyPassed -- "No, repair and validate the candidate again." --> Repair
-  JourneyPassed -- "Yes, continue." --> CommittedCandidate
-  JourneyDecision -- "No, continue." --> CommittedCandidate
+  Implement --> Assert
+  Assert -- "When no end-to-end journey is required, commit the result." --> Commit
+  Assert -- "When an end-to-end journey is required, run it last." --> Test
+  Test -- "After the journey succeeds, commit the result." --> Commit
+  Test -- "Return a failed journey for repair." --> Executor
+  Commit --> CommittedCandidate
   CommittedCandidate --> Check
 
   classDef skill fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A,stroke-width:2px
   classDef agent fill:#F3E8FF,stroke:#9333EA,color:#581C87,stroke-width:2px
   classDef artifact fill:#DCFCE7,stroke:#16A34A,color:#14532D,stroke-width:2px
-  classDef decision fill:#FFEDD5,stroke:#EA580C,color:#7C2D12,stroke-width:2px
   classDef zone fill:#F1F5F9,stroke:#64748B,color:#0F172A,stroke-width:2px
 
-  class Sdlc,Plan,Implement,AssertCode,AssertArchitecture,Commit,Test skill
+  class Sdlc,Plan,Implement,Assert,Test,Commit skill
   class Executor agent
-  class Contract,PlanArtifact,Candidate,CommittedCandidate artifact
-  class AssertionsPassed,ArchitectureDecision,ArchitecturePassed,CommitDecision,JourneyDecision,JourneyPassed decision
-  class Repair,Check zone
+  class Contract,PlanArtifact,CommittedCandidate artifact
+  class Check zone
 ```
