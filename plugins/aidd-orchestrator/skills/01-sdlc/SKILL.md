@@ -10,20 +10,32 @@ description: Orchestrates a request from framing to a draft pull request, isolat
 title: SDLC orchestration
 ---
 flowchart LR
-  Request["$request"]
+  Request[["$request"]]
+  Sdlc["/aidd-orchestrator:01-sdlc"]
   Ready{"Contract ready?"}
   Frame["01 Frame"]
   Deliver["02 Deliver"]
   Check["03 Check"]
-  PullRequest["$pull_request"]
+  PullRequest[["$pull_request"]]
 
-  Request --> Ready
+  Request --> Sdlc
+  Sdlc --> Ready
   Ready -- "no" --> Frame
   Ready -- "yes" --> Deliver
   Frame --> Deliver
   Deliver --> Check
   Check -- "iterate" --> Deliver
   Check -- "ship" --> PullRequest
+
+  classDef skill fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A,stroke-width:2px
+  classDef artifact fill:#DCFCE7,stroke:#16A34A,color:#14532D,stroke-width:2px
+  classDef decision fill:#FFEDD5,stroke:#EA580C,color:#7C2D12,stroke-width:2px
+  classDef zone fill:#F1F5F9,stroke:#64748B,color:#0F172A,stroke-width:2px
+
+  class Sdlc skill
+  class Request,PullRequest artifact
+  class Ready decision
+  class Frame,Deliver,Check zone
 ```
 
 ## References

@@ -6,35 +6,62 @@ Produce a validated candidate from the contract.
 ---
 title: Deliver the candidate
 ---
-sequenceDiagram
-  participant Sdlc as /aidd-orchestrator:01-sdlc
-  participant Plan as /aidd-dev:01-plan
-  participant Executor as @aidd-dev:executor
-  participant Implement as /aidd-dev:02-implement
-  participant Assert as /aidd-dev:03-assert
-  participant Commit as /aidd-vcs:01-commit
-  participant Test as /aidd-dev:06-test
+flowchart TB
+  Contract[["$contract"]]
+  Sdlc["/aidd-orchestrator:01-sdlc"]
+  Plan["/aidd-dev:01-plan"]
+  PlanArtifact[["$plan"]]
+  Executor(["@aidd-dev:executor"])
+  Implement["/aidd-dev:02-implement"]
+  Candidate[["$candidate"]]
+  AssertCode["/aidd-dev:03-assert"]
+  AssertReport[["$assert_report"]]
+  ArchitectureDecision{"Architecture documentation?"}
+  AssertArchitecture["/aidd-dev:03-assert"]
+  ArchitectureReport[["$architecture_report"]]
+  CommitDecision{"Uncommitted changes?"}
+  Commit["/aidd-vcs:01-commit"]
+  CommitSha[["$commit_sha"]]
+  JourneyDecision{"User journey?"}
+  Test["/aidd-dev:06-test"]
+  JourneyReport[["$journey_report"]]
+  CandidateSha[["$candidate_sha"]]
+  Check["03 Check"]
 
-  Sdlc->>Plan: "Build the implementation plan"
-  Plan-->>Sdlc: $plan
-  Sdlc->>Executor: "Deliver the plan or review findings"
-  Executor->>Implement: "Implement the plan or fixes"
-  Implement-->>Executor: $candidate
-  Executor->>Assert: "Validate the candidate"
-  Assert-->>Executor: $assert_report
-  opt "Architecture documentation exists"
-    Executor->>Assert: "Run assert-architecture"
-    Assert-->>Executor: $architecture_report
-  end
-  opt "The candidate has uncommitted changes"
-    Executor->>Commit: "Commit the candidate"
-    Commit-->>Executor: $commit_sha
-  end
-  opt "A user journey is required"
-    Executor->>Test: "Run the final E2E journey"
-    Test-->>Executor: $journey_report
-  end
-  Executor-->>Sdlc: $candidate_sha
+  Contract --> Sdlc
+  Sdlc --> Plan
+  Plan --> PlanArtifact
+  PlanArtifact --> Executor
+  Executor --> Implement
+  Implement --> Candidate
+  Candidate -- "validate" --> AssertCode
+  AssertCode --> AssertReport
+  AssertReport --> ArchitectureDecision
+  ArchitectureDecision -- "yes, run assert-architecture" --> AssertArchitecture
+  AssertArchitecture --> ArchitectureReport
+  ArchitectureReport --> CommitDecision
+  ArchitectureDecision -- "no" --> CommitDecision
+  CommitDecision -- "yes" --> Commit
+  Commit --> CommitSha
+  CommitSha --> JourneyDecision
+  CommitDecision -- "no" --> JourneyDecision
+  JourneyDecision -- "yes, run test-journey" --> Test
+  Test --> JourneyReport
+  JourneyReport --> CandidateSha
+  JourneyDecision -- "no" --> CandidateSha
+  CandidateSha --> Check
+
+  classDef skill fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A,stroke-width:2px
+  classDef agent fill:#F3E8FF,stroke:#9333EA,color:#581C87,stroke-width:2px
+  classDef artifact fill:#DCFCE7,stroke:#16A34A,color:#14532D,stroke-width:2px
+  classDef decision fill:#FFEDD5,stroke:#EA580C,color:#7C2D12,stroke-width:2px
+  classDef zone fill:#F1F5F9,stroke:#64748B,color:#0F172A,stroke-width:2px
+
+  class Sdlc,Plan,Implement,AssertCode,AssertArchitecture,Commit,Test skill
+  class Executor agent
+  class Contract,PlanArtifact,Candidate,AssertReport,ArchitectureReport,CommitSha,JourneyReport,CandidateSha artifact
+  class ArchitectureDecision,CommitDecision,JourneyDecision decision
+  class Check zone
 ```
 
 - `/aidd-orchestrator:01-sdlc` owns `$plan`; `@aidd-dev:executor` never rewrites it.

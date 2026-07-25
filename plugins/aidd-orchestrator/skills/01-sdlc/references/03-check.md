@@ -6,35 +6,50 @@ Review the candidate in a fresh context and route the verdict.
 ---
 title: Check independently
 ---
-sequenceDiagram
-  participant Sdlc as /aidd-orchestrator:01-sdlc
-  participant Checker as @aidd-dev:checker
-  participant Review as /aidd-dev:05-review
-  participant Todo as /aidd-dev:10-todo
-  participant ExecutorA as @aidd-dev:executor A
-  participant ExecutorN as @aidd-dev:executor N
-  participant PullRequest as /aidd-vcs:02-pull-request
+flowchart TB
+  CandidateSha[["$candidate_sha"]]
+  Checker(["@aidd-dev:checker"])
+  Review["/aidd-dev:05-review"]
+  ReviewArtifact[["$review · $verdict"]]
+  Sdlc["/aidd-orchestrator:01-sdlc"]
+  Verdict{"Verdict?"}
+  Todo["/aidd-dev:10-todo"]
+  ExecutorFirst(["@aidd-dev:executor"])
+  ExecutorLast(["@aidd-dev:executor"])
+  FixFirst[["$fix_a"]]
+  FixLast[["$fix_n"]]
+  Fixes[["$fixes"]]
+  Deliver["02 Deliver"]
+  PullRequest["/aidd-vcs:02-pull-request"]
+  PullRequestUrl[["$pull_request_url"]]
 
-  Sdlc->>Checker: "Review the contract, plan, and candidate"
-  Checker->>Review: "Review the current diff"
-  Review-->>Checker: $review, $verdict
-  Checker-->>Sdlc: $verdict
-  alt "Iterate"
-    Sdlc->>Todo: "Dispatch independent findings"
-    par "Finding A"
-      Todo->>ExecutorA: "Implement finding A"
-    and "Finding N"
-      Todo->>ExecutorN: "Implement finding N"
-    end
-    ExecutorA-->>Todo: $fix_a
-    ExecutorN-->>Todo: $fix_n
-    Todo-->>Sdlc: $fixes
-    Sdlc->>Sdlc: "Route fixes to 02 Deliver"
-  else "Ship"
-    Sdlc->>Sdlc: "Verify the reviewed SHA is current"
-    Sdlc->>PullRequest: "Open the draft pull request"
-    PullRequest-->>Sdlc: $pull_request_url
-  end
+  CandidateSha --> Checker
+  Checker --> Review
+  Review --> ReviewArtifact
+  ReviewArtifact --> Sdlc
+  Sdlc --> Verdict
+  Verdict -- "iterate" --> Todo
+  Todo --> ExecutorFirst
+  Todo --> ExecutorLast
+  ExecutorFirst --> FixFirst
+  ExecutorLast --> FixLast
+  FixFirst --> Fixes
+  FixLast --> Fixes
+  Fixes --> Deliver
+  Verdict -- "ship" --> PullRequest
+  PullRequest --> PullRequestUrl
+
+  classDef skill fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A,stroke-width:2px
+  classDef agent fill:#F3E8FF,stroke:#9333EA,color:#581C87,stroke-width:2px
+  classDef artifact fill:#DCFCE7,stroke:#16A34A,color:#14532D,stroke-width:2px
+  classDef decision fill:#FFEDD5,stroke:#EA580C,color:#7C2D12,stroke-width:2px
+  classDef zone fill:#F1F5F9,stroke:#64748B,color:#0F172A,stroke-width:2px
+
+  class Review,Sdlc,Todo,PullRequest skill
+  class Checker,ExecutorFirst,ExecutorLast agent
+  class CandidateSha,ReviewArtifact,FixFirst,FixLast,Fixes,PullRequestUrl artifact
+  class Verdict decision
+  class Deliver zone
 ```
 
 - `@aidd-dev:checker` is fresh and read-only.

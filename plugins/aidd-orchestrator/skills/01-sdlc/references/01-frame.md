@@ -6,27 +6,46 @@ Decide whether the source is ready for planning.
 ---
 title: Frame the delivery contract
 ---
-sequenceDiagram
-  participant Sdlc as /aidd-orchestrator:01-sdlc
-  participant Ticket as /aidd-pm:01-ticket-info
-  participant Brainstorm as /aidd-refine:01-brainstorm
-  participant Spec as /aidd-pm:04-spec
+flowchart TB
+  Source[["$source"]]
+  Sdlc["/aidd-orchestrator:01-sdlc"]
+  TicketDecision{"Ticket reference?"}
+  Ticket["/aidd-pm:01-ticket-info"]
+  TicketArtifact[["$ticket"]]
+  ContractDecision{"Contract ready?"}
+  Contract[["$contract"]]
+  ScopeDecision{"Scope ambiguous?"}
+  Brainstorm["/aidd-refine:01-brainstorm"]
+  ClarifiedScope[["$clarified_scope"]]
+  Spec["/aidd-pm:04-spec"]
+  SpecArtifact[["$spec"]]
+  Deliver["02 Deliver"]
 
-  opt "A ticket reference exists"
-    Sdlc->>Ticket: "Retrieve the source"
-    Ticket-->>Sdlc: $ticket
-  end
-  alt "Objective and acceptance criteria exist"
-    Sdlc->>Sdlc: "Keep the source as contract"
-  else "Scope is ambiguous"
-    Sdlc->>Brainstorm: "Clarify the scope"
-    Brainstorm-->>Sdlc: $clarified_scope
-    Sdlc->>Spec: "Build the specification"
-    Spec-->>Sdlc: $spec
-  else "Scope is clear but contract is incomplete"
-    Sdlc->>Spec: "Build the specification"
-    Spec-->>Sdlc: $spec
-  end
+  Source --> Sdlc
+  Sdlc --> TicketDecision
+  TicketDecision -- "yes" --> Ticket
+  Ticket --> TicketArtifact
+  TicketArtifact --> ContractDecision
+  TicketDecision -- "no" --> ContractDecision
+  ContractDecision -- "yes" --> Contract
+  Contract --> Deliver
+  ContractDecision -- "no" --> ScopeDecision
+  ScopeDecision -- "yes" --> Brainstorm
+  Brainstorm --> ClarifiedScope
+  ClarifiedScope --> Spec
+  ScopeDecision -- "no" --> Spec
+  Spec --> SpecArtifact
+  SpecArtifact --> Deliver
+
+  classDef skill fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A,stroke-width:2px
+  classDef artifact fill:#DCFCE7,stroke:#16A34A,color:#14532D,stroke-width:2px
+  classDef decision fill:#FFEDD5,stroke:#EA580C,color:#7C2D12,stroke-width:2px
+  classDef zone fill:#F1F5F9,stroke:#64748B,color:#0F172A,stroke-width:2px
+
+  class Sdlc,Ticket,Brainstorm,Spec skill
+  class Source,TicketArtifact,Contract,ClarifiedScope,SpecArtifact artifact
+  class TicketDecision,ContractDecision,ScopeDecision decision
+  class Deliver zone
 ```
 
 - `/aidd-orchestrator:01-sdlc` owns the readiness decision.
