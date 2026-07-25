@@ -43,4 +43,3 @@ This is the behavioral baseline. Apply it to every code or diff, and extend it w
 
 - `aidd-dev:05-review`
 - `aidd-dev:04-audit`
-- `aidd-dev:06-test` (`test-journey` only)

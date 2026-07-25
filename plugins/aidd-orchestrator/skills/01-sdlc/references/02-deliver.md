@@ -12,8 +12,8 @@ sequenceDiagram
   participant Executor
   participant Implement as Implementation capability
   participant Assert as Assertion capability
-  participant Test as Test capability
   participant Commit as Commit capability
+  participant Test as E2E test capability
 
   Orchestrator->>Plan: Build plan from contract
   Plan-->>Orchestrator: plan.md
@@ -22,17 +22,18 @@ sequenceDiagram
   Implement-->>Executor: Candidate
   Executor->>Assert: Validate candidate
   Assert-->>Executor: Verdict
-  opt User journey is required
-    Executor->>Test: Validate journey
-    Test-->>Executor: Journey report
-  end
   opt Delivery leaves uncommitted changes
     Executor->>Commit: Commit remaining changes
     Commit-->>Executor: Commit SHA
+  end
+  opt User journey is required
+    Executor->>Test: Run final E2E journey
+    Test-->>Executor: Journey report
   end
   Executor-->>Orchestrator: Clean candidate SHA
 ```
 
 - The orchestrator owns `plan.md`; the executor never rewrites it.
 - The executor implements and self-validates. It does not perform the independent review.
+- Run E2E only after implementation, assertions, and commits are complete. A failure re-enters delivery before one final E2E run.
 - Return only a clean candidate with green validation to `03-check`.
