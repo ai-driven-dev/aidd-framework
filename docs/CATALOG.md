@@ -91,10 +91,10 @@ Version-control workflows: repo init, commit, pull/merge request, release tag, i
 
 Runs synchronous feature delivery and optional async issue automation.
 
-| Skill            | Role                                                  | Actions / sub-flows                                      |
-| ---------------- | ----------------------------------------------------- | -------------------------------------------------------- |
-| `00-async-dev`   | Single entry point for the async-dev pipeline         | `setup`, `run`, `review`                                 |
-| `01-sdlc`        | Drive the full development flow end to end            | `01-spec`, `02-plan`, `03-implement`, `04-review`, `05-ship` |
+| Skill            | Role                                                  | Protocols                |
+| ---------------- | ----------------------------------------------------- | ------------------------ |
+| `00-async-dev`   | Single entry point for the async-dev pipeline         | `setup`, `run`, `review` |
+| `01-sdlc`        | Drive the full development flow end to end            | `frame`, `deliver`, `check` |
 
 ## 🎨 aidd-ui
 

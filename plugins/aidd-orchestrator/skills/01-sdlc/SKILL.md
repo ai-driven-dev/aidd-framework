@@ -1,33 +1,45 @@
 ---
 name: 01-sdlc
-description: Orchestrates a request from specification to shipped code, isolating implementation and review in specialized agents. Use when the user wants to deliver a change end to end. Not for running a single development step.
-argument-hint: interactive | auto
+description: Orchestrates a request from framing to a draft pull request, isolating implementation and review in specialized agents. Use when the user wants to deliver a change end to end. Not for running a single development step.
 ---
 
 # Skill: sdlc
 
 ```mermaid
+---
+title: SDLC orchestration
+---
 flowchart LR
-  spec --> plan --> implement --> review --> ship
-  review -->|iterate| implement
+  Request["Request"]
+  Ready{"Ready contract?"}
+  Frame["01 Frame"]
+  Deliver["02 Deliver"]
+  Check["03 Check"]
+  PullRequest["Draft pull request"]
+
+  Request --> Ready
+  Ready -- "no" --> Frame
+  Ready -- "yes" --> Deliver
+  Frame --> Deliver
+  Deliver --> Check
+  Check -- "iterate" --> Deliver
+  Check -- "ship" --> PullRequest
 ```
 
-## Actions
+## References
 
-Read only the next action's file before running it.
+Read only the current zone's reference before delegating it.
 
-| #   | Action      | Does                                         |
-| --- | ----------- | -------------------------------------------- |
-| 01  | `spec`      | Consolidate sources into the contract        |
-| 02  | `plan`      | Produce the plan file                         |
-| 03  | `implement` | Build the plan's code and gate on assertions |
-| 04  | `review`    | Return a `ship` or `iterate` verdict         |
-| 05  | `ship`      | Open the change request                       |
+| #   | Reference                                      | Does                                  |
+| --- | ---------------------------------------------- | ------------------------------------- |
+| 01  | [Frame](references/01-frame.md)                | Resolve a planning-ready contract     |
+| 02  | [Deliver](references/02-deliver.md)            | Build and validate a committed change |
+| 03  | [Check](references/03-check.md)                | Review independently and open the PR  |
 
 ## Transversal rules
 
-- Delegate implementation and review; never write or judge code yourself.
+- Own routing and verify every handoff against the current reference.
+- Discover cross-plugin capabilities by description, never by plugin name.
+- Run planning in the orchestrator context. Isolate implementation in `executor` and independent review in `checker`.
 - Mode: default `interactive`, pausing for approval at each step; switch to `auto` only when the caller says so, then decide alone and never ask.
-- Every step runs; only `01-spec` self-skips when the source already states an objective and acceptance criteria.
-- Drive the plan status `pending → in-progress → implemented → reviewed`, or `blocked`.
-- Every artifact (spec, plan, phases, review) lands in one feature folder, `aidd_docs/tasks/<yyyy_mm>/<yyyy_mm_dd>_<slug>/`, resolved at entry.
+- Stop on `blocked`. Loop `check → deliver` on `iterate`.

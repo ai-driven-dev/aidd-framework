@@ -32,10 +32,8 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 
 | Group | File | Description |
 |-------|------|---|
-| `actions` | [01-spec.md](skills/01-sdlc/actions/01-spec.md) | - |
-| `actions` | [02-plan.md](skills/01-sdlc/actions/02-plan.md) | - |
-| `actions` | [03-implement.md](skills/01-sdlc/actions/03-implement.md) | - |
-| `actions` | [04-review.md](skills/01-sdlc/actions/04-review.md) | - |
-| `actions` | [05-ship.md](skills/01-sdlc/actions/05-ship.md) | - |
-| `-` | [SKILL.md](skills/01-sdlc/SKILL.md) | `Orchestrates a request from specification to shipped code, isolating implementation and review in specialized agents. Use when the user wants to deliver a change end to end. Not for running a single development step.` |
+| `references` | [01-frame.md](skills/01-sdlc/references/01-frame.md) | - |
+| `references` | [02-deliver.md](skills/01-sdlc/references/02-deliver.md) | - |
+| `references` | [03-check.md](skills/01-sdlc/references/03-check.md) | - |
+| `-` | [SKILL.md](skills/01-sdlc/SKILL.md) | `Orchestrates a request from framing to a draft pull request, isolating implementation and review in specialized agents. Use when the user wants to deliver a change end to end. Not for running a single development step.` |
 
