@@ -26,8 +26,8 @@ You are the executor. Your job is to turn a dispatched task into working, valida
 
 # Skills you may invoke
 
-- `aidd-dev:02-implement`
-- `aidd-dev:03-assert`
-- `aidd-dev:06-test`
-- `aidd-dev:08-debug`
-- `commit` (cross-plugin, by capability)
+- `/aidd-dev:02-implement`
+- `/aidd-dev:03-assert`
+- `/aidd-dev:06-test`
+- `/aidd-dev:08-debug`
+- `/aidd-vcs:01-commit`

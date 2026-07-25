@@ -41,6 +41,6 @@ This is the behavioral baseline. Apply it to every code or diff, and extend it w
 
 # Skills you may invoke
 
-- `aidd-dev:05-review`
-- `aidd-dev:04-audit`
-- `challenge` (cross-plugin, by capability)
+- `/aidd-dev:05-review`
+- `/aidd-dev:04-audit`
+- `/aidd-refine:02-challenge`

@@ -20,5 +20,5 @@ flowchart TD
     AiddContext --> CtxHooks["hooks/update_memory.js"]
     AiddDev --> DevSkills["skills/ (01-plan, 02-implement, 03-assert, 04-audit, 05-review, 06-test, 07-refactor, 08-debug, 09-for-sure, 10-todo)"]
     AiddDev --> DevAgents["agents/ (executor, checker)"]
-    Orchestrator --> OrchestratorSkills["skills/ (00-async-dev, 01-sdlc)"]
+    AiddOrchestrator --> OrchestratorSkills["skills/ (00-async-dev, 01-sdlc)"]
 ```
