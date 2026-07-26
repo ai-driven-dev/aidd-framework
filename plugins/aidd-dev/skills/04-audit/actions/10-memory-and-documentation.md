@@ -25,10 +25,3 @@ Audit whether maintained project memory still matches code and current usage. Hi
 4. Verify each high-impact claim against current code, configuration, manifests, and scripts.
 5. Ignore `aidd_docs/tasks/**`, old plans, and historical reviews even when they contradict memory.
 6. Report at most five stale or missing facts with the greatest agent-decision impact.
-
-## Test
-
-- Every stale-memory finding cites memory and current implementation evidence.
-- “Missing memory” explains the wrong decision a fresh agent could make.
-- No historical task artifact is treated as current truth.
-- The audit never edits memory.

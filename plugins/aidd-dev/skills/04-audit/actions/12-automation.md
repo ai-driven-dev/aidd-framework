@@ -30,10 +30,3 @@ Confirmed findings from other pillars, active automation, rules, skills, memory,
 4. Record recurrence, current human or token cost, proposed layer, expected leverage, false-positive risk, maintenance cost, and owner.
 5. Prefer one class-level guardrail over multiple one-off fixes.
 6. Rank at most five automation candidates.
-
-## Test
-
-- Every candidate links to a confirmed finding or repeated evidenced pattern.
-- One-off preferences do not become permanent machinery.
-- Proposed enforcement is placed at the strongest proportionate layer.
-- Expected leverage and maintenance or false-positive risk are both stated.

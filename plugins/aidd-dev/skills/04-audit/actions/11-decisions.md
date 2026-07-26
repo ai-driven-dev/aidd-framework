@@ -30,10 +30,3 @@ The `## Decision register` and decision-related findings in `05-architecture-and
 4. Apply the generality gate to constants, thresholds, buffers, special cases, and narrowly placed fixes.
 5. Use decision risk to focus code inspection; never let a declared decision suppress contradictory evidence.
 6. Feed verified decision findings into the shared architecture chapter.
-
-## Test
-
-- Retrospective inference is never presented as original intent.
-- Every non-general finding proves the class remains unresolved beyond the observed example.
-- High-confidence declarations cannot override contradictory code evidence.
-- The decision register contains no hidden chain-of-thought.

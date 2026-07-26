@@ -25,10 +25,3 @@ Target code, current budgets when defined, and existing profiler, build, bundle,
 4. Do not launch the site, generate a new profile, or run E2E by default.
 5. A bounded runtime probe must pass the critical escalation gate in `audit-contract.md`.
 6. Report at most five material findings.
-
-## Test
-
-- Every bottleneck finding cites measurement or a decisive complexity path.
-- “Large” is compared with a project budget, artifact, or meaningful consequence.
-- Reliability findings name the failure mode and missing detection or recovery.
-- No general runtime or E2E flow runs.

@@ -25,10 +25,3 @@ Explicit North Star sources, or candidates discovered in the current repository.
 4. Extract only material outcomes and constraints, not every sentence.
 5. Trace them into routes, commands, schemas, public APIs, and critical code paths.
 6. Report at most five verified divergences.
-
-## Test
-
-- Every finding cites both a confirmed North Star statement and implementation evidence.
-- Missing or conflicting sources produce skipped, unknown, or disputed status rather than invented intent.
-- Old plans are ignored unless explicitly declared normative.
-- `02-north-star.md` contains no cosmetic product suggestions.

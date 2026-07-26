@@ -21,11 +21,3 @@ Optional target, scope, North Star sources, rule sources, memory path, architect
 7. **Close coverage.** Write `14-coverage-and-unknowns.md` with scanned, skipped, stale, inaccessible, and unresolved surfaces.
 8. **Summarise.** Write `00-summary.md` last from canonical finding IDs. Never copy full finding prose.
 9. **Validate.** Check each document against its section contract in `../assets/audit-validator.yml`; remove placeholders and unsupported claims.
-
-## Test
-
-- `00` through `14` exist, or a skipped chapter exists with its reason.
-- Every finding exists canonically in one pillar chapter.
-- Summary, challenge, systemic, and action chapters link IDs instead of duplicating findings.
-- `11-challenge-ledger.md` states the achieved independence honestly.
-- No file outside the audit report folder changed.

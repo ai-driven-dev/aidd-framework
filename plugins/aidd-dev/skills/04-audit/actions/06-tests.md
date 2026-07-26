@@ -25,13 +25,7 @@ Test code, production behavior, fixtures, mocks, test configuration, CI history,
 3. Inspect assertions, mocks, fixtures, timing dependencies, skips, snapshots, and overlap. Do not classify from filenames alone.
 4. Classify material groups as `protective`, `redundant`, `brittle`, `ceremonial`, or `misleading`.
 5. Compare signal with runtime, flake, fixture complexity, duplication, and maintenance cost.
-6. Recommend `delete` only when no distinct protected risk remains beyond a cheaper test. Otherwise prefer `keep`, `rewrite`, `merge`, or `unknown`.
-7. Do not run E2E. Use existing CI, coverage, timing, and flake evidence; do not generate new coverage by default.
-8. Report at most five highest-leverage findings.
-
-## Test
-
-- Every finding names protected risk, plausible regression, signal failure, and cost.
-- Coverage percentage alone never produces a finding.
-- A delete recommendation proves the absence of unique protection.
-- Critical untested behavior cites the production path and missing effective witness.
+6. For critical untested behavior, cite the production path and the missing effective witness.
+7. Recommend `delete` only when no distinct protected risk remains beyond a cheaper test. Otherwise prefer `keep`, `rewrite`, `merge`, or `unknown`.
+8. Do not run E2E. Use existing CI, coverage, timing, and flake evidence; do not generate new coverage by default.
+9. Report at most five highest-leverage findings.

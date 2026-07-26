@@ -24,10 +24,3 @@ Target, optional scope, and resolved sources from `01-scope-and-system-map.md`.
 3. Inspect call sites, imports, error paths, and current change surfaces for the strongest leads.
 4. Falsify each lead: a large generated table or cohesive module is not a finding merely because it is large.
 5. Report at most five verified root problems. Architecture coupling belongs to `02`; runtime cost belongs to `05`.
-
-## Test
-
-- Every finding proves a material consequence beyond file size or personal style.
-- No dead code is asserted without call-site or tooling evidence.
-- `06-code-hotspots.md` has the required sections and at most five findings.
-- Application files are unchanged.

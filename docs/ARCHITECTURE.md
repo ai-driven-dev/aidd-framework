@@ -141,7 +141,7 @@ flowchart LR
   ActionN --> Out
 ```
 
-Each action is a self-contained markdown file with inputs, outputs, depends-on, process steps, and a test checklist. Actions can call other skills via the `Skill` tool, so a skill discovers a capability it needs at runtime (by matching skill descriptions, never by hardcoded plugin name) and delegates to it.
+Each action is a self-contained markdown file with inputs, outputs, dependencies, and process steps. Keep a test checklist only when it adds action-specific validation that is not already enforced by a canonical contract or validator. Actions can call other skills via the `Skill` tool, so a skill discovers a capability it needs at runtime (by matching skill descriptions, never by hardcoded plugin name) and delegates to it.
 
 ## 🤖 Skills and agents
 

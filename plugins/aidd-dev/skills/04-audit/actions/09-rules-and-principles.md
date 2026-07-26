@@ -29,10 +29,3 @@ Active host instructions, scoped repository rules, user-supplied principles, and
 4. Group repeated violations of one rule into one root finding, but keep every violating location linked in the control matrix.
 5. Report every active rule in the matrix. The five-finding cap does not hide material rule failures; prioritise the five root causes in the Findings section and link remaining failed controls.
 6. Suggest automation when a rule can be enforced more reliably by type, lint, test, CI, hook, or skill.
-
-## Test
-
-- Every active rule appears exactly once in the control matrix.
-- Every fail cites the exact rule source and concrete implementation evidence.
-- Observed convention is never promoted to a rule.
-- Conflicting precedence is marked disputed, not resolved by guess.
