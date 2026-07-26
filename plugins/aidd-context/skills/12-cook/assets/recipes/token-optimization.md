@@ -1,303 +1,354 @@
-# Token optimization for AI IDEs
+# Token optimization across coding agents
 
-Cut token usage and cost in AI coding assistants without losing output quality.
+Cut token usage across coding agents without confusing general techniques with Claude Code or Codex commands.
 
-- [Token optimization for AI IDEs](#token-optimization-for-ai-ides)
-  - [Why optimize your tokens](#why-optimize-your-tokens)
+- [Token optimization across coding agents](#token-optimization-across-coding-agents)
+  - [Why](#why)
   - [Steps to cut token usage](#steps-to-cut-token-usage)
     - [🟢 Beginner](#-beginner)
-      - [1) 🔎 See what fills the window — `/context`](#1--see-what-fills-the-window--context)
-      - [2) 💸 Read the bill — `/cost`](#2--read-the-bill--cost)
-      - [3) 🔍 Find your bad habits — `/insights`](#3--find-your-bad-habits--insights)
-      - [4) 📈 Track per-prompt with an analytics tool](#4--track-per-prompt-with-an-analytics-tool)
-      - [5) ✂️ Trim your instruction file](#5-️-trim-your-instruction-file)
-      - [6) 🧭 Plan before you edit — plan mode](#6--plan-before-you-edit--plan-mode)
-      - [7) ♻️ Clear context between tasks — `/clear`](#7-️-clear-context-between-tasks--clear)
-      - [8) 🗜️ Compact deliberately](#8-️-compact-deliberately)
+      - [1) 📏 Establish a comparable baseline](#1--establish-a-comparable-baseline)
+      - [2) 🔎 Inspect context pressure](#2--inspect-context-pressure)
+      - [3) ✂️ Trim persistent instructions](#3-️-trim-persistent-instructions)
+      - [4) 🧭 Plan before expensive rework](#4--plan-before-expensive-rework)
+      - [5) ♻️ Reset between unrelated tasks](#5-️-reset-between-unrelated-tasks)
+      - [6) 🗜️ Compact at a natural boundary](#6-️-compact-at-a-natural-boundary)
     - [🟡 Intermediate](#-intermediate)
-      - [9) 🗣️ Make the agent talk less](#9-️-make-the-agent-talk-less)
-      - [10) 🧹 Filter noisy command output](#10--filter-noisy-command-output)
-      - [11) 🚫 Keep big paths out of context — deny reads](#11--keep-big-paths-out-of-context--deny-reads)
-      - [12) 🔌 Prefer CLI over MCP](#12--prefer-cli-over-mcp)
+      - [7) 📈 Export structured usage telemetry](#7--export-structured-usage-telemetry)
+      - [8) 🗣️ Make concise output explicit](#8-️-make-concise-output-explicit)
+      - [9) 🧹 Filter noisy shell output selectively](#9--filter-noisy-shell-output-selectively)
+      - [10) 🔌 Limit MCP exposure by client](#10--limit-mcp-exposure-by-client)
     - [🔴 Expert](#-expert)
-      - [13) 🔬 Audit which skills and tools run — `Ctrl+O`](#13--audit-which-skills-and-tools-run--ctrlo)
-      - [14) 🎯 Route by difficulty](#14--route-by-difficulty)
-      - [15) 🧫 Offload high-volume work to subagents](#15--offload-high-volume-work-to-subagents)
-      - [16) 🧊 Protect your cache hits](#16--protect-your-cache-hits)
-      - [17) ✅ Cap extended thinking](#17--cap-extended-thinking)
+      - [11) 🔬 Inspect client behavior without mixing shortcuts](#11--inspect-client-behavior-without-mixing-shortcuts)
+      - [12) 🎯 Route model and reasoning by difficulty](#12--route-model-and-reasoning-by-difficulty)
+      - [13) 🧫 Isolate noisy work with subagents](#13--isolate-noisy-work-with-subagents)
+      - [14) 🧊 Protect Claude Code prompt-cache stability](#14--protect-claude-code-prompt-cache-stability)
   - [In short](#in-short)
 
-## Why optimize your tokens
+## Why
 
-**Token usage** is the bill — every turn re-sends your whole **context window** and you pay for it again.
+**Token usage** grows with persistent instructions, conversation history, tool output, and reasoning.
 
-Most of it is **waste**: filler prose, noisy logs, stale context, bloated instruction files.
+**Command names are not portable contracts**: `/usage`, `/compact`, `/model`, and keyboard shortcuts can differ across clients.
 
-Reach for this recipe when **cost** climbs faster than your output.
+**Applicability labels** separate portable techniques from verified Claude Code and Codex mechanics. No command is labeled as universal.
 
 ## Steps to cut token usage
 
 ### 🟢 Beginner
 
-#### 1) 🔎 See what fills the window — `/context`
+#### 1) 📏 Establish a comparable baseline
 
-`/context` paints your context as a grid, so you cut the biggest consumers instead of guessing.
+**Applies to:** Claude Code and Codex, with different command semantics.
 
-1. Run `/context` in Claude Code.
-2. Find the heavy blocks: tool schemas, instruction files, long file reads.
-3. Attack the biggest block first.
+Within one client, measure the same task with an unchanged model and reasoning level before and after each change. Compare clients only when their models and usage counters are genuinely comparable.
 
-```text
-$ /context
-  MCP tool schemas   ████████████  28%   ← biggest, cut first
-  file reads         ████████      19%
-  CLAUDE.md          ████          9%
-(illustrative — replace with a screenshot of your real /context)
-```
+1. Use the command for your client.
+2. Record model, reasoning level, task, and result quality beside the usage number.
 
-#### 2) 💸 Read the bill — `/cost`
-
-`/cost` tells you what a session actually costs and where the spend goes.
-
-1. Run `/cost` (alias `/usage`).
-2. Read the breakdown by skill, subagent, and MCP server.
-3. Re-run it after a change to confirm the spend really dropped.
+| Client | Command | What it establishes |
+| --- | --- | --- |
+| Claude Code | `/usage` | Session cost, plan limits, activity statistics, and available breakdowns; `/cost` and `/stats` are aliases |
+| Codex CLI | `/status` | Current chat configuration, context usage, and rate limits |
+| Codex CLI | `/usage` | Daily, weekly, or cumulative account token activity; not session cost or API billing |
 
 ```text
-$ /cost
-  Session: $0.42 · 1.2M tokens
-  By: subagents 38% · MCP 21% · main 41%
-(illustrative — replace with a screenshot of your real /cost)
+Claude Code: /usage
+Codex:       /status
+Codex:       /usage weekly
 ```
 
-#### 3) 🔍 Find your bad habits — `/insights`
+See [Claude Code costs](https://code.claude.com/docs/en/costs) and [Codex commands](https://learn.chatgpt.com/docs/developer-commands?surface=cli).
 
-`/insights` analyses how you prompt — probably sub-optimal — so you fix the pattern, not one prompt. What you repeat every session belongs in the knowledge base, and the counter-intuitive habits you never noticed get surfaced so you can drop them.
+#### 2) 🔎 Inspect context pressure
 
-1. Run `/insights`.
-2. Move what you repeat into `CLAUDE.md` or a rule, and drop the habits it flags.
+**Applies to:** Claude Code and Codex, with different diagnostic depth.
+
+Inspect context before deleting useful guidance or compacting prematurely.
+
+1. In Claude Code, use `/context all` for a breakdown by context component.
+2. In Codex, use `/status` for context usage and remaining capacity.
+3. Do not describe Codex `/status` as equivalent to Claude Code's component grid.
 
 ```text
-$ /insights
-  • You restate the test command in ~60% of sessions → put it in CLAUDE.md
-  • Long "summary" turns inflate output → ask for terse replies
-(illustrative — replace with a screenshot of your real /insights)
+Claude Code: /context all
+Codex:       /status
 ```
 
-#### 4) 📈 Track per-prompt with an analytics tool
+Codex CLI also exposes the experimental `codex debug prompt-input [PROMPT]` diagnostic, which renders model-visible prompt inputs as JSON; it is not the same interface as `/context all`.
 
-Built-ins show one session; an analytics tool reads all your local logs and reveals where the bill truly sits. The lesson it surfaces: **cache reads dwarf input + output**, so caching, not generation, is most of the bill.
+#### 3) ✂️ Trim persistent instructions
 
-1. Pick one: [`prompt-analytics-for-claude-code`](https://github.com/romainfjgaspard/prompt-analytics-for-claude-code) or [`ccusage`](https://www.npmjs.com/package/ccusage).
-2. Run it — `uvx --from prompt-analytics-for-claude-code prompt-analytics summary` — no setup, it parses `~/.claude`.
+**Applies to:** All coding agents; the instruction file is client-specific.
 
-![prompt-analytics dashboard — cost by token type shows cache reads dominate the bill](https://raw.githubusercontent.com/romainfjgaspard/prompt-analytics-for-claude-code/main/docs/screenshots/dashboard-home.png)
+Keep only durable rules in the file that loads for every task, and move specialized procedures to on-demand skills or referenced documents.
 
-#### 5) ✂️ Trim your instruction file
+1. Open only the persistent instruction file documented by your client.
+2. Remove duplicated architecture prose, one-off task details, and commands the agent can discover safely.
+3. Keep completion criteria, constraints, and the canonical validation commands.
 
-Your instruction file ships every turn, so each cut line saves on every message.
-
-1. Open `CLAUDE.md` (or `.github/copilot-instructions.md`).
-2. Cut it to essentials and add explicit conciseness rules.
-3. Model it on a real concise instruction file: [AGENTS.md](../../../02-project-memory/assets/AGENTS.md).
+| Client | Native persistent instructions |
+| --- | --- |
+| Claude Code | `CLAUDE.md` |
+| Codex | `AGENTS.md` or the closer `AGENTS.override.md` |
+| Other clients | Use only the filename and precedence documented by that client |
 
 ```md
-# CLAUDE.md — keep it terse (see AGENTS.md for the full example)
+# Persistent instructions
 
-- Answer first. Lead with the result, then the reason. Drop pleasantries and hedging.
-- No tool-call narration. No decorative tables or emoji unless they carry information.
-- Keep verbatim: code, quoted errors, security warnings. Cut the rest.
+- Lead with the result.
+- Run the smallest relevant validation.
+- Preserve unrelated user changes.
 ```
 
-#### 6) 🧭 Plan before you edit — plan mode
+See [Claude Code memory](https://code.claude.com/docs/en/memory) and [Codex AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
 
-Approving the wrong direction burns tokens on rework, so let Claude explore read-only and propose a plan first.
+#### 4) 🧭 Plan before expensive rework
 
-1. Press `Shift+Tab` twice to enter plan mode (or start with `claude --permission-mode plan`).
-2. Review the plan, then approve to switch to execution.
+**Applies to:** All coding agents as a technique; commands are client-specific.
+
+Plan first when ambiguity or implementation risk makes a wrong direction expensive.
+
+1. Enter the documented plan surface for your client.
+2. Review scope, assumptions, and validation before authorizing implementation.
+3. Use a separate read-only permission or sandbox setting when planning must prohibit writes; plan mode alone is not a universal security boundary.
+
+| Client | Plan command |
+| --- | --- |
+| Claude Code | `/plan` or launch with `claude --permission-mode plan` |
+| Codex | `/plan`; the command can include the first planning prompt |
+| Other clients | Ask for a plan explicitly; use only a documented plan mode if one exists |
 
 ```text
-Shift+Tab Shift+Tab → ⏸ plan mode
-  Claude reads and proposes; no edits until you approve
+/plan Propose the smallest implementation and its validation before editing
 ```
 
-See [permission modes](https://code.claude.com/docs/en/permission-modes).
+See [Claude Code permission modes](https://code.claude.com/docs/en/permission-modes) and [Codex best practices](https://learn.chatgpt.com/guides/best-practices).
 
-#### 7) ♻️ Clear context between tasks — `/clear`
+#### 5) ♻️ Reset between unrelated tasks
 
-Stale early turns ride along and get re-billed every turn, so reset when the task changes.
+**Applies to:** All coding agents as a technique; slash commands are verified only for the named clients.
 
-1. Finish a task, then run `/clear` to drop the history and reload only `CLAUDE.md` and memory.
-2. Use `/compact` instead when you want to keep a summary of the same task.
+Start a fresh conversation when the goal changes instead of paying repeatedly for stale turns.
+
+1. Preserve any durable decision outside the disposable transcript.
+2. Reset with the client-native action.
+
+| Client | Fresh-context action |
+| --- | --- |
+| Claude Code | `/clear` |
+| Codex CLI | `/clear` clears the terminal and starts a fresh chat; `/new` starts another chat without clearing the display |
+| Other clients | Start a new conversation through the documented UI |
 
 ```text
-$ /clear
-  history dropped → fresh window, CLAUDE.md + memory reloaded
+Claude Code: /clear
+Codex:       /new
 ```
 
-See [reduce token usage](https://code.claude.com/docs/en/costs).
+#### 6) 🗜️ Compact at a natural boundary
 
-#### 8) 🗜️ Compact deliberately
+**Applies to:** Claude Code and Codex; argument syntax differs.
 
-Compacting on your terms keeps what matters instead of letting auto-compaction guess.
+Compact only when the same task still needs its earlier decisions and the context pressure justifies a summary.
 
-1. Watch context use and act around 60–70%.
-2. Run `/compact` with focus instructions naming what to keep.
+1. Preserve the current goal, accepted decisions, failing evidence, and next validation.
+2. Use only the syntax documented by your client.
+
+| Client | Compact action |
+| --- | --- |
+| Claude Code | `/compact keep the accepted decisions, repro, and failing test` |
+| Codex | `/compact`; no inline focus argument is documented |
 
 ```text
-$ /compact keep the repro steps and the failing test; drop the file dumps
+Claude Code: /compact keep the repro and failing test; drop file dumps
+Codex:       /compact
 ```
+
+See [Claude Code commands](https://code.claude.com/docs/en/commands) and [Codex commands](https://learn.chatgpt.com/docs/developer-commands?surface=cli).
 
 ### 🟡 Intermediate
 
-#### 9) 🗣️ Make the agent talk less
+#### 7) 📈 Export structured usage telemetry
 
-Output is repetition you pay to generate, so cap the chatter. caveman forces short, filler-free replies (reported ~65% output cut, code intact) and auto-detects 30+ agents.
+**Applies to:** Claude Code and Codex; their configuration and telemetry schemas differ.
 
-1. Built-in route: set `"outputStyle": "concise"` in `settings.json`.
-2. Harder cut: install the [`caveman`](https://github.com/JuliusBrussee/caveman) skill and invoke it like any skill — `/caveman` (or `/caveman ultra`); stop with "normal mode".
+Use your own OpenTelemetry collector when interactive usage commands are not enough for comparisons across sessions.
+
+1. Enable the exporter for the selected client.
+2. Keep prompt and tool content redacted unless an explicit audit requirement justifies collecting it.
+3. Compare token types, model, agent, and tool output; treat cost attribution as an estimate unless it comes from the billing system.
+
+Claude Code metrics export:
+
+```bash
+CLAUDE_CODE_ENABLE_TELEMETRY=1 \
+OTEL_METRICS_EXPORTER=otlp \
+OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://localhost:4318/v1/metrics \
+OTEL_EXPORTER_OTLP_METRICS_PROTOCOL=http/protobuf \
+claude
+```
+
+Codex log export in `config.toml`:
+
+```toml
+[otel]
+environment = "dev"
+log_user_prompt = false
+
+[otel.exporter."otlp-http"]
+endpoint = "http://localhost:4318/v1/logs"
+protocol = "binary"
+```
+
+Claude Code exports metrics such as `claude_code.token.usage`; Codex emits its own events and token fields. Do not query one client's schema under the other's names.
+
+See [Claude Code monitoring](https://code.claude.com/docs/en/monitoring-usage) and [Codex observability](https://learn.chatgpt.com/docs/config-file/config-advanced#observability-and-telemetry).
+
+#### 8) 🗣️ Make concise output explicit
+
+**Applies to:** All coding agents as an instruction; persistent mechanisms are client-specific.
+
+Short answers reduce output tokens only when the instruction does not sacrifice required evidence.
+
+1. Add one concise rule to the client-native instruction surface.
+2. Use the client-specific output control only when its documented scope matches the goal.
+
+| Client | Persistent mechanism |
+| --- | --- |
+| Claude Code | A short custom file under `.claude/output-styles/`, selected through `/config` |
+| Codex | `model_verbosity = "low"` for supported Responses API models, plus a short rule in `AGENTS.md` |
+| Other clients | A documented response-style setting or persistent instruction |
 
 ```text
-/caveman
-
-before: The reason your React component is re-rendering is likely because you're creating a new object reference on each render cycle. When you pass an inline object as a prop, React's shallow comparison sees it as a different object every time, which triggers a re-render. I'd recommend using useMemo to memoize the object.
-
-after:  New object ref each render. Inline object prop = new ref = re-render. Wrap in `useMemo`.
+Answer directly. Preserve code, decisive errors, evidence, and security warnings; omit filler.
 ```
 
-See [output styles](https://code.claude.com/docs/en/output-styles).
+`model_reasoning_summary = "concise"` in Codex shortens the reasoning summary, not the final answer. See [Claude Code output styles](https://code.claude.com/docs/en/output-styles) and [Codex configuration](https://learn.chatgpt.com/docs/config-file/config-reference).
 
-#### 10) 🧹 Filter noisy command output
+#### 9) 🧹 Filter noisy shell output selectively
 
-Test, install, and build logs flood context with lines the model never needs.
+**Applies to:** Shell-capable coding agents; RTK and SNIP are third-party tools.
 
-1. Install a CLI proxy: [`RTK`](https://github.com/rtk-ai/rtk) (Rust) or [`SNIP`](https://github.com/edouard-claude/snip) (Go, YAML filters).
-2. Prefix your command with it: `rtk cargo test`.
+Reduce model-visible logs only when filtering cannot hide evidence needed for diagnosis.
 
-```mermaid
-flowchart LR
-  A["rtk cargo test"] --> R[RTK proxy]
-  R --> C["cargo test runs"]
-  C -->|"~25,000 tokens"| R
-  R -->|"filter · group · dedupe"| M["~2,500 tokens to model"]
+1. Prefer a command's native `--quiet`, `--json`, filtering, or targeted-test option.
+2. If that is insufficient, inspect and install a proxy such as [`RTK`](https://github.com/rtk-ai/rtk) or [`SNIP`](https://github.com/edouard-claude/snip).
+3. Prefix only materially noisy commands and rerun the raw command when the filtered result is incomplete.
+
+```bash
+rtk cargo test
 ```
 
-Real saving: `git push` (15 lines, ~200 tokens) -> `rtk git push` (1 line, ~10 tokens).
+Published reduction figures measure model-visible command output, not independently verified billing savings. Never filter the first security failure or the only copy of a diagnostic log.
 
-#### 11) 🚫 Keep big paths out of context — deny reads
+#### 10) 🔌 Limit MCP exposure by client
 
-Vendor dirs, build output, and secrets get pulled into context by accident. Deny reads on them so they stay out — they remain grep-able.
+**Applies to:** MCP-capable agents; deferral behavior is client-specific.
 
-1. In `settings.json`, add `Read(...)` deny rules for large or sensitive paths.
-2. `.claudeignore` is not shipped — deny rules are the official way.
+Disable unused servers and expose only required tools without assuming every MCP client has Claude Code Tool Search.
 
-```json
-{
-  "permissions": {
-    "deny": ["Read(./vendor/**)", "Read(./dist/**)", "Read(./.env)"]
-  }
-}
+1. Inventory enabled servers and tools.
+2. Apply only controls documented by the selected client.
+
+| Client | Documented control |
+| --- | --- |
+| Claude Code | Tool Search defers MCP tool schemas on supported models and providers; avoid `alwaysLoad` unless a small toolset is needed on nearly every turn |
+| Codex | Inspect with `/mcp verbose`; disable an unused server with `enabled = false`, or restrict it with `enabled_tools` and `disabled_tools` |
+| Other clients | Disable unused servers or tools through their documented configuration; do not assume schema deferral |
+
+```toml
+[mcp_servers.figma]
+url = "https://mcp.figma.com/mcp"
+enabled = false
 ```
 
-See [permissions](https://code.claude.com/docs/en/permissions).
-
-#### 12) 🔌 Prefer CLI over MCP
-
-An MCP server's schema rides along every turn; a CLI costs tokens only when you call it. Newer MCP tooling adds tool/context selection that loads only the tools you pick — cheaper than before — but a CLI is still leaner and faster.
-
-|            | CLI (`gh`, `acli`, …)   | MCP server                                            |
-| ---------- | ----------------------- | ----------------------------------------------------- |
-| Token cost | a few, only when called | a schema every turn; less with tool/context selection |
-| Speed      | fastest                 | slower                                                |
-| Use when   | a CLI exists            | no CLI, or you need typed/live tool calls             |
-
-See [`mcp-installation.md`](mcp-installation.md).
+Codex exposes no public stable setting equivalent to Claude Code's `alwaysLoad`. See [Claude Code MCP](https://code.claude.com/docs/en/mcp#scale-with-mcp-tool-search), [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli), and [`mcp-installation.md`](mcp-installation.md).
 
 ### 🔴 Expert
 
-#### 13) 🔬 Audit which skills and tools run — `Ctrl+O`
+#### 11) 🔬 Inspect client behavior without mixing shortcuts
 
-You optimise what you can see, so expand the transcript to watch what each turn actually invokes and pulls into context.
+**Applies to:** Claude Code for the commands below; Codex has no documented `/insights` equivalent.
 
-1. Press `Ctrl+O` to toggle the transcript — it shows detailed tool and skill usage and expands collapsed MCP calls.
-2. Spot skills or tools that load on turns that don't need them, then scope or remove them.
+Use client-native diagnostics instead of copying shortcuts between products.
 
-```text
-Ctrl+O — transcript expanded
-  ⎿ Skill: token-optimization
-  ⎿ Called slack 3 times → expanded: 3 tool calls
-(illustrative — replace with a screenshot of your real Ctrl+O transcript)
-```
-
-See the [keyboard shortcuts](https://code.claude.com/docs/en/interactive-mode).
-
-#### 14) 🎯 Route by difficulty
-
-The top model on routine work is wasted spend, so pin the model per skill or agent — cheap for routine, top-tier for hard reasoning.
-
-1. Set `model` in a skill's or an agent's frontmatter (`haiku` / `sonnet` / `opus`, a full id, or `inherit`).
-2. Give routine scouts a small model; reserve `opus` for the hard reasoning.
-
-```yaml
-# .claude/agents/explore.md — routine scouting on a cheap model
----
-name: explore
-description: Read-only codebase scout
-tools: Read, Grep, Glob
-model: haiku
----
-```
-
-A skill's `SKILL.md` takes the same `model:` field (e.g. `model: opus` for a heavy step). See [sub-agents](https://code.claude.com/docs/en/sub-agents) and [skills](https://code.claude.com/docs/en/skills).
-
-#### 15) 🧫 Offload high-volume work to subagents
-
-Test runs, log parsing, and wide exploration flood the main window. A subagent does it in its own context and hands back only a summary, so the bloat never lands in your session.
-
-1. Define an agent in `.claude/agents/<name>.md` with only the tools it needs and a small `model`.
-2. Let it run the noisy op and return a short result.
-
-```yaml
-# .claude/agents/test-runner.md
----
-name: test-runner
-description: Run the suite and return only the failures
-tools: Bash, Read
-model: haiku
----
-```
-
-See [sub-agents](https://code.claude.com/docs/en/sub-agents).
-
-#### 16) 🧊 Protect your cache hits
-
-Cached input bills far cheaper, and cache reads are most of your tokens (step 4) — so don't throw the cache away mid-task. A model switch, an MCP connect or disconnect, or an effort change rebuilds it from scratch.
-
-1. Set the model and reasoning effort at the start of a task, not mid-work.
-2. Switch model or toggle MCP servers only at task boundaries, where a cache rebuild is acceptable.
+1. In Claude Code, run `/insights` for a session-pattern report.
+2. In Claude Code, press `Ctrl+O` to expand the detailed transcript.
+3. In Codex, use OTel or the visible transcript for analysis; do not use `Ctrl+O` as a Claude-style transcript toggle.
 
 ```text
-mid-task model switch → cache invalidated → full re-bill
-same model to a boundary → cache reads stay cheap
+Claude Code: /insights
+Claude Code: Ctrl+O
 ```
 
-See [prompt caching](https://code.claude.com/docs/en/prompt-caching).
+In Codex CLI, `Ctrl+O` copies the latest completed response. The experimental `codex debug prompt-input [PROMPT]` command renders model-visible prompt inputs as JSON, but it is not an `/insights` replacement.
 
-#### 17) ✅ Cap extended thinking
+#### 12) 🎯 Route model and reasoning by difficulty
 
-Extended reasoning can silently add thousands of tokens on tasks that don't need it.
+**Applies to:** Claude Code and Codex; configuration formats and command semantics differ.
 
-1. In `settings.json`, set `MAX_THINKING_TOKENS` to `0` for routine work.
-2. See the [Claude Code settings docs](https://code.claude.com/docs/en/settings).
+Use the lowest model and reasoning level that passes a representative task, then raise them only for risk or complexity.
 
-```json
-{
-  "env": {
-    "MAX_THINKING_TOKENS": "0"
-  }
-}
+1. Route routine exploration separately from difficult implementation or review.
+2. Use the configuration native to each client.
+
+| Client | Session control | Agent configuration |
+| --- | --- | --- |
+| Claude Code | `/model` and `/effort low` | `.claude/agents/*.md` or skill frontmatter with `model` and `effort` |
+| Codex | `/model` and `/reasoning` | `.codex/agents/*.toml` with `model` and `model_reasoning_effort` |
+
+Claude Code agent frontmatter:
+
+```yaml
+---
+model: haiku
+effort: low
+---
 ```
+
+Codex project agent:
+
+```toml
+name = "explorer"
+description = "Read-only codebase scout"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "low"
+```
+
+Codex skills do not use Claude Code's `model` and `effort` frontmatter. See [Claude Code model configuration](https://code.claude.com/docs/en/model-config) and [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents).
+
+#### 13) 🧫 Isolate noisy work with subagents
+
+**Applies to:** Coding agents with documented subagent support; configuration is client-specific.
+
+Use subagents for context isolation, parallelism, or specialist quality, not as an assumed reduction in total tokens.
+
+1. Delegate high-volume exploration, test logs, or independent review.
+2. Ask for a short result containing only findings, evidence, and blockers.
+3. Keep tightly coupled edits in one agent to avoid coordination overhead.
+
+```text
+Delegate the test run to one subagent. Return only failing tests, the shortest decisive error, and the command used.
+```
+
+Both Claude Code and Codex give subagents separate working context, but their own model calls still consume tokens and can increase total usage. See [Claude Code subagents](https://code.claude.com/docs/en/sub-agents) and [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents).
+
+#### 14) 🧊 Protect Claude Code prompt-cache stability
+
+**Applies to:** Claude Code. No equivalent user-facing Codex cache-invalidation contract is documented here.
+
+Keep the request prefix stable during one task so prompt caching can reuse it.
+
+1. Choose the model and effort before the first substantive prompt.
+2. Change them mid-task only when the quality gain justifies a cache miss.
+3. Keep MCP tools deferred; a change to tools loaded into the prefix can invalidate that layer.
+
+```text
+/model sonnet
+/effort medium
+```
+
+For Codex, prompt caching is service-managed rather than a documented `config.toml` control; observe `cached_input` through Codex telemetry instead of transposing Claude settings. See [Claude Code prompt caching](https://code.claude.com/docs/en/prompt-caching) and [Codex observability](https://learn.chatgpt.com/docs/config-file/config-advanced#observability-and-telemetry).
 
 ## In short
 
-Measure first, then stack the cheap wins — trimmed instructions, plan mode, a clean context, less chatter, filtered output — before the advanced routing, subagents, and cache discipline. Most of the bill is cache and repetition; cut those and the cost follows.
+Measure first, label every command by client, then reduce persistent instructions, stale history, noisy output, unnecessary tools, and excessive reasoning without hiding evidence or weakening quality.
