@@ -1,6 +1,13 @@
-# <Recipe title>
+# Recipe title
 
 <One sentence describing what this recipe gets the reader.>
+
+- [Recipe title](#recipe-title)
+  - [Why](#why)
+  - [Steps to ](#steps-to-)
+    - [Category ](#category-)
+      - [1)  First step title](#1--first-step-title)
+  - [Verify ](#verify-)
 
 ## Why
 
@@ -8,43 +15,19 @@
 
 ## Steps to <the outcome the reader achieves>
 
-### 🟢 Beginner
+### Category <!-- (optional) -->
 
-#### 1) <emoji> <First step title>
+#### 1) <emoji> First step title
 
 <One benefit-focused line of what and why, in prose.>
 
 1. <where it is, then install it from its URL>
 2. <how to invoke it — its real command or slash>
 
-```bash
-$ <command the reader runs>
-<the useful output it prints, trimmed to what matters>
-```
-
-### 🟡 Intermediate
-
-#### 2) <emoji> <Next step title>
-
-<Benefit-focused what and why, in prose.>
-
-1. <action>
-2. <action>
-
 ```<lang>
 <a config or snippet the reader can copy>
 ```
 
-### 🔴 Expert
-
-#### 3) <emoji> <Last step title — until the goal is reached>
-
-<Benefit-focused what and why, in prose.>
-
-1. <action>
-
-![<what this screenshot or video shows>](<path-or-url>)
-
-## Verify
+## Verify <!-- (optional) -->
 
 - <Optional. An observable check that proves it worked: a command, a UI state, a file that now exists.>

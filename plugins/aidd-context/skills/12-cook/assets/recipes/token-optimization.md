@@ -2,6 +2,31 @@
 
 Cut token usage and cost in AI coding assistants without losing output quality.
 
+- [Token optimization for AI IDEs](#token-optimization-for-ai-ides)
+  - [Why optimize your tokens](#why-optimize-your-tokens)
+  - [Steps to cut token usage](#steps-to-cut-token-usage)
+    - [🟢 Beginner](#-beginner)
+      - [1) 🔎 See what fills the window — `/context`](#1--see-what-fills-the-window--context)
+      - [2) 💸 Read the bill — `/cost`](#2--read-the-bill--cost)
+      - [3) 🔍 Find your bad habits — `/insights`](#3--find-your-bad-habits--insights)
+      - [4) 📈 Track per-prompt with an analytics tool](#4--track-per-prompt-with-an-analytics-tool)
+      - [5) ✂️ Trim your instruction file](#5-️-trim-your-instruction-file)
+      - [6) 🧭 Plan before you edit — plan mode](#6--plan-before-you-edit--plan-mode)
+      - [7) ♻️ Clear context between tasks — `/clear`](#7-️-clear-context-between-tasks--clear)
+      - [8) 🗜️ Compact deliberately](#8-️-compact-deliberately)
+    - [🟡 Intermediate](#-intermediate)
+      - [9) 🗣️ Make the agent talk less](#9-️-make-the-agent-talk-less)
+      - [10) 🧹 Filter noisy command output](#10--filter-noisy-command-output)
+      - [11) 🚫 Keep big paths out of context — deny reads](#11--keep-big-paths-out-of-context--deny-reads)
+      - [12) 🔌 Prefer CLI over MCP](#12--prefer-cli-over-mcp)
+    - [🔴 Expert](#-expert)
+      - [13) 🔬 Audit which skills and tools run — `Ctrl+O`](#13--audit-which-skills-and-tools-run--ctrlo)
+      - [14) 🎯 Route by difficulty](#14--route-by-difficulty)
+      - [15) 🧫 Offload high-volume work to subagents](#15--offload-high-volume-work-to-subagents)
+      - [16) 🧊 Protect your cache hits](#16--protect-your-cache-hits)
+      - [17) ✅ Cap extended thinking](#17--cap-extended-thinking)
+  - [In short](#in-short)
+
 ## Why optimize your tokens
 
 **Token usage** is the bill — every turn re-sends your whole **context window** and you pay for it again.
@@ -78,6 +103,7 @@ Your instruction file ships every turn, so each cut line saves on every message.
 
 ```md
 # CLAUDE.md — keep it terse (see AGENTS.md for the full example)
+
 - Answer first. Lead with the result, then the reason. Drop pleasantries and hedging.
 - No tool-call narration. No decorative tables or emoji unless they carry information.
 - Keep verbatim: code, quoted errors, security warnings. Cut the rest.
@@ -179,11 +205,11 @@ See [permissions](https://code.claude.com/docs/en/permissions).
 
 An MCP server's schema rides along every turn; a CLI costs tokens only when you call it. Newer MCP tooling adds tool/context selection that loads only the tools you pick — cheaper than before — but a CLI is still leaner and faster.
 
-| | CLI (`gh`, `acli`, …) | MCP server |
-| --- | --- | --- |
+|            | CLI (`gh`, `acli`, …)   | MCP server                                            |
+| ---------- | ----------------------- | ----------------------------------------------------- |
 | Token cost | a few, only when called | a schema every turn; less with tool/context selection |
-| Speed | fastest | slower |
-| Use when | a CLI exists | no CLI, or you need typed/live tool calls |
+| Speed      | fastest                 | slower                                                |
+| Use when   | a CLI exists            | no CLI, or you need typed/live tool calls             |
 
 See [`mcp-installation.md`](mcp-installation.md).
 
