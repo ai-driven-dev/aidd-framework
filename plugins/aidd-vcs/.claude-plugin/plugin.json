@@ -12,7 +12,9 @@
     "./skills/01-commit",
     "./skills/02-pull-request",
     "./skills/03-release-tag",
-    "./skills/04-issue-create"
+    "./skills/04-issue-create",
+    "./skills/05-review-reply",
+    "./skills/06-review-apply"
   ],
   "keywords": [
     "git",

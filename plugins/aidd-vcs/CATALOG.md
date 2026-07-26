@@ -13,6 +13,8 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
   - [`skills/02-pull-request`](#skills02-pull-request)
   - [`skills/03-release-tag`](#skills03-release-tag)
   - [`skills/04-issue-create`](#skills04-issue-create)
+  - [`skills/05-review-reply`](#skills05-review-reply)
+  - [`skills/06-review-apply`](#skills06-review-apply)
 
 ---
 
@@ -70,4 +72,24 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `assets` | [CONTRIBUTING.md](skills/04-issue-create/assets/CONTRIBUTING.md) | `Project contribution guidelines template` |
 | `assets` | [issue-template.md](skills/04-issue-create/assets/issue-template.md) | `VCS issue/ticket template` |
 | `-` | [SKILL.md](skills/04-issue-create/SKILL.md) | `Create an issue in the configured ticketing tool. Use when the user wants to file a bug, open an issue, or report a problem. Not for committing, opening a pull request, or commenting on an existing issue.` |
+
+#### `skills/05-review-reply`
+
+| Group | File | Description |
+|-------|------|---|
+| `actions` | [01-collect.md](skills/05-review-reply/actions/01-collect.md) | - |
+| `actions` | [02-draft.md](skills/05-review-reply/actions/02-draft.md) | - |
+| `actions` | [03-post.md](skills/05-review-reply/actions/03-post.md) | - |
+| `references` | [tone.md](skills/05-review-reply/references/tone.md) | - |
+| `-` | [SKILL.md](skills/05-review-reply/SKILL.md) | `Reply to a developer's review comments on a GitHub pull request, one reply per thread, bots and Copilot excluded. Use when the user wants to answer, respond to, or reply to PR review comments. Not for creating a pull request, applying the requested changes, or reviewing a diff.` |
+
+#### `skills/06-review-apply`
+
+| Group | File | Description |
+|-------|------|---|
+| `actions` | [01-collect.md](skills/06-review-apply/actions/01-collect.md) | - |
+| `actions` | [02-apply.md](skills/06-review-apply/actions/02-apply.md) | - |
+| `actions` | [03-verify.md](skills/06-review-apply/actions/03-verify.md) | - |
+| `actions` | [04-explain.md](skills/06-review-apply/actions/04-explain.md) | - |
+| `-` | [SKILL.md](skills/06-review-apply/SKILL.md) | `Apply the fixes a pull request's review comments ask for, verify the result, then explain what changed and why. Use when the user wants to apply, address, or fix review comments on an open pull request. Not for replying to comments, creating a pull request, or committing.` |
 
