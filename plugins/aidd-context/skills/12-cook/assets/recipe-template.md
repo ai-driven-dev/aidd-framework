@@ -5,8 +5,7 @@
 - [Recipe title](#recipe-title)
   - [Why](#why)
   - [Steps to ](#steps-to-)
-    - [Category ](#category-)
-      - [1)  First step title](#1--first-step-title)
+    - [1)  First step title](#1--first-step-title)
   - [Verify ](#verify-)
 
 ## Why
@@ -15,9 +14,14 @@
 
 ## Steps to <the outcome the reader achieves>
 
-### Category <!-- (optional) -->
+<!--
+Keep heading levels continuous:
+- Without categories, steps use level 3 headings, as below.
+- With a level 3 category, its steps use level 4 headings.
+Never place a level 4 step directly below this level 2 section.
+-->
 
-#### 1) <emoji> First step title
+### 1) <emoji> First step title
 
 <One benefit-focused line of what and why, in prose.>
 
