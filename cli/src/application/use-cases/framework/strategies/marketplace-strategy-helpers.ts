@@ -166,7 +166,7 @@ export function buildClaudeStyleMarketplace(
   return obj;
 }
 
-export function buildClaudeStyleCatalogEntry(
+export function buildClaudeStyleMarketplaceEntry(
   name: string,
   description: string,
   version: string,

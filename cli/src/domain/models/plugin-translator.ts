@@ -42,7 +42,7 @@ interface SkillCap {
   serialize: (fm: Record<string, unknown>, body: string) => string;
 }
 
-export class PluginContentTranslator {
+export class PluginTranslator {
   constructor(private readonly hasher: Hasher) {}
 
   translate(dist: PluginDistribution, toolConfig: ToolConfig, docsDir: string): InstallationFile[] {

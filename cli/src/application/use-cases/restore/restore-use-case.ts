@@ -19,10 +19,7 @@ import type { Prompter } from "../../../domain/ports/prompter.js";
 import type { ToolId } from "../../../domain/tools/registry.js";
 import { NoManifestError } from "../../errors.js";
 import type { BuiltMaterializationDeps } from "../shared/apply-plugin-files-use-case.js";
-import {
-  type RestoreAllPluginsResult,
-  RestoreAllPluginsUseCase,
-} from "./restore-all-plugins-use-case.js";
+import { RestoreAllPluginsUseCase } from "./restore-all-plugins-use-case.js";
 import {
   type RestoreToolFilesResult,
   RestoreToolFilesUseCase,
@@ -68,7 +65,6 @@ interface RestoreResult {
   totalRestored: number;
   totalKept: number;
   totalPluginFilesRestored: number;
-  restoredPluginNames: string[];
 }
 
 export class RestoreUseCase {
@@ -116,9 +112,9 @@ export class RestoreUseCase {
 
   private async executeRestore(ctx: RestoreCtx): Promise<RestoreResult> {
     const toolResults = await this.runToolRestores(ctx);
-    const pluginResult = await this.runPluginRestore(ctx);
-    await this.saveIfChanged(toolResults, pluginResult.totalFiles, ctx.manifest);
-    return this.buildTotals(toolResults, pluginResult);
+    const totalPluginFilesRestored = await this.runPluginRestore(ctx);
+    await this.saveIfChanged(toolResults, totalPluginFilesRestored, ctx.manifest);
+    return this.buildTotals(toolResults, totalPluginFilesRestored);
   }
 
   private async runToolRestores(ctx: RestoreCtx): Promise<RestoreToolFilesResult[]> {
@@ -137,10 +133,8 @@ export class RestoreUseCase {
     return results;
   }
 
-  private async runPluginRestore(ctx: RestoreCtx): Promise<RestoreAllPluginsResult> {
-    if (this.pluginFetcher === undefined || this.pluginDistributionReader === undefined) {
-      return { totalFiles: 0, pluginNames: [] };
-    }
+  private async runPluginRestore(ctx: RestoreCtx): Promise<number> {
+    if (this.pluginFetcher === undefined || this.pluginDistributionReader === undefined) return 0;
     return new RestoreAllPluginsUseCase(
       this.fs,
       this.hasher,
@@ -153,7 +147,6 @@ export class RestoreUseCase {
       docsDir: ctx.docsDir,
       fileFilter: ctx.fileFilter,
       pluginName: ctx.pluginName,
-      toolIds: ctx.toolIds,
     });
   }
 
@@ -169,14 +162,13 @@ export class RestoreUseCase {
 
   private buildTotals(
     toolResults: RestoreToolFilesResult[],
-    pluginResult: RestoreAllPluginsResult
+    totalPluginFilesRestored: number
   ): RestoreResult {
     return {
       tools: toolResults,
       totalRestored: toolResults.reduce((s, t) => s + t.restored.length, 0),
       totalKept: toolResults.reduce((s, t) => s + t.kept.length, 0),
-      totalPluginFilesRestored: pluginResult.totalFiles,
-      restoredPluginNames: pluginResult.pluginNames,
+      totalPluginFilesRestored,
     };
   }
 

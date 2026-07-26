@@ -7,12 +7,7 @@ import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { PluginDistributionReader } from "../../../domain/ports/plugin-distribution-reader.js";
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
-import {
-  getToolConfig,
-  isAiTool,
-  type ToolConfig,
-  type ToolId,
-} from "../../../domain/tools/registry.js";
+import { getToolConfig, isAiTool, type ToolConfig } from "../../../domain/tools/registry.js";
 import {
   ApplyPluginFilesUseCase,
   type BuiltMaterializationDeps,
@@ -24,14 +19,6 @@ interface RestoreAllPluginsOptions {
   docsDir: string;
   fileFilter: ((p: string) => boolean) | null;
   pluginName?: string;
-  /** Restrict which AI tools' plugins get touched. Undefined means every installed AI tool (unscoped). */
-  toolIds?: readonly ToolId[];
-}
-
-export interface RestoreAllPluginsResult {
-  totalFiles: number;
-  /** Names of plugins that had >=1 file actually restored, deduped across tools. */
-  pluginNames: string[];
 }
 
 export class RestoreAllPluginsUseCase {
@@ -43,17 +30,15 @@ export class RestoreAllPluginsUseCase {
     private readonly builtDeps?: BuiltMaterializationDeps
   ) {}
 
-  async execute(options: RestoreAllPluginsOptions): Promise<RestoreAllPluginsResult> {
-    const { projectRoot, manifest, docsDir, fileFilter, pluginName, toolIds } = options;
+  async execute(options: RestoreAllPluginsOptions): Promise<number> {
+    const { projectRoot, manifest, docsDir, fileFilter, pluginName } = options;
     const cacheDir = join(projectRoot, PLUGIN_CACHE_SUBDIR);
-    let totalFiles = 0;
-    const restoredNames = new Set<string>();
+    let total = 0;
     for (const toolId of AI_TOOL_IDS) {
       if (!manifest.hasTool(toolId)) continue;
-      if (toolIds !== undefined && !toolIds.includes(toolId)) continue;
       const toolConfig = getToolConfig(toolId);
       if (!isAiTool(toolConfig)) continue;
-      const result = await this.restoreToolPlugins(
+      total += await this.restoreToolPlugins(
         toolId,
         manifest,
         toolConfig,
@@ -63,10 +48,8 @@ export class RestoreAllPluginsUseCase {
         fileFilter,
         pluginName
       );
-      totalFiles += result.totalFiles;
-      for (const name of result.pluginNames) restoredNames.add(name);
     }
-    return { totalFiles, pluginNames: [...restoredNames] };
+    return total;
   }
 
   private async restoreToolPlugins(
@@ -78,14 +61,13 @@ export class RestoreAllPluginsUseCase {
     docsDir: string,
     fileFilter: ((p: string) => boolean) | null,
     pluginName: string | undefined
-  ): Promise<RestoreAllPluginsResult> {
-    let totalFiles = 0;
-    const pluginNames: string[] = [];
+  ): Promise<number> {
+    let total = 0;
     const plugins = manifest.getPlugins(toolId);
     const targets =
       pluginName !== undefined ? plugins.filter((p) => p.name === pluginName) : plugins;
     for (const plugin of targets) {
-      const filesWritten = await new ApplyPluginFilesUseCase(
+      total += await new ApplyPluginFilesUseCase(
         this.fs,
         this.hasher,
         this.pluginFetcher,
@@ -101,9 +83,7 @@ export class RestoreAllPluginsUseCase {
         docsDir,
         fileFilter,
       });
-      totalFiles += filesWritten;
-      if (filesWritten > 0) pluginNames.push(plugin.name);
     }
-    return { totalFiles, pluginNames };
+    return total;
   }
 }
