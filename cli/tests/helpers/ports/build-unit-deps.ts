@@ -37,6 +37,7 @@ import { InMemoryFileAdapter } from "./in-memory-file-adapter.js";
 import { InMemoryManifestRepository } from "./in-memory-manifest-repository.js";
 import { InMemoryMarketplaceRegistry } from "./in-memory-marketplace-registry.js";
 import { seedFromDirectory } from "./seed-from-directory.js";
+import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
 
 const FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework");
 
@@ -174,7 +175,7 @@ export function buildDoctorUseCase(
     deps.manifestRepo,
     new DoctorTrackedFilesUseCase(deps.fs),
     new DoctorMergeFilesUseCase(deps.fs, deps.hasher),
-    new DoctorPluginUseCase(deps.fs),
+    new DoctorPluginUseCase(new DetectPluginDriftUseCase(deps.fs)),
     new DoctorReferencesUseCase(deps.fs),
     new DoctorLayoutUseCase(deps.fs, authReader)
   );

@@ -10,6 +10,7 @@ import { fakeEnsureBuiltMarketplace } from "../../helpers/ports/fake-ensure-buil
 import { FakePlatform } from "../../helpers/ports/fake-platform.js";
 import { OverwritePrompter, ScriptedPrompter } from "../../helpers/ports/scripted-prompter.js";
 import { seedFromDirectory } from "../../helpers/ports/seed-from-directory.js";
+import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
 
 const PROJECT_ROOT = "/test-project";
 const PLUGIN_FIXTURE = join(process.cwd(), "tests/fixtures/plugins/claude-format/sample-plugin");
@@ -52,7 +53,7 @@ function makeRestoreAllUseCase(
   prompter: OverwritePrompter | ScriptedPrompter = new OverwritePrompter(),
   withBuiltDeps = false
 ): RestoreAllUseCase {
-  const statusUseCase = new StatusUseCase(deps.fs, deps.manifestRepo, deps.hasher);
+  const statusUseCase = new StatusUseCase(deps.fs, deps.manifestRepo, deps.hasher, new DetectPluginDriftUseCase(deps.fs));
   const restoreUseCase = new RestoreUseCase(
     deps.fs,
     deps.manifestRepo,

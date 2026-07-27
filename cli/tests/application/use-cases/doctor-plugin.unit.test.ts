@@ -15,6 +15,7 @@ import { Plugin } from "../../../src/domain/models/plugin.js";
 import type { FileReader } from "../../../src/domain/ports/file-reader.js";
 import type { Hasher } from "../../../src/domain/ports/hasher.js";
 import type { ManifestRepository } from "../../../src/domain/ports/manifest-repository.js";
+import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
 
 const EXPECTED_HASH = "abc123abc123abc123abc123abc123ab";
 const DRIFTED_HASH = "def456def456def456def456def456de";
@@ -62,7 +63,7 @@ function makeDoctorUseCase(fs: FileReader, manifest: Manifest): DoctorUseCase {
     makeManifestRepo(manifest),
     new DoctorTrackedFilesUseCase(fs),
     new DoctorMergeFilesUseCase(fs, noopHasher),
-    new DoctorPluginUseCase(fs),
+    new DoctorPluginUseCase(new DetectPluginDriftUseCase(fs)),
     new DoctorReferencesUseCase(fs),
     new DoctorLayoutUseCase(fs)
   );
@@ -154,7 +155,7 @@ describe("DoctorUseCase — plugin integrity", () => {
         deleteEmptyDirectories: async () => {},
         copyFile: async () => {},
       } as unknown as FileReader;
-      const pluginUseCase = new DoctorPluginUseCase(fs);
+      const pluginUseCase = new DoctorPluginUseCase(new DetectPluginDriftUseCase(fs));
 
       await pluginUseCase.execute({
         manifest,

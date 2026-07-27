@@ -13,6 +13,7 @@ import { CleanUseCase } from "../application/use-cases/clean-use-case.js";
 import { DoctorLayoutUseCase } from "../application/use-cases/doctor/doctor-layout-use-case.js";
 import { DoctorMergeFilesUseCase } from "../application/use-cases/doctor/doctor-merge-files-use-case.js";
 import { DoctorPluginUseCase } from "../application/use-cases/doctor/doctor-plugin-use-case.js";
+import { DetectPluginDriftUseCase } from "../application/use-cases/shared/detect-plugin-drift-use-case.js";
 import { DoctorReferencesUseCase } from "../application/use-cases/doctor/doctor-references-use-case.js";
 import { DoctorTrackedFilesUseCase } from "../application/use-cases/doctor/doctor-tracked-files-use-case.js";
 import { DoctorUseCase } from "../application/use-cases/doctor/doctor-use-case.js";
@@ -573,7 +574,8 @@ export async function createDeps(
   const syncConflictResolverUseCase = new SyncConflictResolverUseCase(fs);
   const doctorTrackedFilesUseCase = new DoctorTrackedFilesUseCase(fs);
   const doctorMergeFilesUseCase = new DoctorMergeFilesUseCase(fs, hasher);
-  const doctorPluginUseCase = new DoctorPluginUseCase(fs);
+  const detectPluginDriftUseCase = new DetectPluginDriftUseCase(fs);
+  const doctorPluginUseCase = new DoctorPluginUseCase(detectPluginDriftUseCase);
   const doctorReferencesUseCase = new DoctorReferencesUseCase(fs);
   const doctorLayoutUseCase = new DoctorLayoutUseCase(fs, authReader);
   const doctorUseCase = new DoctorUseCase(
@@ -602,7 +604,7 @@ export async function createDeps(
   );
   const setupToolsPromptUseCase = new SetupToolsPromptUseCase(prompter);
   const projectContextDetector = new ProjectContextDetectorUseCase(fs);
-  const statusUseCase = new StatusUseCase(fs, manifestRepo, hasher);
+  const statusUseCase = new StatusUseCase(fs, manifestRepo, hasher, detectPluginDriftUseCase);
   // Lets restore re-materialize cursor/opencode plugins via the build pipeline,
   // matching what install wrote (otherwise restore rewrites raw content → drift).
   const builtMaterializationDeps = {
