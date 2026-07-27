@@ -88,6 +88,23 @@ describe("self-updater-adapter — fetchLatestRelease", () => {
     expect(release).toEqual({ version: "5.1.2", changelog: null });
   });
 
+  it("resolves the latest version for an unauthenticated user (token provider yields null)", async () => {
+    const calls: GetCall[] = [];
+    const http = fakeHttp(
+      {
+        [NPM_DIST_TAGS_URL]: () => jsonResponse({ latest: "5.1.2" }),
+        [GH_TAG_URL]: () => jsonResponse({ body: "Release notes" }),
+      },
+      calls
+    );
+    const tokenProvider = { resolve: async () => null };
+
+    const release = await new SelfUpdaterAdapter(http, { tokenProvider }).fetchLatestRelease();
+
+    expect(release.version).toBe("5.1.2");
+    expect(calls.some((c) => c.url === NPM_DIST_TAGS_URL)).toBe(true);
+  });
+
   it("traces the reason on the debug channel when the changelog fetch fails", async () => {
     const debug = vi.fn();
     const http = fakeHttp({
