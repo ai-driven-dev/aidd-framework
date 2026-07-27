@@ -11,7 +11,7 @@ import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
-import { PostInstallPipelineUseCase } from "../shared/post-install-pipeline-use-case.js";
+import type { PostInstallPipelineUseCase } from "../shared/post-install-pipeline-use-case.js";
 import type {
   InstallIdeConfigResult,
   InstallIdeConfigUseCase,
@@ -31,6 +31,7 @@ export class InstallIdeToolUseCase {
     private readonly manifestRepo: ManifestRepository,
     private readonly fs: FileReader & FileWriter & FileMerger,
     private readonly hasher: Hasher,
+    private readonly postInstallPipelineUseCase: PostInstallPipelineUseCase,
     private readonly assetProvider?: AssetProvider
   ) {}
 
@@ -96,7 +97,7 @@ export class InstallIdeToolUseCase {
       newEntry,
     ];
     manifest.updateToolMergeFiles(aiId, updated);
-    await new PostInstallPipelineUseCase(this.fs, this.manifestRepo).execute({
+    await this.postInstallPipelineUseCase.execute({
       projectRoot,
       manifest,
     });

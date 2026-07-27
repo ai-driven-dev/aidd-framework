@@ -68,6 +68,8 @@ import {
   type FrameworkBuildFor,
 } from "../application/use-cases/shared/ensure-built-marketplace-use-case.js";
 import { FetchMarketplaceSourceUseCase } from "../application/use-cases/shared/fetch-marketplace-source-use-case.js";
+import { GitignoreUseCase } from "../application/use-cases/shared/gitignore-use-case.js";
+import { PostInstallPipelineUseCase } from "../application/use-cases/shared/post-install-pipeline-use-case.js";
 import { ResolveMarketplaceUseCase } from "../application/use-cases/shared/resolve-marketplace-use-case.js";
 import { ResolveUpdateDecisionUseCase } from "../application/use-cases/shared/resolve-update-decision-use-case.js";
 import { UpdateOneToolUseCase } from "../application/use-cases/shared/update-one-tool-use-case.js";
@@ -503,25 +505,28 @@ export async function createDeps(
     assetProvider,
     logger
   );
+  const gitignoreUseCase = new GitignoreUseCase(fs);
+  const postInstallPipelineUseCase = new PostInstallPipelineUseCase(manifestRepo, gitignoreUseCase);
   const installRuntimeConfigUseCase = new InstallRuntimeConfigUseCase(
     fs,
-    manifestRepo,
     hasher,
     logger,
-    assetProvider
+    assetProvider,
+    postInstallPipelineUseCase
   );
   const installIdeConfigUseCase = new InstallIdeConfigUseCase(
     fs,
-    manifestRepo,
     hasher,
     logger,
-    assetProvider
+    assetProvider,
+    postInstallPipelineUseCase
   );
   const installIdeToolUseCase = new InstallIdeToolUseCase(
     installIdeConfigUseCase,
     manifestRepo,
     fs,
     hasher,
+    postInstallPipelineUseCase,
     assetProvider
   );
   const uninstallIdeUseCase = new UninstallIdeUseCase(fs, manifestRepo);
@@ -655,7 +660,7 @@ export async function createDeps(
     currentVersionProvider,
     updateOneToolUseCase
   );
-  const cleanUseCase = new CleanUseCase(fs, manifestRepo, logger, prompter);
+  const cleanUseCase = new CleanUseCase(fs, manifestRepo, logger, gitignoreUseCase, prompter);
   const doctorAllUseCase = new DoctorAllUseCase(doctorUseCase);
   const checkUpdateUseCase = new CheckUpdateUseCase(cliUpdater, currentVersionProvider, logger, fs);
   const deps: Deps = {
