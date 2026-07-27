@@ -5,7 +5,8 @@ import type { GlobalExecutionError } from "./update-all-use-case.js";
 export interface DoctorAllResult {
   ai: DoctorReport | null;
   ide: DoctorReport | null;
-  plugins: DoctorReport | null;
+  /** Plugin issues only. Plugins hang off AI tools, so the ai scope already carries them all. */
+  pluginIssues: DoctorReport["pluginIssues"];
   healthy: boolean;
   errors: GlobalExecutionError[];
 }
@@ -25,13 +26,8 @@ export class DoctorAllUseCase {
       "ide",
       errors
     );
-    const plugins = await this.runScope(
-      () => this.doctorUseCase.execute({ projectRoot }),
-      "plugins",
-      errors
-    );
-    const healthy = this.computeHealthy(ai, ide, plugins);
-    return { ai, ide, plugins, healthy, errors };
+    const healthy = this.computeHealthy(ai, ide);
+    return { ai, ide, pluginIssues: ai?.pluginIssues ?? [], healthy, errors };
   }
 
   private async runScope<T>(
@@ -47,15 +43,7 @@ export class DoctorAllUseCase {
     }
   }
 
-  private computeHealthy(
-    ai: DoctorReport | null,
-    ide: DoctorReport | null,
-    plugins: DoctorReport | null
-  ): boolean {
-    return (
-      (ai === null || ai.healthy) &&
-      (ide === null || ide.healthy) &&
-      (plugins === null || plugins.healthy)
-    );
+  private computeHealthy(ai: DoctorReport | null, ide: DoctorReport | null): boolean {
+    return (ai === null || ai.healthy) && (ide === null || ide.healthy);
   }
 }

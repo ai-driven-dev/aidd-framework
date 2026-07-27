@@ -94,7 +94,7 @@
     "command": "status",
     "exitCode": 0,
     "stdout": "\nAI tools:\n  (none installed)\n\nIDE tools:\n  (none installed)\n\nPlugins:\n  (all in sync)\n\nLegend: ~ modified  - deleted  + added\n",
-    "stderr": "Warning: [ai] No AIDD manifest found. Run `aidd setup` to initialize your project.\nWarning: [ide] No AIDD manifest found. Run `aidd setup` to initialize your project.\nWarning: [plugins] No AIDD manifest found. Run `aidd setup` to initialize your project.\n",
+    "stderr": "Warning: [ai] No AIDD manifest found. Run `aidd setup` to initialize your project.\nWarning: [ide] No AIDD manifest found. Run `aidd setup` to initialize your project.\n",
     "filesWritten": [],
     "manifest": null
   }
