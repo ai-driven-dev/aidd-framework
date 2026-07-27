@@ -50,14 +50,42 @@ jobs:
           BRANCH="promote/next-to-main-linear"
           git switch -C "$BRANCH" origin/main
 
-          mapfile -t MERGES < <(git rev-list --first-parent --merges --reverse origin/main..origin/next)
-          if [ "${#MERGES[@]}" -ge 2 ]; then
-            START="${MERGES[$((${#MERGES[@]} - 2))]}"
+          # A "sync commit" marks a point where main's history was already
+          # folded into next by back-merge.yml, so it (and everything before
+          # it) must NOT be replayed onto main again. back-merge.yml lands a
+          # sync two ways:
+          #   - no conflicts: a direct-pushed real merge commit (2 parents)
+          #   - conflicts: a PR merged by squash (this repo disallows
+          #     merge-commit PRs), whose subject is stamped verbatim from
+          #     back-merge.yml's fixed PR title
+          # Both must count as boundaries, or a squash sync gets mistaken for
+          # genuine next-only work and cherry-picked back onto main, colliding
+          # with content main already has. Keep the title prefix below in
+          # sync with back-merge.yml's `gh pr create --title`.
+          is_sync_commit() {
+            git rev-parse --verify -q "$1^2" >/dev/null 2>&1 && return 0
+            local subject
+            subject="$(git log -1 --format=%s "$1")"
+            [[ "$subject" == "chore: back-merge main into next"* ]]
+          }
+
+          mapfile -t CANDIDATES < <(git rev-list --first-parent --reverse origin/main..origin/next)
+          SYNCS=()
+          for c in "${CANDIDATES[@]}"; do
+            is_sync_commit "$c" && SYNCS+=("$c")
+          done
+
+          if [ "${#SYNCS[@]}" -ge 2 ]; then
+            START="${SYNCS[$((${#SYNCS[@]} - 2))]}"
           else
             START="origin/main"
           fi
 
-          mapfile -t COMMITS < <(git rev-list --first-parent --reverse --no-merges "${START}..origin/next")
+          COMMITS=()
+          while IFS= read -r c; do
+            is_sync_commit "$c" || COMMITS+=("$c")
+          done < <(git rev-list --first-parent --reverse "${START}..origin/next")
+
           if [ "${#COMMITS[@]}" -eq 0 ]; then
             echo "No commits to promote."
             exit 0
