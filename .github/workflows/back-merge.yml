@@ -58,6 +58,10 @@ jobs:
             BRANCH="back-merge/main-to-next-${{ github.run_id }}"
             git checkout -b "$BRANCH" origin/main
             git push origin "$BRANCH"
+            # promote.yml matches this exact title prefix to recognize a
+            # squash-merged conflict resolution as a sync boundary (this repo
+            # disallows merge-commit PRs, so this can't land as a real merge
+            # commit). Keep both in sync if you change it.
             gh pr create --base next --head "$BRANCH" \
               --title "chore: back-merge main into next (conflicts)" \
               --body "Automated back-merge hit conflicts (CHANGELOG / manifest / version files). Resolve manually, then merge into next." \
