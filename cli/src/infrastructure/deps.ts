@@ -146,7 +146,6 @@ interface Deps {
   pluginCatalogRepository: PluginCatalogRepository;
   pluginFetcher: PluginFetcher;
   pluginDistributionReader: PluginDistributionReader;
-  marketplaceCache: MarketplaceCachePort;
   marketplaceRegistry: MarketplaceRegistry;
   marketplaceTrustStore: MarketplaceTrustStore;
   pluginAddUseCase: PluginAddUseCase;
@@ -435,6 +434,7 @@ export async function createDeps(
     pluginCatalogRepository,
     marketplaceRegistry,
     fetchMarketplaceSource,
+    marketplaceCache,
     logger,
     fs
   );
@@ -680,7 +680,6 @@ export async function createDeps(
     pluginCatalogRepository,
     pluginFetcher,
     pluginDistributionReader,
-    marketplaceCache,
     marketplaceRegistry,
     marketplaceTrustStore,
     pluginAddUseCase,

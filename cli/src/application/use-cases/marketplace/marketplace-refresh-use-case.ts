@@ -8,6 +8,7 @@ import {
 } from "../../../domain/models/plugin-catalog.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { Logger } from "../../../domain/ports/logger.js";
+import type { MarketplaceCachePort } from "../../../domain/ports/marketplace-cache.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
 import type { PluginCatalogRepository } from "../../../domain/ports/plugin-catalog-repository.js";
 import type { FetchMarketplaceSourceUseCase } from "../shared/fetch-marketplace-source-use-case.js";
@@ -15,6 +16,7 @@ import type { FetchMarketplaceSourceUseCase } from "../shared/fetch-marketplace-
 export interface MarketplaceRefreshOptions {
   projectRoot: string;
   name?: string;
+  force?: boolean;
 }
 
 export interface RefreshEntryResult {
@@ -35,11 +37,13 @@ export class MarketplaceRefreshUseCase {
     private readonly catalogRepo: PluginCatalogRepository,
     private readonly registry: MarketplaceRegistry,
     private readonly fetchMarketplaceSource: FetchMarketplaceSourceUseCase,
+    private readonly cache: MarketplaceCachePort,
     private readonly logger?: Logger,
     private readonly fs?: FileReader
   ) {}
 
   async execute(options: MarketplaceRefreshOptions): Promise<MarketplaceRefreshResult> {
+    if (options.force) await this.cache.clear(options.name);
     const all = await this.registry.list(options.projectRoot);
     const targets = options.name ? all.filter((m) => m.name === options.name) : all;
     const results: RefreshEntryResult[] = [];

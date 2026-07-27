@@ -9,6 +9,7 @@ import { PluginCatalogRepositoryAdapter } from "../../../../src/infrastructure/a
 import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
 import { FixturePluginFetcher } from "../../../helpers/ports/fixture-plugin-fetcher.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
+import { InMemoryMarketplaceCache } from "../../../helpers/ports/in-memory-marketplace-cache.js";
 import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-marketplace-registry.js";
 import { seedFromDirectory } from "../../../helpers/ports/seed-from-directory.js";
 
@@ -29,13 +30,55 @@ async function buildUseCase() {
   };
   const pluginFetcher = new FixturePluginFetcher(fetchers);
   const fetchMarketplaceSource = new FetchMarketplaceSourceUseCase(pluginFetcher);
+  const cache = new InMemoryMarketplaceCache();
   const useCase = new MarketplaceRefreshUseCase(
     new PluginCatalogRepositoryAdapter(fs),
     registry,
-    fetchMarketplaceSource
+    fetchMarketplaceSource,
+    cache
   );
-  return { useCase, registry };
+  return { useCase, registry, cache };
 }
+
+describe("MarketplaceRefreshUseCase — force", () => {
+  async function withRegistered(name: string) {
+    const built = await buildUseCase();
+    await built.registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name,
+        source: { kind: "local", path: VALID_FIXTURE },
+        scope: "project",
+        addedAt: "2026-04-29T10:00:00.000Z",
+      })
+    );
+    return built;
+  }
+
+  it("clears the named marketplace's cache before re-fetching", async () => {
+    const { useCase, cache } = await withRegistered("awesome");
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, name: "awesome", force: true });
+
+    expect(cache.clearCalls).toEqual(["awesome"]);
+  });
+
+  it("clears every cached marketplace when no name is given", async () => {
+    const { useCase, cache } = await withRegistered("awesome");
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+    expect(cache.clearCalls).toEqual([undefined]);
+  });
+
+  it("leaves the cache untouched without the flag", async () => {
+    const { useCase, cache } = await withRegistered("awesome");
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, name: "awesome" });
+
+    expect(cache.clearCalls).toEqual([]);
+  });
+});
 
 describe("MarketplaceRefreshUseCase", () => {
   it("refreshes a registered marketplace and updates lastFetched", async () => {
@@ -177,6 +220,7 @@ describe("MarketplaceRefreshUseCase", () => {
         new PluginCatalogRepositoryAdapter(fs),
         registry,
         fetchMarketplaceSource,
+        new InMemoryMarketplaceCache(),
         logger,
         fs
       );
@@ -220,6 +264,7 @@ describe("MarketplaceRefreshUseCase", () => {
         new PluginCatalogRepositoryAdapter(fs),
         registry,
         fetchMarketplaceSource,
+        new InMemoryMarketplaceCache(),
         logger,
         fs
       );
