@@ -191,7 +191,7 @@ describe("restore", () => {
     expect(cursorContent).toBe('{"modified": true}');
   });
 
-  it("toolIds filter also scopes plugin restore — does not leak to other AI tools (BUG-E3-02 / A2)", async () => {
+  it("toolIds filter also scopes plugin restore — does not leak to other AI tools", async () => {
     const deps = await buildUnitDeps(PROJECT_ROOT);
     await initProject(deps, PROJECT_ROOT);
     await installTool(deps, PROJECT_ROOT, "claude");
@@ -217,7 +217,7 @@ describe("restore", () => {
     expect(deps.fs.getFile(codexPluginFile)).toBe("CORRUPTED CODEX");
   });
 
-  it("ide restore never touches AI plugin files, scoped or unscoped (BUG-E3-02 / A2) — IDE_TOOL_IDS has a single member so this covers both", async () => {
+  it("ide restore never touches AI plugin files, scoped or unscoped", async () => {
     const deps = await buildUnitDeps(PROJECT_ROOT);
     await initProject(deps, PROJECT_ROOT);
     await installTool(deps, PROJECT_ROOT, "vscode");

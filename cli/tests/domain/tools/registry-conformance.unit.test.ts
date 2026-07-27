@@ -22,14 +22,14 @@ import {
 /**
  * Conformance suite for the AiTool contract.
  *
- * Every assertion iterates the registry rather than a hardcoded list — that is the point:
- * adding a tool file automatically subjects it to every rule below, so forgetting to add
- * that tool to a parallel list somewhere else fails a test instead of misbehaving at runtime.
+ * Every assertion iterates the registry rather than a hardcoded list, so adding a tool file
+ * automatically subjects it to all of them: omitting that tool from a parallel list elsewhere
+ * fails a test instead of misbehaving at runtime.
  *
- * Scope note: the probe tables (plugin-format.ts) and the build registry (deps.ts) keep
- * their literal entries by design — "a format aidd can read" and "a tool aidd installs into"
- * are distinct concepts that merely coincide today. These tests guard the agreement between
- * them rather than collapsing one into the other.
+ * The probe tables (plugin-format.ts) and the build registry (deps.ts) keep their own literal
+ * entries — "a format aidd can read" and "a tool aidd installs into" are distinct concepts
+ * that happen to share members. These assertions check the two agree, not that one derives
+ * from the other.
  */
 
 const registeredAiTools: [string, AiTool<unknown>][] = [
