@@ -31,7 +31,7 @@ importers:
         version: 3.36.0
       smol-toml:
         specifier: ^1.6.1
-        version: 1.6.1
+        version: 1.7.1
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.4.7
@@ -2437,8 +2437,8 @@ packages:
   simple-git@3.36.0:
     resolution: {integrity: sha512-cGQjLjK8bxJw4QuYT7gxHw3/IouVESbhahSsHrX97MzCL1gu2u7oy38W6L2ZIGECEfIBG4BabsWDPjBxJENv9Q==}
 
-  smol-toml@1.6.1:
-    resolution: {integrity: sha512-dWUG8F5sIIARXih1DTaQAX4SsiTXhInKf1buxdY9DIg4ZYPZK5nGM1VRIYmEbDbsHt7USo99xSLFu5Q1IqTmsg==}
+  smol-toml@1.7.1:
+    resolution: {integrity: sha512-PPlsspAZ4jbMBu5DMFhfUGDQLu/vrL4SyBROVS37x8ynnVmFIs1VPBz1Co8Xks3TvpIaZXmU85y4DrQ+UyVFoQ==}
     engines: {node: '>= 18'}
 
   smol-toml@1.7.1:
@@ -4895,7 +4895,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  smol-toml@1.6.1: {}
+  smol-toml@1.7.1: {}
 
   smol-toml@1.7.1: {}
 
