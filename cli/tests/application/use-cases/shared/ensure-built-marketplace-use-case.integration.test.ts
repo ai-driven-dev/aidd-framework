@@ -216,13 +216,11 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
   });
 });
 
-// BUG-E2-01: deps.ts hardcodes force:true for this rebuild path because outDir is always
-// builtMarketplaceDir() — an aidd-owned disposable cache, never a user-owned directory. A
-// collision here only means "the cache from a previous build already exists" and should be
-// overwritten, not treated as a destructive overwrite of user data. This pins that decision
-// with a real FlatBuildStrategy (not the fake buildFor stub used above), so it fails if
-// force is ever flipped to false here, or if outDir stops being cache-only.
-describe("force behavior at the cache-rebuild path (BUG-E2-01)", () => {
+// outDir here is always builtMarketplaceDir() — an aidd-owned disposable cache, never a
+// user directory — so a collision just means "a previous build is still there" and must be
+// overwritten. Uses a real FlatBuildStrategy rather than the fake buildFor stub above, so it
+// fails if force is flipped to false or outDir stops being cache-only.
+describe("force behavior at the cache-rebuild path", () => {
   it("overwrites a colliding file already present in the build cache instead of throwing FlatTargetExistsError", async () => {
     const memFs = new InMemoryFileAdapter();
     await seedFromDirectory(memFs, FIXTURE_DIR, { useAbsolutePaths: true });
