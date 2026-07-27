@@ -259,14 +259,13 @@ describe.concurrent("Command Matrix: Globals", () => {
     }
   });
 
-  it("self-update --check exits 1 when not authenticated (requires auth)", async () => {
-    // NOTE from matrix: self-update requires valid auth; expected in test env.
-    // Flag is --check (not --check-only as in task spec — verified against actual CLI).
+  it("self-update --check works without authentication", async () => {
+    // --check performs a real npm lookup, so the exit code tracks network reachability;
+    // assert only that authentication is never demanded.
     const { projectDir, fakeHome, cleanup } = await createTestEnv("global-self-update-check");
     try {
-      const { stderr, exitCode } = await runCli(["self-update", "--check"], projectDir, fakeHome);
-      expect(exitCode).toBe(1);
-      expect(stderr).toMatch(/[Nn]ot authenticated|auth login/);
+      const { stderr } = await runCli(["self-update", "--check"], projectDir, fakeHome);
+      expect(stderr).not.toMatch(/[Nn]ot authenticated|auth login/);
     } finally {
       await cleanup();
     }

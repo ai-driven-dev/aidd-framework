@@ -17,8 +17,6 @@ export function registerSelfUpdateCommand(program: Command): void {
       try {
         const deps = await createDeps(projectRoot, { verbose }, output);
 
-        await deps.requireAuthUseCase.execute();
-
         const result = await deps.selfUpdateUseCase.execute({
           check: cmdOptions.check,
           dryRun: cmdOptions.dryRun,
