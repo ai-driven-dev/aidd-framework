@@ -6,7 +6,8 @@ type StatusReport = Awaited<ReturnType<StatusUseCase["execute"]>>;
 export interface StatusAllResult {
   aiTools: StatusReport;
   ideTools: StatusReport;
-  plugins: StatusReport;
+  /** Plugin drift only. Plugins hang off AI tools, so the ai scope already carries them all. */
+  pluginDrift: StatusReport["pluginDrift"];
   errors: GlobalExecutionError[];
 }
 
@@ -15,7 +16,7 @@ export class StatusAllUseCase {
 
   async execute(projectRoot: string): Promise<StatusAllResult> {
     const errors: GlobalExecutionError[] = [];
-    const [aiTools, ideTools, plugins] = await this.collectCategoryReports(
+    const [aiTools, ideTools] = await this.collectCategoryReports(
       this.statusUseCase,
       projectRoot,
       errors
@@ -23,7 +24,7 @@ export class StatusAllUseCase {
     return {
       aiTools: aiTools ?? emptyReport(),
       ideTools: ideTools ?? emptyReport(),
-      plugins: plugins ?? emptyReport(),
+      pluginDrift: aiTools?.pluginDrift ?? [],
       errors,
     };
   }
@@ -32,7 +33,7 @@ export class StatusAllUseCase {
     useCase: StatusUseCase,
     projectRoot: string,
     errors: GlobalExecutionError[]
-  ): Promise<[StatusReport | null, StatusReport | null, StatusReport | null]> {
+  ): Promise<[StatusReport | null, StatusReport | null]> {
     const aiTools = await this.runScope(
       () => useCase.execute({ projectRoot, category: "ai" }),
       "ai",
@@ -43,12 +44,7 @@ export class StatusAllUseCase {
       "ide",
       errors
     );
-    const plugins = await this.runScope(
-      () => useCase.execute({ projectRoot, filterToolId: undefined }),
-      "plugins",
-      errors
-    );
-    return [aiTools, ideTools, plugins];
+    return [aiTools, ideTools];
   }
 
   private async runScope<T>(

@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { createDeps } from "../../infrastructure/deps.js";
-import { printScopeIssues } from "../display/doctor-display.js";
+import { printPluginIssues, printScopeIssues } from "../display/doctor-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import { parseGlobalOptions } from "./global-options.js";
 
@@ -25,7 +25,7 @@ export function registerDoctorCommand(program: Command): void {
 
         printScopeIssues(output, "AI", result.ai);
         printScopeIssues(output, "IDE", result.ide);
-        printScopeIssues(output, "Plugins", result.plugins);
+        printPluginIssues(output, result.pluginIssues);
         process.exit(1);
       } catch (error) {
         errorHandler.handle(error);
