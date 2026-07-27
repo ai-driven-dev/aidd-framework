@@ -18,7 +18,7 @@ export function registerStatusCommand(program: Command): void {
 
         for (const e of result.errors) output.warn(`[${e.scope}] ${e.message}`);
 
-        const allInSync = result.aiTools.inSync && result.ideTools.inSync && result.plugins.inSync;
+        const allInSync = result.aiTools.inSync && result.ideTools.inSync;
 
         if (allInSync && result.errors.length === 0) {
           output.success("All files are in sync");
@@ -30,7 +30,7 @@ export function registerStatusCommand(program: Command): void {
         output.print("\nIDE tools:");
         printScopeReport(output, result.ideTools);
         output.print("\nPlugins:");
-        printPluginDrift(output, result.plugins);
+        printPluginDrift(output, { pluginDrift: result.pluginDrift });
         output.print("\nLegend: ~ modified  - deleted  + added");
       } catch (error) {
         errorHandler.handle(error);
