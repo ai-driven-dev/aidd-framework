@@ -87,7 +87,6 @@ import type { Hasher } from "../domain/ports/hasher.js";
 import type { LatestReleaseResolver } from "../domain/ports/latest-release-resolver.js";
 import type { Logger } from "../domain/ports/logger.js";
 import type { ManifestRepository } from "../domain/ports/manifest-repository.js";
-import type { MarketplaceCachePort } from "../domain/ports/marketplace-cache.js";
 import type { MarketplaceRegistry } from "../domain/ports/marketplace-registry.js";
 import type { MarketplaceTrustStore } from "../domain/ports/marketplace-trust-store.js";
 import type { NativePluginActivator } from "../domain/ports/native-plugin-activator.js";

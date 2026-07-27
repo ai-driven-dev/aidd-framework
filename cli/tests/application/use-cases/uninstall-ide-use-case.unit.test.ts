@@ -11,7 +11,10 @@ const EXTENSIONS = join(PROJECT_ROOT, ".vscode/extensions.json");
 type Deps = Awaited<ReturnType<typeof buildUnitDeps>>;
 
 function makeUseCase(deps: Deps): UninstallIdeUseCase {
-  return new UninstallIdeUseCase(deps.manifestRepo, new UninstallToolsUseCase(deps.fs, deps.logger));
+  return new UninstallIdeUseCase(
+    deps.manifestRepo,
+    new UninstallToolsUseCase(deps.fs, deps.logger)
+  );
 }
 
 function parse(raw: string | undefined): Record<string, unknown> {
