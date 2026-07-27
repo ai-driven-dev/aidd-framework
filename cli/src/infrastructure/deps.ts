@@ -76,6 +76,7 @@ import { UpdateOneToolUseCase } from "../application/use-cases/shared/update-one
 import { StatusUseCase } from "../application/use-cases/status-use-case.js";
 import { SyncConflictResolverUseCase } from "../application/use-cases/sync/sync-conflict-resolver-use-case.js";
 import { UninstallIdeUseCase } from "../application/use-cases/uninstall/uninstall-ide-use-case.js";
+import { UninstallToolsUseCase } from "../application/use-cases/uninstall/uninstall-tools-use-case.js";
 import { UninstallUseCase } from "../application/use-cases/uninstall/uninstall-use-case.js";
 import type { AssetProvider } from "../domain/ports/asset-provider.js";
 import type { CredentialStore } from "../domain/ports/credential-store.js";
@@ -86,7 +87,6 @@ import type { Hasher } from "../domain/ports/hasher.js";
 import type { LatestReleaseResolver } from "../domain/ports/latest-release-resolver.js";
 import type { Logger } from "../domain/ports/logger.js";
 import type { ManifestRepository } from "../domain/ports/manifest-repository.js";
-import type { MarketplaceCachePort } from "../domain/ports/marketplace-cache.js";
 import type { MarketplaceRegistry } from "../domain/ports/marketplace-registry.js";
 import type { MarketplaceTrustStore } from "../domain/ports/marketplace-trust-store.js";
 import type { NativePluginActivator } from "../domain/ports/native-plugin-activator.js";
@@ -529,7 +529,10 @@ export async function createDeps(
     postInstallPipelineUseCase,
     assetProvider
   );
-  const uninstallIdeUseCase = new UninstallIdeUseCase(fs, manifestRepo);
+  const uninstallIdeUseCase = new UninstallIdeUseCase(
+    manifestRepo,
+    new UninstallToolsUseCase(fs, logger)
+  );
   const pluginInstallFromMarketplaceUseCase = new PluginInstallFromMarketplaceUseCase(
     resolveMarketplaceUseCase,
     marketplaceRegistry,
