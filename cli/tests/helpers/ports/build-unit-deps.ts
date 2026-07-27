@@ -17,6 +17,7 @@ import { InitUseCase } from "../../../src/application/use-cases/init-use-case.js
 import { InstallIdeConfigUseCase } from "../../../src/application/use-cases/install/install-ide-config-use-case.js";
 import { InstallRuntimeConfigUseCase } from "../../../src/application/use-cases/install/install-runtime-config-use-case.js";
 import { MarketplaceSyncSettingsUseCase } from "../../../src/application/use-cases/marketplace/marketplace-sync-settings-use-case.js";
+import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
 import { GitignoreUseCase } from "../../../src/application/use-cases/shared/gitignore-use-case.js";
 import { PostInstallPipelineUseCase } from "../../../src/application/use-cases/shared/post-install-pipeline-use-case.js";
 import { ResolveUpdateDecisionUseCase } from "../../../src/application/use-cases/shared/resolve-update-decision-use-case.js";
@@ -37,7 +38,6 @@ import { InMemoryFileAdapter } from "./in-memory-file-adapter.js";
 import { InMemoryManifestRepository } from "./in-memory-manifest-repository.js";
 import { InMemoryMarketplaceRegistry } from "./in-memory-marketplace-registry.js";
 import { seedFromDirectory } from "./seed-from-directory.js";
-import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
 
 const FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework");
 

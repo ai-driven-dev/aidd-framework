@@ -13,7 +13,6 @@ import { CleanUseCase } from "../application/use-cases/clean-use-case.js";
 import { DoctorLayoutUseCase } from "../application/use-cases/doctor/doctor-layout-use-case.js";
 import { DoctorMergeFilesUseCase } from "../application/use-cases/doctor/doctor-merge-files-use-case.js";
 import { DoctorPluginUseCase } from "../application/use-cases/doctor/doctor-plugin-use-case.js";
-import { DetectPluginDriftUseCase } from "../application/use-cases/shared/detect-plugin-drift-use-case.js";
 import { DoctorReferencesUseCase } from "../application/use-cases/doctor/doctor-references-use-case.js";
 import { DoctorTrackedFilesUseCase } from "../application/use-cases/doctor/doctor-tracked-files-use-case.js";
 import { DoctorUseCase } from "../application/use-cases/doctor/doctor-use-case.js";
@@ -64,6 +63,7 @@ import { SetupMarketplaceSourceUseCase } from "../application/use-cases/setup/se
 import { SetupPluginsPromptUseCase } from "../application/use-cases/setup/setup-plugins-prompt-use-case.js";
 import { SetupToolsPromptUseCase } from "../application/use-cases/setup/setup-tools-prompt-use-case.js";
 import { SetupToolsUseCase } from "../application/use-cases/setup/setup-tools-use-case.js";
+import { DetectPluginDriftUseCase } from "../application/use-cases/shared/detect-plugin-drift-use-case.js";
 import {
   EnsureBuiltMarketplaceUseCase,
   type FrameworkBuildFor,

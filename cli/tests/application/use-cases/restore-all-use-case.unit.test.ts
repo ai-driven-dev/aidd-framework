@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { RestoreAllUseCase } from "../../../src/application/use-cases/global/restore-all-use-case.js";
 import { PluginAddUseCase } from "../../../src/application/use-cases/plugin/plugin-add-use-case.js";
 import { RestoreUseCase } from "../../../src/application/use-cases/restore/restore-use-case.js";
+import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
 import { StatusUseCase } from "../../../src/application/use-cases/status-use-case.js";
 import { PluginDistributionReaderAdapter } from "../../../src/infrastructure/adapters/plugin-distribution-reader-adapter.js";
 import { buildUnitDeps, initAndInstall, installTool } from "../../helpers/ports/build-unit-deps.js";
@@ -10,7 +11,6 @@ import { fakeEnsureBuiltMarketplace } from "../../helpers/ports/fake-ensure-buil
 import { FakePlatform } from "../../helpers/ports/fake-platform.js";
 import { OverwritePrompter, ScriptedPrompter } from "../../helpers/ports/scripted-prompter.js";
 import { seedFromDirectory } from "../../helpers/ports/seed-from-directory.js";
-import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
 
 const PROJECT_ROOT = "/test-project";
 const PLUGIN_FIXTURE = join(process.cwd(), "tests/fixtures/plugins/claude-format/sample-plugin");
@@ -53,7 +53,12 @@ function makeRestoreAllUseCase(
   prompter: OverwritePrompter | ScriptedPrompter = new OverwritePrompter(),
   withBuiltDeps = false
 ): RestoreAllUseCase {
-  const statusUseCase = new StatusUseCase(deps.fs, deps.manifestRepo, deps.hasher, new DetectPluginDriftUseCase(deps.fs));
+  const statusUseCase = new StatusUseCase(
+    deps.fs,
+    deps.manifestRepo,
+    deps.hasher,
+    new DetectPluginDriftUseCase(deps.fs)
+  );
   const restoreUseCase = new RestoreUseCase(
     deps.fs,
     deps.manifestRepo,
