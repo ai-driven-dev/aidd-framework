@@ -13,7 +13,7 @@ describe("post-install pipeline", () => {
     const manifest = await deps.manifestRepo.load();
     if (manifest === null) throw new Error("manifest not found");
 
-    await new PostInstallPipelineUseCase(deps.fs, deps.manifestRepo).execute({
+    await new PostInstallPipelineUseCase(deps.manifestRepo, deps.gitignoreUseCase).execute({
       projectRoot: PROJECT_ROOT,
       manifest,
     });

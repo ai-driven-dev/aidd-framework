@@ -9,10 +9,10 @@ const PROJECT_ROOT = "/test-project";
 function buildUseCase(deps: Awaited<ReturnType<typeof buildUnitDeps>>) {
   return new InstallIdeConfigUseCase(
     deps.fs,
-    deps.manifestRepo,
     deps.hasher,
     deps.logger,
-    deps.assetProvider
+    deps.assetProvider,
+    deps.postInstallPipelineUseCase
   );
 }
 

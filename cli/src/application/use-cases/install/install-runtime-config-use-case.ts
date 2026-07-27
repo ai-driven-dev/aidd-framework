@@ -10,9 +10,8 @@ import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { Logger } from "../../../domain/ports/logger.js";
-import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
-import { PostInstallPipelineUseCase } from "../shared/post-install-pipeline-use-case.js";
+import type { PostInstallPipelineUseCase } from "../shared/post-install-pipeline-use-case.js";
 
 export interface InstallRuntimeConfigOptions {
   toolId: AiToolId;
@@ -35,10 +34,10 @@ export interface InstallRuntimeConfigResult {
 export class InstallRuntimeConfigUseCase {
   constructor(
     private readonly fs: FileReader & FileWriter & FileMerger,
-    private readonly manifestRepo: ManifestRepository,
     private readonly hasher: Hasher,
     private readonly logger: Logger,
-    private readonly assets: AssetProvider
+    private readonly assets: AssetProvider,
+    private readonly postInstallPipelineUseCase: PostInstallPipelineUseCase
   ) {}
 
   async execute(options: InstallRuntimeConfigOptions): Promise<InstallRuntimeConfigResult> {
@@ -66,7 +65,7 @@ export class InstallRuntimeConfigUseCase {
     await this.writeMergeFiles(mergeFiles, options.projectRoot);
     const mergeEntries = await this.buildMergeEntries(mergeFiles, options.projectRoot);
     options.manifest.addTool(options.toolId, options.version, allTracked, mergeEntries);
-    await new PostInstallPipelineUseCase(this.fs, this.manifestRepo).execute({
+    await this.postInstallPipelineUseCase.execute({
       projectRoot: options.projectRoot,
       manifest: options.manifest,
     });
