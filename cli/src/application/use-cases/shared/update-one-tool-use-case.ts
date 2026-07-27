@@ -43,6 +43,10 @@ export class UpdateOneToolUseCase {
   ): Promise<{ toolId: ToolId; fileCount: number } | null> {
     const fileHashMap = this.buildManifestHashMap(manifest, toolId);
     const onBeforeWrite = this.buildFileGuard(fileHashMap, projectRoot, options);
+    // @policy report-and-continue: one tool failing must not abort a batch update.
+    // Failures are surfaced via the `errors` channel, which every caller prints.
+    // InputRequiredError is the exception: it means a prompt is needed and the run
+    // cannot proceed unattended, so it propagates and stops the batch.
     try {
       return await this.runInstall(toolId, manifest, projectRoot, version, onBeforeWrite);
     } catch (err) {

@@ -136,6 +136,52 @@ describe("UpdateOneToolUseCase integration", () => {
     });
   });
 
+  describe("install failure", () => {
+    it("reports the failure and returns null instead of throwing", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      vi.spyOn(deps.installRuntimeConfigUseCase, "execute").mockRejectedValue(
+        new Error("disk full")
+      );
+
+      const useCase = buildUseCase(deps, buildFakePrompter("keep"));
+      const errors: Parameters<typeof useCase.execute>[4] = [];
+
+      const result = await useCase.execute(
+        "claude",
+        await loadManifest(deps),
+        PROJECT_ROOT,
+        "test",
+        errors,
+        { userForce: false, interactive: false, bulkState: new BulkConflictState() }
+      );
+
+      expect(result).toBeNull();
+      expect(errors).toEqual([{ scope: "claude", message: "disk full" }]);
+    });
+
+    it("reports a non-Error rejection as a string", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      vi.spyOn(deps.installRuntimeConfigUseCase, "execute").mockRejectedValue("plain string");
+
+      const useCase = buildUseCase(deps, buildFakePrompter("keep"));
+      const errors: Parameters<typeof useCase.execute>[4] = [];
+
+      const result = await useCase.execute(
+        "claude",
+        await loadManifest(deps),
+        PROJECT_ROOT,
+        "test",
+        errors,
+        { userForce: false, interactive: false, bulkState: new BulkConflictState() }
+      );
+
+      expect(result).toBeNull();
+      expect(errors).toEqual([{ scope: "claude", message: "plain string" }]);
+    });
+  });
+
   describe("modified file + TTY + keep", () => {
     it("skips the file and preserves user edit when prompter returns keep", async () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);
