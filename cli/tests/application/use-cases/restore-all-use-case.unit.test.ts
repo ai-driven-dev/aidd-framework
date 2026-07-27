@@ -82,7 +82,7 @@ function countingReader(fs: Deps["fs"]): {
   return { reader, count: () => calls };
 }
 
-describe("RestoreAllUseCase — plugin materialization (BUG-E3-02 / A3)", () => {
+describe("RestoreAllUseCase — plugin materialization", () => {
   it("restores a corrupted plugin file with exactly one materialization call (translate-mode: claude)", async () => {
     const deps = await buildUnitDeps(PROJECT_ROOT);
     await initAndInstall(deps, PROJECT_ROOT, "claude");
@@ -103,13 +103,11 @@ describe("RestoreAllUseCase — plugin materialization (BUG-E3-02 / A3)", () => 
   });
 
   it("restores a corrupted plugin file with exactly one materialization call (cursor — installScope:user tool)", async () => {
-    // A local-source install never hits restoreViaBuiltTree (that path requires
-    // plugin.marketplace to be set — see apply-plugin-files-use-case.ts), so this
-    // still exercises restoreViaTranslate like claude, just for a second, differently
-    // -configured AI tool (installScope:"user", pluginsDir:""). It's not the true
-    // built-tree double-*write* path (that needs a marketplace-sourced install, out
-    // of scope here), but it does independently confirm the collapse-to-one-pass
-    // fix isn't accidentally claude-specific.
+    // A local-source install never reaches restoreViaBuiltTree — that path requires
+    // plugin.marketplace to be set (see apply-plugin-files-use-case.ts) — so this exercises
+    // restoreViaTranslate, same as claude, but for a differently configured tool
+    // (installScope:"user", pluginsDir:""). Confirms single-pass materialization is not
+    // claude-specific; the true built-tree write path needs a marketplace-sourced install.
     const deps = await buildUnitDeps(PROJECT_ROOT);
     await initAndInstall(deps, PROJECT_ROOT, "cursor");
     await seedFromDirectory(deps.fs, PLUGIN_FIXTURE, { useAbsolutePaths: true });
@@ -174,13 +172,10 @@ describe("RestoreAllUseCase — plugin materialization (BUG-E3-02 / A3)", () => 
   });
 
   it("interactive restore with an explicit file selection also skips unselected plugin files (translate-mode)", async () => {
-    // Plugin drift isn't offered by the interactive picker at all (StatusUseCase's
-    // pluginDrift is never read by promptForFiles) — so once the user picks ANY
-    // specific regular file, ctx.fileFilter becomes active and every plugin path
-    // fails to match it (it was never a selectable option). This mirrors what
-    // ai.ts/ide.ts's `restore <file>` already does today (ctx.fileFilter already
-    // reached plugin restore for THAT path before this fix) — this test proves the
-    // global `aidd restore` command now behaves the same way, consistently.
+    // The interactive picker never offers plugin drift (promptForFiles does not read
+    // StatusUseCase's pluginDrift), so once the user picks any specific regular file,
+    // ctx.fileFilter is active and no plugin path can match it. Same behaviour as
+    // ai.ts/ide.ts's `restore <file>`.
     const deps = await buildUnitDeps(PROJECT_ROOT);
     await initAndInstall(deps, PROJECT_ROOT, "claude");
     await installTool(deps, PROJECT_ROOT, "vscode");
@@ -197,12 +192,11 @@ describe("RestoreAllUseCase — plugin materialization (BUG-E3-02 / A3)", () => 
 
     // User selects only the regular vscode file from the drifted-files checkbox
     // (StatusUseCase reports relativePath, not the absolute path). Whether
-    // keybindings.json itself is actually repaired isn't asserted here: RestoreAllUseCase
-    // never supplies frameworkPath to RestoreUseCase, so CONFIG_REFS-driven regular-file
-    // content can't regenerate through this path at all — a separate, pre-existing gap,
-    // out of scope for BUG-E3-02. What this test proves is narrower and in scope: making
-    // ANY explicit selection turns fileFilter on, and once on, it excludes every plugin
-    // path (never offered as a choice), where pre-fix Pass 2 ignored fileFilter entirely.
+    // Whether keybindings.json is itself repaired is not asserted: RestoreAllUseCase never
+    // supplies frameworkPath to RestoreUseCase, so CONFIG_REFS-driven content cannot
+    // regenerate through this path at all. What is asserted is narrower: any explicit
+    // selection turns fileFilter on, and once on it excludes every plugin path, since a
+    // plugin file is never offered as a choice.
     const prompter = new ScriptedPrompter([
       ScriptedPrompter.answer.checkbox([".vscode/keybindings.json"]),
     ]);
