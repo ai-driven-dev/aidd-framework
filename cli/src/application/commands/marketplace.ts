@@ -140,12 +140,10 @@ export function registerMarketplaceCommand(program: Command): void {
       const errorHandler = new ErrorHandler(output);
       try {
         const deps = await createDeps(projectRoot, { verbose }, output);
-        if (cmdOptions.force) {
-          await deps.marketplaceCache.clear(name);
-        }
         const { results, failedCount } = await deps.marketplaceRefreshUseCase.execute({
           projectRoot,
           name,
+          force: cmdOptions.force,
         });
         await deps.marketplaceSyncSettingsUseCase.execute({ projectRoot });
         for (const r of results)

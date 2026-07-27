@@ -6,6 +6,8 @@ import type { MarketplaceCachePort } from "../../../src/domain/ports/marketplace
  */
 export class InMemoryMarketplaceCache implements MarketplaceCachePort {
   private readonly entries = new Map<string, MarketplaceCacheEntry>();
+  /** Every clear() argument in call order, so callers can assert whether and how it was cleared. */
+  readonly clearCalls: (string | undefined)[] = [];
 
   constructor(seed: MarketplaceCacheEntry[] = []) {
     for (const entry of seed) {
@@ -18,6 +20,7 @@ export class InMemoryMarketplaceCache implements MarketplaceCachePort {
   }
 
   async clear(name?: string): Promise<void> {
+    this.clearCalls.push(name);
     if (name !== undefined) {
       this.entries.delete(name);
     } else {

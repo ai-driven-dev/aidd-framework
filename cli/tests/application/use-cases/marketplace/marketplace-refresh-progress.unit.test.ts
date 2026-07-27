@@ -9,6 +9,7 @@ import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
 import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
 import { FixturePluginFetcher } from "../../../helpers/ports/fixture-plugin-fetcher.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
+import { InMemoryMarketplaceCache } from "../../../helpers/ports/in-memory-marketplace-cache.js";
 import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-marketplace-registry.js";
 import { seedFromDirectory } from "../../../helpers/ports/seed-from-directory.js";
 
@@ -29,6 +30,7 @@ async function buildUseCase() {
     new PluginCatalogRepositoryAdapter(fs),
     registry,
     fetchMarketplaceSource,
+    new InMemoryMarketplaceCache(),
     logger
   );
   return { useCase, registry, logger };
