@@ -16,7 +16,12 @@ describe("clean", () => {
     const gitignorePath = join(PROJECT_ROOT, ".gitignore");
     await deps.fs.writeFile(gitignorePath, "node_modules/\n.aidd/cache/\ndist/\n");
 
-    const useCase = new CleanUseCase(deps.fs, deps.manifestRepo, deps.logger);
+    const useCase = new CleanUseCase(
+      deps.fs,
+      deps.manifestRepo,
+      deps.logger,
+      deps.gitignoreUseCase
+    );
     await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
 
     const content = deps.fs.getFile(gitignorePath);
@@ -32,7 +37,12 @@ describe("clean", () => {
     const gitignorePath = join(PROJECT_ROOT, ".gitignore");
     await deps.fs.writeFile(gitignorePath, "node_modules/\n");
 
-    const useCase = new CleanUseCase(deps.fs, deps.manifestRepo, deps.logger);
+    const useCase = new CleanUseCase(
+      deps.fs,
+      deps.manifestRepo,
+      deps.logger,
+      deps.gitignoreUseCase
+    );
     await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
 
     const content = deps.fs.getFile(gitignorePath);
@@ -46,7 +56,12 @@ describe("clean", () => {
     const userFile = join(PROJECT_ROOT, "my-custom-file.txt");
     await deps.fs.writeFile(userFile, "user content");
 
-    const useCase = new CleanUseCase(deps.fs, deps.manifestRepo, deps.logger);
+    const useCase = new CleanUseCase(
+      deps.fs,
+      deps.manifestRepo,
+      deps.logger,
+      deps.gitignoreUseCase
+    );
     await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
 
     expect(deps.fs.has(userFile)).toBe(true);

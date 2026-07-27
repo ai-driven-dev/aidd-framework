@@ -13,7 +13,7 @@ import type { Logger } from "../../domain/ports/logger.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { Prompter } from "../../domain/ports/prompter.js";
 import type { ToolId } from "../../domain/tools/registry.js";
-import { GitignoreUseCase } from "./shared/gitignore-use-case.js";
+import type { GitignoreUseCase } from "./shared/gitignore-use-case.js";
 
 interface CleanOptions {
   projectRoot: string;
@@ -38,6 +38,7 @@ export class CleanUseCase {
     private readonly fs: FileReader & FileWriter,
     private readonly manifestRepo: ManifestRepository,
     private readonly logger: Logger,
+    private readonly gitignoreUseCase: GitignoreUseCase,
     private readonly prompter?: Prompter
   ) {}
 
@@ -52,7 +53,7 @@ export class CleanUseCase {
     if (dryRunResult !== null) return dryRunResult;
     const deleted = await this.deleteAllToolFiles(manifest, options.projectRoot);
     await this.fs.deleteDirectory(join(options.projectRoot, AIDD_DIR));
-    await new GitignoreUseCase(this.fs).remove(options.projectRoot, [`${AIDD_DIR}/cache/`]);
+    await this.gitignoreUseCase.remove(options.projectRoot, [`${AIDD_DIR}/cache/`]);
     return { dryRun: false, manifestFound: true, preview, fileCount: deleted };
   }
 

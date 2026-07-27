@@ -17,6 +17,8 @@ import { InitUseCase } from "../../../src/application/use-cases/init-use-case.js
 import { InstallIdeConfigUseCase } from "../../../src/application/use-cases/install/install-ide-config-use-case.js";
 import { InstallRuntimeConfigUseCase } from "../../../src/application/use-cases/install/install-runtime-config-use-case.js";
 import { MarketplaceSyncSettingsUseCase } from "../../../src/application/use-cases/marketplace/marketplace-sync-settings-use-case.js";
+import { GitignoreUseCase } from "../../../src/application/use-cases/shared/gitignore-use-case.js";
+import { PostInstallPipelineUseCase } from "../../../src/application/use-cases/shared/post-install-pipeline-use-case.js";
 import { ResolveUpdateDecisionUseCase } from "../../../src/application/use-cases/shared/resolve-update-decision-use-case.js";
 import { UpdateOneToolUseCase } from "../../../src/application/use-cases/shared/update-one-tool-use-case.js";
 import { SyncConflictResolverUseCase } from "../../../src/application/use-cases/sync/sync-conflict-resolver-use-case.js";
@@ -52,19 +54,21 @@ export async function buildUnitDeps(_projectRoot: string) {
   const pluginDistributionReader = new PluginDistributionReaderAdapter(fs);
   const pluginCatalogRepository = new PluginCatalogRepositoryAdapter(fs);
   const marketplaceRegistry = new InMemoryMarketplaceRegistry();
+  const gitignoreUseCase = new GitignoreUseCase(fs);
+  const postInstallPipelineUseCase = new PostInstallPipelineUseCase(manifestRepo, gitignoreUseCase);
   const installRuntimeConfigUseCase = new InstallRuntimeConfigUseCase(
     fs,
-    manifestRepo,
     hasher,
     logger,
-    assetProvider
+    assetProvider,
+    postInstallPipelineUseCase
   );
   const installIdeConfigUseCase = new InstallIdeConfigUseCase(
     fs,
-    manifestRepo,
     hasher,
     logger,
-    assetProvider
+    assetProvider,
+    postInstallPipelineUseCase
   );
 
   const currentVersionProvider = new FakeCurrentVersion();
@@ -97,6 +101,8 @@ export async function buildUnitDeps(_projectRoot: string) {
     marketplaceSyncSettings,
     installRuntimeConfigUseCase,
     installIdeConfigUseCase,
+    gitignoreUseCase,
+    postInstallPipelineUseCase,
     currentVersionProvider,
     syncConflictResolver,
   };
