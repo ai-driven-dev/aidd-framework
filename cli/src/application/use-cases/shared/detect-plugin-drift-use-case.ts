@@ -1,10 +1,10 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { PluginsCapability } from "../../../domain/capabilities/plugins-capability.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { AiToolId } from "../../../domain/models/tool-ids.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
-import { getToolConfig, isAiTool, type ToolId } from "../../../domain/tools/registry.js";
+import type { ToolId } from "../../../domain/tools/registry.js";
+import { resolvePluginBaseDir } from "../plugin/plugin-helpers.js";
 
 export type PluginFileDriftKind = "missing" | "hash-mismatch";
 
@@ -40,23 +40,13 @@ export class DetectPluginDriftUseCase {
       const toolId = id as AiToolId;
       const plugins = manifest.getPlugins(toolId);
       const targets = pluginName ? plugins.filter((p) => p.name === pluginName) : plugins;
-      const baseDir = this.resolveBaseDir(toolId, projectRoot);
+      const baseDir = resolvePluginBaseDir(toolId, projectRoot, homedir);
       for (const plugin of targets) {
         const files = await this.driftedFiles(plugin.files, baseDir);
         if (files.length > 0) drifts.push({ toolId, pluginName: plugin.name, files });
       }
     }
     return drifts;
-  }
-
-  /** `projectRoot` for project-scope plugins, the home-relative dir for user-scope ones. */
-  private resolveBaseDir(toolId: AiToolId, projectRoot: string): string {
-    const tool = getToolConfig(toolId);
-    if (tool === undefined || !isAiTool(tool)) return projectRoot;
-    const caps = tool.capabilities as Record<string, unknown>;
-    const plugins = caps.plugins as PluginsCapability | undefined;
-    if (plugins === undefined) return projectRoot;
-    return plugins.resolvePluginsBaseDir(projectRoot, homedir());
   }
 
   private async driftedFiles(

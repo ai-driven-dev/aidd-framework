@@ -1,5 +1,4 @@
 import { join } from "node:path";
-import type { PluginsCapability } from "../../../../domain/capabilities/plugins-capability.js";
 import { InstallationFile } from "../../../../domain/models/file.js";
 import type { Manifest } from "../../../../domain/models/manifest.js";
 import { Plugin } from "../../../../domain/models/plugin.js";
@@ -11,9 +10,8 @@ import type { FileReader } from "../../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../../domain/ports/file-writer.js";
 import type { Hasher } from "../../../../domain/ports/hasher.js";
 import type { MarketplaceRegistry } from "../../../../domain/ports/marketplace-registry.js";
-import { getToolConfig, isAiTool } from "../../../../domain/tools/registry.js";
 import type { EnsureBuiltMarketplaceUseCase } from "../../shared/ensure-built-marketplace-use-case.js";
-import { writePluginFiles } from "../plugin-helpers.js";
+import { resolvePluginBaseDir, writePluginFiles } from "../plugin-helpers.js";
 import { ModeBFlatMaterializationTranslator } from "./mode-b-flat-materialization-translator.js";
 import type { PluginTranslator } from "./plugin-translator.js";
 
@@ -75,7 +73,8 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
             join(builtDir, "plugins", dist.manifest.name),
             dist.manifest.name
           );
-    const baseDir = mode === "flat" ? projectRoot : this.resolveBaseDir(toolId, projectRoot);
+    const baseDir =
+      mode === "flat" ? projectRoot : resolvePluginBaseDir(toolId, projectRoot, this.homedir);
     await writePluginFiles(files, baseDir, this.fs);
     manifest.addPlugin(
       toolId,
@@ -122,13 +121,6 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     return (
       segments[0] === ".opencode" && segments.length >= 3 && segments[2].startsWith(`${name}-`)
     );
-  }
-
-  private resolveBaseDir(toolId: AiToolId, projectRoot: string): string {
-    const toolConfig = getToolConfig(toolId);
-    if (!isAiTool(toolConfig)) return projectRoot;
-    const plugins = (toolConfig.capabilities as { plugins: PluginsCapability }).plugins;
-    return plugins.resolvePluginsBaseDir(projectRoot, this.homedir());
   }
 
   private async findMarketplace(name: string, projectRoot: string) {
