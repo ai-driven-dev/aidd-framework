@@ -1,5 +1,4 @@
 import { join } from "node:path";
-import type { PluginsCapability } from "../../../domain/capabilities/plugins-capability.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Plugin } from "../../../domain/models/plugin.js";
 import { PluginContentTranslator } from "../../../domain/models/plugin-content-translator.js";
@@ -11,9 +10,10 @@ import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
 import type { PluginDistributionReader } from "../../../domain/ports/plugin-distribution-reader.js";
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
-import { isAiTool, type ToolConfig } from "../../../domain/tools/registry.js";
+import type { ToolConfig } from "../../../domain/tools/registry.js";
+import { materializeViaBuiltTree } from "../plugin/plugin-helpers.js";
 import { BuiltTreeMaterializationTranslator } from "../plugin/translator/built-tree-materialization-translator.js";
-import { resolveTranslator } from "../plugin/translator/plugin-translator-factory.js";
+import { resolvePluginTranslator } from "../plugin/translator/resolve-plugin-translator.js";
 import type { EnsureBuiltMarketplaceUseCase } from "./ensure-built-marketplace-use-case.js";
 
 interface ApplyPluginFilesOptions {
@@ -56,10 +56,8 @@ export class ApplyPluginFilesUseCase {
   // Materializing tools (cursor/opencode) must re-materialize from the BUILT tree so
   // restored content + hashes match what install wrote — not the raw source transform.
   private builtTreeTranslator(toolConfig: ToolConfig): BuiltTreeMaterializationTranslator | null {
-    if (this.builtDeps === undefined || !isAiTool(toolConfig)) return null;
-    const caps = toolConfig.capabilities as { plugins?: PluginsCapability };
-    if (caps.plugins === undefined) return null;
-    const translator = resolveTranslator(caps.plugins, {
+    if (this.builtDeps === undefined) return null;
+    const translator = resolvePluginTranslator(toolConfig, {
       fs: this.fs,
       hasher: this.hasher,
       homedir: this.builtDeps.homedir,
@@ -75,16 +73,7 @@ export class ApplyPluginFilesUseCase {
     options: ApplyPluginFilesOptions
   ): Promise<number> {
     const { toolId, plugin, projectRoot, manifest, docsDir } = options;
-    manifest.removePlugin(toolId, plugin.name);
-    await translator.addPlugin(
-      dist,
-      toolId,
-      plugin.source,
-      projectRoot,
-      manifest,
-      plugin.marketplace,
-      docsDir
-    );
+    await materializeViaBuiltTree(translator, dist, toolId, plugin, projectRoot, manifest, docsDir);
     return manifest.getPlugins(toolId).find((p) => p.name === plugin.name)?.files.size ?? 0;
   }
 
