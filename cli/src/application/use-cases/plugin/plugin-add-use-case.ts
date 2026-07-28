@@ -1,6 +1,5 @@
 import { homedir as nodeHomedir } from "node:os";
 import { join } from "node:path";
-import type { PluginsCapability } from "../../../domain/capabilities/plugins-capability.js";
 import {
   DuplicatePluginError,
   MissingPluginMetadataError,
@@ -25,7 +24,8 @@ import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
 import type { EnsureBuiltMarketplaceUseCase } from "../shared/ensure-built-marketplace-use-case.js";
 import { loadPluginManifest, resolvePluginToolIds, writePluginFiles } from "./plugin-helpers.js";
-import { resolveTranslator } from "./translator/plugin-translator-factory.js";
+import type { PluginTranslator } from "./translator/plugin-translator.js";
+import { resolvePluginTranslator } from "./translator/resolve-plugin-translator.js";
 
 export interface PluginAddOptions {
   source: PluginSource;
@@ -93,10 +93,8 @@ export class PluginAddUseCase {
     await this.registerNativeGithubPlugins(options, nativeToolIds, manifest);
   }
 
-  private buildAdapterMap(
-    toolIds: AiToolId[]
-  ): Map<AiToolId, ReturnType<typeof resolveTranslator>> {
-    const map = new Map<AiToolId, ReturnType<typeof resolveTranslator>>();
+  private buildAdapterMap(toolIds: AiToolId[]): Map<AiToolId, PluginTranslator | null> {
+    const map = new Map<AiToolId, PluginTranslator | null>();
     for (const id of toolIds) {
       map.set(id, this.resolveAdapter(getToolConfig(id)));
     }
@@ -296,13 +294,9 @@ export class PluginAddUseCase {
     }
   }
 
-  private resolveAdapter(
-    toolConfig: ReturnType<typeof getToolConfig>
-  ): ReturnType<typeof resolveTranslator> {
-    if (toolConfig === undefined || !isAiTool(toolConfig)) return null;
-    if (!("plugins" in (toolConfig.capabilities as object))) return null;
-    const caps = toolConfig.capabilities as { plugins: PluginsCapability };
-    return resolveTranslator(caps.plugins, {
+  private resolveAdapter(toolConfig: ReturnType<typeof getToolConfig>): PluginTranslator | null {
+    if (toolConfig === undefined) return null;
+    return resolvePluginTranslator(toolConfig, {
       fs: this.fs,
       hasher: this.hasher,
       homedir: nodeHomedir,

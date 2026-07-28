@@ -1,6 +1,5 @@
 import { homedir as nodeHomedir } from "node:os";
 import { join } from "node:path";
-import type { PluginsCapability } from "../../../domain/capabilities/plugins-capability.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import { DOCS_DIR, PLUGIN_CACHE_SUBDIR } from "../../../domain/models/paths.js";
 import { Plugin } from "../../../domain/models/plugin.js";
@@ -14,16 +13,17 @@ import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { PluginDistributionReader } from "../../../domain/ports/plugin-distribution-reader.js";
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
-import { getToolConfig, isAiTool, type ToolConfig } from "../../../domain/tools/registry.js";
+import { getToolConfig, type ToolConfig } from "../../../domain/tools/registry.js";
 import type { BuiltMaterializationDeps } from "../shared/apply-plugin-files-use-case.js";
 import {
   loadPluginManifest,
+  materializeViaBuiltTree,
   resolvePluginBaseDir,
   resolvePluginToolIds,
   writePluginFiles,
 } from "./plugin-helpers.js";
 import { BuiltTreeMaterializationTranslator } from "./translator/built-tree-materialization-translator.js";
-import { resolveTranslator } from "./translator/plugin-translator-factory.js";
+import { resolvePluginTranslator } from "./translator/resolve-plugin-translator.js";
 
 export interface PluginUpdateOptions {
   pluginNames?: string[];
@@ -120,14 +120,13 @@ export class PluginUpdateUseCase {
     const toolConfig = getToolConfig(toolId);
     const builtTree = this.builtTreeTranslator(toolConfig);
     if (builtTree !== null && plugin.marketplace !== undefined) {
-      manifest.removePlugin(toolId, plugin.name);
-      await builtTree.addPlugin(
+      await materializeViaBuiltTree(
+        builtTree,
         dist,
         toolId,
-        plugin.source,
+        plugin,
         projectRoot,
         manifest,
-        plugin.marketplace,
         docsDir
       );
       return;
@@ -157,10 +156,8 @@ export class PluginUpdateUseCase {
   // Materializing tools (cursor/opencode) re-materialize from the BUILT tree so an
   // update writes the same content install did — not the raw source transform.
   private builtTreeTranslator(toolConfig: ToolConfig): BuiltTreeMaterializationTranslator | null {
-    if (this.builtDeps === undefined || !isAiTool(toolConfig)) return null;
-    const caps = toolConfig.capabilities as { plugins?: PluginsCapability };
-    if (caps.plugins === undefined) return null;
-    const translator = resolveTranslator(caps.plugins, {
+    if (this.builtDeps === undefined) return null;
+    const translator = resolvePluginTranslator(toolConfig, {
       fs: this.fs,
       hasher: this.hasher,
       homedir: this.builtDeps.homedir,
