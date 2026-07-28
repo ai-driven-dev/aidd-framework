@@ -1,19 +1,14 @@
-<p align="right">
-  <a href="https://github.com/ai-driven-dev/framework/stargazers">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/star-cta-dark.svg" />
-      <img src="docs/assets/star-cta-light.svg" alt="Support the community, star us! The button is at the top-right of this page" width="290" />
-    </picture>
-  </a>
-</p>
-
 <div align="center">
 
-<img src="docs/assets/logo.png" alt="AIDD" width="140" />
+<img src="docs/assets/logo.png" alt="AIDD" width="100" />
 
-# AI-Driven Dev Framework 🇫🇷
+# The AI-Driven Dev Framework 🇫🇷
 
-## Agentic framework for software engineers to produce 100% quality code with IA, agonistically.
+`Open source` agnostic framework **to generate high quality clean code**.
+
+_(Already tested on `Legacy` codebases)_
+
+[![Made in France](https://img.shields.io/badge/made%20in-France-0055A4?labelColor=EF4135)](https://www.ai-driven-dev.fr/)
 
 <p>
   <!--counts:start--><kbd>7 plugins</kbd> · <kbd>41 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
@@ -22,7 +17,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/ai-driven-dev/framework?include_prereleases&sort=semver)](https://github.com/ai-driven-dev/framework/releases)
 [![CI](https://github.com/ai-driven-dev/framework/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ai-driven-dev/framework/actions/workflows/ci.yml)
-[![Made in France](https://img.shields.io/badge/made%20in-France-0055A4?labelColor=EF4135)](https://www.ai-driven-dev.fr/)
 
 <p>🗺️ <a href="https://github.com/orgs/ai-driven-dev/projects/8"><b>Live roadmap</b></a></p>
 
