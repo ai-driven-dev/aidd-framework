@@ -16,7 +16,7 @@
 ## Agentic framework for software engineers to produce 100% quality code with IA, agonistically.
 
 <p>
-  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>40 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
+  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>41 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -249,9 +249,9 @@ Repo init, commits, pull / merge requests, release tags, issues.
 
 ### 📋 [aidd-pm](plugins/aidd-pm/README.md)
 
-`4 skills` · stable
+`5 skills` · stable
 
-Ticket info, user stories, PRD, spec drafting.
+Ticket info, user stories, PRD, spec drafting, spike investigations.
 
 </td>
 <td width="33%" valign="top">
