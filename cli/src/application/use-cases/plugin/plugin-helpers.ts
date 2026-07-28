@@ -3,12 +3,15 @@ import { McpCapability } from "../../../domain/capabilities/mcp-capability.js";
 import type { PluginsCapability } from "../../../domain/capabilities/plugins-capability.js";
 import type { InstallationFile } from "../../../domain/models/file.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
+import type { Plugin } from "../../../domain/models/plugin.js";
+import type { PluginDistribution } from "../../../domain/models/plugin-distribution.js";
 import type { AiToolId } from "../../../domain/models/tool-ids.js";
 import { AI_TOOL_IDS } from "../../../domain/models/tool-ids.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
 import { NoManifestError } from "../../errors.js";
+import type { BuiltTreeMaterializationTranslator } from "./translator/built-tree-materialization-translator.js";
 
 export function resolvePluginToolIds(toolIds: AiToolId[] | "all", manifest: Manifest): AiToolId[] {
   if (toolIds !== "all") return toolIds;
@@ -58,4 +61,30 @@ export async function writePluginFiles(
   fs: FileWriter
 ): Promise<void> {
   await Promise.all(files.map((f) => fs.writeFile(join(baseDir, f.relativePath), f.content)));
+}
+
+/**
+ * Re-registers a plugin backed by the BUILT tree: drops the existing manifest entry
+ * and lets the translator re-materialize + re-register it, so update and restore both
+ * end up with the same single entry an install would have produced.
+ */
+export async function materializeViaBuiltTree(
+  translator: BuiltTreeMaterializationTranslator,
+  dist: PluginDistribution,
+  toolId: AiToolId,
+  plugin: Plugin,
+  projectRoot: string,
+  manifest: Manifest,
+  docsDir: string
+): Promise<void> {
+  manifest.removePlugin(toolId, plugin.name);
+  await translator.addPlugin(
+    dist,
+    toolId,
+    plugin.source,
+    projectRoot,
+    manifest,
+    plugin.marketplace,
+    docsDir
+  );
 }
