@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { McpCapability } from "../../../../domain/capabilities/mcp-capability.js";
+import type { McpCapability } from "../../../../domain/capabilities/mcp-capability.js";
 import type { PluginsCapability } from "../../../../domain/capabilities/plugins-capability.js";
 import { CursorProjectScopeUnsupportedError } from "../../../../domain/errors.js";
 import { mergeOpencodeMcp } from "../../../../domain/formats/opencode-mcp-merge.js";
@@ -18,7 +18,11 @@ import type { FileReader } from "../../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../../domain/ports/file-writer.js";
 import type { Hasher } from "../../../../domain/ports/hasher.js";
 import { getToolConfig, isAiTool } from "../../../../domain/tools/registry.js";
-import { writePluginFiles } from "../plugin-helpers.js";
+import {
+  qualifiesForOpencodeMcpMerge,
+  resolvePluginBaseDirForCapability,
+  writePluginFiles,
+} from "../plugin-helpers.js";
 import type { PluginTranslator } from "./plugin-translator.js";
 
 /**
@@ -88,7 +92,7 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
     const { files, componentPaths, skipped } = new PluginContentTranslator(
       this.hasher
     ).translateWithComponentPaths(dist, toolConfig, docsDir);
-    const baseDir = this.resolveBaseDir(pluginsCap, projectRoot);
+    const baseDir = resolvePluginBaseDirForCapability(pluginsCap, projectRoot, this.homedir);
     return { caps, files, componentPaths, skipped, baseDir };
   }
 
@@ -101,7 +105,7 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
     const toolConfig = getToolConfig(toolId);
     if (!isAiTool(toolConfig)) return { mcpEntries: new Map(), mcpSkips: [] };
     const caps = toolConfig.capabilities as Record<string, unknown>;
-    if (!this.qualifiesForOpencodeMcpMerge(caps) || dist.components.mcp.length === 0) {
+    if (!qualifiesForOpencodeMcpMerge(caps) || dist.components.mcp.length === 0) {
       return { mcpEntries: new Map(), mcpSkips: [] };
     }
     return this.mergeOpencodeMcpEntries(dist, caps, projectRoot, previousMcpEntries, toolId);
@@ -128,15 +132,6 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
       marketplace
     );
     manifest.addPlugin(toolId, plugin);
-  }
-
-  private qualifiesForOpencodeMcpMerge(caps: Record<string, unknown>): boolean {
-    if (!("mcp" in caps)) return false;
-    const mcp = caps.mcp;
-    if (!(mcp instanceof McpCapability)) return false;
-    if (mcp.params.mergeStrategy !== "framework-prime") return false;
-    const plugins = caps.plugins as PluginsCapability;
-    return plugins.mode === "flat";
   }
 
   private async mergeOpencodeMcpEntries(
@@ -187,12 +182,5 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
       throw err;
     }
-  }
-
-  private resolveBaseDir(
-    plugins: { resolvePluginsBaseDir: (projectRoot: string, homedir: string) => string },
-    projectRoot: string
-  ): string {
-    return plugins.resolvePluginsBaseDir(projectRoot, this.homedir());
   }
 }

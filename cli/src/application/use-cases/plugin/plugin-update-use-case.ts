@@ -16,7 +16,12 @@ import type { PluginDistributionReader } from "../../../domain/ports/plugin-dist
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
 import { getToolConfig, isAiTool, type ToolConfig } from "../../../domain/tools/registry.js";
 import type { BuiltMaterializationDeps } from "../shared/apply-plugin-files-use-case.js";
-import { loadPluginManifest, resolvePluginToolIds, writePluginFiles } from "./plugin-helpers.js";
+import {
+  loadPluginManifest,
+  resolvePluginBaseDir,
+  resolvePluginToolIds,
+  writePluginFiles,
+} from "./plugin-helpers.js";
 import { BuiltTreeMaterializationTranslator } from "./translator/built-tree-materialization-translator.js";
 import { resolveTranslator } from "./translator/plugin-translator-factory.js";
 
@@ -110,7 +115,7 @@ export class PluginUpdateUseCase {
     manifest: Manifest,
     docsDir: string
   ): Promise<void> {
-    const baseDir = this.resolveBaseDir(toolId, projectRoot);
+    const baseDir = resolvePluginBaseDir(toolId, projectRoot, nodeHomedir);
     await this.deleteOldFiles(plugin.files, baseDir);
     const toolConfig = getToolConfig(toolId);
     const builtTree = this.builtTreeTranslator(toolConfig);
@@ -163,15 +168,5 @@ export class PluginUpdateUseCase {
       marketplaceRegistry: this.builtDeps.marketplaceRegistry,
     });
     return translator instanceof BuiltTreeMaterializationTranslator ? translator : null;
-  }
-
-  private resolveBaseDir(toolId: AiToolId, projectRoot: string): string {
-    const toolConfig = getToolConfig(toolId);
-    if (!isAiTool(toolConfig)) return projectRoot;
-    const caps = toolConfig.capabilities as Record<string, unknown>;
-    if (!("plugins" in caps)) return projectRoot;
-    const pluginsCap = caps.plugins as PluginsCapability;
-    if (pluginsCap.installScope !== "user") return projectRoot;
-    return pluginsCap.resolvePluginsBaseDir(projectRoot, nodeHomedir());
   }
 }
