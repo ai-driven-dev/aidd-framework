@@ -63,6 +63,7 @@ import { SetupMarketplaceSourceUseCase } from "../application/use-cases/setup/se
 import { SetupPluginsPromptUseCase } from "../application/use-cases/setup/setup-plugins-prompt-use-case.js";
 import { SetupToolsPromptUseCase } from "../application/use-cases/setup/setup-tools-prompt-use-case.js";
 import { SetupToolsUseCase } from "../application/use-cases/setup/setup-tools-use-case.js";
+import { DetectPluginDriftUseCase } from "../application/use-cases/shared/detect-plugin-drift-use-case.js";
 import {
   EnsureBuiltMarketplaceUseCase,
   type FrameworkBuildFor,
@@ -573,7 +574,8 @@ export async function createDeps(
   const syncConflictResolverUseCase = new SyncConflictResolverUseCase(fs);
   const doctorTrackedFilesUseCase = new DoctorTrackedFilesUseCase(fs);
   const doctorMergeFilesUseCase = new DoctorMergeFilesUseCase(fs, hasher);
-  const doctorPluginUseCase = new DoctorPluginUseCase(fs);
+  const detectPluginDriftUseCase = new DetectPluginDriftUseCase(fs);
+  const doctorPluginUseCase = new DoctorPluginUseCase(detectPluginDriftUseCase);
   const doctorReferencesUseCase = new DoctorReferencesUseCase(fs);
   const doctorLayoutUseCase = new DoctorLayoutUseCase(fs, authReader);
   const doctorUseCase = new DoctorUseCase(
@@ -602,7 +604,7 @@ export async function createDeps(
   );
   const setupToolsPromptUseCase = new SetupToolsPromptUseCase(prompter);
   const projectContextDetector = new ProjectContextDetectorUseCase(fs);
-  const statusUseCase = new StatusUseCase(fs, manifestRepo, hasher);
+  const statusUseCase = new StatusUseCase(fs, manifestRepo, hasher, detectPluginDriftUseCase);
   // Lets restore re-materialize cursor/opencode plugins via the build pipeline,
   // matching what install wrote (otherwise restore rewrites raw content → drift).
   const builtMaterializationDeps = {

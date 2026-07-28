@@ -1,6 +1,7 @@
 import "../../../src/domain/tools/ai/cursor.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
 import { StatusUseCase } from "../../../src/application/use-cases/status-use-case.js";
 import { FileHash } from "../../../src/domain/models/file.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
@@ -71,7 +72,12 @@ describe("StatusUseCase — cursor plugin drift (user-scope)", () => {
         copyFile: async () => {},
       } as unknown as FileReader;
 
-      const useCase = new StatusUseCase(fs, makeManifestRepo(manifest), noopHasher);
+      const useCase = new StatusUseCase(
+        fs,
+        makeManifestRepo(manifest),
+        noopHasher,
+        new DetectPluginDriftUseCase(fs)
+      );
       await useCase.execute({ projectRoot: "/proj" });
 
       // All checked paths must be absolute (resolved from user home, not from projectRoot)
@@ -82,7 +88,12 @@ describe("StatusUseCase — cursor plugin drift (user-scope)", () => {
     it("returns plugin drift entry with the relative key", async () => {
       const manifest = makeManifest(EXPECTED_HASH);
       const fs = makeFs(true, DRIFTED_HASH);
-      const useCase = new StatusUseCase(fs, makeManifestRepo(manifest), noopHasher);
+      const useCase = new StatusUseCase(
+        fs,
+        makeManifestRepo(manifest),
+        noopHasher,
+        new DetectPluginDriftUseCase(fs)
+      );
 
       const report = await useCase.execute({ projectRoot: "/proj" });
 
@@ -97,7 +108,12 @@ describe("StatusUseCase — cursor plugin drift (user-scope)", () => {
     it("returns empty pluginDrift", async () => {
       const manifest = makeManifest(EXPECTED_HASH);
       const fs = makeFs(true, EXPECTED_HASH);
-      const useCase = new StatusUseCase(fs, makeManifestRepo(manifest), noopHasher);
+      const useCase = new StatusUseCase(
+        fs,
+        makeManifestRepo(manifest),
+        noopHasher,
+        new DetectPluginDriftUseCase(fs)
+      );
 
       const report = await useCase.execute({ projectRoot: "/proj" });
 
