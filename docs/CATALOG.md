@@ -52,7 +52,7 @@ The development SDLC: plan, implement, assert, audit, review, test, refactor, de
 
 ## 📋 aidd-pm
 
-Product management: ticket retrieval, user stories, PRD, spec.
+Product management: ticket retrieval, user stories, PRD, spec, spikes.
 
 | Skill                     | Role                                                       | Actions                          |
 | ------------------------- | ---------------------------------------------------------- | -------------------------------- |
@@ -60,6 +60,7 @@ Product management: ticket retrieval, user stories, PRD, spec.
 | `02-user-stories`         | Prioritized, estimated INVEST user-story backlog           | `01-clarify-scope`, `02-split-epic`, `03-draft-stories`, `04-estimate-impact`, `05-prioritize`, `06-sync-tracker` |
 | `03-prd`                  | Generate a structured Product Requirements Document        | `01-prd`                         |
 | `04-spec`                 | Generate or refine a normalized project spec               | `01-build`, `02-refine`          |
+| `05-spike`                | Record or investigate a decision-blocking uncertainty      | `01-create`, `02-investigate`, `03-conclude` |
 
 ## 🪞 aidd-refine
 

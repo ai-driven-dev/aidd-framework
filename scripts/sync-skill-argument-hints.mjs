@@ -95,7 +95,7 @@ function syncArgumentHint(content, hint) {
 // Skills whose argument-hint is written by hand, because it names the user's
 // entrypoint or cases rather than one token per action. The hook leaves these
 // untouched. This is the base pattern for a pipeline or case-based router.
-const MANUAL_ARGUMENT_HINT = new Set(["01-brainstorm", "02-project-memory", "04-skill-generate"]);
+const MANUAL_ARGUMENT_HINT = new Set(["01-brainstorm", "02-project-memory", "04-skill-generate", "05-spike"]);
 
 const stale = [];
 for (const dir of await skillDirs()) {

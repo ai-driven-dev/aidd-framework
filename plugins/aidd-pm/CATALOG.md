@@ -12,6 +12,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
   - [`skills/02-user-stories`](#skills02-user-stories)
   - [`skills/03-prd`](#skills03-prd)
   - [`skills/04-spec`](#skills04-spec)
+  - [`skills/05-spike`](#skills05-spike)
 
 ---
 
@@ -61,4 +62,19 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `actions` | [02-refine.md](skills/04-spec/actions/02-refine.md) | - |
 | `assets` | [spec-template.md](skills/04-spec/assets/spec-template.md) | - |
 | `-` | [SKILL.md](skills/04-spec/SKILL.md) | `Generate or refine a spec, a feature's immutable contract, from a request, a PRD, or review findings. Use to draft or refine a spec. Do NOT use to write code, a full PRD, or change a locked spec.` |
+
+#### `skills/05-spike`
+
+| Group | File | Description |
+|-------|------|---|
+| `actions` | [01-create.md](skills/05-spike/actions/01-create.md) | - |
+| `actions` | [02-investigate.md](skills/05-spike/actions/02-investigate.md) | - |
+| `actions` | [03-conclude.md](skills/05-spike/actions/03-conclude.md) | - |
+| `assets` | [spike-template.md](skills/05-spike/assets/spike-template.md) | - |
+| `references` | [capabilities.md](skills/05-spike/references/capabilities.md) | - |
+| `references` | [investigation.md](skills/05-spike/references/investigation.md) | - |
+| `references` | [lifecycle.md](skills/05-spike/references/lifecycle.md) | - |
+| `references` | [persistence.md](skills/05-spike/references/persistence.md) | - |
+| `references` | [qualification.md](skills/05-spike/references/qualification.md) | - |
+| `-` | [SKILL.md](skills/05-spike/SKILL.md) | `Produces an evidence-bounded spike for an uncertainty blocking estimation, feasibility, or design. Use when the user wants to frame, investigate, resume, or conclude one. Not for general research or implementation.` |
 
