@@ -16,13 +16,14 @@ import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
 import { getToolConfig, type ToolConfig } from "../../../domain/tools/registry.js";
 import type { BuiltMaterializationDeps } from "../shared/apply-plugin-files-use-case.js";
 import {
+  deleteOldFiles,
   loadPluginManifest,
-  materializeViaBuiltTree,
+  materializeViaTranslator,
   resolvePluginBaseDir,
   resolvePluginToolIds,
   writePluginFiles,
 } from "./plugin-helpers.js";
-import { BuiltTreeMaterializationTranslator } from "./translator/built-tree-materialization-translator.js";
+import type { PluginTranslator } from "./translator/plugin-translator.js";
 import { resolvePluginTranslator } from "./translator/resolve-plugin-translator.js";
 
 export interface PluginUpdateOptions {
@@ -116,12 +117,12 @@ export class PluginUpdateUseCase {
     docsDir: string
   ): Promise<void> {
     const baseDir = resolvePluginBaseDir(toolId, projectRoot, nodeHomedir);
-    await this.deleteOldFiles(plugin.files, baseDir);
+    await deleteOldFiles(plugin.files, baseDir, this.fs);
     const toolConfig = getToolConfig(toolId);
-    const builtTree = this.builtTreeTranslator(toolConfig);
-    if (builtTree !== null && plugin.marketplace !== undefined) {
-      await materializeViaBuiltTree(
-        builtTree,
+    const translator = this.resolveTranslator(toolConfig);
+    if (translator !== null && plugin.marketplace !== undefined) {
+      await materializeViaTranslator(
+        translator,
         dist,
         toolId,
         plugin,
@@ -134,36 +135,24 @@ export class PluginUpdateUseCase {
     const { files: newFiles, componentPaths } = new PluginContentTranslator(
       this.hasher
     ).translateWithComponentPaths(dist, toolConfig, docsDir);
-    const isLocalMarketplace = plugin.source.kind === "local" && plugin.marketplace !== undefined;
-    if (!isLocalMarketplace) await writePluginFiles(newFiles, baseDir, this.fs);
+    await writePluginFiles(newFiles, baseDir, this.fs);
     manifest.updatePlugin(
       toolId,
-      Plugin.fromDistribution(
-        dist,
-        plugin.source,
-        isLocalMarketplace ? [] : newFiles,
-        isLocalMarketplace ? new Map() : componentPaths
-      )
+      Plugin.fromDistribution(dist, plugin.source, newFiles, componentPaths)
     );
   }
 
-  private async deleteOldFiles(files: ReadonlyMap<string, string>, baseDir: string): Promise<void> {
-    for (const relativePath of files.keys()) {
-      await this.fs.deleteFile(join(baseDir, relativePath));
-    }
-  }
-
-  // Materializing tools (cursor/opencode) re-materialize from the BUILT tree so an
-  // update writes the same content install did — not the raw source transform.
-  private builtTreeTranslator(toolConfig: ToolConfig): BuiltTreeMaterializationTranslator | null {
+  // Materializing tools (cursor/opencode) re-materialize from the BUILT tree, and Mode A
+  // marketplace tools (claude/codex/copilot) re-register without writing files, so an
+  // update matches whatever install would have done for that tool.
+  private resolveTranslator(toolConfig: ToolConfig): PluginTranslator | null {
     if (this.builtDeps === undefined) return null;
-    const translator = resolvePluginTranslator(toolConfig, {
+    return resolvePluginTranslator(toolConfig, {
       fs: this.fs,
       hasher: this.hasher,
       homedir: this.builtDeps.homedir,
       ensureBuilt: this.builtDeps.ensureBuilt,
       marketplaceRegistry: this.builtDeps.marketplaceRegistry,
     });
-    return translator instanceof BuiltTreeMaterializationTranslator ? translator : null;
   }
 }

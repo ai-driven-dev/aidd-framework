@@ -13,7 +13,7 @@ import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
 import { NoManifestError } from "../../errors.js";
-import type { BuiltTreeMaterializationTranslator } from "./translator/built-tree-materialization-translator.js";
+import type { PluginTranslator } from "./translator/plugin-translator.js";
 
 export function resolvePluginToolIds(toolIds: AiToolId[] | "all", manifest: Manifest): AiToolId[] {
   if (toolIds !== "all") return toolIds;
@@ -65,6 +65,18 @@ export async function writePluginFiles(
   await Promise.all(files.map((f) => fs.writeFile(join(baseDir, f.relativePath), f.content)));
 }
 
+/** Deletes exactly the paths a plugin's own manifest entry lists, joined to its base dir.
+ * Never enumerates the directory or deletes by pattern — only manifest-tracked keys. */
+export async function deleteOldFiles(
+  files: ReadonlyMap<string, string>,
+  baseDir: string,
+  fs: FileWriter
+): Promise<void> {
+  for (const relativePath of files.keys()) {
+    await fs.deleteFile(join(baseDir, relativePath));
+  }
+}
+
 /** Whether the file already on disk matches the content we would write, so a
  * caller can skip the write and, more importantly, not count it as restored. */
 export async function isPluginFileAtDesiredState(
@@ -79,18 +91,21 @@ export async function isPluginFileAtDesiredState(
 }
 
 /**
- * Re-registers a plugin backed by the BUILT tree: drops the existing manifest entry
- * and lets the translator re-materialize + re-register it, so update and restore both
- * end up with the same single entry an install would have produced.
+ * Re-registers a marketplace-sourced plugin through its resolved translator: drops the
+ * existing manifest entry and lets the translator re-add it, so update and restore both
+ * end up with the same single entry an install would have produced. Works for either
+ * translation strategy — materializing tools (cursor/opencode) re-copy the BUILT tree;
+ * Mode A marketplace tools (claude/codex/copilot) register the plugin reference without
+ * writing any files, matching what install does for them.
  *
  * Returns how many files the translator actually (re)wrote — not the plugin's total
  * file count — so a no-op restore reports zero instead of claiming everything changed.
- * `written` is undefined only on the rare fallback path where the translator can't
- * resolve the marketplace and delegates to a strategy that doesn't track counts; that
+ * `written` is undefined for translators that don't track counts (Mode A never writes
+ * files; the rare built-tree fallback where the marketplace can't be resolved); that
  * is reported as 0 rather than guessed.
  */
-export async function materializeViaBuiltTree(
-  translator: BuiltTreeMaterializationTranslator,
+export async function materializeViaTranslator(
+  translator: PluginTranslator,
   dist: PluginDistribution,
   toolId: AiToolId,
   plugin: Plugin,
