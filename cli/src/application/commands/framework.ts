@@ -20,7 +20,10 @@ export function registerFrameworkCommand(program: Command): void {
       "Build a Claude-format framework into a target-native plugin marketplace tree or project workspace"
     )
     .requiredOption("--source <path>", "Path to the source framework directory")
-    .requiredOption("--target <target>", "Build target (claude, cursor, copilot, codex, opencode)")
+    .requiredOption(
+      "--target <target>",
+      "Build target (claude, cursor, copilot, codex, opencode, gemini)"
+    )
     .requiredOption("--out <dir>", "Output directory (marketplace dist or project root)")
     .option("--flat", "Materialize directly into project workspace, bypass marketplace")
     .option("--force", "Overwrite existing files at canonical paths (flat mode only)")

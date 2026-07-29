@@ -710,4 +710,60 @@ describe.concurrent("E2E: aidd framework build", () => {
       await cleanup();
     }
   });
+
+  it("AC #6: --target gemini --flat emits .agents/skills, .gemini/agents, .gemini/settings.json with mcpServers/hooks/context.fileName", async () => {
+    const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fw-flat-gemini");
+    try {
+      const projRoot = join(tempDir, "proj");
+      await mkdir(projRoot, { recursive: true });
+      const result = await runCli(
+        [
+          "framework",
+          "build",
+          "--source",
+          FRAMEWORK_PATH,
+          "--target",
+          "gemini",
+          "--flat",
+          "--out",
+          projRoot,
+        ],
+        projectDir,
+        fakeHome
+      );
+      expect(result.exitCode).toBe(0);
+      expect(existsSync(join(projRoot, ".agents", "skills"))).toBe(true);
+      expect(existsSync(join(projRoot, ".gemini", "agents"))).toBe(true);
+      const settingsPath = join(projRoot, ".gemini", "settings.json");
+      expect(existsSync(settingsPath)).toBe(true);
+      const settings = JSON.parse(await readFile(settingsPath, "utf-8")) as {
+        mcpServers?: Record<string, unknown>;
+        hooks?: Record<string, unknown>;
+        context?: { fileName?: string[] };
+      };
+      expect(settings.mcpServers).toBeDefined();
+      expect(settings.hooks).toBeDefined();
+      expect(settings.context?.fileName).toEqual(["AGENTS.md"]);
+      // aidd-orchestrator exclusion is covered by gemini-plugin-exclusion.integration.test.ts —
+      // the fixture marketplace here has no such plugin to exercise it against.
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("AC #7: --target gemini without --flat exits 1 (no marketplace mode)", async () => {
+    const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fw-gemini-no-flat");
+    try {
+      const outDir = join(tempDir, "dist");
+      const result = await runCli(
+        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "gemini", "--out", outDir],
+        projectDir,
+        fakeHome
+      );
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toMatch(/Unsupported target.mode/i);
+    } finally {
+      await cleanup();
+    }
+  });
 });

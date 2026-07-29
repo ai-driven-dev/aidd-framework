@@ -29,6 +29,7 @@ import {
   buildCopilotMarketplaceContract,
   buildCursorContract,
   buildCursorFlatContract,
+  buildGeminiFlatContract,
   buildOpencodeFlatContract,
 } from "../application/use-cases/framework/strategies/tool-contracts.js";
 import { DoctorAllUseCase } from "../application/use-cases/global/doctor-all-use-case.js";
@@ -331,6 +332,21 @@ const FRAMEWORK_BUILD_REGISTRY: Record<string, FrameworkBuildFactory> = {
           av,
           d.assetProvider,
           buildOpencodeFlatContract(),
+          ctx.force,
+          ctx.outDir,
+          isDirectory,
+          d.logger
+        )
+    ),
+  "gemini:flat": (deps, ctx) =>
+    buildFrameworkUseCase(
+      deps,
+      (d, av) =>
+        new FlatBuildStrategy(
+          d.fs,
+          av,
+          d.assetProvider,
+          buildGeminiFlatContract(),
           ctx.force,
           ctx.outDir,
           isDirectory,

@@ -35,12 +35,17 @@ import {
   mergeCursorFlatHooks,
 } from "../../../../domain/formats/flat-hooks-merge.js";
 import {
+  AGENTS_SKILLS_PREFIX,
   flatMcpKeyPrefix,
   genericFlatAgentPath,
   genericFlatHooksFile,
   genericFlatHooksScriptPath,
   genericFlatSkillPath,
 } from "../../../../domain/formats/flat-paths.js";
+import {
+  mergeGeminiSettingsHooks,
+  mergeGeminiSettingsSeed,
+} from "../../../../domain/formats/gemini-settings-merge.js";
 import { parseFrontmatter, serializeFrontmatter } from "../../../../domain/formats/markdown.js";
 import { buildOpencodeFlatConfig } from "../../../../domain/formats/opencode-mcp-merge.js";
 import { rewriteRelativeLinks } from "../../../../domain/formats/relative-link-rewrite.js";
@@ -626,11 +631,11 @@ export function buildCursorFlatContract(): ToolBuildContract {
 // Codex scans `.agents/skills/` (cwd → repo root) for workspace skills — the documented
 // project skill root (developers.openai.com/codex/skills). Verified live on codex-cli 0.136:
 // a SKILL.md there appears in Codex's "Available skills" context. (`.codex/skills/` also
-// resolves on 0.136 but is undocumented, so we target the documented root.)
-const CODEX_SKILLS_PREFIX = ".agents/skills/";
+// resolves on 0.136 but is undocumented, so we target the documented root.) Gemini CLI's
+// `.agents/skills/` alias resolves to the same tree — see AGENTS_SKILLS_PREFIX.
 
 function codexFlatSkillPath(plugin: string, rel: string): string {
-  return genericFlatSkillPath(CODEX_SKILLS_PREFIX, plugin, rel.replace(/^skills\//, ""));
+  return genericFlatSkillPath(AGENTS_SKILLS_PREFIX, plugin, rel.replace(/^skills\//, ""));
 }
 
 function codexFlatAgentPath(plugin: string, rel: string): string {
@@ -805,6 +810,106 @@ export function buildOpencodeFlatContract(): ToolBuildContract {
       const baseAsset = assetProvider.loadConfigAsset("opencode", "opencode.json");
       const base = typeof baseAsset === "string" ? baseAsset : JSON.stringify(baseAsset);
       await fs.writeFile(configPath, buildOpencodeFlatConfig(base, existing, incoming));
+      return 1;
+    },
+  };
+}
+
+// ── Gemini flat contract ───────────────────────────────────────────────────────
+
+// aidd-orchestrator is structurally Claude-Code-coupled (enabledPlugins in
+// .claude/settings.json, the Claude Code GitHub Action) with no Gemini equivalent.
+const GEMINI_EXCLUDED_PLUGINS: readonly string[] = ["aidd-orchestrator"];
+
+function geminiFlatSkillPath(plugin: string, rel: string): string {
+  return genericFlatSkillPath(AGENTS_SKILLS_PREFIX, plugin, rel.replace(/^skills\//, ""));
+}
+
+function geminiFlatAgentPath(plugin: string, rel: string): string {
+  return genericFlatAgentPath(".gemini/agents/", plugin, rel.replace(/^agents\//, ""), ".md");
+}
+
+function geminiFlatHooksPath(plugin: string, rel: string): string {
+  return genericFlatHooksScriptPath(".gemini/hooks/", plugin, rel.replace(/^hooks\//, ""));
+}
+
+function geminiFlatResolveTarget(plugin: string, rel: string): string {
+  if (rel.startsWith("agents/")) return geminiFlatAgentPath(plugin, rel);
+  if (rel.startsWith("skills/")) return geminiFlatSkillPath(plugin, rel);
+  return rel;
+}
+
+// Strict Gemini agent frontmatter schema (Zod .strict()) rejects unknown keys, so the
+// agent frontmatter is rebuilt from only its required fields rather than passed through.
+function transformGeminiFlatAgent(content: string, plugin: string, outName: string): string {
+  const { frontmatter, body } = parseFrontmatter(content);
+  const flatRelPath = geminiFlatAgentPath(plugin, `agents/${outName}`);
+  const rewrittenBody = rewriteRelativeLinks(body, {
+    currentFilePluginRelative: flatRelPath,
+    resolveTargetPath: (rel) => geminiFlatResolveTarget(plugin, rel),
+  });
+  const prefixedName = `${plugin}-${outName.replace(/\.md$/, "")}`;
+  return serializeFrontmatter(
+    { name: prefixedName, description: frontmatter.description },
+    rewrittenBody
+  );
+}
+
+export function buildGeminiFlatContract(): ToolBuildContract {
+  return {
+    manifestDir: null,
+    marketplaceRelative: null,
+    manifestFileRelative: null,
+    synthesizeManifest: null,
+    manifestSchemaName: null,
+    excludedPlugins: GEMINI_EXCLUDED_PLUGINS,
+    artifacts: {
+      skills: {
+        supported: true,
+        source: { kind: "fullTree", srcDir: "skills" },
+        path: geminiFlatSkillPath,
+        rewriteSkillName: true,
+      },
+      agents: {
+        supported: true,
+        source: { kind: "filteredTree", srcDir: "agents", inputExt: ".md" },
+        path: geminiFlatAgentPath,
+        transform: transformGeminiFlatAgent,
+      },
+      mcp: {
+        supported: true,
+        source: { kind: "configFile", srcPath: ".mcp.json" },
+        path: () => ".gemini/settings.json",
+        merge: (existing, incoming, force) =>
+          mergeVscodeMcp(existing, incoming, force, "mcpServers"),
+        mcpServersKey: "mcpServers",
+        mergeDest: (outDir) => `${outDir}/.gemini/settings.json`,
+      },
+      hooks: {
+        supported: true,
+        source: { kind: "hooksBundle", jsonPath: "hooks/hooks.json", scriptDir: "hooks" },
+        path: geminiFlatHooksPath,
+        hooksMerge: (existing, incoming) => mergeGeminiSettingsHooks(existing, incoming),
+        hooksMergeDest: (outDir) => `${outDir}/.gemini/settings.json`,
+      },
+      rules: { supported: false },
+      commands: { supported: false },
+    },
+    buildMarketplaceCatalog: null,
+    buildMarketplaceEntry: null,
+    emitConfigArtifact: async (
+      _builtPlugins,
+      outDir,
+      _sourceDir,
+      fs,
+      _validator,
+      assetProvider
+    ) => {
+      const configPath = `${outDir}/.gemini/settings.json`;
+      const existing = (await fs.fileExists(configPath)) ? await fs.readFile(configPath) : "";
+      const seedAsset = assetProvider.loadConfigAsset("gemini", "settings.json");
+      const seed = typeof seedAsset === "string" ? seedAsset : JSON.stringify(seedAsset);
+      await fs.writeFile(configPath, mergeGeminiSettingsSeed(existing, seed));
       return 1;
     },
   };

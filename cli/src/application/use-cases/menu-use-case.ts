@@ -82,7 +82,7 @@ const INSTALLED_NODES: MenuNode[] = [
         value: "ai-install",
         description: "Add an AI tool to this project",
         command: ["ai", "install"],
-        inputPrompt: "AI tool (e.g. claude, cursor, copilot, codex)",
+        inputPrompt: "AI tool (e.g. claude, cursor, copilot, codex, gemini)",
       },
       {
         name: "Uninstall",

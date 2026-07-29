@@ -19,7 +19,7 @@ function assertAiToolId(toolId: string): asserts toolId is AiToolId {
 export function registerAiCommand(program: Command): void {
   const ai = program
     .command("ai")
-    .description("Manage AI tools (claude, cursor, copilot, codex, opencode)");
+    .description("Manage AI tools (claude, cursor, copilot, codex, opencode, gemini)");
 
   ai.action(async () => {
     if (!process.stdout.isTTY) {
