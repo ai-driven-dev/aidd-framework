@@ -187,13 +187,13 @@ flowchart TD
 2. Add the predicate to the build-output strategy interface.
 3. Implement it in both strategies: contract-driven for flat, always true for marketplace.
 4. Skip rejected plugins in the build use-case plugin loop, emitting one `warn` per skip.
-5. Write the integration test proving the excluded plugin is absent from gemini and present elsewhere.
+5. 🤖 Write the integration test proving the mechanism (excluded plugin absent, other plugin present, skip reported, excluded from returned results) — named `plugin-exclusion.integration.test.ts`, not `gemini-plugin-exclusion...`, since gemini's real contract (excluding `aidd-orchestrator`) doesn't exist until Phase 4; tested here against a synthetic codex-contract override instead. See Amendments.
 
 #### Acceptance criteria
 
-- [ ] The build use-case contains no tool-name literal
-- [ ] A grep for `if (tool === ` and `if (kind === "agents")` in both orchestrators returns nothing
-- [ ] Skipping a plugin is reported on stderr, and no skip is silent
+- [x] The build use-case contains no tool-name literal
+- [x] A grep for `if (tool === ` and `if (kind === "agents")` in both orchestrators returns nothing
+- [x] Skipping a plugin is reported on stderr, and no skip is silent
 
 ### Phase 4: Declare the gemini flat contract
 
@@ -203,10 +203,11 @@ flowchart TD
 #### Tasks
 
 1. ~~Write the tool definition~~ — done in Phase 1 (`agents`, `skills`, `mcp`, `plugins: unsupported`; no `configOutputPaths`). `hooks` and `settings` capabilities (install-mode fidelity) are deliberately not on gemini's `AiTool` yet — they need real per-tool merge logic (Claude→Gemini hook event translation, `context.fileName` array union) that today's generic install pipeline can't express without a capability-class change. Out of this part's objective (`aidd framework build`, not `aidd install`); tracked for Part 3 (registry citizen).
-2. Write the flat contract declaring all six artifact kinds, with rules and commands explicitly unsupported.
+2. Write the flat contract declaring all six artifact kinds, with rules and commands explicitly unsupported, and `excludedPlugins: ["aidd-orchestrator"]` (Phase 3's mechanism, applied for real).
 3. Reuse codex's skills path and transform without copying them; extract a shared helper if needed.
 4. Wire the contract and the module import into the dependency graph, and add the target to the command surface and its help text.
 5. Add the CI matrix row.
+6. Add `gemini-plugin-exclusion.integration.test.ts` — the real gemini contract excludes `aidd-orchestrator` and builds every other plugin (Phase 3's test covered the generic mechanism only, against a synthetic contract).
 
 #### Acceptance criteria
 
@@ -241,6 +242,8 @@ flowchart TD
 
 🤖 Phase 1/Phase 4 boundary was unsound as originally scoped: adding `"gemini"` to `AI_TOOL_IDS` (Phase 1) without also calling `registerTool(gemini)` (originally Phase 4 task 1) broke every existing test that spreads `AI_TOOL_IDS` as "install all tools" (`tests/application/use-cases/setup-use-case.unit.test.ts`, 3 failures — `UnregisteredToolError: Tool 'gemini' is not registered.`), because `AI_TOOL_IDS` is the real runtime source of truth for "which AI tools does `all` install," not just a type-level list. This would have shipped a crash in the real CLI (`aidd setup --tools all`) had Phase 1 landed alone. Flagged to the user; resolved by pulling the tool-definition write (`domain/tools/ai/gemini.ts`) into Phase 1, atomic with the id registration. Phase 4 shrinks accordingly (its task 1 is struck).
 
+🤖 Phase 3's integration test is generic (`plugin-exclusion.integration.test.ts`, spreading `{ ...buildCodexFlatContract(), excludedPlugins: [...] }`), not gemini-specific, because gemini's own flat contract doesn't exist yet at this point in the phase order — it lands in Phase 4. Phase 4 gets its own task to add the plan's originally-named `gemini-plugin-exclusion.integration.test.ts` against the real contract excluding `aidd-orchestrator`.
+
 🤖 gemini's `AiTool` capability intersection is `HasAgents & HasSkills & HasMcp & HasPlugins` — narrower than codex/opencode. Deliberately omitted: `hooks` (Claude→Gemini event-name translation has no expression point in the current `HooksCapability`/generic install pipeline — content passes through untransformed) and `settings` (the idempotent `context.fileName` array union needs custom merge logic; `SettingsCapability` only supports generic `MergeStrategy` enums or static content, not a custom merge function). `plugins` is `{ mode: "unsupported" }` (no marketplace, no native activation, per the master plan). None of this blocks this part's objective — `aidd framework build` never reads `AiTool.capabilities` (`FlatBuildStrategy`/`ToolBuildContract` are fully standalone) — so the gap is real install-mode functionality deferred to Part 3, not a stub masking Phase 1/4 work.
 
 ## Log
@@ -249,6 +252,7 @@ flowchart TD
 
 - Phase 1: `AiToolId`/`AI_TOOL_IDS`/`FrameworkBuildTarget` extended; `CONFIG_ASSETS["gemini"]` + `assets/configs/gemini/settings.json` seed (`context.fileName: ["AGENTS.md"]`) added; `domain/tools/ai/gemini.ts` written and registered (see Amendments for scope); side-effect imports added to `deps.ts` + both test helpers; two exact-array assertions and `isAiToolId` test fixed; new `gemini` block added to `asset-loader.unit.test.ts`. Verified: `pnpm typecheck` (0 errors), `pnpm test:unit` (1413/1413), `pnpm test:e2e` golden framework-build suite (9-cell matrix byte-identical, claude cell frozen), `biome check` (clean after one formatting auto-fix). Two pre-existing, environment-coupled e2e failures observed and confirmed unrelated (`auth status` / `self-update --check`, depend on local `gh auth login` state, no gemini involvement). Committed 8540e4e9.
 - Phase 2: `domain/formats/gemini-settings-merge.ts` written — `GEMINI_HOOK_EVENT_MAP` (verified against the shipped `@google/gemini-cli@0.52.0` bundle's `EVENT_MAPPING` in `gemini-6K6USV55.js`'s hooks-migrate command, and its settings/hooks JSON-schema in `chunk-SZMWXEEI.js`), `mergeGeminiSettingsHooks` (event-translated additive hooks merge, preserves other keys, warns+drops unmapped events), `mergeGeminiSettingsSeed` (idempotent `context.fileName` array union, string-or-array normalization, preserves all other keys including ones written by prior mcp/hooks merges). 14 new unit tests in `gemini-settings-merge.unit.test.ts`. Verified: `pnpm typecheck` (0 errors), full `pnpm test:unit` (1427/1427, up from 1413), `biome check` (clean after one formatting auto-fix).
+- Phase 3: `excludedPlugins?: readonly string[]` added to `ToolBuildContract`; `shouldBuildPlugin(pluginName)` added to `BuildOutputStrategy` (always `true` in `MarketplaceBuildStrategy`, contract-driven in `FlatBuildStrategy`); `FrameworkBuildUseCase`'s plugin loop extracted into `buildAllPlugins`, skipping rejected plugins with one `logger.warn` each and excluding them from the returned `plugins`/marketplace-catalog entries. New `tests/application/use-cases/framework/plugin-exclusion.integration.test.ts` (4 tests, generic mechanism — see Amendments for the naming/scope note). Verified: `pnpm typecheck` (0 errors), `pnpm test:unit` (1427/1427), `pnpm test:integration` (505/505, up from 501), grep gate for `if (tool === ` / `if (kind === "agents")` in both orchestrators returns nothing, `biome check` (clean after one formatting auto-fix).
 
 ## Validation flow demonstration
 
