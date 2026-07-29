@@ -60,7 +60,7 @@ export function registerFrameworkCommand(program: Command): void {
             );
             process.exit(1);
           }
-          const result = await useCase.execute({ sourceDir, outDir, target, mode, force });
+          const result = await useCase.execute({ sourceDir, outDir, target, mode });
           if (mode === "flat") {
             output.success(
               `Flat-installed ${result.plugins.length} plugins, ${result.totalFiles} files written under ${result.outDir}`
