@@ -9,7 +9,7 @@ import type { FileMerger } from "../../../domain/ports/file-merger.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
-import { ResolveRestoreDecisionUseCase } from "./resolve-restore-decision.js";
+import { RestoreDriftEntriesUseCase } from "./restore-drift-entries-use-case.js";
 
 interface MergeDriftEntry {
   relativePath: string;
@@ -35,24 +35,35 @@ export interface MergeFilesRestoreResult {
 }
 
 export class RestoreMergeFilesUseCase {
+  private readonly restoreDriftEntries: RestoreDriftEntriesUseCase;
+
   constructor(
     private readonly fs: FileReader & FileMerger,
     private readonly hasher: Hasher,
-    private readonly prompter: Prompter
-  ) {}
+    prompter: Prompter
+  ) {
+    this.restoreDriftEntries = new RestoreDriftEntriesUseCase(prompter);
+  }
 
   async execute(options: MergeFilesRestoreOptions): Promise<MergeFilesRestoreResult | null> {
-    const drift = await this.collectMergeDrift(
-      options.mergeFiles,
-      options.distMap,
-      options.projectRoot,
-      options.fileFilter
-    );
-    if (drift.length === 0) return null;
-    return this.applyMergeRestorations(
-      drift,
-      options.mergeFiles,
-      options.projectRoot,
+    const mergeMap = new Map(options.mergeFiles.map((m) => [m.relativePath, m]));
+
+    return this.restoreDriftEntries.execute(
+      {
+        collectDrift: () =>
+          this.collectMergeDrift(
+            options.mergeFiles,
+            options.distMap,
+            options.projectRoot,
+            options.fileFilter
+          ),
+        restore: (entry) => this.applyOneMergeRestore(entry, options.projectRoot, mergeMap),
+        buildResult: (restored, kept) => ({
+          restored,
+          kept,
+          updatedMergeFiles: [...mergeMap.values()],
+        }),
+      },
       options.force,
       options.interactive
     );
@@ -113,33 +124,6 @@ export class RestoreMergeFilesUseCase {
       mergeStrategy: distFile.mergeStrategy,
       sectionKey: entry.sectionKey,
     };
-  }
-
-  private async applyMergeRestorations(
-    drift: MergeDriftEntry[],
-    mergeFiles: readonly MergeFileEntry[],
-    projectRoot: string,
-    force: boolean,
-    interactive: boolean
-  ): Promise<MergeFilesRestoreResult> {
-    const restored: string[] = [];
-    const kept: string[] = [];
-    const mergeMap = new Map(mergeFiles.map((m) => [m.relativePath, m]));
-    for (const entry of drift) {
-      const skip = await new ResolveRestoreDecisionUseCase(this.prompter).execute({
-        relativePath: entry.relativePath,
-        reason: entry.reason,
-        force,
-        interactive,
-      });
-      if (skip) {
-        kept.push(entry.relativePath);
-        continue;
-      }
-      await this.applyOneMergeRestore(entry, projectRoot, mergeMap);
-      restored.push(entry.relativePath);
-    }
-    return { restored, kept, updatedMergeFiles: [...mergeMap.values()] };
   }
 
   private async applyOneMergeRestore(
