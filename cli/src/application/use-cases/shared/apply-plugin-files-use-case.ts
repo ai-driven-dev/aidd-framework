@@ -11,8 +11,8 @@ import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-regi
 import type { PluginDistributionReader } from "../../../domain/ports/plugin-distribution-reader.js";
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
 import type { ToolConfig } from "../../../domain/tools/registry.js";
-import { isPluginFileAtDesiredState, materializeViaBuiltTree } from "../plugin/plugin-helpers.js";
-import { BuiltTreeMaterializationTranslator } from "../plugin/translator/built-tree-materialization-translator.js";
+import { isPluginFileAtDesiredState, materializeViaTranslator } from "../plugin/plugin-helpers.js";
+import type { PluginTranslator } from "../plugin/translator/plugin-translator.js";
 import { resolvePluginTranslator } from "../plugin/translator/resolve-plugin-translator.js";
 import type { EnsureBuiltMarketplaceUseCase } from "./ensure-built-marketplace-use-case.js";
 
@@ -46,34 +46,35 @@ export class ApplyPluginFilesUseCase {
   async execute(options: ApplyPluginFilesOptions): Promise<number> {
     const localPath = await this.pluginFetcher.fetch(options.plugin.source, options.cacheDir);
     const dist = await this.pluginDistributionReader.read(localPath);
-    const builtTree = this.builtTreeTranslator(options.toolConfig);
-    if (builtTree !== null && options.plugin.marketplace !== undefined) {
-      return this.restoreViaBuiltTree(builtTree, dist, options);
+    const translator = this.resolveTranslator(options.toolConfig);
+    if (translator !== null && options.plugin.marketplace !== undefined) {
+      return this.restoreViaTranslator(translator, dist, options);
     }
     return this.restoreViaTranslate(dist, options);
   }
 
   // Materializing tools (cursor/opencode) must re-materialize from the BUILT tree so
-  // restored content + hashes match what install wrote — not the raw source transform.
-  private builtTreeTranslator(toolConfig: ToolConfig): BuiltTreeMaterializationTranslator | null {
+  // restored content + hashes match what install wrote, and Mode A marketplace tools
+  // (claude/codex/copilot) must re-register without writing files — not the raw source
+  // transform in either case.
+  private resolveTranslator(toolConfig: ToolConfig): PluginTranslator | null {
     if (this.builtDeps === undefined) return null;
-    const translator = resolvePluginTranslator(toolConfig, {
+    return resolvePluginTranslator(toolConfig, {
       fs: this.fs,
       hasher: this.hasher,
       homedir: this.builtDeps.homedir,
       ensureBuilt: this.builtDeps.ensureBuilt,
       marketplaceRegistry: this.builtDeps.marketplaceRegistry,
     });
-    return translator instanceof BuiltTreeMaterializationTranslator ? translator : null;
   }
 
-  private async restoreViaBuiltTree(
-    translator: BuiltTreeMaterializationTranslator,
+  private async restoreViaTranslator(
+    translator: PluginTranslator,
     dist: PluginDistribution,
     options: ApplyPluginFilesOptions
   ): Promise<number> {
     const { toolId, plugin, projectRoot, manifest, docsDir } = options;
-    return materializeViaBuiltTree(
+    return materializeViaTranslator(
       translator,
       dist,
       toolId,

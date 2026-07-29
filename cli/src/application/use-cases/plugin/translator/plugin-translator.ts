@@ -20,7 +20,8 @@ export interface PluginTranslator {
    * Add a plugin for a specific tool, writing files and/or registering the plugin reference
    * in the manifest according to this adapter's strategy.
    *
-   * Returns a skip list — non-empty when the plugin contains components the tool cannot consume.
+   * Returns a skip list — non-empty when the plugin contains components the tool cannot consume —
+   * and, for strategies that track it, how many files were actually (re)written to disk.
    *
    * `previousMcpEntries` — pass the plugin's previous mcpEntries when replacing an existing
    * plugin install (--replace path). Used for idempotent re-merge of OpenCode MCP servers.
@@ -34,5 +35,5 @@ export interface PluginTranslator {
     marketplace: string | undefined,
     docsDir: string,
     previousMcpEntries?: ReadonlyMap<string, string>
-  ): Promise<{ skipped: ReadonlySkipList }>;
+  ): Promise<{ skipped: ReadonlySkipList; written?: number }>;
 }
