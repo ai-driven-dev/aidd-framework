@@ -4,12 +4,10 @@ import {
   type Marketplace,
   STALE_MAX_DAYS_DEFAULT,
 } from "../../../domain/models/marketplace.js";
-import { marketplaceCacheDir } from "../../../domain/models/paths.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../domain/models/tool-ids.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
-import type { PluginCatalogRepository } from "../../../domain/ports/plugin-catalog-repository.js";
-import type { FetchMarketplaceSourceUseCase } from "../shared/fetch-marketplace-source-use-case.js";
+import type { ResolveMarketplaceUseCase } from "../shared/resolve-marketplace-use-case.js";
 
 export interface MarketplaceCheckOptions {
   projectRoot: string;
@@ -41,9 +39,8 @@ interface CatalogReadResult {
 export class MarketplaceCheckUseCase {
   constructor(
     private readonly manifestRepo: ManifestRepository,
-    private readonly catalogRepo: PluginCatalogRepository,
     private readonly registry: MarketplaceRegistry,
-    private readonly fetchMarketplaceSource: FetchMarketplaceSourceUseCase
+    private readonly resolveMarketplace: ResolveMarketplaceUseCase
   ) {}
 
   async execute(options: MarketplaceCheckOptions): Promise<MarketplaceCheckResult> {
@@ -84,9 +81,7 @@ export class MarketplaceCheckUseCase {
   // overall report. Errors are surfaced via the `skipped` channel for logging.
   private async readCatalog(m: Marketplace, projectRoot: string): Promise<CatalogReadResult> {
     try {
-      const cacheDir = marketplaceCacheDir(projectRoot, m.name);
-      const localPath = await this.fetchMarketplaceSource.execute({ marketplace: m, cacheDir });
-      const catalog = await this.catalogRepo.load(localPath);
+      const { catalog } = await this.resolveMarketplace.execute({ marketplace: m, projectRoot });
       if (!catalog) return { known: null };
       return { known: new Set(catalog.plugins.map((p) => p.name)) };
     } catch (err) {

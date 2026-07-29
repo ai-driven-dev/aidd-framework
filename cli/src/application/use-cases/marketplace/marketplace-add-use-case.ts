@@ -9,13 +9,11 @@ import {
   Marketplace,
   type MarketplaceScope,
 } from "../../../domain/models/marketplace.js";
-import { marketplaceCacheDir } from "../../../domain/models/paths.js";
 import type { PluginSource } from "../../../domain/models/plugin-source.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
 import type { MarketplaceTrustStore } from "../../../domain/ports/marketplace-trust-store.js";
-import type { PluginCatalogRepository } from "../../../domain/ports/plugin-catalog-repository.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
-import type { FetchMarketplaceSourceUseCase } from "../shared/fetch-marketplace-source-use-case.js";
+import type { ResolveMarketplaceUseCase } from "../shared/resolve-marketplace-use-case.js";
 import type { MarketplaceRemoveUseCase } from "./marketplace-remove-use-case.js";
 
 export interface MarketplaceAddOptions {
@@ -33,10 +31,9 @@ export interface MarketplaceAddResult {
 
 export class MarketplaceAddUseCase {
   constructor(
-    private readonly catalogRepo: PluginCatalogRepository,
     private readonly registry: MarketplaceRegistry,
     private readonly trustStore: MarketplaceTrustStore,
-    private readonly fetchMarketplaceSource: FetchMarketplaceSourceUseCase,
+    private readonly resolveMarketplace: ResolveMarketplaceUseCase,
     private readonly prompter: Prompter,
     private readonly removeUseCase: MarketplaceRemoveUseCase
   ) {}
@@ -48,18 +45,20 @@ export class MarketplaceAddUseCase {
       );
     }
     await this.assertNotRegistered(options.projectRoot, options.name, options.overwrite ?? false);
-    const localPath = await this.fetchSource(options.projectRoot, options.name, options.source);
-    const catalog = await this.catalogRepo.load(localPath);
-    if (catalog === null) {
-      throw new InvalidPluginManifestError(`marketplace.json not found at "${localPath}"`);
-    }
-    await this.ensureTrust(options);
     const marketplace = Marketplace.create({
       name: options.name,
       source: options.source,
       scope: options.scope,
       addedAt: new Date().toISOString(),
     });
+    const { localPath, catalog } = await this.resolveMarketplace.execute({
+      marketplace,
+      projectRoot: options.projectRoot,
+    });
+    if (catalog === null) {
+      throw new InvalidPluginManifestError(`marketplace.json not found at "${localPath}"`);
+    }
+    await this.ensureTrust(options);
     await this.registry.save(options.projectRoot, marketplace);
     return { marketplace };
   }
@@ -74,21 +73,6 @@ export class MarketplaceAddUseCase {
     if (!found) return;
     if (!overwrite) throw new MarketplaceAlreadyRegisteredError(name);
     await this.removeUseCase.execute({ name, projectRoot, autoConfirm: true });
-  }
-
-  private async fetchSource(
-    projectRoot: string,
-    name: string,
-    source: PluginSource
-  ): Promise<string> {
-    const cacheDir = marketplaceCacheDir(projectRoot, name);
-    const marketplace = Marketplace.create({
-      name,
-      source,
-      scope: "project",
-      addedAt: new Date().toISOString(),
-    });
-    return this.fetchMarketplaceSource.execute({ marketplace, cacheDir });
   }
 
   private async ensureTrust(options: MarketplaceAddOptions): Promise<void> {
