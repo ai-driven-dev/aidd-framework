@@ -10,8 +10,7 @@ import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { Logger } from "../../../domain/ports/logger.js";
 import type { MarketplaceCachePort } from "../../../domain/ports/marketplace-cache.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
-import type { PluginCatalogRepository } from "../../../domain/ports/plugin-catalog-repository.js";
-import type { FetchMarketplaceSourceUseCase } from "../shared/fetch-marketplace-source-use-case.js";
+import type { ResolveMarketplaceUseCase } from "../shared/resolve-marketplace-use-case.js";
 
 export interface MarketplaceRefreshOptions {
   projectRoot: string;
@@ -34,9 +33,8 @@ const CLAUDE_CATALOG_PATH = ".claude-plugin/marketplace.json";
 
 export class MarketplaceRefreshUseCase {
   constructor(
-    private readonly catalogRepo: PluginCatalogRepository,
     private readonly registry: MarketplaceRegistry,
-    private readonly fetchMarketplaceSource: FetchMarketplaceSourceUseCase,
+    private readonly resolveMarketplace: ResolveMarketplaceUseCase,
     private readonly cache: MarketplaceCachePort,
     private readonly logger?: Logger,
     private readonly fs?: FileReader
@@ -61,8 +59,11 @@ export class MarketplaceRefreshUseCase {
       const cacheDir = marketplaceCacheDir(projectRoot, m.name);
       await this.warnIfStale(m.name, cacheDir);
       this.logger?.info(`Fetching marketplace '${m.name}'...`);
-      const localPath = await this.fetchSource(m, cacheDir);
-      const catalog = await this.catalogRepo.load(localPath);
+      const { catalog } = await this.resolveMarketplace.execute({
+        marketplace: m,
+        projectRoot,
+        forceRefresh: true,
+      });
       await this.registry.updateLastFetched(projectRoot, m.name, m.scope, new Date().toISOString());
       if (catalog?.version !== undefined) {
         await this.registry.updateVersion(projectRoot, m.name, m.scope, catalog.version);
@@ -75,14 +76,6 @@ export class MarketplaceRefreshUseCase {
         error: err instanceof Error ? err.message : String(err),
       };
     }
-  }
-
-  private async fetchSource(m: Marketplace, cacheDir: string): Promise<string> {
-    return this.fetchMarketplaceSource.execute({
-      marketplace: m,
-      cacheDir,
-      fetchOptions: { forceRefresh: true },
-    });
   }
 
   private async warnIfStale(name: string, cacheDir: string): Promise<void> {

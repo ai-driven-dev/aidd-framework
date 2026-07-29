@@ -411,10 +411,13 @@ export async function createDeps(
     fs,
     logger
   );
+  const resolveMarketplaceUseCase = new ResolveMarketplaceUseCase(
+    fetchMarketplaceSource,
+    pluginCatalogRepository
+  );
   const marketplaceListUseCase = new MarketplaceListUseCase(
     marketplaceRegistry,
-    pluginCatalogRepository,
-    fetchMarketplaceSource,
+    resolveMarketplaceUseCase,
     logger
   );
   const marketplaceRemoveUseCase = new MarketplaceRemoveUseCase(
@@ -424,30 +427,23 @@ export async function createDeps(
     prompter
   );
   const marketplaceAddUseCase = new MarketplaceAddUseCase(
-    pluginCatalogRepository,
     marketplaceRegistry,
     marketplaceTrustStore,
-    fetchMarketplaceSource,
+    resolveMarketplaceUseCase,
     prompter,
     marketplaceRemoveUseCase
   );
   const marketplaceRefreshUseCase = new MarketplaceRefreshUseCase(
-    pluginCatalogRepository,
     marketplaceRegistry,
-    fetchMarketplaceSource,
+    resolveMarketplaceUseCase,
     marketplaceCache,
     logger,
     fs
   );
   const marketplaceCheckUseCase = new MarketplaceCheckUseCase(
     manifestRepo,
-    pluginCatalogRepository,
     marketplaceRegistry,
-    fetchMarketplaceSource
-  );
-  const resolveMarketplaceUseCase = new ResolveMarketplaceUseCase(
-    fetchMarketplaceSource,
-    pluginCatalogRepository
+    resolveMarketplaceUseCase
   );
   const assetProvider = new BundledAssetProviderAdapter();
   const jsonSchemaValidator = new AjvSchemaValidatorAdapter();
