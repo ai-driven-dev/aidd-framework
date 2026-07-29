@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import "../../../../src/domain/tools/ai/claude.js";
 import { MarketplaceCheckUseCase } from "../../../../src/application/use-cases/marketplace/marketplace-check-use-case.js";
 import { FetchMarketplaceSourceUseCase } from "../../../../src/application/use-cases/shared/fetch-marketplace-source-use-case.js";
+import { ResolveMarketplaceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
 import { Manifest } from "../../../../src/domain/models/manifest.js";
 import { Marketplace } from "../../../../src/domain/models/marketplace.js";
 import { Plugin } from "../../../../src/domain/models/plugin.js";
@@ -24,12 +25,11 @@ async function buildUseCase() {
   const registry = new InMemoryMarketplaceRegistry();
   const manifestRepo = new InMemoryManifestRepository();
   const fetchMarketplaceSource = new FetchMarketplaceSourceUseCase(new FixturePluginFetcher());
-  const useCase = new MarketplaceCheckUseCase(
-    manifestRepo,
-    new PluginCatalogRepositoryAdapter(fs),
-    registry,
-    fetchMarketplaceSource
+  const resolveMarketplace = new ResolveMarketplaceUseCase(
+    fetchMarketplaceSource,
+    new PluginCatalogRepositoryAdapter(fs)
   );
+  const useCase = new MarketplaceCheckUseCase(manifestRepo, registry, resolveMarketplace);
   return { useCase, registry, manifestRepo };
 }
 
@@ -102,5 +102,42 @@ describe("MarketplaceCheckUseCase", () => {
       plugin: "ghost-plugin",
       toolId: "claude",
     });
+  });
+
+  it("neither skips nor reports upstream-removed when the catalog is missing (no error)", async () => {
+    const { useCase, registry } = await buildUseCase();
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: "empty",
+        source: { kind: "local", path: "/nonexistent-marketplace-dir" },
+        scope: "project",
+        addedAt: "2026-04-29T10:00:00.000Z",
+      })
+    );
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(result.skipped).toEqual([]);
+    expect(result.upstreamRemoved).toEqual([]);
+  });
+
+  it("reports the marketplace as skipped when the catalog fetch throws", async () => {
+    const { useCase, registry } = await buildUseCase();
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: "unreachable",
+        source: { kind: "github", repo: "nonexistent/repo-12345" },
+        scope: "project",
+        addedAt: "2026-04-29T10:00:00.000Z",
+      })
+    );
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]?.marketplace).toBe("unreachable");
+    expect(result.skipped[0]?.error).toBeDefined();
   });
 });
