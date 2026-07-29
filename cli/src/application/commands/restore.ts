@@ -19,7 +19,11 @@ export function registerRestoreCommand(program: Command): void {
 
         for (const e of result.errors) output.warn(`[${e.scope}] ${e.message}`);
 
-        if (result.totalRestored === 0 && result.pluginNamesRestored.length === 0) {
+        if (
+          result.totalRestored === 0 &&
+          result.pluginNamesRestored.length === 0 &&
+          result.unrestorable.length === 0
+        ) {
           output.success("Nothing to restore — all files are unmodified.");
           return;
         }
@@ -30,6 +34,11 @@ export function registerRestoreCommand(program: Command): void {
         }
         if (result.pluginNamesRestored.length > 0) {
           output.success(`Restored plugins: ${result.pluginNamesRestored.join(", ")}`);
+        }
+        if (result.unrestorable.length > 0) {
+          output.warn(
+            `Could not restore ${result.unrestorable.length} file(s) no longer part of the current distribution: ${result.unrestorable.join(", ")}`
+          );
         }
       } catch (error) {
         errorHandler.handle(error);

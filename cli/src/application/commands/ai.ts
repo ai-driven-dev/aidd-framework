@@ -227,6 +227,11 @@ export function registerAiCommand(program: Command): void {
           output.success(
             `Restored ${restored} ${restored === 1 ? "file" : "files"}, kept ${kept} ${kept === 1 ? "file" : "files"}`
           );
+          if (result.unrestorable.length > 0) {
+            output.warn(
+              `Could not restore ${result.unrestorable.length} file(s) no longer part of the current distribution: ${result.unrestorable.join(", ")}`
+            );
+          }
         } catch (error) {
           errorHandler.handle(error);
         }
