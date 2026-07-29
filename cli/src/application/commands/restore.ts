@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { createDeps } from "../../infrastructure/deps.js";
+import { printUnrestorable } from "../display/restore-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import { parseGlobalOptions } from "./global-options.js";
 
@@ -35,11 +36,7 @@ export function registerRestoreCommand(program: Command): void {
         if (result.pluginNamesRestored.length > 0) {
           output.success(`Restored plugins: ${result.pluginNamesRestored.join(", ")}`);
         }
-        if (result.unrestorable.length > 0) {
-          output.warn(
-            `Could not restore ${result.unrestorable.length} file(s) no longer part of the current distribution: ${result.unrestorable.join(", ")}`
-          );
-        }
+        printUnrestorable(output, result.unrestorable);
       } catch (error) {
         errorHandler.handle(error);
       }
