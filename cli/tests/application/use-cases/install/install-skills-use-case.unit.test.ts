@@ -1,10 +1,12 @@
-// Register the claude tool so its capabilities are accessible
+// Register the claude and copilot tools so their capabilities are accessible
 import "../../../../src/domain/tools/ai/claude.js";
+import "../../../../src/domain/tools/ai/copilot.js";
 import { describe, expect, it } from "vitest";
 import { InstallSkillsUseCase } from "../../../../src/application/use-cases/install/install-skills-use-case.js";
 import type { ContentSection } from "../../../../src/domain/models/framework.js";
 import { GITKEEP_FILE } from "../../../../src/domain/models/framework.js";
 import { claude } from "../../../../src/domain/tools/ai/claude.js";
+import { copilot } from "../../../../src/domain/tools/ai/copilot.js";
 import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
 
 const DOCS_DIR = "aidd_docs";
@@ -165,6 +167,23 @@ describe("InstallSkillsUseCase", () => {
       const files = useCase.execute({
         toolConfig: claude,
         section: skillsSectionWithEntry,
+        contentFiles,
+        docsDir: DOCS_DIR,
+      });
+
+      expect(files).toHaveLength(0);
+    });
+  });
+
+  describe("execute — tool with a null install path for .gitkeep", () => {
+    it("filters out the .gitkeep file entirely instead of producing an empty InstallationFile", () => {
+      const { useCase } = buildUseCase();
+      const gitkeepPath = `skills/${GITKEEP_FILE}`;
+      const contentFiles = new Map([[gitkeepPath, ""]]);
+
+      const files = useCase.execute({
+        toolConfig: copilot,
+        section: skillsSectionFlat,
         contentFiles,
         docsDir: DOCS_DIR,
       });
