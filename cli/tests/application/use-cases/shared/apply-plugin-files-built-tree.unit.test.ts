@@ -128,6 +128,39 @@ describe("RestoreAllPluginsUseCase — built-tree materialization", () => {
     expect([...plugins[0].files.keys()].sort()).toEqual([...installedRelPaths].sort());
   });
 
+  it("reports zero files restored when a built-tree restore finds nothing drifted", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "cursor");
+    const registry = await makeRegistry();
+    await installMarketplacePlugin(deps, registry);
+
+    const manifest = await deps.manifestRepo.load();
+    if (manifest === null) throw new Error("manifest not found");
+    const installedRelPaths = [
+      ...(manifest
+        .getPlugins("cursor")
+        .find((p) => p.name === "sample-plugin")
+        ?.files.keys() ?? []),
+    ];
+    expect(installedRelPaths.length).toBeGreaterThan(0);
+    const builtContent = deps.fs.getFile(BUILT_SKILL);
+    if (builtContent === undefined) throw new Error("built fixture missing");
+    // Seed the user-scope plugin dir with exactly what the built tree already
+    // materializes, so this restore has nothing left to change.
+    for (const relativePath of installedRelPaths) {
+      await deps.fs.writeFile(join(USER_PLUGINS_DIR, relativePath), builtContent);
+    }
+
+    const result = await makeRestoreUseCase(deps, registry).execute({
+      projectRoot: PROJECT_ROOT,
+      manifest,
+      docsDir: DOCS_DIR,
+      fileFilter: null,
+    });
+
+    expect(result.totalFiles).toBe(0);
+  });
+
   it("keeps the manifest's single entry for the plugin after restore (no duplicate registration)", async () => {
     const deps = await buildUnitDeps(PROJECT_ROOT);
     await initAndInstall(deps, PROJECT_ROOT, "cursor");

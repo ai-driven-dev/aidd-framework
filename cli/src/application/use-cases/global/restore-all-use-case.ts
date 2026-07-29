@@ -11,6 +11,7 @@ export interface RestoreAllResult {
   totalKept: number;
   pluginNamesRestored: string[];
   errors: GlobalExecutionError[];
+  unrestorable: string[];
 }
 
 export class RestoreAllUseCase {
@@ -42,6 +43,7 @@ export class RestoreAllUseCase {
       totalKept: restoreResult.totalKept,
       pluginNamesRestored: restoreResult.restoredPluginNames,
       errors,
+      unrestorable: restoreResult.unrestorable,
     };
   }
 
@@ -76,9 +78,15 @@ export class RestoreAllUseCase {
     interactive: boolean,
     manifest: Awaited<ReturnType<ManifestRepository["load"]>>,
     errors: GlobalExecutionError[]
-  ): Promise<{ totalRestored: number; totalKept: number; restoredPluginNames: string[] }> {
+  ): Promise<{
+    totalRestored: number;
+    totalKept: number;
+    restoredPluginNames: string[];
+    unrestorable: string[];
+  }> {
+    const empty = { totalRestored: 0, totalKept: 0, restoredPluginNames: [], unrestorable: [] };
     try {
-      if (manifest === null) return { totalRestored: 0, totalKept: 0, restoredPluginNames: [] };
+      if (manifest === null) return empty;
       const result = await this.restoreUseCase.execute({
         version,
         docsDir: DOCS_DIR,
@@ -92,13 +100,14 @@ export class RestoreAllUseCase {
         totalRestored: result.totalRestored,
         totalKept: result.totalKept,
         restoredPluginNames: result.restoredPluginNames,
+        unrestorable: result.unrestorable,
       };
     } catch (err) {
       errors.push({
         scope: "config-restore",
         message: err instanceof Error ? err.message : String(err),
       });
-      return { totalRestored: 0, totalKept: 0, restoredPluginNames: [] };
+      return empty;
     }
   }
 }

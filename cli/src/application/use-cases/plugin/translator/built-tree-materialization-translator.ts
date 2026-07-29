@@ -11,7 +11,7 @@ import type { FileWriter } from "../../../../domain/ports/file-writer.js";
 import type { Hasher } from "../../../../domain/ports/hasher.js";
 import type { MarketplaceRegistry } from "../../../../domain/ports/marketplace-registry.js";
 import type { EnsureBuiltMarketplaceUseCase } from "../../shared/ensure-built-marketplace-use-case.js";
-import { resolvePluginBaseDir, writePluginFiles } from "../plugin-helpers.js";
+import { isPluginFileAtDesiredState, resolvePluginBaseDir } from "../plugin-helpers.js";
 import { ModeBFlatMaterializationTranslator } from "./mode-b-flat-materialization-translator.js";
 import type { PluginTranslator } from "./plugin-translator.js";
 
@@ -44,7 +44,7 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     marketplace: string | undefined,
     docsDir: string,
     previousMcpEntries: ReadonlyMap<string, string> = new Map()
-  ): Promise<{ skipped: ReadonlySkipList }> {
+  ): Promise<{ skipped: ReadonlySkipList; written?: number }> {
     const resolved =
       marketplace === undefined ? null : await this.findMarketplace(marketplace, projectRoot);
     if (marketplace === undefined || resolved === null) {
@@ -75,12 +75,27 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
           );
     const baseDir =
       mode === "flat" ? projectRoot : resolvePluginBaseDir(toolId, projectRoot, this.homedir);
-    await writePluginFiles(files, baseDir, this.fs);
+    const written = await this.writeChangedFiles(files, baseDir);
     manifest.addPlugin(
       toolId,
       Plugin.fromDistribution(dist, source, files, new Map(), marketplace)
     );
-    return { skipped: [] };
+    return { skipped: [], written };
+  }
+
+  // Verbatim-copies the built subtree, but skips files already matching the built
+  // content on disk so a no-op restore reports (and performs) zero writes.
+  private async writeChangedFiles(files: InstallationFile[], baseDir: string): Promise<number> {
+    let written = 0;
+    for (const f of files) {
+      const outputPath = join(baseDir, f.relativePath);
+      if (await isPluginFileAtDesiredState(this.fs, this.hasher, outputPath, f.hash.value)) {
+        continue;
+      }
+      await this.fs.writeFile(outputPath, f.content);
+      written++;
+    }
+    return written;
   }
 
   // Marketplace build emits plugins/<name>/<rel>; user-scope tools install at
