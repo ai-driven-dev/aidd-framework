@@ -542,17 +542,15 @@ export async function createDeps(
     logger
   );
   const pluginSearchUseCase = new PluginSearchUseCase(
-    pluginCatalogRepository,
     marketplaceRegistry,
-    fetchMarketplaceSource
+    resolveMarketplaceUseCase
   );
   const marketplaceRegisterFrameworkUseCase = new MarketplaceRegisterFrameworkUseCase(
     marketplaceRegistry
   );
   const pluginPickUseCase = new PluginPickUseCase(
-    pluginCatalogRepository,
     marketplaceRegistry,
-    fetchMarketplaceSource,
+    resolveMarketplaceUseCase,
     pluginAddUseCase,
     prompter
   );
