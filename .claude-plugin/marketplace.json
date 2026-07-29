@@ -31,7 +31,7 @@
     {
       "name": "aidd-pm",
       "source": "./plugins/aidd-pm",
-      "description": "Product management: ticket-info, user-stories, prd, spec",
+      "description": "Product management: ticket-info, user-stories, product-brief, prd, spec, spike",
       "strict": true,
       "recommended": true
     },

@@ -13,6 +13,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
   - [`skills/03-prd`](#skills03-prd)
   - [`skills/04-spec`](#skills04-spec)
   - [`skills/05-spike`](#skills05-spike)
+  - [`skills/06-product-brief`](#skills06-product-brief)
 
 ---
 
@@ -77,4 +78,21 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `references` | [persistence.md](skills/05-spike/references/persistence.md) | - |
 | `references` | [qualification.md](skills/05-spike/references/qualification.md) | - |
 | `-` | [SKILL.md](skills/05-spike/SKILL.md) | `Produces an evidence-bounded spike for an uncertainty blocking estimation, feasibility, or design. Use when the user wants to frame, investigate, resume, or conclude one. Not for general research or implementation.` |
+
+#### `skills/06-product-brief`
+
+| Group | File | Description |
+|-------|------|---|
+| `actions` | [01-frame.md](skills/06-product-brief/actions/01-frame.md) | - |
+| `actions` | [02-discover.md](skills/06-product-brief/actions/02-discover.md) | - |
+| `actions` | [03-visualize.md](skills/06-product-brief/actions/03-visualize.md) | - |
+| `actions` | [04-shape.md](skills/06-product-brief/actions/04-shape.md) | - |
+| `actions` | [05-finalize.md](skills/06-product-brief/actions/05-finalize.md) | - |
+| `assets` | [product-brief.md](skills/06-product-brief/assets/product-brief.md) | - |
+| `references` | [brief-quality.md](skills/06-product-brief/references/brief-quality.md) | - |
+| `references` | [evidence.md](skills/06-product-brief/references/evidence.md) | - |
+| `references` | [persistence.md](skills/06-product-brief/references/persistence.md) | - |
+| `references` | [techniques.md](skills/06-product-brief/references/techniques.md) | - |
+| `references` | [visuals.md](skills/06-product-brief/references/visuals.md) | - |
+| `-` | [SKILL.md](skills/06-product-brief/SKILL.md) | `Produces a concise Product Brief before requirements. Use when the user wants to frame or revisit a product opportunity and how it will be validated. Not for requirements, technical design, or planning.` |
 
