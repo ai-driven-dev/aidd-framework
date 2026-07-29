@@ -86,6 +86,74 @@ async function installGithubPlugin(
 }
 
 describe("RestoreAllPluginsUseCase — Mode A marketplace tools (claude/codex/copilot)", () => {
+  it("cleans up files a pre-fix update/restore materialized, leaving the manifest entry empty", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "claude");
+    const registry = await makeGithubRegistry();
+    await installGithubPlugin(deps, registry);
+
+    const manifest = await deps.manifestRepo.load();
+    if (manifest === null) throw new Error("manifest not found");
+    const plugin = manifest.getPlugins("claude").find((p) => p.name === "sample-plugin");
+    if (plugin === undefined) throw new Error("plugin not found");
+
+    // Simulate the pre-fix bug: a buggy update/restore materialized files and recorded
+    // them on the manifest entry, even though Mode A's contract is register-only.
+    const strayFiles = new Map([
+      [".claude/plugins/sample-plugin/commands/greet.md", "stray-hash-1"],
+      [".claude/plugins/sample-plugin/agents/reviewer.md", "stray-hash-2"],
+    ]);
+    manifest.updatePlugin("claude", plugin.withFiles(strayFiles));
+    for (const relativePath of strayFiles.keys()) {
+      await deps.fs.writeFile(join(PROJECT_ROOT, relativePath), "stray content");
+    }
+
+    const result = await makeRestoreUseCase(deps, registry).execute({
+      projectRoot: PROJECT_ROOT,
+      manifest,
+      docsDir: DOCS_DIR,
+      fileFilter: null,
+    });
+
+    for (const relativePath of strayFiles.keys()) {
+      expect(deps.fs.getFile(join(PROJECT_ROOT, relativePath))).toBeUndefined();
+    }
+    const after = manifest.getPlugins("claude").find((p) => p.name === "sample-plugin");
+    expect(after?.files.size).toBe(0);
+    expect(result.totalFiles).toBe(0);
+  });
+
+  it("leaves a file the manifest never tracked untouched, even inside the plugin's own directory", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "claude");
+    const registry = await makeGithubRegistry();
+    await installGithubPlugin(deps, registry);
+
+    const manifest = await deps.manifestRepo.load();
+    if (manifest === null) throw new Error("manifest not found");
+    const plugin = manifest.getPlugins("claude").find((p) => p.name === "sample-plugin");
+    if (plugin === undefined) throw new Error("plugin not found");
+
+    const trackedPath = ".claude/plugins/sample-plugin/commands/greet.md";
+    const untrackedPath = ".claude/plugins/sample-plugin/notes.md";
+    manifest.updatePlugin("claude", plugin.withFiles(new Map([[trackedPath, "stray-hash"]])));
+    await deps.fs.writeFile(join(PROJECT_ROOT, trackedPath), "stray content");
+    // Not in the manifest entry — a file the user (or something else) placed alongside the
+    // plugin's tracked files. The cleanup must never delete this, since it only ever
+    // iterates the manifest's own keys.
+    await deps.fs.writeFile(join(PROJECT_ROOT, untrackedPath), "keep me");
+
+    await makeRestoreUseCase(deps, registry).execute({
+      projectRoot: PROJECT_ROOT,
+      manifest,
+      docsDir: DOCS_DIR,
+      fileFilter: null,
+    });
+
+    expect(deps.fs.getFile(join(PROJECT_ROOT, trackedPath))).toBeUndefined();
+    expect(deps.fs.getFile(join(PROJECT_ROOT, untrackedPath))).toBe("keep me");
+  });
+
   it("restores a github-sourced marketplace plugin on claude without materializing any files", async () => {
     const deps = await buildUnitDeps(PROJECT_ROOT);
     await initAndInstall(deps, PROJECT_ROOT, "claude");

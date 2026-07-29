@@ -11,7 +11,12 @@ import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-regi
 import type { PluginDistributionReader } from "../../../domain/ports/plugin-distribution-reader.js";
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
 import type { ToolConfig } from "../../../domain/tools/registry.js";
-import { isPluginFileAtDesiredState, materializeViaTranslator } from "../plugin/plugin-helpers.js";
+import {
+  deleteOldFiles,
+  isPluginFileAtDesiredState,
+  materializeViaTranslator,
+  resolvePluginBaseDir,
+} from "../plugin/plugin-helpers.js";
 import type { PluginTranslator } from "../plugin/translator/plugin-translator.js";
 import { resolvePluginTranslator } from "../plugin/translator/resolve-plugin-translator.js";
 import type { EnsureBuiltMarketplaceUseCase } from "./ensure-built-marketplace-use-case.js";
@@ -74,6 +79,14 @@ export class ApplyPluginFilesUseCase {
     options: ApplyPluginFilesOptions
   ): Promise<number> {
     const { toolId, plugin, projectRoot, manifest, docsDir } = options;
+    // Mode A never materializes files, so any manifest-tracked path here is a leftover
+    // from a run before that was true (see plugin-update-use-case.ts's unconditional
+    // equivalent). Scoped to the manifest's own keys under the plugin's base dir — never
+    // a directory scan — so it cannot touch files the plugin never wrote.
+    if (translator.mode === "marketplace" && this.builtDeps !== undefined) {
+      const baseDir = resolvePluginBaseDir(toolId, projectRoot, this.builtDeps.homedir);
+      await deleteOldFiles(plugin.files, baseDir, this.fs);
+    }
     return materializeViaTranslator(
       translator,
       dist,

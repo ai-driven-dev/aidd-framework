@@ -65,6 +65,18 @@ export async function writePluginFiles(
   await Promise.all(files.map((f) => fs.writeFile(join(baseDir, f.relativePath), f.content)));
 }
 
+/** Deletes exactly the paths a plugin's own manifest entry lists, joined to its base dir.
+ * Never enumerates the directory or deletes by pattern — only manifest-tracked keys. */
+export async function deleteOldFiles(
+  files: ReadonlyMap<string, string>,
+  baseDir: string,
+  fs: FileWriter
+): Promise<void> {
+  for (const relativePath of files.keys()) {
+    await fs.deleteFile(join(baseDir, relativePath));
+  }
+}
+
 /** Whether the file already on disk matches the content we would write, so a
  * caller can skip the write and, more importantly, not count it as restored. */
 export async function isPluginFileAtDesiredState(

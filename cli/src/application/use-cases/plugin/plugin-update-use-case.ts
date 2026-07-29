@@ -16,6 +16,7 @@ import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
 import { getToolConfig, type ToolConfig } from "../../../domain/tools/registry.js";
 import type { BuiltMaterializationDeps } from "../shared/apply-plugin-files-use-case.js";
 import {
+  deleteOldFiles,
   loadPluginManifest,
   materializeViaTranslator,
   resolvePluginBaseDir,
@@ -116,7 +117,7 @@ export class PluginUpdateUseCase {
     docsDir: string
   ): Promise<void> {
     const baseDir = resolvePluginBaseDir(toolId, projectRoot, nodeHomedir);
-    await this.deleteOldFiles(plugin.files, baseDir);
+    await deleteOldFiles(plugin.files, baseDir, this.fs);
     const toolConfig = getToolConfig(toolId);
     const translator = this.resolveTranslator(toolConfig);
     if (translator !== null && plugin.marketplace !== undefined) {
@@ -139,12 +140,6 @@ export class PluginUpdateUseCase {
       toolId,
       Plugin.fromDistribution(dist, plugin.source, newFiles, componentPaths)
     );
-  }
-
-  private async deleteOldFiles(files: ReadonlyMap<string, string>, baseDir: string): Promise<void> {
-    for (const relativePath of files.keys()) {
-      await this.fs.deleteFile(join(baseDir, relativePath));
-    }
   }
 
   // Materializing tools (cursor/opencode) re-materialize from the BUILT tree, and Mode A

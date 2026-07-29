@@ -53,7 +53,38 @@ Behavior after deploying the fix, verified by reading the final code (not assume
 - **`plugin update`, when no newer version exists**: `updateOnePlugin` returns early (`compareSemver(...) <= 0`) without calling `replacePluginFiles` at all. The stray files and the wrong manifest entry are left untouched indefinitely — update never even looks at this plugin again until a new version ships.
 - **`plugin restore`**: does **not** self-heal. `ApplyPluginFilesUseCase` has no equivalent `deleteOldFiles` step anywhere in the file — `restoreViaTranslate` only ever writes/overwrites files it currently computes, never deletes files absent from that set. After the fix, restore re-registers the manifest entry as empty via the Mode A branch, but the previously-materialized files stay on disk, now **orphaned and untracked** (previously they were at least recorded, if wrongly; after restore they're invisible to the manifest entirely).
 
-This is not implemented as a silent cleanup, per the task's explicit instruction not to delete user files without a decision. Proposed option: add a symmetric `deleteOldFiles`-equivalent step to the Mode A branch of `ApplyPluginFilesUseCase` (delete `plugin.files` under the tool's resolved base dir before calling `materializeViaTranslator`), mirroring what `PluginUpdateUseCase` already does unconditionally. That would make restore self-heal the same way update does when a version bump triggers it, and would also cover the "no version bump" update gap since restore doesn't have a version-gate. This needs an explicit decision because it deletes files the tool previously wrote to the user's project — flagging for follow-up rather than implementing here.
+### Implemented: restore now self-heals
+
+`deleteOldFiles` was extracted from `PluginUpdateUseCase` into a shared, exported function in `plugin-helpers.ts` (`deleteOldFiles(files, baseDir, fs)`), and `ApplyPluginFilesUseCase.restoreViaTranslator` calls it as a new, narrowly-gated step:
+
+```ts
+if (translator.mode === "marketplace" && this.builtDeps !== undefined) {
+  const baseDir = resolvePluginBaseDir(toolId, projectRoot, this.builtDeps.homedir);
+  await deleteOldFiles(plugin.files, baseDir, this.fs);
+}
+```
+
+Safety bounds, checked against the final code:
+
+- **Manifest-scoped only.** `deleteOldFiles` iterates `plugin.files.keys()` — the manifest's own tracked paths — and joins each to `baseDir`. It never lists a directory and never deletes by glob or pattern. A file physically present in the same plugin directory but absent from the manifest entry is untouched (covered by a dedicated test — see below).
+- **Marketplace/Mode A branch only.** The gate is `translator.mode === "marketplace"`, the exact discriminant `resolveTranslator` (`plugin-translator-factory.ts:31-48`) uses to hand out `ModeAMarketplaceTranslator`. `BuiltTreeMaterializationTranslator` (cursor/opencode) and the `restoreViaTranslate` fallback (flat mode / non-marketplace installs) declare `mode: "flat"` or never reach this method at all, so the delete is structurally unreachable for them — confirmed by grepping `readonly mode` across every translator implementation.
+- **Bounded to the plugin's base dir.** `baseDir` comes from `resolvePluginBaseDir(toolId, projectRoot, homedir)`, the same resolver `PluginUpdateUseCase` uses — not a hardcoded `projectRoot`. Checked that all three Mode A tools (claude, codex, copilot) default to `installScope: "project"` (none sets `installScope: "user"`), so `baseDir === projectRoot` for all three today, but the code doesn't assume that.
+- **Missing-file safe.** Both the real `FileAdapter.deleteFile` (`rm(path, { force: true })`) and the in-memory test adapter (`Map.delete`) are no-ops on a path that doesn't exist, so a partially-cleaned install (some stray files already removed by hand) can't crash restore.
+
+`PluginUpdateUseCase.replacePluginFiles` was refactored to call the same shared `deleteOldFiles` (previously a private method with an identical body) instead of duplicating it — its call stayed in the same unconditional position it already had, before the translator branch, since that unconditional delete is by design (it also clears files removed between versions on the built-tree and translate-fallback paths, not just the Mode A case). Only restore's new call is gated on `mode === "marketplace"`; the shared function itself carries no branch logic.
+
+This closes a gap the original fix didn't: `plugin update` only self-heals when a newer version exists upstream (`updateOnePlugin` returns early via `compareSemver` otherwise, per the trace above) — a plugin already on the latest version never gets its stray files cleared by update, ever. `restore` has no such version gate, so it is now the reliable self-heal path for stray Mode A files regardless of whether an upstream update is available.
+
+### Tests
+
+Added to `tests/application/use-cases/shared/apply-plugin-files-mode-a-marketplace.unit.test.ts`:
+
+- "cleans up files a pre-fix update/restore materialized, leaving the manifest entry empty" — seeds a manifest entry with a stray non-empty `files` map (simulating a pre-fix run) plus matching files on disk, restores, and asserts both the files and the manifest entries are gone.
+- "leaves a file the manifest never tracked untouched, even inside the plugin's own directory" — the safety-critical test. Places an untracked file (`.claude/plugins/sample-plugin/notes.md`) alongside a tracked stray file in the *same* plugin directory, restores, and asserts the untracked file survives with its exact original content while the tracked one is gone. Proves the cleanup is manifest-scoped, not directory-scoped.
+- The existing "restores ... without materializing any files" test in the same file already covers the no-op case (empty manifest entry → `deleteOldFiles` iterates zero keys).
+- Regression coverage for built-tree (cursor/opencode) and translate-fallback (flat/local-source) restores was not duplicated — `apply-plugin-files-built-tree.unit.test.ts` and `restore-all-use-case.unit.test.ts` (`restoreViaTranslate` for both claude-local and cursor-local installs) already exercise those paths and stayed green through this change, since the new delete is structurally unreachable from them.
+
+Mutation test: temporarily forced the new `if` guard to `false` (dead code). Both new tests failed with the exact predicted symptom (`expected 'stray content' to be undefined`) — one on the stray-file assertion, one on the tracked-file-gone assertion inside the untracked-survives test. Reverted; full suite re-confirmed green at 2152/2152.
 
 ## Tests
 
@@ -100,3 +131,22 @@ Read directly from the final code, not inferred:
 - `src/application/use-cases/plugin/translator/plugin-translator.ts` — `addPlugin`'s return type gained an optional `written?: number` so the shared helper can report it uniformly across strategies.
 - `tests/application/use-cases/plugin/plugin-update-mode-a-marketplace.unit.test.ts` — new.
 - `tests/application/use-cases/shared/apply-plugin-files-mode-a-marketplace.unit.test.ts` — new.
+
+## Restore self-heal follow-up — verification (real numbers)
+
+1. `npx tsc --noEmit` — clean, no errors.
+2. `pnpm test` from `cli/` — 200 test files, **2152 tests passed**, zero failures. Baseline for this follow-up was the 2150 above; added 2 new tests (both in `apply-plugin-files-mode-a-marketplace.unit.test.ts`). No existing assertion was modified.
+3. Biome, one file at a time via `./node_modules/.bin/biome check --write <file>`:
+   - `src/application/use-cases/plugin/plugin-helpers.ts` — no fixes applied.
+   - `src/application/use-cases/plugin/plugin-update-use-case.ts` — no fixes applied.
+   - `src/application/use-cases/shared/apply-plugin-files-use-case.ts` — no fixes applied.
+   - `tests/application/use-cases/shared/apply-plugin-files-mode-a-marketplace.unit.test.ts` — no fixes applied.
+4. Mutation test: forced the new `if (translator.mode === "marketplace" && this.builtDeps !== undefined)` guard to `&& false`, making the cleanup dead code. Both new tests failed with the exact predicted symptom (`expected 'stray content' to be undefined`). Reverted; `pnpm test` re-confirmed 2152/2152 green.
+5. Golden baseline: `tests/golden/golden-baseline.e2e.test.ts` passed unchanged (2/2) as part of the full suite; no regeneration needed.
+
+## Follow-up files changed
+
+- `src/application/use-cases/plugin/plugin-helpers.ts` — added exported `deleteOldFiles(files, baseDir, fs)`.
+- `src/application/use-cases/plugin/plugin-update-use-case.ts` — private `deleteOldFiles` method removed; now calls the shared function in the same unconditional position.
+- `src/application/use-cases/shared/apply-plugin-files-use-case.ts` — `restoreViaTranslator` calls `deleteOldFiles` gated on `translator.mode === "marketplace"`.
+- `tests/application/use-cases/shared/apply-plugin-files-mode-a-marketplace.unit.test.ts` — 2 new tests (stray-file cleanup, untracked-file survives).
