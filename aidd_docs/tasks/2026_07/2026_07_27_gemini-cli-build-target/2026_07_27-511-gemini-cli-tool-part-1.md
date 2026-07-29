@@ -163,19 +163,19 @@ flowchart TD
 
 #### Tasks
 
-1. Generalize the existing settings-hooks merge helper rather than adding a parallel implementation.
-2. Add the Claude to Gemini hook event mapping, mirroring how the existing per-tool event map is declared.
-3. Implement the additive `mcpServers` merge on the same file.
-4. Implement the idempotent `context.fileName` array union.
+1. ~~Generalize the existing settings-hooks merge helper~~ — new module `domain/formats/gemini-settings-merge.ts` (Gemini's event vocabulary and settings shape are distinct enough from Claude/Cursor/Codex's that a parallel `mergeGeminiSettingsHooks` was clearer than threading a fourth branch through `flat-hooks-merge.ts`; still a pure function following the exact same `(existing, incoming) => {content, warnings}` contract).
+2. Add the Claude to Gemini hook event mapping (`GEMINI_HOOK_EVENT_MAP`), verified against the shipped `gemini-cli` 0.52.0 bundle's own `gemini hooks migrate --from-claude` table.
+3. 🤖 The additive `mcpServers` merge needs no new code: gemini's shape is byte-identical to `.mcp.json`'s (verified), so Phase 4 reuses `mergeVscodeMcp(existing, incoming, force, "mcpServers")` directly — the tool skill's own rule ("generalize a helper rather than reimplement it").
+4. Implement the idempotent `context.fileName` array union (`mergeGeminiSettingsSeed`).
 5. Emit a `warn` for any source hook event with no Gemini equivalent, and drop it rather than write an invalid event name.
-6. Write the unit suite: empty file, user keys preserved, idempotence, pre-existing user `context.fileName` list, unmapped event.
+6. Write the unit suite: empty file, user keys preserved, idempotence, pre-existing user `context.fileName` list (array and string forms), unmapped event.
 
 #### Acceptance criteria
 
-- [ ] Merging twice produces identical bytes
-- [ ] A pre-existing user `context.fileName` array retains its entries and gains `AGENTS.md`
-- [ ] A user-authored unrelated key in the settings file survives every merge
-- [ ] An unmapped hook event produces a warning and no output entry
+- [x] Merging twice produces identical bytes
+- [x] A pre-existing user `context.fileName` array retains its entries and gains `AGENTS.md`
+- [x] A user-authored unrelated key in the settings file survives every merge
+- [x] An unmapped hook event produces a warning and no output entry
 
 ### Phase 3: Add the plugin-exclusion mechanism
 
@@ -247,7 +247,8 @@ flowchart TD
 
 <!-- APPEND ONLY. One entry per step attempt. Never rewrite. -->
 
-- Phase 1: `AiToolId`/`AI_TOOL_IDS`/`FrameworkBuildTarget` extended; `CONFIG_ASSETS["gemini"]` + `assets/configs/gemini/settings.json` seed (`context.fileName: ["AGENTS.md"]`) added; `domain/tools/ai/gemini.ts` written and registered (see Amendments for scope); side-effect imports added to `deps.ts` + both test helpers; two exact-array assertions and `isAiToolId` test fixed; new `gemini` block added to `asset-loader.unit.test.ts`. Verified: `pnpm typecheck` (0 errors), `pnpm test:unit` (1413/1413), `pnpm test:e2e` golden framework-build suite (9-cell matrix byte-identical, claude cell frozen), `biome check` (clean after one formatting auto-fix). Two pre-existing, environment-coupled e2e failures observed and confirmed unrelated (`auth status` / `self-update --check`, depend on local `gh auth login` state, no gemini involvement).
+- Phase 1: `AiToolId`/`AI_TOOL_IDS`/`FrameworkBuildTarget` extended; `CONFIG_ASSETS["gemini"]` + `assets/configs/gemini/settings.json` seed (`context.fileName: ["AGENTS.md"]`) added; `domain/tools/ai/gemini.ts` written and registered (see Amendments for scope); side-effect imports added to `deps.ts` + both test helpers; two exact-array assertions and `isAiToolId` test fixed; new `gemini` block added to `asset-loader.unit.test.ts`. Verified: `pnpm typecheck` (0 errors), `pnpm test:unit` (1413/1413), `pnpm test:e2e` golden framework-build suite (9-cell matrix byte-identical, claude cell frozen), `biome check` (clean after one formatting auto-fix). Two pre-existing, environment-coupled e2e failures observed and confirmed unrelated (`auth status` / `self-update --check`, depend on local `gh auth login` state, no gemini involvement). Committed 8540e4e9.
+- Phase 2: `domain/formats/gemini-settings-merge.ts` written — `GEMINI_HOOK_EVENT_MAP` (verified against the shipped `@google/gemini-cli@0.52.0` bundle's `EVENT_MAPPING` in `gemini-6K6USV55.js`'s hooks-migrate command, and its settings/hooks JSON-schema in `chunk-SZMWXEEI.js`), `mergeGeminiSettingsHooks` (event-translated additive hooks merge, preserves other keys, warns+drops unmapped events), `mergeGeminiSettingsSeed` (idempotent `context.fileName` array union, string-or-array normalization, preserves all other keys including ones written by prior mcp/hooks merges). 14 new unit tests in `gemini-settings-merge.unit.test.ts`. Verified: `pnpm typecheck` (0 errors), full `pnpm test:unit` (1427/1427, up from 1413), `biome check` (clean after one formatting auto-fix).
 
 ## Validation flow demonstration
 
