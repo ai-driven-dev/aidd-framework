@@ -11,7 +11,7 @@ import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-regi
 import type { PluginDistributionReader } from "../../../domain/ports/plugin-distribution-reader.js";
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
 import type { ToolConfig } from "../../../domain/tools/registry.js";
-import { materializeViaBuiltTree } from "../plugin/plugin-helpers.js";
+import { isPluginFileAtDesiredState, materializeViaBuiltTree } from "../plugin/plugin-helpers.js";
 import { BuiltTreeMaterializationTranslator } from "../plugin/translator/built-tree-materialization-translator.js";
 import { resolvePluginTranslator } from "../plugin/translator/resolve-plugin-translator.js";
 import type { EnsureBuiltMarketplaceUseCase } from "./ensure-built-marketplace-use-case.js";
@@ -73,8 +73,15 @@ export class ApplyPluginFilesUseCase {
     options: ApplyPluginFilesOptions
   ): Promise<number> {
     const { toolId, plugin, projectRoot, manifest, docsDir } = options;
-    await materializeViaBuiltTree(translator, dist, toolId, plugin, projectRoot, manifest, docsDir);
-    return manifest.getPlugins(toolId).find((p) => p.name === plugin.name)?.files.size ?? 0;
+    return materializeViaBuiltTree(
+      translator,
+      dist,
+      toolId,
+      plugin,
+      projectRoot,
+      manifest,
+      docsDir
+    );
   }
 
   private async restoreViaTranslate(
@@ -87,7 +94,7 @@ export class ApplyPluginFilesUseCase {
     for (const f of files) {
       if (fileFilter !== null && fileFilter !== undefined && !fileFilter(f.relativePath)) continue;
       const outputPath = join(projectRoot, f.relativePath);
-      if (!(await this.isFileAtDesiredState(outputPath, f.hash.value))) {
+      if (!(await isPluginFileAtDesiredState(this.fs, this.hasher, outputPath, f.hash.value))) {
         await this.fs.writeFile(outputPath, f.content);
         restored++;
       }
@@ -97,14 +104,5 @@ export class ApplyPluginFilesUseCase {
       plugin.withFiles(new Map(files.map((f) => [f.relativePath, f.hash.value])))
     );
     return restored;
-  }
-
-  private async isFileAtDesiredState(
-    outputPath: string,
-    expectedHashValue: string
-  ): Promise<boolean> {
-    if (!(await this.fs.fileExists(outputPath))) return false;
-    const content = await this.fs.readFile(outputPath);
-    return this.hasher.hash(content).value === expectedHashValue;
   }
 }

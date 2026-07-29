@@ -4,6 +4,7 @@ import type { AiToolId } from "../../domain/models/tool-ids.js";
 import { AI_TOOL_IDS, isAiToolId } from "../../domain/models/tool-ids.js";
 import type { ToolId } from "../../domain/tools/registry.js";
 import { createDeps, createMenuDeps } from "../../infrastructure/deps.js";
+import { printUnrestorable } from "../display/restore-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import { NoManifestError } from "../errors.js";
 import { parseGlobalOptions } from "./global-options.js";
@@ -227,6 +228,7 @@ export function registerAiCommand(program: Command): void {
           output.success(
             `Restored ${restored} ${restored === 1 ? "file" : "files"}, kept ${kept} ${kept === 1 ? "file" : "files"}`
           );
+          printUnrestorable(output, result.unrestorable);
         } catch (error) {
           errorHandler.handle(error);
         }

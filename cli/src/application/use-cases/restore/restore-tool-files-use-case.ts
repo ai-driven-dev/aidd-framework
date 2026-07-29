@@ -31,12 +31,14 @@ export interface RestoreToolFilesOptions {
 interface SectionRestoreResult {
   restored: string[];
   kept: string[];
+  unrestorable: string[];
   updatedFiles: InstallationFile[];
 }
 
 interface MergeSectionRestoreResult {
   restored: string[];
   kept: string[];
+  unrestorable: string[];
   updatedMergeFiles: MergeFileEntry[];
 }
 
@@ -45,6 +47,7 @@ export interface RestoreToolFilesResult {
   nothingToRestore: boolean;
   restored: string[];
   kept: string[];
+  unrestorable: string[];
 }
 
 export class RestoreToolFilesUseCase {
@@ -63,7 +66,13 @@ export class RestoreToolFilesUseCase {
     const section = await this.restoreSection(options, distMap);
     const mergeSection = await this.restoreMergeSection(options, distMap);
     if (section === null && mergeSection === null) {
-      return { toolId: options.toolId, nothingToRestore: true, restored: [], kept: [] };
+      return {
+        toolId: options.toolId,
+        nothingToRestore: true,
+        restored: [],
+        kept: [],
+        unrestorable: [],
+      };
     }
     return this.commitToolRestore(options, section, mergeSection);
   }
@@ -122,7 +131,8 @@ export class RestoreToolFilesUseCase {
     manifest.addTool(toolId, manifest.getToolVersion(toolId) ?? version, files, mergeFiles);
     const restored = [...(section?.restored ?? []), ...(mergeSection?.restored ?? [])];
     const kept = [...(section?.kept ?? []), ...(mergeSection?.kept ?? [])];
-    return { toolId, nothingToRestore: false, restored, kept };
+    const unrestorable = [...(section?.unrestorable ?? []), ...(mergeSection?.unrestorable ?? [])];
+    return { toolId, nothingToRestore: false, restored, kept, unrestorable };
   }
 
   private existingFilesAsGenerated(

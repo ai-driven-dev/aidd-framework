@@ -268,7 +268,7 @@ describe("RestoreRegularFilesUseCase", () => {
     expect(deps.fs.getFile(join(PROJECT_ROOT, "b.md"))).toBe("disk modified b");
   });
 
-  it("silently drops a deleted file that has no corresponding entry in the dist map", async () => {
+  it("reports a deleted file with no corresponding dist entry as unrestorable, without touching disk", async () => {
     const deps = await buildDeps();
     const useCase = new RestoreRegularFilesUseCase(deps.fs, new OverwritePrompter());
 
@@ -281,11 +281,13 @@ describe("RestoreRegularFilesUseCase", () => {
       fileFilter: null,
     });
 
-    expect(result).toBeNull();
+    expect(result?.unrestorable).toEqual(["a.md"]);
+    expect(result?.restored).toEqual([]);
+    expect(result?.kept).toEqual([]);
     expect(deps.fs.has(join(PROJECT_ROOT, "a.md"))).toBe(false);
   });
 
-  it("silently drops a modified file that has no corresponding entry in the dist map", async () => {
+  it("reports a modified file with no corresponding dist entry as unrestorable, without touching disk", async () => {
     const deps = await buildDeps();
     await deps.fs.writeFile(join(PROJECT_ROOT, "a.md"), "disk modified content");
     const useCase = new RestoreRegularFilesUseCase(deps.fs, new OverwritePrompter());
@@ -299,7 +301,9 @@ describe("RestoreRegularFilesUseCase", () => {
       fileFilter: null,
     });
 
-    expect(result).toBeNull();
+    expect(result?.unrestorable).toEqual(["a.md"]);
+    expect(result?.restored).toEqual([]);
+    expect(result?.kept).toEqual([]);
     expect(deps.fs.getFile(join(PROJECT_ROOT, "a.md"))).toBe("disk modified content");
   });
 });

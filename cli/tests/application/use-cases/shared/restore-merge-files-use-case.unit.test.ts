@@ -205,7 +205,7 @@ describe("RestoreMergeFilesUseCase", () => {
     expect(deps.fs.getFile(join(PROJECT_ROOT, "b.json"))).toBe(JSON.stringify({ x: "disk" }));
   });
 
-  it("skips merge files whose distribution strategy is 'none'", async () => {
+  it("reports a drifted merge file as unrestorable when the distribution strategy is 'none'", async () => {
     const deps = await buildDeps();
     await deps.fs.writeFile(join(PROJECT_ROOT, "a.json"), JSON.stringify({ x: "disk" }));
     const useCase = new RestoreMergeFilesUseCase(deps.fs, deps.hasher, new OverwritePrompter());
@@ -221,6 +221,43 @@ describe("RestoreMergeFilesUseCase", () => {
             relativePath: "a.json",
             content: JSON.stringify({ x: "framework" }),
             hash: deps.hasher.hash(JSON.stringify({ x: "framework" })),
+            mergeStrategy: "none",
+          }),
+        ],
+      ]),
+      projectRoot: PROJECT_ROOT,
+      force: true,
+      interactive: false,
+      fileFilter: null,
+    });
+
+    expect(result?.unrestorable).toEqual(["a.json"]);
+    expect(result?.restored).toEqual([]);
+    expect(result?.kept).toEqual([]);
+    expect(deps.fs.getFile(join(PROJECT_ROOT, "a.json"))).toBe(JSON.stringify({ x: "disk" }));
+  });
+
+  it("returns null when a merge file's distribution strategy is 'none' and nothing drifted", async () => {
+    const deps = await buildDeps();
+    const distContent = JSON.stringify({ x: "framework" });
+    await deps.fs.writeFile(join(PROJECT_ROOT, "a.json"), distContent);
+    const useCase = new RestoreMergeFilesUseCase(deps.fs, deps.hasher, new OverwritePrompter());
+
+    const result = await useCase.execute({
+      mergeFiles: [
+        {
+          relativePath: "a.json",
+          sectionKey: null,
+          entries: { x: deps.hasher.hash('"framework"') },
+        },
+      ],
+      distMap: new Map([
+        [
+          "a.json",
+          new InstallationFile({
+            relativePath: "a.json",
+            content: distContent,
+            hash: deps.hasher.hash(distContent),
             mergeStrategy: "none",
           }),
         ],

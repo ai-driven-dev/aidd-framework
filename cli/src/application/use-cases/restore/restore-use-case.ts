@@ -69,6 +69,7 @@ interface RestoreResult {
   totalKept: number;
   totalPluginFilesRestored: number;
   restoredPluginNames: string[];
+  unrestorable: string[];
 }
 
 export class RestoreUseCase {
@@ -177,6 +178,7 @@ export class RestoreUseCase {
       totalKept: toolResults.reduce((s, t) => s + t.kept.length, 0),
       totalPluginFilesRestored: pluginResult.totalFiles,
       restoredPluginNames: pluginResult.pluginNames,
+      unrestorable: toolResults.flatMap((t) => t.unrestorable),
     };
   }
 

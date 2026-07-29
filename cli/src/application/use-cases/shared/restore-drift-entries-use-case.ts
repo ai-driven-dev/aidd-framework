@@ -1,9 +1,20 @@
 import type { Prompter } from "../../../domain/ports/prompter.js";
 import { ResolveRestoreDecisionUseCase } from "./resolve-restore-decision.js";
 
-interface DriftDescriptor {
+export interface DriftDescriptor {
   relativePath: string;
   reason: "deleted" | "modified";
+}
+
+/**
+ * What a leaf's drift scan found: entries that can actually be restored (`drift`),
+ * and entries the manifest still tracks as drifted but the current distribution no
+ * longer provides anything to restore them from (`unrestorable`) — e.g. a file
+ * dropped in a newer framework version, or a tool whose content set changed.
+ */
+export interface DriftCollection<TDrift extends DriftDescriptor> {
+  drift: TDrift[];
+  unrestorable: DriftDescriptor[];
 }
 
 /**
@@ -12,9 +23,9 @@ interface DriftDescriptor {
  * which leaf it is running — it only calls these three methods.
  */
 export interface RestoreDriftLeaf<TDrift extends DriftDescriptor, TResult> {
-  collectDrift(): Promise<TDrift[]>;
+  collectDrift(): Promise<DriftCollection<TDrift>>;
   restore(entry: TDrift): Promise<void>;
-  buildResult(restored: string[], kept: string[]): TResult;
+  buildResult(restored: string[], kept: string[], unrestorable: string[]): TResult;
 }
 
 /**
@@ -35,8 +46,8 @@ export class RestoreDriftEntriesUseCase {
     force: boolean,
     interactive: boolean
   ): Promise<TResult | null> {
-    const drift = await leaf.collectDrift();
-    if (drift.length === 0) return null;
+    const { drift, unrestorable } = await leaf.collectDrift();
+    if (drift.length === 0 && unrestorable.length === 0) return null;
 
     const restored: string[] = [];
     const kept: string[] = [];
@@ -56,6 +67,10 @@ export class RestoreDriftEntriesUseCase {
       restored.push(entry.relativePath);
     }
 
-    return leaf.buildResult(restored, kept);
+    return leaf.buildResult(
+      restored,
+      kept,
+      unrestorable.map((entry) => entry.relativePath)
+    );
   }
 }

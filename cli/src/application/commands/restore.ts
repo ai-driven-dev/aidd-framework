@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { createDeps } from "../../infrastructure/deps.js";
+import { printUnrestorable } from "../display/restore-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import { parseGlobalOptions } from "./global-options.js";
 
@@ -19,7 +20,11 @@ export function registerRestoreCommand(program: Command): void {
 
         for (const e of result.errors) output.warn(`[${e.scope}] ${e.message}`);
 
-        if (result.totalRestored === 0 && result.pluginNamesRestored.length === 0) {
+        if (
+          result.totalRestored === 0 &&
+          result.pluginNamesRestored.length === 0 &&
+          result.unrestorable.length === 0
+        ) {
           output.success("Nothing to restore — all files are unmodified.");
           return;
         }
@@ -31,6 +36,7 @@ export function registerRestoreCommand(program: Command): void {
         if (result.pluginNamesRestored.length > 0) {
           output.success(`Restored plugins: ${result.pluginNamesRestored.join(", ")}`);
         }
+        printUnrestorable(output, result.unrestorable);
       } catch (error) {
         errorHandler.handle(error);
       }

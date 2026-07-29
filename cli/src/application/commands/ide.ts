@@ -3,6 +3,7 @@ import { Manifest } from "../../domain/models/manifest.js";
 import { DOCS_DIR } from "../../domain/models/paths.js";
 import { IDE_TOOL_IDS, type IdeToolId } from "../../domain/models/tool-ids.js";
 import { createDeps, createMenuDeps } from "../../infrastructure/deps.js";
+import { printUnrestorable } from "../display/restore-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import { NoManifestError } from "../errors.js";
 import { parseGlobalOptions } from "./global-options.js";
@@ -214,6 +215,7 @@ export function registerIdeCommand(program: Command): void {
         output.success(
           `Restored ${result.totalRestored} ${result.totalRestored === 1 ? "file" : "files"}, kept ${result.totalKept} ${result.totalKept === 1 ? "file" : "files"}`
         );
+        printUnrestorable(output, result.unrestorable);
       } catch (error) {
         errorHandler.handle(error);
       }
