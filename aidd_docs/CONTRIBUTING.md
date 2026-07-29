@@ -22,8 +22,9 @@ All templates live alongside the skill that owns them, under `plugins/<plugin>/s
 | `aidd-context:03-context-generate/assets/skills/`  | `SKILL.md`, action templates                             |
 | `aidd-context:03-context-generate/assets/agents/`  | Agent file template                                      |
 | `aidd-context:03-context-generate/assets/rules/`   | Rule file template                                       |
-| `aidd-pm:03-prd/assets/`                           | PRD body template                                        |
-| `aidd-pm:04-spec/assets/`                          | Spec template and validator                              |
+| `aidd-pm:03-discovery/assets/`                     | Product Brief template                                  |
+| `aidd-pm:04-prd/assets/`                           | PRD body template                                        |
+| `aidd-pm:05-spec/assets/`                          | Spec template and validator                              |
 | `aidd-dev:01-plan/assets/`                         | Plan and master-plan templates                           |
 | `aidd-vcs:01-commit/assets/`                       | Conventional commit message template                     |
 | `aidd-vcs:02-pull-request/assets/`                 | Pull/merge request body template, contributing example   |

@@ -1,5 +1,5 @@
 ---
-name: 05-spike
+name: 06-spike
 description: Produces an evidence-bounded spike for an uncertainty blocking estimation, feasibility, or design. Use when the user wants to frame, investigate, resume, or conclude one. Not for general research or implementation.
 argument-hint: question | spike
 ---
