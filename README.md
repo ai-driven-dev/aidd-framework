@@ -245,7 +245,7 @@ Repo init, commits, pull / merge requests, release tags, issues.
 
 `6 skills` · stable
 
-Ticket info, user stories, discovery, PRD, spec drafting, spike investigations.
+Ticket info, user stories, Product Briefs, PRD, spec drafting, spike investigations.
 
 </td>
 <td width="33%" valign="top">

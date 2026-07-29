@@ -24,12 +24,12 @@ Brainstorming sharpens the raw idea into a precise request.
 
 The PRD turns the idea into structured product requirements.
 
-1. Run `/aidd-pm:03-discovery`.
-2. Pass its folder to `/aidd-pm:04-prd`.
+1. Run `/aidd-pm:06-product-brief`.
+2. Pass its brief to `/aidd-pm:03-prd`.
 
 ```text
-/aidd-pm:03-discovery
-/aidd-pm:04-prd
+/aidd-pm:06-product-brief
+/aidd-pm:03-prd
 ```
 
 #### 3) 🏗️ Design the architecture

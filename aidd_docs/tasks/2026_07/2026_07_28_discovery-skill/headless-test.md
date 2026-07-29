@@ -1,4 +1,4 @@
-# Discovery Skill Headless Test
+# Product Brief Skill Headless Test
 
 Date: 2026-07-28 to 2026-07-29
 Runner: Codex `gpt-5.5` and `gpt-5.6-sol`, medium reasoning, isolated workspaces
@@ -42,7 +42,9 @@ All failing cases passed after their fixes.
 - PRD consumed `product-brief.md` directly and preserved uncertainty under dependencies and open questions.
 - A partial Product Brief became a PRD with explicit open questions; a missing brief stopped the handoff.
 - Blank invocation loaded only the router, `frame`, and its evidence reference. Non-visual and session-only routes skipped unrelated references.
-- Markdown links: 0 broken in 561 files.
+- The installed `06-product-brief` blank route asked one natural question and wrote no file.
+- Installed `03-prd`, `04-spec`, and `05-spike` kept their names and source hashes.
+- Markdown links: 0 broken in 560 files.
 - `git diff --check`: pass.
 
 ## Reference Cleanup

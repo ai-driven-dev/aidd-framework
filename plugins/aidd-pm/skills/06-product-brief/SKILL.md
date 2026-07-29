@@ -1,10 +1,10 @@
 ---
-name: 03-discovery
+name: 06-product-brief
 description: Produces a concise Product Brief before requirements. Use when the user wants to frame or revisit a product opportunity and how it will be validated. Not for requirements, technical design, or planning.
 argument-hint: idea | product
 ---
 
-# Discovery
+# Product Brief
 
 ```mermaid
 flowchart LR

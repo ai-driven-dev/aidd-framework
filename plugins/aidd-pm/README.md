@@ -16,7 +16,7 @@ Covers ticket retrieval, user stories, product discovery, requirements, specs, a
 |---|---|---|
 | [4.1] | [ticket-info](skills/01-ticket-info/SKILL.md) | Retrieve and display ticket information from the configured ticketing tool. |
 | [4.2] | [user-stories](skills/02-user-stories/SKILL.md) | Turn a feature or epic into a prioritized, estimated, INVEST-compliant user-story backlog. |
-| [4.3] | [discovery](skills/03-discovery/SKILL.md) | Produce one evidence-aware Product Brief. |
-| [4.4] | [prd](skills/04-prd/SKILL.md) | Generate a structured Product Requirements Document. |
-| [4.5] | [spec](skills/05-spec/SKILL.md) | Generate and refine a project spec from a free-form human request. The spec is the immutable target a planner consumes. |
-| [4.6] | [spike](skills/06-spike/SKILL.md) | Record or investigate an uncertainty that blocks estimation, feasibility, or design. |
+| [4.3] | [prd](skills/03-prd/SKILL.md) | Generate a structured Product Requirements Document. |
+| [4.4] | [spec](skills/04-spec/SKILL.md) | Generate and refine a project spec from a free-form human request. The spec is the immutable target a planner consumes. |
+| [4.5] | [spike](skills/05-spike/SKILL.md) | Record or investigate an uncertainty that blocks estimation, feasibility, or design. |
+| [4.6] | [product-brief](skills/06-product-brief/SKILL.md) | Produce one evidence-aware Product Brief. |
