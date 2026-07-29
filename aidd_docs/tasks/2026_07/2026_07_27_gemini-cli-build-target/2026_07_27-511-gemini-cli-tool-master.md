@@ -50,8 +50,8 @@ Neither appears in the issue or the brainstorm, and both gate the stated success
 
 | #   | Plan                    | File                                             | Status  | Validated |
 | --- | ----------------------- | ------------------------------------------------ | ------- | --------- |
-| 1   | Build target            | `./2026_07_27-511-gemini-cli-tool-part-1.md`      | pending | [ ]       |
-| 2   | Shared tree safety      | `./2026_07_27-511-gemini-cli-tool-part-2.md`      | blocked | [ ]       |
+| 1   | Build target            | `./2026_07_27-511-gemini-cli-tool-part-1.md`      | done    | [x]       |
+| 2   | Shared tree safety      | `./2026_07_27-511-gemini-cli-tool-part-2.md`      | pending | [ ]       |
 | 3   | Registry citizen        | `./2026_07_27-511-gemini-cli-tool-part-3.md`      | blocked | [ ]       |
 | 4   | Content and docs        | `./2026_07_27-511-gemini-cli-tool-part-4.md`      | blocked | [ ]       |
 
@@ -83,7 +83,7 @@ This supersedes one brainstorm decision. The brainstorm chose tool-neutral skill
 ## Validation Protocol
 
 1. Complete Part 1, run its `success_condition`
-2. [ ] Checkpoint 1: gemini archive builds, 9 existing golden cells byte-identical
+2. [x] Checkpoint 1: gemini archive builds, 9 existing golden cells byte-identical
 3. Unblock Part 2, run its `success_condition`
 4. [ ] Checkpoint 2: shared-path deletion guarded, subset invariant green
 5. Unblock Part 3, run its `success_condition`

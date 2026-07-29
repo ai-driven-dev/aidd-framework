@@ -6,7 +6,7 @@ objective: "aidd framework build --target gemini --flat produces an archive a Ge
 success_condition: "cd cli && pnpm typecheck && pnpm lint && pnpm test"
 iteration: 0
 created_at: "2026-07-27T22:44:41+02:00"
-status: in-progress
+status: implemented
 ---
 
 # Instruction: Gemini CLI flat build target
@@ -253,6 +253,8 @@ flowchart TD
 🤖 Phase 3's integration test is generic (`plugin-exclusion.integration.test.ts`, spreading `{ ...buildCodexFlatContract(), excludedPlugins: [...] }`), not gemini-specific, because gemini's own flat contract doesn't exist yet at this point in the phase order — it lands in Phase 4. Phase 4 gets its own task to add the plan's originally-named `gemini-plugin-exclusion.integration.test.ts` against the real contract excluding `aidd-orchestrator`.
 
 🤖 gemini's `AiTool` capability intersection is `HasAgents & HasSkills & HasMcp & HasPlugins` — narrower than codex/opencode. Deliberately omitted: `hooks` (Claude→Gemini event-name translation has no expression point in the current `HooksCapability`/generic install pipeline — content passes through untransformed) and `settings` (the idempotent `context.fileName` array union needs custom merge logic; `SettingsCapability` only supports generic `MergeStrategy` enums or static content, not a custom merge function). `plugins` is `{ mode: "unsupported" }` (no marketplace, no native activation, per the master plan). None of this blocks this part's objective — `aidd framework build` never reads `AiTool.capabilities` (`FlatBuildStrategy`/`ToolBuildContract` are fully standalone) — so the gap is real install-mode functionality deferred to Part 3, not a stub masking Phase 1/4 work.
+
+🤖 Rebasing this branch onto a `main` that had moved 76 commits ahead replayed it over three exhaustive registry guards that did not exist when the acceptance criteria above were verified, and `gemini` was in none of them. `FRAMEWORK_BUILD_TARGET_MODES` (`domain/models/framework-build.ts`) had replaced framework build's hardcoded target list, so `gemini` needed an entry there or `--target gemini` was rejected outright by the command. `tests/domain/tools/registry-conformance.unit.test.ts` arrived carrying its own side-effect registration list, which `gemini` had to join. That suite's marketplace-probe assertion fired on the mere presence of a plugins capability; `gemini` is the first and only tool to declare `mode: "unsupported"`, so the guard was narrowed to the modes that actually have a marketplace, rather than given a probe entry describing a marketplace format Gemini CLI does not have. Every acceptance criterion above was re-verified after the rebase against a bundle built in the same run — the e2e suite executes `dist/cli.js`, and a stale bundle silently reports on code that is not the code under test. Planned and carried out in `aidd_docs/tasks/2026_08/2026_08_12_gemini-branch-rebase-repair/`.
 
 ## Log
 
