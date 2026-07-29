@@ -11,7 +11,7 @@ _(Already tested on `Legacy` codebases)_
 [![Made in France](https://img.shields.io/badge/made%20in-France-0055A4?labelColor=EF4135)](https://www.ai-driven-dev.fr/)
 
 <p>
-  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>41 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
+  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>42 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -243,9 +243,9 @@ Repo init, commits, pull / merge requests, release tags, issues.
 
 ### 📋 [aidd-pm](plugins/aidd-pm/README.md)
 
-`5 skills` · stable
+`6 skills` · stable
 
-Ticket info, user stories, PRD, spec drafting, spike investigations.
+Ticket info, user stories, Product Briefs, PRD, spec drafting, spike investigations.
 
 </td>
 <td width="33%" valign="top">

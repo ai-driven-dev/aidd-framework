@@ -8,7 +8,7 @@ Product management plugin for the AI-Driven Development framework.
 
 First time? Install with `/plugin install aidd-pm@aidd-framework`, then run `aidd-pm:01-ticket-info`.
 
-Covers ticket retrieval, user stories, product requirements, specs, and bounded spike investigations.
+Covers ticket retrieval, user stories, product discovery, requirements, specs, and bounded spike investigations.
 
 ## Skills
 
@@ -19,3 +19,4 @@ Covers ticket retrieval, user stories, product requirements, specs, and bounded 
 | [4.3] | [prd](skills/03-prd/SKILL.md) | Generate a structured Product Requirements Document. |
 | [4.4] | [spec](skills/04-spec/SKILL.md) | Generate and refine a project spec from a free-form human request. The spec is the immutable target a planner consumes. |
 | [4.5] | [spike](skills/05-spike/SKILL.md) | Record or investigate an uncertainty that blocks estimation, feasibility, or design. |
+| [4.6] | [product-brief](skills/06-product-brief/SKILL.md) | Produce one evidence-aware Product Brief. |

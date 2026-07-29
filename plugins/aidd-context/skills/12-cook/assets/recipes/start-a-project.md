@@ -20,13 +20,15 @@ Brainstorming sharpens the raw idea into a precise request.
 /aidd-refine:01-brainstorm
 ```
 
-#### 2) 📄 Draft the PRD
+#### 2) 📄 Discover the product and draft the PRD
 
 The PRD turns the idea into structured product requirements.
 
-1. Run `/aidd-pm:03-prd`.
+1. Run `/aidd-pm:06-product-brief`.
+2. Pass its brief to `/aidd-pm:03-prd`.
 
 ```text
+/aidd-pm:06-product-brief
 /aidd-pm:03-prd
 ```
 
