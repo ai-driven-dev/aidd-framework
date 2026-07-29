@@ -39,8 +39,6 @@ export interface FrameworkBuildOptions {
   readonly target: FrameworkBuildTarget;
   /** Output layout. Defaults to "marketplace" (Mode A) when absent. */
   readonly mode?: FrameworkBuildMode;
-  /** When true, overwrite existing files at canonical flat paths. Only meaningful in flat mode. */
-  readonly force?: boolean;
 }
 
 export interface BuildPluginResult {

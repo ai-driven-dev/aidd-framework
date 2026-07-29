@@ -134,6 +134,9 @@ export class EnsureBuiltMarketplaceUseCase {
     await this.fs.deleteDirectory(temp);
   }
 
+  // Every outDir reaching this method (see build() and buildViaTemp() above) is either
+  // builtMarketplaceDir() or a temp dir this class just deleteDirectory'd — an aidd-owned
+  // cache, never a user directory — so a collision here is stale-cache reuse, not data loss.
   private async runBuild(
     target: FrameworkBuildTarget,
     mode: FrameworkBuildMode,
@@ -145,7 +148,7 @@ export class EnsureBuiltMarketplaceUseCase {
     if (build === undefined) {
       throw new Error(`No framework build for target '${target}' mode '${mode}'.`);
     }
-    await build.execute({ sourceDir, outDir, target, mode, force: true });
+    await build.execute({ sourceDir, outDir, target, mode });
   }
 
   private async copyDir(from: string, to: string): Promise<void> {
