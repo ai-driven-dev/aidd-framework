@@ -17,6 +17,8 @@
  * RE-BASELINED CELLS (agents-manifest-fix pass: `agents` is now a list of
  *   ./agents/*.md file paths instead of the invalid `["./agents"]` dir form):
  *   claude, cursor, copilot (marketplace)
+ * ADDITIVE (gemini-flat-build-target pass): gemini:flat added as a new cell;
+ *   all 9 pre-existing cells verified byte-identical to the pre-change baseline.
  *
  * USAGE:
  *   Capture all:   UPDATE_FRAMEWORK_GOLDEN=1 pnpm test:e2e tests/golden/framework-build-golden.e2e.test.ts
@@ -39,8 +41,8 @@ type GoldenSnapshot = Record<string, TargetSnapshot>; // key → files
 
 /** All marketplace targets */
 const MARKETPLACE_TARGETS = ["copilot", "codex", "claude", "cursor"] as const;
-/** All flat targets (including opencode which is flat-only) */
-const FLAT_TARGETS = ["claude", "cursor", "copilot", "codex", "opencode"] as const;
+/** All flat targets (including opencode and gemini, both flat-only) */
+const FLAT_TARGETS = ["claude", "cursor", "copilot", "codex", "opencode", "gemini"] as const;
 
 /**
  * Frozen marketplace cell: its fresh build is byte-compared to the stored hash on
@@ -112,7 +114,7 @@ async function captureAllCells(
   return captured;
 }
 
-describe.concurrent("Framework build golden — 9-cell matrix", () => {
+describe.concurrent("Framework build golden — 10-cell matrix", () => {
   it("snapshot is deterministic (two captures of each target are byte-identical)", async () => {
     const env1 = await createTestEnv("fb-golden-det-1");
     const env2 = await createTestEnv("fb-golden-det-2");
@@ -157,7 +159,7 @@ describe.concurrent("Framework build golden — 9-cell matrix", () => {
     }
   });
 
-  it("stored golden baseline covers all 9 cells and the frozen claude cell is byte-identical (AC #1)", async () => {
+  it("stored golden baseline covers all 10 cells and the frozen claude cell is byte-identical (AC #1)", async () => {
     const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fb-golden-baseline");
     try {
       const captured = await captureAllCells(projectDir, fakeHome, tempDir);
@@ -192,7 +194,7 @@ describe.concurrent("Framework build golden — 9-cell matrix", () => {
     }
   });
 
-  it("all 9 cells are non-empty", async () => {
+  it("all 10 cells are non-empty", async () => {
     const stored = JSON.parse(await readFile(SNAPSHOT_FILE, "utf-8")) as GoldenSnapshot;
     const expectedCells = [...MARKETPLACE_TARGETS, ...FLAT_TARGETS.map((t) => `${t}:flat`)];
     for (const key of expectedCells) {
