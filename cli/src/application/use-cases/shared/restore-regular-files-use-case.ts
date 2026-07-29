@@ -3,6 +3,7 @@ import { type FileHash, InstallationFile } from "../../../domain/models/file.js"
 import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
+import type { DriftCollection, DriftDescriptor } from "./restore-drift-entries-use-case.js";
 import { RestoreDriftEntriesUseCase } from "./restore-drift-entries-use-case.js";
 
 interface DriftEntry {
@@ -23,6 +24,7 @@ interface RegularFilesRestoreOptions {
 export interface RegularFilesRestoreResult {
   restored: string[];
   kept: string[];
+  unrestorable: string[];
   updatedFiles: InstallationFile[];
 }
 
@@ -53,9 +55,10 @@ export class RestoreRegularFilesUseCase {
           await this.fs.writeFile(diskPath, entry.content);
           updatedHashMap.set(entry.relativePath, await this.fs.readFileHash(diskPath));
         },
-        buildResult: (restored, kept) => ({
+        buildResult: (restored, kept, unrestorable) => ({
           restored,
           kept,
+          unrestorable,
           updatedFiles: Array.from(updatedHashMap.entries()).map(
             ([relativePath, hash]) => new InstallationFile({ relativePath, content: "", hash })
           ),
@@ -71,38 +74,34 @@ export class RestoreRegularFilesUseCase {
     distMap: Map<string, InstallationFile>,
     projectRoot: string,
     fileFilter: ((p: string) => boolean) | null
-  ): Promise<DriftEntry[]> {
+  ): Promise<DriftCollection<DriftEntry>> {
     const drift: DriftEntry[] = [];
+    const unrestorable: DriftDescriptor[] = [];
 
     for (const manifestFile of manifestFiles) {
       if (fileFilter && !fileFilter(manifestFile.relativePath)) continue;
 
       const diskPath = join(projectRoot, manifestFile.relativePath);
-      const diskExists = await this.fs.fileExists(diskPath);
+      const reason = await this.detectDrift(diskPath, manifestFile.hash.value);
+      if (reason === null) continue;
 
-      if (!diskExists) {
-        const distFile = distMap.get(manifestFile.relativePath);
-        if (distFile)
-          drift.push({
-            relativePath: manifestFile.relativePath,
-            content: distFile.content,
-            reason: "deleted",
-          });
+      const distFile = distMap.get(manifestFile.relativePath);
+      if (!distFile) {
+        unrestorable.push({ relativePath: manifestFile.relativePath, reason });
         continue;
       }
-
-      const diskHash = await this.fs.readFileHash(diskPath);
-      if (diskHash.value !== manifestFile.hash.value) {
-        const distFile = distMap.get(manifestFile.relativePath);
-        if (distFile)
-          drift.push({
-            relativePath: manifestFile.relativePath,
-            content: distFile.content,
-            reason: "modified",
-          });
-      }
+      drift.push({ relativePath: manifestFile.relativePath, content: distFile.content, reason });
     }
 
-    return drift;
+    return { drift, unrestorable };
+  }
+
+  private async detectDrift(
+    diskPath: string,
+    manifestHashValue: string
+  ): Promise<"deleted" | "modified" | null> {
+    if (!(await this.fs.fileExists(diskPath))) return "deleted";
+    const diskHash = await this.fs.readFileHash(diskPath);
+    return diskHash.value !== manifestHashValue ? "modified" : null;
   }
 }

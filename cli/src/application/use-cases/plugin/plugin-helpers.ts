@@ -7,7 +7,9 @@ import type { Plugin } from "../../../domain/models/plugin.js";
 import type { PluginDistribution } from "../../../domain/models/plugin-distribution.js";
 import type { AiToolId } from "../../../domain/models/tool-ids.js";
 import { AI_TOOL_IDS } from "../../../domain/models/tool-ids.js";
+import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
+import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
 import { NoManifestError } from "../../errors.js";
@@ -63,10 +65,29 @@ export async function writePluginFiles(
   await Promise.all(files.map((f) => fs.writeFile(join(baseDir, f.relativePath), f.content)));
 }
 
+/** Whether the file already on disk matches the content we would write, so a
+ * caller can skip the write and, more importantly, not count it as restored. */
+export async function isPluginFileAtDesiredState(
+  fs: FileReader,
+  hasher: Hasher,
+  outputPath: string,
+  expectedHashValue: string
+): Promise<boolean> {
+  if (!(await fs.fileExists(outputPath))) return false;
+  const content = await fs.readFile(outputPath);
+  return hasher.hash(content).value === expectedHashValue;
+}
+
 /**
  * Re-registers a plugin backed by the BUILT tree: drops the existing manifest entry
  * and lets the translator re-materialize + re-register it, so update and restore both
  * end up with the same single entry an install would have produced.
+ *
+ * Returns how many files the translator actually (re)wrote — not the plugin's total
+ * file count — so a no-op restore reports zero instead of claiming everything changed.
+ * `written` is undefined only on the rare fallback path where the translator can't
+ * resolve the marketplace and delegates to a strategy that doesn't track counts; that
+ * is reported as 0 rather than guessed.
  */
 export async function materializeViaBuiltTree(
   translator: BuiltTreeMaterializationTranslator,
@@ -76,9 +97,9 @@ export async function materializeViaBuiltTree(
   projectRoot: string,
   manifest: Manifest,
   docsDir: string
-): Promise<void> {
+): Promise<number> {
   manifest.removePlugin(toolId, plugin.name);
-  await translator.addPlugin(
+  const { written } = await translator.addPlugin(
     dist,
     toolId,
     plugin.source,
@@ -87,4 +108,5 @@ export async function materializeViaBuiltTree(
     plugin.marketplace,
     docsDir
   );
+  return written ?? 0;
 }
