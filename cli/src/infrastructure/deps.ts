@@ -4,6 +4,7 @@ import "../domain/tools/ai/claude.js";
 import "../domain/tools/ai/codex.js";
 import "../domain/tools/ai/copilot.js";
 import "../domain/tools/ai/cursor.js";
+import "../domain/tools/ai/gemini.js";
 import "../domain/tools/ai/opencode.js";
 import "../domain/tools/ide/vscode.js";
 import { CLIOutput } from "../application/output.js";

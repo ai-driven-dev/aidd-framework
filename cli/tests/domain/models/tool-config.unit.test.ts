@@ -25,8 +25,16 @@ const makeStubConfig = (toolId: AiToolId, toolSuffix: string): AiTool<unknown> =
 });
 
 describe("VALID_TOOL_IDS", () => {
-  it("contains exactly claude, cursor, copilot, opencode, codex, vscode", () => {
-    expect(VALID_TOOL_IDS).toEqual(["claude", "cursor", "copilot", "opencode", "codex", "vscode"]);
+  it("contains exactly claude, cursor, copilot, opencode, codex, gemini, vscode", () => {
+    expect(VALID_TOOL_IDS).toEqual([
+      "claude",
+      "cursor",
+      "copilot",
+      "opencode",
+      "codex",
+      "gemini",
+      "vscode",
+    ]);
   });
 });
 
@@ -52,7 +60,14 @@ describe("stripToolSuffix()", () => {
 
 describe("toolIdsForCategory()", () => {
   it("returns AI tool IDs for 'ai'", () => {
-    expect(toolIdsForCategory("ai")).toEqual(["claude", "cursor", "copilot", "opencode", "codex"]);
+    expect(toolIdsForCategory("ai")).toEqual([
+      "claude",
+      "cursor",
+      "copilot",
+      "opencode",
+      "codex",
+      "gemini",
+    ]);
   });
 
   it("returns IDE tool IDs for 'ide'", () => {
