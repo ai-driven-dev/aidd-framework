@@ -22,9 +22,9 @@ flowchart LR
 
 | Tier | How you get there | Adds (on top of the rung below) | Team |
 | ---- | ----------------- | ------------------------------- | ---- |
-| **Public** | Free, any GitHub account | Open issues, comment, react / upvote ideas (signal only) | - |
+| **Public** | Free, any GitHub account | Open issues, comment, react / upvote ideas (signal only), **open a pull request** once its issue is validated | - |
 | **Core Team** | Active [AIDD programme](https://www.ai-driven-dev.fr/) member (training, community, coaching) | A **counted roadmap vote** + voice on direction | [`core-team`](https://github.com/orgs/ai-driven-dev/teams/core-team) |
-| **Certifié AIDD** | Pass the [AIDD certification](https://www.ai-driven-dev.fr/) | Open **pull requests** (framework + courses) | [`certified`](https://github.com/orgs/ai-driven-dev/teams/certified) |
+| **Certifié AIDD** | Pass the [AIDD certification](https://www.ai-driven-dev.fr/) | **Validate contribution issues** (triage: move `Ideation` → `Todo` on the [Roadmap board](https://github.com/orgs/ai-driven-dev/projects/8)) | [`certified`](https://github.com/orgs/ai-driven-dev/teams/certified) |
 | **Habilité AIDD** | Promoted by a majority of Habilité | **Approve & merge** PRs, **quality veto**, appoint/promote, guard the standard | [`habilitated`](https://github.com/orgs/ai-driven-dev/teams/habilitated) |
 
 **Plugin owners** are Habilité scoped to one plugin (`aidd-context`, `aidd-dev`,
@@ -40,6 +40,8 @@ flowchart LR
 - **Habilité** holds the tiebreak and a **quality veto** as the top rung.
 - A poll runs **≥ 7 days**. Accepted items land on the
   [AIDD Roadmap board](https://github.com/orgs/ai-driven-dev/projects/8).
+- This vote decides **roadmap priority**, not whether a contribution issue can
+  move to a PR — that validation is immediate, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## ✅ Code decisions (merging)
 

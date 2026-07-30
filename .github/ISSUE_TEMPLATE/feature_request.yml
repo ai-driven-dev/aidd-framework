@@ -1,14 +1,13 @@
-name: ✨ Feature Request
-description: Propose new content or an improvement to the framework
+name: 🌱 Contribution Rapide
+description: Propose a change or new content for the framework, minimal form
 title: "feat(<scope>): "
 type: Feature
 body:
   - type: markdown
     attributes:
       value: |
-        Have an idea? You can also post and upvote it in
-        [Discussions](https://github.com/ai-driven-dev/framework/discussions) -
-        popular ideas get promoted to a roadmap vote (see [ROADMAP.md](https://github.com/ai-driven-dev/framework/blob/main/ROADMAP.md)).
+        Issue-first: a maintainer validates this before any PR is opened (see [CONTRIBUTING.md](https://github.com/ai-driven-dev/framework/blob/main/CONTRIBUTING.md)).
+        Want to discuss an idea first? Post it in [Discussions](https://github.com/ai-driven-dev/framework/discussions).
   - type: textarea
     id: problem
     attributes:

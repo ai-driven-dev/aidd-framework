@@ -1,13 +1,13 @@
-name: 🗺️ Roadmap item
-description: "Maintainer-authored work: a skill, a refactor, a rule to enforce"
+name: 📋 Contribution Détaillée
+description: "Propose a cadré change: a skill, a refactor, a rule to enforce"
 title: "<type>(<scope>): "
 type: Task
 body:
   - type: markdown
     attributes:
       value: |
-        For maintainers planning framework work. Reporting a bug or asking for a feature as a user?
-        Use the **Bug Report** or **Feature Request** form instead.
+        Issue-first: a maintainer validates this before any PR is opened (see [CONTRIBUTING.md](https://github.com/ai-driven-dev/framework/blob/main/CONTRIBUTING.md)).
+        Reporting a bug? Use the **Bug Report** form instead.
 
         The title carries its own scope, matching `commitlint.config.cjs`: `feat(aidd-pm):`, `fix(framework):`, `refactor(aidd-context):`.
   - type: textarea

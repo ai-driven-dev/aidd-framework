@@ -4,21 +4,18 @@ Source of truth for AIDD skills, agents, rules, and templates — authored in Cl
 
 ```mermaid
 flowchart LR
-    Issue["💡 Issue / idea"] --> Branch["🌿 Branch off next"] --> PR["🔀 Open PR"] --> Review["🛡️ Habilité review"] --> Merge["✅ Squash-merge → next"] --> Release["🚀 Weekly promote → release-please ships"]
+    Issue["💡 Issue: Rapide ou Détaillée"] --> Validate["✅ Certifié/Habilité valide"] --> Branch["🌿 Branch off next"] --> PR["🔀 Open PR"] --> Review["🛡️ Habilité review"] --> Merge["✅ Squash-merge → next"] --> Release["🚀 Weekly promote → release-please ships"]
 ```
 
-## 👥 Who can contribute
+## 👥 Comment contribuer
 
-Roles and their rights are defined in [`GOVERNANCE.md`](./GOVERNANCE.md#-roles). Where each starts:
+Un seul chemin, ouvert à tous, quel que soit ton rôle ([`GOVERNANCE.md`](./GOVERNANCE.md#-roles)) :
 
-| Role | Start here |
-| --- | --- |
-| 👤 **Public** | [Open an issue](https://github.com/ai-driven-dev/framework/issues) or [discussion](https://github.com/ai-driven-dev/framework/discussions) |
-| 🗳️ **Core Team** | Vote on roadmap priority |
-| 🌱 **Certifié** | Open a pull request → [Set up](#-1-set-up) |
-| 🛡️ **Habilité** | Review and merge |
+1. **Ouvre une issue** — [🌱 Contribution Rapide](https://github.com/ai-driven-dev/framework/issues/new?template=feature_request.yml) (rapide) ou [📋 Contribution Détaillée](https://github.com/ai-driven-dev/framework/issues/new?template=roadmap.yml) (cadrée), selon ce que tu veux poser sur la table. Ça cadre le sujet en amont — pas de code écrit pour rien, pas de mauvaise direction sur nos principes.
+2. **Attends la validation** — un Certifié ou un Habilité bascule l'issue de `Ideation` à `Todo` sur le [Roadmap board](https://github.com/orgs/ai-driven-dev/projects/8). C'est le feu vert.
+3. **Ouvre ta PR** — n'importe qui peut, une fois l'issue validée → [Set up](#-1-set-up).
 
-The rest of this guide is the *how* for those opening PRs.
+Pas de vote, pas de délai d'attente formel pour ce feu vert — c'est un geste de triage, pas un scrutin (ça, c'est réservé à la priorité roadmap, voir [`GOVERNANCE.md`](./GOVERNANCE.md#-roadmap-voting)).
 
 ## 🔧 1. Set up
 
@@ -35,20 +32,27 @@ make setup   # deps + git hooks, registers a local marketplace, installs plugins
 - **Test locally** — neither tool hot-reloads the checkout (both serve a cached copy). After editing, run `make reload` (or `PLUGIN="aidd-refine aidd-pm"` for a subset), then restart the session — `/reload-plugins` covers a Claude-only edit to an existing skill.
 - **Commit** — `<type>(<scope>): description`, one scope per commit (split cross-plugin changes). The types, scopes, and rules live in [`aidd_docs/memory/vcs.md`](aidd_docs/memory/vcs.md#commit-convention) (mirrors `commitlint.config.cjs`); the **type** drives the release → [`RELEASE.md`](./RELEASE.md).
 
+## 📜 Principes
+
+- **Pas de slop** — relis chaque ligne avant de la proposer ; pas de contenu généré et jamais vérifié.
+- **Économise le token** — réponses et prompts concis, pas de remplissage.
+- **Suis la structure des skills** — anatomie dans [`ARCHITECTURE.md`](docs/ARCHITECTURE.md), scaffold via `/aidd-context:04-skill-generate`.
+- **Fais évoluer la memory** — ta PR change une convention ? Mets à jour [`aidd_docs/memory/`](aidd_docs/memory/) avec.
+
 ## 🔀 3. Open a pull request
 
 - **Branch off `next`, target `next`** — only `hotfix/*` branches off `main` for urgent production fixes. The branch prefix alone decides the target → [routing table](aidd_docs/memory/vcs.md#types).
 - **Fill the PR template** — explain *what* changed and *how* you solved it; skip re-asserting the conventional title and hooks (CI already enforces them).
 - **Label** follows your branch kind (the PR skill applies it automatically); add `security` when relevant.
-- **A Habilité review gates every merge** ([`CODEOWNERS`](./.github/CODEOWNERS)) — Certifié contributors cannot self-merge. PRs squash-merge on the conventional title. Decision rules → [`GOVERNANCE.md`](./GOVERNANCE.md#-code-decisions-merging).
+- **A Habilité review gates every merge** ([`CODEOWNERS`](./.github/CODEOWNERS)) — no one merges their own PR. PRs squash-merge on the conventional title. Decision rules → [`GOVERNANCE.md`](./GOVERNANCE.md#-code-decisions-merging).
 
 ## 🚀 Releases
 
 The `main`/`next` model, weekly cadence, and hotfix flow → [`RELEASE.md`](./RELEASE.md). A release ships **8 independently-versioned packages** (root `aidd-framework` + the 7 plugins; `aidd-ui` is alpha) plus per-tool archives; full breakdown → [`MAINTAINERS.md`](docs/MAINTAINERS.md#-releases).
 
-## 🐛 Reporting issues
+## 🐛 Reporting a bug
 
-[Open an issue](https://github.com/ai-driven-dev/framework/issues/new/choose) (🐛 Bug or ✨ Feature) — auto-added to the [Roadmap board](https://github.com/orgs/ai-driven-dev/projects/8). For usage questions use [Discussions](https://github.com/ai-driven-dev/framework/discussions), not issues (see [`SUPPORT.md`](./.github/SUPPORT.md)).
+[Open a Bug report](https://github.com/ai-driven-dev/framework/issues/new/choose) — auto-added to the [Roadmap board](https://github.com/orgs/ai-driven-dev/projects/8). Want to contribute a change instead? Use the flow above. For usage questions use [Discussions](https://github.com/ai-driven-dev/framework/discussions), not issues (see [`SUPPORT.md`](./.github/SUPPORT.md)).
 
 ## 📚 Reference
 
