@@ -315,6 +315,10 @@ Free and open-source (MIT). If it saves you time, [a ⭐](https://github.com/ai-
 - **Idea or bug?** [Open an issue](https://github.com/ai-driven-dev/framework/issues) or [start a discussion](https://github.com/ai-driven-dev/framework/discussions).
 - **Contribute code** → [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
+[![Contributors](https://contrib.rocks/image?repo=ai-driven-dev/framework)](https://github.com/ai-driven-dev/framework/graphs/contributors)
+
+> Renders once the repo is **public** (contrib.rocks needs public access). Until then, see the [contributors graph](https://github.com/ai-driven-dev/framework/graphs/contributors).
+
 ---
 
 <div align="center">
