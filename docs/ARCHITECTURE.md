@@ -87,11 +87,12 @@ Both run in the `lefthook` pre-commit hook (when the validator `pipx`/`check-jso
 
 ## 🪝 Bundled hooks
 
-Two plugins ship Claude Code hooks (declared in `plugins/<plugin>/hooks/hooks.json`). Both run Node, so users need `node` on their `PATH`:
+Three plugins ship Claude Code hooks (declared in `plugins/<plugin>/hooks/hooks.json`). They run Node, so users need `node` on their `PATH`:
 
 | Plugin         | Event             | Runs                      | Purpose                                                        |
 | -------------- | ----------------- | ------------------------- | ------------------------------------------------------------- |
 | `aidd-context` | `SessionStart`    | `hooks/update_memory.js`  | Refresh the project memory block in the AI context files      |
+| `aidd-pm`      | `PostToolUse`     | `hooks/check-backlog.js`  | Report structural errors after supported backlog editor writes |
 | `aidd-refine`  | `UserPromptSubmit`| `hooks/condense-stats.js` | Report token savings while condensed output mode is on        |
 
 ## 🧠 Plugin concerns and layers

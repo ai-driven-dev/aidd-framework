@@ -31,7 +31,7 @@
     {
       "name": "aidd-pm",
       "source": "./plugins/aidd-pm",
-      "description": "Product management: ticket-info, user-stories, product-brief, prd, spec, spike",
+      "description": "Product backlog orchestration, refinement, Product Briefs, Epics, User Stories, Tasks, Spikes, Defects, requirements, and specs.",
       "strict": true,
       "recommended": true
     },
