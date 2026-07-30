@@ -10,6 +10,7 @@ Where each template lands: flat under `aidd_docs/memory/`, read from this table,
 | core       | `core/coding-assertions.md` | `aidd_docs/memory/coding-assertions.md`  |
 | core       | `core/testing.md`           | `aidd_docs/memory/testing.md`            |
 | core       | `core/vcs.md`               | `aidd_docs/memory/vcs.md`                |
+| backlog    | `backlog/backlog.md`        | `aidd_docs/memory/backlog.md`            |
 | api        | `api/api.md`                | `aidd_docs/memory/api.md`                |
 | api        | `api/integration.md`        | `aidd_docs/memory/integration.md`        |
 | auth       | `auth/auth.md`              | `aidd_docs/memory/auth.md`               |
