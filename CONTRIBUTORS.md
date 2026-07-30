@@ -14,10 +14,10 @@ list to maintain. The mosaic is generated from the GitHub
 > contrib.rocks image API needs public access). Until then, see the graph link
 > above.
 
-## Maintainers (Habilité AIDD)
+## Maintainers (Trusted Partner AIDD)
 
 Live source of truth: the
-[`@ai-driven-dev/habilitated`](https://github.com/orgs/ai-driven-dev/teams/habilitated)
+[`@ai-driven-dev/trusted-partners`](https://github.com/orgs/ai-driven-dev/teams/trusted-partners)
 team.
 
 - [@blafourcade](https://github.com/blafourcade) (lead)

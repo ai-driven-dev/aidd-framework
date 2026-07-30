@@ -4,20 +4,21 @@ Source of truth for AIDD skills, agents, rules, and templates — authored in Cl
 
 ```mermaid
 flowchart LR
-    Issue["💡 Issue: Rapide ou Détaillée"] --> Validate["✅ Certifié/Habilité valide"] --> Branch["🌿 Branch off next"] --> PR["🔀 Open PR"] --> Review["🛡️ Habilité review"] --> Merge["✅ Squash-merge → next"] --> Release["🚀 Weekly promote → release-please ships"]
+    Issue["💡 Open an issue"] --> Validate["✅ Get validated"] --> Branch["🌿 Branch off next"] --> PR["🔀 Open PR"] --> Review["🛡️ Review"] --> Merge["✅ Squash-merge → next"]
 ```
 
-## 👥 Comment contribuer
+## 👥 How to contribute
 
-Un seul chemin, ouvert à tous, quel que soit ton rôle ([`GOVERNANCE.md`](./GOVERNANCE.md#-roles)) :
+One path, open to everyone, whatever your role ([`GOVERNANCE.md`](./GOVERNANCE.md#-roles)):
 
-1. **Ouvre une issue** — [🌱 Contribution Rapide](https://github.com/ai-driven-dev/framework/issues/new?template=feature_request.yml) (rapide) ou [📋 Contribution Détaillée](https://github.com/ai-driven-dev/framework/issues/new?template=roadmap.yml) (cadrée), selon ce que tu veux poser sur la table. Ça cadre le sujet en amont — pas de code écrit pour rien, pas de mauvaise direction sur nos principes.
-2. **Attends la validation** — un Certifié ou un Habilité bascule l'issue de `Ideation` à `Todo` sur le [Roadmap board](https://github.com/orgs/ai-driven-dev/projects/8). C'est le feu vert.
-3. **Ouvre ta PR** — n'importe qui peut, une fois l'issue validée → [Set up](#-1-set-up).
+1. **Open an issue** — [🌱 Contribution Rapide](https://github.com/ai-driven-dev/framework/issues/new?template=feature_request.yml) or [📋 Contribution Détaillée](https://github.com/ai-driven-dev/framework/issues/new?template=roadmap.yml). Frames the topic upfront — no code written for nothing, no direction fighting our principles.
+2. **Get it validated** — a Certified Member or Trusted Partner moves it `Ideation` → `Todo` on the [Roadmap board](https://github.com/orgs/ai-driven-dev/projects/8). That's the green light.
+3. **Open your PR** — anyone can, once validated → [Set up](#-set-up).
+4. **Get reviewed and merged** — see [Open a pull request](#-open-a-pull-request).
 
-Pas de vote, pas de délai d'attente formel pour ce feu vert — c'est un geste de triage, pas un scrutin (ça, c'est réservé à la priorité roadmap, voir [`GOVERNANCE.md`](./GOVERNANCE.md#-roadmap-voting)).
+No vote, no waiting period for this green light — it's a triage gesture, not a ballot (that's roadmap priority, see [`GOVERNANCE.md`](./GOVERNANCE.md#-roadmap-voting)).
 
-## 🔧 1. Set up
+## 🔧 Set up
 
 Requires **Node 22.12+**, **pnpm**, **jq**, **python3**, and **pipx** (`gh` and the Claude/Codex CLI optional).
 
@@ -27,28 +28,28 @@ make setup   # deps + git hooks, registers a local marketplace, installs plugins
 
 `make` lists every target; `make doctor` and `make check` verify the environment and run the pre-commit checks (including the Markdown link checker).
 
-## ✏️ 2. Make your change
+## ✏️ Make your change
 
 - **Test locally** — neither tool hot-reloads the checkout (both serve a cached copy). After editing, run `make reload` (or `PLUGIN="aidd-refine aidd-pm"` for a subset), then restart the session — `/reload-plugins` covers a Claude-only edit to an existing skill.
 - **Commit** — `<type>(<scope>): description`, one scope per commit (split cross-plugin changes). The types, scopes, and rules live in [`aidd_docs/memory/vcs.md`](aidd_docs/memory/vcs.md#commit-convention) (mirrors `commitlint.config.cjs`); the **type** drives the release → [`RELEASE.md`](./RELEASE.md).
 
-## 📜 Principes
+## 📜 Principles
 
-- **Pas de slop** — relis chaque ligne avant de la proposer ; pas de contenu généré et jamais vérifié.
-- **Économise le token** — réponses et prompts concis, pas de remplissage.
-- **Suis la structure des skills** — anatomie dans [`ARCHITECTURE.md`](docs/ARCHITECTURE.md), scaffold via `/aidd-context:04-skill-generate`.
-- **Fais évoluer la memory** — ta PR change une convention ? Mets à jour [`aidd_docs/memory/`](aidd_docs/memory/) avec.
+- **No slop** — read every line before proposing it; no generated content that was never checked.
+- **Spend tokens like they cost something** — concise prompts and answers, no filler.
+- **Follow the skill structure** — anatomy in [`ARCHITECTURE.md`](docs/ARCHITECTURE.md), scaffold with `/aidd-context:04-skill-generate`.
+- **Evolve the memory** — your PR changes a convention? Update [`aidd_docs/memory/`](aidd_docs/memory/) with it.
 
-## 🔀 3. Open a pull request
+## 🔀 Open a pull request
 
 - **Branch off `next`, target `next`** — only `hotfix/*` branches off `main` for urgent production fixes. The branch prefix alone decides the target → [routing table](aidd_docs/memory/vcs.md#types).
 - **Fill the PR template** — explain *what* changed and *how* you solved it; skip re-asserting the conventional title and hooks (CI already enforces them).
 - **Label** follows your branch kind (the PR skill applies it automatically); add `security` when relevant.
-- **A Habilité review gates every merge** ([`CODEOWNERS`](./.github/CODEOWNERS)) — no one merges their own PR. PRs squash-merge on the conventional title. Decision rules → [`GOVERNANCE.md`](./GOVERNANCE.md#-code-decisions-merging).
+- **A Trusted Partner review gates every merge** ([`CODEOWNERS`](./.github/CODEOWNERS)) — no one merges their own PR. PRs squash-merge on the conventional title. Decision rules → [`GOVERNANCE.md`](./GOVERNANCE.md#-code-decisions-merging).
 
 ## 🚀 Releases
 
-The `main`/`next` model, weekly cadence, and hotfix flow → [`RELEASE.md`](./RELEASE.md). A release ships **8 independently-versioned packages** (root `aidd-framework` + the 7 plugins; `aidd-ui` is alpha) plus per-tool archives; full breakdown → [`MAINTAINERS.md`](docs/MAINTAINERS.md#-releases).
+Weekly `main`/`next` cadence and hotfix flow → [`RELEASE.md`](./RELEASE.md).
 
 ## 🐛 Reporting a bug
 

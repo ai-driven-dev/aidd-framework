@@ -1,6 +1,6 @@
 # Maintainers guide
 
-How to operate this repository day to day. This file is the **Habilité** (maintainer) playbook — it does not restate the others:
+How to operate this repository day to day. This file is the **Trusted Partner** (maintainer) playbook — it does not restate the others:
 
 - **Who** may do what + decision rules → [`GOVERNANCE.md`](../GOVERNANCE.md).
 - **How contributors work** → [`CONTRIBUTING.md`](../CONTRIBUTING.md).
@@ -11,7 +11,7 @@ How to operate this repository day to day. This file is the **Habilité** (maint
 | ----- | ----- | ---- |
 | Published plugins | `.claude-plugin/marketplace.json` + `plugins/` | the only thing shipped in a release |
 | Live backlog & roadmap | [Project board #8](https://github.com/orgs/ai-driven-dev/projects/8) | single source of truth |
-| Roles → access | GitHub teams `habilitated` / `certified` / `core-team` | mapped to the role ladder |
+| Roles → access | GitHub teams `trusted-partners` / `certified-members` / `core-team` | mapped to the role ladder |
 | Branch protection | ruleset "main protection" + `.github/rulesets/main.json` | `main` is PR-only |
 | Releases | release-please (`ci.yml`) + `release-please-config.json` | 8 packages (root + 7 plugins), auto |
 | Pre-commit checks | `lefthook.yml` + `scripts/` | json/yaml/schema/frontmatter/catalogs/counts |
@@ -119,8 +119,8 @@ Keep the file and the live ruleset in sync.
 
 Roles, promotion, and inactivity rules → [`GOVERNANCE.md`](../GOVERNANCE.md#-roles). Team mechanics only:
 
-- Habilité ↔ `habilitated` team + `CODEOWNERS`.
-- Core Team / Certifié ↔ `core-team` / `certified` teams.
+- Trusted Partner ↔ `trusted-partners` team + `CODEOWNERS`.
+- Core Team / Certified Member ↔ `core-team` / `certified-members` teams.
 
 ## 🛡️ Security
 
