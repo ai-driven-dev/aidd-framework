@@ -84,6 +84,8 @@ pre-commit:
         fi
         node scripts/sync-readme-counts.mjs >/dev/null
         git add README.md 2>/dev/null || true
+    backlog-checker-tests:
+      run: node --test scripts/__tests__/check-backlog.test.js
     cli-biome:
       glob: "cli/**"
       run: cd cli && pnpm lint

@@ -20,7 +20,7 @@ flowchart LR
   finalize -->|"learn more"| discover
   finalize -->|"change visual"| visualize
   finalize -->|"revise brief"| shape
-  finalize -->|"approved"| done([Product Brief])
+  finalize -->|"authorized"| done([Product Brief])
 ```
 
 ## Actions
@@ -40,3 +40,4 @@ Run the flow above. Read only the next action's file before running it.
 - Separate evidence, decisions, and assumptions.
 - Keep product decisions with the user.
 - Keep actions and technique names out of user-facing text.
+- Require explicit approval or caller-provided bounded authority before writing.

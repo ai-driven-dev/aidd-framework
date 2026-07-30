@@ -7,13 +7,20 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 ## Table of Contents
 
 - [`.claude-plugin`](#claude-plugin)
+- [`agents`](#agents)
+- [`hooks`](#hooks)
 - [`skills`](#skills)
+  - [`skills/00-backlog`](#skills00-backlog)
   - [`skills/01-ticket-info`](#skills01-ticket-info)
   - [`skills/02-user-stories`](#skills02-user-stories)
   - [`skills/03-prd`](#skills03-prd)
   - [`skills/04-spec`](#skills04-spec)
   - [`skills/05-spike`](#skills05-spike)
   - [`skills/06-product-brief`](#skills06-product-brief)
+  - [`skills/07-epic`](#skills07-epic)
+  - [`skills/08-three-amigos`](#skills08-three-amigos)
+  - [`skills/09-defect`](#skills09-defect)
+  - [`skills/10-task`](#skills10-task)
 
 ---
 
@@ -23,7 +30,42 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 |------|
 | [plugin.json](.claude-plugin/plugin.json) |
 
+### `agents`
+
+| File | Description |
+|------|---|
+| [delivery-advocate.md](agents/delivery-advocate.md) | `Applies the delivery refinement lens to an Epic or Story. Use as one read-only leaf in independent refinement.` |
+| [product-advocate.md](agents/product-advocate.md) | `Applies the product refinement lens to an Epic or Story. Use as one read-only leaf in independent refinement.` |
+| [quality-advocate.md](agents/quality-advocate.md) | `Applies the quality refinement lens to an Epic or Story. Use as one read-only leaf in independent refinement.` |
+
+### `hooks`
+
+| File |
+|------|
+| [check-backlog.js](hooks/check-backlog.js) |
+| [hooks.json](hooks/hooks.json) |
+
 ### `skills`
+
+#### `skills/00-backlog`
+
+| Group | File | Description |
+|-------|------|---|
+| `actions` | [01-inspect.md](skills/00-backlog/actions/01-inspect.md) | - |
+| `actions` | [02-triage.md](skills/00-backlog/actions/02-triage.md) | - |
+| `actions` | [03-review.md](skills/00-backlog/actions/03-review.md) | - |
+| `actions` | [04-route.md](skills/00-backlog/actions/04-route.md) | - |
+| `actions` | [05-assess.md](skills/00-backlog/actions/05-assess.md) | - |
+| `actions` | [06-decide.md](skills/00-backlog/actions/06-decide.md) | - |
+| `actions` | [07-apply.md](skills/00-backlog/actions/07-apply.md) | - |
+| `actions` | [08-verify.md](skills/00-backlog/actions/08-verify.md) | - |
+| `references` | [change-set.md](skills/00-backlog/references/change-set.md) | - |
+| `references` | [events.md](skills/00-backlog/references/events.md) | - |
+| `references` | [intake.md](skills/00-backlog/references/intake.md) | - |
+| `references` | [modes.md](skills/00-backlog/references/modes.md) | - |
+| `references` | [review.md](skills/00-backlog/references/review.md) | - |
+| `references` | [supports.md](skills/00-backlog/references/supports.md) | - |
+| `-` | [SKILL.md](skills/00-backlog/SKILL.md) | `Orchestrates product work through a backlog of Epics, User Stories, Tasks, Spikes, and Defects. Use for intake, triage, refinement, review, lifecycle events, ordering, health checks, or end-to-end updates. Not for one known artifact step.` |
 
 #### `skills/01-ticket-info`
 
@@ -36,15 +78,23 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 
 | Group | File | Description |
 |-------|------|---|
-| `actions` | [01-clarify-scope.md](skills/02-user-stories/actions/01-clarify-scope.md) | - |
-| `actions` | [02-split-epic.md](skills/02-user-stories/actions/02-split-epic.md) | - |
-| `actions` | [03-draft-stories.md](skills/02-user-stories/actions/03-draft-stories.md) | - |
-| `actions` | [04-estimate-impact.md](skills/02-user-stories/actions/04-estimate-impact.md) | - |
-| `actions` | [05-prioritize.md](skills/02-user-stories/actions/05-prioritize.md) | - |
-| `actions` | [06-sync-tracker.md](skills/02-user-stories/actions/06-sync-tracker.md) | - |
+| `actions` | [01-frame.md](skills/02-user-stories/actions/01-frame.md) | - |
+| `actions` | [02-slice.md](skills/02-user-stories/actions/02-slice.md) | - |
+| `actions` | [03-write.md](skills/02-user-stories/actions/03-write.md) | - |
+| `actions` | [04-assess.md](skills/02-user-stories/actions/04-assess.md) | - |
+| `actions` | [05-estimation.md](skills/02-user-stories/actions/05-estimation.md) | - |
+| `actions` | [06-order.md](skills/02-user-stories/actions/06-order.md) | - |
+| `actions` | [07-finalize.md](skills/02-user-stories/actions/07-finalize.md) | - |
 | `assets` | [user-story-template.md](skills/02-user-stories/assets/user-story-template.md) | - |
-| `references` | [rating.md](skills/02-user-stories/references/rating.md) | - |
-| `-` | [SKILL.md](skills/02-user-stories/SKILL.md) | `Turn a feature or epic into a prioritized, estimated, INVEST-compliant user-story backlog in the tracker. Use when the user wants to create, split, estimate, or prioritize user stories. Not for source code or a PRD.` |
+| `references` | [estimation.md](skills/02-user-stories/references/estimation.md) | - |
+| `references` | [lifecycle.md](skills/02-user-stories/references/lifecycle.md) | - |
+| `references` | [ordering.md](skills/02-user-stories/references/ordering.md) | - |
+| `references` | [persistence.md](skills/02-user-stories/references/persistence.md) | - |
+| `references` | [qualification.md](skills/02-user-stories/references/qualification.md) | - |
+| `references` | [readiness.md](skills/02-user-stories/references/readiness.md) | - |
+| `references` | [relations.md](skills/02-user-stories/references/relations.md) | - |
+| `references` | [slicing.md](skills/02-user-stories/references/slicing.md) | - |
+| `-` | [SKILL.md](skills/02-user-stories/SKILL.md) | `Produces or refines ordered User Stories from an Epic, Product Brief, PRD, or bounded request. Use when the user wants to slice, write, assess, order, or persist Stories. Not for Epics or implementation.` |
 
 #### `skills/03-prd`
 
@@ -95,4 +145,53 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `references` | [techniques.md](skills/06-product-brief/references/techniques.md) | - |
 | `references` | [visuals.md](skills/06-product-brief/references/visuals.md) | - |
 | `-` | [SKILL.md](skills/06-product-brief/SKILL.md) | `Produces a concise Product Brief before requirements. Use when the user wants to frame or revisit a product opportunity and how it will be validated. Not for requirements, technical design, or planning.` |
+
+#### `skills/07-epic`
+
+| Group | File | Description |
+|-------|------|---|
+| `actions` | [01-shape.md](skills/07-epic/actions/01-shape.md) | - |
+| `actions` | [02-review.md](skills/07-epic/actions/02-review.md) | - |
+| `actions` | [03-finalize.md](skills/07-epic/actions/03-finalize.md) | - |
+| `assets` | [epic-template.md](skills/07-epic/assets/epic-template.md) | - |
+| `references` | [epic-quality.md](skills/07-epic/references/epic-quality.md) | - |
+| `references` | [lifecycle.md](skills/07-epic/references/lifecycle.md) | - |
+| `references` | [persistence.md](skills/07-epic/references/persistence.md) | - |
+| `-` | [SKILL.md](skills/07-epic/SKILL.md) | `Produces or refines an outcome-based Epic for a product backlog. Use when the user wants to frame, review, resume, or persist an Epic. Not for Product Briefs, User Stories, or implementation.` |
+
+#### `skills/08-three-amigos`
+
+| Group | File | Description |
+|-------|------|---|
+| `actions` | [01-assess.md](skills/08-three-amigos/actions/01-assess.md) | - |
+| `actions` | [02-reconcile.md](skills/08-three-amigos/actions/02-reconcile.md) | - |
+| `references` | [assessment.md](skills/08-three-amigos/references/assessment.md) | - |
+| `references` | [reconciliation.md](skills/08-three-amigos/references/reconciliation.md) | - |
+| `-` | [SKILL.md](skills/08-three-amigos/SKILL.md) | `Assesses an Epic or Story through one product, delivery, or quality lens, then reconciles three caller-supplied reports. Use for refinement before backlog changes. Never spawns or writes.` |
+
+#### `skills/09-defect`
+
+| Group | File | Description |
+|-------|------|---|
+| `actions` | [01-capture.md](skills/09-defect/actions/01-capture.md) | - |
+| `actions` | [02-assess.md](skills/09-defect/actions/02-assess.md) | - |
+| `actions` | [03-finalize.md](skills/09-defect/actions/03-finalize.md) | - |
+| `assets` | [defect-template.md](skills/09-defect/assets/defect-template.md) | - |
+| `references` | [defect-quality.md](skills/09-defect/references/defect-quality.md) | - |
+| `references` | [lifecycle.md](skills/09-defect/references/lifecycle.md) | - |
+| `references` | [persistence.md](skills/09-defect/references/persistence.md) | - |
+| `-` | [SKILL.md](skills/09-defect/SKILL.md) | `Produces or refines a backlog Defect from an observed product mismatch. Use when the user wants to report, assess, link, order, transition, or verify a defect. Not for incident response, debugging, or implementation.` |
+
+#### `skills/10-task`
+
+| Group | File | Description |
+|-------|------|---|
+| `actions` | [01-frame.md](skills/10-task/actions/01-frame.md) | - |
+| `actions` | [02-review.md](skills/10-task/actions/02-review.md) | - |
+| `actions` | [03-finalize.md](skills/10-task/actions/03-finalize.md) | - |
+| `assets` | [task-template.md](skills/10-task/assets/task-template.md) | - |
+| `references` | [lifecycle.md](skills/10-task/references/lifecycle.md) | - |
+| `references` | [persistence.md](skills/10-task/references/persistence.md) | - |
+| `references` | [task-quality.md](skills/10-task/references/task-quality.md) | - |
+| `-` | [SKILL.md](skills/10-task/SKILL.md) | `Produces or refines a backlog Task for bounded delivery work without independent user value. Use to create, classify, link, order, estimate, transition, or complete functional or technical work. Not for User Stories, Spikes, Defects, planning, or implementation.` |
 

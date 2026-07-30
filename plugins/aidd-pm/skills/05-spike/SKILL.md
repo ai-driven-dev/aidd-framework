@@ -37,7 +37,8 @@ Run the flow above. Read only the next action's file before running it.
 
 ## Transversal rules
 
-- Require approval before spike creation or parent changes.
-- Follow approved route and bounds; ask when either is absent.
+- Require explicit approval or caller-provided bounded authority before spike creation or parent changes.
+- Follow authorized route and bounds; ask when either is absent.
 - Preserve edits, evidence, and links.
-- Touch only the spike and approved related artifacts.
+- Touch only the spike and authorized related artifacts.
+- For Markdown, run [the backlog checker](../../hooks/check-backlog.js) before writing and after; stop on existing findings, then correct this skill's findings.

@@ -20,6 +20,7 @@ Evidence and an outcome status.
 | Case | Observable |
 | --- | --- |
 | Terminal spike | No attempt is appended |
+| Activation | frontmatter moves from `open` to `in-progress` |
 | Attempts | Each records method, evidence, and result; retries differ |
 | Unapproved path | Evidence is kept; status is unchanged; user is asked |
 | Output | Evidence and a lifecycle status return; history remains; only the spike changes |

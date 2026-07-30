@@ -2,26 +2,41 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "aidd-pm",
   "version": "2.2.1",
-  "description": "Product management: ticket-info, user-stories, product-brief, prd, spec, spike",
+  "description": "Product backlog orchestration, refinement, Product Briefs, Epics, User Stories, Tasks, Spikes, Defects, requirements, and specs.",
   "author": {
     "name": "AI-Driven Dev",
     "url": "https://github.com/ai-driven-dev"
   },
   "skills": [
+    "./skills/00-backlog",
     "./skills/01-ticket-info",
     "./skills/02-user-stories",
     "./skills/03-prd",
     "./skills/04-spec",
     "./skills/05-spike",
-    "./skills/06-product-brief"
+    "./skills/06-product-brief",
+    "./skills/07-epic",
+    "./skills/08-three-amigos",
+    "./skills/09-defect",
+    "./skills/10-task"
+  ],
+  "agents": [
+    "./agents/product-advocate.md",
+    "./agents/delivery-advocate.md",
+    "./agents/quality-advocate.md"
   ],
   "keywords": [
+    "backlog",
     "product-management",
     "product-brief",
+    "epics",
     "user-stories",
+    "tasks",
+    "three-amigos",
     "prd",
     "specification",
     "spikes",
+    "defects",
     "tickets"
   ],
   "repository": "https://github.com/ai-driven-dev/framework",

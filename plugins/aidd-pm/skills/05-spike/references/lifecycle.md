@@ -1,5 +1,7 @@
 # Lifecycle
 
+`status` lives in frontmatter.
+
 | Status | Meaning | May move to |
 | ------ | ------- | ----------- |
 | `open` | framed only | `in-progress`, `cancelled` |

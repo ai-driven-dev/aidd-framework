@@ -14,7 +14,7 @@ flowchart TD
   Verify["Apply the selected capability"]
   Outcome{"Resolved, blocked, or cancelled?"}
   Path{"Viable evidence path?"}
-  Bounds{"Next path within approved bounds?"}
+  Bounds{"Next path within authorized bounds?"}
   Ask["Ask to extend bounds or stop"]
   Inconclusive["Return inconclusive"]
   Done["Return evidence and status"]

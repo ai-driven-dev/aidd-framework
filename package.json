@@ -28,7 +28,8 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "prepare": "lefthook install || true"
+    "prepare": "lefthook install || true",
+    "test:backlog": "node --test scripts/__tests__/check-backlog.test.js"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",

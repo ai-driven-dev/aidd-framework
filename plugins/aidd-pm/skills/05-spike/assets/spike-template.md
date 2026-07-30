@@ -1,13 +1,17 @@
-# Spike: <title>
+---
+type: spike
+status: open
+---
 
-- Status: <status>
-- Parents: <ids, URLs, or paths>
-- Related spikes: <ids, URLs, or paths>
-- Unblocks: <decision or estimate>
+# Spike: <title>
 
 ## Question
 
 <one answerable question>
+
+## Decision
+
+<decision or estimate this answer unblocks>
 
 ## Bounds
 

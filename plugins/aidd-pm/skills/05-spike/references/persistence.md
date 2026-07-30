@@ -9,9 +9,8 @@
 | Valid completed match in the target | Reuse it |
 | Same open question in the target | Resume it |
 | New spike | Create one dedicated tracker item or Markdown document |
-| Reciprocal links are supported | Link every parent |
-| Blocked work | Make the spike its predecessor |
-| Question changed | Create a new spike and link the previous one |
+| Question changed | Cancel the previous Spike; create a new one that `supersedes` it |
 
-- Never mirror across supports.
-- Assign neither user value nor arbitrary estimates.
+For Markdown, write `aidd_docs/backlog/spikes/<slug>.md`. The Spike owns `parents`; dependent work is found by scanning that field. Use native tracker relations when available, but never mirror a relation or artifact across supports.
+
+Assign neither user value nor arbitrary estimates.

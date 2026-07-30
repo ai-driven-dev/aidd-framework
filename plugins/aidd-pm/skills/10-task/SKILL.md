@@ -1,0 +1,35 @@
+---
+name: 10-task
+description: Produces or refines a backlog Task for bounded delivery work without independent user value. Use to create, classify, link, order, estimate, transition, or complete functional or technical work. Not for User Stories, Spikes, Defects, planning, or implementation.
+argument-hint: request | task
+---
+
+# Task
+
+```mermaid
+flowchart LR
+  source([request or Task]) --> frame --> review --> finalize
+  review -->|"revise"| frame
+  review -->|"investigate, then resume"| review
+  finalize -->|"revise"| frame
+  finalize -->|"authorized"| done([Task])
+```
+
+## Actions
+
+Run the flow above. Read only the next action file.
+
+| Action | Does |
+| --- | --- |
+| frame | define one bounded delivery Task |
+| review | challenge its type and readiness |
+| finalize | persist or transition the Task |
+
+## Transversal rules
+
+- Keep scope, classification, priority, and lifecycle decisions with the user.
+- Record delivery work; never plan or implement it.
+- Preserve source links and existing edits.
+- Ask natural questions; never expose actions, checks, routes, or unchanged state.
+- Require explicit approval or caller-provided bounded authority before any write or related-item change.
+- For Markdown, run [the backlog checker](../../hooks/check-backlog.js) before writing and after; stop on existing findings, then correct this skill's findings.
