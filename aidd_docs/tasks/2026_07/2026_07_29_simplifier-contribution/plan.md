@@ -1,6 +1,6 @@
 ---
 objective: "Tout contributeur suit un seul chemin issue-first, validé par un Certifié ou un Habilité, avant d'ouvrir sa PR."
-status: in-progress
+status: implemented
 ---
 
 <!-- Fill or omit these sections; never add, rename, or reorder one. -->
