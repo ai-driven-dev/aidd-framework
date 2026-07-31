@@ -8,15 +8,15 @@ The confirmed candidate list from `02-split-epic`.
 
 ## Output
 
-One drafted story per candidate, each filling `@../assets/user-story-template.md`: the As-a/I-want/So-that statement, Gherkin acceptance criteria, and a functional DoD.
+One drafted story per candidate, each filling [user-story-template.md](../assets/user-story-template.md): the As-a/I-want/So-that statement, Gherkin acceptance criteria, and a functional DoD.
 
 ## Process
 
 1. **Frame.** Write the As-a/I-want/So-that statement, naming the role, the action, and the outcome.
 2. **Criteria.** Write Gherkin scenarios covering at least one nominal case and one error or boundary case.
-3. **Done.** Write the functional DoD per `@../references/rating.md`: observable, user-facing conditions only, never technical delivery steps.
-4. **Check INVEST.** Verify each story against the six criteria in `@../references/rating.md`. Reshape any story that fails.
-5. **Fill.** Render each story into `@../assets/user-story-template.md`, leaving estimation fields for `04-estimate-impact`.
+3. **Done.** Write the functional DoD per [rating.md](../references/rating.md): observable, user-facing conditions only, never technical delivery steps.
+4. **Check INVEST.** Verify each story against the six criteria in [rating.md](../references/rating.md). Reshape any story that fails.
+5. **Fill.** Render each story into [user-story-template.md](../assets/user-story-template.md), leaving estimation fields for `04-estimate-impact`.
 
 ## Test
 
