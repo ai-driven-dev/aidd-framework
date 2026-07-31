@@ -105,7 +105,7 @@ AIDD is delivered as a plugin marketplace. Pick what you need; do not install ev
 | aidd-refine  | 01-brainstorm, 02-challenge, 03-condense, 04-shadow-areas, 05-fact-check                                            |
 | aidd-dev     | 00-sdlc, 01-plan, 02-implement, 03-assert, 04-audit, 05-review, 06-test, 07-refactor, 08-debug, 09-for-sure         |
 | aidd-vcs     | 01-commit, 02-pull-request, 03-release-tag, 04-issue-create                                                         |
-| aidd-pm      | 00-backlog, 01-ticket-info, 02-user-stories, 03-prd, 04-spec, 05-spike, 06-product-brief, 07-epic, 08-three-amigos, 09-defect |
+| aidd-pm      | 00-backlog, 01-ticket-info, 02-user-stories, 03-prd, 04-spec, 05-spike, 06-product-brief, 07-epic, 08-three-amigos, 09-defect, 10-task |
 
 Each plugin is independently installable; install incrementally. Smaller surface, fewer triggers competing.
 

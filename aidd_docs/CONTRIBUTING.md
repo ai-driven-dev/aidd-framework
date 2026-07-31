@@ -55,5 +55,5 @@ Project recipes live under `aidd_docs/recipes/`. Bundled framework recipes live 
 - Skill names: `<plugin>:<NN>-<slug>`. Slug is kebab-case verb for activity domains, singular noun for tool domains.
 - Action files: `## Input` when needed, then `## Output`, `## Process`, and `## Test`.
 - `## Process` steps start with `**Bold title**.` and use decision-list `Pick first match` for branching.
-- `## Test` states observable outcomes through commands, artifacts, or side effects.
+- `## Test` is a `| Case | Pass |` table stating observable outcomes through commands, artifacts, or side effects.
 - Descriptions in SKILL.md frontmatter include explicit `Use when` triggers and optional `Not for` exclusions.
