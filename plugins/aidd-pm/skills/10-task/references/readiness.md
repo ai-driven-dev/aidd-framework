@@ -1,19 +1,4 @@
-# Task Quality
-
-A Task is bounded delivery work without independent user value.
-
-## Qualification
-
-| Input | Result |
-| --- | --- |
-| several deliverable outcomes | Epic |
-| independently useful behavior | User Story |
-| delivery work serving a parent or goal | Task |
-| bounded uncertainty | Spike |
-| observed mismatch | Defect |
-| same delivery outcome | existing Task |
-
-## Readiness
+# Readiness
 
 | Criterion | Ready when |
 | --- | --- |

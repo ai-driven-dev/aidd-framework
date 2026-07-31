@@ -12,4 +12,4 @@
 
 Use native fields when supported; otherwise use stable ids, URLs, or project-relative paths. Keep one authority across supports.
 
-For Markdown, write `aidd_docs/backlog/tasks/<slug>.md`. A Task may own `source`, `parent`, `depends_on`, `related_to`, `supersedes`, `order`, `estimate`, and optional `work_kind`.
+For Markdown, write `aidd_docs/backlog/tasks/<slug>.md`.

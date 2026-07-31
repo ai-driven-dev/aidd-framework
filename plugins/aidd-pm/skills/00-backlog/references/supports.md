@@ -13,3 +13,5 @@ Resolve durable semantics from loaded project memory and current capabilities fr
 | no support exists | offer session or Markdown |
 
 Each artifact and field has one authority. Across supports, keep stable links or a configured projection; never maintain a second copy manually. Read technical ids from the live support and verify every write there.
+
+The bundled checker reads Markdown only. When another support holds artifacts, the local read model is partial: say so, and never report it as an empty backlog.

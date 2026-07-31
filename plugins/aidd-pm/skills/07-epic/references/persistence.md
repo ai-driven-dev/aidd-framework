@@ -14,8 +14,5 @@
 Use native relation fields when supported. Otherwise keep explicit ids or project-relative paths. Never mirror the same Epic across supports.
 
 Write a Markdown Epic to `aidd_docs/backlog/epics/<slug>.md`.
-Use `goal` for Product Brief or product-goal alignment. Use `source` for a different origin; never store the same reference in both.
-
-Stories and Tasks identify their Epic through `parent`; Spikes identify blocked artifacts through `parents`. Do not copy inverse links into the Epic.
 
 Updating an Epic preserves its identity; it does not relate the Epic to itself.

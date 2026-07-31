@@ -18,15 +18,15 @@ A spike reference, or the reason no spike is needed.
 4. **Place.** Apply [persistence](../references/persistence.md) and follow its result.
 5. **Route.** Resolve `save for later` or `investigate now`.
 6. **Confirm.** Show the new Spike and any previous Spike cancellation.
-7. **Write.** Fill earned fields of [spike template](../assets/spike-template.md). A keep-open Spike stops after `Bounds`; a replaced Spike records its cancellation and replacement under `Outcome` and `Follow-up`.
+7. **Write.** Fill earned fields of [spike template](../assets/spike-template.md) and [relations](../references/relations.md). A keep-open Spike stops after `Bounds`; a replaced Spike records its cancellation and replacement under `Outcome` and `Follow-up`.
 
 ## Test
 
-| Case | Observable |
+| Case | Pass |
 | --- | --- |
-| Missing question, decision, or authority | Spike file count is unchanged |
-| Approved routed spike | One bounded Spike exists with `type: spike`, `status: open`, and owned relations only |
-| Existing match | The existing artifact is reused and spike file count is unchanged |
-| Changed question | Previous Spike is `cancelled` with outcome and follow-up; one new `open` Spike lists it under `supersedes` |
-| Missing route | No spike is created and the choice is requested |
+| Missing question, decision, or authority | Spike file count unchanged |
+| Approved routed spike | one bounded Spike with `type: spike`, `status: open`, and owned relations only |
+| Existing match | existing artifact reused; Spike file count unchanged |
+| Changed question | previous Spike `cancelled` with outcome and follow-up; one new `open` Spike lists it under `supersedes` |
+| Missing route | no Spike created; the choice is requested |
 | Markdown | standard path used; no empty metadata or body-level status and relation fields |

@@ -20,11 +20,6 @@
     "./skills/09-defect",
     "./skills/10-task"
   ],
-  "agents": [
-    "./agents/product-advocate.md",
-    "./agents/delivery-advocate.md",
-    "./agents/quality-advocate.md"
-  ],
   "keywords": [
     "backlog",
     "product-management",

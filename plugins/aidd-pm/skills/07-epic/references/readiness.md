@@ -1,19 +1,4 @@
-# Epic Quality
-
-An Epic coordinates several deliverable slices toward one measurable outcome.
-
-## Qualification
-
-| Requested work | Result |
-| --- | --- |
-| opportunity or product bet | Product Brief |
-| one independently deliverable behavior | User Story |
-| bounded delivery work without independent value | Task |
-| one bounded uncertainty | Spike |
-| several outcomes that can succeed independently | split Epic candidates |
-| one outcome requiring several deliverable slices | Epic |
-
-## Readiness
+# Readiness
 
 | Criterion | Ready when |
 | --- | --- |

@@ -16,7 +16,8 @@ A session draft or one created or updated Task identity.
 2. **Status.** Apply [lifecycle](../references/lifecycle.md) to every requested transition.
 3. **Authorize.** Confirm content, target, classification, planning fields, and relations.
 4. **Write.** Create or update only the authorized Task and preserve unrelated fields.
-5. **Verify.** Read the result back and offer its next delivery move.
+5. **Link.** Apply [relations](../references/relations.md).
+6. **Verify.** Read the result back and offer its next delivery move.
 
 ## Test
 

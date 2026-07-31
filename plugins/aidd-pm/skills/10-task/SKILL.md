@@ -32,4 +32,3 @@ Run the flow above. Read only the next action file.
 - Preserve source links and existing edits.
 - Ask natural questions; never expose actions, checks, routes, or unchanged state.
 - Require explicit approval or caller-provided bounded authority before any write or related-item change.
-- For Markdown, run [the backlog checker](../../hooks/check-backlog.js) before writing and after; stop on existing findings, then correct this skill's findings.

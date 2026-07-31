@@ -13,9 +13,9 @@ A reviewed Epic and its next user decision.
 ## Process
 
 1. **Compare.** Apply [persistence](../references/persistence.md) to find an existing match, overlap, or contradiction.
-2. **Assess.** Apply [Epic quality](../references/epic-quality.md) to the complete draft.
+2. **Assess.** Apply [readiness](../references/readiness.md) to the complete draft.
 3. **Challenge.** Test the outcome, boundaries, success evidence, dependencies, and unknowns against the source.
-4. **Route.** Let the user choose revision, finalization, or an offered Spike for a blocker. Resume review after its outcome.
+4. **Route.** Let the user choose revision, finalization, or [handoffs](../references/handoffs.md).
 5. **Render.** Show a revised Epic or blocking finding; otherwise continue.
 
 ## Test

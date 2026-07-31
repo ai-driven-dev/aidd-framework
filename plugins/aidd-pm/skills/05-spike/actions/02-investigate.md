@@ -17,10 +17,10 @@ Evidence and an outcome status.
 
 ## Test
 
-| Case | Observable |
+| Case | Pass |
 | --- | --- |
-| Terminal spike | No attempt is appended |
+| Terminal Spike | no attempt appended |
 | Activation | frontmatter moves from `open` to `in-progress` |
-| Attempts | Each records method, evidence, and result; retries differ |
-| Unapproved path | Evidence is kept; status is unchanged; user is asked |
-| Output | Evidence and a lifecycle status return; history remains; only the spike changes |
+| Attempts | each records method, evidence, and result; retries differ |
+| Unapproved path | evidence kept; status unchanged; user asked |
+| Output | evidence and a lifecycle status returned; history preserved; only the Spike changes |

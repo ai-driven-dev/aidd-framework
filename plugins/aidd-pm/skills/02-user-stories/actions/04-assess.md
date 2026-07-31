@@ -13,7 +13,7 @@ The Story documents with status and gaps only when `proposed`.
 ## Process
 
 1. **Quality.** Apply [readiness](../references/readiness.md) to every Story.
-2. **Unknowns.** Apply [relations](../references/relations.md). Offer a Spike for a blocking uncertainty and resume assessment after its outcome.
+2. **Unknowns.** Apply [handoffs](../references/handoffs.md) and [relations](../references/relations.md).
 3. **Reshape.** Return an oversized or non-valuable Story to slicing.
 4. **Status.** Use `ready` only when every readiness criterion passes. Otherwise keep `proposed` and list only readiness blockers.
 5. **Feedback.** Show changed or `proposed` Stories and ask about the highest gap; otherwise continue.

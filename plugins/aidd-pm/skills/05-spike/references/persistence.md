@@ -11,6 +11,6 @@
 | New spike | Create one dedicated tracker item or Markdown document |
 | Question changed | Cancel the previous Spike; create a new one that `supersedes` it |
 
-For Markdown, write `aidd_docs/backlog/spikes/<slug>.md`. The Spike owns `parents`; dependent work is found by scanning that field. Use native tracker relations when available, but never mirror a relation or artifact across supports.
+For Markdown, write `aidd_docs/backlog/spikes/<slug>.md`. Blocked work is found by scanning `parents`. Use native tracker relations when available, but never mirror a relation or artifact across supports.
 
 Assign neither user value nor arbitrary estimates.

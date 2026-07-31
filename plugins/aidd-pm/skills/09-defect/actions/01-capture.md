@@ -13,7 +13,7 @@ One Defect draft or one clarification question.
 ## Process
 
 1. **Resolve.** Inspect the supplied source, relevant artifacts, and matching Defects.
-2. **Qualify.** Apply [Defect quality](../references/defect-quality.md). Stop on a different work type.
+2. **Qualify.** Apply [qualification](../references/qualification.md). On mismatch, apply [handoffs](../references/handoffs.md).
 3. **Clarify.** Ask one question only when expected behavior, actual behavior, or impact cannot be resolved.
 4. **Draft.** Fill earned sections of [Defect template](../assets/defect-template.md).
 5. **Feedback.** Show the complete report and fold corrections.

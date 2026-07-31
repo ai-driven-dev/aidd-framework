@@ -1,18 +1,18 @@
 ---
 name: 00-backlog
 description: Orchestrates product work through a backlog of Epics, User Stories, Tasks, Spikes, and Defects. Use for intake, triage, refinement, review, lifecycle events, ordering, health checks, or end-to-end updates. Not for one known artifact step.
-argument-hint: request | artifact | backlog
+argument-hint: create | manage | review | refine
 ---
 
 # Backlog
 
 ```mermaid
 flowchart LR
-  source([request, artifact, or backlog]) --> inspect
-  inspect -->|"intake"| triage --> route
-  inspect -->|"artifact event"| route
+  source([create, manage, review, or refine]) --> inspect
+  inspect -->|"create"| triage --> route
+  inspect -->|"manage"| route
   inspect -->|"review"| review --> decide
-  route -->|"refinement"| assess --> decide
+  route -->|"refine"| assess --> decide
   route -->|"change"| decide
   decide -->|"revise"| route
   decide -->|"authorize"| apply --> verify
@@ -40,7 +40,7 @@ Run the flow above. Read only the next action file.
 
 - Keep product, lifecycle, and backlog decisions with the user.
 - Delegate artifact work to its owning capability; never copy its rules.
-- Spawn only the three leaf reviewers defined by `05-assess`.
+- Spawn only the three isolated role assessments defined by `05-assess`.
 - Store each relation once, in its owning artifact.
 - Run the backlog checker before and after authorized changes.
 - Ask natural questions; never expose internal routes, checks, or unchanged state.

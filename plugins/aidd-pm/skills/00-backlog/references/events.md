@@ -2,7 +2,7 @@
 
 | Event | Owner |
 | --- | --- |
-| Epic create, revise, start, complete, or cancel | Epic |
+| Epic create, revise, order, estimate, start, complete, or cancel | Epic |
 | Story slice, revise, estimate, order, start, complete, or cancel | User Stories |
 | Task create, revise, classify, order, estimate, start, complete, or cancel | Task |
 | uncertainty create, investigate, conclude, or resume | Spike |
@@ -18,3 +18,5 @@
 | health or relation repair | affected artifact owners |
 
 Use the project-defined artifact type when it extends this map. One event may have several consequences, but each field has one owner.
+
+Requirement documents and ticket retrieval are not backlog artifacts: they hold no status, order, or relation this map owns. They feed an event through `source`, never as one.

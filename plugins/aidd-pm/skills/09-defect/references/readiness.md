@@ -1,19 +1,4 @@
-# Defect Quality
-
-A Defect records observed product behavior that conflicts with expected behavior.
-
-## Qualification
-
-| Input | Result |
-| --- | --- |
-| observed mismatch | Defect |
-| desired new behavior | User Story |
-| bounded design or feasibility unknown | Spike |
-| active service disruption | incident-response capability |
-| bounded resolution work | Task linked to the Defect |
-| same mismatch and context | existing Defect |
-
-## Readiness
+# Readiness
 
 | Criterion | Ready when |
 | --- | --- |

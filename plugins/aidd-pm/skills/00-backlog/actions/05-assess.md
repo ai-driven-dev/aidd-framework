@@ -13,8 +13,8 @@ Three independent assessments and one reconciled verdict per target.
 ## Process
 
 1. **Snapshot.** Capture each affected target and its evidence once.
-2. **Spawn.** For one target at a time, run `product-advocate`, `delivery-advocate`, and `quality-advocate` in parallel with the same snapshot.
-3. **Reconcile.** Use Three Amigos to preserve consensus, divergences, questions, and `ready`, `revise`, or `blocked`.
+2. **Spawn.** For one target at a time, run Three Amigos in three isolated parallel assessments, one per role, on the same snapshot.
+3. **Reconcile.** Use Three Amigos to reconcile the three reports.
 
 ## Test
 

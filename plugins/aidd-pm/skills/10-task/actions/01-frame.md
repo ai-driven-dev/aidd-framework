@@ -13,7 +13,7 @@ One Task draft or one clarification question.
 ## Process
 
 1. **Resolve.** Inspect the source, relevant artifacts, and matching Tasks.
-2. **Qualify.** Apply [Task quality](../references/task-quality.md). Stop on another work type.
+2. **Qualify.** Apply [qualification](../references/qualification.md). On mismatch, apply [handoffs](../references/handoffs.md).
 3. **Clarify.** Ask one question at a time while outcome, scope, completion evidence, or ownership remains blocking.
 4. **Draft.** Fill earned sections of [Task template](../assets/task-template.md).
 5. **Feedback.** Show the complete draft and fold corrections.

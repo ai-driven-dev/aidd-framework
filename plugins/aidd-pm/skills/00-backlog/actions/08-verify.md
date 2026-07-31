@@ -12,16 +12,16 @@ A coherent backlog or actionable findings routed for correction.
 
 ## Process
 
-1. **Check.** Run [the backlog checker](../../../hooks/check-backlog.js) in JSON mode.
-2. **Compare.** Verify every authorized mutation and reject any extra change.
-3. **Review.** Ask owning capabilities to verify lifecycle and readiness consequences that metadata cannot prove.
-4. **Route.** Return findings for correction; otherwise report the affected identities.
+1. **Compare.** Verify every authorized mutation and reject any extra change.
+2. **Prove.** Ask each owning capability to prove what it wrote: transitions, relations, and readiness.
+3. **Route.** Return findings for correction; otherwise report the affected identities.
 
 ## Test
 
 | Case | Pass |
 | --- | --- |
-| Structural error | checker code and artifact path returned |
+| Broken artifact | its owning capability names the artifact and the reason |
 | Semantic consequence | owning capability verifies it |
+| Unsupported transition | owning capability rejects it; verification fails |
 | Extra mutation | verification fails |
-| Coherent result | checker exits zero and every authorized mutation matches |
+| Coherent result | every owner proves its own writes and every authorized mutation matches |

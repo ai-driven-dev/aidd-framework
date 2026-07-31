@@ -2,11 +2,8 @@
 
 | Requested work | Result |
 | --- | --- |
-| opportunity or product bet | Product Brief |
-| one outcome requiring several deliverable slices | Epic |
-| several independently successful outcomes | separate Epic candidates |
-| one bounded learning outcome | Spike |
-| functional or technical work without independent value | Task |
 | independently deliverable user or stakeholder value | Story |
+| value spread over several slices | separate Story candidates |
+| anything else | not a Story |
 
 An uncertainty inside a value outcome blocks its Story; it does not replace it.

@@ -24,4 +24,5 @@ Created or updated artifact identities.
 | Mutation | applied by its owning capability, never by Backlog |
 | Scope | no artifact or field outside the authorized change set changes |
 | Failure | unresolved mutation returned; no silent skip |
+| Partial graph | incoherence between two mutations is not treated as a failure |
 | Result | exactly one identity per authorized create or update |

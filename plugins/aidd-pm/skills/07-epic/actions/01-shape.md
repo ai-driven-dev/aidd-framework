@@ -13,7 +13,7 @@ One Epic draft.
 ## Process
 
 1. **Resolve.** Inspect the supplied source, relevant project artifacts, and matching backlog items. Ask for the need only when none can be resolved.
-2. **Qualify.** Apply [Epic quality](../references/epic-quality.md). On mismatch, return its result and one open question, then stop.
+2. **Qualify.** Apply [qualification](../references/qualification.md). On mismatch, apply [handoffs](../references/handoffs.md).
 3. **Gap.** Find the highest-consequence unknown that can change the goal alignment, outcome, boundaries, success evidence, or dependencies. Do not fill it by inference.
 4. **Question.** Ask one focused open question, fold its answer, and repeat while a blocking gap remains. Offer options only when the user needs anchors, with no unsupported default.
 5. **Shape.** Fill [Epic template](../assets/epic-template.md) from confirmed evidence and explicit accepted assumptions.

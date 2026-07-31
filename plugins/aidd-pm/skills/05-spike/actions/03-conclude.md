@@ -19,9 +19,9 @@ A concluded spike with coherent parent links and any authorized backlog update.
 
 ## Test
 
-| Case | Observable |
+| Case | Pass |
 | --- | --- |
-| Outcome | Frontmatter status is lifecycle-valid and `Outcome` plus `Follow-up` are present |
-| Parent update unauthorized | Parent and backlog content are unchanged |
-| Parent update authorized | Exact reassessment changes exist; relations remain single-owned |
+| Outcome | frontmatter status is lifecycle-valid; `Outcome` and `Follow-up` present |
+| Parent update unauthorized | parent and backlog content unchanged |
+| Parent update authorized | exact reassessment changes exist; relations remain single-owned |
 | Resolved parent | owner reassesses readiness and planning fields; no automatic completion |

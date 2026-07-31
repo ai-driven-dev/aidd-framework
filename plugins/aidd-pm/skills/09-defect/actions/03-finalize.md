@@ -16,8 +16,8 @@ A session draft or one created or updated Defect identity.
 2. **Status.** Apply [lifecycle](../references/lifecycle.md) to every requested transition.
 3. **Authorize.** Confirm explicit approval or caller-provided bounded authority for content, target, order, estimate, and relations.
 4. **Write.** Create or update only the authorized Defect and preserve unrelated fields.
-5. **Link.** Store authorized metadata on its owning artifact without mirrored inverses.
-6. **Continue.** Offer the next investigation, delivery, or verification move without performing it.
+5. **Link.** Apply [relations](../references/relations.md).
+6. **Continue.** Apply [handoffs](../references/handoffs.md) to the next move.
 
 ## Test
 

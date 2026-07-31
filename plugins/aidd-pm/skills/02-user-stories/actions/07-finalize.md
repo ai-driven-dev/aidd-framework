@@ -16,7 +16,7 @@ The session drafts or the created and updated Story identities.
 2. **Status.** Apply [lifecycle](../references/lifecycle.md) to every requested state change.
 3. **Authorize.** Confirm explicit approval or caller-provided bounded authority for content, target, order, and relation changes.
 4. **Write.** Create or update only the authorized Stories and preserve fields outside the authorized change.
-5. **Link.** Apply [relations](../references/relations.md) to every authorized related-item change.
+5. **Link.** Apply [relations](../references/relations.md).
 6. **Report.** Return every persisted id, URL, or path in the authorized order.
 
 ## Test

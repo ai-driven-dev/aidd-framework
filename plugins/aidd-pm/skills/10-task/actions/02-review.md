@@ -13,10 +13,10 @@ A reviewed Task and its next user decision.
 ## Process
 
 1. **Compare.** Apply [persistence](../references/persistence.md) to find a match or duplicate.
-2. **Assess.** Apply [Task quality](../references/task-quality.md) to type, outcome, scope, done conditions, and relations.
+2. **Assess.** Apply [readiness](../references/readiness.md) to type, outcome, scope, done conditions, and relations.
 3. **State.** Apply [lifecycle](../references/lifecycle.md) without inferring readiness.
-4. **Relate.** Keep only supported parent, source, dependency, and replacement relations.
-5. **Decide.** Invite revision or finalization; offer a Spike when uncertainty blocks readiness.
+4. **Relate.** Apply [relations](../references/relations.md).
+5. **Decide.** Invite revision or finalization, or apply [handoffs](../references/handoffs.md).
 
 ## Test
 

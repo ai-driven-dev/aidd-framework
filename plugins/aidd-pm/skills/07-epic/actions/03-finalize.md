@@ -16,7 +16,7 @@ The session draft or one created or updated Epic with its links.
 2. **Status.** Apply [lifecycle](../references/lifecycle.md) from the review evidence.
 3. **Authorize.** Confirm explicit approval or caller-provided bounded authority for content, target, and related-item changes.
 4. **Write.** Create or update exactly one Epic and preserve fields outside the authorized change.
-5. **Link.** Record authorized metadata owned by the Epic; never mirror inverse relations.
+5. **Link.** Apply [relations](../references/relations.md).
 6. **Continue.** Offer to derive User Stories from the persisted or session Epic.
 
 ## Test
