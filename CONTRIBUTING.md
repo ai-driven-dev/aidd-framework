@@ -13,7 +13,7 @@ flowchart LR
 
 1. **Open an issue** — fill a template: [🌱 Quick Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=feature_request.yml) or [📋 Detailed Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=roadmap.yml).
 2. **Get it validated** — exchange with Certified Member or Maintainer to be sure to go in right direction. When all it is good, someone moves it status from `Ideation` to`Todo`. That's the green light.
-3. **Make your changes** — once validated, make your work from `next` → [Set up](#-set-up).
+3. **Make your changes** — once validated → [Set up](#-set-up).
 4. **Get reviewed and merged** — see [Open a pull request](#-open-a-pull-request).
 
 ## 🔧 Set up
@@ -24,12 +24,7 @@ Requires **Node 22.12+**, **pnpm**, **jq**, **python3**, and **pipx** (`gh` and 
 make setup   # deps + git hooks, registers a local marketplace, installs plugins into Claude + Codex
 ```
 
-`make` lists every target; `make doctor` and `make check` verify the environment and run the pre-commit checks (including the Markdown link checker).
-
-## ✏️ Make your change
-
-- **Test locally** — neither tool hot-reloads the checkout (both serve a cached copy). After editing, run `make reload` (or `PLUGIN="aidd-refine aidd-pm"` for a subset), then restart the session — `/reload-plugins` covers a Claude-only edit to an existing skill.
-- **Commit** — `<type>(<scope>): description`, one scope per commit (split cross-plugin changes). The types, scopes, and rules live in [`aidd_docs/memory/vcs.md`](aidd_docs/memory/vcs.md#commit-convention) (mirrors `commitlint.config.cjs`); the **type** drives the release → [`RELEASE.md`](./RELEASE.md).
+`make` lists every target; `make doctor` checks your environment, `make check` runs the pre-commit checks.
 
 ## 📜 Principles
 
@@ -38,12 +33,17 @@ make setup   # deps + git hooks, registers a local marketplace, installs plugins
 - **Follow the skill structure** — anatomy in [`ARCHITECTURE.md`](docs/ARCHITECTURE.md), scaffold with `/aidd-context:04-skill-generate`.
 - **Evolve the memory** — your PR changes a convention? Update [`aidd_docs/memory/`](aidd_docs/memory/) with it.
 
+## ✏️ Make your change
+
+- **Test locally** — neither tool hot-reloads the checkout (both serve a cached copy). After editing, run `make reload` (or `PLUGIN="aidd-refine aidd-pm"` for a subset), then restart the session — `/reload-plugins` covers a Claude-only edit to an existing skill.
+- **Commit** — `<type>(<scope>): description`, one scope per commit (split cross-plugin changes). The types, scopes, and rules live in [`aidd_docs/memory/vcs.md`](aidd_docs/memory/vcs.md#commit-convention) (mirrors `commitlint.config.cjs`); the **type** drives the release → [`RELEASE.md`](./RELEASE.md).
+
 ## 🔀 Open a pull request
 
 - **Branch off `next`, target `next`** — only `hotfix/*` branches off `main` for urgent production fixes. The branch prefix alone decides the target → [routing table](aidd_docs/memory/vcs.md#types).
 - **Fill the PR template** — explain *what* changed and *how* you solved it; skip re-asserting the conventional title and hooks (CI already enforces them).
 - **Label** follows your branch kind (the PR skill applies it automatically); add `security` when relevant.
-- **A Maintainer review gates every merge** ([`CODEOWNERS`](./.github/CODEOWNERS)) — no one merges their own PR. PRs squash-merge on the conventional title. Decision rules → [`GOVERNANCE.md`](./GOVERNANCE.md#-code-decisions).
+- **A Maintainer review gates every merge** ([`CODEOWNERS`](./.github/CODEOWNERS)); PRs squash-merge on the conventional title. Decision rules → [`GOVERNANCE.md`](./GOVERNANCE.md#-code-decisions).
 
 ## 🚀 Releases
 
