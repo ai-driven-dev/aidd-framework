@@ -320,6 +320,8 @@ Free and open-source (MIT). If it saves you time, [a ⭐](https://github.com/ai-
 - **Idea or bug?** [Open an issue](https://github.com/ai-driven-dev/framework/issues) or [start a discussion](https://github.com/ai-driven-dev/framework/discussions).
 - **Contribute code** → [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
+[![Contributors](https://contrib.rocks/image?repo=ai-driven-dev/framework)](https://github.com/ai-driven-dev/framework/graphs/contributors)
+
 ---
 
 <div align="center">
