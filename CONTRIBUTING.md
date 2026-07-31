@@ -6,7 +6,10 @@ One path, open to everyone ([roles](./GOVERNANCE.md#-roles)):
 
 ```mermaid
 flowchart LR
-    Issue["💡 Bug · Quick · Detailed"] --> Validate["✅ Get validated"] --> Branch["🌿 Branch off next<br/>type/description"] --> Commit["💬 Commit<br/>type(scope): msg"] --> PR["🔀 Open PR"] --> Review["🛡️ Review"] --> Merge["✅ Squash-merge → next"]
+    Bug["🐛 Bug"] --> Validate["✅ Get validated"]
+    Quick["🌱 Quick"] --> Validate
+    Detailed["📋 Detailed"] --> Validate
+    Validate --> Setup["🔧 Set up"] --> Changes["✏️ Changes"] --> PR["🔀 Open PR"] --> Review["🛡️ Review"] --> Merge["✅ Merged"]
 ```
 
 1. **Open an issue** — [🐛 Bug Report](https://github.com/ai-driven-dev/framework/issues/new?template=bug_report.yml), [🌱 Quick Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=feature_request.yml), or [📋 Detailed Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=roadmap.yml). Just reporting or proposing? Stop here. Usage question instead? → [Discussions](https://github.com/ai-driven-dev/framework/discussions), not an issue.
@@ -15,6 +18,8 @@ flowchart LR
 4. **Open your PR** → [Open a pull request](#-open-a-pull-request).
 
 ## 📜 Principles
+
+What holds for every contribution, whatever you're building:
 
 - **No slop** — read every line before proposing it.
 - **Spend tokens like they cost something.**
@@ -35,7 +40,7 @@ make setup   # deps, git hooks, registers the marketplace, installs plugins into
 ## ✏️ Make your change
 
 - **Follow the [Principles](#-principles).**
-- **Test locally** — run `make reload`, restart your session(s). Test in Claude *and* one other tool (e.g. Codex) — the CLI translates your Claude syntax into each tool's format, and that's exactly what can break.
+- **Test locally** — run `make reload`, restart your session(s). Test in Claude *and* one other tool (e.g. Codex).
 - **Commit** — `<type>(<scope>): description`, one scope per commit → [convention](aidd_docs/memory/vcs.md#commit-convention).
 
 ## 🔀 Open a pull request
