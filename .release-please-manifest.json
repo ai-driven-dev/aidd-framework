@@ -1,11 +1,11 @@
 {
-  ".": "5.5.6",
-  "plugins/aidd-context": "2.4.1",
+  ".": "5.6.0",
+  "plugins/aidd-context": "2.5.0",
   "plugins/aidd-dev": "2.3.1",
   "plugins/aidd-vcs": "2.2.1",
-  "plugins/aidd-pm": "2.2.1",
+  "plugins/aidd-pm": "2.3.0",
   "plugins/aidd-orchestrator": "2.1.1",
-  "plugins/aidd-refine": "2.2.1",
+  "plugins/aidd-refine": "2.2.2",
   "plugins/aidd-ui": "0.2.1-alpha.0",
-  "cli": "5.1.5"
+  "cli": "5.1.6"
 }

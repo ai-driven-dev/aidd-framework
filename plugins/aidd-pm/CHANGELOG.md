@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.0](https://github.com/ai-driven-dev/framework/compare/aidd-pm-v2.2.1...aidd-pm-v2.3.0) (2026-07-31)
+
+
+### Features
+
+* **aidd-pm:** add evidence-bounded spike skill ([#543](https://github.com/ai-driven-dev/framework/issues/543)) ([16e5bfa](https://github.com/ai-driven-dev/framework/commit/16e5bfa59e70acc6692749089c2423c5a7efbe86)), closes [#412](https://github.com/ai-driven-dev/framework/issues/412)
+* **aidd-pm:** add Product Brief discovery skill ([#551](https://github.com/ai-driven-dev/framework/issues/551)) ([d5e7224](https://github.com/ai-driven-dev/framework/commit/d5e72243f683bc57ea439f2571b410df8b332d69)), closes [#349](https://github.com/ai-driven-dev/framework/issues/349)
+
 ## [2.2.1](https://github.com/ai-driven-dev/framework/compare/aidd-pm-v2.2.0...aidd-pm-v2.2.1) (2026-07-10)
 
 
