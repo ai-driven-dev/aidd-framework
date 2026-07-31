@@ -6,7 +6,29 @@ const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 
 const script = path.resolve(__dirname, "../../plugins/aidd-pm/hooks/check-backlog.js");
-const { inspectBacklog, parseFrontmatter, touchesBacklog } = require(script);
+const { FOLDERS, FORBIDDEN, GRAPH_CODES, STATUSES, inspectBacklog, parseFrontmatter, touchesBacklog } =
+  require(script);
+
+const skills = path.resolve(__dirname, "../../plugins/aidd-pm/skills");
+const ARTIFACT_SKILL = {
+  epic: "07-epic",
+  story: "02-user-stories",
+  task: "10-task",
+  spike: "05-spike",
+  defect: "09-defect",
+};
+
+function firstColumn(table) {
+  return table
+    .split("\n")
+    .filter((line) => line.startsWith("|") && !/^\|\s*-/.test(line))
+    .slice(1)
+    .map((line) => line.split("|")[1].trim());
+}
+
+function backticked(text) {
+  return [...text.matchAll(/`([a-z_-]+)`/g)].map((match) => match[1]);
+}
 
 function project(files = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-backlog-"));
@@ -178,15 +200,34 @@ test("embedded artifact frontmatter fails while a horizontal rule remains valid"
   assert.deepEqual(codes(inspectBacklog(root)), ["EMBEDDED_FRONTMATTER"]);
 });
 
-test("backlog metadata in the body fails", () => {
-  for (const line of ["**Status:** proposed", "- **Status:** proposed", "| **Status:** | proposed |", "## Status: proposed"]) {
+test("frontmatter copied into the preamble, a heading, or a table fails", () => {
+  const preamble = (line) =>
+    `---\ntype: epic\nstatus: ready\n---\n\n# Epic\n\n${line}\n\n## Success Evidence\n\n- outcome observed\n`;
+  for (const line of ["**Status:** proposed", "- **Status:** proposed", "## Status: proposed"]) {
     const root = project({
-      "aidd_docs/backlog/epics/body-metadata.md": `${epic()}\n${line}\n`,
+      "aidd_docs/backlog/epics/body-metadata.md": preamble(line),
       "aidd_docs/backlog/epics/example.md":
         `${epic()}\n\`\`\`yaml\nstatus: proposed\n\`\`\`\n\n    status: proposed\n`,
     });
     assert.deepEqual(codes(inspectBacklog(root)), ["BODY_METADATA"]);
   }
+  const table = project({
+    "aidd_docs/backlog/epics/table.md": `${epic()}\n| **Status:** | proposed |\n`,
+  });
+  assert.deepEqual(codes(inspectBacklog(table)), ["BODY_METADATA"]);
+});
+
+test("field words inside a section are prose, not metadata", () => {
+  const root = project({
+    "aidd_docs/backlog/defects/evidence.md": defect(
+      "reported",
+      "",
+      "## Evidence\n\n- source: https://support.example.com/ticket/4821\n",
+    ),
+    "aidd_docs/backlog/stories/acceptance.md":
+      `${story("ready")}\n- order: results are sorted by relevance\n`,
+  });
+  assert.deepEqual(codes(inspectBacklog(root)), []);
 });
 
 test("unknown type and type-specific status fail", () => {
@@ -200,7 +241,7 @@ test("unknown type and type-specific status fail", () => {
 
 test("inverse and wrong-owner fields fail", () => {
   const root = project({
-    "aidd_docs/backlog/epics/epic.md": epic("ready", "children: [US-1]\norder: 1\n"),
+    "aidd_docs/backlog/epics/epic.md": epic("ready", "children: [US-1]\nwork_kind: technical\n"),
     "aidd_docs/backlog/stories/story.md": story("ready", "parents: [EP-1]\n"),
     "aidd_docs/backlog/spikes/spike.md": spike("open", "parent: EP-1\nestimate: M\n"),
   });
@@ -335,7 +376,10 @@ test("mirrored related_to fails", () => {
     "aidd_docs/backlog/stories/a.md": story("ready", "related_to: [aidd_docs/backlog/stories/b.md]\n"),
     "aidd_docs/backlog/stories/b.md": story("ready", "related_to: [aidd_docs/backlog/stories/a.md]\n"),
   });
-  assert.ok(codes(inspectBacklog(root)).includes("MIRRORED_RELATION"));
+  const [finding] = inspectBacklog(root).diagnostics;
+  assert.equal(finding.code, "MIRRORED_RELATION");
+  assert.equal(finding.path, "aidd_docs/backlog/stories/a.md");
+  assert.match(finding.message, /remove it from aidd_docs\/backlog\/stories\/b\.md/);
 });
 
 test("Story order must be a positive integer", () => {
@@ -395,6 +439,14 @@ test("Task classification and completion evidence are validated", () => {
     ),
   });
   assert.equal(inspectBacklog(complete).valid, true);
+});
+
+test("Epic order is unique across the Epic backlog", () => {
+  const root = project({
+    "aidd_docs/backlog/epics/a.md": epic("ready", "order: 1\n"),
+    "aidd_docs/backlog/epics/b.md": epic("ready", "order: 1\nestimate: L\n"),
+  });
+  assert.deepEqual(codes(inspectBacklog(root)), ["DUPLICATE_ORDER"]);
 });
 
 test("Defect order is unique across the Defect backlog", () => {
@@ -539,6 +591,43 @@ test("hook ignores unrelated writes even when the backlog is invalid", () => {
   assert.equal(result.stderr, "");
 });
 
+test("every diagnostic declares whether one file can prove it", () => {
+  const root = project({
+    "aidd_docs/backlog/stories/story.md": story("open", "parent: aidd_docs/backlog/epics/absent.md\n"),
+  });
+  const scopes = new Map(inspectBacklog(root).diagnostics.map((item) => [item.code, item.scope]));
+  assert.deepEqual([...scopes.entries()].sort(), [
+    ["INVALID_STATUS", "file"],
+    ["MISSING_TARGET", "graph"],
+  ]);
+  for (const code of scopes.keys()) {
+    assert.equal(scopes.get(code) === "graph", GRAPH_CODES.has(code));
+  }
+});
+
+test("the write-time hook stays silent on a half-applied change set", () => {
+  const root = project({
+    "aidd_docs/backlog/epics/epic.md": epic(),
+    "aidd_docs/backlog/stories/a.md": story("ready", "parent: aidd_docs/backlog/epics/epic.md\norder: 2\n"),
+    "aidd_docs/backlog/stories/b.md": story("ready", "parent: aidd_docs/backlog/epics/epic.md\norder: 2\n"),
+    "aidd_docs/backlog/stories/c.md": story("ready", "parent: aidd_docs/backlog/epics/absent.md\n"),
+  });
+  assert.deepEqual(codes(inspectBacklog(root)).sort(), ["DUPLICATE_ORDER", "MISSING_TARGET"]);
+
+  const hook = spawnSync(process.execPath, [script, "--hook"], {
+    cwd: root,
+    input: JSON.stringify({ cwd: root, tool_input: { file_path: "aidd_docs/backlog/stories/a.md" } }),
+    encoding: "utf8",
+  });
+  assert.equal(hook.status, 0);
+  assert.equal(hook.stderr, "");
+
+  const cli = spawnSync(process.execPath, [script, root], { encoding: "utf8" });
+  assert.equal(cli.status, 1);
+  assert.match(cli.stderr, /DUPLICATE_ORDER/);
+  assert.match(cli.stderr, /MISSING_TARGET/);
+});
+
 test("hook feeds related invalid writes back after the tool ran", () => {
   const root = project({ "aidd_docs/backlog/stories/story.md": story("open") });
   const result = spawnSync(process.execPath, [script, "--hook"], {
@@ -548,4 +637,78 @@ test("hook feeds related invalid writes back after the tool ran", () => {
   });
   assert.equal(result.status, 2);
   assert.match(result.stderr, /INVALID_STATUS aidd_docs\/backlog\/stories\/story\.md/);
+});
+
+test("documented statuses match the checker", () => {
+  for (const [type, skill] of Object.entries(ARTIFACT_SKILL)) {
+    const lifecycle = fs.readFileSync(path.join(skills, skill, "references/lifecycle.md"), "utf8");
+    assert.deepEqual(
+      firstColumn(lifecycle).flatMap(backticked).sort(),
+      [...STATUSES[type]].sort(),
+      `${skill} lifecycle diverges from the checker`,
+    );
+  }
+});
+
+test("each artifact documents the folder the checker expects", () => {
+  for (const [type, skill] of Object.entries(ARTIFACT_SKILL)) {
+    const persistence = fs.readFileSync(path.join(skills, skill, "references/persistence.md"), "utf8");
+    const documented = [...persistence.matchAll(/aidd_docs\/backlog\/([a-z]+)\//g)].map((m) => m[1]);
+    assert.deepEqual([...new Set(documented)], [FOLDERS[type]], `${skill} persistence diverges`);
+  }
+});
+
+test("each artifact documents its own fields, and the checker agrees", () => {
+  const owned = new Map();
+  const inverse = new Map();
+  for (const [type, skill] of Object.entries(ARTIFACT_SKILL)) {
+    const relations = fs.readFileSync(path.join(skills, skill, "references/relations.md"), "utf8");
+    owned.set(type, firstColumn(relations).flatMap(backticked));
+    inverse.set(
+      type,
+      backticked(relations.split("\n").find((line) => line.startsWith("Inverse links"))),
+    );
+  }
+  const universe = [...new Set([...owned.values()].flat())];
+  for (const [type, forbidden] of Object.entries(FORBIDDEN)) {
+    const documented = [
+      ...inverse.get(type),
+      ...universe.filter((field) => !owned.get(type).includes(field)),
+    ];
+    assert.deepEqual(documented.sort(), [...forbidden].sort(), `${type} ownership diverges`);
+  }
+});
+
+test("no skill links outside itself", () => {
+  const crossing = [];
+  const check = (file, escape) => {
+    if (escape.test(fs.readFileSync(path.join(skills, file), "utf8"))) crossing.push(file);
+  };
+  for (const skill of fs.readdirSync(skills)) {
+    check(`${skill}/SKILL.md`, /\]\(\.\.\//);
+    for (const group of ["actions", "references", "assets"]) {
+      const dir = path.join(skills, skill, group);
+      if (!fs.existsSync(dir)) continue;
+      for (const name of fs.readdirSync(dir)) check(`${skill}/${group}/${name}`, /\]\(\.\.\/\.\.\//);
+    }
+  }
+  assert.deepEqual(crossing, []);
+});
+
+test("every reference is reachable from its own skill", () => {
+  const orphans = [];
+  for (const skill of fs.readdirSync(skills)) {
+    const dir = path.join(skills, skill, "references");
+    if (!fs.existsSync(dir)) continue;
+    const readers = [path.join(skills, skill, "SKILL.md")];
+    const actions = path.join(skills, skill, "actions");
+    if (fs.existsSync(actions)) {
+      readers.push(...fs.readdirSync(actions).map((name) => path.join(actions, name)));
+    }
+    const reachable = readers.map((file) => fs.readFileSync(file, "utf8")).join("\n");
+    for (const name of fs.readdirSync(dir)) {
+      if (!reachable.includes(`references/${name}`)) orphans.push(`${skill}/references/${name}`);
+    }
+  }
+  assert.deepEqual(orphans, []);
 });

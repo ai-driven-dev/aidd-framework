@@ -11,6 +11,7 @@ const STATUSES = {
   defect: new Set(["reported", "ready", "in-progress", "done", "cancelled"]),
 };
 
+const FOLDERS = { epic: "epics", story: "stories", task: "tasks", spike: "spikes", defect: "defects" };
 const RELATIONS = ["goal", "parent", "parents", "depends_on", "related_to", "supersedes"];
 const LIST_FIELDS = new Set(["parents", "depends_on", "related_to", "supersedes"]);
 const TERMINAL = {
@@ -20,8 +21,20 @@ const TERMINAL = {
   spike: new Set(["resolved", "cancelled"]),
   defect: new Set(["done", "cancelled"]),
 };
+// Findings one file cannot prove. A single write is never a transaction, so the
+// write-time hook stays silent on them and 08-verify judges the final graph.
+const GRAPH_CODES = new Set([
+  "ACTIVE_SUPERSEDED",
+  "DUPLICATE_ORDER",
+  "INVALID_GOAL_TYPE",
+  "INVALID_PARENT_TYPE",
+  "MIRRORED_RELATION",
+  "MISSING_SOURCE",
+  "MISSING_TARGET",
+  "RELATION_CYCLE",
+]);
 const FORBIDDEN = {
-  epic: new Set(["parent", "parents", "children", "blocked_by", "superseded_by", "order", "estimate", "work_kind"]),
+  epic: new Set(["parent", "parents", "children", "blocked_by", "superseded_by", "work_kind"]),
   story: new Set(["goal", "parents", "children", "blocked_by", "superseded_by", "work_kind"]),
   task: new Set(["goal", "parents", "children", "blocked_by", "superseded_by"]),
   spike: new Set(["goal", "parent", "children", "blocked_by", "superseded_by", "order", "estimate", "work_kind"]),
@@ -115,6 +128,7 @@ function diagnostic(severity, code, artifactPath, message, field, target) {
   return {
     severity,
     code,
+    scope: GRAPH_CODES.has(code) ? "graph" : "file",
     path: artifactPath,
     ...(field ? { field } : {}),
     ...(target ? { target } : {}),
@@ -154,11 +168,19 @@ function hasEmbeddedFrontmatter(body) {
   );
 }
 
+// A copy of the frontmatter sits in the preamble, in a section heading, or in a
+// metadata table. Inside a section, these words are ordinary prose.
 function hasBodyMetadata(body) {
   const metadata = /^(?:#{1,6}\s+|[-*+]\s+|\|\s*)?(?:\*\*)?(?:type|status|source|goal|parent|parents|depends_on|related_to|supersedes|order|estimate|work_kind)(?:\*\*)?\s*:/i;
-  return withoutFencedCode(body)
-    .split("\n")
-    .some((line) => !/^(?: {4}|\t)/.test(line) && metadata.test(line.trim()));
+  let preamble = true;
+  for (const line of withoutFencedCode(body).split("\n")) {
+    if (/^(?: {4}|\t)/.test(line)) continue;
+    const trimmed = line.trim();
+    const section = trimmed.startsWith("## ");
+    if ((preamble || section || trimmed.startsWith("|")) && metadata.test(trimmed)) return true;
+    if (section) preamble = false;
+  }
+  return false;
 }
 
 function localTarget(value, artifact, project) {
@@ -250,13 +272,7 @@ function inspectBacklog(input) {
     if (!artifact.title) {
       diagnostics.push(diagnostic("error", "MISSING_TITLE", artifactPath, "artifact needs one H1 title"));
     }
-    const expectedFolder = {
-      epic: "epics",
-      story: "stories",
-      task: "tasks",
-      spike: "spikes",
-      defect: "defects",
-    }[type];
+    const expectedFolder = FOLDERS[type];
     if (rest.length > 0 || !filename || folder !== expectedFolder) {
       diagnostics.push(
         diagnostic(
@@ -511,7 +527,7 @@ function inspectBacklog(input) {
             "error",
             "MIRRORED_RELATION",
             artifact.path,
-            `related_to is stored on both artifacts: ${target}`,
+            `related_to is stored on both artifacts; keep it here and remove it from ${target}`,
             "related_to",
             target,
           ),
@@ -525,10 +541,12 @@ function inspectBacklog(input) {
 
   const orders = new Map();
   for (const artifact of artifacts) {
-    if (!["story", "task", "defect"].includes(artifact.type) || !Object.hasOwn(artifact.metadata, "order")) continue;
+    if (!["epic", "story", "task", "defect"].includes(artifact.type)) continue;
+    if (!Object.hasOwn(artifact.metadata, "order")) continue;
+    // Epics and Defects have no parent: they are ordered against their own kind.
     const owner = ["story", "task"].includes(artifact.type)
       ? artifact.localRelations.parent?.[0] || artifact.metadata.parent || `standalone-${artifact.type}`
-      : "defects";
+      : artifact.type;
     const key = `${artifact.type}\0${owner}\0${artifact.metadata.order}`;
     const existing = orders.get(key);
     if (existing) {
@@ -617,6 +635,11 @@ function touchesBacklog(payload) {
   return extractPaths(payload).some((item) => normalize(item).includes("aidd_docs/backlog/"));
 }
 
+function fileScope(result) {
+  const diagnostics = result.diagnostics.filter((item) => item.scope === "file");
+  return { ...result, valid: !diagnostics.some((item) => item.severity === "error"), diagnostics };
+}
+
 function printText(result) {
   if (result.valid) {
     process.stdout.write(`Backlog valid: ${result.stats.files} artifacts\n`);
@@ -646,7 +669,7 @@ async function main(argv = process.argv.slice(2)) {
     if (typeof payload.cwd === "string") input = payload.cwd;
   }
 
-  const result = inspectBacklog(input);
+  const result = hook ? fileScope(inspectBacklog(input)) : inspectBacklog(input);
   if (json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   else if (!hook || !result.valid) printText(result);
   if (hook && !result.valid) return 2;
@@ -659,4 +682,12 @@ if (require.main === module) {
   });
 }
 
-module.exports = { inspectBacklog, parseFrontmatter, touchesBacklog };
+module.exports = {
+  FOLDERS,
+  FORBIDDEN,
+  GRAPH_CODES,
+  STATUSES,
+  inspectBacklog,
+  parseFrontmatter,
+  touchesBacklog,
+};
