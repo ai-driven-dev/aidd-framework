@@ -2,24 +2,25 @@
 
 ## 👥 How to contribute
 
-One path, open to everyone ([roles](./GOVERNANCE.md#-roles)). Just a question? → [Discussions](https://github.com/ai-driven-dev/framework/discussions).
+One path, open to everyone ([roles](./GOVERNANCE.md#-roles)). 
 
 ```mermaid
 flowchart LR
     Start(["Something to share?"]) -->|"just a question"| Discussion["💬 Discussions"]
     Start --> Bug["🐛 Bug"]
-    Start --> Quick["🌱 Quick"]
-    Start --> Detailed["📋 Detailed"]
+    Start --> Quick["🌱 Quick<br/>problem + solution"]
+    Start --> Detailed["📋 Detailed<br/>scope + acceptance criteria"]
     Bug --> Validate["✅ Get validated"]
     Quick --> Validate
     Detailed --> Validate
     Validate --> Setup["🔧 Set up"] --> Changes["✏️ Changes"] --> PR["🔀 Open PR"] --> Review["🛡️ Review"] --> Merge["✅ Merged"]
 ```
 
-1. **Open an issue** — [🐛 Bug Report](https://github.com/ai-driven-dev/framework/issues/new?template=bug_report.yml), [🌱 Quick Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=feature_request.yml), or [📋 Detailed Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=roadmap.yml).
-2. **Get it validated** — a Certified Member or Maintainer moves it to `Todo`. Green light.
-3. **Want to build it yourself?** → [Set up](#-set-up). Anyone can pick up a validated issue, not just the person who opened it.
-4. **Open your PR** → [Open a pull request](#-open-a-pull-request).
+1. Just a question? → [Discussions](https://github.com/ai-driven-dev/framework/discussions).
+2. **Open an issue** — [🐛 Bug Report](https://github.com/ai-driven-dev/framework/issues/new?template=bug_report.yml), [🌱 Quick Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=feature_request.yml), or [📋 Detailed Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=roadmap.yml).
+3. **Get it validated** — a Certified Member or Maintainer moves it to `Todo`. Green light.
+4. **Want to build it yourself?** → [Set up](#-set-up). Anyone can pick up a validated issue, not just the person who opened it.
+5. **Open your PR** → [Open a pull request](#-open-a-pull-request).
 
 ## 📜 Principles
 
