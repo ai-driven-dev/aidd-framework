@@ -6,10 +6,10 @@ One path, open to everyone ([roles](./GOVERNANCE.md#-roles)):
 
 ```mermaid
 flowchart LR
-    Issue["💡 Open an issue"] --> Validate["✅ Get validated"] --> Branch["🌿 Branch off next<br/>type/description"] --> Commit["💬 Commit<br/>type(scope): msg"] --> PR["🔀 Open PR"] --> Review["🛡️ Review"] --> Merge["✅ Squash-merge → next"]
+    Issue["💡 Bug · Quick · Detailed"] --> Validate["✅ Get validated"] --> Branch["🌿 Branch off next<br/>type/description"] --> Commit["💬 Commit<br/>type(scope): msg"] --> PR["🔀 Open PR"] --> Review["🛡️ Review"] --> Merge["✅ Squash-merge → next"]
 ```
 
-1. **Open an issue** — [🌱 Quick Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=feature_request.yml) or [📋 Detailed Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=roadmap.yml). Just reporting or proposing? Stop here.
+1. **Open an issue** — [🐛 Bug Report](https://github.com/ai-driven-dev/framework/issues/new?template=bug_report.yml), [🌱 Quick Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=feature_request.yml), or [📋 Detailed Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=roadmap.yml). Just reporting or proposing? Stop here. Usage question instead? → [Discussions](https://github.com/ai-driven-dev/framework/discussions), not an issue.
 2. **Get it validated** — a Certified Member or Maintainer moves it to `Todo`. Green light.
 3. **Want to build it yourself?** → [Set up](#-set-up). Anyone can pick up a validated issue, not just the person who opened it.
 4. **Open your PR** → [Open a pull request](#-open-a-pull-request).
@@ -43,10 +43,6 @@ make setup   # deps, git hooks, registers the marketplace, installs plugins into
 - **Branch off `next`, target `next`** → [routing table](aidd_docs/memory/vcs.md#types).
 - **Fill the [PR template](.github/PULL_REQUEST_TEMPLATE.md)** — what changed, how you solved it.
 - **A Maintainer review gates every merge** → [`GOVERNANCE.md`](./GOVERNANCE.md#-code-decisions).
-
-## 🐛 Reporting a bug
-
-[Open a Bug report](https://github.com/ai-driven-dev/framework/issues/new/choose). Usage question? → [Discussions](https://github.com/ai-driven-dev/framework/discussions), not an issue.
 
 ## 📚 Reference
 
