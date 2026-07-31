@@ -18,8 +18,8 @@ flowchart LR
 
 - **No slop** — read every line before proposing it.
 - **Spend tokens like they cost something.**
-- **Claude Code syntax only** — skills, agents, and rules are authored in Claude Code syntax; the CLI adapts a per-tool archive at release. Don't hand-author a Cursor/Copilot/Codex variant.
-- **Follow the skill structure** → [`ARCHITECTURE.md`](docs/ARCHITECTURE.md), `/aidd-context:04-skill-generate`.
+- **Claude Code syntax only** — skills, agents, and rules are authored in Claude Code syntax (the [CLI](./cli/) adapts a per-tool archive at release).
+- **Follow the skill structure** → [`ARCHITECTURE.md`](docs/ARCHITECTURE.md), use the `/aidd-context:04-skill-generate`.
 - **Evolve the memory** → [`aidd_docs/memory/`](aidd_docs/memory/).
 
 ## 🔧 Set up
@@ -34,7 +34,8 @@ make setup   # deps, git hooks, registers the marketplace, installs plugins into
 
 ## ✏️ Make your change
 
-- **Test locally** — neither tool hot-reloads the checkout; run `make reload`, then restart your session.
+- **Follow the [Principles](#-principles).**
+- **Test locally** — run `make reload`, restart your session(s). Test in Claude *and* one other tool (e.g. Codex) — the CLI translates your Claude syntax into each tool's format, and that's exactly what can break.
 - **Commit** — `<type>(<scope>): description`, one scope per commit → [convention](aidd_docs/memory/vcs.md#commit-convention).
 
 ## 🔀 Open a pull request
