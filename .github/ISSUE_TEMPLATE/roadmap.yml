@@ -1,5 +1,5 @@
-name: 📋 Contribution Détaillée
-description: "Propose a cadré change: a skill, a refactor, a rule to enforce"
+name: 📋 Detailed Contribution
+description: "Propose a scoped change: a skill, a refactor, a rule to enforce"
 title: "<type>(<scope>): "
 type: Task
 body:

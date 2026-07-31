@@ -1,22 +1,20 @@
 # Contributing to the AIDD Framework
 
-Source of truth for AIDD skills, agents, rules, and templates — authored in Claude Code syntax; the CLI adapts an archive per tool at release. This file covers contributing to **this repository**; the wider community, roles, and training programme live at [ai-driven-dev.fr](https://www.ai-driven-dev.fr/).
-
-```mermaid
-flowchart LR
-    Issue["💡 Open an issue"] --> Validate["✅ Get validated"] --> Branch["🌿 Branch off next"] --> PR["🔀 Open PR"] --> Review["🛡️ Review"] --> Merge["✅ Squash-merge → next"]
-```
+This file covers contributing to **this repository**.
 
 ## 👥 How to contribute
 
 One path, open to everyone, whatever your role ([`GOVERNANCE.md`](./GOVERNANCE.md#-roles)):
 
-1. **Open an issue** — [🌱 Contribution Rapide](https://github.com/ai-driven-dev/framework/issues/new?template=feature_request.yml) or [📋 Contribution Détaillée](https://github.com/ai-driven-dev/framework/issues/new?template=roadmap.yml). Frames the topic upfront — no code written for nothing, no direction fighting our principles.
-2. **Get it validated** — a Certified Member or Maintainer moves it `Ideation` → `Todo` on the [Roadmap board](https://github.com/orgs/ai-driven-dev/projects/8). That's the green light.
-3. **Open your PR** — anyone can, once validated → [Set up](#-set-up).
-4. **Get reviewed and merged** — see [Open a pull request](#-open-a-pull-request).
+```mermaid
+flowchart LR
+    Issue["💡 Open an issue"] --> Validate["✅ Get validated"] --> Branch["🌿 Branch off next<br/>type/description"] --> Commit["💬 Commit<br/>type(scope): msg"] --> PR["🔀 Open PR"] --> Review["🛡️ Review"] --> Merge["✅ Squash-merge → next"]
+```
 
-No vote, no waiting period for this green light — it's a triage gesture, not a ballot (that's roadmap priority, see [`GOVERNANCE.md`](./GOVERNANCE.md#-roadmap-voting)).
+1. **Open an issue** — fill a template: [🌱 Quick Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=feature_request.yml) or [📋 Detailed Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=roadmap.yml).
+2. **Get it validated** — exchange with Certified Member or Maintainer to be sure to go in right direction. When all it is good, someone moves it status from `Ideation` to`Todo`. That's the green light.
+3. **Make your changes** — once validated, make your work from `next` → [Set up](#-set-up).
+4. **Get reviewed and merged** — see [Open a pull request](#-open-a-pull-request).
 
 ## 🔧 Set up
 
@@ -45,7 +43,7 @@ make setup   # deps + git hooks, registers a local marketplace, installs plugins
 - **Branch off `next`, target `next`** — only `hotfix/*` branches off `main` for urgent production fixes. The branch prefix alone decides the target → [routing table](aidd_docs/memory/vcs.md#types).
 - **Fill the PR template** — explain *what* changed and *how* you solved it; skip re-asserting the conventional title and hooks (CI already enforces them).
 - **Label** follows your branch kind (the PR skill applies it automatically); add `security` when relevant.
-- **A Maintainer review gates every merge** ([`CODEOWNERS`](./.github/CODEOWNERS)) — no one merges their own PR. PRs squash-merge on the conventional title. Decision rules → [`GOVERNANCE.md`](./GOVERNANCE.md#-code-decisions-merging).
+- **A Maintainer review gates every merge** ([`CODEOWNERS`](./.github/CODEOWNERS)) — no one merges their own PR. PRs squash-merge on the conventional title. Decision rules → [`GOVERNANCE.md`](./GOVERNANCE.md#-code-decisions).
 
 ## 🚀 Releases
 
