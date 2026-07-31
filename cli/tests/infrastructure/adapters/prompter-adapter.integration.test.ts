@@ -94,21 +94,21 @@ describe("InquirerPrompterAdapter", () => {
     it("returns true when user types y", async () => {
       const { adapter, inputStream } = makeAdapter();
       const result = adapter.confirm("Continue?");
-      process.nextTick(() => inputStream.write(`y${ENTER}`));
+      setImmediate(() => inputStream.write(`y${ENTER}`));
       expect(await result).toBe(true);
     });
 
     it("returns false when user types n", async () => {
       const { adapter, inputStream } = makeAdapter();
       const result = adapter.confirm("Continue?");
-      process.nextTick(() => inputStream.write(`n${ENTER}`));
+      setImmediate(() => inputStream.write(`n${ENTER}`));
       expect(await result).toBe(false);
     });
 
     it("returns false when user presses Enter without input (default is false)", async () => {
       const { adapter, inputStream } = makeAdapter();
       const result = adapter.confirm("Continue?");
-      process.nextTick(() => inputStream.write(ENTER));
+      setImmediate(() => inputStream.write(ENTER));
       expect(await result).toBe(false);
     });
   });
@@ -117,21 +117,21 @@ describe("InquirerPrompterAdapter", () => {
     it("returns typed text", async () => {
       const { adapter, inputStream } = makeAdapter();
       const result = adapter.input("Enter name:");
-      process.nextTick(() => inputStream.write(`hello${ENTER}`));
+      setImmediate(() => inputStream.write(`hello${ENTER}`));
       expect(await result).toBe("hello");
     });
 
     it("returns default value when user presses Enter without typing", async () => {
       const { adapter, inputStream } = makeAdapter();
       const result = adapter.input("Enter name:", "default-value");
-      process.nextTick(() => inputStream.write(ENTER));
+      setImmediate(() => inputStream.write(ENTER));
       expect(await result).toBe("default-value");
     });
 
     it("returns empty string when user presses Enter with no default", async () => {
       const { adapter, inputStream } = makeAdapter();
       const result = adapter.input("Enter name:");
-      process.nextTick(() => inputStream.write(ENTER));
+      setImmediate(() => inputStream.write(ENTER));
       expect(await result).toBe("");
     });
   });
@@ -143,7 +143,7 @@ describe("InquirerPrompterAdapter", () => {
         { name: "Option A", value: "a" },
         { name: "Option B", value: "b" },
       ]);
-      process.nextTick(() => inputStream.write(ENTER));
+      setImmediate(() => inputStream.write(ENTER));
       expect(await result).toBe("a");
     });
 
@@ -153,7 +153,7 @@ describe("InquirerPrompterAdapter", () => {
         { name: "Option A", value: "a" },
         { name: "Option B", value: "b" },
       ]);
-      process.nextTick(() => inputStream.write(`${ARROW_DOWN}${ENTER}`));
+      setImmediate(() => inputStream.write(`${ARROW_DOWN}${ENTER}`));
       expect(await result).toBe("b");
     });
   });
@@ -165,7 +165,7 @@ describe("InquirerPrompterAdapter", () => {
         { name: "A", value: "a", checked: true },
         { name: "B", value: "b" },
       ]);
-      process.nextTick(() => inputStream.write(ENTER));
+      setImmediate(() => inputStream.write(ENTER));
       expect(await result).toEqual(["a"]);
     });
 
@@ -175,7 +175,7 @@ describe("InquirerPrompterAdapter", () => {
         { name: "A", value: "a" },
         { name: "B", value: "b" },
       ]);
-      process.nextTick(() => inputStream.write(ENTER));
+      setImmediate(() => inputStream.write(ENTER));
       expect(await result).toEqual([]);
     });
 
@@ -185,7 +185,7 @@ describe("InquirerPrompterAdapter", () => {
         { name: "A", value: "a" },
         { name: "B", value: "b" },
       ]);
-      process.nextTick(() => inputStream.write(`${SPACE}${ENTER}`));
+      setImmediate(() => inputStream.write(`${SPACE}${ENTER}`));
       expect(await result).toEqual(["a"]);
     });
   });
@@ -194,14 +194,14 @@ describe("InquirerPrompterAdapter", () => {
     it("returns overwrite when user presses Enter (first choice)", async () => {
       const { adapter, inputStream } = makeAdapter();
       const result = adapter.resolveConflict("src/foo.ts", "modified");
-      process.nextTick(() => inputStream.write(ENTER));
+      setImmediate(() => inputStream.write(ENTER));
       expect(await result).toBe("overwrite");
     });
 
     it("returns keep when user presses arrow down then Enter", async () => {
       const { adapter, inputStream } = makeAdapter();
       const result = adapter.resolveConflict("src/foo.ts", "deleted");
-      process.nextTick(() => inputStream.write(`${ARROW_DOWN}${ENTER}`));
+      setImmediate(() => inputStream.write(`${ARROW_DOWN}${ENTER}`));
       expect(await result).toBe("keep");
     });
   });
