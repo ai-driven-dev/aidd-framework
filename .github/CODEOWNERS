@@ -1,5 +1,5 @@
 # Default reviewers for every change in this repository.
 # GitHub assigns these reviewers automatically when a pull request is opened.
-# Only Habilité AIDD maintainers can approve and merge - see GOVERNANCE.md.
+# Only AIDD Maintainers can approve and merge - see GOVERNANCE.md.
 # See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
-*       @ai-driven-dev/habilitated
+*       @ai-driven-dev/trusted-partners
