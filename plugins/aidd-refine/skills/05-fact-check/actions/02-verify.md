@@ -12,7 +12,7 @@ A list of verdicts: each claim gains one verdict (verified, refuted, conflict, o
 
 ## Process
 
-1. **Walk.** For each claim, walk the cascade in `@../references/verification-cascade.md`: first project memory and docs, then codebase inspection, then web lookup.
+1. **Walk.** For each claim, walk the cascade in [verification-cascade.md](../references/verification-cascade.md): first project memory and docs, then codebase inspection, then web lookup.
 2. **Route.** Send repo facts to memory and codebase first; send other claims to memory then the web.
 3. **Short-circuit.** The first tier that resolves a claim sets its verdict. Do not consult later tiers.
 4. **Guard.** Reach the web only after memory and codebase both fail. Prefer one authoritative source, and stop once resolved.

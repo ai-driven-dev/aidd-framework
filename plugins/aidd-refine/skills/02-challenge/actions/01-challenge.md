@@ -9,7 +9,7 @@ Rethink prior work and verify correctness against an agreed plan, then emit a st
 
 ## Output
 
-The findings report following `@../assets/report-template.md`: a confidence percentage plus the Correctness, Deal breakers, and Suggestions sections.
+The findings report following [report-template.md](../assets/report-template.md): a confidence percentage plus the Correctness, Deal breakers, and Suggestions sections.
 
 ## Process
 
@@ -17,8 +17,8 @@ The findings report following `@../assets/report-template.md`: a confidence perc
 2. **Challenge.** Challenge own assumptions and the user's decisions.
 3. **Scan.** Scan for edge cases, errors, gaps, duplications, and inconsistencies.
 4. **Classify.** Classify each finding as Correctness, Deal breaker, or Suggestion.
-5. **Score.** Score confidence per the rubric in `@../references/confidence-rubric.md`.
-6. **Emit.** Fill `@../assets/report-template.md` verbatim and emit it.
+5. **Score.** Score confidence per the rubric in [confidence-rubric.md](../references/confidence-rubric.md).
+6. **Emit.** Fill [report-template.md](../assets/report-template.md) verbatim and emit it.
 
 ## Test
 

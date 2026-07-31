@@ -12,9 +12,9 @@ A full listing of the current level, and, when the user gave a goal, a single be
 
 ## Process
 
-1. **Detect the tools if entered cold.** When the survey did not run first, detect the project's AI tools from the signals in `@../references/ai-mapping.md` before listing anything. Propose the set when it is ambiguous.
+1. **Detect the tools if entered cold.** When the survey did not run first, detect the project's AI tools from the signals in [ai-mapping.md](../references/ai-mapping.md) before listing anything. Propose the set when it is ambiguous.
 2. **Set the scope.** One axis, or all three. For all, take each axis in turn at one level only, never auto-descend every leaf at once.
-3. **List the level.** Enumerate the current level in full from the same sources as the survey (`@../references/ai-mapping.md` for the Tooling and Context surfaces). The top level of an axis is its surfaces or items, a deeper level is one item's internals, a skill's actions, a memory file's sections, a module's files. For a Tooling surface, render a table: the item, where it lives, and its one-line purpose. For a rule scan, the `scripts/list-rules.mjs` helper inventories rules across every tool surface.
+3. **List the level.** Enumerate the current level in full from the same sources as the survey ([ai-mapping.md](../references/ai-mapping.md) for the Tooling and Context surfaces). The top level of an axis is its surfaces or items, a deeper level is one item's internals, a skill's actions, a memory file's sections, a module's files. For a Tooling surface, render a table: the item, where it lives, and its one-line purpose. For a rule scan, the `scripts/list-rules.mjs` helper inventories rules across every tool surface.
 4. **Match the goal.** When the user named a goal, score this level's items and pick the single best match. Mention a close second only when it is genuinely tied.
 5. **Point.** Give a chosen item's exact invocation path. Never run it.
 6. **Descend, loop, or stop.** Offer to expand one item one level deeper, back up, switch axis, or stop. On expand, repeat from step 3 against that item. Stop at a leaf or when the user is done. Wait for the answer.
