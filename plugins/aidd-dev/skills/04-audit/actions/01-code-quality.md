@@ -17,8 +17,8 @@ The `code-quality` findings, written to `code-quality.md` in the run's audit fol
    - **Clean code**: naming clarity, single-responsibility and SOLID, DRY (copy-pasted logic, re-implemented stdlib helpers), readability, abstraction level, magic numbers, dead or misleading comments, code smells.
    - **Tech debt**: dead and unreachable code, unused exports, types, and helpers, stale TODOs, vestigial flags, cyclomatic complexity and file, function, or component length above project thresholds, nesting depth, error handling caught at the wrong boundary or silently swallowed.
    - Use a dedicated tool when available, for example an unused-export finder. Never assert dead code without evidence.
-3. **Rate.** Give each finding a severity and an effort per the `@../assets/audit-template.md` legend, with a concrete `file:line`. The category is always `code-quality`.
-4. **Write.** Fill `@../assets/audit-template.md` into the pillar file: the Findings table (one row per issue, severity-first), the ranked Top actions, and the Coverage section. In a full run, also add the rows to the merged `report.md` in the same folder. Emit the report and stop.
+3. **Rate.** Give each finding a severity and an effort per the [audit-template.md](../assets/audit-template.md) legend, with a concrete `file:line`. The category is always `code-quality`.
+4. **Write.** Fill [audit-template.md](../assets/audit-template.md) into the pillar file: the Findings table (one row per issue, severity-first), the ranked Top actions, and the Coverage section. In a full run, also add the rows to the merged `report.md` in the same folder. Emit the report and stop.
 
 ## Test
 

@@ -17,12 +17,7 @@ A report of the repo root, the resolved default branch and provider, and whether
 1. **Guard.** If `cwd` is already a git work tree, skip and report `created: false`.
 2. **Resolve.** Resolve the default branch and provider; an explicit `default_branch` wins.
 3. **Init.** Run `git init -b <default_branch> <cwd>`.
-4. **Contribute.** Write `CONTRIBUTING.md` at the repo root from the template, filling `{{PROJECT_NAME}}`. Leave no raw `{{...}}`.
-
-   ```markdown
-   @../assets/CONTRIBUTING.md
-   ```
-
+4. **Contribute.** Write `CONTRIBUTING.md` at the repo root from the template [CONTRIBUTING.md](../assets/CONTRIBUTING.md), filling `{{PROJECT_NAME}}`. Leave no raw `{{...}}`.
 5. **Bootstrap.** Commit once so `HEAD` exists and is pushable: `git -C <cwd> commit --allow-empty -m "chore: initialize repository"`.
 6. **Remote.** If `remote_url` is given, run `git -C <cwd> remote add origin <remote_url>`.
 

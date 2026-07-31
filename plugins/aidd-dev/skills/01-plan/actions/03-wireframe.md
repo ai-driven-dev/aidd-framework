@@ -13,7 +13,7 @@ A low-fidelity ASCII wireframe of each screen, its regions and key elements in p
 ## Process
 
 1. **Pick.** List the screens the feature needs. Skip the action entirely when there is no UI.
-2. **Draw.** Sketch each screen per `@../references/wireframe-conventions.md`. The wireframe feeds the plan.
+2. **Draw.** Sketch each screen per [wireframe-conventions.md](../references/wireframe-conventions.md). The wireframe feeds the plan.
 
 ## Test
 

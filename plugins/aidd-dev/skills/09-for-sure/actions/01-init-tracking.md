@@ -22,9 +22,9 @@ The tracking file at `aidd_docs/tasks/<task-name>.md`, marked created or resumed
 5. **Condition.** It must be a runnable command. `npm test exits 0` is valid; "the code is clean" is invalid and is pushed back to `eslint . exits 0`.
 6. **Pre-flight.** For each step, list tools, secrets, API access, data, and permissions. Mark `[✓]` already satisfied, `[~]` soft (the agent self-serves), `[!]` hard (only the user can provide it). Collect every `[!]` now; when any stays unresolved, stop before the next step.
 7. **Map.** Project the whole path as an ASCII map of steps, dependencies, tools, and blockers. Ask the user to confirm and iterate until they do.
-8. **Scaffold.** Load `@../assets/plan-template.md`, creating `aidd_docs/tasks/` when missing.
+8. **Scaffold.** Load [plan-template.md](../assets/plan-template.md), creating `aidd_docs/tasks/` when missing.
 9. **Create.** Write `aidd_docs/tasks/<task-name>.md` from the template. Fill the frontmatter (`objective`, `success_condition`, `iteration: 0`, `status: pending`), the phases with their tasks and acceptance criteria, and the journey map.
-10. **Spawn.** Read the orchestrator recipe from `@./03-autonomous-loop.md` and hand it to the Agent tool with `<task-name>` filled in.
+10. **Spawn.** Read the orchestrator recipe from [03-autonomous-loop.md](./03-autonomous-loop.md) and hand it to the Agent tool with `<task-name>` filled in.
 
 ## Test
 

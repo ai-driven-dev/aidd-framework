@@ -12,7 +12,7 @@ The proposed title, body, and base, approved by the user.
 
 ## Process
 
-1. **Template.** Load the request template, the project's own when set, else the bundled `@../assets/pull_request.md`.
+1. **Template.** Load the request template, the project's own when set, else the bundled [pull_request.md](../assets/pull_request.md).
 2. **Write.** Draft a concise title and a body following the template from the change summary.
 3. **Confirm.** Show the title, body, and base, apply any overrides, and wait for approval.
 

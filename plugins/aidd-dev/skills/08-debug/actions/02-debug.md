@@ -13,12 +13,12 @@ A one-line root cause, the 3 to 5 hypotheses with their confidence and validated
 ## Process
 
 1. **Summarize.** Restate the issue in your own words.
-2. **Map.** Draw the action paths as a Mermaid flowchart (a click calls a function in one file that updates state in another), per `@../references/mermaid-conventions.md`.
+2. **Map.** Draw the action paths as a Mermaid flowchart (a click calls a function in one file that updates state in another), per [mermaid-conventions.md](../references/mermaid-conventions.md).
 3. **Whys.** Start from the symptom and ask "why" iteratively, three to five levels, each documented in a numbered list.
 4. **Tools.** Identify the inspection tools available (MCP, CLI commands, logs, traces).
 5. **Locate.** Find the relevant files in the codebase for the issue.
 6. **Causes.** List 3 to 5 potential causes in a table: analysis, evidence, confidence (1 to 10).
-7. **Track.** Record one task per hypothesis in the project task system, filling `@../assets/task-template.md`.
+7. **Track.** Record one task per hypothesis in the project task system, filling [task-template.md](../assets/task-template.md).
 8. **Validate.** Work the hypotheses one by one, ticking each as validated or invalidated with evidence in the task. Stop when the root cause is found.
 9. **Conclude.** State the conclusion and next steps.
 10. **Confirm.** Wait for user validation before moving on.

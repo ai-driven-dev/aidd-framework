@@ -1,6 +1,6 @@
 # 02 - Propose candidates
 
-Derive 2 to 3 candidate stacks from the filled checklist using the heuristics in `@../references/stack-heuristics.md`, then render a markdown comparison table.
+Derive 2 to 3 candidate stacks from the filled checklist using the heuristics in [stack-heuristics.md](../references/stack-heuristics.md), then render a markdown comparison table.
 
 ## Input
 
@@ -13,7 +13,7 @@ A markdown comparison table with 2 to 3 rows, each a candidate with its front, b
 ## Process
 
 1. **Read.** Read the filled checklist from action 01.
-2. **Derive.** Apply each rule from `@../references/stack-heuristics.md` to derive the recommended family for architecture pattern, front, back, DB, auth, and hosting.
+2. **Derive.** Apply each rule from [stack-heuristics.md](../references/stack-heuristics.md) to derive the recommended family for architecture pattern, front, back, DB, auth, and hosting.
 3. **Spread.** Build 2 to 3 candidates spanning the trade-off space, differing on at least one of hosting model (PaaS, self-host, serverless), back-end language, or architecture pattern. Never propose near-identical candidates.
 4. **Cost.** Estimate each candidate's monthly cost at the user's six-month volume target with rough public pricing, flagging uncertainty.
 5. **Risk.** List 1 to 3 honest risks per candidate (lock-in, ops burden, learning curve, scaling limit). No candidate has zero.

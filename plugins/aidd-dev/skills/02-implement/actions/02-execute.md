@@ -16,7 +16,7 @@ Every phase coded, asserted, and its frontmatter marked `status: done`, with the
 2. **Code.** Build the phase scope against its acceptance criteria.
 3. **Assert.** Assert the phase against its acceptance criteria. On failure, repair and repeat. The gate is the assertion passing, not a self-report. Once it passes, set `status: done` and commit the phase as one unit, its code and its status together.
 4. **Guard.** Stop the loop on either condition:
-   - **Blocked** (see `@../references/blocked.md`): set the plan `status: blocked`, commit, stop.
+   - **Blocked** (see [blocked.md](../references/blocked.md)): set the plan `status: blocked`, commit, stop.
    - **Drift**: any mismatch with the plan, trivial or substantive, stop and report `replan needed: <reason>`. Never rewrite the plan; replanning is the caller's job.
 
 ## Test

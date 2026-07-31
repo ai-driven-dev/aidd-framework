@@ -12,7 +12,7 @@ The rendered screen, and the user's reply.
 
 ## Process
 
-1. **Shape.** Fill the chosen screen from `@../assets/report.md`.
+1. **Shape.** Fill the chosen screen from [report.md](../assets/report.md).
    - Framing line on the first report of the session only.
    - Exactly one action block per screen, carrying its key once.
    - The idle menu is a next-action block. Slot 1 is the action line, slots 2 to 4 join the options line. Never a list.
@@ -25,8 +25,8 @@ The rendered screen, and the user's reply.
    - Command ids, tier clauses, and lookahead only under `[d]`.
    - Keys are letters or digits. Never `?`, `!`, `/`, `@`, `#`: the host takes those.
 2. **Inject.**
-   - Entry screen takes `@../assets/banner.txt`.
-   - Flow or walk screen loads `@../references/flow.md`.
+   - Entry screen takes [banner.txt](../assets/banner.txt).
+   - Flow or walk screen loads [flow.md](../references/flow.md).
 3. **Wait.** Offer the screen, take the reply.
 
 ## Test
