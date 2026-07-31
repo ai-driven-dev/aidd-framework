@@ -15,9 +15,9 @@ Each story annotated with its estimate or blocking spike, its dependencies, an i
 1. **Estimate effort.** Assign story points reflecting relative size.
    - Send a story that is too large to size back to `02-split-epic`.
    - When an unknown blocks sizing, discover a capability that records or investigates it. Resume after resolution, or leave the story unsized with the spike as its dependency.
-2. **Rate impact.** Assign minor, major, or critic per the impact scale in `@../references/rating.md`.
+2. **Rate impact.** Assign minor, major, or critic per the impact scale in [rating.md](../references/rating.md).
 3. **Justify.** Write a one-line rationale for each impact rating.
-4. **Record.** Fill the estimation block in `@../assets/user-story-template.md` for each story.
+4. **Record.** Fill the estimation block in [user-story-template.md](../assets/user-story-template.md) for each story.
 
 ## Test
 
