@@ -7,6 +7,6 @@
     "tmp/**",
     "src/domain/models/marketplace-entry.ts"
   ],
-  "ignoreBinaries": ["gh"],
+  "ignoreBinaries": ["gh", "icacls"],
   "ignoreExportsUsedInFile": true
 }
