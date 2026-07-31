@@ -2,7 +2,9 @@
 
 ## 👥 How to contribute
 
-One path, open to everyone ([roles](./GOVERNANCE.md#-roles)):
+One path, open to everyone ([roles](./GOVERNANCE.md#-roles)).
+
+Just a question or idea? → [Discussions](https://github.com/ai-driven-dev/framework/discussions), not an issue. Reporting or proposing something concrete? Open an issue:
 
 ```mermaid
 flowchart LR
@@ -12,7 +14,7 @@ flowchart LR
     Validate --> Setup["🔧 Set up"] --> Changes["✏️ Changes"] --> PR["🔀 Open PR"] --> Review["🛡️ Review"] --> Merge["✅ Merged"]
 ```
 
-1. **Open an issue** — [🐛 Bug Report](https://github.com/ai-driven-dev/framework/issues/new?template=bug_report.yml), [🌱 Quick Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=feature_request.yml), or [📋 Detailed Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=roadmap.yml). Just reporting or proposing? Stop here. Usage question instead? → [Discussions](https://github.com/ai-driven-dev/framework/discussions), not an issue.
+1. **Open an issue** — [🐛 Bug Report](https://github.com/ai-driven-dev/framework/issues/new?template=bug_report.yml), [🌱 Quick Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=feature_request.yml), or [📋 Detailed Contribution](https://github.com/ai-driven-dev/framework/issues/new?template=roadmap.yml).
 2. **Get it validated** — a Certified Member or Maintainer moves it to `Todo`. Green light.
 3. **Want to build it yourself?** → [Set up](#-set-up). Anyone can pick up a validated issue, not just the person who opened it.
 4. **Open your PR** → [Open a pull request](#-open-a-pull-request).
