@@ -2,15 +2,17 @@
 
 ## 👥 How to contribute
 
-One path, open to everyone ([roles](./GOVERNANCE.md#-roles)).
-
-Just a question or idea? → [Discussions](https://github.com/ai-driven-dev/framework/discussions), not an issue. Reporting or proposing something concrete? Open an issue:
+One path, open to everyone ([roles](./GOVERNANCE.md#-roles)). Just a question? → [Discussions](https://github.com/ai-driven-dev/framework/discussions).
 
 ```mermaid
 flowchart LR
-    Bug["🐛 Bug"] --> Validate["✅ Get validated"]
-    Quick["🌱 Quick"] --> Validate
-    Detailed["📋 Detailed"] --> Validate
+    Start(["Something to share?"]) -->|"just a question"| Discussion["💬 Discussions"]
+    Start --> Bug["🐛 Bug"]
+    Start --> Quick["🌱 Quick"]
+    Start --> Detailed["📋 Detailed"]
+    Bug --> Validate["✅ Get validated"]
+    Quick --> Validate
+    Detailed --> Validate
     Validate --> Setup["🔧 Set up"] --> Changes["✏️ Changes"] --> PR["🔀 Open PR"] --> Review["🛡️ Review"] --> Merge["✅ Merged"]
 ```
 
