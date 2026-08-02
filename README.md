@@ -11,7 +11,7 @@ _(Already tested on `Legacy` codebases)_
 [![Made in France](https://img.shields.io/badge/made%20in-France-0055A4?labelColor=EF4135)](https://www.ai-driven-dev.fr/)
 
 <p>
-  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>42 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
+  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>43 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -228,9 +228,9 @@ Project init, memory bank, context-artifact generation, diagrams, learning, expl
 
 ### ⚙️ [aidd-dev](plugins/aidd-dev/README.md)
 
-`11 skills` · stable
+`12 skills` · stable
 
-SDLC loop: plan, implement, assert, audit, review, test, refactor, debug.
+SDLC loop: plan, implement, assert, audit, review, test, refactor, debug. Standalone Browser QA records short web evidence.
 
 </td>
 <td width="33%" valign="top">
