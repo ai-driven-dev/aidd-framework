@@ -47,6 +47,10 @@ A fourth fix came from the pre-push hook rather than from CI. `knip` reported `c
 
 This silences a real check for exactly those four: if kanban ever stops using one, nothing will say so. The CI knip job is `continue-on-error: true`, so only the local pre-push hook enforces it, and it now passes.
 
+Two more surfaced only once the change landed on `next`, because the `Validate` workflow runs the framework-local lefthook jobs that the PR checks do not. The `json-validity` job parses every JSON file as strict JSON, so the explanatory `//` comments added to `cli/tsconfig.json` broke it — TypeScript accepts JSONC, this repository does not. And the `cli-typecheck` job type-checks the CLI, which now spans `kanban/src`, without ever installing that folder. Its glob is now `{cli,kanban}/**` and it installs kanban when `kanban/node_modules` is missing.
+
+The lesson for anything else that reaches across the two folders: green PR checks are not the whole pipeline. Replay `npx lefthook run pre-commit --all-files` from a tree where `kanban/node_modules` does not exist.
+
 ### Phase 3 — Exercise it on real projects (done)
 
 Run against `framework` (67 documents), `cli` (164), `kairos-app` (259) and `breathflow` (10), table view and interactive view, the latter under a real pty at 190x45. Full write-up in [`findings.md`](./findings.md).
