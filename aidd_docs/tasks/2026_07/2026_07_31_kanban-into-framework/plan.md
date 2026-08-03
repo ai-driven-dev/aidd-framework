@@ -43,6 +43,10 @@ The move broke CI: `cli/tsconfig.json` type-checks `../kanban/src/**/*`, but no 
 
 Verified by replaying the CI sequence locally from a clean `kanban/` install.
 
+A fourth fix came from the pre-push hook rather than from CI. `knip` reported `cli-table3`, `gray-matter`, `ink` and `react` as unused dependencies: it analyses `cli/src` and their only consumers live in `../kanban/src`, outside its scope. Widening knip's `project` to reach the sibling folder makes it worse — declaring `project` at all breaks dependency detection for all nine dependencies, not just the four. So `knip.json` lists the four under `ignoreDependencies` instead.
+
+This silences a real check for exactly those four: if kanban ever stops using one, nothing will say so. The CI knip job is `continue-on-error: true`, so only the local pre-push hook enforces it, and it now passes.
+
 ### Phase 3 — Exercise it on real projects (done)
 
 Run against `framework` (67 documents), `cli` (164), `kairos-app` (259) and `breathflow` (10), table view and interactive view, the latter under a real pty at 190x45. Full write-up in [`findings.md`](./findings.md).
