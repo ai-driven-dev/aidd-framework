@@ -7,21 +7,15 @@
     "types": ["node"],
     "jsx": "react-jsx",
     "outDir": "dist",
-    // The kanban source folder is a sibling, so the type-check program spans both directories.
-    "rootDir": "..",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+    "declaration": false,
+    "sourceMap": true
   },
-  "include": ["src/**/*", "tests/**/*", "../kanban/src/**/*"],
+  "include": ["src/**/*", "tests/**/*"],
   "exclude": ["node_modules", "dist"]
 }
