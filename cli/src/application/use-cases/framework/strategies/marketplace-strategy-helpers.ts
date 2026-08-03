@@ -1,4 +1,4 @@
-import { join, relative } from "node:path";
+import { basename, join, relative } from "node:path";
 import { InvalidSourceMarketplaceError } from "../../../../domain/errors.js";
 import { rewriteRelativeLinks } from "../../../../domain/formats/relative-link-rewrite.js";
 import {
@@ -66,14 +66,15 @@ export async function writeSkillTree(
   fs: FileReader & FileWriter,
   pluginName: string,
   pluginSrc: string,
-  pluginOut: string
+  pluginOut: string,
+  transform?: (content: string, plugin: string, basename: string) => string
 ): Promise<number> {
   const skillsSrc = join(pluginSrc, "skills");
   if (!(await fs.fileExists(skillsSrc))) return 0;
   const files = await fs.listFilesRecursive(skillsSrc);
   let count = 0;
   for (const absPath of files) {
-    count += await writeSkillFile(fs, pluginName, absPath, skillsSrc, pluginOut);
+    count += await writeSkillFile(fs, pluginName, absPath, skillsSrc, pluginOut, transform);
   }
   return count;
 }
@@ -83,7 +84,8 @@ async function writeSkillFile(
   pluginName: string,
   absPath: string,
   skillsSrc: string,
-  pluginOut: string
+  pluginOut: string,
+  transform?: (content: string, plugin: string, basename: string) => string
 ): Promise<number> {
   const relPath = relative(skillsSrc, absPath).replace(/\\/g, "/");
   const destPath = join(pluginOut, "skills", relPath);
@@ -91,7 +93,13 @@ async function writeSkillFile(
   if (absPath.endsWith(".md")) {
     assertNoToolsPlaceholder(content, pluginName, relPath);
     const currentFilePluginRelative = `skills/${relPath}`;
-    await fs.writeFile(destPath, rewriteRelativeLinks(content, { currentFilePluginRelative }));
+    const rewritten = rewriteRelativeLinks(content, { currentFilePluginRelative });
+    await fs.writeFile(
+      destPath,
+      transform && basename(absPath) === "SKILL.md"
+        ? transform(rewritten, pluginName, basename(absPath))
+        : rewritten
+    );
   } else {
     await fs.writeFile(destPath, content);
   }

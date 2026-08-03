@@ -9,6 +9,7 @@ import {
   InvalidBuildPathsError,
   JsonSchemaValidationError,
 } from "../../../../src/domain/errors.js";
+import { parseFrontmatter } from "../../../../src/domain/formats/markdown.js";
 import { parseToml } from "../../../../src/domain/formats/toml.js";
 import type { AssetProvider } from "../../../../src/domain/ports/asset-provider.js";
 import { AjvSchemaValidatorAdapter } from "../../../../src/infrastructure/adapters/ajv-schema-validator-adapter.js";
@@ -223,6 +224,44 @@ describe("CodexOutputStrategy", () => {
   });
 
   describe("skill rewrite (AC #6)", () => {
+    it("uses the Codex skill frontmatter allowlist without changing the source", async () => {
+      const fs = await makeSeededFsFromCodex();
+      const sourcePath = `${CODEX_FIXTURE_DIR}/plugins/aidd-codex-fixture/skills/sample/SKILL.md`;
+      const sourceBefore = await fs.readFile(sourcePath);
+      const uc = makeUseCase(fs);
+
+      await uc.execute({ sourceDir: CODEX_FIXTURE_DIR, outDir: OUT_DIR, target: "codex" });
+
+      const output =
+        fs.getFile(`${OUT_DIR}/plugins/aidd-codex-fixture/skills/sample/SKILL.md`) ?? "";
+      expect(parseFrontmatter(output).frontmatter).toEqual({
+        name: "sample",
+        description: "Sample skill for testing reference rewriting.",
+        allowed_tools: ["Read"],
+      });
+      expect(output).not.toMatch(/^model:/m);
+      expect(await fs.readFile(sourcePath)).toBe(sourceBefore);
+    });
+
+    it("preserves auxiliary Markdown frontmatter", async () => {
+      const fs = await makeSeededFsFromCodex();
+      const sourcePath = `${CODEX_FIXTURE_DIR}/plugins/aidd-codex-fixture/skills/sample/assets/template.md`;
+      const source = await fs.readFile(sourcePath);
+      const uc = makeUseCase(fs);
+
+      await uc.execute({ sourceDir: CODEX_FIXTURE_DIR, outDir: OUT_DIR, target: "codex" });
+
+      const output = fs.getFile(
+        `${OUT_DIR}/plugins/aidd-codex-fixture/skills/sample/assets/template.md`
+      );
+      expect(output).toBe(source);
+      expect(parseFrontmatter(output ?? "").frontmatter).toEqual({
+        name: "template",
+        model: "opus",
+        custom: "keep-this",
+      });
+    });
+
     it("rewrites @./ references in skill SKILL.md to markdown links", async () => {
       const fs = await makeSeededFsFromCodex();
       const uc = makeUseCase(fs);

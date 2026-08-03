@@ -173,7 +173,7 @@ function buildCodexSkillFilePath(fileName: string): string {
   return `${AGENTS_SKILLS_PREFIX}aidd-${skillNameFromPath(fileName)}/SKILL.md`;
 }
 
-function stripCodexSkillFrontmatter(fm: Record<string, unknown>): Record<string, unknown> {
+export function stripCodexSkillFrontmatter(fm: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   if (fm.name !== undefined) result.name = fm.name;
   if (fm.description !== undefined) result.description = fm.description;
