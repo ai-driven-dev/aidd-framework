@@ -88,8 +88,12 @@ pre-commit:
       glob: "cli/**"
       run: cd cli && pnpm lint
     cli-typecheck:
-      glob: "cli/**"
-      run: cd cli && pnpm typecheck
+      # The CLI type-checks `kanban/` too, so that folder's dependencies must be
+      # resolvable. Install them only when they are missing, to keep the hook fast.
+      glob: "{cli,kanban}/**"
+      run: |
+        [ -d kanban/node_modules ] || (cd kanban && pnpm install --frozen-lockfile)
+        cd cli && pnpm typecheck
 
 pre-push:
   commands:
