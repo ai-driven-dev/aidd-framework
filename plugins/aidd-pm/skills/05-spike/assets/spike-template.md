@@ -33,3 +33,7 @@ status: open
 ## Follow-up
 
 <parent change or next capability>
+
+## Cancellation
+
+<why it is no longer pursued>

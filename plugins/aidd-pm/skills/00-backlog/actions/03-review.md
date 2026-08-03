@@ -4,7 +4,7 @@ Find actionable improvements across an existing backlog.
 
 ## Input
 
-The checker read model and any project workflow policy.
+The read model and any project workflow policy.
 
 ## Output
 
@@ -22,7 +22,7 @@ Prioritized findings and an optional change set.
 
 | Case | Pass |
 | --- | --- |
-| Structural error | exact checker finding leads; no semantic review hides it |
+| Reported error | it leads the findings; no semantic review hides it |
 | No workflow policy | WIP and age are not evaluated |
 | Readiness gap | affected owner and evidence named |
 | New completion feedback | each unabsorbed parent, goal, or learning consequence proposed once |

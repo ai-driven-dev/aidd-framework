@@ -15,7 +15,7 @@ One Task draft or one clarification question.
 1. **Resolve.** Inspect the source, relevant artifacts, and matching Tasks.
 2. **Qualify.** Apply [qualification](../references/qualification.md). On mismatch, apply [handoffs](../references/handoffs.md).
 3. **Clarify.** Ask one question at a time while outcome, scope, completion evidence, or ownership remains blocking.
-4. **Draft.** Fill earned sections of [Task template](../assets/task-template.md).
+4. **Draft.** Fill the [Task template](../assets/task-template.md) sections the source supports; leave the rest out.
 5. **Feedback.** Show the complete draft and fold corrections.
 
 ## Test
@@ -23,8 +23,8 @@ One Task draft or one clarification question.
 | Case | Pass |
 | --- | --- |
 | No work identified | no draft; one open outcome question |
-| Different work type | no Task draft; matching route returned |
+| Different work type | no Task draft; the offered capability returned |
 | Existing match | existing identity returned; no duplicate draft |
-| Draft | `type: task`, valid status, outcome, scope, and done conditions present |
+| Draft | `type: task`, `status: proposed`, outcome, scope, and done conditions present |
 | Optional metadata | absent unless known and project-supported |
 | Frame | workspace unchanged |

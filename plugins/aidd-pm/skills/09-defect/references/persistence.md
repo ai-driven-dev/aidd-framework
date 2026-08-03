@@ -13,4 +13,4 @@
 
 Use native fields when supported. Otherwise use stable ids, URLs, or project-relative paths without mirroring the artifact across supports.
 
-Write each Markdown Defect to `aidd_docs/backlog/defects/<slug>.md`.
+Write each Markdown Defect to `aidd_docs/backlog/defects/<slug>.md`, the title in kebab-case.

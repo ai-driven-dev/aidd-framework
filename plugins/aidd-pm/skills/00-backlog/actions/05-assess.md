@@ -21,6 +21,5 @@ Three independent assessments and one reconciled verdict per target.
 | Case | Pass |
 | --- | --- |
 | Inputs | all reviewers for one target receive the same snapshot |
-| Isolation | reviewers neither write nor delegate |
 | Disagreement | divergent findings remain explicit |
 | Result | exactly three role results and one justified verdict per target |

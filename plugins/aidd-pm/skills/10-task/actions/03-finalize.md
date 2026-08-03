@@ -4,7 +4,7 @@ Persist or transition the authorized Task.
 
 ## Input
 
-The reviewed Task, target, and authority.
+One Task, the change asked of it, and the authority for that change.
 
 ## Output
 
@@ -14,18 +14,20 @@ A session draft or one created or updated Task identity.
 
 1. **Resolve.** Apply [persistence](../references/persistence.md) to select the support and identity.
 2. **Status.** Apply [lifecycle](../references/lifecycle.md) to every requested transition.
-3. **Authorize.** Confirm content, target, classification, planning fields, and relations.
+3. **Authorize.** Confirm explicit approval or caller-provided bounded authority for content, target, status, order, estimate, `work_kind`, and relations.
 4. **Write.** Create or update only the authorized Task and preserve unrelated fields.
 5. **Link.** Apply [relations](../references/relations.md).
-6. **Verify.** Read the result back and offer its next delivery move.
+6. **Verify.** Read the result back, then apply [handoffs](../references/handoffs.md) to the next move.
 
 ## Test
 
 | Case | Pass |
 | --- | --- |
 | Unauthorized | Task and related artifacts unchanged |
+| Transition only | state changes; no new draft |
+| Parent | its reassessment is proposed, never inferred |
 | No target | no write; session or Markdown requested |
 | Existing match | identity preserved; no duplicate created |
-| Approved write | exactly one Task; optional fields are earned |
+| Approved write | exactly one Task; no unsupported optional field |
 | Done | done conditions and completion evidence are non-empty |
-| Parent | Epic, Story, or Defect; absent only for explicit standalone work |
+| Order conflict | no write; the occupied value is returned without choosing another |

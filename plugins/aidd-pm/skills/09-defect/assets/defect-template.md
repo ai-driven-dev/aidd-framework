@@ -19,7 +19,7 @@ status: reported
 
 ## Reproduction
 
-<minimal reproducible conditions or steps>
+<minimal steps that show the mismatch>
 
 ## Impact
 
@@ -29,10 +29,10 @@ status: reported
 
 - <stable source or observation>
 
-## Resolution
-
-<conditions a resolution must satisfy>
-
 ## Verification
 
 <evidence that expected behavior is restored>
+
+## Cancellation
+
+<why it is no longer pursued>

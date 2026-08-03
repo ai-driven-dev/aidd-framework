@@ -8,12 +8,10 @@ argument-hint: idea | product
 
 ```mermaid
 flowchart LR
-  start([idea or product]) --> frame
+  source([idea or product]) --> frame
   frame --> discover
-  discover -->|"open decision"| discover
   discover -->|"ready or assumptions accepted"| shape
   discover -->|"visual helps"| visualize
-  visualize -->|"revise"| visualize
   visualize -->|"accepted or skipped"| shape
   shape -->|"evidence gap"| discover
   shape --> finalize
@@ -25,7 +23,7 @@ flowchart LR
 
 ## Actions
 
-Run the flow above. Read only the next action's file before running it.
+Run the flow above. Read only the next action file.
 
 | Action    | Does                                 |
 | --------- | ------------------------------------ |
@@ -37,7 +35,9 @@ Run the flow above. Read only the next action's file before running it.
 
 ## Transversal rules
 
+- Keep product and lifecycle decisions with the user.
 - Separate evidence, decisions, and assumptions.
-- Keep product decisions with the user.
-- Keep actions and technique names out of user-facing text.
-- Require explicit approval or caller-provided bounded authority before writing.
+- Preserve source links and existing edits.
+- Ask natural questions; never expose actions, references, or unchanged state.
+- Require explicit approval or caller-provided bounded authority before any write.
+- Frame the opportunity; never write requirements.

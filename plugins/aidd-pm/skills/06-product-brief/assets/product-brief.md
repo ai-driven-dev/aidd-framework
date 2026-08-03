@@ -1,6 +1,6 @@
 ---
 objective: "<The product outcome in one sentence.>"
-status: current
+revision: current
 ---
 
 # Product Brief: <product>

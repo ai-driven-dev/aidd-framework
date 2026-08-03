@@ -9,4 +9,4 @@
 | Relations | dependencies and source are linked or absent |
 | Classification | `work_kind` is set only when the project uses it |
 
-A Task may remain `proposed` with gaps. `work_kind` is optionally `functional` or `technical`; it never changes the qualification above.
+A Task may remain `proposed` with gaps.

@@ -9,8 +9,8 @@ argument-hint: request | epic
 ```mermaid
 flowchart LR
   source([request, Product Brief, PRD, or Epic]) --> shape --> review --> finalize
+  source -->|"already persisted"| finalize
   review -->|"revise"| shape
-  review -->|"investigate, then resume"| review
   finalize -->|"revise"| shape
   finalize -->|"authorized"| done([Epic])
 ```
@@ -23,13 +23,13 @@ Run the flow above. Read only the next action file.
 | -------- | ------------------------------------- |
 | shape    | frame one outcome-based Epic          |
 | review   | challenge its coherence and readiness |
-| finalize | approve, persist, and hand off         |
+| finalize | approve, persist, or transition             |
 
 ## Transversal rules
 
-- Keep product and backlog decisions with the user.
+- Keep product and lifecycle decisions with the user.
 - Separate evidence, decisions, and assumptions.
-- Stay at outcome level; do not propose child slices or implementation.
-- Ask natural questions; never expose actions, checks, routes, skipped work, or unchanged state.
 - Preserve source links and existing edits.
-- Require explicit approval or caller-provided bounded authority before any write or related-item change.
+- Ask natural questions; never expose actions, references, or unchanged state.
+- Require explicit approval or caller-provided bounded authority before any write.
+- Stay at outcome level; do not propose child slices or implementation.

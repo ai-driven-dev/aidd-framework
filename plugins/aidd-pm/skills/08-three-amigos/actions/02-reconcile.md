@@ -25,7 +25,7 @@ One refinement result with a verdict, findings, conflicts, amendments, and quest
 | Different snapshot | no result; target or revision mismatch identified |
 | Duplicate finding | one finding retains every role and evidence pointer |
 | Conflict | both positions preserved; one open question; no winner inferred |
-| Amendment | before, after, finding ids, and evidence present |
-| Verdict | `ready`, `revise`, or `blocked` follows the unresolved content |
+| Amendment | proposed only when evidence or an explicit decision determines it |
+| Verdict | follows the unresolved content |
 | Approval | never inferred or requested on unresolved conflicts |
 | Side effect | workspace and external systems unchanged |

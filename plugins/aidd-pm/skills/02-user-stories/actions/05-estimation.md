@@ -12,10 +12,9 @@ Confirmed estimates, or unchanged Stories.
 
 ## Process
 
-1. **Apply.** Apply [estimation](../references/estimation.md).
-2. **Compare.** Use comparable completed work when available.
-3. **Propose.** Explain the evidence for each estimate.
-4. **Confirm.** Record only user- or team-confirmed estimates.
+1. **Size.** Apply [estimation](../references/estimation.md).
+2. **Propose.** Explain the evidence for each estimate.
+3. **Confirm.** Record only user- or team-confirmed estimates.
 
 ## Test
 

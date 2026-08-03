@@ -24,7 +24,7 @@ One Epic draft.
 | Case | Pass |
 | --- | --- |
 | No source | no draft; one open question for the outcome |
-| Mismatch | no Epic draft; qualification result and one open question |
-| Draft | `type: epic`, lifecycle-valid status, required sections, no placeholder, and sourced claims |
+| Different work type | no Epic draft; the offered capability returned |
+| Draft | `type: epic`, `status: proposed`, required sections, no placeholder, and sourced claims |
 | Product Brief source | goal relation proposed once; duplicate source relation absent |
 | Proposed | unsupported required content is not inferred; one question for the highest gap |

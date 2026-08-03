@@ -12,4 +12,4 @@
 
 Use native fields when supported; otherwise use stable ids, URLs, or project-relative paths. Keep one authority across supports.
 
-For Markdown, write `aidd_docs/backlog/tasks/<slug>.md`.
+For Markdown, write `aidd_docs/backlog/tasks/<slug>.md`, the title in kebab-case.

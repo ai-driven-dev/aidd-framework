@@ -7,22 +7,13 @@ argument-hint: question | spike
 # Spike
 
 ```mermaid
----
-title: Spike flow
----
 flowchart LR
-  Question([question])
-  Create[create]
-  Open([open])
-  Spike([spike])
-  Investigate[investigate]
-  Conclude[conclude]
-
-  Question --> Create
-  Create -- "save for later" --> Open
-  Create -- "investigate now" --> Investigate
-  Spike --> Investigate
-  Investigate --> Conclude
+  source([question or Spike]) --> create
+  source -->|"already persisted"| investigate
+  create -->|"save for later"| done
+  create -->|"investigate now"| investigate --> conclude
+  conclude -->|"inconclusive"| investigate
+  conclude --> done([Spike])
 ```
 
 ## Actions
@@ -37,7 +28,9 @@ Run the flow above. Read only the next action's file before running it.
 
 ## Transversal rules
 
-- Require explicit approval or caller-provided bounded authority before spike creation or parent changes.
-- Follow authorized route and bounds; ask when either is absent.
-- Preserve edits, evidence, and links.
-- Touch only the spike and authorized related artifacts.
+- Keep product and lifecycle decisions with the user.
+- Separate evidence, decisions, and assumptions.
+- Preserve source links and existing edits.
+- Ask natural questions; never expose actions, references, or unchanged state.
+- Require explicit approval or caller-provided bounded authority before any write.
+- Bound the question; never answer beyond its stop condition.

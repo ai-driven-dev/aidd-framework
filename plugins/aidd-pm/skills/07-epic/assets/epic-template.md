@@ -18,10 +18,14 @@ status: proposed
 
 ## Success Evidence
 
-<The signal that can confirm or challenge the outcome.>
+<The signal that can confirm or challenge the outcome, and once `done`, what it showed.>
 
 ## Dependencies and Unknowns
 
 | Item | Kind | Handling |
 | --- | --- | --- |
 | <dependency or unknown> | <dependency, assumption, decision, or spike> | <relation or next move> |
+
+## Cancellation
+
+<why it is no longer pursued>

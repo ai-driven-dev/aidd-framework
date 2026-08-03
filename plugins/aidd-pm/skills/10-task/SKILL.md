@@ -9,8 +9,8 @@ argument-hint: request | task
 ```mermaid
 flowchart LR
   source([request or Task]) --> frame --> review --> finalize
+  source -->|"already persisted"| finalize
   review -->|"revise"| frame
-  review -->|"investigate, then resume"| review
   finalize -->|"revise"| frame
   finalize -->|"authorized"| done([Task])
 ```
@@ -27,8 +27,9 @@ Run the flow above. Read only the next action file.
 
 ## Transversal rules
 
-- Keep scope, classification, priority, and lifecycle decisions with the user.
-- Record delivery work; never plan or implement it.
+- Keep product and lifecycle decisions with the user.
+- Separate evidence, decisions, and assumptions.
 - Preserve source links and existing edits.
-- Ask natural questions; never expose actions, checks, routes, or unchanged state.
-- Require explicit approval or caller-provided bounded authority before any write or related-item change.
+- Ask natural questions; never expose actions, references, or unchanged state.
+- Require explicit approval or caller-provided bounded authority before any write.
+- Record delivery work; never plan or implement it.

@@ -9,14 +9,9 @@ argument-hint: request | epic
 ```mermaid
 flowchart LR
   source([request, Product Brief, PRD, Epic, or Stories]) --> frame --> slice --> write --> assess
+  source -->|"already persisted"| finalize
   assess -->|"reshape"| slice
-  assess --> estimate{"estimate?"}
-  estimate -->|"yes"| estimation
-  estimate -->|"no"| ordering
-  estimation --> ordering{"order?"}
-  ordering -->|"yes"| order
-  ordering -->|"no"| finalize
-  order --> finalize
+  assess --> estimation --> order --> finalize
   order -->|"reslice"| slice
   finalize -->|"revise"| write
   finalize -->|"authorized"| done([User Stories])
@@ -34,13 +29,13 @@ Run the flow above. Read only the next action file.
 | assess     | determine readiness and blockers          |
 | estimation | estimate only when applicable             |
 | order      | order only when useful                    |
-| finalize   | approve, persist, and link Stories        |
+| finalize   | approve, persist, or transition           |
 
 ## Transversal rules
 
-- Keep product and backlog decisions with the user.
+- Keep product and lifecycle decisions with the user.
 - Separate evidence, decisions, and assumptions.
-- Draft only after actor, need, and outcome are explicit in the source or confirmed.
-- Ask natural questions; never expose actions, checks, routes, skipped work, or unchanged state.
 - Preserve source links and existing edits.
-- Require explicit approval or caller-provided bounded authority before any write or related-item change.
+- Ask natural questions; never expose actions, references, or unchanged state.
+- Require explicit approval or caller-provided bounded authority before any write.
+- Draft only after actor, need, and outcome are explicit in the source or confirmed.

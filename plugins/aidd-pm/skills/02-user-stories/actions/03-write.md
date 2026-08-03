@@ -27,5 +27,4 @@ One Story draft per candidate.
 | Traceability | actor, need, outcome, and acceptance come from the source or a confirmed decision |
 | Acceptance | contains product behavior only; backlog relations stay metadata |
 | Source metadata | absent unless backed by a stable id, URL, or project-relative path |
-| Cleanup | no placeholder, empty optional field, implementation task, or invented relation |
 | Feedback | complete set shown; no write; response ends with one open question |

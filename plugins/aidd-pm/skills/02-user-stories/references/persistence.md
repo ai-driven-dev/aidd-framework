@@ -12,4 +12,4 @@
 
 Use native fields when supported; otherwise use explicit ids or project-relative paths. Never mirror one Story across supports.
 
-Write each Markdown Story to its own `aidd_docs/backlog/stories/<slug>.md` file.
+Write each Markdown Story to its own `aidd_docs/backlog/stories/<slug>.md` file, the title in kebab-case.

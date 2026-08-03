@@ -8,14 +8,8 @@ argument-hint: assess | reconcile
 
 ```mermaid
 flowchart LR
-  target([Epic or Story]) --> assess{"assess --role"}
-  assess -->|product| product[product report]
-  assess -->|delivery| delivery[delivery report]
-  assess -->|quality| quality[quality report]
-  product --> reconcile
-  delivery --> reconcile
-  quality --> reconcile
-  reconcile --> result([findings, conflicts, questions])
+  target([Epic or Story]) --> assess --> report([one role report])
+  reports([three role reports]) --> reconcile --> result([findings, conflicts, questions])
 ```
 
 ## Actions
@@ -32,4 +26,4 @@ Run one route per invocation. Read only that action file.
 - Never spawn, delegate, persist, or mutate.
 - Treat roles as analytical lenses, not human authorities.
 - Ground every finding and question in cited evidence; never invent a decision.
-- Return proposals only. The caller must hold explicit user authority before applying any change.
+- Return proposals only; the caller decides what to do with them.

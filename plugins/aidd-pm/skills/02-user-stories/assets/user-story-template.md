@@ -12,3 +12,7 @@ status: proposed
 ## Acceptance
 
 - <observable condition>
+
+## Cancellation
+
+<why it is no longer pursued>

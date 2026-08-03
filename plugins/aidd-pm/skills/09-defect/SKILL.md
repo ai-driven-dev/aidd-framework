@@ -9,6 +9,7 @@ argument-hint: report | defect
 ```mermaid
 flowchart LR
   source([report or Defect]) --> capture --> assess --> finalize
+  source -->|"already persisted"| finalize
   assess -->|"revise"| capture
   finalize -->|"revise"| capture
   finalize -->|"authorized"| done([Defect])
@@ -26,8 +27,9 @@ Run the flow above. Read only the next action file.
 
 ## Transversal rules
 
-- Keep product, priority, and lifecycle decisions with the user.
-- Separate observation, evidence, and inference.
-- Record the defect; never diagnose or implement its fix.
-- Preserve source evidence and existing edits.
-- Require explicit approval or caller-provided bounded authority before any write or related-item change.
+- Keep product and lifecycle decisions with the user.
+- Separate evidence, decisions, and assumptions.
+- Preserve source links and existing edits.
+- Ask natural questions; never expose actions, references, or unchanged state.
+- Require explicit approval or caller-provided bounded authority before any write.
+- Record the mismatch; never diagnose or implement its fix.

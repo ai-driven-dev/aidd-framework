@@ -1,6 +1,6 @@
 # 08 - Verify
 
-Prove structural and semantic coherence after authorized changes.
+Prove the applied change holds, through the owners that wrote it.
 
 ## Input
 
@@ -20,8 +20,7 @@ A coherent backlog or actionable findings routed for correction.
 
 | Case | Pass |
 | --- | --- |
-| Broken artifact | its owning capability names the artifact and the reason |
-| Semantic consequence | owning capability verifies it |
-| Unsupported transition | owning capability rejects it; verification fails |
+| Broken artifact | its owner names the artifact and the reason |
+| Unsupported transition | its owner rejects it; verification fails |
 | Extra mutation | verification fails |
 | Coherent result | every owner proves its own writes and every authorized mutation matches |

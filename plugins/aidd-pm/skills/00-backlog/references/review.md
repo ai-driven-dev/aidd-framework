@@ -2,8 +2,8 @@
 
 | Signal | Review |
 | --- | --- |
-| checker diagnostic | repair before other changes |
-| active Epic without an identified goal | ask whether alignment exists |
+| reported diagnostic | repair before other changes |
+| `ready` or `in-progress` Epic whose goal is absent or resolves to nothing | ask whether alignment exists |
 | unresolved dependency | confirm whether work is blocked or merely ordered |
 | `ready` artifact | owner verifies its readiness evidence |
 | Task without a parent | confirm that standalone delivery work is intentional |

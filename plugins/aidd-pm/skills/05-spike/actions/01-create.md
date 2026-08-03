@@ -12,13 +12,12 @@ A spike reference, or the reason no spike is needed.
 
 ## Process
 
-1. **Require.** If no unknown is present, ask for one and wait.
-2. **Clarify.** Only if the question or decision is unclear, apply [capabilities](../references/capabilities.md).
-3. **Qualify.** Apply [qualification](../references/qualification.md).
-4. **Place.** Apply [persistence](../references/persistence.md) and follow its result.
-5. **Route.** Resolve `save for later` or `investigate now`.
-6. **Confirm.** Show the new Spike and any previous Spike cancellation.
-7. **Write.** Fill earned fields of [spike template](../assets/spike-template.md) and [relations](../references/relations.md). A keep-open Spike stops after `Bounds`; a replaced Spike records its cancellation and replacement under `Outcome` and `Follow-up`.
+1. **Clarify.** When the question or decision is unclear, apply [capabilities](../references/capabilities.md).
+2. **Qualify.** Apply [qualification](../references/qualification.md).
+3. **Place.** Apply [persistence](../references/persistence.md) and follow its result.
+4. **Route.** Resolve `save for later` or `investigate now`.
+5. **Confirm.** Show the new Spike and any previous Spike cancellation.
+6. **Write.** Fill the [spike template](../assets/spike-template.md) fields the evidence supports, and [relations](../references/relations.md). A keep-open Spike stops after `Bounds`; a replaced Spike records its cancellation and replacement under `Outcome` and `Follow-up`.
 
 ## Test
 

@@ -23,5 +23,5 @@ One confirmed Story scope with its source and optional parent.
 | --- | --- |
 | No source | no candidate; one open question for the need |
 | Missing outcome | no candidate; one open question for the user or stakeholder value |
-| Mismatch | no Story candidate; qualification result and one open question |
+| Different work type | no Story candidate; the offered capability returned |
 | Valid scope | one outcome, explicit boundaries, identified source, and confirmed parent when present |

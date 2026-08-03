@@ -1,7 +1,5 @@
 # Change Set
 
-Each proposed mutation has:
-
 | Field | Value |
 | --- | --- |
 | identity | stable id, URL, or project-relative path; `new` before creation |

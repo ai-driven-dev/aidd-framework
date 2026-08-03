@@ -21,3 +21,7 @@ status: proposed
 ## Completion Evidence
 
 - <evidence produced after completion>
+
+## Cancellation
+
+<why it is no longer pursued>

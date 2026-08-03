@@ -24,6 +24,6 @@ One evidence-backed assessment report.
 | Missing or unknown role | no assessment; supported roles returned |
 | Missing or ambiguous target | no assessment; one target question returned |
 | Unsupported artifact | no assessment; Epic-or-Story requirement returned |
-| Finding | verdict, role, impact, claim, source pointer, excerpt or observation, and question when unresolved are present |
+| Finding | carries every field the report contract requires |
 | No finding | inspected sources, `verdict: ready`, and `findings: []` returned |
 | Side effect | workspace and external systems unchanged |

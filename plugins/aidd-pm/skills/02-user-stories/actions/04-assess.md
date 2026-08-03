@@ -8,7 +8,7 @@ The Story drafts.
 
 ## Output
 
-The Story documents with status and gaps only when `proposed`.
+The Story documents with their status, and a Spike for any blocking unknown.
 
 ## Process
 
@@ -22,7 +22,7 @@ The Story documents with status and gaps only when `proposed`.
 
 | Case | Pass |
 | --- | --- |
-| Ready | every readiness row passes; no `Gaps` section |
+| Ready | every readiness row passes; no blocker left to show |
 | Proposed | each failed row maps to one sourced gap |
 | Unapproved blocker | Story remains; Spike offered; related artifacts unchanged |
 | Approved blocker | Spike `parents` names the Story; no inverse field is mirrored |

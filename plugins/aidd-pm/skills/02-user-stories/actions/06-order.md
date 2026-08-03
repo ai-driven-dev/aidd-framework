@@ -1,6 +1,6 @@
 # 06 - Order
 
-Order competing Stories without inventing priority.
+Order the Stories that share a parent, without inventing priority.
 
 ## Input
 
@@ -12,10 +12,10 @@ An approved relative order.
 
 ## Process
 
-1. **Compare.** Apply [ordering](../references/ordering.md) using supported value, urgency, learning, risk, and dependency signals.
+1. **Compare.** Apply [ordering](../references/ordering.md).
 2. **Sequence.** Apply [relations](../references/relations.md) to predecessors and blockers.
 3. **Explain.** State the evidence behind each proposed position and every tradeoff.
-4. **Decide.** Let the user change or approve the order.
+4. **Decide.** Let the user, or the authority the caller provided, change or approve the order.
 5. **Record.** Store only the approved relative order.
 
 ## Test

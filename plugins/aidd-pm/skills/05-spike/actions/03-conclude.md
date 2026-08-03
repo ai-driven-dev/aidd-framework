@@ -12,7 +12,7 @@ A concluded spike with coherent parent links and any authorized backlog update.
 
 ## Process
 
-1. **Write.** Complete the earned outcome and follow-up fields in [spike template](../assets/spike-template.md).
+1. **Write.** Complete the outcome and follow-up fields the evidence supports in [spike template](../assets/spike-template.md).
 2. **Propose.** Show the outcome and exact parent or backlog changes.
 3. **Sync.** Apply [persistence](../references/persistence.md).
 4. **Continue.** When authorized, apply [capabilities](../references/capabilities.md) to the follow-up.

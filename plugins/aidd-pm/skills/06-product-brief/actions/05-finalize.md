@@ -12,13 +12,12 @@ An authorized Product Brief in session or at its resolved path.
 
 ## Process
 
-1. **Authorize.** Use caller-provided bounded authority or invite revision, discovery, session approval, or persistence.
-2. **Clarify.** Without persistence authority, ask session or persist and wait.
-3. **Place.** Apply [persistence](../references/persistence.md) to resolve authorized files.
-4. **Confirm.** Require authority for both files in a replacement.
-5. **Write.** Persist authorized files; preserve user edits.
-6. **Verify.** Read back every changed brief.
-7. **Continue.** Offer to frame an Epic linked to the brief as its goal.
+1. **Authorize.** Use caller-provided bounded authority or invite revision, discovery, session approval, or persistence. Without persistence authority, ask session or persist and wait.
+2. **Place.** Apply [persistence](../references/persistence.md) to resolve authorized files.
+3. **Confirm.** Require authority for both files in a replacement.
+4. **Write.** Persist authorized files; preserve user edits.
+5. **Verify.** Read back every changed brief.
+6. **Continue.** Apply [handoffs](../references/handoffs.md) to the next move.
 
 ## Test
 
