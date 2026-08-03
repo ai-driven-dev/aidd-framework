@@ -40,6 +40,7 @@ Declared in `plugins/<plugin>/hooks/hooks.json`. They run Node, so users need `n
 | Plugin         | Event              | Runs                      | Purpose                                                  |
 | -------------- | ------------------ | ------------------------- | -------------------------------------------------------- |
 | `aidd-context` | `SessionStart`     | `hooks/update_memory.js`  | Refresh the project memory block in the AI context files |
+| `aidd-pm`      | `PreToolUse`       | `hooks/check-backlog.js`  | Refuse a status move the artifact's lifecycle does not allow |
 | `aidd-pm`      | `PostToolUse`      | `hooks/check-backlog.js`  | Report a broken backlog artifact at the write that broke it |
 | `aidd-refine`  | `UserPromptSubmit` | `hooks/condense-stats.js` | Report token savings while condensed output mode is on   |
 

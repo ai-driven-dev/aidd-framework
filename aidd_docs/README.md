@@ -70,7 +70,8 @@ my-project/
 │   │   └── vcs.md
 │   ├── internal/
 │   │   └── decisions/           # Decision records written by aidd-context:10-learn
-│   ├── backlog/                  # Local Epics, User Stories, Tasks, Spikes, and Defects
+│   ├── product/                 # Product Briefs, durable and one per product
+│   ├── backlog/                 # Local Epics, User Stories, Tasks, Spikes, and Defects
 │   ├── tasks/                   # Specs, plans, run summaries
 │   ├── recipes/                 # Project-specific cook recipes
 │   ├── ADR.md                   # Architecture decision log (aidd-context:10-learn)
