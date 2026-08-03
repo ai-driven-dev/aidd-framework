@@ -20,5 +20,5 @@ The refined spec at the same path, with the changes applied and any residual `TB
 
 ## Test
 
-- The spec still exists at its path and holds every required section in `@../assets/spec-validator.yml`.
+- The spec still exists at its path and holds every required section in [spec-validator.yml](../assets/spec-validator.yml).
 - Every finding is reflected by a change, or by an explicit `TBD: <question>` when it cannot be resolved.

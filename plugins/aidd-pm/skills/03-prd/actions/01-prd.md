@@ -13,7 +13,7 @@ The saved PRD at `aidd_docs/tasks/<yyyy_mm>/<yyyy_mm_dd>-<feature_name>-prd.md`,
 ## Process
 
 1. **Parse.** Extract the feature scope, goals, and constraints from the description and any user stories.
-2. **Draft.** Fill `@../assets/prd-template.md` with its eight sections: overview, problem statement, goals, non-goals, user stories, acceptance criteria, dependencies, open questions.
+2. **Draft.** Fill [prd-template.md](../assets/prd-template.md) with its eight sections: overview, problem statement, goals, non-goals, user stories, acceptance criteria, dependencies, open questions.
 3. **Validate.** Show the full draft, wait for explicit approval, and re-show after each revision.
 4. **Save.** Write the approved PRD to its dated path, creating the month directory when missing.
 

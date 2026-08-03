@@ -19,8 +19,8 @@ The `dependencies` findings, written to `dependencies.md` in the run's audit fol
    - **Outdated packages**: identify packages significantly behind their latest stable release, especially those with security-relevant changelogs.
    - **Unused declared dependencies**: flag packages listed in the manifest with no import found in the scanned source.
    - **Lockfile integrity and supply chain**: verify the lockfile is present and committed. Flag direct git or URL dependencies and any package with no integrity hash.
-3. **Rate.** Give each finding a severity and an effort per the `@../assets/audit-template.md` legend, with a concrete `file:line` in the manifest or lockfile. The category is always `dependencies`.
-4. **Write.** Fill `@../assets/audit-template.md` into the pillar file: the Findings table (one row per issue, severity-first), the ranked Top actions, and the Coverage section. In a full run, also add the rows to the merged `report.md` in the same folder. Emit the report and stop.
+3. **Rate.** Give each finding a severity and an effort per the [audit-template.md](../assets/audit-template.md) legend, with a concrete `file:line` in the manifest or lockfile. The category is always `dependencies`.
+4. **Write.** Fill [audit-template.md](../assets/audit-template.md) into the pillar file: the Findings table (one row per issue, severity-first), the ranked Top actions, and the Coverage section. In a full run, also add the rows to the merged `report.md` in the same folder. Emit the report and stop.
 
 ## Test
 
