@@ -6,8 +6,18 @@ const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 
 const script = path.resolve(__dirname, "../../plugins/aidd-pm/hooks/check-backlog.js");
-const { FOLDERS, FORBIDDEN, GRAPH_CODES, STATUSES, inspectBacklog, parseFrontmatter, touchesBacklog } =
-  require(script);
+const {
+  FOLDERS,
+  FORBIDDEN,
+  GRAPH_CODES,
+  REQUIRED_SECTIONS,
+  STATUSES,
+  TRANSITIONS,
+  inspectBacklog,
+  inspectChange,
+  parseFrontmatter,
+  touchesBacklog,
+} = require(script);
 
 const skills = path.resolve(__dirname, "../../plugins/aidd-pm/skills");
 const ARTIFACT_SKILL = {
@@ -152,7 +162,7 @@ test("valid Epic, Story, Task, Spike, and Defect graph", () => {
     "aidd_docs/backlog/defects/total.md": defect(
       "ready",
       "related_to: [aidd_docs/backlog/stories/checkout.md]\norder: 2\nestimate: S\n",
-      "## Expected\n\nCorrect total.\n\n## Actual\n\nIncorrect total.\n\n## Impact\n\nCheckout fails.\n\n## Evidence\n\n- Report R-1\n",
+      "## Expected\n\nCorrect total.\n\n## Actual\n\nIncorrect total.\n\n## Reproduction\n\nAdd two items, open the cart.\n\n## Impact\n\nCheckout fails.\n\n## Evidence\n\n- Report R-1\n",
     ),
   });
   const result = inspectBacklog(root);
@@ -255,6 +265,19 @@ test("empty, malformed, and duplicate relations fail", () => {
   const result = inspectBacklog(root);
   assert.ok(codes(result).includes("INVALID_RELATION"));
   assert.ok(codes(result).includes("DUPLICATE_RELATION"));
+});
+
+test("a field that may hold several accepts one written plainly", () => {
+  const root = project({
+    "aidd_docs/backlog/stories/old.md": `${story("cancelled")}\n## Cancellation\n\nSuperseded.\n`,
+    "aidd_docs/backlog/stories/new.md": story("ready", "supersedes: aidd_docs/backlog/stories/old.md\n"),
+    "aidd_docs/backlog/stories/two.md": story("ready", "parent: [EP-1, EP-2]\n"),
+  });
+  const findings = inspectBacklog(root).diagnostics;
+  assert.deepEqual(
+    findings.map((item) => `${item.code} ${item.path}`),
+    ["INVALID_RELATION aidd_docs/backlog/stories/two.md"],
+  );
 });
 
 test("Epic goal resolves outside the backlog and belongs only to Epic", () => {
@@ -365,7 +388,7 @@ test("supersedes requires a terminal target", () => {
   assert.ok(codes(inspectBacklog(active)).includes("ACTIVE_SUPERSEDED"));
 
   const terminal = project({
-    "aidd_docs/backlog/spikes/old.md": spike("cancelled"),
+    "aidd_docs/backlog/spikes/old.md": `${spike("cancelled")}\n## Cancellation\n\nQuestion changed.\n`,
     "aidd_docs/backlog/spikes/new.md": spike("open", "supersedes: [aidd_docs/backlog/spikes/old.md]\n"),
   });
   assert.equal(inspectBacklog(terminal).valid, true);
@@ -463,7 +486,7 @@ test("active and done Defects require earned evidence", () => {
     "aidd_docs/backlog/defects/done.md": defect(
       "done",
       "",
-      "## Expected\n\nA.\n\n## Actual\n\nB.\n\n## Impact\n\nC.\n\n## Evidence\n\nD.\n",
+      "## Expected\n\nA.\n\n## Actual\n\nB.\n\n## Reproduction\n\nSteps.\n\n## Impact\n\nC.\n\n## Evidence\n\nD.\n",
     ),
   });
   assert.deepEqual(codes(inspectBacklog(incomplete)).sort(), [
@@ -475,7 +498,7 @@ test("active and done Defects require earned evidence", () => {
     "aidd_docs/backlog/defects/done.md": defect(
       "done",
       "",
-      "## Expected\n\nA.\n\n## Actual\n\nB.\n\n## Impact\n\nC.\n\n## Evidence\n\nD.\n\n## Verification\n\nVerified.\n",
+      "## Expected\n\nA.\n\n## Actual\n\nB.\n\n## Reproduction\n\nSteps.\n\n## Impact\n\nC.\n\n## Evidence\n\nD.\n\n## Verification\n\nVerified.\n",
     ),
   });
   assert.equal(inspectBacklog(complete).valid, true);
@@ -547,6 +570,17 @@ test("done artifacts require their decisive body evidence", () => {
     "MISSING_SUCCESS_EVIDENCE",
     "MISSING_TASK_EVIDENCE",
   ]);
+});
+
+test("a cancelled artifact records why", () => {
+  const root = project({
+    "aidd_docs/backlog/epics/silent.md": epic("cancelled"),
+    "aidd_docs/backlog/epics/explained.md": `${epic("cancelled")}\n## Cancellation\n\nThe partner left.\n`,
+  });
+  assert.deepEqual(
+    inspectBacklog(root).diagnostics.map((item) => `${item.code} ${item.path}`),
+    ["MISSING_CANCELLATION aidd_docs/backlog/epics/silent.md"],
+  );
 });
 
 test("hook path detection ignores unrelated writes", () => {
@@ -639,6 +673,71 @@ test("hook feeds related invalid writes back after the tool ran", () => {
   assert.match(result.stderr, /INVALID_STATUS aidd_docs\/backlog\/stories\/story\.md/);
 });
 
+test("a write is judged before it happens, where a before still exists", () => {
+  const root = project({
+    "aidd_docs/backlog/stories/s.md": story("proposed"),
+  });
+  const file = path.join(root, "aidd_docs/backlog/stories/s.md");
+  const edit = (from, to) => ({ tool_input: { file_path: file, old_string: from, new_string: to } });
+
+  assert.deepEqual(
+    inspectChange(edit("status: proposed", "status: done")).map((item) => [item.code, item.scope]),
+    [["ILLEGAL_TRANSITION", "change"]],
+  );
+  assert.deepEqual(inspectChange(edit("status: proposed", "status: ready")), []);
+  assert.deepEqual(
+    inspectChange({ tool_input: { file_path: file, content: story("cancelled") } }),
+    [],
+  );
+});
+
+test("an artifact cannot be born finished", () => {
+  const root = project({});
+  const born = (status) => ({
+    tool_input: {
+      file_path: path.join(root, "aidd_docs/backlog/tasks/t.md"),
+      content: task(status, "", "## Completion Evidence\n\n- shipped\n"),
+    },
+  });
+  assert.deepEqual(
+    inspectChange(born("done")).map((item) => [item.code, item.scope]),
+    [["TERMINAL_AT_CREATION", "change"]],
+  );
+  assert.deepEqual(inspectChange(born("cancelled")).map((item) => item.code), ["TERMINAL_AT_CREATION"]);
+  assert.deepEqual(inspectChange(born("ready")), []);
+  assert.deepEqual(inspectChange(born("proposed")), []);
+});
+
+test("the pre-write hook stays silent on anything it cannot judge", () => {
+  const root = project({ "aidd_docs/backlog/stories/s.md": story("proposed") });
+  const file = path.join(root, "aidd_docs/backlog/stories/s.md");
+  const cases = [
+    { tool_input: { file_path: path.join(root, "src/app.ts"), content: "x" } },
+    { tool_input: { file_path: path.join(root, "aidd_docs/backlog/stories/absent.md"), content: story("ready") } },
+    { tool_input: { file_path: file, old_string: "never there", new_string: "x" } },
+    { tool_input: { file_path: file, content: "no frontmatter" } },
+    {},
+  ];
+  for (const payload of cases) assert.deepEqual(inspectChange(payload), [], JSON.stringify(payload));
+});
+
+test("documented transitions match the checker", () => {
+  for (const [type, skill] of Object.entries(ARTIFACT_SKILL)) {
+    const lifecycle = fs.readFileSync(path.join(skills, skill, "references/lifecycle.md"), "utf8");
+    const rows = lifecycle
+      .split("\n")
+      .filter((line) => line.startsWith("|") && !/^\|\s*-/.test(line))
+      .slice(1);
+    const documented = Object.fromEntries(
+      rows.map((row) => {
+        const cells = row.split("|");
+        return [backticked(cells[1])[0], backticked(cells[3])];
+      }),
+    );
+    assert.deepEqual(documented, TRANSITIONS[type], `${skill} lifecycle diverges from the checker`);
+  }
+});
+
 test("documented statuses match the checker", () => {
   for (const [type, skill] of Object.entries(ARTIFACT_SKILL)) {
     const lifecycle = fs.readFileSync(path.join(skills, skill, "references/lifecycle.md"), "utf8");
@@ -647,6 +746,34 @@ test("documented statuses match the checker", () => {
       [...STATUSES[type]].sort(),
       `${skill} lifecycle diverges from the checker`,
     );
+  }
+});
+
+test("a section holding only a placeholder is empty, bullet or not", () => {
+  const root = project({
+    "aidd_docs/backlog/stories/placeholder.md":
+      "---\ntype: story\nstatus: ready\n---\n\n# Story: p\n\n## Acceptance\n\n- <observable condition>\n",
+    "aidd_docs/backlog/epics/placeholder.md":
+      "---\ntype: epic\nstatus: ready\n---\n\n# Epic: p\n\n## Success Evidence\n\n<the signal>\n",
+    "aidd_docs/backlog/stories/filled.md": story("ready"),
+  });
+  assert.deepEqual(codes(inspectBacklog(root)).sort(), [
+    "MISSING_ACCEPTANCE",
+    "MISSING_SUCCESS_EVIDENCE",
+    "PLACEHOLDER",
+    "PLACEHOLDER",
+  ]);
+});
+
+test("each template ships the sections the checker will require", () => {
+  for (const [type, skill] of Object.entries(ARTIFACT_SKILL)) {
+    const assets = path.join(skills, skill, "assets");
+    const [name] = fs.readdirSync(assets).filter((file) => file.endsWith("-template.md"));
+    const template = fs.readFileSync(path.join(assets, name), "utf8");
+    const required = REQUIRED_SECTIONS.filter((rule) => rule.type === type).flatMap((rule) => rule.sections);
+    for (const section of new Set(required)) {
+      assert.ok(template.includes(`## ${section}`), `${skill}/${name} is missing "## ${section}"`);
+    }
   }
 });
 

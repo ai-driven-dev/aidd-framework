@@ -8,6 +8,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 
 - [`.claude-plugin`](#claude-plugin)
 - [`hooks`](#hooks)
+  - [`hooks/backlog`](#hooksbacklog)
 - [`skills`](#skills)
   - [`skills/00-backlog`](#skills00-backlog)
   - [`skills/01-ticket-info`](#skills01-ticket-info)
@@ -36,6 +37,19 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | [check-backlog.js](hooks/check-backlog.js) |
 | [hooks.json](hooks/hooks.json) |
 
+#### `hooks/backlog`
+
+| File |
+|------|
+| [artifact-rules.js](hooks/backlog/artifact-rules.js) |
+| [change-rules.js](hooks/backlog/change-rules.js) |
+| [contract.js](hooks/backlog/contract.js) |
+| [diagnostic.js](hooks/backlog/diagnostic.js) |
+| [graph-rules.js](hooks/backlog/graph-rules.js) |
+| [markdown.js](hooks/backlog/markdown.js) |
+| [model.js](hooks/backlog/model.js) |
+| [read.js](hooks/backlog/read.js) |
+
 ### `skills`
 
 #### `skills/00-backlog`
@@ -56,7 +70,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `references` | [modes.md](skills/00-backlog/references/modes.md) | - |
 | `references` | [review.md](skills/00-backlog/references/review.md) | - |
 | `references` | [supports.md](skills/00-backlog/references/supports.md) | - |
-| `-` | [SKILL.md](skills/00-backlog/SKILL.md) | `Orchestrates product work through a backlog of Epics, User Stories, Tasks, Spikes, and Defects. Use for intake, triage, refinement, review, lifecycle events, ordering, health checks, or end-to-end updates. Not for one known artifact step.` |
+| `-` | [SKILL.md](skills/00-backlog/SKILL.md) | `Orchestrates a product backlog end to end. Use for intake, triage, refinement, review, lifecycle events, ordering, health checks, or repair. Not for one known artifact step.` |
 
 #### `skills/01-ticket-info`
 
@@ -134,6 +148,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `assets` | [product-brief.md](skills/06-product-brief/assets/product-brief.md) | - |
 | `references` | [brief-quality.md](skills/06-product-brief/references/brief-quality.md) | - |
 | `references` | [evidence.md](skills/06-product-brief/references/evidence.md) | - |
+| `references` | [handoffs.md](skills/06-product-brief/references/handoffs.md) | - |
 | `references` | [persistence.md](skills/06-product-brief/references/persistence.md) | - |
 | `references` | [techniques.md](skills/06-product-brief/references/techniques.md) | - |
 | `references` | [visuals.md](skills/06-product-brief/references/visuals.md) | - |
