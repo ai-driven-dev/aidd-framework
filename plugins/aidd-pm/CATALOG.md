@@ -10,7 +10,6 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 - [`hooks`](#hooks)
   - [`hooks/backlog`](#hooksbacklog)
 - [`skills`](#skills)
-  - [`skills/00-backlog`](#skills00-backlog)
   - [`skills/01-ticket-info`](#skills01-ticket-info)
   - [`skills/02-user-stories`](#skills02-user-stories)
   - [`skills/03-prd`](#skills03-prd)
@@ -36,41 +35,26 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 |------|
 | [check-backlog.js](hooks/check-backlog.js) |
 | [hooks.json](hooks/hooks.json) |
+| [observe-backlog.js](hooks/observe-backlog.js) |
+| [verify-backlog.js](hooks/verify-backlog.js) |
 
 #### `hooks/backlog`
 
 | File |
 |------|
 | [artifact-rules.js](hooks/backlog/artifact-rules.js) |
+| [canonical-transaction.js](hooks/backlog/canonical-transaction.js) |
 | [change-rules.js](hooks/backlog/change-rules.js) |
 | [contract.js](hooks/backlog/contract.js) |
 | [diagnostic.js](hooks/backlog/diagnostic.js) |
 | [graph-rules.js](hooks/backlog/graph-rules.js) |
+| [hook-event.js](hooks/backlog/hook-event.js) |
+| [journal.js](hooks/backlog/journal.js) |
 | [markdown.js](hooks/backlog/markdown.js) |
 | [model.js](hooks/backlog/model.js) |
 | [read.js](hooks/backlog/read.js) |
 
 ### `skills`
-
-#### `skills/00-backlog`
-
-| Group | File | Description |
-|-------|------|---|
-| `actions` | [01-inspect.md](skills/00-backlog/actions/01-inspect.md) | - |
-| `actions` | [02-triage.md](skills/00-backlog/actions/02-triage.md) | - |
-| `actions` | [03-review.md](skills/00-backlog/actions/03-review.md) | - |
-| `actions` | [04-route.md](skills/00-backlog/actions/04-route.md) | - |
-| `actions` | [05-assess.md](skills/00-backlog/actions/05-assess.md) | - |
-| `actions` | [06-decide.md](skills/00-backlog/actions/06-decide.md) | - |
-| `actions` | [07-apply.md](skills/00-backlog/actions/07-apply.md) | - |
-| `actions` | [08-verify.md](skills/00-backlog/actions/08-verify.md) | - |
-| `references` | [change-set.md](skills/00-backlog/references/change-set.md) | - |
-| `references` | [events.md](skills/00-backlog/references/events.md) | - |
-| `references` | [intake.md](skills/00-backlog/references/intake.md) | - |
-| `references` | [modes.md](skills/00-backlog/references/modes.md) | - |
-| `references` | [review.md](skills/00-backlog/references/review.md) | - |
-| `references` | [supports.md](skills/00-backlog/references/supports.md) | - |
-| `-` | [SKILL.md](skills/00-backlog/SKILL.md) | `Orchestrates a product backlog end to end. Use for intake, triage, refinement, review, lifecycle events, ordering, health checks, or repair. Not for one known artifact step.` |
 
 #### `skills/01-ticket-info`
 

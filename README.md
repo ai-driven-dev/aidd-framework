@@ -243,9 +243,9 @@ Repo init, commits, pull / merge requests, release tags, issues.
 
 ### 📋 [aidd-pm](plugins/aidd-pm/README.md)
 
-`11 skills` · stable
+`10 skills` · stable
 
-Backlog orchestration, Three Amigos refinement, Product Briefs, Epics, User Stories, Tasks, Spikes, Defects, PRD, and specs.
+Three Amigos refinement, Product Briefs, Epics, User Stories, Tasks, Spikes, Defects, PRD, and specs.
 
 </td>
 <td width="33%" valign="top">
@@ -261,9 +261,9 @@ Brainstorm, challenge, condense, shadow-areas, fact-check.
 
 ### 🎼 [aidd-orchestrator](plugins/aidd-orchestrator/README.md)
 
-`1 skill` · stable
+`2 skills` · stable
 
-Async dev: label an issue → get a PR.
+Async development and product backlog orchestration.
 
 </td>
 </tr>
