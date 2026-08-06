@@ -11,7 +11,7 @@ _(Already tested on `Legacy` codebases)_
 [![Made in France](https://img.shields.io/badge/made%20in-France-0055A4?labelColor=EF4135)](https://www.ai-driven-dev.fr/)
 
 <p>
-  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>43 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
+  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>48 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -248,9 +248,9 @@ Repo init, commits, pull / merge requests, release tags, issues.
 
 ### 📋 [aidd-pm](plugins/aidd-pm/README.md)
 
-`6 skills` · stable
+`10 skills` · stable
 
-Ticket info, user stories, Product Briefs, PRD, spec drafting, spike investigations.
+Three Amigos refinement, Product Briefs, Epics, User Stories, Tasks, Spikes, Defects, PRD, and specs.
 
 </td>
 <td width="33%" valign="top">
@@ -266,9 +266,9 @@ Brainstorm, challenge, condense, shadow-areas, fact-check.
 
 ### 🎼 [aidd-orchestrator](plugins/aidd-orchestrator/README.md)
 
-`2 skills` · stable
+`3 skills` · stable
 
-Synchronous feature flow and async issue-to-PR automation.
+Synchronous feature flow, async issue-to-PR automation, and product backlog.
 
 </td>
 </tr>

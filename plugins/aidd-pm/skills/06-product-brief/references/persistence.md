@@ -1,12 +1,11 @@
 # Persistence
 
-Write `product-brief.md` under `aidd_docs/tasks/<yyyy_mm>/<yyyy_mm_dd>_<product-slug>/`.
-Every changed brief has a non-empty `objective` and one listed status.
+Write `aidd_docs/product/<product-slug>.md`. Every changed brief has a non-empty `objective` and one listed revision.
 
-| Situation | Files | Frontmatter |
+| Situation | Files | Revision |
 | --- | --- | --- |
-| No brief matches | create one | `status: current`; omit both relation fields |
-| Revise the current brief | update one | keep `status: current` and any existing `supersedes`; omit `superseded_by` |
-| Replace the current brief | create new, update old | new: `current` + `supersedes`; old: `superseded` + `superseded_by` |
+| No brief matches | create one | `current`; omit `supersedes` |
+| Revise the current brief | update one | keep `current` and any existing `supersedes` |
+| Replace the current brief | create new, update old | new: `current` + `supersedes`; old: `superseded` |
 
 Relation values are project-relative paths.

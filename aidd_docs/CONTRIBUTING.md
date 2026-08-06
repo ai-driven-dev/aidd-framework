@@ -22,9 +22,14 @@ All templates live alongside the skill that owns them, under `plugins/<plugin>/s
 | `aidd-context:03-context-generate/assets/skills/`  | `SKILL.md`, action templates                             |
 | `aidd-context:03-context-generate/assets/agents/`  | Agent file template                                      |
 | `aidd-context:03-context-generate/assets/rules/`   | Rule file template                                       |
+| `aidd-pm:02-user-stories/assets/`                  | User Story template                                      |
 | `aidd-pm:03-prd/assets/`                           | PRD body template                                        |
 | `aidd-pm:04-spec/assets/`                          | Spec template and validator                              |
+| `aidd-pm:05-spike/assets/`                         | Spike template                                           |
 | `aidd-pm:06-product-brief/assets/`                 | Product Brief template                                   |
+| `aidd-pm:07-epic/assets/`                          | Epic template                                            |
+| `aidd-pm:09-defect/assets/`                        | Defect template                                          |
+| `aidd-pm:10-task/assets/`                          | Backlog Task template                                    |
 | `aidd-dev:01-plan/assets/`                         | Plan and master-plan templates                           |
 | `aidd-vcs:01-commit/assets/`                       | Conventional commit message template                     |
 | `aidd-vcs:02-pull-request/assets/`                 | Pull/merge request body template, contributing example   |
@@ -48,7 +53,7 @@ Project recipes live under `aidd_docs/recipes/`. Bundled framework recipes live 
 ## Conventions
 
 - Skill names: `<plugin>:<NN>-<slug>`. Slug is kebab-case verb for activity domains, singular noun for tool domains.
-- Action files: only `## Inputs`, `## Outputs`, `## Process`, `## Test` (`## Depends on` optional).
+- Action files: `## Input` when needed, then `## Output`, `## Process`, and `## Test`.
 - `## Process` steps start with `**Bold title**.` and use decision-list `Pick first match` for branching.
-- `## Test` bullets start with `**Bold name**:` and are checkable (command, artifact check, or observable side effect).
-- Descriptions in SKILL.md frontmatter include explicit "Use when ..." triggers and "Do NOT use for ..." exclusions.
+- `## Test` is a `| Case | Pass |` table stating observable outcomes through commands, artifacts, or side effects.
+- Descriptions in SKILL.md frontmatter include explicit `Use when` triggers and optional `Not for` exclusions.

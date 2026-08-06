@@ -2,16 +2,15 @@
 
 | Situation | Result |
 | --- | --- |
-| Parents span supports | Ask for one target |
-| Parent support exists | Use that support |
-| No parent artifact exists | Use the configured backlog |
-| No target exists | Ask for one |
-| Valid completed match in the target | Reuse it |
-| Same open question in the target | Resume it |
-| New spike | Create one dedicated tracker item or Markdown document |
-| Reciprocal links are supported | Link every parent |
-| Blocked work | Make the spike its predecessor |
-| Question changed | Create a new spike and link the previous one |
+| parents span supports | ask for one target |
+| parent support exists | use that support |
+| no parent artifact exists | use the configured backlog |
+| no target exists | ask for one |
+| valid completed match in the target | reuse it |
+| same open question in the target | resume it |
+| new spike | create one item or Markdown document |
+| question changed | cancel the previous Spike, then create one that `supersedes` it |
 
-- Never mirror across supports.
-- Assign neither user value nor arbitrary estimates.
+For Markdown, write `aidd_docs/backlog/spikes/<slug>.md`, the title in kebab-case. Blocked work is found by scanning `parents`. Use native tracker relations when available, but never mirror a relation or artifact across supports.
+
+Markdown is the only support these skills write today. Naming another one is a project's own integration.

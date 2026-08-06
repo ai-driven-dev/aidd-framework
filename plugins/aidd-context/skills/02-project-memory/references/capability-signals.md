@@ -5,6 +5,7 @@ A concern scan detects from a concrete fact in the repo, or an equivalent one, n
 | Capability   | Means                          | Detected when                                                                             |
 | ------------ | ------------------------------ | ----------------------------------------------------------------------------------------- |
 | `core`       | always                         | always                                                                                    |
+| `backlog`    | organizes planned work         | local backlog artifacts, issue templates, or a repo file naming backlog conventions       |
 | `ui`         | renders a user interface       | a web frontend framework (not React Native), or a `components/` or `pages/` dir           |
 | `api`        | exposes HTTP or RPC            | a server framework, or a `routes/`, `controllers/`, or `api/` dir                         |
 | `database`   | persists data                  | an ORM or driver, a `migrations/` dir, or a schema file                                    |

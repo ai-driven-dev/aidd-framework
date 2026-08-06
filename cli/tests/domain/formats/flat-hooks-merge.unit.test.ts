@@ -85,8 +85,10 @@ describe("flattenCopilotHooksShape", () => {
       },
     });
     const result = JSON.parse(flattenCopilotHooksShape(input)) as {
+      version: number;
       hooks: { PreToolUse: Array<{ type: string; command: string }> };
     };
+    expect(result.version).toBe(1);
     expect(result.hooks.PreToolUse).toHaveLength(1);
     expect(result.hooks.PreToolUse[0].type).toBe("command");
     expect(result.hooks.PreToolUse[0].command).toBe("./.github/hooks/plugin/check.sh");
@@ -130,7 +132,7 @@ describe("flattenCopilotHooksShape", () => {
   it("returns empty hooks when input has no events", () => {
     const input = JSON.stringify({ hooks: {} });
     const result = JSON.parse(flattenCopilotHooksShape(input)) as Record<string, unknown>;
-    expect(result).toEqual({});
+    expect(result).toEqual({ version: 1 });
   });
 });
 
@@ -187,14 +189,32 @@ describe("mergeCursorFlatHooks", () => {
     expect(entry).not.toHaveProperty("hooks");
   });
 
-  it("warns and skips unmapped events", () => {
+  it("maps the common tool lifecycle events", () => {
     const plugin = JSON.stringify({
-      hooks: { PreToolUse: [{ hooks: [{ type: "command", command: "run.sh" }] }] },
+      hooks: {
+        PreToolUse: [{ hooks: [{ type: "command", command: "pre.sh" }] }],
+        PostToolUse: [{ hooks: [{ type: "command", command: "post.sh" }] }],
+        Stop: [{ hooks: [{ type: "command", command: "stop.sh" }] }],
+        SubagentStop: [{ hooks: [{ type: "command", command: "subagent-stop.sh" }] }],
+      },
+    });
+    const { content, warnings } = mergeCursorFlatHooks(null, plugin);
+    const result = JSON.parse(content) as { hooks: Record<string, Array<{ command: string }>> };
+    expect(result.hooks.preToolUse[0].command).toBe("pre.sh");
+    expect(result.hooks.postToolUse[0].command).toBe("post.sh");
+    expect(result.hooks.stop[0].command).toBe("stop.sh");
+    expect(result.hooks.subagentStop[0].command).toBe("subagent-stop.sh");
+    expect(warnings).toEqual([]);
+  });
+
+  it("warns and skips an unsupported source event", () => {
+    const plugin = JSON.stringify({
+      hooks: { UnknownEvent: [{ hooks: [{ type: "command", command: "run.sh" }] }] },
     });
     const { content, warnings } = mergeCursorFlatHooks(null, plugin);
     const result = JSON.parse(content) as { hooks: Record<string, unknown> };
     expect(Object.keys(result.hooks)).toHaveLength(0);
-    expect(warnings.some((w) => w.includes("PreToolUse"))).toBe(true);
+    expect(warnings.some((w) => w.includes("UnknownEvent"))).toBe(true);
   });
 
   it("accumulates both plugins into a single file", () => {
