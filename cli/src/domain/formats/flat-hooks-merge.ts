@@ -6,7 +6,7 @@
  *
  * All functions are pure (no I/O). They receive and return JSON-serialisable values.
  *
- * Claude event names (source): SessionStart, UserPromptSubmit (PascalCase).
+ * Claude event names (source) are PascalCase; Cursor maps supported events to camelCase.
  */
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -16,7 +16,7 @@ type ClaudeMatcherGroup = { matcher?: string; hooks: ClaudeHookItem[] };
 type ClaudeHooksShape = { hooks?: Record<string, ClaudeMatcherGroup[]> };
 
 type FlatHookEntry = { type: string; command: string; timeout?: number };
-type CopilotFlatShape = { hooks?: Record<string, FlatHookEntry[]> };
+type CopilotFlatShape = { version: 1; hooks?: Record<string, FlatHookEntry[]> };
 
 type CursorHookEntry = { command: string };
 type CursorFlatShape = { version: 1; hooks: Record<string, CursorHookEntry[]> };
@@ -32,6 +32,10 @@ type CodexHooksShape = { hooks?: Record<string, CodexHookEntry[]> };
 const CURSOR_EVENT_MAP: Record<string, string> = {
   SessionStart: "sessionStart",
   UserPromptSubmit: "beforeSubmitPrompt",
+  PreToolUse: "preToolUse",
+  PostToolUse: "postToolUse",
+  Stop: "stop",
+  SubagentStop: "subagentStop",
 };
 
 // ── Claude: merge hooks into .claude/settings.json ────────────────────────────
@@ -91,7 +95,7 @@ export function flattenCopilotHooksShape(pluginHooksJson: string): string {
     if (entries.length > 0) flat[event] = entries;
   }
 
-  const output: CopilotFlatShape = {};
+  const output: CopilotFlatShape = { version: 1 };
   if (Object.keys(flat).length > 0) output.hooks = flat;
   return `${JSON.stringify(output, null, 2)}\n`;
 }

@@ -1,9 +1,7 @@
 ---
 objective: "<The product outcome in one sentence.>"
-status: current
+revision: current
 ---
-
-<!-- Fill, then remove comments, placeholders, and empty optional sections. -->
 
 # Product Brief: <product>
 
@@ -42,12 +40,8 @@ status: current
 
 ## Product View
 
-<!-- Optional. Use one approved table, Mermaid diagram, or ASCII wireframe. -->
-
 <visual>
 
 ## Open Decisions
-
-<!-- Optional. Keep only consequential unresolved choices. -->
 
 - <decision>

@@ -8,7 +8,7 @@ A free-form request, or a path to an existing PRD. A feature name for the folder
 
 ## Output
 
-The path to `spec.md` in the feature folder, drafted from the template, with the ambiguities and assumptions noted.
+The path to `spec.md` in the feature folder, drafted from the template, with the ambiguities and assumptions noted. Report its stable identity, changed fields as `before -> after`, affected relations, and verification result. Without a write, state that no persisted change occurred.
 
 ## Process
 
@@ -23,3 +23,5 @@ The path to `spec.md` in the feature folder, drafted from the template, with the
 - `spec.md` exists in the feature folder.
 - It contains every section the validator marks required in [spec-validator.yml](../assets/spec-validator.yml).
 - It carries no library name, framework pattern, or source-file layout.
+- The result reports the stable identity, `before -> after` fields, affected relations, and verification result.
+- Without a write, no persisted change is reported.

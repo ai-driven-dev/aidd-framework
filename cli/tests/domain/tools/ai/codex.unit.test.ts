@@ -195,7 +195,7 @@ describe("mergeCodexConfigToml", () => {
     expect(result).toContain("mcp_servers");
     expect(result).toContain("playwright");
     expect(result).toContain("project_doc_max_bytes = 262144");
-    expect(result).toContain("codex_hooks = true");
+    expect(result).toContain("hooks = true");
   });
 
   it("preserves user keys not managed by AIDD", () => {
@@ -238,9 +238,9 @@ command = "user-command"
     expect(result).toContain("project_doc_max_bytes = 262144");
   });
 
-  it("ensures codex_hooks feature when absent", () => {
+  it("ensures hooks feature when absent", () => {
     const result = mergeCodexConfigToml("", MCP_PAYLOAD);
-    expect(result).toContain("codex_hooks = true");
+    expect(result).toContain("hooks = true");
   });
 
   it("preserves user codex_hooks value when already set", () => {
@@ -250,6 +250,7 @@ codex_hooks = false
 `;
     const result = mergeCodexConfigToml(existing, MCP_PAYLOAD);
     expect(result).toContain("codex_hooks = false");
+    expect(result).not.toContain("hooks = true");
   });
 
   it("does NOT emit [[skills.config]] — discovery is by placement", () => {

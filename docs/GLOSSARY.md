@@ -20,15 +20,15 @@ A self-contained workflow under `plugins/<plugin>/skills/<NN-name>/`. Triggered 
 
 ## 🧭 Router-based skill
 
-The shape every skill in this framework follows. `SKILL.md` is a pure router: it lists triggers, declares `## Available actions`, and dispatches to one of them. It carries no business logic. The logic lives in the action files. This split keeps triggering predictable and keeps each step independently testable.
+The shape every skill in this framework follows. `SKILL.md` is a pure router: it lists triggers, declares `## Actions`, and dispatches through its flow. It carries no business logic. The logic lives in the action files.
 
 ## ⚡ Action
 
-A single atomic step inside a skill, stored at `plugins/<plugin>/skills/<NN-name>/actions/NN-name.md`. Each action file contains only `## Inputs`, `## Outputs`, `## Process`, `## Test`, and optionally `## Depends on`. Tests must be observable: a command to run, an artifact to check, or a side effect to verify.
+A single atomic step inside a skill, stored at `plugins/<plugin>/skills/<NN-name>/actions/NN-name.md`. Each action file contains `## Input`, `## Output`, `## Process`, and `## Test`. Tests assert observable results.
 
 ## 🤖 Agent
 
-A specialized AI persona under `plugins/<plugin>/agents/<name>.md`. Agents are scoped (for example `executor`, `checker`) and spawned by an orchestrator when a step needs isolation in a dedicated role rather than the main thread. Currently agents ship only in `aidd-dev`.
+A specialized AI persona under `plugins/<plugin>/agents/<name>.md`. Agents are scoped and spawned by an orchestrator when a step needs isolation in a dedicated role rather than the main thread.
 
 ## 📏 Rule
 

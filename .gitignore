@@ -3,6 +3,7 @@
 
 # Node
 node_modules/
+node_modules
 .pnpm-store/
 *.log
 npm-debug.log*
