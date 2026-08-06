@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.3](https://github.com/ai-driven-dev/framework/compare/aidd-refine-v2.2.2...aidd-refine-v2.2.3) (2026-08-06)
+
+
+### Refactoring
+
+* **orchestrator:** replace SDLC actions with protocols ([#517](https://github.com/ai-driven-dev/framework/issues/517)) ([ed81604](https://github.com/ai-driven-dev/framework/commit/ed816044709b2b7081cc00ad2103a8571bf0ad6c))
+* **plugins:** action citations use markdown links, not @ ([c5da712](https://github.com/ai-driven-dev/framework/commit/c5da7126ef30354e17d4665300bd88481fc7c816))
+
 ## [2.2.2](https://github.com/ai-driven-dev/framework/compare/aidd-refine-v2.2.1...aidd-refine-v2.2.2) (2026-07-31)
 
 
