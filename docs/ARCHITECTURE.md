@@ -68,7 +68,30 @@ Every capability lives in exactly one plugin, chosen by **concern**. This taxono
 
 ## 🔀 Skills are routers
 
-`SKILL.md` is a router: it carries the triggers, the flow, an `## Actions` table, and the rules shared by every action. No business logic. Each action is self-contained (`## Input`, `## Output`, `## Process`, `## Test`) and reads only the references of its own skill.
+A skill's `SKILL.md` is a manifest plus a router. Claude Code loads the SKILL.md when the skill is invoked; the body decides which local action or orchestration protocol to run.
+
+```mermaid
+---
+title: skill router pattern
+---
+flowchart LR
+  User["User: '/skill-name'"]
+  Skill["/skill-name"]
+  Action1["actions/01-step.md"]
+  Action2["actions/02-step.md"]
+  ActionN["actions/NN-step.md"]
+  Out["Outputs: files, labels, PRs, audit logs"]
+
+  User --> Skill
+  Skill -->|"choose 1..N"| Action1
+  Skill -->|"choose 1..N"| Action2
+  Skill -->|"choose 1..N"| ActionN
+  Action1 --> Out
+  Action2 --> Out
+  ActionN --> Out
+```
+
+Recipe skills route to self-contained actions with inputs, outputs, process steps, and tests. An orchestrator with no domain logic may instead route through numbered reference protocols that define handoffs and delegate the work to capabilities discovered at runtime.
 
 A skill never links outside itself. The same tree ships flat, where the skill folder is renamed `<plugin>-<skill>`, or as a marketplace, so no relative path survives both. A bundled script is named plugin-relative in backticks, never linked.
 
@@ -79,17 +102,18 @@ A skill never links outside itself. The same tree ships flat, where the skill fo
 
 Choose by context, not complexity: keep the work visible to the caller → skill; isolate it and take only the result → agent.
 
-- **Spawning is an orchestration decision, never a skill's.** A recipe skill never spawns; it runs in the caller's context. Only an orchestrator spawns, and it decides per step whether to isolate the work or run the recipe inline.
-- An agent invokes only the recipe skills it declares under `# Skills you may invoke`, never an orchestrator skill, and never reads a skill's files.
-- An agent never delegates flow work to another agent. It may spawn a read-only recon helper that mutates nothing and spawns nothing. The write path stays two layers deep, so delegation can never cycle.
+- **Spawning is authorized by the high-level orchestrator, never invented by a recipe skill.** A recipe skill normally runs in the caller's context. A bounded fan-out capability may mechanically spawn leaf agents only when the orchestrator explicitly delegates that responsibility and retains routing ownership.
+- An orchestrator spawns each isolated step as a leaf agent that runs a recipe, or runs the recipe itself when isolation is unnecessary. The SDLC owns planning, delegates delivery to `executor`, and delegates independent judgments to a fresh `checker`. For independent repair findings, it may explicitly delegate bounded fan-out to `10-todo`; Todo's leaf executors return their results to the SDLC. A recipe invoked inside an agent never spawns again.
+- An agent invokes only the recipe skills it declares under `# Skills you may invoke`, never an orchestrator skill, and never reads a skill's files. It names every skill by its canonical `/plugin:folder` address so its permissions are explicit and auditable.
+- An agent never delegates flow work to another agent and never invokes an orchestrator skill. It may spawn a read-only recon helper (for example `Explore`) that mutates nothing and spawns nothing. So the write path stays two layers deep and delegation can never cycle.
 
 ## 🔗 Capability addressing
 
 Address a capability only where the dispatch is declared: a router's `## Actions` table, an agent's `# Skills you may invoke` list. Everywhere else, name the concept the capability owns, never the skill that owns it.
 
-An address never crosses a plugin boundary, agent or skill alike. A capability in another plugin is discovered at runtime by description. This is what lets a capability move plugin without a single edit elsewhere.
+Recipe skills never hardcode a sibling provider. They discover cross-plugin capabilities at runtime through description matching. Agent permission lists and orchestration references are responsibility maps, so they name the current provider with its canonical `/plugin:folder` or `@plugin:agent` address. The orchestrator must verify that provider is installed before calling it.
 
-The rule is social (PR template checklist), not yet enforced. A `lefthook` grep for an `aidd-<plugin>:` literal outside a router table or an agent allow-list would catch both violations.
+This distinction keeps recipe plugins swappable while making orchestration handoffs explicit and auditable.
 
 ## 🔎 See also
 

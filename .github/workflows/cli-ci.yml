@@ -1,16 +1,22 @@
 name: cli CI
 
 # Native path-filtered isolation: this whole workflow is skipped when nothing
-# under cli/ changed — no third-party paths-filter action needed.
+# under cli/ or kanban/ changed — no third-party paths-filter action needed.
+#
+# kanban/ is a source folder the CLI type-checks and bundles, not a published
+# package. Any job that runs a TypeScript-aware tool over the CLI's program must
+# install kanban's dependencies too, or module resolution fails from its sources.
 
 on:
   push:
     branches: [main, next]
     paths:
       - "cli/**"
+      - "kanban/**"
   pull_request:
     paths:
       - "cli/**"
+      - "kanban/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -32,6 +38,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - run: cd kanban && pnpm install --frozen-lockfile
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm typecheck
 
@@ -64,6 +71,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - run: cd kanban && pnpm install --frozen-lockfile
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm test
 
@@ -79,6 +87,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - run: cd kanban && pnpm install --frozen-lockfile
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm build
 
@@ -95,6 +104,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - run: cd kanban && pnpm install --frozen-lockfile
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm knip:production
 
@@ -113,3 +123,20 @@ jobs:
           node-version: "22"
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm jscpd
+
+  kanban-checks:
+    name: kanban / Typecheck, Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+      - run: cd kanban && pnpm install --frozen-lockfile
+      - run: cd kanban && pnpm typecheck
+      - run: cd kanban && pnpm lint
+      - run: cd kanban && pnpm test

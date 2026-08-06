@@ -11,7 +11,7 @@ _(Already tested on `Legacy` codebases)_
 [![Made in France](https://img.shields.io/badge/made%20in-France-0055A4?labelColor=EF4135)](https://www.ai-driven-dev.fr/)
 
 <p>
-  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>47 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
+  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>48 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -27,8 +27,8 @@ _(Already tested on `Legacy` codebases)_
 The **AI-Driven Dev Framework** installs a working SDLC (Software Development Life Cycle) into your AI coding tool — **skills, agents, commands, rules** — that turns a rough idea into a reviewed, shipped pull request:
 
 ```text
-/aidd-dev:00-sdlc "add rate limiting to the /login endpoint"
-→ spec → plan → implement → review → ship (commit + PR opened)
+/aidd-orchestrator:01-sdlc "add rate limiting to the /login endpoint"
+→ frame when needed → plan → implement → validate → review → challenge → ship
 ```
 
 Why not just write your own commands? → [FAQ](docs/FAQ.md#-why-aidd-instead-of-your-own-skills).
@@ -94,13 +94,16 @@ Same plugin names as Claude Code.
 
 Download your tool's bundle from the [latest release](https://github.com/ai-driven-dev/framework/releases/latest), then follow its steps:
 
+> [!NOTE]
+> Installing the framework host-wide for several tools can make the same command appear more than once in a tool's list. This happens when one tool reads another tool's settings, and is harmless.
+
 <details>
 <summary><strong>Cursor</strong></summary>
 
 **Marketplace**
 
 1. Unzip the `cursor-marketplace` archive.
-2. Copy the plugins, then reload (**Developer → Reload Window**):
+2. Copy the plugins (Cursor reloads them automatically):
 
 ```bash
 cp -r plugins/aidd-* ~/.cursor/plugins/local/
@@ -111,6 +114,8 @@ cp -r plugins/aidd-* ~/.cursor/plugins/local/
 1. Unzip the `cursor-flat` archive into your project root → `.cursor/`.
 
 _All plans; team marketplaces need Teams/Enterprise. Also reads Claude format (`.claude/skills/`)._
+
+Disable **Include Third-Party Plugins, Skills, and Other Configs** under **Settings → Rules, Skills, Subagents** to hide the duplicate commands.
 
 [Docs](https://cursor.com/docs/plugins)
 
@@ -177,7 +182,7 @@ Three ways in — pick one:
 | --- | --- | --- |
 | 🧭 **Guided onboarding** | `/aidd-context:00-onboard` | First time, or unsure what to run — it inspects the project and routes you. |
 | 🧠 **Project memory** | `/aidd-context:02-project-memory` | Build the project memory bank by hand. |
-| ⚙️ **Feature flow** | `/aidd-dev:00-sdlc` | Ship a feature end to end (plan → implement → review → PR). |
+| ⚙️ **Feature flow** | `/aidd-orchestrator:01-sdlc` | Autonomously ship a feature end to end (frame → deliver → check → PR). |
 
 The full loop, and how onboarding sets it up:
 
@@ -225,7 +230,7 @@ Project init, memory bank, context-artifact generation, diagrams, learning, expl
 
 `11 skills` · stable
 
-SDLC loop: plan, implement, assert, audit, review, test, refactor, debug.
+Code transformation: plan, implement, assert, audit, review, test, refactor, debug. Standalone Browser QA records short web evidence.
 
 </td>
 <td width="33%" valign="top">
@@ -261,9 +266,9 @@ Brainstorm, challenge, condense, shadow-areas, fact-check.
 
 ### 🎼 [aidd-orchestrator](plugins/aidd-orchestrator/README.md)
 
-`2 skills` · stable
+`3 skills` · stable
 
-Async development and product backlog orchestration.
+Synchronous feature flow, async issue-to-PR automation, and product backlog.
 
 </td>
 </tr>
@@ -314,6 +319,8 @@ Free and open-source (MIT). If it saves you time, [a ⭐](https://github.com/ai-
 
 - **Idea or bug?** [Open an issue](https://github.com/ai-driven-dev/framework/issues) or [start a discussion](https://github.com/ai-driven-dev/framework/discussions).
 - **Contribute code** → [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+[![Contributors](https://contrib.rocks/image?repo=ai-driven-dev/framework)](https://github.com/ai-driven-dev/framework/graphs/contributors)
 
 ---
 

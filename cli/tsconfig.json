@@ -5,7 +5,9 @@
     "moduleResolution": "NodeNext",
     "lib": ["ESNext"],
     "types": ["node"],
+    "jsx": "react-jsx",
     "outDir": "dist",
+    "rootDir": "..",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -19,6 +21,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*", "tests/**/*"],
+  "include": ["src/**/*", "tests/**/*", "../kanban/src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

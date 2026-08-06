@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "aidd-framework",
-  "version": "5.5.6",
+  "version": "5.6.0",
   "description": "Official plugin marketplace for the AI-Driven Development framework",
   "owner": {
     "name": "AI-Driven Dev"
@@ -17,7 +17,7 @@
     {
       "name": "aidd-dev",
       "source": "./plugins/aidd-dev",
-      "description": "Code transformation: Dev SDLC orchestrator (code-shipping pipeline), plan, assert, audit, review, test, refactor, debug, for-sure. Hosts engineering agents.",
+      "description": "Code transformation: plan, implement, assert, audit, review, test, refactor, debug, for-sure. Hosts engineering agents.",
       "strict": true,
       "recommended": true
     },
@@ -38,9 +38,9 @@
     {
       "name": "aidd-orchestrator",
       "source": "./plugins/aidd-orchestrator",
-      "description": "Async development and product backlog orchestration across focused capabilities.",
+      "description": "Orchestration: synchronous SDLC pipeline, async issue-to-PR automation, and product backlog.",
       "strict": true,
-      "recommended": false
+      "recommended": true
     },
     {
       "name": "aidd-refine",

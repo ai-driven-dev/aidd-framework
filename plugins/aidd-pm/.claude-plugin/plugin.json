@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "aidd-pm",
-  "version": "2.2.1",
+  "version": "2.4.0",
   "description": "Product backlog artifacts, refinement, Product Briefs, Epics, User Stories, Tasks, Spikes, Defects, requirements, and specs.",
   "author": {
     "name": "AI-Driven Dev",

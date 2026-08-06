@@ -1,18 +1,20 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "aidd-orchestrator",
-  "version": "2.1.1",
-  "description": "Orchestrates async development and product backlog workflows across focused capabilities.",
+  "version": "2.2.0",
+  "description": "Orchestrates the synchronous SDLC pipeline, async issue-to-PR automation, and the product backlog.",
   "author": {
     "name": "AI-Driven Dev",
     "url": "https://github.com/ai-driven-dev"
   },
   "skills": [
     "./skills/00-async-dev",
+    "./skills/01-sdlc",
     "./skills/02-backlog"
   ],
   "keywords": [
     "orchestration",
+    "sdlc",
     "async",
     "pipeline",
     "pull-request",

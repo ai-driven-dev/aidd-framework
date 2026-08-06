@@ -14,10 +14,10 @@ A markdown report written next to the source, named by stripping the source's la
 
 ## Process
 
-1. **Load.** Start from the skeleton in `@../assets/report-template.md`.
+1. **Load.** Start from the skeleton in [report-template.md](../assets/report-template.md).
 2. **Name.** Derive the report's folder and filename from the source per the rule above.
 3. **Warn.** If there are warnings, list them under `## Warnings` at the top. Otherwise omit the block.
-4. **Group.** Lay gaps out by category in locked order (`@../references/locked-sets.json`). In plain mode, one heading per category that has a gap. In diff mode, split each category into Closed, Still Open, and Newly Introduced, in that order, dropping empty parts.
+4. **Group.** Lay gaps out by category in locked order ([locked-sets.json](../references/locked-sets.json)). In plain mode, one heading per category that has a gap. In diff mode, split each category into Closed, Still Open, and Newly Introduced, in that order, dropping empty parts.
 5. **Sort.** Within a part, order gaps blocker, then major, then minor.
 6. **Render.** Write each gap as `**[severity]** <question>`, with its snippet as a blockquote on the next line when present.
 7. **Count.** Fill the header totals: overall and per severity. In diff mode, count only still-open and newly-introduced gaps.

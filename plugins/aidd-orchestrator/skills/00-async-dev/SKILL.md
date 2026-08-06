@@ -78,7 +78,7 @@ Executes one orchestration cycle on a fresh issue. Reads ready issues, resolves 
 | 01  | `poll-ready`      | Find the next issue with `to-implement`, no `claude/working`, no open closing PR               |
 | 02  | `resolve-deps`    | Check linked issues / dependencies; abort if blocked                                           |
 | 03  | `acquire-lock`    | Apply `claude/working` label; refuse if already held                                           |
-| 04  | `check-sdlc`      | Verify an SDLC orchestrator is loaded (`aidd-dev:00-sdlc` or equivalent)                       |
+| 04  | `check-sdlc`      | Verify an SDLC orchestration capability is loaded                                              |
 | 05  | `delegate-sdlc`   | Hand the issue to the SDLC capability; observe outcome                                         |
 | 06  | `write-audit`     | Emit `run-result.json` for the workflow's post-job                                             |
 

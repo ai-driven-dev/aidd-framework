@@ -21,7 +21,7 @@ The path to `spec.md` in the feature folder, drafted from the template, with the
 ## Test
 
 - `spec.md` exists in the feature folder.
-- It contains every section the validator marks required in `@../assets/spec-validator.yml`.
+- It contains every section the validator marks required in [spec-validator.yml](../assets/spec-validator.yml).
 - It carries no library name, framework pattern, or source-file layout.
 - The result reports the stable identity, `before -> after` fields, affected relations, and verification result.
 - Without a write, no persisted change is reported.

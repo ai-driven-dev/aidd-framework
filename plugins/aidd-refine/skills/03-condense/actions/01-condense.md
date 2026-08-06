@@ -19,7 +19,7 @@ A single confirmation line: `Condense: ON (<level>).` when enabling, or `Condens
    - `toggle` flips on/off; default level when turning on is `full`.
    - Off phrases (`stop condense`, `normal mode`) force off.
 3. **Emit.** The reply MUST begin with this exact line, filled in and unaltered: `Condense: ON (<level>).` when enabling, or `Condense: OFF.` when disabling. The stats action and the hook parse this line from the transcript, so never paraphrase, decorate, or omit it.
-4. **Apply.** Apply the transversal rules to every subsequent prose turn until the next off signal, using per-level rules and auto-pause passages from `@../references/intensity-levels.md`.
+4. **Apply.** Apply the transversal rules to every subsequent prose turn until the next off signal, using per-level rules and auto-pause passages from [intensity-levels.md](../references/intensity-levels.md).
 
 ## Test
 

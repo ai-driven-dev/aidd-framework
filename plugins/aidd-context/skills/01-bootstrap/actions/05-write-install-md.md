@@ -8,11 +8,11 @@ The filled checklist, folder-structure code block, and Mermaid diagram from acti
 
 ## Output
 
-A new `aidd_docs/INSTALL.md` filled from `@../assets/install-template.md`, with its Vision, Decisions, Stack summary, Architecture, Folder structure, Install steps, and Audit summary sections.
+A new `aidd_docs/INSTALL.md` filled from [install-template.md](../assets/install-template.md), with its Vision, Decisions, Stack summary, Architecture, Folder structure, Install steps, and Audit summary sections.
 
 ## Process
 
-1. **Load.** Read `@../assets/install-template.md` as the skeleton.
+1. **Load.** Read [install-template.md](../assets/install-template.md) as the skeleton.
 2. **Fill.** Fill each placeholder from the upstream artifacts:
    - **Vision**: project name and one-liner from block 1.
    - **Decisions**: each block-4 row paired with a one-line why from the block 2 and 3 constraints.

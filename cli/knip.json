@@ -8,5 +8,6 @@
     "src/domain/models/marketplace-entry.ts"
   ],
   "ignoreBinaries": ["gh", "icacls"],
-  "ignoreExportsUsedInFile": true
+  "ignoreExportsUsedInFile": true,
+  "ignoreDependencies": ["cli-table3", "gray-matter", "ink", "react"]
 }

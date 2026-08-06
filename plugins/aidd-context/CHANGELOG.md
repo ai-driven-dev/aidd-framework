@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.0](https://github.com/ai-driven-dev/framework/compare/aidd-context-v2.4.1...aidd-context-v2.5.0) (2026-07-31)
+
+
+### Features
+
+* **aidd-pm:** add Product Brief discovery skill ([#551](https://github.com/ai-driven-dev/framework/issues/551)) ([d5e7224](https://github.com/ai-driven-dev/framework/commit/d5e72243f683bc57ea439f2571b410df8b332d69)), closes [#349](https://github.com/ai-driven-dev/framework/issues/349)
+
 ## [2.4.1](https://github.com/ai-driven-dev/framework/compare/aidd-context-v2.4.0...aidd-context-v2.4.1) (2026-07-22)
 
 

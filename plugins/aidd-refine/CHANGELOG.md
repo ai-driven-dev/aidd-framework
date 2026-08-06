@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.2](https://github.com/ai-driven-dev/framework/compare/aidd-refine-v2.2.1...aidd-refine-v2.2.2) (2026-07-31)
+
+
+### Refactoring
+
+* **aidd-refine:** 01-brainstorm moves from fixed probing loop to internal discovery map ([#510](https://github.com/ai-driven-dev/framework/issues/510)) ([824220e](https://github.com/ai-driven-dev/framework/commit/824220e7361a9793f7751d54bf0f4d3c22535523)), closes [#504](https://github.com/ai-driven-dev/framework/issues/504)
+
 ## [2.2.1](https://github.com/ai-driven-dev/framework/compare/aidd-refine-v2.2.0...aidd-refine-v2.2.1) (2026-07-10)
 
 
