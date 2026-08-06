@@ -2,23 +2,22 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|apply_patch|shell|mcp__",
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/check-backlog.js --pre-hook",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/observe-backlog.js",
             "timeout": 5
           }
         ]
       }
     ],
-    "PostToolUse": [
+    "Stop": [
       {
-        "matcher": "Write|Edit|apply_patch",
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/check-backlog.js --hook",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/verify-backlog.js",
             "timeout": 5
           }
         ]

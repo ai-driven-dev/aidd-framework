@@ -1,14 +1,15 @@
 ---
-name: 00-backlog
-description: Orchestrates a product backlog end to end. Use for intake, triage, refinement, review, lifecycle events, ordering, health checks, or repair. Not for one known artifact step.
-argument-hint: create | manage | review | refine
+name: 02-backlog
+description: Orchestrates a product backlog end to end. Use to ask what it holds, or for intake, triage, refinement, review, lifecycle events, ordering, health checks, or repair. Not for one known artifact step.
+argument-hint: ask | create | manage | review | refine
 ---
 
 # Backlog
 
 ```mermaid
 flowchart LR
-  intent([create, manage, review, or refine]) --> inspect
+  intent([ask, create, manage, review, or refine]) --> inspect
+  inspect -->|"ask"| answer([answer from the read model])
   inspect -->|"create"| triage --> route
   inspect -->|"manage"| route
   inspect -->|"refine"| assess
@@ -25,7 +26,7 @@ flowchart LR
 
 ## Actions
 
-Run the flow above. Read only the next action file.
+Run the flow above, reading only the next action file. Resolve each capability by its purpose and verify it is installed before delegating.
 
 | Action  | Does                                        |
 | ------- | ------------------------------------------- |

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const fs = require("node:fs");
+const path = require("node:path");
 
 const { checkArtifact } = require("./backlog/artifact-rules.js");
 const { checkBirth, checkTransition } = require("./backlog/change-rules.js");
@@ -17,7 +18,7 @@ const PATCH_HEADER = /^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)
 
 /** Reads the Markdown backlog and judges it. */
 function inspectBacklog(input) {
-  const { project, root, fileCount, artifacts, diagnostics } = readBacklog(input);
+  const { project, root, files, fileCount, artifacts, diagnostics } = readBacklog(input);
   const findings = [
     ...diagnostics,
     ...artifacts.flatMap(checkArtifact),
@@ -25,27 +26,88 @@ function inspectBacklog(input) {
   ];
   return {
     valid: findings.length === 0,
+    project,
     root,
+    files,
     ...buildModel(artifacts, project, fileCount),
     diagnostics: sortDiagnostics(findings),
   };
 }
 
-function writtenPaths(value, found = []) {
+function writeTargets(value, found = []) {
   if (typeof value === "string") {
-    for (const match of value.matchAll(PATCH_HEADER)) found.push(match[1].trim());
+    const headers = [...value.matchAll(PATCH_HEADER)];
+    for (const [index, match] of headers.entries()) {
+      const end = headers[index + 1]?.index ?? value.length;
+      found.push({ target: match[1].trim(), input: { patch: value.slice(match.index, end) } });
+    }
     return found;
   }
   if (!value || typeof value !== "object") return found;
+  const target = PATH_KEYS.map((key) => value[key]).find((item) => typeof item === "string");
+  if (target) found.push({ target, input: value });
   for (const [key, item] of Object.entries(value)) {
-    if (PATH_KEYS.includes(key) && typeof item === "string") found.push(item);
-    else writtenPaths(item, found);
+    if (!PATH_KEYS.includes(key)) writeTargets(item, found);
   }
   return found;
 }
 
 function touchesBacklog(payload) {
-  return writtenPaths(payload).some((item) => toPosix(item).includes(BACKLOG_PATH));
+  const mentionsPath = (value) => {
+    if (typeof value === "string") return toPosix(value).includes(BACKLOG_PATH);
+    if (!value || typeof value !== "object") return false;
+    return Object.values(value).some(mentionsPath);
+  };
+  return mentionsPath(payload);
+}
+
+function patchedContent(patch, current) {
+  if (typeof patch !== "string") return null;
+  const lines = patch.split(/\r?\n/);
+  const header = lines.findIndex((line) => /^\*\*\* (?:Add|Update) File: /.test(line));
+  if (header < 0) return null;
+  const adding = lines[header].startsWith("*** Add File: ");
+  const end = lines.indexOf("*** End Patch", header + 1);
+  const body = lines.slice(header + 1, end < 0 ? lines.length : end);
+
+  if (adding) {
+    if (body.some((line) => line && !line.startsWith("+"))) return null;
+    return body.map((line) => line.slice(1)).join("\n");
+  }
+  if (current === null) return null;
+
+  let result = current;
+  const hunks = [];
+  let hunk = null;
+  for (const line of body) {
+    if (line.startsWith("@@")) {
+      if (hunk) hunks.push(hunk);
+      hunk = [];
+    } else if (hunk) {
+      hunk.push(line);
+    }
+  }
+  if (hunk) hunks.push(hunk);
+  if (hunks.length === 0) return null;
+
+  for (const linesOfHunk of hunks) {
+    const before = [];
+    const after = [];
+    for (const line of linesOfHunk) {
+      if (line.startsWith("-")) before.push(line.slice(1));
+      else if (line.startsWith("+")) after.push(line.slice(1));
+      else {
+        const context = line.startsWith(" ") ? line.slice(1) : line;
+        before.push(context);
+        after.push(context);
+      }
+    }
+    const oldText = before.join("\n");
+    const index = result.indexOf(oldText);
+    if (!oldText || index < 0 || result.indexOf(oldText, index + 1) >= 0) return null;
+    result = `${result.slice(0, index)}${after.join("\n")}${result.slice(index + oldText.length)}`;
+  }
+  return result;
 }
 
 /** The content the tool is about to write, for a Write or an Edit. Null when it cannot be rebuilt. */
@@ -54,16 +116,37 @@ function proposedContent(input, current) {
   if (typeof input?.old_string === "string" && typeof input?.new_string === "string" && current !== null) {
     return current.includes(input.old_string) ? current.replace(input.old_string, input.new_string) : null;
   }
+  if (typeof input?.oldString === "string" && typeof input?.newString === "string" && current !== null) {
+    return current.includes(input.oldString) ? current.replace(input.oldString, input.newString) : null;
+  }
+  if (typeof input?.patch === "string") return patchedContent(input.patch, current);
   return null;
+}
+
+/** A patch never yields the whole file, but the status it sets is enough to judge the move. */
+function patchedStatus(input) {
+  const patch = typeof input?.patch === "string" ? input.patch : null;
+  return patch?.match(/^\+status:\s*(\S+)/m)?.[1] ?? null;
 }
 
 /** Judges a write before it happens, which is the only moment a before and an after both exist. */
 function inspectChange(payload) {
-  const [target] = writtenPaths(payload).filter((item) => toPosix(item).includes(BACKLOG_PATH));
-  if (!target) return [];
+  return writeTargets(payload.tool_input ?? payload)
+    .filter(({ target }) => toPosix(target).includes(BACKLOG_PATH))
+    .flatMap(({ target, input }) => inspectTarget(target, input, payload.cwd));
+}
 
-  const current = fs.existsSync(target) ? fs.readFileSync(target, "utf8") : null;
-  const after = proposedContent(payload.tool_input, current);
+function inspectTarget(target, input, cwd) {
+  const absolute = path.isAbsolute(target) ? target : path.resolve(cwd || process.cwd(), target);
+  const current = fs.existsSync(absolute) ? fs.readFileSync(absolute, "utf8") : null;
+
+  const patched = patchedStatus(input);
+  if (patched !== null && current !== null) {
+    const before = parseFrontmatter(current);
+    return before.error ? [] : checkTransition(before.data, { ...before.data, status: patched }, toPosix(target));
+  }
+
+  const after = proposedContent(input, current);
   if (after === null) return [];
 
   const proposed = parseFrontmatter(after);
@@ -134,4 +217,13 @@ if (require.main === module) {
   });
 }
 
-module.exports = { ...contract, inspectBacklog, inspectChange, parseFrontmatter, touchesBacklog };
+module.exports = {
+  ...contract,
+  inspectBacklog,
+  inspectChange,
+  parseFrontmatter,
+  patchedContent,
+  proposedContent,
+  touchesBacklog,
+  writeTargets,
+};

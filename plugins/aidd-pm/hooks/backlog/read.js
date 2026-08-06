@@ -12,12 +12,23 @@ function toPosix(value) {
 }
 
 /** Accepts the project root or the backlog directory itself. */
+/**
+ * The backlog belongs to the project, not to the directory a tool happens to run from.
+ * A caller inside a subdirectory would otherwise read an empty graph and call it healthy.
+ */
 function locateBacklog(input = process.cwd()) {
   const absolute = path.resolve(input);
   if (toPosix(absolute).endsWith(toPosix(BACKLOG_DIR))) {
     return { project: path.dirname(path.dirname(absolute)), root: absolute };
   }
-  return { project: absolute, root: path.join(absolute, BACKLOG_DIR) };
+  let directory = absolute;
+  while (true) {
+    const root = path.join(directory, BACKLOG_DIR);
+    if (fs.existsSync(root)) return { project: directory, root };
+    const parent = path.dirname(directory);
+    if (parent === directory) return { project: absolute, root: path.join(absolute, BACKLOG_DIR) };
+    directory = parent;
+  }
 }
 
 function markdownFiles(root) {
@@ -91,7 +102,14 @@ function readBacklog(input) {
     artifacts.push(toArtifact(absolute, project, root, parsed));
   }
 
-  return { project, root: toPosix(path.relative(project, root)) || ".", fileCount: files.length, artifacts, diagnostics };
+  return {
+    project,
+    root: toPosix(path.relative(project, root)) || ".",
+    files: files.map((file) => toPosix(path.relative(project, file))),
+    fileCount: files.length,
+    artifacts,
+    diagnostics,
+  };
 }
 
 module.exports = { readBacklog, relationValues, resolveLocalTarget, toPosix };

@@ -8,7 +8,7 @@ The draft, its sources, and authority.
 
 ## Output
 
-An authorized Product Brief in session or at its resolved path.
+An authorized Product Brief in session or at its resolved path. After writing, report its stable identity, changed fields as `before -> after`, affected relations, and verification result. Without a write, state that no persisted change occurred.
 
 ## Process
 
@@ -29,3 +29,5 @@ An authorized Product Brief in session or at its resolved path.
 | Existing persistence | one `current` brief changed; unauthorized edits preserved |
 | Replacement | new brief owns `supersedes`; old brief only becomes `superseded` |
 | Report | written path exists, matches the standard path, and is usable as an Epic goal or PRD source |
+| Write receipt | stable identity, `before -> after` fields, affected relations, and verification result reported |
+| No write | response states that no persisted change occurred |

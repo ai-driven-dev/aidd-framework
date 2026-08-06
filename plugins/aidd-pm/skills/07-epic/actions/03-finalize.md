@@ -8,16 +8,17 @@ One Epic, the change asked of it, and the authority for that change.
 
 ## Output
 
-The session draft or one created or updated Epic with its links.
+The session draft or one created or updated Epic with its links. After a write, report the stable identity, changed fields as `before -> after`, affected relations, and the verification result. For a draft or no-write result, state that no persisted change occurred.
 
 ## Process
 
 1. **Resolve.** Apply [persistence](../references/persistence.md) to select the target and create-or-update route.
 2. **Status.** Apply [lifecycle](../references/lifecycle.md) to every requested transition.
-3. **Authorize.** Confirm explicit approval or caller-provided bounded authority for content, target, status, order, estimate, and relations.
-4. **Write.** Create or update exactly one Epic and preserve fields outside the authorized change.
-5. **Link.** Apply [relations](../references/relations.md).
-6. **Continue.** Apply [handoffs](../references/handoffs.md) to the next move.
+3. **Authorize.** Confirm approval or bounded write authority; otherwise return the proposal.
+4. **Link.** Apply [relations](../references/relations.md).
+5. **Write.** Create or update exactly one Epic and preserve fields outside the authorized change.
+6. **Verify.** Read the affected graph back and report what changed.
+7. **Continue.** Apply [handoffs](../references/handoffs.md) to the next move.
 
 ## Test
 

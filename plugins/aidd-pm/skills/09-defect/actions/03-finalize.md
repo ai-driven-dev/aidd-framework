@@ -8,16 +8,17 @@ One Defect, the change asked of it, and the authority for that change.
 
 ## Output
 
-A session draft or one created or updated Defect identity.
+A session draft or one created or updated Defect identity. After a write, report the stable identity, changed fields as `before -> after`, affected relations, and the verification result. For a draft or no-write result, state that no persisted change occurred.
 
 ## Process
 
 1. **Resolve.** Apply [persistence](../references/persistence.md) to select the support and identity.
 2. **Status.** Apply [lifecycle](../references/lifecycle.md) to every requested transition.
-3. **Authorize.** Confirm explicit approval or caller-provided bounded authority for content, target, status, order, estimate, and relations.
-4. **Write.** Create or update only the authorized Defect and preserve unrelated fields.
-5. **Link.** Apply [relations](../references/relations.md).
-6. **Continue.** Apply [handoffs](../references/handoffs.md) to the next move.
+3. **Authorize.** Confirm approval or bounded write authority; otherwise return the proposal.
+4. **Link.** Apply [relations](../references/relations.md).
+5. **Write.** Create or update only the authorized Defect and preserve unrelated fields.
+6. **Verify.** Read the affected graph back and report what changed.
+7. **Continue.** Apply [handoffs](../references/handoffs.md) to the next move.
 
 ## Test
 
@@ -31,4 +32,4 @@ A session draft or one created or updated Defect identity.
 | Order conflict | no write; occupied value returned without choosing another |
 | Reported | one file under the standard path; unsupported sections absent |
 | Ready | Expected, Actual, Reproduction, Impact, and Evidence are non-empty |
-| Done | Verification proves expected behavior is restored |
+| Done | verification proves expected behavior is restored |

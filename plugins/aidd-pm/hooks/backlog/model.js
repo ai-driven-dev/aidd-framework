@@ -3,18 +3,18 @@
 const { RELATIONS } = require("./contract.js");
 const { relationValues, resolveLocalTarget } = require("./read.js");
 
-const PLANNING_FIELDS = ["source", "order", "estimate", "work_kind"];
+// Structural fields the model exposes in its own shape; anything else a project adds rides along.
+const STRUCTURAL = new Set(["id", "path", "title", "type", "status", ...RELATIONS]);
 
 function toEntry(artifact) {
   const relations = {};
   for (const field of RELATIONS) {
     if (Object.hasOwn(artifact.metadata, field)) relations[field] = relationValues(artifact.metadata, field);
   }
-  const planning = Object.fromEntries(
-    PLANNING_FIELDS.filter((field) => Object.hasOwn(artifact.metadata, field)).map((field) => [
-      field,
-      field === "order" ? Number(artifact.metadata[field]) : artifact.metadata[field],
-    ]),
+  const carried = Object.fromEntries(
+    Object.entries(artifact.metadata)
+      .filter(([field]) => !STRUCTURAL.has(field))
+      .map(([field, value]) => [field, field === "order" ? Number(value) : value]),
   );
   return {
     id: artifact.path,
@@ -22,7 +22,7 @@ function toEntry(artifact) {
     title: artifact.title,
     type: artifact.type,
     status: artifact.status,
-    ...planning,
+    ...carried,
     ...(Object.keys(relations).length > 0 ? { relations } : {}),
   };
 }

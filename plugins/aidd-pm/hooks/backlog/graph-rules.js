@@ -35,6 +35,10 @@ function checkLinkTargets(artifacts, project, diagnostics) {
         if (field === "supersedes" && !TERMINAL[linked.type]?.has(linked.status)) {
           report("ACTIVE_SUPERSEDED", `superseded artifact is not terminal: ${target}`);
         }
+        if (["parent", "parents"].includes(field) && TERMINAL[linked.type]?.has(linked.status) &&
+          !TERMINAL[artifact.type]?.has(artifact.status)) {
+          report("LIVE_CHILD", `live child belongs to terminal parent: ${target}`);
+        }
       }
     }
   }
@@ -59,7 +63,7 @@ function checkMirroredRelations(artifacts, diagnostics) {
   const byPath = new Map(artifacts.map((artifact) => [artifact.path, artifact]));
   for (const artifact of artifacts) {
     for (const target of artifact.relations.related_to || []) {
-      if (artifact.path.localeCompare(target) >= 0) continue;
+      if (artifact.path >= target) continue;
       if (byPath.get(target)?.relations.related_to?.includes(artifact.path)) {
         diagnostics.push(
           diagnostic(
@@ -108,7 +112,7 @@ function checkOrderCollisions(artifacts, diagnostics) {
   const taken = new Map();
   for (const artifact of artifacts) {
     if (!ORDERED_TYPES.includes(artifact.type) || !Object.hasOwn(artifact.metadata, "order")) continue;
-    const key = `${artifact.type}\0${orderSpace(artifact)}\0${artifact.metadata.order}`;
+    const key = `${artifact.type}\0${orderSpace(artifact)}\0${Number(artifact.metadata.order)}`;
     const holder = taken.get(key);
     if (holder) {
       diagnostics.push(

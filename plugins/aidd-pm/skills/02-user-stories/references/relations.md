@@ -14,4 +14,4 @@ Inverse links are never stored: `children`, `blocked_by`, `superseded_by`. Reade
 | `order` | authorized position among its parent's Stories |
 | `estimate` | authorized effort under the project's scale |
 
-A Story carries no other field. When a blocker concludes, preserve its relation and reassess affected gaps, estimate, order, and parent Epic. A child status never completes an Epic without success evidence.
+A Story carries no other field. A standalone Story omits `parent`; the intent must be explicit. When a blocker concludes, preserve its relation and reassess affected gaps, estimate, order, and parent Epic. A child status never completes an Epic without success evidence.

@@ -8,7 +8,7 @@ The path to the current spec, and the findings to address, a list or free text.
 
 ## Output
 
-The refined spec at the same path, with the changes applied and any residual `TBD` questions noted.
+The refined spec at the same path, with the changes applied and any residual `TBD` questions noted. Report its stable identity, changed fields as `before -> after`, affected relations, and verification result. Without a write, state that no persisted change occurred.
 
 ## Process
 
@@ -22,3 +22,5 @@ The refined spec at the same path, with the changes applied and any residual `TB
 
 - The spec still exists at its path and holds every required section in `@../assets/spec-validator.yml`.
 - Every finding is reflected by a change, or by an explicit `TBD: <question>` when it cannot be resolved.
+- The result reports the stable identity, `before -> after` fields, affected relations, and verification result.
+- Without a write, no persisted change is reported.

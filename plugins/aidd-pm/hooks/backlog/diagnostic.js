@@ -18,11 +18,10 @@ function diagnostic(code, artifactPath, message, field, target) {
 
 /** Sorted so a run always reports the same findings in the same order. */
 function sortDiagnostics(diagnostics) {
+  const compare = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
   return diagnostics.sort(
     (a, b) =>
-      a.path.localeCompare(b.path) ||
-      a.code.localeCompare(b.code) ||
-      (a.field || "").localeCompare(b.field || ""),
+      compare(a.path, b.path) || compare(a.code, b.code) || compare(a.field || "", b.field || ""),
   );
 }
 
