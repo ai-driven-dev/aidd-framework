@@ -1,6 +1,6 @@
 # 04 - Plan
 
-Turn the explored source into a plan and its phases, save them, then review the whole until approved. Never code.
+Turn the explored source into a plan and its phases, save them, then review the whole before handoff. Never code.
 
 ## Input
 
@@ -16,7 +16,7 @@ A feature folder, always at `aidd_docs/tasks/<yyyy_mm>/<yyyy_mm_dd>_<feature-slu
 2. **Folder.** Reuse the feature folder the source already lives in, or create one.
 3. **Fill.** Fill the plan and each phase from their templates, following the inline contracts. Slice the projection across the phases.
 4. **Show.** Display the written paths.
-5. **Review.** Show the complete plan and its phases with a confidence score (0 to 10, ✓ reasons and ✗ risks). Take feedback, revise the files, and re-show until approved. The score is never written to the plan.
+5. **Review.** Score the complete plan and its phases from 0 to 10, with ✓ reasons and ✗ risks. In interactive mode, show them and revise until approved. Under an autonomous orchestrator, revise against the source without waiting for approval; ask only when a product decision cannot be resolved from the source. The score is never written to the plan.
 
 ## Test
 
@@ -25,3 +25,4 @@ A feature folder, always at `aidd_docs/tasks/<yyyy_mm>/<yyyy_mm_dd>_<feature-slu
 - No `{...}` placeholder is left in any written file.
 - The phase projection slices together cover the modify, create, and delete lists.
 - A confidence score was reported and written to no file.
+- An autonomous run waits only for a product decision that the source cannot resolve.
