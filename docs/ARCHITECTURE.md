@@ -40,8 +40,8 @@ Declared in `plugins/<plugin>/hooks/hooks.json`. They run Node, so users need `n
 | Plugin         | Event              | Runs                      | Purpose                                                  |
 | -------------- | ------------------ | ------------------------- | -------------------------------------------------------- |
 | `aidd-context` | `SessionStart`     | `hooks/update_memory.js`  | Refresh the project memory block in the AI context files |
-| `aidd-pm`      | `PreToolUse`       | `hooks/check-backlog.js`  | Refuse a status move the artifact's lifecycle does not allow |
-| `aidd-pm`      | `PostToolUse`      | `hooks/check-backlog.js`  | Report a broken backlog artifact at the write that broke it |
+| `aidd-pm`      | `PreToolUse`       | `hooks/observe-backlog.js` | Refuse a backlog write that breaks the artifact contract |
+| `aidd-pm`      | `Stop`             | `hooks/verify-backlog.js` | Judge the resulting graph against the state the turn opened on |
 | `aidd-refine`  | `UserPromptSubmit` | `hooks/condense-stats.js` | Report token savings while condensed output mode is on   |
 
 ## 🧠 Plugin concerns and layers
@@ -63,6 +63,8 @@ Every capability lives in exactly one plugin, chosen by **concern**. This taxono
 - **Knowledge vs execution is a firewall.** Knowledge plugins produce artifacts you *read* and never write or run application source. `aidd-context`'s bootstrap deliberately creates no `package.json`. Real code belongs to `aidd-dev` or an orchestrator's own setup actions.
 - **Concern decides placement, not existence.** A missing capability goes in the plugin whose concern owns it, then the caller delegates. Never reimplement it in the calling plugin because the right home lacks it today.
 - **Orchestration = sequencing across concerns** with little domain logic. Delegating a sub-step once does not make a skill an orchestrator. The orchestrator owns only glue and hands off through a seam artifact, for example an `INSTALL.md` one plugin produces and another consumes.
+- `aidd-orchestrator:02-backlog` owns the cross-artifact flow. Backlog artifact contracts, hooks, and validators remain in `aidd-pm`, so direct PM skill calls keep the same checks.
+- The PM hook judges what a write is about to do, then what the turn left behind. A backlog it can read needs nothing from its owner. A backlog held outside the project may stage its affected `before`, `proposed` and read-back `actual` graph, which the hook validates the same way; nothing requires it until such a support exists.
 
 ## 🔀 Skills are routers
 

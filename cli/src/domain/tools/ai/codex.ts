@@ -99,8 +99,8 @@ function ensureProjectDocMaxBytes(existing: TomlRecord, incoming: TomlRecord): v
 
 function ensureCodexHooks(existing: TomlRecord): void {
   const features = existing.features as TomlRecord | undefined;
-  if (features?.codex_hooks !== undefined) return;
-  existing.features = { ...(features ?? {}), codex_hooks: true };
+  if (features?.hooks !== undefined || features?.codex_hooks !== undefined) return;
+  existing.features = { ...(features ?? {}), hooks: true };
 }
 
 export function mergeCodexConfigToml(existing: string, aiddPayload: string): string {

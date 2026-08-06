@@ -52,11 +52,10 @@ The development SDLC: plan, implement, assert, audit, review, test, refactor, de
 
 ## 📋 aidd-pm
 
-Product backlog orchestration, refinement, Product Briefs, Epics, User Stories, Tasks, Spikes, Defects, requirements, and specs.
+Product backlog artifacts, refinement, Product Briefs, Epics, User Stories, Tasks, Spikes, Defects, requirements, and specs.
 
 | Skill                     | Role                                                       | Actions                          |
 | ------------------------- | ---------------------------------------------------------- | -------------------------------- |
-| `00-backlog`              | Orchestrate intake, review, and backlog events             | `01-inspect` to `08-verify`      |
 | `01-ticket-info`          | Retrieve and display ticket information                    | `01-ticket-info`                 |
 | `02-user-stories`         | Slice, assess, and order User Stories                       | `01-frame` to `07-finalize`      |
 | `03-prd`                  | Generate a structured Product Requirements Document        | `01-prd`                         |
@@ -94,11 +93,12 @@ Version-control workflows: repo init, commit, pull/merge request, release tag, i
 
 ## 🎼 aidd-orchestrator
 
-Optional. Runs the SDLC asynchronously on labeled issues (webhook or cron). Most projects do not need it.
+Cross-domain orchestration for asynchronous development and product backlogs.
 
-| Skill            | Role                                                  | Sub-flows                 |
+| Skill            | Role                                                  | Sub-flows or actions      |
 | ---------------- | ----------------------------------------------------- | ------------------------- |
 | `00-async-dev`   | Single entry point for the async-dev pipeline         | `setup`, `run`, `review`  |
+| `02-backlog`     | Orchestrate intake, review, and backlog events        | `01-inspect` to `08-verify` |
 
 ## 🎨 aidd-ui
 

@@ -8,7 +8,7 @@ A request, artifact, backlog location, or current context.
 
 ## Output
 
-The resolved scope, event, support, authority, and backlog read model.
+The resolved scope, event, support, authority, and backlog read model. A question is answered from that model and changes nothing.
 
 ## Process
 
@@ -30,3 +30,4 @@ The resolved scope, event, support, authority, and backlog read model.
 | Autonomous without bounds | changes stay inside the resolved scope |
 | Memory conflicts with support | conflict returned; no inferred mapping |
 | Resolved scope | event, support, authority, and affected identities are explicit |
+| Question | answered from the read model; workspace unchanged |

@@ -13,4 +13,4 @@
 | completed evidence that changes project knowledge | matching learning capability |
 | health or relation repair | affected artifact owners |
 
-Use the project-defined artifact type when it extends this map. Route to the owner; what the event then means for other artifacts is that owner's to state.
+Use the project-defined artifact type when it extends this map. Route to the owner. What the event then means for other artifacts is for that owner to state.

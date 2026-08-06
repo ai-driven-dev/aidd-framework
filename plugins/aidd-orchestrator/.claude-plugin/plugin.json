@@ -2,20 +2,22 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "aidd-orchestrator",
   "version": "2.1.1",
-  "description": "Orchestration plugin. v1 use case: async development - turn ready issues into pull requests, then iterate on review feedback until a human takes over. Designed to host more orchestration use cases (refactoring, docs, audits) in future versions.",
+  "description": "Orchestrates async development and product backlog workflows across focused capabilities.",
   "author": {
     "name": "AI-Driven Dev",
     "url": "https://github.com/ai-driven-dev"
   },
   "skills": [
-    "./skills/00-async-dev"
+    "./skills/00-async-dev",
+    "./skills/02-backlog"
   ],
   "keywords": [
     "orchestration",
     "async",
     "pipeline",
     "pull-request",
-    "automation"
+    "automation",
+    "backlog"
   ],
   "repository": "https://github.com/ai-driven-dev/framework",
   "homepage": "https://ai-driven.dev",

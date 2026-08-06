@@ -25,9 +25,9 @@ flowchart TB
 
 ## Workflow
 
-| Meaning | Native status |
-| --- | --- |
-| `<project meaning>` | `<support value>` |
+| Support | Native status | Meaning |
+| --- | --- | --- |
+| `<support>` | `<support value>` | `<project meaning>` |
 
 ## Planning
 
