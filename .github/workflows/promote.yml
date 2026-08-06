@@ -75,8 +75,17 @@ jobs:
             is_sync_commit "$c" && SYNCS+=("$c")
           done
 
-          if [ "${#SYNCS[@]}" -ge 2 ]; then
-            START="${SYNCS[$((${#SYNCS[@]} - 2))]}"
+          # The most recent sync is the boundary: everything up to and
+          # including it is already folded into main (that's what "sync"
+          # means), so only commits strictly after it are genuine next-only
+          # work still owed to main. Picking an older sync here replays a
+          # window of already-promoted commits, which either no-ops as empty
+          # cherry-picks (halting the script, since it doesn't pass
+          # --allow-empty) or, worse, collides with unrelated commits that
+          # touched the same files in between (e.g. sequential dependency
+          # lockfile bumps), producing spurious conflicts.
+          if [ "${#SYNCS[@]}" -ge 1 ]; then
+            START="${SYNCS[$((${#SYNCS[@]} - 1))]}"
           else
             START="origin/main"
           fi
