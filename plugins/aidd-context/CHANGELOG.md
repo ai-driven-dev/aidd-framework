@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.6.0](https://github.com/ai-driven-dev/framework/compare/aidd-context-v2.5.0...aidd-context-v2.6.0) (2026-08-06)
+
+
+### Features
+
+* **aidd-pm:** keep a typed product backlog coherent whoever writes to it ([#582](https://github.com/ai-driven-dev/framework/issues/582)) ([fe0eebc](https://github.com/ai-driven-dev/framework/commit/fe0eebc5cf142e6668859f83dfe7ae4a38097435))
+* **framework:** add QA and communication evaluations ([#512](https://github.com/ai-driven-dev/framework/issues/512)) ([871d192](https://github.com/ai-driven-dev/framework/commit/871d1926e9944af231b15951d54bfe6364234536))
+
+
+### Refactoring
+
+* **aidd-context:** citations are links at their point of use ([dc85562](https://github.com/ai-driven-dev/framework/commit/dc855624736645325ae49b2df9e9768bbf82320f))
+* **orchestrator:** replace SDLC actions with protocols ([#517](https://github.com/ai-driven-dev/framework/issues/517)) ([ed81604](https://github.com/ai-driven-dev/framework/commit/ed816044709b2b7081cc00ad2103a8571bf0ad6c))
+* **plugins:** action citations use markdown links, not @ ([c5da712](https://github.com/ai-driven-dev/framework/commit/c5da7126ef30354e17d4665300bd88481fc7c816))
+
 ## [2.5.0](https://github.com/ai-driven-dev/framework/compare/aidd-context-v2.4.1...aidd-context-v2.5.0) (2026-07-31)
 
 

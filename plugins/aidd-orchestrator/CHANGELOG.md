@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.2.0](https://github.com/ai-driven-dev/framework/compare/aidd-orchestrator-v2.1.1...aidd-orchestrator-v2.2.0) (2026-08-06)
+
+
+### Features
+
+* **aidd-pm:** keep a typed product backlog coherent whoever writes to it ([#582](https://github.com/ai-driven-dev/framework/issues/582)) ([fe0eebc](https://github.com/ai-driven-dev/framework/commit/fe0eebc5cf142e6668859f83dfe7ae4a38097435))
+
+
+### Refactoring
+
+* **orchestrator:** replace SDLC actions with protocols ([#517](https://github.com/ai-driven-dev/framework/issues/517)) ([ed81604](https://github.com/ai-driven-dev/framework/commit/ed816044709b2b7081cc00ad2103a8571bf0ad6c))
+
 ## [2.1.1](https://github.com/ai-driven-dev/framework/compare/aidd-orchestrator-v2.1.0...aidd-orchestrator-v2.1.1) (2026-07-10)
 
 

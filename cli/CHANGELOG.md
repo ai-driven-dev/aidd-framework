@@ -1,5 +1,25 @@
 # Changelog
 
+## [5.2.0](https://github.com/ai-driven-dev/framework/compare/cli-v5.1.6...cli-v5.2.0) (2026-08-06)
+
+
+### Features
+
+* **aidd-pm:** keep a typed product backlog coherent whoever writes to it ([#582](https://github.com/ai-driven-dev/framework/issues/582)) ([fe0eebc](https://github.com/ai-driven-dev/framework/commit/fe0eebc5cf142e6668859f83dfe7ae4a38097435))
+* **kanban:** mount the kanban viewer on aidd as a hidden command ([#573](https://github.com/ai-driven-dev/framework/issues/573)) ([0e73737](https://github.com/ai-driven-dev/framework/commit/0e737371ff9c64e152d40575c29ffc985d31e614))
+
+
+### Bug Fixes
+
+* **ci:** unbreak the framework-local checks after the kanban move ([#574](https://github.com/ai-driven-dev/framework/issues/574)) ([2f69050](https://github.com/ai-driven-dev/framework/commit/2f69050ce7df1059ff0fc337d6e171174a5f46b1))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @biomejs/biome from 2.4.7 to 2.5.6 in /cli ([#577](https://github.com/ai-driven-dev/framework/issues/577)) ([2f31414](https://github.com/ai-driven-dev/framework/commit/2f31414126465138bd62e280be8d909371ae1578))
+* **deps-dev:** bump knip from 6.16.1 to 6.31.0 in /cli ([#578](https://github.com/ai-driven-dev/framework/issues/578)) ([c392ccf](https://github.com/ai-driven-dev/framework/commit/c392ccfe34a28a392270ab322e13c967d7f86e47))
+* **deps:** bump react and @types/react in /cli ([#576](https://github.com/ai-driven-dev/framework/issues/576)) ([cc3659a](https://github.com/ai-driven-dev/framework/commit/cc3659a527cf0d50dbd7b07f703999b3ef13da93))
+
 ## [5.1.6](https://github.com/ai-driven-dev/framework/compare/cli-v5.1.5...cli-v5.1.6) (2026-07-31)
 
 
