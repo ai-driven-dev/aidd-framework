@@ -17,7 +17,7 @@
     {
       "name": "aidd-dev",
       "source": "./plugins/aidd-dev",
-      "description": "Code transformation: Dev SDLC orchestrator (code-shipping pipeline), plan, assert, audit, review, test, refactor, debug, for-sure. Hosts engineering agents.",
+      "description": "Code transformation: plan, implement, assert, audit, review, test, refactor, debug, for-sure. Hosts engineering agents.",
       "strict": true,
       "recommended": true
     },
@@ -38,9 +38,9 @@
     {
       "name": "aidd-orchestrator",
       "source": "./plugins/aidd-orchestrator",
-      "description": "Async development orchestration: turn ready issues into pull requests, then iterate on review feedback until a human takes over.",
+      "description": "Orchestration: synchronous SDLC code-shipping pipeline and async issue-to-PR automation.",
       "strict": true,
-      "recommended": false
+      "recommended": true
     },
     {
       "name": "aidd-refine",

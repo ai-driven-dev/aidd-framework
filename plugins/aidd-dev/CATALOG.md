@@ -9,7 +9,6 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 - [`.claude-plugin`](#claude-plugin)
 - [`agents`](#agents)
 - [`skills`](#skills)
-  - [`skills/00-sdlc`](#skills00-sdlc)
   - [`skills/01-plan`](#skills01-plan)
   - [`skills/02-implement`](#skills02-implement)
   - [`skills/03-assert`](#skills03-assert)
@@ -38,17 +37,6 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | [executor.md](agents/executor.md) | `Turns a dispatched task into working, validated code that fits the project. Use when an approved scope must become code. Never plans, never judges its own work.` |
 
 ### `skills`
-
-#### `skills/00-sdlc`
-
-| Group | File | Description |
-|-------|------|---|
-| `actions` | [01-spec.md](skills/00-sdlc/actions/01-spec.md) | - |
-| `actions` | [02-plan.md](skills/00-sdlc/actions/02-plan.md) | - |
-| `actions` | [03-implement.md](skills/00-sdlc/actions/03-implement.md) | - |
-| `actions` | [04-review.md](skills/00-sdlc/actions/04-review.md) | - |
-| `actions` | [05-ship.md](skills/00-sdlc/actions/05-ship.md) | - |
-| `-` | [SKILL.md](skills/00-sdlc/SKILL.md) | `Orchestrate the full dev flow, a free-form request to shipped code, every step delegated. Use to take a request end to end, not a single step. Interactive by default; say auto for unattended.` |
 
 #### `skills/01-plan`
 
