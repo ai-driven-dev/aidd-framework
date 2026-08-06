@@ -39,10 +39,10 @@ Skills are grouped into plugins by domain. Install only the plugins you need.
 | ----------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | aidd-context      | Bootstrap, project init, generation of context artifacts (skills, agents, rules, commands, hooks, plugins, marketplaces), mermaid diagrams, learn, discovery | `02-project-memory`, `03-context-generate`, `09-mermaid`      |
 | aidd-refine       | Meta-cognition: brainstorm, challenge prior work, condensed communication mode     | `01-brainstorm`, `02-challenge`, `03-condense`              |
-| aidd-pm           | Product management: ticket info, user stories, Product Briefs, PRD, spec, spikes     | `01-ticket-info`, `02-user-stories`, `03-prd`, `04-spec`, `05-spike`, `06-product-brief` |
+| aidd-pm           | Product management: backlog artifacts, refinement, Product Briefs, PRD, spec        | `02-user-stories`, `05-spike`, `07-epic`, `09-defect`, `10-task` |
 | aidd-dev          | Code transformation: plan, implement, assert, audit, review, test, refactor, debug, for-sure | `01-plan`, `02-implement`, `05-review`, `06-test` |
 | aidd-vcs          | VCS workflows: commit, pull/merge request, release tag, issue creation             | `01-commit`, `02-pull-request`, `04-issue-create`           |
-| aidd-orchestrator | Synchronous SDLC orchestration and optional async issue-to-PR automation | `00-async-dev`, `01-sdlc` |
+| aidd-orchestrator | Synchronous SDLC, async issue-to-PR automation, and product backlog                 | `00-async-dev`, `01-sdlc`, `02-backlog`                    |
 
 > See the [CATALOG](../docs/CATALOG.md) for the exhaustive list of skills and actions.
 
@@ -70,6 +70,8 @@ my-project/
 │   │   └── vcs.md
 │   ├── internal/
 │   │   └── decisions/           # Decision records written by aidd-context:10-learn
+│   ├── product/                 # Product Briefs, durable and one per product
+│   ├── backlog/                 # Local Epics, User Stories, Tasks, Spikes, and Defects
 │   ├── tasks/                   # Specs, plans, run summaries
 │   ├── recipes/                 # Project-specific cook recipes
 │   ├── ADR.md                   # Architecture decision log (aidd-context:10-learn)
@@ -105,7 +107,8 @@ AIDD is delivered as a plugin marketplace. Pick what you need; do not install ev
 | aidd-dev     | 01-plan, 02-implement, 03-assert, 04-audit, 05-review, 06-test, 07-refactor, 08-debug, 09-for-sure, 10-todo       |
 | aidd-orchestrator | 00-async-dev, 01-sdlc                                                                                         |
 | aidd-vcs     | 01-commit, 02-pull-request, 03-release-tag, 04-issue-create                                                         |
-| aidd-pm      | 01-ticket-info, 02-user-stories, 03-prd, 04-spec, 05-spike, 06-product-brief                                      |
+| aidd-pm      | 01-ticket-info, 02-user-stories, 03-prd, 04-spec, 05-spike, 06-product-brief, 07-epic, 08-three-amigos, 09-defect, 10-task |
+| aidd-orchestrator | 00-async-dev, 02-backlog                                                                                     |
 
 Each plugin is independently installable; install incrementally. Smaller surface, fewer triggers competing.
 
@@ -115,7 +118,7 @@ A typical change cycles through skills from several plugins. The order below is 
 
 1. **Bootstrap** (only for a brand-new project): `aidd-context:01-bootstrap` imagines the stack and architecture, comparing candidate stacks and writing an `INSTALL.md`. Skip this step on an existing project.
 2. **Project init** (once per project, re-runnable to refresh): `aidd-context:02-project-memory` scaffolds `aidd_docs/`, the memory bank, and the AI context files for the tools you use. Re-running later refreshes the scaffold without overwriting your customizations.
-3. **Frame the request**: `aidd-refine:01-brainstorm` to clarify, `aidd-pm:06-product-brief` to align the product, then `aidd-pm:02-user-stories`, `aidd-pm:03-prd`, or `aidd-pm:04-spec` to formalize scope.
+3. **Frame the request**: use `aidd-refine:01-brainstorm` to clarify, then `aidd-orchestrator:02-backlog` to route product artifacts, refinement, and lifecycle changes.
 4. **Plan**: `aidd-dev:01-plan` produces the technical plan, component behavior model, or design-image extraction.
 5. **Implement and assert**: `aidd-dev:02-implement` writes code against the plan; `aidd-dev:03-assert` verifies the result.
 6. **Review**: `aidd-dev:05-review` for code and functional review; `aidd-refine:02-challenge` to stress-test the result.
@@ -136,8 +139,8 @@ Beyond the synchronous path above, `aidd-orchestrator:00-async-dev` runs the SDL
 
 ## Validation Rules
 
-- Skills must have an `## Available actions` table, `## Default flow`, `## Transversal rules`.
-- Actions must contain only `## Inputs`, `## Outputs`, `## Process`, `## Test`.
+- Skills route through an `## Actions` table and keep shared constraints under `## Transversal rules`.
+- Actions use `## Input`, `## Output`, `## Process`, and `## Test`.
 - Tests must be observable: command, artifact check, or side effect.
 
 ---

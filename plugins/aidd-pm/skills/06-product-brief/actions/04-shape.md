@@ -20,9 +20,9 @@ A review-ready Product Brief kept in context.
 
 | Case | Pass |
 | --- | --- |
-| Frontmatter | non-empty `objective`; `status: current`; relation fields absent unless backed by a replacement |
+| Frontmatter | non-empty `objective`; `revision: current`; relation fields absent unless backed by a replacement |
 | Structure | template order unchanged; only empty optional sections omitted |
 | Cleanup | no comment, placeholder, or `TODO` remains |
 | Claims | every consequential claim has a status and basis or next check |
 | Quality | every `brief-quality` row passes |
-| Handoff | complete draft shown; workspace unchanged; finalization follows |
+| Handoff | complete draft shown; workspace unchanged |

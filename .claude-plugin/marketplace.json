@@ -31,14 +31,14 @@
     {
       "name": "aidd-pm",
       "source": "./plugins/aidd-pm",
-      "description": "Product management: ticket-info, user-stories, product-brief, prd, spec, spike",
+      "description": "Product backlog artifacts, refinement, Product Briefs, Epics, User Stories, Tasks, Spikes, Defects, requirements, and specs.",
       "strict": true,
       "recommended": true
     },
     {
       "name": "aidd-orchestrator",
       "source": "./plugins/aidd-orchestrator",
-      "description": "Orchestration: synchronous SDLC code-shipping pipeline and async issue-to-PR automation.",
+      "description": "Orchestration: synchronous SDLC pipeline, async issue-to-PR automation, and product backlog.",
       "strict": true,
       "recommended": true
     },

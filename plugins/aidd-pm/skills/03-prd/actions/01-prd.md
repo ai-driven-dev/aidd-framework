@@ -8,7 +8,7 @@ A feature description (required), and optionally existing user stories (ids or t
 
 ## Output
 
-The saved PRD at `aidd_docs/tasks/<yyyy_mm>/<yyyy_mm_dd>-<feature_name>-prd.md`, carrying all eight sections.
+The saved PRD at `aidd_docs/tasks/<yyyy_mm>/<yyyy_mm_dd>-<feature_name>-prd.md`, carrying all eight sections. After writing, report its stable identity, changed fields as `before -> after`, affected relations, and verification result. Without a write, state that no persisted change occurred.
 
 ## Process
 
@@ -22,3 +22,4 @@ The saved PRD at `aidd_docs/tasks/<yyyy_mm>/<yyyy_mm_dd>-<feature_name>-prd.md`,
 - The PRD file exists on disk after the action completes.
 - It contains the eight headings: Overview, Problem Statement, Goals, Non-Goals, User Stories, Acceptance Criteria, Dependencies, Open Questions.
 - It has no solution detail: no tech-stack, data-model, or architecture section, no `## Implementation` heading, and no source code.
+- A write reports its stable identity, `before -> after` fields, affected relations, and verification result; otherwise no persisted change is reported.

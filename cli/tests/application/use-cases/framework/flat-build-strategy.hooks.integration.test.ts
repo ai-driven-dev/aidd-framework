@@ -163,19 +163,25 @@ describe("cursor flat hooks", () => {
     expect(parsed.version).toBe(1);
   });
 
-  it("skips unmapped events (PreToolUse is not in cursor event map)", async () => {
+  it("installs the common tool lifecycle event in Cursor's native name", async () => {
     const useCase = makeStrategy(memFs, buildCursorFlatContract);
     await useCase.execute({ sourceDir: FIXTURE_DIR, outDir: ABS_OUT, target: "cursor" });
 
     const raw = memFs.getFile(`${ABS_OUT}/.cursor/hooks.json`) ?? "";
     const parsed = JSON.parse(raw) as { hooks?: Record<string, unknown> };
-    // PreToolUse is an unmapped event → warn-and-skip for cursor
-    // (fixture uses PreToolUse, not SessionStart/UserPromptSubmit)
     expect(Object.keys(parsed.hooks ?? {})).not.toContain("PreToolUse");
-    expect(Object.keys(parsed.hooks ?? {})).not.toContain("preToolUse");
+    expect(parsed.hooks?.preToolUse).toBeDefined();
   });
 
-  it("warns for unmapped cursor events", async () => {
+  it("warns for unsupported cursor events", async () => {
+    memFs.setFile(
+      `${FIXTURE_DIR}/plugins/${PLUGIN}/hooks/hooks.json`,
+      JSON.stringify({
+        hooks: {
+          UnknownEvent: [{ hooks: [{ type: "command", command: "run.sh" }] }],
+        },
+      })
+    );
     const logger = new CapturingLogger();
     const strategy = new FlatBuildStrategy(
       memFs,
@@ -195,7 +201,7 @@ describe("cursor flat hooks", () => {
       strategy
     );
     await useCase.execute({ sourceDir: FIXTURE_DIR, outDir: ABS_OUT, target: "cursor" });
-    expect(logger.warnMessages.some((w) => w.includes("PreToolUse"))).toBe(true);
+    expect(logger.warnMessages.some((w) => w.includes("UnknownEvent"))).toBe(true);
   });
 
   it("copies hook scripts to .cursor/hooks/<plugin>/", async () => {
@@ -243,7 +249,11 @@ describe("copilot flat hooks shape", () => {
     await useCase.execute({ sourceDir: FIXTURE_DIR, outDir: ABS_OUT, target: "copilot" });
 
     const raw = memFs.getFile(`${ABS_OUT}/.github/hooks/${PLUGIN}.hooks.json`) ?? "";
-    const parsed = JSON.parse(raw) as { hooks?: Record<string, Array<Record<string, unknown>>> };
+    const parsed = JSON.parse(raw) as {
+      version?: number;
+      hooks?: Record<string, Array<Record<string, unknown>>>;
+    };
+    expect(parsed.version).toBe(1);
     const entries = parsed.hooks?.PreToolUse ?? [];
     // Each entry must be {type, command} directly — no nested {hooks:[...]} wrapper
     for (const entry of entries) {
