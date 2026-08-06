@@ -13,4 +13,4 @@
 
 For Markdown, write `aidd_docs/backlog/spikes/<slug>.md`, the title in kebab-case. Blocked work is found by scanning `parents`. Use native tracker relations when available, but never mirror a relation or artifact across supports.
 
-Markdown is the only support these skills write today. Naming another one is a project's own integration, and nothing verifies it for you.
+Markdown is the only support these skills write today. Naming another one is a project's own integration.

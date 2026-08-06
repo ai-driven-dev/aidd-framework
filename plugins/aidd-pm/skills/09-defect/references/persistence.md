@@ -15,4 +15,4 @@ Use native fields when supported. Otherwise use stable ids, URLs, or project-rel
 
 Write each Markdown Defect to `aidd_docs/backlog/defects/<slug>.md`, the title in kebab-case.
 
-Markdown is the only support these skills write today. Naming another one is a project's own integration, and nothing verifies it for you.
+Markdown is the only support these skills write today. Naming another one is a project's own integration.

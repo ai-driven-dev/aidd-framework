@@ -14,4 +14,4 @@ Use native fields when supported; otherwise use stable ids, URLs, or project-rel
 
 For Markdown, write `aidd_docs/backlog/tasks/<slug>.md`, the title in kebab-case.
 
-Markdown is the only support these skills write today. Naming another one is a project's own integration, and nothing verifies it for you.
+Markdown is the only support these skills write today. Naming another one is a project's own integration.

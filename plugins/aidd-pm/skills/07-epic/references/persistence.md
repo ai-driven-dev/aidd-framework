@@ -17,4 +17,4 @@ Write a Markdown Epic to `aidd_docs/backlog/epics/<slug>.md`, the title in kebab
 
 Updating an Epic preserves its identity; it does not relate the Epic to itself.
 
-Markdown is the only support these skills write today. Naming another one is a project's own integration, and nothing verifies it for you.
+Markdown is the only support these skills write today. Naming another one is a project's own integration.

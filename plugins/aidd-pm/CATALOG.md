@@ -7,8 +7,6 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 ## Table of Contents
 
 - [`.claude-plugin`](#claude-plugin)
-- [`hooks`](#hooks)
-  - [`hooks/backlog`](#hooksbacklog)
 - [`skills`](#skills)
   - [`skills/01-ticket-info`](#skills01-ticket-info)
   - [`skills/02-user-stories`](#skills02-user-stories)
@@ -28,31 +26,6 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | File |
 |------|
 | [plugin.json](.claude-plugin/plugin.json) |
-
-### `hooks`
-
-| File |
-|------|
-| [check-backlog.js](hooks/check-backlog.js) |
-| [hooks.json](hooks/hooks.json) |
-| [observe-backlog.js](hooks/observe-backlog.js) |
-| [verify-backlog.js](hooks/verify-backlog.js) |
-
-#### `hooks/backlog`
-
-| File |
-|------|
-| [artifact-rules.js](hooks/backlog/artifact-rules.js) |
-| [canonical-transaction.js](hooks/backlog/canonical-transaction.js) |
-| [change-rules.js](hooks/backlog/change-rules.js) |
-| [contract.js](hooks/backlog/contract.js) |
-| [diagnostic.js](hooks/backlog/diagnostic.js) |
-| [graph-rules.js](hooks/backlog/graph-rules.js) |
-| [hook-event.js](hooks/backlog/hook-event.js) |
-| [journal.js](hooks/backlog/journal.js) |
-| [markdown.js](hooks/backlog/markdown.js) |
-| [model.js](hooks/backlog/model.js) |
-| [read.js](hooks/backlog/read.js) |
 
 ### `skills`
 

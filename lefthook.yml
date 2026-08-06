@@ -84,14 +84,6 @@ pre-commit:
         fi
         node scripts/sync-readme-counts.mjs >/dev/null
         git add README.md 2>/dev/null || true
-    backlog-checker-tests:
-      glob: "{plugins/aidd-pm/hooks/*,scripts/__tests__/check-backlog.test.js,plugins/aidd-pm/skills/**}"
-      run: |
-        if ! command -v node >/dev/null 2>&1; then
-          echo "ℹ️  node not available; skipping backlog-checker-tests"
-          exit 0
-        fi
-        node --test scripts/__tests__/check-backlog.test.js
     cli-biome:
       glob: "cli/**"
       run: cd cli && pnpm lint
