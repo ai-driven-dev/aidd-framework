@@ -59,7 +59,7 @@ The feature recipe takes the project through the per-feature loop.
 1. Follow [Ship a feature](ship-a-feature.md).
 
 ```text
-/aidd-dev:00-sdlc
+/aidd-orchestrator:01-sdlc
 ```
 
 ## Verify
