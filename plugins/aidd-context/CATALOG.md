@@ -74,6 +74,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `actions` | [01-scan.md](skills/02-project-memory/actions/01-scan.md) | - |
 | `actions` | [02-generate.md](skills/02-project-memory/actions/02-generate.md) | - |
 | `actions` | [03-sync.md](skills/02-project-memory/actions/03-sync.md) | - |
+| `actions` | [04-test-prompt.md](skills/02-project-memory/actions/04-test-prompt.md) | - |
 | `assets` | [AGENTS.md](skills/02-project-memory/assets/AGENTS.md) | - |
 | `assets` | [CONTRIBUTING.md](skills/02-project-memory/assets/CONTRIBUTING.md) | - |
 | `assets` | [GUIDELINES.md](skills/02-project-memory/assets/GUIDELINES.md) | - |
