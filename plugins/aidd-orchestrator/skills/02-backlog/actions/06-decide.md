@@ -14,7 +14,7 @@ An authorized change set, requested revisions, or no change.
 
 1. **Reconcile.** Merge duplicate proposals and surface contradictions.
 2. **Impact.** Show every artifact, field, transition, relation, and reason that would change.
-3. **Authorize.** Use bounded autonomous authority or invite correction, rejection, or approval in one open question.
+3. **Authorize.** Apply bounded autonomous authority, or ask one open question for correction, rejection, or approval and wait for the reply before the change set is frozen.
 4. **Freeze.** Allow no unlisted mutation.
 
 ## Test
@@ -26,3 +26,4 @@ An authorized change set, requested revisions, or no change.
 | Interactive approval | every mutation has identity, owner, before, after, and evidence |
 | Bounded autonomy | only pre-authorized mutations remain |
 | No authority | workspace unchanged |
+| Open question | apply does not start before the reply arrives |
