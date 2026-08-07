@@ -1,107 +1,217 @@
-# Token optimization across coding agents
+# Token optimization techniques
 
-Cut token usage across coding agents without confusing general techniques with Claude Code or Codex commands.
+Cut token usage across coding agents with client-specific commands and measurable checks.
 
-- [Token optimization across coding agents](#token-optimization-across-coding-agents)
+- [Token optimization techniques](#token-optimization-techniques)
   - [Why](#why)
   - [Steps to cut token usage](#steps-to-cut-token-usage)
     - [🟢 Beginner](#-beginner)
-      - [1) 📏 Record a before-and-after baseline](#1--record-a-before-and-after-baseline)
-      - [2) 🔎 Inspect Claude's context breakdown](#2--inspect-claudes-context-breakdown)
-      - [3) ✂️ Trim persistent instructions](#3-️-trim-persistent-instructions)
-      - [4) 🧭 Plan before expensive rework](#4--plan-before-expensive-rework)
-      - [5) ♻️ Reset between unrelated tasks](#5-️-reset-between-unrelated-tasks)
-      - [6) 🗜️ Compact at a natural boundary](#6-️-compact-at-a-natural-boundary)
+      - [1) 📏 Measure session usage](#1--measure-session-usage)
+      - [2) 📟 Keep usage visible](#2--keep-usage-visible)
+      - [3) 📊 Analyze local history](#3--analyze-local-history)
+      - [4) 🔎 Inspect Claude's loaded context](#4--inspect-claudes-loaded-context)
+      - [5) ✂️ Keep AGENTS.md and CLAUDE.md short](#5-️-keep-agentsmd-and-claudemd-short)
+      - [6) 🎯 Scope rules to matching files](#6--scope-rules-to-matching-files)
+      - [7) 🧩 Load skills only on demand](#7--load-skills-only-on-demand)
+      - [8) 🧠 Disable stale auto-memory](#8--disable-stale-auto-memory)
+      - [9) 🪨 Compress instruction files with Caveman](#9--compress-instruction-files-with-caveman)
+      - [10) 🧭 Plan before expensive work](#10--plan-before-expensive-work)
+      - [11) ♻️ Reset unrelated work](#11-️-reset-unrelated-work)
+      - [12) 🗜️ Compact the same task](#12-️-compact-the-same-task)
     - [🟡 Intermediate](#-intermediate)
-      - [7) 📈 Export structured usage telemetry](#7--export-structured-usage-telemetry)
-      - [8) 🗣️ Make concise output explicit](#8-️-make-concise-output-explicit)
-      - [9) 🧹 Filter noisy shell output selectively](#9--filter-noisy-shell-output-selectively)
-      - [10) 🔌 Limit MCP exposure by client](#10--limit-mcp-exposure-by-client)
+      - [13) 📈 Export token telemetry](#13--export-token-telemetry)
+      - [14) 🗣️ Set native concise output](#14-️-set-native-concise-output)
+      - [15) 🪨 Compress output with Caveman](#15--compress-output-with-caveman)
+      - [16) 🧠 Shape actionable output with i-have-adhd](#16--shape-actionable-output-with-i-have-adhd)
+      - [17) 🧹 Filter shell output with RTK](#17--filter-shell-output-with-rtk)
+      - [18) ✂️ Filter shell output with SNIP](#18-️-filter-shell-output-with-snip)
+      - [19) 🪝 Rewrite noisy commands with hooks](#19--rewrite-noisy-commands-with-hooks)
+      - [20) ✋ Cap Codex tool history](#20--cap-codex-tool-history)
+      - [21) 🚫 Block bulky paths](#21--block-bulky-paths)
+      - [22) 🔌 Limit MCP exposure](#22--limit-mcp-exposure)
     - [🔴 Expert](#-expert)
-      - [11) 🔬 Inspect client behavior without mixing shortcuts](#11--inspect-client-behavior-without-mixing-shortcuts)
-      - [12) 🎯 Route model and reasoning by difficulty](#12--route-model-and-reasoning-by-difficulty)
-      - [13) 🧫 Isolate noisy work with subagents](#13--isolate-noisy-work-with-subagents)
-      - [14) 🧊 Protect Claude Code prompt-cache stability](#14--protect-claude-code-prompt-cache-stability)
+      - [23) 🔬 Inspect model-visible behavior](#23--inspect-model-visible-behavior)
+      - [24) 🎯 Route model and effort by difficulty](#24--route-model-and-effort-by-difficulty)
+      - [25) 🧫 Isolate noisy work with subagents](#25--isolate-noisy-work-with-subagents)
+      - [26) 🧊 Preserve Claude prompt-cache prefixes](#26--preserve-claude-prompt-cache-prefixes)
+      - [27) ✅ Lower reasoning on routine work](#27--lower-reasoning-on-routine-work)
+  - [Verify the result](#verify-the-result)
   - [In short](#in-short)
+
 
 ## Why
 
-**Token usage** grows with persistent instructions, conversation history, tool output, and reasoning.
+**Input tokens** come from instructions, history, tools, and logs.
 
-**Command names are not portable contracts**: `/usage`, `/compact`, `/model`, and keyboard shortcuts can differ across clients.
-
-**Applicability labels** separate portable techniques from verified Claude Code and Codex mechanics. No command is labeled as universal.
+**Output tokens** come from verbosity and reasoning effort.
 
 ## Steps to cut token usage
 
 ### 🟢 Beginner
 
-#### 1) 📏 Record a before-and-after baseline
+#### 1) 📏 Measure session usage
 
-**Applies to:** Claude Code and Codex; their counters differ.
+Run the native counter after each feature and compare only equivalent tasks.
 
-1. Run the same task with the same model and reasoning level before and after one optimization, then record the command result and quality gate.
-
-| Client | Command | Record |
+| Client | Command | Measures |
 | --- | --- | --- |
-| Claude Code | `/usage` | Session usage and available breakdowns |
-| Codex | `/status` | Context usage under the current chat configuration |
+| Claude Code | `/usage` (`/cost`, `/stats`) | Session tokens, estimated cost, and supported attribution |
+| Codex | `/status`; `/usage daily`, `/usage weekly`, `/usage cumulative` | Current context and account token activity |
 
-Compare only within the same client. See [Claude Code costs](https://code.claude.com/docs/en/costs) and [Codex commands](https://learn.chatgpt.com/docs/developer-commands?surface=cli).
+See [Claude Code costs](https://code.claude.com/docs/en/costs) and [Codex commands](https://learn.chatgpt.com/docs/developer-commands?surface=cli).
 
-#### 2) 🔎 Inspect Claude's context breakdown
+#### 2) 📟 Keep usage visible
 
-**Applies to:** Claude Code. Codex has no equivalent component grid.
+Use the native status line instead of asking the model for usage.
 
-1. Run `/context all` only when the baseline shows context pressure.
+```text
+Claude Code: /statusline
+Codex:       /statusline
+```
+
+![Claude Code status line showing context-window usage](https://mintcdn.com/claude-code/nibzesLaJVh4ydOq/images/statusline-context-window-usage.png?fit=max&auto=format&n=nibzesLaJVh4ydOq&q=85&s=15b58ab3602f036939145dde3165c6f7)
+
+See [Claude Code status lines](https://code.claude.com/docs/en/statusline).
+
+#### 3) 📊 Analyze local history
+
+Use local logs when one session counter is insufficient.
+
+| Need | Tool | Command |
+| --- | --- | --- |
+| Aggregate supported coding agents | [`ccusage`](https://github.com/ccusage/ccusage) | `npx ccusage@latest` |
+| Inspect individual Claude Code prompts | [`prompt-analytics-for-claude-code`](https://github.com/romainfjgaspard/prompt-analytics-for-claude-code) | `uvx --from prompt-analytics-for-claude-code prompt-analytics summary` |
+
+Local logs can contain prompt text. Treat exports as sensitive.
+
+![Prompt Analytics dashboard](https://raw.githubusercontent.com/romainfjgaspard/prompt-analytics-for-claude-code/main/docs/screenshots/dashboard-home.png)
+
+#### 4) 🔎 Inspect Claude's loaded context
+
+Target the largest source shown by Claude Code.
 
 ```text
 /context all
+/memory
 ```
 
-Target the largest persistent instruction, tool, or history source before compacting.
+#### 5) ✂️ Keep AGENTS.md and CLAUDE.md short
 
-#### 3) ✂️ Trim persistent instructions
+Keep durable constraints and validation commands. Remove architecture prose, task notes, and duplicated instructions.
 
-**Applies to:** All coding agents; the instruction file is client-specific.
-
-Keep only durable rules in the file that loads for every task, and move specialized procedures to on-demand skills or referenced documents.
-
-1. Open only the persistent instruction file documented by your client.
-2. Remove duplicated architecture prose, one-off task details, and commands the agent can discover safely.
-3. Keep completion criteria, constraints, and the canonical validation commands.
-
-| Client | Native persistent instructions |
+| Client | Persistent file |
 | --- | --- |
 | Claude Code | `CLAUDE.md` |
-| Codex | `AGENTS.md` or the closer `AGENTS.override.md` |
-| Other clients | Use only the filename and precedence documented by that client |
+| Codex | `AGENTS.override.md` when present, otherwise `AGENTS.md` |
+| GitHub Copilot | `.github/copilot-instructions.md` |
 
 ```md
 # Persistent instructions
 
 - Lead with the result.
+- Preserve unrelated changes.
 - Run the smallest relevant validation.
-- Preserve unrelated user changes.
+- Quote only the decisive error line.
 ```
 
-See [Claude Code memory](https://code.claude.com/docs/en/memory) and [Codex AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
+See the local [AGENTS.md template](../../../02-project-memory/assets/AGENTS.md), [Claude Code memory](https://code.claude.com/docs/en/memory), and [Codex AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
 
-#### 4) 🧭 Plan before expensive rework
+#### 6) 🎯 Scope rules to matching files
 
-**Applies to:** All coding agents as a technique; commands are client-specific.
+Move file-specific guidance out of the root instruction file.
 
-Plan first when ambiguity or implementation risk makes a wrong direction expensive.
+Claude Code `.claude/rules/api.md`:
 
-1. Enter the documented plan surface for your client.
-2. Review scope, assumptions, and validation before authorizing implementation.
-3. Use a separate read-only permission or sandbox setting when planning must prohibit writes; plan mode alone is not a universal security boundary.
+```md
+---
+paths:
+  - "src/api/**/*.ts"
+---
 
-| Client | Plan command |
+- Validate every API input.
+- Use the standard error response.
+```
+
+Codex `src/api/AGENTS.md`:
+
+```md
+# API rules
+
+- Validate every API input.
+- Use the standard error response.
+```
+
+#### 7) 🧩 Load skills only on demand
+
+Hide manual Claude skills and disable unused Codex skills.
+
+Claude Code skill frontmatter:
+
+```yaml
+---
+name: deploy
+description: Deploy the application
+disable-model-invocation: true
+---
+```
+
+Codex `config.toml`:
+
+```toml
+[[skills.config]]
+path = "/absolute/path/to/skill"
+enabled = false
+```
+
+An invoked skill stays in the session context. Keep its body short.
+
+#### 8) 🧠 Disable stale auto-memory
+
+Disable memory only when repeated rediscovery costs less than loading it.
+
+Claude Code `.claude/settings.local.json`:
+
+```json
+{
+  "autoMemoryEnabled": false
+}
+```
+
+Codex `config.toml` when experimental Memories are enabled:
+
+```toml
+[memories]
+use_memories = false
+generate_memories = false
+```
+
+Inspect first with Claude Code `/memory` or Codex `/memories`.
+
+#### 9) 🪨 Compress instruction files with Caveman
+
+Run `caveman-compress`, inspect the diff, then restore any weakened constraint.
+
+```bash
+# Claude Code
+claude plugin marketplace add JuliusBrussee/caveman
+claude plugin install caveman@caveman
+# Invoke: /caveman:caveman-compress CLAUDE.md
+
+# Codex
+npx skills add JuliusBrussee/caveman -a codex
+# Invoke: $caveman-compress AGENTS.md
+```
+
+See [Caveman's install matrix and benchmarks](https://github.com/JuliusBrussee/caveman/blob/main/README.md).
+
+#### 10) 🧭 Plan before expensive work
+
+Plan only when a wrong implementation would cost more than the planning turn.
+
+| Client | Command |
 | --- | --- |
-| Claude Code | `/plan` or launch with `claude --permission-mode plan` |
-| Codex | `/plan`; the command can include the first planning prompt |
-| Other clients | Ask for a plan explicitly; use only a documented plan mode if one exists |
+| Claude Code | `/plan`, or `claude --permission-mode plan` |
+| Codex | `/plan` |
 
 ```text
 /plan Propose the smallest implementation and its validation before editing
@@ -109,39 +219,19 @@ Plan first when ambiguity or implementation risk makes a wrong direction expensi
 
 See [Claude Code permission modes](https://code.claude.com/docs/en/permission-modes) and [Codex best practices](https://learn.chatgpt.com/guides/best-practices).
 
-#### 5) ♻️ Reset between unrelated tasks
+#### 11) ♻️ Reset unrelated work
 
-**Applies to:** All coding agents as a technique; slash commands are verified only for the named clients.
+Start a fresh context when the goal changes.
 
-Start a fresh conversation when the goal changes instead of paying repeatedly for stale turns.
+| Situation | Claude Code | Codex |
+| --- | --- | --- |
+| New task | `/clear` | `/new` |
+| Abandon a wrong branch | `/rewind` | Start or fork a chat |
+| Disposable aside | `/btw` | `/side` or `/btw` |
 
-1. Preserve any durable decision outside the disposable transcript.
-2. Reset with the client-native action.
+#### 12) 🗜️ Compact the same task
 
-| Client | Fresh-context action |
-| --- | --- |
-| Claude Code | `/clear` |
-| Codex CLI | `/clear` clears the terminal and starts a fresh chat; `/new` starts another chat without clearing the display |
-| Other clients | Start a new conversation through the documented UI |
-
-```text
-Claude Code: /clear
-Codex:       /new
-```
-
-#### 6) 🗜️ Compact at a natural boundary
-
-**Applies to:** Claude Code and Codex; argument syntax differs.
-
-Compact only when the same task still needs its earlier decisions and the context pressure justifies a summary.
-
-1. Preserve the current goal, accepted decisions, failing evidence, and next validation.
-2. Use only the syntax documented by your client.
-
-| Client | Compact action |
-| --- | --- |
-| Claude Code | `/compact keep the accepted decisions, repro, and failing test` |
-| Codex | `/compact`; no inline focus argument is documented |
+Keep the goal, decisions, failing evidence, and next validation.
 
 ```text
 Claude Code: /compact keep the repro and failing test; drop file dumps
@@ -152,17 +242,11 @@ See [Claude Code commands](https://code.claude.com/docs/en/commands) and [Codex 
 
 ### 🟡 Intermediate
 
-#### 7) 📈 Export structured usage telemetry
+#### 13) 📈 Export token telemetry
 
-**Applies to:** Claude Code and Codex; their configuration and telemetry schemas differ.
+Export structured metrics without prompt or tool content.
 
-Use your own OpenTelemetry collector when interactive usage commands are not enough for comparisons across sessions.
-
-1. Enable the exporter for the selected client.
-2. Keep prompt and tool content redacted unless an explicit audit requirement justifies collecting it.
-3. Compare token types, model, agent, and tool output; treat cost attribution as an estimate unless it comes from the billing system.
-
-Claude Code metrics export:
+Claude Code:
 
 ```bash
 CLAUDE_CODE_ENABLE_TELEMETRY=1 \
@@ -172,73 +256,187 @@ OTEL_EXPORTER_OTLP_METRICS_PROTOCOL=http/protobuf \
 claude
 ```
 
-Codex log export in `config.toml`:
+Codex `config.toml`:
 
 ```toml
 [otel]
 environment = "dev"
 log_user_prompt = false
-
-[otel.exporter."otlp-http"]
-endpoint = "http://localhost:4318/v1/logs"
-protocol = "binary"
+exporter = { otlp-http = { endpoint = "http://localhost:4318/v1/logs", protocol = "binary" } }
 ```
-
-Claude Code exports metrics such as `claude_code.token.usage`; Codex emits its own events and token fields. Do not query one client's schema under the other's names.
 
 See [Claude Code monitoring](https://code.claude.com/docs/en/monitoring-usage) and [Codex observability](https://learn.chatgpt.com/docs/config-file/config-advanced#observability-and-telemetry).
 
-#### 8) 🗣️ Make concise output explicit
+#### 14) 🗣️ Set native concise output
 
-**Applies to:** All coding agents as an instruction; persistent mechanisms are client-specific.
+Preserve code, errors, evidence, and security warnings. Remove filler.
 
-Short answers reduce output tokens only when the instruction does not sacrifice required evidence.
+Claude Code `.claude/output-styles/concise-coding.md`:
 
-1. Add one concise rule to the client-native instruction surface.
-2. Use the client-specific output control only when its documented scope matches the goal.
+```md
+---
+name: Concise coding
+description: Short, evidence-preserving coding responses
+keep-coding-instructions: true
+---
 
-| Client | Persistent mechanism |
-| --- | --- |
-| Claude Code | A short custom file under `.claude/output-styles/`, selected through `/config` |
-| Codex | `model_verbosity = "low"` for supported Responses API models, plus a short rule in `AGENTS.md` |
-| Other clients | A documented response-style setting or persistent instruction |
-
-```text
 Answer directly. Preserve code, decisive errors, evidence, and security warnings; omit filler.
 ```
 
-`model_reasoning_summary = "concise"` in Codex shortens the reasoning summary, not the final answer. See [Claude Code output styles](https://code.claude.com/docs/en/output-styles) and [Codex configuration](https://learn.chatgpt.com/docs/config-file/config-reference).
+Codex `config.toml`:
 
-#### 9) 🧹 Filter noisy shell output selectively
+```toml
+model_verbosity = "low"
+model_reasoning_summary = "concise"
+```
 
-**Applies to:** Shell-capable coding agents; RTK and SNIP are third-party tools.
+`model_reasoning_summary` changes the reasoning summary, not the final answer. See [Claude Code output styles](https://code.claude.com/docs/en/output-styles) and [Codex configuration](https://learn.chatgpt.com/docs/config-file/config-reference).
 
-Reduce model-visible logs only when filtering cannot hide evidence needed for diagnosis.
+#### 15) 🪨 Compress output with Caveman
 
-1. Prefer a command's native `--quiet`, `--json`, filtering, or targeted-test option.
-2. If that is insufficient, inspect and install a proxy such as [`RTK`](https://github.com/rtk-ai/rtk) or [`SNIP`](https://github.com/edouard-claude/snip).
-3. Prefix only materially noisy commands and rerun the raw command when the filtered result is incomplete.
+Use `lite` first. Stronger modes trade readability for fewer output tokens.
 
 ```bash
+# Claude Code
+claude plugin marketplace add JuliusBrussee/caveman
+claude plugin install caveman@caveman
+# Invoke: /caveman:caveman lite
+
+# Codex
+npx skills add JuliusBrussee/caveman -a codex
+# Invoke: $caveman lite
+```
+
+```text
+Before:
+The reason your React component is re-rendering is likely because you create a new object reference on each render. When you pass an inline object as a prop, React's shallow comparison sees a different object every time. Wrap the object in `useMemo`.
+
+After:
+New object ref each render. Inline object prop = new ref = re-render. Wrap in `useMemo`.
+```
+
+The maintainer reports 65% fewer output tokens on a small chat benchmark. A [JetBrains benchmark](https://blog.jetbrains.com/ai/2026/07/speak-to-ai-agents-like-cavemen-tosave-tokens/) measured 8.5% on agentic coding tasks. Measure your workload.
+
+#### 16) 🧠 Shape actionable output with i-have-adhd
+
+Use [`i-have-adhd`](https://github.com/ayghri/i-have-adhd) for action-first output, not guaranteed compression.
+
+```bash
+# Claude Code
+claude plugin marketplace add ayghri/i-have-adhd
+claude plugin install i-have-adhd@i-have-adhd
+# Invoke: /i-have-adhd:i-have-adhd
+
+# Codex
+codex plugin marketplace add ayghri/i-have-adhd --ref main
+codex plugin add i-have-adhd@i-have-adhd
+# Invoke: $i-have-adhd
+```
+
+Canonical output example:
+
+```text
+Run `npm install jsonwebtoken@latest`, then edit `src/auth.ts:42`.
+
+1. Open `src/auth.ts`
+2. Replace `verifyToken` (lines 42–58) with the snippet below
+3. Run `npm test -- auth.spec.ts`
+
+Next: paste the first failing line if any test fails.
+```
+
+| Need | Use |
+| --- | --- |
+| Maximum prose compression | Caveman |
+| Action-first structure | `i-have-adhd` |
+| Both | `i-have-adhd`, then Caveman `lite`; benchmark the combination |
+
+Stop one mode with `stop adhd mode` or `stop caveman`. `normal mode` stops both. See the [installation matrix](https://github.com/ayghri/i-have-adhd/blob/main/INSTALL.md) and [rules](https://github.com/ayghri/i-have-adhd/blob/main/skills/i-have-adhd/SKILL.md).
+
+#### 17) 🧹 Filter shell output with RTK
+
+Run RTK only for commands whose raw output is materially noisy.
+
+```bash
+brew install rtk
+rtk gain
 rtk cargo test
 ```
 
-Published reduction figures measure model-visible command output, not independently verified billing savings. Never filter the first security failure or the only copy of a diagnostic log.
+```mermaid
+flowchart LR
+  A["rtk cargo test"] --> R["RTK"]
+  R --> C["cargo test"]
+  C -->|"raw output"| R
+  R -->|"filtered output"| M["Agent context"]
+```
 
-#### 10) 🔌 Limit MCP exposure by client
+A [JetBrains benchmark](https://blog.jetbrains.com/ai/2026/07/rtk-claude-code-token-savings/) found no cost improvement on its workload. Measure before automating.
 
-**Applies to:** MCP-capable agents; deferral behavior is client-specific.
+#### 18) ✂️ Filter shell output with SNIP
 
-Disable unused servers and expose only required tools without assuming every MCP client has Claude Code Tool Search.
+Use YAML filters when RTK's fixed command set does not fit.
 
-1. Inventory enabled servers and tools.
-2. Apply only controls documented by the selected client.
+```bash
+brew install edouard-claude/tap/snip
+snip init                # Claude Code
+snip init --agent codex  # Codex
+```
 
-| Client | Documented control |
+See [`SNIP`](https://github.com/edouard-claude/snip).
+
+#### 19) 🪝 Rewrite noisy commands with hooks
+
+Rewrite only known commands. Keep unknown commands fail-open.
+
+```bash
+rtk init -g          # Claude Code
+rtk init -g --codex  # Codex
+```
+
+Verify with `/hooks`. See [Claude Code filtering hooks](https://code.claude.com/docs/en/costs#offload-processing-to-hooks-and-skills) and [Codex hooks](https://learn.chatgpt.com/docs/hooks).
+
+#### 20) ✋ Cap Codex tool history
+
+Limit stored tool output only after raw diagnostics have been captured.
+
+```toml
+tool_output_token_limit = 12000
+```
+
+Raise or remove the limit when evidence is truncated.
+
+#### 21) 🚫 Block bulky paths
+
+Prevent accidental reads of generated output and dependency trees.
+
+Claude Code `.claude/settings.json`:
+
+```json
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(./vendor/**)",
+      "Read(./dist/**)"
+    ]
+  }
+}
+```
+
+This saves tokens only when the agent would otherwise read those paths. Secrets are primarily a security concern. See [Claude Code permissions](https://code.claude.com/docs/en/permissions).
+
+#### 22) 🔌 Limit MCP exposure
+
+Disable unused servers and tools.
+
+| Client | Control |
 | --- | --- |
-| Claude Code | Tool Search defers MCP tool schemas on supported models and providers; avoid `alwaysLoad` unless a small toolset is needed on nearly every turn |
-| Codex | Inspect with `/mcp verbose`; disable an unused server with `enabled = false`, or restrict it with `enabled_tools` and `disabled_tools` |
-| Other clients | Disable unused servers or tools through their documented configuration; do not assume schema deferral |
+| Claude Code | Tool Search defers supported MCP schemas; avoid unnecessary `alwaysLoad` |
+| Codex | `/mcp verbose`; `enabled = false`; `enabled_tools`; `disabled_tools` |
 
 ```toml
 [mcp_servers.figma]
@@ -246,94 +444,110 @@ url = "https://mcp.figma.com/mcp"
 enabled = false
 ```
 
-Codex exposes no public stable setting equivalent to Claude Code's `alwaysLoad`. See [Claude Code MCP](https://code.claude.com/docs/en/mcp#scale-with-mcp-tool-search), [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli), and [`mcp-installation.md`](mcp-installation.md).
+See [Claude Code MCP](https://code.claude.com/docs/en/mcp#scale-with-mcp-tool-search), [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli), and [`mcp-installation.md`](mcp-installation.md).
 
 ### 🔴 Expert
 
-#### 11) 🔬 Inspect client behavior without mixing shortcuts
+#### 23) 🔬 Inspect model-visible behavior
 
-**Applies to:** Claude Code for the commands below; Codex has no documented `/insights` equivalent.
-
-Use client-native diagnostics instead of copying shortcuts between products.
-
-1. In Claude Code, run `/insights` for a session-pattern report.
-2. In Claude Code, press `Ctrl+O` to expand the detailed transcript.
-3. In Codex, use OTel or the visible transcript for analysis; do not use `Ctrl+O` as a Claude-style transcript toggle.
+Use diagnostics native to each client.
 
 ```text
 Claude Code: /insights
 Claude Code: Ctrl+O
+Codex:       codex debug prompt-input [PROMPT]
 ```
 
-In Codex CLI, `Ctrl+O` copies the latest completed response. The experimental `codex debug prompt-input [PROMPT]` command renders model-visible prompt inputs as JSON, but it is not an `/insights` replacement.
+Codex `Ctrl+O` copies the latest completed response. See [Claude Code commands](https://code.claude.com/docs/en/commands) and [Codex commands](https://learn.chatgpt.com/docs/developer-commands?surface=cli).
 
-#### 12) 🎯 Route model and reasoning by difficulty
+#### 24) 🎯 Route model and effort by difficulty
 
-**Applies to:** Claude Code and Codex; configuration formats and command semantics differ.
+Use cheaper agents for bounded exploration. Keep difficult review and architecture on stronger settings.
 
-Use the lowest model and reasoning level that passes a representative task, then raise them only for risk or complexity.
-
-1. Route routine exploration separately from difficult implementation or review.
-2. Use the configuration native to each client.
-
-| Client | Session control | Agent configuration |
-| --- | --- | --- |
-| Claude Code | `/model` and `/effort low` | `.claude/agents/*.md` or skill frontmatter with `model` and `effort` |
-| Codex | `/model` and `/reasoning` | `.codex/agents/*.toml` with `model` and `model_reasoning_effort` |
-
-Claude Code agent frontmatter:
+Claude Code `.claude/agents/explorer.md`:
 
 ```yaml
 ---
+name: explorer
+description: Read-only codebase scout
+tools: Read, Grep, Glob
 model: haiku
 effort: low
 ---
 ```
 
-Codex project agent:
+Codex `.codex/agents/explorer.toml`:
 
 ```toml
 name = "explorer"
 description = "Read-only codebase scout"
+developer_instructions = "Explore without edits. Return paths, symbols, and decisive evidence only."
 model = "gpt-5.6-terra"
 model_reasoning_effort = "low"
 ```
 
-Codex skills do not use Claude Code's `model` and `effort` frontmatter. See [Claude Code model configuration](https://code.claude.com/docs/en/model-config) and [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents).
+See [Claude Code model configuration](https://code.claude.com/docs/en/model-config) and [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents).
 
-#### 13) 🧫 Isolate noisy work with subagents
+#### 25) 🧫 Isolate noisy work with subagents
 
-**Applies to:** Coding agents with documented subagent support; configuration is client-specific.
-
-Use subagents for context isolation, parallelism, or specialist quality, not as an assumed reduction in total tokens.
-
-1. Delegate high-volume exploration, test logs, or independent review.
-2. Ask for a short result containing only findings, evidence, and blockers.
-3. Keep tightly coupled edits in one agent to avoid coordination overhead.
+Return only findings, evidence, blockers, and the command used.
 
 ```text
-Delegate the test run to one subagent. Return only failing tests, the shortest decisive error, and the command used.
+Delegate the test run. Return only failing tests, the shortest decisive error, and the command used.
 ```
 
-Both Claude Code and Codex give subagents separate working context, but their own model calls still consume tokens and can increase total usage. See [Claude Code subagents](https://code.claude.com/docs/en/sub-agents) and [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents).
+```mermaid
+flowchart LR
+  M["Main context"] --> S["Test subagent"]
+  S --> L["Full logs stay isolated"]
+  S --> F["Failures + command"]
+  F --> M
+```
 
-#### 14) 🧊 Protect Claude Code prompt-cache stability
+Subagents reduce main-context noise, not total token usage. See [Claude Code subagents](https://code.claude.com/docs/en/sub-agents) and [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents).
 
-**Applies to:** Claude Code. No equivalent user-facing Codex cache-invalidation contract is documented here.
+#### 26) 🧊 Preserve Claude prompt-cache prefixes
 
-Keep the request prefix stable during one task so prompt caching can reuse it.
+Choose model, effort, and MCP tools before the first substantive prompt.
 
-1. Choose the model and effort before the first substantive prompt.
-2. Change them mid-task only when the quality gain justifies a cache miss.
-3. Keep MCP tools deferred; a change to tools loaded into the prefix can invalidate that layer.
+![Claude Code prompt caching reuses an unchanged request prefix](https://mintcdn.com/claude-code/VbDJw--l6T9a9Wvm/images/prompt-caching-prefix.svg?fit=max&auto=format&n=VbDJw--l6T9a9Wvm&q=85&s=f2e8f0b8298a50305fe428ca3f1d1594)
 
 ```text
 /model sonnet
 /effort medium
 ```
 
-For Codex, prompt caching is service-managed rather than a documented `config.toml` control; observe `cached_input` through Codex telemetry instead of transposing Claude settings. See [Claude Code prompt caching](https://code.claude.com/docs/en/prompt-caching) and [Codex observability](https://learn.chatgpt.com/docs/config-file/config-advanced#observability-and-telemetry).
+For Codex, observe `cached_input` through telemetry. See [Claude Code prompt caching](https://code.claude.com/docs/en/prompt-caching) and [Codex observability](https://learn.chatgpt.com/docs/config-file/config-advanced#observability-and-telemetry).
+
+#### 27) ✅ Lower reasoning on routine work
+
+Lower effort first. Disable thinking only when a representative task still passes.
+
+```text
+Claude Code: /effort low
+Codex:       /reasoning
+```
+
+Claude Code `.claude/settings.json`:
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_DISABLE_THINKING": "1"
+  }
+}
+```
+
+Codex `config.toml`:
+
+```toml
+model_reasoning_effort = "low"
+```
+
+See [Claude Code model configuration](https://code.claude.com/docs/en/model-config) and [Codex configuration](https://learn.chatgpt.com/docs/config-file/config-reference).
 
 ## In short
 
-Measure first, label every command by client, then reduce persistent instructions, stale history, noisy output, unnecessary tools, and excessive reasoning without hiding evidence or weakening quality.
+Measure first. Change one token source at a time. Keep only measured wins.
+
+Have more clues? Open a [pull request](../../../../../../CONTRIBUTING.md).
