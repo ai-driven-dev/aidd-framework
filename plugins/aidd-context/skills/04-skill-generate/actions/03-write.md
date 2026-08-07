@@ -24,6 +24,11 @@ The skill tree at the target, and the list of files written.
 
 ## Test
 
-- SKILL.md holds a `mermaid` flowchart and a three-column action table.
-- Every action file contains `## Output`, `## Process`, and `## Test`.
-- The written files match [skill-tree.md](../references/skill-tree.md).
+| Case | Pass |
+| --- | --- |
+| The router is written | it holds a `mermaid` flowchart and an `Action \| Does` table |
+| The action table is read back | every slug is bare and every `Does` is a lowercase imperative with no final period |
+| An action file is written | it holds `## Output`, `## Process`, and a `Case \| Pass` `## Test` |
+| The tree is written | its shape matches [skill-tree.md](../references/skill-tree.md) |
+| Any written file is read back | no `<` placeholder and no template instruction line survives |
+| A path resolves outside the chosen target | the run stops and reports that path |

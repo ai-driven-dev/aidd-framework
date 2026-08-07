@@ -16,9 +16,9 @@ The action 02 table augmented with a verdict column, plus a three-bullet rationa
 
    ```text
    Audit the following candidate stack for a SaaS project. Validate three dimensions:
-   1. Tech compatibility: do the components integrate cleanly? Any deprecated combos?
-   2. Ecosystem maturity: are the components stable (≥ 2 years prod-tested) and well-documented?
-   3. Known gotchas: search recent (last 12 months) issues, blog posts, and discussions for blockers.
+   - Tech compatibility: do the components integrate cleanly? Any deprecated combos?
+   - Ecosystem maturity: are the components stable (≥ 2 years prod-tested) and well-documented?
+   - Known gotchas: search recent (last 12 months) issues, blog posts, and discussions for blockers.
 
    Project context: <paste filled checklist blocks 1 to 3>
    Candidate: <paste candidate row from comparison table>

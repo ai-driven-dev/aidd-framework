@@ -18,6 +18,8 @@ A report, one row per file: what was checked and any fix applied.
 
 ## Test
 
-- The report covers every file, each with its findings or none.
-- No file breaches [skill-authoring.md](../references/skill-authoring.md).
-- Any file changed by a fix differs on disk.
+| Case | Pass |
+| --- | --- |
+| The report is delivered | every written file has a row, with its findings or none |
+| The review finds a breach | it names the broken rule and a `file:line` |
+| A fix is confirmed | the file differs on disk and is reviewed again |

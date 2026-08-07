@@ -1,6 +1,7 @@
 ---
 name: 02-challenge
 description: Rethink just-completed work against an agreed plan, classifying findings as deal-breaker, suggestion, or correct, with a confidence score. Use to challenge or critically review recent work. Not for line-by-line style review or writing code.
+argument-hint: work
 ---
 
 # Challenge

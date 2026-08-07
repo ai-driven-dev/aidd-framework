@@ -20,5 +20,7 @@ The ticket's title, description, status, assignee, priority, and URL, displayed 
 
 ## Test
 
-- Querying the configured tool for the resolved id returns a record whose title, description, status, assignee, priority, and URL match the displayed fields.
-- The ticket is reachable at its URL in the tracker.
+| Case | Pass |
+| --- | --- |
+| The id resolves and the tool answers | title, description, status, assignee, priority, and URL match the queried record |
+| The displayed URL is opened | the tracker shows the same ticket |

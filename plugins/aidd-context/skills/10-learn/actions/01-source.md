@@ -12,12 +12,15 @@ One or more source descriptions that name where to look and how narrowly to read
 
 ## Process
 
-1. Apply [sources](../references/sources.md).
-2. Select the smallest readable source set that fits the current context.
-3. Ask only when the source choice would change what gets learned.
-4. Stop on missing, empty, or ambiguous sources.
-5. Emit the selected source descriptions.
+1. **Frame.** Apply [sources](../references/sources.md).
+2. **Select.** Select the smallest readable source set that fits the current context.
+3. **Ask.** Ask only when the source choice would change what gets learned.
+4. **Stop.** Stop on a missing, empty, or ambiguous source.
+5. **Emit.** Emit the selected source descriptions.
 
 ## Test
 
-- Emits one or more readable source descriptions, or stops with the failed source named.
+| Case | Pass |
+| --- | --- |
+| A source is readable | one or more source descriptions are emitted |
+| A source cannot be read | the run stops and names it |

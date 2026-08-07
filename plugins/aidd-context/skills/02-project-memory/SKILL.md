@@ -1,6 +1,6 @@
 ---
 name: 02-project-memory
-description: Build the project's memory of its architecture, conventions, and decisions, and wire it into the tools you use. Use to set up or refresh project memory. Not for editing one existing memory file.
+description: Build the project's memory of its architecture, conventions, and decisions, and wire it into the tools you use. Use when the user wants to set up or refresh project memory. Not for editing one existing memory file.
 argument-hint: setup | refresh | rewire
 ---
 
@@ -8,13 +8,13 @@ argument-hint: setup | refresh | rewire
 
 ```mermaid
 flowchart LR
-  build([setup or refresh]) --> scan --> generate --> sync
-  rewire([rewire only]) --> sync
+  build([no argument, setup, or refresh]) --> scan --> generate --> sync
+  rewire([rewire]) --> sync
 ```
 
 ## Actions
 
-Run the flow above. No argument, `setup`, or `refresh` starts at scan. `rewire` runs sync alone. Read an action's file in `actions/` before running it.
+Run the flow above. Read only the next action file.
 
 | Action   | Does                       |
 | -------- | -------------------------- |

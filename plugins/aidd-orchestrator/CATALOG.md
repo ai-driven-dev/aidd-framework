@@ -56,5 +56,5 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `references` | [modes.md](skills/02-backlog/references/modes.md) | - |
 | `references` | [review.md](skills/02-backlog/references/review.md) | - |
 | `references` | [supports.md](skills/02-backlog/references/supports.md) | - |
-| `-` | [SKILL.md](skills/02-backlog/SKILL.md) | `Orchestrates a product backlog end to end. Use to ask what it holds, or for intake, triage, refinement, review, lifecycle events, ordering, health checks, or repair. Not for one known artifact step.` |
+| `-` | [SKILL.md](skills/02-backlog/SKILL.md) | `Orchestrates a product backlog end to end. Use when the user wants to ask what it holds, or to run intake, triage, refinement, review, lifecycle events, ordering, health checks, or repair. Not for one known artifact step.` |
 

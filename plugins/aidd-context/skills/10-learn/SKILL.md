@@ -1,7 +1,7 @@
 ---
 name: 10-learn
-description: Capture durable project learnings. Use when the user asks to remember, record, or formalize a decision, convention, lesson, pitfall, reusable workflow, or review finding. Not for preferences or temporary notes.
-argument-hint: source | gather | assess | write | sync
+description: Capture durable project learnings. Use when the user wants to remember, record, or formalize a decision, convention, lesson, pitfall, reusable workflow, or review finding. Not for preferences or temporary notes.
+argument-hint: conversation | file | diff | review
 ---
 # Learn
 
@@ -14,7 +14,7 @@ flowchart LR
 
 ## Actions
 
-Run the matching path above. Read only the next action's file before running it.
+Run the flow above. Read only the next action file.
 
 | Action | Does |
 | ------ | ---- |

@@ -1,6 +1,7 @@
 ---
 name: 04-issue-create
 description: Create an issue in the configured ticketing tool. Use when the user wants to file a bug, open an issue, or report a problem. Not for committing, opening a pull request, or commenting on an existing issue.
+argument-hint: problem
 ---
 
 # Issue Create
