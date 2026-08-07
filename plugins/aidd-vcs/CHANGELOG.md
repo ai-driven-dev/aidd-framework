@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/ai-driven-dev/framework/compare/aidd-vcs-v2.3.0...aidd-vcs-v2.3.1) (2026-08-07)
+
+
+### Refactoring
+
+* **framework:** one home for the skill contract ([#601](https://github.com/ai-driven-dev/framework/issues/601)) ([415a777](https://github.com/ai-driven-dev/framework/commit/415a77706c84277036dc7470d6dc329f9abde1de))
+
 ## [2.3.0](https://github.com/ai-driven-dev/framework/compare/aidd-vcs-v2.2.1...aidd-vcs-v2.3.0) (2026-08-06)
 
 
