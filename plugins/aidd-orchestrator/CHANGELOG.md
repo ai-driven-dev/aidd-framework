@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.2.1](https://github.com/ai-driven-dev/framework/compare/aidd-orchestrator-v2.2.0...aidd-orchestrator-v2.2.1) (2026-08-07)
+
+
+### Bug Fixes
+
+* **orchestrator:** backlog decide waits, apply forwards next step ([#602](https://github.com/ai-driven-dev/framework/issues/602)) ([15d552a](https://github.com/ai-driven-dev/framework/commit/15d552a0e3a551ad75ce75cffbf67ca528835e0b))
+
+
+### Refactoring
+
+* **framework:** one home for the skill contract ([#601](https://github.com/ai-driven-dev/framework/issues/601)) ([415a777](https://github.com/ai-driven-dev/framework/commit/415a77706c84277036dc7470d6dc329f9abde1de))
+
 ## [2.2.0](https://github.com/ai-driven-dev/framework/compare/aidd-orchestrator-v2.1.1...aidd-orchestrator-v2.2.0) (2026-08-06)
 
 

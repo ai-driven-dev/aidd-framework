@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.4](https://github.com/ai-driven-dev/framework/compare/aidd-refine-v2.2.3...aidd-refine-v2.2.4) (2026-08-07)
+
+
+### Refactoring
+
+* **framework:** one home for the skill contract ([#601](https://github.com/ai-driven-dev/framework/issues/601)) ([415a777](https://github.com/ai-driven-dev/framework/commit/415a77706c84277036dc7470d6dc329f9abde1de))
+
 ## [2.2.3](https://github.com/ai-driven-dev/framework/compare/aidd-refine-v2.2.2...aidd-refine-v2.2.3) (2026-08-06)
 
 
