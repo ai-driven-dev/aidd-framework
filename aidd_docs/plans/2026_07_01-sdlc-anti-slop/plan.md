@@ -1,6 +1,6 @@
 ---
 objective: "SDLC artifacts stop emitting slop: every template section states what qualifies it and omits when nothing does, gates live only in /assert, the review traces the plan's phases as checkboxes."
-status: pending
+status: implemented
 ---
 
 # Plan: SDLC anti-slop hardening
@@ -37,7 +37,7 @@ Two axes were conflated. Separate them:
 | ------------- | --------------------------- |
 | `plugins/aidd-context/skills/04-skill-generate/references/skill-authoring.md` | Rules live as R1..Rn here; every generator reads it. Home for the Steinberger rule. |
 | `plugins/aidd-dev/skills/03-assert/SKILL.md` | Already the gate: "returns a pass or fail verdict", fix-loop until green. Runs the project's coding assertions. |
-| `plugins/aidd-dev/skills/00-sdlc/SKILL.md` | Chains spec→plan→implement→review→ship. No assert step: gates would drop if stripped from the plan. |
+| `plugins/aidd-orchestrator/skills/01-sdlc/` (moved from `aidd-dev/skills/00-sdlc`) | Deliver zone chains implement → assert → test → commit; Check zone owns review. Assert step present. |
 | `plugins/aidd-dev/skills/01-plan/assets/{plan,phase}-template.md` | Slot templates. `04-plan.md:17` already carries an omit idiom; phase wireframe carries `omit when no UI`. Inconsistent. |
 | `plugins/aidd-pm/skills/04-spec/assets/spec-template.md` | Done-when + optional-section suffix `(optional)` already present. |
 | `plugins/aidd-dev/skills/05-review/assets/review-template.md` | Prose + Follow-up section; functional axis traces criteria in a table, not the plan's phases. |
