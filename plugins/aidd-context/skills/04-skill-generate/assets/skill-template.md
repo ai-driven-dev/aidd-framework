@@ -15,9 +15,9 @@ flowchart LR
 
 Run the flow above. Read only the next action file.
 
-| Action   | Does            |
-| -------- | --------------- |
-| `<slug>` | <one-line verb> |
+| Action  | Does                             |
+| ------- | -------------------------------- |
+| <slug>  | <lowercase imperative half-line> |
 
 ## Transversal rules
 
