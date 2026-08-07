@@ -1,7 +1,7 @@
 ---
 name: 09-for-sure
 description: Run an iterative agent loop that retries until a runnable success condition passes. Use when the user says "for sure", "keep trying until", or wants guaranteed completion against a success command. Not for one-shot tasks or uncheckable goals.
-argument-hint: init-tracking | auto-accept | autonomous-loop
+argument-hint: task | command
 ---
 
 # Skill: for-sure

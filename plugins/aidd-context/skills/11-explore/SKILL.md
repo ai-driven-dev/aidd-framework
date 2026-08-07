@@ -1,7 +1,7 @@
 ---
 name: 11-explore
 description: Explore the current project across its tooling, context, and codebase. Use to survey what is installed, see what is available, or find which skill, agent, or rule fits a goal. Not for choosing the next step or running an item; it only points.
-argument-hint: survey | drill
+argument-hint: tooling | context | codebase | goal
 ---
 
 # Explore

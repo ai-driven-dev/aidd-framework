@@ -26,8 +26,10 @@ Each picked tool's context file, carrying the filled block.
 
 ## Test
 
-- With no `.md` under `aidd_docs/memory/`, sync creates no context file and stops.
-- The script exits `0`.
-- Each picked tool's context file exists, its block listing every file in `aidd_docs/memory/`.
-- A context file for a tool the user did not pick is unchanged.
-- `git diff --cached` is empty: sync stages nothing.
+| Case | Pass |
+| --- | --- |
+| `aidd_docs/memory/` holds no `.md` | sync creates no context file and stops |
+| The script runs | it exits `0` |
+| A tool was picked | its context file exists, its block listing every file in `aidd_docs/memory/` |
+| A tool was not picked | its context file is unchanged |
+| The action completes | `git diff --cached` is empty |

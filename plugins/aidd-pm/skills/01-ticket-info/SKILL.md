@@ -1,6 +1,7 @@
 ---
 name: 01-ticket-info
 description: Retrieve and display a ticket from the configured ticketing tool. Use when the user wants to see, show, or look up a ticket's details. Not for creating a ticket, or commenting on, transitioning, or reassigning one.
+argument-hint: ticket
 ---
 
 # Ticket Info

@@ -1,6 +1,7 @@
 ---
 name: 09-mermaid
 description: Generate a valid Mermaid diagram from a written source through a plan, generate, review loop. Use when the user wants to turn an architecture, lifecycle, or flow into a Mermaid diagram. Not for other diagram formats or image rendering.
+argument-hint: architecture | lifecycle | flow
 ---
 
 # Mermaid

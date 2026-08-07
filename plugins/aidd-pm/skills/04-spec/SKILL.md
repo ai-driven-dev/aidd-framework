@@ -1,10 +1,10 @@
 ---
 name: 04-spec
-description: Generate or refine a spec, a feature's immutable contract, from a request, a PRD, or review findings. Use to draft or refine a spec. Do NOT use to write code, a full PRD, or change a locked spec.
-argument-hint: build | refine
+description: Generate or refine a spec, a feature's immutable contract, from a request, a PRD, or review findings. Use when the user wants to draft or refine a spec. Not for writing code, a full PRD, or changing a locked spec.
+argument-hint: request | prd | spec
 ---
 
-# Skill: spec
+# Spec
 
 Generate or refine the immutable contract for a feature: its target, hard constraints, non-goals, and done-when.
 
