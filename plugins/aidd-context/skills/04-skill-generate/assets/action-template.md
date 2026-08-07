@@ -17,4 +17,6 @@
 
 ## Test
 
-<Deterministic checks, one per line.>
+| Case | Pass |
+| --- | --- |
+| <what is run> | <the observable result it gives> |

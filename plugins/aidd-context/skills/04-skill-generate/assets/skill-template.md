@@ -1,7 +1,7 @@
 ---
 name: <skill-name>
 description: <what it produces>. Use when the user wants to <intents>. <Not for X when needed.>
-argument-hint: <slug | slug>
+argument-hint: <what the user brings: their cases, or the artifact consumed>
 ---
 
 # <Skill Name>
@@ -13,11 +13,11 @@ flowchart LR
 
 ## Actions
 
-Read only the next action's file before running it.
+Run the flow above. Read only the next action file.
 
-| #   | Action   | Does            |
-| --- | -------- | --------------- |
-| 01  | `<slug>` | <one-line verb> |
+| Action   | Does            |
+| -------- | --------------- |
+| `<slug>` | <one-line verb> |
 
 ## Transversal rules
 
