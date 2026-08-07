@@ -10,6 +10,12 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    # One PR per run for all action bumps, so multi-action repos like
+    # github/codeql-action can never land partially and drift their pins apart.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
     commit-message:
       prefix: "ci"
       include: "scope"
