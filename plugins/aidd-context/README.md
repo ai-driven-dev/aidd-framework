@@ -21,7 +21,7 @@ Covers project bootstrap, the project memory bank, generation of context artifac
 | [1.4]      | [mermaid](skills/09-mermaid/SKILL.md)                 | Generate high-quality Mermaid diagrams from markdown content using a structured plan-validate workflow.                                                         |
 | [1.5]      | [learn](skills/10-learn/SKILL.md)                     | Capture durable learnings from the conversation or git history, score each, and route the worthwhile ones to memory, a decision record, a rule, or a new skill. |
 | [1.6]      | [explore](skills/11-explore/SKILL.md)                 | Survey the project across three axes (tooling, context, codebase), then drill into one axis and point to the best-matching item for a goal.                      |
-| [1.7]      | [cook](skills/12-cook/SKILL.md)                       | Maintain project recipes in `aidd_docs/recipes/` and bundled recipes shipped with the skill: list, research, create/update, or apply one.                    |
+| [1.7]      | [cook](skills/12-cook/SKILL.md)                       | Maintain project and bundled recipes: list, research, create/update, apply, or validate one or all.                                                        |
 
 ## Onboarding
 

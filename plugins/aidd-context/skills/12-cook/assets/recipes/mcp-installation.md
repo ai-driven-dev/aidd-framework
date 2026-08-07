@@ -2,26 +2,7 @@
 
 Choose between a CLI and MCP by capability, then install the integration through the configuration native to your AI client.
 
-- [MCP installations](#mcp-installations)
-  - [Why](#why)
-  - [Steps to install the right integration](#steps-to-install-the-right-integration)
-    - [1) 🔎 Choose by capability](#1--choose-by-capability)
-    - [2) ⌨️ Install the CLI route](#2-️-install-the-cli-route)
-    - [3) 🔌 Install the MCP route](#3--install-the-mcp-route)
-    - [4) 🔐 Restrict access](#4--restrict-access)
-    - [5) ✅ Verify the connection](#5--verify-the-connection)
-    - [6) 🧹 Remove or revoke access](#6--remove-or-revoke-access)
-  - [Verify](#verify)
-
-## Why
-
-**Capability fit** matters more than whether a CLI happens to exist.
-
-**[Claude Code Tool Search](https://code.claude.com/docs/en/mcp#scale-with-mcp-tool-search)** defers full MCP tool schemas on supported models and providers; other clients and MCP capabilities may load differently.
-
-**Native configuration** uses the file, schema, scope, and installation flow documented by the selected client.
-
-**Least privilege** limits the impact of write tools, broad OAuth access, and prompt injection.
+<!-- Sources checked: 2026-08-07. -->
 
 ## Steps to install the right integration
 
@@ -57,6 +38,7 @@ The agent-oriented Playwright CLI is a direct browser alternative to Playwright 
 ```bash
 npm install -g @playwright/cli@latest
 playwright-cli open https://example.com --headed
+npm uninstall -g @playwright/cli
 ```
 
 Use `npx playwright test` for the test runner and `npx playwright codegen` for test generation; they are different command surfaces.
@@ -124,13 +106,12 @@ Authentication successful. Connected to figma
 
 Use Figma's read-only [`whoami`](https://developers.figma.com/docs/figma-mcp-server/tools-and-prompts/#whoami-remote-only) tool to confirm the authenticated email, plans, and seat type.
 
-### 6) 🧹 Remove or revoke access
+### 6) 🧹 Remove local access
 
-Clear stored authentication, remove local configuration, then revoke the provider grant when one exists.
+Clearing authentication and local configuration stops the client from using the server.
 
 1. Clear authentication before removing the server entry.
 2. Remove the server or plugin from the client.
-3. For Figma, open [**Settings > Security > Connected apps**](https://help.figma.com/hc/en-us/articles/15021280611607-How-do-I-keep-my-account-secure) and select **Revoke access**.
 
 | Client | Clear authentication | Remove local configuration |
 | --- | --- | --- |
@@ -146,10 +127,20 @@ codex mcp remove figma
 
 Removing configuration alone does not prove that the OAuth grant was revoked.
 
+### 7) 🚫 Revoke provider access
+
+Revoking the provider grant invalidates the remote OAuth authorization independently of local configuration.
+
+1. For Figma, open [**Settings > Security > Connected apps**](https://help.figma.com/hc/en-us/articles/15021280611607-How-do-I-keep-my-account-secure).
+2. Find the MCP client and select **Revoke access**.
+
+```text
+Figma > Settings > Security > Connected apps > Revoke access
+```
+
 ## Verify
 
 - The server appears in the chosen client's server list with the expected transport and scope.
-- Authentication uses the intended account and workspace.
+- Authentication uses the intended account and workspace; for Figma, `whoami` returns that identity.
 - Only the required tools are enabled; mutating calls require confirmation or are disabled.
-- Figma `whoami` returns the intended identity.
-- Authentication clearing, local removal, and provider revocation are separate and documented.
+- Authentication clearing, local removal, and provider revocation pass as three separate checks.

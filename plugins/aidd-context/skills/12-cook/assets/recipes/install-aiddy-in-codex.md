@@ -2,26 +2,13 @@
 
 Install AIDDy, the Agent Y mascot, as a local custom pet in the ChatGPT desktop app.
 
-- [Install AIDDy in Codex](#install-aiddy-in-codex)
-  - [Why](#why)
-  - [Steps to install and wake AIDDy](#steps-to-install-and-wake-aiddy)
-    - [1) 🔗 Open the AIDDy installer](#1--open-the-aiddy-installer)
-    - [2) 📦 Confirm the installation](#2--confirm-the-installation)
-    - [3) 🐾 Select AIDDy](#3--select-aiddy)
-    - [4) ▶️ Wake AIDDy](#4-️-wake-aiddy)
-  - [Verify](#verify)
-
-## Why
-
-**AIDDy** reflects ChatGPT task activity with the AI-Driven Development mascot.
-
-**Sprite version 2** ensures Codex reads the extended 11-row animation atlas correctly.
+<!-- Sources checked: 2026-08-07. -->
 
 ## Steps to install and wake AIDDy
 
 ### 1) 🔗 Open the AIDDy installer
 
-The immutable deep link opens the pet installer with the canonical AIDDy atlas.
+The immutable deep link opens the canonical 11-row AIDDy atlas with sprite version 2.
 
 1. In the ChatGPT desktop app, click [Install AIDDy](codex://pets/install?name=AIDDy&imageUrl=https%3A%2F%2Fraw.githubusercontent.com%2Fai-driven-dev%2Fframework%2F1a52770253628062e4e8cbcda1bd062452354c27%2Fassets%2Fpets%2Faiddy-spritesheet.webp&description=Agent%20Y%20for%20AI-Driven%20Development&spriteVersionNumber=2).
 
@@ -41,6 +28,8 @@ Name: AIDDy
 Description: Agent Y for AI-Driven Development
 Sprite version: 2
 ```
+
+The public pet reference documents installation but no removal command; use the current **Settings > Pets** removal control when available.
 
 ### 3) 🐾 Select AIDDy
 

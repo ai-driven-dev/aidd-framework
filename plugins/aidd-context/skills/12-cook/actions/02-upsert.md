@@ -4,7 +4,7 @@ Create or update one project recipe at `aidd_docs/recipes/<slug>.md`, scaffolded
 
 ## Input
 
-The recipe topic. Ask for any missing field (description, steps, verify, related) before writing.
+The recipe topic. Infer description, steps, and verification from the request and research; ask only for a missing decision that changes the recipe's outcome or scope.
 
 ## Output
 
@@ -19,12 +19,14 @@ The recipe file at `aidd_docs/recipes/<slug>.md`, filled from the template.
    - Only a bundled recipe exists: ask whether to copy it into `aidd_docs/recipes/<slug>.md` or edit the bundled one. Edit a bundled recipe only when the user asks for that framework-source change.
 4. **Dedup.** For a new recipe, run `list` and rate each near match in an overlap table `| Existing recipe | Source | Shared scope | Overlap |`, where `Overlap` is none, partial, or high.
    - On any `high`, recommend updating that recipe instead and ask update-or-create before scaffolding.
-5. **Scaffold.** Scaffold from [recipe-template.md](../assets/recipe-template.md) when needed, applying [recipe-contract.md](../references/recipe-contract.md) to every section.
+5. **Scaffold.** Scaffold from [recipe-template.md](../assets/recipe-template.md) when needed, applying [recipe-contract.md](../references/recipe-contract.md) to every section while preserving verified commands, examples, limits, screenshots, and evidence and deleting narrative repetition.
 6. **Fill.** Fill every placeholder. Never maintain a separate recipe index; `list` reads the files directly.
+7. **Validate.** Run `validate` (05), fix every deterministic or semantic finding, and rerun both checks until they pass.
 
 ## Test
 
 - A new or substantially-updated recipe is drafted from `research` results, not from memory.
-- `aidd_docs/recipes/<slug>.md` exists and follows the recipe contract: opens with a one-sentence description (no Goal label, no table), uses `### N)` for direct steps or `#### N)` below a `###` category without skipping heading levels, gives every step a real example, and leaves no `<...>` placeholder.
+- `aidd_docs/recipes/<slug>.md` exists and passes the recipe contract.
+- `validate` passes after the write; no validation finding is silently waived.
 - A bundled recipe is never overwritten unless the user explicitly asks to change a bundled/framework recipe.
 - A new recipe that highly overlaps an existing project or bundled recipe triggers an update-or-create prompt before scaffolding.

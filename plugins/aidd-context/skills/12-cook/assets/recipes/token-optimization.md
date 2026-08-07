@@ -3,7 +3,6 @@
 Cut token usage across coding agents with client-specific commands and measurable checks.
 
 - [Token optimization techniques](#token-optimization-techniques)
-  - [Why](#why)
   - [Steps to cut token usage](#steps-to-cut-token-usage)
     - [🟢 Beginner](#-beginner)
       - [1) 📏 Measure session usage](#1--measure-session-usage)
@@ -25,7 +24,7 @@ Cut token usage across coding agents with client-specific commands and measurabl
       - [16) 🧠 Shape actionable output with i-have-adhd](#16--shape-actionable-output-with-i-have-adhd)
       - [17) 🧹 Filter shell output with RTK](#17--filter-shell-output-with-rtk)
       - [18) ✂️ Filter shell output with SNIP](#18-️-filter-shell-output-with-snip)
-      - [19) 🪝 Rewrite noisy commands with hooks](#19--rewrite-noisy-commands-with-hooks)
+      - [19) 🪝 Automate RTK where supported](#19--automate-rtk-where-supported)
       - [20) ✋ Cap Codex tool history](#20--cap-codex-tool-history)
       - [21) 🚫 Block bulky paths](#21--block-bulky-paths)
       - [22) 🔌 Limit MCP exposure](#22--limit-mcp-exposure)
@@ -36,14 +35,7 @@ Cut token usage across coding agents with client-specific commands and measurabl
       - [26) 🧊 Preserve Claude prompt-cache prefixes](#26--preserve-claude-prompt-cache-prefixes)
       - [27) ✅ Lower reasoning on routine work](#27--lower-reasoning-on-routine-work)
   - [Verify the result](#verify-the-result)
-  - [In short](#in-short)
-
-
-## Why
-
-**Input tokens** come from instructions, history, tools, and logs.
-
-**Output tokens** come from verbosity and reasoning effort.
+<!-- Sources checked: 2026-08-07. -->
 
 ## Steps to cut token usage
 
@@ -51,7 +43,7 @@ Cut token usage across coding agents with client-specific commands and measurabl
 
 #### 1) 📏 Measure session usage
 
-Run the native counter after each feature and compare only equivalent tasks.
+Measure equivalent tasks end to end: input comes from instructions, history, tools, and logs; output comes from verbosity and reasoning; optimizers and subagents can be net-negative.
 
 | Client | Command | Measures |
 | --- | --- | --- |
@@ -68,6 +60,8 @@ Use the native status line instead of asking the model for usage.
 Claude Code: /statusline
 Codex:       /statusline
 ```
+
+Rollback: run Claude Code `/statusline clear`; remove Codex `tui.status_line` from `config.toml` to restore its default.
 
 ![Claude Code status line showing context-window usage](https://mintcdn.com/claude-code/nibzesLaJVh4ydOq/images/statusline-context-window-usage.png?fit=max&auto=format&n=nibzesLaJVh4ydOq&q=85&s=15b58ab3602f036939145dde3165c6f7)
 
@@ -97,7 +91,7 @@ Target the largest source shown by Claude Code.
 
 #### 5) ✂️ Keep AGENTS.md and CLAUDE.md short
 
-Keep durable constraints and validation commands. Remove architecture prose, task notes, and duplicated instructions.
+Keep durable constraints and validation commands while removing architecture prose, task notes, and duplicated instructions.
 
 | Client | Persistent file |
 | --- | --- |
@@ -114,7 +108,7 @@ Keep durable constraints and validation commands. Remove architecture prose, tas
 - Quote only the decisive error line.
 ```
 
-See the local [AGENTS.md template](../../../02-project-memory/assets/AGENTS.md), [Claude Code memory](https://code.claude.com/docs/en/memory), and [Codex AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
+See the local [AGENTS.md template](../../../02-project-memory/assets/templates/AGENTS.md), [Claude Code memory](https://code.claude.com/docs/en/memory), and [Codex AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
 
 #### 6) 🎯 Scope rules to matching files
 
@@ -155,6 +149,8 @@ disable-model-invocation: true
 ---
 ```
 
+Remove `disable-model-invocation` or set it to `false` to restore automatic Claude invocation.
+
 Codex `config.toml`:
 
 ```toml
@@ -163,7 +159,7 @@ path = "/absolute/path/to/skill"
 enabled = false
 ```
 
-An invoked skill stays in the session context. Keep its body short.
+Set `enabled = true` to restore the Codex skill. An invoked skill stays in the session context, so keep its body short.
 
 #### 8) 🧠 Disable stale auto-memory
 
@@ -185,7 +181,7 @@ use_memories = false
 generate_memories = false
 ```
 
-Inspect first with Claude Code `/memory` or Codex `/memories`.
+Set the flags back to `true` to restore memory generation and use. Inspect first with Claude Code `/memory` or Codex `/memories`.
 
 #### 9) 🪨 Compress instruction files with Caveman
 
@@ -195,14 +191,16 @@ Run `caveman-compress`, inspect the diff, then restore any weakened constraint.
 # Claude Code
 claude plugin marketplace add JuliusBrussee/caveman
 claude plugin install caveman@caveman
-# Invoke: /caveman:caveman-compress CLAUDE.md
+# Invoke: /caveman-compress CLAUDE.md
 
 # Codex
 npx skills add JuliusBrussee/caveman -a codex
 # Invoke: $caveman-compress AGENTS.md
 ```
 
-See [Caveman's install matrix and benchmarks](https://github.com/JuliusBrussee/caveman/blob/main/README.md).
+See [Caveman's install matrix](https://github.com/JuliusBrussee/caveman/blob/main/INSTALL.md) and [compression documentation](https://github.com/JuliusBrussee/caveman/blob/main/README.md#what-you-get).
+
+Rollback the edited instruction file from version control if compression weakens a constraint.
 
 #### 10) 🧭 Plan before expensive work
 
@@ -267,9 +265,11 @@ exporter = { otlp-http = { endpoint = "http://localhost:4318/v1/logs", protocol 
 
 See [Claude Code monitoring](https://code.claude.com/docs/en/monitoring-usage) and [Codex observability](https://learn.chatgpt.com/docs/config-file/config-advanced#observability-and-telemetry).
 
+Remove the telemetry environment variables or the `[otel]` table to stop exporting.
+
 #### 14) 🗣️ Set native concise output
 
-Preserve code, errors, evidence, and security warnings. Remove filler.
+Preserve code, errors, evidence, and security warnings while removing filler.
 
 Claude Code `.claude/output-styles/concise-coding.md`:
 
@@ -292,19 +292,17 @@ model_reasoning_summary = "concise"
 
 `model_reasoning_summary` changes the reasoning summary, not the final answer. See [Claude Code output styles](https://code.claude.com/docs/en/output-styles) and [Codex configuration](https://learn.chatgpt.com/docs/config-file/config-reference).
 
+Select Claude Code's built-in default style or delete the custom file; remove the two Codex keys to restore defaults.
+
 #### 15) 🪨 Compress output with Caveman
 
-Use `lite` first. Stronger modes trade readability for fewer output tokens.
+Use `lite` first because stronger modes trade readability for fewer output tokens.
 
-```bash
-# Claude Code
-claude plugin marketplace add JuliusBrussee/caveman
-claude plugin install caveman@caveman
-# Invoke: /caveman:caveman lite
+Install Caveman with [step 9](#9--compress-instruction-files-with-caveman), then invoke its output mode:
 
-# Codex
-npx skills add JuliusBrussee/caveman -a codex
-# Invoke: $caveman lite
+```text
+Claude Code: /caveman lite
+Codex:       $caveman lite
 ```
 
 ```text
@@ -315,7 +313,7 @@ After:
 New object ref each render. Inline object prop = new ref = re-render. Wrap in `useMemo`.
 ```
 
-The maintainer reports 65% fewer output tokens on a small chat benchmark. A [JetBrains benchmark](https://blog.jetbrains.com/ai/2026/07/speak-to-ai-agents-like-cavemen-tosave-tokens/) measured 8.5% on agentic coding tasks. Measure your workload.
+The maintainer reports 65% fewer output tokens on a small chat benchmark and warns that the skill adds about 1–1.5k input tokens per turn. A [JetBrains benchmark](https://blog.jetbrains.com/ai/2026/07/speak-to-ai-agents-like-cavemen-tosave-tokens/) measured 8.5% on agentic coding tasks. Either workload can be net-negative; measure total usage.
 
 #### 16) 🧠 Shape actionable output with i-have-adhd
 
@@ -325,7 +323,7 @@ Use [`i-have-adhd`](https://github.com/ayghri/i-have-adhd) for action-first outp
 # Claude Code
 claude plugin marketplace add ayghri/i-have-adhd
 claude plugin install i-have-adhd@i-have-adhd
-# Invoke: /i-have-adhd:i-have-adhd
+# Invoke: /i-have-adhd
 
 # Codex
 codex plugin marketplace add ayghri/i-have-adhd --ref main
@@ -333,16 +331,11 @@ codex plugin add i-have-adhd@i-have-adhd
 # Invoke: $i-have-adhd
 ```
 
-Canonical output example:
+Canonical action-first example:
 
 ```text
-Run `npm install jsonwebtoken@latest`, then edit `src/auth.ts:42`.
-
-1. Open `src/auth.ts`
-2. Replace `verifyToken` (lines 42–58) with the snippet below
-3. Run `npm test -- auth.spec.ts`
-
-Next: paste the first failing line if any test fails.
+Bad: "Let's think about this. Your auth flow has a few moving pieces..."
+Good: "Run `npm install jsonwebtoken`, then edit `src/auth.ts:42`."
 ```
 
 | Need | Use |
@@ -371,7 +364,9 @@ flowchart LR
   R -->|"filtered output"| M["Agent context"]
 ```
 
-A [JetBrains benchmark](https://blog.jetbrains.com/ai/2026/07/rtk-claude-code-token-savings/) found no cost improvement on its workload. Measure before automating.
+An independent [JetBrains benchmark](https://blog.jetbrains.com/ai/2026/07/rtk-claude-code-token-savings/) measured a 7.6% median cost increase at low effort and no material cost change at high effort. Measure the full task before keeping RTK.
+
+Run `brew uninstall rtk` to remove the installed binary.
 
 #### 18) ✂️ Filter shell output with SNIP
 
@@ -379,22 +374,26 @@ Use YAML filters when RTK's fixed command set does not fit.
 
 ```bash
 brew install edouard-claude/tap/snip
-snip init                # Claude Code
-snip init --agent codex  # Codex
+snip init                                  # Claude Code
+snip init --agent codex                    # Codex
+snip init --uninstall                      # Remove from Claude Code
+snip init --agent codex --uninstall        # Remove from Codex
 ```
 
 See [`SNIP`](https://github.com/edouard-claude/snip).
 
-#### 19) 🪝 Rewrite noisy commands with hooks
+#### 19) 🪝 Automate RTK where supported
 
-Rewrite only known commands. Keep unknown commands fail-open.
+Claude Code rewrites eligible Bash calls through a hook; Codex installs `AGENTS.md` guidance and still relies on the agent invoking RTK.
 
 ```bash
-rtk init -g          # Claude Code
-rtk init -g --codex  # Codex
+rtk init -g                    # Claude Code hook
+rtk init -g --codex            # Codex instructions
+rtk init -g --uninstall        # Remove the Claude Code integration
+rtk init -g --codex --uninstall # Remove the Codex integration
 ```
 
-Verify with `/hooks`. See [Claude Code filtering hooks](https://code.claude.com/docs/en/costs#offload-processing-to-hooks-and-skills) and [Codex hooks](https://learn.chatgpt.com/docs/hooks).
+Verify Claude Code with `/hooks`. For Codex, inspect the generated `AGENTS.md` and `RTK.md`; do not assume transparent rewriting. See [RTK's current client matrix](https://github.com/rtk-ai/rtk/blob/develop/README.md#supported-ai-tools) and [Claude Code filtering hooks](https://code.claude.com/docs/en/costs#offload-processing-to-hooks-and-skills).
 
 #### 20) ✋ Cap Codex tool history
 
@@ -429,6 +428,8 @@ Claude Code `.claude/settings.json`:
 
 This saves tokens only when the agent would otherwise read those paths. Secrets are primarily a security concern. See [Claude Code permissions](https://code.claude.com/docs/en/permissions).
 
+Remove only the added `deny` entries to restore access.
+
 #### 22) 🔌 Limit MCP exposure
 
 Disable unused servers and tools.
@@ -444,6 +445,8 @@ url = "https://mcp.figma.com/mcp"
 enabled = false
 ```
 
+Set `enabled = true` or remove the override to restore the server.
+
 See [Claude Code MCP](https://code.claude.com/docs/en/mcp#scale-with-mcp-tool-search), [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli), and [`mcp-installation.md`](mcp-installation.md).
 
 ### 🔴 Expert
@@ -454,15 +457,14 @@ Use diagnostics native to each client.
 
 ```text
 Claude Code: /insights
-Claude Code: Ctrl+O
-Codex:       codex debug prompt-input [PROMPT]
+Codex CLI:   codex debug prompt-input "Explain the current context sources"
 ```
 
-Codex `Ctrl+O` copies the latest completed response. See [Claude Code commands](https://code.claude.com/docs/en/commands) and [Codex commands](https://learn.chatgpt.com/docs/developer-commands?surface=cli).
+See [Claude Code commands](https://code.claude.com/docs/en/commands) and [Codex commands](https://learn.chatgpt.com/docs/developer-commands?surface=cli).
 
 #### 24) 🎯 Route model and effort by difficulty
 
-Use cheaper agents for bounded exploration. Keep difficult review and architecture on stronger settings.
+Use cheaper agents for bounded exploration while keeping difficult review and architecture on stronger settings.
 
 Claude Code `.claude/agents/explorer.md`:
 
@@ -487,6 +489,8 @@ model_reasoning_effort = "low"
 ```
 
 See [Claude Code model configuration](https://code.claude.com/docs/en/model-config) and [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents).
+
+Delete these optional agent files to restore each client's default routing.
 
 #### 25) 🧫 Isolate noisy work with subagents
 
@@ -521,7 +525,7 @@ For Codex, observe `cached_input` through telemetry. See [Claude Code prompt cac
 
 #### 27) ✅ Lower reasoning on routine work
 
-Lower effort first. Disable thinking only when a representative task still passes.
+Lower effort first, and disable thinking only when a representative task still passes.
 
 ```text
 Claude Code: /effort low
@@ -544,10 +548,12 @@ Codex `config.toml`:
 model_reasoning_effort = "low"
 ```
 
+Remove the environment variable and Codex key, then restore the prior `/effort` or `/reasoning` value.
+
 See [Claude Code model configuration](https://code.claude.com/docs/en/model-config) and [Codex configuration](https://learn.chatgpt.com/docs/config-file/config-reference).
 
-## In short
+## Verify the result
 
-Measure first. Change one token source at a time. Keep only measured wins.
-
-Have more clues? Open a [pull request](../../../../../../CONTRIBUTING.md).
+- Compare the same task, model, effort, and quality gate before and after each change.
+- Record input, output, reasoning, tool-output, and subagent tokens when the client exposes them.
+- Keep only changes that reduce total usage without weakening the required result.

@@ -207,7 +207,7 @@ flowchart TD
     class PR done;
 ```
 
-> 🍳 **More flows** → bundled recipes: [start a project](plugins/aidd-context/skills/12-cook/assets/recipes/start-a-project.md), [ship a feature](plugins/aidd-context/skills/12-cook/assets/recipes/ship-a-feature.md), and more.
+> 🍳 **How-to sheets** → bundled recipes for [MCP installations](plugins/aidd-context/skills/12-cook/assets/recipes/mcp-installation.md), [token optimization](plugins/aidd-context/skills/12-cook/assets/recipes/token-optimization.md), and [installing AIDDy](plugins/aidd-context/skills/12-cook/assets/recipes/install-aiddy-in-codex.md).
 
 ## 🧩 Plugins
 
@@ -293,7 +293,7 @@ Full catalog → [`CATALOG.md`](docs/CATALOG.md).
 
 | | |
 | --- | --- |
-| 🍳 **Recipes** | Bundled how-to sheets: [start a project](plugins/aidd-context/skills/12-cook/assets/recipes/start-a-project.md), [ship a feature](plugins/aidd-context/skills/12-cook/assets/recipes/ship-a-feature.md), [MCP installations](plugins/aidd-context/skills/12-cook/assets/recipes/mcp-installation.md), [token optimization](plugins/aidd-context/skills/12-cook/assets/recipes/token-optimization.md). Project recipes created by cook live in `aidd_docs/recipes/`. |
+| 🍳 **Recipes** | Bundled how-to sheets: [MCP installations](plugins/aidd-context/skills/12-cook/assets/recipes/mcp-installation.md), [token optimization](plugins/aidd-context/skills/12-cook/assets/recipes/token-optimization.md), [install AIDDy](plugins/aidd-context/skills/12-cook/assets/recipes/install-aiddy-in-codex.md). Project recipes created by cook live in `aidd_docs/recipes/`. |
 | 🏛️ **[Architecture](docs/ARCHITECTURE.md)** | How the framework composes: plugins, skills, hooks, agents. |
 | 🧩 **[Create a plugin](docs/CREATE_PLUGIN.md)** | Build and publish your own. |
 | 🛒 **[Marketplace](docs/MARKETPLACE.md)** | Install scopes, versioning, LLM tiers. |
