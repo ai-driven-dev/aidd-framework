@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.3.0](https://github.com/ai-driven-dev/framework/compare/aidd-vcs-v2.2.1...aidd-vcs-v2.3.0) (2026-08-06)
+
+
+### Features
+
+* **framework:** add QA and communication evaluations ([#512](https://github.com/ai-driven-dev/framework/issues/512)) ([871d192](https://github.com/ai-driven-dev/framework/commit/871d1926e9944af231b15951d54bfe6364234536))
+
+
+### Refactoring
+
+* **plugins:** action citations use markdown links, not @ ([c5da712](https://github.com/ai-driven-dev/framework/commit/c5da7126ef30354e17d4665300bd88481fc7c816))
+
 ## [2.2.1](https://github.com/ai-driven-dev/framework/compare/aidd-vcs-v2.2.0...aidd-vcs-v2.2.1) (2026-07-10)
 
 

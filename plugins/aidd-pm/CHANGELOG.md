@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.0](https://github.com/ai-driven-dev/framework/compare/aidd-pm-v2.3.0...aidd-pm-v2.4.0) (2026-08-06)
+
+
+### Features
+
+* **aidd-pm:** keep a typed product backlog coherent whoever writes to it ([#582](https://github.com/ai-driven-dev/framework/issues/582)) ([fe0eebc](https://github.com/ai-driven-dev/framework/commit/fe0eebc5cf142e6668859f83dfe7ae4a38097435))
+
+
+### Refactoring
+
+* **plugins:** action citations use markdown links, not @ ([c5da712](https://github.com/ai-driven-dev/framework/commit/c5da7126ef30354e17d4665300bd88481fc7c816))
+
 ## [2.3.0](https://github.com/ai-driven-dev/framework/compare/aidd-pm-v2.2.1...aidd-pm-v2.3.0) (2026-07-31)
 
 

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "aidd-dev",
-  "version": "2.3.1",
+  "version": "2.4.0",
   "description": "Code transformation: plan, implement, assert, audit, review, test, refactor, debug, for-sure, plus short standalone Browser QA evidence. Hosts engineering agents.",
   "author": {
     "name": "AI-Driven Dev",
