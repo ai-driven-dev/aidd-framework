@@ -29,4 +29,5 @@ The skill tree at the target, and the list of files written.
 | The router is written | it holds a `mermaid` flowchart and an `Action \| Does` table |
 | An action file is written | it holds `## Output`, `## Process`, and a `Case \| Pass` `## Test` |
 | The tree is written | its shape matches [skill-tree.md](../references/skill-tree.md) |
+| Any written file is read back | no `<` placeholder and no template instruction line survives |
 | A path resolves outside the chosen target | the run stops and reports that path |

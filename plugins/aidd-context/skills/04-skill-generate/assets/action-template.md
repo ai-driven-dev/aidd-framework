@@ -20,3 +20,5 @@
 | Case | Pass |
 | --- | --- |
 | <what is run> | <the observable result it gives> |
+
+> Fill every `<...>` and delete this line. An angle bracket left in the written file is a bug.

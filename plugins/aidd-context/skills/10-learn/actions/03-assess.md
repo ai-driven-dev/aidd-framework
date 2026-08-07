@@ -12,10 +12,10 @@ A learning plan approved by the user and ready to write.
 
 ## Process
 
-1. Apply [assessment](../references/assessment.md), then use [destinations](../references/destinations.md) to propose where each candidate should land.
-2. Score each candidate and reconcile existing coverage.
-3. Show the scored recommendation and ask the user which packets to approve, edit, send to another destination, or skip.
-4. Fill [learning packet](../assets/learning-packet.md) only for user-approved items.
+1. **Frame.** Apply [assessment](../references/assessment.md), then use [destinations](../references/destinations.md) to propose where each candidate should land.
+2. **Score.** Score each candidate and reconcile existing coverage.
+3. **Confirm.** Show the scored recommendation and ask which packets to approve, edit, redirect, or skip.
+4. **Fill.** Fill [learning packet](../assets/learning-packet.md) for approved items only.
 
 ## Test
 

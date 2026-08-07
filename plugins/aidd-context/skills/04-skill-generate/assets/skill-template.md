@@ -24,3 +24,5 @@ Run the flow above. Read only the next action file.
 <Rules owned by no reference or single action, one per line.>
 
 - <rule>
+
+> Fill every `<...>` and delete this line. An angle bracket left in the written file is a bug.

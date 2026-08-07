@@ -12,11 +12,11 @@ The created or updated files, and a summary table.
 
 ## Process
 
-1. Start from the approved learning packet.
-2. Apply only the destination path in [destinations](../references/destinations.md).
-3. Load only the destination asset when one is required, fill it from the packet, and strip its guidance comment.
-4. Apply [review protocol](../references/review-protocol.md) to touched files or handoffs.
-5. Report packet, destination, action, file or handoff, and review verdict.
+1. **Start.** Start from the approved learning packet.
+2. **Route.** Apply only the destination path in [destinations](../references/destinations.md).
+3. **Fill.** Load the destination asset when one is required, fill it from the packet, and strip its guidance comment.
+4. **Review.** Apply [review protocol](../references/review-protocol.md) to every touched file or handoff.
+5. **Report.** Report packet, destination, action, file or handoff, and review verdict.
 
 ## Test
 

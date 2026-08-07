@@ -12,10 +12,10 @@ A list of candidate learnings grounded in evidence, or no candidates when nothin
 
 ## Process
 
-1. Apply [gather protocol](../references/gather-protocol.md) to the selected sources.
-2. Extract durable signals with evidence.
-3. Drop noise and already-useless items.
-4. Emit the candidate list, or end with no candidates.
+1. **Read.** Apply [gather protocol](../references/gather-protocol.md) to the selected sources.
+2. **Extract.** Extract durable signals with their evidence.
+3. **Drop.** Drop noise and already-useless items.
+4. **Emit.** Emit the candidate list, or end stating there is none.
 
 ## Test
 
