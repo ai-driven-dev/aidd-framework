@@ -19,7 +19,10 @@ The saved PRD at `aidd_docs/tasks/<yyyy_mm>/<yyyy_mm_dd>-<feature_name>-prd.md`,
 
 ## Test
 
-- The PRD file exists on disk after the action completes.
-- It contains the eight headings: Overview, Problem Statement, Goals, Non-Goals, User Stories, Acceptance Criteria, Dependencies, Open Questions.
-- It has no solution detail: no tech-stack, data-model, or architecture section, no `## Implementation` heading, and no source code.
-- A write reports its stable identity, `before -> after` fields, affected relations, and verification result; otherwise no persisted change is reported.
+| Case | Pass |
+| --- | --- |
+| The action completes | the PRD file exists on disk |
+| The file is read back | it holds the eight headings of `assets/prd-template.md` and no other |
+| Solution detail was proposed | no tech-stack, data-model, architecture section, `## Implementation` heading, or source code was written |
+| A write happened | the result reports the stable identity, `before -> after` fields, affected relations, and verification result |
+| No write happened | the result states that no persisted change occurred |

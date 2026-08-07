@@ -1,7 +1,7 @@
 ---
 name: 01-commit
 description: Create an atomic git commit with a conventional message, optionally pushing. Use when the user wants to commit changes, optionally pushing the branch. Not for amending, rebasing, opening a pull request, or tagging a release.
-argument-hint: collect | message | commit
+argument-hint: paths | auto | push
 ---
 
 # Commit

@@ -1,6 +1,6 @@
 ---
 name: 10-task
-description: Produces or refines a backlog Task for bounded delivery work without independent user value. Use to create, classify, link, order, estimate, transition, or complete functional or technical work. Not for User Stories, Spikes, Defects, planning, or implementation.
+description: Produces or refines a backlog Task for bounded delivery work without independent user value. Use when the user wants to create, link, order, estimate, transition, or complete one. Not for User Stories, Spikes, Defects, or implementation.
 argument-hint: request | task
 ---
 

@@ -12,21 +12,20 @@ flowchart LR
   edit([modify]) --> plan
 ```
 
-Default to `create`; follow `modify` when asked.
-
 ## Actions
 
-Read only the next action's file before running it.
+Run the flow above. Read only the next action file.
 
-| #  | Action   | Does                       |
-| -- | -------- | -------------------------- |
-| 01 | scope    | frame the skill and target |
-| 02 | plan     | break it into actions      |
-| 03 | write    | write the router and files |
-| 04 | validate | review the files and fix   |
+| Action   | Does                       |
+| -------- | -------------------------- |
+| scope    | frame the skill and target |
+| plan     | break it into actions      |
+| write    | write the router and files |
+| validate | review the files and fix   |
 
 ## Transversal rules
 
+- Default to `create`; follow `modify` when asked.
 - If a cited reference cannot be read, stop and report the missing file.
 - Confirm every target and name with the user.
 - Never write silently.

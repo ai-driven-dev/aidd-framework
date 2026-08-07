@@ -1,7 +1,7 @@
 ---
 name: 06-agent-generate
 description: Generate an agent across the host AI tools a project uses. Use when the user wants to create, scaffold, or refactor an agent, subagent or specialized role. Not for other artifacts like skills, rules, commands, hooks.
-argument-hint: capture-agent | write-agent | validate
+argument-hint: role
 ---
 
 # Agent Generate

@@ -1,7 +1,7 @@
 ---
 name: 01-bootstrap
 description: Design and validate a new SaaS's architecture into an INSTALL.md via Q&A and stack comparison. Use when the user starts a project, chooses a stack, or picks an architecture pattern. Not for editing an existing stack or scaffolding code.
-argument-hint: gather-needs | propose-candidates | audit-candidates | pick-and-design | write-install-md
+argument-hint: idea
 ---
 
 # Bootstrap

@@ -75,7 +75,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `actions` | [01-build.md](skills/04-spec/actions/01-build.md) | - |
 | `actions` | [02-refine.md](skills/04-spec/actions/02-refine.md) | - |
 | `assets` | [spec-template.md](skills/04-spec/assets/spec-template.md) | - |
-| `-` | [SKILL.md](skills/04-spec/SKILL.md) | `Generate or refine a spec, a feature's immutable contract, from a request, a PRD, or review findings. Use to draft or refine a spec. Do NOT use to write code, a full PRD, or change a locked spec.` |
+| `-` | [SKILL.md](skills/04-spec/SKILL.md) | `Generate or refine a spec, a feature's immutable contract, from a request, a PRD, or review findings. Use when the user wants to draft or refine a spec. Not for writing code, a full PRD, or changing a locked spec.` |
 
 #### `skills/05-spike`
 
@@ -135,7 +135,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `actions` | [02-reconcile.md](skills/08-three-amigos/actions/02-reconcile.md) | - |
 | `references` | [assessment.md](skills/08-three-amigos/references/assessment.md) | - |
 | `references` | [reconciliation.md](skills/08-three-amigos/references/reconciliation.md) | - |
-| `-` | [SKILL.md](skills/08-three-amigos/SKILL.md) | `Assesses an Epic or Story through one product, delivery, or quality lens, then reconciles three caller-supplied reports. Use for refinement before backlog changes. Never spawns or writes.` |
+| `-` | [SKILL.md](skills/08-three-amigos/SKILL.md) | `Assesses an Epic or Story through one product, delivery, or quality lens, then reconciles three caller-supplied reports. Use when the user wants to refine one before a backlog change. Not for spawning or writing.` |
 
 #### `skills/09-defect`
 
@@ -167,5 +167,5 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `references` | [qualification.md](skills/10-task/references/qualification.md) | - |
 | `references` | [readiness.md](skills/10-task/references/readiness.md) | - |
 | `references` | [relations.md](skills/10-task/references/relations.md) | - |
-| `-` | [SKILL.md](skills/10-task/SKILL.md) | `Produces or refines a backlog Task for bounded delivery work without independent user value. Use to create, classify, link, order, estimate, transition, or complete functional or technical work. Not for User Stories, Spikes, Defects, planning, or implementation.` |
+| `-` | [SKILL.md](skills/10-task/SKILL.md) | `Produces or refines a backlog Task for bounded delivery work without independent user value. Use when the user wants to create, link, order, estimate, transition, or complete one. Not for User Stories, Spikes, Defects, or implementation.` |
 

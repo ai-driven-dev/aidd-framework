@@ -35,15 +35,14 @@ pre-commit:
             exit 1
           fi
         done
-    sync-skill-argument-hints:
+    check-skill-argument-hints:
       glob: "plugins/*/skills/**"
       run: |
         if ! command -v node >/dev/null 2>&1; then
-          echo "ℹ️  node not available; skipping sync-skill-argument-hints"
+          echo "ℹ️  node not available; skipping check-skill-argument-hints"
           exit 0
         fi
-        node scripts/sync-skill-argument-hints.mjs >/dev/null
-        git add plugins/*/skills/*/SKILL.md 2>/dev/null || true
+        node scripts/check-skill-argument-hints.mjs
     markdown-links:
       glob: "**/*.md"
       run: |
