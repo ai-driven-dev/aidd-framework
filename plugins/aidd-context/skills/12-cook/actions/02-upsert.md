@@ -15,10 +15,10 @@ The recipe file at `aidd_docs/recipes/<slug>.md`, filled from the template.
 1. **Research.** For a new recipe or any substantial update, run `research` (03) on the topic and draft only from its verified results, never from memory.
 2. **Slug.** Derive a kebab-case `<slug>` from the topic.
 3. **Resolve.** Resolve existing recipes with [recipe-locations.md](../references/recipe-locations.md).
-   1. The project recipe exists: update `aidd_docs/recipes/<slug>.md` in place.
-   2. Only a bundled recipe exists: ask whether to copy it into `aidd_docs/recipes/<slug>.md` or edit the bundled one. Edit a bundled recipe only when the user asks for that framework-source change.
+   - The project recipe exists: update `aidd_docs/recipes/<slug>.md` in place.
+   - Only a bundled recipe exists: ask whether to copy it into `aidd_docs/recipes/<slug>.md` or edit the bundled one. Edit a bundled recipe only when the user asks for that framework-source change.
 4. **Dedup.** For a new recipe, run `list` and rate each near match in an overlap table `| Existing recipe | Source | Shared scope | Overlap |`, where `Overlap` is none, partial, or high.
-   1. On any `high`, recommend updating that recipe instead and ask update-or-create before scaffolding.
+   - On any `high`, recommend updating that recipe instead and ask update-or-create before scaffolding.
 5. **Scaffold.** Scaffold from [recipe-template.md](../assets/recipe-template.md) when needed, applying [recipe-contract.md](../references/recipe-contract.md) to every section.
 6. **Fill.** Fill every placeholder. Never maintain a separate recipe index; `list` reads the files directly.
 

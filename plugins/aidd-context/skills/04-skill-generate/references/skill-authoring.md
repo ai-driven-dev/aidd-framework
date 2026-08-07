@@ -21,7 +21,7 @@ The contract every generated skill satisfies. `skill-generate` obeys it too.
 ## An action
 
 - **R11.** Sections in this order: `## Input` when the action consumes something, then `## Output`, `## Process`, `## Test`. A section earns its content or is omitted, never invented or reordered.
-- **R12.** A `## Process` step opens with `**Label.**`, then one imperative sentence. A branch or a loop is a sub-bullet of the step it belongs to.
+- **R12.** A `## Process` step opens with `**Label.**`, then one imperative sentence. A number is always a step run in order; a case, a branch, a loop back, or a constraint is a dash sub-item of the step it belongs to, never a number.
 - **R13.** `## Test` is a `| Case | Pass |` table, each row observable by real execution, never a mock.
 
 ## A reference
