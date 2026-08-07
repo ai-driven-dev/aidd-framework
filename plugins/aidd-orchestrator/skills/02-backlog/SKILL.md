@@ -1,6 +1,6 @@
 ---
 name: 02-backlog
-description: Orchestrates a product backlog end to end. Use to ask what it holds, or for intake, triage, refinement, review, lifecycle events, ordering, health checks, or repair. Not for one known artifact step.
+description: Orchestrates a product backlog end to end. Use when the user wants to ask what it holds, or to run intake, triage, refinement, review, lifecycle events, ordering, health checks, or repair. Not for one known artifact step.
 argument-hint: ask | create | manage | review | refine
 ---
 
@@ -26,7 +26,7 @@ flowchart LR
 
 ## Actions
 
-Run the flow above, reading only the next action file. Resolve each capability by its purpose and verify it is installed before delegating.
+Run the flow above. Read only the next action file.
 
 | Action  | Does                                        |
 | ------- | ------------------------------------------- |
@@ -42,7 +42,7 @@ Run the flow above, reading only the next action file. Resolve each capability b
 ## Transversal rules
 
 - Keep product, lifecycle, and backlog decisions with the user.
-- Delegate artifact work to its owning capability.
+- Delegate artifact work to its owning capability, resolved by purpose and verified as installed before delegating.
 - Store each relation once, in its owning artifact.
 - Ask natural questions; never expose internal routes, checks, or unchanged state.
 - Change only authorized artifacts and fields.

@@ -20,6 +20,8 @@ The confirmed capabilities, printed nowhere.
 
 ## Test
 
-- The run changes no file: `git status --porcelain` reads the same after as before.
-- A capability reaches the confirmed set only when a file or dependency for it exists in the repo.
-- On a repo with no code and nothing describing it, the run stops at Ground and hands nothing to generate.
+| Case | Pass |
+| --- | --- |
+| The action completes | `git status --porcelain` reads the same after as before |
+| A capability is confirmed | a file or dependency for it exists in the repo |
+| The repo holds no code and nothing describing it | the run stops at Ground and hands nothing to generate |

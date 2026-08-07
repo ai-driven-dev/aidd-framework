@@ -20,4 +20,7 @@ One or more source descriptions that name where to look and how narrowly to read
 
 ## Test
 
-- Emits one or more readable source descriptions, or stops with the failed source named.
+| Case | Pass |
+| --- | --- |
+| A source is readable | one or more source descriptions are emitted |
+| A source cannot be read | the run stops and names it |

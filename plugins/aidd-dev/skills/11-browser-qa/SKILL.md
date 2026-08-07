@@ -1,7 +1,7 @@
 ---
 name: 11-browser-qa
 description: Run post-review browser QA and produce short named videos for a locked happy path and sourced browser edge cases. Use when the user wants concise reviewer evidence for a web journey. Not for API, CLI, automated tests, diff review, or application fixes.
-argument-hint: prerequisites | load-scope | prepare-run | run-scenarios
+argument-hint: plan | artifact
 ---
 
 # Browser QA

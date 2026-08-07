@@ -20,7 +20,8 @@ The created or updated files, and a summary table.
 
 ## Test
 
-- Every approved lesson appears in the table.
-- No packet without user approval is written or handed off.
-- Each packet uses the destination chosen by the user.
-- The report includes a review verdict for touched files or handoffs.
+| Case | Pass |
+| --- | --- |
+| A lesson is approved | it appears in the table, at the destination the user chose |
+| A packet has no user approval | it is neither written nor handed off |
+| The report is delivered | it carries a review verdict for every touched file and handoff |

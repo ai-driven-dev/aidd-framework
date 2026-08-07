@@ -1,7 +1,7 @@
 ---
 name: 05-review
 description: Review a diff read-only on three axes, code, behavior versus the plan, and relevancy, into one verdict report. Use before shipping a change. Not for fixing findings or auditing a codebase.
-argument-hint: review-code | review-functional | review-relevancy
+argument-hint: diff | plan
 model: opus
 ---
 

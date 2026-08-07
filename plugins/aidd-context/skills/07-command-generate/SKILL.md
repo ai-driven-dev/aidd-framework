@@ -1,7 +1,7 @@
 ---
 name: 07-command-generate
 description: Generate a flat slash command across the host AI tools a project uses. Use when the user wants to create, scaffold, or refactor a one-shot slash command. Not for multi-step skills or other artifacts like rules, agents, hooks.
-argument-hint: capture-command | write-command | validate
+argument-hint: goal
 ---
 
 # Command Generate

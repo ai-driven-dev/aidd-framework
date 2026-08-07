@@ -20,6 +20,9 @@ Each memory block lists the current memory files, and the memory index is refres
 
 ## Test
 
-- Each context file's memory block references every file in the memory bank, and the report names the files updated rather than a fixed count.
-- The sync result is checked before ending the action.
-- `git diff --cached` is unchanged by this action.
+| Case | Pass |
+| --- | --- |
+| A context file is synced | its memory block references every file in the bank |
+| The report is delivered | it names the files updated, never a fixed count |
+| The sync returns | its result is checked before the action ends |
+| The action completes | `git diff --cached` is unchanged |

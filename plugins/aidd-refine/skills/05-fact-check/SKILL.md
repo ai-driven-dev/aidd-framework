@@ -1,7 +1,7 @@
 ---
 name: 05-fact-check
 description: Verify factual claims in a text against authoritative sources and rewrite it with footnote citations, hedging the unconfirmed. Use to fact-check, verify a claim, or cite sources on request. Not for judging code or clarifying requirements.
-argument-hint: identify-claims | verify | report
+argument-hint: text
 ---
 
 # Fact-check

@@ -1,7 +1,7 @@
 ---
 name: 01-plan
 description: Turn a request, ticket, or file into a phased implementation plan. Use to plan a feature before building, or to turn a ticket into phases. Do NOT use to write code or review a diff.
-argument-hint: gather | explore | wireframe | plan
+argument-hint: request | ticket | file
 ---
 
 # Skill: plan

@@ -20,7 +20,10 @@ The refined spec at the same path, with the changes applied and any residual `TB
 
 ## Test
 
-- The spec still exists at its path and holds every required section in [spec-validator.yml](../assets/spec-validator.yml).
-- Every finding is reflected by a change, or by an explicit `TBD: <question>` when it cannot be resolved.
-- The result reports the stable identity, `before -> after` fields, affected relations, and verification result.
-- Without a write, no persisted change is reported.
+| Case | Pass |
+| --- | --- |
+| The action completes | the spec still exists at its path with every section required by [spec-validator.yml](../assets/spec-validator.yml) |
+| A finding is resolved | the spec changed at the section it names |
+| A finding cannot be resolved | an explicit `TBD: <question>` marks it in place |
+| A write happened | the result reports the stable identity, `before -> after` fields, affected relations, and verification result |
+| No write happened | the result states that no persisted change occurred |

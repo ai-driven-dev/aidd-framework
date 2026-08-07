@@ -19,5 +19,7 @@ A list of candidate learnings grounded in evidence, or no candidates when nothin
 
 ## Test
 
-- Each candidate has source, evidence, learning, and persistence reason.
-- No candidate comes from an unselected source.
+| Case | Pass |
+| --- | --- |
+| A candidate is emitted | it carries source, evidence, learning, and persistence reason |
+| A source was not selected | no candidate comes from it |

@@ -19,5 +19,7 @@ A learning plan approved by the user and ready to write.
 
 ## Test
 
-- Every approved packet has score, approved destination, reconciliation, and user approval.
-- Skipped or covered items are not written.
+| Case | Pass |
+| --- | --- |
+| A packet is approved | it carries score, approved destination, reconciliation, and user approval |
+| An item is skipped or already covered | it is not written |

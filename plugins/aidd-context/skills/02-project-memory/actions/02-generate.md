@@ -26,8 +26,10 @@ The written memory bank, and a report of what changed.
 
 ## Test
 
-- `find aidd_docs/memory -mindepth 2 -name '*.md'` returns nothing outside `internal/` and `external/`.
-- Every `core` destination and every [structure.md](../references/structure.md) path exists at its exact place.
-- `internal/` and `external/` exist, each with a `.gitkeep` and no memory file.
-- No `TODO` or `<placeholder>` remains in a written file.
-- A line the user added survives a re-run, and a flagged missing section is never injected.
+| Case | Pass |
+| --- | --- |
+| The bank is written | `find aidd_docs/memory -mindepth 2 -name '*.md'` returns nothing outside `internal/` and `external/` |
+| A destination is checked | every `core` path and every [structure.md](../references/structure.md) path exists at its exact place |
+| The scaffold is checked | `internal/` and `external/` each hold a `.gitkeep` and no memory file |
+| A written file is read back | no `TODO` and no `<placeholder>` remains |
+| The action runs again on a bank the user edited | the user's line survives and a flagged missing section stays absent |
