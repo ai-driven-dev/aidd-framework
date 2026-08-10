@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.1](https://github.com/ai-driven-dev/framework/compare/aidd-dev-v2.4.0...aidd-dev-v2.4.1) (2026-08-07)
+
+
+### Bug Fixes
+
+* **framework:** leave a fenced block alone when normalising Process steps ([#604](https://github.com/ai-driven-dev/framework/issues/604)) ([019486f](https://github.com/ai-driven-dev/framework/commit/019486f5bc3ab0d91f43a527c05f9a16e322f03a))
+
+
+### Refactoring
+
+* **framework:** one home for the skill contract ([#601](https://github.com/ai-driven-dev/framework/issues/601)) ([415a777](https://github.com/ai-driven-dev/framework/commit/415a77706c84277036dc7470d6dc329f9abde1de))
+
 ## [2.4.0](https://github.com/ai-driven-dev/framework/compare/aidd-dev-v2.3.1...aidd-dev-v2.4.0) (2026-08-06)
 
 

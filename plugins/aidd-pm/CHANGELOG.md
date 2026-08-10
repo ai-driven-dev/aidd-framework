@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.1](https://github.com/ai-driven-dev/framework/compare/aidd-pm-v2.4.0...aidd-pm-v2.4.1) (2026-08-07)
+
+
+### Refactoring
+
+* **framework:** one home for the skill contract ([#601](https://github.com/ai-driven-dev/framework/issues/601)) ([415a777](https://github.com/ai-driven-dev/framework/commit/415a77706c84277036dc7470d6dc329f9abde1de))
+
 ## [2.4.0](https://github.com/ai-driven-dev/framework/compare/aidd-pm-v2.3.0...aidd-pm-v2.4.0) (2026-08-06)
 
 
