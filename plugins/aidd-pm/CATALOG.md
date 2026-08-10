@@ -34,6 +34,8 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | Group | File | Description |
 |-------|------|---|
 | `actions` | [01-ticket-info.md](skills/01-ticket-info/actions/01-ticket-info.md) | - |
+| `assets` | [ticket-template.md](skills/01-ticket-info/assets/ticket-template.md) | - |
+| `references` | [tool-detection.md](skills/01-ticket-info/references/tool-detection.md) | - |
 | `-` | [SKILL.md](skills/01-ticket-info/SKILL.md) | `Retrieve and display a ticket from the configured ticketing tool. Use when the user wants to see, show, or look up a ticket's details. Not for creating a ticket, or commenting on, transitioning, or reassigning one.` |
 
 #### `skills/02-user-stories`
