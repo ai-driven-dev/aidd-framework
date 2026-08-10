@@ -5,11 +5,13 @@ import {
   PLUGIN_AGENT_INPUT_EXT,
   PLUGIN_HOOKS_RELATIVE,
   PLUGIN_MCP_RELATIVE,
+  PLUGIN_SKILL_ENTRY_FILE,
 } from "../../../../domain/models/framework-build.js";
 import type { FileReader } from "../../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../../domain/ports/file-writer.js";
 import { assertNoToolsPlaceholder } from "../shared-plugin-helpers.js";
 
+type SkillContentTransform = (content: string, plugin: string, basename: string) => string;
 export interface PluginPresenceFlags {
   readonly hasAgents: boolean;
   /** Agent markdown files relative to the plugin's `agents/` dir (e.g. "planner.md"), sorted. */
@@ -40,7 +42,11 @@ export async function listSkillNames(
   const files = await fs.listFilesRecursive(skillsDir);
   const names = new Set<string>();
   for (const f of files) {
-    if (!f.endsWith("/SKILL.md") && !f.endsWith("\\SKILL.md") && !f.endsWith("SKILL.md")) {
+    if (
+      !f.endsWith(`/${PLUGIN_SKILL_ENTRY_FILE}`) &&
+      !f.endsWith(`\\${PLUGIN_SKILL_ENTRY_FILE}`) &&
+      !f.endsWith(PLUGIN_SKILL_ENTRY_FILE)
+    ) {
       continue;
     }
     const rel = relative(skillsDir, f);
@@ -67,7 +73,7 @@ export async function writeSkillTree(
   pluginName: string,
   pluginSrc: string,
   pluginOut: string,
-  transform?: (content: string, plugin: string, basename: string) => string
+  transform?: SkillContentTransform
 ): Promise<number> {
   const skillsSrc = join(pluginSrc, "skills");
   if (!(await fs.fileExists(skillsSrc))) return 0;
@@ -85,24 +91,25 @@ async function writeSkillFile(
   absPath: string,
   skillsSrc: string,
   pluginOut: string,
-  transform?: (content: string, plugin: string, basename: string) => string
+  transform?: SkillContentTransform
 ): Promise<number> {
   const relPath = relative(skillsSrc, absPath).replace(/\\/g, "/");
   const destPath = join(pluginOut, "skills", relPath);
   const content = await fs.readFile(absPath);
-  if (absPath.endsWith(".md")) {
-    assertNoToolsPlaceholder(content, pluginName, relPath);
-    const currentFilePluginRelative = `skills/${relPath}`;
-    const rewritten = rewriteRelativeLinks(content, { currentFilePluginRelative });
-    await fs.writeFile(
-      destPath,
-      transform && basename(absPath) === "SKILL.md"
-        ? transform(rewritten, pluginName, basename(absPath))
-        : rewritten
-    );
-  } else {
+  if (!absPath.endsWith(".md")) {
     await fs.writeFile(destPath, content);
+    return 1;
   }
+
+  assertNoToolsPlaceholder(content, pluginName, relPath);
+  const rewritten = rewriteRelativeLinks(content, {
+    currentFilePluginRelative: `skills/${relPath}`,
+  });
+  let output = rewritten;
+  if (transform && basename(absPath) === PLUGIN_SKILL_ENTRY_FILE) {
+    output = transform(rewritten, pluginName, PLUGIN_SKILL_ENTRY_FILE);
+  }
+  await fs.writeFile(destPath, output);
   return 1;
 }
 

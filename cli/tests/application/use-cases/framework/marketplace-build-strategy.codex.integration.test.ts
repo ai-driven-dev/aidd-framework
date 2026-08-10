@@ -224,7 +224,7 @@ describe("CodexOutputStrategy", () => {
   });
 
   describe("skill rewrite (AC #6)", () => {
-    it("uses the Codex skill frontmatter allowlist without changing the source", async () => {
+    it("uses the skill frontmatter allowlist without changing the source", async () => {
       const fs = await makeSeededFsFromCodex();
       const sourcePath = `${CODEX_FIXTURE_DIR}/plugins/aidd-codex-fixture/skills/sample/SKILL.md`;
       const sourceBefore = await fs.readFile(sourcePath);
