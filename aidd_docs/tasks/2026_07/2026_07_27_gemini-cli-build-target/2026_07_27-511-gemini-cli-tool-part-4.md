@@ -160,10 +160,10 @@ flowchart TD
 
 #### Acceptance criteria
 
-- [ ] No document still claims five supported tools or nine build cells
-- [ ] The minimum version and the trust step appear in the gemini install block itself
-- [ ] Every version claim states how it was established
-- [ ] The documented surface mapping matches what the code emits, table by table
+- [x] No document still claims five supported tools or nine build cells
+- [x] The minimum version and the trust step appear in the gemini install block itself
+- [x] Every version claim states how it was established
+- [x] The documented surface mapping matches what the code emits, table by table
 
 ### Phase 3: Re-baseline the golden snapshot deliberately
 
@@ -207,10 +207,15 @@ flowchart TD
 
 🤖 Two limits found in part 3's phase 4 belong in this part's user-facing documentation, and neither was known when this plan was written. The install path never writes `.gemini/settings.json`, so an installed gemini has no hooks and no `AGENTS.md` context wiring — only the archive carries those. And a plugin installed from a raw local path (no marketplace) lands skills at a nesting depth the real binary discovers nothing from. Both are recorded in phase 2's documentation tasks rather than left to the reader to discover.
 
+🤖 `aidd_docs/memory/architecture.md` and `codebase-map.md` at the framework level enumerate no tools at all, so nothing there needed changing. Only the CLI-level memory files did.
+
+🤖 The README already carried a Gemini footnote this plan predates: an upstream `gemini-cli` bug (google-gemini/gemini-cli#14437) blocking end-to-end validation on Gemini 3 Pro models. It is kept and folded into the expanded footnote rather than replaced, and `Gemini · Mistral` was split so Mistral keeps its in-progress status while Gemini moves to supported flat.
+
 ## Log
 
 <!-- APPEND ONLY. One entry per step attempt. Never rewrite. -->
 - Phase 1: gemini added to the memory hook's tool-to-context-file map (`AGENTS.md`) and to eleven reference tables across `aidd-context`: onboarding detection, project-memory tools, skill-generate detection and write targets plus its strict frontmatter row, rule-generate (unsupported, with the AGENTS.md fallback), agent-generate (path, strict-schema frontmatter, detection), command-generate (unsupported, steer to a skill), hook-generate (support row, a full event column, the settings file shape, and the trust-gated scope), learn's sync arguments, explore's four mapping tables, and the rules-listing script. Hook event names are the verified `GEMINI_HOOK_EVENT_MAP` read from the 0.52.0 bundle, including the two Claude moments that both fold onto `AfterAgent`. Verified: `node update_memory.js gemini` exits 0 and writes the memory block into `AGENTS.md`, where it previously exited 1 with `unknown tool gemini`; `node --check` passes on the rules script. The golden snapshot is knowingly red from here until phase 3 re-baselines it, which is this part's whole point.
+- Phase 2: Gemini moves to supported flat in the README compatibility table, with an install block that carries both gating constraints inside it — the 0.28.0 minimum (labelled source-derived, verified against 0.52.0) and the folder-trust step, since an untrusted folder yields an empty skill list with no explanation. The block also states that `aidd-orchestrator` is absent from the archive, and steers users to the archive over `aidd ai install gemini` because the install path writes no `.gemini/settings.json` and so has neither hooks nor the `AGENTS.md` context wiring — the gap part 3's phase 4 measured. `cli/README.md` gains gemini in the `--target` list, the flat-only note, the per-tool layout matrix and the settings-file table; `cli/ARCHITECTURE.md` goes from five targets and nine cells to six and ten; `docs/MAINTAINERS.md` from nine archives to ten; the hexagonal rule and four CLI memory files list the sixth tool.
 
 ## Validation flow demonstration
 

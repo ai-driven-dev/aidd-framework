@@ -13,7 +13,7 @@ paths:
 - `domain/capabilities/` — capability classes (agents, commands, hooks, mcp, plugins, rules, settings, skills)
 - `domain/tools/contracts.ts` — `AiTool<C>`, `Has*` interfaces, `IdeToolConfig`
 - `domain/tools/registry.ts` — tool registry, `ToolConfig` union, guards
-- `domain/tools/ai/` — AI tool definitions (claude, cursor, copilot, opencode, codex)
+- `domain/tools/ai/` — AI tool definitions (claude, cursor, copilot, opencode, codex, gemini)
 - `domain/tools/ide/` — IDE tool definitions (vscode)
 - `application/use-cases/` — orchestrators, sub-use-cases in subdirs (`install/`, `update/`, `sync/`, `auth/`, `shared/`)
 - `application/commands/` — CLI wiring only

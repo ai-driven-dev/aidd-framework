@@ -66,7 +66,7 @@ PluginInstallFromMarketplaceUseCase → MarketplaceRegistry + PluginFetcher (git
 **Framework build** (`aidd framework build --target <tool>`):
 ```
 FrameworkBuildUseCase → BuildOutputStrategy (MarketplaceBuildStrategy | FlatBuildStrategy, reading per-tool ToolBuildContract)
-→ tool-native plugin tree (author-side distribution; all 5 targets shipped — claude/cursor/copilot/codex marketplace+flat, opencode flat-only)
+→ tool-native plugin tree (author-side distribution; all 6 targets shipped — claude/cursor/copilot/codex marketplace+flat, opencode and gemini flat-only)
 ```
 Author-side, not user-side: translates the Claude-format framework into a tool-native
 marketplace dist (Mode A) or flat workspace materialization (Mode B `--flat`).
@@ -89,6 +89,7 @@ loads** plugins (verified live against each tool's real CLI/IDE, not inferred):
 | Claude | `.claude/settings.json` (`extraKnownMarketplaces` + `enabledPlugins`) — read natively, no CLI step | the settings file |
 | Cursor | materialized to `~/.cursor/plugins/local/<name>/` (user-scope) — auto-discovered as "Local" plugins | the plugin files |
 | OpenCode | flat files `.opencode/skills/`, `.opencode/agents/` — auto-discovered | the flat files |
+| Gemini | flat files `.agents/skills/` (shared with codex), `.gemini/agents/` — auto-discovered when the folder is trusted | the flat files |
 | Codex | **native CLI activation** (`codex plugin add`) into user-global `~/.codex/` + cache | drives the CLI |
 | Copilot | **native CLI activation** (`copilot plugin install`) into user-global `~/.copilot/` | drives the CLI + a recommendations file |
 

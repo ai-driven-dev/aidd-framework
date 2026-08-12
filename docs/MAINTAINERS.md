@@ -68,7 +68,7 @@ release-please opens/updates a `chore: release main` PR on each push to `main`.
 3. CI tags each bumped package, creates the GitHub Releases, and attaches the bundles:
    - `aidd-framework-marketplace-X.Y.Z.zip` (`.claude-plugin/` + `plugins/`)
    - `<plugin>-vX.Y.Z.zip`
-   - `aidd-framework-<tool>-<mode>-X.Y.Z.zip` - per-tool distributions (9 archives: 4 marketplace claude/cursor/copilot/codex + 5 flat incl. opencode), produced by the `build-per-tool` matrix job in `ci.yml` via `aidd-cli framework build`. **Pinned** to a specific `@ai-driven-dev/cli` version - bump it deliberately when adopting CLI build changes.
+   - `aidd-framework-<tool>-<mode>-X.Y.Z.zip` - per-tool distributions (10 archives: 4 marketplace claude/cursor/copilot/codex + 6 flat incl. opencode and gemini), produced by the `build-per-tool` matrix job in `ci.yml` via `aidd-cli framework build`. **Pinned** to a specific `@ai-driven-dev/cli` version - bump it deliberately when adopting CLI build changes.
 
 Versions live in `.release-please-manifest.json`. Forcing a version / pre-release: `release-as` in `release-please-config.json` (remove it after the release ships).
 

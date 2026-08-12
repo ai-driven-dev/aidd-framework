@@ -405,6 +405,7 @@ Marketplace registration and plugin enable state are written to per-tool setting
 | GitHub Copilot | `.github/copilot/settings.json` |
 | Codex | `.codex/config.json` |
 | OpenCode | `opencode.json` (project root) |
+| Gemini | `.gemini/settings.json` |
 
 > **GitHub Copilot — workspace recommendations only.** Per [VS Code docs](https://code.visualstudio.com/docs/copilot/customization/agent-plugins), `.github/copilot/settings.json` registers marketplaces as **team recommendations**, not auto-activated. On first chat in the workspace VS Code shows a notification — the user must accept it (or filter Extensions by `@agentPlugins @recommended` and enable manually) before plugins load. To skip the per-project click, add the marketplace to the user-level setting `chat.plugins.marketplaces` (application-scoped, not writable from workspace). See [End-to-end: distribute a framework to Copilot](#end-to-end-distribute-a-framework-to-copilot-marketplace) for the full flow.
 
@@ -423,7 +424,7 @@ aidd framework build \
 | Flag | Required | Description |
 |---|---|---|
 | `--source` | yes | Path to a framework root with `plugins/<name>/.claude-plugin/plugin.json` entries |
-| `--target` | yes | `claude`, `cursor`, `copilot`, `codex`, or `opencode` |
+| `--target` | yes | `claude`, `cursor`, `copilot`, `codex`, `opencode`, or `gemini` |
 | `--out` | yes | Output directory. Marketplace mode: dist root (auto-wiped + recreated). Flat mode: the project root to materialize into |
 | `--flat` | no | Materialize directly into a project workspace, bypassing the marketplace layer |
 | `--force` | no | Overwrite existing files at canonical paths. **Flat mode only** (rejected without `--flat`) |
@@ -435,7 +436,7 @@ aidd framework build \
 
 #### Per-tool / per-mode matrix
 
-`opencode` is **flat-only** (no native marketplace). The other four support both modes.
+`opencode` and `gemini` are **flat-only** (neither vendor has a plugin manager). The other four support both modes.
 
 | Target | Marketplace layout (`<out>/`) | Plugin-root token | Flat layout (`<project>/`) |
 |---|---|---|---|
@@ -444,6 +445,7 @@ aidd framework build \
 | `copilot` | `.plugin/marketplace.json` · `plugins/<n>/.plugin/plugin.json` (OpenPlugin spec) · `agents/*.md` | `${PLUGIN_ROOT}` | `.github/` (+ `.vscode/`) |
 | `codex` | `.claude-plugin/marketplace.json` · `plugins/<n>/.codex-plugin/plugin.json` · `codex-agents/*.toml` | `${PLUGIN_ROOT}` | `.codex/` |
 | `opencode` | — (flat-only) | — | `.opencode/` (+ `opencode.json` for MCP) |
+| `gemini` | — (flat-only) | — | `.agents/skills/` (shared with `codex`) · `.gemini/agents/` · `.gemini/hooks/` (scripts) · `.gemini/settings.json` for MCP, hooks and `context.fileName` |
 
 Copilot uses the [OpenPlugin spec](https://github.com/vercel/open-plugin-spec) (`.plugin/plugin.json`, `${PLUGIN_ROOT}`) — the only layout where Copilot's editor + CLI resolve the plugin-root token at runtime. Codex requires the manifest `skills` field as a **string** (`"./skills"`), and project subagents (`.codex/agents/*.toml`) load only when the project is **trusted**.
 

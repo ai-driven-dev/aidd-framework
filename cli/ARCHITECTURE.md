@@ -72,7 +72,7 @@ Memory ownership (CLAUDE.md, AGENTS.md, copilot-instructions.md) is delegated to
 
 ## Framework Build (author-side)
 
-`aidd framework build` translates a Claude-format framework source into a target-native distribution. Five targets (`claude`, `cursor`, `copilot`, `codex`, `opencode`) × two modes (`marketplace`, `flat`); `opencode` is flat-only, so 9 build cells. The orchestrators (`MarketplaceBuildStrategy`, `FlatBuildStrategy`) read a per-tool `ToolBuildContract` — no per-tool branching. **Scope:** skills, agents, mcp, and hooks are emitted; `rules` and `commands` are currently out of scope (warn + skip per plugin). See `README.md` → `aidd framework build` for the per-tool layout matrix.
+`aidd framework build` translates a Claude-format framework source into a target-native distribution. Six targets (`claude`, `cursor`, `copilot`, `codex`, `opencode`, `gemini`) × two modes (`marketplace`, `flat`); `opencode` and `gemini` are flat-only, so 10 build cells. The orchestrators (`MarketplaceBuildStrategy`, `FlatBuildStrategy`) read a per-tool `ToolBuildContract` — no per-tool branching. **Scope:** skills, agents, mcp, and hooks are emitted; `rules` and `commands` are currently out of scope (warn + skip per plugin). See `README.md` → `aidd framework build` for the per-tool layout matrix.
 
 ## Dependency Wiring
 
