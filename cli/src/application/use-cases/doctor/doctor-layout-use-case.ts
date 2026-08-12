@@ -1,3 +1,5 @@
+import { join } from "node:path";
+import { AGENTS_SKILLS_PREFIX } from "../../../domain/formats/flat-paths.js";
 import type { DoctorIssue } from "../../../domain/models/doctor.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
@@ -18,8 +20,32 @@ export class DoctorLayoutUseCase {
   async execute(options: DoctorLayoutOptions): Promise<DoctorIssue[]> {
     const { manifest, projectRoot } = options;
     const orphanIssues = await this.checkOrphanedDirectories(manifest, projectRoot);
+    const sharedTreeIssues = await this.checkOrphanedSharedTree(manifest, projectRoot);
     const authIssues = await this.checkAuth();
-    return [...orphanIssues, ...authIssues];
+    return [...orphanIssues, ...sharedTreeIssues, ...authIssues];
+  }
+
+  /**
+   * The shared skills tree belongs to no single tool's directory, so the orphan check above
+   * cannot see it: it walks each registered tool's own directory. Left behind by the last
+   * owner's removal, it would sit on disk forever, unreported.
+   */
+  private async checkOrphanedSharedTree(
+    manifest: Manifest,
+    projectRoot: string
+  ): Promise<DoctorIssue[]> {
+    if (!(await this.fs.fileExists(join(projectRoot, AGENTS_SKILLS_PREFIX)))) return [];
+    const claimed = [...manifest.getPathOwners().keys()].some((path) =>
+      path.startsWith(AGENTS_SKILLS_PREFIX)
+    );
+    if (claimed) return [];
+    return [
+      {
+        severity: "warning",
+        message: `Orphaned directory: ${AGENTS_SKILLS_PREFIX} (no installed tool claims it)`,
+        fix: "Remove the directory manually, or reinstall a tool that renders skills there.",
+      },
+    ];
   }
 
   private async checkOrphanedDirectories(

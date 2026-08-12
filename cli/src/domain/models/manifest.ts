@@ -426,12 +426,15 @@ export class Manifest {
     }
   }
 
+  /**
+   * Top-level directories AIDD tracks something in. Derived from every owner, not from a
+   * tool's own files alone: a shared tree is claimed through the plugin path, and reading
+   * only tool files made it look untracked.
+   */
   getInstalledDirectories(): Set<string> {
     const dirs = new Set<string>();
-    for (const entry of this._tools.values()) {
-      for (const file of entry.files) {
-        dirs.add(`${file.relativePath.split("/")[0]}/`);
-      }
+    for (const path of this.getPathOwners().keys()) {
+      dirs.add(`${path.split("/")[0]}/`);
     }
     return dirs;
   }
