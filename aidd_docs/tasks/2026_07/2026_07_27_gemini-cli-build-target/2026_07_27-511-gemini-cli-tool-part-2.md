@@ -125,10 +125,10 @@ flowchart TD
 
 #### Acceptance criteria
 
-- [ ] Two owners of one path, removing one leaves the file on disk
-- [ ] Removing the last owner deletes the file
-- [ ] Every retained file is reported on stderr; no retention is silent
-- [ ] The guard exists in exactly one place
+- [x] Two owners of one path, removing one leaves the file on disk
+- [x] Removing the last owner deletes the file
+- [x] Every retained file is reported on stderr; no retention is silent
+- [x] The guard exists in exactly one place
 
 ### Phase 2: Make co-ownership a first-class read
 
@@ -184,9 +184,19 @@ flowchart TD
 
 <!-- AI-initiated changes during implementation. Each entry is prefixed with 🤖. -->
 
+🤖 The projection's `uninstall-ide-use-case.ts:37-50` entry is stale and was dropped. `main` refactored IDE and AI tool removal onto one implementation (#553) while this plan sat unstarted, so that file is now 36 lines that delegate to `UninstallToolsUseCase`. It inherits the guard rather than needing its own. Every other line reference in the projection was re-checked and still holds, `manifest.ts:364-372` included.
+
+🤖 Two holes the plan does not name, both inside `uninstall-tools-use-case.ts`, and both in phase 1's scope by its own acceptance criterion that the guard exist in exactly one place. `removeAllPluginFiles` deleted every plugin file of the departing tool with no guard whatsoever, which is the same destruction the plan attributes to plugin uninstall alone. And `computeSharedPaths` built its retained set from the remaining tools' own files and merge files only, never their plugins, so even the path the plan calls "already guarded" would delete a tree a surviving tool's plugin still claims. Since skills reach a project through the plugin path, an owners view that skips plugins is the bug, not a subset of it. `computeRetainedPaths` therefore spans tool files, merge files and plugin files, and the departing claim is expressed as a `(toolId, pluginName | null)` pair so one function serves both tool uninstall and plugin uninstall.
+
+🤖 The guard returns a path-to-owners map rather than a set, because phase 1's acceptance criterion asks the warning to name the remaining owner. That is phase 2's owners view in application-layer form; phase 2 moves the derivation into the manifest model and rewires this function to consume it, as its task 3 already anticipates.
+
+🤖 `otherToolsOwnMergeFile` (`uninstall-tools-use-case.ts:214`) still reads the installed tool ids on its own. It answers a different question, whether a merge file may be deleted outright or must be stripped of this tool's entries, so it is not a second copy of the shared-path guard. Left alone in phase 1; a candidate for phase 2's accessor.
+
 ## Log
 
 <!-- APPEND ONLY. One entry per step attempt. Never rewrite. -->
+
+- Phase 1: `application/use-cases/uninstall/shared-path-guard.ts` created as the single owner of "may this uninstall delete that file", spanning tool files, merge files and plugin files, keyed by a `(toolId, pluginName | null)` departing claim and returning a readonly path-to-owners map. Wired into all three deletion sites: the tool-file loop and `removeAllPluginFiles` in `uninstall-tools-use-case.ts` (its module-private `computeSharedPaths` deleted), and `deleteFiles` in `uninstall-plugin-use-case.ts`, which gains the `Logger` it needed to report a retention (single construction site, `uninstall-use-case.ts:35`). Every retained path emits one `warn` naming the surviving owners. New `tests/application/use-cases/uninstall/shared-path-guard.integration.test.ts`, 5 cases: co-owned file survives one owner leaving, solely-owned path still deleted, retention reported once and naming the owner, co-owned file deleted when the last owner goes, and co-owned file surviving a whole-tool uninstall. Mutation-checked: neutralizing `computeRetainedPaths` fails 3 of the 5, the two deletion assertions staying green as they should. Verified: `pnpm typecheck` (0 errors), `biome check` (clean, 2 pre-existing config infos from main's biome bump), full `pnpm test` 2195/2196 — the one failure is `auth status`, caused by an `AIDD_TOKEN` in the developer environment that the e2e sandbox does not scrub, unrelated to this work.
 
 ## Validation flow demonstration
 

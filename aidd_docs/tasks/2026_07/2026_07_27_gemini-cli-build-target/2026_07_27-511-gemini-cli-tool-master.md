@@ -51,7 +51,7 @@ Neither appears in the issue or the brainstorm, and both gate the stated success
 | #   | Plan                    | File                                             | Status  | Validated |
 | --- | ----------------------- | ------------------------------------------------ | ------- | --------- |
 | 1   | Build target            | `./2026_07_27-511-gemini-cli-tool-part-1.md`      | done    | [x]       |
-| 2   | Shared tree safety      | `./2026_07_27-511-gemini-cli-tool-part-2.md`      | pending | [ ]       |
+| 2   | Shared tree safety      | `./2026_07_27-511-gemini-cli-tool-part-2.md`      | in-progress | [ ]       |
 | 3   | Registry citizen        | `./2026_07_27-511-gemini-cli-tool-part-3.md`      | blocked | [ ]       |
 | 4   | Content and docs        | `./2026_07_27-511-gemini-cli-tool-part-4.md`      | blocked | [ ]       |
 

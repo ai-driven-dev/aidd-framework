@@ -32,7 +32,7 @@ export class UninstallUseCase {
     private readonly manifestRepo: ManifestRepository,
     logger: Logger
   ) {
-    this.pluginUninstall = new UninstallPluginUseCase(fs, manifestRepo);
+    this.pluginUninstall = new UninstallPluginUseCase(fs, manifestRepo, logger);
     this.toolsUninstall = new UninstallToolsUseCase(fs, logger);
     this.mcpExclusion = new UninstallMcpExclusionUseCase(fs, logger);
   }
