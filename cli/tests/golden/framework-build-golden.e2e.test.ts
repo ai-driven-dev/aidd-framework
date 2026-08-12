@@ -54,6 +54,9 @@ const FLAT_TARGETS = ["claude", "cursor", "copilot", "codex", "opencode", "gemin
  */
 const FROZEN_CELLS = new Set(["claude"]);
 
+/** Tree codex and gemini both render into, and must render identically. */
+const SHARED_SKILLS_PREFIX = ".agents/skills/";
+
 async function hashDirectory(dir: string): Promise<TargetSnapshot> {
   const result: TargetSnapshot = {};
   const entries = await readdir(dir, { recursive: true });
@@ -189,6 +192,35 @@ describe.concurrent("Framework build golden — 10-cell matrix", () => {
           `cell ${key}: output differs from stored pre-change baseline`
         ).toStrictEqual(storedCell);
       }
+    } finally {
+      await cleanup();
+    }
+  });
+
+  /**
+   * Codex and gemini write the same shared skills tree. Two tools rendering different bytes
+   * to one path is the failure mode co-ownership cannot survive, so it is eliminated by
+   * construction and asserted here rather than left to convention.
+   */
+  it("gemini's shared skills tree is a byte-identical subset of codex's", async () => {
+    const { projectDir, fakeHome, tempDir, cleanup } = await createTestEnv("fb-golden-subset");
+    try {
+      const codex = await captureTarget("codex", true, projectDir, fakeHome, tempDir);
+      const gemini = await captureTarget("gemini", true, projectDir, fakeHome, tempDir);
+      const sharedPaths = Object.keys(gemini)
+        .filter((path) => path.startsWith(SHARED_SKILLS_PREFIX))
+        .sort();
+
+      expect(sharedPaths.length, "gemini renders no skill under the shared tree").toBeGreaterThan(
+        0
+      );
+      const diverging = sharedPaths.find((path) => codex[path] !== gemini[path]);
+      expect(
+        diverging,
+        diverging === undefined
+          ? ""
+          : `co-owned path rendered differently by codex and gemini: ${diverging} (codex ${codex[diverging] ?? "absent"}, gemini ${gemini[diverging]})`
+      ).toBeUndefined();
     } finally {
       await cleanup();
     }
