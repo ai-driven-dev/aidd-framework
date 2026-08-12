@@ -51,6 +51,8 @@ Why not just write your own commands? → [FAQ](docs/FAQ.md#-why-aidd-instead-of
 
 <sub>**Marketplace** = installed and updated through your tool's plugin manager. **Flat** = files copied directly into your project, no plugin manager involved. Install steps per tool → [Other tools](#other-tools).</sub>
 
+<sub>**Gemini CLI**: the flat build target is implemented, but end-to-end validation on Gemini 3 Pro models is currently blocked by an upstream `gemini-cli` bug unrelated to AIDD — [google-gemini/gemini-cli#14437](https://github.com/google-gemini/gemini-cli/issues/14437) (missing `thought_signature` on chained tool calls). Use a Gemini 2.5 model to test in the meantime.</sub>
+
 ## 📦 Install
 
 ### Claude Code
