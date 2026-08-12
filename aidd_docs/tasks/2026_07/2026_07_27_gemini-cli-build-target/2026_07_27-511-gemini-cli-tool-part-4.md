@@ -197,7 +197,7 @@ flowchart TD
 
 - [ ] The issue no longer says agents have no known equivalent, that hooks need investigation, or that Gemini reads `AGENTS.md` by default
 - [ ] The issue records the two prerequisites and the excluded plugin
-- [ ] The manual matrix covers all thirty pairs
+- [ ] The manual matrix covers all thirty pairs — impossible, the commands it exercises no longer exist; see Amendments
 
 ## Amendments
 
@@ -212,6 +212,8 @@ flowchart TD
 🤖 The README already carried a Gemini footnote this plan predates: an upstream `gemini-cli` bug (google-gemini/gemini-cli#14437) blocking end-to-end validation on Gemini 3 Pro models. It is kept and folded into the expanded footnote rather than replaced, and `Gemini · Mistral` was split so Mistral keeps its in-progress status while Gemini moves to supported flat.
 
 🤖 There is no golden re-baseline to perform, and the plan's central premise for this phase is wrong. The golden suite builds from `cli/tests/fixtures/framework-real`, a committed 211-file copy of a subset of the plugins, not from the live `plugins/` tree. Regenerating with `UPDATE_GOLDEN=1` after all of phase 1's content edits produces an empty diff, and the suite stays green including part 2's subset invariant. The fixture is deliberately frozen — that is what makes the golden a test of build behaviour rather than of plugin content — so refreshing it from source on every documentation edit would defeat its purpose. Left as it is. The consequence to record is narrow but real: the fixture's copy of `update_memory.js` no longer matches the source, and any future check that the two agree would now fail.
+
+🤖 The manual pair matrix cannot be extended, because the mechanism it records was removed. `cli/aidd_docs/tasks/2026_05/2026_05_06-cli-v5-cleanup-sync-matrix.md` — the projection places it at the framework level, it is under `cli/` — is a dated record of a manual run from 2026-05-06 against binary v4.1.0-beta.11, exercising `plugin sync --source <a> --target <b>` and `ai sync`. Neither command exists in the CLI today: `plugin --help` lists only list, install and doctor, `ai --help` has no sync, and nothing registers one in `application/commands/`. Only `sync-conflict-resolver-use-case.ts` survives, serving update. The master plan already recorded "there is no sync command" when dismissing a brainstorm risk, without carrying that conclusion into this task. Adding ten gemini rows would mean writing PASS beside runs that cannot be performed, so the document is left untouched: it remains an accurate record of what was true in May.
 
 ## Log
 
