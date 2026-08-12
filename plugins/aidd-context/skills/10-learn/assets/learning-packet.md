@@ -6,8 +6,8 @@
 - Source: <kind + label>
 - Evidence: <short quote or paraphrase>
 - Score: <0-10 + reason>
-- Destination: <approved memory | ADR | rule | skill>
-- Reconciliation: <new | covered | updates | supersedes>
-- User approval: <approved | edited | destination changed>
-- Scope: <files, workflow, or team context>
+- Destination: <approved memory | ADR | contract | rule | skill>
+- Reconciliation: <new | covered | updates | supersedes | retracts>
+- User approval: <approved | modified>
+- Applies to: <files, workflow, or team context>
 - Request: <one sentence when handing off to a generator>

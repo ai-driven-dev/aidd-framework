@@ -180,6 +180,8 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `actions` | [05-sync.md](skills/10-learn/actions/05-sync.md) | - |
 | `assets` | [adr-template.md](skills/10-learn/assets/adr-template.md) | - |
 | `assets` | [learning-packet.md](skills/10-learn/assets/learning-packet.md) | - |
+| `assets` | [recommendation-table.md](skills/10-learn/assets/recommendation-table.md) | - |
+| `assets` | [write-report.md](skills/10-learn/assets/write-report.md) | - |
 | `references` | [assessment.md](skills/10-learn/references/assessment.md) | - |
 | `references` | [destinations.md](skills/10-learn/references/destinations.md) | - |
 | `references` | [gather-protocol.md](skills/10-learn/references/gather-protocol.md) | - |

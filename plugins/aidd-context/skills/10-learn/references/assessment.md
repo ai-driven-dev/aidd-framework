@@ -21,4 +21,5 @@ Reconcile before approval:
 - `new`: no equivalent content exists.
 - `covered`: existing content already carries it.
 - `updates`: refine an existing memory, rule, ADR, or skill.
-- `supersedes`: reverses an earlier decision or rule; require an explicit link.
+- `supersedes`: reverses an earlier decision or rule.
+- `retracts`: existing content no longer holds and nothing replaces it.
