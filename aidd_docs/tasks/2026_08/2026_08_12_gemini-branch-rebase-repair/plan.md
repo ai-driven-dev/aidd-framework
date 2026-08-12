@@ -1,6 +1,6 @@
 ---
 objective: "The rebased gemini branch passes typecheck, lint and the full test suite on top of main, with its repair landed as history that bisects clean."
-status: in-progress
+status: implemented
 ---
 
 # Plan: repair the gemini branch after its rebase
