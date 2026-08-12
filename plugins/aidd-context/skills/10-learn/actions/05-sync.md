@@ -4,7 +4,7 @@ Refresh context references after memory or ADR writes.
 
 ## Input
 
-The write summary, confirming at least one memory or ADR file changed. Skip this action when write only handed off rules or skills.
+The write summary, confirming at least one memory or ADR file changed.
 
 ## Output
 
