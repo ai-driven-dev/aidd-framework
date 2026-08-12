@@ -14,7 +14,7 @@ import { isAiTool } from "../tools/registry.js";
 import { InstallationFile } from "./file.js";
 import type { PluginComponentFile, PluginDistribution } from "./plugin-distribution.js";
 import {
-  OPENCODE_HOOKS_SKIP_REASON,
+  hooksSkipReasonFor,
   type PluginTranslationSkip,
   type ReadonlySkipList,
 } from "./plugin-translation-skip.js";
@@ -200,7 +200,7 @@ export class PluginContentTranslator {
       pluginName: dist.manifest.name,
       component: "hooks",
       toolId: tool.toolId,
-      reason: OPENCODE_HOOKS_SKIP_REASON,
+      reason: hooksSkipReasonFor(tool.toolId, tool.capabilities.plugins.hooksSkipReason),
     };
     return [entry];
   }

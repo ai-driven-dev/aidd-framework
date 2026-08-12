@@ -5,6 +5,7 @@ import { SkillsCapability } from "../../capabilities/skills-capability.js";
 import { detectSectionKeyFromPrefixes } from "../../formats/command.js";
 import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
 import { CONFIG_MCP } from "../../models/framework.js";
+import { GEMINI_HOOKS_SKIP_REASON } from "../../models/plugin-translation-skip.js";
 import type {
   AiTool,
   HasAgents,
@@ -65,9 +66,14 @@ export const gemini: AiTool<HasAgents & HasSkills & HasMcp & HasPlugins> = {
       mergeStrategy: "framework-prime",
       consumes: [CONFIG_MCP],
     }),
-    // Gemini CLI has no plugin-manager equivalent (no marketplace, no native activation).
-    // Plugin install/propagation for gemini is out of scope for this build target.
-    plugins: new PluginsCapability({ mode: "unsupported" }),
+    // Flat, like opencode: Gemini CLI has no plugin manager, so plugin content is
+    // materialized as files rather than registered. Gemini is a target aidd writes to,
+    // never a marketplace format aidd reads, so it is absent from PluginFormat.
+    plugins: new PluginsCapability({
+      mode: "flat",
+      flatNamespacePrefix: "aidd-",
+      hooksSkipReason: GEMINI_HOOKS_SKIP_REASON,
+    }),
   },
 
   rewriteContent(content: string, docsDir: string): string {

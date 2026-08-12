@@ -52,7 +52,7 @@ Neither appears in the issue or the brainstorm, and both gate the stated success
 | --- | ----------------------- | ------------------------------------------------ | ------- | --------- |
 | 1   | Build target            | `./2026_07_27-511-gemini-cli-tool-part-1.md`      | done    | [x]       |
 | 2   | Shared tree safety      | `./2026_07_27-511-gemini-cli-tool-part-2.md`      | done    | [x]       |
-| 3   | Registry citizen        | `./2026_07_27-511-gemini-cli-tool-part-3.md`      | pending | [ ]       |
+| 3   | Registry citizen        | `./2026_07_27-511-gemini-cli-tool-part-3.md`      | in-progress | [ ]       |
 | 4   | Content and docs        | `./2026_07_27-511-gemini-cli-tool-part-4.md`      | blocked | [ ]       |
 
 <!-- Status values: pending, in-progress, done, blocked -->

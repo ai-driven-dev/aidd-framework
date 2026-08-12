@@ -138,9 +138,9 @@ flowchart TD
 
 #### Acceptance criteria
 
-- [ ] No tool-name literal remains in the plugin translation path
-- [ ] Every pre-existing opencode translator test passes without modification
-- [ ] The hooks-skip message names the actual tool
+- [x] No tool-name literal remains in the plugin translation path
+- [x] Every pre-existing opencode translator test passes without modification
+- [x] The hooks-skip message names the actual tool
 
 ### Phase 2: Route the MCP unmerge safely
 
@@ -198,9 +198,18 @@ flowchart TD
 
 <!-- AI-initiated changes during implementation. Each entry is prefixed with 🤖. -->
 
+🤖 The projection omits `cli/src/domain/tools/ai/gemini.ts`, but this part cannot meet its objective without it. Part 1 declared gemini's plugins capability `{ mode: "unsupported" }`, which is what keeps the install path from materializing any plugin content — and skills and agents reach a project as plugin content. Gemini now declares `{ mode: "flat", flatNamespacePrefix: "aidd-" }`, the opencode precedent this plan already names in its summary.
+
+🤖 That change collided with the marketplace-probe conformance guard, which part 2's repair had narrowed to exempt `mode: "unsupported"`. A flat gemini falls back under the requirement, and it cannot be satisfied: `PluginFormat` is a closed union of the five marketplace layouts aidd can *read*, and Gemini CLI has none. Adding gemini to it would make aidd advertise a format that does not exist, contradicting the master plan. Decided with the user: the guard now keys on `PluginFormat` membership rather than on the plugins mode, which is the invariant it was always reaching for — writing plugin content and ingesting a marketplace are different claims, and only the second needs a probe. `PLUGIN_FORMATS` was added beside the type as its runtime companion so the set can be iterated. Opencode keeps its requirement; gemini is out of scope of it by construction rather than by exemption.
+
+🤖 The hooks-skip reason became `FlatPluginsParams.hooksSkipReason`, declared by the tool, rather than a branch on the tool name. A tool-name branch would have satisfied "the message names the actual tool" while violating this phase's other acceptance criterion, that no tool-name literal survives in the translation path. Opencode declares its existing wording, so its message is unchanged and its tests pass untouched; gemini declares why its hooks cannot travel through the flat install path.
+
+🤖 Line references drifted: the translation-mode literal sits at `built-tree-materialization-translator.ts:62` and the ownership check at `:137`, not `:64` and `:120-125`. Both were found and replaced; the ownership rule now accepts the tool's own directory plus the shared `.agents/` root, with `AGENTS_SHARED_ROOT` extracted in `flat-paths.ts` beside the existing skills prefix.
+
 ## Log
 
 <!-- APPEND ONLY. One entry per step attempt. Never rewrite. -->
+- Phase 1: both opencode literals removed from `built-tree-materialization-translator.ts`. The translation mode is read from `PluginsCapability.translationMode`, which already resolves to `"flat"` for flat tools and was simply never consulted. Plugin ownership inside a flat built tree is derived from the tool's own directory plus the shared `.agents/` root instead of a hardcoded `.opencode` segment, matching a plugin-namespaced segment anywhere below the root rather than at a fixed depth, since gemini's agents sit one level shallower than opencode's skills. `FlatPluginsParams` gained `hooksSkipReason` so the skip message comes from the tool rather than a branch. Gemini switched to `{ mode: "flat" }` and the conformance guard was rekeyed on `PluginFormat` (see Amendments). Verified: `pnpm typecheck` (0 errors), `biome check` (clean), unit and integration 2081/2081, e2e 130/131 with the same environment-coupled `auth status` failure, and the grep gate for a tool-name literal under `use-cases/plugin/` returns nothing.
 
 ## Validation flow demonstration
 
