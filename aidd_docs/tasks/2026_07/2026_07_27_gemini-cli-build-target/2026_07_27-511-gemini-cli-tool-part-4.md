@@ -181,7 +181,7 @@ flowchart TD
 - [x] Every path in the re-baseline diff traces to a reference file edited in phase 1 — vacuously: the diff is empty, see Amendments
 - [ ] The re-baseline is documented in the golden suite header with its reason — no re-baseline pass occurred, so there is nothing to record there
 - [x] The shared-tree subset invariant still passes
-- [ ] `cd cli && pnpm typecheck && pnpm lint && pnpm test` exits 0
+- [x] `cd cli && pnpm typecheck && pnpm lint && pnpm test` exits 0 — 2237/2237 in an environment without a stale `AIDD_TOKEN`; see Amendments
 
 ### Phase 4: Correct the record
 
@@ -214,6 +214,8 @@ flowchart TD
 🤖 There is no golden re-baseline to perform, and the plan's central premise for this phase is wrong. The golden suite builds from `cli/tests/fixtures/framework-real`, a committed 211-file copy of a subset of the plugins, not from the live `plugins/` tree. Regenerating with `UPDATE_GOLDEN=1` after all of phase 1's content edits produces an empty diff, and the suite stays green including part 2's subset invariant. The fixture is deliberately frozen — that is what makes the golden a test of build behaviour rather than of plugin content — so refreshing it from source on every documentation edit would defeat its purpose. Left as it is. The consequence to record is narrow but real: the fixture's copy of `update_memory.js` no longer matches the source, and any future check that the two agree would now fail.
 
 🤖 The manual pair matrix cannot be extended, because the mechanism it records was removed. `cli/aidd_docs/tasks/2026_05/2026_05_06-cli-v5-cleanup-sync-matrix.md` — the projection places it at the framework level, it is under `cli/` — is a dated record of a manual run from 2026-05-06 against binary v4.1.0-beta.11, exercising `plugin sync --source <a> --target <b>` and `ai sync`. Neither command exists in the CLI today: `plugin --help` lists only list, install and doctor, `ai --help` has no sync, and nothing registers one in `application/commands/`. Only `sync-conflict-resolver-use-case.ts` survives, serving update. The master plan already recorded "there is no sync command" when dismissing a brainstorm risk, without carrying that conclusion into this task. Adding ten gemini rows would mean writing PASS beside runs that cannot be performed, so the document is left untouched: it remains an accurate record of what was true in May.
+
+🤖 This part's `success_condition` does pass. The single `auth status` failure seen throughout is caused by an expired `AIDD_TOKEN` in the developer's shell, which the e2e sandbox redirects `HOME` around but does not scrub. With `env -u AIDD_TOKEN`, the full suite is 2237/2237. CI has no such variable, so the chain exits 0 there. Part 3's own chain still does not, because it additionally runs `pnpm smoke`, whose four corrupt-cache cases fail on published-catalog drift rather than on anything in the environment.
 
 ## Log
 
