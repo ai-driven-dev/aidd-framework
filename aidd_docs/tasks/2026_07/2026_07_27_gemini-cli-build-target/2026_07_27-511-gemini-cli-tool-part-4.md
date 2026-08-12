@@ -178,9 +178,9 @@ flowchart TD
 
 #### Acceptance criteria
 
-- [ ] Every path in the re-baseline diff traces to a reference file edited in phase 1
-- [ ] The re-baseline is documented in the golden suite header with its reason
-- [ ] The shared-tree subset invariant still passes
+- [x] Every path in the re-baseline diff traces to a reference file edited in phase 1 — vacuously: the diff is empty, see Amendments
+- [ ] The re-baseline is documented in the golden suite header with its reason — no re-baseline pass occurred, so there is nothing to record there
+- [x] The shared-tree subset invariant still passes
 - [ ] `cd cli && pnpm typecheck && pnpm lint && pnpm test` exits 0
 
 ### Phase 4: Correct the record
@@ -211,11 +211,14 @@ flowchart TD
 
 🤖 The README already carried a Gemini footnote this plan predates: an upstream `gemini-cli` bug (google-gemini/gemini-cli#14437) blocking end-to-end validation on Gemini 3 Pro models. It is kept and folded into the expanded footnote rather than replaced, and `Gemini · Mistral` was split so Mistral keeps its in-progress status while Gemini moves to supported flat.
 
+🤖 There is no golden re-baseline to perform, and the plan's central premise for this phase is wrong. The golden suite builds from `cli/tests/fixtures/framework-real`, a committed 211-file copy of a subset of the plugins, not from the live `plugins/` tree. Regenerating with `UPDATE_GOLDEN=1` after all of phase 1's content edits produces an empty diff, and the suite stays green including part 2's subset invariant. The fixture is deliberately frozen — that is what makes the golden a test of build behaviour rather than of plugin content — so refreshing it from source on every documentation edit would defeat its purpose. Left as it is. The consequence to record is narrow but real: the fixture's copy of `update_memory.js` no longer matches the source, and any future check that the two agree would now fail.
+
 ## Log
 
 <!-- APPEND ONLY. One entry per step attempt. Never rewrite. -->
 - Phase 1: gemini added to the memory hook's tool-to-context-file map (`AGENTS.md`) and to eleven reference tables across `aidd-context`: onboarding detection, project-memory tools, skill-generate detection and write targets plus its strict frontmatter row, rule-generate (unsupported, with the AGENTS.md fallback), agent-generate (path, strict-schema frontmatter, detection), command-generate (unsupported, steer to a skill), hook-generate (support row, a full event column, the settings file shape, and the trust-gated scope), learn's sync arguments, explore's four mapping tables, and the rules-listing script. Hook event names are the verified `GEMINI_HOOK_EVENT_MAP` read from the 0.52.0 bundle, including the two Claude moments that both fold onto `AfterAgent`. Verified: `node update_memory.js gemini` exits 0 and writes the memory block into `AGENTS.md`, where it previously exited 1 with `unknown tool gemini`; `node --check` passes on the rules script. The golden snapshot is knowingly red from here until phase 3 re-baselines it, which is this part's whole point.
 - Phase 2: Gemini moves to supported flat in the README compatibility table, with an install block that carries both gating constraints inside it — the 0.28.0 minimum (labelled source-derived, verified against 0.52.0) and the folder-trust step, since an untrusted folder yields an empty skill list with no explanation. The block also states that `aidd-orchestrator` is absent from the archive, and steers users to the archive over `aidd ai install gemini` because the install path writes no `.gemini/settings.json` and so has neither hooks nor the `AGENTS.md` context wiring — the gap part 3's phase 4 measured. `cli/README.md` gains gemini in the `--target` list, the flat-only note, the per-tool layout matrix and the settings-file table; `cli/ARCHITECTURE.md` goes from five targets and nine cells to six and ten; `docs/MAINTAINERS.md` from nine archives to ten; the hexagonal rule and four CLI memory files list the sixth tool.
+- Phase 3: no re-baseline was needed or performed. `UPDATE_GOLDEN=1` regenerated the snapshot after phase 1's twelve content edits and produced a byte-identical file, because the golden builds from the frozen `framework-real` fixture rather than from `plugins/` (see Amendments). Golden suite green, 6 tests, subset invariant included. Full validation: `pnpm typecheck` (0 errors), `biome check` (clean), `pnpm test` 2236/2237 with the same environment-coupled `auth status` failure.
 
 ## Validation flow demonstration
 
