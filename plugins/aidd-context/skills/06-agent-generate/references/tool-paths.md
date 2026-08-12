@@ -11,8 +11,9 @@ The per-tool agent path and the gate every run executes before writing. Agent sl
 | OpenCode       | `.opencode/agents/<name>.md`     | markdown + frontmatter |
 | GitHub Copilot | `.github/agents/<name>.agent.md` | markdown + frontmatter |
 | Codex CLI      | `.codex/agents/<name>.toml`      | TOML (converted)       |
+| Gemini CLI     | `.gemini/agents/<name>.md`       | markdown + frontmatter |
 
-Agents are supported on all five tools.
+Agents are supported on all six tools.
 
 ## Frontmatter per tool
 
@@ -25,6 +26,7 @@ The canonical agent carries `name`, `description`, `model`. Emit those a row acc
 | OpenCode       | `name`, `description`, `model`, optional `temperature`, `permission` |
 | GitHub Copilot | `name`, `description`, `model`, optional `tools`            |
 | Codex CLI      | `name`, `description` (drops `model`)                       |
+| Gemini CLI     | `name`, `description` only; its schema is strict and rejects any other key |
 
 ## Codex TOML conversion
 
@@ -43,6 +45,7 @@ Codex agents are TOML, not markdown. Convert:
 | `.opencode/`                      | OpenCode                              |
 | `.codex/`                         | Codex CLI                             |
 | `.github/copilot-instructions.md` | GitHub Copilot                        |
+| `.gemini/`                        | Gemini CLI                            |
 | `AGENTS.md`                       | Cursor, OpenCode, or Codex (list all) |
 
 ## Write targets

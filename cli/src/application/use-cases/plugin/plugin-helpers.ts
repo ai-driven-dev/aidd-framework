@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { McpCapability } from "../../../domain/capabilities/mcp-capability.js";
 import type { PluginsCapability } from "../../../domain/capabilities/plugins-capability.js";
+import { McpSectionUndeclaredError } from "../../../domain/errors.js";
 import type { InstallationFile } from "../../../domain/models/file.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Plugin } from "../../../domain/models/plugin.js";
@@ -42,13 +43,25 @@ export function resolvePluginBaseDir(
   return resolvePluginBaseDirForCapability(caps.plugins as PluginsCapability, projectRoot, homedir);
 }
 
-export function qualifiesForOpencodeMcpMerge(caps: Record<string, unknown>): boolean {
-  if (!("mcp" in caps)) return false;
+/**
+ * The JSON key a flat tool keeps plugin-contributed MCP servers under, or null when the
+ * tool does not merge them at all. Read from the tool rather than assumed: opencode uses
+ * `mcp` in opencode.json, gemini `mcpServers` in .gemini/settings.json, and running one
+ * tool's unmerge against the other's file would leave a junk section behind.
+ *
+ * Throws rather than falling back when a tool qualifies but declares no section: a silent
+ * default here is a wrong write to a user-owned file.
+ */
+export function flatMcpSectionKey(caps: Record<string, unknown>, toolId: string): string | null {
+  if (!("mcp" in caps)) return null;
   const mcp = caps.mcp;
-  if (!(mcp instanceof McpCapability)) return false;
-  if (mcp.params.mergeStrategy !== "framework-prime") return false;
+  if (!(mcp instanceof McpCapability)) return null;
+  if (mcp.params.mergeStrategy !== "framework-prime") return null;
   const plugins = caps.plugins as PluginsCapability;
-  return plugins.mode === "flat";
+  if (plugins.mode !== "flat") return null;
+  const key = mcp.params.entrySection;
+  if (key === undefined) throw new McpSectionUndeclaredError(toolId);
+  return key;
 }
 
 export async function loadPluginManifest(manifestRepo: ManifestRepository): Promise<Manifest> {

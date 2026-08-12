@@ -145,8 +145,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      # 9-cell matrix: 4 marketplace (claude/cursor/copilot/codex) + 5 flat
-      # (+opencode, which is flat-only). Mirrors the CLI golden snapshot matrix.
+      # 10-cell matrix: 4 marketplace (claude/cursor/copilot/codex) + 6 flat
+      # (+opencode, +gemini, both flat-only). Mirrors the CLI golden snapshot matrix.
       matrix:
         include:
           - { tool: claude, mode: marketplace, flag: "" }
@@ -158,6 +158,7 @@ jobs:
           - { tool: copilot, mode: flat, flag: "--flat" }
           - { tool: codex, mode: flat, flag: "--flat" }
           - { tool: opencode, mode: flat, flag: "--flat" }
+          - { tool: gemini, mode: flat, flag: "--flat" }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

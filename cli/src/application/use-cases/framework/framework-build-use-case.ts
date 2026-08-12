@@ -34,14 +34,26 @@ export class FrameworkBuildUseCase {
     this.guardPaths(sourceDir, outDir);
     const sourceMarketplace = await this.readSourceMarketplace(sourceDir);
     await this.strategy.preBuild(outDir, sourceDir);
-    const builtPlugins: BuildPluginResult[] = [];
-    for (const entry of sourceMarketplace.plugins) {
-      const plugin = await this.buildPlugin(entry, sourceDir, outDir);
-      builtPlugins.push(plugin);
-    }
+    const builtPlugins = await this.buildAllPlugins(sourceMarketplace, sourceDir, outDir);
     const extraFiles = await this.strategy.postBuild(sourceMarketplace, builtPlugins, outDir);
     const totalFiles = builtPlugins.reduce((sum, p) => sum + p.filesWritten, 0) + extraFiles;
     return { outDir, plugins: builtPlugins, totalFiles };
+  }
+
+  private async buildAllPlugins(
+    sourceMarketplace: SourceMarketplace,
+    sourceDir: string,
+    outDir: string
+  ): Promise<BuildPluginResult[]> {
+    const builtPlugins: BuildPluginResult[] = [];
+    for (const entry of sourceMarketplace.plugins) {
+      if (!this.strategy.shouldBuildPlugin(entry.name)) {
+        this.logger.warn(`Skipping plugin '${entry.name}' (excluded for this target).`);
+        continue;
+      }
+      builtPlugins.push(await this.buildPlugin(entry, sourceDir, outDir));
+    }
+    return builtPlugins;
   }
 
   private guardPaths(sourceDir: string, outDir: string): void {

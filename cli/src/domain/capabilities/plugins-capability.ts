@@ -83,6 +83,11 @@ export interface NativePluginsParams {
 export interface FlatPluginsParams {
   mode: "flat";
   flatNamespacePrefix: string;
+  /**
+   * Why this tool cannot take a plugin's declarative hooks. Declared here so the skip
+   * message explains the tool it applies to, instead of borrowing another tool's reason.
+   */
+  hooksSkipReason?: string;
 }
 
 export interface UnsupportedPluginsParams {
@@ -96,6 +101,8 @@ export class PluginsCapability {
   readonly pluginsDir: string | null;
   readonly pluginManifestRelativePath: string | null;
   readonly flatNamespacePrefix: string | null;
+  /** Set only for flat tools that reject declarative hooks; null when hooks are accepted. */
+  readonly hooksSkipReason: string | null;
   readonly acceptsHooks: boolean;
   readonly acceptsMcp: boolean;
   readonly mcpRelativePath: string;
@@ -129,6 +136,7 @@ export class PluginsCapability {
     this.installScope = PluginsCapability.resolveInstallScope(params);
     PluginsCapability.validateUserScope(params);
     if (params.mode === "native") {
+      this.hooksSkipReason = null;
       this.pluginsDir = params.pluginsDir;
       this.pluginManifestRelativePath = params.pluginManifestRelativePath;
       this.flatNamespacePrefix = null;
@@ -144,6 +152,7 @@ export class PluginsCapability {
       this.pluginsDir = null;
       this.pluginManifestRelativePath = null;
       this.flatNamespacePrefix = params.mode === "flat" ? params.flatNamespacePrefix : null;
+      this.hooksSkipReason = params.mode === "flat" ? (params.hooksSkipReason ?? null) : null;
       this.acceptsHooks = false;
       this.acceptsMcp = false;
       this.mcpRelativePath = DEFAULT_MCP_PATH;

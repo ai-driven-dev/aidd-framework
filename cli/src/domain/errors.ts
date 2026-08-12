@@ -130,6 +130,19 @@ export class InvalidMcpServerConfigError extends Error {
   }
 }
 
+/**
+ * A flat tool merges plugin MCP servers into a shared config but never said under which
+ * key. Guessing would write another tool's section into this tool's file.
+ */
+export class McpSectionUndeclaredError extends Error {
+  constructor(toolId: string) {
+    super(
+      `Tool '${toolId}' merges plugin MCP servers but its mcp capability declares no entrySection.`
+    );
+    this.name = "McpSectionUndeclaredError";
+  }
+}
+
 export class OpencodeDualConfigError extends Error {
   constructor() {
     super("Both opencode.json and opencode.jsonc exist. Remove one.");

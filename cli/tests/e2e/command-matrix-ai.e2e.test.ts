@@ -42,7 +42,7 @@ async function seedWithVscode(projectDir: string, fakeHome: string): Promise<voi
 // (claude and cursor installs are in greenfield-setup.e2e.test.ts)
 // ---------------------------------------------------------------------------
 
-describe.concurrent("Command Matrix: AI install/uninstall (copilot, codex, opencode)", () => {
+describe.concurrent("Command Matrix: AI install/uninstall (copilot, codex, opencode, gemini)", () => {
   it("ai install copilot exits 0 and reports installed", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("ai-copilot-install");
     try {
@@ -142,6 +142,35 @@ describe.concurrent("Command Matrix: AI install/uninstall (copilot, codex, openc
       );
       expect(exitCode).toBe(0);
       expect(stdout).toContain("opencode");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("ai install gemini exits 0 and reports installed", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("ai-gemini-install");
+    try {
+      await seedManifest(projectDir);
+      const { stdout, exitCode } = await runCli(["ai", "install", "gemini"], projectDir, fakeHome);
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain("gemini");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("ai uninstall gemini exits 0", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("ai-gemini-uninstall");
+    try {
+      await seedManifest(projectDir);
+      await runCli(["ai", "install", "gemini"], projectDir, fakeHome);
+      const { stdout, exitCode } = await runCli(
+        ["ai", "uninstall", "gemini"],
+        projectDir,
+        fakeHome
+      );
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain("gemini");
     } finally {
       await cleanup();
     }

@@ -15,6 +15,7 @@ A tool is present only when one of its own mapped surfaces below holds a file. A
 | OpenCode       | `.opencode/agents/`         | `.opencode/commands/`                         | **Not supported** (fold into AGENTS.md)  | `.opencode/skills/`                   | `AGENTS.md`                       |
 | GitHub Copilot | `.github/agents/*.agent.md` | `.github/prompts/*.prompt.md`                 | `.github/instructions/*.instructions.md` | `.github/skills/`                     | `.github/copilot-instructions.md` |
 | Codex CLI      | `.codex/agents/{name}.toml` | **Not supported**                             | Not supported                            | `.agents/skills/aidd-{name}/SKILL.md` | `AGENTS.md`                       |
+| Gemini CLI     | `.gemini/agents/{name}.md`  | **Not supported**                             | Not supported                            | `.agents/skills/aidd-{name}/SKILL.md` | `AGENTS.md` (via `context.fileName`) |
 
 ## AI quick map - hooks, plugins
 
@@ -25,6 +26,7 @@ A tool is present only when one of its own mapped surfaces below holds a file. A
 | OpenCode       | JS/TS module under `.opencode/plugins/` (parse as JS, not JSON)                                | Not supported                |
 | GitHub Copilot | `.github/hooks/*.json` (workspace), `~/.copilot/hooks` (user), `<plugin>/hooks.json` or `<plugin>/hooks/hooks.json` (plugin) | `plugin.json` at plugin root |
 | Codex CLI      | `.codex/hooks.json` (project / user) OR `[hooks]` table in `.codex/config.toml`               | `.codex-plugin/plugin.json`  |
+| Gemini CLI     | `hooks` key in `.gemini/settings.json`, under Gemini's own event names                        | Not supported                |
 
 ## MCP config per tool
 
@@ -35,6 +37,7 @@ A tool is present only when one of its own mapped surfaces below holds a file. A
 | OpenCode       | `opencode.json`                                  | `mcp`         |
 | GitHub Copilot | `.vscode/mcp.json` (VS Code); `~/.copilot/mcp-config.json` (CLI) | `servers` (VS Code); `mcpServers` (CLI) |
 | Codex CLI      | `.codex/config.toml`                             | `[mcp_servers.*]` |
+| Gemini CLI     | `.gemini/settings.json`                          | `mcpServers`  |
 
 ## Path layout per tool
 
@@ -57,3 +60,4 @@ Where to scan when enumerating installed plugins (not the plugin manifest path i
 | OpenCode       | `~/.config/opencode/plugins/` (global JS/TS modules); `~/.cache/opencode/node_modules/` (npm-installed); project `.opencode/plugins/` |
 | GitHub Copilot | macOS: `~/Library/Application Support/Code/agentPlugins/` ; Linux: `~/.config/Code/agentPlugins/` ; Windows: `%APPDATA%\Code\agentPlugins\` ; CLI-installed: `~/.copilot/installed-plugins/` |
 | Codex CLI      | `~/.codex/plugins/cache/$MARKETPLACE/$PLUGIN/$VERSION/` |
+| Gemini CLI     | No plugin manager. Content is materialized as files in the project, never registered. |

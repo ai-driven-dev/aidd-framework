@@ -26,6 +26,10 @@ export class MarketplaceBuildStrategy implements BuildOutputStrategy {
     private readonly contract: ToolBuildContract
   ) {}
 
+  shouldBuildPlugin(): boolean {
+    return true;
+  }
+
   async preBuild(outDir: string): Promise<void> {
     await this.fs.deleteDirectory(outDir);
     await this.fs.createDirectory(outDir);

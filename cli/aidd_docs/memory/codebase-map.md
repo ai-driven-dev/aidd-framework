@@ -30,7 +30,7 @@ src/
 │   └── tools/
 │       ├── contracts.ts      # AiTool<C>, Has* interfaces, IdeToolConfig, UserFileSectionKey
 │       ├── registry.ts       # ToolConfig union, isAiTool(), registerTool(), getToolConfig(), hasToolSignals()
-│       ├── ai/               # one file per AI tool (claude, cursor, copilot, opencode, codex)
+│       ├── ai/               # one file per AI tool (claude, cursor, copilot, opencode, codex, gemini)
 │       └── ide/              # one file per IDE tool (vscode)
 └── infrastructure/
     ├── adapters/             # port implementations — one adapter per port (incl. auth-reader, auth-storage, http-client)

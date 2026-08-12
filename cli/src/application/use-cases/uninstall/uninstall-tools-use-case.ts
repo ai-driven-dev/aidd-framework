@@ -9,6 +9,7 @@ import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { Logger } from "../../../domain/ports/logger.js";
 import { getToolConfig, isAiTool, type ToolId } from "../../../domain/tools/registry.js";
+import { computeRetainedPaths, type RetainedPaths } from "./shared-path-guard.js";
 
 export interface UninstallToolsOptions {
   toolIds: ToolId[];
@@ -44,19 +45,22 @@ export class UninstallToolsUseCase {
     projectRoot: string
   ): Promise<UninstallToolsResult> {
     this.logger.info(`Removing ${toolId} files...`);
-    const sharedPaths = this.computeSharedPaths(toolId, allToolIds, manifest);
+    const retained = computeRetainedPaths(
+      manifest,
+      allToolIds.map((id) => ({ toolId: id, pluginName: null }))
+    );
     const mergeFilePaths = this.collectMergeFilePaths(toolId, manifest);
     const allPaths = this.collectToolPaths(toolId, manifest);
     const deletedFiles = await this.deleteToolFiles(
       toolId,
       allToolIds,
       allPaths,
-      sharedPaths,
+      retained,
       mergeFilePaths,
       manifest,
       projectRoot
     );
-    await this.removeAllPluginFiles(toolId, manifest, projectRoot);
+    await this.removeAllPluginFiles(toolId, manifest, projectRoot, retained);
     manifest.removeTool(toolId);
     return { toolId, fileCount: deletedFiles.length, deletedFiles };
   }
@@ -65,14 +69,17 @@ export class UninstallToolsUseCase {
     toolId: ToolId,
     allToolIds: ToolId[],
     allPaths: string[],
-    sharedPaths: Set<string>,
+    retained: RetainedPaths,
     mergeFilePaths: Set<string>,
     manifest: Manifest,
     projectRoot: string
   ): Promise<string[]> {
     const deleted: string[] = [];
     for (const relativePath of allPaths) {
-      if (sharedPaths.has(relativePath) && !mergeFilePaths.has(relativePath)) continue;
+      if (retained.has(relativePath) && !mergeFilePaths.has(relativePath)) {
+        this.warnRetained(relativePath, retained);
+        continue;
+      }
       if (mergeFilePaths.has(relativePath)) {
         const removed = await this.removeMergeFile(
           toolId,
@@ -95,22 +102,33 @@ export class UninstallToolsUseCase {
   private async removeAllPluginFiles(
     toolId: ToolId,
     manifest: Manifest,
-    projectRoot: string
+    projectRoot: string,
+    retained: RetainedPaths
   ): Promise<void> {
     for (const plugin of manifest.getPlugins(toolId)) {
-      await this.deletePluginFiles(plugin.files, projectRoot);
+      await this.deletePluginFiles(plugin.files, projectRoot, retained);
     }
   }
 
   private async deletePluginFiles(
     files: ReadonlyMap<string, string>,
-    projectRoot: string
+    projectRoot: string,
+    retained: RetainedPaths
   ): Promise<void> {
     for (const relativePath of files.keys()) {
+      if (retained.has(relativePath)) {
+        this.warnRetained(relativePath, retained);
+        continue;
+      }
       const fullPath = join(projectRoot, relativePath);
       await this.fs.deleteFile(fullPath);
       await this.fs.deleteEmptyDirectories(dirname(fullPath));
     }
+  }
+
+  private warnRetained(relativePath: string, retained: RetainedPaths): void {
+    const owners = retained.get(relativePath) ?? [];
+    this.logger.warn(`Kept ${relativePath}: still installed for ${owners.join(", ")}`);
   }
 
   private collectMergeFilePaths(toolId: ToolId, manifest: Manifest): Set<string> {
@@ -196,19 +214,5 @@ export class UninstallToolsUseCase {
       .getInstalledToolIds()
       .filter((id) => !uninstallingSet.has(id))
       .some((id) => manifest.getMergeFiles(id).some((m) => m.relativePath === relativePath));
-  }
-
-  private computeSharedPaths(
-    toolId: ToolId,
-    allToolIds: ToolId[],
-    manifest: Manifest
-  ): Set<string> {
-    const remainingToolIds = manifest
-      .getInstalledToolIds()
-      .filter((id) => id !== toolId && !allToolIds.includes(id));
-    return new Set([
-      ...remainingToolIds.flatMap((id) => manifest.getToolFiles(id).map((f) => f.relativePath)),
-      ...remainingToolIds.flatMap((id) => manifest.getMergeFiles(id).map((m) => m.relativePath)),
-    ]);
   }
 }

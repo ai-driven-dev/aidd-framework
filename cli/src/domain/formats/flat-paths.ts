@@ -7,6 +7,17 @@
  */
 
 /**
+ * Shared workspace-skills root, per the documented Codex convention
+ * (developers.openai.com/codex/skills) that Gemini CLI's `.agents/skills/` alias
+ * also resolves to. Both tools reuse this exact prefix so their skills output is a
+ * byte-identical subset of one shared tree, rather than two divergent renderings.
+ */
+/** Root of the cross-tool `.agents/` tree, which belongs to no single tool. */
+export const AGENTS_SHARED_ROOT = ".agents/";
+
+export const AGENTS_SKILLS_PREFIX = `${AGENTS_SHARED_ROOT}skills/`;
+
+/**
  * Returns the flat-output path for an agent file.
  * The source `.md` extension is stripped and replaced with `outputExt`.
  *

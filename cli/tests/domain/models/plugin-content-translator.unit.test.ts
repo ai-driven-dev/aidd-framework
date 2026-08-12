@@ -9,6 +9,7 @@ import { claude } from "../../../src/domain/tools/ai/claude.js";
 import { codex } from "../../../src/domain/tools/ai/codex.js";
 import { copilot } from "../../../src/domain/tools/ai/copilot.js";
 import { cursor } from "../../../src/domain/tools/ai/cursor.js";
+import { gemini } from "../../../src/domain/tools/ai/gemini.js";
 import { opencode } from "../../../src/domain/tools/ai/opencode.js";
 import { vscodeToolConfig } from "../../../src/domain/tools/ide/vscode.js";
 import type { ToolConfig } from "../../../src/domain/tools/registry.js";
@@ -232,6 +233,20 @@ describe("PluginContentTranslator.translate()", () => {
     it("returns empty array", () => {
       expect(translator.translate(makeDist(), vscodeToolConfig, "")).toEqual([]);
     });
+  });
+});
+
+describe("gemini target (flat mode)", () => {
+  it("emits agents under .gemini/agents/sample-plugin/", () => {
+    expect(pathsFor(gemini)).toContain(".gemini/agents/sample-plugin/reviewer.md");
+  });
+
+  it("emits skills under .gemini/skills/sample-plugin/", () => {
+    expect(pathsFor(gemini)).toContain(".gemini/skills/sample-plugin/hello/SKILL.md");
+  });
+
+  it("emits nothing under another flat tool's directory", () => {
+    expect(pathsFor(gemini).some((p) => p.startsWith(".opencode/"))).toBe(false);
   });
 });
 

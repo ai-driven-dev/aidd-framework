@@ -111,10 +111,25 @@ export class StatusUseCase {
     const mergeFiles = manifest.getMergeFiles(toolId);
     const drifted = await this.checkTrackedFiles(trackedFiles, projectRoot);
     drifted.push(...(await this.checkMergeFiles(mergeFiles, projectRoot)));
-    const dir = getToolConfig(toolId).directory;
-    const trackedSet = manifest.getTrackedPathsInDirectory(dir);
-    drifted.push(...(await this.detectAddedFiles(dir, trackedSet, projectRoot)));
+    for (const dir of this.scannedDirectories(manifest, toolId)) {
+      const trackedSet = manifest.getTrackedPathsInDirectory(dir);
+      drifted.push(...(await this.detectAddedFiles(dir, trackedSet, projectRoot)));
+    }
     return { toolId, version, drifted };
+  }
+
+  /**
+   * The tool's own directory plus every other top-level directory it actually claims files in.
+   * A shared tree lives outside the tool directory, so scanning that alone left it invisible.
+   */
+  private scannedDirectories(manifest: Manifest, toolId: ToolId): string[] {
+    const dirs = new Set<string>([getToolConfig(toolId).directory]);
+    for (const [relativePath, owners] of manifest.getPathOwners()) {
+      if (!relativePath.includes("/")) continue;
+      if (!owners.some((owner) => owner.toolId === toolId)) continue;
+      dirs.add(`${relativePath.split("/")[0]}/`);
+    }
+    return [...dirs];
   }
 
   private async detectAddedFiles(

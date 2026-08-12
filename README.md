@@ -35,7 +35,7 @@ Why not just write your own commands? → [FAQ](docs/FAQ.md#-why-aidd-instead-of
 
 ## ✅ Prerequisites
 
-- **An AI coding tool** — Claude Code (native), or Cursor / Copilot / Codex / OpenCode (see [Compatibility](#-compatibility)).
+- **An AI coding tool** — Claude Code (native), or Cursor / Copilot / Codex / OpenCode / Gemini (see [Compatibility](#-compatibility)).
 - **[Node](https://nodejs.org)** on your `PATH` — for the plugins that ship hooks ([what they do](docs/ARCHITECTURE.md#-bundled-hooks)).
 
 ## 🔌 Compatibility
@@ -47,9 +47,12 @@ Why not just write your own commands? → [FAQ](docs/FAQ.md#-why-aidd-instead-of
 | **GitHub Copilot** | ✅ Supported | Marketplace · Flat |
 | **Codex** | ✅ Supported | Marketplace · Flat |
 | **OpenCode** | ✅ Supported | Flat |
-| **Gemini · Mistral** | 🚧 In progress | — |
+| **Gemini** | ✅ Supported | Flat |
+| **Mistral** | 🚧 In progress | — |
 
 <sub>**Marketplace** = installed and updated through your tool's plugin manager. **Flat** = files copied directly into your project, no plugin manager involved. Install steps per tool → [Other tools](#other-tools).</sub>
+
+<sub>**Gemini CLI** requires **0.28.0 or newer** (version derived from the CLI's own source, not published by the vendor; verified against 0.52.0). Below it, the `.agents/skills/` location does not exist and no skill is ever discovered. Gemini also disables project skills, agents and hooks in an **untrusted folder** without explaining why — trust the folder when prompted, or set `security.folderTrust.enabled` to `false`. End-to-end validation on Gemini 3 Pro models is blocked by an upstream `gemini-cli` bug unrelated to AIDD — [google-gemini/gemini-cli#14437](https://github.com/google-gemini/gemini-cli/issues/14437) (missing `thought_signature` on chained tool calls); use a Gemini 2.5 model in the meantime.</sub>
 
 ## 📦 Install
 
@@ -171,6 +174,23 @@ codex plugin add aidd-context@aidd-framework   # per plugin
 1. Unzip the `opencode-flat` archive into your project root → `.opencode/`.
 
 [Docs](https://opencode.ai/docs/config/)
+
+</details>
+
+<details>
+<summary><strong>Gemini CLI</strong> — Flat only</summary>
+
+**Requires Gemini CLI 0.28.0 or newer.** Below that, `.agents/skills/` does not exist and no skill is ever discovered. (Minimum derived from the CLI's own source — the vendor publishes none. Verified against 0.52.0.)
+
+1. Unzip the `gemini-flat` archive into your project root → `.agents/skills/`, `.gemini/agents/`, `.gemini/settings.json`.
+2. **Trust the folder.** In an untrusted folder Gemini silently lists zero skills and disables project agents and hooks. Accept the trust prompt when Gemini starts, or set `security.folderTrust.enabled` to `false` in your user `settings.json`.
+3. Run `gemini skills list --all` — every `aidd-*` skill should appear as `Enabled`.
+
+`aidd-orchestrator` is not part of this archive: it is built on Claude Code's plugin activation and GitHub Action, which have no Gemini equivalent.
+
+Prefer the archive over `aidd ai install gemini`: the install path does not write `.gemini/settings.json`, so an installed-only setup has no hooks and does not load `AGENTS.md` as context.
+
+[Docs](https://google-gemini.github.io/gemini-cli/)
 
 </details>
 

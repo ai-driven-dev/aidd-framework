@@ -32,6 +32,12 @@ export interface SourceMarketplace {
  */
 export interface BuildOutputStrategy {
   /**
+   * Whether this plugin should be built for this tool. Marketplace mode always
+   * returns true; flat mode consults the contract's `excludedPlugins`.
+   */
+  shouldBuildPlugin(pluginName: string): boolean;
+
+  /**
    * Called once before iterating plugins. Mode A wipes and recreates outDir.
    * Flat mode validates outDir exists and is a directory.
    */

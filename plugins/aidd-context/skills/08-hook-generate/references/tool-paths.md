@@ -11,6 +11,7 @@ Per-tool hook support, event names, file formats, and scopes. Hook slice only: n
 | Cursor         | yes       | JSON config + script.                                           |
 | GitHub Copilot | yes       | JSON config + script. Also reads Claude's `.claude/` config.    |
 | OpenCode       | no        | Hooks are JS/TS plugin modules, not config. Skip with the reason below. |
+| Gemini CLI     | yes       | JSON config + script, in `.gemini/settings.json`. Its own event names, see below. |
 
 **OpenCode skip reason.** OpenCode hooks are code, not a config entry plus a script. Point the user to write a plugin under `.opencode/plugins/` (project) or `~/.config/opencode/plugins/` (user), per `https://opencode.ai/docs/plugins`. This skill does not generate it.
 
@@ -18,16 +19,18 @@ Per-tool hook support, event names, file formats, and scopes. Hook slice only: n
 
 Each tool names the same moment differently and supports a different subset. Core moments, with the canonical event name per tool. A `-` means the tool does not expose that moment.
 
-| Moment             | Claude Code        | Codex CLI       | Cursor               | GitHub Copilot     |
-| ------------------ | ------------------ | --------------- | -------------------- | ------------------ |
-| session start      | `SessionStart`     | `SessionStart`  | `sessionStart`       | `SessionStart`     |
-| prompt submitted   | `UserPromptSubmit` | `UserPromptSubmit` | `beforeSubmitPrompt` | `UserPromptSubmit` |
-| before a tool runs | `PreToolUse`       | `PreToolUse`    | `preToolUse`         | `PreToolUse`       |
-| after a tool runs  | `PostToolUse`      | `PostToolUse`   | `postToolUse`        | `PostToolUse`      |
-| before compaction  | `PreCompact`       | `PreCompact`    | `preCompact`         | `PreCompact`       |
-| subagent stop      | `SubagentStop`     | `SubagentStop`  | `subagentStop`       | `SubagentStop`     |
-| turn stop          | `Stop`             | `Stop`          | `stop`               | `Stop`             |
-| session end        | `SessionEnd`       | -               | `sessionEnd`         | `SessionEnd`       |
+| Moment             | Claude Code        | Codex CLI       | Cursor               | GitHub Copilot     | Gemini CLI      |
+| ------------------ | ------------------ | --------------- | -------------------- | ------------------ | --------------- |
+| session start      | `SessionStart`     | `SessionStart`  | `sessionStart`       | `SessionStart`     | `SessionStart`  |
+| prompt submitted   | `UserPromptSubmit` | `UserPromptSubmit` | `beforeSubmitPrompt` | `UserPromptSubmit` | `BeforeAgent`   |
+| before a tool runs | `PreToolUse`       | `PreToolUse`    | `preToolUse`         | `PreToolUse`       | `BeforeTool`    |
+| after a tool runs  | `PostToolUse`      | `PostToolUse`   | `postToolUse`        | `PostToolUse`      | `AfterTool`     |
+| before compaction  | `PreCompact`       | `PreCompact`    | `preCompact`         | `PreCompact`       | `PreCompress`   |
+| subagent stop      | `SubagentStop`     | `SubagentStop`  | `subagentStop`       | `SubagentStop`     | `AfterAgent`    |
+| turn stop          | `Stop`             | `Stop`          | `stop`               | `Stop`             | `AfterAgent`    |
+| session end        | `SessionEnd`       | -               | `sessionEnd`         | `SessionEnd`       | `SessionEnd`    |
+
+Gemini folds turn stop and subagent stop onto one event, so two Claude moments map to `AfterAgent`. Its names come from the mapping table shipped in `gemini hooks migrate`, read out of the 0.52.0 bundle, not from prose documentation.
 
 Each tool exposes more moments than these. For the full list, read the tool's docs: Claude `https://code.claude.com/docs/en/hooks`, Codex `https://developers.openai.com/codex/hooks`, Cursor `https://cursor.com/docs/hooks`, Copilot `https://docs.github.com/en/copilot/reference/hooks-configuration`. Confirm a moment exists before wiring it. Copilot also accepts the camelCase names (`sessionStart`, `preToolUse`).
 
@@ -39,6 +42,7 @@ Each tool exposes more moments than these. For the full list, read the tool's do
 | Codex CLI      | `~/.codex/hooks.json` or `[hooks]` in `config.toml`              | same entry shape as Claude.                       |
 | Cursor         | `.cursor/hooks.json`                                              | `{ "version": 1, "hooks": { "<event>": [ { "command": "..." } ] } }` |
 | GitHub Copilot | `.github/hooks/*.json` or a `hooks` block in `.github/copilot/settings.json` | `{ "version": 1, "hooks": { "<Event>": [ { "type": "command", "command": "..." } ] } }` |
+| Gemini CLI     | `hooks` block in `.gemini/settings.json`                          | same entry shape as Claude, under Gemini's own event names. |
 
 A Claude `settings.json` and a plugin or standalone `hooks/hooks.json` both wrap the event map under a top-level `hooks` key, so the file is `{ "hooks": { "<Event>": [ ... ] } }`. A Codex `config.toml` uses a `[hooks]` table instead.
 
@@ -46,14 +50,16 @@ A Claude `settings.json` and a plugin or standalone `hooks/hooks.json` both wrap
 
 Ask the user which scope, then write the matching file. A `-` means the tool has no such scope.
 
-| Scope            | Claude Code                    | Codex CLI                  | Cursor                       | GitHub Copilot           |
-| ---------------- | ------------------------------ | -------------------------- | ---------------------------- | ------------------------ |
-| user / global    | `~/.claude/settings.json`      | `~/.codex/` (`hooks.json` or `config.toml`) | `~/.cursor/hooks.json`       | `~/.copilot/hooks/`      |
-| project, shared  | `.claude/settings.json`        | `<repo>/.codex/` (trust-gated) | `.cursor/hooks.json`         | `.github/hooks/`         |
-| project, local   | `.claude/settings.local.json`  | -                          | -                            | -                        |
-| component / agent | skill or agent frontmatter     | -                          | -                            | `.agent.md` frontmatter  |
-| plugin           | plugin `hooks/hooks.json`      | plugin `hooks.json`        | -                            | -                        |
-| enterprise / team | managed policy settings        | managed policy             | team or enterprise path      | `policy.d/` or registry  |
+| Scope            | Claude Code                    | Codex CLI                  | Cursor                       | GitHub Copilot           | Gemini CLI                    |
+| ---------------- | ------------------------------ | -------------------------- | ---------------------------- | ------------------------ | ----------------------------- |
+| user / global    | `~/.claude/settings.json`      | `~/.codex/` (`hooks.json` or `config.toml`) | `~/.cursor/hooks.json`       | `~/.copilot/hooks/`      | `~/.gemini/settings.json`     |
+| project, shared  | `.claude/settings.json`        | `<repo>/.codex/` (trust-gated) | `.cursor/hooks.json`         | `.github/hooks/`         | `.gemini/settings.json` (trust-gated) |
+| project, local   | `.claude/settings.local.json`  | -                          | -                            | -                        | -                             |
+| component / agent | skill or agent frontmatter     | -                          | -                            | `.agent.md` frontmatter  | -                             |
+| plugin           | plugin `hooks/hooks.json`      | plugin `hooks.json`        | -                            | -                        | -                             |
+| enterprise / team | managed policy settings        | managed policy             | team or enterprise path      | `policy.d/` or registry  | -                             |
+
+Gemini disables project hooks entirely in an untrusted folder, printing `Project hooks disabled because the folder is not trusted`. Trust the folder, or the project scope silently does nothing.
 
 Never pick a scope silently. State the resolved file and confirm it.
 

@@ -5,6 +5,7 @@ import "../../../src/domain/tools/ai/claude.js";
 import "../../../src/domain/tools/ai/codex.js";
 import "../../../src/domain/tools/ai/copilot.js";
 import "../../../src/domain/tools/ai/cursor.js";
+import "../../../src/domain/tools/ai/gemini.js";
 import "../../../src/domain/tools/ai/opencode.js";
 import "../../../src/domain/tools/ide/vscode.js";
 import { CLIOutput } from "../../../src/application/output.js";

@@ -27,7 +27,7 @@
 | Framework            | Canonical set of agents, commands, rules, skills, templates                                                                                                                       |
 | Distribution         | Tool-specific generated output (files rewritten per tool conventions)                                                                                                             |
 | Manifest             | `.aidd/manifest.json` — hash-based tracking of every installed file                                                                                                               |
-| ToolConfig           | Per-tool configuration: output paths, frontmatter conversion, merge rules. Tools: `claude` → `.claude/`, `cursor` → `.cursor/`, `copilot` → `.github/`, `opencode` → `.opencode/`, `codex` → `.codex/` |
+| ToolConfig           | Per-tool configuration: output paths, frontmatter conversion, merge rules. Tools: `claude` → `.claude/`, `cursor` → `.cursor/`, `copilot` → `.github/`, `opencode` → `.opencode/`, `codex` → `.codex/`, `gemini` → `.gemini/` (skills to the shared `.agents/skills/`) |
 | Plugin               | Capability files (agents, commands, hooks, mcp, rules, skills) distributed per AI tool format via marketplace catalogs                                                            |
 | Drift                | Installed file modified locally vs. what was written at install time                                                                                                              |
 | Init                 | Bootstrap: CLI writes `.aidd/manifest.json` (+ `.aidd/cache` gitignore). The `aidd_docs/` memory bank is scaffolded by the `aidd-context` project-init skill, not the CLI binary    |
@@ -40,7 +40,7 @@
 |---|---|
 | `aidd setup --source remote\|local [--path <dir>] [--release <tag>] [--ai <ids>] [--ide <ids>] [--plugins <none\|all\|recommended\|names>] [--no-default-marketplace] [--yes]` | Initialize project: marketplace + tools + plugins (`--ai all` / `--ide all` for everything) |
 
-### AI tools (claude, cursor, copilot, codex, opencode)
+### AI tools (claude, cursor, copilot, codex, opencode, gemini)
 | Command | Purpose |
 |---|---|
 | `aidd ai install <tool> [--force]` | Install AI tool runtime config |

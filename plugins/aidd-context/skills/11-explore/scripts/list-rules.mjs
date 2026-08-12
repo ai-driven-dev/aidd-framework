@@ -10,12 +10,13 @@
  *   - Cursor:         .cursor/rules/**\/*.mdc
  *   - GitHub Copilot: .github/instructions/**\/*.instructions.md
  *   - OpenCode:       .opencode/rules/**\/*.md       (no frontmatter; name from filename)
+ *   - Gemini CLI:     .gemini/rules/**\/*.md         (no native rules surface; scanned only if a project made one)
  *   - Codex CLI:      rules not supported, skipped
  *
  * Frontmatter shapes differ per tool. The script normalises every entry to:
  *   { tool, path, name, description, paths }
  *
- *   - tool        : claude | cursor | copilot | opencode
+ *   - tool        : claude | cursor | copilot | opencode | gemini
  *   - path        : path relative to --root (defaults to cwd)
  *   - name        : derived from the filename (without extension)
  *   - description : frontmatter `description` (Cursor, Copilot) or empty for OpenCode/Claude when absent
@@ -34,6 +35,7 @@ const TOOL_TARGETS = [
   { tool: 'cursor', dir: '.cursor/rules', ext: '.mdc' },
   { tool: 'copilot', dir: '.github/instructions', ext: '.instructions.md' },
   { tool: 'opencode', dir: '.opencode/rules', ext: '.md' },
+  { tool: 'gemini', dir: '.gemini/rules', ext: '.md' },
 ];
 
 function parseArgs(args) {

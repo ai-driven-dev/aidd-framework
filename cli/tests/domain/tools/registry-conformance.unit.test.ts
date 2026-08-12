@@ -5,10 +5,12 @@ import "../../../src/domain/tools/ai/claude.js";
 import "../../../src/domain/tools/ai/codex.js";
 import "../../../src/domain/tools/ai/copilot.js";
 import "../../../src/domain/tools/ai/cursor.js";
+import "../../../src/domain/tools/ai/gemini.js";
 import "../../../src/domain/tools/ai/opencode.js";
 import { FRAMEWORK_BUILD_TARGET_MODES } from "../../../src/domain/models/framework-build.js";
 import {
   MARKETPLACE_PROBES,
+  PLUGIN_FORMATS,
   PLUGIN_MANIFEST_PROBES,
 } from "../../../src/domain/models/plugin-format.js";
 import { AI_TOOL_IDS } from "../../../src/domain/models/tool-ids.js";
@@ -90,12 +92,14 @@ describe("AiTool contract conformance", () => {
       ).toBe(true);
     });
 
-    it("is ingestible when it declares a plugins capability", () => {
-      const declaresPlugins = "plugins" in (tool.capabilities as object);
-      if (!declaresPlugins) return;
+    it("is detectable when aidd claims to read its marketplace format", () => {
+      // Writing plugin content and reading a marketplace are different claims. A tool aidd
+      // only writes to has no marketplace layout to probe for, and demanding one would make
+      // aidd advertise a format that does not exist.
+      if (!(PLUGIN_FORMATS as readonly string[]).includes(toolId)) return;
       expect(
         MARKETPLACE_PROBES.some((probe) => probe.format === toolId),
-        `${toolId} declares a plugins capability but has no MARKETPLACE_PROBES entry (domain/models/plugin-format.ts) — its native marketplace would never be detected`
+        `${toolId} is a PluginFormat but has no MARKETPLACE_PROBES entry (domain/models/plugin-format.ts) — its marketplace would never be detected`
       ).toBe(true);
     });
   });

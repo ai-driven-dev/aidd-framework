@@ -21,6 +21,15 @@ describe("BundledAssetProviderAdapter.loadConfigAsset", () => {
     });
   });
 
+  describe("gemini", () => {
+    it("returns parsed settings.json with context.fileName", () => {
+      const asset = provider.loadConfigAsset("gemini", "settings.json") as {
+        context: { fileName: string[] };
+      };
+      expect(asset.context.fileName).toEqual(["AGENTS.md"]);
+    });
+  });
+
   describe("codex", () => {
     it("returns config.toml as raw string", () => {
       const asset = provider.loadConfigAsset("codex", "config.toml");

@@ -13,6 +13,7 @@ describe("isAiToolId", () => {
     expect(isAiToolId("copilot")).toBe(true);
     expect(isAiToolId("opencode")).toBe(true);
     expect(isAiToolId("codex")).toBe(true);
+    expect(isAiToolId("gemini")).toBe(true);
   });
 
   it("returns false for unknown strings", () => {

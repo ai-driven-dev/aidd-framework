@@ -35,6 +35,10 @@ export class FlatBuildStrategy implements BuildOutputStrategy {
     private readonly logger?: Logger
   ) {}
 
+  shouldBuildPlugin(pluginName: string): boolean {
+    return !this.contract.excludedPlugins?.includes(pluginName);
+  }
+
   async preBuild(outDir: string, sourceDir: string): Promise<void> {
     const exists = await this.fs.fileExists(outDir);
     if (!exists || !(await this.isDirectory(outDir))) throw new OutDirNotDirectoryError(outDir);

@@ -11,6 +11,7 @@ A tool is used when its own dir exists, or when a file only that tool reads exis
 | cursor   | `.cursor/` or `.cursorrules`                                                         | `AGENTS.md`                        |
 | opencode | `.opencode/`                                                                         | `AGENTS.md`                        |
 | copilot  | `.github/copilot-instructions.md` or `.github/{instructions,agents,skills,prompts}/` | `.github/copilot-instructions.md`  |
+| gemini   | `.gemini/`                                                                           | `AGENTS.md`                        |
 
 - Detected tools only. An unused optional tool is omitted, never crossed.
 - No tool detected at all: the row reads `none yet`, uncrossed. The memory row's `❌` already carries the gap.

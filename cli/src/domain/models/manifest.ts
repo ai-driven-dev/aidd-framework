@@ -40,6 +40,22 @@ interface PluginsEntry {
   readonly files: readonly TrackedFile[];
 }
 
+/** How one tool comes to claim a tracked path. */
+export type PathOwnerKind = "tool" | "merge" | "plugin";
+
+/** One tool's claim on one tracked path. */
+export interface PathOwner {
+  readonly toolId: ToolId;
+  readonly kind: PathOwnerKind;
+  /** The plugin that installed the file, or null when the tool claims it directly. */
+  readonly pluginName: string | null;
+  /** Hash of the whole file, or null for a merge file, which tracks entries rather than bytes. */
+  readonly hash: string | null;
+}
+
+/** Every tracked path with the owners that claim it. */
+export type PathOwners = ReadonlyMap<string, readonly PathOwner[]>;
+
 interface ToolEntry {
   readonly toolId: ToolId;
   readonly version: string;
@@ -361,12 +377,64 @@ export class Manifest {
     return this._tools.get(toolId)?.version;
   }
 
+  /**
+   * Every tracked path with the owners that claim it, derived on read. No schema change:
+   * co-ownership is already expressible, it was simply unreadable.
+   *
+   * A path can be claimed by several tools, and by a tool's plugins as well as by the tool
+   * itself. Consumers that walk tool-and-path pairs cannot see that, which is how one owner
+   * came to delete a tree another still needed. Hashes travel per owner, so a divergence
+   * between two owners of one path stays visible instead of collapsing into one entry.
+   */
+  getPathOwners(): PathOwners {
+    const owners = new Map<string, PathOwner[]>();
+    for (const entry of this._tools.values()) this.collectPathOwners(owners, entry);
+    return owners;
+  }
+
+  private collectPathOwners(owners: Map<string, PathOwner[]>, entry: ToolEntry): void {
+    const toolId = entry.toolId;
+    for (const file of entry.files) {
+      addPathOwner(owners, file.relativePath, {
+        toolId,
+        kind: "tool",
+        pluginName: null,
+        hash: file.hash.value,
+      });
+    }
+    for (const merge of entry.mergeFiles) {
+      addPathOwner(owners, merge.relativePath, {
+        toolId,
+        kind: "merge",
+        pluginName: null,
+        hash: null,
+      });
+    }
+    this.collectPluginOwners(owners, entry);
+  }
+
+  private collectPluginOwners(owners: Map<string, PathOwner[]>, entry: ToolEntry): void {
+    for (const plugin of entry.plugins) {
+      for (const [relativePath, hash] of plugin.files) {
+        addPathOwner(owners, relativePath, {
+          toolId: entry.toolId,
+          kind: "plugin",
+          pluginName: plugin.name,
+          hash,
+        });
+      }
+    }
+  }
+
+  /**
+   * Top-level directories AIDD tracks something in. Derived from every owner, not from a
+   * tool's own files alone: a shared tree is claimed through the plugin path, and reading
+   * only tool files made it look untracked.
+   */
   getInstalledDirectories(): Set<string> {
     const dirs = new Set<string>();
-    for (const entry of this._tools.values()) {
-      for (const file of entry.files) {
-        dirs.add(`${file.relativePath.split("/")[0]}/`);
-      }
+    for (const path of this.getPathOwners().keys()) {
+      dirs.add(`${path.split("/")[0]}/`);
     }
     return dirs;
   }
@@ -526,4 +594,10 @@ export class Manifest {
   private static parsePluginEntries(data: PluginEntryData[]): Plugin[] {
     return data.map((p) => Plugin.fromJSON(p));
   }
+}
+
+function addPathOwner(owners: Map<string, PathOwner[]>, path: string, owner: PathOwner): void {
+  const existing = owners.get(path);
+  if (existing === undefined) owners.set(path, [owner]);
+  else existing.push(owner);
 }

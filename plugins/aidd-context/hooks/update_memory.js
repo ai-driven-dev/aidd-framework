@@ -52,6 +52,7 @@ const TOOL_FILES = {
   cursor: "AGENTS.md",
   opencode: "AGENTS.md",
   copilot: ".github/copilot-instructions.md",
+  gemini: "AGENTS.md",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────

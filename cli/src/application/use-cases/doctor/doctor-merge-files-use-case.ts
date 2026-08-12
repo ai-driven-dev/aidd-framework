@@ -20,10 +20,13 @@ export class DoctorMergeFilesUseCase {
   async execute(options: DoctorMergeFilesOptions): Promise<DoctorIssue[]> {
     const { manifest, projectRoot, allowedIds } = options;
     const issues: DoctorIssue[] = [];
+    // A merge file co-owned by two tools is still one file: report its absence once. Its keys
+    // stay per-owner, because each tool tracks only the entries it wrote.
+    const reportedMissing = new Set<string>();
     for (const toolId of manifest.getInstalledToolIds()) {
       if (allowedIds && !allowedIds.has(toolId)) continue;
       for (const mergeFile of manifest.getMergeFiles(toolId)) {
-        issues.push(...(await this.checkOneMergeFile(mergeFile, projectRoot)));
+        issues.push(...(await this.checkOneMergeFile(mergeFile, projectRoot, reportedMissing)));
       }
     }
     return issues;
@@ -31,10 +34,13 @@ export class DoctorMergeFilesUseCase {
 
   private async checkOneMergeFile(
     mergeFile: MergeFileEntry,
-    projectRoot: string
+    projectRoot: string,
+    reportedMissing: Set<string>
   ): Promise<DoctorIssue[]> {
     const fullPath = join(projectRoot, mergeFile.relativePath);
     if (!(await this.fs.fileExists(fullPath))) {
+      if (reportedMissing.has(mergeFile.relativePath)) return [];
+      reportedMissing.add(mergeFile.relativePath);
       return [
         {
           severity: "error",

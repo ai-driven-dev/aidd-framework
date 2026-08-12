@@ -1,12 +1,21 @@
 import type { Hasher } from "../ports/hasher.js";
 import { stripJsonComments } from "./jsonc.js";
 
-interface OpencodeMcpSection {
-  mcp?: Record<string, unknown>;
+/**
+ * Where a flat tool keeps its MCP servers. Both the JSON key and the file name vary by
+ * tool (opencode uses `mcp` in opencode.json, gemini `mcpServers` in .gemini/settings.json),
+ * so neither may be assumed by the merge.
+ */
+export interface FlatMcpSection {
+  readonly key: string;
+  readonly configName: string;
 }
 
-const MCP_COLLISION_REASON =
-  "server already exists in opencode.json (user-owned); plugin entry skipped";
+const OPENCODE_MCP_KEY = "mcp";
+
+function collisionReason(configName: string): string {
+  return `server already exists in ${configName} (user-owned); plugin entry skipped`;
+}
 
 /**
  * Merges incoming OpenCode-format MCP servers (already transformed via transformMcpToOpencode)
@@ -20,20 +29,21 @@ const MCP_COLLISION_REASON =
  * Both `existingContent` and `incomingTransformed` must be valid JSON strings produced by
  * `JSON.stringify(_, null, 2)` (the same serialization as transformMcpToOpencode).
  */
-export function mergeOpencodeMcp(
+export function mergeFlatMcpSection(
   existingContent: string | null,
   incomingTransformed: string,
   previousEntriesForThisPlugin: ReadonlyMap<string, string>,
-  hasher: Hasher
+  hasher: Hasher,
+  section: FlatMcpSection
 ): {
   mergedContent: string;
   contributedEntries: ReadonlyMap<string, string>;
   collisions: ReadonlyArray<string>;
 } {
-  const { full, mcp } = parseExisting(existingContent);
-  const incoming = parseIncoming(incomingTransformed);
-  const cleaned = stripPreviousEntries(mcp, previousEntriesForThisPlugin);
-  return applyIncoming(full, cleaned, incoming, previousEntriesForThisPlugin, hasher);
+  const { full, servers } = parseExisting(existingContent, section.key);
+  const incoming = parseIncoming(incomingTransformed, section.key);
+  const cleaned = stripPreviousEntries(servers, previousEntriesForThisPlugin);
+  return applyIncoming(full, cleaned, incoming, previousEntriesForThisPlugin, hasher, section);
 }
 
 /**
@@ -63,7 +73,7 @@ export function buildOpencodeFlatConfig(
   incoming: Record<string, unknown>
 ): string {
   const base = JSON.parse(baseConfig) as Record<string, unknown>;
-  const { full, mcp } = parseExisting(existing);
+  const { full, servers: mcp } = parseExisting(existing, OPENCODE_MCP_KEY);
   const userKeys = { ...full };
   for (const key of Object.keys(base)) delete userKeys[key];
   delete userKeys.mcp;
@@ -78,36 +88,40 @@ export function buildOpencodeFlatConfig(
  * Removes servers previously contributed by a plugin from the opencode.json mcp section.
  * Keys not present in `entries` are preserved untouched.
  */
-export function unmergeOpencodeMcp(
+export function unmergeFlatMcpSection(
   existingContent: string,
-  entries: ReadonlyMap<string, string>
+  entries: ReadonlyMap<string, string>,
+  section: FlatMcpSection
 ): string {
-  const parsed = JSON.parse(stripJsonComments(existingContent)) as OpencodeMcpSection;
-  const mcp = { ...(parsed.mcp ?? {}) };
+  const parsed = JSON.parse(stripJsonComments(existingContent)) as Record<string, unknown>;
+  const servers = { ...((parsed[section.key] as Record<string, unknown>) ?? {}) };
   for (const name of entries.keys()) {
-    delete mcp[name];
+    delete servers[name];
   }
-  return JSON.stringify({ ...parsed, mcp }, null, 2);
+  return JSON.stringify({ ...parsed, [section.key]: servers }, null, 2);
 }
 
 // ── Private helpers ──────────────────────────────────────────────────────────
 
-function parseExisting(content: string | null): {
+function parseExisting(
+  content: string | null,
+  sectionKey: string
+): {
   full: Record<string, unknown>;
-  mcp: Record<string, unknown>;
+  servers: Record<string, unknown>;
 } {
-  if (content === null) return { full: {}, mcp: {} };
-  // opencode.json is user-owned and may be JSONC (comments / trailing commas).
-  const parsed = JSON.parse(stripJsonComments(content)) as OpencodeMcpSection;
+  if (content === null) return { full: {}, servers: {} };
+  // The target config is user-owned and may be JSONC (comments / trailing commas).
+  const parsed = JSON.parse(stripJsonComments(content)) as Record<string, unknown>;
   return {
-    full: parsed as Record<string, unknown>,
-    mcp: (parsed.mcp as Record<string, unknown>) ?? {},
+    full: parsed,
+    servers: (parsed[sectionKey] as Record<string, unknown>) ?? {},
   };
 }
 
-function parseIncoming(transformed: string): Record<string, unknown> {
-  const parsed = JSON.parse(transformed) as OpencodeMcpSection;
-  return (parsed.mcp as Record<string, unknown>) ?? {};
+function parseIncoming(transformed: string, sectionKey: string): Record<string, unknown> {
+  const parsed = JSON.parse(transformed) as Record<string, unknown>;
+  return (parsed[sectionKey] as Record<string, unknown>) ?? {};
 }
 
 function stripPreviousEntries(
@@ -126,7 +140,8 @@ function applyIncoming(
   cleanedMcp: Record<string, unknown>,
   incoming: Record<string, unknown>,
   previous: ReadonlyMap<string, string>,
-  hasher: Hasher
+  hasher: Hasher,
+  section: FlatMcpSection
 ): {
   mergedContent: string;
   contributedEntries: ReadonlyMap<string, string>;
@@ -137,12 +152,12 @@ function applyIncoming(
   const collisions: string[] = [];
   for (const [name, server] of Object.entries(incoming)) {
     if (name in cleanedMcp && !previous.has(name)) {
-      collisions.push(`${name}: ${MCP_COLLISION_REASON}`);
+      collisions.push(`${name}: ${collisionReason(section.configName)}`);
       continue;
     }
     mcp[name] = server;
     contributed.set(name, hasher.hash(JSON.stringify(server)).value);
   }
-  const mergedContent = JSON.stringify({ ...full, mcp }, null, 2);
+  const mergedContent = JSON.stringify({ ...full, [section.key]: mcp }, null, 2);
   return { mergedContent, contributedEntries: contributed, collisions };
 }

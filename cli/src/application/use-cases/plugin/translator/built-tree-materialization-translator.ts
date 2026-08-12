@@ -1,4 +1,6 @@
 import { join } from "node:path";
+import type { PluginsCapability } from "../../../../domain/capabilities/plugins-capability.js";
+import { AGENTS_SHARED_ROOT } from "../../../../domain/formats/flat-paths.js";
 import { InstallationFile } from "../../../../domain/models/file.js";
 import type { Manifest } from "../../../../domain/models/manifest.js";
 import { Plugin } from "../../../../domain/models/plugin.js";
@@ -10,6 +12,7 @@ import type { FileReader } from "../../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../../domain/ports/file-writer.js";
 import type { Hasher } from "../../../../domain/ports/hasher.js";
 import type { MarketplaceRegistry } from "../../../../domain/ports/marketplace-registry.js";
+import { getToolConfig, isAiTool } from "../../../../domain/tools/registry.js";
 import type { EnsureBuiltMarketplaceUseCase } from "../../shared/ensure-built-marketplace-use-case.js";
 import { isPluginFileAtDesiredState, resolvePluginBaseDir } from "../plugin-helpers.js";
 import { ModeBFlatMaterializationTranslator } from "./mode-b-flat-materialization-translator.js";
@@ -59,7 +62,7 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
         previousMcpEntries
       );
     }
-    const mode = toolId === "opencode" ? "flat" : "marketplace";
+    const mode = this.translationModeFor(toolId);
     const { builtDir } = await this.ensureBuilt.execute({
       projectRoot,
       marketplace: resolved,
@@ -68,7 +71,7 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     });
     const files =
       mode === "flat"
-        ? await this.readFlatFiles(builtDir, dist.manifest.name)
+        ? await this.readFlatFiles(builtDir, dist.manifest.name, toolId)
         : await this.readBuiltFiles(
             join(builtDir, "plugins", dist.manifest.name),
             dist.manifest.name
@@ -115,14 +118,30 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     );
   }
 
+  /**
+   * Which layout a tool's built tree uses, read from its plugins capability rather than
+   * matched against a tool name: a flat-only tool must not be a special case here, and
+   * adding one must not mean editing this file.
+   */
+  private translationModeFor(toolId: AiToolId): "flat" | "marketplace" {
+    const config = getToolConfig(toolId);
+    if (!isAiTool(config)) return "marketplace";
+    const { plugins } = config.capabilities as { plugins?: PluginsCapability };
+    return plugins?.translationMode === "flat" ? "flat" : "marketplace";
+  }
+
   // Flat build emits the whole marketplace into one workspace, namespaced by
-  // .opencode/<section>/<plugin>-<name>/...; install copies only this plugin's files.
-  private async readFlatFiles(builtDir: string, name: string): Promise<InstallationFile[]> {
+  // <owned root>/<section>/<plugin>-<name>/...; install copies only this plugin's files.
+  private async readFlatFiles(
+    builtDir: string,
+    name: string,
+    toolId: AiToolId
+  ): Promise<InstallationFile[]> {
     const absPaths = await this.fs.listFilesRecursive(builtDir);
     const files: InstallationFile[] = [];
     for (const abs of absPaths) {
       const rel = abs.slice(builtDir.length + 1);
-      if (!this.belongsToPlugin(rel, name)) continue;
+      if (!this.belongsToPlugin(rel, name, toolId)) continue;
       const content = await this.fs.readFile(abs);
       files.push(
         new InstallationFile({ relativePath: rel, content, hash: this.hasher.hash(content) })
@@ -131,11 +150,17 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     return files;
   }
 
-  private belongsToPlugin(rel: string, name: string): boolean {
+  /**
+   * A flat build writes every plugin into one workspace, so install has to pick its own
+   * files back out. Ownership is the tool's own directory plus the shared `.agents/` tree,
+   * which belongs to no single tool, and a segment namespaced with the plugin's name.
+   */
+  private belongsToPlugin(rel: string, name: string, toolId: AiToolId): boolean {
     const segments = rel.split("/");
-    return (
-      segments[0] === ".opencode" && segments.length >= 3 && segments[2].startsWith(`${name}-`)
-    );
+    if (segments.length < 3) return false;
+    const root = `${segments[0]}/`;
+    if (root !== getToolConfig(toolId).directory && root !== AGENTS_SHARED_ROOT) return false;
+    return segments.slice(1).some((segment) => segment.startsWith(`${name}-`));
   }
 
   private async findMarketplace(name: string, projectRoot: string) {

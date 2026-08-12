@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildOpencodeFlatConfig,
-  mergeOpencodeMcp,
-  unmergeOpencodeMcp,
+  mergeFlatMcpSection,
+  unmergeFlatMcpSection,
 } from "../../../src/domain/formats/opencode-mcp-merge.js";
 import { DeterministicHasher } from "../../helpers/ports/deterministic-hasher.js";
 
@@ -20,13 +20,16 @@ function makeExisting(servers: Record<string, unknown>): string {
   return JSON.stringify({ mcp: servers }, null, 2);
 }
 
-describe("mergeOpencodeMcp", () => {
+const OPENCODE_SECTION = { key: "mcp", configName: "opencode.json" };
+
+describe("mergeFlatMcpSection", () => {
   it("merges into empty target", () => {
-    const { mergedContent, contributedEntries, collisions } = mergeOpencodeMcp(
+    const { mergedContent, contributedEntries, collisions } = mergeFlatMcpSection(
       null,
       makeIncoming({ "my-server": LOCAL_SERVER }),
       new Map(),
-      hasher
+      hasher,
+      OPENCODE_SECTION
     );
     const parsed = JSON.parse(mergedContent) as { mcp: Record<string, unknown> };
     expect(parsed.mcp["my-server"]).toEqual(LOCAL_SERVER);
@@ -35,11 +38,12 @@ describe("mergeOpencodeMcp", () => {
   });
 
   it("preserves user-added servers not in incoming", () => {
-    const { mergedContent } = mergeOpencodeMcp(
+    const { mergedContent } = mergeFlatMcpSection(
       makeExisting({ "user-server": REMOTE_SERVER }),
       makeIncoming({ "plugin-server": LOCAL_SERVER }),
       new Map(),
-      hasher
+      hasher,
+      OPENCODE_SECTION
     );
     const parsed = JSON.parse(mergedContent) as { mcp: Record<string, unknown> };
     expect(parsed.mcp["user-server"]).toEqual(REMOTE_SERVER);
@@ -49,18 +53,30 @@ describe("mergeOpencodeMcp", () => {
   it("is idempotent: second merge with same version produces identical output", () => {
     const incoming = makeIncoming({ "plugin-server": LOCAL_SERVER });
     const prev = new Map<string, string>();
-    const first = mergeOpencodeMcp(null, incoming, prev, hasher);
+    const first = mergeFlatMcpSection(null, incoming, prev, hasher, OPENCODE_SECTION);
     const secondPrev = first.contributedEntries;
-    const second = mergeOpencodeMcp(first.mergedContent, incoming, secondPrev, hasher);
+    const second = mergeFlatMcpSection(
+      first.mergedContent,
+      incoming,
+      secondPrev,
+      hasher,
+      OPENCODE_SECTION
+    );
     expect(second.mergedContent).toBe(first.mergedContent);
     expect([...second.contributedEntries.keys()]).toEqual([...first.contributedEntries.keys()]);
   });
 
   it("replace path: drops orphaned server from v1, adds new server from v2", () => {
     const incomingV1 = makeIncoming({ "server-a": LOCAL_SERVER, "server-b": REMOTE_SERVER });
-    const v1 = mergeOpencodeMcp(null, incomingV1, new Map(), hasher);
+    const v1 = mergeFlatMcpSection(null, incomingV1, new Map(), hasher, OPENCODE_SECTION);
     const incomingV2 = makeIncoming({ "server-a": LOCAL_SERVER, "server-c": DISABLED_SERVER });
-    const v2 = mergeOpencodeMcp(v1.mergedContent, incomingV2, v1.contributedEntries, hasher);
+    const v2 = mergeFlatMcpSection(
+      v1.mergedContent,
+      incomingV2,
+      v1.contributedEntries,
+      hasher,
+      OPENCODE_SECTION
+    );
     const parsed = JSON.parse(v2.mergedContent) as { mcp: Record<string, unknown> };
     expect(parsed.mcp).toHaveProperty("server-a");
     expect(parsed.mcp).toHaveProperty("server-c");
@@ -69,11 +85,12 @@ describe("mergeOpencodeMcp", () => {
 
   it("skips incoming server that collides with user-owned key (not in previous)", () => {
     const existing = makeExisting({ "user-server": REMOTE_SERVER });
-    const { collisions, contributedEntries } = mergeOpencodeMcp(
+    const { collisions, contributedEntries } = mergeFlatMcpSection(
       existing,
       makeIncoming({ "user-server": LOCAL_SERVER }),
       new Map(),
-      hasher
+      hasher,
+      OPENCODE_SECTION
     );
     expect(collisions.length).toBeGreaterThan(0);
     expect(collisions[0]).toContain("user-server");
@@ -82,13 +99,14 @@ describe("mergeOpencodeMcp", () => {
 
   it("replaces own server that was previously contributed (no collision)", () => {
     const incoming = makeIncoming({ "plugin-server": LOCAL_SERVER });
-    const first = mergeOpencodeMcp(null, incoming, new Map(), hasher);
+    const first = mergeFlatMcpSection(null, incoming, new Map(), hasher, OPENCODE_SECTION);
     const incomingV2 = makeIncoming({ "plugin-server": DISABLED_SERVER });
-    const { collisions, mergedContent } = mergeOpencodeMcp(
+    const { collisions, mergedContent } = mergeFlatMcpSection(
       first.mergedContent,
       incomingV2,
       first.contributedEntries,
-      hasher
+      hasher,
+      OPENCODE_SECTION
     );
     expect(collisions).toHaveLength(0);
     const parsed = JSON.parse(mergedContent) as { mcp: Record<string, unknown> };
@@ -96,22 +114,24 @@ describe("mergeOpencodeMcp", () => {
   });
 
   it("preserves disabled state (enabled: false) from incoming", () => {
-    const { mergedContent } = mergeOpencodeMcp(
+    const { mergedContent } = mergeFlatMcpSection(
       null,
       makeIncoming({ "off-server": DISABLED_SERVER }),
       new Map(),
-      hasher
+      hasher,
+      OPENCODE_SECTION
     );
     const parsed = JSON.parse(mergedContent) as { mcp: Record<string, unknown> };
     expect((parsed.mcp["off-server"] as { enabled: boolean }).enabled).toBe(false);
   });
 
   it("returns hashes in contributedEntries for each contributed server", () => {
-    const { contributedEntries } = mergeOpencodeMcp(
+    const { contributedEntries } = mergeFlatMcpSection(
       null,
       makeIncoming({ alpha: LOCAL_SERVER, beta: REMOTE_SERVER }),
       new Map(),
-      hasher
+      hasher,
+      OPENCODE_SECTION
     );
     expect(contributedEntries.has("alpha")).toBe(true);
     expect(contributedEntries.has("beta")).toBe(true);
@@ -124,11 +144,12 @@ describe("mergeOpencodeMcp", () => {
       null,
       2
     );
-    const { mergedContent } = mergeOpencodeMcp(
+    const { mergedContent } = mergeFlatMcpSection(
       frameworkDefault,
       makeIncoming({ "my-server": LOCAL_SERVER }),
       new Map(),
-      hasher
+      hasher,
+      OPENCODE_SECTION
     );
     const parsed = JSON.parse(mergedContent) as {
       instructions: string[];
@@ -174,7 +195,7 @@ describe("tolerates a JSONC user-owned opencode.json", () => {
 
   it("unmerges from JSONC content without throwing", () => {
     const entries = new Map([["aidd-context__server", "hash"]]);
-    expect(() => unmergeOpencodeMcp(JSONC_EXISTING, entries)).not.toThrow();
+    expect(() => unmergeFlatMcpSection(JSONC_EXISTING, entries, OPENCODE_SECTION)).not.toThrow();
   });
 });
 
@@ -222,11 +243,11 @@ describe("buildOpencodeFlatConfig", () => {
   });
 });
 
-describe("unmergeOpencodeMcp", () => {
+describe("unmergeFlatMcpSection", () => {
   it("removes only the tracked entries, preserving other servers", () => {
     const existing = makeExisting({ plugin: LOCAL_SERVER, user: REMOTE_SERVER });
     const entries = new Map([["plugin", "somehash"]]);
-    const result = unmergeOpencodeMcp(existing, entries);
+    const result = unmergeFlatMcpSection(existing, entries, OPENCODE_SECTION);
     const parsed = JSON.parse(result) as { mcp: Record<string, unknown> };
     expect(parsed.mcp).not.toHaveProperty("plugin");
     expect(parsed.mcp.user).toEqual(REMOTE_SERVER);
@@ -234,7 +255,7 @@ describe("unmergeOpencodeMcp", () => {
 
   it("is a no-op when entries map is empty", () => {
     const existing = makeExisting({ server: LOCAL_SERVER });
-    const result = unmergeOpencodeMcp(existing, new Map());
+    const result = unmergeFlatMcpSection(existing, new Map(), OPENCODE_SECTION);
     const parsed = JSON.parse(result) as { mcp: Record<string, unknown> };
     expect(parsed.mcp.server).toEqual(LOCAL_SERVER);
   });
@@ -242,8 +263,8 @@ describe("unmergeOpencodeMcp", () => {
   it("does not fail when a tracked key is absent from existing", () => {
     const existing = makeExisting({ server: LOCAL_SERVER });
     const entries = new Map([["ghost-server", "oldhash"]]);
-    expect(() => unmergeOpencodeMcp(existing, entries)).not.toThrow();
-    const parsed = JSON.parse(unmergeOpencodeMcp(existing, entries)) as {
+    expect(() => unmergeFlatMcpSection(existing, entries, OPENCODE_SECTION)).not.toThrow();
+    const parsed = JSON.parse(unmergeFlatMcpSection(existing, entries, OPENCODE_SECTION)) as {
       mcp: Record<string, unknown>;
     };
     expect(parsed.mcp.server).toEqual(LOCAL_SERVER);

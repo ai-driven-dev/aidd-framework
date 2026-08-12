@@ -2,7 +2,7 @@ import { join } from "node:path";
 import type { McpCapability } from "../../../../domain/capabilities/mcp-capability.js";
 import type { PluginsCapability } from "../../../../domain/capabilities/plugins-capability.js";
 import { CursorProjectScopeUnsupportedError } from "../../../../domain/errors.js";
-import { mergeOpencodeMcp } from "../../../../domain/formats/opencode-mcp-merge.js";
+import { mergeFlatMcpSection } from "../../../../domain/formats/opencode-mcp-merge.js";
 import type { InstallationFile } from "../../../../domain/models/file.js";
 import type { Manifest } from "../../../../domain/models/manifest.js";
 import { Plugin } from "../../../../domain/models/plugin.js";
@@ -19,7 +19,7 @@ import type { FileWriter } from "../../../../domain/ports/file-writer.js";
 import type { Hasher } from "../../../../domain/ports/hasher.js";
 import { getToolConfig, isAiTool } from "../../../../domain/tools/registry.js";
 import {
-  qualifiesForOpencodeMcpMerge,
+  flatMcpSectionKey,
   resolvePluginBaseDirForCapability,
   writePluginFiles,
 } from "../plugin-helpers.js";
@@ -105,10 +105,11 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
     const toolConfig = getToolConfig(toolId);
     if (!isAiTool(toolConfig)) return { mcpEntries: new Map(), mcpSkips: [] };
     const caps = toolConfig.capabilities as Record<string, unknown>;
-    if (!qualifiesForOpencodeMcpMerge(caps) || dist.components.mcp.length === 0) {
+    const sectionKey = flatMcpSectionKey(caps, toolId);
+    if (sectionKey === null || dist.components.mcp.length === 0) {
       return { mcpEntries: new Map(), mcpSkips: [] };
     }
-    return this.mergeOpencodeMcpEntries(dist, caps, projectRoot, previousMcpEntries, toolId);
+    return this.mergeMcpEntries(dist, caps, projectRoot, previousMcpEntries, toolId, sectionKey);
   }
 
   private async writeAndRegisterPlugin(
@@ -134,12 +135,13 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
     manifest.addPlugin(toolId, plugin);
   }
 
-  private async mergeOpencodeMcpEntries(
+  private async mergeMcpEntries(
     dist: PluginDistribution,
     caps: Record<string, unknown>,
     projectRoot: string,
     previousMcpEntries: ReadonlyMap<string, string>,
-    toolId: AiToolId
+    toolId: AiToolId,
+    sectionKey: string
   ): Promise<{ mcpEntries: ReadonlyMap<string, string>; mcpSkips: ReadonlySkipList }> {
     const mcpCap = caps.mcp as McpCapability;
     const outputRelPath = await mcpCap.resolveOutput(projectRoot, this.fs);
@@ -147,11 +149,12 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
     const existingContent = await this.readExistingJson(outputPath);
     const rawMcp = dist.components.mcp[0].content;
     const transformed = mcpCap.transform(rawMcp);
-    const { mergedContent, contributedEntries, collisions } = mergeOpencodeMcp(
+    const { mergedContent, contributedEntries, collisions } = mergeFlatMcpSection(
       existingContent,
       transformed,
       previousMcpEntries,
-      this.hasher
+      this.hasher,
+      { key: sectionKey, configName: outputRelPath }
     );
     if (contributedEntries.size > 0 || previousMcpEntries.size > 0) {
       await this.fs.writeFile(outputPath, mergedContent);

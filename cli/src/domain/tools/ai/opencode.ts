@@ -19,6 +19,7 @@ import {
 } from "../../formats/command.js";
 import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
 import { CONFIG_MCP, CONFIG_OPENCODE } from "../../models/framework.js";
+import { OPENCODE_HOOKS_SKIP_REASON } from "../../models/plugin-translation-skip.js";
 import type {
   AiTool,
   HasAgents,
@@ -153,6 +154,7 @@ export const opencode: AiTool<
     plugins: new PluginsCapability({
       mode: "flat",
       flatNamespacePrefix: "aidd-",
+      hooksSkipReason: OPENCODE_HOOKS_SKIP_REASON,
     }),
   },
 

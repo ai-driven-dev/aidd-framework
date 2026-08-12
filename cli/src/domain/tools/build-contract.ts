@@ -113,6 +113,12 @@ export interface ToolBuildContract {
   };
 
   /**
+   * Plugin names structurally incompatible with this tool (e.g. Claude-Code-coupled
+   * plugins with no equivalent runtime). Absent or empty means every plugin is built.
+   */
+  readonly excludedPlugins?: readonly string[];
+
+  /**
    * Optional post-build step emitting a config artifact (e.g. config.toml for codex, opencode.json).
    * Returns count of files written.
    */

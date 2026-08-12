@@ -2,7 +2,7 @@ import { homedir as nodeHomedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { McpCapability } from "../../../domain/capabilities/mcp-capability.js";
 import { PluginNotFoundError } from "../../../domain/errors.js";
-import { unmergeOpencodeMcp } from "../../../domain/formats/opencode-mcp-merge.js";
+import { unmergeFlatMcpSection } from "../../../domain/formats/opencode-mcp-merge.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Plugin } from "../../../domain/models/plugin.js";
 import type { AiToolId } from "../../../domain/models/tool-ids.js";
@@ -11,8 +11,8 @@ import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
 import {
+  flatMcpSectionKey,
   loadPluginManifest,
-  qualifiesForOpencodeMcpMerge,
   resolvePluginBaseDir,
   resolvePluginToolIds,
 } from "./plugin-helpers.js";
@@ -67,13 +67,17 @@ export class PluginRemoveUseCase {
     const toolConfig = getToolConfig(toolId);
     if (!isAiTool(toolConfig)) return;
     const caps = toolConfig.capabilities as Record<string, unknown>;
-    if (!qualifiesForOpencodeMcpMerge(caps)) return;
+    const sectionKey = flatMcpSectionKey(caps, toolId);
+    if (sectionKey === null) return;
     const mcpCap = caps.mcp as McpCapability;
     const outputRelPath = await mcpCap.resolveOutput(projectRoot, this.fs);
     const outputPath = join(projectRoot, outputRelPath);
     const existing = await this.readExistingJson(outputPath);
     if (existing === null) return;
-    const updated = unmergeOpencodeMcp(existing, plugin.mcpEntries);
+    const updated = unmergeFlatMcpSection(existing, plugin.mcpEntries, {
+      key: sectionKey,
+      configName: outputRelPath,
+    });
     await this.fs.writeFile(outputPath, updated);
   }
 

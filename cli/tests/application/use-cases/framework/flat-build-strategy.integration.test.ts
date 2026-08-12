@@ -4,6 +4,7 @@ import { FrameworkBuildUseCase } from "../../../../src/application/use-cases/fra
 import { FlatBuildStrategy } from "../../../../src/application/use-cases/framework/strategies/flat-build-strategy.js";
 import {
   buildCopilotFlatContract,
+  buildGeminiFlatContract,
   buildOpencodeFlatContract,
 } from "../../../../src/application/use-cases/framework/strategies/tool-contracts.js";
 import {
@@ -11,6 +12,7 @@ import {
   JsonSchemaValidationError,
   OutDirNotDirectoryError,
 } from "../../../../src/domain/errors.js";
+import { parseFrontmatter } from "../../../../src/domain/formats/markdown.js";
 import type { AssetProvider } from "../../../../src/domain/ports/asset-provider.js";
 import type { JsonSchemaValidator } from "../../../../src/domain/ports/json-schema-validator.js";
 import { AjvSchemaValidatorAdapter } from "../../../../src/infrastructure/adapters/ajv-schema-validator-adapter.js";
@@ -57,6 +59,9 @@ function makeAssetProvider(): AssetProvider {
           $schema: "https://opencode.ai/config.json",
           instructions: [".opencode/rules/**/*.md"],
         };
+      }
+      if (fileName === "settings.json") {
+        return { context: { fileName: ["AGENTS.md"] } };
       }
       throw new Error("not used");
     },
@@ -396,6 +401,124 @@ describe("FlatOutputStrategy integration", () => {
         .listAll()
         .filter((p) => p.startsWith(ABS_OUT) && p.includes("hooks"));
       expect(hooksFiles).toHaveLength(0);
+    });
+  });
+
+  describe("gemini flat contract", () => {
+    function makeGeminiUseCase(fs: InMemoryFileAdapter, force = false): FrameworkBuildUseCase {
+      const ap = makeAssetProvider();
+      const strategy = new FlatBuildStrategy(
+        fs,
+        new AjvSchemaValidatorAdapter(),
+        ap,
+        buildGeminiFlatContract(),
+        force,
+        ABS_OUT,
+        makeIsDirectory(fs)
+      );
+      return new FrameworkBuildUseCase(fs, makeValidator(), ap, new CapturingLogger(), strategy);
+    }
+
+    it("writes skills under .agents/skills/ and agents under .gemini/agents/", async () => {
+      await makeGeminiUseCase(memFs).execute({
+        sourceDir: FIXTURE_DIR,
+        outDir: ABS_OUT,
+        target: "gemini",
+        mode: "flat",
+      });
+      expect(memFs.has(`${ABS_OUT}/.agents/skills/${PLUGIN}-commit/SKILL.md`)).toBe(true);
+      expect(memFs.has(`${ABS_OUT}/.gemini/agents/${PLUGIN}-code-reviewer.md`)).toBe(true);
+    });
+
+    it("rebuilds agent frontmatter to only name and description (strict Gemini schema)", async () => {
+      await makeGeminiUseCase(memFs).execute({
+        sourceDir: FIXTURE_DIR,
+        outDir: ABS_OUT,
+        target: "gemini",
+        mode: "flat",
+      });
+      const content = memFs.getFile(`${ABS_OUT}/.gemini/agents/${PLUGIN}-code-reviewer.md`) ?? "";
+      const { frontmatter } = parseFrontmatter(content);
+      expect(frontmatter).toEqual({
+        name: `${PLUGIN}-code-reviewer`,
+        description: "Reviews code for quality and correctness.",
+      });
+    });
+
+    it("emits .gemini/settings.json with mcpServers, hooks and context.fileName simultaneously", async () => {
+      await makeGeminiUseCase(memFs).execute({
+        sourceDir: FIXTURE_DIR,
+        outDir: ABS_OUT,
+        target: "gemini",
+        mode: "flat",
+      });
+      const raw = memFs.getFile(`${ABS_OUT}/.gemini/settings.json`) ?? "{}";
+      const settings = JSON.parse(raw) as {
+        mcpServers: Record<string, unknown>;
+        hooks: Record<string, unknown>;
+        context: { fileName: string[] };
+      };
+      expect(settings.mcpServers).toHaveProperty(`${PLUGIN}-aidd-test-server`);
+      expect(settings.hooks.BeforeTool).toBeDefined();
+      expect(settings.context.fileName).toEqual(["AGENTS.md"]);
+    });
+
+    it("translates PreToolUse to BeforeTool (Claude → Gemini event mapping)", async () => {
+      await makeGeminiUseCase(memFs).execute({
+        sourceDir: FIXTURE_DIR,
+        outDir: ABS_OUT,
+        target: "gemini",
+        mode: "flat",
+      });
+      const raw = memFs.getFile(`${ABS_OUT}/.gemini/settings.json`) ?? "{}";
+      const settings = JSON.parse(raw) as { hooks: Record<string, unknown> };
+      expect(settings.hooks.PreToolUse).toBeUndefined();
+      expect(settings.hooks.BeforeTool).toBeDefined();
+    });
+
+    it("writes hooks before mcp, and neither clobbers the other's key in the shared settings file", async () => {
+      await makeGeminiUseCase(memFs).execute({
+        sourceDir: FIXTURE_DIR,
+        outDir: ABS_OUT,
+        target: "gemini",
+        mode: "flat",
+      });
+      // Both writers target .gemini/settings.json; the hooks-then-mcp write order
+      // (framework-build-use-case's plugin loop) must not clobber the other's key.
+      const raw = memFs.getFile(`${ABS_OUT}/.gemini/settings.json`) ?? "{}";
+      const settings = JSON.parse(raw) as Record<string, unknown>;
+      expect(settings).toHaveProperty("hooks");
+      expect(settings).toHaveProperty("mcpServers");
+    });
+
+    it("does NOT write a marketplace.json (flat mode, no marketplace support)", async () => {
+      await makeGeminiUseCase(memFs).execute({
+        sourceDir: FIXTURE_DIR,
+        outDir: ABS_OUT,
+        target: "gemini",
+        mode: "flat",
+      });
+      expect(memFs.has(`${ABS_OUT}/.gemini/marketplace.json`)).toBe(false);
+    });
+
+    it("re-run with --force reproduces the same agent file (collision-checked artifacts are byte-identical)", async () => {
+      // .gemini/settings.json is a merge target, not collision-checked — like claude/cursor/codex's
+      // own hooksMerge targets, a repeated merge is additive rather than idempotent by design.
+      // Agents and skills go through checkCollision + overwrite instead, so those ARE byte-identical.
+      await makeGeminiUseCase(memFs, false).execute({
+        sourceDir: FIXTURE_DIR,
+        outDir: ABS_OUT,
+        target: "gemini",
+        mode: "flat",
+      });
+      const snapshot = memFs.getFile(`${ABS_OUT}/.gemini/agents/${PLUGIN}-code-reviewer.md`);
+      await makeGeminiUseCase(memFs, true).execute({
+        sourceDir: FIXTURE_DIR,
+        outDir: ABS_OUT,
+        target: "gemini",
+        mode: "flat",
+      });
+      expect(memFs.getFile(`${ABS_OUT}/.gemini/agents/${PLUGIN}-code-reviewer.md`)).toBe(snapshot);
     });
   });
 });
