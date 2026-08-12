@@ -11,10 +11,12 @@ The per-tool command path and write targets. Command slice only, nothing about s
 | OpenCode       | `.opencode/commands/<location>/<slug>.md` | yes                                  |
 | GitHub Copilot | `.github/prompts/<slug>.prompt.md`        | yes (flat)                           |
 | Codex CLI      | -                                         | no                                   |
+| Gemini CLI     | -                                         | no                                   |
 
 `<location>` is whatever the user chose: a flat folder, a namespace, or an opt-in `<NN>_<phase>/` from the taxonomy. Copilot is flat: no subfolder, so fold any location prefix into the filename.
 
 - **Codex CLI**: no custom slash commands, only built-ins. Skip it. Suggest a skill if a reusable workflow is needed.
+- **Gemini CLI**: same. Skip it and suggest a skill, which Gemini does discover.
 
 ## Frontmatter per tool
 

@@ -11,6 +11,7 @@ The per-tool rules path and write targets. Rule slice only, nothing about skills
 | GitHub Copilot | `.github/instructions/<NN>-<name>.instructions.md` | yes (flat) |
 | OpenCode       | -                                                  | no         |
 | Codex CLI      | -                                                  | no         |
+| Gemini CLI     | -                                                  | no         |
 
 `<slug>` is the file name `#-slug` from `rule-authoring.md` (e.g. `2-python-fstrings`). `<name>` is that slug with its leading category digit dropped (`python-fstrings`). `<category>` is the folder `<NN>-<name-of-category>`, the zero-padded category index plus the category name from the taxonomy, e.g. `01-standards`. `<NN>` is that same two-digit index.
 
@@ -19,6 +20,7 @@ Copilot is flat: no category folder. Its file is `<NN>-<name>`, e.g. `2-python-f
 When a tool does not support rules, skip it and say what to do instead:
 - **OpenCode**: no rules surface. Add the convention to AGENTS.md, or list its path under `instructions:` in opencode.json.
 - **Codex CLI**: rules are skipped at install. Keep the convention in AGENTS.md.
+- **Gemini CLI**: no rules surface. Keep the convention in AGENTS.md, which Gemini reads once `context.fileName` names it.
 
 ## Scope frontmatter per tool
 
@@ -39,6 +41,7 @@ A multi-glob `paths` becomes a comma-joined string for Cursor and Copilot, or th
 | `.claude/` or `CLAUDE.md`         | Claude Code    |
 | `.cursor/`                        | Cursor         |
 | `.github/copilot-instructions.md` | GitHub Copilot |
+| `.gemini/`                        | Gemini CLI     |
 
 ## Write targets
 

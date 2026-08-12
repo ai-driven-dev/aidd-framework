@@ -140,10 +140,10 @@ flowchart TD
 
 #### Acceptance criteria
 
-- [ ] The memory hook writes the project memory block into `AGENTS.md` for gemini
-- [ ] The hook and its mirror reference file agree
-- [ ] The diff shows only added lines in the multi-tool tables, no modified claude row
-- [ ] The rules-listing script reports gemini rules when a gemini rules directory exists
+- [x] The memory hook writes the project memory block into `AGENTS.md` for gemini
+- [x] The hook and its mirror reference file agree
+- [x] The diff shows only added lines in the multi-tool tables, no modified claude row
+- [x] The rules-listing script reports gemini rules when a gemini rules directory exists
 
 ### Phase 2: Publish the prerequisites and the mapping
 
@@ -203,9 +203,14 @@ flowchart TD
 
 <!-- AI-initiated changes during implementation. Each entry is prefixed with 🤖. -->
 
+🤖 The additive-only criterion needed reading rather than counting. Two tables in `08-hook-generate/references/tool-paths.md` gain a Gemini *column*, which rewrites every row in the diff: 18 lines removed, 24 added. No Claude cell changed value — each row simply grew one column — so the intent of the rule holds even though `git diff` shows deletions. The only other removals are the sentence "Agents are supported on all five tools", now six, and one doc-comment line in the rules script. Every other file is pure insertion.
+
+🤖 Two limits found in part 3's phase 4 belong in this part's user-facing documentation, and neither was known when this plan was written. The install path never writes `.gemini/settings.json`, so an installed gemini has no hooks and no `AGENTS.md` context wiring — only the archive carries those. And a plugin installed from a raw local path (no marketplace) lands skills at a nesting depth the real binary discovers nothing from. Both are recorded in phase 2's documentation tasks rather than left to the reader to discover.
+
 ## Log
 
 <!-- APPEND ONLY. One entry per step attempt. Never rewrite. -->
+- Phase 1: gemini added to the memory hook's tool-to-context-file map (`AGENTS.md`) and to eleven reference tables across `aidd-context`: onboarding detection, project-memory tools, skill-generate detection and write targets plus its strict frontmatter row, rule-generate (unsupported, with the AGENTS.md fallback), agent-generate (path, strict-schema frontmatter, detection), command-generate (unsupported, steer to a skill), hook-generate (support row, a full event column, the settings file shape, and the trust-gated scope), learn's sync arguments, explore's four mapping tables, and the rules-listing script. Hook event names are the verified `GEMINI_HOOK_EVENT_MAP` read from the 0.52.0 bundle, including the two Claude moments that both fold onto `AfterAgent`. Verified: `node update_memory.js gemini` exits 0 and writes the memory block into `AGENTS.md`, where it previously exited 1 with `unknown tool gemini`; `node --check` passes on the rules script. The golden snapshot is knowingly red from here until phase 3 re-baselines it, which is this part's whole point.
 
 ## Validation flow demonstration
 

@@ -9,6 +9,7 @@ Arguments accepted by `hooks/update_memory.js`. The hook maps tool names to cont
 | `cursor` | `AGENTS.md` |
 | `opencode` | `AGENTS.md` |
 | `copilot` | `.github/copilot-instructions.md` |
+| `gemini` | `AGENTS.md` |
 
 Rules:
 
