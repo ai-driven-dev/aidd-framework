@@ -18,9 +18,8 @@ Kind meaning:
 Selection:
 
 - Explicit hint narrows the source kind.
-- No hint defaults to the current conversation, same as before this skill could take an explicit pointer.
+- No hint defaults to the current conversation.
 - Multiple specs are allowed when one source cannot explain the learning alone.
-- Ask before continuing when several source sets are plausible.
 
 Limits:
 
