@@ -142,9 +142,9 @@ flowchart TD
 
 #### Acceptance criteria
 
-- [ ] The manifest version is unchanged and no migration is added
-- [ ] The accessor returns a readonly structure
-- [ ] Divergent hashes between owners are observable through the accessor rather than hidden
+- [x] The manifest version is unchanged and no migration is added
+- [x] The accessor returns a readonly structure
+- [x] Divergent hashes between owners are observable through the accessor rather than hidden
 
 ### Phase 3: Make the shared tree visible
 
@@ -197,6 +197,7 @@ flowchart TD
 <!-- APPEND ONLY. One entry per step attempt. Never rewrite. -->
 
 - Phase 1: `application/use-cases/uninstall/shared-path-guard.ts` created as the single owner of "may this uninstall delete that file", spanning tool files, merge files and plugin files, keyed by a `(toolId, pluginName | null)` departing claim and returning a readonly path-to-owners map. Wired into all three deletion sites: the tool-file loop and `removeAllPluginFiles` in `uninstall-tools-use-case.ts` (its module-private `computeSharedPaths` deleted), and `deleteFiles` in `uninstall-plugin-use-case.ts`, which gains the `Logger` it needed to report a retention (single construction site, `uninstall-use-case.ts:35`). Every retained path emits one `warn` naming the surviving owners. New `tests/application/use-cases/uninstall/shared-path-guard.integration.test.ts`, 5 cases: co-owned file survives one owner leaving, solely-owned path still deleted, retention reported once and naming the owner, co-owned file deleted when the last owner goes, and co-owned file surviving a whole-tool uninstall. Mutation-checked: neutralizing `computeRetainedPaths` fails 3 of the 5, the two deletion assertions staying green as they should. Verified: `pnpm typecheck` (0 errors), `biome check` (clean, 2 pre-existing config infos from main's biome bump), full `pnpm test` 2195/2196 — the one failure is `auth status`, caused by an `AIDD_TOKEN` in the developer environment that the e2e sandbox does not scrub, unrelated to this work.
+- Phase 2: `Manifest.getPathOwners()` added, returning a readonly path-to-owners map derived on read. An owner carries its tool id, how it claims the path (`tool`, `merge` or `plugin`), the plugin name when one applies, and the hash — `null` for a merge file, which tracks entries rather than bytes, so a divergence between two owners of one path stays visible rather than collapsing into a single entry. No schema change: `MANIFEST_VERSION` stays 6 and no migration was added, verified by diffing the model. `computeRetainedPaths` now reads the accessor instead of walking tools, merge files and plugins itself, so the departing-claim match is the only logic left in the application layer. New `tests/domain/models/manifest-path-owners.unit.test.ts`, 8 cases: single owner, two tools on one path, a plugin owning in its own right, a tool and its own plugin on the same path, zero owners, divergent hashes, the merge file's null hash, and an owner disappearing when its claim is released. Verified: `pnpm typecheck` (0 errors), `biome check` (clean), full `pnpm test` 2203/2204, the one failure being the same environment-coupled `auth status` case.
 
 ## Validation flow demonstration
 
