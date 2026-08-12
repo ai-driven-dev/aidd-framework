@@ -2,7 +2,7 @@
 # Full-surface smoke against the REAL remote framework + real built binary.
 #
 # Goal: exercise EVERY leaf command in the CLI surface, with the per-tool
-# commands looped over every AI tool (claude, cursor, copilot, codex, opencode)
+# commands looped over every AI tool (claude, cursor, copilot, codex, opencode, gemini)
 # and IDE tool (vscode). Prints a measured command-coverage percentage.
 #
 # Born from a production crash a user hit on install:
@@ -19,7 +19,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CLI="$ROOT/dist/cli.js"
 FRAMEWORK_FIXTURE="$ROOT/tests/fixtures/framework"
 
-AI_TOOLS=(claude cursor copilot codex opencode)
+AI_TOOLS=(claude cursor copilot codex opencode gemini)
 IDE_TOOLS=(vscode)
 
 # Canonical leaf-command surface. Coverage = exercised / total.
