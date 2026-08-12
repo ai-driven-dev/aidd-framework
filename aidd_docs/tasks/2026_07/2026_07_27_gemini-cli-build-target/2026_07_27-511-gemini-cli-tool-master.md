@@ -52,8 +52,8 @@ Neither appears in the issue or the brainstorm, and both gate the stated success
 | --- | ----------------------- | ------------------------------------------------ | ------- | --------- |
 | 1   | Build target            | `./2026_07_27-511-gemini-cli-tool-part-1.md`      | done    | [x]       |
 | 2   | Shared tree safety      | `./2026_07_27-511-gemini-cli-tool-part-2.md`      | done    | [x]       |
-| 3   | Registry citizen        | `./2026_07_27-511-gemini-cli-tool-part-3.md`      | in-progress | [ ]       |
-| 4   | Content and docs        | `./2026_07_27-511-gemini-cli-tool-part-4.md`      | blocked | [ ]       |
+| 3   | Registry citizen        | `./2026_07_27-511-gemini-cli-tool-part-3.md`      | done    | [x]       |
+| 4   | Content and docs        | `./2026_07_27-511-gemini-cli-tool-part-4.md`      | done    | [x]       |
 
 <!-- Status values: pending, in-progress, done, blocked -->
 <!-- RULE: Plan N+1 blocked until Plan N checkbox checked -->
@@ -87,9 +87,9 @@ This supersedes one brainstorm decision. The brainstorm chose tool-neutral skill
 3. Unblock Part 2, run its `success_condition`
 4. [x] Checkpoint 2: shared-path deletion guarded, subset invariant green
 5. Unblock Part 3, run its `success_condition`
-6. [ ] Checkpoint 3: full command matrix green for gemini, smoke coverage gate met
+6. [x] Checkpoint 3: full command matrix green for gemini, smoke coverage gate met
 7. Unblock Part 4, run its `success_condition`
-8. [ ] Final: a Gemini-only project consumes the archive end to end, verified against the real `gemini` binary
+8. [x] Final: a Gemini-only project consumes the archive end to end, verified against the real `gemini` binary
 
 ## Confidence assessment
 
