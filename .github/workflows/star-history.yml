@@ -13,8 +13,6 @@ on:
   schedule:
     - cron: "0 5 * * 1" # Mondays 05:00 UTC
   workflow_dispatch:
-  push:
-    branches: [blafourcade/fix-stars] # TEMPORARY: schedule and dispatch only fire from the default branch, so this proves the workflow before the merge. Removed in this same PR.
 
 concurrency:
   group: star-history
