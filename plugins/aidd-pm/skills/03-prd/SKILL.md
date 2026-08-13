@@ -6,25 +6,25 @@ argument-hint: need | brainstorm
 
 # PRD
 
-Drafts a structured Product Requirements Document covering scope, goals, and acceptance criteria.
+```mermaid
+flowchart LR
+  source([feature description, optionally with user stories]) --> draft --> finalize --> done([saved PRD])
+```
 
 ## Actions
 
-| #   | Action  | Role                                                 | Input                                           |
-| --- | ------- | ---------------------------------------------------- | ----------------------------------------------- |
-| 01  | `prd`   | Parse input, draft per template, validate, save      | feature_description, user_stories (optional)    |
+Run the flow above. Read only the next action file.
 
-Before running an action, read its file in `actions/`, not only the table or assets.
+| Action   | Does                                 |
+| -------- | -------------------------------------- |
+| draft    | draft per template, iterate to approval |
+| finalize | save the approved draft                |
 
 ## Transversal rules
 
-- Focus on what and why; never include technical implementation detail.
-- Sections stay concise and actionable.
-- Always wait for explicit user validation before saving.
-- Save path: `aidd_docs/tasks/<yyyy_mm>/<yyyy_mm_dd>-<feature_name>-prd.md`.
-- Source of truth for structure: `assets/prd-template.md`.
-
-## Assets
-
-- `assets/prd-template.md`: PRD body template.
-- `assets/task-template.md`: Lightweight task template referenced from the PRD when needed.
+- Keep product and lifecycle decisions with the user.
+- Separate evidence, decisions, and assumptions.
+- Preserve source links and existing edits.
+- Ask natural questions; never expose actions, references, or unchanged state.
+- Require explicit approval or caller-provided bounded authority before any write.
+- State what and why; never a technical plan or user stories.

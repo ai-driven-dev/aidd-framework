@@ -65,9 +65,9 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 
 | Group | File | Description |
 |-------|------|---|
-| `actions` | [01-prd.md](skills/03-prd/actions/01-prd.md) | - |
+| `actions` | [01-draft.md](skills/03-prd/actions/01-draft.md) | - |
+| `actions` | [02-finalize.md](skills/03-prd/actions/02-finalize.md) | - |
 | `assets` | [prd-template.md](skills/03-prd/assets/prd-template.md) | - |
-| `assets` | [task-template.md](skills/03-prd/assets/task-template.md) | `Task tracking system to ensure all tasks are categorized and addressed` |
 | `-` | [SKILL.md](skills/03-prd/SKILL.md) | `Generate a structured Product Requirements Document from a need, idea, or brainstorm, confirmed before save. Use when the user wants to draft or generate a PRD or product requirements. Not for user stories or a technical plan.` |
 
 #### `skills/04-spec`
