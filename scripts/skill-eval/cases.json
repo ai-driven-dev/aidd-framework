@@ -1,6 +1,6 @@
 [
   {
-    "skill": "04-shadow-areas",
+    "skill": "03-shadow-areas",
     "evalName": "xeval-shadow",
     "name": "scans a PRD and writes a structured report",
     "setup": {
@@ -15,7 +15,7 @@
     }
   },
   {
-    "skill": "04-shadow-areas",
+    "skill": "03-shadow-areas",
     "evalName": "xeval-shadow",
     "name": "filename rule keeps a dotless name (Makefile)",
     "setup": { "files": { "Makefile": "build:\n\techo hi\n" } },
@@ -23,7 +23,7 @@
     "expect": { "filesExist": ["Makefile-shadow-report.md"] }
   },
   {
-    "skill": "04-shadow-areas",
+    "skill": "03-shadow-areas",
     "evalName": "xeval-shadow",
     "name": "empty source yields a single blocker",
     "setup": { "files": { "empty.md": "" } },
@@ -35,7 +35,7 @@
     }
   },
   {
-    "skill": "05-fact-check",
+    "skill": "04-fact-check",
     "evalName": "xeval-factcheck",
     "name": "verifies a real file, refutes a fake one, hedges the unknowable, hides mechanics",
     "setup": { "files": { "src/auth.ts": "export const auth = true;\n" } },
@@ -45,15 +45,6 @@
       "stdoutNotContains": ["tier 1", "tier 2", "tier 3", "Cascade", "codebase inspection"],
       "judge": "src/auth.ts is confirmed with a citation; the src/ghost9000.ts claim is corrected as not present (never restated as true); the 47-cats claim is marked unverified; no shell commands or inspection methods appear.",
       "judgeFiles": []
-    }
-  },
-  {
-    "skill": "03-condense",
-    "evalName": "xeval-condense",
-    "name": "turning on confirms condense at the full level",
-    "prompt": "Use the {{SKILL}} skill to turn condense mode on, set to the full level (not lite, not ultra).",
-    "expect": {
-      "stdoutContains": ["condense", "full"]
     }
   },
   {

@@ -21,4 +21,4 @@ A list of verdicts: each claim gains one verdict (verified, refuted, conflict, o
 
 ## Test
 
-- Run on `"the source file plugins/aidd-refine/hooks/condense-stats.js exists in this repo"`: the cascade resolves at the codebase tier, the verdict is verified, the source is that file path, and the web tier is never reached.
+- Run on `"the source file plugins/aidd-context/hooks/update_memory.js exists in this repo"`: the cascade resolves at the codebase tier, the verdict is verified, the source is that file path, and the web tier is never reached.

@@ -45,7 +45,7 @@
     {
       "name": "aidd-refine",
       "source": "./plugins/aidd-refine",
-      "description": "Meta-cognition: refine input through brainstorming, refine output through challenge and condensed communication mode.",
+      "description": "Meta-cognition: refine input through brainstorming, refine output through challenge, blind-spot scanning, and fact-checking.",
       "strict": true,
       "recommended": true
     },

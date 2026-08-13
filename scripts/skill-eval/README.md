@@ -8,7 +8,7 @@ blocks describe.
 
 ```bash
 node scripts/skill-eval.mjs                 # every case, deterministic checks
-node scripts/skill-eval.mjs 04-shadow-areas # one skill
+node scripts/skill-eval.mjs 03-shadow-areas # one skill
 node scripts/skill-eval.mjs --judge         # also run LLM-judge criteria (metered)
 node scripts/skill-eval.mjs --keep          # keep temp dirs to inspect
 ```
@@ -31,7 +31,7 @@ output.
 
 ```json
 {
-  "skill": "04-shadow-areas",
+  "skill": "03-shadow-areas",
   "evalName": "xeval-shadow",
   "name": "short description",
   "setup": { "files": { "prd.md": "..." } },
@@ -63,15 +63,8 @@ as grader, for outcomes that cannot be matched literally.
 
 ## Known findings
 
-The harness surfaced two limitations worth tracking:
+The harness surfaced one limitation worth tracking:
 
-- **condense's `Condense: ON (<level>).` line is model-emitted, not guaranteed.**
-  `02-stats` and the `condense-stats.js` hook parse that exact line from the
-  transcript, but the model paraphrases it ("Condense mode on, level full")
-  even when the action mandates the literal. So the condense case gates on
-  semantics (mentions condense + the level), not the literal, and stats
-  detection is best-effort. A robust fix would emit the marker from the hook
-  rather than rely on model output.
 - **empty-source scanning varies.** Most runs produce exactly one blocker, but
   the exact count/header drifts between runs. The case asserts deterministically
   only that a report is written, and gates the "exactly one blocker" semantics
