@@ -69,15 +69,14 @@ Product backlog artifacts, refinement, Product Briefs, Epics, User Stories, Task
 
 ## 🪞 aidd-refine
 
-Meta-cognition: brainstorm, challenge, condense, blind-spot scan, fact-check.
+Meta-cognition: brainstorm, challenge, blind-spot scan, fact-check.
 
 | Skill              | Role                                                        | Actions                                                                                       |
 | ------------------ | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `01-brainstorm`    | Clarify a vague product or technical intent through natural discovery | `01-capture`, `02-probe`, `03-integrate`, `04-finalize` |
 | `02-challenge`     | Rethink prior work to verify correctness against a plan    | `01-challenge`                                                                                |
-| `03-condense`      | Toggle terse output mode and report token savings          | `01-condense`, `02-stats`                                                                     |
-| `04-shadow-areas`  | Scan a markdown artifact for blind spots                   | `01-detect`, `02-render-report`, `03-diff`                                                    |
-| `05-fact-check`    | Verify factual claims against sources and cite them        | `01-identify-claims`, `02-verify`, `03-report`                                                |
+| `03-shadow-areas`  | Scan a markdown artifact for blind spots                   | `01-detect`, `02-render-report`, `03-diff`                                                    |
+| `04-fact-check`    | Verify factual claims against sources and cite them        | `01-identify-claims`, `02-verify`, `03-report`                                                |
 
 ## 🌿 aidd-vcs
 

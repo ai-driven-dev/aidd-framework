@@ -11,7 +11,7 @@ _(Already tested on `Legacy` codebases)_
 [![Made in France](https://img.shields.io/badge/made%20in-France-0055A4?labelColor=EF4135)](https://www.ai-driven-dev.fr/)
 
 <p>
-  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>48 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
+  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>47 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -36,7 +36,7 @@ Why not just write your own commands? → [FAQ](docs/FAQ.md#-why-aidd-instead-of
 ## ✅ Prerequisites
 
 - **An AI coding tool** — Claude Code (native), or Cursor / Copilot / Codex / OpenCode (see [Compatibility](#-compatibility)).
-- **[Node](https://nodejs.org)** on your `PATH` — for the plugins that ship hooks ([what they do](docs/ARCHITECTURE.md#-bundled-hooks)).
+- **[Node](https://nodejs.org)** on your `PATH` — for the plugin that ships hooks ([what they do](docs/ARCHITECTURE.md#-bundled-hooks)).
 
 ## 🔌 Compatibility
 
@@ -257,9 +257,9 @@ Three Amigos refinement, Product Briefs, Epics, User Stories, Tasks, Spikes, Def
 
 ### 🪞 [aidd-refine](plugins/aidd-refine/README.md)
 
-`5 skills` · stable
+`4 skills` · stable
 
-Brainstorm, challenge, condense, shadow-areas, fact-check.
+Brainstorm, challenge, shadow-areas, fact-check.
 
 </td>
 <td width="33%" valign="top">
