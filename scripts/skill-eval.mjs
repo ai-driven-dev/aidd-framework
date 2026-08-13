@@ -8,7 +8,7 @@
 //
 // Usage:
 //   node scripts/skill-eval.mjs                 # run every case (deterministic checks)
-//   node scripts/skill-eval.mjs 04-shadow-areas # run cases for one skill
+//   node scripts/skill-eval.mjs 03-shadow-areas # run cases for one skill
 //   node scripts/skill-eval.mjs --judge         # also run LLM-judge criteria (metered)
 //   node scripts/skill-eval.mjs --keep          # keep temp dirs for inspection
 //
