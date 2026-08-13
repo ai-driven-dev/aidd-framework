@@ -121,7 +121,7 @@ ${xTicks
   .join("\n")}
 <polygon points="${round(MARGIN.left)},${baseline} ${curve} ${round(x(lastDate))},${baseline}" fill="${AREA_COLOR}" />
 <polyline points="${curve}" fill="none" stroke="${LINE_COLOR}" stroke-width="2" stroke-linejoin="round" />
-<text x="${MARGIN.left}" y="${MARGIN.top - 12}" fill="${AXIS_COLOR}">${REPO} — ${total} stars</text>
+<text x="${MARGIN.left}" y="${MARGIN.top - 12}" fill="${AXIS_COLOR}">${REPO} · ${total} stars</text>
 </svg>
 `;
 }
