@@ -6,6 +6,7 @@ A memory file:
 - Never restates a schema or a file tree.
 - Points to the code over a copy.
 - Holds one fact in one home, referenced elsewhere.
+- A duplicate keeps its home and loses the copy.
 - Stays small: short bullets, code in backticks.
 - Names a tech without its version (`React`, not `React 19`).
 - Reflects the current state only: no unused section, no placeholder.

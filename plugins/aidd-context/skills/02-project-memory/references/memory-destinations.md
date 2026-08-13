@@ -2,6 +2,8 @@
 
 Where each template lands: flat under `aidd_docs/memory/`, read from this table, never derived.
 
+Read backwards, it names the capabilities a bank already holds: a file present means its row's capability held when the bank was written.
+
 | Capability | Template                    | Write to                                 |
 | ---------- | --------------------------- | ---------------------------------------- |
 | core       | `core/project-brief.md`     | `aidd_docs/memory/project-brief.md`      |
@@ -10,6 +12,7 @@ Where each template lands: flat under `aidd_docs/memory/`, read from this table,
 | core       | `core/coding-assertions.md` | `aidd_docs/memory/coding-assertions.md`  |
 | core       | `core/testing.md`           | `aidd_docs/memory/testing.md`            |
 | core       | `core/vcs.md`               | `aidd_docs/memory/vcs.md`                |
+| ecosystem  | `ecosystem/ecosystem.md`    | `aidd_docs/memory/ecosystem.md`          |
 | backlog    | `backlog/backlog.md`        | `aidd_docs/memory/backlog.md`            |
 | api        | `api/api.md`                | `aidd_docs/memory/api.md`                |
 | api        | `api/integration.md`        | `aidd_docs/memory/integration.md`        |

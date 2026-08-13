@@ -10,39 +10,77 @@
     },
     "prompt": "Use the {{SKILL}} skill on ./prd.md to find blind spots and write the shadow report file next to it.",
     "expect": {
-      "filesExist": ["prd-shadow-report.md"],
-      "fileContains": { "prd-shadow-report.md": ["# Shadow Areas Report", "## Gaps by Category", "Total gaps:", "[blocker]"] }
+      "filesExist": [
+        "prd-shadow-report.md"
+      ],
+      "fileContains": {
+        "prd-shadow-report.md": [
+          "# Shadow Areas Report",
+          "## Gaps by Category",
+          "Total gaps:",
+          "[blocker]"
+        ]
+      }
     }
   },
   {
     "skill": "03-shadow-areas",
     "evalName": "xeval-shadow",
     "name": "filename rule keeps a dotless name (Makefile)",
-    "setup": { "files": { "Makefile": "build:\n\techo hi\n" } },
+    "setup": {
+      "files": {
+        "Makefile": "build:\n\techo hi\n"
+      }
+    },
     "prompt": "Use the {{SKILL}} skill on ./Makefile to find blind spots and write the shadow report next to it.",
-    "expect": { "filesExist": ["Makefile-shadow-report.md"] }
+    "expect": {
+      "filesExist": [
+        "Makefile-shadow-report.md"
+      ]
+    }
   },
   {
     "skill": "03-shadow-areas",
     "evalName": "xeval-shadow",
     "name": "empty source yields a single blocker",
-    "setup": { "files": { "empty.md": "" } },
+    "setup": {
+      "files": {
+        "empty.md": ""
+      }
+    },
     "prompt": "Use the {{SKILL}} skill on ./empty.md to find blind spots and write the shadow report next to it.",
     "expect": {
-      "filesExist": ["empty-shadow-report.md"],
+      "filesExist": [
+        "empty-shadow-report.md"
+      ],
       "judge": "The report flags exactly one blocker gap, asking what content the (empty) artifact should contain.",
-      "judgeFiles": ["empty-shadow-report.md"]
+      "judgeFiles": [
+        "empty-shadow-report.md"
+      ]
     }
   },
   {
     "skill": "04-fact-check",
     "evalName": "xeval-factcheck",
     "name": "verifies a real file, refutes a fake one, hedges the unknowable, hides mechanics",
-    "setup": { "files": { "src/auth.ts": "export const auth = true;\n" } },
+    "setup": {
+      "files": {
+        "src/auth.ts": "export const auth = true;\n"
+      }
+    },
     "prompt": "Use the {{SKILL}} skill to fact-check this text and rewrite it with citations: \"The file src/auth.ts exists in this repo. The file src/ghost9000.ts exists in this repo. The lead maintainer of this project owns exactly 47 cats.\"",
     "expect": {
-      "stdoutContains": ["## Sources", "(unverified - no source found)"],
-      "stdoutNotContains": ["tier 1", "tier 2", "tier 3", "Cascade", "codebase inspection"],
+      "stdoutContains": [
+        "## Sources",
+        "(unverified - no source found)"
+      ],
+      "stdoutNotContains": [
+        "tier 1",
+        "tier 2",
+        "tier 3",
+        "Cascade",
+        "codebase inspection"
+      ],
       "judge": "src/auth.ts is confirmed with a citation; the src/ghost9000.ts claim is corrected as not present (never restated as true); the 47-cats claim is marked unverified; no shell commands or inspection methods appear.",
       "judgeFiles": []
     }
@@ -53,8 +91,220 @@
     "name": "flags a plan violation as a deal breaker with low confidence",
     "prompt": "Use the {{SKILL}} skill. Agreed plan: the function must RETURN THE SUM of a and b. Work to review: function add(a, b) { return a - b }. Challenge the work against the plan and emit the report.",
     "expect": {
-      "stdoutContains": ["confidence", "Deal breakers"],
+      "stdoutContains": [
+        "confidence",
+        "Deal breakers"
+      ],
       "judge": "A confidence percentage below 75% is stated, and the subtraction (returning a - b instead of a + b) is listed as a deal breaker."
+    }
+  },
+  {
+    "plugin": "aidd-context",
+    "skill": "02-project-memory",
+    "evalName": "xeval-memory",
+    "name": "setup writes the bank to its destinations",
+    "setup": {
+      "files": {
+        "package.json": "{\n  \"name\": \"shop\",\n  \"version\": \"1.0.0\",\n  \"scripts\": { \"test\": \"vitest\" },\n  \"dependencies\": { \"express\": \"^4.19.0\" }\n}\n",
+        "README.md": "# Shop\n\nA small order API. Express server, Postgres behind it.\n",
+        "src/server.js": "const express = require(\"express\");\nconst app = express();\napp.get(\"/orders\", (req, res) => res.json([]));\nmodule.exports = app;\n",
+        ".github/workflows/ci.yml": "name: CI\non: [push]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill to set up the project memory. You are running headless with no human available, so answer every question yourself from the repo evidence, never wait for input, and complete the whole flow.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/memory/project-brief.md",
+        "aidd_docs/memory/architecture.md",
+        "aidd_docs/memory/codebase-map.md",
+        "aidd_docs/memory/coding-assertions.md",
+        "aidd_docs/memory/testing.md",
+        "aidd_docs/memory/vcs.md",
+        "aidd_docs/memory/ecosystem.md",
+        "aidd_docs/memory/README.md",
+        "aidd_docs/GUIDELINES.md",
+        "aidd_docs/CONTRIBUTING.md"
+      ],
+      "fileNotContains": {
+        "aidd_docs/memory/vcs.md": [
+          "Ticketing"
+        ],
+        "aidd_docs/memory/ecosystem.md": [
+          "<vcs platform>",
+          "<tracker>",
+          "<hand-off>",
+          "Remove this comment"
+        ]
+      },
+      "fileContains": {
+        "aidd_docs/memory/ecosystem.md": [
+          "flowchart",
+          "click"
+        ],
+        "aidd_docs/GUIDELINES.md": [
+          "A rule the AI must follow here"
+        ],
+        "aidd_docs/CONTRIBUTING.md": [
+          "A naming or placement rule specific to this repo"
+        ]
+      },
+      "fileMatches": {
+        "aidd_docs/memory/ecosystem.md": "^# Ecosystem\\s*```mermaid\\n[\\s\\S]*\\n```\\s*$"
+      }
+    }
+  },
+  {
+    "plugin": "aidd-context",
+    "skill": "02-project-memory",
+    "evalName": "xeval-memory",
+    "name": "check flags an orphan file and deletes nothing",
+    "setup": {
+      "files": {
+        "package.json": "{ \"name\": \"shop\", \"version\": \"1.0.0\" }\n",
+        "src/index.js": "module.exports = 1;\n",
+        "aidd_docs/memory/vcs.md": "# VCS\n\n- Main branch: main\n- Platform: github\n",
+        "aidd_docs/memory/architecture.md": "# Architecture\n\n## Stack\n\n- Node, CommonJS\n\n## Gotchas\n\n- QUARTZLINE runs on Node.js 18 only\n",
+        "aidd_docs/memory/browsing.md": "# Browsing\n\n- Pages are server rendered.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill to check the project memory. You are running headless with no human available, so report what drifted and delete nothing.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/memory/browsing.md"
+      ],
+      "stdoutContains": [
+        "Memory bank",
+        "aidd_docs/tasks/"
+      ],
+      "filesUnchanged": [
+        "aidd_docs/memory/architecture.md",
+        "aidd_docs/memory/vcs.md",
+        "aidd_docs/memory/browsing.md"
+      ],
+      "judge": "The printed output is a short summary with no markdown table, naming a report path; the written report file holds the tables.",
+      "stdoutNotContains": [
+        "| File |",
+        "| Fact |"
+      ]
+    }
+  },
+  {
+    "plugin": "aidd-context",
+    "skill": "02-project-memory",
+    "evalName": "xeval-memory",
+    "name": "check flags the always file the bank lacks",
+    "setup": {
+      "files": {
+        "package.json": "{ \"name\": \"shop\", \"version\": \"1.0.0\" }\n",
+        "src/index.js": "module.exports = 1;\n",
+        ".github/workflows/ci.yml": "name: CI\non: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n",
+        "aidd_docs/memory/vcs.md": "# VCS\n\n- Main branch: main\n- Platform: github\n",
+        "aidd_docs/memory/architecture.md": "# Architecture\n\n## Stack\n\n- Node, CommonJS\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill to check the project memory. You are running headless with no human available, so report what drifted, change nothing, and do not wait for input.",
+    "expect": {
+      "stdoutContains": [
+        "Memory bank",
+        "aidd_docs/tasks/"
+      ],
+      "filesAbsent": [
+        "aidd_docs/memory/ecosystem.md"
+      ],
+      "filesUnchanged": [
+        "aidd_docs/memory/vcs.md",
+        "aidd_docs/memory/architecture.md"
+      ],
+      "judge": "The printed output is a short summary with no markdown table, naming a report path; the written report file holds the tables.",
+      "stdoutNotContains": [
+        "| File |",
+        "| Fact |"
+      ]
+    }
+  },
+  {
+    "plugin": "aidd-context",
+    "skill": "02-project-memory",
+    "evalName": "xeval-memory",
+    "name": "rewire fills the context block",
+    "setup": {
+      "files": {
+        "package.json": "{ \"name\": \"shop\", \"version\": \"1.0.0\" }\n",
+        "aidd_docs/memory/architecture.md": "# Architecture\n\n## Stack\n\n- Node\n",
+        "aidd_docs/memory/vcs.md": "# VCS\n\n- Main branch: main\n",
+        "CLAUDE.md": "# Shop\n\n## Memory Management\n\n<aidd_project_memory>\n</aidd_project_memory>\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill to rewire the existing project memory into Claude. You are running headless with no human available, so pick Claude yourself and do not wait for input.",
+    "expect": {
+      "fileContains": {
+        "CLAUDE.md": [
+          "@aidd_docs/memory/architecture.md",
+          "@aidd_docs/memory/vcs.md"
+        ]
+      }
+    }
+  },
+  {
+    "plugin": "aidd-context",
+    "skill": "02-project-memory",
+    "evalName": "xeval-memory",
+    "name": "an empty repo produces no bank",
+    "setup": {
+      "files": {
+        "notes.txt": "\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill to set up the project memory. You are running headless with no human available, so do not wait for input.",
+    "expect": {
+      "filesAbsent": [
+        "aidd_docs/memory/architecture.md",
+        "aidd_docs/memory/vcs.md"
+      ]
+    }
+  },
+  {
+    "plugin": "aidd-context",
+    "skill": "02-project-memory",
+    "evalName": "xeval-memory",
+    "name": "refresh adds the delta and keeps the user edits",
+    "setup": {
+      "files": {
+        "package.json": "{\n  \"name\": \"shop\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": { \"express\": \"^4.19.0\" }\n}\n",
+        "src/server.js": "const express = require(\"express\");\nmodule.exports = express();\n",
+        "Dockerfile": "FROM node:22-alpine\nWORKDIR /app\nCOPY . .\nCMD [\"node\", \"src/server.js\"]\n",
+        "aidd_docs/memory/README.md": "# memory/\n\n<!-- files:start -->\n<!-- files:end -->\n",
+        "aidd_docs/memory/architecture.md": "# Architecture\n\n## Stack\n\n- Node and Express\n\n## Gotchas\n\n- ZEBRAQUARTZ the order queue is single threaded on purpose, do not parallelise it\n",
+        "aidd_docs/memory/vcs.md": "# VCS\n\n- Main branch: main\n- Platform: github\n",
+        "aidd_docs/memory/project-brief.md": "# Project Brief\n\n## What it is\n\n- A small order API\n",
+        "aidd_docs/memory/codebase-map.md": "# Codebase Map\n\n## Areas\n\n- `src/`: the server\n",
+        "aidd_docs/memory/coding-assertions.md": "# Coding Assertions\n\n## Before commit\n\n| Order | Command | Checks |\n| --- | --- | --- |\n| 1 | `npm test` | tests |\n",
+        "aidd_docs/memory/testing.md": "# Testing\n\n## Run\n\n- `npm test`\n",
+        ".github/workflows/ci.yml": "name: CI\non: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill to refresh the project memory. A bank already exists. You are running headless with no human available, so answer every question yourself from the repo evidence, never wait for input, and complete the whole flow.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/memory/deployment.md",
+        "aidd_docs/memory/ecosystem.md",
+        "aidd_docs/memory/architecture.md",
+        "aidd_docs/memory/vcs.md",
+        "aidd_docs/memory/project-brief.md"
+      ],
+      "fileContains": {
+        "aidd_docs/memory/architecture.md": [
+          "ZEBRAQUARTZ"
+        ],
+        "aidd_docs/memory/deployment.md": [
+          "Docker"
+        ]
+      },
+      "fileNotContains": {
+        "aidd_docs/memory/vcs.md": [
+          "Ticketing"
+        ]
+      }
     }
   }
 ]
