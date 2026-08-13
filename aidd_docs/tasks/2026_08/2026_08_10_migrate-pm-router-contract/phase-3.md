@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Migrate `04-spec` to the router contract
@@ -11,62 +11,27 @@ status: pending
 ```txt
 .
 └── plugins/aidd-pm/skills/04-spec/
-    ├── SKILL.md                          ✏️ mermaid with 2 entry nodes, `| Action | Does |`, canonical lead-in, drop `## Assets`, drop the `TBD:` rule
-    ├── actions/01-build.md               ✏️ cite references/tbd-marker.md instead of restating TBD: <precise question>
-    ├── actions/02-refine.md              ✏️ same citation; fix the 2 drifted spellings (bare `TBD` at :11, short `TBD: <question>` at :27)
-    ├── assets/spec-template.md           — unchanged
-    ├── assets/spec-validator.yml         — unchanged
+    ├── SKILL.md                    ✏️ mermaid (2 entry nodes: build vs refine), `| Action | Does |`, canonical lead-in, no `## Assets`, own 4-line Transversal rules (not the epic/task/prd boilerplate — spec has no approval gate, doesn't fit)
+    ├── actions/01-build.md         ✏️ cite tbd-marker.md, cite spec-template.md (pre-existing gap, was never actually linked), drop before->after/affected relations (always creates fresh, no diff)
+    ├── actions/02-refine.md        ✏️ cite tbd-marker.md, fix 2 drifted TBD spellings, keep before->after (legitimate — rewrites in place), drop affected relations
     └── references/
-        └── tbd-marker.md                 ✅ create — the one canonical `TBD:` spelling and rule
+        └── tbd-marker.md           ✅ create — the one canonical `TBD: <precise question>` spelling
 ```
 
-## Tasks to do
+## Decisions
 
-### `1)` Create the `TBD:` marker's one home
+- **No epic/task/prd Transversal-rules boilerplate.** Checked each of the 5 shared lines against what `build`/`refine` actually do: no approval gate before write, no lifecycle, uses TBD-marking instead of interactive questioning. None of it fits — inventing it would add behavior that doesn't exist. Kept spec's own rules instead (matches `08-three-amigos`'s precedent of not sharing the boilerplate either).
+- **Dispatch-by-input moved into the mermaid** as two entry nodes (request/PRD → `build`, spec+findings → `refine`), replacing the router prose that stated the same branch (R7, R17).
+- **`before -> after` kept in `refine`, dropped from `build`.** `refine` genuinely rewrites an existing file in place (real diff). `build` always creates a fresh dated file — no prior state exists to diff.
+- **Router never cites a reference.** No other router does (checked all 7) — R18 only names Process/Output/Test as valid citation sites. Router states policy in plain words ("Never invent; mark every gap instead of guessing"); the actions cite `tbd-marker.md` where they apply it.
+- **`tbd-marker.md` trimmed to the literal string only** (`TBD: <precise question>`, no policy prose) — the policy already lives once in the router; anything more would duplicate it.
+- **`build.md`'s Source step split into 2 sub-bullets** (PRD path vs free-form request) instead of one dense sentence; "never explore the codebase" promoted out of it into the router's Transversal rules (applies to both actions, not just Source).
+- **`refine.md`'s Output cut to one line**, TBD citation removed from Output (stays in Process step 4 only — was duplicated), added an explicit `Verify` step so `before -> after` reporting has a Process home instead of living only in prose.
+- **Two pre-existing gaps fixed while auditing citations, not part of the original scope:** `build.md` never linked `spec-template.md` (called it "the template" in prose only); the router's "reuse the folder when it exists" line was deleted without moving its actual path pattern into `build.md` (first draft), caught by a live headless run hitting the gap itself. Second catch: the fixed version still lost the word "resolve" (search-then-reuse-or-create), reducing it to a same-day-only check — restored the two-outcome framing.
+- **Two follow-up issues filed, not fixed here** (behavior changes, out of #564's "no behaviour change" scope): [#625](https://github.com/ai-driven-dev/framework/issues/625) — SDLC's Frame stage never checks `spec-validator.yml` before handing a spec to Deliver. [#626](https://github.com/ai-driven-dev/framework/issues/626) — `spec-template.md` has no `## Open Questions` section, so TBD placement is non-deterministic (confirmed: same feature, two runs, two different placements).
 
-> Issue: 3 sites, 3 drifting spellings, no owner. All 3 sites already live inside `04-spec` — resolved during brainstorm as an intra-skill reference, not a cross-skill shared one (this codebase doesn't share references across skills).
+## Plugin-wide verification (AC#1, AC#5 — span all 10 skills, checked here as the last phase)
 
-1. Create `references/tbd-marker.md`: states the exact literal `TBD: <precise question>`, the rule "never guess, mark the gap instead", and nothing else (R15: one fact per reference).
-2. In `SKILL.md`'s `## Transversal rules`, replace the inline "Mark every gap as `TBD: <precise question>`..." line with a citation to the reference (R18) — the rule's text now lives only in `references/tbd-marker.md`.
-3. In `actions/01-build.md` step 2 ("Gaps"), replace "Replace any missing required field with `TBD: <precise question>`" with a citation to the reference.
-4. In `actions/02-refine.md`: fix `:11`'s bare `` `TBD` `` (Output line) and `:18`/`:27`'s spellings so every occurrence either matches the canonical literal exactly or cites `references/tbd-marker.md` instead of re-typing it.
-
-### `2)` Rebuild the router with a branching mermaid
-
-> R7: the existing dispatch prose ("a spec path with findings runs `refine`; a request or PRD path runs `build`") is a branch — it belongs in the flow, not as router prose (R17: one fact, one home).
-
-1. Add a mermaid `flowchart LR` with 2 entry nodes: one for "request or PRD path" → `build`, one for "spec path + findings" → `refine`. Both converge on a terminal node (`spec.md` written/updated).
-2. Delete the "Dispatch by input: ..." sentence from the router prose once the mermaid states it — do not keep both (R17).
-3. Replace the `| # | Action | Role | Input |` table with `| Action | Does |`.
-4. Replace the lead-in with the canonical sentence: "Run the flow above. Read only the next action file."
-5. Delete `## Assets` entirely; `spec-template.md` and `spec-validator.yml` get cited from the actions that use them instead.
-
-### `3)` Sort the remaining `## Transversal rules` lines
-
-> Everything except the `TBD:` rule (moved in task 1) needs a home: stays as genuinely cross-cutting (both `build` and `refine` rely on it), or moves into one action if only one uses it.
-
-1. "The spec holds intent, never implementation..." — used by both actions (both write/rewrite the spec body) → stays a router transversal rule, or becomes `references/spec-shape.md` if it grows past what a router line should hold (R15 vs R9 — keep as a router line unless it's genuinely table/list-shaped).
-2. "Keep it readable..." — same test as above.
-3. "Output: one `spec.md` in the feature folder... Reuse the folder when it exists." — both actions write to the same path; verify it isn't already stated in both actions' `## Output`. If it is, delete the router copy (R17); if neither states it, it's genuinely transversal and stays.
-4. "Immutable once validated: never rewrite a spec that has been locked." — check whether this constraint is enforced/stated anywhere in `02-refine.md`; if not, this is a gap the migration surfaces (not new scope, but flag it rather than silently drop it).
-
-### `4)` Verify the plugin-wide acceptance criteria
-
-> AC#1 ("same shape, sections, **and section order**") and AC#5 ("every asset in the plugin is filled by an action") aren't scoped to one skill — this is the last phase, so it's where they get checked across all 10.
-
-1. For each of the 10 `plugins/aidd-pm/skills/*/SKILL.md`, dump the `^#{1,2} ` heading sequence (`grep -n '^#\{1,2\} '`) and confirm all 10 now agree: `# Title`, `## Actions`, `## Transversal rules`, in that order, nothing else.
-2. Enumerate `plugins/aidd-pm/skills/*/assets/*` and confirm each file is consumed by a named action: a template asset is filled (produces the output artifact), a validator/checklist asset is read against (gates the output). `04-spec/assets/spec-validator.yml` is the one checklist-shaped asset in scope — already cited from both `01-build.md` and `02-refine.md` — so it passes under "consumed by a named action", the actual defect AC#5 targets being `task-template.md`'s prior state: cited by nothing at all. State this reading to the user when reporting the phase, rather than re-litigating it live.
-3. Report to the user: the issue's own count is off by one (it says "eight follow the contract, three don't" = eleven, and AC#1 says "eleven routers"; the plugin has 10 skills total, so it's seven already-migrated plus three migrated here). Flag this the same way the issue's "What already landed" section already flagged two other wrong claims — don't silently satisfy the literal "eleven".
-
-## Test acceptance criteria
-
-| Task | Acceptance criteria                                                                                        |
-| ---- | ---------------------------------------------------------------------------------------------------------------- |
-| 1    | `grep -rn "TBD" plugins/aidd-pm/skills/04-spec/` shows exactly one canonical literal spelling, defined once in `references/tbd-marker.md`, cited (not restated) everywhere else. |
-| 2    | `SKILL.md`'s mermaid shows both entry cases (build vs refine); no router prose duplicates the dispatch rule the mermaid now states. |
-| 2    | `SKILL.md` has `\| Action \| Does \|`, canonical lead-in, no `## Assets` section. |
-| 3    | Every remaining `## Transversal rules` line states a fact no single action's `## Process`/`## Output` already states. |
-| 3    | The "immutable once locked" constraint is either confirmed enforced somewhere reachable from `02-refine.md`, or explicitly flagged in the phase review as a pre-existing gap. |
-| 4    | All 10 `SKILL.md` heading sequences match exactly (title, Actions, Transversal rules, that order, nothing else). |
-| 4    | Every `plugins/aidd-pm/skills/*/assets/*` file is confirmed consumed by a named action (template filled, or validator cited); `spec-validator.yml`'s read-only status is reported to the user as the resolved reading, not asked about. |
-| 4    | The "eleven routers" vs. actual 10-skill count discrepancy is reported to the user, not silently absorbed. |
+- All 10 `SKILL.md` files: `# Title` → `## Actions` (mermaid + `| Action | Does |` + canonical lead-in) → optional `## Transversal rules`. Section presence varies only where content is legitimately absent (`01-ticket-info` has none — real precedent elsewhere in the framework, e.g. `aidd-dev:01-plan`), never order.
+- Every asset in `plugins/aidd-pm/skills/*/assets/*` is cited from a named action. `spec-validator.yml` is read against, not filled — the "consumed by a named action" reading (see `plan.md` Decisions) covers it.
+- **Issue count correction:** issue #564 says "eight follow the contract, three don't" (= 11) and AC#1 says "the eleven routers." The plugin holds 10 skills, not 11 — 7 already matched the contract, 3 migrated here. Reporting this rather than silently treating "eleven" as satisfied.

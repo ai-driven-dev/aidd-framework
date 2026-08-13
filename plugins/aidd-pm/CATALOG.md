@@ -77,6 +77,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `actions` | [01-build.md](skills/04-spec/actions/01-build.md) | - |
 | `actions` | [02-refine.md](skills/04-spec/actions/02-refine.md) | - |
 | `assets` | [spec-template.md](skills/04-spec/assets/spec-template.md) | - |
+| `references` | [tbd-marker.md](skills/04-spec/references/tbd-marker.md) | - |
 | `-` | [SKILL.md](skills/04-spec/SKILL.md) | `Generate or refine a spec, a feature's immutable contract, from a request, a PRD, or review findings. Use when the user wants to draft or refine a spec. Not for writing code, a full PRD, or changing a locked spec.` |
 
 #### `skills/05-spike`

@@ -1,6 +1,6 @@
 ---
 objective: "01-ticket-info, 03-prd, and 04-spec routers match the aidd-pm contract (07-epic shape): references/ hold every rule an action doesn't, TBD: has one spelling in one file, and the PRD sections live only in prd-template.md."
-status: in-progress
+status: implemented
 ---
 
 # Plan: Migrate ticket-info, PRD, spec to the router contract
@@ -45,6 +45,8 @@ Each phase migrates exactly one skill. Stop after each phase for interactive rev
 | One phase per skill, review gate between phases                          | User-requested; keeps each migration independently verifiable against the shape criterion. |
 | Verify AC#1 (section order, all 10 skills) and AC#5 (every plugin asset filled) in phase 3, not a separate phase | Both criteria span skills beyond any single phase's scope; checking them after the last migration is cheaper than a 4th review-gated phase. |
 | AC#5's "filled by an action" reads as "consumed by a named action" — a template is filled, a validator/checklist is read against | `spec-validator.yml` is read, never written; the issue's actual named defect is `task-template.md` being cited by nothing at all. Resolving the reading now avoids relitigating it mid-phase-3. |
+| `04-spec` keeps its own 4-line `## Transversal rules`, not the epic/task/prd 5+1 boilerplate | Checked each shared line against what `build`/`refine` actually do: no approval gate before write, no lifecycle, TBD-marking instead of interactive questioning. None fit — matches `08-three-amigos`'s precedent of not sharing the boilerplate either. |
+| `04-spec`'s report contract keeps `before -> after` in `refine`, drops it from `build`; drops `affected relations` from both | `refine` rewrites an existing file in place (real diff); `build` always creates fresh (nothing to diff). No `relations.md` exists for spec, same as PRD. |
 
 ## Correction
 
