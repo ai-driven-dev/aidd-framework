@@ -326,7 +326,7 @@ Free and open-source (MIT). If it saves you time, [a ⭐](https://github.com/ai-
 
 <div align="center">
 
-<img src="https://api.star-history.com/svg?repos=ai-driven-dev/framework&type=Date" alt="Star History Chart" width="500" />
+<a href="https://github.com/ai-driven-dev/framework/stargazers"><img src="https://raw.githubusercontent.com/ai-driven-dev/framework/star-history/star-history.svg" alt="Star History Chart" width="500" /></a>
 
 Made with care in France 🇫🇷 · ← [AIDD organisation](https://github.com/ai-driven-dev)
 
