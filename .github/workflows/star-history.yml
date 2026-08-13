@@ -1,0 +1,68 @@
+name: Star history
+
+# Regenerates the star history chart the README embeds. GitHub restricted the
+# stargazers API to a repository's own admins and collaborators on June 30 2026,
+# so no third-party service can draw this chart any more — only the repository
+# itself can, with its own token.
+#
+# The SVG is published on the `star-history` orphan branch rather than committed
+# to main: main requires a pull request, and a data-only branch keeps generated
+# bytes out of the source history while staying servable over raw.githubusercontent.
+
+on:
+  schedule:
+    - cron: "0 5 * * 1" # Mondays 05:00 UTC
+  workflow_dispatch:
+  push:
+    branches: [blafourcade/fix-stars] # TEMPORARY: schedule and dispatch only fire from the default branch, so this proves the workflow before the merge. Removed in this same PR.
+
+concurrency:
+  group: star-history
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  star-history:
+    name: Render the chart and publish it
+    runs-on: ubuntu-latest
+    env:
+      BRANCH: star-history
+      FILE: star-history.svg
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Render the chart
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/generate-star-history.mjs > "$FILE"
+
+      - name: Publish it to the ${{ env.BRANCH }} branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          parent=""
+          if git fetch --depth=1 origin "$BRANCH" 2>/dev/null; then
+            parent=$(git rev-parse FETCH_HEAD)
+          fi
+
+          blob=$(git hash-object -w "$FILE")
+          tree=$(printf '100644 blob %s\t%s\n' "$blob" "$FILE" | git mktree)
+
+          # The renderer is deterministic, so an identical tree means no new star.
+          if [ -n "$parent" ] && [ "$(git rev-parse "$parent^{tree}")" = "$tree" ]; then
+            echo "Star history unchanged."
+            exit 0
+          fi
+
+          commit=$(git commit-tree "$tree" ${parent:+-p "$parent"} -m "chore(ci): refresh star history chart")
+          git push origin "$commit:refs/heads/$BRANCH"
