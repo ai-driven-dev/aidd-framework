@@ -40,7 +40,6 @@ Declared in `plugins/<plugin>/hooks/hooks.json`. They run Node, so users need `n
 | Plugin         | Event              | Runs                      | Purpose                                                  |
 | -------------- | ------------------ | ------------------------- | -------------------------------------------------------- |
 | `aidd-context` | `SessionStart`     | `hooks/update_memory.js`  | Refresh the project memory block in the AI context files |
-| `aidd-refine`  | `UserPromptSubmit` | `hooks/condense-stats.js` | Report token savings while condensed output mode is on   |
 
 ## 🧠 Plugin concerns and layers
 
