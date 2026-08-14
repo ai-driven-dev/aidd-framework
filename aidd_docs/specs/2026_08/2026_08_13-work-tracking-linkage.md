@@ -25,7 +25,7 @@ C'est l'hypothèse qui porte tout le montage : l'identifiant qu'un hook voit est
 | Codex CLI | `session_id` | `conversation.id` sur `codex.sse_event` | **oui** | **zéro token** |
 | GitHub Copilot | `sessionId` | `gen_ai.conversation.id` sur le span `invoke_agent` | **oui** | **zéro crédit** |
 | Cursor | `conversation_id`, plus `session_id` et `generation_id` | `cursor.conversation.id` sur les logs | hooks prouvés, **export non mesurable** | un tour réel : Cursor valide tout avant d'ouvrir la session |
-| OpenCode | aucun | aucun | sans objet | rien à tester |
+| OpenCode | plugins JS, non testé | `session.id` sur les spans `ai.streamText`, derrière `experimental.openTelemetry` | jointure export prouvée ; côté plugin à mesurer | une session réelle |
 
 Les identifiants sont fabriqués côté client, avant tout appel au modèle. Un appel qui échoue produit donc quand même le démarrage de session, l'invocation du hook et l'événement de télémétrie : **Codex et Copilot se testent sans consommer de quota**, en pointant le fournisseur vers une adresse qui ne répond pas. C'est la méthode à retenir pour la vérification continue.
 
@@ -378,7 +378,7 @@ Chaque ligne est calculable avec ce qui précède. Aucune n'exige un format mais
 
 - Le collecteur, son stockage et sa rétention. Le framework configure l'export, il n'héberge rien.
 - Le calcul de coût pour Codex et Cursor, qui n'exportent pas de montant : il faudra une table de prix, et elle n'est pas dans ce périmètre.
-- OpenCode, qui n'expose ni export, ni identifiant, ni usage. Déclaré non couvert. Vérifié deux fois : ses pages de documentation ne mentionnent aucune télémétrie, et si le binaire 1.14.20 embarque `@opentelemetry/api` et `@opentelemetry/sdk-trace`, il n'embarque aucun exportateur — une session aboutie avec `OTEL_EXPORTER_OTLP_ENDPOINT` posé n'a produit aucune requête. La demande est ouverte en amont (`anomalyco/opencode#14246`), sans réponse ni pull request. À re-tester à chaque version mineure plutôt qu'à décider une fois.
+- OpenCode n'est plus hors jeu, et cette spec ne le couvre pas encore. Posé `experimental.openTelemetry` dans `opencode.json`, il exporte en OTLP, honore `OTEL_RESOURCE_ATTRIBUTES`, et ses spans `ai.streamText` portent `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` **et** `session.id` sur le même span : les tokens par session y sont donc atteignables, sans coût exporté. Reste à mesurer si un plugin voit ce même `session.id`. Deux réserves : la documentation publique ne mentionne rien et la demande amont `anomalyco/opencode#14246` est sans réponse, donc l'interface peut bouger sans préavis ; et le volume est considérable, 495 spans pour une session triviale, ce qui impose un échantillonnage.
 - L'installation de l'export Cursor : c'est un réglage d'équipe en plan Enterprise, la CLI peut le vérifier mais pas le poser.
 - Rattraper les tâches et sessions antérieures à la fonctionnalité.
 
