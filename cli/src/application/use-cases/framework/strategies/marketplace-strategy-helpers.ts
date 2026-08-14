@@ -1,15 +1,17 @@
-import { join, relative } from "node:path";
+import { basename, join, relative } from "node:path";
 import { InvalidSourceMarketplaceError } from "../../../../domain/errors.js";
 import { rewriteRelativeLinks } from "../../../../domain/formats/relative-link-rewrite.js";
 import {
   PLUGIN_AGENT_INPUT_EXT,
   PLUGIN_HOOKS_RELATIVE,
   PLUGIN_MCP_RELATIVE,
+  PLUGIN_SKILL_ENTRY_FILE,
 } from "../../../../domain/models/framework-build.js";
 import type { FileReader } from "../../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../../domain/ports/file-writer.js";
 import { assertNoToolsPlaceholder } from "../shared-plugin-helpers.js";
 
+type SkillContentTransform = (content: string, plugin: string, basename: string) => string;
 export interface PluginPresenceFlags {
   readonly hasAgents: boolean;
   /** Agent markdown files relative to the plugin's `agents/` dir (e.g. "planner.md"), sorted. */
@@ -40,7 +42,11 @@ export async function listSkillNames(
   const files = await fs.listFilesRecursive(skillsDir);
   const names = new Set<string>();
   for (const f of files) {
-    if (!f.endsWith("/SKILL.md") && !f.endsWith("\\SKILL.md") && !f.endsWith("SKILL.md")) {
+    if (
+      !f.endsWith(`/${PLUGIN_SKILL_ENTRY_FILE}`) &&
+      !f.endsWith(`\\${PLUGIN_SKILL_ENTRY_FILE}`) &&
+      !f.endsWith(PLUGIN_SKILL_ENTRY_FILE)
+    ) {
       continue;
     }
     const rel = relative(skillsDir, f);
@@ -66,14 +72,15 @@ export async function writeSkillTree(
   fs: FileReader & FileWriter,
   pluginName: string,
   pluginSrc: string,
-  pluginOut: string
+  pluginOut: string,
+  transform?: SkillContentTransform
 ): Promise<number> {
   const skillsSrc = join(pluginSrc, "skills");
   if (!(await fs.fileExists(skillsSrc))) return 0;
   const files = await fs.listFilesRecursive(skillsSrc);
   let count = 0;
   for (const absPath of files) {
-    count += await writeSkillFile(fs, pluginName, absPath, skillsSrc, pluginOut);
+    count += await writeSkillFile(fs, pluginName, absPath, skillsSrc, pluginOut, transform);
   }
   return count;
 }
@@ -83,18 +90,26 @@ async function writeSkillFile(
   pluginName: string,
   absPath: string,
   skillsSrc: string,
-  pluginOut: string
+  pluginOut: string,
+  transform?: SkillContentTransform
 ): Promise<number> {
   const relPath = relative(skillsSrc, absPath).replace(/\\/g, "/");
   const destPath = join(pluginOut, "skills", relPath);
   const content = await fs.readFile(absPath);
-  if (absPath.endsWith(".md")) {
-    assertNoToolsPlaceholder(content, pluginName, relPath);
-    const currentFilePluginRelative = `skills/${relPath}`;
-    await fs.writeFile(destPath, rewriteRelativeLinks(content, { currentFilePluginRelative }));
-  } else {
+  if (!absPath.endsWith(".md")) {
     await fs.writeFile(destPath, content);
+    return 1;
   }
+
+  assertNoToolsPlaceholder(content, pluginName, relPath);
+  const rewritten = rewriteRelativeLinks(content, {
+    currentFilePluginRelative: `skills/${relPath}`,
+  });
+  let output = rewritten;
+  if (transform && basename(absPath) === PLUGIN_SKILL_ENTRY_FILE) {
+    output = transform(rewritten, pluginName, PLUGIN_SKILL_ENTRY_FILE);
+  }
+  await fs.writeFile(destPath, output);
   return 1;
 }
 

@@ -57,7 +57,10 @@ import {
 } from "../../../../domain/models/framework-build.js";
 import type { FileReader } from "../../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../../domain/ports/file-writer.js";
-import { mergeCodexConfigToml } from "../../../../domain/tools/ai/codex.js";
+import {
+  mergeCodexConfigToml,
+  stripCodexSkillFrontmatter,
+} from "../../../../domain/tools/ai/codex.js";
 import { transformMcpToOpencode } from "../../../../domain/tools/ai/opencode.js";
 import type { PluginPresence, ToolBuildContract } from "../../../../domain/tools/build-contract.js";
 import {
@@ -331,6 +334,11 @@ function buildCodexManifest(
   return manifest;
 }
 
+function transformCodexSkill(content: string): string {
+  const { frontmatter, body } = parseFrontmatter(content);
+  return serializeFrontmatter(stripCodexSkillFrontmatter(frontmatter), body);
+}
+
 export function buildCodexContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_CODEX_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_CODEX_MARKETPLACE_RELATIVE;
@@ -348,6 +356,7 @@ export function buildCodexContract(): ToolBuildContract {
         supported: true,
         source: { kind: "fullTree", srcDir: "skills" },
         path: (_p, rel) => rel,
+        transform: transformCodexSkill,
       },
       agents: {
         supported: true,
