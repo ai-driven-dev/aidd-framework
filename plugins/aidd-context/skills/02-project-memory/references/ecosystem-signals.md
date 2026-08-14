@@ -27,19 +27,21 @@ the memory into are `tools.md`, not this.
 | `http` | a direct API call                       |
 | `web`  | a browser interface, nothing programmatic |
 
+## What earns an edge
+
+| Edge                              | Verdict                                                   |
+| --------------------------------- | ---------------------------------------------------------- |
+| `Agent` reaching a tool           | keep, what an assistant can drive is never obvious          |
+| `App` reaching a tool             | keep, it names a runtime dependency                         |
+| `Human` reaching a tool by `web`  | drop, a person opens anything in a browser                  |
+| `Human` where no agent can follow | keep as `human only` in the label, so absence is not doubt  |
+| a hand-off with its trigger       | keep, the trigger is what makes it a rule                   |
+| a hand-off without one            | keep the edge, name the trigger the repo proves             |
+
 ## Detected when
 
 | Fact                                                                 | Read as                                    |
 | -------------------------------------------------------------------- | ------------------------------------------ |
-| a third-party service config, a repo integration, or a service badge | the tool exists                            |
+| a service config or a repo integration, whoever runs it, plus a badge | the tool exists                            |
 | a CI config, a webhook, or an integration naming two tools           | a hand-off between them                    |
 | the user names it                                                    | what the repo cannot prove                 |
-
-## Drawn as
-
-| Element                     | Written as                                                     |
-| --------------------------- | -------------------------------------------------------------- |
-| an actor reaching a tool    | an edge labelled with the access mode                          |
-| a hand-off                  | an edge between two distinct tools, labelled with what moves    |
-| a tool a memory file owns   | a `click` line at that file, a bare name, the bank being flat   |
-| a tool no memory file owns  | no click, which is the statement that nobody owns it            |

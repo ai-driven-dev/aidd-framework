@@ -1,7 +1,7 @@
 ---
 name: 02-project-memory
 description: Build the project's memory of its architecture, conventions, and decisions, and wire it into your AI tools. Use when the user wants to set up, refresh, or check project memory, or rewire it into a tool. Not for editing one existing memory file.
-argument-hint: setup | refresh | check | rewire
+argument-hint: setup or refresh | check | rewire
 ---
 
 # Project Memory
@@ -9,7 +9,8 @@ argument-hint: setup | refresh | check | rewire
 ```mermaid
 flowchart LR
   build([no argument, setup, or refresh]) --> scan --> write --> check --> sync --> wired([memory wired])
-  audit([check alone]) --> check
+  audit([check]) --> scan
+  scan -. "check only" .-> check
   rewire([rewire]) --> sync
   scan -.-> empty([nothing to remember])
 ```

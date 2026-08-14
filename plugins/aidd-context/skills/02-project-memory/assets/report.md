@@ -3,17 +3,14 @@
 ## Printed once, at any terminal width
 
 ```txt
-Memory bank — 8 on disk, 2 missing, 32 findings
+Memory bank — <n> on disk, <n> gaps, <n> findings
 
-  deployment.md          8
-  architecture.md        6
-  codebase-map.md        6
-  vcs.md                 3
-  browsing.md            orphan
-  ecosystem.md           missing
-  memory/README.md       missing
+  <file>.md              missing
+  <file>.md              orphan
+  <file>.md              <n>
+  <file>.md              <n>
 
-  aidd_docs/tasks/2026_08/2026_08_13_memory-check/report.md
+  aidd_docs/tasks/<yyyy_mm>/<yyyy_mm_dd>_memory-check/report.md
 ```
 
 No table, and one file per line. A terminal is narrow: a table reflows into unreadable blocks, and
@@ -21,23 +18,38 @@ so does a line that lists several files. Keep every line under forty characters,
 
 ## Written to that path
 
-| File             | State   | Why                            |
-| ---------------- | ------- | ------------------------------ |
-| architecture.md  | drifted |                                |
-| browsing.md      | orphan  | no destination row produces it |
-| ecosystem.md     | missing | the capability always holds    |
+### Structure
 
-| File            | Finding                       | Evidence                               |
-| --------------- | ----------------------------- | -------------------------------------- |
-| architecture.md | says Node.js 20               | `engines.node` is `>=22.12`            |
-| architecture.md | names `scripts/build-dist.sh` | no such file, the build is in `ci.yml` |
+What the tables prove. Same answer every run.
 
-| Fact                | Home            | Copy            |
-| ------------------- | --------------- | --------------- |
-| plugin enumeration  | architecture.md | codebase-map.md |
+| File        | Gap     | Why                                   |
+| ----------- | ------- | ------------------------------------- |
+| `<file>.md` | missing | the capability always holds           |
+| `<file>.md` | missing | `structure.md` scaffolds it           |
+| `<file>.md` | orphan  | no destination row produces it        |
 
-Close the written report with a `## Notes` section when something the run could not decide needs
-saying, for example a capability that holds in the repo but was not confirmed by a scan.
+### Findings
+
+What the reviewers saw this run. Another run may see more.
+
+| File        | Finding                          | Evidence                            |
+| ----------- | -------------------------------- | ----------------------------------- |
+| `<file>.md` | `<the claim the file makes>`     | `<the fact that settles it>`        |
+| `<file>.md` | names a path that does not exist | `<the path>`                        |
+
+### Duplicated facts
+
+| Fact      | Home        | Copy        |
+| --------- | ----------- | ----------- |
+| `<fact>`  | `<file>.md` | `<file>.md` |
+
+### Notes
+
+- `<file>.md` — `<what this run could not settle about it>`
+
+Notes hold what this run could not settle about the bank, and nothing else. Name a file, a
+capability, a fact about the project. Never how this skill works, never one of its steps: the reader
+wants their bank, not its machinery.
 
 - One row per file, per finding, per duplicated fact. Never a paragraph in a cell.
 - A finding is a fragment; its evidence is the fact that settles it.

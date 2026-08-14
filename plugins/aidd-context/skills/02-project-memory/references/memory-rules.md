@@ -10,3 +10,4 @@ A memory file:
 - Stays small: short bullets, code in backticks.
 - Names a tech without its version (`React`, not `React 19`).
 - Reflects the current state only: no unused section, no placeholder.
+- Carries the diagram alone when a diagram is its payload: no note, no caption under it.

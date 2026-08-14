@@ -108,7 +108,8 @@
         "package.json": "{\n  \"name\": \"shop\",\n  \"version\": \"1.0.0\",\n  \"scripts\": { \"test\": \"vitest\" },\n  \"dependencies\": { \"express\": \"^4.19.0\" }\n}\n",
         "README.md": "# Shop\n\nA small order API. Express server, Postgres behind it.\n",
         "src/server.js": "const express = require(\"express\");\nconst app = express();\napp.get(\"/orders\", (req, res) => res.json([]));\nmodule.exports = app;\n",
-        ".github/workflows/ci.yml": "name: CI\non: [push]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n"
+        ".github/workflows/ci.yml": "name: CI\non: [push]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n",
+        ".github/dependabot.yml": "version: 2\nupdates:\n  - package-ecosystem: npm\n    directory: \"/\"\n    schedule:\n      interval: weekly\n"
       }
     },
     "prompt": "Use the {{SKILL}} skill to set up the project memory. You are running headless with no human available, so answer every question yourself from the repo evidence, never wait for input, and complete the whole flow.",
@@ -139,7 +140,8 @@
       "fileContains": {
         "aidd_docs/memory/ecosystem.md": [
           "flowchart",
-          "click"
+          "·",
+          "ependabot"
         ],
         "aidd_docs/GUIDELINES.md": [
           "A rule the AI must follow here"
@@ -181,10 +183,14 @@
         "aidd_docs/memory/vcs.md",
         "aidd_docs/memory/browsing.md"
       ],
-      "judge": "The printed output is a short summary with no markdown table, naming a report path; the written report file holds the tables.",
+      "judge": "The report describes only the memory bank: no cell or note names a step of the skill, nor explains how a finding was reached.",
       "stdoutNotContains": [
-        "| File |",
-        "| Fact |"
+        "Match step",
+        "Review step",
+        "Prune step",
+        "02-write",
+        "03-check",
+        "01-scan"
       ]
     }
   },
@@ -206,7 +212,8 @@
     "expect": {
       "stdoutContains": [
         "Memory bank",
-        "aidd_docs/tasks/"
+        "aidd_docs/tasks/",
+        "ecosystem"
       ],
       "filesAbsent": [
         "aidd_docs/memory/ecosystem.md"
@@ -215,10 +222,14 @@
         "aidd_docs/memory/vcs.md",
         "aidd_docs/memory/architecture.md"
       ],
-      "judge": "The printed output is a short summary with no markdown table, naming a report path; the written report file holds the tables.",
+      "judge": "The report describes only the memory bank: no cell or note names a step of the skill, nor explains how a finding was reached.",
       "stdoutNotContains": [
-        "| File |",
-        "| Fact |"
+        "Match step",
+        "Review step",
+        "Prune step",
+        "02-write",
+        "03-check",
+        "01-scan"
       ]
     }
   },

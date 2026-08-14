@@ -6,7 +6,7 @@ In a monorepo, every workspace is scanned, never the root manifest alone.
 
 | Capability   | Means                          | Detected when                                                                             |
 | ------------ | ------------------------------ | ----------------------------------------------------------------------------------------- |
-| `core`       | always                         | always                                                                                    |
+| `core`       | is a project at all            | always                                                                                    |
 | `ecosystem`  | works through external tools   | always                                                                                    |
 | `backlog`    | organizes planned work         | local backlog artifacts, issue templates, a ticketing tool in use, or a repo file naming backlog conventions |
 | `ui`         | renders a user interface       | a web frontend framework (not React Native), or a `components/`, `pages/`, or `views/` dir |

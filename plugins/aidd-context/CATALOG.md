@@ -75,15 +75,13 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `actions` | [02-write.md](skills/02-project-memory/actions/02-write.md) | - |
 | `actions` | [03-check.md](skills/02-project-memory/actions/03-check.md) | - |
 | `actions` | [04-sync.md](skills/02-project-memory/actions/04-sync.md) | - |
-| `assets` | [AGENTS.md](skills/02-project-memory/assets/AGENTS.md) | - |
-| `assets` | [CONTRIBUTING.md](skills/02-project-memory/assets/CONTRIBUTING.md) | - |
-| `assets` | [GUIDELINES.md](skills/02-project-memory/assets/GUIDELINES.md) | - |
-| `assets` | [README.md](skills/02-project-memory/assets/README.md) | - |
 | `assets` | [report.md](skills/02-project-memory/assets/report.md) | - |
+| `assets` | [scan-summary.md](skills/02-project-memory/assets/scan-summary.md) | - |
 | `references` | [capability-signals.md](skills/02-project-memory/references/capability-signals.md) | - |
 | `references` | [ecosystem-signals.md](skills/02-project-memory/references/ecosystem-signals.md) | - |
 | `references` | [memory-destinations.md](skills/02-project-memory/references/memory-destinations.md) | - |
 | `references` | [memory-rules.md](skills/02-project-memory/references/memory-rules.md) | - |
+| `references` | [reading-sources.md](skills/02-project-memory/references/reading-sources.md) | - |
 | `references` | [review-protocol.md](skills/02-project-memory/references/review-protocol.md) | - |
 | `references` | [structure.md](skills/02-project-memory/references/structure.md) | - |
 | `references` | [tools.md](skills/02-project-memory/references/tools.md) | - |
