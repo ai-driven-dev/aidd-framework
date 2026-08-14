@@ -278,7 +278,7 @@
     "plugin": "aidd-context",
     "skill": "02-project-memory",
     "evalName": "xeval-memory",
-    "name": "refresh adds the delta and keeps the user edits",
+    "name": "refresh applies what is approved and leaves the rest",
     "setup": {
       "files": {
         "package.json": "{\n  \"name\": \"shop\",\n  \"version\": \"1.0.0\",\n  \"dependencies\": { \"express\": \"^4.19.0\" }\n}\n",
@@ -294,7 +294,7 @@
         ".github/workflows/ci.yml": "name: CI\non: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n"
       }
     },
-    "prompt": "Use the {{SKILL}} skill to refresh the project memory. A bank already exists. You are running headless with no human available, so answer every question yourself from the repo evidence, never wait for input, and complete the whole flow.",
+    "prompt": "Use the {{SKILL}} skill to refresh the project memory. A bank already exists. You are running headless with no human available: answer for me, approving every finding that adds or corrects a fact, and declining every finding that would remove a line already in a file. Never wait for input, and complete the whole flow.",
     "expect": {
       "filesExist": [
         "aidd_docs/memory/deployment.md",

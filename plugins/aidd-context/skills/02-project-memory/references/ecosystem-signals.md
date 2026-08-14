@@ -7,8 +7,7 @@ the memory into are `tools.md`, not this.
 
 - It holds state, or does work, outside the repo past a single CI run. A build step does not.
 - One entry per role: a platform that is also the tracker gives two.
-- The VCS platform, whenever the repo proves one.
-- Nothing provable at all: no file. Say so in the run, never as a line inside the file.
+- The VCS platform always counts: a repo has one, so the graph is never empty.
 
 ## Actors
 
@@ -36,6 +35,7 @@ the memory into are `tools.md`, not this.
 | `Human` reaching a tool by `web`  | drop, a person opens anything in a browser                  |
 | `Human` where no agent can follow | keep as `human only` in the label, so absence is not doubt  |
 | a hand-off with its trigger       | keep, the trigger is what makes it a rule                   |
+| a tool nobody drives              | keep it for its hand-off alone: acting on its own is the fact |
 | a hand-off without one            | keep the edge, name the trigger the repo proves             |
 
 ## Detected when
