@@ -70,6 +70,7 @@ export const OUTPUT_MARKETPLACE_RELATIVE = ".plugin/marketplace.json";
 export const PLUGIN_HOOKS_RELATIVE = "hooks/hooks.json";
 export const PLUGIN_MCP_RELATIVE = ".mcp.json";
 export const PLUGIN_AGENT_INPUT_EXT = ".md";
+export const PLUGIN_SKILL_ENTRY_FILE = "SKILL.md";
 
 /** Subdirectory names that are out-of-scope for MVP1 and receive a warn+skip. */
 export const OUT_OF_SCOPE_PLUGIN_SECTIONS: readonly ["commands", "rules"] = ["commands", "rules"];
