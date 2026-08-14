@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.6.2](https://github.com/ai-driven-dev/framework/compare/aidd-context-v2.6.1...aidd-context-v2.6.2) (2026-08-14)
+
+
+### Bug Fixes
+
+* **aidd-context:** make 10-learn's recommendation step consistent ([#622](https://github.com/ai-driven-dev/framework/issues/622)) ([56bbb6e](https://github.com/ai-driven-dev/framework/commit/56bbb6e2d88e9d00e8bad304f59049709174389d))
+* **aidd-context:** make 10-learn's recommendation step consistent and enforce scope ([56bbb6e](https://github.com/ai-driven-dev/framework/commit/56bbb6e2d88e9d00e8bad304f59049709174389d)), closes [#561](https://github.com/ai-driven-dev/framework/issues/561)
+
+
+### Refactoring
+
+* **aidd-context:** project memory shows what it would change before writing ([#633](https://github.com/ai-driven-dev/framework/issues/633)) ([a9d5b0b](https://github.com/ai-driven-dev/framework/commit/a9d5b0b20a4812857cff2e15c9f3dfe97456003b))
+
 ## [2.6.1](https://github.com/ai-driven-dev/framework/compare/aidd-context-v2.6.0...aidd-context-v2.6.1) (2026-08-07)
 
 
