@@ -50,6 +50,26 @@ sessionEnd ajoute    final_status, duration_ms
 
 Il reste que l'export OpenTelemetry de Cursor est un réglage d'équipe en plan Enterprise, en bêta : l'égalité d'identifiant entre le hook et l'export n'est toujours pas mesurable, faute d'un compte de ce type.
 
+### Le découpage par étape ne peut pas venir des métriques
+
+Mesuré le 2026-08-14, sur une session réelle avec les plugins AIDD installés depuis leur marketplace.
+
+| Porteur | Sans `OTEL_LOG_TOOL_DETAILS` | Avec `OTEL_LOG_TOOL_DETAILS=1` |
+| --- | --- | --- |
+| métrique `claude_code.token.usage` | `skill.name = third-party` | `skill.name = third-party` |
+| métrique `claude_code.cost.usage` | `skill.name = third-party` | `skill.name = third-party` |
+| événement `skill_activated` | `skill.name = custom_skill` | **`skill.name = aidd-context:11-explore`** |
+
+La documentation l'annonçait pour qui la lisait jusqu'au bout : « Built-in, bundled, user-defined, and official-marketplace plugin skill names appear verbatim. **Third-party plugin skill names are replaced with `"third-party"`.** » AIDD est une marketplace tierce. **Toutes ses skills se confondent donc en une seule étiquette sur les métriques**, et le drapeau de dé-rédaction ne les sépare pas — il n'agit que sur les événements.
+
+Trois conséquences.
+
+**Claude Code cesse d'être l'exception.** L'affirmation « le seul outil où la jointure tient au grain métrique » ne vaut que pour les totaux **par session**. Pour le découpage **par étape**, il rejoint les trois autres : la jointure se fait sur les logs. Le pipeline doit ingérer les événements, pas seulement les métriques, dès la v1 et non plus « pour les autres outils plus tard ».
+
+**Le découpage se calcule par recoupement d'événements**, pas par filtrage d'attribut : `skill_activated` donne le nom de la skill, l'horodatage et le `prompt.id` ; `api_request` donne les tokens et le coût par requête. On rattache par `prompt.id` ou par fenêtre de temps. C'est exactement le mécanisme prévu pour Codex, Cursor et Copilot — il devient universel.
+
+**Un arbitrage de confidentialité apparaît, et il est dur.** `OTEL_LOG_TOOL_DETAILS=1` n'est pas sélectif : il active aussi la journalisation des commandes Bash, des noms d'outils MCP et des entrées d'outil. Autrement dit, **on ne peut pas obtenir le coût par skill sur Claude Code sans exporter aussi les commandes exécutées**. La seule parade est de filtrer ces attributs au collecteur — ce qui rend le collecteur obligatoire, et fait de sa configuration une exigence de confidentialité et non un simple confort.
+
 ### Les quatre outils verrouillent leurs hooks, chacun à sa façon
 
 Trouvé en faisant tirer les sondes, jamais dans une documentation. Aucune sonde n'a fonctionné du premier coup, et le motif est le même partout : **écrire le fichier de hook ne suffit pas, il faut aussi lever un verrou.** C'est un sujet d'installation à part entière, et exactement l'état que le `status` de #617 doit signaler comme cassé plutôt que sain.
