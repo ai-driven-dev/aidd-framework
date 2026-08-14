@@ -112,16 +112,15 @@ Un fichier par session préserve la propriété qui compte : un seul écrivain, 
 
 L'index du travail. Écrit par les skills, aux frontières d'étape — quelques écritures sur la vie d'une tâche, donc lisible et corrigeable à la main.
 
+Un seul lien vers le haut : `backlog`. Ni le type de travail, ni le ticket d'origine ne sont répétés ici — l'artefact de backlog les porte déjà, dans `type`, `work_kind` et `source`. Les répéter créerait deux vérités qui divergeraient.
+
 ```json
 {
   "schema_version": 1,
   "aidd_id": "01J9X4M2K7QRVB",
   "task_id": "2026_08_13_telemetry-layer",
-  "type": "feature",
-  "title": "Couche de télémétrie AIDD",
 
   "backlog": "backlog/stories/telemetry-layer.md",
-  "issue": "ai-driven-dev/framework#620",
   "branch": "feat/telemetry-layer",
   "pull_request": "ai-driven-dev/framework#631",
 
@@ -168,11 +167,16 @@ Ce que le fichier **ne** contient **pas**, et pourquoi :
 
 | Absent | Qui le possède |
 | --- | --- |
+| le type de travail | l'artefact de backlog, dans `type` et `work_kind` |
+| le ticket d'origine | l'artefact de backlog, dans `source` |
+| l'epic, la story, le defect au-dessus | l'artefact de backlog, dans `parent` |
 | `status` de chaque étape | le frontmatter de l'artefact ; une étape avec un `to` est finie, c'est déductible |
 | la liste des fichiers du dossier | le listing du dossier ; `produced` n'est pas un inventaire mais une provenance, que personne d'autre ne connaît |
 | les titres | le `.md` lui-même |
 | tokens, coût, modèle, durée | la télémétrie ; ils changent en cours de session |
 | la liste des sessions | une recherche sur `task_id` dans `runs/` |
+
+Cas dégénéré, à accepter comme normal : un dossier de livraison sans artefact de backlog, quand quelqu'un lance directement un plan depuis une demande orale. Alors `backlog` est nul, et seulement dans ce cas le fichier porte lui-même un `source` et un `type`. Ce n'est pas une exception au principe : c'est le fichier qui devient propriétaire de l'information faute d'artefact au-dessus.
 
 `steps` est un **journal**, pas une liste de cases à cocher : ça s'ajoute, ça se répète, ça arrive dans le désordre. Trois `aidd-dev:08-debug` au milieu de l'implémentation donnent trois entrées. Le flux se lit après coup, il ne se contraint pas avant.
 
@@ -197,6 +201,45 @@ Ce que le fichier **ne** contient **pas**, et pourquoi :
 `vendor_field` porte le nom du champ chez l'outil, parce qu'il diffère partout : `session.id` chez Claude Code, `conversation_id` chez Cursor, `sessionId` chez Copilot, `session_id` chez Codex. Le lecteur en aval sait ainsi quoi interroger, sans table codée en dur.
 
 `task_id` à `null` est un état normal, pas une anomalie : c'est le travail hors flux.
+
+## La chaîne complète, du run à l'epic
+
+Chaque flèche est un champ déjà défini, sur son unique propriétaire. Aucune n'est inventée par cette spec, sauf `task_id` et `backlog`.
+
+```txt
+runs/2026_08/01J9X4M2K7.json
+    │ task_id
+    ▼
+tasks/2026_08/2026_08_13_telemetry-layer/metadata.json
+    │ backlog
+    ▼
+backlog/tasks/fix-token-join.md          type: task · work_kind: technical
+    │ parent                             source: ai-driven-dev/framework#620
+    ▼
+backlog/defects/token-join-broken.md     type: defect
+    │ related_to                         source: rapport utilisateur
+    ▼
+backlog/stories/telemetry-layer.md       type: story
+    │ parent
+    ▼
+backlog/epics/prove-session-cost.md      type: epic · goal: brief produit
+```
+
+Le modèle existant couvre déjà tous les cas de figure, y compris ceux auxquels je ne m'attendais pas :
+
+| Travail | Comment il se rattache |
+| --- | --- |
+| une feature | dossier → `backlog/stories/*.md` → `parent` → epic |
+| un bug | dossier → `backlog/tasks/*.md` → `parent` → `backlog/defects/*.md`. `relations.md` du defect le dit : « It has no `parent`: resolution work is a Task whose `parent` is the Defect » |
+| le defect et la story qu'il casse | `related_to` du defect, décrit comme « the affected artifacts » |
+| une tâche technique | `backlog/tasks/*.md`, `work_kind: technical`, `parent` facultatif |
+| un spike | `backlog/spikes/*.md`, `parents` au pluriel : les artefacts que l'incertitude bloque |
+| une issue GitHub ou Jira | `source` de l'artefact de backlog, jamais ailleurs |
+| un debug hors flux | `run.json` avec `task_id` nul. Rattachable après coup : le fichier de run est à nous, on y écrit le `task_id` le jour où le sujet devient une tâche |
+
+**Rien ne pointe vers le bas, et il ne faut rien ajouter qui le fasse.** Un artefact de backlog ne connaît pas ses dossiers de livraison : le lecteur indexe `tasks/*/*/metadata.json` et regroupe par `backlog`. C'est exactement ce que `relations.md` prescrit — « Inverse links are never stored. Readers derive them. » Une story livrée en deux fois donne deux dossiers pointant vers elle, sans qu'elle ait à le savoir.
+
+D'où la question « combien a coûté cet epic » se répond en descendant les liens dérivés : epic → stories dont `parent` vaut l'epic → dossiers dont `backlog` vaut ces stories → runs dont `task_id` vaut ces dossiers → télémétrie de ces sessions.
 
 ## Comment les tokens rejoignent une étape
 
