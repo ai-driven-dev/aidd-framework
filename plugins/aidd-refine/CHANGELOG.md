@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.0](https://github.com/ai-driven-dev/framework/compare/aidd-refine-v2.2.4...aidd-refine-v3.0.0) (2026-08-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **refine:** `aidd-refine:03-condense` is removed, and the skills after it are renumbered: `04-shadow-areas` becomes `03-shadow-areas`, and `05-fact-check` becomes `04-fact-check`. Any pinned reference to the old names must be updated. The plugin no longer ships a hooks directory.
+
+### Features
+
+* **refine:** remove condense skill and its hook ([#624](https://github.com/ai-driven-dev/framework/issues/624)) ([e7e2c43](https://github.com/ai-driven-dev/framework/commit/e7e2c43819ca6e8f976d5d613c0b4dfc23e51019))
+
 ## [2.2.4](https://github.com/ai-driven-dev/framework/compare/aidd-refine-v2.2.3...aidd-refine-v2.2.4) (2026-08-07)
 
 

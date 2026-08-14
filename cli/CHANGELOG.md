@@ -1,5 +1,22 @@
 # Changelog
 
+## [5.2.1](https://github.com/ai-driven-dev/framework/compare/cli-v5.2.0...cli-v5.2.1) (2026-08-14)
+
+
+### Bug Fixes
+
+* **cli:** transform codex marketplace skills ([#571](https://github.com/ai-driven-dev/framework/issues/571)) ([734c9c3](https://github.com/ai-driven-dev/framework/commit/734c9c39cad9b6f4f9ea181e320ff360d870741f))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @biomejs/biome from 2.5.6 to 2.5.7 in /cli ([#616](https://github.com/ai-driven-dev/framework/issues/616)) ([287a161](https://github.com/ai-driven-dev/framework/commit/287a161c443adbca10fb99c6d5224a1fbe705ed7))
+* **deps-dev:** bump @types/node from 26.1.2 to 26.2.0 in /cli ([#615](https://github.com/ai-driven-dev/framework/issues/615)) ([89fd4ea](https://github.com/ai-driven-dev/framework/commit/89fd4eac5113aa62b9075a91b33e51c386ee4dc3))
+* **deps-dev:** bump fast-check from 4.7.0 to 4.9.0 in /cli ([#607](https://github.com/ai-driven-dev/framework/issues/607)) ([2cd5aa6](https://github.com/ai-driven-dev/framework/commit/2cd5aa676a070def99e73cefc3007290303a8591))
+* **deps-dev:** bump jscpd from 5.0.7 to 5.0.14 in /cli ([#606](https://github.com/ai-driven-dev/framework/issues/606)) ([74c15c2](https://github.com/ai-driven-dev/framework/commit/74c15c2d22067d1065de9bf4991a781394d938cf))
+* **deps-dev:** bump knip from 6.31.0 to 6.32.0 in /cli ([#613](https://github.com/ai-driven-dev/framework/issues/613)) ([6e1f6aa](https://github.com/ai-driven-dev/framework/commit/6e1f6aa3426a94cf2d16a47963b9c0b1453bfbc4))
+* **deps:** bump smol-toml from 1.6.1 to 1.7.1 in /cli ([#614](https://github.com/ai-driven-dev/framework/issues/614)) ([b766a31](https://github.com/ai-driven-dev/framework/commit/b766a3163d4793c36bf22737a6572ead1726c5b8))
+
 ## [5.2.0](https://github.com/ai-driven-dev/framework/compare/cli-v5.1.6...cli-v5.2.0) (2026-08-06)
 
 
