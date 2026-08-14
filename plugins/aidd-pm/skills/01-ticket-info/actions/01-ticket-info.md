@@ -8,19 +8,17 @@ An optional ticket id or URL. When omitted, auto-detect it from the current bran
 
 ## Output
 
-The ticket's title, description, status, assignee, priority, and URL, displayed for the user.
+The ticket rendered per [ticket-template.md](../assets/ticket-template.md).
 
 ## Process
 
-1. **Tool.** Use the ticketing tool declared in project memory. Otherwise inspect the repo configuration or environment for the configured tool.
-2. **Identifier.** Use the provided ticket id when given. Otherwise take it from the current branch name, per project convention.
-3. **Format.** Apply the project ticketing convention to the identifier (prefix, separator, casing).
-4. **Query.** Invoke the configured ticketing tool to fetch the ticket record.
-5. **Display.** Render the title, description, status, assignee, priority, and URL.
+1. **Resolve.** Resolve the ticketing tool and the ticket identifier per [tool-detection.md](../references/tool-detection.md).
+2. **Query.** Invoke the configured ticketing tool to fetch the ticket record.
+3. **Display.** Fill [ticket-template.md](../assets/ticket-template.md) from the queried record and render it for the user.
 
 ## Test
 
 | Case | Pass |
 | --- | --- |
-| The id resolves and the tool answers | title, description, status, assignee, priority, and URL match the queried record |
+| The id resolves and the tool answers | every field `ticket-template.md` defines matches the queried record |
 | The displayed URL is opened | the tracker shows the same ticket |
