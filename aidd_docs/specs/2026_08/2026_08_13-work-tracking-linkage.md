@@ -378,7 +378,7 @@ Chaque ligne est calculable avec ce qui précède. Aucune n'exige un format mais
 
 - Le collecteur, son stockage et sa rétention. Le framework configure l'export, il n'héberge rien.
 - Le calcul de coût pour Codex et Cursor, qui n'exportent pas de montant : il faudra une table de prix, et elle n'est pas dans ce périmètre.
-- OpenCode, qui n'expose ni export, ni identifiant, ni usage documenté. Déclaré non couvert.
+- OpenCode, qui n'expose ni export, ni identifiant, ni usage. Déclaré non couvert. Vérifié deux fois : ses pages de documentation ne mentionnent aucune télémétrie, et si le binaire 1.14.20 embarque `@opentelemetry/api` et `@opentelemetry/sdk-trace`, il n'embarque aucun exportateur — une session aboutie avec `OTEL_EXPORTER_OTLP_ENDPOINT` posé n'a produit aucune requête. La demande est ouverte en amont (`anomalyco/opencode#14246`), sans réponse ni pull request. À re-tester à chaque version mineure plutôt qu'à décider une fois.
 - L'installation de l'export Cursor : c'est un réglage d'équipe en plan Enterprise, la CLI peut le vérifier mais pas le poser.
 - Rattraper les tâches et sessions antérieures à la fonctionnalité.
 
