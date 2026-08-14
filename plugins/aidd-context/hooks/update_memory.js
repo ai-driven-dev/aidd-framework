@@ -190,6 +190,12 @@ function gitAdd(childProcess, files) {
   const path = await import("node:path");
   const childProcess = await import("node:child_process");
 
+  // Every path below is project-relative, so anchor on the project root when
+  // Claude Code names it. Without this a run started elsewhere finds no bank
+  // and exits 0, which reads as success.
+  const root = process.env.CLAUDE_PROJECT_DIR;
+  if (root && fs.existsSync(root)) process.chdir(root);
+
   if (!fs.existsSync(DOCS_DIR)) process.exit(0);
 
   const tools = process.argv.slice(2).map((arg) => arg.toLowerCase());
