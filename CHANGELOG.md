@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.8.1](https://github.com/ai-driven-dev/framework/compare/v5.8.0...v5.8.1) (2026-08-14)
+
+
+### Miscellaneous
+
+* **release:** drop the 5.8.0 pin and attribute the breaking change ([#642](https://github.com/ai-driven-dev/framework/issues/642)) ([12aa699](https://github.com/ai-driven-dev/framework/commit/12aa699680a10c94cd74dce465a1f924dbfb222d))
+
 ## [5.8.0](https://github.com/ai-driven-dev/framework/compare/v5.7.1...v5.8.0) (2026-08-14)
 
 
