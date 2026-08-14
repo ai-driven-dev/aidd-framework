@@ -15,14 +15,18 @@ Deux sessions réelles sur Claude Code 2.1.232, télémétrie OTLP capturée par
 
 | Question | Réponse mesurée |
 | --- | --- |
-| L'identifiant du hook est-il celui de la télémétrie ? | **oui** — même valeur des deux côtés, sur deux sessions indépendantes |
+| L'identifiant du hook est-il celui de la télémétrie ? | **oui** — sur Claude Code, Codex et Copilot, une session par outil. Cursor reste ouvert, son export exige un compte Enterprise |
 | Les tokens portent-ils la skill ? | **oui** — `skill.name` sur `claude_code.token.usage` |
 | Le coût aussi ? | **oui** — `skill.name` sur `claude_code.cost.usage`, en USD |
 | Le temps passé est-il mesuré ? | **oui** — `claude_code.active_time.total`, en secondes |
 | Les sous-agents sont-ils séparables ? | **oui** — `query_source` : `main`, `subagent`, `sdk`, `agent:builtin:<Type>` |
 | Le démarrage d'une skill est-il un événement ? | **oui** — `skill_activated`, avec `invocation_trigger` et `prompt.id` |
 
-Ce résultat retire l'hypothèse la plus fragile du jalon sur l'outil principal, et déplace la conception : **sur Claude Code, le journal des étapes est déjà émis par l'outil**. Le framework n'a plus qu'à fournir le rattachement à la tâche. Deux limites mesurées l'accompagnent : `skill.name` est collant, donc il sur-attribue à la dernière skill activée si deux skills s'entrelacent ; et un sous-agent Claude Code n'a pas d'identifiant propre, il partage celui du parent — l'inverse de Cursor.
+Les identifiants étant fabriqués côté client, avant tout appel au modèle, **Codex et Copilot se vérifient sans consommer un seul token** : on pointe le fournisseur vers une adresse qui ne répond pas, la session démarre quand même, le hook tire et la télémétrie part. La sonde a donc sa place dans l'intégration continue, pas seulement dans une vérification ponctuelle.
+
+Deux verrous trouvés en faisant tirer les sondes, et que le `status` de #617 doit signaler comme cassés plutôt que sains : les hooks Codex n'émettent rien sans `--enable hooks` **et** sans confiance persistée accordée ; les hooks Copilot de niveau dépôt n'émettent rien dans un dossier non approuvé, là où le périmètre utilisateur fonctionne immédiatement. Dans les deux cas le hook est installé et muet.
+
+Ce résultat retire l'hypothèse la plus fragile du jalon sur les trois outils testés, et déplace la conception : **sur Claude Code, le journal des étapes est déjà émis par l'outil**. Le framework n'a plus qu'à fournir le rattachement à la tâche. Deux limites mesurées l'accompagnent : `skill.name` est collant, donc il sur-attribue à la dernière skill activée si deux skills s'entrelacent ; et un sous-agent Claude Code n'a pas d'identifiant propre, il partage celui du parent — l'inverse de Cursor.
 
 La conception qui en découle est décrite dans `aidd_docs/specs/2026_08/2026_08_13-work-tracking-linkage.md`.
 

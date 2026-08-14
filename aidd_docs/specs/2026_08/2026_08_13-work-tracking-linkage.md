@@ -15,9 +15,31 @@ Depuis n'importe quel outil supporté, retrouver pour un travail donné : d'où 
 
 Deux sessions réelles sur Claude Code 2.1.232, télémétrie OTLP capturée par un collecteur local. Les valeurs ci-dessous sont relevées, pas lues dans une documentation.
 
+### L'égalité d'identifiant, sur trois outils
+
+C'est l'hypothèse qui porte tout le montage : l'identifiant qu'un hook voit est-il celui que la télémétrie exporte ? Aucun fournisseur ne le documente. Mesuré directement, une session par outil.
+
+| Outil | Champ côté hook | Attribut côté export | Même valeur | Coût du test |
+| --- | --- | --- | --- | --- |
+| Claude Code | `session_id` | `session.id` sur métriques et événements | **oui**, sur deux sessions indépendantes | deux sessions réelles |
+| Codex CLI | `session_id` | `conversation.id` sur `codex.sse_event` | **oui** | **zéro token** |
+| GitHub Copilot | `sessionId` | `gen_ai.conversation.id` sur le span `invoke_agent` | **oui** | **zéro crédit** |
+| Cursor | `conversation_id` | `cursor.conversation.id` sur les logs | non testable | l'export est un réglage d'équipe en plan Enterprise |
+| OpenCode | aucun | aucun | sans objet | rien à tester |
+
+Les identifiants sont fabriqués côté client, avant tout appel au modèle. Un appel qui échoue produit donc quand même le démarrage de session, l'invocation du hook et l'événement de télémétrie : **Codex et Copilot se testent sans consommer de quota**, en pointant le fournisseur vers une adresse qui ne répond pas. C'est la méthode à retenir pour la vérification continue.
+
+### Deux verrous qui rendent un hook inerte
+
+Trouvés en faisant tirer les sondes, pas dans une documentation. Ce sont exactement les cas que le `status` de #617 doit signaler comme cassés plutôt que sains.
+
+- **Codex.** Les hooks n'ont rien émis avant l'ajout de `--enable hooks` **et** de `--dangerously-bypass-hook-trust`. Ils sont derrière un drapeau de fonctionnalité et derrière un mécanisme de confiance persistée. Un hook posé sur un poste où la confiance n'a pas été accordée est installé et muet.
+- **Copilot.** Un fichier `.github/hooks/*.json` n'a rien émis dans un dossier non approuvé ; le même contenu en périmètre utilisateur, sous `$COPILOT_HOME/hooks/`, a fonctionné immédiatement. La documentation ne le dit qu'en creux, en précisant que seuls les hooks de politique machine chargent « regardless of folder trust state ».
+
+### Le reste, mesuré sur Claude Code
+
 | Question | Réponse mesurée |
 | --- | --- |
-| L'identifiant vu par un hook est-il celui de la télémétrie ? | **Oui.** `session_id` du hook et `session.id` de l'export portent la même valeur, sur deux sessions indépendantes |
 | Les tokens sont-ils rattachés à la skill ? | **Oui.** `skill.name` est présent sur `claude_code.token.usage` |
 | Le coût aussi ? | **Oui.** `skill.name` est présent sur `claude_code.cost.usage`, en USD |
 | Le temps passé est-il mesuré ? | **Oui.** `claude_code.active_time.total`, en secondes, par session |
@@ -335,7 +357,8 @@ Chaque ligne est calculable avec ce qui précède. Aucune n'exige un format mais
 
 ## Ce qui reste non vérifié
 
-- L'égalité d'identifiant est prouvée **sur Claude Code seulement**. Le même banc de test doit tourner sur Codex, Cursor et Copilot avant de promettre leur couverture.
+- L'égalité d'identifiant est prouvée sur Claude Code, Codex et Copilot. **Cursor reste ouvert** : son côté hook est observable, mais son export est un réglage d'équipe en plan Enterprise, donc il n'y a rien à comparer sans un compte de ce type. La ligne Cursor du tableau de couverture est une promesse tant que personne n'a fait tourner la sonde avec un tel compte.
+- L'égalité est prouvée par une session, pas par construction. Elle peut se rompre à une mise à jour d'outil. La sonde étant gratuite sur Codex et Copilot, elle a sa place dans l'intégration continue plutôt que dans une vérification ponctuelle.
 - La survie de l'identifiant à une reprise, un `clear`, une compaction ou un fork. Aucun outil ne le documente, et le banc de test actuel ne la couvre pas.
 - Le coût réel du frottement : un run réécrit à chaque tour salit l'arbre de travail. À trancher entre écrire hors du dépôt pendant la session et matérialiser au commit, ou assumer le bruit.
 - La tension entre l'anonymat inscrit dans #297 et les statistiques par personne attendues du gouvernail. Ce sont deux promesses incompatibles, et l'arbitrage dépasse l'équipe technique.
