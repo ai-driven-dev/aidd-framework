@@ -72,20 +72,20 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | Group | File | Description |
 |-------|------|---|
 | `actions` | [01-scan.md](skills/02-project-memory/actions/01-scan.md) | - |
-| `actions` | [02-generate.md](skills/02-project-memory/actions/02-generate.md) | - |
-| `actions` | [03-sync.md](skills/02-project-memory/actions/03-sync.md) | - |
-| `assets` | [AGENTS.md](skills/02-project-memory/assets/AGENTS.md) | - |
-| `assets` | [CONTRIBUTING.md](skills/02-project-memory/assets/CONTRIBUTING.md) | - |
-| `assets` | [GUIDELINES.md](skills/02-project-memory/assets/GUIDELINES.md) | - |
-| `assets` | [README.md](skills/02-project-memory/assets/README.md) | - |
+| `actions` | [02-write.md](skills/02-project-memory/actions/02-write.md) | - |
+| `actions` | [03-check.md](skills/02-project-memory/actions/03-check.md) | - |
+| `actions` | [04-sync.md](skills/02-project-memory/actions/04-sync.md) | - |
 | `assets` | [report.md](skills/02-project-memory/assets/report.md) | - |
+| `assets` | [scan-summary.md](skills/02-project-memory/assets/scan-summary.md) | - |
 | `references` | [capability-signals.md](skills/02-project-memory/references/capability-signals.md) | - |
+| `references` | [ecosystem-signals.md](skills/02-project-memory/references/ecosystem-signals.md) | - |
 | `references` | [memory-destinations.md](skills/02-project-memory/references/memory-destinations.md) | - |
 | `references` | [memory-rules.md](skills/02-project-memory/references/memory-rules.md) | - |
+| `references` | [reading-sources.md](skills/02-project-memory/references/reading-sources.md) | - |
 | `references` | [review-protocol.md](skills/02-project-memory/references/review-protocol.md) | - |
 | `references` | [structure.md](skills/02-project-memory/references/structure.md) | - |
 | `references` | [tools.md](skills/02-project-memory/references/tools.md) | - |
-| `-` | [SKILL.md](skills/02-project-memory/SKILL.md) | `Build the project's memory of its architecture, conventions, and decisions, and wire it into the tools you use. Use when the user wants to set up or refresh project memory. Not for editing one existing memory file.` |
+| `-` | [SKILL.md](skills/02-project-memory/SKILL.md) | `Build the project's memory of its architecture, conventions, and decisions, and wire it into your AI tools. Use when the user wants to set up or refresh project memory, or rewire it into a tool. Not for editing one existing memory file.` |
 
 #### `skills/03-context-generate`
 

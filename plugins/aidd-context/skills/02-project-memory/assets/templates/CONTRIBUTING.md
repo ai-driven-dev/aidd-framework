@@ -1,6 +1,6 @@
 # Contributing to this project's AI context
 
-How to add or change the context the AI relies on here. For authoring AIDD skills, agents, rules, and templates, see the framework guide: <https://github.com/ai-driven-dev/framework/blob/main/CONTRIBUTING.md>.
+How to add or change the context the AI relies on here. Fill the placeholders below, drop what does not apply. For authoring AIDD skills, agents, rules, and templates, see the framework guide: <https://github.com/ai-driven-dev/framework/blob/main/CONTRIBUTING.md>.
 
 ## Changing project memory
 
