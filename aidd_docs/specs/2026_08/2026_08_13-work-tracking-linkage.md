@@ -163,13 +163,15 @@ L'index du travail. Écrit par les skills, aux frontières d'étape — quelques
 
 Un seul lien vers le haut : `backlog`. Ni le type de travail, ni le ticket d'origine ne sont répétés ici — l'artefact de backlog les porte déjà, dans `type`, `work_kind` et `source`. Les répéter créerait deux vérités qui divergeraient.
 
+`backlog` désigne l'artefact **sur son support**, quel qu'il soit : une référence d'issue quand le backlog vit chez le fournisseur de tickets, un chemin relatif au projet quand il vit en Markdown. C'est littéralement ce que prescrit `plugins/aidd-pm/skills/*/references/persistence.md` : « Use native fields when supported; otherwise use explicit ids or project-relative paths. »
+
 ```json
 {
   "schema_version": 1,
   "aidd_id": "01J9X4M2K7QRVB",
   "task_id": "2026_08_13_telemetry-layer",
 
-  "backlog": "backlog/stories/telemetry-layer.md",
+  "backlog": "ai-driven-dev/framework#617",
   "branch": "feat/telemetry-layer",
   "pull_request": "ai-driven-dev/framework#631",
 
@@ -250,6 +252,32 @@ Cas dégénéré, à accepter comme normal : un dossier de livraison sans artefa
 `vendor_field` porte le nom du champ chez l'outil, parce qu'il diffère partout : `session.id` chez Claude Code, `conversation_id` chez Cursor, `sessionId` chez Copilot, `session_id` chez Codex. Le lecteur en aval sait ainsi quoi interroger, sans table codée en dur.
 
 `task_id` à `null` est un état normal, pas une anomalie : c'est le travail hors flux.
+
+## Backlog local et backlog distant : ne pas synchroniser, ne pas dupliquer
+
+La question se pose dès qu'un projet a des issues chez un fournisseur et des artefacts en Markdown. Le framework y a déjà répondu, dans `persistence.md` :
+
+> **Never mirror one Story across supports.**
+
+Ce n'est pas une préférence, c'est ce qui rend la cohérence tenable. Un artefact vit sur **un** support et un seul. Il n'y a donc rien à synchroniser, et aucune divergence possible — le problème est supprimé plutôt que résolu.
+
+Ce que cela donne concrètement, selon le projet :
+
+| Le backlog vit… | Les artefacts de backlog | `backlog` dans `metadata.json` | Ce qui reste local, toujours |
+| --- | --- | --- | --- |
+| chez le fournisseur de tickets | issues, avec leur type, leur état, leurs jalons | `org/repo#617` | le dossier de livraison et le journal des exécutions |
+| en Markdown | `aidd_docs/backlog/**` | `backlog/stories/<slug>.md` | idem |
+| les deux | **interdit** | — | — |
+
+Les deux couches basses ne sont jamais en concurrence avec le distant, parce qu'aucun fournisseur de tickets ne sait exprimer ce qu'elles portent : quel dossier a livré quelle issue, quelles étapes ont tourné, quelles sessions et pendant combien de temps. Elles ajoutent, elles ne recopient pas.
+
+Trois règles suffisent à tenir l'ensemble.
+
+- **Un artefact, un support.** Choisi par projet, jamais par artefact.
+- **Le lien monte, jamais l'inverse.** Une issue ne connaît pas ses dossiers de livraison ; le lecteur indexe `tasks/*/*/metadata.json` et regroupe par `backlog`. C'est déjà la règle de `relations.md` : « Inverse links are never stored. Readers derive them. »
+- **Le local ne stocke que ce que le distant ignore.** S'il existe un champ natif chez le fournisseur, il est le propriétaire ; sinon seulement, le champ vit en local.
+
+Ce dépôt en est l'illustration : il n'a pas de `aidd_docs/backlog/`, ses issues GitHub **sont** son backlog. Y créer des stories en Markdown pour les mêmes sujets violerait la règle et créerait exactement la dérive qu'on cherche à éviter.
 
 ## La chaîne complète, du run à l'epic
 
