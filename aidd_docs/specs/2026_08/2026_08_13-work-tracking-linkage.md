@@ -24,10 +24,22 @@ C'est l'hypothèse qui porte tout le montage : l'identifiant qu'un hook voit est
 | Claude Code | `session_id` | `session.id` sur métriques et événements | **oui**, sur deux sessions indépendantes | deux sessions réelles |
 | Codex CLI | `session_id` | `conversation.id` sur `codex.sse_event` | **oui** | **zéro token** |
 | GitHub Copilot | `sessionId` | `gen_ai.conversation.id` sur le span `invoke_agent` | **oui** | **zéro crédit** |
-| Cursor | `conversation_id` | `cursor.conversation.id` sur les logs | non testable | l'export est un réglage d'équipe en plan Enterprise |
+| Cursor | `conversation_id` | `cursor.conversation.id` sur les logs | **non testable, voir plus bas** | — |
 | OpenCode | aucun | aucun | sans objet | rien à tester |
 
 Les identifiants sont fabriqués côté client, avant tout appel au modèle. Un appel qui échoue produit donc quand même le démarrage de session, l'invocation du hook et l'événement de télémétrie : **Codex et Copilot se testent sans consommer de quota**, en pointant le fournisseur vers une adresse qui ne répond pas. C'est la méthode à retenir pour la vérification continue.
+
+### Cursor, trois obstacles empilés
+
+La sonde a été écrite et lancée. Elle n'a rien produit, et la raison compte davantage que le résultat manquant.
+
+1. **Cursor valide l'authentification avant d'ouvrir la session.** Une clé factice est rejetée d'emblée — « The provided API key is invalid » — donc aucun hook ne tire. L'astuce qui rend les tests Codex et Copilot gratuits ne fonctionne pas ici : chez eux la session démarre puis l'appel modèle échoue, chez Cursor rien ne démarre.
+2. **La documentation des hooks ne parle que de l'éditeur.** Les moments listés sont ceux de l'IDE, jusqu'à `workspaceOpen`, et rien n'affirme que `cursor-agent`, le binaire en ligne de commande, lit `.cursor/hooks.json`. Tant que ce point n'est pas établi, **on ignore si Cursor est instrumentable depuis une installation en ligne de commande**, ce qui est le seul mode dont dispose la CLI AIDD.
+3. **L'export OpenTelemetry est un réglage d'équipe en plan Enterprise, en bêta.** Même avec les hooks qui tirent, il n'y a rien à comparer sans un compte de ce type.
+
+Le point 2 est le plus lourd de conséquences : il ne s'agit plus d'une vérification en attente mais d'une question de périmètre. Si les hooks Cursor sont réservés à l'éditeur, Cursor ne peut pas figurer dans la couverture d'une couche installée par une CLI, et il faut le dire dans le tableau plutôt que le laisser en promesse.
+
+Ce qui débloquerait, dans l'ordre du moins cher au plus cher : une connexion `cursor-agent login` pour savoir si le binaire honore `.cursor/hooks.json` ; puis un compte Enterprise avec l'export d'équipe activé pour fermer l'égalité d'identifiant.
 
 ### Deux verrous qui rendent un hook inerte
 
@@ -357,7 +369,7 @@ Chaque ligne est calculable avec ce qui précède. Aucune n'exige un format mais
 
 ## Ce qui reste non vérifié
 
-- L'égalité d'identifiant est prouvée sur Claude Code, Codex et Copilot. **Cursor reste ouvert** : son côté hook est observable, mais son export est un réglage d'équipe en plan Enterprise, donc il n'y a rien à comparer sans un compte de ce type. La ligne Cursor du tableau de couverture est une promesse tant que personne n'a fait tourner la sonde avec un tel compte.
+- L'égalité d'identifiant est prouvée sur Claude Code, Codex et Copilot. **Cursor reste entièrement ouvert**, et pas seulement faute de compte : rien n'établit que son binaire en ligne de commande lit `.cursor/hooks.json`. La ligne Cursor du tableau de couverture est une promesse, et elle pourrait devoir être retirée plutôt que confirmée.
 - L'égalité est prouvée par une session, pas par construction. Elle peut se rompre à une mise à jour d'outil. La sonde étant gratuite sur Codex et Copilot, elle a sa place dans l'intégration continue plutôt que dans une vérification ponctuelle.
 - La survie de l'identifiant à une reprise, un `clear`, une compaction ou un fork. Aucun outil ne le documente, et le banc de test actuel ne la couvre pas.
 - Le coût réel du frottement : un run réécrit à chaque tour salit l'arbre de travail. À trancher entre écrire hors du dépôt pendant la session et matérialiser au commit, ou assumer le bruit.

@@ -15,7 +15,7 @@ Deux sessions réelles sur Claude Code 2.1.232, télémétrie OTLP capturée par
 
 | Question | Réponse mesurée |
 | --- | --- |
-| L'identifiant du hook est-il celui de la télémétrie ? | **oui** — sur Claude Code, Codex et Copilot, une session par outil. Cursor reste ouvert, son export exige un compte Enterprise |
+| L'identifiant du hook est-il celui de la télémétrie ? | **oui** — sur Claude Code, Codex et Copilot, une session par outil. Cursor reste entièrement ouvert, voir plus bas |
 | Les tokens portent-ils la skill ? | **oui** — `skill.name` sur `claude_code.token.usage` |
 | Le coût aussi ? | **oui** — `skill.name` sur `claude_code.cost.usage`, en USD |
 | Le temps passé est-il mesuré ? | **oui** — `claude_code.active_time.total`, en secondes |
@@ -54,7 +54,7 @@ Convention de marquage, reprise de #618 : `[v]` = lu dans la source officielle �
 ### Deux pièges de configuration repérés à la vérification
 
 - **Codex exporte ses métriques vers Statsig par défaut.** `otel.metrics_exporter` a pour valeur par défaut `statsig`, et non `none`. Activer la télémétrie Codex sans toucher cette clé envoie donc des métriques à un tiers. La CLI doit la poser explicitement, et le `status` doit la lire.
-- **Cursor est réservé au plan Enterprise et se règle au niveau de l'équipe**, pas du poste. Ce n'est pas une case à cocher que la CLI peut installer : c'est une démarche d'administrateur, en bêta. Toute promesse de couverture Cursor doit le dire.
+- **Cursor est peut-être hors de portée d'une installation en ligne de commande.** Deux obstacles distincts, et le second est le plus lourd. D'abord l'export : réglage d'équipe, plan Enterprise, en bêta — une démarche d'administrateur, pas une case que la CLI coche. Ensuite les hooks : la documentation ne décrit que des moments de l'éditeur, jusqu'à `workspaceOpen`, et rien n'affirme que le binaire `cursor-agent` lit `.cursor/hooks.json`. La sonde n'a pas pu trancher, Cursor refusant d'ouvrir une session sans authentification valide. Tant que ce point n'est pas établi, la couverture Cursor n'est pas une vérification en attente mais une question de périmètre.
 
 ### Ce que le dépôt a déjà tranché
 
