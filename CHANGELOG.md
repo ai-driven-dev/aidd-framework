@@ -3,9 +3,9 @@
 ## [5.8.0](https://github.com/ai-driven-dev/framework/compare/v5.7.1...v5.8.0) (2026-08-14)
 
 
-### ⚠ BREAKING CHANGES
+### Notes
 
-* **refine:** `aidd-refine:03-condense` is removed, and the skills after it are renumbered: `04-shadow-areas` becomes `03-shadow-areas`, and `05-fact-check` becomes `04-fact-check`. Any pinned reference to the old names must be updated. The plugin no longer ships a hooks directory.
+* **refine:** removing `aidd-refine:03-condense` and renumbering the skills after it is a breaking change of the `aidd-refine` plugin, released as [aidd-refine 3.0.0](https://github.com/ai-driven-dev/framework/releases/tag/aidd-refine-v3.0.0). The marketplace itself carries no breaking change in this release.
 
 ### Features
 
