@@ -9,6 +9,23 @@ Répondre à une seule question : **combien a coûté cette feature, et où est 
 
 La couche de télémétrie n'est donc pas un collecteur. C'est une **jointure**. Le framework n'a pas à mesurer les tokens : les outils le font déjà, mieux, et à la source. Il a à produire l'identifiant qui permet de rattacher leur mesure à son propre découpage du travail, et à garantir que cet identifiant survit au commit, au squash, au worktree parallèle et à la session qui ne produit rien.
 
+## Mesuré, pas lu
+
+Deux sessions réelles sur Claude Code 2.1.232, télémétrie OTLP capturée par un collecteur local le 2026-08-13. Ces lignes ne viennent pas d'une documentation.
+
+| Question | Réponse mesurée |
+| --- | --- |
+| L'identifiant du hook est-il celui de la télémétrie ? | **oui** — même valeur des deux côtés, sur deux sessions indépendantes |
+| Les tokens portent-ils la skill ? | **oui** — `skill.name` sur `claude_code.token.usage` |
+| Le coût aussi ? | **oui** — `skill.name` sur `claude_code.cost.usage`, en USD |
+| Le temps passé est-il mesuré ? | **oui** — `claude_code.active_time.total`, en secondes |
+| Les sous-agents sont-ils séparables ? | **oui** — `query_source` : `main`, `subagent`, `sdk`, `agent:builtin:<Type>` |
+| Le démarrage d'une skill est-il un événement ? | **oui** — `skill_activated`, avec `invocation_trigger` et `prompt.id` |
+
+Ce résultat retire l'hypothèse la plus fragile du jalon sur l'outil principal, et déplace la conception : **sur Claude Code, le journal des étapes est déjà émis par l'outil**. Le framework n'a plus qu'à fournir le rattachement à la tâche. Deux limites mesurées l'accompagnent : `skill.name` est collant, donc il sur-attribue à la dernière skill activée si deux skills s'entrelacent ; et un sous-agent Claude Code n'a pas d'identifiant propre, il partage celui du parent — l'inverse de Cursor.
+
+La conception qui en découle est décrite dans `aidd_docs/specs/2026_08/2026_08_13-work-tracking-linkage.md`.
+
 ## Faits qui cadrent la décision
 
 Convention de marquage, reprise de #618 : `[v]` = lu dans la source officielle à la date indiquée, avec la citation reportée en annexe. `[?]` = non documenté à l'endroit lu. Une cellule `[?]` reste `[?]` et n'est jamais comblée par une valeur plausible. Deux passes, 2026-08-13 : la seconde a rouvert Cursor et la documentation Codex, inaccessibles à la première. Sources en fin de document.
