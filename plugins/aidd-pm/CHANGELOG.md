@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.2](https://github.com/ai-driven-dev/framework/compare/aidd-pm-v2.4.1...aidd-pm-v2.4.2) (2026-08-14)
+
+
+### Refactoring
+
+* **aidd-pm:** migrate ticket-info, prd, and spec to router contract ([#628](https://github.com/ai-driven-dev/framework/issues/628)) ([f6539e2](https://github.com/ai-driven-dev/framework/commit/f6539e2c1d6564edf55b6fea983acd6362d2dd7e))
+
 ## [2.4.1](https://github.com/ai-driven-dev/framework/compare/aidd-pm-v2.4.0...aidd-pm-v2.4.1) (2026-08-07)
 
 
