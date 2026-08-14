@@ -15,6 +15,7 @@
   ],
   "packages": {
     ".": {
+      "release-as": "5.8.0",
       "extra-files": [
         {
           "type": "json",
