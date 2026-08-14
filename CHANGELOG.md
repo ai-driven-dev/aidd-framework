@@ -1,42 +1,5 @@
 # Changelog
 
-## [6.0.0](https://github.com/ai-driven-dev/framework/compare/v5.7.1...v6.0.0) (2026-08-14)
-
-
-### ⚠ BREAKING CHANGES
-
-* **refine:** `aidd-refine:03-condense` is removed, and the skills after it are renumbered: `04-shadow-areas` becomes `03-shadow-areas`, and `05-fact-check` becomes `04-fact-check`. Any pinned reference to the old names must be updated. The plugin no longer ships a hooks directory.
-
-### Features
-
-* **refine:** remove condense skill and its hook ([#624](https://github.com/ai-driven-dev/framework/issues/624)) ([e7e2c43](https://github.com/ai-driven-dev/framework/commit/e7e2c43819ca6e8f976d5d613c0b4dfc23e51019))
-
-
-### Bug Fixes
-
-* **aidd-context:** make 10-learn's recommendation step consistent ([#622](https://github.com/ai-driven-dev/framework/issues/622)) ([56bbb6e](https://github.com/ai-driven-dev/framework/commit/56bbb6e2d88e9d00e8bad304f59049709174389d))
-* **aidd-context:** make 10-learn's recommendation step consistent and enforce scope ([56bbb6e](https://github.com/ai-driven-dev/framework/commit/56bbb6e2d88e9d00e8bad304f59049709174389d)), closes [#561](https://github.com/ai-driven-dev/framework/issues/561)
-* **ci:** promote widens its window until it reproduces next ([#634](https://github.com/ai-driven-dev/framework/issues/634)) ([7090156](https://github.com/ai-driven-dev/framework/commit/70901567b1c66f3481a6f93eb4500e54d07efd9b))
-* **ci:** render the star history chart from the repo's own token ([#627](https://github.com/ai-driven-dev/framework/issues/627)) ([0bbd940](https://github.com/ai-driven-dev/framework/commit/0bbd94027944d3ec3d3fa5ce665e0755b9655f6f))
-* **cli:** transform codex marketplace skills ([#571](https://github.com/ai-driven-dev/framework/issues/571)) ([734c9c3](https://github.com/ai-driven-dev/framework/commit/734c9c39cad9b6f4f9ea181e320ff360d870741f))
-
-
-### Miscellaneous
-
-* **deps-dev:** bump @biomejs/biome from 2.5.6 to 2.5.7 in /cli ([#616](https://github.com/ai-driven-dev/framework/issues/616)) ([287a161](https://github.com/ai-driven-dev/framework/commit/287a161c443adbca10fb99c6d5224a1fbe705ed7))
-* **deps-dev:** bump @types/node from 26.1.2 to 26.2.0 in /cli ([#615](https://github.com/ai-driven-dev/framework/issues/615)) ([89fd4ea](https://github.com/ai-driven-dev/framework/commit/89fd4eac5113aa62b9075a91b33e51c386ee4dc3))
-* **deps-dev:** bump fast-check from 4.7.0 to 4.9.0 in /cli ([#607](https://github.com/ai-driven-dev/framework/issues/607)) ([2cd5aa6](https://github.com/ai-driven-dev/framework/commit/2cd5aa676a070def99e73cefc3007290303a8591))
-* **deps-dev:** bump js-yaml from 5.2.2 to 5.2.3 ([#605](https://github.com/ai-driven-dev/framework/issues/605)) ([99f4be1](https://github.com/ai-driven-dev/framework/commit/99f4be15f3f05f36e97cd34feb80c3bfb58bf1bf))
-* **deps-dev:** bump jscpd from 5.0.7 to 5.0.14 in /cli ([#606](https://github.com/ai-driven-dev/framework/issues/606)) ([74c15c2](https://github.com/ai-driven-dev/framework/commit/74c15c2d22067d1065de9bf4991a781394d938cf))
-* **deps-dev:** bump knip from 6.31.0 to 6.32.0 in /cli ([#613](https://github.com/ai-driven-dev/framework/issues/613)) ([6e1f6aa](https://github.com/ai-driven-dev/framework/commit/6e1f6aa3426a94cf2d16a47963b9c0b1453bfbc4))
-* **deps:** bump smol-toml from 1.6.1 to 1.7.1 in /cli ([#614](https://github.com/ai-driven-dev/framework/issues/614)) ([b766a31](https://github.com/ai-driven-dev/framework/commit/b766a3163d4793c36bf22737a6572ead1726c5b8))
-
-
-### Refactoring
-
-* **aidd-context:** project memory shows what it would change before writing ([#633](https://github.com/ai-driven-dev/framework/issues/633)) ([a9d5b0b](https://github.com/ai-driven-dev/framework/commit/a9d5b0b20a4812857cff2e15c9f3dfe97456003b))
-* **aidd-pm:** migrate ticket-info, prd, and spec to router contract ([#628](https://github.com/ai-driven-dev/framework/issues/628)) ([f6539e2](https://github.com/ai-driven-dev/framework/commit/f6539e2c1d6564edf55b6fea983acd6362d2dd7e))
-
 ## [5.7.1](https://github.com/ai-driven-dev/framework/compare/v5.7.0...v5.7.1) (2026-08-07)
 
 
