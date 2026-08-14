@@ -24,29 +24,44 @@ C'est l'hypothèse qui porte tout le montage : l'identifiant qu'un hook voit est
 | Claude Code | `session_id` | `session.id` sur métriques et événements | **oui**, sur deux sessions indépendantes | deux sessions réelles |
 | Codex CLI | `session_id` | `conversation.id` sur `codex.sse_event` | **oui** | **zéro token** |
 | GitHub Copilot | `sessionId` | `gen_ai.conversation.id` sur le span `invoke_agent` | **oui** | **zéro crédit** |
-| Cursor | `conversation_id` | `cursor.conversation.id` sur les logs | **non testable, voir plus bas** | — |
+| Cursor | `conversation_id`, plus `session_id` et `generation_id` | `cursor.conversation.id` sur les logs | hooks prouvés, **export non mesurable** | un tour réel : Cursor valide tout avant d'ouvrir la session |
 | OpenCode | aucun | aucun | sans objet | rien à tester |
 
 Les identifiants sont fabriqués côté client, avant tout appel au modèle. Un appel qui échoue produit donc quand même le démarrage de session, l'invocation du hook et l'événement de télémétrie : **Codex et Copilot se testent sans consommer de quota**, en pointant le fournisseur vers une adresse qui ne répond pas. C'est la méthode à retenir pour la vérification continue.
 
-### Cursor, trois obstacles empilés
+### Cursor est instrumentable en ligne de commande
 
-La sonde a été écrite et lancée. Elle n'a rien produit, et la raison compte davantage que le résultat manquant.
+C'était la question de périmètre du jalon, et la sonde y répond : **`cursor-agent` lit bien `.cursor/hooks.json`.** La documentation ne décrivant que des moments de l'éditeur, jusqu'à `workspaceOpen`, le doute était légitime ; il est levé sur données réelles. Cursor peut donc figurer dans une couche installée par une CLI.
 
-1. **Cursor valide l'authentification avant d'ouvrir la session.** Une clé factice est rejetée d'emblée — « The provided API key is invalid » — donc aucun hook ne tire. L'astuce qui rend les tests Codex et Copilot gratuits ne fonctionne pas ici : chez eux la session démarre puis l'appel modèle échoue, chez Cursor rien ne démarre.
-2. **La documentation des hooks ne parle que de l'éditeur.** Les moments listés sont ceux de l'IDE, jusqu'à `workspaceOpen`, et rien n'affirme que `cursor-agent`, le binaire en ligne de commande, lit `.cursor/hooks.json`. Tant que ce point n'est pas établi, **on ignore si Cursor est instrumentable depuis une installation en ligne de commande**, ce qui est le seul mode dont dispose la CLI AIDD.
-3. **L'export OpenTelemetry est un réglage d'équipe en plan Enterprise, en bêta.** Même avec les hooks qui tirent, il n'y a rien à comparer sans un compte de ce type.
+Trois refus successifs ont dû être franchis avant d'y arriver, et chacun est une information : Cursor valide la clé d'API, puis le nom du modèle, puis la confiance de l'espace de travail — **avant** d'ouvrir la session. C'est pourquoi l'astuce qui rend les tests Codex et Copilot gratuits ne s'applique pas ici : chez eux la session démarre puis l'appel échoue, chez Cursor rien ne démarre tant que tout n'est pas valide. Vérifier Cursor coûte donc un vrai tour de modèle.
 
-Le point 2 est le plus lourd de conséquences : il ne s'agit plus d'une vérification en attente mais d'une question de périmètre. Si les hooks Cursor sont réservés à l'éditeur, Cursor ne peut pas figurer dans la couverture d'une couche installée par une CLI, et il faut le dire dans le tableau plutôt que le laisser en promesse.
+Ce que le payload contient, relevé et non lu :
 
-Ce qui débloquerait, dans l'ordre du moins cher au plus cher : une connexion `cursor-agent login` pour savoir si le binaire honore `.cursor/hooks.json` ; puis un compte Enterprise avec l'export d'équipe activé pour fermer l'égalité d'identifiant.
+```txt
+session_id           7059918f-ce9d-49ed-a33f-0f1906a79f27
+conversation_id      7059918f-ce9d-49ed-a33f-0f1906a79f27
+generation_id        7059918f-ce9d-49ed-a33f-0f1906a79f27
+model, user_email, workspace_roots, transcript_path,
+cursor_version, is_background_agent, hook_event_name
+sessionEnd ajoute    final_status, duration_ms
+```
 
-### Deux verrous qui rendent un hook inerte
+**Trois identifiants, pas un**, là où la documentation n'en décrit qu'un. Sur une session à un seul tour ils portent la même valeur, ce qui est un piège : rien ne dit qu'ils restent égaux sur plusieurs tours, et `generation_id` est précisément le genre de nom qui change à chaque génération. Le journal doit donc stocker `conversation_id`, le seul que la documentation qualifie de « stable across many turns », et non le premier des trois qui passe. Une sonde à deux tours reste à faire pour confirmer que les deux autres divergent.
 
-Trouvés en faisant tirer les sondes, pas dans une documentation. Ce sont exactement les cas que le `status` de #617 doit signaler comme cassés plutôt que sains.
+Il reste que l'export OpenTelemetry de Cursor est un réglage d'équipe en plan Enterprise, en bêta : l'égalité d'identifiant entre le hook et l'export n'est toujours pas mesurable, faute d'un compte de ce type.
 
-- **Codex.** Les hooks n'ont rien émis avant l'ajout de `--enable hooks` **et** de `--dangerously-bypass-hook-trust`. Ils sont derrière un drapeau de fonctionnalité et derrière un mécanisme de confiance persistée. Un hook posé sur un poste où la confiance n'a pas été accordée est installé et muet.
-- **Copilot.** Un fichier `.github/hooks/*.json` n'a rien émis dans un dossier non approuvé ; le même contenu en périmètre utilisateur, sous `$COPILOT_HOME/hooks/`, a fonctionné immédiatement. La documentation ne le dit qu'en creux, en précisant que seuls les hooks de politique machine chargent « regardless of folder trust state ».
+### Les quatre outils verrouillent leurs hooks, chacun à sa façon
+
+Trouvé en faisant tirer les sondes, jamais dans une documentation. Aucune sonde n'a fonctionné du premier coup, et le motif est le même partout : **écrire le fichier de hook ne suffit pas, il faut aussi lever un verrou.** C'est un sujet d'installation à part entière, et exactement l'état que le `status` de #617 doit signaler comme cassé plutôt que sain.
+
+| Outil | Verrou | Levée |
+| --- | --- | --- |
+| Codex | drapeau de fonctionnalité **et** confiance persistée | `--enable hooks` et `--dangerously-bypass-hook-trust` |
+| Copilot | confiance du dossier pour `.github/hooks/*.json` | périmètre utilisateur sous `$COPILOT_HOME/hooks/`, qui n'est pas soumis à la confiance |
+| Cursor | confiance de l'espace de travail | `--trust`, ou une approbation interactive |
+| Claude Code | aucun | — |
+
+Un hook posé sans lever le verrou est installé, silencieux, et ne produit aucune erreur. C'est le pire état possible pour une couche de mesure : la configuration paraît complète et la donnée n'existe pas.
 
 ### Le reste, mesuré sur Claude Code
 
@@ -369,7 +384,8 @@ Chaque ligne est calculable avec ce qui précède. Aucune n'exige un format mais
 
 ## Ce qui reste non vérifié
 
-- L'égalité d'identifiant est prouvée sur Claude Code, Codex et Copilot. **Cursor reste entièrement ouvert**, et pas seulement faute de compte : rien n'établit que son binaire en ligne de commande lit `.cursor/hooks.json`. La ligne Cursor du tableau de couverture est une promesse, et elle pourrait devoir être retirée plutôt que confirmée.
+- L'égalité d'identifiant est prouvée sur Claude Code, Codex et Copilot. **Sur Cursor elle reste ouverte** : ses hooks fonctionnent bien en ligne de commande, mais son export exige un compte Enterprise avec la diffusion d'équipe activée, donc il n'y a rien à comparer.
+- **Lequel des trois identifiants Cursor est celui de l'export.** Ils coïncident sur une session à un tour ; une sonde à deux tours dirait si `generation_id` et `session_id` s'en détachent.
 - L'égalité est prouvée par une session, pas par construction. Elle peut se rompre à une mise à jour d'outil. La sonde étant gratuite sur Codex et Copilot, elle a sa place dans l'intégration continue plutôt que dans une vérification ponctuelle.
 - La survie de l'identifiant à une reprise, un `clear`, une compaction ou un fork. Aucun outil ne le documente, et le banc de test actuel ne la couvre pas.
 - Le coût réel du frottement : un run réécrit à chaque tour salit l'arbre de travail. À trancher entre écrire hors du dépôt pendant la session et matérialiser au commit, ou assumer le bruit.

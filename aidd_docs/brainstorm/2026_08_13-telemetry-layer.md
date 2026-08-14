@@ -15,7 +15,7 @@ Deux sessions réelles sur Claude Code 2.1.232, télémétrie OTLP capturée par
 
 | Question | Réponse mesurée |
 | --- | --- |
-| L'identifiant du hook est-il celui de la télémétrie ? | **oui** — sur Claude Code, Codex et Copilot, une session par outil. Cursor reste entièrement ouvert, voir plus bas |
+| L'identifiant du hook est-il celui de la télémétrie ? | **oui** — sur Claude Code, Codex et Copilot, une session par outil. sur Cursor les hooks sont prouvés mais l'export exige un compte Enterprise |
 | Les tokens portent-ils la skill ? | **oui** — `skill.name` sur `claude_code.token.usage` |
 | Le coût aussi ? | **oui** — `skill.name` sur `claude_code.cost.usage`, en USD |
 | Le temps passé est-il mesuré ? | **oui** — `claude_code.active_time.total`, en secondes |
@@ -24,7 +24,7 @@ Deux sessions réelles sur Claude Code 2.1.232, télémétrie OTLP capturée par
 
 Les identifiants étant fabriqués côté client, avant tout appel au modèle, **Codex et Copilot se vérifient sans consommer un seul token** : on pointe le fournisseur vers une adresse qui ne répond pas, la session démarre quand même, le hook tire et la télémétrie part. La sonde a donc sa place dans l'intégration continue, pas seulement dans une vérification ponctuelle.
 
-Deux verrous trouvés en faisant tirer les sondes, et que le `status` de #617 doit signaler comme cassés plutôt que sains : les hooks Codex n'émettent rien sans `--enable hooks` **et** sans confiance persistée accordée ; les hooks Copilot de niveau dépôt n'émettent rien dans un dossier non approuvé, là où le périmètre utilisateur fonctionne immédiatement. Dans les deux cas le hook est installé et muet.
+**Aucune sonde n'a fonctionné du premier coup, et toujours pour la même raison : écrire le fichier de hook ne suffit pas, il faut lever un verrou.** Codex exige `--enable hooks` et une confiance persistée ; Copilot ignore `.github/hooks/*.json` dans un dossier non approuvé mais honore le périmètre utilisateur ; Cursor réclame `--trust` ou une approbation interactive ; Claude Code seul n'oppose rien. Un hook posé sans lever le verrou est installé, silencieux, et ne lève aucune erreur — le pire état pour une couche de mesure, puisque la configuration paraît complète et que la donnée n'existe pas. C'est un sujet d'installation à part entière pour #617.
 
 Ce résultat retire l'hypothèse la plus fragile du jalon sur les trois outils testés, et déplace la conception : **sur Claude Code, le journal des étapes est déjà émis par l'outil**. Le framework n'a plus qu'à fournir le rattachement à la tâche. Deux limites mesurées l'accompagnent : `skill.name` est collant, donc il sur-attribue à la dernière skill activée si deux skills s'entrelacent ; et un sous-agent Claude Code n'a pas d'identifiant propre, il partage celui du parent — l'inverse de Cursor.
 
@@ -54,7 +54,7 @@ Convention de marquage, reprise de #618 : `[v]` = lu dans la source officielle �
 ### Deux pièges de configuration repérés à la vérification
 
 - **Codex exporte ses métriques vers Statsig par défaut.** `otel.metrics_exporter` a pour valeur par défaut `statsig`, et non `none`. Activer la télémétrie Codex sans toucher cette clé envoie donc des métriques à un tiers. La CLI doit la poser explicitement, et le `status` doit la lire.
-- **Cursor est peut-être hors de portée d'une installation en ligne de commande.** Deux obstacles distincts, et le second est le plus lourd. D'abord l'export : réglage d'équipe, plan Enterprise, en bêta — une démarche d'administrateur, pas une case que la CLI coche. Ensuite les hooks : la documentation ne décrit que des moments de l'éditeur, jusqu'à `workspaceOpen`, et rien n'affirme que le binaire `cursor-agent` lit `.cursor/hooks.json`. La sonde n'a pas pu trancher, Cursor refusant d'ouvrir une session sans authentification valide. Tant que ce point n'est pas établi, la couverture Cursor n'est pas une vérification en attente mais une question de périmètre.
+- **Cursor est instrumentable en ligne de commande, c'est mesuré.** `cursor-agent` lit bien `.cursor/hooks.json`, alors que la documentation ne décrit que des moments de l'éditeur — le doute est levé. Reste que son export est un réglage d'équipe en plan Enterprise, en bêta : une démarche d'administrateur, pas une case que la CLI coche. Et son payload porte trois identifiants là où la documentation n'en décrit qu'un, égaux sur une session à un tour, ce qui n'autorise pas à les croire interchangeables.
 
 ### Ce que le dépôt a déjà tranché
 
