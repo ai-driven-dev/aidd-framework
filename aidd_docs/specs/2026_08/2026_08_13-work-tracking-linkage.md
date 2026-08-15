@@ -340,36 +340,24 @@ D'où la question « combien a coûté cet epic » se répond en descendant les 
 
 ## Comment les tokens rejoignent une étape
 
-Deux chemins, choisis par le champ `tool` du run. C'est le seul endroit du système qui dépend de l'outil.
+Mesuré, et différent de ce que la première rédaction supposait.
 
-```mermaid
-flowchart LR
-  RUN["run.json<br/>tool, vendor_id, dates"] --> Q{"tool ?"}
-  Q -- "claude-code" --> A["jointure directe<br/>skill.name est déjà<br/>sur le compteur"]
-  Q -- "cursor · codex · copilot" --> B["jointure par le temps<br/>from/to de l'étape<br/>+ vendor_id"]
-  Q -- "opencode" --> C["aucune donnée"]
-  A --> OUT["tokens, coût, modèle<br/>par étape"]
-  B --> OUT
-```
+**Le total par session** vient des métriques : `claude_code.token.usage` et `claude_code.cost.usage` portent toutes deux `session.id`, et `claude_code.active_time.total` donne le temps.
 
-**Chemin direct, Claude Code.** La télémétrie porte déjà `skill.name` sur `token.usage` et `cost.usage`. Rien à calculer : on filtre. Le `metadata.json` ne sert alors qu'à savoir de quelle *tâche* il s'agit — la seule chose que l'outil ne peut pas savoir.
+**Le découpage par étape ne peut pas venir des métriques.** `skill.name` y vaut la chaîne littérale `third-party` pour toutes les skills AIDD, et `OTEL_LOG_TOOL_DETAILS=1` ne le lève pas — ni sur les métriques, ni sur l'événement `api_request`. Le vrai nom n'apparaît que sur l'événement `skill_activated`.
 
-**Chemin temporel, les trois autres.** L'étape a couru de 10h10 à 11h05 sur la session `vendor_id` : on somme les tokens de cette fenêtre. C'est pour cette raison que les `from` et `to` de chaque étape ne sont pas décoratifs — sur trois outils sur quatre, **ce sont eux qui portent l'attribution**. Précision moindre, mécanisme identique.
+La jointure est donc une **corrélation d'événements, et elle est exacte** — pas une fenêtre de temps approximative. Relevé sur session réelle :
 
-Un nouvel outil ajouté au framework, c'est une ligne dans ce branchement, et rien d'autre à toucher.
+| Événement | Ce qu'il porte |
+| --- | --- |
+| `skill_activated` | le vrai `skill.name`, avec `session.id`, `prompt.id`, `event.sequence` |
+| `api_request` | `input_tokens`, `output_tokens`, `cache_*`, `cost_usd`, `model`, `query_source`, avec `session.id`, `prompt.id`, `event.sequence` |
 
-## Le vocabulaire à ajouter à OpenTelemetry
+**La règle :** dans une session, ordonner par `event.sequence`, et reporter le dernier `skill_activated` observé sur les `api_request` qui suivent, jusqu'au suivant.
 
-Quatre attributs, et pas un de plus. Tout le reste existe déjà chez les fournisseurs.
+Ce report n'est pas un contournement : il épouse exactement le comportement collant de `skill.name`, qui désigne la dernière skill activée. Deux skills entrelacées restent mal attribuées — c'est une propriété du fournisseur, pas de la lecture, et la sortie doit le dire au lieu de le masquer.
 
-| Attribut | Valeur | Pourquoi il n'existe pas déjà |
-| --- | --- | --- |
-| `aidd.id` | l'identifiant chapeau | aucun outil ne connaît notre unité de travail |
-| `aidd.task_id` | le dossier de livraison | idem |
-| `aidd.type` | `feature`, `bug`, `spike`, `chore` | idem |
-| `aidd.step` | l'identifiant de skill | Claude Code émet déjà `skill.name` ; les autres non |
-
-Là où l'outil accepte des attributs personnalisés, ils partent dans la télémétrie et la jointure disparaît. Mesuré : Claude Code lit un bloc `env` de `settings.json` « applied to every session » et attache ces valeurs « on every metric datapoint and event record ». Donc `aidd.task_id` par projet est acquis sans rien lancer. Un `aidd.id` qui change à chaque session demanderait un lanceur, ce que la CLI n'est pas aujourd'hui — d'où le `runs/` qui tient la correspondance en attendant.
+Le même mécanisme vaudra pour les autres outils, à ceci près qu'aucun n'émet d'équivalent de `skill_activated` : là, les frontières d'étape devront être émises par le framework lui-même.
 
 ## Ce qui manque dans les templates existants
 
@@ -424,7 +412,7 @@ Chaque ligne est calculable avec ce qui précède. Aucune n'exige un format mais
 
 ## Non-goals
 
-- Le collecteur, son stockage et sa rétention. Le framework configure l'export, il n'héberge rien.
+- Le stockage longue durée, l'agrégation et toute UI. Un puits local minimal est en revanche **dans** le périmètre : Claude Code n'expose aucun exportateur fichier, donc sans point de réception rien n'est relisible après la session.
 - Le calcul de coût pour Codex et Cursor, qui n'exportent pas de montant : il faudra une table de prix, et elle n'est pas dans ce périmètre.
 - OpenCode n'est plus hors jeu, et cette spec ne le couvre pas encore. Posé `experimental.openTelemetry` dans `opencode.json`, il exporte en OTLP, honore `OTEL_RESOURCE_ATTRIBUTES`, et ses spans `ai.streamText` portent `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` **et** `session.id` sur le même span : les tokens par session y sont donc atteignables, sans coût exporté. Reste à mesurer si un plugin voit ce même `session.id`. Deux réserves : la documentation publique ne mentionne rien et la demande amont `anomalyco/opencode#14246` est sans réponse, donc l'interface peut bouger sans préavis ; et le volume est considérable, 495 spans pour une session triviale, ce qui impose un échantillonnage.
 - L'installation de l'export Cursor : c'est un réglage d'équipe en plan Enterprise, la CLI peut le vérifier mais pas le poser.
