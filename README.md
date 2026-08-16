@@ -2,13 +2,13 @@
 
 <img src="docs/assets/logo.png" alt="AIDD" width="100" />
 
-# The AI-Driven Dev Framework 🇫🇷
+# AI-Driven Dev Framework
 
-`Open source` agnostic framework **to generate high quality clean code**.
+## Enterprise-grade SDLC for high-quality software development.
 
-_(Already tested on `Legacy` codebases)_
+Unify **engineering teams** around **standardized workflows** and **shared best practices**, across modern stacks and **legacy systems**, while reducing **technical debt**.
 
-[![Made in France](https://img.shields.io/badge/made%20in-France-0055A4?labelColor=EF4135)](https://www.ai-driven-dev.fr/)
+🧱 **IDE agnostic** · 🏗️ **Legacy systems** · 🌱 **Token-optimized** · 🇫🇷 **Made in France**
 
 <p>
   <!--counts:start--><kbd>7 plugins</kbd> · <kbd>47 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
