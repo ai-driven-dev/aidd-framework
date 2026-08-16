@@ -52,6 +52,12 @@ The last row is what makes this safe: unrecognised means silent, so a fifth tool
 or a changed path shape degrades to writing nothing rather than to writing a
 wrong `tool` field.
 
+The Codex segment was recorded under a probe `CODEX_HOME`, so it could have been
+an artefact of the probe. Checked against the default home: `~/.codex/sessions/`
+holds `2026/04/24/rollout-<iso>-<uuid>.jsonl`. The shape is the tool's, not the
+probe's. Both hosts end in `.jsonl`, and they are disjoint on `/projects/` versus
+`/sessions/`; Codex is tested first regardless.
+
 ## Architecture projection
 
 ```txt
@@ -98,8 +104,20 @@ user project, so a test folder there ships to them.
    existence check, no config format, no CLI, no network call, and no repository
    visibility detection — a project opts in by committing the directory, and the
    failure direction is off.
+   The directory that authorises is not the directory that receives, and until
+   task 4 ships it stays empty in git. Two things follow. Its `.gitkeep` carries
+   a one-line README beside it saying what committing the directory turns on, so
+   a reviewer six months out reads an intention rather than an accident. And
+   `status` (#617) must report that state as **on, not yet materialised** — the
+   gate is open, the journal is being written out of the repository, nothing has
+   landed in it. Reporting it as "on" would hide a missing half; reporting it as
+   "not wired" would claim a failure that is not one.
 4. `run_id`: a ULID minted at `SessionStart`, stored in the file whose name it
    is. Reused on `Stop` by looking the file up on `vendor_id`.
+   `vendor_field` names the **export-side attribute**, so `session.id` on Claude
+   Code — not `session_id`, the hook field it was read from. The only consumer is
+   #629's join, which queries telemetry; a reader handed the hook's field name
+   would have nothing to look it up by.
 5. `project_id`: derived from `git remote get-url origin` as `owner/repo`,
    falling back to the repository root's basename. Never stored — #646 pushes
    the same value into `OTEL_RESOURCE_ATTRIBUTES` and must derive it by the same
@@ -118,6 +136,14 @@ user project, so a test folder there ships to them.
 
 1. Read `.aidd/current-task` if present. Absent → the interval carries
    `task_id: null`, which is out-of-flow work and a normal state.
+   The pointer is deliberately ephemeral, and gitignoring it is the point rather
+   than an oversight: it answers "what is being worked on right now", it is
+   written by the planning and implementation skills, and a fresh clone
+   legitimately has no answer until one of them runs. `aidd clean` wiping it
+   mid-work costs one interval boundary, and the next skill invocation rewrites
+   it. What must not happen is `status` reading an absent pointer as a broken
+   installation — #617 distinguishes *no pointer* from *pointer stale* from
+   *hook silent*, and only the last two are faults.
 2. On `Stop`, close the open interval and open a new one when the pointer's
    value has changed. Two concurrent sessions in one checkout share the pointer;
    last-writer-wins plus an interval boundary records the mis-attribution

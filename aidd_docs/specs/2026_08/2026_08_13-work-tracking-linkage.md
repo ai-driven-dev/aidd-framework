@@ -269,7 +269,7 @@ Cas dégénéré, à accepter comme normal : un dossier de livraison sans artefa
 }
 ```
 
-`vendor_field` porte le nom du champ chez l'outil, parce qu'il diffère partout : `session.id` chez Claude Code, `conversation_id` chez Cursor, `sessionId` chez Copilot, `session_id` chez Codex. Le lecteur en aval sait ainsi quoi interroger, sans table codée en dur.
+`vendor_field` porte le nom de l'attribut **du côté export**, parce qu'il diffère partout : `session.id` chez Claude Code, `conversation.id` chez Codex, `gen_ai.conversation.id` chez Copilot, `cursor.conversation.id` chez Cursor. Le lecteur en aval sait ainsi quoi interroger, sans table codée en dur — et c'est bien la télémétrie qu'il interroge, pas le hook. Le champ côté hook, lui, n'a pas besoin d'être stocké : il a déjà donné sa valeur dans `vendor_id`.
 
 `task_id` à `null` est un état normal, pas une anomalie : c'est le travail hors flux.
 
