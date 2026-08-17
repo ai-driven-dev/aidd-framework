@@ -1,59 +1,100 @@
 ---
-objective: "Sequence the telemetry work across three milestones; the issues hold the content."
+objective: "Build the run journal: every session leaves a durable record tying it to a task, and never a measurement."
 status: pending
 type: plan
 ---
 
-# Plan: telemetry, three milestones
+# Plan: the run journal
 
 ## Overview
 
 | Field | Value |
 | --- | --- |
-| **Goal** | Sequence the work. The issues, not this file, hold what to build |
-| **Source** | Milestones 14, 15 and 16 on `ai-driven-dev/framework` |
+| **Goal** | A plugin whose hooks journal every session, one file per session |
+| **Specification** | `ai-driven-dev/framework#620` |
 | **Design** | `aidd_docs/specs/2026_08/2026_08_13-work-tracking-linkage.md` |
 | **Evidence** | `aidd_docs/brainstorm/2026_08_13-telemetry-layer.md` |
 
-This file deliberately carries no design. An earlier version described the hooks' owning plugin, the way a task is resolved, the CLI surface and the join — and every one of those four claims was falsified by measurement within two days, while remaining readable as instructions. A plan that restates its issues drifts from them silently, and the drift is invisible until someone builds the wrong thing.
+An earlier version of this file indexed three milestones and their issues. That
+index is gone. This repository's GitHub issues **are** its backlog, and
+`persistence.md` is explicit — "Never mirror one Story across supports". A plan
+that restates its issues creates a second truth that drifts silently, which is
+what already happened once here: four load-bearing claims were falsified by
+measurement in two days while remaining readable as instructions.
 
-What follows is only the order, and why.
+So this file plans the building. What to build lives in #620, once.
 
-## Milestone 14 — one figure, on one tool
+## What is proven, and what it forces
 
-| Issue | Type | Role |
+Both were measured on 2026-08-16, because both were premises the plan would have
+rested on.
+
+**Installing the plugin activates its hooks.** No `plugin.json` in this
+repository declares a `hooks` key, so the mechanism might have reached users only
+through `aidd framework build` — in which case "do not install it" is not the
+opt-out and the CLI does wire per tool. Probed with the local marketplace under
+an isolated `CLAUDE_CONFIG_DIR`: after installing `aidd-context`, one session
+filled the `<aidd_project_memory>` block. Discovery is by convention.
+
+The same probe gave the acceptance method for everything below: **the hook fired
+on a session that ended `Not logged in`.** Session start is minted client-side,
+so verifying the journal consumes nothing.
+
+**The host cannot be read from field names, and must not be read from the
+environment.** Claude Code and Codex hand a `SessionStart` hook the same five
+keys — `session_id`, `transcript_path`, `cwd`, `source`, `hook_event_name`.
+Environment is actively wrong: a Codex session launched from inside a Claude Code
+session inherits `CLAUDECODE`, `CLAUDE_CODE_SESSION_ID` and `CLAUDE_PID` from its
+parent, and nesting is the normal case in this project.
+
+This is why phase 2 exists as its own phase. Host detection is not a line inside
+the write path; it is the thing most likely to be silently wrong, so it is built
+and proven before anything is written.
+
+## Phases
+
+| # | Phase | Ends when |
 | --- | --- | --- |
-| #632 | Spike, closed | the measurement campaign that grounds everything below |
-| #618 | Bug | per-tool facts, corrected and dated |
-| #620 | Task | the `aidd-telemetry` plugin and its run journal |
-| #646 | Feature | the one CLI gesture: turn the provider export on |
-| #647 | Task | a readable sink, since no file exporter exists |
-| #617 | Feature | the skill that proves the pipe flows |
-| #629 | Feature | the skill that reports the figure |
+| 1 | [Plugin shell and test runner](./phase-1.md) | the plugin installs, does nothing, and `node --test` runs in `lefthook` |
+| 2 | [Host gate](./phase-2.md) | four recorded payloads replay, one is recognised, three exit 0 |
+| 3 | [Opt-in and location](./phase-3.md) | a session writes one file outside the repository, only when opted in |
+| 4 | [The record](./phase-4.md) | that file carries exactly the ten keys, refreshed each turn |
+| 5 | [Attachment](./phase-5.md) | a session that switches task produces two intervals |
+| 6 | [Materialisation at commit](./phase-6.md) | **confirm the owner first** — see below |
 
-Parallel: #618 and #650 depend on nothing. #620, #646 and #647 can proceed together once the endpoint contract between #646 and #647 is fixed. #617 and #629 follow.
+Phases 1 to 5 are reversible: everything they write lives outside the repository
+and can be deleted without trace. Phase 6 is not.
 
-## Milestone 15 — the board sees the whole feature
+## The decision phase 6 waits on
 
-#648 epic, with #649 task identity, #650 artefact types, #651 the board reading execution.
+Session records live outside the repository and are materialised into
+`aidd_docs/runs/` at commit. The plugin cannot own that step — its hooks only see
+sessions, and a commit can be made by a human with none running. Only git knows a
+commit happened, so the trigger is a git `post-commit` hook installed by the CLI
+gesture of #646.
 
-#650 blocks nothing and unblocks #651; pulling it into milestone 14 costs nothing.
+It is also the only step that puts who-worked-on-what-and-for-how-long into
+permanent git history, which #652 says cannot ship without an organisational
+decision. Confirm the owner before building it; build phases 1 to 5 regardless.
 
-## Milestone 16 — aggregate across tools and people
+## Standing rules for every phase
 
-#652 epic, with #653 the four remaining tools, #654 the price table, #655 upload-path redaction, #656 per-person reporting, #630 the commit trailer.
-
-This milestone cannot start before the anonymity decision is settled. #297 recorded anonymised identifiers as a decision of record; per-person reporting reverses it. That reversal is an organisational call, not an engineering one.
-
-## Decisions that belong here rather than to any single issue
-
-- **Claude Code first and alone**, through milestone 14. The mechanics are identical elsewhere; only the export configuration and the gate differ. Widening before proving multiplies the causes of failure.
-- **Do not wait on #585.** `.aidd/config.yml` exists in no code and the CLI uses no YAML parser. The one key needed fits the JSON already read from `.aidd/`. When #585 lands, that is a line of reading to move.
-- **The plugin carries the hooks; the CLI carries one gesture.** A plugin's `settings.json` accepts only `agent` and `subagentStatusLine`, and unknown keys are silently ignored, so a plugin cannot switch a provider export on. Everything else that reads belongs to skills.
+- **Exit 0 on every failure path.** A measurement layer that breaks a session is
+  worse than one that misses a session.
+- **No token, cost, model or duration in any file.** Those change mid-session and
+  come from telemetry; the journal only makes them joinable.
+- **One writer per file.** One file per session is what makes parallel worktrees
+  conflict-free, and it is not an optimisation to revisit.
+- **Tests live in `scripts/__tests__/`.** The build copies `hooks/` recursively
+  into every user project, so a test folder inside the plugin ships to them —
+  `docs/ARCHITECTURE.md` states this.
 
 ## Resources
 
-- The issues above, which are the specification.
-- `plugins/aidd-context/hooks/` — the proven bundled-hook pattern.
-- `cli/src/application/commands/` — where the one CLI gesture lands.
-- The probes from the measurement campaign, reusable as acceptance tests.
+- #620, the specification. Its comment thread carries the closed decisions.
+- `plugins/aidd-context/hooks/` — the proven bundled-hook pattern, and what the
+  activation probe exercised.
+- `cli/.../framework/strategies/tool-contracts.ts`, `hooksBundle` — copies
+  `hooks/` into all five tool targets with no exclusion mechanism. This is why
+  the plugin must be separate rather than a folder in an existing one.
+- The recorded hook payloads, one per host, reused as fixtures in phase 2.
