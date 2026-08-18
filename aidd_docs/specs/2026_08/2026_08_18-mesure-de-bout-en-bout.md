@@ -39,7 +39,8 @@ Une seule étape est construite : **observer**. Elle produit la clé de jointure
 | configurer | CLI | `.aidd/config.json` | #646 |
 | émettre | CLI écrit, l'outil émet | `.claude/settings.local.json` | #646 |
 | observer | hook | `aidd_docs/runs/<id>.json` | **#620 fait** |
-| observer les étapes | hook | frontières d'étape | #663 |
+| observer les étapes | hook | frontières d'étape, début **et** fin | #663 |
+| relier au backlog | skills | `tasks/<mois>/<id>/metadata.json` | #649 |
 | collecter | service | le collecteur | #647 |
 | présenter | skill | le rapport | #629 |
 | expédier | à décider | — | #662, #655 |
@@ -83,8 +84,8 @@ Ce n'est pas du bruit, c'est structurel. Une frontière émise par le framework 
 | `.aidd/config.json` | CLI | l'interrupteur AIDD, l'endpoint |
 | `.claude/settings.local.json` | CLI | les variables OTEL |
 | `aidd_docs/runs/<id>.json` | hook | session ↔ tâche ↔ créneaux |
-| frontières d'étape | hook | nom réel · début · fin · `run_id` |
-| `metadata.json` | skills | livraison ↔ backlog |
+| frontières d'étape | hook | nom réel · **début et fin** · `run_id` |
+| `aidd_docs/tasks/<mois>/<task_id>/metadata.json` | skills | livraison ↔ backlog, **une entrée par étape avec son `run_id`** |
 | le collecteur | service | `cost_usd` par appel, identité salée |
 
 AIDD n'a ni serveur ni démon : **chaque jointure est un fichier**. Donc le contrat n'est pas du code partagé, c'est un schéma versionné dans un dossier `schemas/`, publiable comme Claude publie les siens. Le hook reste bête et sans dépendance : il n'importe rien, il écrit du JSON conforme, et un test confronte sa *sortie réelle* au schéma.
@@ -100,9 +101,22 @@ AIDD n'a ni serveur ni démon : **chaque jointure est un fichier**. Donc le cont
 
 **L'heure ne choisit jamais une session.** Les horodatages sont déjà tous en UTC — le fuseau n'a jamais été le problème. La concurrence, si.
 
+## L'imbrication n'est pas un blocage
+
+La sonde a vu `invocation_trigger: "nested-skill"`, et j'en avais fait une question ouverte. C'en est une pour le **rapport**, jamais pour la **trace**.
+
+Enregistrer un début **et** une fin par invocation suffit : `PreToolUse` et `PostToolUse` déclenchent tous les deux sur `Skill`. L'imbrication devient alors **déductible** au lieu d'être un choix de modèle figé à l'écriture — exactement comme un profileur distingue le temps propre du temps total.
+
+| Question | Réponse |
+| --- | --- |
+| qu'a fait cette session ? | la suite des débuts et fins, sans ambiguïté |
+| combien a coûté l'étape A seule ? | coût propre : A moins ce qui tourne dedans |
+| combien a coûté A avec tout ce qu'elle a déclenché ? | coût total : de son début à sa fin |
+
+Le corollaire compte autant : **une skill appelée hors du flux standard est une étape comme une autre.** Personne n'est contraint de suivre le parcours, et c'est justement ce qui rend la mesure utile — une tâche passée de la spécification à l'implémentation sans revue se voit, au lieu d'être supposée.
+
 ## Ce qui reste ouvert
 
-- **Les skills s'imbriquent-elles ou se suivent-elles ?** La seconde skill mesurée portait `invocation_trigger: "nested-skill"`. Si elles s'imbriquent, découper le coût à plat est un choix de modèle et non un fait. Périmètre de #663.
 - **Un projet finit-il avec deux fichiers de config ?** #585 prévoyait du YAML pour la politique humaine ; la télémétrie impose du JSON, parce qu'un hook sans dépendance ne lit pas de YAML. Un seul format et on perd les commentaires, ou deux et on perd la règle.
 - **Les fiches quittent-elles la machine, et par où ?** Commitées dans git, ou expédiées. L'une est irréversible et lisible par quiconque clone, l'autre est révocable.
 - **Anonyme ou nommé ?** Reporté, et sans risque : la fiche ne porte jamais de champ auteur, et l'identité du fournisseur est remplacée par une étiquette salée dès l'entrée. Tant qu'aucun nom n'est écrit, les deux modes restent ouverts.
