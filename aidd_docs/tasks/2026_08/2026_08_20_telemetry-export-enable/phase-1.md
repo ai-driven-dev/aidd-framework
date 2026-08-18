@@ -35,16 +35,31 @@ be delegated to a provider's setting.
 
 ### `1)` The file
 
-1. `aidd_docs/telemetry.json`, committed, so the answer survives a clone and
+1. `.aidd/config.json`, committed, so the answer survives a clone and
    binds the project rather than whoever ran a command.
 2. Minimum keys: whether AIDD telemetry is on, and the endpoint records are meant
    for. Nothing that duplicates what a tool's own config already states.
 3. Absent file means **off**. A project that never decided has not consented.
 
-> Not `.aidd/`. That directory is the CLI's install manifest — machine-local, and
-> `aidd clean` removes it. A project-level decision cannot live somewhere a
-> routine cleanup erases, and a decision that does not survive a clone is not the
-> project's.
+> **Not `aidd_docs/`, which is documentation.** Configuration and documentation
+> in one directory is how both stop being trustworthy.
+>
+> `.aidd/` is already the intended home: #585 specifies it as the project config
+> root, committed, host-neutral. This work does not invent a location, it lands
+> in the one already chosen.
+>
+> **JSON rather than #585's YAML, and the reason is not preference.** The journal
+> hook ships with zero dependencies — `aidd framework build` copies `hooks/`
+> verbatim with no install step — and the CLI has no YAML parser either. A hook
+> can `JSON.parse`; it cannot parse YAML without something to parse it with.
+> Anything a hook must read is therefore JSON. #585 already anticipates this with
+> its `config.json` fallback; tell it that telemetry took that path and why.
+>
+> `.aidd/` currently holds `manifest.json`, which is machine state and stays
+> ignored. A committed `config.json` beside it is a different kind of file, and
+> `aidd clean` must be made to leave it alone — losing a tracked file to a
+> cleanup is recoverable with `git checkout`, but a command that deletes a
+> project's decisions is still a bug.
 
 ### `2)` Everything reads it
 
@@ -77,8 +92,10 @@ be delegated to a provider's setting.
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 1 | With no `telemetry.json`, a session writes nothing, even with `aidd_docs/runs/` present |
+| 1 | With no `.aidd/config.json`, a session writes nothing, even with `aidd_docs/runs/` present |
 | 1 | The file is tracked by git, and a fresh clone inherits the answer |
+| 1 | `aidd clean` leaves it in place, and says so in its own output |
+| 1 | The hook parses it with no dependency of any kind |
 | 2 | Turning it off mid-session stops the very next write, with no restart |
 | 2 | With AIDD off but the provider exporting, the journal still writes nothing — the case the switch exists for |
 | 3 | An unparseable file means off, and the hook exits 0 |

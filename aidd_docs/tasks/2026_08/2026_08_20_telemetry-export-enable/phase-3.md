@@ -33,7 +33,7 @@ So: the CLI writes, the skill explains, and neither reimplements the other.
 
 ### `1)` Set the switch, then the tools
 
-1. Write `aidd_docs/telemetry.json` from phase 1.
+1. Write `.aidd/config.json` from phase 1.
 2. Then configure every installed tool that can be configured, one adapter each.
 3. Report per tool what happened, including the tools that were skipped.
 
