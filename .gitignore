@@ -32,6 +32,17 @@ coverage/
 .claude/settings.local.json
 .claude/worktrees/
 
+# AIDD CLI's own local state (install manifest, auth): machine-local, never
+# part of the project's own tracked content.
+.aidd/
+
+# AIDD run-journal records: this directory being committed is the opt-in
+# gate (see plugins/aidd-telemetry/hooks/journal.js); the records it holds
+# never are.
+aidd_docs/runs/*
+!aidd_docs/runs/.gitkeep
+!aidd_docs/runs/README.md
+
 # SpecStory captures (may contain transcripts / secrets)
 .specstory/
 

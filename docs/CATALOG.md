@@ -9,6 +9,7 @@ The exhaustive list of AIDD plugins, skills, and actions. Skills are invoked thr
 - [aidd-vcs](#-aidd-vcs) - version control workflows
 - [aidd-orchestrator](#-aidd-orchestrator) - async orchestration (optional)
 - [aidd-ui](#-aidd-ui) - UI / UX (🚧 alpha, not ready)
+- [aidd-telemetry](#-aidd-telemetry) - measurement, hooks only (🚧 alpha, not ready)
 
 ---
 
@@ -107,3 +108,9 @@ Runs synchronous feature delivery, optional async issue automation, and the prod
 | Skill      | Role                                      | Actions    |
 | ---------- | ----------------------------------------- | ---------- |
 | `01-hello` | Smoke-test that confirms the plugin loads | `01-greet` |
+
+## 📈 aidd-telemetry
+
+🚧 **Alpha — not ready for use.** Measurement: journals every session so a unit of work can be tied to what it cost.
+
+**It ships no skills.** Its whole surface is three bundled hooks (`SessionStart`, `Stop`, `PostToolUse`), so there is nothing here to invoke. Installing the plugin installs the mechanism; not installing it is the opt-out.

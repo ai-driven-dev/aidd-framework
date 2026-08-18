@@ -10,7 +10,7 @@ status: implemented
 | Field      | Value                                                                 |
 | ---------- | --------------------------------------------------------------------- |
 | **Goal**   | One canonical routing table; all surfaces link/derive; board playbook. |
-| **Source** | [`2026_06_23-unify-taxonomy.md`](../../specs/2026_06/2026_06_23-unify-taxonomy.md) (spec, VALID 100/100) |
+| **Source** | [`2026_06_23-unify-taxonomy.md`](../../../specs/2026_06/2026_06_23-unify-taxonomy.md) (spec, VALID 100/100) |
 
 ## Phases
 

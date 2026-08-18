@@ -1,6 +1,6 @@
 ---
 objective: "Build the run journal: every session leaves a durable record tying it to a task, and never a measurement."
-status: pending
+status: implemented
 type: plan
 ---
 
@@ -57,25 +57,34 @@ and proven before anything is written.
 | --- | --- | --- |
 | 1 | [Plugin shell and test runner](./phase-1.md) | the plugin installs, does nothing, and `node --test` runs in `lefthook` |
 | 2 | [Host gate](./phase-2.md) | four recorded payloads replay, one is recognised, three exit 0 |
-| 3 | [Opt-in and location](./phase-3.md) | a session writes one file outside the repository, only when opted in |
+| 3 | [Opt-in and location](./phase-3.md) | a session writes one file into `aidd_docs/runs/`, only when opted in |
 | 4 | [The record](./phase-4.md) | that file carries exactly the ten keys, refreshed each turn |
 | 5 | [Attachment](./phase-5.md) | a session that switches task produces two intervals |
-| 6 | [Materialisation at commit](./phase-6.md) | **confirm the owner first** — see below |
+| 6 | [Where a record goes](./phase-6.md) | **answer the destination question first** — see below |
 
-Phases 1 to 5 are reversible: everything they write lives outside the repository
-and can be deleted without trace. Phase 6 is not.
+**Phases 1 to 5 are done.** Git ignores everything they write, so all of it can be
+deleted without trace.
+
+**Phase 6 is not part of this feature.** It was "materialise records into git at
+commit", and the decision that the project chooses — with `.gitignore` as the
+switch — dissolved the copying step: a project that wants its records committed
+simply stops ignoring them, and there is nothing to transport. What is left of
+phase 6 is one mechanism that only the committed answer needs, measured and
+recorded there, plus a question (git or dashboard) that belongs to the product
+rather than to this plan.
 
 ## The decision phase 6 waits on
 
-Session records live outside the repository and are materialised into
-`aidd_docs/runs/` at commit. The plugin cannot own that step — its hooks only see
-sessions, and a commit can be made by a human with none running. Only git knows a
-commit happened, so the trigger is a git `post-commit` hook installed by the CLI
-gesture of #646.
+Records sit in `aidd_docs/runs/`, which git ignores. So the question is not how to
+copy them anywhere — it is whether they are meant to be **committed into git** or
+**sent to the dashboard**, which are different products with different
+consequences, not two ways of doing one thing.
 
-It is also the only step that puts who-worked-on-what-and-for-how-long into
-permanent git history, which #652 says cannot ship without an organisational
-decision. Confirm the owner before building it; build phases 1 to 5 regardless.
+The git answer is irreversible and is the only step that puts
+who-worked-on-what-and-for-how-long into permanent history, which #652 says
+cannot ship without an organisational decision. The dashboard answer is
+reversible, needs no framework capability outside a plugin, and is what the
+dashboard existed for. Weighed in [`phase-6.md`](./phase-6.md); not settled here.
 
 ## Standing rules for every phase
 

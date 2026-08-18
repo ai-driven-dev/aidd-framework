@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: the host gate
@@ -70,9 +70,20 @@ scripts/__tests__/
 
 ### `3)` The fixtures
 
-1. Commit one captured `SessionStart` payload per host, verbatim, under
+1. Commit one captured `SessionStart` payload per host under
    `scripts/__tests__/fixtures/`. These are recordings, not hand-written
    examples; a hand-written one would encode the assumption being tested.
+2. Redact exactly two things, and nothing else: Cursor's `user_email`, and the
+   home-directory prefix of every absolute path. Replace them with fixed
+   placeholders, keeping the path **shape** intact — the shape is the entire
+   point of the fixture.
+3. Note the redaction in the fixture directory's README, so the next reader
+   knows the files are recordings minus two named fields rather than recordings.
+
+> A verbatim commit would put a real address and a real home path into permanent
+> git history, which is precisely the class of leak this layer exists to avoid.
+> Detection reads `cursor_version`, `sessionId`, and the `/projects/` versus
+> `/sessions/` segments — none of which the redaction touches.
 
 ## Test acceptance criteria
 
@@ -82,4 +93,5 @@ scripts/__tests__/
 | 2 | Replaying the Claude Code fixture yields `claude-code` |
 | 2 | An empty payload, a truncated payload, and a payload whose `transcript_path` matches neither shape all yield no host and exit 0 |
 | 2 | A real Claude Code session that ends `Not logged in` still reaches detection. The acceptance method, and it costs nothing |
-| 3 | Every fixture is byte-identical to what the probe captured |
+| 3 | Every fixture differs from what the probe captured in exactly two places: `user_email` and the home-directory prefix. Path shapes are unchanged |
+| 3 | No fixture contains an email address, a real home directory, or a session id belonging to a real user's work |

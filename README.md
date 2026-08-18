@@ -11,7 +11,7 @@ _(Already tested on `Legacy` codebases)_
 [![Made in France](https://img.shields.io/badge/made%20in-France-0055A4?labelColor=EF4135)](https://www.ai-driven-dev.fr/)
 
 <p>
-  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>47 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
+  <!--counts:start--><kbd>8 plugins</kbd> · <kbd>47 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -55,7 +55,7 @@ Why not just write your own commands? → [FAQ](docs/FAQ.md#-why-aidd-instead-of
 
 ### Claude Code
 
-Installs the 6 stable plugins (`aidd-ui` is 🚧 alpha, install separately — see [Plugins](#-plugins)).
+Installs the 6 stable plugins (`aidd-ui` and `aidd-telemetry` are 🚧 alpha, install separately — see [Plugins](#-plugins)).
 
 **In the session** (slash commands)
 
@@ -211,7 +211,7 @@ flowchart TD
 
 ## 🧩 Plugins
 
-Seven plugins covering the whole SDLC — **install all of them**; they work together. (`aidd-ui` is 🚧 **alpha**, off the curated path.)
+Eight plugins covering the whole SDLC — **install all of them**; they work together. (`aidd-ui` and `aidd-telemetry` are 🚧 **alpha**, off the curated path.)
 
 <table>
 <tr>
@@ -282,7 +282,15 @@ Synchronous feature flow, async issue-to-PR automation, and product backlog.
 UI / UX design — smoke-test only, not ready for use.
 
 </td>
-<td width="33%" valign="top"></td>
+<td width="33%" valign="top">
+
+### 📈 [aidd-telemetry](plugins/aidd-telemetry/README.md) 🚧
+
+`hooks only` · **alpha**
+
+Journals every session so a unit of work can be tied to what it cost. Installs and does nothing yet.
+
+</td>
 <td width="33%" valign="top"></td>
 </tr>
 </table>

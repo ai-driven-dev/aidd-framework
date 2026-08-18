@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: the record
@@ -62,6 +62,35 @@ count or a model name to a file that gets committed.
 > duration — those change mid-session and are joined after the fact from
 > telemetry, never copied into a file that may end up in git.
 
+### `5)` The cost of finding the run again
+
+Phase 3 finds a session's file by reading and JSON-parsing **every** run file in
+the project's directory. `Stop` fires on every turn, so that scan runs on every
+turn, and it grows without bound: after a few hundred sessions on one project,
+each turn parses a few hundred files. It also shells out to git twice per turn —
+`rev-parse` then `remote get-url` — to rebuild a value that cannot change within
+a session.
+
+1. Make the lookup O(1) in the number of past sessions. Carrying `vendor_id` in
+   the filename is enough: the run stays sortable by its `run_id` prefix, and
+   finding it becomes a name match with no file read at all.
+2. Do not derive `project_id` twice in one invocation.
+
+> This is the phase that acquires a latency budget, so it is the phase that has
+> to stop the growth. A journal whose cost rises with how much you have used it
+> is one that gets uninstalled.
+
+### `6)` The latency budget
+
+1. Assert the hook's in-process work stays under 200 ms at p95 over 100
+   invocations, against a directory already holding several hundred run files —
+   an empty directory would measure nothing.
+
+> Asserted on in-process work, not on process spawn, which is flaky under CI
+> load. Spawn latency stays a manual smoke, stated here so it is not written
+> twice. The assertion must also fail on a hang rather than wait for one, which
+> is what covers `readFileSync(0)` having no timeout.
+
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
@@ -72,3 +101,6 @@ count or a model name to a file that gets committed.
 | 3 | The key is present and null on a session that ran subagents |
 | 4 | Adding any eleventh key fails the test |
 | 4 | No written value is a token count, a cost, a model name or a duration |
+| 5 | Finding an existing run reads no run file at all, and one turn shells out to git no more than it did with one session on disk |
+| 6 | p95 under 200 ms over 100 invocations, measured against a directory holding several hundred runs |
+| 6 | A hook that never returns fails the assertion rather than hanging it |

@@ -37,9 +37,10 @@ A plugin never contains its own tests: the build copies `hooks/` recursively int
 
 Declared in `plugins/<plugin>/hooks/hooks.json`. They run Node, so users need `node` on their `PATH`:
 
-| Plugin         | Event              | Runs                      | Purpose                                                  |
-| -------------- | ------------------ | ------------------------- | -------------------------------------------------------- |
-| `aidd-context` | `SessionStart`     | `hooks/update_memory.js`  | Refresh the project memory block in the AI context files |
+| Plugin           | Event                                    | Runs                      | Purpose                                                              |
+| ---------------- | ----------------------------------------- | ------------------------- | --------------------------------------------------------------------- |
+| `aidd-context`   | `SessionStart`                            | `hooks/update_memory.js`  | Refresh the project memory block in the AI context files              |
+| `aidd-telemetry` | `SessionStart` · `Stop` · `PostToolUse`   | `hooks/journal.js`        | Journal every session so a unit of work can be tied to what it cost   |
 
 ## 🧠 Plugin concerns and layers
 
@@ -54,8 +55,13 @@ Every capability lives in exactly one plugin, chosen by **concern**. This taxono
 | `aidd-vcs`          | Version control      | External     |
 | `aidd-orchestrator` | Orchestration        | Coordination |
 | `aidd-ui` 🚧        | UI/UX design         | Execution    |
+| `aidd-telemetry` 🚧 | Measurement          | Observation  |
 
 `aidd-ui` is alpha: smoke-test only, off the curated install path.
+
+`aidd-telemetry` is alpha, off the curated install path: opt-in only — a repository must commit `aidd_docs/runs/`, whose contents git ignores. It records which session served which task, and never a measurement; tokens and cost are joined afterwards from the provider's telemetry.
+
+**Observation** writes only *about* the other layers, never the artifact it describes, and nothing may depend on it.
 
 - **Knowledge vs execution is a firewall.** Knowledge plugins produce artifacts you *read* and never write or run application source. `aidd-context`'s bootstrap deliberately creates no `package.json`. Real code belongs to `aidd-dev` or an orchestrator's own setup actions.
 - **Concern decides placement, not existence.** A missing capability goes in the plugin whose concern owns it, then the caller delegates. Never reimplement it in the calling plugin because the right home lacks it today.
