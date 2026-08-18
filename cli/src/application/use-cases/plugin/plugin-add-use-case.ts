@@ -23,7 +23,8 @@ import type { PluginDistributionReader } from "../../../domain/ports/plugin-dist
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
 import type { EnsureBuiltMarketplaceUseCase } from "../shared/ensure-built-marketplace-use-case.js";
-import { loadPluginManifest, resolvePluginToolIds, writePluginFiles } from "./plugin-helpers.js";
+import { loadPluginManifest, writePluginFiles } from "./plugin-file-sync.js";
+import { resolvePluginToolIds } from "./plugin-target-resolution.js";
 import type { PluginTranslator } from "./translator/plugin-translator.js";
 import { resolvePluginTranslator } from "./translator/resolve-plugin-translator.js";
 

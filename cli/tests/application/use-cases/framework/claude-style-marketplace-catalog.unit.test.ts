@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { PluginPresenceFlags } from "../../../../src/application/use-cases/framework/strategies/marketplace-strategy-helpers.js";
 import {
   buildClaudeStyleCatalogEntry,
   buildClaudeStyleMarketplace,
   synthesizeClaudeStyleManifest,
-} from "../../../../src/application/use-cases/framework/strategies/marketplace-strategy-helpers.js";
+} from "../../../../src/application/use-cases/framework/strategies/claude-style-marketplace-catalog.js";
+import type { PluginPresenceFlags } from "../../../../src/application/use-cases/framework/strategies/plugin-source-tree-reader.js";
 
 const EMPTY_PRESENCE: PluginPresenceFlags = {
   hasAgents: false,

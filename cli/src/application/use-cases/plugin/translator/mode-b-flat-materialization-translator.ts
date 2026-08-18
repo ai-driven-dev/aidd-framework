@@ -18,11 +18,11 @@ import type { FileReader } from "../../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../../domain/ports/file-writer.js";
 import type { Hasher } from "../../../../domain/ports/hasher.js";
 import { getToolConfig, isAiTool } from "../../../../domain/tools/registry.js";
+import { writePluginFiles } from "../plugin-file-sync.js";
 import {
-  qualifiesForOpencodeMcpMerge,
+  isFrameworkPrimeFlatMcp,
   resolvePluginBaseDirForCapability,
-  writePluginFiles,
-} from "../plugin-helpers.js";
+} from "../plugin-target-resolution.js";
 import type { PluginTranslator } from "./plugin-translator.js";
 
 /**
@@ -105,7 +105,7 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
     const toolConfig = getToolConfig(toolId);
     if (!isAiTool(toolConfig)) return { mcpEntries: new Map(), mcpSkips: [] };
     const caps = toolConfig.capabilities as Record<string, unknown>;
-    if (!qualifiesForOpencodeMcpMerge(caps) || dist.components.mcp.length === 0) {
+    if (!isFrameworkPrimeFlatMcp(caps) || dist.components.mcp.length === 0) {
       return { mcpEntries: new Map(), mcpSkips: [] };
     }
     return this.mergeOpencodeMcpEntries(dist, caps, projectRoot, previousMcpEntries, toolId);

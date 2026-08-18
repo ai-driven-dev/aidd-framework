@@ -10,12 +10,12 @@ import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
+import { loadPluginManifest } from "./plugin-file-sync.js";
 import {
-  loadPluginManifest,
-  qualifiesForOpencodeMcpMerge,
+  isFrameworkPrimeFlatMcp,
   resolvePluginBaseDir,
   resolvePluginToolIds,
-} from "./plugin-helpers.js";
+} from "./plugin-target-resolution.js";
 
 export interface PluginRemoveOptions {
   pluginName: string;
@@ -67,7 +67,7 @@ export class PluginRemoveUseCase {
     const toolConfig = getToolConfig(toolId);
     if (!isAiTool(toolConfig)) return;
     const caps = toolConfig.capabilities as Record<string, unknown>;
-    if (!qualifiesForOpencodeMcpMerge(caps)) return;
+    if (!isFrameworkPrimeFlatMcp(caps)) return;
     const mcpCap = caps.mcp as McpCapability;
     const outputRelPath = await mcpCap.resolveOutput(projectRoot, this.fs);
     const outputPath = join(projectRoot, outputRelPath);

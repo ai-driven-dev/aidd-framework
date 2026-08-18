@@ -19,10 +19,9 @@ import {
   deleteOldFiles,
   loadPluginManifest,
   materializeViaTranslator,
-  resolvePluginBaseDir,
-  resolvePluginToolIds,
   writePluginFiles,
-} from "./plugin-helpers.js";
+} from "./plugin-file-sync.js";
+import { resolvePluginBaseDir, resolvePluginToolIds } from "./plugin-target-resolution.js";
 import type { PluginTranslator } from "./translator/plugin-translator.js";
 import { resolvePluginTranslator } from "./translator/resolve-plugin-translator.js";
 

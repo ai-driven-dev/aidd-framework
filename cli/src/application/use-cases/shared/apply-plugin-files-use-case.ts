@@ -15,8 +15,8 @@ import {
   deleteOldFiles,
   isPluginFileAtDesiredState,
   materializeViaTranslator,
-  resolvePluginBaseDir,
-} from "../plugin/plugin-helpers.js";
+} from "../plugin/plugin-file-sync.js";
+import { resolvePluginBaseDir } from "../plugin/plugin-target-resolution.js";
 import type { PluginTranslator } from "../plugin/translator/plugin-translator.js";
 import { resolvePluginTranslator } from "../plugin/translator/resolve-plugin-translator.js";
 import type { EnsureBuiltMarketplaceUseCase } from "./ensure-built-marketplace-use-case.js";

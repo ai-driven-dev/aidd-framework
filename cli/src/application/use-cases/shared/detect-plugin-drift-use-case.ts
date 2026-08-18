@@ -4,7 +4,7 @@ import type { Manifest } from "../../../domain/models/manifest.js";
 import type { AiToolId } from "../../../domain/models/tool-ids.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { ToolId } from "../../../domain/tools/registry.js";
-import { resolvePluginBaseDir } from "../plugin/plugin-helpers.js";
+import { resolvePluginBaseDir } from "../plugin/plugin-target-resolution.js";
 
 export type PluginFileDriftKind = "missing" | "hash-mismatch";
 

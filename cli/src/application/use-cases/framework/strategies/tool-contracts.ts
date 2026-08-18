@@ -66,12 +66,10 @@ import type { PluginPresence, ToolBuildContract } from "../../../../domain/tools
 import {
   buildClaudeStyleCatalogEntry,
   buildClaudeStyleMarketplace,
-  buildCodexMarketplace,
-  buildCodexMarketplaceEntry,
-  resolveDescription,
-  resolveVersion,
   synthesizeClaudeStyleManifest,
-} from "./marketplace-strategy-helpers.js";
+} from "./claude-style-marketplace-catalog.js";
+import { buildCodexMarketplace, buildCodexMarketplaceEntry } from "./codex-marketplace-catalog.js";
+import { resolveDescription, resolveVersion } from "./plugin-source-tree-reader.js";
 
 type FsType = FileReader & FileWriter;
 type SrcEntry =

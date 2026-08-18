@@ -14,9 +14,10 @@ import type {
   SourcePluginEntryRef,
   ToolBuildContract,
 } from "../../../../domain/tools/build-contract.js";
-import { assertNoToolsPlaceholder } from "../shared-plugin-helpers.js";
+import { assertNoToolsPlaceholder } from "../assert-no-tools-placeholder.js";
 import type { BuildOutputStrategy, SourceMarketplace } from "./build-output-strategy.js";
-import { detectPluginPresenceFlags, writeSkillTree } from "./marketplace-strategy-helpers.js";
+import { detectPluginPresenceFlags } from "./plugin-source-tree-reader.js";
+import { writeSkillTree } from "./write-skill-tree.js";
 
 export class MarketplaceBuildStrategy implements BuildOutputStrategy {
   constructor(

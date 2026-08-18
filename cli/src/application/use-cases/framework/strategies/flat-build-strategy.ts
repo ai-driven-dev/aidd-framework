@@ -18,7 +18,7 @@ import type {
   ArtifactContract,
   ToolBuildContract,
 } from "../../../../domain/tools/build-contract.js";
-import { assertNoToolsPlaceholder } from "../shared-plugin-helpers.js";
+import { assertNoToolsPlaceholder } from "../assert-no-tools-placeholder.js";
 import type { BuildOutputStrategy, SourceMarketplace } from "./build-output-strategy.js";
 
 export class FlatBuildStrategy implements BuildOutputStrategy {
