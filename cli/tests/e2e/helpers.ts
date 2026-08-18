@@ -7,21 +7,19 @@ import { promisify } from "node:util";
 import { CLIOutput } from "../../src/application/output.js";
 import { InitUseCase } from "../../src/application/use-cases/init-use-case.js";
 import { createDeps } from "../../src/infrastructure/deps.js";
+import { environmentWithoutGitVariables as withoutGitEnv } from "../../src/infrastructure/git-environment.js";
 
 export const execFileAsync = promisify(execFile);
 
-const GIT_ENV_VARS = [
-  "GIT_DIR",
-  "GIT_WORK_TREE",
-  "GIT_INDEX_FILE",
-  "GIT_COMMON_DIR",
-  "GIT_OBJECT_DIRECTORY",
-];
-
 export async function gitInit(cwd: string): Promise<void> {
-  const env = { ...process.env };
-  for (const key of GIT_ENV_VARS) delete env[key];
-  await execFileAsync("git", ["init"], { cwd, env });
+  await execFileAsync("git", ["init"], { cwd, env: withoutGitEnv(process.env) });
+}
+
+export async function gitSetOriginRemote(cwd: string, url: string): Promise<void> {
+  await execFileAsync("git", ["remote", "add", "origin", url], {
+    cwd,
+    env: withoutGitEnv(process.env),
+  });
 }
 
 export const CLI_PATH = resolve(process.cwd(), "dist/cli.js");
@@ -58,11 +56,12 @@ function sandboxedEnv(
   extra?: Record<string, string>,
   options?: { realHome?: boolean }
 ): NodeJS.ProcessEnv {
+  const base = withoutGitEnv(process.env);
   if (options?.realHome) {
-    return { ...process.env, ...extra, AIDD_USER_CONFIG_DIR: join(fakeHome, ".config", "aidd") };
+    return { ...base, ...extra, AIDD_USER_CONFIG_DIR: join(fakeHome, ".config", "aidd") };
   }
   return {
-    ...process.env,
+    ...base,
     ...extra,
     HOME: fakeHome,
     XDG_CONFIG_HOME: join(fakeHome, ".config"),

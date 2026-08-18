@@ -156,6 +156,11 @@ export const opencode: AiTool<
     }),
   },
 
+  telemetry: {
+    kind: "planned",
+    trackedIn: "#653",
+  },
+
   rewriteContent(content: string, docsDir: string): string {
     return baseRewriteContent(content, DIRECTORY, docsDir).replace(
       /(@?)\.opencode\/commands\/(\d+)[_-][^/]+\/([^\s]+)/g,

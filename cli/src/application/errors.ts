@@ -58,3 +58,20 @@ export class InvalidCategoryError extends Error {
     this.name = "InvalidCategoryError";
   }
 }
+
+export class InvalidTelemetryScopeError extends Error {
+  constructor(scope: string) {
+    super(`Invalid --scope '${scope}'. Expected 'local', 'project', or 'user'.`);
+    this.name = "InvalidTelemetryScopeError";
+  }
+}
+
+export class TelemetryProjectScopeRequiresYesError extends Error {
+  constructor(settingsPath: string) {
+    super(
+      `--scope project writes the git-tracked ${settingsPath}, turning telemetry on for ` +
+        "everyone who clones. Pass --yes to confirm."
+    );
+    this.name = "TelemetryProjectScopeRequiresYesError";
+  }
+}

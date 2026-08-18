@@ -1,5 +1,6 @@
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
+import { basename } from "node:path";
 import "../domain/tools/ai/claude.js";
 import "../domain/tools/ai/codex.js";
 import "../domain/tools/ai/copilot.js";
@@ -76,9 +77,16 @@ import { ResolveUpdateDecisionUseCase } from "../application/use-cases/shared/re
 import { UpdateOneToolUseCase } from "../application/use-cases/shared/update-one-tool-use-case.js";
 import { StatusUseCase } from "../application/use-cases/status-use-case.js";
 import { SyncConflictResolverUseCase } from "../application/use-cases/sync/sync-conflict-resolver-use-case.js";
+import { EnableToolTelemetryUseCase } from "../application/use-cases/telemetry/enable-tool-telemetry-use-case.js";
+import { TelemetryOffUseCase } from "../application/use-cases/telemetry/telemetry-off-use-case.js";
+import { TelemetryOnUseCase } from "../application/use-cases/telemetry/telemetry-on-use-case.js";
 import { UninstallIdeUseCase } from "../application/use-cases/uninstall/uninstall-ide-use-case.js";
 import { UninstallToolsUseCase } from "../application/use-cases/uninstall/uninstall-tools-use-case.js";
 import { UninstallUseCase } from "../application/use-cases/uninstall/uninstall-use-case.js";
+import {
+  parseOwnerRepoFromRemote,
+  sanitizeProjectId,
+} from "../domain/models/telemetry-project-id.js";
 import type { AssetProvider } from "../domain/ports/asset-provider.js";
 import type { CredentialStore } from "../domain/ports/credential-store.js";
 import type { FileMerger } from "../domain/ports/file-merger.js";
@@ -195,6 +203,8 @@ interface Deps {
   cleanUseCase: CleanUseCase;
   doctorAllUseCase: DoctorAllUseCase;
   checkUpdateUseCase: CheckUpdateUseCase;
+  telemetryOnUseCase: TelemetryOnUseCase;
+  telemetryOffUseCase: TelemetryOffUseCase;
 }
 
 const _cache = new Map<string, Deps>();
@@ -662,6 +672,28 @@ export async function createDeps(
   const cleanUseCase = new CleanUseCase(fs, manifestRepo, logger, gitignoreUseCase, prompter);
   const doctorAllUseCase = new DoctorAllUseCase(doctorUseCase);
   const checkUpdateUseCase = new CheckUpdateUseCase(cliUpdater, currentVersionProvider, logger, fs);
+  const enableToolTelemetryUseCase = new EnableToolTelemetryUseCase(
+    fs,
+    hasher,
+    manifestRepo,
+    logger
+  );
+  // Mirrors the journal hook's own `deriveProjectId`: same remote-URL parsing, same
+  // sanitizing, same basename fallback — verified by test against the hook's real
+  // functions rather than shared at runtime (see telemetry-project-id.ts's doc comment).
+  const deriveTelemetryProjectId = async (repoRoot: string): Promise<string> => {
+    const remoteUrl = await git.getRemoteUrl(repoRoot);
+    const ownerRepo = remoteUrl !== null ? parseOwnerRepoFromRemote(remoteUrl) : null;
+    return sanitizeProjectId(ownerRepo ?? basename(repoRoot));
+  };
+  const telemetryOnUseCase = new TelemetryOnUseCase(
+    fs,
+    manifestRepo,
+    enableToolTelemetryUseCase,
+    logger,
+    deriveTelemetryProjectId
+  );
+  const telemetryOffUseCase = new TelemetryOffUseCase(fs, manifestRepo, logger);
   const deps: Deps = {
     fs,
     manifestRepo,
@@ -727,6 +759,8 @@ export async function createDeps(
     cleanUseCase,
     doctorAllUseCase,
     checkUpdateUseCase,
+    telemetryOnUseCase,
+    telemetryOffUseCase,
   };
   _cache.set(projectRoot, deps);
   return deps;

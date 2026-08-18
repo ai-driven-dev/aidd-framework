@@ -98,6 +98,15 @@ describe("AiTool contract conformance", () => {
         `${toolId} declares a plugins capability but has no MARKETPLACE_PROBES entry (domain/models/plugin-format.ts) — its native marketplace would never be detected`
       ).toBe(true);
     });
+
+    // The type system already requires `telemetry`; this pins the kind, which a literal
+    // could still get wrong.
+    it("declares a telemetry activation with a recognized kind", () => {
+      expect(
+        ["settings-file", "environment-variable", "planned", "external"],
+        `${toolId} declares an unrecognized telemetry kind: ${tool.telemetry.kind}`
+      ).toContain(tool.telemetry.kind);
+    });
   });
 });
 

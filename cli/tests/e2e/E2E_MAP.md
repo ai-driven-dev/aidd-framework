@@ -545,6 +545,37 @@ Removes ALL AIDD-managed files.
 
 ---
 
+## `aidd telemetry`
+
+Controls the AIDD switch (`.aidd/config.json`) and, on `on`, configures whichever
+installed tools can be configured. `on`/`off` do not accept a `[category]` argument.
+
+### `telemetry on`
+
+| Option | Type | Default | Notes |
+|--------|------|---------|-------|
+| `--endpoint <url>` | string | — | Reused from `.aidd/config.json` when omitted; missing from both is a hard error, nothing written |
+| `--scope <local\|project\|user>` | string | `local` | Where Claude Code's `env` block is written |
+| `--yes` | boolean | false | Required to confirm `--scope project` (git-tracked) |
+
+### `telemetry off`
+No options. Sets `enabled: false`, preserves `endpoint`, never deletes `.aidd/config.json`.
+
+### Test cases
+
+| # | Scenario | Expected |
+|---|----------|----------|
+| T1 | `on` → `on` (endpoint reused) → `off`, `.claude/settings.local.json` pre-seeded with unrelated content | File is byte-identical before and after the whole journey |
+| T2 | `on --endpoint <url>` | `aidd.project_id` in the written `env` block matches the temp repo's own `origin` remote, never a leaked `GIT_DIR` |
+| T3 | `on --scope project` (no `--yes`) | Exit non-zero; `.aidd/config.json` never created, `.claude/settings.json` byte-unchanged (checked on disk) |
+| T4 | `on --scope project --yes` | `.claude/settings.json` (git-tracked) written; `.claude/settings.local.json` and the home-scope file untouched |
+| T5 | `on --scope user --yes` | `~/.claude/settings.json` (resolved home dir) written, read independently of the path the command printed; project-scope file unchanged |
+| T6 | `on` with Cursor installed | Reported `cursor: cannot be enabled by us`, never `enabled`; exit 0 |
+| T7 | `off` when never turned on, Claude + Cursor installed | Exit 0, "already off"; no tool's settings file gains any OTEL key |
+| T8 | `on` with no `--endpoint` and no `.aidd/config.json` | Exit non-zero; nothing written — no switch file, no settings file |
+
+---
+
 ## `aidd sync`
 
 Propagates local modifications from one tool to others.

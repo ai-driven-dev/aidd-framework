@@ -62,6 +62,12 @@ export function getToolConfig(toolId: ToolId): ToolConfig {
   return config;
 }
 
+export function getAiToolConfig(toolId: AiToolId): AiTool<unknown> {
+  const config = getToolConfig(toolId);
+  if (!isAiTool(config)) throw new UnregisteredToolError(toolId);
+  return config;
+}
+
 export function getAllRegisteredTools(): Map<ToolId, ToolConfig> {
   return new Map(TOOL_REGISTRY);
 }

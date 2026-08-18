@@ -59,7 +59,7 @@ Every capability lives in exactly one plugin, chosen by **concern**. This taxono
 
 `aidd-ui` is alpha: smoke-test only, off the curated install path.
 
-`aidd-telemetry` is alpha, off the curated install path: opt-in only — a repository must commit `aidd_docs/runs/`, whose contents git ignores. It records which session served which task, and never a measurement; tokens and cost are joined afterwards from the provider's telemetry.
+`aidd-telemetry` is alpha, off the curated install path: opt-in only — a repository must commit `.aidd/config.json` with `telemetry.enabled: true`. Records land in `aidd_docs/runs/`, created on demand and git-ignored; that directory's presence is a location, not a permission. It records which session served which task, and never a measurement; tokens and cost are joined afterwards from the provider's telemetry.
 
 **Observation** writes only *about* the other layers, never the artifact it describes, and nothing may depend on it.
 

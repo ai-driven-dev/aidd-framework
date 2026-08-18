@@ -41,8 +41,16 @@ export function extractMergeEntries(
   }
   const container = resolveContainer(parsed, sectionKey);
   if (container === null || typeof container !== "object" || Array.isArray(container)) return {};
+  return hashJsonEntries(container as Record<string, unknown>, hasher);
+}
+
+/** Hashes each top-level value of a JSON-serialisable object, one entry per key. */
+export function hashJsonEntries(
+  entries: Record<string, unknown>,
+  hasher: Hasher
+): Record<string, FileHash> {
   const result: Record<string, FileHash> = {};
-  for (const [key, value] of Object.entries(container as Record<string, unknown>)) {
+  for (const [key, value] of Object.entries(entries)) {
     result[key] = hasher.hash(JSON.stringify(value));
   }
   return result;
@@ -70,12 +78,19 @@ export function removeEntriesFromJson(
   keysToRemove: string[]
 ): string {
   const parsed = JSON.parse(content) as Record<string, unknown>;
-  const container =
-    sectionKey !== null
-      ? ((parsed[sectionKey] as Record<string, unknown> | undefined) ?? {})
-      : parsed;
-  for (const key of keysToRemove) {
-    delete (container as Record<string, unknown>)[key];
+  if (sectionKey === null) {
+    for (const key of keysToRemove) delete parsed[key];
+    return JSON.stringify(parsed, null, 2);
+  }
+  const container = (parsed[sectionKey] as Record<string, unknown> | undefined) ?? {};
+  for (const key of keysToRemove) delete container[key];
+  // A section we emptied out must vanish, not linger as `{}` — a settings file that
+  // shares its top level with unrelated keys (Claude's settings.json, permissions and
+  // all) must come back byte-identical once every key we own is gone.
+  if (Object.keys(container).length === 0) {
+    delete parsed[sectionKey];
+  } else {
+    parsed[sectionKey] = container;
   }
   return JSON.stringify(parsed, null, 2);
 }

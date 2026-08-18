@@ -31,7 +31,10 @@ import { BundledAssetProviderAdapter } from "../../../src/infrastructure/assets/
 
 export const linuxPlatform: Platform = { current: () => "linux" };
 export const win32Platform: Platform = { current: () => "win32" };
-export const noGit: VersionControl = { installPreCommitDelegate: async () => {} };
+export const noGit: VersionControl = {
+  installPreCommitDelegate: async () => {},
+  getRemoteUrl: async () => null,
+};
 
 export { SilentPrompterAdapter as OverwritePrompter };
 

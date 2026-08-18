@@ -26,6 +26,7 @@ const {
   processPayload,
   resolveEventName,
   runsDir,
+  telemetryEnabled,
 } = require("../../plugins/aidd-telemetry/hooks/journal.js");
 
 const INTERVAL_KEYS = ["from", "task_id", "to"];
@@ -439,7 +440,11 @@ function makeTempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
-function makeTempRepo({ remote, withRunsDir = true } = {}) {
+// `withConfig` is independent of `withRunsDir`: the switch and the location
+// it writes to no longer have to move together, which is the whole point of
+// phase 1. Defaults to a switched-on repo, matching every test written
+// before the config file existed.
+function makeTempRepo({ remote, withRunsDir = true, withConfig = true } = {}) {
   const dir = makeTempDir("aidd-telemetry-repo-");
   execFileSync("git", ["init", "-q"], { cwd: dir, env: CLEAN_ENV });
   execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: dir, env: CLEAN_ENV });
@@ -450,7 +455,17 @@ function makeTempRepo({ remote, withRunsDir = true } = {}) {
   if (withRunsDir) {
     fs.mkdirSync(path.join(dir, "aidd_docs", "runs"), { recursive: true });
   }
+  if (withConfig) {
+    writeTelemetryConfig(dir, { enabled: true });
+  }
   return dir;
+}
+
+function writeTelemetryConfig(repo, { enabled = true, endpoint = "http://127.0.0.1:4318", raw } = {}) {
+  const dir = path.join(repo, ".aidd");
+  fs.mkdirSync(dir, { recursive: true });
+  const content = raw !== undefined ? raw : JSON.stringify({ telemetry: { enabled, endpoint } });
+  fs.writeFileSync(path.join(dir, "config.json"), content);
 }
 
 function runsDirOf(repo) {
@@ -481,6 +496,17 @@ function replayIn(payload, event = ARGV_EVENT_BY_HOOK_EVENT_NAME[payload.hook_ev
   });
 }
 
+// The one replay that does NOT strip GIT_*: it hands the hook the poisoned environment
+// git itself exports, which is the only way to exercise the hook's own defence.
+function replayInWithGitDir(payload, gitDir) {
+  return spawnSync(process.execPath, [script, "session-start"], {
+    cwd: root,
+    encoding: "utf8",
+    input: JSON.stringify(payload),
+    env: { ...CLEAN_ENV, AIDD_RUNS_DIR: "", GIT_DIR: gitDir },
+  });
+}
+
 function readJsonFilesRecursively(dir) {
   const files = [];
   let entries;
@@ -506,17 +532,160 @@ function cleanup(...dirs) {
   }
 }
 
-test("a session writes nothing and exits 0 when aidd_docs/runs is absent", () => {
-  const repo = makeTempRepo({ remote: "git@github.com:acme/no-opt-in.git", withRunsDir: false });
+test("a session writes nothing and exits 0 when .aidd/config.json is absent, even with aidd_docs/runs/ present", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/no-config.git", withConfig: false });
   try {
     const result = replayIn(
       makePayload({ cwd: repo, sessionId: "00000000-0000-4000-8000-000000000001", event: "SessionStart" }),
     );
     assert.equal(result.status, 0);
-    // The gate itself must not be created as a side effect of a closed-gate run.
-    assert.equal(fs.existsSync(runsDirOf(repo)), false);
+    assert.equal(readJsonFilesRecursively(runsDirOf(repo)).length, 0);
   } finally {
     cleanup(repo);
+  }
+});
+
+test("aidd_docs/runs/ is no longer a permission: a switched-on session creates it on demand when it does not exist yet", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/dir-on-demand.git", withRunsDir: false });
+  try {
+    assert.equal(fs.existsSync(runsDirOf(repo)), false);
+    const result = replayIn(
+      makePayload({ cwd: repo, sessionId: "00000000-0000-4000-8000-0000000000dm", event: "SessionStart" }),
+    );
+    assert.equal(result.status, 0);
+    assert.equal(readJsonFilesRecursively(runsDirOf(repo)).length, 1);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("an unparseable .aidd/config.json means off, and the hook exits 0", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/bad-config.git", withConfig: false });
+  writeTelemetryConfig(repo, { raw: "{ this is not json" });
+  try {
+    const result = replayIn(
+      makePayload({ cwd: repo, sessionId: "00000000-0000-4000-8000-0000000000bc", event: "SessionStart" }),
+    );
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(readJsonFilesRecursively(runsDirOf(repo)).length, 0);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a config.json that cannot be read at all (a directory in its place) means off, and the hook exits 0", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/unreadable-config.git", withConfig: false });
+  // A directory named config.json: readFileSync throws EISDIR, deterministically,
+  // standing in for any read error a real filesystem could hand back.
+  fs.mkdirSync(path.join(repo, ".aidd", "config.json"), { recursive: true });
+  try {
+    const result = replayIn(
+      makePayload({ cwd: repo, sessionId: "00000000-0000-4000-8000-0000000000rf", event: "SessionStart" }),
+    );
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr, "");
+    assert.equal(readJsonFilesRecursively(runsDirOf(repo)).length, 0);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("telemetry.enabled: false means off - nothing written", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/disabled-config.git", withConfig: false });
+  writeTelemetryConfig(repo, { enabled: false });
+  try {
+    const result = replayIn(
+      makePayload({ cwd: repo, sessionId: "00000000-0000-4000-8000-0000000000df", event: "SessionStart" }),
+    );
+    assert.equal(result.status, 0);
+    assert.equal(readJsonFilesRecursively(runsDirOf(repo)).length, 0);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("AIDD off but the provider exporting: the journal still writes nothing - the case the switch exists for", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/provider-exporting.git", withConfig: false });
+  try {
+    const result = spawnSync(
+      process.execPath,
+      [script, "session-start"],
+      {
+        cwd: root,
+        encoding: "utf8",
+        input: JSON.stringify(
+          makePayload({ cwd: repo, sessionId: "00000000-0000-4000-8000-0000000000pe", event: "SessionStart" }),
+        ),
+        // The provider's own export switches, on, with AIDD's own switch absent -
+        // the journal must not key off any of these.
+        env: {
+          ...CLEAN_ENV,
+          AIDD_RUNS_DIR: "",
+          CLAUDE_CODE_ENABLE_TELEMETRY: "1",
+          OTEL_METRICS_EXPORTER: "otlp",
+          OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+        },
+      },
+    );
+    assert.equal(result.status, 0);
+    assert.equal(readJsonFilesRecursively(runsDirOf(repo)).length, 0);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("turning telemetry off mid-session stops the very next write, with no restart - the switch is read at the point of use, never cached", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/mid-session-off.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-0000000000ms1";
+    replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
+    const written = readJsonFilesRecursively(runsDirOf(repo));
+    assert.equal(written.length, 1);
+    const before = JSON.parse(fs.readFileSync(written[0], "utf8"));
+
+    execFileSync("sleep", ["1.1"]);
+
+    writeTelemetryConfig(repo, { enabled: false });
+
+    const result = replayIn(makePayload({ cwd: repo, sessionId, event: "Stop" }));
+    assert.equal(result.status, 0);
+
+    const after = JSON.parse(fs.readFileSync(written[0], "utf8"));
+    assert.deepEqual(after, before, "ended_at must not advance once telemetry is off, with no restart needed");
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("telemetryEnabled requires enabled strictly === true, not merely truthy", () => {
+  const repo = makeTempDir("aidd-telemetry-strict-");
+  try {
+    writeTelemetryConfig(repo, { raw: JSON.stringify({ telemetry: { enabled: "true" } }) });
+    assert.equal(telemetryEnabled(repo), false, "a string 'true' must not enable telemetry");
+
+    writeTelemetryConfig(repo, { raw: JSON.stringify({ telemetry: { enabled: 1 } }) });
+    assert.equal(telemetryEnabled(repo), false, "a truthy number must not enable telemetry");
+
+    writeTelemetryConfig(repo, { raw: JSON.stringify({ telemetry: null }) });
+    assert.equal(telemetryEnabled(repo), false, "a null telemetry key must not enable telemetry");
+
+    writeTelemetryConfig(repo, { raw: JSON.stringify({}) });
+    assert.equal(telemetryEnabled(repo), false, "a missing telemetry key must not enable telemetry");
+
+    writeTelemetryConfig(repo, { enabled: true });
+    assert.equal(telemetryEnabled(repo), true);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("telemetryEnabled is off for a repo root with no .aidd/config.json at all", () => {
+  const dir = makeTempDir("aidd-telemetry-no-config-");
+  try {
+    assert.equal(telemetryEnabled(dir), false);
+  } finally {
+    cleanup(dir);
   }
 });
 
@@ -1616,9 +1785,17 @@ test("two concurrent sessions in the same checkout each attach only from their o
   }
 });
 
-test("the repository's own .gitignore excludes .aidd/", () => {
-  const gitignore = fs.readFileSync(path.join(root, ".gitignore"), "utf8");
-  assert.match(gitignore, /^\.aidd\/$/mu);
+// Read once so every test below fails together if a line is renamed or
+// reordered, rather than drifting silently apart from what is committed.
+function readAiddGitignoreBlock() {
+  const lines = fs.readFileSync(path.join(root, ".gitignore"), "utf8").split("\n");
+  const startIndex = lines.findIndex((line) => line.trim() === ".aidd/*");
+  assert.ok(startIndex !== -1, "expected an .aidd/* line in the repository's own .gitignore");
+  return lines.slice(startIndex, startIndex + 2);
+}
+
+test("the repository's own .gitignore excludes .aidd/ state but tracks .aidd/config.json, the committed telemetry switch", () => {
+  assert.deepEqual(readAiddGitignoreBlock(), [".aidd/*", "!.aidd/config.json"]);
 });
 
 // Read once so every test below fails together if a line is renamed or
@@ -1680,18 +1857,14 @@ test("in a real temporary git repo: the marker files are tracked, a record file 
   }
 });
 
-test("a repository whose .gitignore excludes .aidd/ and aidd_docs/runs/* stays clean after a session attaches to an already-tracked task file", () => {
+test("a repository whose .gitignore excludes .aidd/* (config.json excepted) and aidd_docs/runs/* stays clean after a session attaches to an already-tracked task file", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/gitignore-aidd.git" });
   // Reuses the exact rules from this repository's own .gitignore, so the
   // integration proof and the documented rules cannot silently drift apart.
-  const aiddRule = fs
-    .readFileSync(path.join(root, ".gitignore"), "utf8")
-    .split("\n")
-    .find((line) => line.trim() === ".aidd/");
-  assert.ok(aiddRule, "expected an .aidd/ line in the repository's own .gitignore");
+  const aiddRules = readAiddGitignoreBlock();
   const runsRules = readRunsGitignoreBlock();
 
-  fs.writeFileSync(path.join(repo, ".gitignore"), `${aiddRule}\n${runsRules.join("\n")}\n`);
+  fs.writeFileSync(path.join(repo, ".gitignore"), `${aiddRules.join("\n")}\n${runsRules.join("\n")}\n`);
   const filePath = writeIntoTaskFolder(repo, "2026_08_15_alpha");
   execFileSync("git", ["add", "-A"], { cwd: repo, env: CLEAN_ENV });
   execFileSync("git", ["commit", "-q", "-m", "add gitignore and task file"], { cwd: repo, env: CLEAN_ENV });
@@ -1706,5 +1879,26 @@ test("a repository whose .gitignore excludes .aidd/ and aidd_docs/runs/* stays c
     assert.equal(status, "");
   } finally {
     cleanup(repo);
+  }
+});
+
+test("a leaked GIT_DIR never redirects a session into another repository", () => {
+  const here = makeTempRepo({ remote: "git@github.com:acme/here.git" });
+  const elsewhere = makeTempRepo({ remote: "git@github.com:acme/elsewhere.git" });
+  try {
+    const result = replayInWithGitDir(
+      makePayload({ cwd: here, sessionId: "00000000-0000-4000-8000-0000000000gd", event: "SessionStart" }),
+      path.join(elsewhere, ".git"),
+    );
+
+    assert.equal(result.status, 0);
+    assert.equal(readJsonFilesRecursively(runsDirOf(elsewhere)).length, 0);
+
+    const written = readJsonFilesRecursively(runsDirOf(here));
+    assert.equal(written.length, 1);
+    assert.equal(JSON.parse(fs.readFileSync(written[0], "utf8")).project_id, "acme/here");
+  } finally {
+    cleanup(here);
+    cleanup(elsewhere);
   }
 });

@@ -38,6 +38,12 @@ execFileSync("git", ["remote", "add", "origin", "git@github.com:acme/perf.git"],
 const dir = path.join(repo, "aidd_docs", "runs");
 fs.mkdirSync(dir, { recursive: true });
 
+fs.mkdirSync(path.join(repo, ".aidd"), { recursive: true });
+fs.writeFileSync(
+  path.join(repo, ".aidd", "config.json"),
+  JSON.stringify({ telemetry: { enabled: true, endpoint: "http://127.0.0.1:4318" } }),
+);
+
 const sessionId = "perf-target-session";
 function payload(event) {
   return {

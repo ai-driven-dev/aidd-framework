@@ -129,4 +129,24 @@ describe("claude", () => {
       );
     });
   });
+
+  describe("capabilities.telemetry", () => {
+    it("is a settings-file activation, git-tracked only at project scope", () => {
+      const activation = claude.telemetry;
+      expect(activation.kind).toBe("settings-file");
+      if (activation.kind !== "settings-file") return;
+      expect(activation.sectionKey).toBe("env");
+      expect(activation.scopes).toEqual(["local", "project", "user"]);
+      expect(activation.defaultScope).toBe("local");
+      expect(activation.trackedScopes).toEqual(["project"]);
+    });
+
+    it("resolves the local-scope settings path", () => {
+      const activation = claude.telemetry;
+      if (activation.kind !== "settings-file") throw new Error("expected settings-file");
+      expect(activation.resolveSettingsPath("local", "/repo", "/home/dev")).toBe(
+        "/repo/.claude/settings.local.json"
+      );
+    });
+  });
 });

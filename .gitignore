@@ -33,12 +33,17 @@ coverage/
 .claude/worktrees/
 
 # AIDD CLI's own local state (install manifest, auth): machine-local, never
-# part of the project's own tracked content.
-.aidd/
+# part of the project's own tracked content. config.json is the exception:
+# it is the committed telemetry switch (see .aidd/config.json and
+# aidd_docs/tasks/2026_08/2026_08_20_telemetry-export-enable/phase-1.md),
+# tracked so a fresh clone inherits the project's decision.
+.aidd/*
+!.aidd/config.json
 
-# AIDD run-journal records: this directory being committed is the opt-in
-# gate (see plugins/aidd-telemetry/hooks/journal.js); the records it holds
-# never are.
+# AIDD run-journal records: where they land once .aidd/config.json turns
+# telemetry on (see plugins/aidd-telemetry/hooks/journal.js) - this
+# directory being committed is a location, not a permission. The records it
+# holds never are.
 aidd_docs/runs/*
 !aidd_docs/runs/.gitkeep
 !aidd_docs/runs/README.md

@@ -14,6 +14,14 @@ const CLEAN_ENV = Object.fromEntries(
 
 const root = path.resolve(__dirname, "../..");
 
+function writeTelemetryConfig(repo) {
+  fs.mkdirSync(path.join(repo, ".aidd"), { recursive: true });
+  fs.writeFileSync(
+    path.join(repo, ".aidd", "config.json"),
+    JSON.stringify({ telemetry: { enabled: true, endpoint: "http://127.0.0.1:4318" } }),
+  );
+}
+
 test("AIDD_RUNS_DIR overrides where runs are written", () => {
   const os = require("node:os");
   const { spawnSync } = require("node:child_process");
@@ -24,6 +32,7 @@ test("AIDD_RUNS_DIR overrides where runs are written", () => {
 
   spawnSync("git", ["init", "-q", repo], { encoding: "utf8", env: CLEAN_ENV });
   fs.mkdirSync(defaultRunsDir, { recursive: true });
+  writeTelemetryConfig(repo);
 
   spawnSync(process.execPath, [script, "session-start"], {
     input: JSON.stringify({
@@ -57,6 +66,7 @@ test("a user-named AIDD_RUNS_DIR keeps the permissions its owner gave it", () =>
   fs.mkdirSync(path.join(repo, "aidd_docs", "runs"), { recursive: true });
   fs.mkdirSync(runs, { recursive: true, mode: 0o755 });
   fs.chmodSync(runs, 0o755);
+  writeTelemetryConfig(repo);
 
   spawnSync(process.execPath, [script, "session-start"], {
     input: JSON.stringify({

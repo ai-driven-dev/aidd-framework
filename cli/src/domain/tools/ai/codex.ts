@@ -240,6 +240,14 @@ export const codex: AiTool<
     }),
   },
 
+  // Whoever writes Codex's telemetry activation: its `otel.metrics_exporter` defaults
+  // to `statsig`, a third party nobody chose. Set it explicitly (e.g. "otlp") in the
+  // `[otel]` block, or enabling telemetry silently ships metrics off-project.
+  telemetry: {
+    kind: "planned",
+    trackedIn: "#653",
+  },
+
   rewriteContent(content: string, docsDir: string): string {
     return rewriteCodexContent(content, { directory: DIRECTORY, docsDir });
   },

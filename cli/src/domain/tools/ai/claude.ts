@@ -24,6 +24,11 @@ import type {
   UserFileSectionKey,
 } from "../contracts.js";
 import { registerTool } from "../registry.js";
+import {
+  buildClaudeTelemetryEnv,
+  CLAUDE_TELEMETRY_POST_ENABLE_NOTICE,
+  resolveClaudeTelemetrySettingsPath,
+} from "./claude-telemetry.js";
 
 const DIRECTORY = ".claude/";
 const TOOL_SUFFIX = ".claude.md";
@@ -115,6 +120,19 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
           toEntry: buildClaudeStyleMarketplaceEntry,
         },
       }),
+    },
+
+    telemetry: {
+      kind: "settings-file",
+      sectionKey: "env",
+      scopes: ["local", "project", "user"],
+      defaultScope: "local",
+      // .claude/settings.json is git-tracked — writing there turns telemetry on for
+      // everyone who clones. .local.json and the home-dir file are not.
+      trackedScopes: ["project"],
+      resolveSettingsPath: resolveClaudeTelemetrySettingsPath,
+      buildEnv: buildClaudeTelemetryEnv,
+      postEnableNotice: CLAUDE_TELEMETRY_POST_ENABLE_NOTICE,
     },
 
     rewriteContent(content: string, docsDir: string): string {

@@ -124,6 +124,12 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
       }),
     },
 
+    telemetry: {
+      kind: "external",
+      reason: "Cannot be enabled by us — a team setting on an Enterprise plan, in beta.",
+      remedy: "Enable it from your Cursor admin dashboard.",
+    },
+
     rewriteContent(content: string, docsDir: string): string {
       return baseRewriteContent(content, DIRECTORY, docsDir)
         .replace(

@@ -1,6 +1,6 @@
 ---
 objective: "One AIDD switch the whole framework obeys, and one per-tool activation behind it."
-status: pending
+status: implemented
 type: plan
 ---
 

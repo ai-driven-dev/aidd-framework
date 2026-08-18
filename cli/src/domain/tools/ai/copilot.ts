@@ -341,6 +341,12 @@ export const copilot: AiTool<
     }),
   },
 
+  telemetry: {
+    kind: "environment-variable",
+    variable: "COPILOT_OTEL_ENABLED",
+    value: "true",
+  },
+
   rewriteContent: rewriteCopilotContent,
 
   reverseRewriteContent: reverseCopilotContent,

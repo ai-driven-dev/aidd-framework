@@ -1,7 +1,9 @@
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import type { FileReader } from "../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../domain/ports/file-writer.js";
 import type { VersionControl } from "../../domain/ports/version-control.js";
+import { environmentWithoutGitVariables } from "../git-environment.js";
 
 const GITDIR_PREFIX = "gitdir:";
 const HOOK_HEADER = "#!/bin/sh";
@@ -26,6 +28,22 @@ export class GitAdapter implements VersionControl {
 
     await this.fs.writeFile(hookPath, content);
     await this.fs.chmodExecutable(hookPath);
+  }
+
+  // Mirrors the journal hook's own `getRemoteUrl` (plugins/aidd-telemetry/hooks/lib/repo.js)
+  // exactly, so `aidd telemetry on` derives the same `aidd.project_id` the journal does.
+  async getRemoteUrl(repoRoot: string): Promise<string | null> {
+    try {
+      const result = spawnSync("git", ["remote", "get-url", "origin"], {
+        cwd: repoRoot,
+        encoding: "utf8",
+        env: environmentWithoutGitVariables(),
+      });
+      if (result.status !== 0) return null;
+      return result.stdout.trim() || null;
+    } catch {
+      return null;
+    }
   }
 
   private async resolveHooksDir(projectRoot: string): Promise<string | null> {

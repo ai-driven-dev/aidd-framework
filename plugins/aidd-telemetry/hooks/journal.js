@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // journal.js - thin entry point for the run journal: read stdin, detect the
 // host, dispatch by event, exit 0 no matter what. The actual work (host
-// detection, the opt-in gate, the record, attachment) lives in hooks/lib/;
-// this file only wires stdin to the right handler.
+// detection, the telemetry switch, the record, attachment) lives in
+// hooks/lib/; this file only wires stdin to the right handler.
 
 const fs = require("node:fs");
 
@@ -77,6 +77,7 @@ module.exports = {
   parseOwnerRepoFromRemote: repo.parseOwnerRepoFromRemote,
   sanitizeProjectId: repo.sanitizeProjectId,
   runsDir: repo.runsDir,
+  telemetryEnabled: repo.telemetryEnabled,
   generateUlid: record.generateUlid,
   findRunFileByVendorId: record.findRunFileByVendorId,
   advanceTasks: attach.advanceTasks,
