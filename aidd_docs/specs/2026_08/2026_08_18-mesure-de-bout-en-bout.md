@@ -90,6 +90,27 @@ Ce n'est pas du bruit, c'est structurel. Une frontière émise par le framework 
 
 AIDD n'a ni serveur ni démon : **chaque jointure est un fichier**. Donc le contrat n'est pas du code partagé, c'est un schéma versionné dans un dossier `schemas/`, publiable comme Claude publie les siens. Le hook reste bête et sans dépendance : il n'importe rien, il écrit du JSON conforme, et un test confronte sa *sortie réelle* au schéma.
 
+## Nommer l'étape : cinq outils, un seul contrat
+
+Mesuré sur les cinq. **Le coût par étape est portable** — pas un raccourci Claude Code, comme je l'avais affirmé à tort sur une documentation périmée.
+
+| Outil | Invocation d'une skill | Événement | Champ portant le nom | Force |
+| --- | --- | --- | --- | --- |
+| Claude Code | appel d'outil `Skill` | `PreToolUse` / `PostToolUse` | `tool_input.skill` | structurel, **mesuré** |
+| Copilot | outil dédié `skill` | `preToolUse` / `postToolUse` | `toolArgs: {"skill":"…"}` | structurel, **mesuré** |
+| Cursor | lecture de `SKILL.md` | `preToolUse`, `beforeReadFile` | `file_path` | structurel, **mesuré** |
+| OpenCode | outil natif `skill({name})` | plugin `tool.execute.before` | `input.tool === "skill"` | structurel, **documenté** |
+| Codex | le modèle lit `SKILL.md` en Bash | `PreToolUse` / `PostToolUse` | `tool_input.command`, texte libre | **heuristique**, mesuré |
+
+Tous donnent un **début et une fin**. Le contrat ne change jamais — `nom · début · fin · run_id` — seule la provenance du nom diffère, et elle vit dans un extracteur par outil.
+
+Deux exceptions à porter :
+
+- **Codex est heuristique.** Il faut extraire un chemin `SKILL.md` d'une commande shell libre. Un `cat` ou une commande groupée déclenchent quand même le hook mais rendent l'identité plus difficile à retrouver. C'est le seul outil où « sans l'aide du modèle » n'est pas strictement vrai, et donc le seul où une frontière émise par le framework gagne sa place.
+- **OpenCode n'a pas d'artefact.** Sa capacité existe, mais AIDD ne lui expédie aucun hook ni plugin — `hooks: { supported: false }`. Trou de chaîne de build, pas de capacité. C'est #676.
+
+**Aucune skill n'écrit jamais rien.** Une consigne dans du markdown est une chose qu'on espère voir exécutée ; un appel d'outil est un fait. Les étapes vont dans la fiche de run, que git ignore — jamais dans `metadata.json`, qui est commité et que réécrire à chaque skill salirait l'arbre en permanence.
+
 ## Les jointures
 
 | De | Vers | Clé | Pourquoi |
