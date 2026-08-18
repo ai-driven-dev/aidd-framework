@@ -14,17 +14,20 @@ file.
 
 ### `1)` The round trip
 
-1. `cli/tests/e2e/telemetry.e2e.test.ts`: enable, enable again, disable, on a
+1. `cli/tests/e2e/telemetry.e2e.test.ts`: `on`, `on` again, `off`, on a
    repository whose settings file already holds unrelated content.
 2. Assert the file is byte-identical before and after the whole journey. That
    single assertion is worth more than the three it replaces.
 3. List it in `cli/tests/e2e/E2E_MAP.md`, as the other journeys are.
 
-### `2)` The guarded scope
+### `2)` The guarded scope, and the tools we cannot enable
 
 1. `--scope project` without `--yes` writes nothing and exits non-zero.
 2. `--scope project --yes` writes the tracked file, and the local one is
    untouched.
+3. With Cursor present, the run reports it as not enableable by us and still
+   succeeds — a tool we cannot configure is not a failure, but claiming it was
+   configured would be.
 
 ### `3)` Strip the git environment
 
@@ -50,5 +53,7 @@ file.
 | 1 | Enable, re-enable, disable leaves the settings file byte-identical, unrelated content included |
 | 1 | The journey is listed in `E2E_MAP.md` |
 | 2 | The unguarded `--scope project` writes nothing at all, checked on disk rather than from the exit code |
+| 2 | A tool that cannot be enabled is reported as such, and never counted as enabled |
+| 2 | With the AIDD switch off, no tool is configured at all |
 | 3 | The suite passes with `GIT_DIR` exported, proving it under a git hook |
 | 4 | The assertion reads the file at the resolved path, never a value the command reported |

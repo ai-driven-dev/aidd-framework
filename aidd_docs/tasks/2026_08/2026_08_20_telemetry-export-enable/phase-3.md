@@ -2,80 +2,95 @@
 status: pending
 ---
 
-# Instruction: the command, and the scope it writes
+# Instruction: the command
 
 Part of [`plan.md`](./plan.md).
 
-`aidd telemetry enable` and `aidd telemetry disable`. Thin wrappers over phase 2,
-per the repository's command convention — the judgement lives in the use-case,
-not in the handler.
+`aidd telemetry on` and `aidd telemetry off`. A thin wrapper, per the repository's
+command convention: the judgement lives in the use-case.
 
-The only real decision here is **which file**, and it is a sharing decision
-wearing a configuration costume.
+Two things happen when it runs, and keeping them distinct is the point — it sets
+the AIDD switch, and it configures whichever tools are installed and can be
+configured.
 
-## The three scopes, and what each one means
+## Why a command and not a skill
 
-| Scope | File | Who it turns telemetry on for |
-| --- | --- | --- |
-| `local` *(default)* | `.claude/settings.local.json` | only you, only this repository. Not git-tracked |
-| `project` | `.claude/settings.json` | **everyone who clones**, from the commit onward |
-| `user` | `~/.claude/settings.json` | you, in every repository on this machine |
+Both were on the table. The split follows what each can actually do.
+
+A skill runs inside a session, in the model's context, and is the right place to
+**read state and explain it** — that is #617. It is the wrong place to write
+configuration that must be exactly reversible, because the thing that records
+what was written and removes exactly that is `.aidd/manifest.json`, which the CLI
+owns.
+
+A command runs outside any session, which is also the only place that can set an
+environment variable a session will read: those are resolved at process start, so
+a hook writing one takes effect a session late.
+
+So: the CLI writes, the skill explains, and neither reimplements the other.
 
 ## Tasks to do
 
-### `1)` Default to the scope that surprises nobody
+### `1)` Set the switch, then the tools
 
-1. `--scope local` is the default.
+1. Write `aidd_docs/telemetry.json` from phase 1.
+2. Then configure every installed tool that can be configured, one adapter each.
+3. Report per tool what happened, including the tools that were skipped.
 
-> Turning on an export that sends data to an endpoint is a decision about someone
-> else's process and someone else's data. Making it for one person by default,
-> and making the shared choice explicit, is the only ordering where a mistake is
-> recoverable.
+### `2)` Report honestly per tool
 
-### `2)` Guard the shared scope
+1. Enabled — with the file that was written.
+2. Not installed — skipped.
+3. **Cannot be enabled by us** — Cursor's export is a team setting on an
+   Enterprise plan, in beta. Say it plainly and point at what the user must do.
+4. **Not a file** — Copilot reads `COPILOT_OTEL_ENABLED` from the environment, so
+   print the variable rather than pretending to have set it.
 
-1. `--scope project` requires `--yes`, and without it stops with what it would
-   have done: this commits telemetry on for everyone who clones the repository.
+> A command that prints "telemetry enabled" while one of five tools is silently
+> unconfigured is the failure this whole layer exists to catch, committed by the
+> tool meant to prevent it.
 
-> This replaces #646's "refuses to run on a public repository unless `--yes`".
-> Repository visibility is the wrong signal — the export goes to an endpoint the
-> user named, and their private repository is not safer than their public one.
-> The hazard is the **tracked file**, which is a path, needs no network call, and
-> cannot fail open.
+### `3)` The scope, which is a sharing decision
 
-### `3)` Say the file before touching it
+| Scope | File | Turns telemetry on for |
+| --- | --- | --- |
+| `local` *(default)* | `.claude/settings.local.json` | you, this repository. Not git-tracked |
+| `project` | `.claude/settings.json` | **everyone who clones** |
+| `user` | `~/.claude/settings.json` | you, every repository on this machine |
 
-1. Print the resolved absolute path, then act. On every scope, every run.
+1. Default to `local`.
+2. `--scope project` requires `--yes`, and without it stops saying what it would
+   have done.
+
+> This replaces #646's "refuses on a public repository unless `--yes`".
+> Repository visibility is the wrong signal: the export goes to an endpoint the
+> project named, and a private repository is not safer than a public one. The
+> hazard is the tracked file. Checking a path needs no network and cannot fail
+> open.
+>
+> Note the asymmetry, and keep it: **the switch is project-scoped and committed,
+> the tool configuration defaults to personal.** Consenting to be measured is the
+> project's call; sending data from your machine is yours.
+
+### `4)` Say the file before touching it
+
+1. Print each resolved absolute path, then act. Every scope, every run.
 2. Print what changed, or that nothing did.
 
-### `4)` The endpoint is asked for, never guessed
+### `5)` `off` is exact
 
-1. `--endpoint` names it; interactively, prompt. No default host, ever.
-
-> A default endpoint in a telemetry command is a default destination for someone
-> else's data. There is no value that is safe to assume, including localhost,
-> which would silently succeed and export nothing anyone reads.
-
-### `5)` No consent file
-
-1. Write no `.aidd/telemetry.json`. The settings file **is** the record.
-
-> #646 asked for one, and for a rule about whether `aidd clean` should preserve
-> it. Both disappear together: nothing is stored twice, so nothing can drift, and
-> a directory `clean` removes cannot hold the only copy of a decision.
->
-> "Is telemetry on" is answered by reading the settings file — which is #617's
-> job, and it must read the real file rather than a record of intent, or it
-> reports what someone meant instead of what is true.
+1. Set the switch off, and remove exactly the entries the manifest recorded.
+2. `off` on a project that was never on succeeds and changes nothing.
 
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 1 | With no `--scope`, the local file is written and the tracked one is untouched |
-| 2 | `--scope project` without `--yes` exits non-zero, writes nothing, and says it would affect everyone who clones |
-| 2 | `--scope project --yes` writes the tracked file |
-| 3 | The resolved path appears in the output before the file changes, in all three scopes |
-| 4 | Non-interactive with no `--endpoint` fails rather than choosing one |
-| 5 | No file is created under `.aidd/` |
-| 5 | The command handler contains no judgement — the decisions live in the use-case, per the repository's command convention |
+| 1 | With no tool installed, the switch is still written and the command says so |
+| 2 | Cursor is reported as not enableable by us, never as enabled |
+| 2 | Copilot's environment variable is printed, not silently assumed |
+| 3 | With no `--scope`, the local file is written and the tracked one is untouched |
+| 3 | `--scope project` without `--yes` exits non-zero and writes nothing, checked on disk |
+| 4 | Every resolved path appears in the output before the file changes |
+| 5 | on then off leaves every touched file byte-identical to before |
+| 5 | The handler carries no judgement — it lives in the use-case |

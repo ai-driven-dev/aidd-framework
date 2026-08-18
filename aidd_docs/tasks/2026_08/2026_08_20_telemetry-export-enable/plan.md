@@ -1,86 +1,97 @@
 ---
-objective: "One command turns the provider's export on, in a scope the user chose, and takes it back off exactly."
+objective: "One AIDD switch the whole framework obeys, and one per-tool activation behind it."
 status: pending
 type: plan
 ---
 
-# Plan: turning the export on
+# Plan: turning telemetry on
 
 ## Overview
 
 | Field | Value |
 | --- | --- |
-| **Goal** | `aidd telemetry enable` makes Claude Code emit tokens, cost and timings |
+| **Goal** | AIDD measures only when AIDD was told to, on whichever tool the project uses |
 | **Specification** | `ai-driven-dev/framework#646` |
-| **Depends on** | #620, done — the journal that this gives something to join against |
-| **Unblocks** | #647 the sink, then #617 the diagnostic, then #629 the report |
+| **Depends on** | #620, done — the journal this gives something to join against |
+| **Unblocks** | #647 the sink, #617 the diagnostic, #629 the report |
 
-The journal knows which session served which task. It carries no measurement by
-rule. This is the other half of the join: without it there is nothing to attach a
-cost to, and the layer produces identifiers pointing at nothing.
+## Two questions, and only one of them is about Claude Code
 
-## What is proven before planning
+An earlier version of this plan answered one question — how to write an `env`
+block into a Claude Code settings file — and called it the feature. That was the
+smaller half, and it made the plan Claude-shaped when the framework is not.
 
-**Claude Code reads an `env` block from `settings.json`.** The whole issue rests
-on it, and the documentation not only confirms the key but uses OTEL variables as
-its own example. Settings resolve highest-first: managed, command line,
-`.claude/settings.local.json` (repository root, **not** git-tracked),
-`.claude/settings.json` (tracked), `~/.claude/settings.json`.
+**Is AIDD allowed to measure this project at all?** One switch, one answer, read
+by every component: the journal hook, the sink, the diagnostic, the report. It is
+independent of whether the tool is exporting telemetry, because a tool may be
+exporting for reasons that have nothing to do with us — an organisation's own
+collector, an unrelated setting, a default nobody chose. **AIDD not helping
+itself to data it was not given is the guarantee**, and it cannot be delegated to
+a provider's setting.
 
-That precedence is the plan's central fact, because it means **the scope choice
-is a sharing choice**: one file affects only the person who ran the command,
-another turns telemetry on for everyone who clones the repository.
+**How is each tool made to emit?** Differently everywhere, and for one of them,
+not at all by us.
 
-**The CLI already edits a settings file surgically.** `MarketplaceSyncSettingsUseCase`
-upserts one key without disturbing the rest, through `FileReader`/`FileWriter`
-ports. This work follows that seam rather than inventing a second way to touch
-the same file.
+## What each tool actually needs, measured
 
-## Three corrections to #646, to make before building
+| Tool | Where the export is turned on | Who can turn it on |
+| --- | --- | --- |
+| Claude Code | `env` block in `settings.json` | the CLI |
+| Codex | `[otel]` in `config.toml` | the CLI — **and it must set `metrics_exporter`, which defaults to `statsig`, a third party nobody chose** |
+| OpenCode | `experimental.openTelemetry` in `opencode.json` | the CLI |
+| GitHub Copilot | `COPILOT_OTEL_ENABLED`, an environment variable | nobody writes a file for this; the CLI can only instruct |
+| Cursor | a team setting, Enterprise plan, in beta | **nobody.** The framework can check it, never set it |
 
-**Two different consents are conflated.** Turning the provider's *export* on is a
-per-developer decision about data leaving a process. Whether *run records* get
-committed is a per-project decision, already settled and already living in
-`.gitignore`. They are not the same question and must not share a mechanism.
+So "one command turns the export on" is true for three tools, partial for a
+fourth, and false for the fifth. A plan that does not say which is which will be
+discovered to be Claude-only by whoever tries the second tool.
 
-**`.aidd/telemetry.json` should not exist.** The settings file the command writes
-**is** the record of what was turned on; a second file restates it and the two
-would drift. It also sits in a directory `aidd clean` removes, which is why the
-issue had to ask whether cleaning resets consent — a question that disappears
-once nothing is stored twice.
+## Who does what
 
-**"Refuses to run on a public repository unless `--yes`" guards the wrong thing.**
-The export goes to an endpoint the user names; repository visibility has no
-bearing on it, and detecting visibility needs a network call that can fail. The
-real hazard is writing the **tracked** scope, which turns telemetry on for
-everyone who clones. Guard that instead: it is a path check, needs no network,
-and fails closed.
+| Concern | Owner | Why |
+| --- | --- | --- |
+| The switch | a file both sides read | a hook cannot run the CLI, and the CLI cannot be present in a session |
+| Writing a tool's config | the CLI | it already tracks what it wrote, per tool, and already removes exactly that |
+| Reading state and explaining it | a skill | #617; it belongs where the user is asking |
+| Obeying the switch | everything | the journal hook first, since it is the one already shipping |
+
+**The CLI does not need a new writer.** `.aidd/manifest.json` already records
+`mergeFiles` — which file, which section, which entries — per tool, and
+`clean-use-case.ts` already removes exactly those through `removeEntriesFromJson`.
+Enabling a tool's export is one more merge entry in machinery that exists and is
+already exercised by `aidd clean`. Writing a second one would give the repository
+two ways to edit the same file, and only one of them undoable.
 
 ## Phases
 
 | # | Phase | Ends when |
 | --- | --- | --- |
-| 1 | [The variable set](./phase-1.md) | the exact block is written down, with what is deliberately absent |
-| 2 | [Surgical write and exact removal](./phase-2.md) | enable then disable leaves the file byte-identical to before |
-| 3 | [The command and its scope](./phase-3.md) | `aidd telemetry enable` names the file before touching it, and guards the shared scope |
-| 4 | [The journeys](./phase-4.md) | an e2e test covers enable, re-enable, disable |
+| 1 | [The switch](./phase-1.md) | the journal refuses to write when AIDD telemetry is off, whatever the tool is doing |
+| 2 | [What Claude Code needs](./phase-2.md) | one tool emits, through the existing manifest machinery |
+| 3 | [The command](./phase-3.md) | `aidd telemetry on\|off`, naming its file and guarding the shared scope |
+| 4 | [The journeys](./phase-4.md) | an e2e test covers on, on-again, off, and proves where it wrote |
+
+Phase 1 comes first because it is the guarantee. A tool made to emit before the
+switch exists is a tool exporting data with nothing empowered to stop it.
 
 ## Standing rules
 
-- **Say the file before writing it.** A command that mutates configuration names
-  the path first, every time, whatever the scope.
-- **Never touch a key the command did not add.** Enable is an upsert of a known
-  set; disable removes exactly that set and leaves everything else, including a
-  key the user changed by hand.
-- **Idempotent.** Running enable twice changes nothing the second time.
-- **Nothing is enabled by installing.** The plugin ships hooks; this command is
-  the only thing that turns an export on, and it is an explicit gesture.
+- **The switch is checked at the point of use, never cached.** Something turned
+  off must stop mattering immediately, not next session.
+- **Say the file before writing it**, on every scope, every run.
+- **Never touch a key we did not add.** Enable is an upsert of a known set;
+  disable removes exactly that set, through the manifest that recorded it.
+- **Nothing is enabled by installing.** The plugin ships hooks; turning an export
+  on is always an explicit gesture.
+- **Never claim a tool is covered when it is not.** Cursor cannot be enabled by
+  us, and saying so is part of the deliverable.
 
 ## Resources
 
-- #646, the specification.
+- #646, the specification, plus its comment thread for the decisions already closed.
+- `cli/src/application/use-cases/clean-use-case.ts` and `.aidd/manifest.json`'s
+  `mergeFiles` — the write-and-undo machinery to extend, not duplicate.
 - `cli/src/application/use-cases/marketplace/marketplace-sync-settings-use-case.ts` —
-  the surgical-upsert precedent to follow.
-- `cli/src/domain/tools/ai/claude.ts` — where `.claude/settings.json` is already named.
-- `cli/tests/e2e/` — the journey shape, and `E2E_MAP.md` for where a new one is listed.
-- [Claude Code settings reference](https://code.claude.com/docs/en/settings).
+  the surgical-upsert precedent.
+- #653 for the four other tools' export switches, and #676 for OpenCode's plugin API.
+- [Claude Code settings](https://code.claude.com/docs/en/settings).
