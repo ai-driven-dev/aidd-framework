@@ -42,6 +42,18 @@ interface SkillCap {
   serialize: (fm: Record<string, unknown>, body: string) => string;
 }
 
+const PLUGIN_HOOKS_DIR = "hooks";
+
+function parentDirOf(path: string): string {
+  return path.split("/").slice(0, -1).join("/");
+}
+
+// A hook script requires its siblings relative to itself, so the tree below hooks/ has to
+// survive translation intact; flattening it breaks every such require.
+function pathBelow(dir: string, path: string): string {
+  return path.startsWith(`${dir}/`) ? path.slice(dir.length + 1) : path;
+}
+
 export class PluginContentTranslator {
   constructor(private readonly hasher: Hasher) {}
 
@@ -138,14 +150,16 @@ export class PluginContentTranslator {
     if (file.relativePath === ".mcp.json") {
       return cap.acceptsMcp ? { relativePath: cap.mcpRelativePath, content: file.content } : null;
     }
-    if (file.relativePath.split("/")[0] === "hooks") {
+    if (file.relativePath.split("/")[0] === PLUGIN_HOOKS_DIR) {
       if (!cap.acceptsHooks) return null;
-      if (file.relativePath === "hooks/hooks.json") {
+      if (file.relativePath === `${PLUGIN_HOOKS_DIR}/hooks.json`) {
         return { relativePath: cap.hooksRelativePath, content: file.content };
       }
-      const hooksDir = cap.hooksRelativePath.split("/").slice(0, -1).join("/");
-      const filename = file.relativePath.split("/").at(-1) ?? "";
-      return { relativePath: `${hooksDir}/${filename}`, content: file.content };
+      const hooksDir = parentDirOf(cap.hooksRelativePath);
+      return {
+        relativePath: `${hooksDir}/${pathBelow(PLUGIN_HOOKS_DIR, file.relativePath)}`,
+        content: file.content,
+      };
     }
     return this.translateComponent(file, tool);
   }
