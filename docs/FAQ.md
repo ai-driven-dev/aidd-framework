@@ -41,7 +41,8 @@ You can write your own Claude Code skills — nothing stops you. AIDD exists bec
 - **Not autonomous by default.** Skills run under human supervision; you drive each step.
 - **Authored for Claude Code.** Other tools install via their native mechanism from the release archives ([Other tools](../README.md#other-tools)); public-marketplace publishing is on the way, native parity is a roadmap item.
 - **Plugins assume their own context.** A skill that expects a git repo, a `package.json`, or a ticketing tool won't work without it — check the plugin's README.
-- **No hosted service.** AIDD is prompt content you install into your own tool; there is no AIDD server, account, or telemetry.
+- **No hosted service.** AIDD is prompt content you install into your own tool; there is no AIDD server and no account.
+- **Measurement is opt-in, local, and off unless you turn it on.** The `aidd-telemetry` plugin is not installed by the curated path, and even installed it writes nothing until a repository commits an `aidd_docs/runs/` directory. What it then writes stays on your machine — git ignores it — and records which session served which task, never what you typed. Tokens and cost are never copied into it: they stay in your AI tool's own telemetry, which AIDD does not enable for you.
 
 ## 🆘 Still stuck?
 
