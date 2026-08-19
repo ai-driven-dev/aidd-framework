@@ -107,6 +107,53 @@ describe("AiTool contract conformance", () => {
         `${toolId} declares an unrecognized telemetry kind: ${tool.telemetry.kind}`
       ).toContain(tool.telemetry.kind);
     });
+
+    // Same shape guard for the export declaration phase 1 of #647 added: the type system
+    // requires `telemetryExport` to exist, but not that its `kind` is one of the two this
+    // union defines — a typo here would silently widen to `unmeasured`-shaped `undefined`
+    // fields rather than fail loudly.
+    it("declares its export shape as either measured or explicitly unmeasured", () => {
+      expect(
+        ["declared", "unmeasured"],
+        `${toolId} declares an unrecognized telemetryExport kind: ${tool.telemetryExport.kind}`
+      ).toContain(tool.telemetryExport.kind);
+      if (tool.telemetryExport.kind === "declared") {
+        expect(
+          tool.telemetryExport.identityAttribute.length,
+          `${toolId}: telemetryExport.identityAttribute must not be empty`
+        ).toBeGreaterThan(0);
+      }
+    });
+  });
+});
+
+// Exact values, not just shape: this is what phase 1's own acceptance criterion asks for
+// — "asserted for all five" — and it is the test that catches a future contributor
+// quietly guessing an unmeasured tool's attribute name instead of declaring it unmeasured.
+describe("telemetryExport — exact declarations, measured 2026-08-13/14", () => {
+  const EXPECTED: Record<string, { kind: "declared" | "unmeasured"; identityAttribute?: string }> =
+    {
+      claude: { kind: "declared", identityAttribute: "session.id" },
+      codex: { kind: "declared", identityAttribute: "conversation.id" },
+      copilot: { kind: "declared", identityAttribute: "gen_ai.conversation.id" },
+      // Documentation names an attribute; no payload was ever captured. Unmeasured.
+      cursor: { kind: "unmeasured" },
+      opencode: { kind: "unmeasured" },
+    };
+
+  it.each(Object.entries(EXPECTED))("%s", (toolId, expected) => {
+    const tool = registeredAiTools.find(([id]) => id === toolId)?.[1];
+    if (!tool) throw new Error(`${toolId} is not registered`);
+
+    const shape = tool.telemetryExport;
+    expect(shape.kind).toBe(expected.kind);
+    if (shape.kind === "declared" && expected.kind === "declared") {
+      expect(shape.identityAttribute).toBe(expected.identityAttribute);
+    }
+  });
+
+  it("covers exactly the five registered AI tools — no tool escapes this check", () => {
+    expect(Object.keys(EXPECTED).sort()).toEqual(registeredAiTools.map(([id]) => id).sort());
   });
 });
 

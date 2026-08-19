@@ -66,6 +66,13 @@ export class InvalidTelemetryScopeError extends Error {
   }
 }
 
+export class InvalidTelemetryReceivePortError extends Error {
+  constructor(value: string) {
+    super(`Invalid --port '${value}'. Expected an integer between 0 and 65535.`);
+    this.name = "InvalidTelemetryReceivePortError";
+  }
+}
+
 export class TelemetryProjectScopeRequiresYesError extends Error {
   constructor(settingsPath: string) {
     super(

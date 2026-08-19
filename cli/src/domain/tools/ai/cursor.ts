@@ -131,6 +131,12 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
       remedy: "Enable it from your Cursor admin dashboard.",
     },
 
+    // Cursor's documentation names `cursor.conversation.id`, but no payload has ever been
+    // captured: the export is an Enterprise team setting nobody here can turn on. A field
+    // read from documentation is a guess, and a guess declared as measured is the kind of
+    // false figure this whole layer exists to prevent.
+    telemetryExport: { kind: "unmeasured" },
+
     rewriteContent(content: string, docsDir: string): string {
       return baseRewriteContent(content, DIRECTORY, docsDir)
         .replace(

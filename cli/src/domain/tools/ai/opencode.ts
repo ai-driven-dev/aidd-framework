@@ -162,6 +162,13 @@ export const opencode: AiTool<
     trackedIn: "#653",
   },
 
+  // `session.id` on `ai.streamText` spans is documented behind `experimental.openTelemetry`,
+  // but no session has been captured to confirm it against the hook-side identifier —
+  // declared unmeasured rather than guessed.
+  telemetryExport: {
+    kind: "unmeasured",
+  },
+
   rewriteContent(content: string, docsDir: string): string {
     return baseRewriteContent(content, DIRECTORY, docsDir).replace(
       /(@?)\.opencode\/commands\/(\d+)[_-][^/]+\/([^\s]+)/g,

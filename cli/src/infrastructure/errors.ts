@@ -36,6 +36,16 @@ export class AuthStorageError extends Error {
   }
 }
 
+export class TelemetrySinkUnwritableError extends Error {
+  constructor(path: string, cause: unknown) {
+    super(
+      `Telemetry sink directory is not writable: ${path} ` +
+        `(${cause instanceof Error ? cause.message : String(cause)})`
+    );
+    this.name = "TelemetrySinkUnwritableError";
+  }
+}
+
 export class GhCliError extends Error {
   constructor(message: string) {
     super(message);

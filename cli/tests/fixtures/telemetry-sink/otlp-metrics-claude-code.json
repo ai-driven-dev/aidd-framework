@@ -1,0 +1,498 @@
+{
+  "resourceMetrics": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "arm64"
+            }
+          },
+          {
+            "key": "os.type",
+            "value": {
+              "stringValue": "darwin"
+            }
+          },
+          {
+            "key": "os.version",
+            "value": {
+              "stringValue": "25.5.0"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "claude-code"
+            }
+          },
+          {
+            "key": "service.version",
+            "value": {
+              "stringValue": "2.1.235"
+            }
+          }
+        ],
+        "droppedAttributesCount": 0
+      },
+      "scopeMetrics": [
+        {
+          "scope": {
+            "name": "com.anthropic.claude_code",
+            "version": "2.1.235"
+          },
+          "metrics": [
+            {
+              "name": "claude_code.cost.usage",
+              "description": "Cost of the Claude Code session",
+              "unit": "USD",
+              "sum": {
+                "aggregationTemporality": 1,
+                "isMonotonic": true,
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "user.id",
+                        "value": {
+                          "stringValue": "0000000000000000000000000000000000000000000000000000000000000000"
+                        }
+                      },
+                      {
+                        "key": "session.id",
+                        "value": {
+                          "stringValue": "22177147-d8cb-4ee1-976f-0ef82bd62491"
+                        }
+                      },
+                      {
+                        "key": "organization.id",
+                        "value": {
+                          "stringValue": "00000000-2222-4333-8444-555555555555"
+                        }
+                      },
+                      {
+                        "key": "user.email",
+                        "value": {
+                          "stringValue": "person@example.com"
+                        }
+                      },
+                      {
+                        "key": "user.account_uuid",
+                        "value": {
+                          "stringValue": "00000000-1111-4222-8333-444444444444"
+                        }
+                      },
+                      {
+                        "key": "user.account_id",
+                        "value": {
+                          "stringValue": "user_00EXAMPLEACCOUNTID0000000"
+                        }
+                      },
+                      {
+                        "key": "terminal.type",
+                        "value": {
+                          "stringValue": "Orca"
+                        }
+                      },
+                      {
+                        "key": "model",
+                        "value": {
+                          "stringValue": "claude-sonnet-5"
+                        }
+                      },
+                      {
+                        "key": "query_source",
+                        "value": {
+                          "stringValue": "main"
+                        }
+                      },
+                      {
+                        "key": "effort",
+                        "value": {
+                          "stringValue": "high"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1787125781133000000",
+                    "timeUnixNano": "1787125783337000000",
+                    "asDouble": 0.015060299999999999
+                  }
+                ]
+              }
+            },
+            {
+              "name": "claude_code.token.usage",
+              "description": "Number of tokens used",
+              "unit": "tokens",
+              "sum": {
+                "aggregationTemporality": 1,
+                "isMonotonic": true,
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "user.id",
+                        "value": {
+                          "stringValue": "0000000000000000000000000000000000000000000000000000000000000000"
+                        }
+                      },
+                      {
+                        "key": "session.id",
+                        "value": {
+                          "stringValue": "22177147-d8cb-4ee1-976f-0ef82bd62491"
+                        }
+                      },
+                      {
+                        "key": "organization.id",
+                        "value": {
+                          "stringValue": "00000000-2222-4333-8444-555555555555"
+                        }
+                      },
+                      {
+                        "key": "user.email",
+                        "value": {
+                          "stringValue": "person@example.com"
+                        }
+                      },
+                      {
+                        "key": "user.account_uuid",
+                        "value": {
+                          "stringValue": "00000000-1111-4222-8333-444444444444"
+                        }
+                      },
+                      {
+                        "key": "user.account_id",
+                        "value": {
+                          "stringValue": "user_00EXAMPLEACCOUNTID0000000"
+                        }
+                      },
+                      {
+                        "key": "terminal.type",
+                        "value": {
+                          "stringValue": "Orca"
+                        }
+                      },
+                      {
+                        "key": "model",
+                        "value": {
+                          "stringValue": "claude-sonnet-5"
+                        }
+                      },
+                      {
+                        "key": "query_source",
+                        "value": {
+                          "stringValue": "main"
+                        }
+                      },
+                      {
+                        "key": "effort",
+                        "value": {
+                          "stringValue": "high"
+                        }
+                      },
+                      {
+                        "key": "type",
+                        "value": {
+                          "stringValue": "input"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1787125781133000000",
+                    "timeUnixNano": "1787125783337000000",
+                    "asDouble": 2
+                  },
+                  {
+                    "attributes": [
+                      {
+                        "key": "user.id",
+                        "value": {
+                          "stringValue": "0000000000000000000000000000000000000000000000000000000000000000"
+                        }
+                      },
+                      {
+                        "key": "session.id",
+                        "value": {
+                          "stringValue": "22177147-d8cb-4ee1-976f-0ef82bd62491"
+                        }
+                      },
+                      {
+                        "key": "organization.id",
+                        "value": {
+                          "stringValue": "00000000-2222-4333-8444-555555555555"
+                        }
+                      },
+                      {
+                        "key": "user.email",
+                        "value": {
+                          "stringValue": "person@example.com"
+                        }
+                      },
+                      {
+                        "key": "user.account_uuid",
+                        "value": {
+                          "stringValue": "00000000-1111-4222-8333-444444444444"
+                        }
+                      },
+                      {
+                        "key": "user.account_id",
+                        "value": {
+                          "stringValue": "user_00EXAMPLEACCOUNTID0000000"
+                        }
+                      },
+                      {
+                        "key": "terminal.type",
+                        "value": {
+                          "stringValue": "Orca"
+                        }
+                      },
+                      {
+                        "key": "model",
+                        "value": {
+                          "stringValue": "claude-sonnet-5"
+                        }
+                      },
+                      {
+                        "key": "query_source",
+                        "value": {
+                          "stringValue": "main"
+                        }
+                      },
+                      {
+                        "key": "effort",
+                        "value": {
+                          "stringValue": "high"
+                        }
+                      },
+                      {
+                        "key": "type",
+                        "value": {
+                          "stringValue": "output"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1787125781133000000",
+                    "timeUnixNano": "1787125783337000000",
+                    "asDouble": 4
+                  },
+                  {
+                    "attributes": [
+                      {
+                        "key": "user.id",
+                        "value": {
+                          "stringValue": "0000000000000000000000000000000000000000000000000000000000000000"
+                        }
+                      },
+                      {
+                        "key": "session.id",
+                        "value": {
+                          "stringValue": "22177147-d8cb-4ee1-976f-0ef82bd62491"
+                        }
+                      },
+                      {
+                        "key": "organization.id",
+                        "value": {
+                          "stringValue": "00000000-2222-4333-8444-555555555555"
+                        }
+                      },
+                      {
+                        "key": "user.email",
+                        "value": {
+                          "stringValue": "person@example.com"
+                        }
+                      },
+                      {
+                        "key": "user.account_uuid",
+                        "value": {
+                          "stringValue": "00000000-1111-4222-8333-444444444444"
+                        }
+                      },
+                      {
+                        "key": "user.account_id",
+                        "value": {
+                          "stringValue": "user_00EXAMPLEACCOUNTID0000000"
+                        }
+                      },
+                      {
+                        "key": "terminal.type",
+                        "value": {
+                          "stringValue": "Orca"
+                        }
+                      },
+                      {
+                        "key": "model",
+                        "value": {
+                          "stringValue": "claude-sonnet-5"
+                        }
+                      },
+                      {
+                        "key": "query_source",
+                        "value": {
+                          "stringValue": "main"
+                        }
+                      },
+                      {
+                        "key": "effort",
+                        "value": {
+                          "stringValue": "high"
+                        }
+                      },
+                      {
+                        "key": "type",
+                        "value": {
+                          "stringValue": "cacheRead"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1787125781133000000",
+                    "timeUnixNano": "1787125783337000000",
+                    "asDouble": 43841
+                  },
+                  {
+                    "attributes": [
+                      {
+                        "key": "user.id",
+                        "value": {
+                          "stringValue": "0000000000000000000000000000000000000000000000000000000000000000"
+                        }
+                      },
+                      {
+                        "key": "session.id",
+                        "value": {
+                          "stringValue": "22177147-d8cb-4ee1-976f-0ef82bd62491"
+                        }
+                      },
+                      {
+                        "key": "organization.id",
+                        "value": {
+                          "stringValue": "00000000-2222-4333-8444-555555555555"
+                        }
+                      },
+                      {
+                        "key": "user.email",
+                        "value": {
+                          "stringValue": "person@example.com"
+                        }
+                      },
+                      {
+                        "key": "user.account_uuid",
+                        "value": {
+                          "stringValue": "00000000-1111-4222-8333-444444444444"
+                        }
+                      },
+                      {
+                        "key": "user.account_id",
+                        "value": {
+                          "stringValue": "user_00EXAMPLEACCOUNTID0000000"
+                        }
+                      },
+                      {
+                        "key": "terminal.type",
+                        "value": {
+                          "stringValue": "Orca"
+                        }
+                      },
+                      {
+                        "key": "model",
+                        "value": {
+                          "stringValue": "claude-sonnet-5"
+                        }
+                      },
+                      {
+                        "key": "query_source",
+                        "value": {
+                          "stringValue": "main"
+                        }
+                      },
+                      {
+                        "key": "effort",
+                        "value": {
+                          "stringValue": "high"
+                        }
+                      },
+                      {
+                        "key": "type",
+                        "value": {
+                          "stringValue": "cacheCreation"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1787125781133000000",
+                    "timeUnixNano": "1787125783337000000",
+                    "asDouble": 307
+                  }
+                ]
+              }
+            },
+            {
+              "name": "claude_code.active_time.total",
+              "description": "Total active time in seconds",
+              "unit": "s",
+              "sum": {
+                "aggregationTemporality": 1,
+                "isMonotonic": true,
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "user.id",
+                        "value": {
+                          "stringValue": "0000000000000000000000000000000000000000000000000000000000000000"
+                        }
+                      },
+                      {
+                        "key": "session.id",
+                        "value": {
+                          "stringValue": "22177147-d8cb-4ee1-976f-0ef82bd62491"
+                        }
+                      },
+                      {
+                        "key": "organization.id",
+                        "value": {
+                          "stringValue": "00000000-2222-4333-8444-555555555555"
+                        }
+                      },
+                      {
+                        "key": "user.email",
+                        "value": {
+                          "stringValue": "person@example.com"
+                        }
+                      },
+                      {
+                        "key": "user.account_uuid",
+                        "value": {
+                          "stringValue": "00000000-1111-4222-8333-444444444444"
+                        }
+                      },
+                      {
+                        "key": "user.account_id",
+                        "value": {
+                          "stringValue": "user_00EXAMPLEACCOUNTID0000000"
+                        }
+                      },
+                      {
+                        "key": "terminal.type",
+                        "value": {
+                          "stringValue": "Orca"
+                        }
+                      },
+                      {
+                        "key": "type",
+                        "value": {
+                          "stringValue": "cli"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1787125783334000000",
+                    "timeUnixNano": "1787125783337000000",
+                    "asDouble": 9.714
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

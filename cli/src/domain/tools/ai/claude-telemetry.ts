@@ -1,6 +1,48 @@
 import { join } from "node:path";
 import type { TelemetryScope } from "../../capabilities/telemetry-capability.js";
 import { MissingTelemetryEndpointError } from "../../errors.js";
+import type { TelemetrySessionMeasure } from "../../models/telemetry-sink-record.js";
+
+/** Measured 2026-08-13/14 on real Claude Code sessions: `session.id` on both metrics and
+ * events, `prompt.id` per turn on `api_request`. See
+ * aidd_docs/specs/2026_08/2026_08_13-work-tracking-linkage.md. */
+export const CLAUDE_TELEMETRY_IDENTITY_ATTRIBUTE = "session.id";
+export const CLAUDE_TELEMETRY_TURN_ATTRIBUTE = "prompt.id";
+
+/**
+ * `/v1/metrics` datapoint -> allowlisted field, measured on a real export (see
+ * `tests/fixtures/telemetry-sink/otlp-metrics-claude-code.json`). `claude_code.token.usage`
+ * reports all four token counts under one metric name, distinguished only by `type` —
+ * everything else here is a metric name naming its own single field.
+ */
+export const CLAUDE_TELEMETRY_SESSION_MEASURES: readonly TelemetrySessionMeasure[] = [
+  { metric: "claude_code.cost.usage", field: "cost_usd" },
+  { metric: "claude_code.active_time.total", field: "active_time_s" },
+  {
+    metric: "claude_code.token.usage",
+    field: "input_tokens",
+    whenAttribute: "type",
+    whenValue: "input",
+  },
+  {
+    metric: "claude_code.token.usage",
+    field: "output_tokens",
+    whenAttribute: "type",
+    whenValue: "output",
+  },
+  {
+    metric: "claude_code.token.usage",
+    field: "cache_read_tokens",
+    whenAttribute: "type",
+    whenValue: "cacheRead",
+  },
+  {
+    metric: "claude_code.token.usage",
+    field: "cache_creation_tokens",
+    whenAttribute: "type",
+    whenValue: "cacheCreation",
+  },
+];
 
 /** Well under the 60s default: a session shorter than a minute must still flush. */
 export const TELEMETRY_METRIC_EXPORT_INTERVAL_MS = "10000";

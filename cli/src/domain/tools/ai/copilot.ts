@@ -348,6 +348,15 @@ export const copilot: AiTool<
     value: "true",
   },
 
+  // Measured 2026-08-13, zero-credit to verify: `gen_ai.conversation.id` lives on the
+  // `invoke_agent` span, not on a log record or a metric — a receiver that only listens
+  // to /v1/logs and /v1/metrics never sees the one attribute that identifies a Copilot
+  // session.
+  telemetryExport: {
+    kind: "declared",
+    identityAttribute: "gen_ai.conversation.id",
+  },
+
   rewriteContent: rewriteCopilotContent,
 
   reverseRewriteContent: reverseCopilotContent,

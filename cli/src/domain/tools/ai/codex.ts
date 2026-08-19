@@ -249,6 +249,14 @@ export const codex: AiTool<
     trackedIn: "#653",
   },
 
+  // Measured 2026-08-13: `conversation.id` on `codex.sse_event`, zero-token to verify —
+  // the identifier is minted client-side before any model call. Turn identifier and
+  // metrics export are unmeasured.
+  telemetryExport: {
+    kind: "declared",
+    identityAttribute: "conversation.id",
+  },
+
   rewriteContent(content: string, docsDir: string): string {
     return rewriteCodexContent(content, { directory: DIRECTORY, docsDir });
   },

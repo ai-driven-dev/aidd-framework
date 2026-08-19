@@ -8,8 +8,19 @@ import {
 import { createDeps } from "../../infrastructure/deps.js";
 import { printTelemetryOffReport, printTelemetryOnReport } from "../display/telemetry-display.js";
 import { ErrorHandler } from "../error-handler.js";
-import { InvalidTelemetryScopeError } from "../errors.js";
+import { InvalidTelemetryReceivePortError, InvalidTelemetryScopeError } from "../errors.js";
 import { parseGlobalOptions } from "./global-options.js";
+
+/** OTLP/HTTP's own conventional default port — reused so `aidd telemetry on`'s default
+ * `--endpoint` and this command's default `--port` agree without either hardcoding the
+ * other. Extracted for direct testing, same reason as `parseTelemetryScope`. */
+export function parseTelemetryReceivePort(raw: string): number {
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    throw new InvalidTelemetryReceivePortError(raw);
+  }
+  return port;
+}
 
 /** Extracted for direct testing: the only judgement `telemetry on`'s handler makes is
  * validating the `--scope` flag's shape before anything is built — everything else lives
@@ -48,6 +59,25 @@ export function registerTelemetryCommand(program: Command): void {
           confirmProjectScope: cmdOptions.yes,
         });
         printTelemetryOnReport(output, result);
+      } catch (error) {
+        errorHandler.handle(error);
+      }
+    });
+
+  telemetry
+    .command("receive")
+    .description("Listen for OTLP telemetry exports and store them under the AIDD telemetry sink")
+    .option("--port <number>", "Port to listen on (default: 4318, the OTLP/HTTP default)", "4318")
+    .action(async (cmdOptions: { port: string }) => {
+      const { verbose, output } = parseGlobalOptions(program);
+      const errorHandler = new ErrorHandler(output);
+      try {
+        const port = parseTelemetryReceivePort(cmdOptions.port);
+        const deps = await createDeps(process.cwd(), { verbose }, output);
+        const { rootDir } = await deps.receiveTelemetryUseCase.start();
+        output.info(`AIDD telemetry sink -> ${rootDir}`);
+        const { port: boundPort } = await deps.otlpHttpReceiverAdapter.listen(port);
+        output.info(`Listening for OTLP telemetry on http://localhost:${boundPort}`);
       } catch (error) {
         errorHandler.handle(error);
       }

@@ -26,7 +26,10 @@ import type {
 import { registerTool } from "../registry.js";
 import {
   buildClaudeTelemetryEnv,
+  CLAUDE_TELEMETRY_IDENTITY_ATTRIBUTE,
   CLAUDE_TELEMETRY_POST_ENABLE_NOTICE,
+  CLAUDE_TELEMETRY_SESSION_MEASURES,
+  CLAUDE_TELEMETRY_TURN_ATTRIBUTE,
   resolveClaudeTelemetrySettingsPath,
 } from "./claude-telemetry.js";
 
@@ -134,6 +137,13 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
       resolveSettingsPath: resolveClaudeTelemetrySettingsPath,
       buildEnv: buildClaudeTelemetryEnv,
       postEnableNotice: CLAUDE_TELEMETRY_POST_ENABLE_NOTICE,
+    },
+
+    telemetryExport: {
+      kind: "declared",
+      identityAttribute: CLAUDE_TELEMETRY_IDENTITY_ATTRIBUTE,
+      turnAttribute: CLAUDE_TELEMETRY_TURN_ATTRIBUTE,
+      sessionMeasures: CLAUDE_TELEMETRY_SESSION_MEASURES,
     },
 
     rewriteContent(content: string, docsDir: string): string {

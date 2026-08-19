@@ -1,3 +1,5 @@
+import type { TelemetrySessionMeasure } from "../models/telemetry-sink-record.js";
+
 /**
  * Where the enabled export lands, and who is affected:
  * - `local`   — machine-local, not git-tracked (default)
@@ -55,3 +57,24 @@ export type TelemetryActivation =
   | TelemetryEnvironmentVariableActivation
   | TelemetryPlannedActivation
   | TelemetryExternalActivation;
+
+/**
+ * What a tool's OTLP export actually carries — measured by hand, one session per tool,
+ * never guessed from documentation. Separate from {@link TelemetryActivation}: a tool can
+ * be enableable (or not) independently of whether its export shape has been proven. The
+ * sink mapper (`telemetry-sink-record.ts`) reads this and nothing else to resolve which
+ * tool sent a payload — it never branches on `toolId`.
+ */
+export interface TelemetryExportDeclared {
+  readonly kind: "declared";
+  readonly identityAttribute: string;
+  readonly turnAttribute?: string;
+  readonly sessionMeasures?: readonly TelemetrySessionMeasure[];
+}
+
+/** No session has been captured for this tool's export yet — declared rather than guessed. */
+export interface TelemetryExportUnmeasured {
+  readonly kind: "unmeasured";
+}
+
+export type TelemetryExport = TelemetryExportDeclared | TelemetryExportUnmeasured;

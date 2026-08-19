@@ -472,3 +472,12 @@ export class NativePluginCliError extends Error {
     this.name = "NativePluginCliError";
   }
 }
+
+export class UnknownTelemetrySinkSchemaVersionError extends Error {
+  constructor(version: unknown) {
+    super(
+      `Unknown telemetry sink schema version '${String(version)}' — refusing to guess its shape.`
+    );
+    this.name = "UnknownTelemetrySinkSchemaVersionError";
+  }
+}

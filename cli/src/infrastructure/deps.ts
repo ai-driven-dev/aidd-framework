@@ -78,6 +78,7 @@ import { UpdateOneToolUseCase } from "../application/use-cases/shared/update-one
 import { StatusUseCase } from "../application/use-cases/status-use-case.js";
 import { SyncConflictResolverUseCase } from "../application/use-cases/sync/sync-conflict-resolver-use-case.js";
 import { EnableToolTelemetryUseCase } from "../application/use-cases/telemetry/enable-tool-telemetry-use-case.js";
+import { ReceiveTelemetryUseCase } from "../application/use-cases/telemetry/receive-telemetry-use-case.js";
 import { TelemetryOffUseCase } from "../application/use-cases/telemetry/telemetry-off-use-case.js";
 import { TelemetryOnUseCase } from "../application/use-cases/telemetry/telemetry-on-use-case.js";
 import { UninstallIdeUseCase } from "../application/use-cases/uninstall/uninstall-ide-use-case.js";
@@ -124,12 +125,14 @@ import { ManifestRepositoryAdapter } from "./adapters/manifest-repository-adapte
 import { MarketplaceCacheAdapter } from "./adapters/marketplace-cache-adapter.js";
 import { MarketplaceRegistryAdapter } from "./adapters/marketplace-registry-adapter.js";
 import { MarketplaceTrustStoreAdapter } from "./adapters/marketplace-trust-store-adapter.js";
+import { OtlpHttpReceiverAdapter } from "./adapters/otlp-http-receiver-adapter.js";
 import { PlatformAdapter } from "./adapters/platform-adapter.js";
 import { PluginCatalogRepositoryAdapter } from "./adapters/plugin-catalog-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "./adapters/plugin-distribution-reader-adapter.js";
 import { PluginFetcherAdapter } from "./adapters/plugin-fetcher-adapter.js";
 import { InquirerPrompterAdapter, SilentPrompterAdapter } from "./adapters/prompter-adapter.js";
 import { SelfUpdaterAdapter } from "./adapters/self-updater-adapter.js";
+import { TelemetrySinkAdapter } from "./adapters/telemetry-sink-adapter.js";
 import { BundledAssetProviderAdapter } from "./assets/asset-loader.js";
 import { AuthStorage } from "./auth/auth-storage.js";
 import { HttpClient } from "./http/http-client.js";
@@ -205,6 +208,8 @@ interface Deps {
   checkUpdateUseCase: CheckUpdateUseCase;
   telemetryOnUseCase: TelemetryOnUseCase;
   telemetryOffUseCase: TelemetryOffUseCase;
+  receiveTelemetryUseCase: ReceiveTelemetryUseCase;
+  otlpHttpReceiverAdapter: OtlpHttpReceiverAdapter;
 }
 
 const _cache = new Map<string, Deps>();
@@ -694,6 +699,9 @@ export async function createDeps(
     deriveTelemetryProjectId
   );
   const telemetryOffUseCase = new TelemetryOffUseCase(fs, manifestRepo, logger);
+  const telemetrySink = new TelemetrySinkAdapter();
+  const receiveTelemetryUseCase = new ReceiveTelemetryUseCase(telemetrySink, logger);
+  const otlpHttpReceiverAdapter = new OtlpHttpReceiverAdapter(receiveTelemetryUseCase, logger);
   const deps: Deps = {
     fs,
     manifestRepo,
@@ -761,6 +769,8 @@ export async function createDeps(
     checkUpdateUseCase,
     telemetryOnUseCase,
     telemetryOffUseCase,
+    receiveTelemetryUseCase,
+    otlpHttpReceiverAdapter,
   };
   _cache.set(projectRoot, deps);
   return deps;

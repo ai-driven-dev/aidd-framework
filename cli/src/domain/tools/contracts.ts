@@ -6,7 +6,7 @@ import type { PluginsCapability } from "../capabilities/plugins-capability.js";
 import type { RulesCapability } from "../capabilities/rules-capability.js";
 import type { SettingsCapability } from "../capabilities/settings-capability.js";
 import type { SkillsCapability } from "../capabilities/skills-capability.js";
-import type { TelemetryActivation } from "../capabilities/telemetry-capability.js";
+import type { TelemetryActivation, TelemetryExport } from "../capabilities/telemetry-capability.js";
 import type { AiToolId, IdeToolId } from "../models/tool-ids.js";
 
 export type UserFileSection = "agents" | "commands" | "rules" | "skills";
@@ -57,6 +57,9 @@ export interface AiTool<C> {
   // Not a capability: `capabilities` holds what varies between tools, and every AI tool
   // has a telemetry story — the union covers the tools AIDD cannot enable.
   readonly telemetry: TelemetryActivation;
+  /** What the tool's OTLP export actually carries, measured independently of whether
+   * AIDD can enable it — see {@link TelemetryExport}. */
+  readonly telemetryExport: TelemetryExport;
   readonly directory: string;
   readonly toolSuffix: string;
   readonly signalDir: string | null;
