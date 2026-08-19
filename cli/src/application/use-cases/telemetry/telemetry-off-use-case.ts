@@ -1,5 +1,4 @@
 import { dirname, join } from "node:path";
-import type { TelemetrySettingsFileActivation } from "../../../domain/capabilities/telemetry-capability.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import {
   isMergeContentEmpty,
