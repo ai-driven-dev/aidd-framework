@@ -18,7 +18,6 @@ file.
    repository whose settings file already holds unrelated content.
 2. Assert the file is byte-identical before and after the whole journey. That
    single assertion is worth more than the three it replaces.
-3. List it in `cli/tests/e2e/E2E_MAP.md`, as the other journeys are.
 
 ### `2)` The guarded scope, and the tools we cannot enable
 
@@ -51,7 +50,6 @@ file.
 | Task | Acceptance criteria |
 | ---- | ------------------- |
 | 1 | Enable, re-enable, disable leaves the settings file byte-identical, unrelated content included |
-| 1 | The journey is listed in `E2E_MAP.md` |
 | 2 | The unguarded `--scope project` writes nothing at all, checked on disk rather than from the exit code |
 | 2 | A tool that cannot be enabled is reported as such, and never counted as enabled |
 | 2 | With the AIDD switch off, no tool is configured at all |

@@ -1,3 +1,4 @@
+import { getAiToolConfig } from "../../domain/tools/registry.js";
 import type { CLIOutput } from "../output.js";
 import type { TelemetryOffResult } from "../use-cases/telemetry/telemetry-off-use-case.js";
 import type {
@@ -18,9 +19,8 @@ export function printTelemetryOnReport(output: CLIOutput, result: TelemetryOnRes
   output.success(`AIDD telemetry: ${switchLabel} (${result.switchPath})`);
   output.print(`Endpoint: ${result.endpoint}`);
   for (const report of result.toolReports) {
-    // The tool registry has no human-readable display-name field (only `toolId`), so the
-    // identifier itself is the label — not a raw value the display layer had to interpret.
-    output.print(`  ${report.tool}: ${STATUS_LABELS[report.status]} — ${report.detail}`);
+    const name = getAiToolConfig(report.tool).displayName;
+    output.print(`  ${name}: ${STATUS_LABELS[report.status]} — ${report.detail}`);
   }
 }
 

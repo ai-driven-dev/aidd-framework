@@ -41,6 +41,7 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
   {
     kind: "ai",
     toolId: "claude",
+    displayName: "Claude Code",
     directory: DIRECTORY,
     toolSuffix: TOOL_SUFFIX,
     signalDir: ".claude/commands",

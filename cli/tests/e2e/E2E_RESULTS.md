@@ -1,6 +1,5 @@
 # AIDD CLI — E2E Test Results
 
-> Reference: `tests/e2e/E2E_MAP.md`
 > Run date: 2026-05-03 (real-env re-run post plugin-architecture refactor)
 > CLI version: aidd/4.1.0
 > Framework: main (local path, v3.9.1)

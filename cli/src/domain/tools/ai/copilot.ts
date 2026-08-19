@@ -256,6 +256,7 @@ export const copilot: AiTool<
 > = {
   kind: "ai",
   toolId: "copilot",
+  displayName: "GitHub Copilot",
   directory: DIRECTORY,
   toolSuffix: TOOL_SUFFIX,
   signalDir: ".github/prompts",

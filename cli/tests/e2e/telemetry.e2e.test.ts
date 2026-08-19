@@ -213,7 +213,7 @@ describe.concurrent("E2E: aidd telemetry", () => {
       );
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain("cursor: cannot be enabled by us");
+      expect(result.stdout).toContain("Cursor: cannot be enabled by us");
       expect(result.stdout).not.toMatch(/cursor: enabled/);
     } finally {
       await cleanup();

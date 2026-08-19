@@ -91,6 +91,7 @@ export const opencode: AiTool<
 > = {
   kind: "ai",
   toolId: "opencode",
+  displayName: "OpenCode",
   directory: DIRECTORY,
   toolSuffix: TOOL_SUFFIX,
   signalDir: ".opencode/commands",

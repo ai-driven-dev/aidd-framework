@@ -51,6 +51,9 @@ export interface HasPlugins {
 export interface AiTool<C> {
   readonly kind: "ai";
   readonly toolId: AiToolId;
+  /** How the vendor writes it. `toolId` is a key, not a name: nothing user-facing
+   * should print `copilot` where a person reads "GitHub Copilot". */
+  readonly displayName: string;
   // Not a capability: `capabilities` holds what varies between tools, and every AI tool
   // has a telemetry story — the union covers the tools AIDD cannot enable.
   readonly telemetry: TelemetryActivation;

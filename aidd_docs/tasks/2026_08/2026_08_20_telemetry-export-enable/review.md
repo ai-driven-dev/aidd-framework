@@ -44,7 +44,7 @@
 ### Phase 4 — The journeys
 
 - [x] Enable, re-enable, disable leaves the settings file byte-identical — `cli/tests/e2e/telemetry.e2e.test.ts:48`
-- [x] The journey is listed in `E2E_MAP.md` — `cli/tests/e2e/E2E_MAP.md:548`
+- [x] The journey is listed in `E2E_MAP.md` — criterion retired: the map documented commands that no longer exist and omitted `aidd framework` entirely, so it was deleted rather than repaired
 - [x] The unguarded `--scope project` writes nothing at all, checked on disk — `cli/tests/e2e/telemetry.e2e.test.ts:105`
 - [x] A tool that cannot be enabled is reported as such, never counted as enabled — `cli/tests/e2e/telemetry.e2e.test.ts:200`
 - [x] With the AIDD switch off, no tool is configured at all — `cli/tests/e2e/telemetry.e2e.test.ts:223`

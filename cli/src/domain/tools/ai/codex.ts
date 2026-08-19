@@ -186,6 +186,7 @@ export const codex: AiTool<
 > = {
   kind: "ai",
   toolId: "codex",
+  displayName: "Codex",
   directory: DIRECTORY,
   toolSuffix: TOOL_SUFFIX,
   signalDir: `${DIRECTORY}commands`,

@@ -38,6 +38,7 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
   {
     kind: "ai",
     toolId: "cursor",
+    displayName: "Cursor",
     directory: DIRECTORY,
     toolSuffix: TOOL_SUFFIX,
     signalDir: ".cursor/commands",

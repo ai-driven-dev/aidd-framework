@@ -57,10 +57,10 @@ export class TelemetryOffUseCase {
   private buildManualUnsetReminders(): string[] {
     const reminders: string[] = [];
     for (const toolId of AI_TOOL_IDS) {
-      const { telemetry } = getAiToolConfig(toolId);
+      const { telemetry, displayName } = getAiToolConfig(toolId);
       if (telemetry.kind !== "environment-variable") continue;
       reminders.push(
-        `${toolId}: if you exported ${telemetry.variable} yourself, unset it by hand.`
+        `${displayName}: if you exported ${telemetry.variable} yourself, unset it by hand.`
       );
     }
     return reminders;

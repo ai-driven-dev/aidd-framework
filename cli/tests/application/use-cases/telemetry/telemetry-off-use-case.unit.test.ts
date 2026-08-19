@@ -212,7 +212,7 @@ describe("TelemetryOffUseCase — manual-unset reminders", () => {
     const { useCase } = buildUseCase(null);
     const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
     expect(result.manualUnsetReminders).toEqual([
-      "copilot: if you exported COPILOT_OTEL_ENABLED yourself, unset it by hand.",
+      "GitHub Copilot: if you exported COPILOT_OTEL_ENABLED yourself, unset it by hand.",
     ]);
   });
 });
