@@ -1,5 +1,7 @@
-// record.js - the run record itself: minting a run_id, naming and finding
-// its file, building the ten-key shape, and reading/writing it back to disk.
+// record.js - the run log itself: minting a run_id, naming and finding its
+// file, and appending session_start / turn_end lines. Every write is one
+// line ended with "\n"; nothing here reads a run file back in order to write
+// it again - findRunFileByVendorId matches on the directory listing alone.
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -52,25 +54,33 @@ function nowIso() {
   return new Date().toISOString().replace(/\.\d{3}Z$/u, "Z");
 }
 
-// `<run_id>__<vendor_id>.json`, vendor_id sanitised as a path segment.
+// `<run_id>__<vendor_id>.jsonl`, vendor_id sanitised as a path segment. A
+// JSON object is a closed block that can only be rewritten whole; a
+// line-per-object file can be appended to, which is the entire point of this
+// shape (see plan.md).
+const RUN_FILE_EXTENSION = ".jsonl";
+
 function runFileName(runId, vendorId) {
-  return `${runId}__${sanitizePathSegment(String(vendorId))}.json`;
+  return `${runId}__${sanitizePathSegment(String(vendorId))}${RUN_FILE_EXTENSION}`;
 }
 
 // Splits on the fixed ULID_LENGTH rather than searching for "__", since a
 // sanitised vendor_id may itself contain "__".
 function parseRunFileName(entry) {
-  if (!entry.endsWith(".json")) return null;
-  if (entry.length <= ULID_LENGTH + "__".length + ".json".length) return null;
+  if (!entry.endsWith(RUN_FILE_EXTENSION)) return null;
+  const minLength = ULID_LENGTH + "__".length + RUN_FILE_EXTENSION.length;
+  if (entry.length <= minLength) return null;
   if (entry.slice(ULID_LENGTH, ULID_LENGTH + 2) !== "__") return null;
   return {
     runId: entry.slice(0, ULID_LENGTH),
-    vendorSegment: entry.slice(ULID_LENGTH + 2, -".json".length),
+    vendorSegment: entry.slice(ULID_LENGTH + 2, -RUN_FILE_EXTENSION.length),
   };
 }
 
 // Matches on the directory listing alone - no file read, no JSON parse -
-// since turn-end and file-written both call this on every event.
+// since turn-end and file-written both call this on every event. This is
+// what lets findRunFileByVendorId scan directory *names* without that
+// counting as reading a run file in order to write it again.
 function findRunFileByVendorId(dir, vendorId) {
   let entries;
   try {
@@ -87,56 +97,79 @@ function findRunFileByVendorId(dir, vendorId) {
   return null;
 }
 
-const SCHEMA_VERSION = 1;
+// Moved from 1: the mutable ten-key record it described is gone, replaced by
+// this append-only line log. Recorded once, on session_start, so a reader
+// can tell which shape a given file is without inspecting every line.
+const SCHEMA_VERSION = 2;
 
 // Which export-side attribute vendor_id can be joined against, per host.
 const VENDOR_FIELD_BY_HOST = Object.freeze({
   "claude-code": "session.id",
 });
 
-// tasks opens as a single unattached interval; file-written replaces or
-// extends it once path evidence arrives (see attach.js).
-function buildRecord({ host, runId, projectId, vendorId, startedAt }) {
+const PRIVATE_FILE_MODE = 0o600;
+
+// The only write primitive in this file: one line, appended. `mode` only
+// takes effect when the append call is the one that creates the file (the
+// session_start line always is, since SessionStart mints the file), matching
+// writeRecord's old guarantee that the file never lands world-readable.
+function appendLine(filePath, line) {
+  fs.appendFileSync(filePath, `${JSON.stringify(line)}\n`, { mode: PRIVATE_FILE_MODE });
+}
+
+function buildSessionStartLine({ at, runId, projectId, projectRemote, host, vendorId }) {
   return {
+    type: "session_start",
+    at,
     schema_version: SCHEMA_VERSION,
     run_id: runId,
     project_id: projectId,
+    project_remote: projectRemote,
     tool: host,
     vendor_id: vendorId,
     vendor_field: VENDOR_FIELD_BY_HOST[host],
-    parent_run_id: null,
-    started_at: startedAt,
-    ended_at: startedAt,
-    tasks: [{ task_id: null, from: startedAt, to: null }],
   };
 }
 
-function readRecord(filePath) {
-  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+// prompt_id is omitted, never written as null, when the payload carries none
+// - no host observed today does, but the field stays a first-class part of
+// the shape for one that does.
+function buildTurnEndLine({ at, promptId }) {
+  const line = { type: "turn_end", at };
+  if (typeof promptId === "string" && promptId !== "") line.prompt_id = promptId;
+  return line;
 }
 
-const PRIVATE_FILE_MODE = 0o600;
-
-function writeRecord(filePath, record) {
-  fs.writeFileSync(filePath, `${JSON.stringify(record, null, 2)}\n`, { mode: PRIVATE_FILE_MODE });
+// path is repository-relative and "/"-separated on every platform (see
+// file-writes.js's taskFolderRelativePath) - never a task_id, which is a
+// derivation that belongs to the reader, not the writer.
+function buildFileWrittenLine({ at, path: writtenPath }) {
+  return { type: "file_written", at, path: writtenPath };
 }
 
 function handleSessionStart(payload, host) {
   const target = resolveWriteTarget(payload.cwd);
   if (!target) return;
-  const { projectId, dir } = target;
+  const { projectId, projectRemote, dir } = target;
 
   // SessionStart is not documented to fire only once per session_id
   // (`source` takes values beyond `startup`), so this guard prevents a
-  // second file for one vendor_id outright.
+  // second file - and a duplicate session_start line - for one vendor_id
+  // outright.
   if (findRunFileByVendorId(dir, payload.session_id)) return;
 
   const runId = generateUlid();
-  const startedAt = nowIso();
-  const record = buildRecord({ host, runId, projectId, vendorId: payload.session_id, startedAt });
+  const line = buildSessionStartLine({
+    at: nowIso(),
+    runId,
+    projectId,
+    projectRemote,
+    host,
+    vendorId: payload.session_id,
+  });
 
   fs.mkdirSync(dir, { recursive: true, mode: PRIVATE_DIR_MODE });
-  writeRecord(path.join(dir, runFileName(runId, payload.session_id)), record);
+  appendLine(path.join(dir, runFileName(runId, payload.session_id)), line);
   tightenOwnedDir(dir);
 }
 
@@ -151,23 +184,23 @@ function handleTurnEnd(payload) {
   const filePath = findRunFileByVendorId(dir, payload.session_id);
   if (!filePath) return;
 
-  const record = readRecord(filePath);
-  record.ended_at = nowIso();
-  writeRecord(filePath, record);
+  appendLine(filePath, buildTurnEndLine({ at: nowIso(), promptId: payload.prompt_id }));
 }
 
 module.exports = {
   generateUlid,
   ULID_LENGTH,
   nowIso,
+  RUN_FILE_EXTENSION,
   runFileName,
   parseRunFileName,
   findRunFileByVendorId,
   SCHEMA_VERSION,
   VENDOR_FIELD_BY_HOST,
-  buildRecord,
-  readRecord,
-  writeRecord,
+  appendLine,
+  buildSessionStartLine,
+  buildTurnEndLine,
+  buildFileWrittenLine,
   PRIVATE_FILE_MODE,
   handleSessionStart,
   handleTurnEnd,

@@ -45,10 +45,10 @@ test("AIDD_RUNS_DIR overrides where runs are written", () => {
     encoding: "utf8",
   });
 
-  const written = fs.readdirSync(runs, { recursive: true }).filter((f) => String(f).endsWith(".json"));
+  const written = fs.readdirSync(runs, { recursive: true }).filter((f) => String(f).endsWith(".jsonl"));
   assert.equal(written.length, 1, "the record did not land under AIDD_RUNS_DIR");
 
-  const defaultWritten = fs.readdirSync(defaultRunsDir).filter((f) => f.endsWith(".json"));
+  const defaultWritten = fs.readdirSync(defaultRunsDir).filter((f) => f.endsWith(".jsonl"));
   assert.equal(defaultWritten.length, 0, "the default aidd_docs/runs/ location was used anyway");
 
   fs.rmSync(repo, { recursive: true, force: true });
@@ -89,18 +89,18 @@ test("a user-named AIDD_RUNS_DIR keeps the permissions its owner gave it", () =>
   fs.rmSync(repo, { recursive: true, force: true });
 });
 
-test("a task written as a single .md file attaches like a folder", () => {
-  const { taskIdFromPath } = require("../../plugins/aidd-telemetry/hooks/lib/attach.js");
+test("a task written as a single .md file is recorded like a folder - the path is returned whole, not reduced to a task_id", () => {
+  const { taskFolderRelativePath } = require("../../plugins/aidd-telemetry/hooks/lib/file-writes.js");
   const repo = "/repo";
   assert.equal(
-    taskIdFromPath(repo, "/repo/aidd_docs/tasks/2026_08/2026_08_14_telemetry-v1/plan.md"),
-    "2026_08_14_telemetry-v1",
+    taskFolderRelativePath(repo, "/repo/aidd_docs/tasks/2026_08/2026_08_14_telemetry-v1/plan.md"),
+    "aidd_docs/tasks/2026_08/2026_08_14_telemetry-v1/plan.md",
   );
   assert.equal(
-    taskIdFromPath(repo, "/repo/aidd_docs/tasks/2026_06/2026_06_19-rolling-weekly-releases.md"),
-    "2026_06_19-rolling-weekly-releases",
+    taskFolderRelativePath(repo, "/repo/aidd_docs/tasks/2026_06/2026_06_19-rolling-weekly-releases.md"),
+    "aidd_docs/tasks/2026_06/2026_06_19-rolling-weekly-releases.md",
   );
-  assert.equal(taskIdFromPath(repo, "/repo/aidd_docs/tasks/2026_08/notes.txt"), null);
-  assert.equal(taskIdFromPath(repo, "/repo/src/index.ts"), null);
-  assert.equal(taskIdFromPath(repo, "/repobis/aidd_docs/tasks/2026_08/x/plan.md"), null);
+  assert.equal(taskFolderRelativePath(repo, "/repo/aidd_docs/tasks/2026_08/notes.txt"), null);
+  assert.equal(taskFolderRelativePath(repo, "/repo/src/index.ts"), null);
+  assert.equal(taskFolderRelativePath(repo, "/repobis/aidd_docs/tasks/2026_08/x/plan.md"), null);
 });

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // journal.js - thin entry point for the run journal: read stdin, detect the
 // host, dispatch by event, exit 0 no matter what. The actual work (host
-// detection, the telemetry switch, the record, attachment) lives in
+// detection, the telemetry switch, the record, which writes are worth a line) lives in
 // hooks/lib/; this file only wires stdin to the right handler.
 
 const fs = require("node:fs");
@@ -9,7 +9,7 @@ const fs = require("node:fs");
 const { detectHost } = require("./lib/host.js");
 const repo = require("./lib/repo.js");
 const record = require("./lib/record.js");
-const attach = require("./lib/attach.js");
+const fileWrites = require("./lib/file-writes.js");
 
 function readStdin() {
   try {
@@ -43,8 +43,9 @@ function processPayload(payload, event) {
   const host = detectHost(payload);
   if (host !== "claude-code") return;
 
-  // Otherwise reaches buildRecord with vendorId undefined, and
-  // JSON.stringify silently drops undefined values - a nine-key file, not ten.
+  // Otherwise the session_start line reaches JSON.stringify with vendor_id
+  // undefined, which it drops silently - a line missing the very key every
+  // later join depends on.
   if (typeof payload.session_id !== "string" || payload.session_id === "") return;
 
   const resolvedEvent = resolveEventName(event, payload);
@@ -53,7 +54,7 @@ function processPayload(payload, event) {
   } else if (resolvedEvent === "turn-end") {
     record.handleTurnEnd(payload);
   } else if (resolvedEvent === "file-written") {
-    attach.handleFileWritten(payload, host);
+    fileWrites.handleFileWritten(payload, host);
   }
 }
 
@@ -80,9 +81,7 @@ module.exports = {
   telemetryEnabled: repo.telemetryEnabled,
   generateUlid: record.generateUlid,
   findRunFileByVendorId: record.findRunFileByVendorId,
-  advanceTasks: attach.advanceTasks,
-  taskIdFromPath: attach.taskIdFromPath,
-  looksLikeTaskPath: attach.looksLikeTaskPath,
+  looksLikeTaskPath: fileWrites.looksLikeTaskPath,
   processPayload,
   resolveEventName,
 };

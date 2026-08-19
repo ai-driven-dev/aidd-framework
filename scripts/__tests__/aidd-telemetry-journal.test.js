@@ -20,8 +20,6 @@ const {
   sanitizeProjectId,
   generateUlid,
   findRunFileByVendorId,
-  advanceTasks,
-  taskIdFromPath,
   looksLikeTaskPath,
   processPayload,
   resolveEventName,
@@ -29,20 +27,26 @@ const {
   telemetryEnabled,
 } = require("../../plugins/aidd-telemetry/hooks/journal.js");
 
-const INTERVAL_KEYS = ["from", "task_id", "to"];
+const { taskFolderRelativePath } = require("../../plugins/aidd-telemetry/hooks/lib/file-writes.js");
 
-const THE_TEN_KEYS = [
+// One exact key set per line type (see phase-1.md) - the replacement for the
+// old THE_TEN_KEYS whitelist, which guarded a single mutable record that no
+// longer exists.
+const SESSION_START_KEYS = [
+  "type",
+  "at",
   "schema_version",
   "run_id",
   "project_id",
+  "project_remote",
   "tool",
   "vendor_id",
   "vendor_field",
-  "parent_run_id",
-  "started_at",
-  "ended_at",
-  "tasks",
 ].sort();
+
+const TURN_END_KEYS = ["type", "at"].sort();
+const TURN_END_WITH_PROMPT_KEYS = ["type", "at", "prompt_id"].sort();
+const FILE_WRITTEN_KEYS = ["type", "at", "path"].sort();
 
 const root = path.resolve(__dirname, "../..");
 const script = path.join(root, "plugins/aidd-telemetry/hooks/journal.js");
@@ -289,19 +293,19 @@ test("a session-start replay with hook_event_name stripped still mints a record 
     delete payload.hook_event_name;
     const result = replayIn(payload, "session-start");
     assert.equal(result.status, 0);
-    assert.equal(readJsonFilesRecursively(runsDirOf(repo)).length, 1);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 1);
   } finally {
     cleanup(repo);
   }
 });
 
-test("a turn-end replay with hook_event_name stripped still advances ended_at - argv alone drives dispatch", () => {
+test("a turn-end replay with hook_event_name stripped still appends a turn_end line - argv alone drives dispatch", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/argv-only-turn-end.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000aa";
     replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const before = JSON.parse(fs.readFileSync(written[0], "utf8"));
+    const written = readRunFiles(runsDirOf(repo));
+    const before = readLines(written[0]);
 
     execFileSync("sleep", ["1.1"]);
 
@@ -310,14 +314,15 @@ test("a turn-end replay with hook_event_name stripped still advances ended_at - 
     const result = replayIn(payload, "turn-end");
     assert.equal(result.status, 0);
 
-    const after = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.notEqual(after.ended_at, before.ended_at);
+    const after = readLines(written[0]);
+    assert.equal(after.length, before.length + 1);
+    assert.equal(after[after.length - 1].type, "turn_end");
   } finally {
     cleanup(repo);
   }
 });
 
-test("a file-written replay with hook_event_name stripped still attaches to the task folder - argv alone drives dispatch", () => {
+test("a file-written replay with hook_event_name stripped still appends a file_written line - argv alone drives dispatch", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/argv-only-file-written.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000ab";
@@ -329,9 +334,10 @@ test("a file-written replay with hook_event_name stripped still attaches to the 
     const result = replayIn(payload, "file-written");
     assert.equal(result.status, 0);
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.equal(record.tasks[0].task_id, "2026_08_15_alpha");
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
+    assert.equal(lines[lines.length - 1].type, "file_written");
+    assert.equal(lines[lines.length - 1].path, "aidd_docs/tasks/2026_08/2026_08_15_alpha/notes.md");
   } finally {
     cleanup(repo);
   }
@@ -507,7 +513,9 @@ function replayInWithGitDir(payload, gitDir) {
   });
 }
 
-function readJsonFilesRecursively(dir) {
+// Run files are `.jsonl` - one line per observation, appended, never
+// rewritten (see plan.md). Recurses because AIDD_RUNS_DIR can point anywhere.
+function readRunFiles(dir) {
   const files = [];
   let entries;
   try {
@@ -518,12 +526,21 @@ function readJsonFilesRecursively(dir) {
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      files.push(...readJsonFilesRecursively(full));
-    } else if (entry.name.endsWith(".json")) {
+      files.push(...readRunFiles(full));
+    } else if (entry.name.endsWith(".jsonl")) {
       files.push(full);
     }
   }
   return files;
+}
+
+// One parsed object per non-empty line, in file order.
+function readLines(filePath) {
+  return fs
+    .readFileSync(filePath, "utf8")
+    .split("\n")
+    .filter((line) => line.length > 0)
+    .map((line) => JSON.parse(line));
 }
 
 function cleanup(...dirs) {
@@ -539,7 +556,7 @@ test("a session writes nothing and exits 0 when .aidd/config.json is absent, eve
       makePayload({ cwd: repo, sessionId: "00000000-0000-4000-8000-000000000001", event: "SessionStart" }),
     );
     assert.equal(result.status, 0);
-    assert.equal(readJsonFilesRecursively(runsDirOf(repo)).length, 0);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 0);
   } finally {
     cleanup(repo);
   }
@@ -553,7 +570,7 @@ test("aidd_docs/runs/ is no longer a permission: a switched-on session creates i
       makePayload({ cwd: repo, sessionId: "00000000-0000-4000-8000-0000000000dm", event: "SessionStart" }),
     );
     assert.equal(result.status, 0);
-    assert.equal(readJsonFilesRecursively(runsDirOf(repo)).length, 1);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 1);
   } finally {
     cleanup(repo);
   }
@@ -568,7 +585,7 @@ test("an unparseable .aidd/config.json means off, and the hook exits 0", () => {
     );
     assert.equal(result.status, 0);
     assert.equal(result.stderr, "");
-    assert.equal(readJsonFilesRecursively(runsDirOf(repo)).length, 0);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 0);
   } finally {
     cleanup(repo);
   }
@@ -585,7 +602,7 @@ test("a config.json that cannot be read at all (a directory in its place) means 
     );
     assert.equal(result.status, 0);
     assert.equal(result.stderr, "");
-    assert.equal(readJsonFilesRecursively(runsDirOf(repo)).length, 0);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 0);
   } finally {
     cleanup(repo);
   }
@@ -599,7 +616,7 @@ test("telemetry.enabled: false means off - nothing written", () => {
       makePayload({ cwd: repo, sessionId: "00000000-0000-4000-8000-0000000000df", event: "SessionStart" }),
     );
     assert.equal(result.status, 0);
-    assert.equal(readJsonFilesRecursively(runsDirOf(repo)).length, 0);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 0);
   } finally {
     cleanup(repo);
   }
@@ -629,7 +646,7 @@ test("AIDD off but the provider exporting: the journal still writes nothing - th
       },
     );
     assert.equal(result.status, 0);
-    assert.equal(readJsonFilesRecursively(runsDirOf(repo)).length, 0);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 0);
   } finally {
     cleanup(repo);
   }
@@ -640,9 +657,9 @@ test("turning telemetry off mid-session stops the very next write, with no resta
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000ms1";
     replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
-    const written = readJsonFilesRecursively(runsDirOf(repo));
+    const written = readRunFiles(runsDirOf(repo));
     assert.equal(written.length, 1);
-    const before = JSON.parse(fs.readFileSync(written[0], "utf8"));
+    const before = fs.readFileSync(written[0]);
 
     execFileSync("sleep", ["1.1"]);
 
@@ -651,8 +668,10 @@ test("turning telemetry off mid-session stops the very next write, with no resta
     const result = replayIn(makePayload({ cwd: repo, sessionId, event: "Stop" }));
     assert.equal(result.status, 0);
 
-    const after = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.deepEqual(after, before, "ended_at must not advance once telemetry is off, with no restart needed");
+    // Byte-identical, not merely deepEqual once parsed: no line - not even
+    // a changed field on an existing one - may land once the switch is off.
+    const after = fs.readFileSync(written[0]);
+    assert.ok(after.equals(before), "no line may be appended once telemetry is off, with no restart needed");
   } finally {
     cleanup(repo);
   }
@@ -689,7 +708,7 @@ test("telemetryEnabled is off for a repo root with no .aidd/config.json at all",
   }
 });
 
-test("a session writes exactly one file directly under aidd_docs/runs/ when opted in, carrying exactly the ten documented keys", () => {
+test("a session writes exactly one file directly under aidd_docs/runs/ when opted in, its session_start line carrying exactly the documented keys", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/opted-in.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-000000000002";
@@ -697,23 +716,24 @@ test("a session writes exactly one file directly under aidd_docs/runs/ when opte
     assert.equal(result.status, 0);
 
     const runsPath = runsDirOf(repo);
-    const written = readJsonFilesRecursively(runsPath);
+    const written = readRunFiles(runsPath);
     assert.equal(written.length, 1);
     assert.equal(path.dirname(written[0]), runsPath);
 
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.deepEqual(Object.keys(record).sort(), THE_TEN_KEYS);
-    assert.equal(record.schema_version, 1);
-    assert.equal(record.project_id, "acme/opted-in");
-    assert.equal(record.tool, "claude-code");
-    assert.equal(record.vendor_id, sessionId);
-    assert.equal(record.vendor_field, "session.id");
-    assert.equal(record.parent_run_id, null);
-    assert.deepEqual(record.tasks, [{ task_id: null, from: record.started_at, to: null }]);
-    assert.match(record.run_id, /^[0-9A-HJKMNP-TV-Z]{26}$/u);
-    assert.equal(path.basename(written[0], ".json"), `${record.run_id}__${sessionId}`);
-    assert.match(record.started_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u);
-    assert.equal(record.ended_at, record.started_at);
+    const lines = readLines(written[0]);
+    assert.equal(lines.length, 1);
+    const line = lines[0];
+    assert.deepEqual(Object.keys(line).sort(), SESSION_START_KEYS);
+    assert.equal(line.type, "session_start");
+    assert.equal(line.schema_version, 2);
+    assert.equal(line.project_id, "acme/opted-in");
+    assert.equal(line.project_remote, "git@github.com:acme/opted-in.git");
+    assert.equal(line.tool, "claude-code");
+    assert.equal(line.vendor_id, sessionId);
+    assert.equal(line.vendor_field, "session.id");
+    assert.match(line.run_id, /^[0-9A-HJKMNP-TV-Z]{26}$/u);
+    assert.equal(path.basename(written[0], ".jsonl"), `${line.run_id}__${sessionId}`);
+    assert.match(line.at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u);
   } finally {
     cleanup(repo);
   }
@@ -732,7 +752,7 @@ test(
       const result = replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
       assert.equal(result.status, 0);
 
-      const written = readJsonFilesRecursively(runsDirOf(repo));
+      const written = readRunFiles(runsDirOf(repo));
       assert.equal(written.length, 1);
 
       const fileMode = fs.statSync(written[0]).mode & 0o777;
@@ -747,18 +767,84 @@ test(
   },
 );
 
-test("the whitelist: adding any eleventh key would fail this assertion", () => {
+test("the whitelist: an eleventh key on either line type would fail this assertion", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/whitelist.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-00000000wl01";
     replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
     replayIn(makePayload({ cwd: repo, sessionId, event: "Stop" }));
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
+    const written = readRunFiles(runsDirOf(repo));
     assert.equal(written.length, 1);
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
+    const lines = readLines(written[0]);
+    assert.equal(lines.length, 2);
+    assert.deepEqual(Object.keys(lines[0]).sort(), SESSION_START_KEYS);
+    assert.deepEqual(Object.keys(lines[1]).sort(), TURN_END_KEYS);
+  } finally {
+    cleanup(repo);
+  }
+});
 
-    assert.deepEqual(Object.keys(record).sort(), THE_TEN_KEYS);
+test("turn_end carries prompt_id when the Stop payload provides one", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/prompt-id-present.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-00000000pi01";
+    replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
+
+    const payload = makePayload({ cwd: repo, sessionId, event: "Stop" });
+    payload.prompt_id = "prompt-001";
+    const result = replayIn(payload);
+    assert.equal(result.status, 0);
+
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
+    const turnEnd = lines[lines.length - 1];
+    assert.equal(turnEnd.type, "turn_end");
+    assert.equal(turnEnd.prompt_id, "prompt-001");
+    assert.deepEqual(Object.keys(turnEnd).sort(), TURN_END_WITH_PROMPT_KEYS);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("turn_end omits prompt_id, rather than writing null, when the payload carries none - the case every host observed today falls into", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/prompt-id-absent.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-00000000pi02";
+    replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
+    replayIn(makePayload({ cwd: repo, sessionId, event: "Stop" })); // no prompt_id field at all
+
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
+    const turnEnd = lines[lines.length - 1];
+    assert.equal(turnEnd.type, "turn_end");
+    assert.equal(Object.prototype.hasOwnProperty.call(turnEnd, "prompt_id"), false);
+    assert.deepEqual(Object.keys(turnEnd).sort(), TURN_END_KEYS);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("no written line contains ended_at, tasks, parent_run_id or task_id - the fields the event log leaves out", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/no-forbidden-fields.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-00000000ff01";
+    replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
+    replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath: writeIntoTaskFolder(repo, "2026_08_15_alpha") }));
+    replayIn(makePayload({ cwd: repo, sessionId, event: "Stop" }));
+
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
+    assert.equal(lines.length, 3);
+    for (const line of lines) {
+      for (const forbidden of ["ended_at", "tasks", "parent_run_id", "task_id"]) {
+        assert.equal(
+          Object.prototype.hasOwnProperty.call(line, forbidden),
+          false,
+          `"${forbidden}" must never appear on a ${line.type} line`,
+        );
+      }
+    }
   } finally {
     cleanup(repo);
   }
@@ -771,8 +857,8 @@ test("no written value is a token count, a cost, a model name, or a duration", (
     replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
     replayIn(makePayload({ cwd: repo, sessionId, event: "Stop" }));
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
 
     const forbiddenKeys = [
       "tokens",
@@ -788,22 +874,16 @@ test("no written value is a token count, a cost, a model name, or a duration", (
       "elapsed",
       "elapsed_ms",
     ];
-    for (const key of forbiddenKeys) {
-      assert.equal(Object.prototype.hasOwnProperty.call(record, key), false, `record must not carry "${key}"`);
-    }
-
-    for (const [key, value] of Object.entries(record)) {
-      if (key === "schema_version") {
-        assert.equal(typeof value, "number");
-      } else if (key === "parent_run_id") {
-        assert.equal(value, null);
-      } else if (key === "tasks") {
-        assert.ok(Array.isArray(value));
-        for (const interval of value) {
-          assert.deepEqual(Object.keys(interval).sort(), ["from", "task_id", "to"]);
+    for (const line of lines) {
+      for (const key of forbiddenKeys) {
+        assert.equal(Object.prototype.hasOwnProperty.call(line, key), false, `${line.type} must not carry "${key}"`);
+      }
+      for (const [key, value] of Object.entries(line)) {
+        if (key === "schema_version") {
+          assert.equal(typeof value, "number");
+        } else {
+          assert.equal(typeof value, "string", `"${key}" must be a string, not a measured quantity`);
         }
-      } else {
-        assert.equal(typeof value, "string", `"${key}" must be a string, not a measured quantity`);
       }
     }
   } finally {
@@ -811,7 +891,7 @@ test("no written value is a token count, a cost, a model name, or a duration", (
   }
 });
 
-test("ten turns in one session produce one file, not ten, and ended_at strictly advances past started_at", () => {
+test("ten turns in one session produce one file, not ten, and its lines record real time passing", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/ten-turns.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-000000000003";
@@ -819,16 +899,15 @@ test("ten turns in one session produce one file, not ten, and ended_at strictly 
     assert.equal(start.status, 0);
 
     const runsPath = runsDirOf(repo);
-    const afterStart = readJsonFilesRecursively(runsPath);
+    const afterStart = readRunFiles(runsPath);
     assert.equal(afterStart.length, 1);
-    const initialRecord = JSON.parse(fs.readFileSync(afterStart[0], "utf8"));
-    assert.equal(initialRecord.ended_at, initialRecord.started_at);
+    const startLine = readLines(afterStart[0])[0];
 
     // nowIso() truncates to whole seconds, so a Stop replayed within the
-    // same wall-clock second as SessionStart would not visibly move
-    // ended_at even if handleStop ran correctly. Crossing a second boundary
-    // for real is what makes "ended_at advances" a fact about handleStop,
-    // not a fact about clock resolution.
+    // same wall-clock second as SessionStart would not visibly move `at`
+    // even if handleTurnEnd ran correctly. Crossing a second boundary for
+    // real is what makes "time advances" a fact about handleTurnEnd, not a
+    // fact about clock resolution.
     execFileSync("sleep", ["1.1"]);
 
     for (let i = 0; i < 9; i++) {
@@ -836,22 +915,24 @@ test("ten turns in one session produce one file, not ten, and ended_at strictly 
       assert.equal(stop.status, 0);
     }
 
-    const written = readJsonFilesRecursively(runsPath);
-    assert.equal(written.length, 1);
+    const written = readRunFiles(runsPath);
+    assert.equal(written.length, 1, "nine Stop events must append to the one file, never mint a second");
 
-    const finalRecord = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.equal(finalRecord.run_id, initialRecord.run_id);
-    assert.notEqual(finalRecord.ended_at, initialRecord.ended_at);
+    const lines = readLines(written[0]);
+    assert.equal(lines.length, 10, "one session_start line plus nine turn_end lines");
+    assert.equal(lines[0].run_id, startLine.run_id);
+    const lastTurnEnd = lines[lines.length - 1];
+    assert.equal(lastTurnEnd.type, "turn_end");
     assert.ok(
-      new Date(finalRecord.ended_at) > new Date(initialRecord.started_at),
-      `ended_at (${finalRecord.ended_at}) did not advance past started_at (${initialRecord.started_at})`,
+      new Date(lastTurnEnd.at) > new Date(startLine.at),
+      `last turn_end.at (${lastTurnEnd.at}) did not advance past session_start.at (${startLine.at})`,
     );
   } finally {
     cleanup(repo);
   }
 });
 
-test("a second SessionStart for the same session does not mint a second file", () => {
+test("a second SessionStart for the same session does not mint a second file, or a second session_start line", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/resumed-session.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-000000000006";
@@ -859,16 +940,20 @@ test("a second SessionStart for the same session does not mint a second file", (
     assert.equal(first.status, 0);
 
     const runsPath = runsDirOf(repo);
-    const afterFirst = readJsonFilesRecursively(runsPath);
+    const afterFirst = readRunFiles(runsPath);
     assert.equal(afterFirst.length, 1);
-    const runIdAfterFirst = JSON.parse(fs.readFileSync(afterFirst[0], "utf8")).run_id;
+    const firstLines = readLines(afterFirst[0]);
+    assert.equal(firstLines.length, 1);
+    const runIdAfterFirst = firstLines[0].run_id;
 
     const second = replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
     assert.equal(second.status, 0);
 
-    const afterSecond = readJsonFilesRecursively(runsPath);
+    const afterSecond = readRunFiles(runsPath);
     assert.equal(afterSecond.length, 1);
-    assert.equal(JSON.parse(fs.readFileSync(afterSecond[0], "utf8")).run_id, runIdAfterFirst);
+    const secondLines = readLines(afterSecond[0]);
+    assert.equal(secondLines.length, 1, "a resumed SessionStart must not append a duplicate session_start line");
+    assert.equal(secondLines[0].run_id, runIdAfterFirst);
   } finally {
     cleanup(repo);
   }
@@ -888,7 +973,7 @@ test("a session exits 0 and writes nothing when git is unavailable", () => {
     });
     assert.equal(result.status, 0);
     assert.equal(result.stderr, "");
-    assert.equal(readJsonFilesRecursively(runsDirOf(repo)).length, 0);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 0);
   } finally {
     cleanup(repo);
   }
@@ -930,7 +1015,7 @@ test("a SessionStart with no session_id exits 0 and writes nothing, rather than 
     const result = replayIn(payload);
     assert.equal(result.status, 0);
     assert.equal(result.stderr, "");
-    assert.equal(readJsonFilesRecursively(runsDirOf(repo)).length, 0);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 0);
   } finally {
     cleanup(repo);
   }
@@ -941,9 +1026,9 @@ test("a Stop with no session_id exits 0 and writes nothing", () => {
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000f6";
     replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
-    const written = readJsonFilesRecursively(runsDirOf(repo));
+    const written = readRunFiles(runsDirOf(repo));
     assert.equal(written.length, 1);
-    const before = JSON.parse(fs.readFileSync(written[0], "utf8"));
+    const before = fs.readFileSync(written[0]);
 
     const payload = {
       transcript_path: "/home/user/probe/cc-home/projects/-home-user-probe-project/no-session-id.jsonl",
@@ -956,9 +1041,9 @@ test("a Stop with no session_id exits 0 and writes nothing", () => {
     assert.equal(result.status, 0);
     assert.equal(result.stderr, "");
 
-    const after = readJsonFilesRecursively(runsDirOf(repo));
+    const after = readRunFiles(runsDirOf(repo));
     assert.equal(after.length, 1);
-    assert.deepEqual(JSON.parse(fs.readFileSync(after[0], "utf8")), before);
+    assert.ok(fs.readFileSync(after[0]).equals(before));
   } finally {
     cleanup(repo);
   }
@@ -972,32 +1057,42 @@ test("a Stop exits 0 and writes nothing when no file was ever minted for the ses
     );
     assert.equal(result.status, 0);
     assert.equal(result.stderr, "");
-    assert.equal(readJsonFilesRecursively(runsDirOf(repo)).length, 0);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 0);
   } finally {
     cleanup(repo);
   }
 });
 
-test("a Stop exits 0 when the matched run file holds corrupted JSON", () => {
+test("a Stop still appends its line even when the run file's existing content is not valid JSON - turn-end never parses the file it appends to", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/corrupted-record.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000f2";
     const start = replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
     assert.equal(start.status, 0);
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
+    const written = readRunFiles(runsDirOf(repo));
     assert.equal(written.length, 1);
-    fs.writeFileSync(written[0], "{ this is not valid json");
+    // A corrupted earlier line, still newline-terminated (a truncated-last-line
+    // scenario is covered separately, further down).
+    fs.appendFileSync(written[0], "{ this is not valid json\n");
+    const corrupted = fs.readFileSync(written[0]);
 
     const stop = replayIn(makePayload({ cwd: repo, sessionId, event: "Stop" }));
     assert.equal(stop.status, 0);
     assert.equal(stop.stderr, "");
+
+    const after = fs.readFileSync(written[0]);
+    assert.ok(
+      after.subarray(0, corrupted.length).equals(corrupted),
+      "the corrupted content must survive untouched - turn-end only ever appends",
+    );
+    assert.ok(after.length > corrupted.length, "turn-end must still append its own line after a corrupted one");
   } finally {
     cleanup(repo);
   }
 });
 
-test("a session that never produces a git commit still yields a complete, ten-key record", () => {
+test("a session that never produces a git commit still yields a complete session_start line", () => {
   // makeTempRepo runs `git init` and configures identity but never commits -
   // every test in this file already exercises that shape. This test states
   // the acceptance criterion explicitly rather than leaving it implicit.
@@ -1010,34 +1105,23 @@ test("a session that never produces a git commit still yields a complete, ten-ke
     replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
     replayIn(makePayload({ cwd: repo, sessionId, event: "Stop" }));
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
+    const written = readRunFiles(runsDirOf(repo));
     assert.equal(written.length, 1);
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.deepEqual(Object.keys(record).sort(), THE_TEN_KEYS);
-    for (const key of THE_TEN_KEYS) {
-      assert.notEqual(record[key], undefined, `"${key}" must be present even with no commit in the repo`);
+    const sessionStart = readLines(written[0])[0];
+    assert.deepEqual(Object.keys(sessionStart).sort(), SESSION_START_KEYS);
+    for (const key of SESSION_START_KEYS) {
+      assert.notEqual(sessionStart[key], undefined, `"${key}" must be present even with no commit in the repo`);
     }
   } finally {
     cleanup(repo);
   }
 });
 
-test("parent_run_id is present and null - hooks cannot see query_source, so a subagent session looks identical to any other", () => {
-  // A Claude Code subagent shares its parent's session_id and differs only by
-  // query_source, an attribute no hook payload carries.
-  const repo = makeTempRepo({ remote: "git@github.com:acme/subagent.git" });
-  try {
-    const sessionId = "00000000-0000-4000-8000-0000000000f4";
-    replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
-
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.ok(Object.prototype.hasOwnProperty.call(record, "parent_run_id"));
-    assert.equal(record.parent_run_id, null);
-  } finally {
-    cleanup(repo);
-  }
-});
+// `parent_run_id is present and null` (#620) is gone: the field itself left
+// the written form. Measured reason, from plan.md - a subagent shares its
+// parent's session_id, and SubagentStart/SubagentStop carry an agent_id, so
+// nesting is inside a run, not between runs; there is nothing left for the
+// field to model.
 
 test("vendor_field names the export-side attribute, and vendor_id is the same session.id value a live export would carry", () => {
   // vendor_id is exactly the payload's session_id, the same value Claude
@@ -1047,11 +1131,11 @@ test("vendor_field names the export-side attribute, and vendor_id is the same se
     const sessionId = "00000000-0000-4000-8000-0000000000f5";
     replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.equal(record.vendor_field, "session.id");
-    assert.notEqual(record.vendor_field, "session_id"); // not the hook-side field name
-    assert.equal(record.vendor_id, sessionId);
+    const written = readRunFiles(runsDirOf(repo));
+    const line = readLines(written[0])[0];
+    assert.equal(line.vendor_field, "session.id");
+    assert.notEqual(line.vendor_field, "session_id"); // not the hook-side field name
+    assert.equal(line.vendor_id, sessionId);
   } finally {
     cleanup(repo);
   }
@@ -1068,14 +1152,14 @@ test("two repositories with different remotes each write into their own aidd_doc
       makePayload({ cwd: repoB, sessionId: "00000000-0000-4000-8000-0000000000b1", event: "SessionStart" }),
     );
 
-    assert.equal(readJsonFilesRecursively(runsDirOf(repoA)).length, 1);
-    assert.equal(readJsonFilesRecursively(runsDirOf(repoB)).length, 1);
+    assert.equal(readRunFiles(runsDirOf(repoA)).length, 1);
+    assert.equal(readRunFiles(runsDirOf(repoB)).length, 1);
   } finally {
     cleanup(repoA, repoB);
   }
 });
 
-test("a repository with no remote still produces one record, project_id keyed on its basename - the path itself no longer depends on it", () => {
+test("a repository with no remote still produces one record, project_id keyed on its basename and project_remote null - the path itself no longer depends on either", () => {
   const repo = makeTempRepo({});
   const basename = path.basename(repo);
   try {
@@ -1083,10 +1167,11 @@ test("a repository with no remote still produces one record, project_id keyed on
     const result = replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
     assert.equal(result.status, 0);
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
+    const written = readRunFiles(runsDirOf(repo));
     assert.equal(written.length, 1);
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.equal(record.project_id, basename);
+    const line = readLines(written[0])[0];
+    assert.equal(line.project_id, basename);
+    assert.equal(line.project_remote, null);
   } finally {
     cleanup(repo);
   }
@@ -1099,10 +1184,10 @@ test("findRunFileByVendorId locates the file by filename alone, ignoring file co
     const runIdB = generateUlid();
     // Deliberately invalid JSON: finding run B anyway proves the match is by
     // filename, not by content.
-    fs.writeFileSync(path.join(dir, `${runIdA}__session-a.json`), "not json at all {{{");
-    fs.writeFileSync(path.join(dir, `${runIdB}__session-b.json`), "not json at all {{{");
+    fs.writeFileSync(path.join(dir, `${runIdA}__session-a.jsonl`), "not json at all {{{");
+    fs.writeFileSync(path.join(dir, `${runIdB}__session-b.jsonl`), "not json at all {{{");
 
-    assert.equal(findRunFileByVendorId(dir, "session-b"), path.join(dir, `${runIdB}__session-b.json`));
+    assert.equal(findRunFileByVendorId(dir, "session-b"), path.join(dir, `${runIdB}__session-b.jsonl`));
     assert.equal(findRunFileByVendorId(dir, "session-missing"), null);
     assert.equal(findRunFileByVendorId(path.join(dir, "nowhere"), "session-a"), null);
   } finally {
@@ -1116,23 +1201,36 @@ test("findRunFileByVendorId does not mistake a vendor_id containing the filename
   const dir = makeTempDir("aidd-telemetry-lookup-sep-");
   try {
     const runId = generateUlid();
-    fs.writeFileSync(path.join(dir, `${runId}__a__b.json`), "irrelevant");
+    fs.writeFileSync(path.join(dir, `${runId}__a__b.jsonl`), "irrelevant");
 
     assert.equal(findRunFileByVendorId(dir, "b"), null);
     assert.equal(findRunFileByVendorId(dir, "a"), null);
-    assert.equal(findRunFileByVendorId(dir, "a__b"), path.join(dir, `${runId}__a__b.json`));
+    assert.equal(findRunFileByVendorId(dir, "a__b"), path.join(dir, `${runId}__a__b.jsonl`));
   } finally {
     cleanup(dir);
   }
 });
 
-test("findRunFileByVendorId ignores a leftover phase-3 <run_id>.json file with no embedded vendor_id", () => {
+test("findRunFileByVendorId ignores leftover pre-event-log .json files (both the bare <run_id>.json and the old <run_id>__<vendor_id>.json shapes), matching only .jsonl", () => {
   const dir = makeTempDir("aidd-telemetry-lookup-legacy-");
   try {
-    const runId = generateUlid();
-    fs.writeFileSync(path.join(dir, `${runId}.json`), JSON.stringify({ vendor_id: "session-legacy" }));
+    const legacyBareRunId = generateUlid();
+    fs.writeFileSync(path.join(dir, `${legacyBareRunId}.json`), JSON.stringify({ vendor_id: "session-legacy" }));
+
+    const legacyTenKeyRunId = generateUlid();
+    fs.writeFileSync(
+      path.join(dir, `${legacyTenKeyRunId}__session-legacy.json`),
+      JSON.stringify({ vendor_id: "session-legacy", schema_version: 1 }),
+    );
 
     assert.equal(findRunFileByVendorId(dir, "session-legacy"), null);
+
+    // A real .jsonl file for the same vendor_id, sitting alongside the two
+    // legacy leftovers, is still found - the extension is what gates a
+    // match, not merely the absence of a same-vendor legacy file.
+    const runId = generateUlid();
+    fs.writeFileSync(path.join(dir, `${runId}__session-legacy.jsonl`), '{"type":"session_start"}\n');
+    assert.equal(findRunFileByVendorId(dir, "session-legacy"), path.join(dir, `${runId}__session-legacy.jsonl`));
   } finally {
     cleanup(dir);
   }
@@ -1195,7 +1293,7 @@ test("a Stop shells out to git no more times with several hundred run files on d
 
       for (let i = 0; i < 300; i++) {
         const runId = generateUlid();
-        fs.writeFileSync(path.join(dir, `${runId}__seed-${i}.json`), "irrelevant, never read");
+        fs.writeFileSync(path.join(dir, `${runId}__seed-${i}.jsonl`), "irrelevant, never read");
       }
 
       const callsWithMany = countGitInvocations(() => {
@@ -1332,147 +1430,104 @@ test("looksLikeTaskPath recognises a Windows-shaped backslash path", () => {
   );
 });
 
-test("taskIdFromPath extracts the task_id when the path resolves inside repoRoot's task folder", () => {
+test("taskFolderRelativePath returns the path relative to repoRoot when it resolves inside repoRoot's task folder", () => {
   assert.equal(
-    taskIdFromPath("/repo", "/repo/aidd_docs/tasks/2026_08/2026_08_15_alpha/notes.md"),
-    "2026_08_15_alpha",
+    taskFolderRelativePath("/repo", "/repo/aidd_docs/tasks/2026_08/2026_08_15_alpha/notes.md"),
+    "aidd_docs/tasks/2026_08/2026_08_15_alpha/notes.md",
   );
 });
 
-test("taskIdFromPath returns null when the path is outside repoRoot entirely", () => {
-  assert.equal(taskIdFromPath("/repo", "/elsewhere/aidd_docs/tasks/2026_08/2026_08_15_alpha/notes.md"), null);
+test("taskFolderRelativePath returns null when the path is outside repoRoot entirely", () => {
+  assert.equal(taskFolderRelativePath("/repo", "/elsewhere/aidd_docs/tasks/2026_08/2026_08_15_alpha/notes.md"), null);
 });
 
-test("taskIdFromPath returns null for a sibling directory that merely shares repoRoot as a string prefix", () => {
+test("taskFolderRelativePath returns null for a sibling directory that merely shares repoRoot as a string prefix", () => {
   // repoRoot "/repo" must not match "/repoaidd_docs/..." - a bare startsWith
   // without a "/" boundary would let it, and the remainder after slicing off
-  // the raw prefix would then satisfy the anchored TASK_ID_PATTERN too.
+  // the raw prefix would then satisfy the anchored pattern too.
   assert.equal(
-    taskIdFromPath("/repo", "/repoaidd_docs/tasks/2026_08/2026_08_15_alpha/notes.md"),
+    taskFolderRelativePath("/repo", "/repoaidd_docs/tasks/2026_08/2026_08_15_alpha/notes.md"),
     null,
   );
   assert.equal(
-    taskIdFromPath("/repo", "/repo-other/aidd_docs/tasks/2026_08/2026_08_15_alpha/notes.md"),
+    taskFolderRelativePath("/repo", "/repo-other/aidd_docs/tasks/2026_08/2026_08_15_alpha/notes.md"),
     null,
   );
 });
 
-test("taskIdFromPath returns null when the path is inside the repo but names no task", () => {
-  assert.equal(taskIdFromPath("/repo", "/repo/src/index.js"), null);
-  assert.equal(taskIdFromPath("/repo", "/repo/aidd_docs/tasks/2026_08/notes.txt"), null);
+test("taskFolderRelativePath returns null when the path is inside the repo but names no task", () => {
+  assert.equal(taskFolderRelativePath("/repo", "/repo/src/index.js"), null);
+  assert.equal(taskFolderRelativePath("/repo", "/repo/aidd_docs/tasks/2026_08/notes.txt"), null);
 });
 
-test("taskIdFromPath reads a task written as a single .md file", () => {
+test("taskFolderRelativePath reads a task written as a single .md file", () => {
   assert.equal(
-    taskIdFromPath("/repo", "/repo/aidd_docs/tasks/2026_08/2026_08_15_alpha.md"),
-    "2026_08_15_alpha",
+    taskFolderRelativePath("/repo", "/repo/aidd_docs/tasks/2026_08/2026_08_15_alpha.md"),
+    "aidd_docs/tasks/2026_08/2026_08_15_alpha.md",
   );
 });
 
-test("taskIdFromPath recognises a Windows-shaped backslash path", () => {
+test("taskFolderRelativePath recognises a Windows-shaped backslash path, and returns a '/'-separated result", () => {
   assert.equal(
-    taskIdFromPath("C:\\repo", "C:\\repo\\aidd_docs\\tasks\\2026_08\\2026_08_15_alpha\\notes.md"),
-    "2026_08_15_alpha",
+    taskFolderRelativePath("C:\\repo", "C:\\repo\\aidd_docs\\tasks\\2026_08\\2026_08_15_alpha\\notes.md"),
+    "aidd_docs/tasks/2026_08/2026_08_15_alpha/notes.md",
   );
 });
 
-test("taskIdFromPath returns null for non-string or empty input", () => {
-  assert.equal(taskIdFromPath("/repo", ""), null);
-  assert.equal(taskIdFromPath("/repo", undefined), null);
-  assert.equal(taskIdFromPath("", "/repo/aidd_docs/tasks/2026_08/alpha/x.md"), null);
-  assert.equal(taskIdFromPath(undefined, "/repo/aidd_docs/tasks/2026_08/alpha/x.md"), null);
+test("taskFolderRelativePath returns null for non-string or empty input", () => {
+  assert.equal(taskFolderRelativePath("/repo", ""), null);
+  assert.equal(taskFolderRelativePath("/repo", undefined), null);
+  assert.equal(taskFolderRelativePath("", "/repo/aidd_docs/tasks/2026_08/alpha/x.md"), null);
+  assert.equal(taskFolderRelativePath(undefined, "/repo/aidd_docs/tasks/2026_08/alpha/x.md"), null);
 });
 
-// ── advanceTasks: pure unit ──────────────────────────────────────────
+// advanceTasks (the tasks[]-interval state machine) is gone outright, along
+// with every pure-unit test of it: file_written no longer computes or stores
+// an interval, or a task_id - it records the path, and nothing derives from
+// it in this hook. The six advanceTasks tests that stood here (open/leave-
+// open/resume/close-and-open/null-switch/placeholder-replace) have no
+// replacement, because there is no longer a state machine for them to prove
+// correct - the assertions they made are about a shape this plan removes,
+// not evidence this plan still needs in another form.
 
-test("advanceTasks opens the first interval, unclosed, when there is none yet", () => {
-  const result = advanceTasks([], "2026_08_15_alpha", "T2", "T1");
-  assert.deepEqual(result, [{ task_id: "2026_08_15_alpha", from: "T1", to: null }]);
-});
-
-test("advanceTasks leaves the interval open when the same task is seen again, so attachment does not end at the last write", () => {
-  const before = [{ task_id: "2026_08_15_alpha", from: "T1", to: null }];
-  const after = advanceTasks(before, "2026_08_15_alpha", "T2", "T0");
-  assert.deepEqual(after, [{ task_id: "2026_08_15_alpha", from: "T1", to: null }]);
-  assert.deepEqual(before, [{ task_id: "2026_08_15_alpha", from: "T1", to: null }]);
-});
-
-test("advanceTasks resumes a task with a new interval when the previous one was already closed", () => {
-  const before = [{ task_id: "2026_08_15_alpha", from: "T1", to: "T2" }];
-  const after = advanceTasks(before, "2026_08_15_alpha", "T3", "T0");
-  assert.deepEqual(after, [
-    { task_id: "2026_08_15_alpha", from: "T1", to: "T2" },
-    { task_id: "2026_08_15_alpha", from: "T3", to: null },
-  ]);
-});
-
-test("advanceTasks closes the open interval and opens a new one when the pointer has changed", () => {
-  const before = [{ task_id: "2026_08_15_alpha", from: "T1", to: null }];
-  const after = advanceTasks(before, "2026_08_16_beta", "T2", "T0");
-  assert.deepEqual(after, [
-    { task_id: "2026_08_15_alpha", from: "T1", to: "T2" },
-    { task_id: "2026_08_16_beta", from: "T2", to: null },
-  ]);
-});
-
-test("advanceTasks treats a switch to null the same as a switch to any other task_id (pure contract; file-written's own caller never passes null)", () => {
-  const before = [{ task_id: "2026_08_15_alpha", from: "T1", to: null }];
-  const after = advanceTasks(before, null, "T2", "T0");
-  assert.deepEqual(after, [
-    { task_id: "2026_08_15_alpha", from: "T1", to: "T2" },
-    { task_id: null, from: "T2", to: null },
-  ]);
-});
-
-test("advanceTasks replaces the unattached placeholder outright rather than closing an empty interval and appending - task A then task B is two intervals, not three", () => {
-  const placeholder = [{ task_id: null, from: "T0", to: null }];
-  const afterA = advanceTasks(placeholder, "2026_08_15_alpha", "T1", "T-1");
-  assert.deepEqual(afterA, [{ task_id: "2026_08_15_alpha", from: "T0", to: null }]);
-
-  const afterB = advanceTasks(afterA, "2026_08_16_beta", "T2", "T-1");
-  assert.deepEqual(afterB, [
-    { task_id: "2026_08_15_alpha", from: "T0", to: "T2" },
-    { task_id: "2026_08_16_beta", from: "T2", to: null },
-  ]);
-  assert.equal(afterB.length, 2);
-});
-
-test("a session with no file-written at all produces a record with one interval and task_id: null, never no record", () => {
+test("a session with no file-written at all produces only the session_start line, never a file_written line", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/no-write.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000t1";
     replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
+    const written = readRunFiles(runsDirOf(repo));
     assert.equal(written.length, 1);
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.deepEqual(record.tasks, [{ task_id: null, from: record.started_at, to: null }]);
+    const lines = readLines(written[0]);
+    assert.equal(lines.length, 1);
+    assert.equal(lines[0].type, "session_start");
   } finally {
     cleanup(repo);
   }
 });
 
-test("a session whose only write lands outside any task folder stays task_id: null", () => {
+test("a session whose only write lands outside any task folder appends no file_written line", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/write-outside.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000t2";
     replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
+
+    const written = readRunFiles(runsDirOf(repo));
+    const before = fs.readFileSync(written[0]);
 
     const filePath = path.join(repo, "src", "index.js");
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, "x\n");
     replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath }));
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.equal(record.tasks.length, 1);
-    assert.equal(record.tasks[0].task_id, null);
+    const after = fs.readFileSync(written[0]);
+    assert.ok(after.equals(before), "a write outside any task folder must append nothing at all");
   } finally {
     cleanup(repo);
   }
 });
 
-test("a session attaches to the task folder its first write lands in", () => {
+test("a session appends a file_written line naming the path its first write lands in", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/first-write.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000t3";
@@ -1481,15 +1536,17 @@ test("a session attaches to the task folder its first write lands in", () => {
     const filePath = writeIntoTaskFolder(repo, "2026_08_15_alpha");
     replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath }));
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.deepEqual(record.tasks, [{ task_id: "2026_08_15_alpha", from: record.started_at, to: null }]);
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
+    assert.equal(lines.length, 2);
+    assert.equal(lines[1].type, "file_written");
+    assert.equal(lines[1].path, "aidd_docs/tasks/2026_08/2026_08_15_alpha/notes.md");
   } finally {
     cleanup(repo);
   }
 });
 
-test("a second write into the same task folder keeps one interval, still open, so attached time runs to the session's end", () => {
+test("a second write into the same task folder appends a second file_written line, not a merged interval", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/same-task.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000t4";
@@ -1498,22 +1555,26 @@ test("a second write into the same task folder keeps one interval, still open, s
     const filePath = writeIntoTaskFolder(repo, "2026_08_15_alpha");
     replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath }));
 
-    execFileSync("sleep", ["1.1"]); // cross a whole-second boundary, see the ended_at test above
+    execFileSync("sleep", ["1.1"]); // cross a whole-second boundary, see the ten-turns test above
 
-    replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath: writeIntoTaskFolder(repo, "2026_08_15_alpha", "more.md") }));
+    replayIn(
+      fileWrittenPayload({ cwd: repo, sessionId, filePath: writeIntoTaskFolder(repo, "2026_08_15_alpha", "more.md") }),
+    );
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.equal(record.tasks.length, 1);
-    assert.equal(record.tasks[0].task_id, "2026_08_15_alpha");
-    assert.equal(record.tasks[0].to, null, "a repeat write must not end the attachment");
-    assert.notEqual(record.ended_at, record.tasks[0].from, "ended_at still advances");
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
+    assert.equal(lines.length, 3, "one session_start line plus two separate file_written lines");
+    assert.equal(lines[1].type, "file_written");
+    assert.equal(lines[1].path, "aidd_docs/tasks/2026_08/2026_08_15_alpha/notes.md");
+    assert.equal(lines[2].type, "file_written");
+    assert.equal(lines[2].path, "aidd_docs/tasks/2026_08/2026_08_15_alpha/more.md");
+    assert.notEqual(lines[2].at, lines[1].at, "the second write is its own observation, not folded into the first");
   } finally {
     cleanup(repo);
   }
 });
 
-test("a session whose writes move from task A to task B produces two intervals, never one overwritten value", () => {
+test("a session whose writes move from task A to task B produces two file_written lines, one path each, in order", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/task-switch.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000t5";
@@ -1523,67 +1584,69 @@ test("a session whose writes move from task A to task B produces two intervals, 
     execFileSync("sleep", ["1.1"]);
     replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath: writeIntoTaskFolder(repo, "2026_08_16_beta") }));
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
 
-    assert.equal(record.tasks.length, 2);
-    assert.equal(record.tasks[0].task_id, "2026_08_15_alpha");
-    assert.notEqual(record.tasks[0].to, null);
-    assert.equal(record.tasks[1].task_id, "2026_08_16_beta");
-    assert.equal(record.tasks[1].to, null);
-    assert.equal(record.tasks[0].to, record.tasks[1].from);
+    assert.equal(lines.length, 3);
+    assert.equal(lines[1].type, "file_written");
+    assert.equal(lines[1].path, "aidd_docs/tasks/2026_08/2026_08_15_alpha/notes.md");
+    assert.equal(lines[2].type, "file_written");
+    assert.equal(lines[2].path, "aidd_docs/tasks/2026_08/2026_08_16_beta/notes.md");
   } finally {
     cleanup(repo);
   }
 });
 
-test("turn-end never touches tasks - only ended_at moves, attachment is file-written's alone", () => {
+test("turn-end never appends a file_written line - a write and a turn are always separate observations", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/turn-end-tasks.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000t6";
     replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
     replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath: writeIntoTaskFolder(repo, "2026_08_15_alpha") }));
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const beforeTasks = JSON.parse(fs.readFileSync(written[0], "utf8")).tasks;
+    const written = readRunFiles(runsDirOf(repo));
+    const beforeLines = readLines(written[0]);
 
     replayIn(makePayload({ cwd: repo, sessionId, event: "Stop" }));
 
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.deepEqual(record.tasks, beforeTasks);
+    const afterLines = readLines(written[0]);
+    assert.equal(afterLines.length, beforeLines.length + 1);
+    assert.deepEqual(afterLines.slice(0, beforeLines.length), beforeLines, "every line already on disk is unchanged");
+    assert.equal(afterLines[afterLines.length - 1].type, "turn_end");
   } finally {
     cleanup(repo);
   }
 });
 
-test("file-written's accept path also advances ended_at - the de-facto turn signal on a host with no turn-end event", () => {
+test("file-written's accept path appends a line with its own fresh `at` - the de-facto turn signal on a host with no turn-end event", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/file-written-ended-at.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000ea1";
     replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const before = JSON.parse(fs.readFileSync(written[0], "utf8"));
+    const written = readRunFiles(runsDirOf(repo));
+    const startLine = readLines(written[0])[0];
 
     execFileSync("sleep", ["1.1"]);
 
     replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath: writeIntoTaskFolder(repo, "2026_08_15_alpha") }));
 
-    const after = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.notEqual(after.ended_at, before.ended_at);
+    const lines = readLines(written[0]);
+    assert.equal(lines.length, 2);
+    assert.notEqual(lines[1].at, startLine.at);
   } finally {
     cleanup(repo);
   }
 });
 
-test("file-written's reject path never touches ended_at - only the accept path is already paying for the record write", () => {
+test("file-written's reject path appends nothing at all - only the accept path is already paying for a write", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/file-written-reject-ended-at.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000ea2";
     replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const before = JSON.parse(fs.readFileSync(written[0], "utf8"));
+    const written = readRunFiles(runsDirOf(repo));
+    const before = fs.readFileSync(written[0]);
 
     execFileSync("sleep", ["1.1"]);
 
@@ -1596,14 +1659,14 @@ test("file-written's reject path never touches ended_at - only the accept path i
       tool_input: { command: "echo hi" },
     });
 
-    const after = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.equal(after.ended_at, before.ended_at);
+    const after = fs.readFileSync(written[0]);
+    assert.ok(after.equals(before));
   } finally {
     cleanup(repo);
   }
 });
 
-test("a NotebookEdit into a task folder attaches, reading tool_input.notebook_path rather than file_path", () => {
+test("a NotebookEdit into a task folder appends a file_written line, reading tool_input.notebook_path rather than file_path", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/notebook-edit.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000nb1";
@@ -1612,15 +1675,16 @@ test("a NotebookEdit into a task folder attaches, reading tool_input.notebook_pa
     const notebookPath = writeIntoTaskFolder(repo, "2026_08_15_alpha", "scratch.ipynb");
     replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath: notebookPath, toolName: "NotebookEdit" }));
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.equal(record.tasks[0].task_id, "2026_08_15_alpha");
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
+    assert.equal(lines[1].type, "file_written");
+    assert.equal(lines[1].path, "aidd_docs/tasks/2026_08/2026_08_15_alpha/scratch.ipynb");
   } finally {
     cleanup(repo);
   }
 });
 
-test("an Edit into a task folder attaches, same as Write", () => {
+test("an Edit into a task folder appends a file_written line, same as Write", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/edit-attaches.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000ed1";
@@ -1629,15 +1693,16 @@ test("an Edit into a task folder attaches, same as Write", () => {
     const filePath = writeIntoTaskFolder(repo, "2026_08_15_alpha");
     replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath, toolName: "Edit" }));
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.equal(record.tasks[0].task_id, "2026_08_15_alpha");
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
+    assert.equal(lines[1].type, "file_written");
+    assert.equal(lines[1].path, "aidd_docs/tasks/2026_08/2026_08_15_alpha/notes.md");
   } finally {
     cleanup(repo);
   }
 });
 
-test("a Bash call into what looks like a task path (via tool_input.command, not a write-target field) never attaches", () => {
+test("a Bash call into what looks like a task path (via tool_input.command, not a write-target field) never appends a line", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/bash-not-a-write.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000bh1";
@@ -1654,15 +1719,15 @@ test("a Bash call into what looks like a task path (via tool_input.command, not 
     });
     assert.equal(result.status, 0);
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.equal(record.tasks[0].task_id, null);
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
+    assert.equal(lines.length, 1);
   } finally {
     cleanup(repo);
   }
 });
 
-test("a Bash call whose tool_input happens to carry a file_path key still never attaches - the gate reads tool_name, not field presence", () => {
+test("a Bash call whose tool_input happens to carry a file_path key still never appends a line - the gate reads tool_name, not field presence", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/bash-with-file-path.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000bh3";
@@ -1679,15 +1744,15 @@ test("a Bash call whose tool_input happens to carry a file_path key still never 
     });
     assert.equal(result.status, 0);
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.equal(record.tasks[0].task_id, null);
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
+    assert.equal(lines.length, 1);
   } finally {
     cleanup(repo);
   }
 });
 
-test("replaying the recorded Bash PostToolUse fixture against a real opted-in repo never attaches, only the whitelisted tools do", () => {
+test("replaying the recorded Bash PostToolUse fixture against a real opted-in repo never appends a line, only the whitelisted tools do", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/bash-fixture.git" });
   try {
     const fixture = loadFixture("claude-code-post-tool-use-bash.json");
@@ -1695,15 +1760,15 @@ test("replaying the recorded Bash PostToolUse fixture against a real opted-in re
     replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
     replayIn({ ...fixture, session_id: sessionId, cwd: repo });
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.equal(record.tasks[0].task_id, null);
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
+    assert.equal(lines.length, 1);
   } finally {
     cleanup(repo);
   }
 });
 
-test("every interval object carries exactly task_id, from, to - no eleventh key on a task switch", () => {
+test("every file_written line carries exactly type, at, path - no fourth key", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/interval-whitelist.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000t7";
@@ -1711,15 +1776,97 @@ test("every interval object carries exactly task_id, from, to - no eleventh key 
     replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath: writeIntoTaskFolder(repo, "2026_08_15_alpha") }));
     replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath: writeIntoTaskFolder(repo, "2026_08_16_beta") }));
 
-    const written = readJsonFilesRecursively(runsDirOf(repo));
-    const record = JSON.parse(fs.readFileSync(written[0], "utf8"));
-    assert.equal(record.tasks.length, 2);
-    for (const interval of record.tasks) {
-      assert.deepEqual(Object.keys(interval).sort(), INTERVAL_KEYS);
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
+    const fileWrittenLines = lines.filter((line) => line.type === "file_written");
+    assert.equal(fileWrittenLines.length, 2);
+    for (const line of fileWrittenLines) {
+      assert.deepEqual(Object.keys(line).sort(), FILE_WRITTEN_KEYS);
     }
   } finally {
     cleanup(repo);
   }
+});
+
+test("appending a later line never rewrites the bytes already on disk - each prior byte is byte-identical after every subsequent append", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/append-only.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-0000000000ap1";
+    replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
+    const written = readRunFiles(runsDirOf(repo));
+    assert.equal(written.length, 1);
+    const filePath = written[0];
+
+    const afterStart = fs.readFileSync(filePath);
+
+    replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath: writeIntoTaskFolder(repo, "2026_08_15_alpha") }));
+    const afterWrite = fs.readFileSync(filePath);
+    assert.ok(afterWrite.length > afterStart.length);
+    assert.ok(
+      afterWrite.subarray(0, afterStart.length).equals(afterStart),
+      "the session_start line's bytes must be unchanged after the file-written append",
+    );
+
+    replayIn(makePayload({ cwd: repo, sessionId, event: "Stop" }));
+    const afterStop = fs.readFileSync(filePath);
+    assert.ok(afterStop.length > afterWrite.length);
+    assert.ok(
+      afterStop.subarray(0, afterWrite.length).equals(afterWrite),
+      "every byte written before the turn-end append must be unchanged after it",
+    );
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a truncated final line leaves every earlier line readable", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/truncated-last-line.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-0000000000tr1";
+    replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
+    replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath: writeIntoTaskFolder(repo, "2026_08_15_alpha") }));
+    replayIn(makePayload({ cwd: repo, sessionId, event: "Stop" }));
+
+    const written = readRunFiles(runsDirOf(repo));
+    const filePath = written[0];
+    const complete = fs.readFileSync(filePath);
+
+    // Cut into the last line's own bytes, not at a "\n" boundary - the file
+    // ends in "\n", so dropping a handful of trailing bytes lands mid-line.
+    const truncated = complete.subarray(0, complete.length - 5);
+    fs.writeFileSync(filePath, truncated);
+
+    const rawLines = fs.readFileSync(filePath, "utf8").split("\n").filter((l) => l.length > 0);
+    assert.equal(rawLines.length, 3, "two complete lines plus the truncated remnant of the third");
+    for (let i = 0; i < rawLines.length - 1; i++) {
+      assert.doesNotThrow(() => JSON.parse(rawLines[i]), `line ${i} must still parse after the last line was truncated`);
+    }
+    assert.throws(() => JSON.parse(rawLines[rawLines.length - 1]), "the truncated final line must not parse cleanly");
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("no source file in hooks/lib/ reads a run file's contents back - record.js and file-writes.js never read a file at all", () => {
+  // Scoped to record.js and file-writes.js, not repo.js: repo.js legitimately
+  // reads .aidd/config.json, which is not a run file. This is the static
+  // half of the hard constraint (append never reads); the dynamic half is
+  // exercised above by the corrupted-content and byte-identity tests, which
+  // would fail immediately if a read-modify-write crept back in.
+  const recordSrc = fs.readFileSync(
+    path.join(root, "plugins/aidd-telemetry/hooks/lib/record.js"),
+    "utf8",
+  );
+  const fileWritesSrc = fs.readFileSync(
+    path.join(root, "plugins/aidd-telemetry/hooks/lib/file-writes.js"),
+    "utf8",
+  );
+  // Every way of reading a file, not just the one in use today: a regression
+  // reintroducing read-modify-write through fs.readFile or a stream would
+  // otherwise slip past a guard that only knows one name.
+  const ANY_READ = /\b(readFileSync|readFile|createReadStream|openSync|promises\s*\.\s*readFile)\b/u;
+  assert.doesNotMatch(recordSrc, ANY_READ, "record.js must never read a run file back in order to append to it");
+  assert.doesNotMatch(fileWritesSrc, ANY_READ, "file-writes.js must never read a run file back in order to append to it");
 });
 
 // Runs the hook as a real, non-blocking child process so two sessions can
@@ -1742,7 +1889,7 @@ function replayAsync(payload, event = ARGV_EVENT_BY_HOOK_EVENT_NAME[payload.hook
   });
 }
 
-test("two concurrent sessions in the same checkout each attach only from their own writes, never from the other's", async () => {
+test("two concurrent sessions in the same checkout each record only their own writes, never the other's", async () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/concurrent.git" });
   try {
     const sessionA = "00000000-0000-4000-8000-0000000000c1";
@@ -1756,7 +1903,7 @@ test("two concurrent sessions in the same checkout each attach only from their o
     assert.equal(startB.code, 0);
 
     const runsPath = runsDirOf(repo);
-    assert.equal(readJsonFilesRecursively(runsPath).length, 2);
+    assert.equal(readRunFiles(runsPath).length, 2);
 
     const filePathA = writeIntoTaskFolder(repo, "2026_08_15_alpha", "a.md");
     const filePathB = writeIntoTaskFolder(repo, "2026_08_16_beta", "b.md");
@@ -1767,19 +1914,25 @@ test("two concurrent sessions in the same checkout each attach only from their o
     assert.equal(writeA.code, 0);
     assert.equal(writeB.code, 0);
 
-    const files = readJsonFilesRecursively(runsPath);
+    const files = readRunFiles(runsPath);
     assert.equal(files.length, 2);
 
-    const records = files.map((f) => JSON.parse(fs.readFileSync(f, "utf8")));
-    const byVendorId = Object.fromEntries(records.map((r) => [r.vendor_id, r]));
+    const byVendorId = {};
+    for (const file of files) {
+      const lines = readLines(file);
+      byVendorId[lines[0].vendor_id] = lines;
+    }
     assert.deepEqual(Object.keys(byVendorId).sort(), [sessionA, sessionB].sort());
 
-    assert.deepEqual(byVendorId[sessionA].tasks, [
-      { task_id: "2026_08_15_alpha", from: byVendorId[sessionA].started_at, to: null },
-    ]);
-    assert.deepEqual(byVendorId[sessionB].tasks, [
-      { task_id: "2026_08_16_beta", from: byVendorId[sessionB].started_at, to: null },
-    ]);
+    const linesA = byVendorId[sessionA];
+    assert.equal(linesA.length, 2);
+    assert.equal(linesA[1].type, "file_written");
+    assert.equal(linesA[1].path, "aidd_docs/tasks/2026_08/2026_08_15_alpha/a.md");
+
+    const linesB = byVendorId[sessionB];
+    assert.equal(linesB.length, 2);
+    assert.equal(linesB[1].type, "file_written");
+    assert.equal(linesB[1].path, "aidd_docs/tasks/2026_08/2026_08_16_beta/b.md");
   } finally {
     cleanup(repo);
   }
@@ -1839,7 +1992,7 @@ test("in a real temporary git repo: the marker files are tracked, a record file 
     const result = replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
     assert.equal(result.status, 0);
 
-    const recordFiles = fs.readdirSync(runsPath).filter((f) => f.endsWith(".json"));
+    const recordFiles = fs.readdirSync(runsPath).filter((f) => f.endsWith(".jsonl"));
     assert.equal(recordFiles.length, 1, "the record did not land in aidd_docs/runs/");
     const recordPath = path.join(runsPath, recordFiles[0]);
     assert.ok(fs.existsSync(recordPath), "the record must be present on disk");
@@ -1857,7 +2010,7 @@ test("in a real temporary git repo: the marker files are tracked, a record file 
   }
 });
 
-test("a repository whose .gitignore excludes .aidd/* (config.json excepted) and aidd_docs/runs/* stays clean after a session attaches to an already-tracked task file", () => {
+test("a repository whose .gitignore excludes .aidd/* (config.json excepted) and aidd_docs/runs/* stays clean after a session writes into an already-tracked task file", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/gitignore-aidd.git" });
   // Reuses the exact rules from this repository's own .gitignore, so the
   // integration proof and the documented rules cannot silently drift apart.
@@ -1882,6 +2035,41 @@ test("a repository whose .gitignore excludes .aidd/* (config.json excepted) and 
   }
 });
 
+test("a credential in the remote never reaches the journal", () => {
+  const repo = makeTempRepo({ remote: "https://x-access-token:ghp_SECRET123@github.com/acme/private.git" });
+  try {
+    replayIn(
+      makePayload({ cwd: repo, sessionId: "00000000-0000-4000-8000-0000000000cr", event: "SessionStart" }),
+    );
+    const files = readRunFiles(runsDirOf(repo));
+    assert.equal(files.length, 1);
+    const raw = fs.readFileSync(files[0], "utf8");
+    assert.equal(raw.includes("ghp_SECRET123"), false, "the token must not appear anywhere in the file");
+    assert.equal(raw.includes("x-access-token"), false);
+
+    const line = JSON.parse(raw.split("\n")[0]);
+    assert.equal(line.project_remote, "https://github.com/acme/private.git");
+    assert.equal(line.project_id, "acme/private");
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("remoteWithoutCredentials strips userinfo from a scheme URL and leaves scp-style whole", () => {
+  const { remoteWithoutCredentials } = require("../../plugins/aidd-telemetry/hooks/lib/repo.js");
+  assert.equal(
+    remoteWithoutCredentials("https://user:pass@github.com/o/r.git"),
+    "https://github.com/o/r.git",
+  );
+  assert.equal(
+    remoteWithoutCredentials("https://ghp_x@github.com/o/r.git"),
+    "https://github.com/o/r.git",
+  );
+  assert.equal(remoteWithoutCredentials("https://github.com/o/r.git"), "https://github.com/o/r.git");
+  assert.equal(remoteWithoutCredentials("git@github.com:o/r.git"), "git@github.com:o/r.git");
+  assert.equal(remoteWithoutCredentials(null), null);
+});
+
 test("a leaked GIT_DIR never redirects a session into another repository", () => {
   const here = makeTempRepo({ remote: "git@github.com:acme/here.git" });
   const elsewhere = makeTempRepo({ remote: "git@github.com:acme/elsewhere.git" });
@@ -1892,11 +2080,11 @@ test("a leaked GIT_DIR never redirects a session into another repository", () =>
     );
 
     assert.equal(result.status, 0);
-    assert.equal(readJsonFilesRecursively(runsDirOf(elsewhere)).length, 0);
+    assert.equal(readRunFiles(runsDirOf(elsewhere)).length, 0);
 
-    const written = readJsonFilesRecursively(runsDirOf(here));
+    const written = readRunFiles(runsDirOf(here));
     assert.equal(written.length, 1);
-    assert.equal(JSON.parse(fs.readFileSync(written[0], "utf8")).project_id, "acme/here");
+    assert.equal(readLines(written[0])[0].project_id, "acme/here");
   } finally {
     cleanup(here);
     cleanup(elsewhere);

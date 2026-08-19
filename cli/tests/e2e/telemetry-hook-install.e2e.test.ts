@@ -57,11 +57,21 @@ describe("E2E: the journal hook runs from where installation puts it", () => {
 
       const written = readdirSync(join(projectDir, "aidd_docs", "runs"));
       expect(written).toHaveLength(1);
-      const record = JSON.parse(
-        readFileSync(join(projectDir, "aidd_docs", "runs", written[0] as string), "utf-8")
-      );
-      expect(record.project_id).toBe("aidd-lab/hook-install");
-      expect(record.vendor_id).toBe(payload.session_id);
+      expect(written[0]).toMatch(/\.jsonl$/);
+      const lines = readFileSync(
+        join(projectDir, "aidd_docs", "runs", written[0] as string),
+        "utf-8"
+      )
+        .split("\n")
+        .filter((line) => line.length > 0)
+        .map((line) => JSON.parse(line));
+      expect(lines).toHaveLength(1);
+      const sessionStart = lines[0];
+      expect(sessionStart.type).toBe("session_start");
+      expect(sessionStart.schema_version).toBe(2);
+      expect(sessionStart.project_id).toBe("aidd-lab/hook-install");
+      expect(sessionStart.project_remote).toBe("git@github.com:aidd-lab/hook-install.git");
+      expect(sessionStart.vendor_id).toBe(payload.session_id);
     } finally {
       await cleanup();
     }

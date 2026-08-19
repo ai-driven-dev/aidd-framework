@@ -5,6 +5,13 @@ status: draft
 
 # Suivre un travail de bout en bout
 
+> **Dépassé sur quatre points depuis le 2026-08-19**, par
+> [`2026_08_19_run-journal-event-log`](../../tasks/2026_08/2026_08_19_run-journal-event-log/plan.md).
+> La fiche de run n'est plus un objet mutable mais un journal en ajout pur, un objet par
+> ligne : `ended_at` et `parent_run_id` n'existent plus, un `task_id` n'est jamais écrit —
+> le chemin est enregistré et la tâche s'en déduit à la lecture — et **aucun skill n'écrit
+> quoi que ce soit** : le hook observe, seul. Le reste du document tient.
+
 Comment relier l'intention, la livraison et l'exécution d'un travail — dans le flux habituel comme en dehors — sans dupliquer une seule information, et sans dépendre de l'outil utilisé.
 
 ## Target
@@ -251,22 +258,17 @@ Cas dégénéré, à accepter comme normal : un dossier de livraison sans artefa
 
 `steps` est un **journal**, pas une liste de cases à cocher : ça s'ajoute, ça se répète, ça arrive dans le désordre. Trois `aidd-dev:08-debug` au milieu de l'implémentation donnent trois entrées. Le flux se lit après coup, il ne se contraint pas avant.
 
-## `runs/<mois>/<run_id>.json`
+## `runs/<run_id>__<vendor_id>.jsonl`
 
-Écrit par un hook, jamais par le modèle. Créé au démarrage de session, `ended_at` rafraîchi au dernier tour observé — pas à un événement de fin de session, que Codex n'accorde qu'une seconde et ne déclenche pas pour les sous-agents, et qu'OpenCode n'a pas.
+Écrit par un hook, jamais par le modèle. Une ligne par fait observé, ajoutée et jamais
+réécrite. La fin de session n'a pas besoin d'événement dédié — que Codex n'accorde qu'une
+seconde, ne déclenche pas pour les sous-agents, et qu'OpenCode n'a pas : la session se
+termine à l'horodatage de sa dernière ligne.
 
 ```json
-{
-  "schema_version": 1,
-  "run_id": "01J9X4M2K7QRVB",
-  "task_id": "2026_08_13_telemetry-layer",
-  "tool": "claude-code",
-  "vendor_id": "79041f53-35b0-4924-8855-e43e9de72431",
-  "vendor_field": "session.id",
-  "parent_run_id": null,
-  "started_at": "2026-08-13T10:08:44Z",
-  "ended_at": "2026-08-13T11:05:20Z"
-}
+{"at":"2026-08-13T10:08:44Z","type":"session_start","schema_version":2,"run_id":"01J9X4M2K7QRVB","project_id":"acme/repo","project_remote":"https://github.com/acme/repo.git","tool":"claude-code","vendor_id":"79041f53-35b0-4924-8855-e43e9de72431","vendor_field":"session.id"}
+{"at":"2026-08-13T10:22:10Z","type":"file_written","path":"aidd_docs/tasks/2026_08/2026_08_13_telemetry-layer/plan.md"}
+{"at":"2026-08-13T11:05:20Z","type":"turn_end","prompt_id":"a7294fac-94af-4c32-b02d-d4c9a6d6edaa"}
 ```
 
 `vendor_field` porte le nom de l'attribut **du côté export**, parce qu'il diffère partout : `session.id` chez Claude Code, `conversation.id` chez Codex, `gen_ai.conversation.id` chez Copilot, `cursor.conversation.id` chez Cursor. Le lecteur en aval sait ainsi quoi interroger, sans table codée en dur — et c'est bien la télémétrie qu'il interroge, pas le hook. Le champ côté hook, lui, n'a pas besoin d'être stocké : il a déjà donné sa valeur dans `vendor_id`.
@@ -384,9 +386,9 @@ Un seul champ nouveau par fichier. Le `task_id` n'est répété nulle part : **l
 | Écrivain | Écrit | Quand | Fréquence |
 | --- | --- | --- | --- |
 | la skill qui crée le dossier | `metadata.json`, identité et lien vers le backlog | à la création | une fois |
-| chaque skill de livraison | son entrée dans `steps`, et son propre frontmatter | en fin d'étape | quelques fois |
-| hook de démarrage | `runs/<mois>/<run_id>.json` | au démarrage de session | une fois par session |
-| hook de fin de tour | `ended_at` du run courant | à chaque tour | souvent, sur un fichier à un seul écrivain |
+| chaque skill de livraison | *plus rien* — le hook observe, aucun skill n'écrit | — | — |
+| hook de démarrage | la ligne `session_start` | au démarrage de session | une fois par session |
+| hook de fin de tour | une ligne `turn_end` ajoutée | à chaque tour | souvent, en ajout pur |
 | hook de commit | le trailer `AIDD-Session-Id` | au commit | une fois par commit |
 | personne | tokens, coût, modèle, durée | — | vient de la télémétrie |
 

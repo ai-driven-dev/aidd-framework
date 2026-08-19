@@ -29,7 +29,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 
 | File |
 |------|
-| [attach.js](hooks/lib/attach.js) |
+| [file-writes.js](hooks/lib/file-writes.js) |
 | [host.js](hooks/lib/host.js) |
 | [record.js](hooks/lib/record.js) |
 | [repo.js](hooks/lib/repo.js) |

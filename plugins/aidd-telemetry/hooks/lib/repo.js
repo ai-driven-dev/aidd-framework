@@ -99,11 +99,20 @@ function sanitizeProjectId(projectId) {
     .join("/");
 }
 
-function deriveProjectId(repoRoot) {
-  const remoteUrl = getRemoteUrl(repoRoot);
+// Split from deriveProjectId so a caller that already has remoteUrl (see
+// resolveWriteTarget below, which also wants it for project_remote) can pay
+// for one git shellout, not two.
+function projectIdFromRemote(repoRoot, remoteUrl) {
   const ownerRepo = remoteUrl ? parseOwnerRepoFromRemote(remoteUrl) : null;
   const raw = ownerRepo || path.basename(repoRoot);
   return sanitizeProjectId(raw);
+}
+
+// Single-arg public contract: the CLI duplicates this algorithm
+// (telemetry-project-id.ts) and an integration test proves the two agree for
+// the same repoRoot, so this signature is not this plugin's alone to change.
+function deriveProjectId(repoRoot) {
+  return projectIdFromRemote(repoRoot, getRemoteUrl(repoRoot));
 }
 
 // `AIDD_RUNS_DIR` overrides outright; otherwise the default location the
@@ -136,10 +145,24 @@ function resolveRunsDir(cwd) {
   return { repoRoot, dir: runsDir(repoRoot) };
 }
 
+// A remote can carry a live credential in its userinfo — `https://ghp_xxx@host/o/r`
+// is what a token-authenticated clone leaves in .git/config. The journal is meant to
+// be read, and eventually shipped to a sink, so the credential never reaches a line.
+// Only scheme-bearing URLs have userinfo to strip; scp-style `git@host:owner/repo` has
+// no scheme and is left whole.
+function remoteWithoutCredentials(remoteUrl) {
+  if (typeof remoteUrl !== "string") return null;
+  return remoteUrl.replace(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^/]*@/u, "$1");
+}
+
+// project_remote is kept beside project_id so a changed remote can be re-derived
+// instead of silently splitting a project in two.
 function resolveWriteTarget(cwd) {
   const target = resolveRunsDir(cwd);
   if (!target) return null;
-  return { ...target, projectId: deriveProjectId(target.repoRoot) };
+  const remoteUrl = getRemoteUrl(target.repoRoot);
+  const projectId = projectIdFromRemote(target.repoRoot, remoteUrl);
+  return { ...target, projectId, projectRemote: remoteWithoutCredentials(remoteUrl) };
 }
 
 module.exports = {
@@ -147,6 +170,7 @@ module.exports = {
   readTelemetryConfig,
   telemetryEnabled,
   getRemoteUrl,
+  remoteWithoutCredentials,
   parseOwnerRepoFromRemote,
   sanitizePathSegment,
   sanitizeProjectId,

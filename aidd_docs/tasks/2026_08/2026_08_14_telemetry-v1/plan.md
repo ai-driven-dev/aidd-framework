@@ -65,6 +65,12 @@ and proven before anything is written.
 **Phases 1 to 5 are done.** Git ignores everything they write, so all of it can be
 deleted without trace.
 
+**The record shape phase 4 built — the mutable ten-key file, rewritten every
+turn — was replaced by an append-only event log.** See
+[`aidd_docs/tasks/2026_08/2026_08_19_run-journal-event-log/plan.md`](../2026_08_19_run-journal-event-log/plan.md).
+This file is left as it was written, not edited into agreement with that
+replacement.
+
 **Phase 6 is not part of this feature.** It was "materialise records into git at
 commit", and the decision that the project chooses — with `.gitignore` as the
 switch — dissolved the copying step: a project that wants its records committed

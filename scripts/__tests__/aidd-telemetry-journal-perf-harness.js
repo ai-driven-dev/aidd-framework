@@ -73,7 +73,7 @@ processPayload(payload("SessionStart"));
 const SEED_COUNT = 300;
 for (let i = 0; i < SEED_COUNT; i++) {
   const runId = generateUlid();
-  fs.writeFileSync(path.join(dir, `${runId}__seed-session-${i}.json`), "not real json, never read {{{");
+  fs.writeFileSync(path.join(dir, `${runId}__seed-session-${i}.jsonl`), "not real json, never read {{{");
 }
 
 function measure(label, count, fn) {
