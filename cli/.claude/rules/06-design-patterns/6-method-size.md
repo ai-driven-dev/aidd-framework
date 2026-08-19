@@ -1,6 +1,6 @@
 ---
 paths:
-  - "src/application/use-cases/**/*.ts"
+  - "src/**/*.ts"
   - "src/domain/**/*.ts"
 ---
 
@@ -9,6 +9,9 @@ paths:
 ## Rules
 
 - Hard limit: ≤ 20 lines per method (public or private)
+- Enforced by `noExcessiveLinesPerFunction` in `cli/biome.json`, everywhere under `src/`
+- `src/application/commands/` is exempt: registering a subcommand is a declarative block,
+  and splitting it hides the command surface rather than clarifying it
 - Code lines count; blank lines and comment-only lines excluded
 - Extracted method name describes intent, not mechanics
 
