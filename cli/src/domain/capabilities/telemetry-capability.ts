@@ -1,3 +1,4 @@
+import type { MergeStrategy } from "../models/merge.js";
 import type { TelemetrySessionMeasure } from "../models/telemetry-sink-record.js";
 
 /**
@@ -10,17 +11,14 @@ export const TELEMETRY_SCOPES = ["local", "project", "user"] as const;
 export type TelemetryScope = (typeof TELEMETRY_SCOPES)[number];
 export const DEFAULT_TELEMETRY_SCOPE: TelemetryScope = "local";
 
-/**
- * The tool writes telemetry config into a settings file AIDD can merge into, through the
- * existing `FileMerger` + manifest `mergeFiles` machinery `aidd clean` already knows how to
- * undo. `resolveSettingsPath` and `buildEnv` are pure — no `fs`, no `process` — so the
- * use-case that calls them stays free of I/O and of this tool's on-disk shape.
- * `trackedScopes` lists which of `scopes` write a git-tracked file: writing to one of them
- * needs `--yes`, since it turns telemetry on for everyone who clones.
- */
+/** The tool writes telemetry config into a settings file AIDD merges into, so `aidd clean`
+ * can undo it. `resolveSettingsPath` and `buildEnv` are pure, keeping the calling use-case
+ * free of I/O and of this tool's on-disk shape. `trackedScopes` names the scopes that write
+ * a git-tracked file, which need `--yes`. */
 export interface TelemetrySettingsFileActivation {
   readonly kind: "settings-file";
   readonly sectionKey: string;
+  readonly mergeStrategy: MergeStrategy;
   readonly scopes: readonly TelemetryScope[];
   readonly defaultScope: TelemetryScope;
   readonly trackedScopes: readonly TelemetryScope[];
@@ -58,13 +56,9 @@ export type TelemetryActivation =
   | TelemetryPlannedActivation
   | TelemetryExternalActivation;
 
-/**
- * What a tool's OTLP export actually carries — measured by hand, one session per tool,
- * never guessed from documentation. Separate from {@link TelemetryActivation}: a tool can
- * be enableable (or not) independently of whether its export shape has been proven. The
- * sink mapper (`telemetry-sink-record.ts`) reads this and nothing else to resolve which
- * tool sent a payload — it never branches on `toolId`.
- */
+/** What a tool's OTLP export carries, measured by hand one session per tool, never taken
+ * from documentation. The sink mapper reads this and nothing else to resolve which tool
+ * sent a payload; it never branches on `toolId`. */
 export interface TelemetryExportDeclared {
   readonly kind: "declared";
   readonly identityAttribute: string;

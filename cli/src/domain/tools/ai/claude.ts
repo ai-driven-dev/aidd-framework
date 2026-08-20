@@ -129,6 +129,7 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
     telemetry: {
       kind: "settings-file",
       sectionKey: "env",
+      mergeStrategy: "framework-prime",
       scopes: ["local", "project", "user"],
       defaultScope: "local",
       // .claude/settings.json is git-tracked — writing there turns telemetry on for

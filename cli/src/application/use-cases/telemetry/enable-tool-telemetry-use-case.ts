@@ -53,7 +53,7 @@ export class EnableToolTelemetryUseCase {
     );
     this.logger.info(`${toolId} telemetry -> ${settingsPath}`);
     const payload = JSON.stringify({ [activation.sectionKey]: env });
-    await this.fs.mergeJsonFile(settingsPath, payload, "framework-prime");
+    await this.fs.mergeJsonFile(settingsPath, payload, activation.mergeStrategy);
     this.trackMergeFile(manifest, options, env, settingsPath);
     await this.manifestRepo.save(manifest);
     if (activation.postEnableNotice) this.logger.info(activation.postEnableNotice);

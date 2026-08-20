@@ -273,6 +273,7 @@ describe("EnableToolTelemetryUseCase — genuinely tool-agnostic", () => {
     const syntheticActivation: TelemetrySettingsFileActivation = {
       kind: "settings-file",
       sectionKey: "otelSettings",
+      mergeStrategy: "framework-prime",
       scopes: ["local"],
       defaultScope: "local",
       trackedScopes: [],
@@ -295,5 +296,46 @@ describe("EnableToolTelemetryUseCase — genuinely tool-agnostic", () => {
     expect(written.otelSettings.SYNTHETIC_ENDPOINT).toBe(ENDPOINT);
     expect(manifestRepo.getCurrent()?.getMergeFiles("cursor")).toHaveLength(1);
     expect(manifestRepo.getCurrent()?.getMergeFiles("claude")).toEqual([]);
+  });
+
+  it("merges with the strategy the activation declares, not one it picks itself", async () => {
+    const hasher = new DeterministicHasher();
+    const settingsPath = `${PROJECT_ROOT}/.synthetic/settings.json`;
+    const fs = new InMemoryFileAdapter(
+      { [settingsPath]: JSON.stringify({ otelSettings: { SYNTHETIC_ENDPOINT: "set-by-user" } }) },
+      hasher
+    );
+    const manifest = Manifest.create();
+    manifest.addTool("cursor", "1.0.0", []);
+    const useCase = new EnableToolTelemetryUseCase(
+      fs,
+      hasher,
+      new InMemoryManifestRepository(manifest),
+      new CapturingLogger()
+    );
+
+    const userPrimeActivation: TelemetrySettingsFileActivation = {
+      kind: "settings-file",
+      sectionKey: "otelSettings",
+      mergeStrategy: "user-prime",
+      scopes: ["local"],
+      defaultScope: "local",
+      trackedScopes: [],
+      resolveSettingsPath: (_scope, projectRoot) => `${projectRoot}/.synthetic/settings.json`,
+      buildEnv: (endpoint) => ({ SYNTHETIC_ENDPOINT: endpoint ?? "" }),
+    };
+
+    await useCase.execute({
+      toolId: "cursor",
+      activation: userPrimeActivation,
+      projectRoot: PROJECT_ROOT,
+      homeDir: HOME_DIR,
+      endpoint: ENDPOINT,
+      projectId: PROJECT_ID,
+      scope: "local",
+    });
+
+    const written = JSON.parse(fs.getFile(settingsPath) ?? "null");
+    expect(written.otelSettings.SYNTHETIC_ENDPOINT).toBe("set-by-user");
   });
 });
