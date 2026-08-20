@@ -31,6 +31,7 @@ export interface TelemetrySinkRecord {
   readonly duration_ms?: number;
   readonly active_time_s?: number;
   readonly event_timestamp?: string;
+  readonly event_sequence?: number;
 }
 
 /** The only thing that varies the mapper per tool, and it arrives as data, not a branch.
@@ -72,6 +73,7 @@ const ATTRIBUTE_ALLOWLIST: ReadonlyMap<string, keyof TelemetrySinkRecord> = new 
   ["agent.name", "agent_name"],
   ["duration_ms", "duration_ms"],
   ["event.timestamp", "event_timestamp"],
+  ["event.sequence", "event_sequence"],
 ]);
 
 const NUMERIC_FIELDS: ReadonlySet<keyof TelemetrySinkRecord> = new Set([
@@ -82,6 +84,7 @@ const NUMERIC_FIELDS: ReadonlySet<keyof TelemetrySinkRecord> = new Set([
   "cache_creation_tokens",
   "duration_ms",
   "active_time_s",
+  "event_sequence",
 ]);
 
 interface OtlpAnyValue {

@@ -16,6 +16,36 @@ function loadFixture(name: string): unknown {
   return JSON.parse(readFileSync(fileURLToPath(url), "utf8"));
 }
 
+interface RawAttribute {
+  readonly key?: string;
+  readonly value?: { readonly stringValue?: string; readonly intValue?: number | string };
+}
+interface RawLogsPayload {
+  readonly resourceLogs?: ReadonlyArray<{
+    readonly scopeLogs?: ReadonlyArray<{
+      readonly logRecords?: ReadonlyArray<{ readonly attributes?: readonly RawAttribute[] }>;
+    }>;
+  }>;
+}
+
+/** Every `event.sequence` -> `event.timestamp` pair the raw export carries, read straight
+ * off the fixture — independent of the mapper, to prove the collision exists in the
+ * capture itself rather than in a hand-written record. */
+function collectRawEventStamps(payload: unknown): Map<number, string> {
+  const stamps = new Map<number, string>();
+  for (const resourceLog of (payload as RawLogsPayload).resourceLogs ?? []) {
+    for (const scopeLog of resourceLog.scopeLogs ?? []) {
+      for (const logRecord of scopeLog.logRecords ?? []) {
+        const attrs = new Map((logRecord.attributes ?? []).map((a) => [a.key, a.value]));
+        const seq = attrs.get("event.sequence")?.intValue;
+        const ts = attrs.get("event.timestamp")?.stringValue;
+        if (seq !== undefined && ts !== undefined) stamps.set(Number(seq), ts);
+      }
+    }
+  }
+  return stamps;
+}
+
 const CLAUDE_VENDOR: TelemetryVendorIdentity = {
   identityAttribute: "session.id",
   turnAttribute: "prompt.id",
@@ -94,6 +124,57 @@ describe("mapOtlpLogsToSinkRecords()", () => {
     expect(record.query_source).toBe("sdk");
     expect(record.duration_ms).toBe(1598);
     expect(record.event_timestamp).toBe("2026-08-18T17:04:39.258Z");
+    expect(record.event_sequence).toBe(45);
+  });
+
+  // The load-bearing measurement for this phase, read from the capture itself: seq 45
+  // (api_request, billed) and seq 46 (assistant_response) share one millisecond, so the
+  // timestamp alone cannot order them. No fabricated record — the collision is the export's.
+  it("shares a millisecond between two records one sequence apart (setup sanity)", () => {
+    const stamps = collectRawEventStamps(logsPayload);
+    expect(stamps.get(45)).toBe("2026-08-18T17:04:39.258Z");
+    expect(stamps.get(45)).toBe(stamps.get(46));
+  });
+
+  // The subagent capture is the one fixture with two real billed lines, at different
+  // sequences (50, 55). Together with the millisecond collision above and the stored
+  // event_sequence asserted on the main fixture, this proves the stored sequence field
+  // — not the timestamp — is what a reader would sort on to recover the export's order.
+  it("orders multiple stored records by their own sequence, from stored data alone", () => {
+    const subagentPayload = loadFixture("otlp-logs-claude-code-subagent.json");
+    const records = mapOtlpLogsToSinkRecords(subagentPayload, [CLAUDE_VENDOR]);
+    const sequenced = records.filter((record) => record.event_sequence !== undefined);
+    const bySequence = [...sequenced].sort(
+      (a, b) => (a.event_sequence ?? 0) - (b.event_sequence ?? 0)
+    );
+    expect(bySequence.map((record) => record.event_sequence)).toEqual([50, 55]);
+  });
+
+  it("stores the timestamp alone, inventing no sequence, when the export sends none", () => {
+    const payload = {
+      resourceLogs: [
+        {
+          resource: { attributes: [] },
+          scopeLogs: [
+            {
+              logRecords: [
+                {
+                  attributes: [
+                    { key: "session.id", value: { stringValue: "s-1" } },
+                    { key: "cost_usd", value: { doubleValue: 0.01 } },
+                    { key: "event.timestamp", value: { stringValue: "2026-08-18T17:04:39.258Z" } },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const [record] = mapOtlpLogsToSinkRecords(payload, [CLAUDE_VENDOR]);
+    expect(record.event_timestamp).toBe("2026-08-18T17:04:39.258Z");
+    expect(record.event_sequence).toBeUndefined();
+    expect(Object.keys(record)).not.toContain("event_sequence");
   });
 
   it("drops every named identity attribute, by name and by value", () => {

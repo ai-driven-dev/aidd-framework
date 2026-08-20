@@ -33,4 +33,5 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | [host.js](hooks/lib/host.js) |
 | [record.js](hooks/lib/record.js) |
 | [repo.js](hooks/lib/repo.js) |
+| [step-starts.js](hooks/lib/step-starts.js) |
 
