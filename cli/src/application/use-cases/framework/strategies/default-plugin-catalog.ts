@@ -1,21 +1,14 @@
 import type { PluginPresenceFlags } from "./plugin-source-tree-reader.js";
 
-export interface SynthesizeClaudeStyleManifestOpts {
-  /** Output manifest subdirectory name (e.g. ".claude-plugin" or ".cursor-plugin"). Reserved for caller/future divergence. */
-  readonly manifestDir: string;
+export interface SynthesizeDefaultPluginManifestOpts {
   /** When true, include `agents` as a list of `./agents/*.md` file paths if agents are present. */
   readonly agentsField: boolean;
 }
 
-/**
- * Synthesize a Claude-style plugin manifest shared by claude + cursor + copilot strategies.
- * Key insertion order: name, description, version, author, homepage, repository, license,
- * keywords, agents (conditional), skills (conditional), hooks (conditional), mcpServers (conditional).
- */
-export function synthesizeClaudeStyleManifest(
+export function synthesizeDefaultPluginManifest(
   source: Record<string, unknown>,
   presence: PluginPresenceFlags,
-  opts: SynthesizeClaudeStyleManifestOpts
+  opts: SynthesizeDefaultPluginManifestOpts
 ): Record<string, unknown> {
   const manifest: Record<string, unknown> = {};
   if (typeof source.name === "string") manifest.name = source.name;
@@ -36,10 +29,7 @@ export function synthesizeClaudeStyleManifest(
   return manifest;
 }
 
-/**
- * Build a Claude-style marketplace catalog object shared by claude + cursor + codex strategies.
- */
-export function buildClaudeStyleMarketplace(
+export function buildDefaultMarketplace(
   source: { name: string; version?: string; description?: string; owner?: unknown },
   pluginEntries: readonly Record<string, unknown>[]
 ): Record<string, unknown> {
@@ -51,7 +41,7 @@ export function buildClaudeStyleMarketplace(
   return obj;
 }
 
-export function buildClaudeStyleCatalogEntry(
+export function buildDefaultCatalogEntry(
   name: string,
   description: string,
   version: string,

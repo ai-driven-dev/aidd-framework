@@ -63,12 +63,12 @@ import {
 } from "../../../../domain/tools/ai/codex.js";
 import { transformMcpToOpencode } from "../../../../domain/tools/ai/opencode.js";
 import type { PluginPresence, ToolBuildContract } from "../../../../domain/tools/build-contract.js";
-import {
-  buildClaudeStyleCatalogEntry,
-  buildClaudeStyleMarketplace,
-  synthesizeClaudeStyleManifest,
-} from "./claude-style-marketplace-catalog.js";
 import { buildCodexMarketplace, buildCodexMarketplaceEntry } from "./codex-marketplace-catalog.js";
+import {
+  buildDefaultCatalogEntry,
+  buildDefaultMarketplace,
+  synthesizeDefaultPluginManifest,
+} from "./default-plugin-catalog.js";
 import { resolveDescription, resolveVersion } from "./plugin-source-tree-reader.js";
 
 type FsType = FileReader & FileWriter;
@@ -97,7 +97,7 @@ function transformCursorAgent(content: string, _plugin: string, outName: string)
 
 // ── Shared catalog builders ────────────────────────────────────────────────────
 
-async function buildClaudeStyleEntry(
+async function buildDefaultEntry(
   name: string,
   outDir: string,
   srcEntry: SrcEntry,
@@ -107,7 +107,7 @@ async function buildClaudeStyleEntry(
   const args = [fs, name, srcEntry, outDir, manifestRelative] as const;
   const version = await resolveVersion(...args);
   const description = await resolveDescription(...args);
-  return buildClaudeStyleCatalogEntry(
+  return buildDefaultCatalogEntry(
     name,
     description,
     version,
@@ -128,8 +128,7 @@ export function buildClaudeContract(): ToolBuildContract {
     pluginRootToken: claudeToken,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: (source, presence) =>
-      synthesizeClaudeStyleManifest(source, presence, {
-        manifestDir: ".claude-plugin",
+      synthesizeDefaultPluginManifest(source, presence, {
         agentsField: true,
       }),
     manifestSchemaName: "plugin-manifest",
@@ -159,15 +158,15 @@ export function buildClaudeContract(): ToolBuildContract {
       commands: { supported: false },
     },
     buildMarketplaceCatalog: async (source, entries, _fs) => ({
-      catalog: buildClaudeStyleMarketplace(
-        source as Parameters<typeof buildClaudeStyleMarketplace>[0],
+      catalog: buildDefaultMarketplace(
+        source as Parameters<typeof buildDefaultMarketplace>[0],
         entries
       ),
       schemaName: "claude-marketplace",
       destRelPath: marketplaceRelative,
     }),
     buildMarketplaceEntry: async (name, _src, outDir, srcEntry, fs) =>
-      buildClaudeStyleEntry(name, outDir, srcEntry, manifestRelative, fs),
+      buildDefaultEntry(name, outDir, srcEntry, manifestRelative, fs),
   };
 }
 
@@ -184,8 +183,7 @@ export function buildCursorContract(): ToolBuildContract {
     pluginRootToken: cursorToken,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: (source, presence) =>
-      synthesizeClaudeStyleManifest(source, presence, {
-        manifestDir: ".cursor-plugin",
+      synthesizeDefaultPluginManifest(source, presence, {
         agentsField: true,
       }),
     manifestSchemaName: "plugin-manifest",
@@ -215,15 +213,15 @@ export function buildCursorContract(): ToolBuildContract {
       commands: { supported: false },
     },
     buildMarketplaceCatalog: async (source, entries, _fs) => ({
-      catalog: buildClaudeStyleMarketplace(
-        source as Parameters<typeof buildClaudeStyleMarketplace>[0],
+      catalog: buildDefaultMarketplace(
+        source as Parameters<typeof buildDefaultMarketplace>[0],
         entries
       ),
       schemaName: "claude-marketplace",
       destRelPath: marketplaceRelative,
     }),
     buildMarketplaceEntry: async (name, _src, outDir, srcEntry, fs) =>
-      buildClaudeStyleEntry(name, outDir, srcEntry, manifestRelative, fs),
+      buildDefaultEntry(name, outDir, srcEntry, manifestRelative, fs),
   };
 }
 
@@ -240,8 +238,7 @@ export function buildCopilotMarketplaceContract(): ToolBuildContract {
     pluginRootToken: copilotToken,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: (source, presence) =>
-      synthesizeClaudeStyleManifest(source, presence, {
-        manifestDir: ".plugin",
+      synthesizeDefaultPluginManifest(source, presence, {
         agentsField: true,
       }),
     manifestSchemaName: null, // Copilot does not use AJV for the plugin manifest
