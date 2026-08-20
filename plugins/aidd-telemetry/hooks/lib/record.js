@@ -12,6 +12,7 @@ const {
   resolveWriteTarget,
   tightenOwnedDir,
   PRIVATE_DIR_MODE,
+  readCwd,
 } = require("./repo.js");
 
 // Hand-rolled ULID - 48-bit millisecond timestamp plus 80 bits of randomness, both
@@ -93,10 +94,32 @@ function findRunFileByVendorId(dir, vendorId) {
 // on session_start, so a reader can tell a file's shape without scanning it.
 const SCHEMA_VERSION = 2;
 
-// Which export-side attribute vendor_id can be joined against, per host.
+// Which export-side attribute vendor_id can be joined against, per host - measured, never
+// guessed. `null` on Cursor is a fact, not a gap: its own telemetry export is itself
+// unmeasured (an Enterprise team setting nobody here can turn on), so there is no
+// attribute name to name. A documented-but-uncaptured guess would be exactly the false
+// figure this layer exists to prevent.
 const VENDOR_FIELD_BY_HOST = Object.freeze({
-  "claude-code": "session.id",
+  "claude-code": "session.id", // CLAUDE_TELEMETRY_IDENTITY_ATTRIBUTE, measured 2026-08-13.
+  codex: "conversation.id", // Measured 2026-08-13, on codex.sse_event.
+  copilot: "gen_ai.conversation.id", // Measured 2026-08-13, on the invoke_agent span.
+  cursor: null,
 });
+
+// How each host names the session id in its own hook payload. journal.js used to read
+// payload.session_id outright - one host's spelling, promoted to a rule. Copilot alone
+// spells it sessionId; every other declared host agrees on session_id.
+const SESSION_ID_READER_BY_HOST = Object.freeze({
+  "claude-code": (payload) => payload.session_id,
+  codex: (payload) => payload.session_id,
+  copilot: (payload) => payload.sessionId,
+  cursor: (payload) => payload.session_id,
+});
+
+function readSessionId(host, payload) {
+  const reader = SESSION_ID_READER_BY_HOST[host];
+  return reader ? reader(payload) : undefined;
+}
 
 const PRIVATE_FILE_MODE = 0o600;
 
@@ -133,14 +156,35 @@ function buildFileWrittenLine({ at, path: writtenPath }) {
   return { type: "file_written", at, path: writtenPath };
 }
 
-function handleSessionStart(payload, host) {
-  const target = resolveWriteTarget(payload.cwd);
+// A start, and nothing else. No end, no duration, no parent: no tool exposes when a
+// skill's work finishes, so all three would be a conclusion stored as a fact. The skill
+// name is sanitised as a value, never as a path segment - it is a name here, not a
+// location. turn_id is omitted, never written as null, when the host carries none.
+function buildStepStartLine({ at, skill, turnId }) {
+  const line = { type: "step_start", at, skill: sanitizeSkillName(skill) };
+  if (typeof turnId === "string" && turnId !== "") line.turn_id = turnId;
+  return line;
+}
+
+// Separators and traversal collapse to "-", so a hostile name cannot read as a path or
+// escape its own field. Emptied entirely, it reads "-" rather than vanishing.
+function sanitizeSkillName(skill) {
+  const cleaned = String(skill).replace(/[^\w.:-]/gu, "-");
+  return cleaned === "" || cleaned === "." || cleaned === ".." ? "-" : cleaned;
+}
+
+// sessionId arrives already read behind the host declaration (see readSessionId above) -
+// this function never assumes payload.session_id is that host's own spelling. The working
+// directory is read the same way, behind readCwd - Cursor names it workspace_roots, never
+// cwd (see hooks/lib/repo.js).
+function handleSessionStart(payload, host, sessionId) {
+  const target = resolveWriteTarget(readCwd(host, payload));
   if (!target) return;
   const { projectId, projectRemote, dir } = target;
 
   // SessionStart is not documented to fire once per session_id - `source` takes values
   // beyond `startup` - so this guard prevents a second file for one vendor_id.
-  if (findRunFileByVendorId(dir, payload.session_id)) return;
+  if (findRunFileByVendorId(dir, sessionId)) return;
 
   const runId = generateUlid();
   const line = buildSessionStartLine({
@@ -149,22 +193,22 @@ function handleSessionStart(payload, host) {
     projectId,
     projectRemote,
     host,
-    vendorId: payload.session_id,
+    vendorId: sessionId,
   });
 
   fs.mkdirSync(dir, { recursive: true, mode: PRIVATE_DIR_MODE });
-  appendLine(path.join(dir, runFileName(runId, payload.session_id)), line);
+  appendLine(path.join(dir, runFileName(runId, sessionId)), line);
   tightenOwnedDir(dir);
 }
 
 // Driven by Stop, not a session-end event: Codex grants a session-end handler one second
 // at most and does not fire it for subagents, so the last turn-end is the only reliable end.
-function handleTurnEnd(payload) {
-  const target = resolveRunsDir(payload.cwd);
+function handleTurnEnd(payload, host, sessionId) {
+  const target = resolveRunsDir(readCwd(host, payload));
   if (!target) return;
   const { dir } = target;
 
-  const filePath = findRunFileByVendorId(dir, payload.session_id);
+  const filePath = findRunFileByVendorId(dir, sessionId);
   if (!filePath) return;
 
   appendLine(filePath, buildTurnEndLine({ at: nowIso(), promptId: payload.prompt_id }));
@@ -180,10 +224,14 @@ module.exports = {
   findRunFileByVendorId,
   SCHEMA_VERSION,
   VENDOR_FIELD_BY_HOST,
+  SESSION_ID_READER_BY_HOST,
+  readSessionId,
   appendLine,
   buildSessionStartLine,
   buildTurnEndLine,
   buildFileWrittenLine,
+  buildStepStartLine,
+  sanitizeSkillName,
   PRIVATE_FILE_MODE,
   handleSessionStart,
   handleTurnEnd,

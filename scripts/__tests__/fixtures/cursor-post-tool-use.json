@@ -1,0 +1,20 @@
+{
+  "conversation_id": "016b6a9e-920e-4560-b1e2-5024bbfcef80",
+  "generation_id": "016b6a9e-920e-4560-b1e2-5024bbfcef80",
+  "model": "default",
+  "tool_name": "Read",
+  "tool_input": {
+    "file_path": "/home/user/probe/project-cursor-skill/.cursor/skills/probe-echo/SKILL.md"
+  },
+  "tool_output": "{\"file_path\":\"/home/user/probe/project-cursor-skill/.cursor/skills/probe-echo/SKILL.md\",\"content_length\":251}",
+  "duration": 352.413,
+  "tool_use_id": "call_Pcihf51QkJJPVrqHheQ3X4fA\nfc_07841c621464695d016a842dabe1448195aaa891093db23e60",
+  "session_id": "016b6a9e-920e-4560-b1e2-5024bbfcef80",
+  "hook_event_name": "postToolUse",
+  "cursor_version": "2026.08.11-e8db854",
+  "workspace_roots": [
+    "/home/user/probe/project-cursor-skill"
+  ],
+  "user_email": "user@example.com",
+  "transcript_path": "/home/user/.cursor/projects/project-cursor-skill/agent-transcripts/016b6a9e-920e-4560-b1e2-5024bbfcef80/016b6a9e-920e-4560-b1e2-5024bbfcef80.jsonl"
+}

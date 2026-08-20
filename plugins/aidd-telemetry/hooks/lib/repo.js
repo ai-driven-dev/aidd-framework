@@ -27,6 +27,32 @@ function getRepoRoot(cwd) {
   }
 }
 
+// The first workspace_roots entry getRepoRoot actually resolves - a multi-root workspace
+// carries several entries and only some of them are git repositories, so index zero is not
+// safe to assume.
+function firstGitWorkspaceRoot(workspaceRoots) {
+  if (!Array.isArray(workspaceRoots)) return undefined;
+  for (const root of workspaceRoots) {
+    if (typeof root === "string" && root && getRepoRoot(root)) return root;
+  }
+  return undefined;
+}
+
+// How each host names its working directory in its own hook payload. Every host but
+// Cursor delivers cwd directly; Cursor delivers workspace_roots instead (see
+// fixtures/README.md) and never cwd at all.
+const CWD_READER_BY_HOST = Object.freeze({
+  "claude-code": (payload) => payload.cwd,
+  codex: (payload) => payload.cwd,
+  copilot: (payload) => payload.cwd,
+  cursor: (payload) => firstGitWorkspaceRoot(payload.workspace_roots),
+});
+
+function readCwd(host, payload) {
+  const reader = CWD_READER_BY_HOST[host];
+  return reader ? reader(payload) : undefined;
+}
+
 // `aidd framework build` copies hooks/ verbatim with no install step, so JSON.parse is
 // the only parser available.
 function readTelemetryConfig(repoRoot) {
@@ -162,4 +188,6 @@ module.exports = {
   tightenOwnedDir,
   resolveRunsDir,
   resolveWriteTarget,
+  CWD_READER_BY_HOST,
+  readCwd,
 };

@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/journal.js file-written"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/journal.js tool-used"
           }
         ]
       }

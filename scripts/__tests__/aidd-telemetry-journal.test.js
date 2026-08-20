@@ -29,6 +29,10 @@ const {
 
 const { taskFolderRelativePath } = require("../../plugins/aidd-telemetry/hooks/lib/file-writes.js");
 
+const { readSessionId, VENDOR_FIELD_BY_HOST } = require("../../plugins/aidd-telemetry/hooks/lib/record.js");
+
+const { readCwd } = require("../../plugins/aidd-telemetry/hooks/lib/repo.js");
+
 // One exact key set per line type (see phase-1.md) - the replacement for the
 // old THE_TEN_KEYS whitelist, which guarded a single mutable record that no
 // longer exists.
@@ -88,7 +92,7 @@ const FIXTURE_NAMES = [
 const ARGV_EVENT_BY_HOOK_EVENT_NAME = {
   SessionStart: "session-start",
   Stop: "turn-end",
-  PostToolUse: "file-written",
+  PostToolUse: "tool-used",
 };
 
 test("detectHost recognises the Claude Code fixture", () => {
@@ -193,7 +197,7 @@ for (const name of [
   "claude-code-post-tool-use-bash.json",
 ]) {
   test(`replaying the ${name} fixture exits 0 and prints nothing`, () => {
-    const result = replay(readFixture(name), "file-written");
+    const result = replay(readFixture(name), "tool-used");
     assert.equal(result.status, 0);
     assert.equal(result.stdout, "");
     assert.equal(result.stderr, "");
@@ -236,16 +240,16 @@ test("replaying with no stdin at all exits 0", () => {
 test("resolveEventName trusts a recognised argv word outright, even against a disagreeing hook_event_name", () => {
   assert.equal(resolveEventName("session-start", { hook_event_name: "Stop" }), "session-start");
   assert.equal(resolveEventName("turn-end", { hook_event_name: "SessionStart" }), "turn-end");
-  assert.equal(resolveEventName("file-written", {}), "file-written");
+  assert.equal(resolveEventName("tool-used", {}), "tool-used");
 });
 
 test("resolveEventName falls back to hook_event_name, mapped per its own spelling, only when argv is absent or unrecognised", () => {
   assert.equal(resolveEventName(undefined, { hook_event_name: "SessionStart" }), "session-start");
   assert.equal(resolveEventName(undefined, { hook_event_name: "Stop" }), "turn-end");
-  assert.equal(resolveEventName(undefined, { hook_event_name: "PostToolUse" }), "file-written");
+  assert.equal(resolveEventName(undefined, { hook_event_name: "PostToolUse" }), "tool-used");
   assert.equal(resolveEventName(undefined, { hook_event_name: "sessionStart" }), "session-start"); // Cursor, Copilot
   assert.equal(resolveEventName(undefined, { hook_event_name: "stop" }), "turn-end"); // Cursor
-  assert.equal(resolveEventName(undefined, { hook_event_name: "postToolUse" }), "file-written"); // Cursor, Copilot
+  assert.equal(resolveEventName(undefined, { hook_event_name: "postToolUse" }), "tool-used"); // Cursor, Copilot
   assert.equal(resolveEventName("not-a-real-event", { hook_event_name: "Stop" }), "turn-end");
 });
 
@@ -279,7 +283,7 @@ for (const name of [
   test(`replaying ${name} with hook_event_name stripped from the payload still exits 0 - argv alone drives dispatch`, () => {
     const payload = loadFixture(name);
     delete payload.hook_event_name;
-    const result = replay(JSON.stringify(payload), "file-written");
+    const result = replay(JSON.stringify(payload), "tool-used");
     assert.equal(result.status, 0);
     assert.equal(result.stdout, "");
     assert.equal(result.stderr, "");
@@ -331,7 +335,7 @@ test("a file-written replay with hook_event_name stripped still appends a file_w
     const filePath = writeIntoTaskFolder(repo, "2026_08_15_alpha");
     const payload = fileWrittenPayload({ cwd: repo, sessionId, filePath });
     delete payload.hook_event_name;
-    const result = replayIn(payload, "file-written");
+    const result = replayIn(payload, "tool-used");
     assert.equal(result.status, 0);
 
     const written = readRunFiles(runsDirOf(repo));
@@ -343,32 +347,19 @@ test("a file-written replay with hook_event_name stripped still appends a file_w
   }
 });
 
-test("no fixture contains a real email address, a real home directory, or the developer's name", () => {
-  for (const name of FIXTURE_NAMES) {
-    const raw = readFixture(name);
-    assert.doesNotMatch(raw, /baptistelafourcade/iu, `${name} leaks a real username`);
-    assert.doesNotMatch(raw, /\/Users\//u, `${name} leaks a real macOS home path`);
-    assert.doesNotMatch(raw, /@gmail\.com/iu, `${name} leaks a real email domain`);
-  }
-});
+// The two hardcoded-list versions of these checks (one per redacted concern) were replaced
+// by a single directory-scanning test, further down, per phase-1.md task 3.3: "run it over
+// every fixture in the directory... which were never checked" - a hardcoded FIXTURE_NAMES
+// array is exactly the thing a fixture added later would silently escape.
 
 test("the Cursor fixture's user_email is the redaction placeholder", () => {
   const cursor = loadFixture("cursor-session-start.json");
   assert.equal(cursor.user_email, "user@example.com");
 });
 
-test("every fixture's absolute paths are redacted to the /home/user shape", () => {
-  for (const name of FIXTURE_NAMES) {
-    const raw = readFixture(name);
-    const absolutePaths = raw.match(/"(\/[^"]*)"/gu) || [];
-    for (const quoted of absolutePaths) {
-      const value = quoted.slice(1, -1);
-      assert.ok(
-        value.startsWith("/home/user"),
-        `${name} has an absolute path not under /home/user: ${value}`,
-      );
-    }
-  }
+test("the Cursor post-tool-use fixture's user_email is the redaction placeholder too - the field the earlier check never reached", () => {
+  const cursor = loadFixture("cursor-post-tool-use.json");
+  assert.equal(cursor.user_email, "user@example.com");
 });
 
 test("parseOwnerRepoFromRemote reads owner/repo out of an SSH remote", () => {
@@ -2088,5 +2079,572 @@ test("a leaked GIT_DIR never redirects a session into another repository", () =>
   } finally {
     cleanup(here);
     cleanup(elsewhere);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Phase 1: the journal serves four hosts (see phase-1.md). Each host's own
+// SessionStart shape, mirroring scripts/__tests__/fixtures/*-session-start.json -
+// same field names, synthetic ids so each test owns its own session.
+
+function makeCodexPayload({ cwd, sessionId, event, turnId }) {
+  return {
+    session_id: sessionId,
+    turn_id: turnId,
+    transcript_path: `/home/user/probe/codex-home/sessions/2026/08/14/rollout-2026-08-14T10-11-20-${sessionId}.jsonl`,
+    cwd,
+    hook_event_name: event,
+    model: "probe-stub",
+    permission_mode: "bypassPermissions",
+    source: "startup",
+  };
+}
+
+function makeCopilotPayload({ cwd, sessionId }) {
+  // Never carries hook_event_name - not observed in any capture, on any event (see
+  // fixtures/README.md). The event name can only ever come from argv for this host.
+  return {
+    sessionId,
+    timestamp: Date.now(),
+    cwd,
+    source: "new",
+    initialPrompt: "reply with the single word ok",
+  };
+}
+
+// Cursor's own captured payload (fixtures/cursor-session-start.json - the exact shape the
+// probe measured, per plan.md) carries no top-level cwd at all, only workspace_roots.
+// repo.js's resolveWriteTarget/resolveRunsDir read payload.cwd unconditionally, and
+// repo.js is outside phase-1's architecture projection - translating workspace_roots into a
+// usable cwd is not this phase's work to invent. So this builder mirrors the real shape
+// exactly; it must NOT grow a cwd field just to make a happy-path test pass, or the test
+// would assert a capability the code does not have.
+function makeCursorPayload({ cwd, sessionId, event }) {
+  return {
+    conversation_id: sessionId,
+    generation_id: sessionId,
+    model: "default",
+    is_background_agent: false,
+    session_id: sessionId,
+    hook_event_name: event,
+    cursor_version: "2026.08.11-e8db854",
+    workspace_roots: [cwd],
+    user_email: "user@example.com",
+    transcript_path: null,
+  };
+}
+
+test("a Codex session-start writes a session_start line naming codex, vendor_field conversation.id - measured on codex.sse_event", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/codex-start.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-0000000cdx1";
+    const result = replayIn(makeCodexPayload({ cwd: repo, sessionId, event: "SessionStart" }));
+    assert.equal(result.status, 0);
+
+    const written = readRunFiles(runsDirOf(repo));
+    assert.equal(written.length, 1);
+    const line = readLines(written[0])[0];
+    assert.deepEqual(Object.keys(line).sort(), SESSION_START_KEYS);
+    assert.equal(line.tool, "codex");
+    assert.equal(line.vendor_id, sessionId);
+    assert.equal(line.vendor_field, "conversation.id");
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a Codex turn-end (Stop) appends a turn_end line to the same file - one host table, no dispatcher change", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/codex-turn-end.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-0000000cdx2";
+    replayIn(makeCodexPayload({ cwd: repo, sessionId, event: "SessionStart" }));
+
+    execFileSync("sleep", ["1.1"]);
+
+    const result = replayIn(makeCodexPayload({ cwd: repo, sessionId, event: "Stop", turnId: "codex-turn-1" }));
+    assert.equal(result.status, 0);
+
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
+    assert.equal(lines.length, 2);
+    assert.equal(lines[1].type, "turn_end");
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a Cursor session-start payload carrying no cwd still produces a run file - readCwd resolves workspace_roots (task 4), closing the gap phase 1 first shipped with", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/cursor-no-cwd.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-0000000cur1";
+    const payload = makeCursorPayload({ cwd: repo, sessionId, event: "sessionStart" });
+    assert.equal(payload.cwd, undefined, "this payload must carry no cwd - that is exactly the shape being proven");
+
+    const result = replayIn(payload);
+    assert.equal(result.status, 0);
+
+    const written = readRunFiles(runsDirOf(repo));
+    assert.equal(written.length, 1);
+    const line = readLines(written[0])[0];
+    assert.deepEqual(Object.keys(line).sort(), SESSION_START_KEYS);
+    assert.equal(line.tool, "cursor");
+    assert.equal(line.vendor_id, sessionId);
+    assert.equal(line.vendor_field, null);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a Cursor workspace whose first root is not a git repository resolves to the root that is, not index zero", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/cursor-multi-root.git" });
+  const notARepo = makeTempDir("aidd-telemetry-not-a-repo-");
+  try {
+    const sessionId = "00000000-0000-4000-8000-0000000cur4";
+    const payload = makeCursorPayload({ cwd: repo, sessionId, event: "sessionStart" });
+    payload.workspace_roots = [notARepo, repo];
+
+    const result = replayIn(payload);
+    assert.equal(result.status, 0);
+
+    assert.equal(readRunFiles(notARepo).length, 0, "the non-repository root must never be treated as a write target");
+    const written = readRunFiles(runsDirOf(repo));
+    assert.equal(written.length, 1, "the second root, the one that is actually a git repository, must be the one resolved");
+  } finally {
+    cleanup(repo, notARepo);
+  }
+});
+
+test("readCwd: every host but Cursor reads payload.cwd directly; Cursor reads the first workspace_roots entry that is a git repository", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/read-cwd-unit.git" });
+  const notARepo = makeTempDir("aidd-telemetry-not-a-repo-unit-");
+  try {
+    assert.equal(readCwd("claude-code", { cwd: "/some/path" }), "/some/path");
+    assert.equal(readCwd("codex", { cwd: "/some/path" }), "/some/path");
+    assert.equal(readCwd("copilot", { cwd: "/some/path" }), "/some/path");
+
+    assert.equal(readCwd("cursor", { workspace_roots: [notARepo, repo] }), repo);
+    assert.equal(readCwd("cursor", { workspace_roots: [repo, notARepo] }), repo);
+    assert.equal(readCwd("cursor", { workspace_roots: [notARepo] }), undefined);
+    assert.equal(readCwd("cursor", { workspace_roots: [] }), undefined);
+    assert.equal(readCwd("cursor", {}), undefined);
+    assert.equal(readCwd("cursor", { cwd: repo }), undefined, "Cursor's reader must never fall back to cwd - it never carries one");
+  } finally {
+    cleanup(repo, notARepo);
+  }
+});
+
+test("Cursor's per-host declaration is correct on its own terms: readSessionId reads session_id, and vendor_field is null because the export itself is unmeasured, not because Cursor went undetected", () => {
+  assert.equal(
+    readSessionId("cursor", { session_id: "cursor-declared-1" }),
+    "cursor-declared-1",
+  );
+  assert.equal(
+    VENDOR_FIELD_BY_HOST.cursor,
+    null,
+    "Cursor's telemetry export is unmeasured (an Enterprise team setting) - null states that fact rather than guessing a documented-but-uncaptured attribute name",
+  );
+});
+
+test("Cursor's real headless end-of-session shape (sessionEnd, captured under out-cursor-skill) resolves to no canonical event at all - #680's gap, stated as a fact about resolveEventName directly", () => {
+  assert.equal(
+    resolveEventName(undefined, { hook_event_name: "sessionEnd" }),
+    null,
+    "sessionEnd is not mapped to turn-end - substituting a fabricated turn boundary is exactly what task 5 forbids",
+  );
+});
+
+test("a Copilot session-start writes nothing when no event resolves - the current, real shape: no capture of any Copilot event ever carries hook_event_name, and nothing here yet supplies a decidable argv either (#681)", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/copilot-blocked.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-0000000cop1";
+    // No explicit event: mirrors real Copilot traffic, where hook_event_name is absent and
+    // nothing in this repository yet supplies the missing argv (see fixtures/README.md).
+    const result = replayIn(makeCopilotPayload({ cwd: repo, sessionId }), undefined);
+    assert.equal(result.status, 0);
+
+    assert.equal(
+      readRunFiles(runsDirOf(repo)).length,
+      0,
+      "Copilot is declared (see lib/record.js), but no event resolves for it today - #681 is what supplies a decidable event, not a dispatcher change",
+    );
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a Copilot session-start, given a resolvable event, writes a session_start line carrying sessionId as vendor_id - proves the camelCase reader on its own, independent of #681's argv gap", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/copilot-camelcase.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-0000000cop2";
+    const result = replayIn(makeCopilotPayload({ cwd: repo, sessionId }), "session-start");
+    assert.equal(result.status, 0);
+
+    const written = readRunFiles(runsDirOf(repo));
+    assert.equal(written.length, 1);
+    const line = readLines(written[0])[0];
+    assert.equal(line.tool, "copilot");
+    assert.equal(line.vendor_id, sessionId, "vendor_id must be the real id, not the string \"undefined\"");
+    assert.equal(line.vendor_field, "gen_ai.conversation.id");
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a Copilot session-start with an empty sessionId writes nothing, even given a resolvable event - the guard reads behind Copilot's own spelling too", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/copilot-empty-id.git" });
+  try {
+    const result = replayIn({ sessionId: "", timestamp: Date.now(), cwd: repo, source: "new" }, "session-start");
+    assert.equal(result.status, 0);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 0);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a payload matching no declared host's shape writes nothing and exits 0, in a real switched-on repo", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/undeclared-host.git" });
+  try {
+    const result = replayIn(
+      { session_id: "x", transcript_path: "/home/user/somewhere/else/notes.txt", cwd: repo, hook_event_name: "SessionStart" },
+      "session-start",
+    );
+    assert.equal(result.status, 0);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 0);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("replaying codex-post-tool-use.json and cursor-post-tool-use.json exits 0 and writes only what was already there - captured ahead of the phase 2 extractors that will read them", () => {
+  for (const name of ["codex-post-tool-use.json", "cursor-post-tool-use.json"]) {
+    const result = replay(readFixture(name), "tool-used");
+    assert.equal(result.status, 0, `${name} must exit 0`);
+    assert.equal(result.stdout, "");
+    assert.equal(result.stderr, "");
+  }
+});
+
+test("every fixture in the directory is free of a real email address, a real home path, or a token - not just the four checked before phase 1", () => {
+  const names = fs.readdirSync(fixturesDir).filter((name) => name.endsWith(".json"));
+  assert.ok(names.length >= 10, "expected at least the ten fixtures phase 1 leaves behind");
+  for (const name of names) {
+    const raw = readFixture(name);
+    assert.doesNotMatch(raw, /baptistelafourcade/iu, `${name} leaks a real username`);
+    assert.doesNotMatch(raw, /\/Users\//u, `${name} leaks a real macOS home path`);
+    assert.doesNotMatch(raw, /\/private\/tmp\//u, `${name} leaks an unredacted probe scratchpad path`);
+    assert.doesNotMatch(raw, /@gmail\.com/iu, `${name} leaks a real email domain`);
+    assert.doesNotMatch(raw, /@ecomail\.fr/iu, `${name} leaks a real email domain`);
+
+    const emails = raw.match(/"[^"]+@[^"]+"/gu) || [];
+    for (const quoted of emails) {
+      assert.equal(quoted, '"user@example.com"', `${name} carries an email address other than the redaction placeholder: ${quoted}`);
+    }
+
+    const absolutePaths = raw.match(/"(\/[^"]*)"/gu) || [];
+    for (const quoted of absolutePaths) {
+      const value = quoted.slice(1, -1);
+      assert.ok(
+        value.startsWith("/home/user"),
+        `${name} has an absolute path not under /home/user: ${value}`,
+      );
+    }
+  }
+});
+
+// ── Phase 2: a started step is a fact ─────────────────────────────────────────
+
+const {
+  SKILL_FILE_PATTERN,
+  STEP_START_BY_HOST,
+} = require("../../plugins/aidd-telemetry/hooks/lib/step-starts.js");
+const { buildStepStartLine } = require("../../plugins/aidd-telemetry/hooks/lib/record.js");
+
+// Each entry is a real captured payload, edited only where a test needs its own repo,
+// session or skill name. The shapes themselves are never hand-written: Copilot delivering
+// its arguments as a JSON string and Codex naming the tool `Bash` are exactly the details
+// a plausible invention would get wrong.
+const STEP_FIXTURE_BY_HOST = {
+  "claude-code": "claude-code-post-tool-use-skill.json",
+  copilot: "copilot-post-tool-use-skill.json",
+  codex: "codex-post-tool-use-skill-read.json",
+  cursor: "cursor-post-tool-use-skill-read.json",
+};
+
+function stepPayload(host, { cwd, sessionId, skill }) {
+  const payload = loadFixture(STEP_FIXTURE_BY_HOST[host]);
+  if (host === "copilot") {
+    payload.sessionId = sessionId;
+    payload.cwd = cwd;
+    if (skill) payload.toolArgs = JSON.stringify({ skill });
+    return payload;
+  }
+  payload.session_id = sessionId;
+  if (host === "cursor") payload.workspace_roots = [cwd];
+  else payload.cwd = cwd;
+  if (skill) rewriteSkillIn(payload, skill);
+  return payload;
+}
+
+function rewriteSkillIn(payload, skill) {
+  if (payload.tool_input.skill !== undefined) {
+    payload.tool_input.skill = skill;
+    return;
+  }
+  for (const key of Object.keys(payload.tool_input)) {
+    const value = payload.tool_input[key];
+    if (typeof value === "string") {
+      payload.tool_input[key] = value.replace(/skills\/[^/]+\/SKILL\.md/u, `skills/${skill}/SKILL.md`);
+    }
+  }
+}
+
+function sessionStartPayload(host, { cwd, sessionId }) {
+  const payload = loadFixture(`${host}-session-start.json`);
+  if (host === "copilot") {
+    payload.sessionId = sessionId;
+    payload.cwd = cwd;
+    return payload;
+  }
+  payload.session_id = sessionId;
+  if (host === "cursor") payload.workspace_roots = [cwd];
+  else payload.cwd = cwd;
+  return payload;
+}
+
+function stepLinesIn(repo) {
+  const written = readRunFiles(runsDirOf(repo));
+  if (written.length === 0) return [];
+  return readLines(written[0]).filter((line) => line.type === "step_start");
+}
+
+// Claude Code and Copilot name the skill in a tool argument; Codex and Cursor leave only a
+// SKILL.md path. Four hosts, one assertion, because the point of the table is that the
+// caller cannot tell which family ran.
+for (const host of Object.keys(STEP_FIXTURE_BY_HOST)) {
+  test(`a skill opened on ${host} leaves a step_start naming it, from a payload that host actually sent`, () => {
+    const repo = makeTempRepo({ remote: `git@github.com:acme/step-${host}.git` });
+    try {
+      const sessionId = `00000000-0000-4000-8000-0000000st${host.slice(0, 3)}`;
+      replayIn(sessionStartPayload(host, { cwd: repo, sessionId }), "session-start");
+      const result = replayIn(stepPayload(host, { cwd: repo, sessionId }), "tool-used");
+      assert.equal(result.status, 0);
+
+      const steps = stepLinesIn(repo);
+      assert.equal(steps.length, 1);
+      assert.equal(steps[0].skill, "probe-echo");
+    } finally {
+      cleanup(repo);
+    }
+  });
+}
+
+test("two skills interleaved leave three ordered lines and two distinct names - the sticky attribution this whole ticket exists to replace", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/step-interleaved.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-00000000steA";
+    replayIn(sessionStartPayload("claude-code", { cwd: repo, sessionId }), "session-start");
+    for (const skill of ["alpha", "beta", "alpha"]) {
+      replayIn(stepPayload("claude-code", { cwd: repo, sessionId, skill }), "tool-used");
+    }
+
+    const steps = stepLinesIn(repo);
+    assert.deepEqual(
+      steps.map((line) => line.skill),
+      ["alpha", "beta", "alpha"]
+    );
+    assert.equal(new Set(steps.map((line) => line.skill)).size, 2);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("where the host delivers a turn identifier the step carries it, so the join to cost is exact rather than ordinal", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/step-turn-id.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-00000000steB";
+    replayIn(sessionStartPayload("claude-code", { cwd: repo, sessionId }), "session-start");
+    const payload = stepPayload("claude-code", { cwd: repo, sessionId });
+    payload.prompt_id = "16231051-346b-4bfd-addc-581f911ef878";
+    replayIn(payload, "tool-used");
+
+    const [step] = stepLinesIn(repo);
+    assert.equal(step.turn_id, "16231051-346b-4bfd-addc-581f911ef878");
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a host that carries no turn identifier omits the key rather than writing it null", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/step-no-turn-id.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-00000000steC";
+    replayIn(sessionStartPayload("copilot", { cwd: repo, sessionId }), "session-start");
+    replayIn(stepPayload("copilot", { cwd: repo, sessionId }), "tool-used");
+
+    const [step] = stepLinesIn(repo);
+    assert.equal(Object.hasOwn(step, "turn_id"), false);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a step line carries no end, no duration and no parent - none of the three is anything a tool said", () => {
+  const line = buildStepStartLine({ at: "2026-08-20T10:00:00Z", skill: "alpha", turnId: "t1" });
+  assert.deepEqual(Object.keys(line).sort(), ["at", "skill", "turn_id", "type"]);
+});
+
+test("a skill name carrying separators or traversal cannot escape its own field", () => {
+  // The separators are what make traversal traversal; the dots alone name nothing.
+  assert.equal(buildStepStartLine({ at: "x", skill: "../../etc/passwd" }).skill, "..-..-etc-passwd");
+  assert.equal(buildStepStartLine({ at: "x", skill: ".." }).skill, "-");
+  assert.equal(buildStepStartLine({ at: "x", skill: "a/b" }).skill, "a-b");
+});
+
+test("an ordinary tool call opens no step", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/step-ordinary-tool.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-00000000steD";
+    replayIn(sessionStartPayload("claude-code", { cwd: repo, sessionId }), "session-start");
+    const filePath = writeIntoTaskFolder(repo, "2026_08_20_ordinary");
+    replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath }), "tool-used");
+
+    assert.equal(stepLinesIn(repo).length, 0);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a skill call opens a step even though it has no task-folder path - the two readings of the event share nothing but the event", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/step-no-task-path.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-00000000steE";
+    replayIn(sessionStartPayload("claude-code", { cwd: repo, sessionId }), "session-start");
+    replayIn(stepPayload("claude-code", { cwd: repo, sessionId }), "tool-used");
+
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
+    assert.equal(lines.filter((line) => line.type === "step_start").length, 1);
+    assert.equal(lines.filter((line) => line.type === "file_written").length, 0);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a file whose name ends in SKILL.md but sits outside a skills tree opens nothing", () => {
+  assert.equal(SKILL_FILE_PATTERN.test("/repo/docs/SKILL.md"), false);
+  assert.equal(SKILL_FILE_PATTERN.test("/repo/notskills/alpha/SKILL.md"), false);
+  assert.equal(SKILL_FILE_PATTERN.test("/repo/.cursor/skills/alpha/SKILL.md"), true);
+  assert.equal(SKILL_FILE_PATTERN.test("sed -n '1,120p' .agents/skills/alpha/SKILL.md"), true);
+});
+
+// The decisive shape is a call the argument family REJECTS that still carries a SKILL.md
+// path: on an argument-family host, merely reading a skill file is not opening a step.
+// A fallback chain would mint a phantom step here, and a payload the argument family
+// accepts could never show it, since the first family would answer and the second never run.
+test("reading a SKILL.md on an argument-family host opens no step - the table names one family, it is not a fallback chain", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/step-two-candidates.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-00000000steF";
+    replayIn(sessionStartPayload("claude-code", { cwd: repo, sessionId }), "session-start");
+
+    const payload = stepPayload("claude-code", { cwd: repo, sessionId });
+    payload.tool_name = "Read";
+    payload.tool_input = { file_path: `${repo}/.claude/skills/other/SKILL.md` };
+    const result = replayIn(payload, "tool-used");
+    assert.equal(result.status, 0);
+
+    assert.deepEqual(stepLinesIn(repo), []);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a skill argument still opens its step when the same payload also carries an unrelated SKILL.md path", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/step-decoy-path.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-00000000steI";
+    replayIn(sessionStartPayload("claude-code", { cwd: repo, sessionId }), "session-start");
+    const payload = stepPayload("claude-code", { cwd: repo, sessionId });
+    payload.tool_input.decoy = "/repo/.claude/skills/other/SKILL.md";
+    replayIn(payload, "tool-used");
+
+    const steps = stepLinesIn(repo);
+    assert.equal(steps.length, 1);
+    assert.equal(steps[0].skill, "probe-echo");
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a step for a session that was never journaled writes nothing and exits 0", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/step-no-run-file.git" });
+  try {
+    const result = replayIn(
+      stepPayload("claude-code", { cwd: repo, sessionId: "00000000-0000-4000-8000-00000000steG" }),
+      "tool-used"
+    );
+    assert.equal(result.status, 0);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 0);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a step still open at session end reads differently from one closed by a turn boundary", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/step-open-vs-closed.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-00000000steH";
+    replayIn(sessionStartPayload("claude-code", { cwd: repo, sessionId }), "session-start");
+    replayIn(stepPayload("claude-code", { cwd: repo, sessionId, skill: "closed" }), "tool-used");
+    replayIn(makePayload({ cwd: repo, sessionId, event: "Stop" }), "turn-end");
+    replayIn(stepPayload("claude-code", { cwd: repo, sessionId, skill: "open" }), "tool-used");
+
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
+    const lastStep = lines.map((line) => line.type).lastIndexOf("step_start");
+    const lastTurnEnd = lines.map((line) => line.type).lastIndexOf("turn_end");
+    assert.equal(lines[lastStep].skill, "open");
+    assert.ok(lastStep > lastTurnEnd, "the trailing step has no turn boundary after it");
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("adding a fifth host is a table entry, not an edit to the handler", () => {
+  assert.deepEqual(Object.keys(STEP_START_BY_HOST).sort(), [
+    "claude-code",
+    "codex",
+    "copilot",
+    "cursor",
+  ]);
+  for (const declaration of Object.values(STEP_START_BY_HOST)) {
+    assert.equal(typeof declaration.skillName, "function");
+  }
+});
+
+// The word hooks.json ships and the word journal.js accepts are two halves of one
+// contract, and nothing else checks they agree. The journal was already dead on every
+// real installation once, for a mismatch of exactly this shape that 2250 tests missed
+// because they all ran from the source tree.
+test("every argv word hooks.json ships is one journal.js recognises", () => {
+  const declared = JSON.parse(
+    fs.readFileSync(path.join(root, "plugins/aidd-telemetry/hooks/hooks.json"), "utf8")
+  );
+  const words = [];
+  for (const groups of Object.values(declared.hooks)) {
+    for (const group of groups) {
+      for (const entry of group.hooks) {
+        const word = entry.command.trim().split(/\s+/u).pop();
+        words.push(word);
+      }
+    }
+  }
+  assert.ok(words.length > 0, "hooks.json declares at least one command");
+  for (const word of words) {
+    assert.equal(
+      resolveEventName(word, {}),
+      word,
+      `journal.js does not recognise the argv word "${word}" that hooks.json ships`
+    );
   }
 });

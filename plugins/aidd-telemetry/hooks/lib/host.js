@@ -11,6 +11,12 @@ function normalizeSeparators(value) {
   return value.replace(/\\/gu, "/");
 }
 
+// The complete set of hosts journal.js will write for. A fifth host becomes one more
+// entry here, never a branch in the dispatcher - detectHost above stays the only place
+// that decides which host a payload came from; this only decides whether that host is
+// one the journal acts on yet.
+const DECLARED_HOSTS = new Set(["claude-code", "codex", "copilot", "cursor"]);
+
 function detectHost(payload) {
   if (!payload || typeof payload !== "object") return null;
 
@@ -36,4 +42,4 @@ function detectHost(payload) {
   return null;
 }
 
-module.exports = { detectHost, normalizeSeparators };
+module.exports = { detectHost, normalizeSeparators, DECLARED_HOSTS };

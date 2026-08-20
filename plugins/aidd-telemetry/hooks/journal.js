@@ -4,10 +4,11 @@
 
 const fs = require("node:fs");
 
-const { detectHost } = require("./lib/host.js");
+const { detectHost, DECLARED_HOSTS } = require("./lib/host.js");
 const repo = require("./lib/repo.js");
 const record = require("./lib/record.js");
 const fileWrites = require("./lib/file-writes.js");
+const stepStarts = require("./lib/step-starts.js");
 
 function readStdin() {
   try {
@@ -17,7 +18,7 @@ function readStdin() {
   }
 }
 
-const CANONICAL_EVENTS = new Set(["session-start", "turn-end", "file-written"]);
+const CANONICAL_EVENTS = new Set(["session-start", "turn-end", "tool-used"]);
 
 // hook_event_name spellings observed per tool, consulted only as a fallback.
 const HOOK_EVENT_NAME_TO_CANONICAL = Object.freeze({
@@ -25,8 +26,8 @@ const HOOK_EVENT_NAME_TO_CANONICAL = Object.freeze({
   sessionStart: "session-start", // Cursor, Copilot
   Stop: "turn-end",
   stop: "turn-end", // Cursor
-  PostToolUse: "file-written",
-  postToolUse: "file-written", // Cursor, Copilot
+  PostToolUse: "tool-used",
+  postToolUse: "tool-used", // Cursor, Copilot
 });
 
 // Argv carries the event name because Copilot's payload has none at all.
@@ -37,19 +38,24 @@ function resolveEventName(argvEvent, payload) {
 
 function processPayload(payload, event) {
   const host = detectHost(payload);
-  if (host !== "claude-code") return;
+  if (!DECLARED_HOSTS.has(host)) return;
 
-  // Otherwise JSON.stringify silently drops an undefined vendor_id, leaving a line
-  // missing the key every later join depends on.
-  if (typeof payload.session_id !== "string" || payload.session_id === "") return;
+  // Read behind the host's own declaration, never one host's spelling promoted to a rule.
+  const sessionId = record.readSessionId(host, payload);
+  // JSON.stringify silently drops an undefined vendor_id, leaving a line missing the key
+  // every later join depends on.
+  if (typeof sessionId !== "string" || sessionId === "") return;
 
   const resolvedEvent = resolveEventName(event, payload);
   if (resolvedEvent === "session-start") {
-    record.handleSessionStart(payload, host);
+    record.handleSessionStart(payload, host, sessionId);
   } else if (resolvedEvent === "turn-end") {
-    record.handleTurnEnd(payload);
-  } else if (resolvedEvent === "file-written") {
+    record.handleTurnEnd(payload, host, sessionId);
+  } else if (resolvedEvent === "tool-used") {
+    // One event, two readings of it. They share nothing else: handleFileWritten returns
+    // early unless the path looks like a task folder, and a skill call has no task path.
     fileWrites.handleFileWritten(payload, host);
+    stepStarts.handleStepStart(payload, host, sessionId);
   }
 }
 
@@ -77,6 +83,7 @@ module.exports = {
   generateUlid: record.generateUlid,
   findRunFileByVendorId: record.findRunFileByVendorId,
   looksLikeTaskPath: fileWrites.looksLikeTaskPath,
+  handleStepStart: stepStarts.handleStepStart,
   processPayload,
   resolveEventName,
 };
