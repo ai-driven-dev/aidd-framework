@@ -31,12 +31,10 @@ export interface TelemetryOffResult {
   readonly manualUnsetReminders: readonly string[];
 }
 
-/** `aidd telemetry off`'s judgement: sets the switch off (preserving the endpoint, since
- * the file is committed) and removes exactly the merge-file entries the manifest recorded
- * for each installed tool's `settings-file` activation — through the same
- * `removeEntriesFromJson` `aidd clean` already uses, never a second remover. A project
- * that was never on changes nothing. Knows nothing about any specific tool: which section
- * of which file to clean comes from that tool's `capabilities.telemetry`. */
+/** Sets the switch off, preserving the endpoint since the file is committed, and removes
+ * exactly the merge-file entries the manifest recorded — through the same
+ * `removeEntriesFromJson` `aidd clean` uses, never a second remover. Which section of which
+ * file to clean comes from that tool's `capabilities.telemetry`. */
 export class TelemetryOffUseCase {
   constructor(
     private readonly fs: FileReader & FileWriter,

@@ -27,11 +27,7 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-/**
- * Every write is `appendFile` — nothing here ever reads a day file's content, matching
- * the run journal's `record.js`: retention only lists directory *names* (`listDayFiles`),
- * never opens a file it is about to keep or delete.
- */
+/** Every write is `appendFile`; no method here ever reads a day file's content. */
 export class TelemetrySinkAdapter implements TelemetrySink {
   readonly rootDir: string;
 

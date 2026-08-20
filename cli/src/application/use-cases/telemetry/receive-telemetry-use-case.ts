@@ -51,18 +51,15 @@ export class ReceiveTelemetryUseCase {
     private readonly retentionDays: number = DEFAULT_TELEMETRY_SINK_RETENTION_DAYS
   ) {}
 
-  /** Resolves and prints the absolute sink path before the caller starts listening —
-   * `AIDD_USER_CONFIG_DIR ?? ~/.config/aidd`, then `telemetry/`. Throws if the directory
-   * cannot be created or written to; the caller must not start listening on that error. */
+  /** Throws if the sink directory cannot be created or written to; the caller must not
+   * start listening on that error. */
   async start(): Promise<TelemetryReceiveStartResult> {
     await this.sink.ensureWritable();
     return { rootDir: this.sink.rootDir };
   }
 
-  /** `payload` is already-parsed JSON — parsing raw bytes is the HTTP adapter's job, so a
-   * malformed body never reaches here. `/v1/traces` is accepted and dropped: no tool
-   * measured so far puts a billed request on a span this layer reads. `receivedAt`
-   * defaults to now; tests pass it explicitly to exercise day rollover deterministically. */
+  /** `payload` is already-parsed JSON. `/v1/traces` is accepted and dropped: no tool
+   * measured so far puts a billed request on a span this layer reads. */
   async receive(
     path: TelemetryOtlpPath,
     payload: unknown,
@@ -82,9 +79,8 @@ export class ReceiveTelemetryUseCase {
     }
   }
 
-  // Catches under the long-lived-process carve-out in
-  // `.claude/rules/00-architecture/0-error-handling.md`: the payload that triggered this
-  // is already durably stored, and a housekeeping failure must not cost it.
+  // Catches under the long-lived-process carve-out: the payload that triggered this is
+  // already stored, and a housekeeping failure must not cost it.
   private async pruneOldDayFiles(): Promise<void> {
     let prune: readonly string[];
     try {
@@ -96,8 +92,7 @@ export class ReceiveTelemetryUseCase {
       this.logger.warn(`telemetry receive: retention prune failed — ${errorMessage(error)}`);
       return;
     }
-    // Per file, so one that cannot be deleted does not spare every older one behind it —
-    // and does not wedge pruning for good, since it stays the oldest candidate forever.
+    // Per file, so one that cannot be deleted does not spare every older one behind it.
     for (const fileName of prune) {
       try {
         await this.sink.deleteDayFile(fileName);

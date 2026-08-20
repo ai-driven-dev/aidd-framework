@@ -6,13 +6,9 @@ export const SINK_SCHEMA_VERSION = 1;
  * datapoints carry no turn identifier on any tool measured so far. */
 export type TelemetrySinkRecordKind = "request" | "session";
 
-/**
- * The tool-neutral stored line. `vendor_field` (and `turn_field`, when present) name the
- * export-side attribute a value came from, because that attribute differs per tool —
- * `session.id` on Claude Code, `conversation.id` on Codex, `gen_ai.conversation.id` on
- * Copilot, `cursor.conversation.id` on Cursor. Every other field is an allowlist: this
- * type is the complete list of what a session is allowed to leave behind.
- */
+/** The tool-neutral stored line, and the complete allowlist of what a session may leave
+ * behind. `vendor_field` and `turn_field` name the export-side attribute a value came
+ * from, since that attribute differs per tool. */
 export interface TelemetrySinkRecord {
   readonly sink_schema_version: number;
   readonly kind: TelemetrySinkRecordKind;
@@ -37,22 +33,16 @@ export interface TelemetrySinkRecord {
   readonly event_timestamp?: string;
 }
 
-/** What a tool's export uses as the session identity, and (when it has one) the turn
- * identifier — gathered from every measured `AiTool.telemetryExport` by the caller, never
- * hardcoded here. This is the only thing that varies the mapper's behavior per tool, and
- * it arrives as data, not as a branch. */
+/** The only thing that varies the mapper per tool, and it arrives as data, not a branch.
+ * The caller gathers it from every measured `AiTool.telemetryExport`. */
 export interface TelemetryVendorIdentity {
   readonly identityAttribute: string;
   readonly turnAttribute?: string;
 }
 
-/**
- * One `/v1/metrics` datapoint a tool's export carries, and which allowlisted field it
- * fills. `whenAttribute`/`whenValue` select among datapoints of the same metric name that
- * differ only by an attribute — Claude Code reports all four token counts under
- * `claude_code.token.usage`, distinguished by `type`. Declared per tool (see
- * `claude-telemetry.ts`), never matched here by name.
- */
+/** One `/v1/metrics` datapoint and the allowlisted field it fills.
+ * `whenAttribute`/`whenValue` select among datapoints sharing a metric name that differ
+ * only by an attribute. */
 export interface TelemetrySessionMeasure {
   readonly metric: string;
   readonly field: keyof TelemetrySinkRecord;
@@ -62,9 +52,7 @@ export interface TelemetrySessionMeasure {
 
 type AttributeValue = string | number | boolean;
 
-/** The record under construction. A mutable object is assignable to the readonly
- * interface, so building one costs no cast — and a cast is how a field outside the
- * allowlist would slip in unnoticed. */
+/** Mutable while building; assignable to the readonly interface without a cast. */
 type SinkRecordDraft = { -readonly [K in keyof TelemetrySinkRecord]: TelemetrySinkRecord[K] };
 
 const COST_ATTRIBUTE = "cost_usd";
@@ -227,8 +215,7 @@ function asReadonlyArray<T>(value: unknown): readonly T[] {
   return Array.isArray(value) ? (value as readonly T[]) : [];
 }
 
-/** Every log record in a payload, already merged with its resource attributes. Flattening
- * the three nesting levels here keeps each mapper a single loop over what it cares about. */
+/** Every log record, already merged with its resource attributes. */
 function* eachLogRecord(payload: unknown): Generator<Map<string, AttributeValue>> {
   const resourceLogs = asReadonlyArray<OtlpResourceLogs>(
     (payload as OtlpLogsPayload)?.resourceLogs
@@ -243,12 +230,8 @@ function* eachLogRecord(payload: unknown): Generator<Map<string, AttributeValue>
   }
 }
 
-/**
- * Log records that never carry `cost_usd` are not billed requests — hook lifecycle
- * events, plugin loads, tool results — and are dropped here rather than stored under a
- * kind the allowlist does not define. `cost_usd` is an allowlisted attribute name, not a
- * vendor identifier: it selects "was this billed", the same test on every tool measured.
- */
+/** A log record without `cost_usd` is not a billed request — hook lifecycle events,
+ * plugin loads, tool results — and is dropped. */
 export function mapOtlpLogsToSinkRecords(
   payload: unknown,
   vendors: readonly TelemetryVendorIdentity[]
@@ -304,12 +287,9 @@ function numericValue(dataPoint: OtlpNumberDataPoint): number | undefined {
   return dataPoint.asInt !== undefined ? Number(dataPoint.asInt) : undefined;
 }
 
-/**
- * One line per datapoint, never merged: metrics arrive as separate datapoints (four for
- * token usage alone, distinguished by `type`), and joining them would assume an ordering
- * no tool documents. Datapoints carry no turn identifier on any tool measured so far, so
- * every line here is `kind: "session"`.
- */
+/** One line per datapoint, never merged: joining them would assume an ordering no tool
+ * documents. No datapoint measured so far carries a turn identifier, so every line is
+ * `kind: "session"`. */
 export function mapOtlpMetricsToSinkRecords(
   payload: unknown,
   vendors: readonly TelemetryVendorIdentity[],
@@ -335,8 +315,6 @@ export function serializeTelemetrySinkRecord(record: TelemetrySinkRecord): strin
   return JSON.stringify(record);
 }
 
-/** The reader half of this format — proven in tests against a fixture the mapper never
- * produced, so the shape survives independently of whatever the receiver happens to emit. */
 export function parseTelemetrySinkLine(line: string): TelemetrySinkRecord {
   const parsed = JSON.parse(line) as { sink_schema_version?: unknown };
   if (parsed.sink_schema_version !== SINK_SCHEMA_VERSION) {

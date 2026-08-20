@@ -52,9 +52,8 @@ export interface TelemetryOnResult {
   readonly toolReports: readonly TelemetryToolReport[];
 }
 
-/** Builds the report for every activation kind AIDD cannot write to itself — a generic
- * switch over `kind`, never over a tool name. Every user-facing detail comes straight from
- * the activation the tool declared. */
+/** The report for every activation kind AIDD cannot write to itself. Switches over `kind`,
+ * never over a tool name. */
 function staticReportFor(
   toolId: AiToolId,
   activation: Exclude<TelemetryActivation, TelemetrySettingsFileActivation>
@@ -83,11 +82,10 @@ function staticStatusAndDetail(
   }
 }
 
-/** `aidd telemetry on`'s judgement: writes the AIDD switch, then configures whichever
- * tools are installed and can be configured — reporting every one of the five states
- * honestly, never silently. Nothing is written when the project-scope guard refuses, or
- * when no endpoint can be resolved. Knows nothing about any specific tool: every per-tool
- * detail comes from that tool's `capabilities.telemetry` in the registry. */
+/** Writes the AIDD switch, then configures whichever installed tools can be configured,
+ * reporting each state rather than skipping it. Nothing is written when the project-scope
+ * guard refuses or no endpoint resolves. Every per-tool detail comes from that tool's
+ * `capabilities.telemetry`. */
 export class TelemetryOnUseCase {
   constructor(
     private readonly fs: FileReader & FileWriter,
@@ -112,8 +110,8 @@ export class TelemetryOnUseCase {
     return { switchPath, switchChanged, endpoint, toolReports };
   }
 
-  // Fires regardless of whether the blocking tool is installed — the same guarantee
-  // `--scope project` without `--yes` writes nothing at all relies on, unconditionally.
+  // Fires whether or not the blocking tool is installed, so `--scope project` without
+  // `--yes` writes nothing at all.
   private guardTrackedScope(options: TelemetryOnOptions): void {
     if (options.confirmProjectScope) return;
     for (const toolId of AI_TOOL_IDS) {
@@ -133,8 +131,7 @@ export class TelemetryOnUseCase {
   }
 
   // MergeFileEntry.relativePath for --scope user is a `..`-prefixed traversal from
-  // projectRoot to the home directory (inherited from phase 2). It resolves correctly
-  // today; surfacing it here beats papering over what `off` may fail to find later.
+  // projectRoot to the home directory, so it breaks if the project directory moves.
   private noteUserScopeCaveat(options: TelemetryOnOptions): void {
     if (options.scope !== "user") return;
     this.logger.info(

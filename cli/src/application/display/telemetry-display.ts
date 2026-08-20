@@ -22,9 +22,6 @@ export function printTelemetryOnReport(output: CLIOutput, result: TelemetryOnRes
     const name = getAiToolConfig(report.tool).displayName;
     output.print(`  ${name}: ${STATUS_LABELS[report.status]} — ${report.detail}`);
   }
-  // Nothing supervises the receiver, by design: a session must never wait on it. The cost
-  // of that choice is that a project can be switched on, emit correctly, and store nothing
-  // — so the one thing left to do is said here rather than discovered from an empty report.
   output.print(
     "Run `aidd telemetry receive` to capture what is exported — without it, nothing is stored."
   );
@@ -38,7 +35,5 @@ export function printTelemetryOffReport(output: CLIOutput, result: TelemetryOffR
   } else {
     for (const file of result.removedFiles) output.print(`  Removed telemetry entries: ${file}`);
   }
-  // Symmetric with `on`'s notice: AIDD never set these variables either, so it cannot
-  // unset them — one line per environment-variable-activation tool, from the capability.
   for (const reminder of result.manualUnsetReminders) output.print(reminder);
 }

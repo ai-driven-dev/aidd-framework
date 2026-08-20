@@ -1,10 +1,5 @@
-/**
- * Measured: one mapped `request` line from a real captured payload
- * (`tests/fixtures/telemetry-sink/otlp-logs-claude-code.json`) serializes to 576 bytes.
- * At 500 billed requests — a genuinely heavy working day — that's ~281 KB/day; 90 days of
- * that is ~25 MB. Bounding growth over months is the goal, not saving space today, so the
- * default favors a long window over a tight one.
- */
+/** Measured: a mapped `request` line is 576 bytes, so ~281 KB on a 500-request day and
+ * ~25 MB over the window. */
 export const DEFAULT_TELEMETRY_SINK_RETENTION_DAYS = 90;
 
 export interface TelemetrySinkRetentionDecision {
@@ -12,12 +7,8 @@ export interface TelemetrySinkRetentionDecision {
   readonly prune: readonly string[];
 }
 
-/**
- * Pure: given the day files present (`YYYY-MM-DD.jsonl`, whatever order) and a window in
- * days, says which survive and which are pruned — oldest first, whole days only. Never
- * touches disk; the caller does the deleting. `windowDays` is clamped to at least 1 so the
- * newest file is never a prune candidate, whatever value is passed.
- */
+/** `windowDays` is clamped to at least 1, so the newest day file is never a prune
+ * candidate whatever value is passed. */
 export function decideTelemetrySinkRetention(
   dayFileNames: readonly string[],
   windowDays: number

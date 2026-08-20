@@ -1,8 +1,6 @@
 #!/usr/bin/env node
-// journal.js - thin entry point for the run journal: read stdin, detect the
-// host, dispatch by event, exit 0 no matter what. The actual work (host
-// detection, the telemetry switch, the record, which writes are worth a line) lives in
-// hooks/lib/; this file only wires stdin to the right handler.
+// Entry point for the run journal: read stdin, detect the host, dispatch by event, exit 0
+// no matter what. The work itself lives in hooks/lib/.
 
 const fs = require("node:fs");
 
@@ -21,8 +19,7 @@ function readStdin() {
 
 const CANONICAL_EVENTS = new Set(["session-start", "turn-end", "file-written"]);
 
-// hook_event_name spellings observed per tool for these three moments; only
-// consulted as a fallback (see resolveEventName).
+// hook_event_name spellings observed per tool, consulted only as a fallback.
 const HOOK_EVENT_NAME_TO_CANONICAL = Object.freeze({
   SessionStart: "session-start",
   sessionStart: "session-start", // Cursor, Copilot
@@ -32,8 +29,7 @@ const HOOK_EVENT_NAME_TO_CANONICAL = Object.freeze({
   postToolUse: "file-written", // Cursor, Copilot
 });
 
-// Argv carries the event name because Copilot's payload has none at all;
-// hook_event_name is only a fallback for a bare/manual invocation with no argv.
+// Argv carries the event name because Copilot's payload has none at all.
 function resolveEventName(argvEvent, payload) {
   if (CANONICAL_EVENTS.has(argvEvent)) return argvEvent;
   return HOOK_EVENT_NAME_TO_CANONICAL[payload && payload.hook_event_name] || null;
@@ -43,9 +39,8 @@ function processPayload(payload, event) {
   const host = detectHost(payload);
   if (host !== "claude-code") return;
 
-  // Otherwise the session_start line reaches JSON.stringify with vendor_id
-  // undefined, which it drops silently - a line missing the very key every
-  // later join depends on.
+  // Otherwise JSON.stringify silently drops an undefined vendor_id, leaving a line
+  // missing the key every later join depends on.
   if (typeof payload.session_id !== "string" || payload.session_id === "") return;
 
   const resolvedEvent = resolveEventName(event, payload);
@@ -64,8 +59,8 @@ function main() {
     const payload = raw ? JSON.parse(raw) : null;
     processPayload(payload, process.argv[2]);
   } catch {
-    // Exit 0 no matter what: a measurement layer that breaks a session, or a
-    // tool call, is worse than one that misses a session.
+    // Exit 0 no matter what: a measurement layer that breaks a session is worse than one
+    // that misses a session.
   }
 }
 

@@ -11,9 +11,6 @@ import { ErrorHandler } from "../error-handler.js";
 import { InvalidTelemetryReceivePortError, InvalidTelemetryScopeError } from "../errors.js";
 import { parseGlobalOptions } from "./global-options.js";
 
-/** OTLP/HTTP's own conventional default port — reused so `aidd telemetry on`'s default
- * `--endpoint` and this command's default `--port` agree without either hardcoding the
- * other. Extracted for direct testing, same reason as `parseTelemetryScope`. */
 export function parseTelemetryReceivePort(raw: string): number {
   const port = Number(raw);
   if (!Number.isInteger(port) || port < 0 || port > 65535) {
@@ -22,9 +19,6 @@ export function parseTelemetryReceivePort(raw: string): number {
   return port;
 }
 
-/** Extracted for direct testing: the only judgement `telemetry on`'s handler makes is
- * validating the `--scope` flag's shape before anything is built — everything else lives
- * in TelemetryOnUseCase. */
 export function parseTelemetryScope(raw: string | undefined): TelemetryScope {
   if (raw === undefined) return DEFAULT_TELEMETRY_SCOPE;
   if ((TELEMETRY_SCOPES as readonly string[]).includes(raw)) return raw as TelemetryScope;

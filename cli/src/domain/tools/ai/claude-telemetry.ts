@@ -3,18 +3,13 @@ import type { TelemetryScope } from "../../capabilities/telemetry-capability.js"
 import { MissingTelemetryEndpointError } from "../../errors.js";
 import type { TelemetrySessionMeasure } from "../../models/telemetry-sink-record.js";
 
-/** Measured 2026-08-13/14 on real Claude Code sessions: `session.id` on both metrics and
- * events, `prompt.id` per turn on `api_request`. See
- * aidd_docs/specs/2026_08/2026_08_13-work-tracking-linkage.md. */
+/** Measured on real sessions: `session.id` on both metrics and events, `prompt.id` per
+ * turn on `api_request`. */
 export const CLAUDE_TELEMETRY_IDENTITY_ATTRIBUTE = "session.id";
 export const CLAUDE_TELEMETRY_TURN_ATTRIBUTE = "prompt.id";
 
-/**
- * `/v1/metrics` datapoint -> allowlisted field, measured on a real export (see
- * `tests/fixtures/telemetry-sink/otlp-metrics-claude-code.json`). `claude_code.token.usage`
- * reports all four token counts under one metric name, distinguished only by `type` —
- * everything else here is a metric name naming its own single field.
- */
+/** `claude_code.token.usage` reports all four token counts under one metric name,
+ * distinguished only by the `type` attribute. */
 export const CLAUDE_TELEMETRY_SESSION_MEASURES: readonly TelemetrySessionMeasure[] = [
   { metric: "claude_code.cost.usage", field: "cost_usd" },
   { metric: "claude_code.active_time.total", field: "active_time_s" },
@@ -52,22 +47,14 @@ const CLAUDE_PROJECT_RELATIVE_SETTINGS_PATH: Record<Exclude<TelemetryScope, "use
   project: ".claude/settings.json",
 };
 
-// Per-step cost needs the real skill name on skill_activated, which only
-// OTEL_LOG_TOOL_DETAILS provides — and that flag also logs every Bash command line,
-// MCP tool name, and tool input. #663 removes the need instead of trading privacy for
-// it; until then this is said out loud rather than left for a user to discover later.
+// The skill name on `skill_activated` comes only with OTEL_LOG_TOOL_DETAILS, which also
+// logs every Bash command line, MCP tool name, and tool input.
 export const CLAUDE_TELEMETRY_POST_ENABLE_NOTICE =
   "Per-step cost is unavailable until #663 lands. OTEL_LOG_TOOL_DETAILS is not set — " +
   "no Bash command, MCP tool name, or tool input is logged.";
 
-/**
- * The exact `env` block Claude Code needs to emit OTLP metrics and logs.
- *
- * Pure function of its inputs — never reads `.aidd/config.json` or any other file to
- * discover the endpoint. Absent endpoint is a caller error: there is no default, not
- * even localhost. `OTEL_LOG_TOOL_DETAILS` is deliberately never set here — see
- * {@link CLAUDE_TELEMETRY_POST_ENABLE_NOTICE} for why.
- */
+/** The `env` block Claude Code needs to emit OTLP metrics and logs. An absent endpoint is
+ * a caller error: there is no default, not even localhost. */
 export function buildClaudeTelemetryEnv(
   endpoint: string | undefined,
   projectId: string
@@ -85,7 +72,6 @@ export function buildClaudeTelemetryEnv(
   };
 }
 
-/** Resolves `scope` to the absolute settings file Claude Code reads for it. */
 export function resolveClaudeTelemetrySettingsPath(
   scope: TelemetryScope,
   projectRoot: string,

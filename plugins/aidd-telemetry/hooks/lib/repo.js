@@ -1,8 +1,5 @@
-// repo.js - the repository root, the telemetry switch, and where a
-// session's record lives. The switch is `.aidd/config.json`'s
-// `telemetry.enabled`, read fresh at every call - never cached across a
-// session. `aidd_docs/runs/` existing is no longer a permission, only the
-// location the switch, once on, writes to (see aidd_docs/runs/README.md).
+// The repository root, the telemetry switch, and where a session's record lives. The
+// switch is `.aidd/config.json`'s `telemetry.enabled`, read fresh at every call.
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -30,10 +27,8 @@ function getRepoRoot(cwd) {
   }
 }
 
-// Zero-dependency by requirement: `aidd framework build` copies hooks/
-// verbatim with no install step, so JSON.parse is the only parser available.
-// Unreadable, unparseable, or absent -> null, same failure direction as
-// everywhere else in this layer.
+// `aidd framework build` copies hooks/ verbatim with no install step, so JSON.parse is
+// the only parser available.
 function readTelemetryConfig(repoRoot) {
   try {
     return JSON.parse(fs.readFileSync(path.join(repoRoot, ".aidd", "config.json"), "utf8"));
@@ -42,8 +37,7 @@ function readTelemetryConfig(repoRoot) {
   }
 }
 
-// The entire switch. Strict `=== true`, not merely truthy: a config a tool
-// half-wrote (a string, a 1, a null telemetry key) must read as off, not on.
+// Strict `=== true`, not truthy: a half-written config must read as off, not on.
 function telemetryEnabled(repoRoot) {
   const config = readTelemetryConfig(repoRoot);
   return Boolean(config && config.telemetry && config.telemetry.enabled === true);
@@ -64,11 +58,9 @@ function getRemoteUrl(repoRoot) {
   }
 }
 
-//   SSH:   git@github.com:owner/repo.git       -> owner/repo
-//   HTTPS: https://github.com/owner/repo.git   -> owner/repo
-//
-// A GitLab-style subgroup path (group/subgroup/repo) collapses to its last
-// two segments.
+//   git@github.com:owner/repo.git      -> owner/repo
+//   https://github.com/owner/repo.git   -> owner/repo
+// A GitLab subgroup path collapses to its last two segments.
 function parseOwnerRepoFromRemote(remoteUrl) {
   if (typeof remoteUrl !== "string") return null;
   const trimmed = remoteUrl.trim().replace(/\.git$/u, "");
@@ -84,8 +76,7 @@ function parseOwnerRepoFromRemote(remoteUrl) {
   return segments.slice(-2).join("/");
 }
 
-// Never bare "." or ".." - either would walk the filesystem tree instead of
-// naming something inside it.
+// Never bare "." or ".." - either walks the tree instead of naming something in it.
 function sanitizePathSegment(segment) {
   const cleaned = String(segment).replace(/[^\w.-]/gu, "-");
   return cleaned === "" || cleaned === "." || cleaned === ".." ? "-" : cleaned;
@@ -99,37 +90,30 @@ function sanitizeProjectId(projectId) {
     .join("/");
 }
 
-// Split from deriveProjectId so a caller that already has remoteUrl (see
-// resolveWriteTarget below, which also wants it for project_remote) can pay
-// for one git shellout, not two.
+// Split from deriveProjectId so a caller holding remoteUrl pays one git shellout, not two.
 function projectIdFromRemote(repoRoot, remoteUrl) {
   const ownerRepo = remoteUrl ? parseOwnerRepoFromRemote(remoteUrl) : null;
   const raw = ownerRepo || path.basename(repoRoot);
   return sanitizeProjectId(raw);
 }
 
-// Single-arg public contract: the CLI duplicates this algorithm
-// (telemetry-project-id.ts) and an integration test proves the two agree for
-// the same repoRoot, so this signature is not this plugin's alone to change.
+// The CLI duplicates this algorithm in telemetry-project-id.ts and a test proves the two
+// agree, so the signature is not this plugin's alone to change.
 function deriveProjectId(repoRoot) {
   return projectIdFromRemote(repoRoot, getRemoteUrl(repoRoot));
 }
 
-// `AIDD_RUNS_DIR` overrides outright; otherwise the default location the
-// switch, once on, writes to - not itself a second gate.
+// `AIDD_RUNS_DIR` overrides outright. The directory existing is not a second gate.
 function runsDir(repoRoot) {
   return process.env.AIDD_RUNS_DIR || path.join(repoRoot, "aidd_docs", "runs");
 }
 
-// Directories and files this hook creates hold who-worked-on-what-and-for-
-// how-long, so they are not left world-readable at the OS default. Windows
-// ignores POSIX modes rather than erroring on them.
+// What this hook writes is who-worked-on-what-for-how-long, so it is not left
+// world-readable. Windows ignores POSIX modes rather than erroring on them.
 const PRIVATE_DIR_MODE = 0o700;
 
-// `aidd_docs/runs/` arrives from a git checkout, and `mkdirSync`'s `mode`
-// applies only to a directory it creates - this chmod is what actually holds
-// 0700 on it. Deliberately not applied to a user-named AIDD_RUNS_DIR: that
-// directory belongs to whoever named it.
+// `mkdirSync`'s `mode` applies only to a directory it creates, so a checked-out
+// `aidd_docs/runs/` needs this chmod. Never applied to a user-named AIDD_RUNS_DIR.
 function tightenOwnedDir(dir) {
   if (process.env.AIDD_RUNS_DIR) return;
   try {
@@ -145,18 +129,16 @@ function resolveRunsDir(cwd) {
   return { repoRoot, dir: runsDir(repoRoot) };
 }
 
-// A remote can carry a live credential in its userinfo — `https://ghp_xxx@host/o/r`
-// is what a token-authenticated clone leaves in .git/config. The journal is meant to
-// be read, and eventually shipped to a sink, so the credential never reaches a line.
-// Only scheme-bearing URLs have userinfo to strip; scp-style `git@host:owner/repo` has
-// no scheme and is left whole.
+// A token-authenticated clone leaves a live credential in the remote's userinfo
+// (`https://ghp_xxx@host/o/r`), and the journal is meant to be read and shipped. Only
+// scheme-bearing URLs have userinfo; scp-style `git@host:owner/repo` is left whole.
 function remoteWithoutCredentials(remoteUrl) {
   if (typeof remoteUrl !== "string") return null;
   return remoteUrl.replace(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^/]*@/u, "$1");
 }
 
-// project_remote is kept beside project_id so a changed remote can be re-derived
-// instead of silently splitting a project in two.
+// project_remote sits beside project_id so a changed remote can be re-derived instead of
+// silently splitting a project in two.
 function resolveWriteTarget(cwd) {
   const target = resolveRunsDir(cwd);
   if (!target) return null;

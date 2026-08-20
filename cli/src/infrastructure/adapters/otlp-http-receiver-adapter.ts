@@ -9,13 +9,10 @@ const OTLP_PATHS: ReadonlySet<string> = new Set(["/v1/logs", "/v1/metrics", "/v1
 const EMPTY_JSON_OBJECT = "{}";
 const LOOPBACK_HOST = "127.0.0.1";
 
-// An OTLP batch of telemetry lines is kilobytes. A receiver that runs unattended for
-// months must not grow a buffer on a body that never ends, so the cap is deliberate
-// rather than inherited from Node's request timeout.
+// A receiver running unattended must not grow a buffer on a body that never ends.
 const MAX_BODY_BYTES = 8 * 1024 * 1024;
 
-/** Distinguished from any other failure so the cap we chose is answered as a refusal
- * (413) rather than reported to the client as our own crash. */
+/** Answered as a refusal (413) rather than reported to the client as our own crash. */
 class PayloadTooLargeError extends Error {}
 
 function declaresOversizedBody(req: IncomingMessage): boolean {
@@ -38,28 +35,21 @@ function readBody(req: IncomingMessage): Promise<string> {
         chunks.push(chunk);
         return;
       }
-      // Pause rather than destroy: destroying here kills the socket before the refusal can
-      // be written, and the client sees a reset instead of being told what it did wrong.
-      // The caller destroys once the 413 is out.
+      // Pause rather than destroy: destroying kills the socket before the refusal can be
+      // written, and the client sees a reset. The caller destroys once the 413 is out.
       req.pause();
       reject(new PayloadTooLargeError(`exceeded ${MAX_BODY_BYTES} bytes`));
     });
     req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
     req.on("error", reject);
-    // A client that vanishes mid-body fires neither `end` nor `error`; without this the
-    // promise never settles and its closure outlives the request.
+    // A client that vanishes mid-body fires neither `end` nor `error`.
     req.on("close", () => reject(new Error("client closed the connection mid-body")));
   });
 }
 
-/**
- * `node:http` only — no framework, no OTLP SDK. Owns exactly the OTLP/HTTP protocol
- * surface: which three paths exist, that every one of them answers 200 with `{}` so an
- * exporter that already delivered a payload never retries it, and that a body which
- * fails to parse is logged and dropped rather than taking the process down. Every
- * judgement about what a payload *means* lives in `ReceiveTelemetryUseCase` and the
- * phase-1 mapper it calls — this class never inspects an attribute.
- */
+/** Owns the OTLP/HTTP protocol surface only: which paths exist, and that each answers 200
+ * with `{}` so an exporter that already delivered a payload never retries it. What a
+ * payload means is `ReceiveTelemetryUseCase`'s judgement. */
 export class OtlpHttpReceiverAdapter {
   private server: Server | null = null;
 
@@ -81,9 +71,8 @@ export class OtlpHttpReceiverAdapter {
     this.server = server;
     await new Promise<void>((resolve, reject) => {
       server.once("error", reject);
-      // Loopback only: the endpoint takes anything anyone posts, with no authentication.
-      // Without a host, node binds every interface, which would put an open writable
-      // sink on the local network.
+      // Loopback only: the endpoint is unauthenticated, and without a host node binds
+      // every interface, putting an open writable sink on the local network.
       server.listen(port, LOOPBACK_HOST, () => resolve());
     });
     const address = server.address();
