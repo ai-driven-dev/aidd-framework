@@ -1,7 +1,8 @@
-import { access, appendFile, mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { access, appendFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
+  parseTelemetrySinkLine,
   serializeTelemetrySinkRecord,
   type TelemetrySinkRecord,
 } from "../../domain/models/telemetry-sink-record.js";
@@ -27,7 +28,8 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-/** Every write is `appendFile`; no method here ever reads a day file's content. */
+/** Every write is `appendFile`. `readRecordsForVendor` is the only method that reads a day
+ * file's content, and only to let a local re-read know what is already stored. */
 export class TelemetrySinkAdapter implements TelemetrySink {
   readonly rootDir: string;
 
@@ -69,5 +71,38 @@ export class TelemetrySinkAdapter implements TelemetrySink {
 
   async deleteDayFile(fileName: string): Promise<void> {
     await rm(join(this.rootDir, fileName), { force: true });
+  }
+
+  async readRecordsForVendor(vendorId: string): Promise<readonly TelemetrySinkRecord[]> {
+    const records: TelemetrySinkRecord[] = [];
+    for (const fileName of await this.listDayFiles()) {
+      records.push(...(await this.readVendorRecordsFromFile(fileName, vendorId)));
+    }
+    return records;
+  }
+
+  private async readVendorRecordsFromFile(
+    fileName: string,
+    vendorId: string
+  ): Promise<readonly TelemetrySinkRecord[]> {
+    const content = await readFile(join(this.rootDir, fileName), "utf8");
+    const records: TelemetrySinkRecord[] = [];
+    for (const line of content.split("\n")) {
+      if (line.trim() === "") continue;
+      const record = this.parseLineOrSkip(line);
+      if (record?.vendor_id === vendorId) records.push(record);
+    }
+    return records;
+  }
+
+  // A torn final line (a concurrent write still in flight) or a stray older-schema line
+  // must not fail an unrelated session's read — skipped, not translated, since there is
+  // no typed exception a caller could usefully act on for one line among many.
+  private parseLineOrSkip(line: string): TelemetrySinkRecord | undefined {
+    try {
+      return parseTelemetrySinkLine(line);
+    } catch {
+      return undefined;
+    }
   }
 }

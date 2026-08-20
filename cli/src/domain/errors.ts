@@ -481,3 +481,14 @@ export class UnknownTelemetrySinkSchemaVersionError extends Error {
     this.name = "UnknownTelemetrySinkSchemaVersionError";
   }
 }
+
+/** A genuine `opencode export` failure — a non-zero exit not explained by "no such
+ * session", or the command exceeding its timeout. An absent binary or an unknown session
+ * are not this: those mean the machine simply holds no OpenCode data, and the reader
+ * resolves to an empty array for them instead of throwing. */
+export class OpencodeExportError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OpencodeExportError";
+  }
+}

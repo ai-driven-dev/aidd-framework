@@ -1,5 +1,9 @@
 import { getAiToolConfig } from "../../domain/tools/registry.js";
 import type { CLIOutput } from "../output.js";
+import type {
+  LocalCostToolStatus,
+  ReadLocalCostResult,
+} from "../use-cases/telemetry/read-local-cost-use-case.js";
 import type { TelemetryOffResult } from "../use-cases/telemetry/telemetry-off-use-case.js";
 import type {
   TelemetryOnResult,
@@ -14,6 +18,12 @@ const STATUS_LABELS: Record<TelemetryToolReport["status"], string> = {
   "cannot-enable": "cannot be enabled by us",
 };
 
+const LOCAL_COST_STATUS_LABELS: Record<LocalCostToolStatus, string> = {
+  found: "read",
+  empty: "read, nothing found",
+  "not-covered": "not covered",
+};
+
 export function printTelemetryOnReport(output: CLIOutput, result: TelemetryOnResult): void {
   const switchLabel = result.switchChanged ? "on" : "already on";
   output.success(`AIDD telemetry: ${switchLabel} (${result.switchPath})`);
@@ -25,6 +35,17 @@ export function printTelemetryOnReport(output: CLIOutput, result: TelemetryOnRes
   output.print(
     "Run `aidd telemetry receive` to capture what is exported — without it, nothing is stored."
   );
+}
+
+export function printLocalCostReadReport(output: CLIOutput, result: ReadLocalCostResult): void {
+  for (const report of result.toolReports) {
+    const name = getAiToolConfig(report.tool).displayName;
+    const label = LOCAL_COST_STATUS_LABELS[report.status];
+    const counts =
+      report.status === "found" ? ` (${report.recordsStored} new of ${report.recordsFound})` : "";
+    const reason = report.reason ? ` — ${report.reason}` : "";
+    output.print(`  ${name}: ${label}${counts}${reason}`);
+  }
 }
 
 export function printTelemetryOffReport(output: CLIOutput, result: TelemetryOffResult): void {

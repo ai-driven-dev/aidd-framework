@@ -5,6 +5,7 @@ import { McpCapability } from "../../capabilities/mcp-capability.js";
 import { PluginsCapability } from "../../capabilities/plugins-capability.js";
 import { RulesCapability } from "../../capabilities/rules-capability.js";
 import { SkillsCapability } from "../../capabilities/skills-capability.js";
+import { CODEX_ROLLOUT_LOCATION } from "../../formats/codex-rollout.js";
 import {
   buildAiddCommandFilePath,
   convertCommandFrontmatter,
@@ -256,6 +257,13 @@ export const codex: AiTool<
     kind: "declared",
     identityAttribute: "conversation.id",
   },
+
+  // Measured 2026-08-20: a rollout's `token_count` events carry counters but no model and
+  // no request id — those come from the preceding `turn_context` event, keyed on `turn_id`.
+  // Resolved by `session_meta.id`, not `session_id`, which a resumed session's rollout can
+  // disagree with. See codex-rollout.ts for the full measurement and its two captured
+  // fixtures.
+  telemetryLocalRead: { kind: "declared", transcript: CODEX_ROLLOUT_LOCATION },
 
   rewriteContent(content: string, docsDir: string): string {
     return rewriteCodexContent(content, { directory: DIRECTORY, docsDir });

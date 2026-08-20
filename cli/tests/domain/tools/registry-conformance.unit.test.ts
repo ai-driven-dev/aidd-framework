@@ -124,6 +124,21 @@ describe("AiTool contract conformance", () => {
         ).toBeGreaterThan(0);
       }
     });
+
+    // Same shape guard for local-read: the type system requires `telemetryLocalRead` to
+    // exist, but not that its `kind` is one of the three this union defines.
+    it("declares its local-read shape as declared, unmeasured, or explicitly unsupported", () => {
+      expect(
+        ["declared", "unmeasured", "unsupported"],
+        `${toolId} declares an unrecognized telemetryLocalRead kind: ${tool.telemetryLocalRead.kind}`
+      ).toContain(tool.telemetryLocalRead.kind);
+      if (tool.telemetryLocalRead.kind === "unsupported") {
+        expect(
+          tool.telemetryLocalRead.reason.length,
+          `${toolId}: telemetryLocalRead.reason must not be empty`
+        ).toBeGreaterThan(0);
+      }
+    });
   });
 });
 
@@ -149,6 +164,38 @@ describe("telemetryExport — exact declarations, measured 2026-08-13/14", () =>
     expect(shape.kind).toBe(expected.kind);
     if (shape.kind === "declared" && expected.kind === "declared") {
       expect(shape.identityAttribute).toBe(expected.identityAttribute);
+    }
+  });
+
+  it("covers exactly the five registered AI tools — no tool escapes this check", () => {
+    expect(Object.keys(EXPECTED).sort()).toEqual(registeredAiTools.map(([id]) => id).sort());
+  });
+});
+
+// Copilot and Cursor's local-read reasons are measured facts (see spec.md non-goals), not
+// guesses. Claude and Codex are declared as of phase 2: read via TranscriptCostReaderAdapter,
+// see claude-code-transcript.ts and codex-rollout.ts for their measurements. OpenCode is
+// declared as of phase 3: read via OpencodeCostReaderAdapter.
+describe("telemetryLocalRead — exact declarations, phase 2 of local-cost-read", () => {
+  const EXPECTED: Record<
+    string,
+    { kind: "declared" | "unmeasured" | "unsupported"; reason?: string }
+  > = {
+    claude: { kind: "declared" },
+    codex: { kind: "declared" },
+    opencode: { kind: "declared" },
+    copilot: { kind: "unsupported", reason: "outputTokens" },
+    cursor: { kind: "unsupported", reason: "token count" },
+  };
+
+  it.each(Object.entries(EXPECTED))("%s", (toolId, expected) => {
+    const tool = registeredAiTools.find(([id]) => id === toolId)?.[1];
+    if (!tool) throw new Error(`${toolId} is not registered`);
+
+    const shape = tool.telemetryLocalRead;
+    expect(shape.kind).toBe(expected.kind);
+    if (shape.kind === "unsupported" && expected.reason) {
+      expect(shape.reason).toContain(expected.reason);
     }
   });
 

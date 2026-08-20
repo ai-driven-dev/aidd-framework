@@ -78,6 +78,7 @@ import { UpdateOneToolUseCase } from "../application/use-cases/shared/update-one
 import { StatusUseCase } from "../application/use-cases/status-use-case.js";
 import { SyncConflictResolverUseCase } from "../application/use-cases/sync/sync-conflict-resolver-use-case.js";
 import { EnableToolTelemetryUseCase } from "../application/use-cases/telemetry/enable-tool-telemetry-use-case.js";
+import { ReadLocalCostUseCase } from "../application/use-cases/telemetry/read-local-cost-use-case.js";
 import { ReceiveTelemetryUseCase } from "../application/use-cases/telemetry/receive-telemetry-use-case.js";
 import { TelemetryOffUseCase } from "../application/use-cases/telemetry/telemetry-off-use-case.js";
 import { TelemetryOnUseCase } from "../application/use-cases/telemetry/telemetry-on-use-case.js";
@@ -85,9 +86,18 @@ import { UninstallIdeUseCase } from "../application/use-cases/uninstall/uninstal
 import { UninstallToolsUseCase } from "../application/use-cases/uninstall/uninstall-tools-use-case.js";
 import { UninstallUseCase } from "../application/use-cases/uninstall/uninstall-use-case.js";
 import {
+  CLAUDE_CODE_TRANSCRIPT_LOCATION,
+  createClaudeCodeTranscriptAccumulator,
+} from "../domain/formats/claude-code-transcript.js";
+import {
+  CODEX_ROLLOUT_LOCATION,
+  createCodexRolloutAccumulator,
+} from "../domain/formats/codex-rollout.js";
+import {
   parseOwnerRepoFromRemote,
   sanitizeProjectId,
 } from "../domain/models/telemetry-project-id.js";
+import type { AiToolId } from "../domain/models/tool-ids.js";
 import type { AssetProvider } from "../domain/ports/asset-provider.js";
 import type { CredentialStore } from "../domain/ports/credential-store.js";
 import type { FileMerger } from "../domain/ports/file-merger.js";
@@ -106,6 +116,7 @@ import type { PluginDistributionReader } from "../domain/ports/plugin-distributi
 import type { PluginFetcher } from "../domain/ports/plugin-fetcher.js";
 import type { Prompter } from "../domain/ports/prompter.js";
 import type { SelfUpdater } from "../domain/ports/self-updater.js";
+import type { SessionCostReader } from "../domain/ports/session-cost-reader.js";
 import type { VersionControl } from "../domain/ports/version-control.js";
 import type { VersionReader } from "../domain/ports/version-reader.js";
 import { AjvSchemaValidatorAdapter } from "./adapters/ajv-schema-validator-adapter.js";
@@ -125,6 +136,7 @@ import { ManifestRepositoryAdapter } from "./adapters/manifest-repository-adapte
 import { MarketplaceCacheAdapter } from "./adapters/marketplace-cache-adapter.js";
 import { MarketplaceRegistryAdapter } from "./adapters/marketplace-registry-adapter.js";
 import { MarketplaceTrustStoreAdapter } from "./adapters/marketplace-trust-store-adapter.js";
+import { OpencodeCostReaderAdapter } from "./adapters/opencode-cost-reader-adapter.js";
 import { OtlpHttpReceiverAdapter } from "./adapters/otlp-http-receiver-adapter.js";
 import { PlatformAdapter } from "./adapters/platform-adapter.js";
 import { PluginCatalogRepositoryAdapter } from "./adapters/plugin-catalog-repository-adapter.js";
@@ -133,6 +145,7 @@ import { PluginFetcherAdapter } from "./adapters/plugin-fetcher-adapter.js";
 import { InquirerPrompterAdapter, SilentPrompterAdapter } from "./adapters/prompter-adapter.js";
 import { SelfUpdaterAdapter } from "./adapters/self-updater-adapter.js";
 import { TelemetrySinkAdapter } from "./adapters/telemetry-sink-adapter.js";
+import { TranscriptCostReaderAdapter } from "./adapters/transcript-cost-reader-adapter.js";
 import { BundledAssetProviderAdapter } from "./assets/asset-loader.js";
 import { AuthStorage } from "./auth/auth-storage.js";
 import { HttpClient } from "./http/http-client.js";
@@ -210,6 +223,7 @@ interface Deps {
   telemetryOffUseCase: TelemetryOffUseCase;
   receiveTelemetryUseCase: ReceiveTelemetryUseCase;
   otlpHttpReceiverAdapter: OtlpHttpReceiverAdapter;
+  readLocalCostUseCase: ReadLocalCostUseCase;
 }
 
 const _cache = new Map<string, Deps>();
@@ -702,6 +716,31 @@ export async function createDeps(
   const telemetrySink = new TelemetrySinkAdapter();
   const receiveTelemetryUseCase = new ReceiveTelemetryUseCase(telemetrySink, logger);
   const otlpHttpReceiverAdapter = new OtlpHttpReceiverAdapter(receiveTelemetryUseCase, logger);
+  // This is the one place allowed to map a tool that declares `telemetryLocalRead: {
+  // kind: "declared" }` to the adapter that reads it.
+  const localCostReaders: ReadonlyMap<AiToolId, SessionCostReader> = new Map<
+    AiToolId,
+    SessionCostReader
+  >([
+    ["opencode", new OpencodeCostReaderAdapter()],
+    [
+      "claude",
+      new TranscriptCostReaderAdapter(
+        homedir(),
+        CLAUDE_CODE_TRANSCRIPT_LOCATION,
+        createClaudeCodeTranscriptAccumulator
+      ),
+    ],
+    [
+      "codex",
+      new TranscriptCostReaderAdapter(
+        homedir(),
+        CODEX_ROLLOUT_LOCATION,
+        createCodexRolloutAccumulator
+      ),
+    ],
+  ]);
+  const readLocalCostUseCase = new ReadLocalCostUseCase(telemetrySink, localCostReaders);
   const deps: Deps = {
     fs,
     manifestRepo,
@@ -771,6 +810,7 @@ export async function createDeps(
     telemetryOffUseCase,
     receiveTelemetryUseCase,
     otlpHttpReceiverAdapter,
+    readLocalCostUseCase,
   };
   _cache.set(projectRoot, deps);
   return deps;

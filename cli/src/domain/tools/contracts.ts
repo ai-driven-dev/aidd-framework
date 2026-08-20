@@ -6,7 +6,11 @@ import type { PluginsCapability } from "../capabilities/plugins-capability.js";
 import type { RulesCapability } from "../capabilities/rules-capability.js";
 import type { SettingsCapability } from "../capabilities/settings-capability.js";
 import type { SkillsCapability } from "../capabilities/skills-capability.js";
-import type { TelemetryActivation, TelemetryExport } from "../capabilities/telemetry-capability.js";
+import type {
+  TelemetryActivation,
+  TelemetryExport,
+  TelemetryLocalRead,
+} from "../capabilities/telemetry-capability.js";
 import type { AiToolId, IdeToolId } from "../models/tool-ids.js";
 
 export type UserFileSection = "agents" | "commands" | "rules" | "skills";
@@ -60,6 +64,10 @@ export interface AiTool<C> {
   /** What the tool's OTLP export actually carries, measured independently of whether
    * AIDD can enable it — see {@link TelemetryExport}. */
   readonly telemetryExport: TelemetryExport;
+  /** Whether this tool's own file(s) can be read locally for a session's counters — see
+   * {@link TelemetryLocalRead}. Independent of `telemetryExport`: a tool can be readable
+   * by one route, both, or neither. */
+  readonly telemetryLocalRead: TelemetryLocalRead;
   readonly directory: string;
   readonly toolSuffix: string;
   readonly signalDir: string | null;

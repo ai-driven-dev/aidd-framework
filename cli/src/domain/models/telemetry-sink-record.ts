@@ -1,10 +1,21 @@
 import { UnknownTelemetrySinkSchemaVersionError } from "../errors.js";
 
-export const SINK_SCHEMA_VERSION = 1;
+// v2 adds `provenance`, required rather than defaulted, because a default meaning "the
+// old route" is exactly the ambiguity the field exists to remove. No migration: the sink
+// is delivered but unmerged, so no v1 day file exists outside this branch to migrate.
+export const SINK_SCHEMA_VERSION = 2;
 
-/** A billed request joins to a turn; a session-level measure never does — metric
- * datapoints carry no turn identifier on any tool measured so far. */
+/** A request-kind record joins to a turn when its route can name one — an OTLP `api_request`
+ * names it via `turn_field`, a local read names it via the tool's own per-record id. A
+ * session-level measure never does — metric datapoints carry no turn identifier on any
+ * tool measured so far. `turn_id`, when present, is also the key a re-read is deduplicated
+ * on: the tool's own identifier for that record, never a hash of the line, since a hash
+ * changes the moment the tool appends anything else to the same record. */
 export type TelemetrySinkRecordKind = "request" | "session";
+
+/** Which route produced this line. Never optional: a default meaning "the old route"
+ * would make the field unreadable the day a third route appears. */
+export type TelemetrySinkRecordProvenance = "export" | "local-read";
 
 /** The tool-neutral stored line, and the complete allowlist of what a session may leave
  * behind. `vendor_field` and `turn_field` name the export-side attribute a value came
@@ -12,6 +23,7 @@ export type TelemetrySinkRecordKind = "request" | "session";
 export interface TelemetrySinkRecord {
   readonly sink_schema_version: number;
   readonly kind: TelemetrySinkRecordKind;
+  readonly provenance: TelemetrySinkRecordProvenance;
   readonly vendor_id: string;
   readonly vendor_field: string;
   readonly turn_id?: string;
@@ -202,6 +214,9 @@ function buildBaseRecord(
   const draft: SinkRecordDraft = {
     sink_schema_version: SINK_SCHEMA_VERSION,
     kind,
+    // The only route this file's mappers ever produce — a locally read record is never
+    // built here, since it carries no OTLP attribute map to walk.
+    provenance: "export",
     vendor_id: identity.vendorId,
     vendor_field: identity.vendorField,
     turn_id: identity.turnId,

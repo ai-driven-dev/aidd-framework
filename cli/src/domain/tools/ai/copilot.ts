@@ -357,6 +357,16 @@ export const copilot: AiTool<
     identityAttribute: "gen_ai.conversation.id",
   },
 
+  // Measured: Copilot's own local file carries `outputTokens` per turn and nothing else —
+  // no per-request input figure exists on disk, so no per-step record can be built from
+  // it. A gap this deliverable names rather than fills; see spec.md non-goals.
+  telemetryLocalRead: {
+    kind: "unsupported",
+    reason:
+      "Its file carries outputTokens per turn and nothing else — no per-request " +
+      "input figure exists to build a record from.",
+  },
+
   rewriteContent: rewriteCopilotContent,
 
   reverseRewriteContent: reverseCopilotContent,

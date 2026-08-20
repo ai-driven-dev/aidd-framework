@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, readFile, rm } from "node:fs/promises";
+import { appendFile, chmod, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -7,8 +7,9 @@ import { decideTelemetrySinkRetention } from "../../../src/domain/models/telemet
 import { TelemetrySinkAdapter } from "../../../src/infrastructure/adapters/telemetry-sink-adapter.js";
 
 const RECORD: TelemetrySinkRecord = {
-  sink_schema_version: 1,
+  sink_schema_version: 2,
   kind: "request",
+  provenance: "export",
   vendor_id: "s-1",
   vendor_field: "session.id",
   cost_usd: 1,
@@ -73,6 +74,29 @@ describe("TelemetrySinkAdapter", () => {
     const after = await adapter.listDayFiles();
     expect(after).toEqual(keep);
     expect(after).toEqual(["2026-08-16.jsonl", "2026-08-17.jsonl"]);
+  });
+
+  it("finds a vendor's records across every day file, ignoring other vendors", async () => {
+    const adapter = new TelemetrySinkAdapter(userConfigDir);
+    await adapter.ensureWritable();
+    const other = { ...RECORD, vendor_id: "s-2" };
+    await adapter.appendRecord(RECORD, new Date("2026-08-15T10:00:00Z"));
+    await adapter.appendRecord(other, new Date("2026-08-15T11:00:00Z"));
+    await adapter.appendRecord(RECORD, new Date("2026-08-16T10:00:00Z"));
+
+    const records = await adapter.readRecordsForVendor("s-1");
+    expect(records).toHaveLength(2);
+    expect(records.every((r) => r.vendor_id === "s-1")).toBe(true);
+  });
+
+  it("skips a torn final line rather than failing the whole scan", async () => {
+    const adapter = new TelemetrySinkAdapter(userConfigDir);
+    await adapter.ensureWritable();
+    const { filePath } = await adapter.appendRecord(RECORD, new Date("2026-08-15T10:00:00Z"));
+    await appendFile(filePath, '{"sink_schema_version":2,"kind":"requ');
+
+    const records = await adapter.readRecordsForVendor("s-1");
+    expect(records).toHaveLength(1);
   });
 
   // chmod-based permission denial is meaningless for root (common in CI containers) and

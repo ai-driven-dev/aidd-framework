@@ -6,7 +6,11 @@ import {
   type TelemetryScope,
 } from "../../domain/capabilities/telemetry-capability.js";
 import { createDeps } from "../../infrastructure/deps.js";
-import { printTelemetryOffReport, printTelemetryOnReport } from "../display/telemetry-display.js";
+import {
+  printLocalCostReadReport,
+  printTelemetryOffReport,
+  printTelemetryOnReport,
+} from "../display/telemetry-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import { InvalidTelemetryReceivePortError, InvalidTelemetryScopeError } from "../errors.js";
 import { parseGlobalOptions } from "./global-options.js";
@@ -72,6 +76,24 @@ export function registerTelemetryCommand(program: Command): void {
         output.info(`AIDD telemetry sink -> ${rootDir}`);
         const { port: boundPort } = await deps.otlpHttpReceiverAdapter.listen(port);
         output.info(`Listening for OTLP telemetry on http://localhost:${boundPort}`);
+      } catch (error) {
+        errorHandler.handle(error);
+      }
+    });
+
+  telemetry
+    .command("read")
+    .description(
+      "Read a session's token counts and model from the files its tool already wrote, with no process running"
+    )
+    .requiredOption("--session <id>", "Session identifier to read")
+    .action(async (cmdOptions: { session: string }) => {
+      const { verbose, output, projectRoot } = parseGlobalOptions(program);
+      const errorHandler = new ErrorHandler(output);
+      try {
+        const deps = await createDeps(projectRoot, { verbose }, output);
+        const result = await deps.readLocalCostUseCase.execute({ sessionId: cmdOptions.session });
+        printLocalCostReadReport(output, result);
       } catch (error) {
         errorHandler.handle(error);
       }

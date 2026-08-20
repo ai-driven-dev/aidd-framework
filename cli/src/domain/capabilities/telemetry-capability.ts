@@ -72,3 +72,47 @@ export interface TelemetryExportUnmeasured {
 }
 
 export type TelemetryExport = TelemetryExportDeclared | TelemetryExportUnmeasured;
+
+/** Where a tool's own transcript files live, and how to recognise the one file (or files)
+ * for a session — declared per tool since only the tool knows its own directory layout, so
+ * the adapter that opens files never encodes one itself. `matches` receives the candidate's
+ * path already relative to `root`, not its basename: Claude Code's subagent transcripts live
+ * one directory per session (`<sessionId>/subagents/*.jsonl`), distinguishable only by that
+ * nesting, not by file name alone. */
+export interface TranscriptLocation {
+  root(homeDir: string): string;
+  matches(relativePath: string, sessionId: string): boolean;
+}
+
+/** This tool's own file(s) can be read for a session's counters without exporting anything
+ * and without a process running. Read through `ReadLocalCostUseCase`, which asks every
+ * tool's declaration and never branches on `toolId`. `transcript` is optional: a tool read
+ * by another means entirely (OpenCode shells out to its own CLI instead of opening a file)
+ * declares `{ kind: "declared" }` with no transcript location at all. */
+export interface TelemetryLocalReadDeclared {
+  readonly kind: "declared";
+  readonly transcript?: TranscriptLocation;
+  /** A caveat that survives to the person reading the result, when what this tool can be
+   * read for is narrower than the others. Data rather than a source comment, because a
+   * comment reaches nobody downstream: a consumer would otherwise see figures with no
+   * journal entry beside them and be left to guess why. */
+  readonly limitation?: string;
+}
+
+/** No reader has been wired for this tool yet in this codebase — a fact about current
+ * coverage, not a claim that the tool's file could never be read. */
+export interface TelemetryLocalReadUnmeasured {
+  readonly kind: "unmeasured";
+}
+
+/** This tool's own file cannot yield what a local read needs, established by probe rather
+ * than assumed from an empty result. */
+export interface TelemetryLocalReadUnsupported {
+  readonly kind: "unsupported";
+  readonly reason: string;
+}
+
+export type TelemetryLocalRead =
+  | TelemetryLocalReadDeclared
+  | TelemetryLocalReadUnmeasured
+  | TelemetryLocalReadUnsupported;

@@ -169,6 +169,19 @@ export const opencode: AiTool<
     kind: "unmeasured",
   },
 
+  // Read via `opencode export <sessionID> --sanitize` (OpencodeCostReaderAdapter),
+  // measured 2026-08-20 on opencode 1.14.20 — see domain/formats/opencode-export.ts.
+  // Unlike the other two local readers, this one cannot yet be joined to a run journal
+  // entry: no hook or plugin payload has ever been captured carrying OpenCode's own
+  // `ses_…` session identity, so there is nothing established to join on. It answers
+  // only what it can answer alone — what a given OpenCode session consumed. Joining it
+  // belongs with #676, which owns whether a plugin can write the journal at all.
+  telemetryLocalRead: {
+    kind: "declared",
+    limitation:
+      "read alone: no captured payload establishes that a hook or plugin sees OpenCode's own session id, so these figures cannot yet be joined to a run journal entry.",
+  },
+
   rewriteContent(content: string, docsDir: string): string {
     return baseRewriteContent(content, DIRECTORY, docsDir).replace(
       /(@?)\.opencode\/commands\/(\d+)[_-][^/]+\/([^\s]+)/g,

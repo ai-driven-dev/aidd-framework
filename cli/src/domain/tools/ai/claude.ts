@@ -5,6 +5,7 @@ import { McpCapability } from "../../capabilities/mcp-capability.js";
 import { PluginsCapability } from "../../capabilities/plugins-capability.js";
 import { RulesCapability } from "../../capabilities/rules-capability.js";
 import { SkillsCapability } from "../../capabilities/skills-capability.js";
+import { CLAUDE_CODE_TRANSCRIPT_LOCATION } from "../../formats/claude-code-transcript.js";
 import {
   convertCommandFrontmatter,
   detectSectionKeyFromPrefixes,
@@ -146,6 +147,11 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
       turnAttribute: CLAUDE_TELEMETRY_TURN_ATTRIBUTE,
       sessionMeasures: CLAUDE_TELEMETRY_SESSION_MEASURES,
     },
+
+    // Measured 2026-08-20: an assistant message in ~/.claude/projects/*/*.jsonl carries
+    // `message.usage`'s four counters and `message.model`, keyed on `requestId`. See
+    // claude-code-transcript.ts for the full measurement and its two captured fixtures.
+    telemetryLocalRead: { kind: "declared", transcript: CLAUDE_CODE_TRANSCRIPT_LOCATION },
 
     rewriteContent(content: string, docsDir: string): string {
       return baseRewriteContent(content, DIRECTORY, docsDir).replace(

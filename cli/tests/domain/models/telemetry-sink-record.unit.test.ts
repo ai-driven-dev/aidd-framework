@@ -109,6 +109,13 @@ describe("mapOtlpLogsToSinkRecords()", () => {
     expect(record.turn_field).toBe("prompt.id");
   });
 
+  // The mapper only ever produces the export route — a locally read record is never built
+  // from an OTLP attribute map, since a local reader has no such map to walk.
+  it("marks a record built from a real captured export as provenance: export", () => {
+    const [record] = mapOtlpLogsToSinkRecords(logsPayload, [CLAUDE_VENDOR]);
+    expect(record.provenance).toBe("export");
+  });
+
   it("keeps every allowlisted field present on the real captured payload", () => {
     const [record] = mapOtlpLogsToSinkRecords(logsPayload, [CLAUDE_VENDOR]);
     expect(record.project_id).toBe("aidd-lab/telemetry-proof");
@@ -420,6 +427,16 @@ describe("parseTelemetrySinkLine()", () => {
     ).toThrow(UnknownTelemetrySinkSchemaVersionError);
   });
 
+  // The literal version this schema moved past — v1 carried no `provenance`, so guessing
+  // one for it would be exactly the false "old route" default the field exists to forbid.
+  it("rejects the v1 shape specifically, not just an unrecognised number", () => {
+    expect(() =>
+      parseTelemetrySinkLine(
+        JSON.stringify({ sink_schema_version: 1, kind: "request", vendor_id: "s-1" })
+      )
+    ).toThrow(UnknownTelemetrySinkSchemaVersionError);
+  });
+
   it("parses a hand-written fixture the mapper never produced", () => {
     const url = new URL("../../fixtures/telemetry-sink/expected.jsonl", import.meta.url);
     const lines = readFileSync(fileURLToPath(url), "utf8").trim().split("\n");
@@ -434,5 +451,13 @@ describe("parseTelemetrySinkLine()", () => {
     const sessionLine = records.find((r) => r.kind === "session" && r.active_time_s !== undefined);
     expect(sessionLine?.active_time_s).toBeGreaterThan(0);
     expect(sessionLine?.turn_id).toBeUndefined();
+  });
+
+  it("carries provenance for both routes, on the same fixture", () => {
+    const url = new URL("../../fixtures/telemetry-sink/expected.jsonl", import.meta.url);
+    const lines = readFileSync(fileURLToPath(url), "utf8").trim().split("\n");
+    const records = lines.map(parseTelemetrySinkLine);
+    expect(records.some((r) => r.provenance === "export")).toBe(true);
+    expect(records.some((r) => r.provenance === "local-read")).toBe(true);
   });
 });

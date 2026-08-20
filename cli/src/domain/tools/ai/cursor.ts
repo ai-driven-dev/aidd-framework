@@ -137,6 +137,14 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
     // false figure this whole layer exists to prevent.
     telemetryExport: { kind: "unmeasured" },
 
+    // Measured: Cursor writes no token count in any file it produces — there is nothing
+    // on disk for a local reader to find. A gap this deliverable names rather than fills;
+    // see spec.md non-goals.
+    telemetryLocalRead: {
+      kind: "unsupported",
+      reason: "It writes no token count in any file it produces.",
+    },
+
     rewriteContent(content: string, docsDir: string): string {
       return baseRewriteContent(content, DIRECTORY, docsDir)
         .replace(
