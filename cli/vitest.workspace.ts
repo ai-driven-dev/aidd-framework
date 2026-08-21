@@ -16,6 +16,15 @@ export default defineWorkspace([
   {
     plugins: [textLoader(TEXT_EXTENSIONS)],
     test: {
+      name: "architecture",
+      include: ["tests/architecture/**/*.arch.test.ts"],
+      globals: false,
+      environment: "node",
+    },
+  },
+  {
+    plugins: [textLoader(TEXT_EXTENSIONS)],
+    test: {
       name: "integration",
       include: ["tests/**/*.integration.test.ts"],
       globals: false,

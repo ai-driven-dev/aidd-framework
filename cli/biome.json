@@ -1,10 +1,26 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.7/schema.json",
-  "assist": { "actions": { "source": { "organizeImports": "on" } } },
+  "$schema": "https://biomejs.dev/schemas/2.5.8/schema.json",
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "performance": {
+        "noBarrelFile": "error",
+        "noReExportAll": "error"
+      },
+      "suspicious": {
+        "noImportCycles": "error"
+      },
+      "correctness": {
+        "noUnresolvedImports": "error"
+      }
     }
   },
   "formatter": {
@@ -44,8 +60,40 @@
   },
   "overrides": [
     {
+      "includes": ["src/domain/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/application/**", "**/infrastructure/**"],
+                    "message": "domain must not import application or infrastructure"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["tests/helpers/**/*.ts"],
+      "linter": {
+        "rules": {
+          "performance": {
+            "noBarrelFile": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["**/package.json"],
-      "formatter": { "enabled": false }
+      "formatter": {
+        "enabled": false
+      }
     }
   ]
 }

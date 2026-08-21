@@ -86,6 +86,10 @@ pre-commit:
     cli-biome:
       glob: "cli/**"
       run: cd cli && pnpm lint
+    cli-architecture:
+      # Reads source as text only — no build, no imports — so it stays under a second.
+      glob: "{cli/src/**,cli/tests/architecture/**,cli/ARCHITECTURE.md,cli/README.md,cli/aidd_docs/memory/codebase-map.md}"
+      run: cd cli && pnpm test:arch
     cli-typecheck:
       # The CLI type-checks `kanban/` too, so that folder's dependencies must be
       # resolvable. Install them only when they are missing, to keep the hook fast.
