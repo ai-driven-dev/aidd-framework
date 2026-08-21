@@ -50,11 +50,14 @@ function processPayload(payload, event) {
   if (resolvedEvent === "session-start") {
     record.handleSessionStart(payload, host, sessionId);
   } else if (resolvedEvent === "turn-end") {
+    // Before the turn_end line, so the run file's mtime still marks where this turn began
+    // - the observed pass reads that mark to know what changed since.
+    fileWrites.handleTaskFilesObserved(payload, host, sessionId);
     record.handleTurnEnd(payload, host, sessionId);
   } else if (resolvedEvent === "tool-used") {
     // One event, two readings of it. They share nothing else: handleFileWritten returns
     // early unless the path looks like a task folder, and a skill call has no task path.
-    fileWrites.handleFileWritten(payload, host);
+    fileWrites.handleFileWritten(payload, host, sessionId);
     stepStarts.handleStepStart(payload, host, sessionId);
   }
 }

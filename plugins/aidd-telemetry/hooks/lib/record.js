@@ -106,12 +106,49 @@ const VENDOR_FIELD_BY_HOST = Object.freeze({
   cursor: null,
 });
 
+// A Codex rollout is named `rollout-<timestamp>-<uuid>.jsonl`, and that trailing uuid is
+// the rollout's own `session_meta.id` - measured across every rollout on disk, including
+// resumed ones where it differs from `session_meta.session_id`. The reader side resolves a
+// Codex session on exactly this equality; see CODEX_ROLLOUT_LOCATION in
+// cli/src/domain/formats/codex-rollout.ts, whose `matches` this mirrors. The two parses
+// live apart because hooks/ is copied verbatim by the framework build and can import
+// nothing from cli/ - the same reason sanitizePathSegment is duplicated - so
+// tests/domain/formats/codex-rollout.unit.test.ts pins them to each other and turns red if
+// either moves.
+const CODEX_ROLLOUT_PREFIX = "rollout-";
+const CODEX_ROLLOUT_EXTENSION = ".jsonl";
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+
+function codexSessionIdFromTranscriptPath(transcriptPath) {
+  if (typeof transcriptPath !== "string" || transcriptPath === "") return undefined;
+  const base = transcriptPath.split(/[\\/]/u).pop() || "";
+  if (!base.startsWith(CODEX_ROLLOUT_PREFIX) || !base.endsWith(CODEX_ROLLOUT_EXTENSION)) {
+    return undefined;
+  }
+  const stem = base.slice(0, -CODEX_ROLLOUT_EXTENSION.length);
+  const candidate = stem.slice(-36);
+  return UUID_PATTERN.test(candidate) && stem.length > 36 ? candidate : undefined;
+}
+
 // How each host names the session id in its own hook payload. journal.js used to read
 // payload.session_id outright - one host's spelling, promoted to a rule. Copilot alone
 // spells it sessionId; every other declared host agrees on session_id.
+//
+// Codex is the one host whose payload spelling cannot simply be trusted: 124 of 330
+// rollouts on this machine are resumed sessions where `session_meta.session_id` holds the
+// parent's identifier rather than the rollout's own, and a vendor_id written from the
+// wrong one joins to nothing while the journal still looks healthy. Its payload carries
+// `transcript_path` - measured 2026-08-21 from the serde field table shipped in the
+// codex-cli 0.145.0 binary, `strings -n 4 <bin> | grep session_id`, which lists
+// `session_id transcript_path hook_event_name reason permission_mode source turn_id
+// agent_transcript_path agent_type last_assistant_message` - so the identity is derived
+// from the rollout the session is actually writing, and the two sides agree by
+// construction instead of by coincidence. `session_id` remains the fallback for a payload
+// carrying no transcript path.
 const SESSION_ID_READER_BY_HOST = Object.freeze({
   "claude-code": (payload) => payload.session_id,
-  codex: (payload) => payload.session_id,
+  codex: (payload) =>
+    codexSessionIdFromTranscriptPath(payload.transcript_path) ?? payload.session_id,
   copilot: (payload) => payload.sessionId,
   cursor: (payload) => payload.session_id,
 });
@@ -152,8 +189,14 @@ function buildTurnEndLine({ at, promptId }) {
 
 // path is repository-relative and "/"-separated on every platform. Never a task_id: that
 // derivation belongs to the reader, not the writer.
-function buildFileWrittenLine({ at, path: writtenPath }) {
-  return { type: "file_written", at, path: writtenPath };
+// `source` says how the path came to be known, for the same reason step_attribution does:
+// "tool-stated" is the path the host handed us, exact and with no false positive.
+// "observed" is a file that changed inside a task folder while this session was running,
+// which is how a write made through a shell command or an apply_patch becomes visible at
+// all - and which can, in principle, catch a file something else on the machine wrote in
+// the same window. A consumer that must not risk that filters on this field.
+function buildFileWrittenLine({ at, path: writtenPath, source }) {
+  return { type: "file_written", at, path: writtenPath, source };
 }
 
 // A start, and nothing else. No end, no duration, no parent: no tool exposes when a
@@ -225,6 +268,7 @@ module.exports = {
   SCHEMA_VERSION,
   VENDOR_FIELD_BY_HOST,
   SESSION_ID_READER_BY_HOST,
+  codexSessionIdFromTranscriptPath,
   readSessionId,
   appendLine,
   buildSessionStartLine,

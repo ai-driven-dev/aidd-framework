@@ -50,7 +50,10 @@ const SESSION_START_KEYS = [
 
 const TURN_END_KEYS = ["type", "at"].sort();
 const TURN_END_WITH_PROMPT_KEYS = ["type", "at", "prompt_id"].sort();
-const FILE_WRITTEN_KEYS = ["type", "at", "path"].sort();
+// `source` says how the path was known: "tool-stated" is the path the host handed us,
+// "observed" is a file that changed in the task tree during the turn - the only way a
+// write made through a shell command becomes visible at all.
+const FILE_WRITTEN_KEYS = ["at", "path", "source", "type"];
 
 const root = path.resolve(__dirname, "../..");
 const script = path.join(root, "plugins/aidd-telemetry/hooks/journal.js");
@@ -1759,7 +1762,7 @@ test("replaying the recorded Bash PostToolUse fixture against a real opted-in re
   }
 });
 
-test("every file_written line carries exactly type, at, path - no fourth key", () => {
+test("every file_written line carries exactly type, at, path, source - no fifth key", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/interval-whitelist.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000000t7";
@@ -1773,6 +1776,7 @@ test("every file_written line carries exactly type, at, path - no fourth key", (
     assert.equal(fileWrittenLines.length, 2);
     for (const line of fileWrittenLines) {
       assert.deepEqual(Object.keys(line).sort(), FILE_WRITTEN_KEYS);
+      assert.ok(["tool-stated", "observed"].includes(line.source), `unknown source ${line.source}`);
     }
   } finally {
     cleanup(repo);
@@ -2370,6 +2374,18 @@ const STEP_FIXTURE_BY_HOST = {
   cursor: "cursor-post-tool-use-skill-read.json",
 };
 
+// Codex's session identity is the rollout it writes, read off transcript_path, not the
+// session_id the payload also carries - a resumed session's session_id names its parent.
+// A test that renamed only session_id would leave the two events pointing at two different
+// sessions, which is precisely the bug the derivation exists to prevent.
+function retargetCodexTranscript(payload, sessionId) {
+  // The last 36 characters before the extension, exactly as the hook's own parse takes
+  // them - matching a UUID-ish run of characters instead could cross the timestamp
+  // boundary, and this codebase already has two parses of this filename to keep in step.
+  const stem = payload.transcript_path.slice(0, -".jsonl".length);
+  payload.transcript_path = `${stem.slice(0, -36)}${sessionId}.jsonl`;
+}
+
 function stepPayload(host, { cwd, sessionId, skill }) {
   const payload = loadFixture(STEP_FIXTURE_BY_HOST[host]);
   if (host === "copilot") {
@@ -2379,6 +2395,7 @@ function stepPayload(host, { cwd, sessionId, skill }) {
     return payload;
   }
   payload.session_id = sessionId;
+  if (host === "codex") retargetCodexTranscript(payload, sessionId);
   if (host === "cursor") payload.workspace_roots = [cwd];
   else payload.cwd = cwd;
   if (skill) rewriteSkillIn(payload, skill);
@@ -2406,6 +2423,7 @@ function sessionStartPayload(host, { cwd, sessionId }) {
     return payload;
   }
   payload.session_id = sessionId;
+  if (host === "codex") retargetCodexTranscript(payload, sessionId);
   if (host === "cursor") payload.workspace_roots = [cwd];
   else payload.cwd = cwd;
   return payload;
@@ -2420,11 +2438,20 @@ function stepLinesIn(repo) {
 // Claude Code and Copilot name the skill in a tool argument; Codex and Cursor leave only a
 // SKILL.md path. Four hosts, one assertion, because the point of the table is that the
 // caller cannot tell which family ran.
+// Hex throughout, so Codex's identity really is derived from its transcript path rather
+// than quietly falling back to session_id because the synthetic id is not a UUID.
+const STEP_SESSION_SUFFIX_BY_HOST = {
+  "claude-code": "aaa",
+  copilot: "bbb",
+  codex: "ccc",
+  cursor: "ddd",
+};
+
 for (const host of Object.keys(STEP_FIXTURE_BY_HOST)) {
   test(`a skill opened on ${host} leaves a step_start naming it, from a payload that host actually sent`, () => {
     const repo = makeTempRepo({ remote: `git@github.com:acme/step-${host}.git` });
     try {
-      const sessionId = `00000000-0000-4000-8000-0000000st${host.slice(0, 3)}`;
+      const sessionId = `00000000-0000-4000-8000-000000000${STEP_SESSION_SUFFIX_BY_HOST[host]}`;
       replayIn(sessionStartPayload(host, { cwd: repo, sessionId }), "session-start");
       const result = replayIn(stepPayload(host, { cwd: repo, sessionId }), "tool-used");
       assert.equal(result.status, 0);
@@ -2646,5 +2673,79 @@ test("every argv word hooks.json ships is one journal.js recognises", () => {
       word,
       `journal.js does not recognise the argv word "${word}" that hooks.json ships`
     );
+  }
+});
+
+test("a file written through a shell command still reaches its task, observed at turn end", () => {
+  // The gap a live Claude Code session exposed: asked to create a file, the model reached
+  // for Bash, whose payload carries a command and no path. Parsing the command would be
+  // guessing; watching the task tree is observing.
+  const repo = makeTempRepo({ remote: "git@github.com:acme/observed-write.git" });
+  const sessionId = "00000000-0000-4000-8000-00000000obs1";
+  try {
+    replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
+    const written = writeIntoTaskFolder(repo, "2026_08_21_shell");
+    // A Bash call naming nothing, exactly as the host reports one.
+    replayIn({
+      session_id: sessionId,
+      transcript_path: `/home/user/probe/cc-home/projects/-home-user-probe-project/${sessionId}.jsonl`,
+      cwd: repo,
+      hook_event_name: "PostToolUse",
+      tool_name: "Bash",
+      tool_input: { command: `printf x > ${written}`, description: "write" },
+    });
+
+    const duringTheTurn = readLines(readRunFiles(runsDirOf(repo))[0]).filter(
+      (line) => line.type === "file_written",
+    );
+    assert.equal(duringTheTurn.length, 0, "nothing is claimed while the turn is still running");
+
+    replayIn({ ...makePayload({ cwd: repo, sessionId }), hook_event_name: "Stop" }, "turn-end");
+
+    const observed = readLines(readRunFiles(runsDirOf(repo))[0]).filter(
+      (line) => line.type === "file_written",
+    );
+    assert.equal(observed.length, 1, "the shell write is recorded at turn end");
+    assert.match(observed[0].path, /aidd_docs\/tasks\/[^/]+\/2026_08_21_shell\//u);
+    assert.equal(observed[0].source, "observed", "and it says it was observed, not stated");
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a path the host stated is recorded as stated, and never twice", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/stated-write.git" });
+  const sessionId = "00000000-0000-4000-8000-00000000obs2";
+  try {
+    replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
+    const written = writeIntoTaskFolder(repo, "2026_08_21_stated");
+    replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath: written }));
+    replayIn({ ...makePayload({ cwd: repo, sessionId }), hook_event_name: "Stop" }, "turn-end");
+
+    const lines = readLines(readRunFiles(runsDirOf(repo))[0]).filter(
+      (line) => line.type === "file_written",
+    );
+    // Appending the stated line moved the run file's mtime past the write, so the observed
+    // pass finds nothing to add. One write, one line.
+    assert.deepEqual(
+      lines.map((line) => line.source),
+      ["tool-stated"],
+    );
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a turn that wrote nothing into a task folder records nothing", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/no-write.git" });
+  const sessionId = "00000000-0000-4000-8000-00000000obs3";
+  try {
+    replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
+    replayIn({ ...makePayload({ cwd: repo, sessionId }), hook_event_name: "Stop" }, "turn-end");
+
+    const lines = readLines(readRunFiles(runsDirOf(repo))[0]);
+    assert.equal(lines.filter((line) => line.type === "file_written").length, 0);
+  } finally {
+    cleanup(repo);
   }
 });
