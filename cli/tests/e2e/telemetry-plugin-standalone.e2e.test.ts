@@ -216,6 +216,27 @@ describe("the plugin measures on its own", () => {
   });
 });
 
+describe("what the plugin ships is readable", () => {
+  it("keeps the reporter unminified, with the source file each block came from", () => {
+    // An unreadable file in someone else's repository is a reason not to trust it, before
+    // it is anything else. Unminified, every block still says where it came from.
+    const bundle = readFileSync(REPORT_BIN, "utf8");
+
+    expect(bundle).toContain("// src/domain/models/cost-report.ts");
+    expect(bundle).toContain("function buildCostReport");
+    expect(bundle.split("\n").length).toBeGreaterThan(1000);
+  });
+
+  it("keeps the switch hand-written, so what turns measurement on can be read", () => {
+    const source = readFileSync(SWITCH_BIN, "utf8");
+
+    expect(source).not.toContain("Generated from");
+    expect(source).toContain('require("node:fs")');
+    // Short enough that someone deciding whether to allow measuring can read all of it.
+    expect(source.split("\n").length).toBeLessThan(80);
+  });
+});
+
 describe("the committed bundle", () => {
   for (const bin of [SWITCH_BIN, REPORT_BIN]) {
     it(`${bin.split("/").slice(-3).join("/")} carries a shebang and requires nothing but node's own modules`, () => {
@@ -243,9 +264,10 @@ describe("the committed bundle", () => {
 
   it("is small enough to ship inside a plugin", () => {
     // Not a style rule: this file is copied into every project that installs the plugin.
-    // The number is generous; it exists so that pulling in a renderer or a git library by
-    // accident is noticed here rather than by whoever clones the repository.
-    expect(readFileSync(REPORT_BIN).byteLength).toBeLessThan(250 * 1024);
+    // The number is generous, and generous on purpose since the bundle is deliberately
+    // unminified; it exists so that pulling in a renderer or a git library by accident is
+    // noticed here rather than by whoever clones the repository.
+    expect(readFileSync(REPORT_BIN).byteLength).toBeLessThan(400 * 1024);
   });
 });
 
@@ -271,12 +293,11 @@ describe("the committed bundle cannot drift from its source", () => {
         }
       );
 
-      for (const [name, committed] of [
-        ["telemetry-switch.js", SWITCH_BIN],
-        ["telemetry-report.js", REPORT_BIN],
-      ] as const) {
-        expect(readFileSync(join(into, name), "utf8"), name).toBe(readFileSync(committed, "utf8"));
-      }
+      // Only the reporter is generated. The switch is hand-written plain CommonJS, like
+      // the hooks, so there is nothing for it to drift from.
+      expect(readFileSync(join(into, "telemetry-report.js"), "utf8")).toBe(
+        readFileSync(REPORT_BIN, "utf8")
+      );
     } finally {
       await rm(into, { recursive: true, force: true });
     }

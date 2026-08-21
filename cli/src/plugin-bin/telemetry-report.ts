@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { homedir } from "node:os";
 import "../domain/tools/ai/claude.js";
 import "../domain/tools/ai/codex.js";
