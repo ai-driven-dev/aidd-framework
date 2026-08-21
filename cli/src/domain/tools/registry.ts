@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import type { NativeActivation } from "../capabilities/plugins-capability.js";
 import {
   CategoryMismatchError,
   UnknownToolCategoryError,
@@ -82,4 +83,17 @@ export async function hasToolSignals(
     if (/^name:\s*['"]?aidd[_:]/m.test(content)) matches.push(join(config.signalDir, filePath));
   }
   return matches;
+}
+
+/**
+ * The tool's native plugin CLI declaration, or undefined when it has none.
+ * Read from the profile so the set of driven tools is data, not a hand-kept list.
+ */
+export function nativeActivationOf(toolId: ToolId): NativeActivation | undefined {
+  const config = getToolConfig(toolId);
+  if (config === undefined || !isAiTool(config)) return undefined;
+  const caps = config.capabilities as {
+    plugins?: { nativeActivation?: NativeActivation | null };
+  };
+  return caps.plugins?.nativeActivation ?? undefined;
 }

@@ -39,13 +39,22 @@ export interface MarketplaceSettings {
 }
 
 /**
- * Declares that a tool enables plugins by driving an external CLI binary
- * (e.g. `codex plugin add`, `copilot plugin install`) because a project-local
- * settings file alone does not load its plugins. The `binary` keys the matching
+ * Declares that a tool registers marketplaces and enables plugins through its own
+ * CLI (e.g. `claude plugin marketplace add`, `codex plugin add`,
+ * `copilot plugin install`). The `binary` keys the matching
  * `NativePluginActivator` in the marketplace-sync registry.
+ *
+ * Only for tools whose project-local settings file does not load their plugins.
+ * Claude Code is deliberately absent: its `plugin marketplace add` exists, but it
+ * rewrites `.claude/settings.json` after this CLI recorded that file's hash, which
+ * makes `status` report drift forever. See the comment in the claude profile.
  */
 export interface NativeActivation {
   binary: "codex" | "copilot";
+  /** Verb this CLI uses to re-index its marketplaces, after `plugin marketplace`. */
+  upgradeVerb: string;
+  /** Verb this CLI uses to enable a plugin, after `plugin`. */
+  enableVerb: string;
 }
 
 export interface NativePluginsParams {

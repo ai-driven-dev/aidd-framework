@@ -78,6 +78,7 @@ import { SyncConflictResolverUseCase } from "../application/use-cases/sync/sync-
 import { UninstallIdeUseCase } from "../application/use-cases/uninstall/uninstall-ide-use-case.js";
 import { UninstallToolsUseCase } from "../application/use-cases/uninstall/uninstall-tools-use-case.js";
 import { UninstallUseCase } from "../application/use-cases/uninstall/uninstall-use-case.js";
+import { AI_TOOL_IDS } from "../domain/models/tool-ids.js";
 import type { AssetProvider } from "../domain/ports/asset-provider.js";
 import type { CredentialStore } from "../domain/ports/credential-store.js";
 import type { FileMerger } from "../domain/ports/file-merger.js";
@@ -98,11 +99,10 @@ import type { Prompter } from "../domain/ports/prompter.js";
 import type { SelfUpdater } from "../domain/ports/self-updater.js";
 import type { VersionControl } from "../domain/ports/version-control.js";
 import type { VersionReader } from "../domain/ports/version-reader.js";
+import { nativeActivationOf } from "../domain/tools/registry.js";
 import { AjvSchemaValidatorAdapter } from "./adapters/ajv-schema-validator-adapter.js";
 import { AuthProviderAdapter } from "./adapters/auth-provider-adapter.js";
 import { AuthReaderAdapter } from "./adapters/auth-reader-adapter.js";
-import { CodexCliAdapter } from "./adapters/codex-cli-adapter.js";
-import { CopilotCliAdapter } from "./adapters/copilot-cli-adapter.js";
 import { CurrentVersionAdapter } from "./adapters/current-version-adapter.js";
 import { FileAdapter } from "./adapters/file-adapter.js";
 import { GhCliAdapter } from "./adapters/gh-cli-adapter.js";
@@ -115,6 +115,7 @@ import { ManifestRepositoryAdapter } from "./adapters/manifest-repository-adapte
 import { MarketplaceCacheAdapter } from "./adapters/marketplace-cache-adapter.js";
 import { MarketplaceRegistryAdapter } from "./adapters/marketplace-registry-adapter.js";
 import { MarketplaceTrustStoreAdapter } from "./adapters/marketplace-trust-store-adapter.js";
+import { NativePluginCliAdapter } from "./adapters/native-plugin-cli-adapter.js";
 import { PlatformAdapter } from "./adapters/platform-adapter.js";
 import { PluginCatalogRepositoryAdapter } from "./adapters/plugin-catalog-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "./adapters/plugin-distribution-reader-adapter.js";
@@ -398,8 +399,19 @@ export async function createDeps(
     ? new InquirerPrompterAdapter()
     : new SilentPrompterAdapter();
   const nativePluginActivators = new Map<string, NativePluginActivator>([
-    ["codex", new CodexCliAdapter()],
-    ["copilot", new CopilotCliAdapter()],
+    ...AI_TOOL_IDS.map((id) => {
+      const activation = nativeActivationOf(id);
+      return activation === undefined
+        ? undefined
+        : ([
+            activation.binary,
+            new NativePluginCliAdapter(
+              activation.binary,
+              activation.upgradeVerb,
+              activation.enableVerb
+            ),
+          ] as const);
+    }).filter((entry): entry is NonNullable<typeof entry> => entry !== undefined),
   ]);
   const pluginRemoveUseCase = new PluginRemoveUseCase(fs, manifestRepo);
   const pluginListUseCase = new PluginListUseCase(manifestRepo);

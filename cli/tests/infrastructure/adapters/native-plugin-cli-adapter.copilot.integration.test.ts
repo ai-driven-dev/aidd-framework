@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NativePluginCliError } from "../../../src/domain/errors.js";
-import { CopilotCliAdapter } from "../../../src/infrastructure/adapters/copilot-cli-adapter.js";
+import { NativePluginCliAdapter } from "../../../src/infrastructure/adapters/native-plugin-cli-adapter.js";
 
 vi.mock("node:child_process", () => ({
   spawnSync: vi.fn(),
@@ -42,7 +42,7 @@ describe("CopilotCliAdapter", () => {
       rmSync(dir, { recursive: true, force: true });
     };
 
-    expect(new CopilotCliAdapter().isAvailable()).toBe(true);
+    expect(new NativePluginCliAdapter("copilot", "update", "install").isAvailable()).toBe(true);
     expect(mockSpawnSync).not.toHaveBeenCalled();
   });
 
@@ -55,13 +55,13 @@ describe("CopilotCliAdapter", () => {
       rmSync(emptyDir, { recursive: true, force: true });
     };
 
-    expect(new CopilotCliAdapter().isAvailable()).toBe(false);
+    expect(new NativePluginCliAdapter("copilot", "update", "install").isAvailable()).toBe(false);
   });
 
   it("registers a marketplace via `copilot plugin marketplace add <source>`", () => {
     mockSpawnSync.mockReturnValue(makeResult({}));
 
-    new CopilotCliAdapter().addMarketplace("/abs/mkt");
+    new NativePluginCliAdapter("copilot", "update", "install").addMarketplace("/abs/mkt");
 
     expect(mockSpawnSync).toHaveBeenCalledWith(
       "copilot",
@@ -73,7 +73,7 @@ describe("CopilotCliAdapter", () => {
   it("refreshes marketplaces via `copilot plugin marketplace update`", () => {
     mockSpawnSync.mockReturnValue(makeResult({}));
 
-    new CopilotCliAdapter().upgradeMarketplaces();
+    new NativePluginCliAdapter("copilot", "update", "install").upgradeMarketplaces();
 
     expect(mockSpawnSync).toHaveBeenCalledWith(
       "copilot",
@@ -85,7 +85,9 @@ describe("CopilotCliAdapter", () => {
   it("installs a plugin via `copilot plugin install <ref>`", () => {
     mockSpawnSync.mockReturnValue(makeResult({}));
 
-    new CopilotCliAdapter().enablePlugin("aidd-context@aidd-framework");
+    new NativePluginCliAdapter("copilot", "update", "install").enablePlugin(
+      "aidd-context@aidd-framework"
+    );
 
     expect(mockSpawnSync).toHaveBeenCalledWith(
       "copilot",
@@ -97,13 +99,19 @@ describe("CopilotCliAdapter", () => {
   it("throws NativePluginCliError with stderr detail on non-zero exit", () => {
     mockSpawnSync.mockReturnValue(makeResult({ status: 1, stderr: 'Marketplace "m1" not found' }));
 
-    expect(() => new CopilotCliAdapter().enablePlugin("ghost@m1")).toThrow(NativePluginCliError);
-    expect(() => new CopilotCliAdapter().enablePlugin("ghost@m1")).toThrow("Marketplace");
+    expect(() =>
+      new NativePluginCliAdapter("copilot", "update", "install").enablePlugin("ghost@m1")
+    ).toThrow(NativePluginCliError);
+    expect(() =>
+      new NativePluginCliAdapter("copilot", "update", "install").enablePlugin("ghost@m1")
+    ).toThrow("Marketplace");
   });
 
   it("throws NativePluginCliError when the process fails to spawn", () => {
     mockSpawnSync.mockReturnValue(makeResult({ error: new Error("spawn EACCES"), status: null }));
 
-    expect(() => new CopilotCliAdapter().addMarketplace("/abs/mkt")).toThrow(NativePluginCliError);
+    expect(() =>
+      new NativePluginCliAdapter("copilot", "update", "install").addMarketplace("/abs/mkt")
+    ).toThrow(NativePluginCliError);
   });
 });

@@ -236,7 +236,7 @@ export const codex: AiTool<
       // Codex only enables plugins from its user-global config (~/.codex/config.toml)
       // plus its plugin cache (~/.codex/plugins/cache/). A project-local settings file
       // is inert, so we drive the `codex` CLI directly during marketplace sync instead.
-      nativeActivation: { binary: "codex" },
+      nativeActivation: { binary: "codex", upgradeVerb: "upgrade", enableVerb: "add" },
     }),
   },
 

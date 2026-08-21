@@ -30,9 +30,6 @@ const BASELINE = [
   "src/domain/models/manifest.ts",
   "src/domain/models/plugin-format.ts",
   "src/domain/models/tool-recommendations.ts",
-  "src/infrastructure/adapters/codex-cli-adapter.ts",
-  "src/infrastructure/adapters/copilot-cli-adapter.ts",
-  "src/infrastructure/deps.ts",
 ];
 
 describe("adding a tool costs one file", () => {

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NativePluginCliError } from "../../../src/domain/errors.js";
-import { CodexCliAdapter } from "../../../src/infrastructure/adapters/codex-cli-adapter.js";
+import { NativePluginCliAdapter } from "../../../src/infrastructure/adapters/native-plugin-cli-adapter.js";
 
 function pathWithExecutable(name: string): { dir: string; restore: () => void } {
   const dir = mkdtempSync(join(tmpdir(), "aidd-bin-"));
@@ -50,7 +50,7 @@ describe("CodexCliAdapter", () => {
     const env = pathWithExecutable("codex");
     restorePath = env.restore;
 
-    expect(new CodexCliAdapter().isAvailable()).toBe(true);
+    expect(new NativePluginCliAdapter("codex", "upgrade", "add").isAvailable()).toBe(true);
     expect(mockSpawnSync).not.toHaveBeenCalled();
   });
 
@@ -63,13 +63,13 @@ describe("CodexCliAdapter", () => {
       rmSync(emptyDir, { recursive: true, force: true });
     };
 
-    expect(new CodexCliAdapter().isAvailable()).toBe(false);
+    expect(new NativePluginCliAdapter("codex", "upgrade", "add").isAvailable()).toBe(false);
   });
 
   it("registers a marketplace via `codex plugin marketplace add <source>`", () => {
     mockSpawnSync.mockReturnValue(makeResult({}));
 
-    new CodexCliAdapter().addMarketplace("/abs/mkt");
+    new NativePluginCliAdapter("codex", "upgrade", "add").addMarketplace("/abs/mkt");
 
     expect(mockSpawnSync).toHaveBeenCalledWith(
       "codex",
@@ -81,7 +81,7 @@ describe("CodexCliAdapter", () => {
   it("upgrades marketplaces via `codex plugin marketplace upgrade`", () => {
     mockSpawnSync.mockReturnValue(makeResult({}));
 
-    new CodexCliAdapter().upgradeMarketplaces();
+    new NativePluginCliAdapter("codex", "upgrade", "add").upgradeMarketplaces();
 
     expect(mockSpawnSync).toHaveBeenCalledWith(
       "codex",
@@ -93,7 +93,9 @@ describe("CodexCliAdapter", () => {
   it("enables a plugin via `codex plugin add <ref>`", () => {
     mockSpawnSync.mockReturnValue(makeResult({}));
 
-    new CodexCliAdapter().enablePlugin("aidd-context@aidd-framework");
+    new NativePluginCliAdapter("codex", "upgrade", "add").enablePlugin(
+      "aidd-context@aidd-framework"
+    );
 
     expect(mockSpawnSync).toHaveBeenCalledWith(
       "codex",
@@ -107,15 +109,19 @@ describe("CodexCliAdapter", () => {
       makeResult({ status: 1, stderr: "plugin `ghost` was not found in marketplace `m1`" })
     );
 
-    expect(() => new CodexCliAdapter().enablePlugin("ghost@m1")).toThrow(NativePluginCliError);
-    expect(() => new CodexCliAdapter().enablePlugin("ghost@m1")).toThrow(
-      "plugin `ghost` was not found"
-    );
+    expect(() =>
+      new NativePluginCliAdapter("codex", "upgrade", "add").enablePlugin("ghost@m1")
+    ).toThrow(NativePluginCliError);
+    expect(() =>
+      new NativePluginCliAdapter("codex", "upgrade", "add").enablePlugin("ghost@m1")
+    ).toThrow("plugin `ghost` was not found");
   });
 
   it("throws NativePluginCliError when the process fails to spawn", () => {
     mockSpawnSync.mockReturnValue(makeResult({ error: new Error("spawn EACCES"), status: null }));
 
-    expect(() => new CodexCliAdapter().addMarketplace("/abs/mkt")).toThrow(NativePluginCliError);
+    expect(() =>
+      new NativePluginCliAdapter("codex", "upgrade", "add").addMarketplace("/abs/mkt")
+    ).toThrow(NativePluginCliError);
   });
 });

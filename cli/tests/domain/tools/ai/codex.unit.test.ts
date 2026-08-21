@@ -169,8 +169,12 @@ describe("codex", () => {
   });
 
   describe("capabilities.plugins", () => {
-    it("declares native codex CLI activation", () => {
-      expect(codex.capabilities.plugins.nativeActivation).toEqual({ binary: "codex" });
+    it("declares native codex CLI activation, with the verbs codex uses", () => {
+      expect(codex.capabilities.plugins.nativeActivation).toEqual({
+        binary: "codex",
+        upgradeVerb: "upgrade",
+        enableVerb: "add",
+      });
     });
 
     it("does not write a project-local marketplace settings file", () => {

@@ -171,3 +171,31 @@ changer sans préavis. La dépendance est déjà acceptée pour deux outils sur 
 
 Décision produit, non tranchée.
 
+### Uniformiser sur la CLI de l'outil : tenté, mesuré, abandonné pour Claude
+
+Piloter `claude plugin marketplace add --scope project` a été implémenté puis retiré. Le golden a
+dit pourquoi : l'empreinte de `.claude/settings.json` change et `status` rapporte le fichier
+**modifié** là où il était en phase.
+
+La cause est nette. Cette commande **écrit elle-même dans `.claude/settings.json`**, après qu'AIDD
+l'a écrit et a enregistré son empreinte au manifest. Deux écrivains, un seul qui enregistre : le
+projet signale une dérive permanente. Sans `--scope project` c'est pire encore — la commande vise le
+**user scope par défaut** et enregistrerait le marketplace globalement, pour tous les projets de la
+machine.
+
+Codex et Copilot n'ont pas ce problème : leurs profils déclarent `marketplaceSettings: null` ou un
+fichier que leur CLI ne réécrit pas. Ils sont pilotés parce que leur fichier de config **ne suffit
+pas**, et le pilotage n'entre pas en conflit avec le suivi d'empreinte.
+
+Ce que ça révèle, au-delà du cas : `.claude/settings.json` n'est pas co-possédé avec *l'utilisateur*
+mais avec *l'outil*. Suivre l'empreinte d'un fichier qu'un autre programme réécrit légitimement
+fabrique de la fausse dérive. C'est une troisième catégorie, à côté des fichiers possédés et
+co-possédés, et le régime à lui appliquer n'est tranché nulle part.
+
+### Cursor : sa CLI a évolué, mais pas dans le sens utile
+
+`cursor-agent plugin marketplace add|list|remove|update` existe désormais. Vérifié : `add` prend une
+**URL de dépôt git** et `list` liste ce qui est « visible to this account » — un concept hébergé,
+indexé côté serveur. AIDD construit un marketplace **local** ; cette commande ne peut pas le
+prendre. La matérialisation plugin-locale actuelle de Cursor reste la bonne approche.
+

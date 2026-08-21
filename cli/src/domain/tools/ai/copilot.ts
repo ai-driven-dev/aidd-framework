@@ -327,7 +327,7 @@ export const copilot: AiTool<
       // auto-install (github/copilot-cli#2249); the project marketplace is also not
       // installable from project scope (#3088). Drive `copilot plugin install` to
       // actually load plugins — the settings file below still surfaces recommendations.
-      nativeActivation: { binary: "copilot" },
+      nativeActivation: { binary: "copilot", upgradeVerb: "update", enableVerb: "install" },
       // VS Code Copilot: extraKnownMarketplaces in .github/copilot/settings.json.
       // chat.plugins.marketplaces has application scope and cannot be set in workspace
       // .vscode/settings.json — VSCode rejects it with "This setting has an application scope".

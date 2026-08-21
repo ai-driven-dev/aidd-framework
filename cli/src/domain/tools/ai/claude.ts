@@ -108,6 +108,12 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         acceptsHooks: true,
         acceptsMcp: true,
         translationMode: "marketplace",
+        // Deliberately NOT driven through `claude plugin marketplace add`, though the
+        // command exists and takes a local path. Measured: it writes `.claude/settings.json`
+        // itself, after this CLI wrote it and recorded its hash — two writers, one
+        // recorder, so `status` reports the file modified forever after. Claude Code
+        // reads a project-local settings file, so writing it is sufficient; codex and
+        // copilot are driven because for them it is not.
         marketplaceSettings: {
           settingsPath: ".claude/settings.json",
           settingsKey: "extraKnownMarketplaces",
