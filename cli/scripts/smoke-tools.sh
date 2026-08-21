@@ -363,15 +363,23 @@ if [[ -n "${SMOKE_REMOTE:-}" ]]; then
     if [[ -z "$catalog" ]]; then bad "no cached catalog (shape: $shape)"; continue; fi
     printf '%s' "$shape" > "$catalog"
     out=$(cd "$p" && node "$CLI" plugin install aidd-dev --yes 2>&1); rc=$?
-    # This assertion encodes an expectation the product no longer meets: with the
-    # fetched catalog corrupted, the install now SUCCEEDS instead of failing with a
-    # message naming `marketplace refresh --force`. Recovering silently may well be
-    # the better behavior — a fetched catalog is a cache, and the regime for
-    # CLI-owned files is to regenerate rather than to error. Nobody has decided
-    # which side is right, so this reports rather than fails, and the heal check
-    # below still runs.
+    # A fetched catalog is a cache, and the rule for CLI-owned files is to regenerate
+    # rather than to error. So recovering from a corrupt one is the behavior to pin,
+    # not an error message to demand. This used to assert the opposite, and stopped
+    # holding without anyone noticing.
+    #
+    # Either outcome is acceptable as long as it is coherent: recover silently, or
+    # fail with a message that says what to run. Failing with neither is the defect.
     if [[ "$rc" -eq 0 ]]; then
-      skip "corrupt cache no longer blocks install (${shape:0:22}) — expectation or product?"
+      # Assert what a user sees, not whether the cache file was rewritten: the CLI
+      # must keep working with the corrupt catalog still on disk. Three of the four
+      # shapes do rewrite it, `{ truncated` does not — an internal difference that
+      # would make a cache-file assertion flap for no user-visible reason.
+      if (cd "$p" && node "$CLI" plugin list >/dev/null 2>&1); then
+        ok "corrupt → recovered, CLI still usable (${shape:0:22})"
+      else
+        bad "install succeeded but left the CLI broken (shape: $shape)" "$out"
+      fi
     elif [[ "$out" == *"marketplace refresh --force"* ]]; then
       ok "corrupt → actionable error (${shape:0:22})"
     else
