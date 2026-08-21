@@ -55,3 +55,4 @@ status: in-progress
 | The command surface changes last, through aliases                | The e2e net invokes the CLI. Renaming breaks it exactly when it is most needed |
 | A tool is not a managed resource, it is the scope of every command | `ai install cursor` already equips a tool with everything; `tool add` would be the same command twice. `--tool` replaces both groups |
 | Two ownership regimes get two treatments                         | Generated files are regenerated; files co-owned with the user are merged. Applying hash tracking to the first is over-engineering, blind rewriting of the second destroys their work |
+| Telemetry lands in the current structure and migrates with it     | It is being built in parallel with this refactor. Following today's conventions keeps one structure at a time; the cost is that its files move with their layer, so every phase projection has to account for whatever it added |

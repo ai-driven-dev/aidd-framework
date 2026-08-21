@@ -111,6 +111,24 @@ Les phases 1 et 2 sont indépendantes l'une de l'autre. Les phases 5 à 9 sont s
 construction (chaque contexte dépend de celui d'en dessous). La phase 13 suit chaque phase qu'elle
 documente, plutôt que d'attendre la fin.
 
+## Télémétrie, développée en parallèle
+
+Elle arrive pendant ce refactor, et elle atterrit dans la structure actuelle : elle suivra ses
+couches comme le reste. Trois conséquences à ne pas perdre.
+
+- **Les projections de phase ne la connaissent pas.** Chaque fiche liste des fichiers nommés ;
+  ceux que la télémétrie ajoutera devront être intégrés à la projection de la phase qui déplace
+  leur couche, sinon ils seront oubliés au déplacement.
+- **`docs/FAQ.md:44` promet aujourd'hui le contraire** : « No hosted service. AIDD is prompt content
+  you install into your own tool; there is no AIDD server, account, or telemetry. » C'est le seul
+  endroit du dépôt qui porte cette promesse — le README ne la contient pas. Elle doit être réécrite
+  avant qu'une release embarque de la télémétrie, faute de quoi l'engagement est faux le temps d'une
+  version.
+- **« Activer la télémétrie pour tel outil » lit l'état que possède `framework`.** L'invariant
+  « seul `framework` importe un autre contexte » ne le permet pas. Soit la télémétrie s'active
+  globalement en attendant, soit `framework` expose une lecture publique de son état — décision à
+  prendre au moment où ce besoin devient réel, pas avant.
+
 ## Points encore ouverts
 
 | Sujet | État |
