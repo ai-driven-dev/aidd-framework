@@ -9,7 +9,7 @@ import {
   DEFAULT_TELEMETRY_SINK_RETENTION_DAYS,
   decideTelemetrySinkRetention,
 } from "../../../domain/models/telemetry-sink-retention.js";
-import { AI_TOOL_IDS } from "../../../domain/models/tool-ids.js";
+import { AI_TOOL_IDS, type AiToolId } from "../../../domain/models/tool-ids.js";
 import type { Logger } from "../../../domain/ports/logger.js";
 import type { TelemetrySink } from "../../../domain/ports/telemetry-sink.js";
 import { getAiToolConfig } from "../../../domain/tools/registry.js";
@@ -20,24 +20,32 @@ export interface TelemetryReceiveStartResult {
   readonly rootDir: string;
 }
 
-function declaredExports(): readonly TelemetryExportDeclared[] {
-  const declared: TelemetryExportDeclared[] = [];
+/** A declared export shape, paired with the tool that declared it — the pairing this
+ * file's only job is to carry forward, never to branch on. */
+interface DeclaredExport {
+  readonly toolId: AiToolId;
+  readonly shape: TelemetryExportDeclared;
+}
+
+function declaredExports(): readonly DeclaredExport[] {
+  const declared: DeclaredExport[] = [];
   for (const toolId of AI_TOOL_IDS) {
     const shape = getAiToolConfig(toolId).telemetryExport;
-    if (shape.kind === "declared") declared.push(shape);
+    if (shape.kind === "declared") declared.push({ toolId, shape });
   }
   return declared;
 }
 
 function declaredVendorIdentities(): readonly TelemetryVendorIdentity[] {
-  return declaredExports().map(({ identityAttribute, turnAttribute }) => ({
-    identityAttribute,
-    turnAttribute,
+  return declaredExports().map(({ toolId, shape }) => ({
+    tool: toolId,
+    identityAttribute: shape.identityAttribute,
+    turnAttribute: shape.turnAttribute,
   }));
 }
 
 function declaredSessionMeasures(): readonly TelemetrySessionMeasure[] {
-  return declaredExports().flatMap((shape) => shape.sessionMeasures ?? []);
+  return declaredExports().flatMap(({ shape }) => shape.sessionMeasures ?? []);
 }
 
 function errorMessage(error: unknown): string {

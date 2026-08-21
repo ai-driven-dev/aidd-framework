@@ -10,6 +10,7 @@ const RECORD: TelemetrySinkRecord = {
   sink_schema_version: 2,
   kind: "request",
   provenance: "export",
+  tool: "claude",
   vendor_id: "s-1",
   vendor_field: "session.id",
   cost_usd: 1,

@@ -1,4 +1,5 @@
 import { UnknownTelemetrySinkSchemaVersionError } from "../errors.js";
+import type { AiToolId } from "./tool-ids.js";
 
 // v2 adds `provenance`, required rather than defaulted, because a default meaning "the
 // old route" is exactly the ambiguity the field exists to remove. No migration: the sink
@@ -19,11 +20,14 @@ export type TelemetrySinkRecordProvenance = "export" | "local-read";
 
 /** The tool-neutral stored line, and the complete allowlist of what a session may leave
  * behind. `vendor_field` and `turn_field` name the export-side attribute a value came
- * from, since that attribute differs per tool. */
+ * from, since that attribute differs per tool — `tool` names the tool itself, so no
+ * consumer ever has to reverse that attribute back into an identity. Never optional: an
+ * unnamed record is exactly the ambiguity this field exists to remove. */
 export interface TelemetrySinkRecord {
   readonly sink_schema_version: number;
   readonly kind: TelemetrySinkRecordKind;
   readonly provenance: TelemetrySinkRecordProvenance;
+  readonly tool: AiToolId;
   readonly vendor_id: string;
   readonly vendor_field: string;
   readonly turn_id?: string;
@@ -47,8 +51,11 @@ export interface TelemetrySinkRecord {
 }
 
 /** The only thing that varies the mapper per tool, and it arrives as data, not a branch.
- * The caller gathers it from every measured `AiTool.telemetryExport`. */
+ * The caller gathers it from every measured `AiTool.telemetryExport`. `tool` is the
+ * declaration's own identifier, carried alongside the attribute so the mapper can stamp
+ * which tool matched without branching on `identityAttribute`'s value. */
 export interface TelemetryVendorIdentity {
+  readonly tool: AiToolId;
   readonly identityAttribute: string;
   readonly turnAttribute?: string;
 }
@@ -179,15 +186,26 @@ function mergeAttributes(
   return new Map([...resource, ...record]);
 }
 
+/** The tool the mapper matched, and nothing else — computed once by `resolveIdentity` and
+ * reused by both `buildBaseRecord` callers, rather than re-derived from `vendorField`. */
+interface ResolvedIdentity {
+  readonly tool: AiToolId;
+  readonly vendorId: string;
+  readonly vendorField: string;
+  readonly turnId?: string;
+  readonly turnField?: string;
+}
+
 function resolveIdentity(
   merged: Map<string, AttributeValue>,
   vendors: readonly TelemetryVendorIdentity[]
-): { vendorId: string; vendorField: string; turnId?: string; turnField?: string } | null {
+): ResolvedIdentity | null {
   for (const vendor of vendors) {
     const id = merged.get(vendor.identityAttribute);
     if (typeof id !== "string" || id === "") continue;
     const turn = vendor.turnAttribute ? merged.get(vendor.turnAttribute) : undefined;
     return {
+      tool: vendor.tool,
       vendorId: id,
       vendorField: vendor.identityAttribute,
       ...(typeof turn === "string" && turn !== ""
@@ -208,7 +226,7 @@ function setAllowlistedField(
 
 function buildBaseRecord(
   kind: TelemetrySinkRecordKind,
-  identity: { vendorId: string; vendorField: string; turnId?: string; turnField?: string },
+  identity: ResolvedIdentity,
   merged: Map<string, AttributeValue>
 ): SinkRecordDraft {
   const draft: SinkRecordDraft = {
@@ -217,6 +235,7 @@ function buildBaseRecord(
     // The only route this file's mappers ever produce — a locally read record is never
     // built here, since it carries no OTLP attribute map to walk.
     provenance: "export",
+    tool: identity.tool,
     vendor_id: identity.vendorId,
     vendor_field: identity.vendorField,
     turn_id: identity.turnId,

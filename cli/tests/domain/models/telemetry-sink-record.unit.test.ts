@@ -47,6 +47,7 @@ function collectRawEventStamps(payload: unknown): Map<number, string> {
 }
 
 const CLAUDE_VENDOR: TelemetryVendorIdentity = {
+  tool: "claude",
   identityAttribute: "session.id",
   turnAttribute: "prompt.id",
 };
@@ -107,6 +108,15 @@ describe("mapOtlpLogsToSinkRecords()", () => {
     expect(record.vendor_field).toBe("session.id");
     expect(record.turn_id).toBe("a4b7b0b6-dc16-4889-b25a-def1d207aec9");
     expect(record.turn_field).toBe("prompt.id");
+  });
+
+  // Task 1's own criterion: the tool named is the one whose identity attribute matched —
+  // a fact the mapper had already computed and previously threw away — and `vendor_field`
+  // keeps meaning what it always meant, unaffected by the new field beside it.
+  it("names the tool whose identity attribute matched, leaving vendor_field as the attribute name", () => {
+    const [record] = mapOtlpLogsToSinkRecords(logsPayload, [CLAUDE_VENDOR]);
+    expect(record.tool).toBe("claude");
+    expect(record.vendor_field).toBe("session.id");
   });
 
   // The mapper only ever produces the export route — a locally read record is never built
@@ -254,11 +264,15 @@ describe("mapOtlpLogsToSinkRecords()", () => {
         },
       ],
     };
-    const codexVendor: TelemetryVendorIdentity = { identityAttribute: "conversation.id" };
+    const codexVendor: TelemetryVendorIdentity = {
+      tool: "codex",
+      identityAttribute: "conversation.id",
+    };
     const [record] = mapOtlpLogsToSinkRecords(payload, [codexVendor]);
     expect(record.vendor_id).toBe("conv-abc123");
     expect(record.vendor_field).toBe("conversation.id");
     expect(record.turn_id).toBeUndefined();
+    expect(record.tool).toBe("codex");
   });
 
   // agent.name rides only on a subagent's own request, which the main capture has none of.
@@ -279,7 +293,10 @@ describe("mapOtlpLogsToSinkRecords()", () => {
   // registered tool's identity at once. Tested one at a time, the "first match wins" loop
   // is never exercised — nor is the risk that a non-matching vendor's turn attribute leaks.
   it("resolves the matching tool when several vendors are offered at once", () => {
-    const codexVendor: TelemetryVendorIdentity = { identityAttribute: "conversation.id" };
+    const codexVendor: TelemetryVendorIdentity = {
+      tool: "codex",
+      identityAttribute: "conversation.id",
+    };
     const payload = {
       resourceLogs: [
         {
@@ -306,6 +323,9 @@ describe("mapOtlpLogsToSinkRecords()", () => {
     expect(record.vendor_id).toBe("codex-session");
     expect(record.turn_id).toBeUndefined();
     expect(record.turn_field).toBeUndefined();
+    // The matched vendor's own tool, not the first vendor offered — proves `tool` tracks
+    // whichever identity actually matched, the same loop `vendor_field` already relies on.
+    expect(record.tool).toBe("codex");
   });
 
   it("drops a billed-looking record when the tool it came from declares no matching identity", () => {
@@ -356,6 +376,7 @@ describe("mapOtlpMetricsToSinkRecords()", () => {
     expect(activeTime?.active_time_s).toBe(9.714);
     expect(activeTime?.kind).toBe("session");
     expect(activeTime?.turn_id).toBeUndefined();
+    expect(activeTime?.tool).toBe("claude");
   });
 
   it("produces one line per datapoint, never merging token subtypes", () => {

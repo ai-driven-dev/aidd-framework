@@ -96,10 +96,40 @@ describe("ReadLocalCostUseCase", () => {
     expect(stored).toMatchObject({
       sink_schema_version: 2,
       provenance: "local-read",
+      tool: "claude",
       vendor_id: SESSION_ID,
       input_tokens: 10,
       output_tokens: 20,
     });
+  });
+
+  // Task 2's own criterion: the use-case names the tool it asked, never the candidate
+  // itself — `CANDIDATE` carries no `tool` field at all (the type omits it), so this is
+  // structurally impossible for the reader to have supplied.
+  it("stamps the tool it asked", async () => {
+    declareClaudeReadable();
+    const sink = new InMemoryTelemetrySink();
+    const useCase = new ReadLocalCostUseCase(sink, new Map([["claude", stubReader([CANDIDATE])]]));
+
+    await useCase.execute({ sessionId: SESSION_ID });
+
+    const [stored] = [...sink.files.values()].flat();
+    expect(stored.tool).toBe("claude");
+  });
+
+  // A reader cannot name its own tool, and the proof belongs to the compiler rather than
+  // to a run: `LocalCostCandidateRecord` omits `tool`, so the attempt below does not
+  // compile. `@ts-expect-error` inverts that into an assertion — the day the field becomes
+  // settable, the directive has nothing to suppress and `tsc` fails on it. A runtime test
+  // would have had to widen the type to build the value it forbids, which is the hole
+  // being closed, not a way to check it is closed.
+  it("forbids a reader from naming its own tool, at compile time", () => {
+    const candidate: LocalCostCandidateRecord = {
+      ...CANDIDATE,
+      // @ts-expect-error `tool` is omitted from what a reader may return
+      tool: "codex",
+    };
+    expect(candidate).toBeDefined();
   });
 
   it("leaves the store byte-identical on a second read of the same session", async () => {

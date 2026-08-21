@@ -66,7 +66,7 @@ export class ReadLocalCostUseCase {
       return { tool, status: "not-covered", recordsFound: 0, recordsStored: 0, reason };
     }
     const candidates = (await this.readers.get(tool)?.read(sessionId)) ?? [];
-    const recordsStored = await this.storeNewCandidates(sessionId, candidates, at);
+    const recordsStored = await this.storeNewCandidates(tool, sessionId, candidates, at);
     return {
       tool,
       status: candidates.length === 0 ? "empty" : "found",
@@ -81,6 +81,7 @@ export class ReadLocalCostUseCase {
    * as the same record is read again. A candidate with no `turn_id` cannot be matched and
    * is always appended: the reader's contract forbids inventing a key for it. */
   private async storeNewCandidates(
+    tool: AiToolId,
     sessionId: string,
     candidates: readonly LocalCostCandidateRecord[],
     at: Date
@@ -93,13 +94,23 @@ export class ReadLocalCostUseCase {
     let stored = 0;
     for (const candidate of candidates) {
       if (candidate.turn_id !== undefined && storedTurnIds.has(candidate.turn_id)) continue;
-      await this.sink.appendRecord(this.stampProvenance(candidate), at);
+      await this.sink.appendRecord(this.stampProvenanceAndTool(tool, candidate), at);
       stored++;
     }
     return stored;
   }
 
-  private stampProvenance(candidate: LocalCostCandidateRecord): TelemetrySinkRecord {
-    return { ...candidate, sink_schema_version: SINK_SCHEMA_VERSION, provenance: "local-read" };
+  // The caller asked this tool's reader by name — that is the fact this stamps, never
+  // inferred from the candidate itself, which the reader's contract forbids it naming.
+  private stampProvenanceAndTool(
+    tool: AiToolId,
+    candidate: LocalCostCandidateRecord
+  ): TelemetrySinkRecord {
+    return {
+      ...candidate,
+      sink_schema_version: SINK_SCHEMA_VERSION,
+      provenance: "local-read",
+      tool,
+    };
   }
 }

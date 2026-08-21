@@ -1,11 +1,13 @@
 import type { TelemetrySinkRecord } from "../models/telemetry-sink-record.js";
 
-/** What a per-tool local reader returns: every field of the stored shape except the two
- * the caller stamps uniformly across every tool — `sink_schema_version` and `provenance`.
- * A reader that could set `provenance` itself could also claim to be an export it is not. */
+/** What a per-tool local reader returns: every field of the stored shape except the three
+ * the caller stamps uniformly across every tool — `sink_schema_version`, `provenance`, and
+ * `tool`. A reader that could set `provenance` itself could also claim to be an export it
+ * is not; `tool` joins the same omission list for the same reason — a reader that could
+ * name itself could name another. */
 export type LocalCostCandidateRecord = Omit<
   TelemetrySinkRecord,
-  "sink_schema_version" | "provenance"
+  "sink_schema_version" | "provenance" | "tool"
 >;
 
 /**
