@@ -38,6 +38,7 @@ describe("mapCodexRolloutToSinkRecords", () => {
       turn_field: "turn_id",
       model: "gpt-5.6-sol",
       effort: "high",
+      event_timestamp: "2026-07-29T15:12:27.889Z",
       input_tokens: 8898,
       output_tokens: 827,
       cache_read_tokens: 65792,
@@ -51,6 +52,7 @@ describe("mapCodexRolloutToSinkRecords", () => {
       turn_field: "turn_id",
       model: "gpt-5.6-sol",
       effort: "high",
+      event_timestamp: "2026-07-29T15:15:13.692Z",
       input_tokens: 5032,
       output_tokens: 3550,
       cache_read_tokens: 99840,
@@ -88,6 +90,7 @@ describe("mapCodexRolloutToSinkRecords", () => {
       turn_field: "turn_id",
       model: "gpt-5.5",
       effort: "high",
+      event_timestamp: "2026-07-16T07:26:08.898Z",
       input_tokens: 25073,
       output_tokens: 1148,
       cache_read_tokens: 22272,
@@ -99,6 +102,29 @@ describe("mapCodexRolloutToSinkRecords", () => {
     const moved = loadFixture(TARGET_PATH).replaceAll("last_token_usage", "lastTokenUsage");
 
     expect(mapCodexRolloutToSinkRecords(moved)).toHaveLength(0);
+  });
+
+  // Without a moment, a Codex record cannot fall inside any step interval, so the journal
+  // — the only step source Codex has — could never attribute it. The rollout carries the
+  // moment on the `turn_context` line; taking it is what makes the fallback reachable.
+  it("carries the turn's own start, so a journal interval can reach it", () => {
+    const records = mapCodexRolloutToSinkRecords(loadFixture(TARGET_PATH));
+
+    expect(records.length).toBeGreaterThan(0);
+    for (const record of records) {
+      expect(record.event_timestamp).toBeDefined();
+    }
+    expect(records[0].event_timestamp).toBe("2026-07-29T15:12:27.889Z");
+  });
+
+  it("takes the moment from turn_context, not from a counted event inside the turn", () => {
+    const records = mapCodexRolloutToSinkRecords(loadFixture(TARGET_PATH));
+
+    // The `token_count` events of a turn arrive after it opens; a record covering the whole
+    // turn must not claim a moment inside it.
+    const [first] = records;
+    expect(first.event_timestamp).toBe("2026-07-29T15:12:27.889Z");
+    expect(first.turn_id).toBe("019fae6f-2084-7d63-b3c1-3d45d0864fe9");
   });
 
   it("touches no filesystem — a string in, an array out", () => {

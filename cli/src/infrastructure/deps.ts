@@ -143,6 +143,7 @@ import { PluginCatalogRepositoryAdapter } from "./adapters/plugin-catalog-reposi
 import { PluginDistributionReaderAdapter } from "./adapters/plugin-distribution-reader-adapter.js";
 import { PluginFetcherAdapter } from "./adapters/plugin-fetcher-adapter.js";
 import { InquirerPrompterAdapter, SilentPrompterAdapter } from "./adapters/prompter-adapter.js";
+import { RunJournalReaderAdapter } from "./adapters/run-journal-reader-adapter.js";
 import { SelfUpdaterAdapter } from "./adapters/self-updater-adapter.js";
 import { TelemetrySinkAdapter } from "./adapters/telemetry-sink-adapter.js";
 import { TranscriptCostReaderAdapter } from "./adapters/transcript-cost-reader-adapter.js";
@@ -740,7 +741,12 @@ export async function createDeps(
       ),
     ],
   ]);
-  const readLocalCostUseCase = new ReadLocalCostUseCase(telemetrySink, localCostReaders);
+  const runJournalReader = new RunJournalReaderAdapter(projectRoot);
+  const readLocalCostUseCase = new ReadLocalCostUseCase(
+    telemetrySink,
+    localCostReaders,
+    runJournalReader
+  );
   const deps: Deps = {
     fs,
     manifestRepo,

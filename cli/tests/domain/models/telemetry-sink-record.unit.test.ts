@@ -126,6 +126,16 @@ describe("mapOtlpLogsToSinkRecords()", () => {
     expect(record.provenance).toBe("export");
   });
 
+  // Task 1.4's own criterion: the export path never fills a step from the vendor's own
+  // attribute, which reads `third-party` for every framework skill. Every export-mapped
+  // record is unattributed — the journal, not this mapper, is where an export path's
+  // attribution would ever come from.
+  it("never fills a step from the vendor's own attribute — every export record is unattributed", () => {
+    const [record] = mapOtlpLogsToSinkRecords(logsPayload, [CLAUDE_VENDOR]);
+    expect(record.step_attribution).toBe("unattributed");
+    expect(record.step).toBeUndefined();
+  });
+
   it("keeps every allowlisted field present on the real captured payload", () => {
     const [record] = mapOtlpLogsToSinkRecords(logsPayload, [CLAUDE_VENDOR]);
     expect(record.project_id).toBe("aidd-lab/telemetry-proof");
@@ -377,6 +387,12 @@ describe("mapOtlpMetricsToSinkRecords()", () => {
     expect(activeTime?.kind).toBe("session");
     expect(activeTime?.turn_id).toBeUndefined();
     expect(activeTime?.tool).toBe("claude");
+  });
+
+  it("stamps every session-measure record unattributed too, on the same basis as a log record", () => {
+    const records = mapOtlpMetricsToSinkRecords(metricsPayload, [CLAUDE_VENDOR], CLAUDE_MEASURES);
+    expect(records.length).toBeGreaterThan(0);
+    expect(records.every((r) => r.step_attribution === "unattributed")).toBe(true);
   });
 
   it("produces one line per datapoint, never merging token subtypes", () => {

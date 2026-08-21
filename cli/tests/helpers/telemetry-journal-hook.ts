@@ -12,6 +12,7 @@ interface JournalRepoModule {
   getRemoteUrl(repoRoot: string): string | null;
   parseOwnerRepoFromRemote(remoteUrl: string | null): string | null;
   sanitizeProjectId(projectId: string): string;
+  sanitizePathSegment(segment: string): string;
   deriveProjectId(repoRoot: string): string;
   telemetryEnabled(repoRoot: string): boolean;
 }

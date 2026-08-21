@@ -34,6 +34,7 @@ interface CodexTokenUsage {
 
 interface CodexLine {
   readonly type?: unknown;
+  readonly timestamp?: unknown;
   readonly payload?: {
     readonly id?: unknown;
     readonly turn_id?: unknown;
@@ -48,6 +49,7 @@ interface PendingTurn {
   readonly turnId: string;
   readonly model?: string;
   readonly effort?: string;
+  readonly at?: string;
   inputTokens?: number;
   outputTokens?: number;
   cacheReadTokens?: number;
@@ -72,10 +74,16 @@ function parseLine(line: string): CodexLine | null {
   }
 }
 
-function startTurn(payload: NonNullable<CodexLine["payload"]>): PendingTurn | null {
+// `at` is the turn's own start, taken from the `turn_context` line rather than from any
+// counted event: a record here covers a whole turn, so a moment inside it would claim a
+// precision the record does not have. It is what a step interval is matched against.
+function startTurn(
+  payload: NonNullable<CodexLine["payload"]>,
+  at: string | undefined
+): PendingTurn | null {
   const turnId = asString(payload.turn_id);
   if (turnId === undefined) return null;
-  return { turnId, model: asString(payload.model), effort: asString(payload.effort) };
+  return { turnId, model: asString(payload.model), effort: asString(payload.effort), at };
 }
 
 /** Adds this event's own increment to the turn's running sums — never the cumulative
@@ -115,6 +123,7 @@ function buildRecord(vendorId: string, pending: PendingTurn): LocalCostCandidate
     turn_field: TURN_FIELD,
     ...(pending.model !== undefined ? { model: pending.model } : {}),
     ...(pending.effort !== undefined ? { effort: pending.effort } : {}),
+    ...(pending.at !== undefined ? { event_timestamp: pending.at } : {}),
     ...(pending.inputTokens !== undefined ? { input_tokens: pending.inputTokens } : {}),
     ...(pending.outputTokens !== undefined ? { output_tokens: pending.outputTokens } : {}),
     ...(pending.cacheReadTokens !== undefined
@@ -138,7 +147,7 @@ class CodexRolloutAccumulator implements TranscriptLineAccumulator {
     const parsed = parseLine(line);
     if (!parsed?.payload) return;
     if (parsed.type === "session_meta") this.vendorId = asString(parsed.payload.id);
-    else if (parsed.type === "turn_context") this.startNewTurn(parsed.payload);
+    else if (parsed.type === "turn_context") this.startNewTurn(parsed.payload, parsed.timestamp);
     else if (parsed.type === "event_msg" && parsed.payload.type === "token_count") {
       this.applyTokenCount(parsed.payload.info?.last_token_usage);
     }
@@ -149,9 +158,9 @@ class CodexRolloutAccumulator implements TranscriptLineAccumulator {
     return this.records;
   }
 
-  private startNewTurn(payload: NonNullable<CodexLine["payload"]>): void {
+  private startNewTurn(payload: NonNullable<CodexLine["payload"]>, timestamp: unknown): void {
     this.flush();
-    this.pending = startTurn(payload) ?? undefined;
+    this.pending = startTurn(payload, asString(timestamp)) ?? undefined;
   }
 
   private applyTokenCount(usage: CodexTokenUsage | undefined): void {

@@ -14,6 +14,7 @@ const RECORD: TelemetrySinkRecord = {
   vendor_id: "s-1",
   vendor_field: "session.id",
   cost_usd: 1,
+  step_attribution: "unattributed",
 };
 
 describe("TelemetrySinkAdapter", () => {

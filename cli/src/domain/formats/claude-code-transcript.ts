@@ -32,6 +32,8 @@ interface ClaudeTranscriptLine {
   readonly timestamp?: unknown;
   readonly effort?: unknown;
   readonly attributionAgent?: unknown;
+  readonly attributionSkill?: unknown;
+  readonly attributionPlugin?: unknown;
   readonly message?: {
     readonly model?: unknown;
     readonly id?: unknown;
@@ -87,18 +89,33 @@ function buildIdentity(
 // otlp-logs-claude-code-subagent.json); matching that here is what keeps a consumer from
 // being able to tell a local-read subagent record from an exported one by anything but
 // `provenance`.
+// `attributionSkill` is exact and unflagged, per message, on the same line as `usage` —
+// measured 2026-08-20 against 40 real transcripts (2267 attributed messages, 25 distinct
+// skills). It arrived around Claude Code 2.1.220 and is omitted, never nulled, when no
+// skill is running; a version that predates the field omits it identically. Nothing on the
+// line separates those two cases, so its absence here yields no `step` at all, leaving
+// attribution to fall back to a run-journal interval (or unattributed) rather than
+// asserting "no skill ran". `attributionPlugin` is read alongside it, and only alongside
+// it — a plugin name with no skill name is not a fact this line can state.
 function buildOptionalFields(
   line: ClaudeTranscriptLine
-): Pick<LocalCostCandidateRecord, "model" | "effort" | "event_timestamp" | "agent_name"> {
+): Pick<
+  LocalCostCandidateRecord,
+  "model" | "effort" | "event_timestamp" | "agent_name" | "step" | "step_plugin"
+> {
   const model = asString(line.message?.model);
   const effort = asString(line.effort);
   const timestamp = asString(line.timestamp);
   const agentName = line.isSidechain === true ? asString(line.attributionAgent) : undefined;
+  const step = asString(line.attributionSkill);
+  const stepPlugin = step !== undefined ? asString(line.attributionPlugin) : undefined;
   return {
     ...(model !== undefined ? { model } : {}),
     ...(effort !== undefined ? { effort } : {}),
     ...(timestamp !== undefined ? { event_timestamp: timestamp } : {}),
     ...(agentName !== undefined ? { agent_name: agentName } : {}),
+    ...(step !== undefined ? { step } : {}),
+    ...(stepPlugin !== undefined ? { step_plugin: stepPlugin } : {}),
   };
 }
 

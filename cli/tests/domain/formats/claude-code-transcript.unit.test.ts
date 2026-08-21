@@ -72,12 +72,33 @@ describe("mapClaudeCodeTranscriptToSinkRecords", () => {
         effort: "high",
         event_timestamp: "2026-08-14T07:54:15.988Z",
         agent_name: "Explore",
+        // A real, unflagged fact this capture carries — task 1's own field, read straight
+        // off the transcript with no journal beside it. No `step_plugin`: this line carries
+        // no `attributionPlugin` at all, and one is never invented alongside a real skill.
+        step: "probe-echo",
         input_tokens: 2,
         output_tokens: 1,
         cache_read_tokens: 0,
         cache_creation_tokens: 20212,
       },
     ]);
+  });
+
+  // Task 1's own criterion: the field's absence is never read as "no skill ran" — it is
+  // simply not asserted at all. Built by removing the real fixture's own attributionSkill
+  // key rather than hand-writing a payload, so this exercises the same real line shape the
+  // presence test above does, differing only in the one field under test.
+  it("carries no step at all when a line has no attributionSkill, never asserting none ran", () => {
+    const withoutAttribution = loadFixture(SUBAGENT_PATH).replace(
+      /"attributionSkill":\s*"[^"]*",?/,
+      ""
+    );
+
+    const records = mapClaudeCodeTranscriptToSinkRecords(withoutAttribution);
+
+    expect(records).toHaveLength(1);
+    expect(records[0] && "step" in records[0]).toBe(false);
+    expect(records[0] && "step_plugin" in records[0]).toBe(false);
   });
 
   it("keeps a subagent's counters distinct from the main line's — never merged into one figure", () => {

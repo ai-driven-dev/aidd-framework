@@ -13,6 +13,10 @@ import type {
 } from "../../../../src/domain/ports/session-cost-reader.js";
 import type { AiTool } from "../../../../src/domain/tools/contracts.js";
 import { getAiToolConfig, registerTool } from "../../../../src/domain/tools/registry.js";
+import {
+  InMemoryRunJournalReader,
+  NULL_RUN_JOURNAL_READER,
+} from "../../../helpers/ports/in-memory-run-journal-reader.js";
 import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetry-sink.js";
 
 const SESSION_ID = "s-1";
@@ -61,7 +65,11 @@ describe("ReadLocalCostUseCase", () => {
       telemetryLocalRead: { kind: "declared", limitation: "read alone: nothing to join on yet." },
     });
     const sink = new InMemoryTelemetrySink();
-    const useCase = new ReadLocalCostUseCase(sink, new Map([["claude", stubReader([CANDIDATE])]]));
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER
+    );
 
     const result = await useCase.execute({ sessionId: SESSION_ID });
 
@@ -75,7 +83,11 @@ describe("ReadLocalCostUseCase", () => {
   it("invents no limitation for a covered tool that declares none", async () => {
     declareClaudeReadable();
     const sink = new InMemoryTelemetrySink();
-    const useCase = new ReadLocalCostUseCase(sink, new Map([["claude", stubReader([CANDIDATE])]]));
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER
+    );
 
     const result = await useCase.execute({ sessionId: SESSION_ID });
 
@@ -86,7 +98,11 @@ describe("ReadLocalCostUseCase", () => {
   it("stores a found session's counters in the stored shape, marked as read locally", async () => {
     declareClaudeReadable();
     const sink = new InMemoryTelemetrySink();
-    const useCase = new ReadLocalCostUseCase(sink, new Map([["claude", stubReader([CANDIDATE])]]));
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER
+    );
 
     const result = await useCase.execute({ sessionId: SESSION_ID });
 
@@ -109,7 +125,11 @@ describe("ReadLocalCostUseCase", () => {
   it("stamps the tool it asked", async () => {
     declareClaudeReadable();
     const sink = new InMemoryTelemetrySink();
-    const useCase = new ReadLocalCostUseCase(sink, new Map([["claude", stubReader([CANDIDATE])]]));
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER
+    );
 
     await useCase.execute({ sessionId: SESSION_ID });
 
@@ -135,7 +155,11 @@ describe("ReadLocalCostUseCase", () => {
   it("leaves the store byte-identical on a second read of the same session", async () => {
     declareClaudeReadable();
     const sink = new InMemoryTelemetrySink();
-    const useCase = new ReadLocalCostUseCase(sink, new Map([["claude", stubReader([CANDIDATE])]]));
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER
+    );
 
     await useCase.execute({ sessionId: SESSION_ID });
     const afterFirst = JSON.stringify([...sink.files.values()]);
@@ -152,7 +176,7 @@ describe("ReadLocalCostUseCase", () => {
 
   it("reports a tool with no declared local read as not-covered, with its declared reason", async () => {
     const sink = new InMemoryTelemetrySink();
-    const useCase = new ReadLocalCostUseCase(sink, new Map());
+    const useCase = new ReadLocalCostUseCase(sink, new Map(), NULL_RUN_JOURNAL_READER);
 
     const result = await useCase.execute({ sessionId: SESSION_ID });
 
@@ -170,7 +194,7 @@ describe("ReadLocalCostUseCase", () => {
     // fact that has not been established either way.
     registerTool({ ...claudeConfig, telemetryLocalRead: { kind: "unmeasured" } });
     const sink = new InMemoryTelemetrySink();
-    const useCase = new ReadLocalCostUseCase(sink, new Map());
+    const useCase = new ReadLocalCostUseCase(sink, new Map(), NULL_RUN_JOURNAL_READER);
 
     const result = await useCase.execute({ sessionId: SESSION_ID });
 
@@ -181,7 +205,11 @@ describe("ReadLocalCostUseCase", () => {
   it("distinguishes not-covered from covered-and-empty", async () => {
     declareClaudeReadable();
     const sink = new InMemoryTelemetrySink();
-    const useCase = new ReadLocalCostUseCase(sink, new Map([["claude", stubReader([])]]));
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([])]]),
+      NULL_RUN_JOURNAL_READER
+    );
 
     const result = await useCase.execute({ sessionId: SESSION_ID });
 
@@ -196,7 +224,11 @@ describe("ReadLocalCostUseCase", () => {
     const sink = new InMemoryTelemetrySink();
     // A reader mid-transcript returns only the complete records it already parsed — the
     // use-case has no way to know, or need to know, that more will exist on a later read.
-    const useCase = new ReadLocalCostUseCase(sink, new Map([["claude", stubReader([CANDIDATE])]]));
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER
+    );
 
     await expect(useCase.execute({ sessionId: SESSION_ID })).resolves.toBeDefined();
     expect([...sink.files.values()].flat()).toHaveLength(1);
@@ -208,7 +240,8 @@ describe("ReadLocalCostUseCase", () => {
     const sink = new InMemoryTelemetrySink();
     const useCase = new ReadLocalCostUseCase(
       sink,
-      new Map([["claude", stubReader([noIdCandidate])]])
+      new Map([["claude", stubReader([noIdCandidate])]]),
+      NULL_RUN_JOURNAL_READER
     );
 
     await useCase.execute({ sessionId: SESSION_ID });
@@ -221,5 +254,154 @@ describe("ReadLocalCostUseCase", () => {
     for (const stored of [...sink.files.values()].flat()) {
       expect(stored.turn_id).toBeUndefined();
     }
+  });
+
+  describe("step attribution", () => {
+    const MOMENT_CANDIDATE: LocalCostCandidateRecord = {
+      ...CANDIDATE,
+      event_timestamp: "2026-08-20T10:02:00Z",
+    };
+
+    function journalWithOneStep(skill: string): InMemoryRunJournalReader {
+      const journal = new InMemoryRunJournalReader();
+      journal.set(SESSION_ID, {
+        boundaries: [
+          { type: "step_start", at: "2026-08-20T10:00:00Z", skill },
+          { type: "turn_end", at: "2026-08-20T10:05:00Z" },
+        ],
+      });
+      return journal;
+    }
+
+    it("stores a tool-stated step, marked as stated by the tool", async () => {
+      declareClaudeReadable();
+      const sink = new InMemoryTelemetrySink();
+      const candidate: LocalCostCandidateRecord = { ...CANDIDATE, step: "aidd-dev:02-implement" };
+      const useCase = new ReadLocalCostUseCase(
+        sink,
+        new Map([["claude", stubReader([candidate])]]),
+        NULL_RUN_JOURNAL_READER
+      );
+
+      await useCase.execute({ sessionId: SESSION_ID });
+
+      const [stored] = [...sink.files.values()].flat();
+      expect(stored).toMatchObject({
+        step_attribution: "tool-stated",
+        step: "aidd-dev:02-implement",
+      });
+    });
+
+    it("carries a tool-stated plugin alongside its step", async () => {
+      declareClaudeReadable();
+      const sink = new InMemoryTelemetrySink();
+      const candidate: LocalCostCandidateRecord = {
+        ...CANDIDATE,
+        step: "aidd-dev:02-implement",
+        step_plugin: "aidd-dev",
+      };
+      const useCase = new ReadLocalCostUseCase(
+        sink,
+        new Map([["claude", stubReader([candidate])]]),
+        NULL_RUN_JOURNAL_READER
+      );
+
+      await useCase.execute({ sessionId: SESSION_ID });
+
+      const [stored] = [...sink.files.values()].flat();
+      expect(stored.step_plugin).toBe("aidd-dev");
+    });
+
+    it("derives a step from a journal interval when the tool states none", async () => {
+      declareClaudeReadable();
+      const sink = new InMemoryTelemetrySink();
+      const useCase = new ReadLocalCostUseCase(
+        sink,
+        new Map([["claude", stubReader([MOMENT_CANDIDATE])]]),
+        journalWithOneStep("aidd-dev:06-test")
+      );
+
+      await useCase.execute({ sessionId: SESSION_ID });
+
+      const [stored] = [...sink.files.values()].flat();
+      expect(stored).toMatchObject({
+        step_attribution: "journal-interval",
+        step: "aidd-dev:06-test",
+      });
+    });
+
+    it("reads a record as unattributed when neither the tool nor a journal can say", async () => {
+      declareClaudeReadable();
+      const sink = new InMemoryTelemetrySink();
+      const useCase = new ReadLocalCostUseCase(
+        sink,
+        new Map([["claude", stubReader([CANDIDATE])]]),
+        NULL_RUN_JOURNAL_READER
+      );
+
+      await useCase.execute({ sessionId: SESSION_ID });
+
+      const [stored] = [...sink.files.values()].flat();
+      expect(stored.step_attribution).toBe("unattributed");
+      expect(stored.step).toBeUndefined();
+    });
+
+    // Task 3's own criterion: a journal interval covers the same moment too, and still
+    // loses — the tool's own answer is exact, an interval is only ever an inference.
+    it("prefers the tool's own stated step over a journal interval that also covers it", async () => {
+      declareClaudeReadable();
+      const sink = new InMemoryTelemetrySink();
+      const candidate: LocalCostCandidateRecord = {
+        ...MOMENT_CANDIDATE,
+        step: "aidd-dev:02-implement",
+      };
+      const useCase = new ReadLocalCostUseCase(
+        sink,
+        new Map([["claude", stubReader([candidate])]]),
+        journalWithOneStep("some-other-skill")
+      );
+
+      await useCase.execute({ sessionId: SESSION_ID });
+
+      const [stored] = [...sink.files.values()].flat();
+      expect(stored).toMatchObject({
+        step_attribution: "tool-stated",
+        step: "aidd-dev:02-implement",
+      });
+    });
+
+    // Task 4's own criterion: attribution is an addition, never a precondition. The same
+    // transcript, read with and without a journal beside it, must store the same figures.
+    it("yields identical counters whether a journal is present or not", async () => {
+      declareClaudeReadable();
+      const withJournalSink = new InMemoryTelemetrySink();
+      const withJournal = new ReadLocalCostUseCase(
+        withJournalSink,
+        new Map([["claude", stubReader([MOMENT_CANDIDATE])]]),
+        journalWithOneStep("aidd-dev:06-test")
+      );
+      const withoutJournalSink = new InMemoryTelemetrySink();
+      const withoutJournal = new ReadLocalCostUseCase(
+        withoutJournalSink,
+        new Map([["claude", stubReader([MOMENT_CANDIDATE])]]),
+        NULL_RUN_JOURNAL_READER
+      );
+
+      await withJournal.execute({ sessionId: SESSION_ID });
+      await withoutJournal.execute({ sessionId: SESSION_ID });
+
+      const [withStored] = [...withJournalSink.files.values()].flat();
+      const [withoutStored] = [...withoutJournalSink.files.values()].flat();
+      const counters = (record: typeof withStored) => ({
+        input_tokens: record.input_tokens,
+        output_tokens: record.output_tokens,
+        cache_read_tokens: record.cache_read_tokens,
+        cache_creation_tokens: record.cache_creation_tokens,
+      });
+      expect(counters(withStored)).toEqual(counters(withoutStored));
+      // The one thing that does differ is the attribution itself.
+      expect(withStored.step_attribution).toBe("journal-interval");
+      expect(withoutStored.step_attribution).toBe("unattributed");
+    });
   });
 });

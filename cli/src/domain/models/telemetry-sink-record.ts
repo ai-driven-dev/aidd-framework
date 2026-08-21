@@ -1,4 +1,5 @@
 import { UnknownTelemetrySinkSchemaVersionError } from "../errors.js";
+import type { StepAttributionSource } from "./step-attribution.js";
 import type { AiToolId } from "./tool-ids.js";
 
 // v2 adds `provenance`, required rather than defaulted, because a default meaning "the
@@ -32,6 +33,18 @@ export interface TelemetrySinkRecord {
   readonly vendor_field: string;
   readonly turn_id?: string;
   readonly turn_field?: string;
+  /** How `step` came to be known. Never optional, for the same reason `provenance` is not:
+   * an absent field would be read as "no step ran", which is exactly the assertion nothing
+   * on a transcript or a journal can support. See `domain/models/step-attribution.ts`. */
+  readonly step_attribution: StepAttributionSource;
+  /** The skill or step name — present only where `step_attribution` names a source that
+   * actually found one; absent, never a placeholder, when `step_attribution` is
+   * `"unattributed"`. */
+  readonly step?: string;
+  /** The plugin a tool-stated `step` came bundled with, when the tool reports one
+   * alongside the skill name. Never set from a journal interval, which carries no plugin
+   * at all. */
+  readonly step_plugin?: string;
   readonly project_id?: string;
   readonly user_id?: string;
   readonly cost_usd?: number;
@@ -240,6 +253,10 @@ function buildBaseRecord(
     vendor_field: identity.vendorField,
     turn_id: identity.turnId,
     turn_field: identity.turnId ? identity.turnField : undefined,
+    // The export path has no journal beside it and no exact per-line field of its own —
+    // the vendor's own attribute reads `third-party` for every framework skill, which is
+    // why it is never read here. Always unattributed, never a guess.
+    step_attribution: "unattributed",
   };
   for (const [key, field] of ATTRIBUTE_ALLOWLIST) {
     const value = merged.get(key);
