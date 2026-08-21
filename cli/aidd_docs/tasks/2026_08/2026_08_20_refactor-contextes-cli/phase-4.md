@@ -2,17 +2,14 @@
 status: pending
 ---
 
-# Instruction: Drop the manifest version migrations
+# Instruction: One build mode per tool
 
-`manifest.ts` carries five migration functions, `migrateV1toV2` through `migrateV5toV6`, plus fields
-kept only so a legacy manifest round-trips. A comment at line 89 says the block must stay "until all
-users have upgraded past v1".
+`ARCHITECTURE.md` documents five targets by two modes, nine cells since OpenCode is flat-only. But
+four of five tools already declare `mode: "native"`, and three of them `translationMode:
+"marketplace"` — they point at a locally built marketplace instead of copying. Their flat cells
+duplicate what their native mode already does, at the cost of 831 lines.
 
-A domain entity that knows every past shape of its own JSON is carrying a persistence concern. The
-decision is to remove them, not relocate them: the reachable versions are behind us.
-
-This is the one deletion that changes what the CLI accepts, so it is its own batch and it needs a
-check before it starts.
+The mode a tool uses is a property of the tool, not a user option.
 
 ## Architecture projection
 
@@ -21,18 +18,25 @@ check before it starts.
 ```txt
 .
 └── cli/
-    ├── src/domain/models/manifest.ts   ✏️ modify (drop 5 migrations, legacy fields, VSCODE_MIGRATION_PATHS)
-    ├── tests/domain/models/manifest.unit.test.ts  ✏️ modify (drop the legacy round-trip cases)
-    └── README.md                        ✏️ modify (state the minimum manifest version accepted)
+    ├── src/
+    │   ├── application/
+    │   │   ├── commands/framework.ts    ✏️ modify (drop --flat for tools that declare native)
+    │   │   └── use-cases/framework/strategies/
+    │   │       └── flat-build-strategy.ts  ✏️ modify (opencode only)
+    │   ├── domain/formats/
+    │   │   ├── flat-paths.ts            ✏️ modify (opencode only)
+    │   │   └── flat-hooks-merge.ts      ✏️ modify (opencode only)
+    │   └── infrastructure/deps.ts       ✏️ modify (4 build registry entries removed)
+    └── tests/golden/snapshots/framework-build/golden.json  ✏️ modify (9 cells become 5)
 ```
 
 ## User Journey
 
 ```mermaid
 flowchart TD
-  A[A project has a .aidd/manifest.json] --> B{Is it version 6?}
-  B -->|Yes| C[Loaded]
-  B -->|No| D[Refused with a message naming the version and the way out]
+  A[A framework is built for a target] --> B{Does the tool have a native plugin mechanism?}
+  B -->|Yes| C[Marketplace mode, the only mode]
+  B -->|No, OpenCode| D[Flat materialization, the only mode]
 ```
 
 ## Test Scope
@@ -43,44 +47,41 @@ title: Test scope
 ---
 journey
   section Setup
-    a project set up by the current CLI => manifest is v6: 5: cli
+    the framework fixture => a source tree to build from: 5: system
   section Happy path
-    run status, doctor and restore => manifest loads and behaves as before: 5: cli
-  section Edge case - an older manifest
-    a v5 manifest on disk => run any command that reads it => refused, message names the version: 1: cli
-    the same project => run setup again => a fresh v6 manifest is written: 1: cli
+    build for claude, cursor, copilot, codex => marketplace output, byte-identical to before: 5: cli
+    build for opencode => flat output, byte-identical to before: 5: cli
+  section Edge case - a removed cell
+    a native tool => ask for flat mode => refused with a message naming the tool's mode: 1: cli
   section Teardown
-    manifest.ts holds one shape => no migration function remains: 5: system
+    the build golden holds five cells => the four removed ones are gone from the snapshot: 5: system
 ```
 
 ## Tasks to do
 
-### `0)` Check before removing
+### `1)` Make the mode a property of the tool
 
-> The only task in this plan that can lose user data if skipped.
+1. Read the mode from the tool profile instead of accepting it as an option for tools that declare
+   `native`.
+2. `--flat` on a native tool fails with a message naming the mode that tool uses.
 
-1. Confirm no manifest below v6 is still in circulation: the release that introduced v6, and how
-   long ago it shipped.
-2. If any doubt remains, stop and report. This phase is safe to postpone; every other phase is
-   independent of it.
+### `2)` Remove the four redundant cells
 
-### `1)` Remove the migrations
+1. Drop the four flat build contracts for claude, cursor, copilot and codex.
+2. Drop their entries from the build registry in `deps.ts`.
+3. Narrow `flat-build-strategy`, `flat-paths` and `flat-hooks-merge` to what OpenCode needs.
 
-1. Delete `migrateV1toV2` through `migrateV5toV6`, `VSCODE_MIGRATION_PATHS`, and the fields retained
-   only for legacy round-trip.
-2. Keep the version guard: an unsupported version must still fail with a clear message.
-3. Drop the legacy round-trip cases from the manifest unit test, keep the version-guard ones.
+### `3)` Recapture the build golden
 
-### `2)` Say it in the README
-
-1. One line: the minimum manifest version the CLI reads, and what to run when an older one is found.
+1. Recapture with `UPDATE_FRAMEWORK_GOLDEN=1`.
+2. Review: the five surviving cells must be **byte-identical** to before. Only the four removed
+   cells may disappear. Any other change means the narrowing went too far.
 
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 0    | The check is recorded in the phase or the phase is postponed with a reason |
-| 1    | A v6 manifest loads and every command behaves as before; a v5 manifest is refused with a message naming the version |
-| 1    | `manifest.ts` contains no function whose name starts with `migrate` |
-| 2    | The README states the minimum version and the way out |
-| all  | Golden and e2e pass unmodified: no fixture carries a manifest below v6 |
+| 1    | Asking for flat mode on a native tool fails with a message naming that tool's mode |
+| 2    | Building for each of the five surviving target/mode pairs produces the same tree as before |
+| 3    | The build golden diff is pure removal: five cells unchanged, four gone |
+| all  | `ARCHITECTURE.md` no longer claims nine cells |

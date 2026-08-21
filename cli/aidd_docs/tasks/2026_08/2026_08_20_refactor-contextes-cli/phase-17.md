@@ -2,16 +2,18 @@
 status: pending
 ---
 
-# Instruction: Rewrite the documentation and the skills
+# Instruction: Move the command surface, by alias
 
-The last phase, because until now the documentation described a tree that had not moved.
+Last, and by alias, for one reason: the e2e net invokes the CLI. Renaming breaks it at the moment it
+is most needed. The new surface arrives beside the old, the tests move, the snapshot is recaptured,
+then the old spelling goes.
 
-Two files are rewritten rather than corrected: `codebase-map.md` (32 structural references) and
-`memory/architecture.md` (16). The ten skills are replaced rather than updated: they encode the
-layer taxonomy, answering "how do I create an adapter" when the first question becomes "which
-context does this belong to".
+The grammar is not invented: it is what Claude Code and Codex both follow without exception. A bare
+verb performs an action; a noun then a verb manages a resource. `claude doctor` and `codex update`
+act on the CLI; `claude plugin install` and `codex plugin add` manage a resource.
 
-Three target invariants also become rules here, now that they are true.
+Today the same verb is declared four times — `update`, `status`, `list`, `doctor` — because the
+grouping is by object. And `ai` and `ide` expose the same seven verbs for what is one subject.
 
 ## Architecture projection
 
@@ -20,27 +22,30 @@ Three target invariants also become rules here, now that they are true.
 ```txt
 .
 └── cli/
-    ├── ARCHITECTURE.md              ✏️ modify (four contexts, the chain, the two ownership regimes)
-    ├── aidd_docs/memory/
-    │   ├── codebase-map.md          ✏️ modify (rewritten; the map test keeps it honest)
-    │   └── architecture.md          ✏️ modify (rewritten)
-    ├── .claude/skills/
-    │   ├── {adapter,capability,command,domain-model,feature,format,tool,use-case}/  ❌ delete
-    │   ├── {translate,tools,distribution,framework}/  ✅ create (one per context)
-    │   └── {test,audit-remediate}/   ✏️ modify (cross-cutting, kept)
-    └── .claude/rules/
-        ├── 00-architecture/0-contexts.md  ✅ create (the chain, the kernel, one public entry)
-        └── 01-standards/1-exports.md      ✏️ modify (barrels forbidden, context entry allowed)
+    ├── src/presentation/commands/
+    │   ├── ai.ts  ide.ts            ❌ delete (become the --tool flag)
+    │   ├── status.ts  restore.ts  self-update.ts  ❌ delete (folded into doctor, sync, update)
+    │   ├── framework.ts             ✏️ modify (install/update/remove; build becomes translate)
+    │   ├── translate.ts             ✅ create (the core, visible in --help at last)
+    │   ├── sync.ts                  ✅ create (the command ARCHITECTURE.md announced and never had)
+    │   ├── doctor.ts                ✏️ modify (absorbs status, gains the tool inventory)
+    │   ├── plugin.ts  marketplace.ts  ✏️ modify (aliases, no create)
+    │   └── kanban.ts  telemetry.ts  ✏️ modify (open; enable/disable)
+    └── tests/golden/
+        ├── surface-equivalence.e2e.test.ts  ✅ create (old spelling and new produce the same outcome)
+        ├── snapshots/phase0/snapshot.json   ✏️ modify (recaptured on the new surface)
+        └── snapshots/help/surface.json      ✏️ modify (recaptured: this phase is the surface change)
 ```
 
 ## User Journey
 
 ```mermaid
 flowchart TD
-  A[A contributor adds something] --> B[Which context does it serve?]
-  B --> C[That context's skill says what to write and where]
-  C --> D[The rules say what may not be done]
-  D --> E[The architecture tests refuse what slipped through]
+  A[A user types a command] --> B{Bare verb or noun?}
+  B -->|Bare verb| C[An action now: setup, doctor, sync, translate, clean, update]
+  B -->|Noun then verb| D[A resource's lifecycle: framework, plugin, marketplace]
+  E[--tool scopes any of them] --> C
+  E --> D
 ```
 
 ## Test Scope
@@ -51,50 +56,71 @@ title: Test scope
 ---
 journey
   section Setup
-    the code has moved => the documentation can describe what exists: 5: system
+    both surfaces registered => old and new spellings answer: 5: cli
   section Happy path
-    read codebase-map => every directory under src is listed: 5: system
-    read ARCHITECTURE.md => every command it presents exists: 5: system
-    follow a context skill to add a format => it lands in the right place: 5: system
-  section Edge case - a stale map
-    a directory is added without updating the map => the map test fails: 1: system
+    run each new command => same outcome as its old spelling: 5: cli
+    run doctor without --tool => every tool reported, with what is wrong: 5: cli
+    run sync on a drifted project => generated files regenerated: 5: cli
+  section Edge case - the ambiguous verb
+    a user types update with no subject => the CLI updates itself, and says so: 1: cli
+  section Edge case - an old spelling
+    a user types ai install cursor => it still works => a deprecation line names the new form: 1: cli
   section Teardown
-    the three target invariants are rules => the plan leaves nothing in a task folder: 5: system
+    remove the aliases => only the new surface answers => the snapshot is recaptured once: 5: cli
 ```
 
 ## Tasks to do
 
-### `1)` Rewrite the two memory files
+### `1)` Add the new surface beside the old
 
-1. `codebase-map.md` describes the four contexts, the kernel, presentation and runtime. The
-   `codebase-map` architecture test keeps it honest from then on.
-2. `architecture.md` keeps its File Ownership section and drops what described the layer tree.
+1. `sync` first: it never existed, so nothing is replaced. Then `doctor` enriched with the tool
+   inventory. Then `translate`, before `framework build` is retired.
+2. Every old spelling keeps working and prints one line naming its replacement.
 
-### `2)` Replace the skills
+### `2)` Prove the two surfaces are equivalent
 
-1. One per context: `translate`, `tools`, `distribution`, `framework`. Each answers what goes in,
-   how, and how it is tested — relying on the invariants rather than repeating them.
-2. Keep `test` and `audit-remediate`, which cut across.
-3. The launcher subject — locate and execute, never embed — joins the skill of the context that
-   carries kanban and telemetry.
+> This is the one phase that changes the net and the subject at once. Recapturing the golden cannot
+> tell a successful rename from a behavior change, because the command string moved too. So the net
+> for this phase is not the snapshot — it is equivalence, and it only exists while both spellings do.
 
-### `3)` Promote the three target invariants
+1. Add `surface-equivalence.e2e.test.ts`: for each pair, run the old spelling and the new one on two
+   freshly created identical projects, and assert the same exit code, the same files written, the
+   same manifest, and the same stdout once the command echo is removed.
+2. Cover every pair the phase introduces, including the ones that fold several commands into one:
+   `status` and `ai status` against `doctor`, `restore` against `sync`, `ai install <tool>` against
+   `framework install --tool <tool>`, `self-update` against `update`, `framework build` against
+   `translate`.
+3. The test lives only as long as the aliases. It is deleted with them in task 4, and its passing
+   run is what licenses the deletion.
 
-1. The chain `framework → translate → tools → kernel` plus `framework → distribution`.
-2. The kernel imports no context and carries no business logic.
-3. One public entry per context; nothing imports an interior.
+### `3)` Move the tests
 
-### `4)` Settle the barrel conflict
+1. e2e and golden invoke the new spellings. Recapture once, and review the diff as the behavior
+   change it is.
 
-1. `1-exports.md` forbids every `index.ts`. The context entry is a boundary, not a convenience.
-   Distinguish the two, and align the biome `override` with the rule.
+### `4)` Retire the old surface
+
+1. Remove `ai`, `ide`, `status`, `restore`, `self-update` and the aliases.
+2. `--tool` is the single scope flag everywhere.
+
+### `5)` Say what each adjacent command does
+
+> Six pairs are close enough to be confused. One line each, in `--help`.
+
+1. `marketplace refresh` re-fetches catalogs; `framework update` moves to a new version; `sync`
+   rewrites owned files from what is already there.
+2. `translate` converts an arbitrary source and records nothing; `sync` does the same conversion,
+   driven by the manifest.
+3. `setup` bootstraps the whole project; `framework install` acts on the framework alone.
+4. `clean` removes AIDD from the project; `framework remove` removes the framework.
 
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 1    | The `codebase-map` and `docs-do-not-lie` tests pass without a baseline |
-| 2    | Ten skills become six; each context skill answers where a new artifact goes |
-| 3    | The three invariants are rules, and each has a test or a lint rule behind it |
-| 4    | A context entry is allowed, a convenience barrel is refused, and the rule says which is which |
-| all  | Nothing in this plan remains described only in a task folder |
+| 1    | Every new command produces the same outcome as the old spelling it replaces; every old spelling still works and names its replacement |
+| 2    | For every pair, the old and the new spelling produce the same exit code, files, manifest and output on identical projects |
+| 3    | The golden diff shows the invocation strings changing and nothing else |
+| 4    | No verb is declared twice for the same subject; `--tool` scopes every command that accepts a scope. The equivalence test is deleted with the aliases, after a passing run |
+| 5    | `--help` distinguishes the six adjacent commands in one line each |
+| all  | A user coming from Claude Code or Codex finds `update`, `doctor` and the noun groups where those CLIs put them |

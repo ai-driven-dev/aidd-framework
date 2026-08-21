@@ -14,25 +14,26 @@ status: pending
 
 ## Phases
 
-| #   | Phase                                     | File                           |
-| --- | ----------------------------------------- | ------------------------------ |
-| 1   | Extend the golden net                     | [`phase-1.md`](./phase-1.md)   |
-| 2   | Delete dead code                          | [`phase-2.md`](./phase-2.md)   |
-| 3   | Drop plugin scaffolding                   | [`phase-3.md`](./phase-3.md)   |
-| 4   | Drop the manifest version migrations      | [`phase-4.md`](./phase-4.md)   |
-| 5   | One build mode per tool                   | [`phase-5.md`](./phase-5.md)   |
-| 6   | Untangle without moving anything          | [`phase-6.md`](./phase-6.md)   |
-| 7   | Dissolve the shared dumping ground        | [`phase-7.md`](./phase-7.md)   |
-| 8   | Put three misplaced units where they belong | [`phase-8.md`](./phase-8.md) |
-| 9   | Extract the kernel                        | [`phase-9.md`](./phase-9.md)   |
-| 10  | Extract the tools context                 | [`phase-10.md`](./phase-10.md) |
-| 11  | Extract the translate context             | [`phase-11.md`](./phase-11.md) |
-| 12  | Extract the distribution context          | [`phase-12.md`](./phase-12.md) |
-| 13  | Extract the framework context             | [`phase-13.md`](./phase-13.md) |
-| 14  | Separate presentation from runtime        | [`phase-14.md`](./phase-14.md) |
-| 15  | Turn kanban into a launcher               | [`phase-15.md`](./phase-15.md) |
-| 16  | Move the command surface, by alias        | [`phase-16.md`](./phase-16.md) |
-| 17  | Rewrite the documentation and the skills  | [`phase-17.md`](./phase-17.md) |
+| #   | Phase                                       | File                           |
+| --- | ------------------------------------------- | ------------------------------ |
+| 1   | Extend the golden net                       | [`phase-1.md`](./phase-1.md) |
+| 2   | Delete dead code                            | [`phase-2.md`](./phase-2.md) |
+| 3   | Drop plugin scaffolding                     | [`phase-3.md`](./phase-3.md) |
+| 4   | One build mode per tool                     | [`phase-4.md`](./phase-4.md) |
+| 5   | Untangle without moving anything            | [`phase-5.md`](./phase-5.md) |
+| 6   | Dissolve the shared dumping ground          | [`phase-6.md`](./phase-6.md) |
+| 7   | Put three misplaced units where they belong | [`phase-7.md`](./phase-7.md) |
+| 8   | Extract the kernel                          | [`phase-8.md`](./phase-8.md) |
+| 9   | Extract the tools context                   | [`phase-9.md`](./phase-9.md) |
+| 10  | Extract the translate context               | [`phase-10.md`](./phase-10.md) |
+| 11  | Extract the distribution context            | [`phase-11.md`](./phase-11.md) |
+| 12  | Extract the framework context               | [`phase-12.md`](./phase-12.md) |
+| 13  | Split the Manifest aggregate                | [`phase-13.md`](./phase-13.md) |
+| 14  | Drop the manifest version migrations        | [`phase-14.md`](./phase-14.md) |
+| 15  | Separate presentation from runtime          | [`phase-15.md`](./phase-15.md) |
+| 16  | Turn kanban into a launcher                 | [`phase-16.md`](./phase-16.md) |
+| 17  | Move the command surface, by alias          | [`phase-17.md`](./phase-17.md) |
+| 18  | Rewrite the documentation and the skills    | [`phase-18.md`](./phase-18.md) |
 
 ## Resources
 

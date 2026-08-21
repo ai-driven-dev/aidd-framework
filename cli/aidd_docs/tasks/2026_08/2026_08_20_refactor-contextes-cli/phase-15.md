@@ -2,15 +2,14 @@
 status: pending
 ---
 
-# Instruction: Turn kanban into a launcher
+# Instruction: Separate presentation from runtime
 
-`commands/kanban.ts` imports `../../../../kanban/src/presentation/…`, a deep path into another
-package. The consequences are measured: `cli/package.json` declares `ink`, `react`, `cli-table3` and
-`gray-matter`, none of which `cli/src` imports — they are listed in `knip.json` as ignored
-dependencies for exactly that reason. And `pnpm typecheck` fails on `../kanban/src/**` unless
-kanban's own dependencies are installed, which `lefthook.yml` already documents as a workaround.
+What was called the shell mixed two layers. Presentation is not a technical leftover: commands
+(1746 l.), display (139 l.), the interactive menu (366 l.) and the prompts add up to roughly 2 600
+lines — and part of it currently sits under `use-cases/`, where a prompt was called a use case.
 
-kanban only ever needed `DOCS_DIR`. The CLI should locate and run it, not contain it.
+Runtime is the other half: wiring, http, git, platform, auth, self-update. `deps.ts` alone is 733
+lines and becomes one wiring module per context.
 
 ## Architecture projection
 
@@ -18,21 +17,29 @@ kanban only ever needed `DOCS_DIR`. The CLI should locate and run it, not contai
 
 ```txt
 .
-└── cli/
-    ├── src/launchers/kanban.ts      ✅ create (locate the binary, execute it)
-    ├── src/presentation/commands/kanban.ts  ✏️ modify (no deep import)
-    ├── package.json                 ✏️ modify (drop ink, react, cli-table3, gray-matter)
-    ├── knip.json                    ✏️ modify (drop the four ignored dependencies)
-    └── ../lefthook.yml              ✏️ modify (cli-typecheck no longer needs kanban's node_modules)
+└── cli/src/
+    ├── presentation/                ✅ create
+    │   ├── commands/                ✏️ modify (from application/commands/)
+    │   ├── display/                 ✏️ modify (from application/display/)
+    │   ├── prompts/                 ✅ create (setup-tools, setup-plugins, plugin-pick, conflict, menu)
+    │   ├── output.ts                ✏️ modify
+    │   └── error-handler.ts         ✏️ modify
+    └── runtime/                     ✅ create
+        ├── wiring/                  ✅ create (one module per context)
+        ├── auth/                     ✏️ modify (credential-store, oauth-provider, token-provider)
+        ├── prompter/                 ✏️ modify (the prompter port and its adapter)
+        ├── http/  git/  platform/  project-root/  self-update/   ✏️ modify
+        └── deps.ts                  ❌ delete (733 l., split across wiring/)
 ```
 
 ## User Journey
 
 ```mermaid
 flowchart TD
-  A[aidd kanban] --> B{Is the binary reachable?}
-  B -->|Yes| C[It runs, the board opens]
-  B -->|No| D[A message names the path that was tried]
+  A[A user runs a command] --> B[Presentation parses and asks]
+  B --> C[A context does the work]
+  C --> D[Presentation renders the result]
+  E[Runtime wires the two together] --> C
 ```
 
 ## Test Scope
@@ -43,38 +50,38 @@ title: Test scope
 ---
 journey
   section Setup
-    a project with aidd_docs => there are tasks to show: 5: cli
+    a terminal without a TTY => the non-interactive path is exercised: 5: cli
   section Happy path
-    run aidd kanban list => the same rows as before: 5: cli
-  section Edge case - the binary is missing
-    kanban is not installed => run aidd kanban => a message names the path that was tried: 1: cli
+    run every command with --yes => same stdout, same exit codes: 5: cli
+    run the interactive menu with a TTY => same choices, same outcomes: 5: cli
+  section Edge case - a conflict during install
+    a co-owned file was edited => install the same content => the conflict is asked, not assumed: 1: cli
   section Teardown
-    typecheck the CLI without kanban's node_modules => it passes: 5: system
+    no prompt lives under a context => interaction is presentation only: 5: system
 ```
 
 ## Tasks to do
 
-### `1)` Locate and execute
+### `1)` Move the interaction out of the contexts
 
-1. Replace the deep import with a launcher that finds the binary and runs it.
-2. On failure, name the path that was tried — a launcher that fails silently is worse than none.
+1. `setup-tools-prompt`, `setup-plugins-prompt`, `plugin-pick`, `sync-conflict-resolver` and
+   `menu-use-case` ask the user. They are presentation, not use cases.
+2. What remains in a context is the decision the answer feeds.
 
-### `2)` Drop the four dependencies
+### `2)` Split the wiring
 
-1. `ink`, `react`, `cli-table3` and `gray-matter` leave `cli/package.json`, and their entries leave
-   `knip.json`.
-2. Note the drop in the bundle budget: it is a verifiable gain, not a claim.
+1. `deps.ts` becomes one wiring module per context, each assembling only what its context needs.
+2. `createMenuDeps` keeps its role: the pre-parse subset, which the current rule already describes.
 
-### `3)` Simplify the hook
+### `3)` Gather the runtime
 
-1. `cli-typecheck` no longer needs to install kanban's dependencies. Remove the workaround and its
-   comment.
+1. auth, http, git, platform, project-root and self-update are technical services, not a context.
 
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 1    | `aidd kanban` and `aidd kanban list` behave as before; a missing binary gives a message naming the path |
-| 2    | `cli/src` imports none of the four packages, and `knip.json` ignores no dependency |
-| 3    | `pnpm typecheck` passes with `kanban/node_modules` absent |
-| all  | The bundle is smaller than before, measured by `check-bundle-size.mjs` |
+| 1    | Every interactive flow behaves as before, with and without a TTY; no context contains a prompt |
+| 2    | Each context can be wired without pulling another's adapters; the pre-parse path still does no extra I/O |
+| 3    | `presentation` and `runtime` import contexts; no context imports either |
+| all  | Golden and e2e pass **unmodified**, including the TTY persona test |

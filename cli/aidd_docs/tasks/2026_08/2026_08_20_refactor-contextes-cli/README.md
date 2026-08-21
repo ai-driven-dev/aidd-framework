@@ -43,6 +43,29 @@ Aujourd'hui : huit endroits. Vérifié en continu par `tests/architecture/tool-a
   de `codebase-map.md`, et le manifest v6 prétendant porter les marketplaces.
 - Un ré-export supprimé : `doctor-use-case.ts` réexportait du domaine pour un test.
 
+## Les filets, et ce que chacun attrape
+
+Un refactor de cette taille ne tient pas sur la relecture. Chaque phase s'appuie sur un filet qui
+échoue tout seul, et aucun filet ne couvre tout — d'où la liste.
+
+| Filet | Attrape | Depuis |
+|---|---|---|
+| golden baseline | un changement de comportement sur un scénario complet, dérive comprise | phase 1, étendu |
+| instantané de l'aide | un changement de surface utilisateur pendant un déplacement | phase 1, nouveau |
+| golden du build | une sortie de build différente, cellule par cellule | existant, réduit en phase 4 |
+| e2e, 15 fichiers | les parcours réels, binaire compris | existant |
+| tests d'architecture | les invariants : partage, orchestration, coût d'un outil, doc, carte | livrés |
+| graphe des contextes | une arête latérale entre contextes | phase 12, nouveau |
+| aller-retour du manifest | un modèle qui change et une sortie qui bouge | phase 13, nouveau |
+| équivalence des surfaces | un renommage qui change autre chose que le nom | phase 17, nouveau, temporaire |
+| Biome | cycles d'exécution, ré-exports, barrels, frontière du domaine | livré |
+| knip, jscpd | code mort, duplication en hausse | livrés, bloquants |
+| seuils de couverture | un test perdu pendant un déplacement (85 / 80 / 90 / 85) | existant |
+
+Trois de ces filets n'existaient pas quand le plan a été écrit la première fois. Ils répondent aux
+trois faiblesses qui avaient été signalées : une phase trop grosse, une phase sans filet propre, et
+onze déplacements sans preuve que la surface utilisateur n'avait pas bougé.
+
 ## Points encore ouverts
 
 | Sujet | État |

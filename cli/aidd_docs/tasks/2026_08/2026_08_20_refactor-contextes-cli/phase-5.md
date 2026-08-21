@@ -2,14 +2,11 @@
 status: pending
 ---
 
-# Instruction: One build mode per tool
+# Instruction: Untangle without moving anything
 
-`ARCHITECTURE.md` documents five targets by two modes, nine cells since OpenCode is flat-only. But
-four of five tools already declare `mode: "native"`, and three of them `translationMode:
-"marketplace"` — they point at a locally built marketplace instead of copying. Their flat cells
-duplicate what their native mode already does, at the cost of 831 lines.
-
-The mode a tool uses is a property of the tool, not a user option.
+Four small changes that make every later extraction possible, none of which moves a file. Each was
+measured: two design cycles closing through `import type`, six re-export sites, one capability file
+mixing two concerns, and one branch re-deriving by name what a profile already declares.
 
 ## Architecture projection
 
@@ -17,26 +14,26 @@ The mode a tool uses is a property of the tool, not a user option.
 
 ```txt
 .
-└── cli/
-    ├── src/
-    │   ├── application/
-    │   │   ├── commands/framework.ts    ✏️ modify (drop --flat for tools that declare native)
-    │   │   └── use-cases/framework/strategies/
-    │   │       └── flat-build-strategy.ts  ✏️ modify (opencode only)
-    │   ├── domain/formats/
-    │   │   ├── flat-paths.ts            ✏️ modify (opencode only)
-    │   │   └── flat-hooks-merge.ts      ✏️ modify (opencode only)
-    │   └── infrastructure/deps.ts       ✏️ modify (4 build registry entries removed)
-    └── tests/golden/snapshots/framework-build/golden.json  ✏️ modify (9 cells become 5)
+└── cli/src/
+    ├── domain/
+    │   ├── formats/command.ts             ✏️ modify (own the two section types)
+    │   ├── tools/contracts.ts             ✏️ modify (import them instead of defining them)
+    │   ├── tools/registry.ts              ✏️ modify (stop re-exporting 8 symbols)
+    │   ├── capabilities/{rules,commands,skills}-capability.ts  ✏️ modify (import AI_TOOL_IDS from its source)
+    │   ├── capabilities/plugins-capability.ts  ✏️ modify (keep PluginsCapability only)
+    │   └── capabilities/marketplace-settings.ts  ✅ create (the MarketplaceSettings half)
+    └── application/use-cases/
+        ├── setup-use-case.ts              ✏️ modify (stop re-exporting SetupToolsResult)
+        ├── global/update-all-use-case.ts  ✏️ modify (stop re-exporting GlobalExecutionError)
+        └── plugin/translator/built-tree-materialization-translator.ts  ✏️ modify (read mode from the profile)
 ```
 
 ## User Journey
 
 ```mermaid
 flowchart TD
-  A[A framework is built for a target] --> B{Does the tool have a native plugin mechanism?}
-  B -->|Yes| C[Marketplace mode, the only mode]
-  B -->|No, OpenCode| D[Flat materialization, the only mode]
+  A[A file needs a symbol] --> B[It imports it from where it is defined]
+  B --> C[No hub, no cycle, no second source of truth]
 ```
 
 ## Test Scope
@@ -47,41 +44,50 @@ title: Test scope
 ---
 journey
   section Setup
-    the framework fixture => a source tree to build from: 5: system
+    the golden net and the architecture ratchets are in place => regressions are visible: 5: system
   section Happy path
-    build for claude, cursor, copilot, codex => marketplace output, byte-identical to before: 5: cli
-    build for opencode => flat output, byte-identical to before: 5: cli
-  section Edge case - a removed cell
-    a native tool => ask for flat mode => refused with a message naming the tool's mode: 1: cli
+    run the whole suite => golden and e2e pass untouched: 5: system
+    build and install for every tool => output unchanged: 5: cli
+  section Edge case - the opencode branch
+    opencode as a target => materialize a plugin => flat mode chosen from the profile, not the name: 1: cli
   section Teardown
-    the build golden holds five cells => the four removed ones are gone from the snapshot: 5: system
+    biome reports no re-export => the ratchet for tool names shrank by one: 5: system
 ```
 
 ## Tasks to do
 
-### `1)` Make the mode a property of the tool
+### `1)` Break the two design cycles
 
-1. Read the mode from the tool profile instead of accepting it as an option for tools that declare
-   `native`.
-2. `--flat` on a native tool fails with a message naming the mode that tool uses.
+> Neither is a runtime cycle: both close through `import type`, which is why `noImportCycles` stays
+> silent. They are still two modules that cannot be separated.
 
-### `2)` Remove the four redundant cells
+1. Move `UserFileSection` and `UserFileSectionKey` out of `tools/contracts.ts` into
+   `formats/command.ts`, and have `contracts.ts` import them.
+2. Point the three `AI_TOOL_IDS` imports in `capabilities/` at `models/tool-ids.ts`, their source.
 
-1. Drop the four flat build contracts for claude, cursor, copilot and codex.
-2. Drop their entries from the build registry in `deps.ts`.
-3. Narrow `flat-build-strategy`, `flat-paths` and `flat-hooks-merge` to what OpenCode needs.
+### `2)` Remove the six re-exports
 
-### `3)` Recapture the build golden
+1. `registry.ts` re-exports eight symbols it imported from `models/tool-ids.ts`. Delete the
+   re-export; consumers import the source.
+2. Same for `setup-use-case.ts` and `global/update-all-use-case.ts`.
 
-1. Recapture with `UPDATE_FRAMEWORK_GOLDEN=1`.
-2. Review: the five surviving cells must be **byte-identical** to before. Only the four removed
-   cells may disappear. Any other change means the narrowing went too far.
+### `3)` Split the capability that carries two concerns
+
+1. `plugins-capability.ts` holds `PluginsCapability`, used by the five tool profiles, and
+   `MarketplaceSettings*`, used only by marketplace settings synchronisation. Move the second half
+   to its own file.
+
+### `4)` Read the mode, do not re-derive it
+
+1. Replace `toolId === "opencode" ? "flat" : "marketplace"` in
+   `built-tree-materialization-translator.ts` with a read of `mode` on the tool profile.
 
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 1    | Asking for flat mode on a native tool fails with a message naming that tool's mode |
-| 2    | Building for each of the five surviving target/mode pairs produces the same tree as before |
-| 3    | The build golden diff is pure removal: five cells unchanged, four gone |
-| all  | `ARCHITECTURE.md` no longer claims nine cells |
+| 1    | `formats/` no longer imports `tools/`, and `capabilities/` no longer imports `tools/registry` |
+| 2    | Biome reports no re-export anywhere under `src/` |
+| 3    | The five tool profiles import `PluginsCapability` without pulling marketplace settings |
+| 4    | Materializing for OpenCode still produces flat output, chosen from the profile; adding a sixth flat tool needs no edit here |
+| all  | Golden and e2e pass **unmodified**. This batch moves no file and changes no behavior |

@@ -2,14 +2,14 @@
 status: pending
 ---
 
-# Instruction: Extract the distribution context
+# Instruction: Extract the framework context
 
-Where content comes from: registered marketplaces, their catalogs, their caches, and whether they
-are trusted. After phase 8 moved the three cross-area flows out, it knows nothing about tools and
-nothing about what is installed — it is a leaf, and this phase proves it.
+What is installed here, at which version, and whether it is still true. It is the only context
+allowed to call another, and it owns `manifest.json` and the tool files.
 
-Its state left the manifest a while ago: `manifest.ts:142` records that the registry lives in
-`.aidd/marketplaces.json`.
+This phase **moves only**. The aggregate keeps the shape it has today, defects included: 529 lines,
+28 public methods, six responsibilities. Splitting it is phase 13, on its own, because a move and a
+domain redesign in the same pass cannot both be reviewed.
 
 ## Architecture projection
 
@@ -17,27 +17,32 @@ Its state left the manifest a while ago: `manifest.ts:142` records that the regi
 
 ```txt
 .
-└── cli/src/contexts/distribution/   ✅ create
+└── cli/src/contexts/framework/      ✅ create
     ├── index.ts                     ✅ create (the only public entry)
     ├── domain/
-    │   ├── marketplace.ts           ✏️ modify (entry, scope, staleness)
-    │   ├── cache-entry.ts           ✏️ modify
-    │   ├── source-mode.ts           ✏️ modify
-    │   ├── catalog.ts               ✏️ modify (from domain/models/plugin-catalog.ts)
-    │   ├── catalog-parsers/         ✅ create (the Copilot-native reader from phase 8)
-    │   └── ports/                   ✅ create (registry, cache, trust-store, catalog-repository, fetcher, raw-fetcher)
-    ├── application/                 ✏️ modify (add, list, refresh, register-framework, resolve, fetch-source)
-    └── infrastructure/              ✏️ modify (registry, catalog-repository, fetcher, cache, trust, raw-fetcher)
+    │   ├── manifest.ts              ✏️ modify (moved as-is, not yet split)
+    │   ├── plugin.ts                ✏️ modify (moved as-is, renamed in phase 13)
+    │   ├── doctor.ts                ✏️ modify
+    │   ├── install-scope.ts         ✏️ modify
+    │   ├── setup-flow.ts            ✏️ modify
+    │   ├── project-context.ts       ✏️ modify
+    │   ├── semver.ts                ✏️ modify
+    │   └── ports/                   ✅ create (manifest-repository, plugin-distribution-reader)
+    ├── application/
+    │   ├── flows/                   ✏️ modify (setup, sync, update, and the three from phase 7)
+    │   └── cases/                   ✏️ modify (install, uninstall, plugin *, materialize, status, doctor, clean, init)
+    └── infrastructure/              ✏️ modify (manifest-repository, plugin-distribution-reader, native plugin CLIs)
 ```
 
 ## User Journey
 
 ```mermaid
 flowchart TD
-  A[A user names a source] --> B[Registered, with a scope]
-  B --> C[Fetched and cached]
-  C --> D[Trusted or refused]
-  D --> E[Its catalog is offered to whoever asks]
+  A[A developer sets up a project] --> B[The framework is installed into the chosen tools]
+  B --> C[The manifest records every file it wrote]
+  C --> D{Later: is it still true?}
+  D -->|Yes| E[Nothing to do]
+  D -->|No| F[Regenerate what the CLI owns, report what the user also owns]
 ```
 
 ## Test Scope
@@ -48,42 +53,45 @@ title: Test scope
 ---
 journey
   section Setup
-    a project and the local framework fixture => a source that needs no network: 5: cli
+    a project set up from the local fixture => manifest and tool files written: 5: cli
   section Happy path
-    add, list and refresh a marketplace => unchanged behavior: 5: cli
-    resolve a catalog twice => the second read comes from cache: 5: cli
-  section Edge case - a malformed catalog
-    the marketplace-malformed fixture => refresh it => non-zero exit naming the file: 1: cli
-  section Edge case - an untrusted source
-    a source not yet trusted => resolve it => the trust decision is asked before any read: 1: cli
+    run setup, status, update, install and remove a plugin => unchanged behavior: 5: cli
+  section Edge case - a drifted generated file
+    a tracked file was edited => run restore --force => regenerated, no prompt: 1: cli
+  section Edge case - a drifted co-owned file
+    settings.json was edited by the user => run restore => the edit is reported, not overwritten: 1: cli
   section Teardown
-    the context imports only the kernel => no tool profile, no manifest: 5: system
+    the context graph test passes => framework reaches translate and distribution, neither reaches back: 5: system
 ```
 
 ## Tasks to do
 
-### `1)` Move the sourcing domain and its ports
+### `1)` Move what is left
 
-1. The marketplace models, the catalog model and the Copilot-native parser.
-2. The six ports it owns: `marketplace-registry`, `marketplace-cache`, `marketplace-trust-store`,
-   `plugin-catalog-repository`, `plugin-fetcher`, `raw-catalog-fetcher`.
+> After four contexts leave, this context is what remains.
 
-### `2)` Move the six use cases that stayed
+1. The installation domain, its two ports, the flows and the cases.
+2. Change no signature and no method. Anything tempting to fix here belongs to phase 13.
 
-1. `add`, `list`, `refresh`, `register-framework`, `resolve`, `fetch-source`. The three that crossed
-   into the installation record left at phase 8.
+### `2)` Close the context
 
-### `3)` Close the context and prove the leaf
+1. One `index.ts`. It is the only context entry allowed to import another context's.
+2. Add the biome `override` refusing imports into the interior.
 
-1. One `index.ts`. Add the biome `override`.
-2. Verify by import graph, not by reading: nothing under the context imports a tool profile or
-   `Manifest`.
+### `3)` Turn the chain into a test
+
+> The invariant that carries the whole plan deserves more than a lint pattern.
+
+1. Add `tests/architecture/context-graph.arch.test.ts`: build the import graph, map each file to its
+   context, and assert the only edges are `framework → translate`, `framework → distribution`, and
+   every context to the kernel.
+2. It replaces the per-context `override` guesswork with one readable list of allowed edges.
 
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 1    | Adding, listing, refreshing and removing a marketplace behave as before, including the trust prompt |
-| 2    | A malformed catalog still fails with a message naming the file, and one bad catalog does not abort a multi-marketplace report |
-| 3    | The context imports only the kernel; an import into its interior fails the lint |
-| all  | Golden and e2e pass **unmodified** |
+| 1    | Every command touching the installation record behaves as before; no public method changed |
+| 2    | An import into `contexts/framework/` interior fails the lint |
+| 3    | The context graph test lists the allowed edges and fails when a new one appears, verified by adding one |
+| all  | Golden, help snapshot and e2e pass **unmodified** |

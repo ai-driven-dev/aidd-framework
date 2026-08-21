@@ -2,14 +2,19 @@
 status: pending
 ---
 
-# Instruction: Extract the framework context
+# Instruction: Split the Manifest aggregate
 
-What is installed here, at which version, and whether it is still true. It is the only context
-allowed to call another, and it is the one that owns `manifest.json` and the tool files.
+`Manifest` is 529 lines and 28 public methods covering six responsibilities: tools, tracked files,
+merge files, mcp exclusions, plugins, serialization. None can change without reopening the same
+file. It is a facade over a JSON document, not an aggregate.
 
-It is also the phase where `Manifest` stops being a facade: 529 lines, 28 public methods, six
-responsibilities. It becomes an aggregate root whose members are separated, which is what makes any
-of the six evolve without reopening the same file.
+This phase changes the domain and moves nothing. It is separate from phase 12 so its diff is
+readable: one shows files arriving, the other shows a model changing shape.
+
+Two smaller defects go with it. `FileHash` exists as a proper value object with `equals()`, and yet
+the installed record carries three `ReadonlyMap<string, string>` of different meanings, told apart
+only by a comment — the compiler sees the same type in all three. And `Plugin` alone does not say
+which of the five plugins it is.
 
 ## Architecture projection
 
@@ -17,32 +22,23 @@ of the six evolve without reopening the same file.
 
 ```txt
 .
-└── cli/src/contexts/framework/      ✅ create
-    ├── index.ts                     ✅ create (the only public entry)
-    ├── domain/
-    │   ├── manifest.ts              ✏️ modify (aggregate root, identity and consistency only)
-    │   ├── tool-entry.ts            ✅ create (tracked files, merge files, mcp exclusions, installed plugins)
-    │   ├── installed-plugin.ts      ✏️ modify (from domain/models/plugin.ts, renamed for what it is)
-    │   ├── doctor.ts                ✏️ modify
-    │   ├── install-scope.ts         ✏️ modify
-    │   ├── setup-flow.ts            ✏️ modify
-    │   ├── project-context.ts       ✏️ modify
-    │   └── ports/                   ✅ create (manifest-repository, plugin-distribution-reader)
-    ├── application/
-    │   ├── flows/                   ✏️ modify (setup, sync, update, and the three from phase 8)
-    │   └── cases/                   ✏️ modify (install, uninstall, plugin *, materialize, status, doctor, clean, init)
-    └── infrastructure/              ✏️ modify (manifest-repository, plugin-distribution-reader, native plugin CLIs)
+└── cli/src/contexts/framework/domain/
+    ├── manifest.ts                  ✏️ modify (aggregate root: identity and consistency only)
+    ├── tool-entry.ts                ✅ create (one tool's slice of the record)
+    ├── tracked-files.ts             ✅ create (paths and hashes)
+    ├── merge-files.ts               ✅ create (co-owned file entries)
+    ├── mcp-exclusions.ts            ✅ create (from the manifest's four methods)
+    ├── installed-plugin.ts          ✏️ modify (from plugin.ts, renamed and typed)
+    └── manifest-serialization.ts    ✅ create (toJSON / fromJSON, out of the entity)
 ```
 
 ## User Journey
 
 ```mermaid
 flowchart TD
-  A[A developer sets up a project] --> B[The framework is installed into the chosen tools]
-  B --> C[The manifest records every file it wrote]
-  C --> D{Later: is it still true?}
-  D -->|Yes| E[Nothing to do]
-  D -->|No| F[Regenerate what the CLI owns, report what the user also owns]
+  A[A command changes what is installed] --> B[It asks the aggregate root]
+  B --> C[The root delegates to the member that owns it]
+  C --> D[One save, one consistent document]
 ```
 
 ## Test Scope
@@ -53,50 +49,51 @@ title: Test scope
 ---
 journey
   section Setup
-    a project set up from the local fixture => manifest and tool files written: 5: cli
+    a project with two tools, plugins, merge files and an mcp exclusion => every member populated: 5: cli
   section Happy path
-    run setup, then status, then update => unchanged behavior: 5: cli
-    install and remove a plugin => the manifest reflects both: 5: cli
-  section Edge case - a drifted generated file
-    a tracked file was edited => run restore --force => regenerated, no prompt: 1: cli
-  section Edge case - a drifted co-owned file
-    settings.json was edited by the user => run restore => the edit is reported, not overwritten: 1: cli
+    run every command that reads or writes the record => unchanged behavior: 5: cli
+    write the manifest twice with no change between => byte-identical output: 5: system
+  section Edge case - a partial failure
+    a write fails mid-flow => read the manifest => it is the last consistent state, not a half-written one: 1: system
+  section Edge case - the three maps
+    pass a component-path map where a hash map is expected => it does not compile: 1: system
   section Teardown
-    clean the project => manifest and every written file removed: 5: cli
+    the aggregate exposes fewer than ten methods => the six responsibilities live in their own files: 5: system
 ```
 
 ## Tasks to do
 
-### `1)` Move what is left
+### `1)` Separate the members
 
-1. The installation domain, its two ports, the flows and the cases. What remains after four
-   contexts left is this context.
+> One save, one invariant, one file per responsibility.
 
-### `2)` Split the aggregate
+1. `Manifest` keeps identity, consistency and the entry point to its members.
+2. `ToolEntry` carries tracked files, merge files, mcp exclusions and installed plugins.
+3. Serialization leaves the entity: `toJSON` and `fromJSON` become their own module.
 
-1. `Manifest` keeps identity and consistency: one save, one invariant.
-2. `ToolEntry` takes tracked files, merge files, mcp exclusions and installed plugins, one file per
-   responsibility.
-3. Type the three `Map<string, string>` of the installed record: path to hash, installed path to
-   component path, mcp server name to digest. `FileHash` already shows the way.
+### `2)` Type the three maps
+
+1. Path to hash, installed path to component path, mcp server name to digest. Three distinct types,
+   so one can no longer be passed where another is expected. `FileHash` already shows the shape.
 
 ### `3)` Rename by intention
 
 1. `Plugin` becomes `InstalledPlugin`. The catalog entry and the fetched payload keep their own
    names, so each context speaks of its own plugin without ambiguity.
 
-### `4)` Close the context
+### `4)` Prove the round-trip did not move
 
-1. One `index.ts`. It is the only context whose `index.ts` may import another context's.
-2. Verify the chain by import graph: `framework` reaches `translate` and `distribution`, and neither
-   reaches back.
+> The strongest available net for a model change: the document on disk must be identical.
+
+1. Add a test that loads every manifest fixture, writes it back, and asserts the bytes are unchanged.
+2. Run it before and after the split. This is what makes the phase reviewable.
 
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 1    | Every command that touches the installation record behaves as before |
-| 2    | One save still writes one consistent manifest; the three maps can no longer be passed for one another |
-| 3    | No type named `Plugin` alone remains; each context's plugin type says which one it is |
-| 4    | `framework` is the only context importing another; an import into any interior fails the lint |
-| all  | Golden and e2e pass **unmodified** |
+| 1    | Every command touching the record behaves as before; one save still writes one consistent document |
+| 2    | Passing one of the three maps where another is expected fails to compile, verified by trying |
+| 3    | No type named `Plugin` alone remains |
+| 4    | Loading and rewriting every manifest fixture produces byte-identical output, before and after |
+| all  | Golden, help snapshot and e2e pass **unmodified** |

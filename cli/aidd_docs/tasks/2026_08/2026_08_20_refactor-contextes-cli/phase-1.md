@@ -25,8 +25,10 @@ own golden spans the nine target/mode cells.
 .
 └── cli/tests/golden/
     ├── golden-baseline.e2e.test.ts   ✏️ modify (honest docstring, extended scenario, error scenario)
-    └── snapshots/phase0/
-        └── snapshot.json             ✏️ modify (recaptured with UPDATE_GOLDEN=1)
+    ├── help-surface.e2e.test.ts      ✅ create (--help for every command and subcommand)
+    └── snapshots/
+        ├── phase0/snapshot.json      ✏️ modify (recaptured with UPDATE_GOLDEN=1)
+        └── help/surface.json         ✅ create (the user-visible surface, frozen)
 ```
 
 ## User Journey
@@ -105,7 +107,17 @@ journey
 4. Capture an unknown tool id and an unknown command.
 5. Prefix each entry's `command` with its scenario so both live in one snapshot file.
 
-### `5)` Prove the capture is deterministic
+### `5)` Freeze the user-visible surface
+
+> The eleven relocation phases have no other net for "nothing the user sees moved".
+
+1. Add `help-surface.e2e.test.ts`: walk the command tree from the root, capture `--help` for every
+   command and every subcommand, and store it as one snapshot.
+2. It needs no fixture project and no network, so it is fast and runs everywhere.
+3. From then on, a move that changes a description, a flag, an argument or an order fails
+   immediately, with the diff naming the command.
+
+### `6)` Prove the capture is deterministic
 
 > Reproducible at capture time is not the same as stable.
 
@@ -115,7 +127,7 @@ journey
    dropping the field.
 3. Run the suite twice without `UPDATE_GOLDEN`.
 
-### `6)` Record what stays out of reach
+### `7)` Record what stays out of reach
 
 > An honest net names its holes.
 
@@ -126,9 +138,10 @@ journey
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 1, 6 | The docstring describes what the file covers and names what it does not; no claim exceeds the content |
+| 1, 7 | The docstring describes what the file covers and names what it does not; no claim exceeds the content |
 | 2    | The snapshot holds an entry for `doctor`, `marketplace list`, `plugin list`, `plugin install`, `plugin remove` and a second tool install, on top of the existing five |
 | 3    | The snapshot holds a `status` and a `doctor` taken on a drifted project, and a `status` after `restore --force` showing it back in sync |
 | 4    | The snapshot holds at least four entries with a non-zero exit code, captured in a directory the main scenario never touched |
-| 5    | Two consecutive captures are byte-identical, two consecutive verification runs pass, and no absolute path, version string or timestamp survives in the snapshot |
+| 5    | The help snapshot holds an entry per command and per subcommand; changing one description fails the test, verified by changing one |
+| 6    | Two consecutive captures are byte-identical, two consecutive verification runs pass, and no absolute path, version string or timestamp survives in the snapshot |
 | all  | The snapshot diff of this phase is pure addition: no existing entry changes. If one does, the capture is not deterministic and task 5 is unfinished |

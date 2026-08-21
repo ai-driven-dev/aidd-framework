@@ -2,18 +2,15 @@
 status: pending
 ---
 
-# Instruction: Move the command surface, by alias
+# Instruction: Turn kanban into a launcher
 
-Last, and by alias, for one reason: the e2e net invokes the CLI. Renaming breaks it at the moment it
-is most needed. The new surface arrives beside the old, the tests move, the snapshot is recaptured,
-then the old spelling goes.
+`commands/kanban.ts` imports `../../../../kanban/src/presentation/…`, a deep path into another
+package. The consequences are measured: `cli/package.json` declares `ink`, `react`, `cli-table3` and
+`gray-matter`, none of which `cli/src` imports — they are listed in `knip.json` as ignored
+dependencies for exactly that reason. And `pnpm typecheck` fails on `../kanban/src/**` unless
+kanban's own dependencies are installed, which `lefthook.yml` already documents as a workaround.
 
-The grammar is not invented: it is what Claude Code and Codex both follow without exception. A bare
-verb performs an action; a noun then a verb manages a resource. `claude doctor` and `codex update`
-act on the CLI; `claude plugin install` and `codex plugin add` manage a resource.
-
-Today the same verb is declared four times — `update`, `status`, `list`, `doctor` — because the
-grouping is by object. And `ai` and `ide` expose the same seven verbs for what is one subject.
+kanban only ever needed `DOCS_DIR`. The CLI should locate and run it, not contain it.
 
 ## Architecture projection
 
@@ -22,27 +19,20 @@ grouping is by object. And `ai` and `ide` expose the same seven verbs for what i
 ```txt
 .
 └── cli/
-    ├── src/presentation/commands/
-    │   ├── ai.ts  ide.ts            ❌ delete (become the --tool flag)
-    │   ├── status.ts  restore.ts  self-update.ts  ❌ delete (folded into doctor, sync, update)
-    │   ├── framework.ts             ✏️ modify (install/update/remove; build becomes translate)
-    │   ├── translate.ts             ✅ create (the core, visible in --help at last)
-    │   ├── sync.ts                  ✅ create (the command ARCHITECTURE.md announced and never had)
-    │   ├── doctor.ts                ✏️ modify (absorbs status, gains the tool inventory)
-    │   ├── plugin.ts  marketplace.ts  ✏️ modify (aliases, no create)
-    │   └── kanban.ts  telemetry.ts  ✏️ modify (open; enable/disable)
-    └── tests/golden/snapshots/phase0/snapshot.json  ✏️ modify (recaptured on the new surface)
+    ├── src/launchers/kanban.ts      ✅ create (locate the binary, execute it)
+    ├── src/presentation/commands/kanban.ts  ✏️ modify (no deep import)
+    ├── package.json                 ✏️ modify (drop ink, react, cli-table3, gray-matter)
+    ├── knip.json                    ✏️ modify (drop the four ignored dependencies)
+    └── ../lefthook.yml              ✏️ modify (cli-typecheck no longer needs kanban's node_modules)
 ```
 
 ## User Journey
 
 ```mermaid
 flowchart TD
-  A[A user types a command] --> B{Bare verb or noun?}
-  B -->|Bare verb| C[An action now: setup, doctor, sync, translate, clean, update]
-  B -->|Noun then verb| D[A resource's lifecycle: framework, plugin, marketplace]
-  E[--tool scopes any of them] --> C
-  E --> D
+  A[aidd kanban] --> B{Is the binary reachable?}
+  B -->|Yes| C[It runs, the board opens]
+  B -->|No| D[A message names the path that was tried]
 ```
 
 ## Test Scope
@@ -53,54 +43,38 @@ title: Test scope
 ---
 journey
   section Setup
-    both surfaces registered => old and new spellings answer: 5: cli
+    a project with aidd_docs => there are tasks to show: 5: cli
   section Happy path
-    run each new command => same outcome as its old spelling: 5: cli
-    run doctor without --tool => every tool reported, with what is wrong: 5: cli
-    run sync on a drifted project => generated files regenerated: 5: cli
-  section Edge case - the ambiguous verb
-    a user types update with no subject => the CLI updates itself, and says so: 1: cli
-  section Edge case - an old spelling
-    a user types ai install cursor => it still works => a deprecation line names the new form: 1: cli
+    run aidd kanban list => the same rows as before: 5: cli
+  section Edge case - the binary is missing
+    kanban is not installed => run aidd kanban => a message names the path that was tried: 1: cli
   section Teardown
-    remove the aliases => only the new surface answers => the snapshot is recaptured once: 5: cli
+    typecheck the CLI without kanban's node_modules => it passes: 5: system
 ```
 
 ## Tasks to do
 
-### `1)` Add the new surface beside the old
+### `1)` Locate and execute
 
-1. `sync` first: it never existed, so nothing is replaced. Then `doctor` enriched with the tool
-   inventory. Then `translate`, before `framework build` is retired.
-2. Every old spelling keeps working and prints one line naming its replacement.
+1. Replace the deep import with a launcher that finds the binary and runs it.
+2. On failure, name the path that was tried — a launcher that fails silently is worse than none.
 
-### `2)` Move the tests
+### `2)` Drop the four dependencies
 
-1. e2e and golden invoke the new spellings. Recapture once, and review the diff as the behavior
-   change it is.
+1. `ink`, `react`, `cli-table3` and `gray-matter` leave `cli/package.json`, and their entries leave
+   `knip.json`.
+2. Note the drop in the bundle budget: it is a verifiable gain, not a claim.
 
-### `3)` Retire the old surface
+### `3)` Simplify the hook
 
-1. Remove `ai`, `ide`, `status`, `restore`, `self-update` and the aliases.
-2. `--tool` is the single scope flag everywhere.
-
-### `4)` Say what each adjacent command does
-
-> Six pairs are close enough to be confused. One line each, in `--help`.
-
-1. `marketplace refresh` re-fetches catalogs; `framework update` moves to a new version; `sync`
-   rewrites owned files from what is already there.
-2. `translate` converts an arbitrary source and records nothing; `sync` does the same conversion,
-   driven by the manifest.
-3. `setup` bootstraps the whole project; `framework install` acts on the framework alone.
-4. `clean` removes AIDD from the project; `framework remove` removes the framework.
+1. `cli-typecheck` no longer needs to install kanban's dependencies. Remove the workaround and its
+   comment.
 
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 1    | Every new command produces the same outcome as the old spelling it replaces; every old spelling still works and names its replacement |
-| 2    | The golden diff shows the invocation strings changing and nothing else |
-| 3    | No verb is declared twice for the same subject; `--tool` scopes every command that accepts a scope |
-| 4    | `--help` distinguishes the six adjacent commands in one line each |
-| all  | A user coming from Claude Code or Codex finds `update`, `doctor` and the noun groups where those CLIs put them |
+| 1    | `aidd kanban` and `aidd kanban list` behave as before; a missing binary gives a message naming the path |
+| 2    | `cli/src` imports none of the four packages, and `knip.json` ignores no dependency |
+| 3    | `pnpm typecheck` passes with `kanban/node_modules` absent |
+| all  | The bundle is smaller than before, measured by `check-bundle-size.mjs` |
