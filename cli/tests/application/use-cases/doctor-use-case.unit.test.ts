@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractAtReferences,
   extractMarkdownLinkTargets,
-} from "../../../src/application/use-cases/doctor/doctor-use-case.js";
+} from "../../../src/domain/formats/markdown-references.js";
 import type { ToolId } from "../../../src/domain/tools/registry.js";
 import {
   buildDoctorUseCase,

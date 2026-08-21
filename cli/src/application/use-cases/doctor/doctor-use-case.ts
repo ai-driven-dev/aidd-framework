@@ -16,11 +16,6 @@ import type { DoctorPluginUseCase } from "./doctor-plugin-use-case.js";
 import type { DoctorReferencesUseCase } from "./doctor-references-use-case.js";
 import type { DoctorTrackedFilesUseCase } from "./doctor-tracked-files-use-case.js";
 
-export {
-  extractAtReferences,
-  extractMarkdownLinkTargets,
-} from "../../../domain/formats/markdown-references.js";
-
 export interface DoctorOptions {
   projectRoot: string;
   category?: ToolCategory;
