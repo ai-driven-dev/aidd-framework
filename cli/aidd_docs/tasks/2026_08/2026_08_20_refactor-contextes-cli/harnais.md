@@ -144,6 +144,40 @@ ré-export a disparu. Un test qui déformait la production.
 - CI : nouveau job `cli / Architecture invariants` lançant `pnpm test:arch`.
 - pre-commit : `cli-architecture`, restreint aux chemins qui peuvent invalider un invariant.
 
+## État de la mesure, vérifié le 2026-08-21
+
+| Filet | Volume | Ce qu'il attrape |
+|---|---|---|
+| unitaire | 1 380 tests | domaine et use cases |
+| intégration | 465 tests | adapters sur un vrai système de fichiers |
+| e2e | 126 tests, 15 fichiers | le binaire réel |
+| architecture | 6 tests, 238 ms | invariants, doc, carte, coût d'ajout d'un outil |
+| smoke | 98 vérifications, 92 s | 36/36 commandes feuilles, hermétique |
+
+**Couverture de code : 91,3 % / 88,1 % / 91,0 % / 91,3 %**, seuils configurés 85/80/90/85.
+
+### Pourquoi la couche commandes est exclue de la couverture
+
+Elle l'était sans raison écrite. Vérifié : l'inclure fait tomber le total de 91,3 % à 82,0 % et
+affiche `cli.ts` à **0 %** et `commands/` à **0,69 %** — alors que 126 tests e2e et 98 vérifications
+smoke les exercent. Les deux lancent `dist/cli.js` en **sous-processus**, et la couverture v8 ne
+traverse pas une frontière de processus. Les inclure produit un faux zéro, pas une mesure.
+L'exclusion est conservée, avec cette raison désormais écrite dans `vitest.config.ts`. Leur filet
+réel est l'e2e et le smoke, comptés à part.
+
+### Stryker : le premier blocage est levé, le second est diagnostiqué
+
+`tsconfigFile: ""` supprime le crash `TypeError: ts.parseConfigFileTextToJson is not a function` :
+c'est le préprocesseur TSConfig de Stryker qui appelait une API que TypeScript 7 n'expose plus.
+
+Il atteint désormais son run initial et échoue plus loin, pour une autre raison : son runner lance
+vitest, qui prend `vitest.workspace.ts` et exécute donc l'e2e — et le golden de build ne survit pas
+au bac à sable de Stryker, où les chemins absolus diffèrent. Les options `vitest.dir`,
+`vitest.related` et un fichier de configuration dédié ont été essayés : aucune ne restreint le run
+initial. Le déblocage demande d'empêcher Stryker d'utiliser le workspace, ce qui n'a pas été fait.
+
+Reste donc utile pour la phase 14, avec un obstacle nommé au lieu d'un « cassé ».
+
 ## Placement
 
 | Moment | Ce qui tourne | Pourquoi |
