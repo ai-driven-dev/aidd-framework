@@ -116,6 +116,23 @@ Runtime configs and IDE configs ship inside the CLI binary (tsup bundles them):
 - Budget: 500 KB (`bundleBudgetKB` in `package.json`)
 - Enforced at build time: `scripts/check-bundle-size.mjs` runs after `tsup`
 
+## File Ownership
+
+Two regimes live side by side on disk. Confusing them is the main source of accidental
+complexity in the install and repair paths.
+
+| Regime | Examples | On drift |
+| --- | --- | --- |
+| CLI-owned | generated tool trees, gitignored | regenerate from source |
+| Co-owned with the user | `settings.json`, `.mcp.json`, `.vscode/` | merge and report conflicts |
+
+Hash tracking and per-file merge on CLI-owned files is over-engineering: the canonical
+source can always reproduce them. Blind rewriting of co-owned files destroys the user's
+own edits, which is why merge strategies and MCP exclusions exist.
+
+This distinction is what `doctor` and `restore` should be scoped by — see
+`aidd_docs/tasks/2026_08/2026_08_20_refactor-contextes-cli/`.
+
 ## Key Design Decisions
 
 - Merge files (JSON/TOML): surgical key-level tracking; uninstall removes only AIDD keys

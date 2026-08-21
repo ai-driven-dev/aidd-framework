@@ -7,13 +7,17 @@ src/
 ├── cli.ts                    # Entry point — commander setup, global flags, preAction hook
 ├── application/
 │   ├── commands/             # CLI wiring only (1 file per command)
+│   ├── display/              # result rendering per command group (doctor, restore, setup, status)
 │   ├── use-cases/            # Business orchestration
 │   │   ├── auth/             # login / logout / status / require-auth
 │   │   ├── doctor/           # orchestrator + layout / merge-files / plugin / references / tracked-files
+│   │   ├── framework/        # author-side build: source → target-native distribution
+│   │   │   └── strategies/   # marketplace and flat build strategies, per-tool build contracts
 │   │   ├── global/           # cross-tool chains: update-all / status-all / restore-all / doctor-all
 │   │   ├── install/          # capability sub-use-cases: runtime-config / ide-config / agents / commands / rules / skills / config
 │   │   ├── marketplace/      # marketplace lifecycle: add / list / remove / refresh / check / register-framework / sync-settings
 │   │   ├── plugin/           # create / add / install / install-from-marketplace / remove / list / update / search / pick
+│   │   │   └── translator/   # per-tool materialization strategies (native, flat, built-tree)
 │   │   ├── restore/          # orchestrator + tool-files / all-plugins / plugin
 │   │   ├── setup/            # sub-use-cases: marketplace-source / tools / plugins-prompt
 │   │   ├── sync/             # conflict-resolver only — drift/conflict resolution reused by the update flow
@@ -35,6 +39,9 @@ src/
 └── infrastructure/
     ├── adapters/             # port implementations — one adapter per port (incl. auth-reader, auth-storage, http-client)
     ├── assets/               # asset-loader.ts — typed loader for configs/stubs bundled in binary
+    ├── auth/                 # credential resolution
+    ├── git/                  # token injection for authenticated git fetches
+    ├── http/                 # HTTP client
     ├── deps.ts               # dependency injection wiring
     └── errors.ts             # infrastructure typed exceptions (internal only)
 ```

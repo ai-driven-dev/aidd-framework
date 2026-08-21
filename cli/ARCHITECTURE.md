@@ -38,9 +38,9 @@ Dependencies point inward only: infrastructure → application → domain. Domai
 |---|---|
 | `SetupFlow` | Aggregate carrying all setup parameters (source, tools, pluginMode, interactive) |
 | `MarketplaceSourceMode` | Value object: `remote()` or `local(path)` |
-| `MarketplaceEntry` | A registered marketplace (name, source, trustLevel) |
+| `Marketplace` | A registered marketplace (name, source, scope). Registry stored at `.aidd/marketplaces.json`, not in the manifest |
 | `MarketplaceCacheEntry` | Cached catalog fetch (marketplace name, fetchedAt, size) |
-| `Manifest` (v6) | Top-level schema: `version`, `tools`, `marketplaces`. Plugins live per-tool under `tools[id].plugins`. Stripped top-level fields: `docsDir`, `repo`, `mode`, `scripts`, `plugins`, `topPlugins`. Stored at `.aidd/manifest.json` |
+| `Manifest` (v6) | Top-level schema: `version`, `tools`. Plugins live per-tool under `tools[id].plugins`. Stripped top-level fields: `docsDir`, `repo`, `mode`, `scripts`, `plugins`, `topPlugins`, `marketplaces`. Stored at `.aidd/manifest.json` |
 | `Plugin` | Installed plugin: id, source (marketplace + version), tool, files |
 | `PluginDistribution` | Capability files for a plugin as fetched from the source |
 
@@ -55,7 +55,6 @@ aidd marketplace    — marketplace management (add/list/remove/refresh/check)
 aidd status         — global drift view (delegates to ai + ide status)
 aidd doctor         — global integrity check (delegates to ai + ide doctor)
 aidd restore        — global file restore (delegates to ai restore)
-aidd sync           — global sync (delegates to ai sync)
 aidd update         — global update (delegates to ai + ide update)
 aidd clean          — remove all AIDD files
 aidd auth           — credential management
