@@ -16,7 +16,11 @@ export function registerRestoreCommand(program: Command): void {
       try {
         const deps = await createDeps(projectRoot, { verbose }, output);
         const interactive = !cmdOptions.force && process.stdout.isTTY;
-        const result = await deps.restoreAllUseCase.execute(projectRoot, interactive);
+        const result = await deps.restoreAllUseCase.execute(
+          projectRoot,
+          cmdOptions.force,
+          interactive
+        );
 
         for (const e of result.errors) output.warn(`[${e.scope}] ${e.message}`);
 

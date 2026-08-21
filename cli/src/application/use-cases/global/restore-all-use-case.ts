@@ -22,7 +22,11 @@ export class RestoreAllUseCase {
     private readonly restoreUseCase: RestoreUseCase
   ) {}
 
-  async execute(projectRoot: string, interactive: boolean): Promise<RestoreAllResult> {
+  async execute(
+    projectRoot: string,
+    force: boolean,
+    interactive: boolean
+  ): Promise<RestoreAllResult> {
     const errors: GlobalExecutionError[] = [];
     const manifest = await this.manifestRepo.load();
     if (manifest === null) throw new NoManifestError();
@@ -33,6 +37,7 @@ export class RestoreAllUseCase {
       projectRoot,
       version,
       effectiveFiles,
+      force,
       interactive,
       manifest,
       errors
@@ -75,6 +80,7 @@ export class RestoreAllUseCase {
     projectRoot: string,
     version: string,
     files: string[] | undefined,
+    force: boolean,
     interactive: boolean,
     manifest: Awaited<ReturnType<ManifestRepository["load"]>>,
     errors: GlobalExecutionError[]
@@ -92,7 +98,7 @@ export class RestoreAllUseCase {
         docsDir: DOCS_DIR,
         projectRoot,
         files,
-        force: interactive,
+        force,
         interactive,
         manifest,
       });

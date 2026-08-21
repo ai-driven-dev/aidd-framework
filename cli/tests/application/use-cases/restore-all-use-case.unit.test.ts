@@ -88,6 +88,54 @@ function countingReader(fs: Deps["fs"]): {
   return { reader, count: () => calls };
 }
 
+describe("RestoreAllUseCase — the --force flag", () => {
+  /**
+   * `aidd restore --force` used to be inert: the command folded `force` into
+   * `interactive` and the use case only took `interactive`, so a non-TTY run always
+   * decided with `force: false`. A modified file raised InputRequiredError, the
+   * caller swallowed it into a warning telling the user to pass `--force` — which
+   * they had — and the command then reported "all files are unmodified" while
+   * `status` reported the same file modified.
+   */
+  async function setupWithModifiedTrackedFile(): Promise<{
+    deps: Deps;
+    reader: PluginDistributionReaderAdapter;
+    trackedPath: string;
+  }> {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "claude");
+
+    const manifest = await deps.manifestRepo.load();
+    const tracked = manifest?.getToolFiles("claude") ?? [];
+    expect(tracked.length, "the fixture must track at least one file").toBeGreaterThan(0);
+
+    const trackedPath = join(PROJECT_ROOT, tracked[0].relativePath);
+    await deps.fs.writeFile(trackedPath, "EDITED OUTSIDE THE CLI");
+
+    return { deps, reader: new PluginDistributionReaderAdapter(deps.fs), trackedPath };
+  }
+
+  it("restores a modified tracked file when force is set", async () => {
+    const { deps, reader, trackedPath } = await setupWithModifiedTrackedFile();
+
+    const result = await makeRestoreAllUseCase(deps, reader).execute(PROJECT_ROOT, true, false);
+
+    expect(deps.fs.getFile(trackedPath)).not.toBe("EDITED OUTSIDE THE CLI");
+    expect(result.errors, "force must reach the decision, not raise InputRequired").toEqual([]);
+    expect(result.totalRestored).toBeGreaterThan(0);
+  });
+
+  it("keeps a modified tracked file and reports why when force is not set", async () => {
+    const { deps, reader, trackedPath } = await setupWithModifiedTrackedFile();
+
+    const result = await makeRestoreAllUseCase(deps, reader).execute(PROJECT_ROOT, false, false);
+
+    expect(deps.fs.getFile(trackedPath)).toBe("EDITED OUTSIDE THE CLI");
+    expect(result.totalRestored).toBe(0);
+    expect(result.errors.map((e) => e.message).join(" ")).toContain("--force");
+  });
+});
+
 describe("RestoreAllUseCase — plugin materialization", () => {
   it("restores a corrupted plugin file with exactly one materialization call (translate-mode: claude)", async () => {
     const deps = await buildUnitDeps(PROJECT_ROOT);
@@ -101,7 +149,7 @@ describe("RestoreAllUseCase — plugin materialization", () => {
     // Counting reader wired only from here — installPlugin's own read() must not count.
     const { reader, count } = countingReader(deps.fs);
     const useCase = makeRestoreAllUseCase(deps, reader);
-    await useCase.execute(PROJECT_ROOT, false);
+    await useCase.execute(PROJECT_ROOT, false, false);
 
     expect(deps.fs.getFile(pluginFile)).not.toBe("CORRUPTED CONTENT");
     expect(deps.fs.getFile(pluginFile)).toContain("Greet from sample-plugin.");
@@ -133,7 +181,7 @@ describe("RestoreAllUseCase — plugin materialization", () => {
     // Counting reader wired only from here — installPlugin's own read() must not count.
     const { reader, count } = countingReader(deps.fs);
     const useCase = makeRestoreAllUseCase(deps, reader, new OverwritePrompter(), true);
-    await useCase.execute(PROJECT_ROOT, false);
+    await useCase.execute(PROJECT_ROOT, false, false);
 
     expect(deps.fs.getFile(pluginFile)).not.toBe("CORRUPTED CONTENT");
     expect(count()).toBe(1);
@@ -149,7 +197,7 @@ describe("RestoreAllUseCase — plugin materialization", () => {
     const pluginFile = join(PROJECT_ROOT, ".claude/plugins/sample-plugin/commands/greet.md");
     await deps.fs.writeFile(pluginFile, "CORRUPTED CONTENT");
 
-    const result = await makeRestoreAllUseCase(deps, reader).execute(PROJECT_ROOT, false);
+    const result = await makeRestoreAllUseCase(deps, reader).execute(PROJECT_ROOT, false, false);
 
     expect(result.pluginNamesRestored).toEqual(["sample-plugin"]);
     expect(result.errors).toHaveLength(0);
@@ -168,7 +216,7 @@ describe("RestoreAllUseCase — plugin materialization", () => {
       ?.getPlugins("claude")
       .find((p) => p.name === "sample-plugin");
 
-    const result = await makeRestoreAllUseCase(deps, reader).execute(PROJECT_ROOT, false);
+    const result = await makeRestoreAllUseCase(deps, reader).execute(PROJECT_ROOT, false, false);
 
     expect(result.pluginNamesRestored).toEqual([]);
     expect(result.errors).toHaveLength(0);
@@ -207,7 +255,7 @@ describe("RestoreAllUseCase — plugin materialization", () => {
       ScriptedPrompter.answer.checkbox([".vscode/keybindings.json"]),
     ]);
     const useCase = makeRestoreAllUseCase(deps, reader, prompter);
-    await useCase.execute(PROJECT_ROOT, true);
+    await useCase.execute(PROJECT_ROOT, true, true);
 
     expect(deps.fs.getFile(pluginFile)).toBe("CORRUPTED CONTENT");
   });
@@ -240,7 +288,7 @@ describe("RestoreAllUseCase — plugin materialization", () => {
     await deps.fs.writeFile(claudePluginFile, "CORRUPTED CLAUDE");
     await deps.fs.writeFile(codexPluginFile, "CORRUPTED CODEX");
 
-    await makeRestoreAllUseCase(deps, reader).execute(PROJECT_ROOT, false);
+    await makeRestoreAllUseCase(deps, reader).execute(PROJECT_ROOT, false, false);
 
     expect(deps.fs.getFile(claudePluginFile)).not.toBe("CORRUPTED CLAUDE");
     expect(deps.fs.getFile(codexPluginFile)).not.toBe("CORRUPTED CODEX");

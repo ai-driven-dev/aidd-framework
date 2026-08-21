@@ -463,8 +463,8 @@
   {
     "command": "restore --force",
     "exitCode": 0,
-    "stdout": "Checking claude for files to restore...\nNothing to restore — all files are unmodified.\n",
-    "stderr": "Warning: [config-restore] Use --force to overwrite modified files in non-interactive mode.\n",
+    "stdout": "Checking claude for files to restore...\nChecking cursor for files to restore...\nRestored 1 file(s), kept 0 file(s)\n",
+    "stderr": "",
     "filesWritten": [],
     "manifest": {
       "version": 6,
@@ -475,7 +475,7 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "8a80554c91d9fca8acb82f023de02f11"
+              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
             }
           ],
           "mergeFiles": [],
@@ -531,7 +531,7 @@
   {
     "command": "status",
     "exitCode": 0,
-    "stdout": "\nAI tools:\n  claude (v5.2.1):\n    ~ .claude/settings.json\n  1 modified, 0 deleted, 0 added\n  cursor (v5.2.1): in sync\n\nIDE tools:\n  (none installed)\n\nPlugins:\n  (all in sync)\n\nLegend: ~ modified  - deleted  + added\n",
+    "stdout": "All files are in sync\n",
     "stderr": "",
     "filesWritten": [],
     "manifest": {
@@ -543,7 +543,7 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "8a80554c91d9fca8acb82f023de02f11"
+              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
             }
           ],
           "mergeFiles": [],
@@ -611,7 +611,7 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "d0f35079274480d34972b83dc2b65b4e"
+              "hash": "b7669b899b9a72e8ef129510a7da6d62"
             }
           ],
           "mergeFiles": []
