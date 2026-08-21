@@ -63,6 +63,24 @@ journey
 
 ## Tasks to do
 
+### `0)` Restore, or replace, the mutation net
+
+> `stryker.conf.json` mutates exactly one file: `src/domain/models/manifest.ts`, with a break
+> threshold of 50. It is the strongest available evidence that this aggregate's tests catch a
+> change, which is exactly what this phase needs before redesigning it.
+
+1. It does not run today. `stryker run` crashes with
+   `TypeError: ts.parseConfigFileTextToJson is not a function`: Stryker 9.6.1's TSConfig
+   preprocessor calls a TypeScript API that TypeScript 7.0.2, the native port, no longer exposes.
+   No CI job and no hook invokes it, so nobody saw it break.
+2. Attempt the repair: a Stryker release supporting TypeScript 7, or a configuration that bypasses
+   its TSConfig preprocessor.
+3. If neither works, say so here and name what replaces it. The round-trip test in task 4 is the
+   fallback, and it is weaker: it proves the output is stable, not that the tests would notice a
+   behavior change.
+4. Whatever the outcome, run it **before** the split and record the score. A number taken after the
+   redesign proves nothing about the redesign.
+
 ### `1)` Separate the members
 
 > One save, one invariant, one file per responsibility.
@@ -92,6 +110,7 @@ journey
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
+| 0    | Either a mutation score for `manifest.ts` is recorded before the split, or the phase records why it cannot be and what stands in its place |
 | 1    | Every command touching the record behaves as before; one save still writes one consistent document |
 | 2    | Passing one of the three maps where another is expected fails to compile, verified by trying |
 | 3    | No type named `Plugin` alone remains |

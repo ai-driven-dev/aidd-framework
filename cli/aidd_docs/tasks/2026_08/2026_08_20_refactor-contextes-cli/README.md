@@ -10,13 +10,13 @@ Chaque affirmation chiffrée y est reproductible.
 | `arborescence.md` | l'arbre cible fichier par fichier, avec les règles de dépendance |
 | `commandes.md` | la surface de commandes cible et sa grammaire |
 | `domaine.md` | critique du domaine et sa cible, avec le test d'acceptation |
-| `migration.md` | le plan en treize phases et sa règle centrale |
 | `harnais.md` | les garde-fous déterministes, leur état et ce qui reste |
 | `plan.md` | le plan exécutable : 19 phases, objectif, ressources, décisions |
 | `phase-1.md` … `phase-19.md` | une fiche par phase : projection, parcours, portée de test, tâches, critères |
 
-`migration.md` reste la note de cadrage qui a produit le plan ; `plan.md` et ses phases sont
-l'artefact exécutable. En cas d'écart, `plan.md` fait foi.
+`migration.md` a été supprimé : sa numérotation en treize phases contredisait les dix-neuf du plan,
+et deux systèmes de numéros dans le même dossier sont un piège. Ses deux sections propres sont
+reprises plus bas ; tout le reste vit dans `plan.md` et les fiches de phase.
 
 ## Décisions structurantes
 
@@ -62,6 +62,7 @@ Un refactor de cette taille ne tient pas sur la relecture. Chaque phase s'appuie
 | Biome | cycles d'exécution, ré-exports, barrels, frontière du domaine | livré |
 | knip, jscpd | code mort, duplication en hausse | livrés, bloquants |
 | seuils de couverture | un test perdu pendant un déplacement (85 / 80 / 90 / 85) | existant |
+| mutation sur `manifest.ts` | des tests qui passent sans rien vérifier, sur l'agrégat que la phase 14 redécoupe | existant, **cassé** — phase 14, tâche 0 |
 
 Trois de ces filets n'existaient pas quand le plan a été écrit la première fois. Ils répondent aux
 trois faiblesses qui avaient été signalées : une phase trop grosse, une phase sans filet propre, et
@@ -78,9 +79,37 @@ onze déplacements sans preuve que la surface utilisateur n'avait pas bougé.
   corrompues qu'il injecte est `{"message":"API rate limit exceeded"}` — quelqu'un l'a rencontrée.
 - **11 des 24 options déclarées n'ont jamais été passées**, dont `--flat`, que la phase 5 supprime
   pour quatre outils, et `--scope`, qui décide où les fichiers atterrissent.
+- **Stryker est cassé, pas seulement dormant.** `stryker.conf.json` mute exactement un fichier,
+  `src/domain/models/manifest.ts`, avec un seuil de rupture à 50 — le filet le plus pertinent qui
+  soit pour la phase la plus risquée. `stryker run` plante sur
+  `TypeError: ts.parseConfigFileTextToJson is not a function` : Stryker 9.6.1 appelle une API que
+  TypeScript 7.0.2, le portage natif, n'expose plus. Aucun job, aucun hook, donc personne ne l'a vu
+  se casser à la montée de version.
 - **Deux de mes propres mesures étaient fausses** avant exécution : le smoke couvre 100 % des
   commandes feuilles, pas 23 sur 27 ; et il fait 77 vérifications, pas 44. L'analyse par regex
   ratait les invocations en boucle.
+
+## Les tests pendant la migration
+
+Il n'y a pas de phase de coupe : la mesure ne la justifie pas (voir `brainstorm.md`). Les tests ont
+en revanche deux besoins concrets.
+
+**Réécriture de chemins.** 157 fichiers de test importent `src/`. Chaque phase d'extraction les
+casse par le chemin, pas par le comportement. C'est mécanique, et c'est le signe qu'un lot est bien
+neutre : si un test échoue autrement que par un chemin, le lot ne l'était pas.
+
+**Extension du filet, en phase 1.** Le golden ne couvre que cinq invocations. Tout le reste du plan
+en dépend.
+
+Repères de durée mesurés avant la migration, à surveiller : unit 4,65 s pour 1 520 tests,
+integration 2,91 s pour 510, e2e 15,5 s pour 128 après build. Une phase qui fait franchement gonfler
+l'un de ces chiffres mérite d'être regardée.
+
+## Ce qui peut être fait en parallèle
+
+Les phases 1 et 2 sont indépendantes l'une de l'autre. Les phases 5 à 9 sont séquentielles par
+construction (chaque contexte dépend de celui d'en dessous). La phase 13 suit chaque phase qu'elle
+documente, plutôt que d'attendre la fin.
 
 ## Points encore ouverts
 
