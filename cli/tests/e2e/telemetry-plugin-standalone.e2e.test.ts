@@ -1,5 +1,5 @@
 import { execFile, execFileSync } from "node:child_process";
-import { readFileSync, realpathSync } from "node:fs";
+import { readdirSync, readFileSync, realpathSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { builtinModules } from "node:module";
 import { tmpdir } from "node:os";
@@ -217,89 +217,48 @@ describe("the plugin measures on its own", () => {
 });
 
 describe("what the plugin ships is readable", () => {
-  it("keeps the reporter unminified, with the source file each block came from", () => {
-    // An unreadable file in someone else's repository is a reason not to trust it, before
-    // it is anything else. Unminified, every block still says where it came from.
-    const bundle = readFileSync(REPORT_BIN, "utf8");
+  it("keeps both scripts hand-written, so what runs can be read", () => {
+    // A generated file in someone else's repository is a reason not to trust it. Both are
+    // plain CommonJS now, and a rebuild is not a thing that can go stale.
+    for (const bin of [SWITCH_BIN, REPORT_BIN]) {
+      const source = readFileSync(bin, "utf8");
 
-    expect(bundle).toContain("// src/domain/models/cost-report.ts");
-    expect(bundle).toContain("function buildCostReport");
-    expect(bundle.split("\n").length).toBeGreaterThan(1000);
-  });
-
-  it("keeps the switch hand-written, so what turns measurement on can be read", () => {
-    const source = readFileSync(SWITCH_BIN, "utf8");
-
-    expect(source).not.toContain("Generated from");
-    expect(source).toContain('require("node:fs")');
-    // Short enough that someone deciding whether to allow measuring can read all of it.
-    expect(source.split("\n").length).toBeLessThan(80);
-  });
-});
-
-describe("the committed bundle", () => {
-  for (const bin of [SWITCH_BIN, REPORT_BIN]) {
-    it(`${bin.split("/").slice(-3).join("/")} carries a shebang and requires nothing but node's own modules`, () => {
-      const bundle = readFileSync(bin, "utf8");
-      // CommonJS, matching the hooks beside it, so the dependency edges are `require` calls.
-      // The bundle is minified, so a bare `require("` also occurs inside string literals —
-      // matching those would report noise as dependencies.
-      const specifiers = [...bundle.matchAll(/(?:^|[^\w.])require\(\s*"([^"]+)"\s*\)/gu)]
-        .map((match) => match[1] ?? "")
-        .filter((specifier) => !specifier.startsWith("."));
-      const external = specifiers.filter(
-        (specifier) => !builtinModules.includes(specifier.replace(/^node:/u, ""))
-      );
-
-      expect(bundle.startsWith("#!/usr/bin/env node")).toBe(true);
-      expect(
-        specifiers.length,
-        "no require call found — the check matched nothing"
-      ).toBeGreaterThan(0);
-      // A dependency left external would need `node_modules` beside the plugin, which a
-      // plugin copied verbatim into someone's project will never have.
-      expect(external).toEqual([]);
-    });
-  }
-
-  it("is small enough to ship inside a plugin", () => {
-    // Not a style rule: this file is copied into every project that installs the plugin.
-    // The number is generous, and generous on purpose since the bundle is deliberately
-    // unminified; it exists so that pulling in a renderer or a git library by accident is
-    // noticed here rather than by whoever clones the repository.
-    expect(readFileSync(REPORT_BIN).byteLength).toBeLessThan(400 * 1024);
-  });
-});
-
-describe("the committed bundle cannot drift from its source", () => {
-  it("is byte-identical to a fresh build of the source it is generated from", async () => {
-    // The plugin ships a build artefact, because a plugin is copied verbatim and cannot run
-    // an install step. Committing a build artefact means it can go stale, so it is rebuilt
-    // here and compared — a source change without a rebuild fails now rather than shipping
-    // a plugin that measures with last week's rules.
-    const into = await mkdtemp(join(tmpdir(), "aidd-bundle-check-"));
-    try {
-      execFileSync(
-        process.execPath,
-        [
-          join(process.cwd(), "node_modules", "tsup", "dist", "cli-default.js"),
-          "--config",
-          "tsup.plugin-bin.ts",
-        ],
-        {
-          cwd: process.cwd(),
-          env: { ...process.env, AIDD_PLUGIN_BIN_OUT_DIR: into },
-          stdio: "pipe",
-        }
-      );
-
-      // Only the reporter is generated. The switch is hand-written plain CommonJS, like
-      // the hooks, so there is nothing for it to drift from.
-      expect(readFileSync(join(into, "telemetry-report.js"), "utf8")).toBe(
-        readFileSync(REPORT_BIN, "utf8")
-      );
-    } finally {
-      await rm(into, { recursive: true, force: true });
+      expect(source.startsWith("#!/usr/bin/env node"), bin).toBe(true);
+      expect(source, bin).not.toContain("Generated from");
     }
-  }, 60_000);
+  });
+
+  it("keeps the switch short enough to read before allowing anything", () => {
+    expect(readFileSync(SWITCH_BIN, "utf8").split("\n").length).toBeLessThan(80);
+  });
+
+  it("requires nothing but node's own modules, across every file it ships", () => {
+    // A dependency would need `node_modules` beside the plugin, which a plugin copied
+    // verbatim into someone's project will never have.
+    const libDir = join(SKILLS, "01-cost", "scripts", "lib");
+    const files = [SWITCH_BIN, REPORT_BIN, ...readdirSync(libDir).map((n) => join(libDir, n))];
+
+    for (const file of files) {
+      const specifiers = [...readFileSync(file, "utf8").matchAll(/require\("([^"]+)"\)/gu)].map(
+        (match) => match[1] ?? ""
+      );
+      const external = specifiers.filter(
+        (specifier) =>
+          !specifier.startsWith(".") && !builtinModules.includes(specifier.replace(/^node:/u, ""))
+      );
+
+      expect(external, file).toEqual([]);
+    }
+  });
+
+  it("stays small enough that nobody skips reading it", () => {
+    const libDir = join(SKILLS, "01-cost", "scripts", "lib");
+    const lines = [SWITCH_BIN, REPORT_BIN, ...readdirSync(libDir).map((n) => join(libDir, n))]
+      .map((file) => readFileSync(file, "utf8").split("\n").length)
+      .reduce((sum, count) => sum + count, 0);
+
+    // Not a style rule: the generated bundle this replaced was 4,183 lines, and the number
+    // exists so that drifting back toward it is noticed here.
+    expect(lines).toBeLessThan(1800);
+  });
 });

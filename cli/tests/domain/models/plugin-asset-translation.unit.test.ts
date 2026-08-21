@@ -64,20 +64,6 @@ describe("a plugin's executable files survive being installed", () => {
       ).toBe(true);
     });
   }
-
-  const SCRIPT_UNDER_TEST = "skills/01-cost/scripts/telemetry-report.js";
-
-  it("the measurement script is one a rewrite really would damage", () => {
-    // The guard above is only worth having because this is true. If a future bundle stops
-    // matching any tool's rewrite, this fails and says the guard has gone untested rather
-    // than letting it quietly protect nothing.
-    const content = pluginFile(SCRIPT_UNDER_TEST);
-    const damaged = AI_TOOL_IDS.filter(
-      (tool) => getAiToolConfig(tool).rewriteContent(content, "aidd_docs") !== content
-    );
-
-    expect(damaged.length).toBeGreaterThan(0);
-  });
 });
 
 /** The decisive check: not "would a rewrite damage it", but "does installing the plugin
@@ -149,9 +135,8 @@ describe("installing the plugin carries its measurement script, on every tool", 
   for (const tool of [claude, codex, copilot, cursor, opencode]) {
     it(`${tool.toolId} leaves a script's own paths alone`, () => {
       // Paths this tool's own rewrite is built to touch, in a file that is not prose.
-      // Whether this particular tool's rewrite would in fact change them varies — the
-      // check that the guard is not vacuous is made once, against the shipped bundle, in
-      // "the measurement script is one a rewrite really would damage" above.
+      // Whether this particular tool's rewrite would change them varies; that the guard is
+      // not vacuous is asserted once, below, over every tool at once.
       const script = rewritableScript(tool.directory);
 
       const installed = translator
@@ -172,5 +157,15 @@ describe("installing the plugin carries its measurement script, on every tool", 
 
     expect(installed, "opencode drops the script entirely").toBeDefined();
     expect(installed?.content).toBe(pluginFile(SCRIPT));
+  });
+  it("guards against a rewrite that some tool really would apply", () => {
+    // Without this, every assertion above could pass over content no rewrite touches, and
+    // the guard would be protecting nothing while looking thorough.
+    const rewritten = [claude, codex, copilot, cursor, opencode].filter((tool) => {
+      const script = rewritableScript(tool.directory);
+      return tool.rewriteContent(script, "aidd_docs") !== script;
+    });
+
+    expect(rewritten.length).toBeGreaterThan(0);
   });
 });
