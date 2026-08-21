@@ -1,4 +1,4 @@
-import { copyFileSync } from "node:fs";
+import { copyFileSync, mkdirSync } from "node:fs";
 import { defineConfig } from "tsup";
 
 export default defineConfig({
@@ -25,6 +25,16 @@ export default defineConfig({
     options.minifyWhitespace = true;
   },
   async onSuccess() {
+    mkdirSync("dist/kanban-frontend", { recursive: true });
+    copyFileSync(
+      "../kanban/src/presentation/web/frontend/index.html",
+      "dist/kanban-frontend/index.html"
+    );
+    copyFileSync(
+      "../kanban/src/presentation/web/frontend/styles.css",
+      "dist/kanban-frontend/styles.css"
+    );
+    copyFileSync("../kanban/src/presentation/web/frontend/app.js", "dist/kanban-frontend/app.js");
     copyFileSync(
       "assets/schemas/claude-code-plugin-manifest.json",
       "dist/claude-code-plugin-manifest.json"

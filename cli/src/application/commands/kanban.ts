@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { registerInteractiveCommand } from "../../../../kanban/src/presentation/commands/interactive-command.js";
 import { registerListCommand } from "../../../../kanban/src/presentation/commands/list-command.js";
+import { registerWebCommand } from "../../../../kanban/src/presentation/commands/web-command.js";
 import type { KanbanCommandDeps } from "../../../../kanban/src/presentation/kanban-deps.js";
 import { DOCS_DIR } from "../../domain/models/paths.js";
 import { ErrorHandler } from "../error-handler.js";
@@ -30,4 +31,5 @@ export function registerKanbanCommand(program: Command): void {
   // `aidd kanban [path]` still lands on it, and each view owns its options.
   registerListCommand(kanban, deps);
   registerInteractiveCommand(kanban.command("interactive", { isDefault: true }), deps);
+  registerWebCommand(kanban.command("web"), deps);
 }
