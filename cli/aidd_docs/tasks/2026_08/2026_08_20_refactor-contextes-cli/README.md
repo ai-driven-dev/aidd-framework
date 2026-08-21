@@ -12,6 +12,7 @@ Chaque affirmation chiffrée y est reproductible.
 | `domaine.md` | critique du domaine et sa cible, avec le test d'acceptation |
 | `migration.md` | le plan en treize phases et sa règle centrale |
 | `harnais.md` | les garde-fous déterministes, leur état et ce qui reste |
+| `phase-0.md` | la première phase du plan, prête à exécuter |
 
 ## Décisions structurantes
 
