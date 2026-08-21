@@ -57,6 +57,7 @@
     "test:kanban": "pnpm --dir ../kanban test",
     "test:watch": "vitest",
     "smoke": "pnpm build && bash scripts/smoke-tools.sh",
+    "smoke:full": "pnpm build && SMOKE_REMOTE=1 bash scripts/smoke-tools.sh",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "format": "biome format --write .",

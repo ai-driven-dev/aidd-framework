@@ -90,6 +90,23 @@ jobs:
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm test
 
+  cli-smoke:
+    name: cli / Smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+      - run: cd cli && pnpm install --frozen-lockfile
+      # Hermetic: every setup uses the local framework fixture, so this needs no
+      # token and no network. `smoke:full` adds the remote-fetch section on demand.
+      - run: cd cli && pnpm smoke
+
   cli-build:
     name: cli / Build & Bundle Budget
     runs-on: ubuntu-latest
