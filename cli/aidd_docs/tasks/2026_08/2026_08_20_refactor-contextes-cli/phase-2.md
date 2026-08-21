@@ -2,34 +2,38 @@
 status: pending
 ---
 
-# Instruction: Revive and make the smoke suite hermetic
+# Instruction: Make the smoke suite run, hermetically
 
-`scripts/smoke-tools.sh` is the only net that drives the built binary the way a user does: real
-arguments, throwaway projects, deliberate fault injection. It reports **100% leaf command coverage,
-37 of 37**, and it measures that itself.
+`scripts/smoke-tools.sh` drives the built binary with real arguments in throwaway projects and
+injects faults. It is the only net that exercises the CLI the way a user does.
 
-It runs nowhere. No CI job, no lefthook entry, last touched by the commit that moved the repository.
+It runs nowhere: no CI job, no lefthook entry, last touched by the commit that moved the repository.
 
-Run on 2026-08-21, it is **red**: 73 pass, 4 fail, 7 minutes 11 seconds.
+## What running it established
 
-## What the four failures actually are
+**It is red.** 73 pass, 4 fail, 7 min 11 s.
 
-One scenario, four shapes. `corrupt-cache fault injection` runs
-`setup --source remote --ai claude --plugins recommended --yes`, corrupts the cached catalog, then
-expects `plugin install aidd-dev` to fail with a message naming `marketplace refresh --force`.
+**Its coverage depends on ambient machine state.** Line 106 reads
+`TOKEN="${AIDD_TOKEN:-$(gh auth token 2>/dev/null || true)}"`, and everything substantial sits
+behind `if [[ -z "$TOKEN" ]]`. Counted statically:
 
-It gets `Error: Plugin 'aidd-dev' is already installed.` — because `aidd-dev` is in the recommended
-set, so setup installed it, and the install refuses on "already installed" **before ever reading the
-corrupt catalog**. The scenario stopped testing what it claims the day that plugin became
-recommended. Nobody saw it, because nobody ran it.
+| | invocations | sections |
+|---|---|---|
+| hermetic | 11 | help/version, framework build, plugin create, auth, self-update --check, local marketplace |
+| behind the token | 30 | the setup matrix, global read-only commands, restore, per-tool AI and IDE commands, plugin commands, the update conflict guard, fault injection |
 
-This is a test defect, not a product defect. It must be fixed before the suite can guard anything.
+So on a machine where `gh` happens to be logged in, the suite covers 41 invocations and reports
+100% leaf command coverage. Where it is not, it covers 11 and the coverage report collapses. Same
+command, same repository, two different nets — which is why it cannot gate a build as it stands.
 
-## The other problem: it needs the network
+**The four failures are one scenario that stopped testing what it claims.**
+`corrupt-cache fault injection` sets up with `--plugins recommended`, corrupts the cached catalog,
+then expects `plugin install aidd-dev` to fail with a message naming `marketplace refresh --force`.
+It gets `Error: Plugin 'aidd-dev' is already installed.` — `aidd-dev` is in the recommended set, so
+setup installed it and the install refuses before ever reading the corrupt catalog. A test defect.
 
-Seven invocations use `--source remote`, fetching the really published framework. That is why one of
-the injected corrupt shapes is `{"message":"API rate limit exceeded"}` — someone met it. A net that
-depends on a remote repository and on a rate limit cannot block a build.
+**And one command hangs.** In a second run, `plugin update (all)` exceeded the script's own 180 s
+ceiling and was killed. Seen once, not yet diagnosed.
 
 ## Architecture projection
 
@@ -38,9 +42,9 @@ depends on a remote repository and on a rate limit cannot block a build.
 ```txt
 .
 └── cli/
-    ├── scripts/smoke-tools.sh       ✏️ modify (fix the broken scenario, go hermetic, cover 11 options)
+    ├── scripts/smoke-tools.sh       ✏️ modify (local fixture, repaired scenario, 11 missing options)
     ├── package.json                 ✏️ modify (smoke:fast and smoke:full)
-    └── ../.github/workflows/cli-ci.yml  ✏️ modify (a blocking smoke job on the hermetic subset)
+    └── ../.github/workflows/cli-ci.yml  ✏️ modify (a blocking smoke job)
 ```
 
 ## User Journey
@@ -62,9 +66,10 @@ title: Test scope
 ---
 journey
   section Setup
-    build the binary and point setup at the local fixture => no network needed: 5: system
+    build the binary and point setup at the local fixture => no token needed: 5: system
     create one throwaway project per group => no shared state between invocations: 5: system
   section Happy path
+    run the suite with no token available => same coverage as with one: 5: cli
     run every leaf command with its real arguments => expected exit code for each: 5: cli
     pass every declared option at least once => none is silently unimplemented: 5: cli
   section Edge case - the repaired fault injection
@@ -79,24 +84,37 @@ journey
 
 ## Tasks to do
 
+### `0)` Reproduce the hang, then bound it
+
+> A net that can hang is a net that gets bypassed.
+
+1. Reproduce `plugin update` exceeding 180 s, with and without a token.
+2. If it is a product defect, record it as its own issue and fix it outside this phase — a net
+   phase does not change behavior.
+3. Either way, keep a per-command ceiling so one hang cannot stall the run, and make a timeout
+   report which invocation stalled.
+
 ### `1)` Repair the broken scenario
 
 > It must fail for the reason it claims, or it guards nothing.
 
-1. Install a plugin the recommended set does **not** contain, or set up with `--plugins none` so the
-   target is genuinely absent.
-2. Verify the repair the only way that counts: the assertion must pass for the right reason, and
-   still fail when the actionable message is removed from the product.
+1. Set up with `--plugins none`, or target a plugin the recommended set does not contain, so the
+   install genuinely reaches the corrupt catalog.
+2. Verify the repair the only way that counts: the assertion passes for the right reason, and still
+   fails when the actionable message is removed from the product.
 
-### `2)` Make the suite hermetic
+### `2)` Move the 30 gated invocations onto the local fixture
 
-> Seven invocations fetch the real published framework. A net gated by a rate limit is not a net.
+> This is the phase's real work, and what makes the suite a gate.
 
-1. Point every `--source remote` at the local fixture, except a small subset that genuinely tests
-   remote fetching.
-2. Split the script: `smoke:fast` is hermetic and blocking; `smoke:full` keeps the remote subset and
-   runs on demand, or on a schedule.
-3. Record the measured wall-clock of each in the header. The full run is 7 min 11 s today.
+1. Replace `setup --source remote` with `--source local --path "$FRAMEWORK_FIXTURE"` in the seven
+   places that use it.
+2. The per-tool and plugin sections install `aidd-dev`, a really published plugin. The fixture
+   serves `aidd-test` from a local path — swap the name, and check every assertion that depends on
+   the plugin's content.
+3. Keep a genuinely remote subset for what only remote fetching can prove, still gated, and name it
+   as such. `smoke:fast` is hermetic and blocking; `smoke:full` adds the remote subset.
+4. Record the measured wall-clock of each in the header. The full run is 7 min 11 s today.
 
 ### `3)` Pass the eleven options that never ran
 
@@ -110,18 +128,18 @@ journey
    `--release`.
 5. `--gh` needs credentials: assert the refusal path and say so in a comment.
 
-### `4)` Make it run, and make a failure readable
+### `4)` Make it run
 
 1. Add a blocking `cli / Smoke` job running `smoke:fast` after the build job.
-2. On failure, print the invocation, the expected and received exit codes, and the output. Keep the
-   summary that already names every failing check — it is what made these four visible.
+2. Keep the summary that already names every failing check — it is what made the four visible.
 
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
+| 0    | No invocation can stall the run; a timeout names the invocation that stalled |
 | 1    | The corrupt-catalog scenario fails when the actionable message is removed from the product, and passes otherwise |
-| 2    | `smoke:fast` completes with the network unavailable; the remote subset is named and separated |
+| 2    | With no token available, the suite reports the same leaf command coverage as with one, and completes without reaching the network except in the named remote subset |
 | 3    | Every declared option is passed at least once; `--dry-run` writes nothing and the two scopes write to different places |
 | 4    | A red smoke run fails the build, and one run names every failing invocation with its output |
-| all  | The suite is green before any later phase moves a file. Its self-measured command coverage stays at 100% |
+| all  | The suite is green before any later phase moves a file |

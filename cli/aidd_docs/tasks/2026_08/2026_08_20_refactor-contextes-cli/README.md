@@ -75,8 +75,15 @@ onze déplacements sans preuve que la surface utilisateur n'avait pas bougé.
   où `aidd-dev` est entré dans les plugins recommandés : `setup --plugins recommended` l'installe,
   donc `plugin install aidd-dev` échoue sur « already installed » avant même de lire le catalogue
   corrompu qu'il vient d'injecter. Défaut de test, pas de produit.
-- **Le smoke dépend du réseau** : sept invocations utilisent `--source remote`. L'une des formes
-  corrompues qu'il injecte est `{"message":"API rate limit exceeded"}` — quelqu'un l'a rencontrée.
+- **La couverture du smoke dépend de l'état d'authentification de la machine.** Ligne 106 :
+  `TOKEN="${AIDD_TOKEN:-$(gh auth token 2>/dev/null || true)}"`, et tout ce qui compte est derrière
+  `if [[ -z "$TOKEN" ]]`. Compté statiquement : **11 invocations hermétiques contre 30 derrière le
+  jeton** — la matrice de setup, les commandes globales, restore, les commandes par outil et par
+  plugin, le garde-fou de conflit et l'injection de faute sont toutes dans le bloc gardé. Sur une
+  machine où `gh` est connecté, la suite couvre 41 invocations et annonce 100 % ; ailleurs elle en
+  couvre 11. Même commande, même dépôt, deux filets différents.
+- **Et une commande pend** : `plugin update (all)` a dépassé le plafond de 180 s du script et a été
+  tuée. Vu une fois, non diagnostiqué.
 - **11 des 24 options déclarées n'ont jamais été passées**, dont `--flat`, que la phase 5 supprime
   pour quatre outils, et `--scope`, qui décide où les fichiers atterrissent.
 - **Stryker est cassé, pas seulement dormant.** `stryker.conf.json` mute exactement un fichier,
