@@ -48,7 +48,6 @@ import { MarketplaceRegisterFrameworkUseCase } from "../application/use-cases/ma
 import { MarketplaceRemoveUseCase } from "../application/use-cases/marketplace/marketplace-remove-use-case.js";
 import { MarketplaceSyncSettingsUseCase } from "../application/use-cases/marketplace/marketplace-sync-settings-use-case.js";
 import { PluginAddUseCase } from "../application/use-cases/plugin/plugin-add-use-case.js";
-import { PluginCreateUseCase } from "../application/use-cases/plugin/plugin-create-use-case.js";
 import { PluginInstallFromMarketplaceUseCase } from "../application/use-cases/plugin/plugin-install-from-marketplace-use-case.js";
 import { PluginInstallUseCase } from "../application/use-cases/plugin/plugin-install-use-case.js";
 import { PluginListUseCase } from "../application/use-cases/plugin/plugin-list-use-case.js";
@@ -151,7 +150,6 @@ interface Deps {
   marketplaceTrustStore: MarketplaceTrustStore;
   pluginAddUseCase: PluginAddUseCase;
   frameworkBuildUseCase: FrameworkBuildUseCase;
-  pluginCreateUseCase: PluginCreateUseCase;
   pluginRemoveUseCase: PluginRemoveUseCase;
   pluginListUseCase: PluginListUseCase;
   pluginUpdateUseCase: PluginUpdateUseCase;
@@ -495,13 +493,6 @@ export async function createDeps(
       buildCopilotMarketplaceContract()
     )
   );
-  const pluginCreateUseCase = new PluginCreateUseCase(
-    fs,
-    prompter,
-    jsonSchemaValidator,
-    assetProvider,
-    logger
-  );
   const gitignoreUseCase = new GitignoreUseCase(fs);
   const postInstallPipelineUseCase = new PostInstallPipelineUseCase(manifestRepo, gitignoreUseCase);
   const installRuntimeConfigUseCase = new InstallRuntimeConfigUseCase(
@@ -683,7 +674,6 @@ export async function createDeps(
     marketplaceTrustStore,
     pluginAddUseCase,
     frameworkBuildUseCase,
-    pluginCreateUseCase,
     pluginRemoveUseCase,
     pluginListUseCase,
     pluginUpdateUseCase,

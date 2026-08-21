@@ -1,7 +1,5 @@
-import { join } from "node:path";
 import type { Command } from "commander";
 import { parseInstallScope } from "../../domain/models/install-scope.js";
-import { parsePluginComponentKind } from "../../domain/models/plugin-component-kind.js";
 import { assertValidAiToolId, parseToolOption } from "../../domain/models/tool-ids.js";
 import { createDeps, createMenuDeps } from "../../infrastructure/deps.js";
 import { ErrorHandler } from "../error-handler.js";
@@ -28,48 +26,6 @@ export function registerPluginCommand(program: Command): void {
     ]);
     await spawnCliCommand(["plugin", choice]);
   });
-
-  plugin
-    .command("create [name]")
-    .description("Scaffold a new plugin in the given output directory")
-    .option("--output <dir>", "Output directory (default: current directory)")
-    .option("--type <kind>", "Plugin type: full, skills, agents, hooks, mcp (default: full)")
-    .option("--force", "Overwrite existing directory")
-    .option("--yes", "Skip all interactive prompts (CI mode)")
-    .action(
-      async (
-        nameArg: string | undefined,
-        cmdOptions: { output?: string; type?: string; force?: boolean; yes?: boolean }
-      ) => {
-        const { verbose, output, projectRoot } = parseGlobalOptions(program);
-        const errorHandler = new ErrorHandler(output);
-        if (nameArg === undefined && !process.stdout.isTTY) {
-          output.error("Plugin name is required in non-interactive mode.");
-          process.exit(1);
-        }
-        const kind =
-          cmdOptions.type !== undefined ? parsePluginComponentKind(cmdOptions.type) : undefined;
-        const resolvedName = nameArg ?? "";
-        try {
-          const deps = await createDeps(projectRoot, { verbose }, output);
-          const result = await deps.pluginCreateUseCase.execute({
-            name: resolvedName,
-            kind,
-            outputDir: cmdOptions.output ?? join(projectRoot, "plugins"),
-            force: cmdOptions.force ?? false,
-            yes: cmdOptions.yes ?? false,
-            interactive: process.stdout.isTTY,
-            projectRoot,
-          });
-          output.success(
-            `Plugin '${resolvedName}' created at ${result.pluginDir} (${result.filesWritten} files).`
-          );
-          if (result.marketplaceUpdated) output.info("marketplace.json updated.");
-        } catch (error) {
-          errorHandler.handle(error);
-        }
-      }
-    );
 
   plugin
     .command("remove <name>")

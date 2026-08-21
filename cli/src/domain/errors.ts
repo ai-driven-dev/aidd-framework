@@ -316,13 +316,6 @@ export class MissingPluginMetadataError extends Error {
   }
 }
 
-export class InvalidPluginComponentKindError extends Error {
-  constructor(kind: string) {
-    super(`Invalid kind: "${kind}". Valid: skills|agents|hooks|mcp|full.`);
-    this.name = "InvalidPluginComponentKindError";
-  }
-}
-
 export class JsonSchemaValidationError extends Error {
   constructor(errors: string[]) {
     super(`Manifest validation failed: ${errors.join("; ")}`);

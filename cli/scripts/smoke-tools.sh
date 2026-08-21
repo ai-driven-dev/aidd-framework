@@ -32,7 +32,7 @@ ALL_COMMANDS=(
   "setup" "status" "restore" "update" "doctor" "clean" "self-update"
   "ai install" "ai uninstall" "ai list" "ai status" "ai update" "ai restore" "ai doctor"
   "ide install" "ide uninstall" "ide list" "ide status" "ide update" "ide restore" "ide doctor"
-  "plugin create" "plugin remove" "plugin list" "plugin install" "plugin search" "plugin update" "plugin doctor"
+  "plugin remove" "plugin list" "plugin install" "plugin search" "plugin update" "plugin doctor"
   "marketplace add" "marketplace list" "marketplace remove" "marketplace refresh" "marketplace check"
   "auth login" "auth logout" "auth status"
   "framework build"
@@ -130,11 +130,6 @@ if run "framework build --target claude" 0 "" "$ROOT" -- \
 FW_FLAT=$(mktemp -d "$TMPROOT/fw-flat.XXXXXX")
 run "framework build --flat" 0 "" "$ROOT" -- \
   framework build --source "$FRAMEWORK_FIXTURE" --target claude --flat --out "$FW_FLAT" --force
-
-section "plugin create (scaffold)"
-PC_OUT="$TMPROOT/pc"
-run "plugin create demo --type full --yes" 0 "" "$ROOT" -- \
-  plugin create demo --output "$PC_OUT" --type full --yes
 
 section "auth (isolated config)"
 AUTH_HOME="$TMPROOT/auth-home"; mkdir -p "$AUTH_HOME"

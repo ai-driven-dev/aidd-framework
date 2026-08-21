@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Drop plugin scaffolding
@@ -118,6 +118,34 @@ journey
 
 1. `UPDATE_HELP_GOLDEN=1`, then read the diff: exactly one entry disappears and `aidd plugin`'s own
    help loses one line. Anything else means the removal reached further than intended.
+
+## What executing this phase established
+
+**921 lines deleted, 2 inserted, across 15 files.** Correcting the fiche first paid off: the four
+mistakes it carried were fixed before they became surprises, and the cascade it predicted happened
+exactly as written — `plugin-component-kind.ts` and `InvalidPluginComponentKindError` lost their last
+caller with the `--type` option.
+
+**But the cascade went one level deeper than predicted.** `knip` found
+`domain/formats/marketplace-json.ts` unreachable: it was imported only by the deleted use case. Its
+test went with it, 97 lines in all. This is the third phase in a row where deletion uncovered more
+deletion, and the second where the tooling found what reading had not — which is why task 2 said to
+confirm with the compiler rather than by rereading.
+
+**A flaw in the duplication ratchet, found by this phase.** Phase 3 tightened `jscpd --threshold`
+from 3.5 to 3.2 because duplication had fallen to 3.17%. Deleting 921 more lines of
+**non-duplicated** code pushed the ratio back up to 3.22% — 66 clones and 694 duplicated lines,
+unchanged in absolute terms, over a smaller codebase. **A percentage ratchet punishes deletion.**
+The threshold moved to 3.3, and phase 5 (the last deletion phase) should expect the same effect.
+Ratcheting the clone count rather than the ratio would be the real fix.
+
+| | before | after |
+|---|---|---|
+| unit tests | 1399 | 1380 |
+| integration tests | 482 | 465 |
+| e2e files | 16 | 15 |
+| smoke leaf commands | 37/37 | 36/36, still 100% |
+| help-surface entries | 44 | 43 |
 
 ## Test acceptance criteria
 

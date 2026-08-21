@@ -157,12 +157,7 @@
   {
     "invocation": "aidd plugin",
     "exitCode": 0,
-    "help": "Usage: aidd plugin [options] [command]\n\nManage plugins for AI tools\n\nOptions:\n  -h, --help                  display help for command\n\nCommands:\n  create [options] [name]     Scaffold a new plugin in the given output\n                              directory\n  remove [options] <name>     Remove a plugin from one or all AI tools\n  list [options]              List installed plugins for one or all AI tools\n  install [options] [plugin]  Install a plugin (marketplace name, local path, or\n                              interactive pick)\n  search [options] <query>    Search registered marketplaces for plugins\n  update [options] [name]     Update one or all plugins for one or all AI tools\n  doctor [options]            Check plugin installation health"
-  },
-  {
-    "invocation": "aidd plugin create",
-    "exitCode": 0,
-    "help": "Usage: aidd plugin create [options] [name]\n\nScaffold a new plugin in the given output directory\n\nOptions:\n  --output <dir>  Output directory (default: current directory)\n  --type <kind>   Plugin type: full, skills, agents, hooks, mcp (default: full)\n  --force         Overwrite existing directory\n  --yes           Skip all interactive prompts (CI mode)\n  -h, --help      display help for command"
+    "help": "Usage: aidd plugin [options] [command]\n\nManage plugins for AI tools\n\nOptions:\n  -h, --help                  display help for command\n\nCommands:\n  remove [options] <name>     Remove a plugin from one or all AI tools\n  list [options]              List installed plugins for one or all AI tools\n  install [options] [plugin]  Install a plugin (marketplace name, local path, or\n                              interactive pick)\n  search [options] <query>    Search registered marketplaces for plugins\n  update [options] [name]     Update one or all plugins for one or all AI tools\n  doctor [options]            Check plugin installation health"
   },
   {
     "invocation": "aidd plugin doctor",
