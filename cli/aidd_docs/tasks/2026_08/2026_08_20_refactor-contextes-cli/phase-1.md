@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: done
 ---
 
 # Instruction: Extend the golden net
@@ -144,4 +144,25 @@ journey
 | 4    | The snapshot holds at least four entries with a non-zero exit code, captured in a directory the main scenario never touched |
 | 5    | The help snapshot holds an entry per command and per subcommand; changing one description fails the test, verified by changing one |
 | 6    | Two consecutive captures are byte-identical, two consecutive verification runs pass, and no absolute path, version string or timestamp survives in the snapshot |
-| all  | The snapshot diff of this phase is pure addition: no existing entry changes. If one does, the capture is not deterministic and task 5 is unfinished |
+| all  | The snapshot diff of this phase is pure addition, **or** an entry changed for a reviewed reason recorded here. A change with no such reason means the capture is not deterministic |
+
+## What this phase found
+
+Extending the net immediately produced two results the plan did not anticipate.
+
+**`aidd restore --force` was inert.** The command folded the flag into
+`interactive = !force && isTTY`, and `RestoreAllUseCase` only took `interactive`, so a non-TTY run
+always decided with `force: false`. A modified tracked file raised `InputRequiredError`, swallowed
+into a warning telling the user to pass `--force` — which they had — while the command reported
+"all files are unmodified" and `status` reported the same file modified. Fixed in its own commit;
+that is why one existing snapshot entry changed, and its diff is the review.
+
+**Two invocations this phase wrote were wrong, and the capture said so.**
+`plugin remove --yes` recorded `error: unknown option`, not a removal. Worth noting while fixing it:
+`plugin install` accepts `--yes` silently and `plugin remove` rejects it, though neither declares it
+and it is not a global option.
+
+**Every tracked file in this scenario is co-owned.** With claude and cursor installed, the manifest
+tracks exactly one file per tool — their `settings.json`. `plugin install` writes no tracked file at
+all: for both tools AIDD registers a locally built marketplace rather than copying. So this scenario
+cannot exercise the CLI-owned regeneration regime; a flat-mode tool would be needed for that.
