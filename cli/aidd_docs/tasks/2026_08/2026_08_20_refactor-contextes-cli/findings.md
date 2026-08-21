@@ -143,3 +143,31 @@ Limites de la comparaison : ils ne livrent que des skills et des hooks, soit les
 - « Generated trees gitignored by default; CI/dev runs sync after checkout » — l'arbre généré est jetable, donc régénérable.
 
 C'est le même mécanisme que le `translate` générique : une source canonique, convertie vers chaque cible installée.
+
+## Enregistrer un marketplace : la CLI de l'outil ou son fichier de config ?
+
+Trois façons de faire coexistent, pour la même opération.
+
+| outil | mécanisme |
+|---|---|
+| copilot | `nativeActivation: { binary: "copilot" }` — pilote la CLI de l'outil |
+| codex | `nativeActivation: { binary: "codex" }` — pilote la CLI de l'outil |
+| **claude** | **écrit `.claude/settings.json` à la main** (`extraKnownMarketplaces`, `enabledPlugins`) |
+| cursor | découverte plugin-locale, rien à enregistrer |
+
+`claude plugin marketplace add|list|remove|update` existe, vérifié dans l'aide de Claude Code. AIDD
+édite donc à la main le fichier de configuration privé d'un outil qui expose une commande officielle
+pour ça — et ce fichier est **co-possédé** : c'est le seul fichier tracé du profil Claude, celui
+dont la dérive est apparue en phase 1.
+
+Le profil Copilot documente pourquoi il pilote la CLI : « Copilot treats enabledPlugins in
+settings.json as a recommendation, not an auto-install (github/copilot-cli#2249) ». Autrement dit,
+on est passé par la CLI **parce que le fichier ne suffisait pas**, pas par principe. Le profil Claude
+ne porte aucun commentaire : le choix n'a pas été questionné.
+
+**L'arbitrage.** Écrire le fichier fonctionne sans que l'outil soit installé ; piloter sa CLI exige
+sa présence mais s'appuie sur un contrat public plutôt que sur un format de fichier privé qui peut
+changer sans préavis. La dépendance est déjà acceptée pour deux outils sur quatre.
+
+Décision produit, non tranchée.
+
