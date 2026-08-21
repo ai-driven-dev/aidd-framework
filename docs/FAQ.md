@@ -42,7 +42,57 @@ You can write your own Claude Code skills — nothing stops you. AIDD exists bec
 - **Authored for Claude Code.** Other tools install via their native mechanism from the release archives ([Other tools](../README.md#other-tools)); public-marketplace publishing is on the way, native parity is a roadmap item.
 - **Plugins assume their own context.** A skill that expects a git repo, a `package.json`, or a ticketing tool won't work without it — check the plugin's README.
 - **No hosted service.** AIDD is prompt content you install into your own tool; there is no AIDD server and no account.
-- **Measurement is opt-in, local, and off unless you turn it on.** The `aidd-telemetry` plugin is not installed by the curated path, and even installed it writes nothing until a repository commits `.aidd/config.json` with `telemetry.enabled: true` — that file, read fresh on every write, is the single switch every component obeys; an `aidd_docs/runs/` directory existing is not itself permission. What it then writes stays on your machine — git ignores it — and records which session served which task, never what you typed. Tokens and cost are never copied into it: they stay in your AI tool's own telemetry, which AIDD does not enable for you.
+- **Measurement is off unless you turn it on.** It records nothing until you do, and nothing ever leaves your machine → [Measurement](#-measurement).
+
+## 📊 Measurement
+
+**Off unless you turn it on, and nothing leaves your machine.**
+
+The `aidd-telemetry` plugin is not part of the curated install. Even installed, it records
+nothing until a project's `.aidd/config.json` carries `telemetry.enabled: true` — read
+fresh at every write, so turning it off takes effect immediately.
+
+```bash
+node <plugin>/skills/00-init/scripts/telemetry-switch.js on
+node <plugin>/skills/00-init/scripts/telemetry-switch.js off
+```
+
+Nothing else is needed: no account, no server, no second tool to install.
+
+### What it records, and where
+
+| Where | What |
+| --- | --- |
+| `aidd_docs/runs/` in your repository, git-ignored | which session served which task, which skill was running when, and which files inside a task folder changed |
+| `~/.config/aidd/telemetry/` | token counts, model names and, where your AI tool records one, an amount — read out of the transcript your tool already wrote |
+
+The second only happens when you ask for it. Reading is a command you run; a session never
+does it for you.
+
+### What it never records
+
+**No prompt. No code. No diff.** Counters, model names, skill names and file paths inside
+task folders — nothing else. The stored shape is an allowlist, written down field by field
+in [`metrics-contract.md`](../aidd_docs/product/metrics-contract.md), and a field not on
+that list cannot be stored.
+
+### What leaves your machine
+
+**Nothing, today.** Everything above is written locally and read locally.
+
+Sending these figures to a service that prices them is planned and is not built. When it
+is, it will be a separate, stated choice — never a side effect of measuring.
+
+### Turning it off keeps what you measured
+
+`off` stops the recording from that moment. Sessions already measured stay measured and
+still report. To remove them, delete `aidd_docs/runs/` and
+`~/.config/aidd/telemetry/` — they are ordinary files.
+
+### What it cannot tell you
+
+Coverage differs per AI tool, and a tool that cannot be measured is named as such rather
+than shown as a zero. See [Known limits](./telemetry-limits.md).
 
 ## 🆘 Still stuck?
 

@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "aidd-telemetry",
   "version": "0.1.0",
-  "description": "Measurement: journals every session so a unit of work can be tied to what it cost. This plugin ships hooks only, and carries no measurement itself.",
+  "description": "Measurement. The hooks journal which skill served which task; the scripts read what your AI tool already wrote and answer what a period or a task consumed. Self-contained, off unless you turn it on, and it computes no amount.",
   "author": {
     "name": "AI-Driven Dev",
     "url": "https://github.com/ai-driven-dev"

@@ -2,10 +2,119 @@
 
 # aidd-telemetry
 
-Measurement plugin for the AI-Driven Development framework.
+Know what a piece of work cost — tokens, models, and which skill spent them.
 
-> Status: alpha.
+> Status: alpha. Proven end to end on Claude Code; see [Coverage](#coverage) for the rest.
 
-It journals every session so a unit of work can be tied to what it cost, and carries no measurement itself. No token, cost, model, or duration ever lands in a journal entry — those come from telemetry and are only made joinable to it.
+Providers can tell you a developer burned four million tokens on Tuesday. None can tell you
+that `aidd-dev:02-implement` spent 78,188 of them. The difference is the task, the step and
+the skill — what the framework knows and a provider does not.
 
-It ships no skills, only hooks. On Claude Code, and only when a repository has committed `.aidd/config.json` with `telemetry.enabled: true`, it appends one line per observation to one file per session — `aidd_docs/runs/<run_id>__<vendor_id>.jsonl`, git-ignored (that directory is created on demand and is a location, not a permission), never rewritten. `session_start` opens the file; `turn_end` appends on every Stop; `file_written` appends a repository-relative path when a tool call lands inside `aidd_docs/tasks/<yyyy_mm>/<task_id>/` — no declared pointer, and never a `task_id` itself, since which task a path belongs to is a derivation for whatever reads the log, not a fact the hook writes. `aidd_docs/runs/README.md` documents the three line shapes; `aidd_docs/tasks/2026_08/2026_08_19_run-journal-event-log/plan.md` is what replaced the original mutable record with this append-only one; `aidd_docs/tasks/2026_08/2026_08_20_telemetry-export-enable/phase-1.md` tracks the switch itself.
+**Nothing is measured until you say so, and nothing ever leaves your machine.**
+
+## Install and use
+
+Install the plugin through your tool's own mechanism. Nothing else: no `npm install`, no
+CLI, no account. The two scripts it ships are self-contained and run under plain `node`.
+
+```bash
+# 1. allow it, once per project
+node <plugin>/skills/00-init/scripts/telemetry-switch.js on
+
+# 2. work
+
+# 3. read what your tools wrote, then ask
+node <plugin>/skills/01-cost/scripts/telemetry-report.js read
+node <plugin>/skills/01-cost/scripts/telemetry-report.js report
+```
+
+Or let the skills do it: **init** turns it on and checks it is recording, **cost** answers
+what the work consumed.
+
+```
+period    2026-08-21 to 2026-08-21
+
+  sessions                  1
+  requests                  3
+  tokens                    116,678    80% cache
+  cost                      amount unknown
+
+  by step    of tokens
+    aidd-ui:01-hello           67%   78,188 tokens    stated by the tool
+    aidd-ui:01-hello           33%   38,490 tokens    from a journal interval
+```
+
+`report --json` prints the same figures as one object a program can parse —
+[the contract](../../aidd_docs/product/cost-report-contract.md).
+
+## How it works
+
+Three parts, and the third is the only one that joins anything.
+
+**The hooks journal.** While measuring is on, they append one line per observation to
+`aidd_docs/runs/<run_id>__<vendor_id>.jsonl` — git-ignored, one file per session, never
+rewritten. Which session, which skill was running when, which files inside a task folder
+changed. **No token, no cost, no model ever lands there.**
+
+**Your AI tool writes its own transcript**, in its own place, in its own format. It holds
+the tokens and knows nothing about AIDD skills.
+
+**`read` joins the two.** It opens the transcript, normalises it into one shape whatever
+tool produced it, matches each record against the journal, and stores the result under
+`~/.config/aidd/telemetry/`. `report` reads only that.
+
+The join cannot happen live: when a hook fires, the tokens for that turn are not written
+yet.
+
+## What a figure tells you about itself
+
+Every attributed figure says **how** it was attributed, because the two ways are not the
+same claim:
+
+| Reads | Means |
+| --- | --- |
+| stated by the tool | the tool named the running skill itself, on the line with the counters — exact |
+| from a journal interval | derived from the interval between two boundaries the framework recorded — an inference |
+| unattributed | neither source could say |
+
+**`unattributed` never means "no step ran".** On at least one measured tool the two are
+indistinguishable, so the stronger reading would be a fact nobody measured.
+
+The same rule runs through everything here: **an absent figure is named, never shown as a
+zero.** A tool that cannot be read, one that carries no amount, one that measured nothing,
+and one whose reader failed are four different answers.
+
+## Coverage
+
+| Tool | Tokens | Step | Task |
+| --- | --- | --- | --- |
+| **Claude Code** | ✅ proven on live sessions | ✅ stated by the tool, and by interval | ✅ |
+| **Codex** | ✅ on captured rollouts | ✅ by interval | ✅ observed |
+| **OpenCode** | ✅ | ❌ no journal entry ([#676](https://github.com/ai-driven-dev/framework/issues/676)) | ❌ |
+| **Copilot** | ❌ no per-request figure on disk | ❌ journal silent ([#681](https://github.com/ai-driven-dev/framework/issues/681)) | ❌ |
+| **Cursor** | ❌ no token count in any file it writes | ❌ turn-end never fires headless ([#680](https://github.com/ai-driven-dev/framework/issues/680)) | ❌ |
+
+**No amount, anywhere.** No tool read locally writes a figure in currency. Reports give
+tokens; turning tokens into money is a separate service's job.
+
+Every limit above, with the measurement behind it →
+[Known limits](../../docs/telemetry-limits.md).
+
+## Privacy
+
+- **Off unless you turn it on**, per project, in a file you commit or do not.
+- **No prompt, no code, no diff.** The stored shape is an allowlist, field by field, in
+  [the record contract](../../aidd_docs/product/metrics-contract.md).
+- **Nothing leaves your machine.** Sending these figures anywhere is planned and not built.
+- **`off` keeps what you measured.** It stops the recording; delete the two directories to
+  remove the history.
+
+## Where things are written down
+
+- [`aidd_docs/runs/README.md`](../../aidd_docs/runs/README.md) — what the journal records,
+  and what it deliberately does not.
+- [`cost-report-contract.md`](../../aidd_docs/product/cost-report-contract.md) — the object
+  a skill consumes.
+- [`metrics-contract.md`](../../aidd_docs/product/metrics-contract.md) — one stored line,
+  for a service that prices them.
+- [`telemetry-limits.md`](../../docs/telemetry-limits.md) — what cannot be measured, and why.
