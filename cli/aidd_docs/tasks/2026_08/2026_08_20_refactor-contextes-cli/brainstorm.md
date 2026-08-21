@@ -25,7 +25,7 @@ Sa valeur propre est la **translation**. Un utilisateur sous Claude Code peut d�
 - **Le partage se mérite** : appelants dans au moins deux contextes. Sur les 14 fichiers de `use-cases/shared/`, deux seulement passent la règle (`resolve-marketplace`, `ensure-built-marketplace`) et cinq n'ont qu'un seul appelant.
 - **kanban, telemetry et governance sont lancés, pas contenus.** Le CLI les localise et les exécute. Cela évite de faire entrer `ink` et `react` — déjà dans les dépendances, ignorés par `knip.json` parce que seul kanban les utilise — dans le bundle de tous les utilisateurs, alors qu'un budget de taille est vérifié par `scripts/check-bundle-size.mjs`.
 - **Télémétrie : user-scope, sans override projet.** Décision de confiance avant d'être une décision d'architecture : si un projet pouvait l'activer, cloner un dépôt déclencherait l'envoi de données à l'insu de celui qui clone. Le projet peut demander, la personne décide.
-- **Un mode par outil, choisi par ce que l'outil sait faire.** Quatre outils sur cinq sont déjà en `mode: "native"` ; seul OpenCode est `flat`. Les quatre cellules flat de Claude, Cursor, Copilot et Codex font doublon avec leur mode natif et coûtent 831 lignes de code spécifique.
+- **Les neuf cellules de build sont conservées.** La décision inverse avait été prise puis annulée : elle reposait sur une confusion entre deux axes. `PluginsCapability.mode` décrit comment un *plugin* s'installe dans un outil ; `FrameworkBuildMode` décrit comment le *framework* est construit pour une cible. Le constat « quatre outils sur cinq sont en `native` » portait sur le premier et ne disait rien du second. Vérifié dans le golden de build : pour Claude, le mode marketplace produit 198 fichiers sous `.claude-plugin/` et `plugins/`, le mode flat en produit 189 sous `.claude/agents/`, `.claude/skills/`, `.claude/hooks/`. Deux livrables différents, et `cli/README.md` documente le second — « or when you want files on disk in the project ».
 - **Publier plutôt que consommer.** Lire les catalogues cursor/copilot/codex disparaît (code mort) ; publier le framework dans les registres tiers devient une capacité côté auteur, aux côtés de `build-distribution`.
 - **Ports et adapters par contexte** ; chaque contexte expose un seul `index.ts`. `deps.ts` éclate en un câblage par contexte.
 - **Présentation et runtime sont deux couches**, pas une coquille. La présentation (commandes 1736, affichage 139, menu 366, prompts ~300) inclut des fichiers aujourd'hui rangés en `use-cases/`. Le runtime porte le câblage, http, git, plateforme, auth, self-update.
@@ -52,7 +52,6 @@ Sa valeur propre est la **translation**. Un utilisateur sous Claude Code peut d�
 - `domain/models/marketplace-entry.ts` (103 loc) : seul fichier inatteignable depuis `src/cli.ts`, et `knip.json` l'ignore explicitement au lieu qu'il soit supprimé. L'homonyme vivant est `domain/capabilities/marketplace-entry.ts` (25 loc).
 - Quatre exports morts de `mcp-exclusion.ts` (`extractMcpKeys`, `filterMcpExclusions`, `computeMcpExclusions`, `detectNewMcpEntries`), plus `buildMergeFileEntries` et `Update{Ai,Ide}Tools{Input,Result}`.
 - `plugin create` et `plugin-scaffold.ts` : personne n'écrit de plugin tiers aujourd'hui.
-- Mode flat pour les quatre outils natifs. Conservé pour OpenCode seul.
 
 ## Encore ouvert
 

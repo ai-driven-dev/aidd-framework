@@ -137,4 +137,3 @@ cli/src/
 - `domain/models/marketplace-entry.ts` (103 loc, inatteignable, ignoré par knip.json)
 - 4 exports morts de `mcp-exclusion.ts`, `buildMergeFileEntries`, `UpdateAiToolsInput/Result`, `UpdateIdeToolsInput/Result`
 - `plugin create` et `plugin-scaffold.ts` (personne n'écrit de plugin tiers)
-- mode flat pour claude, cursor, copilot, codex : un mode par outil, choisi par ce que l'outil sait faire. Flat ne reste que pour OpenCode.

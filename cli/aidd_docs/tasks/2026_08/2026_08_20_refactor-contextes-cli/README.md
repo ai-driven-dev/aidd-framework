@@ -150,6 +150,14 @@ couches comme le reste. Trois conséquences à ne pas perdre.
 
 ## Corrections faites en cours de route
 
+- **La phase 5 est annulée** : elle voulait supprimer le mode flat pour les quatre outils natifs, en
+  croyant qu'il faisait doublon. Vérifié avant exécution : pour Claude, le mode marketplace produit
+  198 fichiers sous `.claude-plugin/` et `plugins/`, le mode flat 189 sous `.claude/agents/`,
+  `.claude/skills/`, `.claude/hooks/`. Deux livrables différents, et `cli/README.md` documente le
+  second. L'erreur venait d'une confusion entre `PluginsCapability.mode`, qui décrit l'installation
+  d'un *plugin*, et `FrameworkBuildMode`, qui décrit la construction du *framework*.
+
+
 Elles sont conservées parce qu'elles disent où le raisonnement a dérapé.
 
 - La matérialisation n'est pas la cause de la moitié du CLI : 3 outils sur 5 pointent déjà.

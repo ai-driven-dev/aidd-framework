@@ -1,87 +1,55 @@
 ---
-status: pending
+status: cancelled
 ---
 
-# Instruction: One build mode per tool
+# Instruction: One build mode per tool — CANCELLED
 
-`ARCHITECTURE.md` documents five targets by two modes, nine cells since OpenCode is flat-only. But
-four of five tools already declare `mode: "native"`, and three of them `translationMode:
-"marketplace"` — they point at a locally built marketplace instead of copying. Their flat cells
-duplicate what their native mode already does, at the cost of 831 lines.
+This phase was going to remove flat build mode for claude, cursor, copilot and codex, keeping it
+only for OpenCode, on the grounds that their flat cells duplicated their native mode and cost 831
+lines.
 
-The mode a tool uses is a property of the tool, not a user option.
+**The premise was wrong, and checking it before executing is what caught it.**
 
-## Architecture projection
+## Why it was wrong
 
-> Tree of the final files. ✅ create · ✏️ modify · ❌ delete
+Two different axes were conflated.
 
-```txt
-.
-└── cli/
-    ├── src/
-    │   ├── application/
-    │   │   ├── commands/framework.ts    ✏️ modify (drop --flat for tools that declare native)
-    │   │   └── use-cases/framework/strategies/
-    │   │       └── flat-build-strategy.ts  ✏️ modify (opencode only)
-    │   ├── domain/formats/
-    │   │   ├── flat-paths.ts            ✏️ modify (opencode only)
-    │   │   └── flat-hooks-merge.ts      ✏️ modify (opencode only)
-    │   └── infrastructure/deps.ts       ✏️ modify (4 build registry entries removed)
-    └── tests/golden/snapshots/framework-build/golden.json  ✏️ modify (9 cells become 5)
-```
+- `PluginsCapability.mode` (`native` | `flat`) describes how a **plugin** is installed into a tool.
+  Four tools of five declare `native`.
+- `FrameworkBuildMode` (`marketplace` | `flat`) describes how the **framework** is built for a
+  target. That is a separate setting, and the measurement about plugin installation said nothing
+  about it.
 
-## User Journey
+The build golden settles it. For claude:
 
-```mermaid
-flowchart TD
-  A[A framework is built for a target] --> B{Does the tool have a native plugin mechanism?}
-  B -->|Yes| C[Marketplace mode, the only mode]
-  B -->|No, OpenCode| D[Flat materialization, the only mode]
-```
+| cell | files | shape |
+|---|---|---|
+| `claude` | 198 | `.claude-plugin/marketplace.json` + `plugins/<name>/…`, a distributable marketplace tree |
+| `claude:flat` | 189 | `.claude/agents/`, `.claude/skills/`, `.claude/hooks/`, materialized into the tool's own directories with plugin names flattened into filenames |
 
-## Test Scope
+Not duplicates. One produces a marketplace, the other puts the framework straight into the tool's
+config directory with no marketplace indirection.
 
-```mermaid
----
-title: Test scope
----
-journey
-  section Setup
-    the framework fixture => a source tree to build from: 5: system
-  section Happy path
-    build for claude, cursor, copilot, codex => marketplace output, byte-identical to before: 5: cli
-    build for opencode => flat output, byte-identical to before: 5: cli
-  section Edge case - a removed cell
-    a native tool => ask for flat mode => refused with a message naming the tool's mode: 1: cli
-  section Teardown
-    the build golden holds five cells => the four removed ones are gone from the snapshot: 5: system
-```
+And it is documented. `cli/README.md` describes `--flat` in four places, including:
 
-## Tasks to do
+> Flat (`--flat`) — materializes plugin content directly under the tool's workspace config
+> directory (e.g. `.claude/`, `.cursor/`), with no marketplace indirection. For tools without native
+> marketplace support, **or when you want files on disk in the project**.
 
-### `1)` Make the mode a property of the tool
+That last clause is the second use case, and it applies to every tool, native or not.
 
-1. Read the mode from the tool profile instead of accepting it as an option for tools that declare
-   `native`.
-2. `--flat` on a native tool fails with a message naming the mode that tool uses.
+## What this changes elsewhere
 
-### `2)` Remove the four redundant cells
+- The nine build cells stay. `framework build`'s golden keeps all nine.
+- The 831 lines of flat-specific code stay: `flat-build-strategy`, `flat-hooks-merge`,
+  `mode-b-flat-materialization-translator`, `flat-paths`.
+- Phase 2's `--flat` smoke coverage keeps its value, but for a different reason: it exercises a
+  documented mode that nothing covered before, not a "before" for a removal.
+- The plan loses a deletion phase. Phases 6 onwards are unaffected — none depended on this one.
 
-1. Drop the four flat build contracts for claude, cursor, copilot and codex.
-2. Drop their entries from the build registry in `deps.ts`.
-3. Narrow `flat-build-strategy`, `flat-paths` and `flat-hooks-merge` to what OpenCode needs.
+## What to keep from it
 
-### `3)` Recapture the build golden
-
-1. Recapture with `UPDATE_FRAMEWORK_GOLDEN=1`.
-2. Review: the five surviving cells must be **byte-identical** to before. Only the four removed
-   cells may disappear. Any other change means the narrowing went too far.
-
-## Test acceptance criteria
-
-| Task | Acceptance criteria |
-| ---- | ------------------- |
-| 1    | Asking for flat mode on a native tool fails with a message naming that tool's mode |
-| 2    | Building for each of the five surviving target/mode pairs produces the same tree as before |
-| 3    | The build golden diff is pure removal: five cells unchanged, four gone |
-| all  | `ARCHITECTURE.md` no longer claims nine cells |
+One finding survives and belongs to phase 6, which already carries it:
+`built-tree-materialization-translator.ts:62` re-derives `"flat"` from `toolId === "opencode"`
+instead of reading `mode` off the tool profile. That is about **plugin materialization**, the axis
+this phase confused with build mode, and it is a genuine defect regardless.

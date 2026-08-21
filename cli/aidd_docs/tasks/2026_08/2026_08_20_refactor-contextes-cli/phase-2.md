@@ -120,8 +120,8 @@ journey
 
 > 11 of 24 declared options have never been passed once.
 
-1. `--flat` on every target that accepts it. Phase 5 removes four of them, and that removal needs a
-   before to compare against.
+1. `--flat` on every target that accepts it. It is a documented build mode producing a different
+   tree from marketplace mode, and nothing exercised it before.
 2. `--scope project` against `--scope user`: assert the two land in different places.
 3. `--dry-run`: assert the exit code **and** that nothing was written.
 4. `--from`, `--marketplace`, `--plugin`, `--recommended`, `--no-plugins`, `--overwrite`,
