@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { InstallationFile } from "../../../src/domain/models/file.js";
-import {
-  computeMcpExclusions,
-  detectNewMcpEntries,
-  extractMcpKeys,
-  filterMcpExclusions,
-  transformFor,
-} from "../../../src/domain/models/mcp-exclusion.js";
-import type { MergeFileEntry } from "../../../src/domain/models/merge.js";
+import { transformFor } from "../../../src/domain/models/mcp-exclusion.js";
 import type { Hasher } from "../../../src/domain/ports/hasher.js";
 
 function makeConfig(servers: Record<string, object>): string {
@@ -92,7 +85,7 @@ describe("transformFor()", () => {
 
 // ── Helpers for domain function tests ────────────────────────────────────────
 
-const stubHasher: Hasher = { hash: (v) => v as unknown as ReturnType<Hasher["hash"]> };
+const _stubHasher: Hasher = { hash: (v) => v as unknown as ReturnType<Hasher["hash"]> };
 
 function makeGetEntrySection(
   sectionKey: string | null,
@@ -105,7 +98,7 @@ function makeGetEntrySection(
   };
 }
 
-function makeMcpFile(
+function _makeMcpFile(
   relativePath: string,
   servers: Record<string, object>,
   frameworkPath = "config/mcp.json"
@@ -120,7 +113,7 @@ function makeMcpFile(
   });
 }
 
-function makeRegularFile(relativePath: string): InstallationFile {
+function _makeRegularFile(relativePath: string): InstallationFile {
   return new InstallationFile({
     relativePath,
     content: "# doc",
@@ -130,130 +123,12 @@ function makeRegularFile(relativePath: string): InstallationFile {
 }
 
 const lookup = new Map([["config/mcp.json", "mcp"]]);
-const mcpGetEntrySection = makeGetEntrySection("mcpServers", lookup);
+const _mcpGetEntrySection = makeGetEntrySection("mcpServers", lookup);
 
 // ── extractMcpKeys ───────────────────────────────────────────────────────────
 
-describe("extractMcpKeys()", () => {
-  it("returns server keys for MCP-capable merge files", () => {
-    const file = makeMcpFile(".mcp.json", { github: {}, playwright: {} });
-    const result = extractMcpKeys([file], mcpGetEntrySection);
-    expect(result.get(".mcp.json")).toEqual(["github", "playwright"]);
-  });
-
-  it("skips regular (non-merge) files", () => {
-    const file = makeRegularFile("README.md");
-    const result = extractMcpKeys([file], mcpGetEntrySection);
-    expect(result.size).toBe(0);
-  });
-
-  it("skips files whose frameworkPath is not in the lookup", () => {
-    const file = makeMcpFile(".mcp.json", { github: {} }, "unknown/path.json");
-    const result = extractMcpKeys([file], mcpGetEntrySection);
-    expect(result.size).toBe(0);
-  });
-
-  it("skips files where getEntrySection returns null sectionKey", () => {
-    const file = makeMcpFile(".mcp.json", { github: {} });
-    const result = extractMcpKeys([file], makeGetEntrySection(null, lookup));
-    expect(result.size).toBe(0);
-  });
-
-  it("returns empty map when no MCP content exists", () => {
-    const file = makeMcpFile(".mcp.json", {});
-    const result = extractMcpKeys([file], mcpGetEntrySection);
-    expect(result.size).toBe(0);
-  });
-});
-
 // ── filterMcpExclusions ──────────────────────────────────────────────────────
-
-describe("filterMcpExclusions()", () => {
-  it("removes excluded server keys from file content", () => {
-    const file = makeMcpFile(".mcp.json", { github: {}, playwright: {} });
-    const exclusions = [{ configPath: ".mcp.json", entryKey: "github" }];
-    const result = filterMcpExclusions([file], mcpGetEntrySection, exclusions, stubHasher);
-    const parsed = JSON.parse(result[0].content) as { mcpServers: Record<string, unknown> };
-    expect(Object.keys(parsed.mcpServers)).toEqual(["playwright"]);
-  });
-
-  it("returns the original array reference when exclusions is empty", () => {
-    const file = makeMcpFile(".mcp.json", { github: {} });
-    const input = [file];
-    const result = filterMcpExclusions(input, mcpGetEntrySection, [], stubHasher);
-    expect(result).toBe(input);
-  });
-
-  it("passes through regular files untouched", () => {
-    const regular = makeRegularFile("README.md");
-    const exclusions = [{ configPath: "README.md", entryKey: "anything" }];
-    const result = filterMcpExclusions([regular], mcpGetEntrySection, exclusions, stubHasher);
-    expect(result[0]).toBe(regular);
-  });
-
-  it("passes through MCP files with no matching exclusions", () => {
-    const file = makeMcpFile(".mcp.json", { github: {}, playwright: {} });
-    const exclusions = [{ configPath: ".cursor/mcp.json", entryKey: "github" }];
-    const result = filterMcpExclusions([file], mcpGetEntrySection, exclusions, stubHasher);
-    expect(result[0].content).toBe(file.content);
-  });
-});
 
 // ── computeMcpExclusions ─────────────────────────────────────────────────────
 
-describe("computeMcpExclusions()", () => {
-  it("returns entries not present in selectedKeys", () => {
-    const file = makeMcpFile(".mcp.json", { github: {}, playwright: {} });
-    const selected = new Set(["playwright"]);
-    const result = computeMcpExclusions([file], mcpGetEntrySection, selected);
-    expect(result).toEqual([{ configPath: ".mcp.json", entryKey: "github" }]);
-  });
-
-  it("returns empty when all keys are selected", () => {
-    const file = makeMcpFile(".mcp.json", { github: {}, playwright: {} });
-    const selected = new Set(["github", "playwright"]);
-    const result = computeMcpExclusions([file], mcpGetEntrySection, selected);
-    expect(result).toHaveLength(0);
-  });
-
-  it("returns all entries when selectedKeys is empty", () => {
-    const file = makeMcpFile(".mcp.json", { github: {}, playwright: {} });
-    const result = computeMcpExclusions([file], mcpGetEntrySection, new Set());
-    expect(result).toHaveLength(2);
-  });
-});
-
 // ── detectNewMcpEntries ──────────────────────────────────────────────────────
-
-describe("detectNewMcpEntries()", () => {
-  const knownEntry: MergeFileEntry = {
-    relativePath: ".mcp.json",
-    sectionKey: "mcpServers",
-    entries: { github: "hash-g" as unknown as ReturnType<Hasher["hash"]> },
-  };
-
-  it("detects entries in distribution not tracked in manifest", () => {
-    const file = makeMcpFile(".mcp.json", { github: {}, playwright: {} });
-    const result = detectNewMcpEntries([file], mcpGetEntrySection, [knownEntry], []);
-    expect(result).toEqual([{ configPath: ".mcp.json", entryKey: "playwright" }]);
-  });
-
-  it("returns empty when all distribution entries are already known", () => {
-    const file = makeMcpFile(".mcp.json", { github: {} });
-    const result = detectNewMcpEntries([file], mcpGetEntrySection, [knownEntry], []);
-    expect(result).toHaveLength(0);
-  });
-
-  it("skips entries that are already in excluded list", () => {
-    const file = makeMcpFile(".mcp.json", { github: {}, playwright: {} });
-    const excluded = [{ configPath: ".mcp.json", entryKey: "playwright" }];
-    const result = detectNewMcpEntries([file], mcpGetEntrySection, [knownEntry], excluded);
-    expect(result).toHaveLength(0);
-  });
-
-  it("treats all entries as new when manifest has no entry for this file", () => {
-    const file = makeMcpFile(".mcp.json", { github: {}, playwright: {} });
-    const result = detectNewMcpEntries([file], mcpGetEntrySection, [], []);
-    expect(result).toHaveLength(2);
-  });
-});

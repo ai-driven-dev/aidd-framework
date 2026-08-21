@@ -1,12 +1,6 @@
 {
   "entry": ["src/cli.ts", "scripts/check-bundle-size.mjs"],
-  "ignore": [
-    "tests/**/helpers.ts",
-    "tests/helpers/**",
-    "tests/fixtures/**",
-    "tmp/**",
-    "src/domain/models/marketplace-entry.ts"
-  ],
+  "ignore": ["tests/**/helpers.ts", "tests/helpers/**", "tests/fixtures/**", "tmp/**"],
   "ignoreBinaries": ["gh", "icacls"],
   "ignoreExportsUsedInFile": true,
   "ignoreDependencies": ["cli-table3", "gray-matter", "ink", "react"]

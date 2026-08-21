@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InstallationFile } from "../../../src/domain/models/file.js";
 import {
-  buildMergeFileEntries,
   extractMergeEntries,
   parseEntryKeys,
   removeEntriesFromJson,
@@ -120,120 +118,6 @@ describe("parseEntryKeys", () => {
 
   it("returns empty array for invalid JSON", () => {
     expect(parseEntryKeys("not json", "mcpServers")).toEqual([]);
-  });
-});
-
-describe("buildMergeFileEntries", () => {
-  function getEntrySection(frameworkPath: string): string | null {
-    if (frameworkPath === "config/mcp.json" || frameworkPath === "config/.opencode/opencode.json")
-      return "mcp";
-    if (frameworkPath === "config/claude/settings.json") return "mcpServers";
-    return null;
-  }
-
-  it("dedups two InstallationFiles sharing relativePath and sectionKey", () => {
-    const mcpContent = JSON.stringify({
-      mcp: {
-        playwright: { command: "npx", args: ["-y", "pkg"] },
-        figma: { url: "https://mcp.figma.com/mcp" },
-      },
-    });
-    const opencodeTemplateContent = JSON.stringify({
-      instructions: [".opencode/rules/**/*.md"],
-      mcp: {},
-    });
-    const files = [
-      new InstallationFile({
-        relativePath: "opencode.json",
-        content: mcpContent,
-        hash: hasher.hash(mcpContent),
-        mergeStrategy: "framework-prime",
-        frameworkPath: "config/mcp.json",
-      }),
-      new InstallationFile({
-        relativePath: "opencode.json",
-        content: opencodeTemplateContent,
-        hash: hasher.hash(opencodeTemplateContent),
-        mergeStrategy: "framework-prime",
-        frameworkPath: "config/.opencode/opencode.json",
-      }),
-    ];
-
-    const result = buildMergeFileEntries(files, getEntrySection, hasher);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].relativePath).toBe("opencode.json");
-    expect(result[0].sectionKey).toBe("mcp");
-    expect(Object.keys(result[0].entries)).toEqual(["playwright", "figma"]);
-  });
-
-  it("later input wins on colliding entry key", () => {
-    const firstContent = JSON.stringify({ mcp: { playwright: { command: "old" } } });
-    const secondContent = JSON.stringify({ mcp: { playwright: { command: "new" } } });
-    const files = [
-      new InstallationFile({
-        relativePath: "opencode.json",
-        content: firstContent,
-        hash: hasher.hash(firstContent),
-        mergeStrategy: "framework-prime",
-        frameworkPath: "config/mcp.json",
-      }),
-      new InstallationFile({
-        relativePath: "opencode.json",
-        content: secondContent,
-        hash: hasher.hash(secondContent),
-        mergeStrategy: "framework-prime",
-        frameworkPath: "config/.opencode/opencode.json",
-      }),
-    ];
-
-    const result = buildMergeFileEntries(files, getEntrySection, hasher);
-
-    expect(result).toHaveLength(1);
-    expect(result[0].entries.playwright.value).toBe(
-      hasher.hash(JSON.stringify({ command: "new" })).value
-    );
-  });
-
-  it("keeps separate entries when relativePath differs", () => {
-    const mcpContent = JSON.stringify({ mcp: { playwright: { command: "npx" } } });
-    const claudeContent = JSON.stringify({ mcpServers: { github: { command: "gh" } } });
-    const files = [
-      new InstallationFile({
-        relativePath: "opencode.json",
-        content: mcpContent,
-        hash: hasher.hash(mcpContent),
-        mergeStrategy: "framework-prime",
-        frameworkPath: "config/mcp.json",
-      }),
-      new InstallationFile({
-        relativePath: ".mcp.json",
-        content: claudeContent,
-        hash: hasher.hash(claudeContent),
-        mergeStrategy: "framework-prime",
-        frameworkPath: "config/claude/settings.json",
-      }),
-    ];
-
-    const result = buildMergeFileEntries(files, getEntrySection, hasher);
-
-    expect(result).toHaveLength(2);
-    expect(result.map((e) => e.relativePath).sort()).toEqual([".mcp.json", "opencode.json"]);
-  });
-
-  it("skips files with mergeStrategy none", () => {
-    const files = [
-      new InstallationFile({
-        relativePath: ".opencode/agents/foo.md",
-        content: "body",
-        hash: hasher.hash("body"),
-        mergeStrategy: "none",
-      }),
-    ];
-
-    const result = buildMergeFileEntries(files, getEntrySection, hasher);
-
-    expect(result).toEqual([]);
   });
 });
 

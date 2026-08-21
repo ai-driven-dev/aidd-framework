@@ -1,6 +1,6 @@
 import { stripJsonComments } from "../formats/jsonc.js";
 import type { Hasher } from "../ports/hasher.js";
-import type { FileHash, InstallationFile } from "./file.js";
+import type { FileHash } from "./file.js";
 
 // ── MergeStrategy ────────────────────────────────────────────────────────────
 
@@ -91,25 +91,4 @@ export function isMergeContentEmpty(content: string, sectionKey: string | null):
   } catch {
     return false;
   }
-}
-
-export function buildMergeFileEntries(
-  distribution: InstallationFile[],
-  getEntrySection: (frameworkPath: string) => string | null,
-  hasher: Hasher
-): MergeFileEntry[] {
-  const grouped = new Map<string, MergeFileEntry>();
-  for (const file of distribution) {
-    if (file.mergeStrategy === "none") continue;
-    const sectionKey = file.frameworkPath ? getEntrySection(file.frameworkPath) : null;
-    const hashes = extractMergeEntries(file.content, sectionKey, hasher);
-    const key = `${file.relativePath}::${sectionKey ?? ""}`;
-    const previous = grouped.get(key);
-    grouped.set(key, {
-      relativePath: file.relativePath,
-      sectionKey,
-      entries: { ...(previous?.entries ?? {}), ...hashes },
-    });
-  }
-  return [...grouped.values()];
 }

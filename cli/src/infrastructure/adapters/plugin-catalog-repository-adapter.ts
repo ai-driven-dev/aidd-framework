@@ -1,14 +1,8 @@
 import { isAbsolute, join, resolve } from "node:path";
 import { MalformedMarketplaceCatalogError } from "../../domain/errors.js";
-import { parseCodexMarketplace } from "../../domain/formats/codex-marketplace.js";
-import { parseCopilotMarketplace } from "../../domain/formats/copilot-marketplace.js";
 import { parseCopilotMarketplaceCatalog } from "../../domain/formats/copilot-marketplace-catalog.js";
-import { parseCursorMarketplace } from "../../domain/formats/cursor-marketplace.js";
-import { parseOpencodeMarketplace } from "../../domain/formats/opencode-marketplace.js";
-import type { NormalizedPlugin } from "../../domain/models/normalized-plugin.js";
 import { MARKETPLACE_CACHE_SUBDIR } from "../../domain/models/paths.js";
 import { type PluginCatalog, parsePluginCatalog } from "../../domain/models/plugin-catalog.js";
-import { MARKETPLACE_PROBES } from "../../domain/models/plugin-format.js";
 import type { PluginSource } from "../../domain/models/plugin-source.js";
 import type { FileReader } from "../../domain/ports/file-reader.js";
 import type { PluginCatalogRepository } from "../../domain/ports/plugin-catalog-repository.js";
@@ -31,19 +25,6 @@ export class PluginCatalogRepositoryAdapter implements PluginCatalogRepository {
     }
     const catalog = await this.readClaudeCatalog(claudePath);
     return this.resolveLocalPaths(catalog, frameworkPath);
-  }
-
-  async loadForeign(frameworkPath: string): Promise<NormalizedPlugin[]> {
-    for (const probe of MARKETPLACE_PROBES) {
-      if (probe.format === "claude") continue;
-      const fullPath = join(frameworkPath, probe.relativePath);
-      if (!(await this.fs.fileExists(fullPath))) continue;
-      if (probe.format === "cursor") return this.readCursorCatalog(fullPath);
-      if (probe.format === "codex") return this.readCodexCatalog(fullPath);
-      if (probe.format === "copilot") return this.readCopilotCatalog(fullPath);
-      if (probe.format === "opencode") return this.readOpencodeCatalog(fullPath);
-    }
-    return [];
   }
 
   private isCachePath(fullPath: string): boolean {
@@ -81,26 +62,6 @@ export class PluginCatalogRepositoryAdapter implements PluginCatalogRepository {
     } catch (err) {
       throw new MalformedMarketplaceCatalogError(fullPath, this.parseDetail(err), cached);
     }
-  }
-
-  private async readCursorCatalog(fullPath: string): Promise<NormalizedPlugin[]> {
-    const raw = await this.fs.readFile(fullPath);
-    return [...parseCursorMarketplace(raw).plugins];
-  }
-
-  private async readCodexCatalog(fullPath: string): Promise<NormalizedPlugin[]> {
-    const raw = await this.fs.readFile(fullPath);
-    return [...parseCodexMarketplace(raw).plugins];
-  }
-
-  private async readCopilotCatalog(fullPath: string): Promise<NormalizedPlugin[]> {
-    const raw = await this.fs.readFile(fullPath);
-    return [...parseCopilotMarketplace(raw).plugins];
-  }
-
-  private async readOpencodeCatalog(fullPath: string): Promise<NormalizedPlugin[]> {
-    const raw = await this.fs.readFile(fullPath);
-    return [...parseOpencodeMarketplace(raw).plugins];
   }
 
   private resolveLocalPaths(catalog: PluginCatalog, frameworkPath: string): PluginCatalog {

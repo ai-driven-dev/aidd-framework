@@ -76,7 +76,6 @@ describe("MarketplaceListUseCase", () => {
       } as unknown as FetchMarketplaceSourceUseCase;
       const fakeCatalogRepo: PluginCatalogRepository = {
         load: async () => fakeCatalog,
-        loadForeign: async () => [],
       };
       const resolveMarketplace = new ResolveMarketplaceUseCase(fakeFetcher, fakeCatalogRepo);
 
@@ -99,7 +98,6 @@ describe("MarketplaceListUseCase", () => {
       } as unknown as FetchMarketplaceSourceUseCase;
       const fakeCatalogRepo: PluginCatalogRepository = {
         load: async () => null,
-        loadForeign: async () => [],
       };
       const resolveMarketplace = new ResolveMarketplaceUseCase(failingFetcher, fakeCatalogRepo);
 
@@ -122,7 +120,6 @@ describe("MarketplaceListUseCase", () => {
       } as unknown as FetchMarketplaceSourceUseCase;
       const fakeCatalogRepo: PluginCatalogRepository = {
         load: async () => null,
-        loadForeign: async () => [],
       };
       const resolveMarketplace = new ResolveMarketplaceUseCase(failingFetcher, fakeCatalogRepo);
       const logger = { info: vi.fn(), debug: vi.fn(), warn: vi.fn() };

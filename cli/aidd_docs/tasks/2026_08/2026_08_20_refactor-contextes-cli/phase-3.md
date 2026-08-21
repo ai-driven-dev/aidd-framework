@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Delete dead code
@@ -103,6 +103,37 @@ journey
 ### `4)` Shrink the ratchets
 
 1. Remove the deleted files from the `tool-addition-cost` baseline.
+
+## What executing this phase established
+
+**1871 lines deleted across 23 files, one line inserted.** The nets were not touched: golden, help
+surface, smoke and e2e all pass on files unchanged by this phase, which is what makes a deletion
+batch reviewable.
+
+**The compiler found what the plan had missed.** Four whole test files for the deleted parsers — 595
+lines — were not in the projection, and neither was the 180-line `loadForeign` block inside the
+catalog adapter's integration test. A projection written by reading is not a projection verified by
+compiling.
+
+**Deleting dead code revealed more dead code.** `ForeignSchemaValidationError` existed only to serve
+the foreign-catalog path; once that path went, nothing referenced it. That is the argument for doing
+this before the moves rather than after: each removal exposes the next.
+
+**The ratchets did their job without being asked.** `tool-addition-cost` refused to stay silent on
+six entries that had become obsolete, naming each one. Its baseline is now 14 instead of 20 — and
+the difference is a measurement of what this phase removed, not a claim about it.
+
+**Duplication fell with it**: 3.43% to 3.17%, 71 clones to 66. The jscpd threshold moved from 3.5 to
+3.2 to match, since leaving it where it was would have allowed a third of a percent of new
+duplication to pass unnoticed.
+
+| | before | after |
+|---|---|---|
+| unit tests | 1522 | 1399 |
+| integration tests | 510 | 482 |
+| `knip.json` ignore entries | 1 | 0 |
+| duplication | 3.43% | 3.17% |
+| `tool-addition-cost` baseline | 20 | 14 |
 
 ## Test acceptance criteria
 
