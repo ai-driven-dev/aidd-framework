@@ -12,7 +12,11 @@ Chaque affirmation chiffrée y est reproductible.
 | `domaine.md` | critique du domaine et sa cible, avec le test d'acceptation |
 | `migration.md` | le plan en treize phases et sa règle centrale |
 | `harnais.md` | les garde-fous déterministes, leur état et ce qui reste |
-| `phase-0.md` | la première phase du plan, prête à exécuter |
+| `plan.md` | le plan exécutable : 17 phases, objectif, ressources, décisions |
+| `phase-1.md` … `phase-17.md` | une fiche par phase : projection, parcours, portée de test, tâches, critères |
+
+`migration.md` reste la note de cadrage qui a produit le plan ; `plan.md` et ses phases sont
+l'artefact exécutable. En cas d'écart, `plan.md` fait foi.
 
 ## Décisions structurantes
 
