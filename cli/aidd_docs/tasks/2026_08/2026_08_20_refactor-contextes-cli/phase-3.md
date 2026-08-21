@@ -4,11 +4,20 @@ status: pending
 
 # Instruction: Delete dead code
 
-Do not move what will be thrown away. Three findings, each measured: `loadForeign()` has no
-production caller, `domain/models/marketplace-entry.ts` is the only file unreachable from
-`src/cli.ts`, and four exports of `mcp-exclusion.ts` are covered by tests but called by nothing.
+Do not move what will be thrown away. Every target re-verified after phases 1 and 2 changed the
+code around them.
 
-The last one is the telling case: live tests guarding dead behavior.
+| Target | Evidence | Size |
+|---|---|---|
+| the foreign-catalog branch | `loadForeign` has no production caller; `NormalizedPlugin` appears in 7 source files and 0 tests | 4 parsers (282 l.) + `normalized-plugin.ts` (27 l.) + a port method + 5 adapter methods of 123 |
+| `domain/models/marketplace-entry.ts` | the only file unreachable from `src/cli.ts`, and `knip.json` names it to stay silent | 103 l. + its 157-line test |
+| 4 exports of `mcp-exclusion.ts` | each appears once in `src` — its own definition — and once in tests | 134 of the file's 186 lines |
+| `buildMergeFileEntries` | same shape: defined, tested, called by nothing | ~25 l. |
+| `Update{Ai,Ide}Tools{Input,Result}` | once in `src`, zero in tests | 4 type declarations |
+
+Roughly 700 lines, of which the telling part is the middle three rows: **live tests guarding dead
+behavior**. They pass, they prove nothing, and they would have been carried through eleven
+relocation phases.
 
 ## Architecture projection
 
@@ -30,9 +39,11 @@ The last one is the telling case: live tests guarding dead behavior.
     ├── src/application/use-cases/global/
     │   ├── update-ai-tools-use-case.ts     ✏️ modify (drop unused Input/Result types)
     │   └── update-ide-tools-use-case.ts    ✏️ modify (idem)
-    ├── tests/domain/models/marketplace-entry.unit.test.ts  ❌ delete (tests a deleted file)
+    ├── tests/domain/models/marketplace-entry.unit.test.ts  ❌ delete (157 l., tests a deleted file)
     ├── tests/domain/models/mcp.unit.test.ts ✏️ modify (drop the 4 dead-export cases)
+    ├── tests/domain/models/merge-entry.unit.test.ts  ✏️ modify (drop buildMergeFileEntries)
     ├── tests/application/use-cases/marketplace/marketplace-list-use-case.unit.test.ts  ✏️ modify (drop loadForeign stubs)
+    ├── tests/infrastructure/adapters/plugin-catalog-repository-adapter.integration.test.ts  ✏️ modify (drop foreign reads)
     └── knip.json                            ✏️ modify (empty the ignore list)
 ```
 
@@ -55,7 +66,7 @@ journey
   section Setup
     the golden net covers the surface => phase 1 is done: 5: system
   section Happy path
-    run the whole suite => golden and e2e pass untouched: 5: system
+    run the whole suite => golden, help, smoke and e2e pass untouched: 5: system
     run knip with an empty ignore list => nothing reported: 5: system
     read a catalog from a Copilot-native fixture => still parsed correctly: 5: cli
   section Edge case - the live catalog path
