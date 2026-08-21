@@ -46,7 +46,7 @@
   },
   "bundleBudgetKB": 500,
   "scripts": {
-    "build": "tsup && node scripts/check-bundle-size.mjs",
+    "build": "tsup && tsup --config tsup.plugin-bin.ts && node scripts/check-bundle-size.mjs",
     "build:check-size": "node scripts/check-bundle-size.mjs",
     "dev": "tsup --watch",
     "test": "pnpm build && vitest run",
