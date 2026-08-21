@@ -21,6 +21,17 @@ file hashes (recomputed over normalized content so CI and local machines agree).
 Already covered elsewhere, do not duplicate: `framework build` has its own golden over the
 nine target/mode cells (`framework-build-golden.e2e.test.ts`).
 
+**On `framework build` still existing.** The command surface change is phase 12, deliberately last,
+because the e2e net invokes the CLI and renaming would break it exactly when it is needed most. So
+the command exists through phases 0 to 11. Its *behavior* is never removed at all — `translate`
+absorbs it: same engine, same source-to-output, new name. Its golden is therefore touched twice,
+and at two different moments:
+
+- **phase 1**, when flat mode is dropped for claude, cursor, copilot and codex: nine cells become
+  five, and that diff is the review of a deliberate scope reduction;
+- **phase 12**, when the invocation becomes `translate`, with the old spelling kept as an alias
+  until the tests have moved.
+
 ## Architecture projection
 
 > ✅ create · ✏️ modify · ❌ delete

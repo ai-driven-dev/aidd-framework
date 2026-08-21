@@ -18,9 +18,11 @@ ou « voici exactement ce qui a bougé ».
 `restore --force`, `clean --force`, `status` — alors que l'en-tête du test annonce « each public CLI
 command ». Trois des cinq sont invalidées par les décisions de surface.
 
-Ajouter les invocations manquantes avant tout déplacement : `framework build`, installation d'un
-outil, `plugin install`, `plugin list`, `marketplace add|list|refresh`, `doctor`, et les chemins
-d'erreur. Coût faible (une capture), gain décisif : les phases 2 à 11 deviennent vérifiables.
+Ajouter les invocations manquantes avant tout déplacement : installation d'un outil,
+`plugin install|list|remove`, `marketplace add|list|refresh`, `doctor`, un projet en dérive, et les
+chemins d'erreur. Coût faible (une capture), gain décisif : les phases 2 à 11 deviennent
+vérifiables. `framework build` en est exclu : il a déjà son propre golden sur les neuf cellules
+cible/mode. Détail dans `phase-0.md`.
 
 Corriger aussi l'en-tête, qui promet plus qu'il ne couvre.
 
