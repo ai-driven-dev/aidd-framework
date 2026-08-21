@@ -12,6 +12,7 @@ Chaque affirmation chiffrée y est reproductible.
 | `domaine.md` | critique du domaine et sa cible, avec le test d'acceptation |
 | `harnais.md` | les garde-fous déterministes, leur état et ce qui reste |
 | `plan.md` | le plan exécutable : 19 phases, objectif, ressources, décisions |
+| `marketplaces-heberges.md` | note de conception : héberger les distributions générées, ce qui débloque la phase 5 |
 | `phase-1.md` … `phase-19.md` | une fiche par phase : projection, parcours, portée de test, tâches, critères |
 
 `migration.md` a été supprimé : sa numérotation en treize phases contredisait les dix-neuf du plan,
