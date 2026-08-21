@@ -56,6 +56,29 @@ export type TelemetryActivation =
   | TelemetryPlannedActivation
   | TelemetryExternalActivation;
 
+/** What a route was **measured to supply**, not what it might. Three facts, because a
+ * consumer reading a report has to tell four things apart that all look like a missing
+ * number: a tool that supplies no counters at all, one that supplies counters but no
+ * amount, one that supplies an amount, and one whose figures carry the step the tool
+ * itself named.
+ *
+ * Declared per route rather than per tool, because the answer differs by route on the
+ * first tool measured: Claude Code carries an amount on its export and not on its local
+ * read, and states its own step on the local read and not on the export.
+ *
+ * Every field is required. A default here would be a capability nobody measured, quietly
+ * asserted for a tool nobody looked at. */
+export interface TelemetryRouteSupply {
+  /** The four token counters. */
+  readonly tokenCounters: boolean;
+  /** A figure denominated in currency. Never a credit, a premium request, or a zero whose
+   * denomination was never established. */
+  readonly amount: boolean;
+  /** The tool names the running step itself, on the record. An interval derived from the
+   * run journal is not this — that is the framework's inference, not the tool's statement. */
+  readonly toolStatedStep: boolean;
+}
+
 /** What a tool's OTLP export carries, measured by hand one session per tool, never taken
  * from documentation. The sink mapper reads this and nothing else to resolve which tool
  * sent a payload; it never branches on `toolId`. */
@@ -64,6 +87,7 @@ export interface TelemetryExportDeclared {
   readonly identityAttribute: string;
   readonly turnAttribute?: string;
   readonly sessionMeasures?: readonly TelemetrySessionMeasure[];
+  readonly supplies: TelemetryRouteSupply;
 }
 
 /** No session has been captured for this tool's export yet — declared rather than guessed. */
@@ -92,6 +116,7 @@ export interface TranscriptLocation {
 export interface TelemetryLocalReadDeclared {
   readonly kind: "declared";
   readonly transcript?: TranscriptLocation;
+  readonly supplies: TelemetryRouteSupply;
   /** A caveat that survives to the person reading the result, when what this tool can be
    * read for is narrower than the others. Data rather than a source comment, because a
    * comment reaches nobody downstream: a consumer would otherwise see figures with no

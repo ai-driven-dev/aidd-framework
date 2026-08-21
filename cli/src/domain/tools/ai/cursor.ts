@@ -144,6 +144,8 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
       kind: "unsupported",
       reason: "It writes no token count in any file it produces.",
     },
+    telemetryTaskAttributable: false,
+    telemetryJournalHost: "cursor",
 
     rewriteContent(content: string, docsDir: string): string {
       return baseRewriteContent(content, DIRECTORY, docsDir)

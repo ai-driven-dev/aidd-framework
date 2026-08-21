@@ -68,6 +68,17 @@ export function getAiToolConfig(toolId: AiToolId): AiTool<unknown> {
   return config;
 }
 
+/** The `AiToolId` whose declaration claims a journal host, or `null` for a host no
+ * registered tool claims. The only place the journal hook's host names and this codebase's
+ * tool ids are related, and it relates them by reading declarations rather than by holding
+ * a table that a fifth host would have to be remembered into. */
+export function journalHostToAiToolId(journalHost: string): AiToolId | null {
+  for (const toolId of AI_TOOL_IDS) {
+    if (getAiToolConfig(toolId).telemetryJournalHost === journalHost) return toolId;
+  }
+  return null;
+}
+
 export function getAllRegisteredTools(): Map<ToolId, ToolConfig> {
   return new Map(TOOL_REGISTRY);
 }

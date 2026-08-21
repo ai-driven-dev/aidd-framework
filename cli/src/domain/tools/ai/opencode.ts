@@ -180,7 +180,12 @@ export const opencode: AiTool<
     kind: "declared",
     limitation:
       "read alone: no captured payload establishes that a hook or plugin sees OpenCode's own session id, so these figures cannot yet be joined to a run journal entry.",
+    // Counters per message, and no amount: `info.cost` is `0` in every message captured
+    // and its denomination was never established, so it is deliberately never read. No
+    // field names a running skill either.
+    supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
   },
+  telemetryTaskAttributable: false,
 
   rewriteContent(content: string, docsDir: string): string {
     return baseRewriteContent(content, DIRECTORY, docsDir).replace(

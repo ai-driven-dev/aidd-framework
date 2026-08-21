@@ -256,6 +256,9 @@ export const codex: AiTool<
   telemetryExport: {
     kind: "declared",
     identityAttribute: "conversation.id",
+    // Declared from a zero-token capture that established the identifier and nothing else:
+    // no counters have ever been observed flowing through this route.
+    supplies: { tokenCounters: false, amount: false, toolStatedStep: false },
   },
 
   // Measured 2026-08-20: a rollout's `token_count` events carry counters but no model and
@@ -263,7 +266,15 @@ export const codex: AiTool<
   // Resolved by `session_meta.id`, not `session_id`, which a resumed session's rollout can
   // disagree with. See codex-rollout.ts for the full measurement and its two captured
   // fixtures.
-  telemetryLocalRead: { kind: "declared", transcript: CODEX_ROLLOUT_LOCATION },
+  telemetryLocalRead: {
+    kind: "declared",
+    transcript: CODEX_ROLLOUT_LOCATION,
+    // Complete counters per turn, no currency anywhere in a rollout, and no field naming a
+    // running skill - so a step here can only ever come from a run journal interval.
+    supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
+  },
+  telemetryTaskAttributable: false,
+  telemetryJournalHost: "codex",
 
   rewriteContent(content: string, docsDir: string): string {
     return rewriteCodexContent(content, { directory: DIRECTORY, docsDir });

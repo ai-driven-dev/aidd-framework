@@ -18,13 +18,42 @@ export interface RunJournalTurnEnd {
 
 export type RunJournalBoundary = RunJournalStepStart | RunJournalTurnEnd;
 
-/** What the journal side promises a reader: every `step_start` and `turn_end` line for one
- * session's run file, in file order — nothing else read, nothing derived. `session_start`
- * and `file_written` lines carry no boundary the interval logic needs, so they are not
- * surfaced here; deriving intervals from these boundaries is `domain/models/
- * step-attribution.ts`'s job, not this port's. */
+/** The `session_start` line: the one line naming what a session was. `tool` holds the
+ * journal hook's own host identifier ("claude-code", "codex", "copilot", "cursor"), which
+ * is not an `AiToolId` — `journalHostToAiToolId` in `domain/tools/registry.ts` is the only
+ * place the two are related, and it reads a declaration rather than a table. */
+export interface RunJournalSessionStart {
+  readonly type: "session_start";
+  readonly at: string;
+  readonly run_id: string;
+  readonly tool: string;
+  readonly vendor_id: string;
+  readonly project_id?: string;
+}
+
+/** A `file_written` line: a repository-relative, "/"-separated path a session wrote inside
+ * a task folder, and when. Deliberately carries no task identity — the hook that writes it
+ * refuses to store a derivation as a fact, so deriving the task is the reader's job. */
+export interface RunJournalFileWritten {
+  readonly type: "file_written";
+  readonly at: string;
+  readonly path: string;
+}
+
+/** What the journal side promises a reader, for one session's run file, in file order —
+ * lines read, nothing derived. Deriving intervals from `boundaries` is `domain/models/
+ * step-attribution.ts`'s job; deriving a task from `filesWritten` is the cost report's.
+ *
+ * `boundaries` was once all of this: step attribution needed nothing else, and this port
+ * said so. It is no longer the whole readership. A report has to know which tool and which
+ * project a session belonged to, and which task it wrote into, and both facts are already
+ * lines in the same file — so the exclusion was scoped to step attribution, never to the
+ * journal as a source. `session` is optional because a file whose first line is torn is
+ * still worth its boundaries. */
 export interface RunJournal {
   readonly boundaries: readonly RunJournalBoundary[];
+  readonly session?: RunJournalSessionStart;
+  readonly filesWritten: readonly RunJournalFileWritten[];
 }
 
 /**
@@ -36,4 +65,10 @@ export interface RunJournal {
  */
 export interface RunJournalReader {
   read(sessionId: string): Promise<RunJournal | null>;
+  /** Every session the journal holds, for a caller that has no identifier to ask about —
+   * a report covers a stretch of time, and the sessions inside it are what it is looking
+   * for. Filtering to a period is the caller's, from each journal's own `session.at`: the
+   * run file's name carries no date. Never throws, for the same reason `read` does not; a
+   * missing or unreadable runs directory answers an empty list. */
+  list(): Promise<readonly RunJournal[]>;
 }

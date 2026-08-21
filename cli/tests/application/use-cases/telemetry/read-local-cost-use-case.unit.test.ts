@@ -7,6 +7,7 @@ import "../../../../src/domain/tools/ai/copilot.js";
 import "../../../../src/domain/tools/ai/cursor.js";
 import "../../../../src/domain/tools/ai/opencode.js";
 import { ReadLocalCostUseCase } from "../../../../src/application/use-cases/telemetry/read-local-cost-use-case.js";
+import type { AiToolId } from "../../../../src/domain/models/tool-ids.js";
 import type {
   LocalCostCandidateRecord,
   SessionCostReader,
@@ -22,7 +23,12 @@ import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetr
 const SESSION_ID = "s-1";
 
 function stubReader(records: readonly LocalCostCandidateRecord[]): SessionCostReader {
-  return { read: async (sessionId: string) => (sessionId === SESSION_ID ? records : []) };
+  return {
+    read: async (sessionId: string) =>
+      sessionId === SESSION_ID
+        ? { records, sessionFound: true }
+        : { records: [], sessionFound: false },
+  };
 }
 
 // Shaped like a real Claude Code transcript reader's output (see
@@ -55,14 +61,25 @@ describe("ReadLocalCostUseCase", () => {
     registerTool(claudeConfig);
   });
 
+  // What this stub route supplies is not what this file is about; it declares the minimum
+  // the type requires so the use case's own orchestration is what gets tested.
+  const SUPPLIES_NOTHING = { tokenCounters: false, amount: false, toolStatedStep: false } as const;
+
   function declareClaudeReadable(): void {
-    registerTool({ ...claudeConfig, telemetryLocalRead: { kind: "declared" } });
+    registerTool({
+      ...claudeConfig,
+      telemetryLocalRead: { kind: "declared", supplies: SUPPLIES_NOTHING },
+    });
   }
 
   it("carries a covered tool's stated limitation through to the report, since a source comment reaches nobody", async () => {
     registerTool({
       ...claudeConfig,
-      telemetryLocalRead: { kind: "declared", limitation: "read alone: nothing to join on yet." },
+      telemetryLocalRead: {
+        kind: "declared",
+        limitation: "read alone: nothing to join on yet.",
+        supplies: SUPPLIES_NOTHING,
+      },
     });
     const sink = new InMemoryTelemetrySink();
     const useCase = new ReadLocalCostUseCase(
@@ -199,7 +216,10 @@ describe("ReadLocalCostUseCase", () => {
     const result = await useCase.execute({ sessionId: SESSION_ID });
 
     const claude = result.toolReports.find((r) => r.tool === "claude");
-    expect(claude).toMatchObject({ status: "not-covered", reason: undefined });
+    expect(claude).toMatchObject({ status: "not-covered" });
+    // The key is absent, not present-and-empty: this codebase omits rather than nulls, so
+    // a reason that shows up as a blank line downstream is a bug, not a formatting choice.
+    expect(claude).not.toHaveProperty("reason");
   });
 
   it("distinguishes not-covered from covered-and-empty", async () => {
@@ -269,6 +289,7 @@ describe("ReadLocalCostUseCase", () => {
           { type: "step_start", at: "2026-08-20T10:00:00Z", skill },
           { type: "turn_end", at: "2026-08-20T10:05:00Z" },
         ],
+        filesWritten: [],
       });
       return journal;
     }
@@ -403,5 +424,313 @@ describe("ReadLocalCostUseCase", () => {
       expect(withStored.step_attribution).toBe("journal-interval");
       expect(withoutStored.step_attribution).toBe("unattributed");
     });
+  });
+});
+
+describe("a reader that fails", () => {
+  const BOOM = "opencode export s-1 failed: spawnSync opencode ETIMEDOUT";
+
+  function throwingReader(): SessionCostReader {
+    return {
+      read: async () => {
+        throw new Error(BOOM);
+      },
+    };
+  }
+
+  it("costs its own tool's figures and no other tool's", async () => {
+    const sink = new InMemoryTelemetrySink();
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([
+        ["opencode", throwingReader()],
+        ["claude", stubReader([CANDIDATE])],
+      ]),
+      NULL_RUN_JOURNAL_READER
+    );
+
+    const result = await useCase.execute({ sessionId: SESSION_ID });
+
+    const claude = result.toolReports.find((report) => report.tool === "claude");
+    expect(claude?.status).toBe("found");
+    expect(claude?.recordsStored).toBe(1);
+    expect([...sink.files.values()].flat()).toHaveLength(1);
+  });
+
+  it("says the tool could not be read, and why, in the reader's own words", async () => {
+    const useCase = new ReadLocalCostUseCase(
+      new InMemoryTelemetrySink(),
+      new Map([["opencode", throwingReader()]]),
+      NULL_RUN_JOURNAL_READER
+    );
+
+    const opencode = (await useCase.execute({ sessionId: SESSION_ID })).toolReports.find(
+      (report) => report.tool === "opencode"
+    );
+
+    expect(opencode?.status).toBe("unreadable");
+    expect(opencode?.reason).toBe(BOOM);
+  });
+
+  it("is a fifth answer, never one of the four that already exist", async () => {
+    const useCase = new ReadLocalCostUseCase(
+      new InMemoryTelemetrySink(),
+      new Map([["opencode", throwingReader()]]),
+      NULL_RUN_JOURNAL_READER
+    );
+
+    const opencode = (await useCase.execute({ sessionId: SESSION_ID })).toolReports.find(
+      (report) => report.tool === "opencode"
+    );
+
+    // The four it must not be mistaken for: it billed nothing, it has no trace of the
+    // session, it cannot be read at all, or it read fine.
+    expect(["empty", "not-found", "not-covered", "found"]).not.toContain(opencode?.status);
+  });
+
+  it("claims no zero when every reader fails", async () => {
+    const sink = new InMemoryTelemetrySink();
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([
+        ["opencode", throwingReader()],
+        ["claude", throwingReader()],
+      ]),
+      NULL_RUN_JOURNAL_READER
+    );
+
+    const result = await useCase.execute({ sessionId: SESSION_ID });
+
+    expect([...sink.files.values()].flat()).toEqual([]);
+    const failed = result.toolReports.filter((report) =>
+      ["opencode", "claude"].includes(report.tool)
+    );
+    expect(failed.map((report) => report.status)).toEqual(["unreadable", "unreadable"]);
+    expect(failed.every((report) => report.recordsFound === 0)).toBe(true);
+    // Nothing anywhere in the answer claims a tool cost zero.
+    expect(result.toolReports.some((report) => report.status === "empty")).toBe(false);
+  });
+
+  it("stores what a failed read missed, once the reader recovers", async () => {
+    const sink = new InMemoryTelemetrySink();
+    const failing = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", throwingReader()]]),
+      NULL_RUN_JOURNAL_READER
+    );
+    await failing.execute({ sessionId: SESSION_ID });
+
+    const recovered = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER
+    );
+    const result = await recovered.execute({ sessionId: SESSION_ID });
+
+    expect(result.toolReports.find((report) => report.tool === "claude")?.recordsStored).toBe(1);
+  });
+});
+
+describe("reading every session the journal knows", () => {
+  function journalNaming(...vendorIds: readonly string[]): InMemoryRunJournalReader {
+    const reader = new InMemoryRunJournalReader();
+    for (const vendorId of vendorIds) {
+      reader.set(vendorId, {
+        boundaries: [],
+        filesWritten: [],
+        session: {
+          type: "session_start",
+          at: "2026-08-20T09:00:00Z",
+          run_id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+          tool: "claude-code",
+          vendor_id: vendorId,
+        },
+      });
+    }
+    return reader;
+  }
+
+  function readerFor(records: ReadonlyMap<string, readonly LocalCostCandidateRecord[]>) {
+    return {
+      read: async (sessionId: string) => ({
+        records: records.get(sessionId) ?? [],
+        sessionFound: records.has(sessionId),
+      }),
+    };
+  }
+
+  it("reads every journalled session when none is named", async () => {
+    const sink = new InMemoryTelemetrySink();
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([
+        [
+          "claude",
+          readerFor(
+            new Map([
+              ["s-a", [{ ...CANDIDATE, vendor_id: "s-a", turn_id: "a" }]],
+              ["s-b", [{ ...CANDIDATE, vendor_id: "s-b", turn_id: "b" }]],
+            ])
+          ),
+        ],
+      ]),
+      journalNaming("s-a", "s-b")
+    );
+
+    const result = await useCase.execute({});
+
+    expect(result.sessions.map((session) => session.sessionId)).toEqual(["s-a", "s-b"]);
+    expect([...sink.files.values()].flat()).toHaveLength(2);
+  });
+
+  it("reads only the session named, when one is", async () => {
+    const useCase = new ReadLocalCostUseCase(
+      new InMemoryTelemetrySink(),
+      new Map([["claude", readerFor(new Map([["s-a", [CANDIDATE]]]))]]),
+      journalNaming("s-a", "s-b")
+    );
+
+    const result = await useCase.execute({ sessionId: "s-a" });
+
+    expect(result.sessions.map((session) => session.sessionId)).toEqual(["s-a"]);
+  });
+
+  it("reads nothing, without failing, when the journal names no session", async () => {
+    const useCase = new ReadLocalCostUseCase(
+      new InMemoryTelemetrySink(),
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER
+    );
+
+    expect(await useCase.execute({})).toEqual({ sessions: [], toolReports: expect.anything() });
+  });
+
+  it("stores nothing new on a second sweep", async () => {
+    const sink = new InMemoryTelemetrySink();
+    const readers = new Map<AiToolId, SessionCostReader>([
+      ["claude", readerFor(new Map([["s-a", [{ ...CANDIDATE, vendor_id: "s-a" }]]]))],
+    ]);
+    const useCase = new ReadLocalCostUseCase(sink, readers, journalNaming("s-a"));
+    await useCase.execute({});
+
+    const second = await useCase.execute({});
+
+    expect(second.toolReports.find((report) => report.tool === "claude")?.recordsStored).toBe(0);
+    expect([...sink.files.values()].flat()).toHaveLength(1);
+  });
+
+  it("keeps reading the other sessions when one session's reader throws", async () => {
+    const sink = new InMemoryTelemetrySink();
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map<AiToolId, SessionCostReader>([
+        [
+          "claude",
+          {
+            read: async (sessionId: string) => {
+              if (sessionId === "s-bad") throw new Error("that one is broken");
+              return { records: [{ ...CANDIDATE, vendor_id: sessionId }], sessionFound: true };
+            },
+          },
+        ],
+      ]),
+      journalNaming("s-bad", "s-good")
+    );
+
+    const result = await useCase.execute({});
+
+    const bad = result.sessions.find((session) => session.sessionId === "s-bad");
+    const good = result.sessions.find((session) => session.sessionId === "s-good");
+    expect(bad?.toolReports.find((report) => report.tool === "claude")?.status).toBe("unreadable");
+    expect(good?.toolReports.find((report) => report.tool === "claude")?.status).toBe("found");
+    expect([...sink.files.values()].flat()).toHaveLength(1);
+  });
+
+  it("sums a tool's counts across the sweep and keeps its strongest answer", async () => {
+    const useCase = new ReadLocalCostUseCase(
+      new InMemoryTelemetrySink(),
+      new Map([
+        [
+          "claude",
+          readerFor(
+            new Map([
+              ["s-a", [{ ...CANDIDATE, vendor_id: "s-a", turn_id: "a" }]],
+              ["s-b", []],
+            ])
+          ),
+        ],
+      ]),
+      journalNaming("s-a", "s-b")
+    );
+
+    const claude = (await useCase.execute({})).toolReports.find(
+      (report) => report.tool === "claude"
+    );
+
+    // It read one session and found nothing in the other. Reporting it as empty would
+    // discard a real figure; reporting it as found is what actually happened.
+    expect(claude?.status).toBe("found");
+    expect(claude?.recordsFound).toBe(1);
+  });
+});
+
+describe("a failure in a sweep does not disappear behind a success", () => {
+  it("reports the tool as read, and still says how many sessions it could not read", async () => {
+    // Nineteen good sessions and one bad is the case that matters: the figures are real,
+    // so the status is honest, and a failure visible only in the status would vanish
+    // exactly where there is most to lose.
+    const journal = new InMemoryRunJournalReader();
+    for (const vendorId of ["s-good", "s-bad"]) {
+      journal.set(vendorId, {
+        boundaries: [],
+        filesWritten: [],
+        session: {
+          type: "session_start",
+          at: "2026-08-20T09:00:00Z",
+          run_id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+          tool: "claude-code",
+          vendor_id: vendorId,
+        },
+      });
+    }
+    const useCase = new ReadLocalCostUseCase(
+      new InMemoryTelemetrySink(),
+      new Map<AiToolId, SessionCostReader>([
+        [
+          "claude",
+          {
+            read: async (sessionId: string) => {
+              if (sessionId === "s-bad") throw new Error("that one is broken");
+              return { records: [{ ...CANDIDATE, vendor_id: sessionId }], sessionFound: true };
+            },
+          },
+        ],
+      ]),
+      journal
+    );
+
+    const claude = (await useCase.execute({})).toolReports.find(
+      (report) => report.tool === "claude"
+    );
+
+    expect(claude?.status).toBe("found");
+    expect(claude?.recordsFound).toBe(1);
+    expect(claude?.sessionsFailed).toBe(1);
+    expect(claude?.failureReason).toBe("that one is broken");
+  });
+
+  it("counts no failure when every session read cleanly", async () => {
+    const useCase = new ReadLocalCostUseCase(
+      new InMemoryTelemetrySink(),
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER
+    );
+
+    const claude = (await useCase.execute({ sessionId: SESSION_ID })).toolReports.find(
+      (report) => report.tool === "claude"
+    );
+
+    expect(claude?.sessionsFailed).toBe(0);
+    expect(claude?.failureReason).toBeUndefined();
   });
 });

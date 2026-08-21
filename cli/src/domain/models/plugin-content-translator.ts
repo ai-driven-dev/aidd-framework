@@ -29,6 +29,12 @@ const PLUGIN_MANIFEST_PATHS: readonly string[] = [
 interface TranslatedFile {
   relativePath: string;
   content: string;
+  /** An artefact, not prose: copied byte for byte, with no frontmatter round-trip and no
+   * path rewriting. A skill's `scripts/` and a hook's `lib/` hold executable files, and
+   * rewriting a path inside one silently corrupts it — measured: Codex's and Copilot's
+   * rewrites change a bundled script by six and one bytes respectively, which is a file
+   * that no longer parses. Prose is translated; artefacts are carried. */
+  verbatim?: true;
 }
 
 interface MarkdownCap {
@@ -43,6 +49,7 @@ interface SkillCap {
 }
 
 const PLUGIN_HOOKS_DIR = "hooks";
+const MARKDOWN_EXTENSION = ".md";
 
 function parentDirOf(path: string): string {
   return path.split("/").slice(0, -1).join("/");
@@ -120,7 +127,7 @@ export class PluginContentTranslator {
       const translated = this.translateFile(file, tool);
       if (translated === null) continue;
       const hooked = this.maybeConvertHooks(file.relativePath, translated.content, tool);
-      const content = tool.rewriteContent(hooked, docsDir);
+      const content = translated.verbatim ? hooked : tool.rewriteContent(hooked, docsDir);
       const installedPath = `${pluginRoot}${translated.relativePath}`;
       result.push(this.makeFile(installedPath, content));
       if (isComponentFile(file.relativePath)) {
@@ -156,9 +163,11 @@ export class PluginContentTranslator {
         return { relativePath: cap.hooksRelativePath, content: file.content };
       }
       const hooksDir = parentDirOf(cap.hooksRelativePath);
+      // Everything under `hooks/` but its own manifest is a script the host runs.
       return {
         relativePath: `${hooksDir}/${pathBelow(PLUGIN_HOOKS_DIR, file.relativePath)}`,
         content: file.content,
+        verbatim: true,
       };
     }
     return this.translateComponent(file, tool);
@@ -242,7 +251,12 @@ export class PluginContentTranslator {
     if (!sectionPresent(tool, section)) return null;
     const sectionDir = `${section}/`;
     const fileName = file.relativePath.slice(sectionDir.length);
-    const content = tool.rewriteContent(file.content, docsDir);
+    // Same rule as the native path: prose is rewritten, an artefact is carried. A flat
+    // install rewrote every file it carried, so a script survived here only where a tool's
+    // own rewrite happened to leave it alone — which is luck, not a guarantee.
+    const content = isProse(file.relativePath)
+      ? tool.rewriteContent(file.content, docsDir)
+      : file.content;
     return this.makeFile(`${tool.directory}${section}/${pluginName}/${fileName}`, content);
   }
 
@@ -283,6 +297,13 @@ function hasSkills(tool: AiTool<HasPlugins>): tool is AiTool<HasPlugins & HasSki
 
 function sectionPresent(tool: AiTool<HasPlugins>, section: "agents" | "rules" | "skills"): boolean {
   return section in (tool.capabilities as object);
+}
+
+/** Prose is translated; anything else a plugin ships is an artefact, carried byte for
+ * byte. The extension is the whole test: a plugin's components are markdown by definition,
+ * and everything beside them — a script, a template, a fixture — is not. */
+function isProse(relativePath: string): boolean {
+  return relativePath.endsWith(MARKDOWN_EXTENSION);
 }
 
 function isComponentFile(relativePath: string): boolean {
@@ -346,7 +367,14 @@ function translateMarkdown(
   return { relativePath, content };
 }
 
+/** A skill is prose with frontmatter; anything else under `skills/` is an asset the skill
+ * carries — a script it runs, a template it copies. Translating an asset would put it
+ * through a frontmatter round-trip and a path rewrite, neither of which is meaningful for
+ * a file that is not prose and both of which can damage it. */
 function translateSkill(file: PluginComponentFile, cap: SkillCap): TranslatedFile {
+  if (!isProse(file.relativePath)) {
+    return { relativePath: file.relativePath, content: file.content, verbatim: true };
+  }
   const { frontmatter, body } = parseFrontmatter(file.content);
   const newFm = cap.convertFrontmatter(frontmatter);
   const content = cap.serialize(newFm, body);

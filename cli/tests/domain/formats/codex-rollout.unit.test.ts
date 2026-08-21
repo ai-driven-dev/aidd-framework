@@ -1,10 +1,13 @@
 import { readFileSync } from "node:fs";
+import { sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  CODEX_ROLLOUT_LOCATION,
   createCodexRolloutAccumulator,
   mapCodexRolloutToSinkRecords,
 } from "../../../src/domain/formats/codex-rollout.js";
+import { journalRecord } from "../../helpers/telemetry-journal-hook.js";
 
 const TARGET_ID = "019fae6f-2009-7cd3-86b2-b8f83481b160";
 const TARGET_PARENT = "019f69d0-9e1f-7951-86c9-ddb23cfd51f4";
@@ -140,5 +143,49 @@ describe("createCodexRolloutAccumulator", () => {
     for (const line of loadFixture(TARGET_PATH).split("\n")) accumulator.push(line);
 
     expect(accumulator.build()).toEqual(whole);
+  });
+});
+
+describe("CODEX_ROLLOUT_LOCATION", () => {
+  it("accepts a rollout for the id the journal hook derives from the same path", () => {
+    // The hook writes vendor_id; this location resolves the file to read. They agree only
+    // if both read the rollout's own id off the filename, and they live apart because
+    // hooks/ is copied verbatim by the framework build and can import nothing from cli/.
+    // Pinned here so a drift in either one turns this red rather than silently dropping
+    // every resumed session's figures from a report.
+    for (const path of [TARGET_PATH, PARENT_PATH]) {
+      const derived = journalRecord.codexSessionIdFromTranscriptPath(path);
+
+      expect(derived).toBeDefined();
+      expect(CODEX_ROLLOUT_LOCATION.matches(path.split("/").join(sep), derived as string)).toBe(
+        true
+      );
+    }
+  });
+
+  it("derives the resumed rollout's own id, never its parent's", () => {
+    // The trap: on a resumed session `session_meta.session_id` holds the parent's id, and a
+    // vendor_id written from it joins to nothing. 124 of 330 rollouts measured on one
+    // machine are resumed, so this is 38% of Codex sessions, not an edge case.
+    expect(journalRecord.codexSessionIdFromTranscriptPath(TARGET_PATH)).toBe(TARGET_ID);
+    expect(journalRecord.codexSessionIdFromTranscriptPath(TARGET_PATH)).not.toBe(TARGET_PARENT);
+  });
+
+  it("derives nothing from a path that is not a rollout, so the payload's own spelling is used", () => {
+    expect(journalRecord.codexSessionIdFromTranscriptPath(undefined)).toBeUndefined();
+    expect(journalRecord.codexSessionIdFromTranscriptPath("/tmp/notes.jsonl")).toBeUndefined();
+    expect(
+      journalRecord.codexSessionIdFromTranscriptPath("rollout-no-uuid-here.jsonl")
+    ).toBeUndefined();
+  });
+
+  it("falls back to the payload's session_id when no transcript path is carried", () => {
+    expect(journalRecord.readSessionId("codex", { session_id: "fallback-id" })).toBe("fallback-id");
+    expect(
+      journalRecord.readSessionId("codex", {
+        session_id: "parent-id",
+        transcript_path: TARGET_PATH,
+      })
+    ).toBe(TARGET_ID);
   });
 });

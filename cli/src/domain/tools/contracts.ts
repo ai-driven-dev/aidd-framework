@@ -68,6 +68,25 @@ export interface AiTool<C> {
    * {@link TelemetryLocalRead}. Independent of `telemetryExport`: a tool can be readable
    * by one route, both, or neither. */
   readonly telemetryLocalRead: TelemetryLocalRead;
+  /** How the run journal's hook names this tool in its own `session_start` line, when the
+   * hook writes for it at all. Not the same string as `toolId` — the hook detects a host
+   * from the shape of a payload and spells Claude Code `claude-code`, while `toolId` is
+   * `claude`. Declared here so a report joining a journal to its records reads one
+   * declaration rather than carrying a table of four; a fifth host is a fifth declaration.
+   * Absent for a tool the journal hook does not run under. */
+  readonly telemetryJournalHost?: string;
+  /** Whether this tool's writes can be traced to the task they landed in. True only where
+   * the journal hook can read a written path out of that tool's own hook payload — Codex
+   * writes through an `apply_patch` command string, and Copilot's and Cursor's were never
+   * captured carrying one at all. The truth lives in `WRITTEN_PATH_EXTRACTOR_BY_HOST`,
+   * inside a zero-dependency script the framework build copies verbatim and this side
+   * cannot import, so it is declared here and pinned to that table by a test — the same
+   * arrangement `telemetryJournalHost` already uses for `DECLARED_HOSTS`.
+   *
+   * A tool declaring `false` is still fully reportable by period, and by step wherever a
+   * journal covers it. It simply belongs to no task, which is not the same as having
+   * touched nothing. */
+  readonly telemetryTaskAttributable: boolean;
   readonly directory: string;
   readonly toolSuffix: string;
   readonly signalDir: string | null;

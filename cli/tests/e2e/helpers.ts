@@ -72,9 +72,9 @@ export async function runCli(
   args: string[],
   cwd: string,
   fakeHome: string,
-  options?: { realHome?: boolean }
+  options?: { realHome?: boolean; env?: Record<string, string> }
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-  const env = sandboxedEnv(fakeHome, undefined, options);
+  const env = sandboxedEnv(fakeHome, options?.env, options);
   try {
     const { stdout, stderr } = await execFileAsync("node", [CLI_PATH, ...args], { cwd, env });
     return { stdout, stderr, exitCode: 0 };

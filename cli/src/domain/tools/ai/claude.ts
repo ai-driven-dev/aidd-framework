@@ -146,12 +146,24 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
       identityAttribute: CLAUDE_TELEMETRY_IDENTITY_ATTRIBUTE,
       turnAttribute: CLAUDE_TELEMETRY_TURN_ATTRIBUTE,
       sessionMeasures: CLAUDE_TELEMETRY_SESSION_MEASURES,
+      // The only route on any tool that has ever carried an amount. Its own skill
+      // attribute reads `third-party` for every framework skill, so nothing here states a
+      // step - which is the whole reason the run journal exists.
+      supplies: { tokenCounters: true, amount: true, toolStatedStep: false },
     },
 
     // Measured 2026-08-20: an assistant message in ~/.claude/projects/*/*.jsonl carries
     // `message.usage`'s four counters and `message.model`, keyed on `requestId`. See
     // claude-code-transcript.ts for the full measurement and its two captured fixtures.
-    telemetryLocalRead: { kind: "declared", transcript: CLAUDE_CODE_TRANSCRIPT_LOCATION },
+    telemetryLocalRead: {
+      kind: "declared",
+      transcript: CLAUDE_CODE_TRANSCRIPT_LOCATION,
+      // The mirror image of the export: the transcript names the running skill exactly, on
+      // the same line as the counters, and carries no amount at all.
+      supplies: { tokenCounters: true, amount: false, toolStatedStep: true },
+    },
+    telemetryTaskAttributable: true,
+    telemetryJournalHost: "claude-code",
 
     rewriteContent(content: string, docsDir: string): string {
       return baseRewriteContent(content, DIRECTORY, docsDir).replace(

@@ -3,7 +3,14 @@
 This is the contract for `TelemetrySinkRecord`, the one shape every AI-tool telemetry
 line takes once it reaches storage. It is written for a consumer outside this
 repository — a pricing service, an aggregator — that needs to price and attribute a
-session's usage without reading this repository's source. Everything a correct
+session's usage without reading this repository's source.
+
+> **Writing a skill, or anything that reports on AIDD work?** Read
+> [`cost-report-contract.md`](./cost-report-contract.md) instead. It describes the object
+> `aidd telemetry report --json` prints, with the rules below already applied. Reading raw
+> records makes you responsible for the two double-count rules, the split between the two
+> record kinds, and re-read deduplication — which is worth doing once, in one place, and
+> that place already exists. Everything a correct
 consumer needs is below: the file layout, every field's meaning and presence
 condition, the two ways a naive reader double counts, and what each tool can and
 cannot supply.
@@ -384,18 +391,31 @@ absence means.
 
 #### `event_timestamp`
 - **Type**: string, ISO 8601.
-- **Present**: conditional — present when the producing route carries a
-  per-record moment: Claude Code's export (`event.timestamp` attribute) and
-  local transcript (`timestamp` field); Codex's local read, where it is the
-  turn's own *start* (the `turn_context` event's timestamp), not a moment
-  inside the turn — a record spans a whole turn, so a moment inside it would
-  claim a precision the record does not have. OpenCode's local reader never
-  sets this field.
-- **Meaning**: the moment used to attribute a record against a run-journal step
-  interval, when `step` is not already tool-stated.
-- **If absent**: this record can never be attributed via a journal interval
-  (only via a tool-stated `step`, if one exists); it falls back to
-  `step_attribution: "unattributed"`.
+- **Present**: on every route measured so far, from its own source:
+  - **Export**, both kinds: the OTLP record's own `timeUnixNano` (nanoseconds
+    since the epoch, converted here to milliseconds). The `event.timestamp`
+    attribute is read in preference when a payload carries one, but no captured
+    payload ever has.
+  - **Claude Code, local**: the transcript line's `timestamp` field.
+  - **Codex, local**: the turn's own *start*, from the `turn_context` event —
+    not a moment inside the turn. A record spans a whole turn, so a moment
+    inside it would claim a precision the record does not have.
+  - **OpenCode, local**: the message's `time.created`, in epoch milliseconds.
+    Not `time.completed`, which is absent on some counted messages — a field
+    that sometimes means "started" and sometimes "finished" is worse than one
+    that always means the same thing.
+- **Meaning**: when the work this record measures happened. Two consumers rely
+  on it and they are separate: attributing a record against a run-journal step
+  interval when `step` is not already tool-stated, and placing the record in a
+  reporting period.
+- **If absent**: two things become impossible, and neither may be substituted
+  for. The record can no longer be attributed via a journal interval (only via
+  a tool-stated `step`, if one exists), so it falls back to
+  `step_attribution: "unattributed"`. And it belongs to **no period**: the only
+  other moment available is the day file it was appended to, and that is when
+  the record was received, not when the work ran — a session read locally days
+  after it happened lands in the day file for the day it was *read*. A consumer
+  reports such records as undated; it never places them by their day file.
 
 #### `event_sequence`
 - **Type**: number.
@@ -415,12 +435,30 @@ from silence.
 | ---- | ------------- | ------------------ |
 | **Claude Code** | Declared and measured: full request-level counters via `/v1/logs`, plus the six `"session"`-kind delta metrics via `/v1/metrics` every 10 seconds. `cost_usd` is only ever available through this route — no local file carries it. | Declared and measured: complete token counters per assistant message, keyed on `requestId`. Step is stated by the tool itself (`attributionSkill`), exact per message — the strongest attribution any tool or route offers. No `cost_usd`. |
 | **Codex** | Declared (`conversation.id` measured, zero-token, to verify the identifier only). Turn identifier and any metrics export are unmeasured — no counters, no cost, flow through this route today. | Declared and measured: complete counters per turn, keyed on `turn_id`, from the rollout's `token_count` events paired with the preceding `turn_context`. No tool-stated step — attribution is only ever a run-journal interval, or unattributed. No `cost_usd`. |
-| **OpenCode** | Unmeasured — no export payload has ever been captured for this tool. | Declared and measured, via `opencode export <sessionID> --sanitize`: counters per request (message), keyed on the message's own `id`. No established join to a run-journal entry — no captured hook or plugin payload has ever carried OpenCode's own session identity, so nothing exists to join on; these figures answer only what a session consumed, alone. `info.cost` is deliberately never read: it is `0` in every message captured, and its denomination (which currency, computed vs. billed) has never been established — a figure whose meaning is unknown is worse than an absent one. |
+| **OpenCode** | Unmeasured — no export payload has ever been captured for this tool. | Declared and measured, via `opencode export <sessionID> --sanitize`: counters per request (message), keyed on the message's own `id`. No established join to a run-journal entry — no captured hook or plugin payload has ever carried OpenCode's own session identity, so nothing exists to join on; these figures answer only what a session consumed, alone. `info.cost` is deliberately never read: it is `0` in every message captured, and its denomination (which currency, computed vs. billed) has never been established — a figure whose meaning is unknown is worse than an absent one. Records carry `event_timestamp` from the message's `time.created`, so they can be placed in a period; step attribution stays out of reach regardless, since there is no join to a run journal to attribute against. |
 | **Copilot** | Declared (`gen_ai.conversation.id` measured, zero-credit, to verify the identifier only) — but that attribute lives on the `invoke_agent` *span*, not on a log record or a metric, and this receiver only listens on `/v1/logs` and `/v1/metrics`. A receiver limited to those two paths never sees the one attribute that identifies a Copilot session, so this route yields nothing in practice today. | Unsupported (probed, not merely unmeasured): its own file carries `outputTokens` per turn and nothing else — no per-request input figure exists on disk, so no per-request record can be built from it at all. Separately, its file's own `cost` field is denominated in premium requests, not currency, so it could not be treated as `cost_usd` even where it is present. |
 | **Cursor** | Unmeasured — no payload has ever been captured. Cursor's own documentation names `cursor.conversation.id`, but a name read from documentation is a guess, and enabling the export to verify it is a team setting on an Enterprise plan, in beta, that nobody outside a Cursor admin can turn on — so it is declared unmeasured rather than declared from an unverified guess. | Unsupported (probed): Cursor writes no token count in any file it produces — there is nothing on disk for a local reader to find. |
 
 Cursor is the one tool uncovered by both routes today: its export cannot be
 enabled here to measure, and its local files carry nothing to read.
+
+### Attributing records to a task
+
+A record carries no task identity, on any route. A task is derived by whatever
+reads the records, from the `file_written` lines the run journal records beside
+them — a session that wrote inside a task folder belongs to that task. That
+derivation is deliberately not stored: a conclusion frozen at write time cannot
+be revised, while a derivation re-runs over every past session the day it
+changes.
+
+**Only Claude Code produces those lines.** The journal hook reads a written
+path from the tool's own hook payload, and only Claude Code's carries one in a
+readable form: Copilot's and Cursor's were never captured doing so, and Codex
+writes through an `apply_patch` command string that would have to be parsed
+rather than read. A session on any other tool is therefore attributable to a
+**period** and, where a journal covers it, to a **step** — but never to a task.
+A consumer prints that as a limit of the tool, exactly as it prints "not
+covered": a Codex session with no task is not a session that touched nothing.
 
 The Copilot denomination is measured, though not from anything in this
 repository — it comes from reading that tool's own session files, and is

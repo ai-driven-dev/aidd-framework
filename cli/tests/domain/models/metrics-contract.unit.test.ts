@@ -184,7 +184,7 @@ describe("metrics contract worked example: a re-read appends unless matched", ()
     const sink = new InMemoryTelemetrySink();
     const useCase = new ReadLocalCostUseCase(
       sink,
-      new Map([["claude", { read: async () => [candidate] }]]),
+      new Map([["claude", { read: async () => ({ records: [candidate], sessionFound: true }) }]]),
       NULL_RUN_JOURNAL_READER
     );
 
@@ -211,7 +211,12 @@ describe("metrics contract worked example: a re-read appends unless matched", ()
     const sink = new InMemoryTelemetrySink();
     const useCase = new ReadLocalCostUseCase(
       sink,
-      new Map([["claude", { read: async () => [candidateWithNoTurnId] }]]),
+      new Map([
+        [
+          "claude",
+          { read: async () => ({ records: [candidateWithNoTurnId], sessionFound: true }) },
+        ],
+      ]),
       NULL_RUN_JOURNAL_READER
     );
 

@@ -16,12 +16,22 @@ export type LocalCostCandidateRecord = Omit<
   "sink_schema_version" | "provenance" | "tool" | "step_attribution"
 >;
 
+/** What a reader answers with. `sessionFound` separates the two silences a bare empty list
+ * conflates: a tool that held this session and recorded nothing billable, and a tool that
+ * held no trace of it at all. A report that printed both as zero would let a session read
+ * as free when in truth it was never found — the failure this whole layer exists to make
+ * impossible. */
+export interface LocalCostReadResult {
+  readonly records: readonly LocalCostCandidateRecord[];
+  readonly sessionFound: boolean;
+}
+
 /**
  * What a per-tool local reader promises: given the session identity a run-journal entry
  * already carries, return the records that tool's own file holds for it — nothing more,
- * nothing else joined in. `read` resolves to an empty array, never throws, when the tool
- * wrote no file for that session; that is a tool which ran and consumed nothing, not an
- * error.
+ * nothing else joined in. `read` never throws when the tool wrote no file for that
+ * session; it answers `sessionFound: false` with no records, which is a session this tool
+ * has no trace of rather than an error.
  *
  * Every returned record's `vendor_id` equals the `sessionId` passed in, so a caller never
  * resolves identity twice. `turn_id`, when the tool's file carries a stable per-record
@@ -31,7 +41,7 @@ export type LocalCostCandidateRecord = Omit<
  * are simply appended again rather than deduplicated.
  */
 export interface SessionCostReader {
-  read(sessionId: string): Promise<readonly LocalCostCandidateRecord[]>;
+  read(sessionId: string): Promise<LocalCostReadResult>;
 }
 
 /**

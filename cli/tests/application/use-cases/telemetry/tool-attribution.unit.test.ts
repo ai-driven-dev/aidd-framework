@@ -64,7 +64,9 @@ async function readCapturedTranscript(): Promise<{
   readonly records: readonly TelemetrySinkRecord[];
 }> {
   const candidates = mapClaudeCodeTranscriptToSinkRecords(loadCapturedTranscript());
-  const stubReader: SessionCostReader = { read: async () => candidates };
+  const stubReader: SessionCostReader = {
+    read: async () => ({ records: candidates, sessionFound: true }),
+  };
   const sink = new InMemoryTelemetrySink();
   const useCase = new ReadLocalCostUseCase(
     sink,

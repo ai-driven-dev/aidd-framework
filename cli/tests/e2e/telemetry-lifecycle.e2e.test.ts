@@ -1,0 +1,235 @@
+import { execFile, execFileSync } from "node:child_process";
+import { existsSync, realpathSync } from "node:fs";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { delimiter, dirname, join, resolve } from "node:path";
+import { promisify } from "node:util";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { environmentWithoutGitVariables } from "../../src/infrastructure/git-environment.js";
+
+const execFileAsync = promisify(execFile);
+const REPO_ROOT = resolve(process.cwd(), "..");
+const PLUGIN = join(REPO_ROOT, "plugins", "aidd-telemetry");
+const SWITCH_BIN = join(PLUGIN, "skills", "00-init", "scripts", "telemetry-switch.js");
+const REPORT_BIN = join(PLUGIN, "skills", "01-cost", "scripts", "telemetry-report.js");
+const JOURNAL_HOOK = join(PLUGIN, "hooks", "journal.js");
+const HOOK_FIXTURES = join(REPO_ROOT, "scripts", "__tests__", "fixtures");
+const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
+
+const SESSION = "22222222-2222-4222-8222-222222222222";
+const TASK = "2026_08/2026_08_21_probe-task";
+const PERIOD = ["--from", "2026-08-01", "--to", "2026-08-31"] as const;
+/** Every token the captured Claude Code session billed, recomputed in
+ * `telemetry-plugin-standalone.e2e.test.ts` from the transcript itself. */
+const SESSION_TOKENS = "151,826";
+
+interface Run {
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly exitCode: number;
+}
+
+/**
+ * The whole life of measurement on one project, in order, with nothing but node.
+ *
+ * Not a feature test: each step is only meaningful because of the one before it. Reporting
+ * before enabling has to answer nothing rather than fail; disabling has to stop the
+ * recording without erasing what was already measured; re-enabling has to resume rather
+ * than start over. A test per step would pass while the sequence was broken.
+ */
+describe("measurement, from nothing to off and back", () => {
+  let projectDir: string;
+  let fakeHome: string;
+  let configDir: string;
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = realpathSync(await mkdtemp(join(tmpdir(), "aidd-lifecycle-")));
+    projectDir = join(tempDir, "project");
+    fakeHome = join(tempDir, "home");
+    configDir = join(tempDir, "config");
+    await mkdir(projectDir, { recursive: true });
+    await mkdir(fakeHome, { recursive: true });
+    execFileSync("git", ["init", "-q", projectDir]);
+    // The tool's own transcript, exactly as a machine that ran the session would hold it.
+    await execFileAsync("cp", ["-R", `${LOCAL_COST_FIXTURES}/.`, fakeHome]);
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  /** Only node's own directory: no `aidd`, and nothing from this repository's
+   * `node_modules`. The plugin has to be enough. */
+  function env(): NodeJS.ProcessEnv {
+    return {
+      ...environmentWithoutGitVariables(process.env),
+      PATH: [dirname(process.execPath), "/usr/bin", "/bin"].join(delimiter),
+      HOME: fakeHome,
+      AIDD_USER_CONFIG_DIR: configDir,
+    };
+  }
+
+  async function run(bin: string, args: readonly string[]): Promise<Run> {
+    try {
+      const { stdout, stderr } = await execFileAsync(process.execPath, [bin, ...args], {
+        cwd: projectDir,
+        env: env(),
+      });
+      return { stdout, stderr, exitCode: 0 };
+    } catch (error) {
+      const failed = error as { stdout?: string; stderr?: string; code?: number };
+      return {
+        stdout: failed.stdout ?? "",
+        stderr: failed.stderr ?? "",
+        exitCode: failed.code ?? 1,
+      };
+    }
+  }
+
+  const switchTo = (state: "on" | "off") => run(SWITCH_BIN, [state]);
+  const measure = (args: readonly string[]) => run(REPORT_BIN, args);
+
+  /** One captured hook payload, retargeted at this project and session. The hook decides
+   * the host from the payload's own shape, so nothing here tells it which tool it is. */
+  async function hook(fixture: string, event: string, extra: object = {}): Promise<void> {
+    const payload = JSON.parse(await readFile(join(HOOK_FIXTURES, `${fixture}.json`), "utf8"));
+    execFileSync(process.execPath, [JOURNAL_HOOK, event], {
+      input: JSON.stringify({
+        ...payload,
+        session_id: SESSION,
+        transcript_path: join(fakeHome, ".claude", "projects", "fake-project", `${SESSION}.jsonl`),
+        cwd: projectDir,
+        ...extra,
+      }),
+      cwd: projectDir,
+      env: env(),
+    });
+  }
+
+  /** A whole session as the host reports it: it starts, a skill opens, a file lands in a
+   * task folder, the turn ends. */
+  async function aSessionRuns(): Promise<void> {
+    await hook("claude-code-session-start", "session-start");
+    await hook("claude-code-post-tool-use-skill", "tool-used", {
+      tool_input: { skill: "aidd-dev:02-implement" },
+    });
+    const notes = join(
+      projectDir,
+      "aidd_docs",
+      "tasks",
+      "2026_08",
+      "2026_08_21_probe-task",
+      "notes.md"
+    );
+    await mkdir(dirname(notes), { recursive: true });
+    await writeFile(notes, "probe\n", "utf-8");
+    await hook("claude-code-post-tool-use-write", "tool-used", {
+      tool_input: { file_path: notes, content: "probe" },
+    });
+    await hook("claude-code-session-start", "turn-end");
+  }
+
+  async function runFiles(): Promise<readonly string[]> {
+    const dir = join(projectDir, "aidd_docs", "runs");
+    return existsSync(dir) ? await readdir(dir) : [];
+  }
+
+  /** Every line the journal holds, across every session. Counting files would miss a
+   * session that carries on: a run file is named for its session, so a second turn appends
+   * to the file the first turn opened rather than starting another. */
+  async function journalLines(): Promise<number> {
+    const dir = join(projectDir, "aidd_docs", "runs");
+    let total = 0;
+    for (const name of await runFiles()) {
+      total += (await readFile(join(dir, name), "utf8")).trim().split("\n").filter(Boolean).length;
+    }
+    return total;
+  }
+
+  it("lives the whole sequence, each step meaning what the one before it set up", async () => {
+    // 1. Nothing set up at all. Answering must be empty, not broken.
+    const beforeAnything = await measure(["report", ...PERIOD]);
+    expect(beforeAnything.exitCode, beforeAnything.stderr).toBe(0);
+    expect(beforeAnything.stdout).toContain("nothing in this period");
+    expect(existsSync(join(projectDir, ".aidd", "config.json"))).toBe(false);
+
+    // 2. A session runs while measuring is off. The hook must write nothing at all.
+    await aSessionRuns();
+    expect(await runFiles()).toEqual([]);
+
+    // 3. Allowed.
+    expect((await switchTo("on")).exitCode).toBe(0);
+
+    // 4. A session runs. Now it is journalled.
+    await aSessionRuns();
+    expect(await runFiles()).toHaveLength(1);
+
+    // 5. Read, and report. The figures carry the step the tool named and the task the
+    //    journal recorded.
+    const read = await measure(["read"]);
+    expect(read.stdout).toContain("Claude Code: read (4 new of 4)");
+    const reported = await measure(["report", ...PERIOD]);
+    expect(reported.stdout).toContain(SESSION_TOKENS);
+    expect(reported.stdout).toContain("probe-echo");
+    const byTask = await measure(["report", ...PERIOD, "--task", TASK]);
+    expect(byTask.stdout).toContain(`task ${TASK}`);
+    expect(byTask.stdout).toContain(SESSION_TOKENS);
+
+    // 6. Turned off. What was measured stays measured; only the recording stops.
+    expect((await switchTo("off")).exitCode).toBe(0);
+    const afterOff = await measure(["report", ...PERIOD]);
+    expect(afterOff.stdout).toContain(SESSION_TOKENS);
+
+    // 7. A session runs while off. Not one line is journalled — the switch is read at the
+    //    moment of every write, not once at startup.
+    const before = await journalLines();
+    expect(before).toBeGreaterThan(0);
+    await aSessionRuns();
+    expect(await journalLines()).toBe(before);
+
+    // 8. Allowed again. Recording resumes into the journal that already exists rather than
+    //    starting a new one, so nothing measured before is orphaned.
+    await switchTo("on");
+    await aSessionRuns();
+    expect(await journalLines()).toBeGreaterThan(before);
+    expect(await runFiles()).toHaveLength(1);
+
+    // 9. Reading again stores nothing twice.
+    const second = await measure(["read"]);
+    expect(second.stdout).toContain("Claude Code: read (0 new of 4)");
+    expect((await measure(["report", ...PERIOD])).stdout).toContain(SESSION_TOKENS);
+  }, 60_000);
+
+  it("leaves the project's own config alone through the whole cycle", async () => {
+    await mkdir(join(projectDir, ".aidd"), { recursive: true });
+    await writeFile(
+      join(projectDir, ".aidd", "config.json"),
+      JSON.stringify({ somethingElse: { kept: true } }),
+      "utf-8"
+    );
+
+    await switchTo("on");
+    await switchTo("off");
+    await switchTo("on");
+
+    const config = JSON.parse(await readFile(join(projectDir, ".aidd", "config.json"), "utf8"));
+    expect(config.somethingElse).toEqual({ kept: true });
+    expect(config.telemetry).toEqual({ enabled: true });
+  }, 30_000);
+
+  it("answers a program the same way through the same cycle", async () => {
+    await switchTo("on");
+    await aSessionRuns();
+    await measure(["read"]);
+
+    const envelope = JSON.parse((await measure(["report", ...PERIOD, "--json"])).stdout);
+    await switchTo("off");
+    const afterOff = JSON.parse((await measure(["report", ...PERIOD, "--json"])).stdout);
+
+    // Turning measurement off changes what is recorded next, never what a past period
+    // answers — a consumer that cached a figure must not see it move.
+    expect(afterOff).toEqual(envelope);
+    expect(envelope.cost_report_version).toBe(1);
+  }, 60_000);
+});

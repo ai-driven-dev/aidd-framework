@@ -23,6 +23,7 @@ interface OpencodeMessageInfo {
   readonly id?: unknown;
   readonly modelID?: unknown;
   readonly tokens?: OpencodeTokenCounts;
+  readonly time?: { readonly created?: unknown; readonly completed?: unknown };
 }
 
 interface OpencodeExportPayload {
@@ -35,6 +36,16 @@ function asNumber(value: unknown): number | undefined {
 
 function asString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+// `time.created`, not `time.completed`: created is on every counted message measured, while
+// completed is absent on some, and a record that sometimes means "started" and sometimes
+// means "finished" is worse than one that always means the same thing. Epoch milliseconds.
+function isoFromEpochMillis(value: unknown): string | undefined {
+  const millis = asNumber(value);
+  if (millis === undefined || millis <= 0) return undefined;
+  const at = new Date(millis);
+  return Number.isNaN(at.getTime()) ? undefined : at.toISOString();
 }
 
 function buildIdentity(
@@ -75,10 +86,12 @@ function buildRecord(
 ): LocalCostCandidateRecord | null {
   if (info.tokens === undefined) return null;
   const model = asString(info.modelID);
+  const at = isoFromEpochMillis(info.time?.created);
   return {
     kind: "request",
     ...buildIdentity(info, sessionId),
     ...(model !== undefined ? { model } : {}),
+    ...(at !== undefined ? { event_timestamp: at } : {}),
     ...buildCounters(info.tokens),
   };
 }

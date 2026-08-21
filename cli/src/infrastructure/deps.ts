@@ -80,6 +80,7 @@ import { SyncConflictResolverUseCase } from "../application/use-cases/sync/sync-
 import { EnableToolTelemetryUseCase } from "../application/use-cases/telemetry/enable-tool-telemetry-use-case.js";
 import { ReadLocalCostUseCase } from "../application/use-cases/telemetry/read-local-cost-use-case.js";
 import { ReceiveTelemetryUseCase } from "../application/use-cases/telemetry/receive-telemetry-use-case.js";
+import { ReportCostUseCase } from "../application/use-cases/telemetry/report-cost-use-case.js";
 import { TelemetryOffUseCase } from "../application/use-cases/telemetry/telemetry-off-use-case.js";
 import { TelemetryOnUseCase } from "../application/use-cases/telemetry/telemetry-on-use-case.js";
 import { UninstallIdeUseCase } from "../application/use-cases/uninstall/uninstall-ide-use-case.js";
@@ -225,6 +226,7 @@ interface Deps {
   receiveTelemetryUseCase: ReceiveTelemetryUseCase;
   otlpHttpReceiverAdapter: OtlpHttpReceiverAdapter;
   readLocalCostUseCase: ReadLocalCostUseCase;
+  reportCostUseCase: ReportCostUseCase;
 }
 
 const _cache = new Map<string, Deps>();
@@ -747,6 +749,7 @@ export async function createDeps(
     localCostReaders,
     runJournalReader
   );
+  const reportCostUseCase = new ReportCostUseCase(telemetrySink, runJournalReader);
   const deps: Deps = {
     fs,
     manifestRepo,
@@ -817,6 +820,7 @@ export async function createDeps(
     receiveTelemetryUseCase,
     otlpHttpReceiverAdapter,
     readLocalCostUseCase,
+    reportCostUseCase,
   };
   _cache.set(projectRoot, deps);
   return deps;

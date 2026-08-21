@@ -30,7 +30,7 @@ describe("TranscriptCostReaderAdapter — Claude Code", () => {
   );
 
   it("reads both the main transcript and a subagent's own file for one session", async () => {
-    const records = await adapter.read(CLAUDE_SID);
+    const { records } = await adapter.read(CLAUDE_SID);
 
     // 3 real turns from the main transcript (one API call's two lines collapsed to one)
     // plus 1 from the subagent's own file.
@@ -38,10 +38,8 @@ describe("TranscriptCostReaderAdapter — Claude Code", () => {
     expect(records.filter((r) => r.agent_name === "Explore")).toHaveLength(1);
   });
 
-  it("answers with nothing for a session neither file was written for", async () => {
-    const records = await adapter.read("no-such-session");
-
-    expect(records).toEqual([]);
+  it("says it found no session, not that the session cost nothing, when no file names it", async () => {
+    expect(await adapter.read("no-such-session")).toEqual({ records: [], sessionFound: false });
   });
 
   it("answers with nothing, not an error, when the declared root does not exist", async () => {
@@ -51,7 +49,10 @@ describe("TranscriptCostReaderAdapter — Claude Code", () => {
       createClaudeCodeTranscriptAccumulator
     );
 
-    await expect(adapterWithNoHome.read(CLAUDE_SID)).resolves.toEqual([]);
+    await expect(adapterWithNoHome.read(CLAUDE_SID)).resolves.toEqual({
+      records: [],
+      sessionFound: false,
+    });
   });
 });
 
@@ -63,23 +64,27 @@ describe("TranscriptCostReaderAdapter — Codex", () => {
   );
 
   it("resolves a resumed session by its own id, never its parent's, even with both on disk", async () => {
-    const records = await adapter.read(CODEX_TARGET_ID);
+    const { records } = await adapter.read(CODEX_TARGET_ID);
 
     expect(records).toHaveLength(2);
     expect(records.every((r) => r.vendor_id === CODEX_TARGET_ID)).toBe(true);
   });
 
   it("resolves the parent's own session independently, not the resumed session's records", async () => {
-    const records = await adapter.read(CODEX_PARENT_ID);
+    const { records } = await adapter.read(CODEX_PARENT_ID);
 
     expect(records).toHaveLength(1);
     expect(records[0]?.vendor_id).toBe(CODEX_PARENT_ID);
     expect(records[0]?.turn_id).toBe("019f69d1-8dcc-7272-a9eb-523ef9976475");
   });
 
-  it("answers with nothing for a session no rollout file names", async () => {
-    const records = await adapter.read("no-such-session");
+  it("says it found no session for an id no rollout file names", async () => {
+    expect(await adapter.read("no-such-session")).toEqual({ records: [], sessionFound: false });
+  });
 
-    expect(records).toEqual([]);
+  it("finds the resumed session, so a report never reads 38% of Codex sessions as absent", async () => {
+    // The trap this guards: the journal hook and this reader must name a resumed session
+    // the same way. 124 of 330 rollouts measured on one machine are resumed.
+    expect((await adapter.read(CODEX_TARGET_ID)).sessionFound).toBe(true);
   });
 });

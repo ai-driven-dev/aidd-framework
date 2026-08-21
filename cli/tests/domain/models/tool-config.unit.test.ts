@@ -22,6 +22,7 @@ const makeStubConfig = (toolId: AiToolId, toolSuffix: string): AiTool<unknown> =
   telemetry: { kind: "planned", trackedIn: "#653" },
   telemetryExport: { kind: "unmeasured" },
   telemetryLocalRead: { kind: "unmeasured" },
+  telemetryTaskAttributable: false,
   capabilities: {},
   rewriteContent: (content: string) => content,
   reverseRewriteContent: (content: string) => content,

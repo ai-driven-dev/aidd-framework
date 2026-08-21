@@ -135,6 +135,7 @@ interface OtlpNumberDataPoint {
   readonly attributes?: readonly OtlpKeyValue[];
   readonly asDouble?: number;
   readonly asInt?: string | number;
+  readonly timeUnixNano?: string | number;
 }
 
 interface OtlpMetric {
@@ -158,6 +159,23 @@ interface OtlpMetricsPayload {
 
 interface OtlpLogRecord {
   readonly attributes?: readonly OtlpKeyValue[];
+  readonly timeUnixNano?: string | number;
+}
+
+// Every OTLP record carries its own moment in `timeUnixNano`, and no captured payload has
+// ever carried the `event.timestamp` attribute the allowlist also accepts. Without reading
+// it, an exported record has no moment at all — so a report asking what a week cost could
+// only place it by the day the line was appended, which is when it was received rather
+// than when the work ran. Nanoseconds since the epoch, as a string on every payload
+// measured; `Number` is exact to the millisecond this converts to well past year 2200.
+const NANOSECONDS_PER_MILLISECOND = 1e6;
+
+function isoFromUnixNano(value: string | number | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const nanos = Number(value);
+  if (!Number.isFinite(nanos) || nanos <= 0) return undefined;
+  const at = new Date(Math.floor(nanos / NANOSECONDS_PER_MILLISECOND));
+  return Number.isNaN(at.getTime()) ? undefined : at.toISOString();
 }
 
 interface OtlpScopeLogs {
@@ -269,8 +287,13 @@ function asReadonlyArray<T>(value: unknown): readonly T[] {
   return Array.isArray(value) ? (value as readonly T[]) : [];
 }
 
-/** Every log record, already merged with its resource attributes. */
-function* eachLogRecord(payload: unknown): Generator<Map<string, AttributeValue>> {
+interface MergedLogRecord {
+  readonly merged: Map<string, AttributeValue>;
+  readonly at: string | undefined;
+}
+
+/** Every log record, already merged with its resource attributes, and its own moment. */
+function* eachLogRecord(payload: unknown): Generator<MergedLogRecord> {
   const resourceLogs = asReadonlyArray<OtlpResourceLogs>(
     (payload as OtlpLogsPayload)?.resourceLogs
   );
@@ -278,7 +301,10 @@ function* eachLogRecord(payload: unknown): Generator<Map<string, AttributeValue>
     const resourceAttrs = attributesToMap(resourceLog?.resource?.attributes);
     for (const scopeLog of asReadonlyArray<OtlpScopeLogs>(resourceLog?.scopeLogs)) {
       for (const logRecord of asReadonlyArray<OtlpLogRecord>(scopeLog?.logRecords)) {
-        yield mergeAttributes(resourceAttrs, attributesToMap(logRecord?.attributes));
+        yield {
+          merged: mergeAttributes(resourceAttrs, attributesToMap(logRecord?.attributes)),
+          at: isoFromUnixNano(logRecord?.timeUnixNano),
+        };
       }
     }
   }
@@ -291,10 +317,15 @@ export function mapOtlpLogsToSinkRecords(
   vendors: readonly TelemetryVendorIdentity[]
 ): TelemetrySinkRecord[] {
   const records: TelemetrySinkRecord[] = [];
-  for (const merged of eachLogRecord(payload)) {
+  for (const { merged, at } of eachLogRecord(payload)) {
     if (!merged.has(COST_ATTRIBUTE)) continue;
     const identity = resolveIdentity(merged, vendors);
-    if (identity) records.push(buildBaseRecord("request", identity, merged));
+    if (!identity) continue;
+    const draft = buildBaseRecord("request", identity, merged);
+    // The attribute wins where a payload carries both: it is the tool's own statement of
+    // when the event happened, while `timeUnixNano` is when the record was emitted.
+    if (draft.event_timestamp === undefined && at !== undefined) draft.event_timestamp = at;
+    records.push(draft);
   }
   return records;
 }
@@ -360,9 +391,31 @@ export function mapOtlpMetricsToSinkRecords(
     if (!identity) continue;
     const draft = buildBaseRecord("session", identity, merged);
     setAllowlistedField(draft, measure.field, value);
+    const at = isoFromUnixNano(dataPoint?.timeUnixNano);
+    if (draft.event_timestamp === undefined && at !== undefined) draft.event_timestamp = at;
     records.push(draft);
   }
   return records;
+}
+
+const DAY_KEY_LENGTH = "YYYY-MM-DD".length;
+
+/** The UTC day a record's own moment falls on, or `undefined` when it carries none.
+ *
+ * Lives here rather than in the sink adapter because more than one thing has to agree on
+ * it — the adapter that reads day files and every double that stands in for it — and two
+ * implementations of "which day is this" diverge on exactly the inputs nobody writes a
+ * fixture for. ISO 8601 with a `Z` offset is what every producer writes, so the first ten
+ * characters are already the UTC day; anything else is parsed rather than sliced, so a
+ * moment written with a non-UTC offset lands on the day it actually happened
+ * (`2026-08-18T01:00:00+05:00` is the 17th) and an unparseable one answers `undefined`
+ * rather than a sliced fragment. */
+export function telemetrySinkRecordDayKey(record: TelemetrySinkRecord): string | undefined {
+  const at = record.event_timestamp;
+  if (at === undefined) return undefined;
+  if (at.length >= DAY_KEY_LENGTH && at.endsWith("Z")) return at.slice(0, DAY_KEY_LENGTH);
+  const parsed = new Date(at);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString().slice(0, DAY_KEY_LENGTH);
 }
 
 export function serializeTelemetrySinkRecord(record: TelemetrySinkRecord): string {

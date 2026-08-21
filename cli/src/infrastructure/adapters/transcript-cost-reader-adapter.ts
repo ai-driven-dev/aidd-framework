@@ -6,6 +6,7 @@ import { createInterface } from "node:readline";
 import type { TranscriptLocation } from "../../domain/capabilities/telemetry-capability.js";
 import type {
   LocalCostCandidateRecord,
+  LocalCostReadResult,
   SessionCostReader,
   TranscriptLineAccumulator,
 } from "../../domain/ports/session-cost-reader.js";
@@ -30,8 +31,9 @@ async function* walk(dir: string): AsyncGenerator<string> {
  * directory to search, and which file names belong to a session, are the tool's own
  * declaration (`TranscriptLocation`, from `telemetryLocalRead.transcript`); this class walks
  * and reads, and never encodes a path of its own. A missing directory, or no matching file,
- * answers with no records — that is a tool which wrote none for this session, not a failure
- * to read. A file is read through `readline` rather than `readFile`, so a large transcript
+ * answers `sessionFound: false` rather than an empty success — this tool has no trace of
+ * that session, which is a different fact from a transcript that exists and holds nothing
+ * billable, and not a failure to read either. A file is read through `readline` rather than `readFile`, so a large transcript
  * is never held whole in memory, and a half-written final line (a live session being
  * appended to as this reads) reaches the format module like any other line — its own job to
  * accept or skip.
@@ -43,14 +45,14 @@ export class TranscriptCostReaderAdapter implements SessionCostReader {
     private readonly createAccumulator: () => TranscriptLineAccumulator
   ) {}
 
-  async read(sessionId: string): Promise<readonly LocalCostCandidateRecord[]> {
+  async read(sessionId: string): Promise<LocalCostReadResult> {
     const root = this.location.root(this.homeDir);
     const files = await this.findMatchingFiles(root, sessionId);
     const records: LocalCostCandidateRecord[] = [];
     for (const file of files) {
       records.push(...(await this.readFile(file)));
     }
-    return records;
+    return { records, sessionFound: files.length > 0 };
   }
 
   private async findMatchingFiles(root: string, sessionId: string): Promise<string[]> {

@@ -12,10 +12,15 @@ export class InMemoryRunJournalReader implements RunJournalReader {
   async read(sessionId: string): Promise<RunJournal | null> {
     return this.journals.get(sessionId) ?? null;
   }
+
+  async list(): Promise<readonly RunJournal[]> {
+    return [...this.journals.values()];
+  }
 }
 
 /** No run file for any session — every candidate falls through to unattributed, exactly as
  * a session with telemetry enabled but no journal beside it would read. */
 export const NULL_RUN_JOURNAL_READER: RunJournalReader = {
   read: async () => null,
+  list: async () => [],
 };

@@ -78,15 +78,20 @@ describe("OpencodeCostReaderAdapter", () => {
     const env = emptyPath();
     restorePath = env.restore;
 
-    await expect(new OpencodeCostReaderAdapter().read(SESSION_ID)).resolves.toEqual([]);
+    // No binary on the path is no trace of the session, never a session that cost nothing.
+    await expect(new OpencodeCostReaderAdapter().read(SESSION_ID)).resolves.toEqual({
+      records: [],
+      sessionFound: false,
+    });
   });
 
   it("reads a well-behaved export into one record per counted message", async () => {
     const env = installStandIn(WELL_BEHAVED_SCRIPT);
     restorePath = env.restore;
 
-    const records = await new OpencodeCostReaderAdapter().read(SESSION_ID);
+    const { records, sessionFound } = await new OpencodeCostReaderAdapter().read(SESSION_ID);
 
+    expect(sessionFound).toBe(true);
     expect(records).toHaveLength(4);
     expect(records[0]).toMatchObject({
       kind: "request",
@@ -101,11 +106,14 @@ describe("OpencodeCostReaderAdapter", () => {
     expect(records.every((r) => typeof r.turn_id === "string" && r.turn_id.length > 0)).toBe(true);
   });
 
-  it("returns nothing, not an error, for an unknown session", async () => {
+  it("says it found no session, not an error, for an unknown session", async () => {
     const env = installStandIn(UNKNOWN_SESSION_SCRIPT);
     restorePath = env.restore;
 
-    await expect(new OpencodeCostReaderAdapter().read(SESSION_ID)).resolves.toEqual([]);
+    await expect(new OpencodeCostReaderAdapter().read(SESSION_ID)).resolves.toEqual({
+      records: [],
+      sessionFound: false,
+    });
   });
 
   it("throws OpencodeExportError, and stores nothing, on a non-zero exit unrelated to an unknown session", async () => {

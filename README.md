@@ -11,7 +11,7 @@ _(Already tested on `Legacy` codebases)_
 [![Made in France](https://img.shields.io/badge/made%20in-France-0055A4?labelColor=EF4135)](https://www.ai-driven-dev.fr/)
 
 <p>
-  <!--counts:start--><kbd>8 plugins</kbd> · <kbd>47 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
+  <!--counts:start--><kbd>8 plugins</kbd> · <kbd>49 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -286,9 +286,9 @@ UI / UX design — smoke-test only, not ready for use.
 
 ### 📈 [aidd-telemetry](plugins/aidd-telemetry/README.md) 🚧
 
-`hooks only` · **alpha**
+`2 skills` · **alpha**
 
-Journals every session so a unit of work can be tied to what it cost. Installs and does nothing yet.
+Answers what a piece of work cost — tokens, models, and which skill spent them. Off unless you turn it on, and nothing leaves your machine.
 
 </td>
 <td width="33%" valign="top"></td>

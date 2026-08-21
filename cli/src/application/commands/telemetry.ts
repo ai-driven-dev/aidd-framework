@@ -5,7 +5,10 @@ import {
   TELEMETRY_SCOPES,
   type TelemetryScope,
 } from "../../domain/capabilities/telemetry-capability.js";
+import { toCostReportEnvelope } from "../../domain/models/cost-report-envelope.js";
+import { DEFAULT_REPORT_DAYS, resolveReportPeriod } from "../../domain/models/report-period.js";
 import { createDeps } from "../../infrastructure/deps.js";
+import { printCostReport } from "../display/cost-report-display.js";
 import {
   printLocalCostReadReport,
   printTelemetryOffReport,
@@ -84,20 +87,69 @@ export function registerTelemetryCommand(program: Command): void {
   telemetry
     .command("read")
     .description(
-      "Read a session's token counts and model from the files its tool already wrote, with no process running"
+      "Read what sessions cost from the files their tools already wrote, with no process running"
     )
-    .requiredOption("--session <id>", "Session identifier to read")
-    .action(async (cmdOptions: { session: string }) => {
+    .option(
+      "--session <id>",
+      "One session to read. Omitted, every session the run journal knows is read"
+    )
+    .action(async (cmdOptions: { session?: string }) => {
       const { verbose, output, projectRoot } = parseGlobalOptions(program);
       const errorHandler = new ErrorHandler(output);
       try {
         const deps = await createDeps(projectRoot, { verbose }, output);
-        const result = await deps.readLocalCostUseCase.execute({ sessionId: cmdOptions.session });
+        const result = await deps.readLocalCostUseCase.execute(
+          cmdOptions.session === undefined ? {} : { sessionId: cmdOptions.session }
+        );
         printLocalCostReadReport(output, result);
       } catch (error) {
         errorHandler.handle(error);
       }
     });
+
+  telemetry
+    .command("report")
+    .description(
+      "Report what a period, or one task inside it, cost — tokens, models and steps, with how strongly each was attributed"
+    )
+    .option("--from <day>", "First UTC day to report, as YYYY-MM-DD")
+    .option("--to <day>", "Last UTC day to report, as YYYY-MM-DD (default today)")
+    .option(
+      "--days <n>",
+      `How many days back to report, ending at --to (default ${DEFAULT_REPORT_DAYS})`
+    )
+    .option(
+      "--task <identity>",
+      "Restrict to the sessions that wrote into this task, as <yyyy_mm>/<name>"
+    )
+    .option("--json", "Print one object a program can parse, instead of text for a person")
+    .action(
+      async (cmdOptions: {
+        from?: string;
+        to?: string;
+        days?: string;
+        task?: string;
+        json?: boolean;
+      }) => {
+        const { verbose, output, projectRoot } = parseGlobalOptions(program);
+        const errorHandler = new ErrorHandler(output);
+        try {
+          // The clock is read once, here, and never again: everything downstream works from
+          // the two absolute days this resolves to, so the same call answers the same twice.
+          const period = resolveReportPeriod(cmdOptions, new Date());
+          const deps = await createDeps(projectRoot, { verbose }, output);
+          const report = await deps.reportCostUseCase.execute({
+            period,
+            ...(cmdOptions.task === undefined ? {} : { task: cmdOptions.task }),
+          });
+          // One value, two renderings. Neither derives a figure the other cannot see.
+          if (cmdOptions.json) output.print(JSON.stringify(toCostReportEnvelope(report), null, 2));
+          else printCostReport(output, report);
+        } catch (error) {
+          errorHandler.handle(error);
+        }
+      }
+    );
 
   telemetry
     .command("off")

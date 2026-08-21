@@ -5,18 +5,26 @@ import {
   parseTelemetrySinkLine,
   serializeTelemetrySinkRecord,
   type TelemetrySinkRecord,
+  telemetrySinkRecordDayKey,
 } from "../../domain/models/telemetry-sink-record.js";
 import type {
   TelemetrySink,
   TelemetrySinkAppendResult,
+  TelemetrySinkPeriodRead,
 } from "../../domain/ports/telemetry-sink.js";
 import { TelemetrySinkUnwritableError } from "../errors.js";
 
 const DAY_FILE_EXTENSION = ".jsonl";
 const PRIVATE_FILE_MODE = 0o600;
 
+const DAY_KEY_LENGTH = "YYYY-MM-DD".length;
+
+function dayKey(at: Date): string {
+  return at.toISOString().slice(0, DAY_KEY_LENGTH);
+}
+
 function dayFileName(at: Date): string {
-  return `${at.toISOString().slice(0, 10)}${DAY_FILE_EXTENSION}`;
+  return `${dayKey(at)}${DAY_FILE_EXTENSION}`;
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -79,6 +87,48 @@ export class TelemetrySinkAdapter implements TelemetrySink {
       records.push(...(await this.readVendorRecordsFromFile(fileName, vendorId)));
     }
     return records;
+  }
+
+  // Every day file is opened, not only the ones the period names: a session read locally
+  // days after it ran is appended to today's file while its records carry their own, older
+  // moments. Selecting by file name would be selecting by when we heard about the work.
+  async readRecordsInPeriod(fromDay: Date, toDay: Date): Promise<TelemetrySinkPeriodRead> {
+    const [fromKey, toKey] = [dayKey(fromDay), dayKey(toDay)].sort();
+    const records: TelemetrySinkRecord[] = [];
+    const undated: TelemetrySinkRecord[] = [];
+    let skippedLines = 0;
+    for (const fileName of await this.listDayFiles()) {
+      const read = await this.readAllRecordsFromFile(fileName);
+      skippedLines += read.skippedLines;
+      for (const record of read.records) {
+        const key = telemetrySinkRecordDayKey(record);
+        if (key === undefined) undated.push(record);
+        else if (key >= fromKey && key <= toKey) records.push(record);
+      }
+    }
+    return { records, undated, skippedLines };
+  }
+
+  private async readAllRecordsFromFile(
+    fileName: string
+  ): Promise<{ records: TelemetrySinkRecord[]; skippedLines: number }> {
+    let content: string;
+    try {
+      content = await readFile(join(this.rootDir, fileName), "utf8");
+    } catch {
+      // A file listed a moment ago and unreadable now — rotated, deleted, or never ours.
+      // Nothing about it is known, so nothing about it is counted as skipped either.
+      return { records: [], skippedLines: 0 };
+    }
+    const records: TelemetrySinkRecord[] = [];
+    let skippedLines = 0;
+    for (const line of content.split("\n")) {
+      if (line.trim() === "") continue;
+      const record = this.parseLineOrSkip(line);
+      if (record) records.push(record);
+      else skippedLines += 1;
+    }
+    return { records, skippedLines };
   }
 
   private async readVendorRecordsFromFile(

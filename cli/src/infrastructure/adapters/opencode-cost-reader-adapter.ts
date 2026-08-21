@@ -4,7 +4,7 @@ import { delimiter, join } from "node:path";
 import { OpencodeExportError } from "../../domain/errors.js";
 import { mapOpencodeExportToSinkRecords } from "../../domain/formats/opencode-export.js";
 import type {
-  LocalCostCandidateRecord,
+  LocalCostReadResult,
   SessionCostReader,
 } from "../../domain/ports/session-cost-reader.js";
 
@@ -26,8 +26,10 @@ const SESSION_NOT_FOUND = /session not found/i;
 export class OpencodeCostReaderAdapter implements SessionCostReader {
   constructor(private readonly timeoutMs: number = DEFAULT_TIMEOUT_MS) {}
 
-  async read(sessionId: string): Promise<readonly LocalCostCandidateRecord[]> {
-    if (!this.isAvailable()) return [];
+  async read(sessionId: string): Promise<LocalCostReadResult> {
+    // No binary on the path is no trace of the session, not a session that cost nothing —
+    // the one case where this reader can say nothing at all about what OpenCode did.
+    if (!this.isAvailable()) return { records: [], sessionFound: false };
     const result = spawnSync(BINARY, ["export", sessionId, "--sanitize"], {
       timeout: this.timeoutMs,
       stdio: ["ignore", "pipe", "pipe"],
@@ -39,7 +41,13 @@ export class OpencodeCostReaderAdapter implements SessionCostReader {
       );
     }
     if (result.status !== 0) return this.handleFailure(sessionId, result.status, result.stderr);
-    return mapOpencodeExportToSinkRecords(this.parseExport(sessionId, result.stdout), sessionId);
+    return {
+      records: mapOpencodeExportToSinkRecords(
+        this.parseExport(sessionId, result.stdout),
+        sessionId
+      ),
+      sessionFound: true,
+    };
   }
 
   /** Filesystem check, not a `--version` probe — matches
@@ -61,8 +69,8 @@ export class OpencodeCostReaderAdapter implements SessionCostReader {
     sessionId: string,
     status: number | null,
     stderr: string
-  ): readonly LocalCostCandidateRecord[] {
-    if (SESSION_NOT_FOUND.test(stderr)) return [];
+  ): LocalCostReadResult {
+    if (SESSION_NOT_FOUND.test(stderr)) return { records: [], sessionFound: false };
     throw new OpencodeExportError(
       `${BINARY} export ${sessionId} exited with code ${status ?? "unknown"}: ${stderr.trim() || "no stderr output"}`
     );

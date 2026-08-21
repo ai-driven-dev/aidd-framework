@@ -73,6 +73,13 @@ export class InvalidTelemetryReceivePortError extends Error {
   }
 }
 
+export class InvalidTelemetryPeriodError extends Error {
+  constructor(value: string, maxDays: number) {
+    super(`Invalid --days '${value}'. Expected an integer between 1 and ${maxDays}.`);
+    this.name = "InvalidTelemetryPeriodError";
+  }
+}
+
 export class TelemetryProjectScopeRequiresYesError extends Error {
   constructor(settingsPath: string) {
     super(

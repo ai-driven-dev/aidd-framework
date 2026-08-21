@@ -492,3 +492,17 @@ export class OpencodeExportError extends Error {
     this.name = "OpencodeExportError";
   }
 }
+
+export class InvalidReportDayError extends Error {
+  constructor(flag: string, value: string) {
+    super(`Invalid ${flag} '${value}'. Expected a UTC day, as YYYY-MM-DD.`);
+    this.name = "InvalidReportDayError";
+  }
+}
+
+export class InvalidReportSpanError extends Error {
+  constructor(value: string, maxDays: number) {
+    super(`Invalid --days '${value}'. Expected an integer between 1 and ${maxDays}.`);
+    this.name = "InvalidReportSpanError";
+  }
+}

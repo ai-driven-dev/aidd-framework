@@ -3,7 +3,9 @@ import { join } from "node:path";
 import type {
   RunJournal,
   RunJournalBoundary,
+  RunJournalFileWritten,
   RunJournalReader,
+  RunJournalSessionStart,
 } from "../../domain/ports/run-journal-reader.js";
 
 const ULID_LENGTH = 26; // encodeTime(10) + encodeRandom(16), matching record.js's own ULID_LENGTH.
@@ -39,20 +41,27 @@ interface RawJournalLine {
   readonly type?: unknown;
   readonly at?: unknown;
   readonly skill?: unknown;
+  readonly run_id?: unknown;
+  readonly tool?: unknown;
+  readonly vendor_id?: unknown;
+  readonly project_id?: unknown;
+  readonly path?: unknown;
 }
 
-/** One `step_start` or `turn_end` line, or `null` for every other line type (`session_start`,
- * `file_written`) and every line this file cannot parse — a torn final line from a session
- * still in progress reads as nothing, not as a boundary at the wrong moment. */
-function parseBoundary(line: string): RunJournalBoundary | null {
+function parseLine(line: string): RawJournalLine | null {
   const trimmed = line.trim();
   if (!trimmed) return null;
-  let parsed: RawJournalLine;
   try {
-    parsed = JSON.parse(trimmed) as RawJournalLine;
+    return JSON.parse(trimmed) as RawJournalLine;
   } catch {
     return null;
   }
+}
+
+/** One `step_start` or `turn_end` line, or `null` for every other line type and every line
+ * this file cannot parse — a torn final line from a session still in progress reads as
+ * nothing, not as a boundary at the wrong moment. */
+function parseBoundary(parsed: RawJournalLine): RunJournalBoundary | null {
   const at = asString(parsed.at);
   if (at === undefined) return null;
   if (parsed.type === "turn_end") return { type: "turn_end", at };
@@ -60,9 +69,41 @@ function parseBoundary(line: string): RunJournalBoundary | null {
   return skill !== undefined ? { type: "step_start", at, skill } : null;
 }
 
+/** The header line, or `null` when the line is not one or is missing a field a join needs.
+ * `run_id`, `tool` and `vendor_id` are all required: a header naming two of the three
+ * cannot say which session it belongs to, and a half-read header is worse than none. */
+function parseSessionStart(parsed: RawJournalLine): RunJournalSessionStart | null {
+  if (parsed.type !== "session_start") return null;
+  const at = asString(parsed.at);
+  const runId = asString(parsed.run_id);
+  const tool = asString(parsed.tool);
+  const vendorId = asString(parsed.vendor_id);
+  if (at === undefined || runId === undefined || tool === undefined || vendorId === undefined) {
+    return null;
+  }
+  const projectId = asString(parsed.project_id);
+  return {
+    type: "session_start",
+    at,
+    run_id: runId,
+    tool,
+    vendor_id: vendorId,
+    ...(projectId === undefined ? {} : { project_id: projectId }),
+  };
+}
+
+function parseFileWritten(parsed: RawJournalLine): RunJournalFileWritten | null {
+  if (parsed.type !== "file_written") return null;
+  const at = asString(parsed.at);
+  const writtenPath = asString(parsed.path);
+  return at === undefined || writtenPath === undefined
+    ? null
+    : { type: "file_written", at, path: writtenPath };
+}
+
 /**
- * Reads one session's run journal (#663) for the boundaries the interval logic needs, and
- * nothing else — the one class in this path allowed to open a file under `aidd_docs/runs`.
+ * Reads a session's run journal (#663) — the one class in this path allowed to open a file
+ * under `aidd_docs/runs`.
  * Never throws: no run file for this session, an unreadable runs directory, or a truncated
  * final line all answer `null` or an empty boundary list, since a missing or damaged
  * journal costs attribution, not the read itself. `AIDD_RUNS_DIR` overrides the directory
@@ -72,9 +113,29 @@ export class RunJournalReaderAdapter implements RunJournalReader {
   constructor(private readonly projectRoot: string) {}
 
   async read(sessionId: string): Promise<RunJournal | null> {
-    const dir = process.env.AIDD_RUNS_DIR || join(this.projectRoot, "aidd_docs", "runs");
-    const filePath = await this.findRunFile(dir, sessionId);
-    return filePath ? this.readBoundaries(filePath) : null;
+    const filePath = await this.findRunFile(this.runsDir(), sessionId);
+    return filePath ? this.readJournal(filePath) : null;
+  }
+
+  async list(): Promise<readonly RunJournal[]> {
+    const dir = this.runsDir();
+    let entries: string[];
+    try {
+      entries = await readdir(dir);
+    } catch {
+      return [];
+    }
+    const journals: RunJournal[] = [];
+    for (const entry of entries.sort()) {
+      if (!entry.endsWith(RUN_FILE_EXTENSION)) continue;
+      const journal = await this.readJournal(join(dir, entry));
+      if (journal) journals.push(journal);
+    }
+    return journals;
+  }
+
+  private runsDir(): string {
+    return process.env.AIDD_RUNS_DIR || join(this.projectRoot, "aidd_docs", "runs");
   }
 
   private async findRunFile(dir: string, sessionId: string): Promise<string | null> {
@@ -89,7 +150,7 @@ export class RunJournalReaderAdapter implements RunJournalReader {
     return match ? join(dir, match) : null;
   }
 
-  private async readBoundaries(filePath: string): Promise<RunJournal | null> {
+  private async readJournal(filePath: string): Promise<RunJournal | null> {
     let content: string;
     try {
       content = await readFile(filePath, "utf8");
@@ -97,10 +158,25 @@ export class RunJournalReaderAdapter implements RunJournalReader {
       return null;
     }
     const boundaries: RunJournalBoundary[] = [];
+    const filesWritten: RunJournalFileWritten[] = [];
+    let session: RunJournalSessionStart | undefined;
     for (const line of content.split("\n")) {
-      const boundary = parseBoundary(line);
-      if (boundary) boundaries.push(boundary);
+      const parsed = parseLine(line);
+      if (!parsed) continue;
+      const boundary = parseBoundary(parsed);
+      if (boundary) {
+        boundaries.push(boundary);
+        continue;
+      }
+      const written = parseFileWritten(parsed);
+      if (written) {
+        filesWritten.push(written);
+        continue;
+      }
+      // The header is written once, first. Keeping the first one read means a second,
+      // however it got there, never silently replaces the identity the file opened with.
+      session ??= parseSessionStart(parsed) ?? undefined;
     }
-    return { boundaries };
+    return { boundaries, filesWritten, ...(session ? { session } : {}) };
   }
 }

@@ -355,6 +355,10 @@ export const copilot: AiTool<
   telemetryExport: {
     kind: "declared",
     identityAttribute: "gen_ai.conversation.id",
+    // The identifier lives on the `invoke_agent` span, and the receiver listens on
+    // `/v1/logs` and `/v1/metrics` only - so nothing has ever reached storage by this
+    // route, whatever the payload may hold.
+    supplies: { tokenCounters: false, amount: false, toolStatedStep: false },
   },
 
   // Measured: Copilot's own local file carries `outputTokens` per turn and nothing else —
@@ -366,6 +370,8 @@ export const copilot: AiTool<
       "Its file carries outputTokens per turn and nothing else — no per-request " +
       "input figure exists to build a record from.",
   },
+  telemetryTaskAttributable: false,
+  telemetryJournalHost: "copilot",
 
   rewriteContent: rewriteCopilotContent,
 

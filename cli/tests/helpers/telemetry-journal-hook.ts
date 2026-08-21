@@ -20,3 +20,43 @@ interface JournalRepoModule {
 export const journalRepo: JournalRepoModule = createRequire(import.meta.url)(
   "../../../plugins/aidd-telemetry/hooks/lib/repo.js"
 );
+
+/**
+ * The same reach into `record.js`, for the one derivation the reader side must agree with:
+ * a Codex session's identity, taken from the rollout the hook is told the session writes.
+ */
+interface JournalRecordModule {
+  codexSessionIdFromTranscriptPath(transcriptPath: unknown): string | undefined;
+  readSessionId(host: string, payload: Record<string, unknown>): string | undefined;
+}
+
+export const journalRecord: JournalRecordModule = createRequire(import.meta.url)(
+  "../../../plugins/aidd-telemetry/hooks/lib/record.js"
+);
+
+/** The hook's own list of the hosts it writes for, so a conformance test can compare it
+ * against what the tool declarations claim rather than against a second copy of the list. */
+interface JournalHostModule {
+  DECLARED_HOSTS: ReadonlySet<string>;
+}
+
+export const journalHost: JournalHostModule = createRequire(import.meta.url)(
+  "../../../plugins/aidd-telemetry/hooks/lib/host.js"
+);
+
+/** The hook's file-writes module, for the one line phase 2's task derivation rests on.
+ * `WRITTEN_PATH_EXTRACTOR_BY_HOST` is exposed so a test can assert which hosts are covered
+ * rather than assume all of them are. */
+interface JournalFileWritesModule {
+  WRITTEN_PATH_EXTRACTOR_BY_HOST: Readonly<Record<string, unknown>>;
+  taskFolderRelativePath(repoRoot: string, rawPath: string): string | null;
+  handleFileWritten(
+    payload: Record<string, unknown>,
+    host: string,
+    sessionId: string | undefined
+  ): void;
+}
+
+export const journalFileWrites: JournalFileWritesModule = createRequire(import.meta.url)(
+  "../../../plugins/aidd-telemetry/hooks/lib/file-writes.js"
+);

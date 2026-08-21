@@ -17,7 +17,9 @@ import {
   getAllRegisteredTools,
   getToolConfig,
   isAiTool,
+  journalHostToAiToolId,
 } from "../../../src/domain/tools/registry.js";
+import { journalFileWrites, journalHost } from "../../helpers/telemetry-journal-hook.js";
 
 /**
  * Conformance suite for the AiTool contract.
@@ -235,6 +237,66 @@ describe("no parallel list references an unregistered tool", () => {
           registered.has(probe.format),
           `${label} has an entry for format "${probe.format}" (${probe.relativePath}), which is not a registered AI tool (stale entry?)`
         ).toBe(true);
+      }
+    }
+  });
+
+  it("every host the journal hook writes for is claimed by exactly one tool declaration", () => {
+    // The hook spells Claude Code "claude-code" while its toolId is "claude", so a report
+    // joining a journal line to a stored record has to relate the two. It relates them by
+    // reading these declarations, which is only safe while every host has one — a fifth
+    // host added to the hook and not declared here would join to nothing, silently.
+    for (const host of journalHost.DECLARED_HOSTS) {
+      expect(
+        journalHostToAiToolId(host),
+        `the journal hook writes for host "${host}", which no registered AI tool declares as its telemetryJournalHost`
+      ).not.toBeNull();
+    }
+  });
+
+  it("declares no journal host the hook does not write for", () => {
+    for (const [toolId, config] of registeredAiTools) {
+      const declared = config.telemetryJournalHost;
+      if (declared === undefined) continue;
+      expect(
+        journalHost.DECLARED_HOSTS.has(declared),
+        `"${toolId}" declares telemetryJournalHost "${declared}", which the journal hook never writes`
+      ).toBe(true);
+    }
+  });
+
+  it("resolves an unknown host to null rather than to a nearby tool", () => {
+    expect(journalHostToAiToolId("not-a-host")).toBeNull();
+  });
+
+  it("declares task attributability exactly where the journal hook can read a written path", () => {
+    // The hook's table is the truth and lives in a script this side cannot import. A tool
+    // gaining an extractor without a declaration would silently never be attributed to a
+    // task; one declaring it without an extractor would be attributed to none and look
+    // broken. Both fail here, by name.
+    for (const [toolId, config] of registeredAiTools) {
+      const host = config.telemetryJournalHost;
+      const hookCanRead =
+        host !== undefined && host in journalFileWrites.WRITTEN_PATH_EXTRACTOR_BY_HOST;
+
+      expect(
+        config.telemetryTaskAttributable,
+        `"${toolId}" declares telemetryTaskAttributable ${config.telemetryTaskAttributable}, but the journal hook ${hookCanRead ? "can" : "cannot"} read a written path for host "${host}"`
+      ).toBe(hookCanRead);
+    }
+  });
+
+  it("declares what every readable route supplies, for every tool", () => {
+    for (const [toolId, config] of registeredAiTools) {
+      for (const [route, declaration] of [
+        ["telemetryExport", config.telemetryExport],
+        ["telemetryLocalRead", config.telemetryLocalRead],
+      ] as const) {
+        if (declaration.kind !== "declared") continue;
+        expect(
+          declaration.supplies,
+          `"${toolId}" declares a ${route} route without saying what it supplies`
+        ).toBeDefined();
       }
     }
   });

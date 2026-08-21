@@ -9,6 +9,9 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 - [`.claude-plugin`](#claude-plugin)
 - [`hooks`](#hooks)
   - [`hooks/lib`](#hookslib)
+- [`skills`](#skills)
+  - [`skills/00-init`](#skills00-init)
+  - [`skills/01-cost`](#skills01-cost)
 
 ---
 
@@ -34,4 +37,26 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | [record.js](hooks/lib/record.js) |
 | [repo.js](hooks/lib/repo.js) |
 | [step-starts.js](hooks/lib/step-starts.js) |
+
+### `skills`
+
+#### `skills/00-init`
+
+| Group | File | Description |
+|-------|------|---|
+| `actions` | [01-check.md](skills/00-init/actions/01-check.md) | - |
+| `actions` | [02-enable.md](skills/00-init/actions/02-enable.md) | - |
+| `actions` | [03-verify.md](skills/00-init/actions/03-verify.md) | - |
+| `scripts` | [telemetry-switch.js](skills/00-init/scripts/telemetry-switch.js) | - |
+| `-` | [SKILL.md](skills/00-init/SKILL.md) | `Turns AIDD measurement on for a project and proves it is recording. Use when the user wants to start measuring what their work costs, wants to stop, or asks why nothing is being recorded. Not for answering what a piece of work consumed.` |
+
+#### `skills/01-cost`
+
+| Group | File | Description |
+|-------|------|---|
+| `actions` | [01-locate.md](skills/01-cost/actions/01-locate.md) | - |
+| `actions` | [02-collect.md](skills/01-cost/actions/02-collect.md) | - |
+| `actions` | [03-report.md](skills/01-cost/actions/03-report.md) | - |
+| `scripts` | [telemetry-report.js](skills/01-cost/scripts/telemetry-report.js) | - |
+| `-` | [SKILL.md](skills/01-cost/SKILL.md) | `Answers what a period or one task consumed, broken down by step, model and tool, with how strongly each figure was attributed. Use when the user asks what a piece of work cost, where the effort went, or which step or model consumed the most. Not for turning measurement on.` |
 

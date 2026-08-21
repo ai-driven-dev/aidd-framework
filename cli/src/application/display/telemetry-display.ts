@@ -21,6 +21,12 @@ const STATUS_LABELS: Record<TelemetryToolReport["status"], string> = {
 const LOCAL_COST_STATUS_LABELS: Record<LocalCostToolStatus, string> = {
   found: "read",
   empty: "read, nothing found",
+  // Never "nothing found": this tool has no trace of the session, so it can say nothing
+  // about what it cost. Printing the two alike would let a session read as free.
+  "not-found": "no session found",
+  // Its reader failed, so nothing is known about this tool for this session and something
+  // is wrong. Distinct from "no session found", where nothing is known and nothing is wrong.
+  unreadable: "could not be read",
   "not-covered": "not covered",
 };
 
@@ -38,13 +44,32 @@ export function printTelemetryOnReport(output: CLIOutput, result: TelemetryOnRes
 }
 
 export function printLocalCostReadReport(output: CLIOutput, result: ReadLocalCostResult): void {
+  // A sweep prints one line per tool, never one per tool per session: twenty sessions
+  // times five tools is a hundred lines nobody reads. How many sessions it covered is the
+  // fact that changes, so it leads.
+  const yielded = result.sessions.filter((session) =>
+    session.toolReports.some((report) => report.recordsFound > 0)
+  ).length;
+  if (result.sessions.length === 0) {
+    output.print("  No session journalled yet — nothing to read.");
+    return;
+  }
+  output.print(
+    `  ${result.sessions.length} session${result.sessions.length === 1 ? "" : "s"} read, ${yielded} with records`
+  );
   for (const report of result.toolReports) {
     const name = getAiToolConfig(report.tool).displayName;
     const label = LOCAL_COST_STATUS_LABELS[report.status];
     const counts =
       report.status === "found" ? ` (${report.recordsStored} new of ${report.recordsFound})` : "";
     const reason = report.reason ? ` — ${report.reason}` : "";
-    output.print(`  ${name}: ${label}${counts}${reason}`);
+    // Never folded into the status: a tool that read most sessions and failed one reports
+    // as read, and a failure visible only in the status would vanish exactly there.
+    const failures =
+      report.sessionsFailed > 0
+        ? ` [${report.sessionsFailed} session${report.sessionsFailed === 1 ? "" : "s"} could not be read: ${report.failureReason}]`
+        : "";
+    output.print(`  ${name}: ${label}${counts}${reason}${failures}`);
   }
 }
 
