@@ -1,5 +1,5 @@
 ---
-status: pending
+status: blocked
 ---
 
 # Instruction: Let each tool own its own configuration
@@ -34,6 +34,12 @@ owns.**
 
 `--scope project` is not optional: the command defaults to **user** scope and would otherwise
 register the marketplace globally, for every project on the machine.
+
+## Reporté (2026-08-21)
+
+Cette phase attend une décision produit qui n'est pas prise : ni le comportement hors ligne, ni la
+forme d'hébergement. Elle ne bloque rien — aucune autre phase n'en dépend, et le refactor continue
+en phase 6. Elle reprend quand la forme est tranchée, voir `marketplaces-heberges.md`.
 
 ## The decision this phase needs
 

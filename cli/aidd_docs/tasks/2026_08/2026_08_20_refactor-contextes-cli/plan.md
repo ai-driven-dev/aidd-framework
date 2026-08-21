@@ -20,7 +20,7 @@ status: in-progress
 | 2   | Revive and complete the smoke suite         | [`phase-2.md`](./phase-2.md) |
 | 3   | Delete dead code                            | [`phase-3.md`](./phase-3.md) |
 | 4   | Drop plugin scaffolding                     | [`phase-4.md`](./phase-4.md) |
-| 5   | Let each tool own its own configuration     | [`phase-5.md`](./phase-5.md) |
+| 5   | Let each tool own its own configuration ⏸  | [`phase-5.md`](./phase-5.md) |
 | 6   | Untangle without moving anything            | [`phase-6.md`](./phase-6.md) |
 | 7   | Dissolve the shared dumping ground          | [`phase-7.md`](./phase-7.md) |
 | 8   | Put three misplaced units where they belong | [`phase-8.md`](./phase-8.md) |
