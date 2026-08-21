@@ -1,10 +1,23 @@
 /**
- * P1 Golden Baseline — behavior snapshot for the core command matrix.
+ * Golden baseline — behavior snapshot for two scenarios.
  *
- * Each public CLI command is exercised against a hermetic fixture project.
- * The captured snapshot (stdout, stderr, exitCode, filesWritten, manifest)
- * is normalized (abs-paths → <ROOT>, version strings → <VERSION>) then
- * compared byte-for-byte against the stored baseline in snapshots/phase0/.
+ * Not a list of independent invocations: the main scenario runs commands in order
+ * against one hermetic fixture project, so state accumulates and `clean --force`
+ * ends it. Error paths therefore get a second project of their own.
+ *
+ * Each entry captures stdout, stderr, exitCode, filesWritten and the manifest,
+ * normalized (absolute paths → placeholders, versions → <VERSION>, file hashes
+ * recomputed over normalized content) then compared byte-for-byte against
+ * snapshots/phase0/.
+ *
+ * NOT covered here, on purpose:
+ *   - anything reaching the network: `marketplace add` on a GitHub source,
+ *     `self-update`, the update check. The fixture is local so a capture never
+ *     depends on a remote repository or a rate limit.
+ *   - anything interactive: the menu and every prompt. Captures run with `--yes`.
+ *   - `framework build`, which has its own golden over the nine target/mode cells
+ *     in framework-build-golden.e2e.test.ts.
+ *   - the shape of `--help`, frozen separately in help-surface.e2e.test.ts.
  *
  * USAGE:
  *   Capture: UPDATE_GOLDEN=1 pnpm test:e2e --reporter=verbose tests/golden/golden-baseline.e2e.test.ts
@@ -186,42 +199,114 @@ async function collectFiles(
 // Command matrix
 // ---------------------------------------------------------------------------
 
+/**
+ * Overwrite a tracked file with fixed content, to make the next capture see drift.
+ * Not a command, so it produces no entry: its effect shows in what follows.
+ */
+async function drift(projectDir: string, relativePath: string): Promise<void> {
+  await writeFile(join(projectDir, relativePath), "{}\n", "utf-8");
+}
+
+/**
+ * The main scenario, in order, against one project. `clean --force` is terminal,
+ * so nothing may follow it but the post-clean read.
+ */
 async function captureMatrix(projectDir: string, fakeHome: string): Promise<CommandEntry[]> {
   const entries: CommandEntry[] = [];
+  const capture = async (args: string[]): Promise<void> => {
+    entries.push(await captureCommand(args, projectDir, fakeHome));
+  };
 
-  // 1. setup — initialize from local fixture, claude only, no plugins
-  entries.push(
-    await captureCommand(
-      [
-        "setup",
-        "--source",
-        "local",
-        "--path",
-        FRAMEWORK_FIXTURE,
-        "--ai",
-        "claude",
-        "--plugins",
-        "none",
-        "--yes",
-      ],
-      projectDir,
-      fakeHome
-    )
-  );
+  // Fresh project, from the local fixture: claude only, no plugins.
+  await capture([
+    "setup",
+    "--source",
+    "local",
+    "--path",
+    FRAMEWORK_FIXTURE,
+    "--ai",
+    "claude",
+    "--plugins",
+    "none",
+    "--yes",
+  ]);
 
-  // 2. status — after fresh setup, everything should be in sync
-  entries.push(await captureCommand(["status"], projectDir, fakeHome));
+  // Read-only views of a freshly set up project.
+  await capture(["doctor"]);
+  await capture(["marketplace", "list"]);
+  await capture(["plugin", "list"]);
 
-  // 3. restore --force — no-op since nothing modified
-  entries.push(await captureCommand(["restore", "--force"], projectDir, fakeHome));
+  // The fixture serves aidd-test from a local path, so this stays offline.
+  await capture(["plugin", "install", "aidd-test"]);
+  await capture(["plugin", "list"]);
 
-  // 4. clean --force — removes all AIDD files
-  entries.push(await captureCommand(["clean", "--force"], projectDir, fakeHome));
+  // A second tool, written from bundled assets.
+  await capture(["ai", "install", "cursor", "--force"]);
+  await capture(["status"]);
 
-  // 5. status after clean — warns about missing manifest
-  entries.push(await captureCommand(["status"], projectDir, fakeHome));
+  // A tracked file edited outside the CLI: the mechanism status and doctor share.
+  await drift(projectDir, join(".claude", "settings.json"));
+  await capture(["status"]);
+  await capture(["doctor"]);
+
+  // Regeneration, then back in sync.
+  await capture(["restore", "--force"]);
+  await capture(["status"]);
+
+  await capture(["plugin", "remove", "aidd-test"]);
+
+  // Terminal: removes every AIDD file, then a read of the empty project.
+  await capture(["clean", "--force"]);
+  await capture(["status"]);
 
   return entries;
+}
+
+/**
+ * Error paths, in a project of their own because `clean --force` ends the main one.
+ * Each entry is prefixed so both scenarios can share one snapshot file.
+ */
+async function captureErrors(projectDir: string, fakeHome: string): Promise<CommandEntry[]> {
+  const entries: CommandEntry[] = [];
+  const capture = async (args: string[]): Promise<void> => {
+    const entry = await captureCommand(args, projectDir, fakeHome);
+    entries.push({ ...entry, command: `[errors] ${entry.command}` });
+  };
+
+  // A directory that was never set up.
+  await capture(["doctor"]);
+  await capture(["status"]);
+  await capture(["plugin", "list"]);
+
+  // Asking for something that cannot be resolved.
+  await capture(["plugin", "install", "does-not-exist"]);
+  await capture(["ai", "install", "not-a-tool"]);
+  await capture(["definitely-not-a-command"]);
+
+  // A marketplace whose catalog does not parse.
+  await capture([
+    "marketplace",
+    "add",
+    "malformed",
+    join(FRAMEWORK_FIXTURE, "marketplace-malformed"),
+  ]);
+
+  return entries;
+}
+
+/**
+ * Both scenarios, in one snapshot. The error scenario gets its own project because
+ * the main one ends with `clean --force`.
+ */
+async function captureAll(projectDir: string, fakeHome: string): Promise<CommandEntry[]> {
+  const main = await captureMatrix(projectDir, fakeHome);
+  const errorEnv = await createTestEnv("golden-errors");
+  try {
+    const errors = await captureErrors(errorEnv.projectDir, errorEnv.fakeHome);
+    return [...main, ...errors];
+  } finally {
+    await errorEnv.cleanup();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -233,8 +318,8 @@ describe.concurrent("Golden baseline — command matrix", () => {
     const env1 = await createTestEnv("golden-det-1");
     const env2 = await createTestEnv("golden-det-2");
     try {
-      const capture1 = normalizeSnapshot(await captureMatrix(env1.projectDir, env1.fakeHome));
-      const capture2 = normalizeSnapshot(await captureMatrix(env2.projectDir, env2.fakeHome));
+      const capture1 = normalizeSnapshot(await captureAll(env1.projectDir, env1.fakeHome));
+      const capture2 = normalizeSnapshot(await captureAll(env2.projectDir, env2.fakeHome));
       expect(JSON.stringify(capture1, null, 2)).toStrictEqual(JSON.stringify(capture2, null, 2));
     } finally {
       await env1.cleanup();
@@ -245,7 +330,7 @@ describe.concurrent("Golden baseline — command matrix", () => {
   it("snapshot matches stored baseline (behavior-preserving gate)", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("golden-baseline");
     try {
-      const captured = normalizeSnapshot(await captureMatrix(projectDir, fakeHome));
+      const captured = normalizeSnapshot(await captureAll(projectDir, fakeHome));
 
       if (process.env.UPDATE_GOLDEN === "1") {
         await mkdir(join(ROOT, "tests/golden/snapshots/phase0"), { recursive: true });

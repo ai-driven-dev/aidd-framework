@@ -1,6 +1,6 @@
 ---
 objective: "cli/src is organised by functional context, each boundary verified by a test rather than a convention, and adding a sixth tool touches one file."
-status: pending
+status: in-progress
 ---
 
 # Plan: Refactor the CLI by functional context
