@@ -2,14 +2,14 @@
 status: pending
 ---
 
-# Instruction: Extract the translate context
+# Instruction: Extract the tools context
 
-The core. Converting one canonical source into what each tool expects, at every level: plugin
-content into a tool's format, a framework source into a target-native distribution, paths, merges
-and rewrites.
+What the project targets, and how each target is configured. This is the phase that settles the
+plan's acceptance test: adding a sixth tool must touch one file.
 
-It is the only thing the CLI does that a user cannot do without it, which is why it is a context and
-not a service.
+Today it touches eight, and three of them are parallel unions of the same five values. Measured:
+`AiToolId`, `PluginFormat` and `FrameworkBuildTarget` have exactly the same members, in different
+order, with nothing checking that they agree.
 
 ## Architecture projection
 
@@ -17,28 +17,32 @@ not a service.
 
 ```txt
 .
-└── cli/src/contexts/translate/      ✅ create
+└── cli/src/contexts/tools/          ✅ create
     ├── index.ts                     ✅ create (the only public entry)
     ├── domain/
-    │   ├── capabilities/            ✏️ modify (agents, skills, commands, rules, hooks)
-    │   ├── formats/                 ✏️ modify (markdown, command, placeholders, toml, jsonc, paths, merges, rewrites)
-    │   ├── content-translator.ts    ✏️ modify (from domain/models/plugin-content-translator.ts)
-    │   ├── canon.ts                 ✏️ modify (from domain/models/framework.ts)
-    │   └── build-target.ts          ✏️ modify (what remains of framework-build.ts)
-    ├── application/
-    │   └── translate-source.ts      ✏️ modify (from use-cases/framework/, in place or to a distribution tree)
-    └── infrastructure/schema-validator.ts  ✏️ modify
+    │   ├── profiles/                ✅ create (claude, cursor, copilot, codex, opencode, vscode)
+    │   ├── registry.ts              ✏️ modify (from domain/tools/)
+    │   ├── contracts.ts             ✏️ modify (from domain/tools/)
+    │   ├── settings-capability.ts   ✏️ modify (co-owned files)
+    │   ├── mcp-capability.ts        ✏️ modify (co-owned files)
+    │   ├── mcp-exclusion.ts         ✏️ modify (from domain/models/)
+    │   └── ports/                   ✅ create (native-plugin-activator, file-merger)
+    ├── application/                 ✏️ modify (install-tool, uninstall-tool, the three config installs)
+    └── infrastructure/              ✏️ modify (native-plugin-cli, codex-cli, copilot-cli)
+
+cli/src/application/use-cases/framework/strategies/tool-contracts.ts  ❌ delete (820 l., split across profiles)
+cli/src/domain/models/plugin-format.ts        ✏️ modify (becomes derived)
+cli/src/domain/models/framework-build.ts      ✏️ modify (keeps only the mode type)
 ```
 
 ## User Journey
 
 ```mermaid
 flowchart TD
-  A[A canonical source] --> B[translate]
-  B --> C[Cursor .mdc]
-  B --> D[Codex TOML]
-  B --> E[Copilot .github/instructions]
-  B --> F[A distribution tree, or files written in place]
+  A[A sixth tool is supported] --> B[One profile file is written]
+  B --> C[It declares paths, formats, capabilities and its build contract]
+  C --> D[One registration line]
+  D --> E[Nothing else is edited]
 ```
 
 ## Test Scope
@@ -49,44 +53,48 @@ title: Test scope
 ---
 journey
   section Setup
-    the framework fixture and an installed project => both call sites exercised: 5: system
+    the tool-addition-cost ratchet lists twenty files => the target is measurable: 5: system
   section Happy path
-    build a framework for every surviving target => output byte-identical: 5: cli
-    install a plugin into each tool => translated content identical to before: 5: cli
-  section Edge case - a format with no equivalent
-    a capability a target cannot represent => translate for that target => skipped with a clear message: 1: cli
+    install and uninstall each supported tool => unchanged behavior: 5: cli
+    build for each surviving target => output byte-identical: 5: cli
+    merge settings and mcp into a project that already has its own => user entries preserved: 5: cli
+  section Edge case - a seventh tool, on paper
+    add a profile in a scratch branch => nothing outside it needs an edit => the ratchet stays empty: 1: system
   section Teardown
-    the context imports tools and the kernel, nothing else => the chain holds: 5: system
+    the three parallel unions are gone => one source, two derived types: 5: system
 ```
 
 ## Tasks to do
 
-### `1)` Move the content capabilities
+### `1)` Give each profile its build contract
 
-1. `agents`, `skills`, `commands`, `rules` and `hooks` describe content. They come here; `settings`
-   and `mcp` stayed in `tools` at phase 10.
+1. `tool-contracts.ts` holds nine `build*Contract()` functions for five tools. A tool's build
+   contract is a property of that tool: move each into its profile.
+2. The 820-line file disappears.
 
-### `2)` Move the formats and the translator
+### `2)` Derive the unions
 
-1. Everything under `domain/formats/` that survived phase 2, plus `plugin-content-translator.ts`.
-2. `framework.ts` becomes `canon.ts`: it describes the canonical source shape, not a product.
+1. `PluginFormat` and `FrameworkBuildTarget` have the same members as `AiToolId`. Make them aliases
+   or explicit subsets so the values are written once.
+2. `FRAMEWORK_BUILD_TARGET_MODES` becomes derived: each profile declares its mode, since phase 5
+   made the mode a property of the tool.
 
-### `3)` Move the build, renamed for what it does
+### `3)` Move the co-owned configuration
 
-1. `use-cases/framework/` becomes `translate-source`: one source, N targets, written in place or to
-   a distribution tree. The command keeps its current name until phase 16.
+1. `settings-capability`, `mcp-capability` and `mcp-exclusion` describe files the user also owns.
+   They belong here, with the merge strategies that keep the user's entries.
 
 ### `4)` Close the context
 
-1. One `index.ts`. Add the biome `override`. Verify it depends on `tools` and the kernel and on
-   nothing else.
+1. One `index.ts`. Add the biome `override` refusing imports into the interior.
+2. Shrink the `tool-addition-cost` baseline to empty, or record what is left and why.
 
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 1    | Installing a plugin produces the same files for every tool |
-| 2    | Every format transform behaves as before; the build golden is unchanged |
-| 3    | `framework build` still works, unchanged, under its current name |
-| 4    | The context imports only `tools` and the kernel; an import into its interior fails the lint |
+| 1    | Building for each surviving target produces the same tree; no file outside the profiles names a tool |
+| 2    | Changing the tool list in one place is enough; the derived types follow without a second edit |
+| 3    | Installing into a project that already has its own `settings.json` and `.mcp.json` preserves the user's entries |
+| 4    | An import into `contexts/tools/` interior fails the lint; the `tool-addition-cost` baseline is empty or justified line by line |
 | all  | Golden, build golden and e2e pass **unmodified** |

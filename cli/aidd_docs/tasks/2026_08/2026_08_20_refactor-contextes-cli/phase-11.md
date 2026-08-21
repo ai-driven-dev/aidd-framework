@@ -2,14 +2,14 @@
 status: pending
 ---
 
-# Instruction: Extract the distribution context
+# Instruction: Extract the translate context
 
-Where content comes from: registered marketplaces, their catalogs, their caches, and whether they
-are trusted. After phase 8 moved the three cross-area flows out, it knows nothing about tools and
-nothing about what is installed — it is a leaf, and this phase proves it.
+The core. Converting one canonical source into what each tool expects, at every level: plugin
+content into a tool's format, a framework source into a target-native distribution, paths, merges
+and rewrites.
 
-Its state left the manifest a while ago: `manifest.ts:142` records that the registry lives in
-`.aidd/marketplaces.json`.
+It is the only thing the CLI does that a user cannot do without it, which is why it is a context and
+not a service.
 
 ## Architecture projection
 
@@ -17,27 +17,28 @@ Its state left the manifest a while ago: `manifest.ts:142` records that the regi
 
 ```txt
 .
-└── cli/src/contexts/distribution/   ✅ create
+└── cli/src/contexts/translate/      ✅ create
     ├── index.ts                     ✅ create (the only public entry)
     ├── domain/
-    │   ├── marketplace.ts           ✏️ modify (entry, scope, staleness)
-    │   ├── cache-entry.ts           ✏️ modify
-    │   ├── source-mode.ts           ✏️ modify
-    │   ├── catalog.ts               ✏️ modify (from domain/models/plugin-catalog.ts)
-    │   ├── catalog-parsers/         ✅ create (the Copilot-native reader from phase 8)
-    │   └── ports/                   ✅ create (registry, cache, trust-store, catalog-repository, fetcher, raw-fetcher)
-    ├── application/                 ✏️ modify (add, list, refresh, register-framework, resolve, fetch-source)
-    └── infrastructure/              ✏️ modify (registry, catalog-repository, fetcher, cache, trust, raw-fetcher)
+    │   ├── capabilities/            ✏️ modify (agents, skills, commands, rules, hooks)
+    │   ├── formats/                 ✏️ modify (markdown, command, placeholders, toml, jsonc, paths, merges, rewrites)
+    │   ├── content-translator.ts    ✏️ modify (from domain/models/plugin-content-translator.ts)
+    │   ├── canon.ts                 ✏️ modify (from domain/models/framework.ts)
+    │   └── build-target.ts          ✏️ modify (what remains of framework-build.ts)
+    ├── application/
+    │   └── translate-source.ts      ✏️ modify (from use-cases/framework/, in place or to a distribution tree)
+    └── infrastructure/schema-validator.ts  ✏️ modify
 ```
 
 ## User Journey
 
 ```mermaid
 flowchart TD
-  A[A user names a source] --> B[Registered, with a scope]
-  B --> C[Fetched and cached]
-  C --> D[Trusted or refused]
-  D --> E[Its catalog is offered to whoever asks]
+  A[A canonical source] --> B[translate]
+  B --> C[Cursor .mdc]
+  B --> D[Codex TOML]
+  B --> E[Copilot .github/instructions]
+  B --> F[A distribution tree, or files written in place]
 ```
 
 ## Test Scope
@@ -48,42 +49,44 @@ title: Test scope
 ---
 journey
   section Setup
-    a project and the local framework fixture => a source that needs no network: 5: cli
+    the framework fixture and an installed project => both call sites exercised: 5: system
   section Happy path
-    add, list and refresh a marketplace => unchanged behavior: 5: cli
-    resolve a catalog twice => the second read comes from cache: 5: cli
-  section Edge case - a malformed catalog
-    the marketplace-malformed fixture => refresh it => non-zero exit naming the file: 1: cli
-  section Edge case - an untrusted source
-    a source not yet trusted => resolve it => the trust decision is asked before any read: 1: cli
+    build a framework for every surviving target => output byte-identical: 5: cli
+    install a plugin into each tool => translated content identical to before: 5: cli
+  section Edge case - a format with no equivalent
+    a capability a target cannot represent => translate for that target => skipped with a clear message: 1: cli
   section Teardown
-    the context imports only the kernel => no tool profile, no manifest: 5: system
+    the context imports tools and the kernel, nothing else => the chain holds: 5: system
 ```
 
 ## Tasks to do
 
-### `1)` Move the sourcing domain and its ports
+### `1)` Move the content capabilities
 
-1. The marketplace models, the catalog model and the Copilot-native parser.
-2. The six ports it owns: `marketplace-registry`, `marketplace-cache`, `marketplace-trust-store`,
-   `plugin-catalog-repository`, `plugin-fetcher`, `raw-catalog-fetcher`.
+1. `agents`, `skills`, `commands`, `rules` and `hooks` describe content. They come here; `settings`
+   and `mcp` stayed in `tools` at phase 10.
 
-### `2)` Move the six use cases that stayed
+### `2)` Move the formats and the translator
 
-1. `add`, `list`, `refresh`, `register-framework`, `resolve`, `fetch-source`. The three that crossed
-   into the installation record left at phase 8.
+1. Everything under `domain/formats/` that survived phase 3, plus `plugin-content-translator.ts`.
+2. `framework.ts` becomes `canon.ts`: it describes the canonical source shape, not a product.
 
-### `3)` Close the context and prove the leaf
+### `3)` Move the build, renamed for what it does
 
-1. One `index.ts`. Add the biome `override`.
-2. Verify by import graph, not by reading: nothing under the context imports a tool profile or
-   `Manifest`.
+1. `use-cases/framework/` becomes `translate-source`: one source, N targets, written in place or to
+   a distribution tree. The command keeps its current name until phase 18.
+
+### `4)` Close the context
+
+1. One `index.ts`. Add the biome `override`. Verify it depends on `tools` and the kernel and on
+   nothing else.
 
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 1    | Adding, listing, refreshing and removing a marketplace behave as before, including the trust prompt |
-| 2    | A malformed catalog still fails with a message naming the file, and one bad catalog does not abort a multi-marketplace report |
-| 3    | The context imports only the kernel; an import into its interior fails the lint |
-| all  | Golden and e2e pass **unmodified** |
+| 1    | Installing a plugin produces the same files for every tool |
+| 2    | Every format transform behaves as before; the build golden is unchanged |
+| 3    | `framework build` still works, unchanged, under its current name |
+| 4    | The context imports only `tools` and the kernel; an import into its interior fails the lint |
+| all  | Golden, build golden and e2e pass **unmodified** |

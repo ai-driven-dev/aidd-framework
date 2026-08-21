@@ -2,22 +2,19 @@
 status: pending
 ---
 
-# Instruction: Drop the manifest version migrations
+# Instruction: Split the Manifest aggregate
 
-`manifest.ts` carries five migration functions, `migrateV1toV2` through `migrateV5toV6`, plus fields
-kept only so a legacy manifest round-trips. A comment at line 89 says the block must stay "until all
-users have upgraded past v1".
+`Manifest` is 529 lines and 28 public methods covering six responsibilities: tools, tracked files,
+merge files, mcp exclusions, plugins, serialization. None can change without reopening the same
+file. It is a facade over a JSON document, not an aggregate.
 
-A domain entity that knows every past shape of its own JSON is carrying a persistence concern. The
-decision is to remove them, not relocate them: the reachable versions are behind us.
+This phase changes the domain and moves nothing. It is separate from phase 13 so its diff is
+readable: one shows files arriving, the other shows a model changing shape.
 
-This is the one deletion that changes what the CLI **accepts**, not just what it contains. It is
-therefore placed late and deliberately: nothing in this plan depends on it, so it can be postponed
-by its own opening check without holding anything back.
-
-It also comes after phase 13, so the migrations are removed from an aggregate that has already been
-split — a smaller file, a smaller diff, and the round-trip test written in phase 13 is available to
-prove the removal changed no output for a supported manifest.
+Two smaller defects go with it. `FileHash` exists as a proper value object with `equals()`, and yet
+the installed record carries three `ReadonlyMap<string, string>` of different meanings, told apart
+only by a comment — the compiler sees the same type in all three. And `Plugin` alone does not say
+which of the five plugins it is.
 
 ## Architecture projection
 
@@ -25,19 +22,23 @@ prove the removal changed no output for a supported manifest.
 
 ```txt
 .
-└── cli/
-    ├── src/domain/models/manifest.ts   ✏️ modify (drop 5 migrations, legacy fields, VSCODE_MIGRATION_PATHS)
-    ├── tests/domain/models/manifest.unit.test.ts  ✏️ modify (drop the legacy round-trip cases)
-    └── README.md                        ✏️ modify (state the minimum manifest version accepted)
+└── cli/src/contexts/framework/domain/
+    ├── manifest.ts                  ✏️ modify (aggregate root: identity and consistency only)
+    ├── tool-entry.ts                ✅ create (one tool's slice of the record)
+    ├── tracked-files.ts             ✅ create (paths and hashes)
+    ├── merge-files.ts               ✅ create (co-owned file entries)
+    ├── mcp-exclusions.ts            ✅ create (from the manifest's four methods)
+    ├── installed-plugin.ts          ✏️ modify (from plugin.ts, renamed and typed)
+    └── manifest-serialization.ts    ✅ create (toJSON / fromJSON, out of the entity)
 ```
 
 ## User Journey
 
 ```mermaid
 flowchart TD
-  A[A project has a .aidd/manifest.json] --> B{Is it version 6?}
-  B -->|Yes| C[Loaded]
-  B -->|No| D[Refused with a message naming the version and the way out]
+  A[A command changes what is installed] --> B[It asks the aggregate root]
+  B --> C[The root delegates to the member that owns it]
+  C --> D[One save, one consistent document]
 ```
 
 ## Test Scope
@@ -48,44 +49,51 @@ title: Test scope
 ---
 journey
   section Setup
-    a project set up by the current CLI => manifest is v6: 5: cli
+    a project with two tools, plugins, merge files and an mcp exclusion => every member populated: 5: cli
   section Happy path
-    run status, doctor and restore => manifest loads and behaves as before: 5: cli
-  section Edge case - an older manifest
-    a v5 manifest on disk => run any command that reads it => refused, message names the version: 1: cli
-    the same project => run setup again => a fresh v6 manifest is written: 1: cli
+    run every command that reads or writes the record => unchanged behavior: 5: cli
+    write the manifest twice with no change between => byte-identical output: 5: system
+  section Edge case - a partial failure
+    a write fails mid-flow => read the manifest => it is the last consistent state, not a half-written one: 1: system
+  section Edge case - the three maps
+    pass a component-path map where a hash map is expected => it does not compile: 1: system
   section Teardown
-    manifest.ts holds one shape => no migration function remains: 5: system
+    the aggregate exposes fewer than ten methods => the six responsibilities live in their own files: 5: system
 ```
 
 ## Tasks to do
 
-### `0)` Check before removing
+### `1)` Separate the members
 
-> The only task in this plan that can lose user data if skipped.
+> One save, one invariant, one file per responsibility.
 
-1. Confirm no manifest below v6 is still in circulation: the release that introduced v6, and how
-   long ago it shipped.
-2. If any doubt remains, stop and report. Postponing costs nothing: this phase is the only one no
-   other phase waits for, which is why it sits here.
+1. `Manifest` keeps identity, consistency and the entry point to its members.
+2. `ToolEntry` carries tracked files, merge files, mcp exclusions and installed plugins.
+3. Serialization leaves the entity: `toJSON` and `fromJSON` become their own module.
 
-### `1)` Remove the migrations
+### `2)` Type the three maps
 
-1. Delete `migrateV1toV2` through `migrateV5toV6`, `VSCODE_MIGRATION_PATHS`, and the fields retained
-   only for legacy round-trip.
-2. Keep the version guard: an unsupported version must still fail with a clear message.
-3. Drop the legacy round-trip cases from the manifest unit test, keep the version-guard ones.
+1. Path to hash, installed path to component path, mcp server name to digest. Three distinct types,
+   so one can no longer be passed where another is expected. `FileHash` already shows the shape.
 
-### `2)` Say it in the README
+### `3)` Rename by intention
 
-1. One line: the minimum manifest version the CLI reads, and what to run when an older one is found.
+1. `Plugin` becomes `InstalledPlugin`. The catalog entry and the fetched payload keep their own
+   names, so each context speaks of its own plugin without ambiguity.
+
+### `4)` Prove the round-trip did not move
+
+> The strongest available net for a model change: the document on disk must be identical.
+
+1. Add a test that loads every manifest fixture, writes it back, and asserts the bytes are unchanged.
+2. Run it before and after the split. This is what makes the phase reviewable.
 
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 0    | The check is recorded in the phase or the phase is postponed with a reason |
-| 1    | A v6 manifest loads and every command behaves as before; a v5 manifest is refused with a message naming the version |
-| 1    | `manifest.ts` contains no function whose name starts with `migrate` |
-| 2    | The README states the minimum version and the way out |
-| all  | Golden and e2e pass unmodified: no fixture carries a manifest below v6 |
+| 1    | Every command touching the record behaves as before; one save still writes one consistent document |
+| 2    | Passing one of the three maps where another is expected fails to compile, verified by trying |
+| 3    | No type named `Plugin` alone remains |
+| 4    | Loading and rewriting every manifest fixture produces byte-identical output, before and after |
+| all  | Golden, help snapshot and e2e pass **unmodified** |

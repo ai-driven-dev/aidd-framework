@@ -2,16 +2,11 @@
 status: pending
 ---
 
-# Instruction: Dissolve the shared dumping ground
+# Instruction: Untangle without moving anything
 
-`use-cases/shared/` holds fourteen files. Measured against the rule this repo now carries — a module
-is shared when it has callers in two areas — seven fail: five have one caller, two have none outside
-`shared/` itself.
-
-The directory is not the cause. `0-layer-responsibilities.md` used to say a use case may be promoted
-as soon as another use case calls it; that rule is gone, and this phase clears what it produced.
-
-Do this before any extraction: otherwise the dumping ground gets moved rather than emptied.
+Four small changes that make every later extraction possible, none of which moves a file. Each was
+measured: two design cycles closing through `import type`, six re-export sites, one capability file
+mixing two concerns, and one branch re-deriving by name what a profile already declares.
 
 ## Architecture projection
 
@@ -19,26 +14,26 @@ Do this before any extraction: otherwise the dumping ground gets moved rather th
 
 ```txt
 .
-└── cli/src/application/
-    ├── commands/shared/spawn-cli-command.ts   ✏️ modify (move next to its single caller)
-    └── use-cases/shared/
-        ├── resolve-marketplace-use-case.ts     ✏️ modify (stays: 9 callers, several areas)
-        ├── ensure-built-marketplace-use-case.ts ✏️ modify (stays: 5 callers, several areas)
-        ├── fetch-marketplace-source-use-case.ts ❌ delete (moves under its only caller)
-        ├── generate-tool-distribution-use-case.ts ❌ delete (moves under restore)
-        ├── resolve-restore-decision.ts          ❌ delete (moves under restore)
-        ├── restore-drift-entries-use-case.ts    ❌ delete (moves under restore)
-        ├── restore-merge-files-use-case.ts      ❌ delete (moves under restore)
-        └── restore-regular-files-use-case.ts    ❌ delete (moves under restore)
+└── cli/src/
+    ├── domain/
+    │   ├── formats/command.ts             ✏️ modify (own the two section types)
+    │   ├── tools/contracts.ts             ✏️ modify (import them instead of defining them)
+    │   ├── tools/registry.ts              ✏️ modify (stop re-exporting 8 symbols)
+    │   ├── capabilities/{rules,commands,skills}-capability.ts  ✏️ modify (import AI_TOOL_IDS from its source)
+    │   ├── capabilities/plugins-capability.ts  ✏️ modify (keep PluginsCapability only)
+    │   └── capabilities/marketplace-settings.ts  ✅ create (the MarketplaceSettings half)
+    └── application/use-cases/
+        ├── setup-use-case.ts              ✏️ modify (stop re-exporting SetupToolsResult)
+        ├── global/update-all-use-case.ts  ✏️ modify (stop re-exporting GlobalExecutionError)
+        └── plugin/translator/built-tree-materialization-translator.ts  ✏️ modify (read mode from the profile)
 ```
 
 ## User Journey
 
 ```mermaid
 flowchart TD
-  A[A developer looks for a step] --> B{Who calls it?}
-  B -->|One area| C[It lives in that area]
-  B -->|Several areas| D[It is shared, and it earned it]
+  A[A file needs a symbol] --> B[It imports it from where it is defined]
+  B --> C[No hub, no cycle, no second source of truth]
 ```
 
 ## Test Scope
@@ -49,39 +44,50 @@ title: Test scope
 ---
 journey
   section Setup
-    the earned-sharing ratchet lists seven violations => the target is measurable: 5: system
+    the golden net and the architecture ratchets are in place => regressions are visible: 5: system
   section Happy path
     run the whole suite => golden and e2e pass untouched: 5: system
-    run restore on a drifted project => same output, same files rewritten: 5: cli
+    build and install for every tool => output unchanged: 5: cli
+  section Edge case - the opencode branch
+    opencode as a target => materialize a plugin => flat mode chosen from the profile, not the name: 1: cli
   section Teardown
-    the earned-sharing baseline is empty => the rule holds without exception: 5: system
+    biome reports no re-export => the ratchet for tool names shrank by one: 5: system
 ```
 
 ## Tasks to do
 
-### `1)` Move the seven down
+### `1)` Break the two design cycles
 
-> Each goes under the area that calls it. Tests follow their subject.
+> Neither is a runtime cycle: both close through `import type`, which is why `noImportCycles` stays
+> silent. They are still two modules that cannot be separated.
 
-1. `fetch-marketplace-source` has one caller, `resolve-marketplace`. It becomes its private step.
-2. The four `restore-*` files and `resolve-restore-decision` move under `restore/`.
-3. `generate-tool-distribution` moves under `restore/`, its only caller.
-4. `commands/shared/spawn-cli-command.ts` moves next to its single caller.
+1. Move `UserFileSection` and `UserFileSectionKey` out of `tools/contracts.ts` into
+   `formats/command.ts`, and have `contracts.ts` import them.
+2. Point the three `AI_TOOL_IDS` imports in `capabilities/` at `models/tool-ids.ts`, their source.
 
-### `2)` Keep the two that earned it
+### `2)` Remove the six re-exports
 
-1. `resolve-marketplace` and `ensure-built-marketplace` stay. Record in one line each why: nine and
-   five callers, spread across areas.
+1. `registry.ts` re-exports eight symbols it imported from `models/tool-ids.ts`. Delete the
+   re-export; consumers import the source.
+2. Same for `setup-use-case.ts` and `global/update-all-use-case.ts`.
 
-### `3)` Empty the ratchet
+### `3)` Split the capability that carries two concerns
 
-1. Remove the seven entries from the `earned-sharing` baseline. The list must be empty.
+1. `plugins-capability.ts` holds `PluginsCapability`, used by the five tool profiles, and
+   `MarketplaceSettings*`, used only by marketplace settings synchronisation. Move the second half
+   to its own file.
+
+### `4)` Read the mode, do not re-derive it
+
+1. Replace `toolId === "opencode" ? "flat" : "marketplace"` in
+   `built-tree-materialization-translator.ts` with a read of `mode` on the tool profile.
 
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 1    | Every moved file sits under the area that calls it; no `shared/` directory holds a single-caller module |
-| 2    | The two survivors still serve every caller they served before |
-| 3    | The `earned-sharing` baseline is empty, and the test fails if a new single-caller shared module appears |
-| all  | Golden and e2e pass **unmodified**: this batch moves files and changes no behavior |
+| 1    | `formats/` no longer imports `tools/`, and `capabilities/` no longer imports `tools/registry` |
+| 2    | Biome reports no re-export anywhere under `src/` |
+| 3    | The five tool profiles import `PluginsCapability` without pulling marketplace settings |
+| 4    | Materializing for OpenCode still produces flat output, chosen from the profile; adding a sixth flat tool needs no edit here |
+| all  | Golden and e2e pass **unmodified**. This batch moves no file and changes no behavior |

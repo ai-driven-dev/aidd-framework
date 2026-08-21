@@ -2,13 +2,13 @@
 status: pending
 ---
 
-# Instruction: Drop plugin scaffolding
+# Instruction: Delete dead code
 
-`aidd plugin create` is exposed in `--help` and documented nowhere: zero mentions across `docs/`,
-`README.md` and `cli/README.md`. `docs/CREATE_PLUGIN.md`, the contribution guide, describes an
-entirely manual flow — create the directory, register it in `marketplace.json`, test, open a PR.
+Do not move what will be thrown away. Three findings, each measured: `loadForeign()` has no
+production caller, `domain/models/marketplace-entry.ts` is the only file unreachable from
+`src/cli.ts`, and four exports of `mcp-exclusion.ts` are covered by tests but called by nothing.
 
-Nobody writes third-party plugins today, and the command was never on a contributor's path.
+The last one is the telling case: live tests guarding dead behavior.
 
 ## Architecture projection
 
@@ -17,23 +17,32 @@ Nobody writes third-party plugins today, and the command was never on a contribu
 ```txt
 .
 └── cli/
-    ├── src/
-    │   ├── application/
-    │   │   ├── commands/plugin.ts                     ✏️ modify (drop the create subcommand)
-    │   │   └── use-cases/plugin/plugin-create-use-case.ts  ❌ delete
-    │   └── domain/models/plugin-scaffold.ts           ❌ delete
-    └── tests/
-        ├── e2e/plugin-create.e2e.test.ts              ❌ delete
-        └── golden/snapshots/phase0/snapshot.json      ✏️ modify (help output loses one line)
+    ├── src/domain/
+    │   ├── models/
+    │   │   ├── marketplace-entry.ts        ❌ delete (unreachable; knip.json silenced it)
+    │   │   ├── normalized-plugin.ts        ❌ delete (only the dead foreign path used it)
+    │   │   ├── mcp-exclusion.ts            ✏️ modify (drop 4 uncalled exports)
+    │   │   └── merge.ts                    ✏️ modify (drop buildMergeFileEntries)
+    │   ├── formats/{cursor,codex,copilot,opencode}-marketplace.ts  ❌ delete (foreign catalogs)
+    │   └── ports/plugin-catalog-repository.ts  ✏️ modify (drop loadForeign)
+    ├── src/infrastructure/adapters/
+    │   └── plugin-catalog-repository-adapter.ts  ✏️ modify (drop loadForeign and its readers)
+    ├── src/application/use-cases/global/
+    │   ├── update-ai-tools-use-case.ts     ✏️ modify (drop unused Input/Result types)
+    │   └── update-ide-tools-use-case.ts    ✏️ modify (idem)
+    ├── tests/domain/models/marketplace-entry.unit.test.ts  ❌ delete (tests a deleted file)
+    ├── tests/domain/models/mcp.unit.test.ts ✏️ modify (drop the 4 dead-export cases)
+    ├── tests/application/use-cases/marketplace/marketplace-list-use-case.unit.test.ts  ✏️ modify (drop loadForeign stubs)
+    └── knip.json                            ✏️ modify (empty the ignore list)
 ```
 
 ## User Journey
 
 ```mermaid
 flowchart TD
-  A[Someone wants to write a plugin] --> B[docs/CREATE_PLUGIN.md]
-  B --> C[Create the directory, register it, open a PR]
-  C --> D[The documented path, unchanged]
+  A[A reader opens the codebase] --> B{Is this code reachable?}
+  B -->|Yes| C[It earns its place]
+  B -->|No| D[It is gone, not silenced in a config]
 ```
 
 ## Test Scope
@@ -44,33 +53,52 @@ title: Test scope
 ---
 journey
   section Setup
-    a project with the framework installed => plugins usable: 5: cli
+    the golden net covers the surface => phase 1 is done: 5: system
   section Happy path
-    run plugin --help => create is absent, every other subcommand remains: 5: cli
-    install, list and remove a plugin => unchanged behavior: 5: cli
-  section Edge case - the removed command
-    a user types plugin create => the CLI reports an unknown command => exit code is non-zero: 1: cli
+    run the whole suite => golden and e2e pass untouched: 5: system
+    run knip with an empty ignore list => nothing reported: 5: system
+    read a catalog from a Copilot-native fixture => still parsed correctly: 5: cli
+  section Edge case - the live catalog path
+    copilot-marketplace-catalog stays => read .plugin/marketplace.json => plugin list unchanged: 1: cli
   section Teardown
-    recapture the golden => the diff touches only the help output: 5: system
+    the architecture ratchets shrink => tool-addition-cost drops the deleted files: 5: system
 ```
 
 ## Tasks to do
 
-### `1)` Remove the command and its use case
+### `1)` Remove the foreign catalog branch
 
-1. Drop the `create` subcommand from `commands/plugin.ts` and its wiring in `deps.ts`.
-2. Delete `plugin-create-use-case.ts` and `domain/models/plugin-scaffold.ts`.
-3. Delete `tests/e2e/plugin-create.e2e.test.ts`.
+> Reachable but never invoked.
 
-### `2)` Recapture the baseline
+1. Delete `loadForeign()` from `PluginCatalogRepositoryAdapter` and from the port.
+2. Delete `normalized-plugin.ts` and the four `{cursor,codex,copilot,opencode}-marketplace.ts`.
+3. Drop the three `loadForeign` stubs in the marketplace-list unit test.
+4. Keep `copilot-marketplace-catalog.ts`: it serves the live `load()` path, reading Copilot's own
+   `.plugin/marketplace.json` into `PluginCatalog`.
 
-1. Run the capture. The only expected change is the help output.
-2. Review the diff: any other change means the removal reached further than intended.
+### `2)` Remove the unreachable model
+
+1. Delete `domain/models/marketplace-entry.ts` and its unit test.
+2. Empty the `ignore` list in `knip.json`. The live namesake is
+   `domain/capabilities/marketplace-entry.ts`, 25 lines, untouched.
+
+### `3)` Remove the uncalled exports
+
+1. From `mcp-exclusion.ts`, drop `extractMcpKeys`, `filterMcpExclusions`, `computeMcpExclusions`,
+   `detectNewMcpEntries`. Keep `transformFor`, `McpExclusion`, `mcpExclusionEquals`.
+2. Drop their cases from `tests/domain/models/mcp.unit.test.ts`.
+3. Drop `buildMergeFileEntries` and the four `Update{Ai,Ide}Tools{Input,Result}` types.
+
+### `4)` Shrink the ratchets
+
+1. Remove the deleted files from the `tool-addition-cost` baseline.
 
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 1    | `plugin --help` no longer lists `create`; install, list, remove, update and search behave as before |
-| 2    | The golden diff touches the help output and nothing else |
-| all  | `docs/CREATE_PLUGIN.md` needs no edit: it never mentioned the command |
+| 1    | Reading a Copilot-native marketplace still returns the same plugin list; no other behavior changes |
+| 2    | `knip.json` carries no ignore entry for `src/`, and knip reports nothing |
+| 3    | `mcp-exclusion.ts` exports three symbols, all called from production |
+| 4    | The `tool-addition-cost` baseline shrank, and the test fails if an entry is removed from the list without the file being fixed |
+| all  | The golden snapshot and every e2e file pass **unmodified**: this batch removes only code nothing reaches |

@@ -12,8 +12,8 @@ Chaque affirmation chiffrée y est reproductible.
 | `domaine.md` | critique du domaine et sa cible, avec le test d'acceptation |
 | `migration.md` | le plan en treize phases et sa règle centrale |
 | `harnais.md` | les garde-fous déterministes, leur état et ce qui reste |
-| `plan.md` | le plan exécutable : 17 phases, objectif, ressources, décisions |
-| `phase-1.md` … `phase-17.md` | une fiche par phase : projection, parcours, portée de test, tâches, critères |
+| `plan.md` | le plan exécutable : 19 phases, objectif, ressources, décisions |
+| `phase-1.md` … `phase-19.md` | une fiche par phase : projection, parcours, portée de test, tâches, critères |
 
 `migration.md` reste la note de cadrage qui a produit le plan ; `plan.md` et ses phases sont
 l'artefact exécutable. En cas d'écart, `plan.md` fait foi.
@@ -55,6 +55,7 @@ Un refactor de cette taille ne tient pas sur la relecture. Chaque phase s'appuie
 | golden du build | une sortie de build différente, cellule par cellule | existant, réduit en phase 4 |
 | e2e, 15 fichiers | les parcours réels, binaire compris | existant |
 | tests d'architecture | les invariants : partage, orchestration, coût d'un outil, doc, carte | livrés |
+| smoke, 77 vérifications, 100% des commandes feuilles | une commande qui casse avec ses vrais arguments, binaire compris | existant, **ne tourne nulle part et il est rouge** — phase 2 |
 | graphe des contextes | une arête latérale entre contextes | phase 12, nouveau |
 | aller-retour du manifest | un modèle qui change et une sortie qui bouge | phase 13, nouveau |
 | équivalence des surfaces | un renommage qui change autre chose que le nom | phase 17, nouveau, temporaire |
@@ -65,6 +66,21 @@ Un refactor de cette taille ne tient pas sur la relecture. Chaque phase s'appuie
 Trois de ces filets n'existaient pas quand le plan a été écrit la première fois. Ils répondent aux
 trois faiblesses qui avaient été signalées : une phase trop grosse, une phase sans filet propre, et
 onze déplacements sans preuve que la surface utilisateur n'avait pas bougé.
+
+## Ce que la session a trouvé en exécutant plutôt qu'en lisant
+
+- **Le smoke est rouge et personne ne le sait.** 73 succès, 4 échecs, 7 min 11 s. Aucun job de CI,
+  aucun hook. Les quatre échecs sont un seul scénario qui a cessé de tester ce qu'il annonce le jour
+  où `aidd-dev` est entré dans les plugins recommandés : `setup --plugins recommended` l'installe,
+  donc `plugin install aidd-dev` échoue sur « already installed » avant même de lire le catalogue
+  corrompu qu'il vient d'injecter. Défaut de test, pas de produit.
+- **Le smoke dépend du réseau** : sept invocations utilisent `--source remote`. L'une des formes
+  corrompues qu'il injecte est `{"message":"API rate limit exceeded"}` — quelqu'un l'a rencontrée.
+- **11 des 24 options déclarées n'ont jamais été passées**, dont `--flat`, que la phase 5 supprime
+  pour quatre outils, et `--scope`, qui décide où les fichiers atterrissent.
+- **Deux de mes propres mesures étaient fausses** avant exécution : le smoke couvre 100 % des
+  commandes feuilles, pas 23 sur 27 ; et il fait 77 vérifications, pas 44. L'analyse par regex
+  ratait les invocations en boucle.
 
 ## Points encore ouverts
 

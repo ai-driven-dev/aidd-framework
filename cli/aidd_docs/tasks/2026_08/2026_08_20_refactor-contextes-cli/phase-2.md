@@ -2,13 +2,34 @@
 status: pending
 ---
 
-# Instruction: Delete dead code
+# Instruction: Revive and make the smoke suite hermetic
 
-Do not move what will be thrown away. Three findings, each measured: `loadForeign()` has no
-production caller, `domain/models/marketplace-entry.ts` is the only file unreachable from
-`src/cli.ts`, and four exports of `mcp-exclusion.ts` are covered by tests but called by nothing.
+`scripts/smoke-tools.sh` is the only net that drives the built binary the way a user does: real
+arguments, throwaway projects, deliberate fault injection. It reports **100% leaf command coverage,
+37 of 37**, and it measures that itself.
 
-The last one is the telling case: live tests guarding dead behavior.
+It runs nowhere. No CI job, no lefthook entry, last touched by the commit that moved the repository.
+
+Run on 2026-08-21, it is **red**: 73 pass, 4 fail, 7 minutes 11 seconds.
+
+## What the four failures actually are
+
+One scenario, four shapes. `corrupt-cache fault injection` runs
+`setup --source remote --ai claude --plugins recommended --yes`, corrupts the cached catalog, then
+expects `plugin install aidd-dev` to fail with a message naming `marketplace refresh --force`.
+
+It gets `Error: Plugin 'aidd-dev' is already installed.` — because `aidd-dev` is in the recommended
+set, so setup installed it, and the install refuses on "already installed" **before ever reading the
+corrupt catalog**. The scenario stopped testing what it claims the day that plugin became
+recommended. Nobody saw it, because nobody ran it.
+
+This is a test defect, not a product defect. It must be fixed before the suite can guard anything.
+
+## The other problem: it needs the network
+
+Seven invocations use `--source remote`, fetching the really published framework. That is why one of
+the injected corrupt shapes is `{"message":"API rate limit exceeded"}` — someone met it. A net that
+depends on a remote repository and on a rate limit cannot block a build.
 
 ## Architecture projection
 
@@ -17,32 +38,20 @@ The last one is the telling case: live tests guarding dead behavior.
 ```txt
 .
 └── cli/
-    ├── src/domain/
-    │   ├── models/
-    │   │   ├── marketplace-entry.ts        ❌ delete (unreachable; knip.json silenced it)
-    │   │   ├── normalized-plugin.ts        ❌ delete (only the dead foreign path used it)
-    │   │   ├── mcp-exclusion.ts            ✏️ modify (drop 4 uncalled exports)
-    │   │   └── merge.ts                    ✏️ modify (drop buildMergeFileEntries)
-    │   ├── formats/{cursor,codex,copilot,opencode}-marketplace.ts  ❌ delete (foreign catalogs)
-    │   └── ports/plugin-catalog-repository.ts  ✏️ modify (drop loadForeign)
-    ├── src/infrastructure/adapters/
-    │   └── plugin-catalog-repository-adapter.ts  ✏️ modify (drop loadForeign and its readers)
-    ├── src/application/use-cases/global/
-    │   ├── update-ai-tools-use-case.ts     ✏️ modify (drop unused Input/Result types)
-    │   └── update-ide-tools-use-case.ts    ✏️ modify (idem)
-    ├── tests/domain/models/marketplace-entry.unit.test.ts  ❌ delete (tests a deleted file)
-    ├── tests/domain/models/mcp.unit.test.ts ✏️ modify (drop the 4 dead-export cases)
-    ├── tests/application/use-cases/marketplace/marketplace-list-use-case.unit.test.ts  ✏️ modify (drop loadForeign stubs)
-    └── knip.json                            ✏️ modify (empty the ignore list)
+    ├── scripts/smoke-tools.sh       ✏️ modify (fix the broken scenario, go hermetic, cover 11 options)
+    ├── package.json                 ✏️ modify (smoke:fast and smoke:full)
+    └── ../.github/workflows/cli-ci.yml  ✏️ modify (a blocking smoke job on the hermetic subset)
 ```
 
 ## User Journey
 
 ```mermaid
 flowchart TD
-  A[A reader opens the codebase] --> B{Is this code reachable?}
-  B -->|Yes| C[It earns its place]
-  B -->|No| D[It is gone, not silenced in a config]
+  A[A change lands] --> B[The binary is built]
+  B --> C[Every leaf command runs with its real arguments]
+  C --> D{Every exit code as expected?}
+  D -->|Yes| E[The change ships]
+  D -->|No| F[The failing invocation is named, with its output]
 ```
 
 ## Test Scope
@@ -53,52 +62,66 @@ title: Test scope
 ---
 journey
   section Setup
-    the golden net covers the surface => phase 1 is done: 5: system
+    build the binary and point setup at the local fixture => no network needed: 5: system
+    create one throwaway project per group => no shared state between invocations: 5: system
   section Happy path
-    run the whole suite => golden and e2e pass untouched: 5: system
-    run knip with an empty ignore list => nothing reported: 5: system
-    read a catalog from a Copilot-native fixture => still parsed correctly: 5: cli
-  section Edge case - the live catalog path
-    copilot-marketplace-catalog stays => read .plugin/marketplace.json => plugin list unchanged: 1: cli
+    run every leaf command with its real arguments => expected exit code for each: 5: cli
+    pass every declared option at least once => none is silently unimplemented: 5: cli
+  section Edge case - the repaired fault injection
+    a corrupt cached catalog and a plugin not yet installed => install it => the error names marketplace refresh --force: 1: cli
+    the same project => run marketplace refresh --force => the catalog heals: 1: cli
+  section Edge case - a flag that decides what lands on disk
+    scope project against scope user => install with each => the two write to different places: 1: cli
+    a command offering dry-run => run it => nothing is written, exit code zero: 1: cli
   section Teardown
-    the architecture ratchets shrink => tool-addition-cost drops the deleted files: 5: system
+    remove every throwaway project => nothing left in the home or the repo: 5: system
 ```
 
 ## Tasks to do
 
-### `1)` Remove the foreign catalog branch
+### `1)` Repair the broken scenario
 
-> Reachable but never invoked.
+> It must fail for the reason it claims, or it guards nothing.
 
-1. Delete `loadForeign()` from `PluginCatalogRepositoryAdapter` and from the port.
-2. Delete `normalized-plugin.ts` and the four `{cursor,codex,copilot,opencode}-marketplace.ts`.
-3. Drop the three `loadForeign` stubs in the marketplace-list unit test.
-4. Keep `copilot-marketplace-catalog.ts`: it serves the live `load()` path, reading Copilot's own
-   `.plugin/marketplace.json` into `PluginCatalog`.
+1. Install a plugin the recommended set does **not** contain, or set up with `--plugins none` so the
+   target is genuinely absent.
+2. Verify the repair the only way that counts: the assertion must pass for the right reason, and
+   still fail when the actionable message is removed from the product.
 
-### `2)` Remove the unreachable model
+### `2)` Make the suite hermetic
 
-1. Delete `domain/models/marketplace-entry.ts` and its unit test.
-2. Empty the `ignore` list in `knip.json`. The live namesake is
-   `domain/capabilities/marketplace-entry.ts`, 25 lines, untouched.
+> Seven invocations fetch the real published framework. A net gated by a rate limit is not a net.
 
-### `3)` Remove the uncalled exports
+1. Point every `--source remote` at the local fixture, except a small subset that genuinely tests
+   remote fetching.
+2. Split the script: `smoke:fast` is hermetic and blocking; `smoke:full` keeps the remote subset and
+   runs on demand, or on a schedule.
+3. Record the measured wall-clock of each in the header. The full run is 7 min 11 s today.
 
-1. From `mcp-exclusion.ts`, drop `extractMcpKeys`, `filterMcpExclusions`, `computeMcpExclusions`,
-   `detectNewMcpEntries`. Keep `transformFor`, `McpExclusion`, `mcpExclusionEquals`.
-2. Drop their cases from `tests/domain/models/mcp.unit.test.ts`.
-3. Drop `buildMergeFileEntries` and the four `Update{Ai,Ide}Tools{Input,Result}` types.
+### `3)` Pass the eleven options that never ran
 
-### `4)` Shrink the ratchets
+> 11 of 24 declared options have never been passed once.
 
-1. Remove the deleted files from the `tool-addition-cost` baseline.
+1. `--flat` on every target that accepts it. Phase 5 removes four of them, and that removal needs a
+   before to compare against.
+2. `--scope project` against `--scope user`: assert the two land in different places.
+3. `--dry-run`: assert the exit code **and** that nothing was written.
+4. `--from`, `--marketplace`, `--plugin`, `--recommended`, `--no-plugins`, `--overwrite`,
+   `--release`.
+5. `--gh` needs credentials: assert the refusal path and say so in a comment.
+
+### `4)` Make it run, and make a failure readable
+
+1. Add a blocking `cli / Smoke` job running `smoke:fast` after the build job.
+2. On failure, print the invocation, the expected and received exit codes, and the output. Keep the
+   summary that already names every failing check — it is what made these four visible.
 
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 1    | Reading a Copilot-native marketplace still returns the same plugin list; no other behavior changes |
-| 2    | `knip.json` carries no ignore entry for `src/`, and knip reports nothing |
-| 3    | `mcp-exclusion.ts` exports three symbols, all called from production |
-| 4    | The `tool-addition-cost` baseline shrank, and the test fails if an entry is removed from the list without the file being fixed |
-| all  | The golden snapshot and every e2e file pass **unmodified**: this batch removes only code nothing reaches |
+| 1    | The corrupt-catalog scenario fails when the actionable message is removed from the product, and passes otherwise |
+| 2    | `smoke:fast` completes with the network unavailable; the remote subset is named and separated |
+| 3    | Every declared option is passed at least once; `--dry-run` writes nothing and the two scopes write to different places |
+| 4    | A red smoke run fails the build, and one run names every failing invocation with its output |
+| all  | The suite is green before any later phase moves a file. Its self-measured command coverage stays at 100% |
