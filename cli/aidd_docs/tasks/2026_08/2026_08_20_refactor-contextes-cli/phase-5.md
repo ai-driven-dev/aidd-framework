@@ -254,8 +254,9 @@ journey
 > fichier, c'est **lire sans enregistrer d'empreinte** : lire pour confirmer ne crée pas de dérive,
 > enregistrer un hachage en crée.
 
-1. `doctor` confirme l'enregistrement en lisant les deux fichiers, sans suivre celui qui est
-   machine-local.
+1. `doctor` confirme l'enregistrement en lisant le fichier machine-local, sans en suivre
+   l'empreinte. Le fichier partagé n'a pas besoin de ce contrôle : son empreinte est déjà suivie,
+   donc il signale ses propres dégâts.
 
 ### `3)` Ne suivre que ce qui se partage
 
@@ -279,6 +280,14 @@ exacte, et les fichiers machine-locaux suivent le même précédent, lus sur le 
 empreinte cesse de correspondre. Un fichier délibérément non suivi ne signale rien : supprimé à la
 main, `doctor` disait « installation saine ». `DoctorRegistrationUseCase` comble exactement cet angle
 mort, et la commande qu'il propose répare vraiment — vérifié.
+
+**L'exclusion dans `status` repose sur une égalité de chaînes, donc sur une convention tacite.**
+`detectAddedFiles` compare le chemin déclaré par le profil à celui qu'il reconstruit depuis le
+répertoire de l'outil : un profil déclarant `settings.local.json` au lieu de
+`.claude/settings.local.json` cesserait silencieusement d'être exclu. Un test autour de `status` ne
+l'attrape pas — le fichier tomberait hors du répertoire scanné, donc aucune dérive de toute façon,
+et le test passerait pour la mauvaise raison. La convention est donc devenue un invariant vérifié
+sur tous les profils dans `registry-conformance`, éprouvé par injection.
 
 **`update` n'appelle pas la synchronisation des marketplaces.** Elle tourne sur `setup`, `install`,
 `marketplace add/remove/refresh` et `plugin install`, pas sur `update`. Antérieur à cette phase, non

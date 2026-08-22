@@ -18,6 +18,7 @@ import {
   getAllRegisteredTools,
   getToolConfig,
   isAiTool,
+  machineLocalFilesOf,
 } from "../../../src/domain/tools/registry.js";
 
 /**
@@ -154,6 +155,23 @@ describe("frameworkBuildModeFor()", () => {
       const caps = config.capabilities as { plugins?: { mode?: string } };
       const expected = caps.plugins?.mode === "flat" ? "flat" : "marketplace";
       expect(frameworkBuildModeFor(toolId), toolId).toBe(expected);
+    }
+  });
+});
+
+describe("machineLocalFilesOf()", () => {
+  // `status` scans a tool's directory and calls anything untracked an addition. It
+  // skips these files by comparing the path the profile declares against the path it
+  // built from the directory, so a profile declaring `settings.local.json` instead of
+  // `.claude/settings.local.json` would silently stop being skipped. Declaring the
+  // path project-relative is the invariant that keeps the two forms comparable.
+  it("declares every machine-local file project-relative, inside its own tool directory", () => {
+    for (const toolId of AI_TOOL_IDS) {
+      const config = getToolConfig(toolId);
+      if (!isAiTool(config)) continue;
+      for (const relativePath of machineLocalFilesOf(toolId)) {
+        expect(relativePath.startsWith(config.directory), `${toolId}: ${relativePath}`).toBe(true);
+      }
     }
   });
 });

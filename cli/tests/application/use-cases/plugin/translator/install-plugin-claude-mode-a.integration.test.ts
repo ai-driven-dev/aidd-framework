@@ -184,5 +184,11 @@ describe("install claude plugin via Mode A (integration)", () => {
     ).toEqual({
       source: { source: "directory", path: "/built/claude" },
     });
+    // Both branches wrote the shared file in this one call — the eviction, then the
+    // enabled-plugins merge. Asserting the plugin landed proves the second write
+    // happened, and that it did not carry the evicted key back with it.
+    expect(
+      (shared.enabledPlugins as Record<string, boolean>)[`aidd-context@${MARKETPLACE_NAME}`]
+    ).toBe(true);
   });
 });
