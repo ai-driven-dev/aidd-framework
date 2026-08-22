@@ -60,7 +60,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `actions` | [02-collect.md](skills/01-cost/actions/02-collect.md) | - |
 | `actions` | [03-report.md](skills/01-cost/actions/03-report.md) | - |
 | `scripts` | [telemetry-report.js](skills/01-cost/scripts/telemetry-report.js) | - |
-| `-` | [SKILL.md](skills/01-cost/SKILL.md) | `Answers what a period or one task consumed, broken down by step, model and tool, with how strongly each figure was attributed. Use when the user asks what a piece of work cost, where the effort went, or which step or model consumed the most. Not for turning measurement on.` |
+| `-` | [SKILL.md](skills/01-cost/SKILL.md) | `Answers what a period or one task consumed - a total, a day-by-day series, or a breakdown by step, model, tool or project - and hands back the artefact each question deserves. Use when the user asks what a piece of work cost, what changed, where the effort went, or for which project. Not for turning measurement on, and not for a per-person figure.` |
 
 #### `skills/02-check`
 

@@ -84,4 +84,27 @@ function readJournal(projectRoot, sessionId) {
   return null;
 }
 
-module.exports = { listJournals, readJournal };
+/**
+ * The project a journalled session ran in, one hop past `session_start` - which already
+ * resolved both `project_id` and `project_remote` and stops there. `project_remote` wins
+ * when it exists: it is a git remote, the same for every checkout of one repository,
+ * where `project_id` alone falls back to a directory name that collides across machines.
+ * `project_field` names which of the two the value came from, the same reason
+ * `vendor_field` exists on the identifier - so a consumer never has to guess.
+ *
+ * A journal with no session, or a session naming neither field, answers `{}`: no project
+ * is the honest reading, never a guess at the reader's own repository.
+ */
+function projectOf(journal) {
+  const session = journal && journal.session;
+  if (!session) return {};
+  if (typeof session.project_remote === "string" && session.project_remote !== "") {
+    return { project_id: session.project_remote, project_field: "project_remote" };
+  }
+  if (typeof session.project_id === "string" && session.project_id !== "") {
+    return { project_id: session.project_id, project_field: "project_id" };
+  }
+  return {};
+}
+
+module.exports = { listJournals, readJournal, projectOf };

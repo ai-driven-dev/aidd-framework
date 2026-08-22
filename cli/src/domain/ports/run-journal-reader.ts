@@ -29,6 +29,10 @@ export interface RunJournalSessionStart {
   readonly tool: string;
   readonly vendor_id: string;
   readonly project_id?: string;
+  /** The git remote this session's repository resolved to, absent for a repository with
+   * none. Carried beside `project_id` rather than replacing it, the same shape
+   * `record.js`'s own `session_start` line writes. */
+  readonly project_remote?: string;
 }
 
 /** A `file_written` line: a repository-relative, "/"-separated path a session wrote inside

@@ -135,6 +135,19 @@ of an active session.
   session, regardless of which route produced either one, since the identifier
   value itself is the tool's own and does not change between its local file and
   its export.
+- **`project_id`** is the repository a session ran in, when it is known.
+  On the export route it is set directly from the `aidd.project_id` resource
+  attribute, with no join and no `project_field`. On the local-read route it
+  is joined from the run journal's own `session_start` line, which already
+  resolves `project_id` and `project_remote` for the repository the hook
+  fired in — the same value never re-derived from wherever the reader
+  happens to be standing. **`project_field`** names which of the journal's
+  two fields the value came from, present only on a record joined this way:
+  `"project_remote"` when the journal named a git remote (the same value for
+  every checkout of one repository), `"project_id"` otherwise (a directory
+  name, which can collide across machines). A record with neither field
+  belongs to no known project — never guessed at from the current
+  repository, and never dropped.
 - **`turn_id`** is the tool's own identifier for one turn or request, when the
   tool's file or export can name one. It is the key local-read re-reads are
   matched on (above), but **it is not guaranteed unique to one billed request**:
@@ -276,12 +289,25 @@ absence means.
 
 #### `project_id`
 - **Type**: string.
-- **Present**: conditional — present when the emitting environment set a
-  project identity (the `aidd.project_id` resource attribute, on the export
-  route).
-- **Meaning**: the AIDD project this session belongs to.
-- **If absent**: no project identity was configured for this record — not "no
-  project."
+- **Present**: conditional. On the export route: present when the emitting
+  environment set a project identity (the `aidd.project_id` resource
+  attribute). On the local-read route: present when the run journal's
+  `session_start` line named a project for the session — see "Identity and
+  joins."
+- **Meaning**: the repository this session ran in.
+- **If absent**: no project identity is known for this record — read as
+  belonging to no known project, never attributed to a guess.
+
+#### `project_field`
+- **Type**: `"project_id"` or `"project_remote"`.
+- **Present**: conditional — present only on a local-read record whose
+  `project_id` was joined from the run journal; absent on an export-route
+  record, whose `project_id` is set directly with no journal join to name a
+  source for.
+- **Meaning**: which of the journal's own two fields `project_id` came
+  from — see "Identity and joins."
+- **If absent**: either the record carries no `project_id` at all, or it
+  does and came from the export route.
 
 #### `user_id`
 - **Type**: string.

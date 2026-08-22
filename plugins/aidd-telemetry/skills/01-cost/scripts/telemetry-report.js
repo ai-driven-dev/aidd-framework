@@ -9,9 +9,9 @@
 //   telemetry-report report [--from <day>] [--to <day>] [--days <n>] [--task <id>] [--json]
 
 const { buildIntervals, attribute } = require("./lib/attribution.js");
-const { listJournals, readJournal } = require("./lib/journal.js");
+const { listJournals, readJournal, projectOf } = require("./lib/journal.js");
 const { TOOLS, DISPLAY_NAME, homeDir } = require("./lib/readers.js");
-const { printReport, toEnvelope } = require("./lib/render.js");
+const { printReport, toEnvelope, buildArtefact, ARTEFACT_AXES } = require("./lib/render.js");
 const { build } = require("./lib/report.js");
 const { SCHEMA_VERSION, append, readForVendor, readPeriod } = require("./lib/sink.js");
 
@@ -24,6 +24,7 @@ const USAGE = [
   "Usage:",
   "  telemetry-report read [--session <id>]",
   "  telemetry-report report [--from <day>] [--to <day>] [--days <n>] [--task <id>] [--json]",
+  `  telemetry-report report ... --axis <${ARTEFACT_AXES.join("|")}>`,
 ].join("\n");
 
 const out = (line) => process.stdout.write(`${line}\n`);
@@ -74,7 +75,7 @@ function resolvePeriod(argv, today) {
  * no trace of the session, `unreadable` one whose reader failed, `not-covered` one nothing
  * here can read at all.
  */
-function readOneTool(declaration, sessionId, intervals, at) {
+function readOneTool(declaration, sessionId, intervals, project, at) {
   const base = { tool: declaration.tool, recordsFound: 0, recordsStored: 0, sessionsFailed: 0 };
   if (!declaration.read) {
     return { ...base, status: "not-covered", ...(declaration.reason ? { reason: declaration.reason } : {}) };
@@ -88,7 +89,7 @@ function readOneTool(declaration, sessionId, intervals, at) {
     const failure = error instanceof Error ? error.message : String(error);
     return { ...base, status: "unreadable", sessionsFailed: 1, reason: failure, failureReason: failure };
   }
-  const stored = store(declaration.tool, sessionId, read.records, intervals, at);
+  const stored = store(declaration.tool, sessionId, read.records, intervals, project, at);
   return {
     ...base,
     status: read.records.length > 0 ? "found" : read.sessionFound ? "empty" : "not-found",
@@ -100,8 +101,12 @@ function readOneTool(declaration, sessionId, intervals, at) {
 
 /** Matched on `turn_id` alone, never on a hash of the line: the tool's own file keeps
  * growing as the same record is read again. A record with no turn id cannot be matched and
- * is appended, since inventing a key for it would be worse than appending twice. */
-function store(tool, sessionId, records, intervals, at) {
+ * is appended, since inventing a key for it would be worse than appending twice.
+ *
+ * `project` is resolved once per session, from the same journal `intervals` was built
+ * from, and spread onto every record it covers - never re-derived per record, and never
+ * from wherever this process happens to be running. */
+function store(tool, sessionId, records, intervals, project, at) {
   if (records.length === 0) return 0;
   const known = new Set(
     readForVendor(sessionId)
@@ -112,7 +117,14 @@ function store(tool, sessionId, records, intervals, at) {
   for (const record of records) {
     if (record.turn_id !== undefined && known.has(record.turn_id)) continue;
     append(
-      { ...record, sink_schema_version: SCHEMA_VERSION, provenance: "local-read", tool, ...attribute(record, intervals) },
+      {
+        ...record,
+        sink_schema_version: SCHEMA_VERSION,
+        provenance: "local-read",
+        tool,
+        ...attribute(record, intervals),
+        ...project,
+      },
       at
     );
     stored += 1;
@@ -172,9 +184,10 @@ function runRead(argv, projectRoot) {
   const sessions = sessionIds.map((sessionId) => {
     const journal = readJournal(projectRoot, sessionId);
     const intervals = journal ? buildIntervals(journal) : [];
+    const project = projectOf(journal);
     return {
       sessionId,
-      toolReports: TOOLS.map((tool) => readOneTool(tool, sessionId, intervals, at)),
+      toolReports: TOOLS.map((tool) => readOneTool(tool, sessionId, intervals, project, at)),
     };
   });
 
@@ -217,8 +230,16 @@ function runReport(argv, projectRoot) {
     unreadableLines: read.skipped,
     ...(task === undefined ? {} : { task }),
   });
-  if (argv.includes("--json")) out(JSON.stringify(toEnvelope(report), null, 2));
-  else printReport(out, report);
+  emitReport(out, argv, report);
+}
+
+/** JSON, one axis's artefact, or the full text - in that order of preference, since a
+ * caller asking for the object wants it whole even when `--axis` was also given. */
+function emitReport(out, argv, report) {
+  if (argv.includes("--json")) return out(JSON.stringify(toEnvelope(report), null, 2));
+  const axis = flag(argv, "--axis");
+  if (axis !== undefined) return out(buildArtefact(toEnvelope(report), axis));
+  return printReport(out, report);
 }
 
 function main(argv) {

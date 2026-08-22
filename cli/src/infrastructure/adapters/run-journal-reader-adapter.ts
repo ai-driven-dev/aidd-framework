@@ -45,6 +45,7 @@ interface RawJournalLine {
   readonly tool?: unknown;
   readonly vendor_id?: unknown;
   readonly project_id?: unknown;
+  readonly project_remote?: unknown;
   readonly path?: unknown;
 }
 
@@ -82,6 +83,7 @@ function parseSessionStart(parsed: RawJournalLine): RunJournalSessionStart | nul
     return null;
   }
   const projectId = asString(parsed.project_id);
+  const projectRemote = asString(parsed.project_remote);
   return {
     type: "session_start",
     at,
@@ -89,6 +91,7 @@ function parseSessionStart(parsed: RawJournalLine): RunJournalSessionStart | nul
     tool,
     vendor_id: vendorId,
     ...(projectId === undefined ? {} : { project_id: projectId }),
+    ...(projectRemote === undefined ? {} : { project_remote: projectRemote }),
   };
 }
 

@@ -161,6 +161,7 @@ describe("RunJournalReaderAdapter, beyond the boundaries", () => {
       at: "2026-08-20T09:59:00Z",
       run_id: RUN_ID,
       project_id: "acme-widgets",
+      project_remote: "github.com/acme/widgets",
       tool: "claude-code",
       vendor_id: SESSION_ID,
     });

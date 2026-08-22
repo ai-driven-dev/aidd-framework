@@ -220,3 +220,48 @@ test("the cost skill states the shape of its answer", () => {
     "must say an empty breakdown is left out rather than filled with zeroes",
   );
 });
+
+// Someone asking what last month cost does not know which axis answers them - the skill
+// has to derive the axis from the question, not hand back a flag for the person to pick.
+test("the cost skill offers its axes in the language of a question", () => {
+  for (const axis of ["total", "day", "step", "model", "tool", "project"]) {
+    assert.ok(everything.includes(axis), `must name the "${axis}" axis`);
+  }
+  for (const question of ["what did this cost", "what changed", "where did it go"]) {
+    assert.ok(everything.includes(question), `must speak in the language of "${question}"`);
+  }
+  assert.ok(everything.includes("--axis"), "must derive the flag itself, from the question");
+});
+
+// Per person is the one axis nothing can answer today, and the reason is structural, not a
+// missing flag: no identity is recorded anywhere. Saying so plainly is the point - a skill
+// that stayed silent would let the person assume the question just needs a different flag.
+test("the cost skill names per-person as unanswerable, and what would fix it", () => {
+  assert.ok(/per.person/iu.test(everything), "must name the axis that does not exist");
+  assert.ok(
+    everything.includes("identity"),
+    "must say why: nothing records an identity anywhere",
+  );
+  for (const issue of ["#660", "#661", "#656"]) {
+    assert.ok(everything.includes(issue), `must name ${issue} as what would make it answerable`);
+  }
+});
+
+// The version bug this pins against: render.js bumped `ENVELOPE_VERSION` to 2 when
+// `by_day` and `by_project` landed, and the skill kept telling itself to refuse anything
+// but version 1 - which would have made it stop on every object the script now prints.
+test("the cost skill checks the envelope version it actually gets, not a stale one", () => {
+  assert.ok(!everything.includes("is `1` today"), "must not still expect version 1");
+  assert.ok(everything.includes("`2`"), "must expect the version render.js actually sends");
+});
+
+// A total to quote and a table to paste are different things - a rendering suited to the
+// axis, written to a file when a file is what was asked for.
+test("the cost skill writes an artefact to a file when a file is what was asked for", () => {
+  assert.ok(everything.includes("Write it to a file"), "must say when it writes rather than shows");
+  assert.ok(everything.includes("Show it inline"), "must say when it shows rather than writes");
+  assert.ok(
+    /states its period and (its )?axis/u.test(everything) || everything.includes("period and its axis"),
+    "an artefact must name the period and axis it came from",
+  );
+});

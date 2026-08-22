@@ -1,5 +1,9 @@
 import type { TelemetryLocalRead } from "../../../domain/capabilities/telemetry-capability.js";
 import {
+  resolveSessionProject,
+  type SessionProject,
+} from "../../../domain/models/session-project.js";
+import {
   attributeMoment,
   buildStepIntervals,
   type StepInterval,
@@ -198,12 +202,14 @@ export class ReadLocalCostUseCase {
     // Read once per session, never per tool: every reader's candidates for one session are
     // joined against the same journal. A session with no journal at all — the reader's
     // contract promises never to throw for that — yields an empty interval list, so every
-    // candidate falls through to unattributed rather than the read failing.
+    // candidate falls through to unattributed rather than the read failing; the project is
+    // `null` for the same reason, never re-derived from wherever this process runs.
     const journal = await this.runJournalReader.read(sessionId);
     const intervals = journal ? buildStepIntervals(journal) : [];
+    const project = resolveSessionProject(journal);
     const toolReports: LocalCostToolReport[] = [];
     for (const tool of AI_TOOL_IDS) {
-      toolReports.push(await this.readOneTool(tool, sessionId, at, intervals));
+      toolReports.push(await this.readOneTool(tool, sessionId, at, intervals, project));
     }
     return toolReports;
   }
@@ -212,14 +218,22 @@ export class ReadLocalCostUseCase {
     tool: AiToolId,
     sessionId: string,
     at: Date,
-    intervals: readonly StepInterval[]
+    intervals: readonly StepInterval[],
+    project: SessionProject | null
   ): Promise<LocalCostToolReport> {
     const localRead = getAiToolConfig(tool).telemetryLocalRead;
     if (localRead.kind !== "declared") return notCovered(tool, localRead);
     const attempt = await this.attemptRead(tool, sessionId);
     if ("failure" in attempt) return unreadable(tool, attempt.failure);
     const candidates = attempt.records;
-    const recordsStored = await this.storeNewCandidates(tool, sessionId, candidates, at, intervals);
+    const recordsStored = await this.storeNewCandidates(
+      tool,
+      sessionId,
+      candidates,
+      at,
+      intervals,
+      project
+    );
     return {
       tool,
       status: candidates.length > 0 ? "found" : attempt.sessionFound ? "empty" : "not-found",
@@ -258,7 +272,8 @@ export class ReadLocalCostUseCase {
     sessionId: string,
     candidates: readonly LocalCostCandidateRecord[],
     at: Date,
-    intervals: readonly StepInterval[]
+    intervals: readonly StepInterval[],
+    project: SessionProject | null
   ): Promise<number> {
     if (candidates.length === 0) return 0;
     const existing = await this.sink.readRecordsForVendor(sessionId);
@@ -268,7 +283,10 @@ export class ReadLocalCostUseCase {
     let stored = 0;
     for (const candidate of candidates) {
       if (candidate.turn_id !== undefined && storedTurnIds.has(candidate.turn_id)) continue;
-      await this.sink.appendRecord(this.stampProvenanceAndTool(tool, candidate, intervals), at);
+      await this.sink.appendRecord(
+        this.stampProvenanceAndTool(tool, candidate, intervals, project),
+        at
+      );
       stored++;
     }
     return stored;
@@ -279,7 +297,8 @@ export class ReadLocalCostUseCase {
   private stampProvenanceAndTool(
     tool: AiToolId,
     candidate: LocalCostCandidateRecord,
-    intervals: readonly StepInterval[]
+    intervals: readonly StepInterval[],
+    project: SessionProject | null
   ): TelemetrySinkRecord {
     return {
       ...candidate,
@@ -287,6 +306,9 @@ export class ReadLocalCostUseCase {
       provenance: "local-read",
       tool,
       ...this.resolveStepAttribution(candidate, intervals),
+      ...(project === null
+        ? {}
+        : { project_id: project.projectId, project_field: project.projectField }),
     };
   }
 

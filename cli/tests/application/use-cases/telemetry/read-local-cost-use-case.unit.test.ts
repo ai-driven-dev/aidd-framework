@@ -425,6 +425,77 @@ describe("ReadLocalCostUseCase", () => {
       expect(withoutStored.step_attribution).toBe("unattributed");
     });
   });
+
+  describe("project attribution", () => {
+    function journalWithProject(
+      projectId: string | undefined,
+      projectRemote: string | undefined
+    ): InMemoryRunJournalReader {
+      const journal = new InMemoryRunJournalReader();
+      journal.set(SESSION_ID, {
+        session: {
+          type: "session_start",
+          at: "2026-08-20T09:59:00Z",
+          run_id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+          tool: "claude-code",
+          vendor_id: SESSION_ID,
+          ...(projectId === undefined ? {} : { project_id: projectId }),
+          ...(projectRemote === undefined ? {} : { project_remote: projectRemote }),
+        },
+        boundaries: [],
+        filesWritten: [],
+      });
+      return journal;
+    }
+
+    it("prefers the remote, and says so", async () => {
+      declareClaudeReadable();
+      const sink = new InMemoryTelemetrySink();
+      const useCase = new ReadLocalCostUseCase(
+        sink,
+        new Map([["claude", stubReader([CANDIDATE])]]),
+        journalWithProject("acme-widgets", "git@github.com:acme/widgets.git")
+      );
+
+      await useCase.execute({ sessionId: SESSION_ID });
+
+      const [stored] = [...sink.files.values()].flat();
+      expect(stored.project_id).toBe("git@github.com:acme/widgets.git");
+      expect(stored.project_field).toBe("project_remote");
+    });
+
+    it("falls back to the directory-name field with no remote, and says so", async () => {
+      declareClaudeReadable();
+      const sink = new InMemoryTelemetrySink();
+      const useCase = new ReadLocalCostUseCase(
+        sink,
+        new Map([["claude", stubReader([CANDIDATE])]]),
+        journalWithProject("acme-widgets", undefined)
+      );
+
+      await useCase.execute({ sessionId: SESSION_ID });
+
+      const [stored] = [...sink.files.values()].flat();
+      expect(stored.project_id).toBe("acme-widgets");
+      expect(stored.project_field).toBe("project_id");
+    });
+
+    it("stores no project for a session with no journal at all", async () => {
+      declareClaudeReadable();
+      const sink = new InMemoryTelemetrySink();
+      const useCase = new ReadLocalCostUseCase(
+        sink,
+        new Map([["claude", stubReader([CANDIDATE])]]),
+        NULL_RUN_JOURNAL_READER
+      );
+
+      await useCase.execute({ sessionId: SESSION_ID });
+
+      const [stored] = [...sink.files.values()].flat();
+      expect(stored.project_id).toBeUndefined();
+      expect(stored.project_field).toBeUndefined();
+    });
+  });
 });
 
 describe("a reader that fails", () => {

@@ -46,6 +46,12 @@ export interface TelemetrySinkRecord {
    * at all. */
   readonly step_plugin?: string;
   readonly project_id?: string;
+  /** Which field on the run journal's `session_start` line `project_id` came from —
+   * `"project_remote"` or `"project_id"`, present only on a record joined from a journal
+   * (see `domain/models/session-project.ts`). Absent on an export-provenance record: its
+   * `project_id` is set directly from the `aidd.project_id` OTLP attribute, with no
+   * journal join to name a source for. */
+  readonly project_field?: string;
   readonly user_id?: string;
   readonly cost_usd?: number;
   readonly input_tokens?: number;
