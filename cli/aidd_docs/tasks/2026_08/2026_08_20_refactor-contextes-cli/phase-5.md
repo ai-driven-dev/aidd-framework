@@ -69,6 +69,43 @@ asking for.
 
 That is a product direction, not a refactor step. This phase should be sized once it is settled.
 
+## Les scopes, outil par outil
+
+Vérifié contre les quatre CLI installées.
+
+| outil | scopes exposés par sa propre commande | fichier écrit |
+|---|---|---|
+| claude | `user` (défaut), `project`, `local` | `~/.claude/`, `.claude/settings.json`, `.claude/settings.local.json` |
+| codex | aucun — user-global par conception | `~/.codex/config.toml` |
+| copilot | aucun — pas d'option `--scope` | `~/.copilot/` |
+| cursor | aucun — niveau compte | indexé côté serveur |
+
+Seul Claude a des scopes à offrir. Le modèle d'AIDD doit donc passer d'un scope **unique par outil**
+(`installScope: "project" | "user"`, une valeur) à la **liste des scopes supportés** plus un défaut,
+et n'exposer `--scope` que là où l'outil en accepte un.
+
+## Ce que le .gitignore change au raisonnement
+
+AIDD ajoute une seule ligne au `.gitignore` du projet : `.aidd/cache/`. Ce qui reste versionné :
+`.aidd/manifest.json`, `.aidd/marketplaces.json` et `.claude/settings.json`.
+
+Or `.claude/settings.json` est committé **et** contient le chemin du marketplace enregistré — un
+chemin **absolu** vers `.aidd/cache/built/aidd-framework/claude`, c'est-à-dire vers le dossier
+ignoré. Vérifié sur un projet neuf.
+
+Un collègue qui clone récupère donc un pointeur vers un répertoire qui n'existe pas chez lui et
+n'existera qu'après son propre `setup`. C'est un défaut latent du modèle actuel, indépendant de tout
+le reste, et il décide du scope par défaut :
+
+| contenu | scope | fichier | pourquoi |
+|---|---|---|---|
+| config runtime d'AIDD (`respectGitignore`, `permissions`) | `project` | `.claude/settings.json` | réellement partageable, mérite d'être committé |
+| enregistrement du marketplace | `local` | `.claude/settings.local.json` | chemin absolu vers un dossier ignoré : il ne peut être que machine-local |
+
+Le défaut `local` n'est pas un compromis, c'est la seule valeur cohérente avec ce que
+l'enregistrement contient. Et `--scope local` écrit un **fichier séparé**, vérifié — ce qui supprime
+au passage la collision d'empreinte qui avait fait échouer la première tentative.
+
 ## Architecture projection
 
 > Tree of the final files. ✅ create · ✏️ modify · ❌ delete
