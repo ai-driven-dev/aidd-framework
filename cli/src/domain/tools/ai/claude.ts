@@ -126,6 +126,9 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
           enabledPluginsKey: "enabledPlugins",
           toEntry: buildDefaultMarketplaceEntry,
         },
+        // Measured on #703: `claude -p` reads its own user-global plugin registry, not
+        // the project-local settings.json declaration above — see claude-cli-adapter.ts.
+        nativeActivation: { binary: "claude" },
       }),
     },
 

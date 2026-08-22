@@ -45,7 +45,7 @@ export interface MarketplaceSettings {
  * `NativePluginActivator` in the marketplace-sync registry.
  */
 export interface NativeActivation {
-  binary: "codex" | "copilot";
+  binary: "claude" | "codex" | "copilot";
 }
 
 export interface NativePluginsParams {

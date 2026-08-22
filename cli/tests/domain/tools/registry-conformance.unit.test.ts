@@ -102,6 +102,24 @@ describe("AiTool contract conformance", () => {
       ).toBe(true);
     });
 
+    // #703: a tool that declares `marketplaceSettings` writes a project-local
+    // extraKnownMarketplaces/enabledPlugins declaration — that alone was proven, for
+    // Claude, to load nothing under `claude -p` (nor even interactively): the runtime
+    // reads its own user-global registry, not the project file. `nativeActivation`
+    // is what drives that registry via the tool's own CLI. Its absence here is exactly
+    // the two-install-surfaces disagreement #703 measured: settings.json says a plugin
+    // is enabled, the runtime that actually loads plugins was never told.
+    it("drives native CLI activation when its plugins capability declares marketplaceSettings", () => {
+      const caps = tool.capabilities as {
+        plugins?: { marketplaceSettings?: unknown; nativeActivation?: unknown };
+      };
+      if (caps.plugins?.marketplaceSettings == null) return;
+      expect(
+        caps.plugins.nativeActivation,
+        `${toolId} declares marketplaceSettings without nativeActivation — its settings.json declaration is never registered with the runtime that resolves plugins`
+      ).not.toBeNull();
+    });
+
     // The type system already requires `telemetry`; this pins the kind, which a literal
     // could still get wrong.
     it("declares a telemetry activation with a recognized kind", () => {
@@ -175,10 +193,12 @@ describe("telemetryExport — exact declarations, measured 2026-08-13/14", () =>
   });
 });
 
-// Copilot and Cursor's local-read reasons are measured facts (see spec.md non-goals), not
-// guesses. Claude and Codex are declared as of phase 2: read via TranscriptCostReaderAdapter,
-// see claude-code-transcript.ts and codex-rollout.ts for their measurements. OpenCode is
-// declared as of phase 3: read via OpencodeCostReaderAdapter.
+// Cursor's local-read reason is a measured fact (see spec.md non-goals), not a guess.
+// Claude and Codex are declared as of phase 2: read via TranscriptCostReaderAdapter, see
+// claude-code-transcript.ts and codex-rollout.ts for their measurements. OpenCode is
+// declared as of phase 3: read via OpencodeCostReaderAdapter. Copilot is declared as of
+// #697: read via TranscriptCostReaderAdapter and copilot-events.ts, at session rather than
+// request granularity - see copilot-events.unit.test.ts for the measurement.
 describe("telemetryLocalRead — exact declarations, phase 2 of local-cost-read", () => {
   const EXPECTED: Record<
     string,
@@ -187,7 +207,7 @@ describe("telemetryLocalRead — exact declarations, phase 2 of local-cost-read"
     claude: { kind: "declared" },
     codex: { kind: "declared" },
     opencode: { kind: "declared" },
-    copilot: { kind: "unsupported", reason: "outputTokens" },
+    copilot: { kind: "declared" },
     cursor: { kind: "unsupported", reason: "token count" },
   };
 

@@ -123,8 +123,10 @@ import type { VersionReader } from "../domain/ports/version-reader.js";
 import { AjvSchemaValidatorAdapter } from "./adapters/ajv-schema-validator-adapter.js";
 import { AuthProviderAdapter } from "./adapters/auth-provider-adapter.js";
 import { AuthReaderAdapter } from "./adapters/auth-reader-adapter.js";
+import { ClaudeCliAdapter } from "./adapters/claude-cli-adapter.js";
 import { CodexCliAdapter } from "./adapters/codex-cli-adapter.js";
 import { CopilotCliAdapter } from "./adapters/copilot-cli-adapter.js";
+import { CopilotCostReaderAdapter } from "./adapters/copilot-cost-reader-adapter.js";
 import { CurrentVersionAdapter } from "./adapters/current-version-adapter.js";
 import { FileAdapter } from "./adapters/file-adapter.js";
 import { GhCliAdapter } from "./adapters/gh-cli-adapter.js";
@@ -432,6 +434,7 @@ export async function createDeps(
     ? new InquirerPrompterAdapter()
     : new SilentPrompterAdapter();
   const nativePluginActivators = new Map<string, NativePluginActivator>([
+    ["claude", new ClaudeCliAdapter()],
     ["codex", new CodexCliAdapter()],
     ["copilot", new CopilotCliAdapter()],
   ]);
@@ -742,6 +745,7 @@ export async function createDeps(
         createCodexRolloutAccumulator
       ),
     ],
+    ["copilot", new CopilotCostReaderAdapter(homedir())],
   ]);
   const runJournalReader = new RunJournalReaderAdapter(projectRoot);
   const readLocalCostUseCase = new ReadLocalCostUseCase(
