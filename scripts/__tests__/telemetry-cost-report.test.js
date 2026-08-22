@@ -1,11 +1,24 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
-const { describe, it } = require("node:test");
+const { spawnSync } = require("node:child_process");
+const { describe, it, before, after } = require("node:test");
 
 const SCRIPTS = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts");
+const HOOKS_LIB = path.resolve(__dirname, "../../plugins/aidd-telemetry/hooks/lib");
 const { buildIntervals, attribute } = require(path.join(SCRIPTS, "lib/attribution.js"));
 const { build, taskOf, toMicroUsd } = require(path.join(SCRIPTS, "lib/report.js"));
 const { printReport, toEnvelope } = require(path.join(SCRIPTS, "lib/render.js"));
+const sink = require(path.join(SCRIPTS, "lib/sink.js"));
+const { listJournals } = require(path.join(SCRIPTS, "lib/journal.js"));
+const {
+  buildSessionStartLine,
+  buildFileWrittenLine,
+  appendLine,
+  runFileName,
+  generateUlid,
+} = require(path.join(HOOKS_LIB, "record.js"));
 
 const NO_CAPABILITY = {
   localRead: null,
@@ -356,5 +369,159 @@ describe("what a program reads", () => {
     const envelope = toEnvelope(report());
 
     assert.deepEqual(JSON.parse(JSON.stringify(envelope)), envelope);
+  });
+});
+
+// Everything shipped elsewhere in this suite has met at most three sessions and a handful
+// of day files. This builds a year of day files and a hundred journalled sessions - through
+// sink.append() and record.js's own line builders, never a hand-written fixture - and asks
+// the CLI the three questions a person actually runs: the period, the sweep, and one task's
+// breakdown. Numbers: aidd_docs/tasks/2026_08/2026_08_21_telemetry-v1-close/measurements.md.
+describe("a period that has met a hundred sessions", () => {
+  const CLI = path.join(SCRIPTS, "telemetry-report.js");
+  const NUM_SESSIONS = 100;
+  const NUM_TASKS = 25;
+  const NUM_DAYS = 365;
+  const FROM_DAY = "2025-08-22";
+  const TO_DAY = "2026-08-21";
+  const START_MS = Date.parse(`${FROM_DAY}T12:00:00.000Z`);
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const SOURCES_CYCLE = ["tool-stated", "journal-interval", "unattributed"];
+  const MODELS = ["opus", "sonnet", "haiku"];
+
+  const sessionVendorId = (i) => `sess-${String(i).padStart(3, "0")}`;
+  const taskIndexOfSession = (i) => i % NUM_TASKS;
+  const taskPath = (taskIndex) => `aidd_docs/tasks/2026_08/2026_08_01_task-${taskIndex}/plan.md`;
+  const taskId = (taskIndex) => `2026_08/2026_08_01_task-${taskIndex}`;
+
+  let configDir;
+  let runsDir;
+  let homeDir;
+  let previousEnv;
+  let fixtureRecords;
+
+  function writeJournals() {
+    for (let i = 0; i < NUM_SESSIONS; i++) {
+      const vendorId = sessionVendorId(i);
+      const runId = generateUlid();
+      const filePath = path.join(runsDir, runFileName(runId, vendorId));
+      const at = new Date(START_MS).toISOString();
+      appendLine(
+        filePath,
+        buildSessionStartLine({ at, runId, projectId: "acme/repo", projectRemote: null, host: "claude-code", vendorId }),
+      );
+      appendLine(
+        filePath,
+        buildFileWrittenLine({ at, path: taskPath(taskIndexOfSession(i)), source: "tool-stated" }),
+      );
+    }
+  }
+
+  function writeDayFiles() {
+    const records = [];
+    for (let day = 0; day < NUM_DAYS; day++) {
+      const at = new Date(START_MS + day * DAY_MS);
+      const attribution = SOURCES_CYCLE[day % SOURCES_CYCLE.length];
+      const record = {
+        sink_schema_version: 2,
+        kind: "request",
+        provenance: "local-read",
+        tool: "claude",
+        vendor_id: sessionVendorId(day % NUM_SESSIONS),
+        event_timestamp: at.toISOString(),
+        cost_usd: ((day % 23) + 1) / 100,
+        input_tokens: 100 + day,
+        model: MODELS[day % MODELS.length],
+        step_attribution: attribution,
+        ...(attribution === "unattributed" ? {} : { step: attribution === "tool-stated" ? "implement" : "review" }),
+      };
+      sink.append(record, at);
+      records.push(record);
+    }
+    return records;
+  }
+
+  before(() => {
+    previousEnv = { AIDD_USER_CONFIG_DIR: process.env.AIDD_USER_CONFIG_DIR, AIDD_RUNS_DIR: process.env.AIDD_RUNS_DIR };
+    configDir = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-year-sink-"));
+    runsDir = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-year-runs-"));
+    homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-year-home-"));
+    process.env.AIDD_USER_CONFIG_DIR = configDir;
+    process.env.AIDD_RUNS_DIR = runsDir;
+
+    writeJournals();
+    fixtureRecords = writeDayFiles();
+  });
+
+  after(() => {
+    fs.rmSync(configDir, { recursive: true, force: true });
+    fs.rmSync(runsDir, { recursive: true, force: true });
+    fs.rmSync(homeDir, { recursive: true, force: true });
+    for (const [key, value] of Object.entries(previousEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+
+  // No git shellout in the read path of telemetry-report.js, so no repo needs setting up -
+  // only readPeriod() and listJournals(), both of which already respect these two env vars.
+  // HOME points at an empty directory and PATH is stripped so claudeRead, codexRead and
+  // opencodeRead all fail fast rather than walking a real machine's session files, or - for
+  // opencode - shelling out for real, a hundred times over.
+  function runCli(args) {
+    const startedAt = process.hrtime.bigint();
+    const result = spawnSync(process.execPath, [CLI, ...args], {
+      encoding: "utf8",
+      env: { ...process.env, HOME: homeDir, PATH: "", AIDD_USER_CONFIG_DIR: configDir, AIDD_RUNS_DIR: runsDir },
+      timeout: 30_000,
+    });
+    const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+    assert.equal(result.status, 0, `telemetry-report.js ${args.join(" ")} exited ${result.status}: ${result.stderr}`);
+    return { stdout: result.stdout, elapsedMs };
+  }
+
+  const expectedMicroUsd = (records) => records.reduce((sum, r) => sum + toMicroUsd(r.cost_usd), 0);
+
+  const reconciles = (built) => {
+    const total = (rows) => rows.reduce((sum, row) => sum + (row.totals.cost_micro_usd ?? 0), 0);
+    for (const rows of [built.by_step, built.by_model]) {
+      assert.equal(total(rows), built.totals.cost_micro_usd);
+    }
+  };
+
+  it("answers a period spanning a year of day files, and every breakdown reconciles to the total exactly", () => {
+    const { stdout, elapsedMs } = runCli(["report", "--from", FROM_DAY, "--to", TO_DAY, "--json"]);
+    console.log(`cost-report period over ${NUM_DAYS} day files, ${NUM_SESSIONS} sessions: ${elapsedMs.toFixed(1)}ms`);
+    const envelope = JSON.parse(stdout);
+
+    assert.equal(envelope.sessions, NUM_SESSIONS);
+    assert.equal(envelope.totals.requests, NUM_DAYS);
+    assert.equal(envelope.totals.cost_micro_usd, expectedMicroUsd(fixtureRecords));
+    reconciles(envelope);
+  });
+
+  it("answers the session sweep, one journalled session at a time", () => {
+    const { stdout, elapsedMs } = runCli(["read"]);
+    console.log(`cost-report read sweep over ${NUM_SESSIONS} journalled sessions: ${elapsedMs.toFixed(1)}ms`);
+
+    assert.match(stdout, new RegExp(`${NUM_SESSIONS} sessions read`));
+  });
+
+  it("answers one task's breakdown, reconciling to the total exactly", () => {
+    const taskIndex = 0;
+    const wanted = taskId(taskIndex);
+    const wantedRecords = fixtureRecords.filter(
+      (r) => taskIndexOfSession(Number(r.vendor_id.slice("sess-".length))) === taskIndex,
+    );
+    assert.ok(wantedRecords.length > 0, "fixture built no records for the task under test");
+
+    const { stdout, elapsedMs } = runCli(["report", "--from", FROM_DAY, "--to", TO_DAY, "--task", wanted, "--json"]);
+    console.log(`cost-report --task breakdown, ${wantedRecords.length} of ${NUM_DAYS} records: ${elapsedMs.toFixed(1)}ms`);
+    const envelope = JSON.parse(stdout);
+
+    assert.equal(envelope.task, wanted);
+    assert.equal(envelope.totals.requests, wantedRecords.length);
+    assert.equal(envelope.totals.cost_micro_usd, expectedMicroUsd(wantedRecords));
+    reconciles(envelope);
   });
 });

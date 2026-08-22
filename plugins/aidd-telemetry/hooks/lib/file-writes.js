@@ -60,19 +60,37 @@ const WRITTEN_PATH_EXTRACTOR_BY_HOST = Object.freeze({
 const TASKS_DIR = "aidd_docs/tasks";
 // A task folder holds documents. A scan that walked node_modules would cost more than the
 // git shellout this hook already pays on every event.
+//
+// Measured 2026-08-22 against a synthetic tree: reaching 2000 entries costs ~13.5ms p95,
+// well inside the 200ms p95 the whole turn-end handler already budgets for
+// (aidd-telemetry-journal.test.js) while spending ~9ms of it on git shellouts and
+// everything else - see measurements.md (aidd_docs/tasks/2026_08/2026_08_21_telemetry-v1-close/)
+// for the full numbers, including this repository's own tree, which uses 172 of the 2000.
 const MAX_SCAN_ENTRIES = 2000;
 
-// Every file under the task tree modified since `sinceMs`, repository-relative and
-// "/"-separated. This is what makes a task attributable on a tool that never says what it
-// wrote: a write made through a shell command, an apply_patch, or an editor leaves the
-// same trace on disk as one made through a file tool, and the disk is the one thing every
-// host shares. Scoped to the task tree rather than the repository, so a build touching a
-// thousand files is never walked.
+/**
+ * Every file under the task tree modified since `sinceMs`, repository-relative and
+ * "/"-separated. This is what makes a task attributable on a tool that never says what it
+ * wrote: a write made through a shell command, an apply_patch, or an editor leaves the
+ * same trace on disk as one made through a file tool, and the disk is the one thing every
+ * host shares. Scoped to the task tree rather than the repository, so a build touching a
+ * thousand files is never walked.
+ *
+ * `truncated` is true whenever the budget ran out before the tree was fully read - either a
+ * directory's own listing was cut short (a wide directory, still processing when the cap
+ * hit) or a directory was queued but never opened at all (`pending` non-empty at the end).
+ * Checking `pending` alone misses the first case: a listing cut off mid-read can still
+ * leave `pending` empty, and reading that as "nothing left" is exactly the silent
+ * truncation this exists to catch. `scanned` is exactly how many entries were looked at,
+ * never one more: the entry that would have crossed the cap is left unopened rather than
+ * counted and dropped.
+ */
 function taskFilesModifiedSince(repoRoot, sinceMs) {
   const root = path.join(repoRoot, ...TASKS_DIR.split("/"));
   const found = [];
   const pending = [root];
   let seen = 0;
+  let cutShort = false;
   while (pending.length > 0 && seen < MAX_SCAN_ENTRIES) {
     const dir = pending.pop();
     let entries;
@@ -82,7 +100,11 @@ function taskFilesModifiedSince(repoRoot, sinceMs) {
       continue;
     }
     for (const entry of entries) {
-      if (++seen >= MAX_SCAN_ENTRIES) break;
+      if (seen >= MAX_SCAN_ENTRIES) {
+        cutShort = true;
+        break;
+      }
+      seen++;
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         pending.push(full);
@@ -91,7 +113,7 @@ function taskFilesModifiedSince(repoRoot, sinceMs) {
       }
     }
   }
-  return found;
+  return { found, truncated: cutShort || pending.length > 0, scanned: seen };
 }
 
 function modifiedSince(filePath, sinceMs) {
@@ -146,16 +168,30 @@ function handleTaskFilesObserved(payload, host, sessionId) {
   // the task tree newer than it changed since. No state to keep, and appending moves the
   // mark forward on its own.
   const since = lastWriteMs(filePath);
+  const { found, truncated, scanned } = taskFilesModifiedSince(target.repoRoot, since);
   const alreadyStated = new Set();
-  for (const observed of taskFilesModifiedSince(target.repoRoot, since)) {
+  for (const observed of found) {
     if (alreadyStated.has(observed)) continue;
     alreadyStated.add(observed);
     appendFileWritten(filePath, observed, "observed");
+  }
+  // Silent truncation would read as complete coverage - the one failure mode this layer
+  // exists to remove. A reader of the run file must be able to tell "nothing else changed"
+  // from "the walk gave up before it could tell."
+  if (truncated) {
+    appendLine(filePath, buildScanTruncatedLine({ at: nowIso(), cap: MAX_SCAN_ENTRIES, scanned }));
   }
 }
 
 function appendFileWritten(filePath, relativePath, source) {
   appendLine(filePath, buildFileWrittenLine({ at: nowIso(), path: relativePath, source }));
+}
+
+// Not a record.js builder: record.js owns session_start/turn_end/file_written/step_start
+// alone, and readJournalFile there already ignores any type it does not name, so this new
+// one is inert to every existing reader rather than breaking one.
+function buildScanTruncatedLine({ at, cap, scanned }) {
+  return { type: "scan_truncated", at, cap, scanned };
 }
 
 function lastWriteMs(filePath) {
@@ -189,6 +225,7 @@ module.exports = {
   looksLikeTaskPath,
   taskFolderRelativePath,
   taskFilesModifiedSince,
+  MAX_SCAN_ENTRIES,
   WRITTEN_PATH_EXTRACTOR_BY_HOST,
   handleFileWritten,
   handleTaskFilesObserved,
