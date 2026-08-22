@@ -15,6 +15,7 @@ import type { TelemetrySinkRecord } from "../../../../src/domain/models/telemetr
 import { AI_TOOL_IDS } from "../../../../src/domain/models/tool-ids.js";
 import type { SessionCostReader } from "../../../../src/domain/ports/session-cost-reader.js";
 import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
+import { NULL_PERSON_IDENTITY_READER } from "../../../helpers/ports/in-memory-person-identity-reader.js";
 import { NULL_RUN_JOURNAL_READER } from "../../../helpers/ports/in-memory-run-journal-reader.js";
 import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetry-sink.js";
 
@@ -71,7 +72,8 @@ async function readCapturedTranscript(): Promise<{
   const useCase = new ReadLocalCostUseCase(
     sink,
     new Map([["claude", stubReader]]),
-    NULL_RUN_JOURNAL_READER
+    NULL_RUN_JOURNAL_READER,
+    NULL_PERSON_IDENTITY_READER
   );
   await useCase.execute({ sessionId: TRANSCRIPT_SESSION_ID });
   return { sink, records: [...sink.files.values()].flat() };

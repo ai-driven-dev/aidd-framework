@@ -164,6 +164,70 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
     expect(storedIn(pluginConfig)).toBe(storedIn(cliConfig));
   });
 
+  it("stamps the same person on both sides once one opted in, and neither by default", async () => {
+    const [, defaultPlugin] = await bothOf(["read"]);
+    expect(defaultPlugin).not.toContain("person_id");
+    for (const stored of [storedIn(cliConfig), storedIn(pluginConfig)]) {
+      for (const line of stored.trim().split("\n")) {
+        expect(JSON.parse(line)).not.toHaveProperty("person_id");
+      }
+    }
+
+    await mkdir(join(fakeHome, ".config", "aidd"), { recursive: true });
+    await writeFile(
+      join(fakeHome, ".config", "aidd", "identity.json"),
+      JSON.stringify({ person_id: "person-e2e-1", display_name: "Baptiste" })
+    );
+    await rm(join(cliConfig, "telemetry"), { recursive: true, force: true });
+    await rm(join(pluginConfig, "telemetry"), { recursive: true, force: true });
+
+    const [fromCli, fromPlugin] = await bothOf(["read"]);
+    expect(fromPlugin).toBe(fromCli);
+    expect(storedIn(pluginConfig)).toBe(storedIn(cliConfig));
+    for (const line of storedIn(cliConfig).trim().split("\n")) {
+      const record = JSON.parse(line);
+      expect(record.person_id).toBe("person-e2e-1");
+      expect(record.person_display_name).toBe("Baptiste");
+    }
+
+    // Person is not yet a report dimension (phase 3) - a report built over records that
+    // do carry it must still agree between the two sides, and must not leak the field
+    // into an envelope shape that has not been extended for it.
+    const [reportCli, reportPlugin] = await bothOf([
+      "report",
+      "--from",
+      "2026-07-01",
+      "--to",
+      "2026-08-31",
+      "--json",
+    ]);
+    expect(reportPlugin).toBe(reportCli);
+    expect(reportPlugin).not.toContain("person");
+  });
+
+  it("cannot be handed an identity through AIDD_USER_CONFIG_DIR - only this machine's own profile counts", async () => {
+    // cliConfig/pluginConfig are each an AIDD_USER_CONFIG_DIR - a location the README
+    // documents pointing at a directory a team or a CI can share. Planting an identity
+    // file there, rather than under fakeHome, must change nothing.
+    await mkdir(cliConfig, { recursive: true });
+    await mkdir(pluginConfig, { recursive: true });
+    await writeFile(
+      join(cliConfig, "identity.json"),
+      JSON.stringify({ person_id: "forced-by-a-shared-config-dir" })
+    );
+    await writeFile(
+      join(pluginConfig, "identity.json"),
+      JSON.stringify({ person_id: "forced-by-a-shared-config-dir" })
+    );
+
+    const [fromCli, fromPlugin] = await bothOf(["read"]);
+    expect(fromPlugin).toBe(fromCli);
+    expect(fromPlugin).not.toContain("forced-by-a-shared-config-dir");
+    for (const stored of [storedIn(cliConfig), storedIn(pluginConfig)]) {
+      expect(stored).not.toContain("forced-by-a-shared-config-dir");
+    }
+  });
+
   it("answers a person the same way, on every shape of period", async () => {
     await bothOf(["read"]);
 

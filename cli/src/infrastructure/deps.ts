@@ -141,6 +141,7 @@ import { MarketplaceRegistryAdapter } from "./adapters/marketplace-registry-adap
 import { MarketplaceTrustStoreAdapter } from "./adapters/marketplace-trust-store-adapter.js";
 import { OpencodeCostReaderAdapter } from "./adapters/opencode-cost-reader-adapter.js";
 import { OtlpHttpReceiverAdapter } from "./adapters/otlp-http-receiver-adapter.js";
+import { PersonIdentityAdapter } from "./adapters/person-identity-adapter.js";
 import { PlatformAdapter } from "./adapters/platform-adapter.js";
 import { PluginCatalogRepositoryAdapter } from "./adapters/plugin-catalog-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "./adapters/plugin-distribution-reader-adapter.js";
@@ -748,10 +749,12 @@ export async function createDeps(
     ["copilot", new CopilotCostReaderAdapter(homedir())],
   ]);
   const runJournalReader = new RunJournalReaderAdapter(projectRoot);
+  const personIdentityReader = new PersonIdentityAdapter();
   const readLocalCostUseCase = new ReadLocalCostUseCase(
     telemetrySink,
     localCostReaders,
-    runJournalReader
+    runJournalReader,
+    personIdentityReader
   );
   const reportCostUseCase = new ReportCostUseCase(telemetrySink, runJournalReader);
   const deps: Deps = {

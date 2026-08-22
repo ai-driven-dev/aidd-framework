@@ -10,6 +10,7 @@
 
 const { buildIntervals, attribute } = require("../../_shared/attribution.js");
 const { listJournals, readJournal, projectOf } = require("../../_shared/journal.js");
+const { readIdentity } = require("../../_shared/identity.js");
 const { TOOLS, DISPLAY_NAME, homeDir } = require("../../_shared/readers.js");
 const { printReport, toEnvelope, buildArtefact, ARTEFACT_AXES } = require("./lib/render.js");
 const { build } = require("./lib/report.js");
@@ -77,7 +78,7 @@ function resolvePeriod(argv, today) {
  * no trace of the session, `unreadable` one whose reader failed, `not-covered` one nothing
  * here can read at all.
  */
-function readOneTool(declaration, sessionId, intervals, project, at) {
+function readOneTool(declaration, sessionId, intervals, project, person, at) {
   const base = { tool: declaration.tool, recordsFound: 0, recordsStored: 0, sessionsFailed: 0 };
   if (!declaration.read) {
     return { ...base, status: "not-covered", ...(declaration.reason ? { reason: declaration.reason } : {}) };
@@ -91,7 +92,7 @@ function readOneTool(declaration, sessionId, intervals, project, at) {
     const failure = error instanceof Error ? error.message : String(error);
     return { ...base, status: "unreadable", sessionsFailed: 1, reason: failure, failureReason: failure };
   }
-  const stored = store(declaration.tool, sessionId, read.records, intervals, project, at);
+  const stored = store(declaration.tool, sessionId, read.records, intervals, project, person, at);
   return {
     ...base,
     status: read.records.length > 0 ? "found" : read.sessionFound ? "empty" : "not-found",
@@ -101,14 +102,25 @@ function readOneTool(declaration, sessionId, intervals, project, at) {
   };
 }
 
+/** `identity` reads once per invocation, not per record or session: it names this machine's
+ * own person, a fact of the run rather than of any one session. `{}` when nobody opted in
+ * - the default - so a spread of it adds nothing, exactly like an unset `project`. */
+function personOf(identity) {
+  if (!identity) return {};
+  const fields = { person_id: identity.person_id };
+  if (identity.display_name) fields.person_display_name = identity.display_name;
+  return fields;
+}
+
 /** Matched on `turn_id` alone, never on a hash of the line: the tool's own file keeps
  * growing as the same record is read again. A record with no turn id cannot be matched and
  * is appended, since inventing a key for it would be worse than appending twice.
  *
- * `project` is resolved once per session, from the same journal `intervals` was built
- * from, and spread onto every record it covers - never re-derived per record, and never
- * from wherever this process happens to be running. */
-function store(tool, sessionId, records, intervals, project, at) {
+ * `project` and `person` are each resolved once per call and spread onto every record they
+ * cover - never re-derived per record. `person` never comes from the export route (see
+ * metrics-contract.md): only a local read runs on this person's own machine, which is the
+ * one route this decision is safe to attach to at all. */
+function store(tool, sessionId, records, intervals, project, person, at) {
   if (records.length === 0) return 0;
   const known = new Set(
     readForVendor(sessionId)
@@ -126,6 +138,7 @@ function store(tool, sessionId, records, intervals, project, at) {
         tool,
         ...attribute(record, intervals),
         ...project,
+        ...person,
       },
       at
     );
@@ -183,13 +196,14 @@ function runRead(argv, projectRoot) {
         ),
       ];
   const at = new Date();
+  const person = personOf(readIdentity());
   const sessions = sessionIds.map((sessionId) => {
     const journal = readJournal(projectRoot, sessionId);
     const intervals = journal ? buildIntervals(journal) : [];
     const project = projectOf(journal);
     return {
       sessionId,
-      toolReports: TOOLS.map((tool) => readOneTool(tool, sessionId, intervals, project, at)),
+      toolReports: TOOLS.map((tool) => readOneTool(tool, sessionId, intervals, project, person, at)),
     };
   });
 

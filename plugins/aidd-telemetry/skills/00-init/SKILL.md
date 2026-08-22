@@ -1,6 +1,6 @@
 ---
 name: 00-init
-description: Turns AIDD measurement on for a project and proves it is recording. Use when the user wants to start measuring what their work costs, wants to stop, or asks why nothing is being recorded. Not for answering what a piece of work consumed.
+description: Turns AIDD measurement on for a project, proves it is recording, and lets a person opt into (or out of) naming themselves on their own records. Use when the user wants to start measuring what their work costs, wants to stop, asks why nothing is being recorded, or wants their own name to appear on (or disappear from) what gets measured. Not for answering what a piece of work consumed.
 argument-hint: project
 ---
 
@@ -13,18 +13,33 @@ flowchart LR
   verify --> recording([recording])
 ```
 
+A second, independent choice belongs to the person rather than the project: whether their
+own records carry an identifier at all.
+
+```mermaid
+flowchart LR
+  ask2([this person]) --> identify
+  identify -.->|"already chose"| status1([relayed, unchanged])
+  identify -->|"opted in"| forget
+  forget -.->|"never opted in"| status2([relayed, unchanged])
+```
+
 ## Actions
 
 Run the flow above. Read only the next action file.
 
-| Action | Does                                        |
-| ------ | ------------------------------------------- |
-| check  | find the script and read the current switch |
-| enable | ask, then turn measurement on               |
-| verify | prove a session is actually being recorded  |
+| Action   | Does                                                    |
+| -------- | -------------------------------------------------------- |
+| check    | find the script and read the current switch               |
+| enable   | ask, then turn measurement on                              |
+| verify   | prove a session is actually being recorded                 |
+| identify | ask this person, then attach their own identifier          |
+| forget   | withdraw it, without touching what is already stored       |
 
 ## Transversal rules
 
 - Measuring someone's project is theirs to allow. Ask before turning it on, always.
-- Run only `scripts/telemetry-switch.js`, beside this skill. Never a script belonging to another skill, and never the `aidd` command.
+- Naming a person is theirs alone to allow, separately from the project switch above — never assumed from the project being measured, never asked on someone else's behalf.
+- Run only `scripts/telemetry-switch.js` and `scripts/telemetry-identity.js`, beside this skill. Never a script belonging to another skill, and never the `aidd` command.
+- `telemetry-identity.js` never reads `.aidd/config.json` or `AIDD_USER_CONFIG_DIR` — both are settings a repository or a CI job can set, and this choice is not theirs to make. It reads and writes only this machine's own user profile.
 - The script cannot be found: say so and change nothing.

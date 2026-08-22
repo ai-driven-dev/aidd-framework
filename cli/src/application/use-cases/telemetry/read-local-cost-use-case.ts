@@ -13,6 +13,10 @@ import {
   type TelemetrySinkRecord,
 } from "../../../domain/models/telemetry-sink-record.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../domain/models/tool-ids.js";
+import type {
+  PersonIdentity,
+  PersonIdentityReader,
+} from "../../../domain/ports/person-identity-reader.js";
 import type { RunJournalReader } from "../../../domain/ports/run-journal-reader.js";
 import type {
   LocalCostCandidateRecord,
@@ -61,6 +65,16 @@ export interface ReadLocalCostOptions {
    * only route a person has, since nothing tells them a session identifier. */
   readonly sessionId?: string;
   readonly at?: Date;
+}
+
+/** What every candidate from one session gets stamped with, gathered once and carried as
+ * one value rather than three parameters — `intervals` and `project` are per-session,
+ * `person` is per-sweep, but all three are facts about where a record came from, never
+ * about the record itself. */
+interface LocalReadAttribution {
+  readonly intervals: readonly StepInterval[];
+  readonly project: SessionProject | null;
+  readonly person: PersonIdentity | null;
 }
 
 /** What one session's read produced. `sessionId` is on the report because a sweep answers
@@ -173,16 +187,20 @@ export class ReadLocalCostUseCase {
   constructor(
     private readonly sink: TelemetrySink,
     private readonly readers: ReadonlyMap<AiToolId, SessionCostReader>,
-    private readonly runJournalReader: RunJournalReader
+    private readonly runJournalReader: RunJournalReader,
+    private readonly personIdentityReader: PersonIdentityReader
   ) {}
 
   async execute(options: ReadLocalCostOptions): Promise<ReadLocalCostResult> {
     const at = options.at ?? new Date();
     const sessionIds =
       options.sessionId === undefined ? await this.journalledSessionIds() : [options.sessionId];
+    // Resolved once for the whole sweep, not per session: this is a fact about the machine
+    // this process is running on, not about any one session it reads.
+    const person = await this.personIdentityReader.read();
     const sessions: LocalCostSessionReport[] = [];
     for (const sessionId of sessionIds) {
-      sessions.push({ sessionId, toolReports: await this.readOneSession(sessionId, at) });
+      sessions.push({ sessionId, toolReports: await this.readOneSession(sessionId, at, person) });
     }
     return { sessions, toolReports: mergeToolReports(sessions) };
   }
@@ -197,7 +215,8 @@ export class ReadLocalCostUseCase {
 
   private async readOneSession(
     sessionId: string,
-    at: Date
+    at: Date,
+    person: PersonIdentity | null
   ): Promise<readonly LocalCostToolReport[]> {
     // Read once per session, never per tool: every reader's candidates for one session are
     // joined against the same journal. A session with no journal at all — the reader's
@@ -205,11 +224,14 @@ export class ReadLocalCostUseCase {
     // candidate falls through to unattributed rather than the read failing; the project is
     // `null` for the same reason, never re-derived from wherever this process runs.
     const journal = await this.runJournalReader.read(sessionId);
-    const intervals = journal ? buildStepIntervals(journal) : [];
-    const project = resolveSessionProject(journal);
+    const attribution: LocalReadAttribution = {
+      intervals: journal ? buildStepIntervals(journal) : [],
+      project: resolveSessionProject(journal),
+      person,
+    };
     const toolReports: LocalCostToolReport[] = [];
     for (const tool of AI_TOOL_IDS) {
-      toolReports.push(await this.readOneTool(tool, sessionId, at, intervals, project));
+      toolReports.push(await this.readOneTool(tool, sessionId, at, attribution));
     }
     return toolReports;
   }
@@ -218,8 +240,7 @@ export class ReadLocalCostUseCase {
     tool: AiToolId,
     sessionId: string,
     at: Date,
-    intervals: readonly StepInterval[],
-    project: SessionProject | null
+    attribution: LocalReadAttribution
   ): Promise<LocalCostToolReport> {
     const localRead = getAiToolConfig(tool).telemetryLocalRead;
     if (localRead.kind !== "declared") return notCovered(tool, localRead);
@@ -231,8 +252,7 @@ export class ReadLocalCostUseCase {
       sessionId,
       candidates,
       at,
-      intervals,
-      project
+      attribution
     );
     return {
       tool,
@@ -272,8 +292,7 @@ export class ReadLocalCostUseCase {
     sessionId: string,
     candidates: readonly LocalCostCandidateRecord[],
     at: Date,
-    intervals: readonly StepInterval[],
-    project: SessionProject | null
+    attribution: LocalReadAttribution
   ): Promise<number> {
     if (candidates.length === 0) return 0;
     const existing = await this.sink.readRecordsForVendor(sessionId);
@@ -283,10 +302,7 @@ export class ReadLocalCostUseCase {
     let stored = 0;
     for (const candidate of candidates) {
       if (candidate.turn_id !== undefined && storedTurnIds.has(candidate.turn_id)) continue;
-      await this.sink.appendRecord(
-        this.stampProvenanceAndTool(tool, candidate, intervals, project),
-        at
-      );
+      await this.sink.appendRecord(this.stampProvenanceAndTool(tool, candidate, attribution), at);
       stored++;
     }
     return stored;
@@ -297,8 +313,7 @@ export class ReadLocalCostUseCase {
   private stampProvenanceAndTool(
     tool: AiToolId,
     candidate: LocalCostCandidateRecord,
-    intervals: readonly StepInterval[],
-    project: SessionProject | null
+    { intervals, project, person }: LocalReadAttribution
   ): TelemetrySinkRecord {
     return {
       ...candidate,
@@ -309,6 +324,8 @@ export class ReadLocalCostUseCase {
       ...(project === null
         ? {}
         : { project_id: project.projectId, project_field: project.projectField }),
+      ...(person === null ? {} : { person_id: person.personId }),
+      ...(person?.displayName === undefined ? {} : { person_display_name: person.displayName }),
     };
   }
 

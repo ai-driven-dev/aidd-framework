@@ -15,6 +15,10 @@ import type {
 import type { AiTool } from "../../../../src/domain/tools/contracts.js";
 import { getAiToolConfig, registerTool } from "../../../../src/domain/tools/registry.js";
 import {
+  InMemoryPersonIdentityReader,
+  NULL_PERSON_IDENTITY_READER,
+} from "../../../helpers/ports/in-memory-person-identity-reader.js";
+import {
   InMemoryRunJournalReader,
   NULL_RUN_JOURNAL_READER,
 } from "../../../helpers/ports/in-memory-run-journal-reader.js";
@@ -85,7 +89,8 @@ describe("ReadLocalCostUseCase", () => {
     const useCase = new ReadLocalCostUseCase(
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
 
     const result = await useCase.execute({ sessionId: SESSION_ID });
@@ -103,7 +108,8 @@ describe("ReadLocalCostUseCase", () => {
     const useCase = new ReadLocalCostUseCase(
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
 
     const result = await useCase.execute({ sessionId: SESSION_ID });
@@ -118,7 +124,8 @@ describe("ReadLocalCostUseCase", () => {
     const useCase = new ReadLocalCostUseCase(
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
 
     const result = await useCase.execute({ sessionId: SESSION_ID });
@@ -136,6 +143,78 @@ describe("ReadLocalCostUseCase", () => {
     });
   });
 
+  it("stamps no person field when nobody opted in - the default", async () => {
+    declareClaudeReadable();
+    const sink = new InMemoryTelemetrySink();
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
+    );
+
+    await useCase.execute({ sessionId: SESSION_ID });
+
+    const [stored] = [...sink.files.values()].flat();
+    expect("person_id" in stored).toBe(false);
+    expect("person_display_name" in stored).toBe(false);
+  });
+
+  it("stamps the identifier a person chose, and a display name only once they set one", async () => {
+    declareClaudeReadable();
+    const sink = new InMemoryTelemetrySink();
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER,
+      new InMemoryPersonIdentityReader({ personId: "person-1" })
+    );
+
+    await useCase.execute({ sessionId: SESSION_ID });
+
+    const [stored] = [...sink.files.values()].flat();
+    expect(stored.person_id).toBe("person-1");
+    expect("person_display_name" in stored).toBe(false);
+  });
+
+  it("carries a display name alongside the identifier, never in its place", async () => {
+    declareClaudeReadable();
+    const sink = new InMemoryTelemetrySink();
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER,
+      new InMemoryPersonIdentityReader({ personId: "person-1", displayName: "Baptiste" })
+    );
+
+    await useCase.execute({ sessionId: SESSION_ID });
+
+    const [stored] = [...sink.files.values()].flat();
+    expect(stored.person_id).toBe("person-1");
+    expect(stored.person_display_name).toBe("Baptiste");
+  });
+
+  // The spec's own line: a choice made today does not reach backwards. Re-reading an
+  // already-stored session after opting in must not retroactively name it.
+  it("leaves a session stored before opting in unnamed, even on a later read", async () => {
+    declareClaudeReadable();
+    const sink = new InMemoryTelemetrySink();
+    const identity = new InMemoryPersonIdentityReader(null);
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER,
+      identity
+    );
+
+    await useCase.execute({ sessionId: SESSION_ID });
+    identity.set({ personId: "person-1" });
+    await useCase.execute({ sessionId: SESSION_ID });
+
+    const [stored] = [...sink.files.values()].flat();
+    expect("person_id" in stored).toBe(false);
+  });
+
   // Task 2's own criterion: the use-case names the tool it asked, never the candidate
   // itself — `CANDIDATE` carries no `tool` field at all (the type omits it), so this is
   // structurally impossible for the reader to have supplied.
@@ -145,7 +224,8 @@ describe("ReadLocalCostUseCase", () => {
     const useCase = new ReadLocalCostUseCase(
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
 
     await useCase.execute({ sessionId: SESSION_ID });
@@ -175,7 +255,8 @@ describe("ReadLocalCostUseCase", () => {
     const useCase = new ReadLocalCostUseCase(
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
 
     await useCase.execute({ sessionId: SESSION_ID });
@@ -193,7 +274,12 @@ describe("ReadLocalCostUseCase", () => {
 
   it("reports a tool with no declared local read as not-covered, with its declared reason", async () => {
     const sink = new InMemoryTelemetrySink();
-    const useCase = new ReadLocalCostUseCase(sink, new Map(), NULL_RUN_JOURNAL_READER);
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map(),
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
+    );
 
     const result = await useCase.execute({ sessionId: SESSION_ID });
 
@@ -209,7 +295,12 @@ describe("ReadLocalCostUseCase", () => {
     // fact that has not been established either way.
     registerTool({ ...claudeConfig, telemetryLocalRead: { kind: "unmeasured" } });
     const sink = new InMemoryTelemetrySink();
-    const useCase = new ReadLocalCostUseCase(sink, new Map(), NULL_RUN_JOURNAL_READER);
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map(),
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
+    );
 
     const result = await useCase.execute({ sessionId: SESSION_ID });
 
@@ -226,7 +317,8 @@ describe("ReadLocalCostUseCase", () => {
     const useCase = new ReadLocalCostUseCase(
       sink,
       new Map([["claude", stubReader([])]]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
 
     const result = await useCase.execute({ sessionId: SESSION_ID });
@@ -245,7 +337,8 @@ describe("ReadLocalCostUseCase", () => {
     const useCase = new ReadLocalCostUseCase(
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
 
     await expect(useCase.execute({ sessionId: SESSION_ID })).resolves.toBeDefined();
@@ -259,7 +352,8 @@ describe("ReadLocalCostUseCase", () => {
     const useCase = new ReadLocalCostUseCase(
       sink,
       new Map([["claude", stubReader([noIdCandidate])]]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
 
     await useCase.execute({ sessionId: SESSION_ID });
@@ -300,7 +394,8 @@ describe("ReadLocalCostUseCase", () => {
       const useCase = new ReadLocalCostUseCase(
         sink,
         new Map([["claude", stubReader([candidate])]]),
-        NULL_RUN_JOURNAL_READER
+        NULL_RUN_JOURNAL_READER,
+        NULL_PERSON_IDENTITY_READER
       );
 
       await useCase.execute({ sessionId: SESSION_ID });
@@ -323,7 +418,8 @@ describe("ReadLocalCostUseCase", () => {
       const useCase = new ReadLocalCostUseCase(
         sink,
         new Map([["claude", stubReader([candidate])]]),
-        NULL_RUN_JOURNAL_READER
+        NULL_RUN_JOURNAL_READER,
+        NULL_PERSON_IDENTITY_READER
       );
 
       await useCase.execute({ sessionId: SESSION_ID });
@@ -338,7 +434,8 @@ describe("ReadLocalCostUseCase", () => {
       const useCase = new ReadLocalCostUseCase(
         sink,
         new Map([["claude", stubReader([MOMENT_CANDIDATE])]]),
-        journalWithOneStep("aidd-dev:06-test")
+        journalWithOneStep("aidd-dev:06-test"),
+        NULL_PERSON_IDENTITY_READER
       );
 
       await useCase.execute({ sessionId: SESSION_ID });
@@ -356,7 +453,8 @@ describe("ReadLocalCostUseCase", () => {
       const useCase = new ReadLocalCostUseCase(
         sink,
         new Map([["claude", stubReader([CANDIDATE])]]),
-        NULL_RUN_JOURNAL_READER
+        NULL_RUN_JOURNAL_READER,
+        NULL_PERSON_IDENTITY_READER
       );
 
       await useCase.execute({ sessionId: SESSION_ID });
@@ -378,7 +476,8 @@ describe("ReadLocalCostUseCase", () => {
       const useCase = new ReadLocalCostUseCase(
         sink,
         new Map([["claude", stubReader([candidate])]]),
-        journalWithOneStep("some-other-skill")
+        journalWithOneStep("some-other-skill"),
+        NULL_PERSON_IDENTITY_READER
       );
 
       await useCase.execute({ sessionId: SESSION_ID });
@@ -398,13 +497,15 @@ describe("ReadLocalCostUseCase", () => {
       const withJournal = new ReadLocalCostUseCase(
         withJournalSink,
         new Map([["claude", stubReader([MOMENT_CANDIDATE])]]),
-        journalWithOneStep("aidd-dev:06-test")
+        journalWithOneStep("aidd-dev:06-test"),
+        NULL_PERSON_IDENTITY_READER
       );
       const withoutJournalSink = new InMemoryTelemetrySink();
       const withoutJournal = new ReadLocalCostUseCase(
         withoutJournalSink,
         new Map([["claude", stubReader([MOMENT_CANDIDATE])]]),
-        NULL_RUN_JOURNAL_READER
+        NULL_RUN_JOURNAL_READER,
+        NULL_PERSON_IDENTITY_READER
       );
 
       await withJournal.execute({ sessionId: SESSION_ID });
@@ -454,7 +555,8 @@ describe("ReadLocalCostUseCase", () => {
       const useCase = new ReadLocalCostUseCase(
         sink,
         new Map([["claude", stubReader([CANDIDATE])]]),
-        journalWithProject("acme-widgets", "git@github.com:acme/widgets.git")
+        journalWithProject("acme-widgets", "git@github.com:acme/widgets.git"),
+        NULL_PERSON_IDENTITY_READER
       );
 
       await useCase.execute({ sessionId: SESSION_ID });
@@ -470,7 +572,8 @@ describe("ReadLocalCostUseCase", () => {
       const useCase = new ReadLocalCostUseCase(
         sink,
         new Map([["claude", stubReader([CANDIDATE])]]),
-        journalWithProject("acme-widgets", undefined)
+        journalWithProject("acme-widgets", undefined),
+        NULL_PERSON_IDENTITY_READER
       );
 
       await useCase.execute({ sessionId: SESSION_ID });
@@ -486,7 +589,8 @@ describe("ReadLocalCostUseCase", () => {
       const useCase = new ReadLocalCostUseCase(
         sink,
         new Map([["claude", stubReader([CANDIDATE])]]),
-        NULL_RUN_JOURNAL_READER
+        NULL_RUN_JOURNAL_READER,
+        NULL_PERSON_IDENTITY_READER
       );
 
       await useCase.execute({ sessionId: SESSION_ID });
@@ -517,7 +621,8 @@ describe("a reader that fails", () => {
         ["opencode", throwingReader()],
         ["claude", stubReader([CANDIDATE])],
       ]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
 
     const result = await useCase.execute({ sessionId: SESSION_ID });
@@ -532,7 +637,8 @@ describe("a reader that fails", () => {
     const useCase = new ReadLocalCostUseCase(
       new InMemoryTelemetrySink(),
       new Map([["opencode", throwingReader()]]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
 
     const opencode = (await useCase.execute({ sessionId: SESSION_ID })).toolReports.find(
@@ -547,7 +653,8 @@ describe("a reader that fails", () => {
     const useCase = new ReadLocalCostUseCase(
       new InMemoryTelemetrySink(),
       new Map([["opencode", throwingReader()]]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
 
     const opencode = (await useCase.execute({ sessionId: SESSION_ID })).toolReports.find(
@@ -567,7 +674,8 @@ describe("a reader that fails", () => {
         ["opencode", throwingReader()],
         ["claude", throwingReader()],
       ]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
 
     const result = await useCase.execute({ sessionId: SESSION_ID });
@@ -587,14 +695,16 @@ describe("a reader that fails", () => {
     const failing = new ReadLocalCostUseCase(
       sink,
       new Map([["claude", throwingReader()]]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
     await failing.execute({ sessionId: SESSION_ID });
 
     const recovered = new ReadLocalCostUseCase(
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
     const result = await recovered.execute({ sessionId: SESSION_ID });
 
@@ -646,7 +756,8 @@ describe("reading every session the journal knows", () => {
           ),
         ],
       ]),
-      journalNaming("s-a", "s-b")
+      journalNaming("s-a", "s-b"),
+      NULL_PERSON_IDENTITY_READER
     );
 
     const result = await useCase.execute({});
@@ -659,7 +770,8 @@ describe("reading every session the journal knows", () => {
     const useCase = new ReadLocalCostUseCase(
       new InMemoryTelemetrySink(),
       new Map([["claude", readerFor(new Map([["s-a", [CANDIDATE]]]))]]),
-      journalNaming("s-a", "s-b")
+      journalNaming("s-a", "s-b"),
+      NULL_PERSON_IDENTITY_READER
     );
 
     const result = await useCase.execute({ sessionId: "s-a" });
@@ -671,7 +783,8 @@ describe("reading every session the journal knows", () => {
     const useCase = new ReadLocalCostUseCase(
       new InMemoryTelemetrySink(),
       new Map([["claude", stubReader([CANDIDATE])]]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
 
     expect(await useCase.execute({})).toEqual({ sessions: [], toolReports: expect.anything() });
@@ -682,7 +795,12 @@ describe("reading every session the journal knows", () => {
     const readers = new Map<AiToolId, SessionCostReader>([
       ["claude", readerFor(new Map([["s-a", [{ ...CANDIDATE, vendor_id: "s-a" }]]]))],
     ]);
-    const useCase = new ReadLocalCostUseCase(sink, readers, journalNaming("s-a"));
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      readers,
+      journalNaming("s-a"),
+      NULL_PERSON_IDENTITY_READER
+    );
     await useCase.execute({});
 
     const second = await useCase.execute({});
@@ -706,7 +824,8 @@ describe("reading every session the journal knows", () => {
           },
         ],
       ]),
-      journalNaming("s-bad", "s-good")
+      journalNaming("s-bad", "s-good"),
+      NULL_PERSON_IDENTITY_READER
     );
 
     const result = await useCase.execute({});
@@ -732,7 +851,8 @@ describe("reading every session the journal knows", () => {
           ),
         ],
       ]),
-      journalNaming("s-a", "s-b")
+      journalNaming("s-a", "s-b"),
+      NULL_PERSON_IDENTITY_READER
     );
 
     const claude = (await useCase.execute({})).toolReports.find(
@@ -779,7 +899,8 @@ describe("a failure in a sweep does not disappear behind a success", () => {
           },
         ],
       ]),
-      journal
+      journal,
+      NULL_PERSON_IDENTITY_READER
     );
 
     const claude = (await useCase.execute({})).toolReports.find(
@@ -796,7 +917,8 @@ describe("a failure in a sweep does not disappear behind a success", () => {
     const useCase = new ReadLocalCostUseCase(
       new InMemoryTelemetrySink(),
       new Map([["claude", stubReader([CANDIDATE])]]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
 
     const claude = (await useCase.execute({ sessionId: SESSION_ID })).toolReports.find(

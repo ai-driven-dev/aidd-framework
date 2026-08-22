@@ -56,6 +56,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | File |
 |------|
 | [attribution.js](skills/_shared/attribution.js) |
+| [identity.js](skills/_shared/identity.js) |
 | [journal.js](skills/_shared/journal.js) |
 | [readers.js](skills/_shared/readers.js) |
 
@@ -66,8 +67,11 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `actions` | [01-check.md](skills/00-init/actions/01-check.md) | - |
 | `actions` | [02-enable.md](skills/00-init/actions/02-enable.md) | - |
 | `actions` | [03-verify.md](skills/00-init/actions/03-verify.md) | - |
+| `actions` | [04-identify.md](skills/00-init/actions/04-identify.md) | - |
+| `actions` | [05-forget.md](skills/00-init/actions/05-forget.md) | - |
+| `scripts` | [telemetry-identity.js](skills/00-init/scripts/telemetry-identity.js) | - |
 | `scripts` | [telemetry-switch.js](skills/00-init/scripts/telemetry-switch.js) | - |
-| `-` | [SKILL.md](skills/00-init/SKILL.md) | `Turns AIDD measurement on for a project and proves it is recording. Use when the user wants to start measuring what their work costs, wants to stop, or asks why nothing is being recorded. Not for answering what a piece of work consumed.` |
+| `-` | [SKILL.md](skills/00-init/SKILL.md) | `Turns AIDD measurement on for a project, proves it is recording, and lets a person opt into (or out of) naming themselves on their own records. Use when the user wants to start measuring what their work costs, wants to stop, asks why nothing is being recorded, or wants their own name to appear on (or disappear from) what gets measured. Not for answering what a piece of work consumed.` |
 
 #### `skills/01-cost`
 
