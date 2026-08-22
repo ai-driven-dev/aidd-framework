@@ -108,8 +108,17 @@ TMPROOT=$(mktemp -d -t aidd-smoke-tools-XXXXXXXX)
 export AIDD_USER_CONFIG_DIR="$TMPROOT/cfg"; mkdir -p "$AIDD_USER_CONFIG_DIR"
 trap 'rm -rf "$TMPROOT"' EXIT
 
+# Read the token before HOME moves: `gh` looks for its credentials under the real one.
 TOKEN="${AIDD_TOKEN:-$(gh auth token 2>/dev/null || true)}"
 export AIDD_TOKEN="$TOKEN"
+
+# Hermetic means hermetic about what the TOOLS write too, not only about what this CLI
+# writes under the project. `marketplace add --scope user` lands in the tool's home
+# settings, and native activation shells out to `codex` and `copilot`, which register
+# marketplaces in their own home store. Left pointing at the real one, every run leaves
+# a registration behind naming a temp directory this script then deletes — verified on
+# a developer machine, in both `~/.claude/settings.json` and copilot's global store.
+export HOME="$TMPROOT/home"; mkdir -p "$HOME"
 
 # ════════════════════════════════════════════════════════════════
 # OFFLINE / LOCAL — runs without a token
