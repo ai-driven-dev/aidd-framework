@@ -10,6 +10,7 @@ import { PluginCatalogRepositoryAdapter } from "../../../../../src/infrastructur
 import { CapturingLogger } from "../../../../helpers/ports/capturing-logger.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
 import { fakeEnsureBuiltMarketplace } from "../../../../helpers/ports/fake-ensure-built-marketplace.js";
+import { FakeNativePluginActivator } from "../../../../helpers/ports/fake-native-plugin-activator.js";
 import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryManifestRepository } from "../../../../helpers/ports/in-memory-manifest-repository.js";
 import { InMemoryMarketplaceRegistry } from "../../../../helpers/ports/in-memory-marketplace-registry.js";
@@ -34,12 +35,14 @@ function buildDist(name = "aidd-context"): PluginDistribution {
 }
 
 describe("install claude plugin via Mode A (integration)", () => {
-  it("splits the two keys by what each can carry, after sync", async () => {
+  it("leaves the registration to claude and keeps only what it owns", async () => {
     const fs = new InMemoryFileAdapter();
     const hasher = new DeterministicHasher();
     const manifestRepo = new InMemoryManifestRepository();
     const registry = new InMemoryMarketplaceRegistry();
     const catalog = new PluginCatalogRepositoryAdapter(fs);
+    // Claude drives its own registration; it does not enable plugins that way.
+    const activator = new FakeNativePluginActivator({ available: true, enablesPlugins: false });
     const manifest = Manifest.create();
     manifest.addTool("claude", "test", []);
 
@@ -70,33 +73,27 @@ describe("install claude plugin via Mode A (integration)", () => {
       catalog,
       hasher,
       new CapturingLogger(),
-      new Map(),
+      new Map([["claude", activator]]),
       fakeEnsureBuiltMarketplace()
     );
-    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
 
-    expect(result.updatedTools).toContain("claude");
     const shared = JSON.parse(
       await fs.readFile(resolve(PROJECT_ROOT, ".claude/settings.json"))
     ) as Record<string, unknown>;
-    const machineLocal = JSON.parse(
-      await fs.readFile(resolve(PROJECT_ROOT, ".claude/settings.local.json"))
-    ) as Record<string, unknown>;
 
-    // The registration names the BUILT claude tree by absolute path, so it describes
-    // this machine and goes to the file the CLI writes without committing or hashing it.
-    expect(
-      (machineLocal.extraKnownMarketplaces as Record<string, unknown>)[MARKETPLACE_NAME]
-    ).toEqual({
-      source: { source: "directory", path: "/built/claude" },
-    });
+    // Claude registers its own marketplaces through its own command, so this CLI
+    // writes no registration anywhere — not in the shared file, not beside it.
     expect(shared.extraKnownMarketplaces).toBeUndefined();
+    expect(await fs.fileExists(resolve(PROJECT_ROOT, ".claude/settings.local.json"))).toBe(false);
+    expect(activator.addedMarketplaces).toEqual(["/built/claude"]);
 
-    // Enabled plugins are named, not located, so they stay in the shared file.
+    // Enabled plugins stay here: `claude plugin install --scope project` writes this
+    // very object, so driving it would be a second way of doing the same thing.
     expect(
       (shared.enabledPlugins as Record<string, boolean>)[`aidd-context@${MARKETPLACE_NAME}`]
     ).toBe(true);
-    expect(machineLocal.enabledPlugins).toBeUndefined();
+    expect(activator.enabledPlugins).toEqual([]);
   });
 
   it("does not materialize plugin files on disk for Mode A", async () => {
@@ -124,6 +121,8 @@ describe("install claude plugin via Mode A (integration)", () => {
     const manifestRepo = new InMemoryManifestRepository();
     const registry = new InMemoryMarketplaceRegistry();
     const catalog = new PluginCatalogRepositoryAdapter(fs);
+    // Claude drives its own registration; it does not enable plugins that way.
+    const activator = new FakeNativePluginActivator({ available: true, enablesPlugins: false });
     const manifest = Manifest.create();
     manifest.addTool("claude", "test", []);
 
@@ -154,7 +153,7 @@ describe("install claude plugin via Mode A (integration)", () => {
       catalog,
       hasher,
       new CapturingLogger(),
-      new Map(),
+      new Map([["claude", activator]]),
       fakeEnsureBuiltMarketplace()
     );
 
@@ -174,16 +173,9 @@ describe("install claude plugin via Mode A (integration)", () => {
     const shared = JSON.parse(
       await fs.readFile(resolve(PROJECT_ROOT, ".claude/settings.json"))
     ) as Record<string, unknown>;
-    const machineLocal = JSON.parse(
-      await fs.readFile(resolve(PROJECT_ROOT, ".claude/settings.local.json"))
-    ) as Record<string, unknown>;
 
     expect(shared.extraKnownMarketplaces).toBeUndefined();
-    expect(
-      (machineLocal.extraKnownMarketplaces as Record<string, unknown>)[MARKETPLACE_NAME]
-    ).toEqual({
-      source: { source: "directory", path: "/built/claude" },
-    });
+    expect(activator.addedMarketplaces).toContain("/built/claude");
     // Both branches wrote the shared file in this one call — the eviction, then the
     // enabled-plugins merge. Asserting the plugin landed proves the second write
     // happened, and that it did not carry the evicted key back with it.

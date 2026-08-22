@@ -3,7 +3,7 @@
     "command": "setup --source local --path <FRAMEWORK_FIXTURE> --ai claude --plugins none --yes",
     "exitCode": 0,
     "stdout": "Fetching marketplace 'aidd-framework'...\nProject initialized.\nInstalled claude (1 files)\n",
-    "stderr": "Warning: Skipping commands/ in plugin 'aidd-test' (out of scope for MVP1).\nWarning: Skipping rules/ in plugin 'aidd-test' (out of scope for MVP1).\n",
+    "stderr": "Warning: Skipping commands/ in plugin 'aidd-test' (out of scope for MVP1).\nWarning: Skipping rules/ in plugin 'aidd-test' (out of scope for MVP1).\nWarning: claude CLI not found on PATH — skipping native plugin activation.\n",
     "filesWritten": [
       ".aidd/cache/built/aidd-framework/claude/.build-version",
       ".aidd/cache/built/aidd-framework/claude/.claude-plugin/marketplace.json",
@@ -17,7 +17,6 @@
       ".aidd/manifest.json",
       ".aidd/marketplaces.json",
       ".claude/settings.json",
-      ".claude/settings.local.json",
       ".gitignore"
     ],
     "manifest": {
@@ -110,7 +109,7 @@
     "command": "plugin install aidd-test",
     "exitCode": 0,
     "stdout": "Installed 'aidd-test'.\n",
-    "stderr": "",
+    "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\n",
     "filesWritten": [],
     "manifest": {
       "version": 6,
@@ -182,7 +181,7 @@
     "command": "ai install cursor --force",
     "exitCode": 0,
     "stdout": "Installed cursor (1 files)\n",
-    "stderr": "Warning: Skipping commands/ in plugin 'aidd-test' (out of scope for MVP1).\nWarning: Skipping rules/ in plugin 'aidd-test' (out of scope for MVP1).\n",
+    "stderr": "Warning: Skipping commands/ in plugin 'aidd-test' (out of scope for MVP1).\nWarning: Skipping rules/ in plugin 'aidd-test' (out of scope for MVP1).\nWarning: claude CLI not found on PATH — skipping native plugin activation.\n",
     "filesWritten": [
       ".aidd/cache/built/aidd-framework/cursor/.build-version",
       ".aidd/cache/built/aidd-framework/cursor/.cursor-plugin/marketplace.json",
@@ -601,7 +600,7 @@
     "command": "plugin remove aidd-test",
     "exitCode": 0,
     "stdout": "Plugin 'aidd-test' removed.\n",
-    "stderr": "",
+    "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\n",
     "filesWritten": [],
     "manifest": {
       "version": 6,

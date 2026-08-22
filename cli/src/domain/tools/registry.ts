@@ -8,13 +8,10 @@ import {
 import type { FrameworkBuildMode } from "../models/framework-build.js";
 import {
   AI_TOOL_IDS,
-  type AiToolId,
   IDE_TOOL_IDS,
   type IdeToolId,
-  isAiToolId,
   type ToolCategory,
   type ToolId,
-  VALID_TOOL_IDS,
 } from "../models/tool-ids.js";
 import type { FileReader } from "../ports/file-reader.js";
 import type { AiTool, IdeToolConfig } from "./contracts.js";

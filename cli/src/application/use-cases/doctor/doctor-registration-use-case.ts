@@ -5,7 +5,8 @@ import type { Manifest } from "../../../domain/models/manifest.js";
 import type { ToolId } from "../../../domain/models/tool-ids.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
-import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
+import type { NativePluginActivator } from "../../../domain/ports/native-plugin-activator.js";
+import { getToolConfig, isAiTool, nativeActivationOf } from "../../../domain/tools/registry.js";
 
 export interface DoctorRegistrationOptions {
   manifest: Manifest;
@@ -24,7 +25,9 @@ export interface DoctorRegistrationOptions {
 export class DoctorRegistrationUseCase {
   constructor(
     private readonly fs: FileReader,
-    private readonly registry: MarketplaceRegistry
+    private readonly registry: MarketplaceRegistry,
+    /** Native plugin CLI activators keyed by `NativeActivation.binary`. */
+    private readonly activators: ReadonlyMap<string, NativePluginActivator> = new Map()
   ) {}
 
   async execute(options: DoctorRegistrationOptions): Promise<DoctorIssue[]> {
@@ -37,6 +40,10 @@ export class DoctorRegistrationUseCase {
       if (allowedIds && !allowedIds.has(toolId)) continue;
       const settings = this.untrackedSettingsOf(toolId);
       if (settings === undefined) continue;
+      // A tool that writes its own registration cannot have written one while its
+      // binary was out of reach. Reporting the absence then would be reporting that
+      // an uninstalled tool is unconfigured, which is not a fault to fix.
+      if (!this.canRegisterItself(toolId)) continue;
       const registered = await this.registeredNames(projectRoot, settings);
       for (const marketplace of expected) {
         if (registered.has(marketplace.name)) continue;
@@ -83,5 +90,11 @@ export class DoctorRegistrationUseCase {
     if (Array.isArray(value)) return new Set(value.map(String));
     if (value !== null && typeof value === "object") return new Set(Object.keys(value));
     return new Set();
+  }
+
+  private canRegisterItself(toolId: ToolId): boolean {
+    const activation = nativeActivationOf(toolId);
+    if (activation === undefined) return true;
+    return this.activators.get(activation.binary)?.isAvailable() ?? false;
   }
 }

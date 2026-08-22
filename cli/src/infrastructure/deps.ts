@@ -409,7 +409,8 @@ export async function createDeps(
             new NativePluginCliAdapter(
               activation.binary,
               activation.upgradeVerb,
-              activation.enableVerb
+              activation.enableVerb,
+              activation.marketplaceAddArgs
             ),
           ] as const);
     }).filter((entry): entry is NonNullable<typeof entry> => entry !== undefined),
@@ -583,7 +584,7 @@ export async function createDeps(
     doctorPluginUseCase,
     doctorReferencesUseCase,
     doctorLayoutUseCase,
-    new DoctorRegistrationUseCase(fs, marketplaceRegistry)
+    new DoctorRegistrationUseCase(fs, marketplaceRegistry, nativePluginActivators)
   );
   const releaseResolver = new GitHubReleaseResolverAdapter(http, authReader);
   const setupMarketplaceSourceUseCase = new SetupMarketplaceSourceUseCase(

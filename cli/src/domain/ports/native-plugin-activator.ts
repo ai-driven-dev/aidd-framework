@@ -1,19 +1,23 @@
 /**
- * Drives a tool's native plugin CLI to register marketplaces and enable plugins.
+ * Drives a tool's native plugin CLI, so the tool writes its own configuration.
  *
- * Some tools (Codex, Copilot) only load plugins from user-global state populated by
- * their `<tool> plugin` subcommands — writing a project-local config does not enable
- * a plugin. Implementations shell out to the tool's CLI binary. Each implementation
- * targets one binary; the binary it serves is declared via `NativeActivation.binary`.
+ * What each tool delegates differs. Codex and Copilot load plugins only from
+ * user-global state their `<tool> plugin` subcommands populate, so both steps are
+ * driven. Claude registers its marketplaces through its command but reads enabled
+ * plugins from a project file this CLI writes, so only the registration is — driving
+ * the rest would write exactly what is already written. Implementations shell out to
+ * the binary declared by `NativeActivation.binary`.
  */
 export interface NativePluginActivator {
   /** Returns true when the tool's CLI binary is callable on PATH. Never throws. */
   isAvailable(): boolean;
   /** Registers a marketplace source (local path, `owner/repo[@ref]`, or git URL). Idempotent. */
   addMarketplace(source: string): void;
+  /** True when this tool enables plugins through its CLI rather than through a file. */
+  enablesPlugins(): boolean;
   /** Unregisters a marketplace by name. May throw when absent — callers wrap it best-effort. */
   removeMarketplace(name: string): void;
-  /** Refreshes marketplace snapshots so plugin installs pick up new versions. */
+  /** Refreshes marketplace snapshots so plugin installs pick up new versions. No-op when unsupported. */
   upgradeMarketplaces(): void;
   /** Installs and enables a plugin referenced as `<plugin>@<marketplace>`. Idempotent. */
   enablePlugin(pluginRef: string): void;

@@ -275,7 +275,7 @@ l'outil accepte de lire une déclaration machine-locale.
 
 | outil | ce que son architecture permet | ce qu'AIDD écrit |
 |---|---|---|
-| claude | trois scopes, et `--scope local` écrit `.claude/settings.local.json` — vérifié, c'est le fichier que Claude écrit lui-même | l'enregistrement va dans ce fichier, gitignoré, non suivi ; la config runtime et `enabledPlugins` restent partagés |
+| claude | `plugin marketplace add … --scope local` écrit `.claude/settings.local.json` ; `plugin install --scope project` écrit `enabledPlugins` | **la commande écrit l'enregistrement**, AIDD n'écrit rien ; la config runtime et `enabledPlugins` restent à AIDD |
 | copilot | aucun jumeau machine-local. `.github/copilot/settings.json` est lu par VS Code et documenté comme la recommandation d'équipe ; `chat.plugins.marketplaces` a une portée application et VS Code la refuse en réglages d'espace de travail | `enabledPlugins` seulement. Aucun enregistrement : un chemin absolu ne peut pas être une recommandation d'équipe. Copilot apprend ses marketplaces par sa propre CLI |
 | codex | pas de réglages de marketplace du tout, tout passe par sa CLI | rien |
 | cursor | idem, et sa commande n'accepte qu'une URL git | rien |
@@ -283,6 +283,42 @@ l'outil accepte de lire une déclaration machine-locale.
 
 La capability porte donc trois réponses possibles pour l'emplacement des enregistrements, et non deux :
 dans le fichier partagé, dans un fichier machine-local, ou **nulle part**.
+
+### La règle qui tranche : la commande de l'outil d'abord
+
+Un outil qui propose une commande pour écrire sa configuration l'écrit mieux que nous — dans son
+format, à son scope, et il continuera de le faire quand ce format changera. AIDD n'écrit donc que ce
+qu'aucune commande ne couvre. La capability sépare les deux axes : `marketplaceSettings` dit **où**
+le fichier se trouve, pour le `.gitignore` et pour `status` ; `nativeActivation` dit **qui** l'écrit.
+
+Ce qui a résisté à la règle, mesuré plutôt que supposé : `claude plugin install --scope project`
+écrit exactement `{"<plugin>@<marketplace>": true}` dans `.claude/settings.json`, caractère pour
+caractère ce qu'AIDD y écrit déjà. Le piloter ne serait pas mieux, ce serait une seconde manière de
+faire la même chose, et ça donnerait un second auteur à un fichier dont AIDD enregistre l'empreinte.
+`enabledPlugins` reste donc écrit par AIDD.
+
+**Hors ligne.** L'enregistrement étant piloté, un binaire absent veut dire aucun enregistrement —
+comme codex et copilot aujourd'hui. Vérifié : `Warning: claude CLI not found on PATH — skipping
+native plugin activation.`, et rien d'écrit. C'est la lecture littérale du principe : le fichier
+quand l'outil n'offre **pas de commande**, pas quand le binaire manque.
+
+### Deux régressions que le golden a attrapées, et une fragilité qu'il révélait
+
+Piloter la commande rend la sortie observable dépendante de ce que la machine a d'installé. Le golden
+est devenu vert ici et rouge sans le binaire — donc inutilisable comme garde-fou. Les runs bac à
+sable filtrent maintenant du `PATH` tout répertoire contenant une CLI pilotable, et appellent node par
+`process.execPath` : filtrer par répertoire est ce qui tient sur une machine où `node` et `copilot`
+partagent `/opt/homebrew/bin`.
+
+Sous ce filtre, le golden a montré deux vraies régressions :
+
+- **L'arbre construit disparaissait.** La construction était un effet de bord de l'enregistrement,
+  donc plus de binaire, plus d'arbre — alors que construire est le travail d'AIDD quel que soit
+  l'écrivain, et que l'arbre est ce que tout enregistrement désigne. Construire vient maintenant
+  avant de décider qui écrit.
+- **`doctor` sortait en 1** en signalant qu'un outil non installé ne déclare pas son marketplace.
+  Le contrôle ne se déclenche plus quand le binaire est hors de portée : signaler ça, c'est signaler
+  qu'un logiciel absent est mal configuré.
 
 ### Ce qui a été écarté, et pourquoi
 

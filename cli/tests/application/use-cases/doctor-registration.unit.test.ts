@@ -6,13 +6,18 @@ import type { ToolId } from "../../../src/domain/models/tool-ids.js";
 import "../../../src/domain/tools/ai/claude.js";
 import "../../../src/domain/tools/ai/copilot.js";
 import "../../../src/domain/tools/ai/cursor.js";
+import { FakeNativePluginActivator } from "../../helpers/ports/fake-native-plugin-activator.js";
 import { InMemoryFileAdapter } from "../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryMarketplaceRegistry } from "../../helpers/ports/in-memory-marketplace-registry.js";
 
 const PROJECT_ROOT = "/project";
 const LOCAL_SETTINGS = `${PROJECT_ROOT}/.claude/settings.local.json`;
 
-async function issuesFor(registered: string[] | null, toolId: ToolId = "claude") {
+async function issuesFor(
+  registered: string[] | null,
+  toolId: ToolId = "claude",
+  toolInstalled = true
+) {
   const fs = new InMemoryFileAdapter();
   if (registered !== null) {
     const entries = Object.fromEntries(registered.map((name) => [name, { source: {} }]));
@@ -30,7 +35,10 @@ async function issuesFor(registered: string[] | null, toolId: ToolId = "claude")
   );
   const manifest = Manifest.create();
   manifest.addTool(toolId, "test", []);
-  return new DoctorRegistrationUseCase(fs, registry).execute({
+  const activators = new Map([
+    ["claude", new FakeNativePluginActivator({ available: toolInstalled, enablesPlugins: false })],
+  ]);
+  return new DoctorRegistrationUseCase(fs, registry, activators).execute({
     manifest,
     projectRoot: PROJECT_ROOT,
     allowedIds: null,
@@ -53,6 +61,13 @@ describe("DoctorRegistrationUseCase", () => {
     const issues = await issuesFor(null);
     expect(issues).toHaveLength(1);
     expect(issues[0].severity).toBe("warning");
+  });
+
+  // The registration is written by the tool itself, so it cannot exist while the tool
+  // does not. Reporting it missing then would be reporting that something uninstalled
+  // is unconfigured.
+  it("says nothing about a tool whose binary is out of reach", async () => {
+    expect(await issuesFor(null, "claude", false)).toEqual([]);
   });
 
   it("stays silent for a tool that keeps its registrations in a tracked file", async () => {

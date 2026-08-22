@@ -108,12 +108,20 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         acceptsHooks: true,
         acceptsMcp: true,
         translationMode: "marketplace",
-        // Deliberately NOT driven through `claude plugin marketplace add`, though the
-        // command exists and takes a local path. Measured: it writes `.claude/settings.json`
-        // itself, after this CLI wrote it and recorded its hash — two writers, one
-        // recorder, so `status` reports the file modified forever after. Claude Code
-        // reads a project-local settings file, so writing it is sufficient; codex and
-        // copilot are driven because for them it is not.
+        // Claude registers its own marketplaces. An earlier attempt drove the command
+        // at project scope, where it rewrites `.claude/settings.json` after this CLI
+        // hashed it — two writers, one recorder, and `status` reporting drift forever.
+        // `--scope local` writes `.claude/settings.local.json` instead, a file this CLI
+        // does not write and does not track, so nothing collides. Measured.
+        //
+        // No `enableVerb`: `claude plugin install --scope project` writes exactly
+        // `{"<plugin>@<marketplace>": true}` into `.claude/settings.json`, character for
+        // character what this CLI already writes there. Driving it would be a second way
+        // of doing the same thing, and would hand a tracked file a second writer.
+        nativeActivation: {
+          binary: "claude",
+          marketplaceAddArgs: ["--scope", "local"],
+        },
         marketplaceSettings: {
           settingsPath: ".claude/settings.json",
           settingsKey: "extraKnownMarketplaces",

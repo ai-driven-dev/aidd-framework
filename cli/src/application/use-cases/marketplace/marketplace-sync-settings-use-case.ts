@@ -15,7 +15,7 @@ import type { ManifestRepository } from "../../../domain/ports/manifest-reposito
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
 import type { NativePluginActivator } from "../../../domain/ports/native-plugin-activator.js";
 import type { PluginCatalogRepository } from "../../../domain/ports/plugin-catalog-repository.js";
-import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
+import { getToolConfig, isAiTool, nativeActivationOf } from "../../../domain/tools/registry.js";
 import type { EnsureBuiltMarketplaceUseCase } from "../shared/ensure-built-marketplace-use-case.js";
 
 export interface MarketplaceSyncSettingsOptions {
@@ -88,15 +88,20 @@ export class MarketplaceSyncSettingsUseCase {
     marketplaces: readonly Marketplace[]
   ): Promise<void> {
     const { refs, marketplaces: used } = this.pluginActivation(toolId, manifest, marketplaces);
-    if (refs.length === 0) return;
+    // A tool that enables its plugins elsewhere still needs its marketplaces declared,
+    // and a project can have marketplaces before it has plugins — so registration is
+    // driven for every known marketplace, not only for the ones a plugin points at.
+    const toRegister = activator.enablesPlugins() ? used : marketplaces;
+    if (toRegister.length === 0 && refs.length === 0) return;
     if (!activator.isAvailable()) {
       this.logger.warn(`${binary} CLI not found on PATH — skipping native plugin activation.`);
       return;
     }
     // Each step is independently best-effort: one failing plugin or marketplace
     // must warn and let the others through, never abort the whole activation.
-    for (const marketplace of used)
+    for (const marketplace of toRegister)
       await this.registerMarketplace(activator, toolId, marketplace, projectRoot);
+    if (!activator.enablesPlugins()) return;
     this.bestEffort(() => activator.upgradeMarketplaces(), "upgrade marketplaces");
     for (const ref of refs) {
       this.bestEffort(() => activator.enablePlugin(ref), `enable plugin '${ref}'`);
@@ -271,15 +276,21 @@ export class MarketplaceSyncSettingsUseCase {
     marketplaces: readonly Marketplace[],
     versionByName: Map<string, string | undefined>
   ): Promise<boolean> {
-    if (settings.marketplacesSettingsPath === null) {
-      // Nowhere to put them, so put them nowhere. The tool learns about its
-      // marketplaces through its own CLI instead; see the profile for why.
+    // Building the tree is this CLI's job whoever registers it: a tool that is not
+    // installed today may be tomorrow, and the tree is what any registration points
+    // at. So build first, and only then decide who writes the registration down.
+    const builtSources = await this.builtSourcesForTool(toolId, marketplaces, projectRoot);
+
+    // Where the profile declares a native CLI, the tool writes its own registrations —
+    // in its own format and at its own scope. Writing them here too would be a second
+    // copy of something this CLI does not own. `marketplacesSettingsPath` still says
+    // where that file is, so the gitignore and `status` keep knowing about it.
+    if (settings.marketplacesSettingsPath === null || nativeActivationOf(toolId) !== undefined) {
       return this.evictMarketplacesFromSharedFile(toolId, projectRoot, manifest, settings);
     }
     const relativePath = settings.marketplacesSettingsPath ?? settings.settingsPath;
     const absPath = resolve(projectRoot, relativePath);
     const json = await this.loadSettings(absPath);
-    const builtSources = await this.builtSourcesForTool(toolId, marketplaces, projectRoot);
     const merged = this.mergeMarketplaces(
       json,
       settings,

@@ -31,14 +31,21 @@ export abstract class AbstractNativePluginCliAdapter implements NativePluginActi
     });
   }
 
+  /** Extra arguments the profile appends to `plugin marketplace add`, e.g. a scope. */
+  protected readonly addArgs: readonly string[] = [];
+
   addMarketplace(source: string): void {
-    this.run(["plugin", "marketplace", "add", source], `marketplace add ${source}`);
+    this.run(
+      ["plugin", "marketplace", "add", source, ...this.addArgs],
+      `marketplace add ${source}`
+    );
   }
 
   removeMarketplace(name: string): void {
     this.run(["plugin", "marketplace", "remove", name], `marketplace remove ${name}`);
   }
 
+  abstract enablesPlugins(): boolean;
   abstract upgradeMarketplaces(): void;
   abstract enablePlugin(pluginRef: string): void;
 

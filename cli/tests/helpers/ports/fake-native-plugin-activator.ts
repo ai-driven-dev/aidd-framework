@@ -20,6 +20,7 @@ export class FakeNativePluginActivator implements NativePluginActivator {
   private readonly failOnPlugins: ReadonlySet<string>;
   private readonly conflictOnAdd: boolean;
   private readonly throwOnRemove: boolean;
+  private readonly pluginsEnabledHere: boolean;
 
   constructor(
     options: {
@@ -27,12 +28,19 @@ export class FakeNativePluginActivator implements NativePluginActivator {
       failOnPlugins?: readonly string[];
       conflictOnAdd?: boolean;
       throwOnRemove?: boolean;
+      /** False for a tool whose plugins are enabled by a file this CLI writes. */
+      enablesPlugins?: boolean;
     } = {}
   ) {
     this.available = options.available ?? false;
     this.failOnPlugins = new Set(options.failOnPlugins ?? []);
     this.conflictOnAdd = options.conflictOnAdd ?? false;
     this.throwOnRemove = options.throwOnRemove ?? false;
+    this.pluginsEnabledHere = options.enablesPlugins ?? true;
+  }
+
+  enablesPlugins(): boolean {
+    return this.pluginsEnabledHere;
   }
 
   isAvailable(): boolean {

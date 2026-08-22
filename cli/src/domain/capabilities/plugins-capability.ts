@@ -10,22 +10,36 @@ const DEFAULT_HOOKS_PATH = "hooks/hooks.json";
 const DEFAULT_HOOKS_FORMAT: HooksContentFormat = "claude";
 
 /**
- * Declares that a tool registers marketplaces and enables plugins through its own
- * CLI (e.g. `claude plugin marketplace add`, `codex plugin add`,
- * `copilot plugin install`). The `binary` keys the matching
- * `NativePluginActivator` in the marketplace-sync registry.
+ * Declares that a tool writes its own marketplace registration, through its own CLI.
  *
- * Only for tools whose project-local settings file does not load their plugins.
- * Claude Code is deliberately absent: its `plugin marketplace add` exists, but it
- * rewrites `.claude/settings.json` after this CLI recorded that file's hash, which
- * makes `status` report drift forever. See the comment in the claude profile.
+ * Where a tool offers the command, driving it is preferred to writing the file: the
+ * tool then owns its configuration, in the format and at the scope it decides, and
+ * this CLI stops keeping a second copy of something it does not own. Declaring this
+ * is what makes the marketplace sync stand back — `marketplaceSettings` still says
+ * *where* the file is, for the gitignore and for `status`, but no longer *who* writes
+ * it.
+ *
+ * The `binary` keys the matching `NativePluginActivator` in the sync registry.
  */
 export interface NativeActivation {
-  binary: "codex" | "copilot";
-  /** Verb this CLI uses to re-index its marketplaces, after `plugin marketplace`. */
-  upgradeVerb: string;
-  /** Verb this CLI uses to enable a plugin, after `plugin`. */
-  enableVerb: string;
+  binary: "claude" | "codex" | "copilot";
+  /**
+   * Arguments appended to `plugin marketplace add`, when the defaults are wrong.
+   * Claude registers at user scope unless told otherwise, which would declare a
+   * project's marketplace for every project on the machine.
+   */
+  marketplaceAddArgs?: readonly string[];
+  /**
+   * Verb this CLI uses to re-index its marketplaces, after `plugin marketplace`.
+   * Omit when nothing needs re-indexing because plugins are not enabled through the CLI.
+   */
+  upgradeVerb?: string;
+  /**
+   * Verb this CLI uses to enable a plugin, after `plugin`. Omit when the tool loads
+   * plugins from a project file this CLI writes: driving the command would then be a
+   * second way of doing the same thing, not a better one.
+   */
+  enableVerb?: string;
 }
 
 export interface NativePluginsParams {

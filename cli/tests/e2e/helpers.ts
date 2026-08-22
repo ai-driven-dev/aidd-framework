@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
+import { accessSync, constants, existsSync } from "node:fs";
 import { copyFile, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { delimiter, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { CLIOutput } from "../../src/application/output.js";
 import { InitUseCase } from "../../src/application/use-cases/init-use-case.js";
@@ -53,6 +53,37 @@ export async function createTestEnv(prefix: string): Promise<{
   };
 }
 
+/**
+ * The AI tool CLIs this project can drive. A sandboxed run must not reach them: the
+ * CLI registers marketplaces through a tool's own command when the binary is there,
+ * so leaving them reachable makes the recorded output depend on what the developer
+ * happens to have installed — green here, red in CI, for no change in this codebase.
+ */
+const DRIVABLE_TOOL_BINARIES = ["claude", "codex", "copilot", "cursor-agent"];
+
+/**
+ * PATH with every directory holding one of those binaries removed. Filtering by
+ * directory rather than listing directories to keep is what makes this hold on a
+ * machine where a tool sits beside everything else — `node` and `copilot` share
+ * `/opt/homebrew/bin` on macOS, so callers reach node through `process.execPath`
+ * instead of through PATH.
+ */
+function pathWithoutToolBinaries(): string {
+  const dirs = (process.env.PATH ?? "").split(delimiter).filter((dir) => dir !== "");
+  return dirs
+    .filter((dir) =>
+      DRIVABLE_TOOL_BINARIES.every((binary) => {
+        try {
+          accessSync(join(dir, binary), constants.X_OK);
+          return false;
+        } catch {
+          return true;
+        }
+      })
+    )
+    .join(delimiter);
+}
+
 function sandboxedEnv(
   fakeHome: string,
   extra?: Record<string, string>,
@@ -66,6 +97,7 @@ function sandboxedEnv(
     ...extra,
     HOME: fakeHome,
     XDG_CONFIG_HOME: join(fakeHome, ".config"),
+    PATH: pathWithoutToolBinaries(),
   };
 }
 
@@ -77,7 +109,10 @@ export async function runCli(
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   const env = sandboxedEnv(fakeHome, undefined, options);
   try {
-    const { stdout, stderr } = await execFileAsync("node", [CLI_PATH, ...args], { cwd, env });
+    const { stdout, stderr } = await execFileAsync(process.execPath, [CLI_PATH, ...args], {
+      cwd,
+      env,
+    });
     return { stdout, stderr, exitCode: 0 };
   } catch (error) {
     const err = error as { stdout?: string; stderr?: string; code?: number };
@@ -97,7 +132,10 @@ export async function runCliFast(
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   const env = sandboxedEnv(fakeHome, { AIDD_SKIP_MARKETPLACE_REFRESH: "1" });
   try {
-    const { stdout, stderr } = await execFileAsync("node", [CLI_PATH, ...args], { cwd, env });
+    const { stdout, stderr } = await execFileAsync(process.execPath, [CLI_PATH, ...args], {
+      cwd,
+      env,
+    });
     return { stdout, stderr, exitCode: 0 };
   } catch (error) {
     const err = error as { stdout?: string; stderr?: string; code?: number };
