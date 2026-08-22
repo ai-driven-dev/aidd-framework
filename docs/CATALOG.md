@@ -8,7 +8,7 @@ The exhaustive list of AIDD plugins, skills, and actions. Skills are invoked thr
 - [aidd-refine](#-aidd-refine) - meta-cognition
 - [aidd-vcs](#-aidd-vcs) - version control workflows
 - [aidd-orchestrator](#-aidd-orchestrator) - async orchestration (optional)
-- [aidd-ui](#-aidd-ui) - UI / UX (🚧 alpha, not ready)
+- [aidd-ui](#-aidd-ui) - UI / UX decisions (🚧 alpha)
 
 ---
 
@@ -102,8 +102,14 @@ Runs synchronous feature delivery, optional async issue automation, and the prod
 
 ## 🎨 aidd-ui
 
-🚧 **Alpha — not ready for use.** UI / UX: design, review, and improve frontend interfaces. Currently a smoke-test only.
+🚧 **Alpha.** UI / UX decisions and implementation handoff. Off the curated install path.
 
-| Skill      | Role                                      | Actions    |
-| ---------- | ----------------------------------------- | ---------- |
-| `01-hello` | Smoke-test that confirms the plugin loads | `01-greet` |
+| Skill | Role | Actions |
+| --- | --- | --- |
+| `01-design` | Design or redesign an interface from intent and evidence | `frame`, `inspect`, `structure`, `compose`, `validate` |
+| `02-review` | Review experience quality | `inspect`, `assess` |
+| `03-system` | Discover or minimally extend an interface system | `inspect`, `map`, `decide` |
+| `04-accessibility` | Define or review accessibility behavior | `inspect`, `specify`, `assess` |
+| `05-responsive` | Define or review constrained-space behavior | `inspect`, `specify`, `assess` |
+| `06-polish` | Refine a settled interface without restructuring | `refine` |
+| `07-handoff` | Write and verify an engineering experience contract | `compile`, `verify` |

@@ -55,10 +55,11 @@ Every capability lives in exactly one plugin, chosen by **concern**. This taxono
 | `aidd-orchestrator` | Orchestration        | Coordination |
 | `aidd-ui` 🚧        | UI/UX design         | Execution    |
 
-`aidd-ui` is alpha: smoke-test only, off the curated install path.
+`aidd-ui` is alpha: it owns interface experience decisions and remains off the curated install path.
 
 - **Knowledge vs execution is a firewall.** Knowledge plugins produce artifacts you *read* and never write or run application source. `aidd-context`'s bootstrap deliberately creates no `package.json`. Real code belongs to `aidd-dev` or an orchestrator's own setup actions.
 - **Concern decides placement, not existence.** A missing capability goes in the plugin whose concern owns it, then the caller delegates. Never reimplement it in the calling plugin because the right home lacks it today.
+- **The UI seam is an experience contract, not application code.** Product intent and durable project knowledge feed UI decisions; code transformation consumes those decisions for implementation. Current code wins when project memory drifts, and only the knowledge concern updates memory.
 - **Orchestration = sequencing across concerns** with little domain logic. Delegating a sub-step once does not make a skill an orchestrator. The orchestrator owns only glue and hands off through a seam artifact, for example an `INSTALL.md` one plugin produces and another consumes.
 - `aidd-orchestrator:02-backlog` owns the cross-artifact flow. Each artifact's contract stays in its `aidd-pm` skill, so a direct PM call follows the same rules as an orchestrated one.
 
