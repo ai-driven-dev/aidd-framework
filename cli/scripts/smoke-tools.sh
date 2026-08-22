@@ -194,12 +194,48 @@ if [[ -f "$proj_reg" ]] && grep -q "scoped" "$proj_reg"; then
 else
   bad "--scope project did not write $proj_reg"
 fi
-run "marketplace add --scope user" 0 "" "$P_SCOPE" -- marketplace add userscoped "$MKT_SRC" --yes --scope user
+# A second source, with its own manifest name: the tool keys its registry by the name
+# inside the marketplace, not by the name AIDD gave it, so two AIDD marketplaces sharing
+# a source cannot both be declared — and this check would then measure that collision
+# rather than the scope.
+USER_MKT_SRC="$TMPROOT/user-mkt-src"; mkdir -p "$USER_MKT_SRC/.claude-plugin"
+printf '%s' '{"name":"user-mkt","owner":{"name":"smoke"},"version":"1.0.0","plugins":[]}' > "$USER_MKT_SRC/.claude-plugin/marketplace.json"
+run "marketplace add --scope user" 0 "" "$P_SCOPE" -- marketplace add userscoped "$USER_MKT_SRC" --yes --scope user
 if grep -q "userscoped" "$proj_reg" 2>/dev/null; then
   bad "--scope user leaked into the project registry"
 else
   ok "--scope user stays out of the project registry"
 fi
+# The checks above read AIDD's own registry. What actually matters is where the
+# registration reached the TOOL: claude declares a project marketplace at its local
+# scope, beside the project, and a user one in the home settings. Nothing else in the
+# suite sees this, and the e2e nets are blind to it by design — they strip the tool
+# binaries from PATH so their output does not depend on what is installed.
+if command -v claude >/dev/null 2>&1; then
+  claude_local="$P_SCOPE/.claude/settings.local.json"
+  claude_home="$HOME/.claude/settings.json"
+  if [[ -f "$claude_local" ]] && grep -q "extraKnownMarketplaces" "$claude_local"; then
+    ok "claude declares the project marketplace at local scope"
+  else
+    bad "claude has no local-scope declaration in $claude_local"
+  fi
+  if [[ -f "$claude_home" ]] && grep -q "user-mkt" "$claude_home"; then
+    ok "claude declares the user marketplace in the home settings"
+  else
+    bad "claude wrote no user-scope declaration in $claude_home"
+  fi
+  # Match the marketplace NAME only. The path would match too, but for the wrong
+  # reason: a user-scope marketplace is built inside the project that registered it,
+  # so the home settings legitimately name that project's directory.
+  if grep -q '"local-mkt"' "$claude_home" 2>/dev/null; then
+    bad "a project-scope registration leaked into the home settings"
+  else
+    ok "the project registration stayed out of the home settings"
+  fi
+else
+  skip "claude scope placement (binary not installed)"
+fi
+
 run "marketplace remove (scoped)" 0 "" "$P_SCOPE" -- marketplace remove scoped --yes
 run "marketplace remove" 0 "removed" "$P_MKT" -- marketplace remove local --yes
 

@@ -15,12 +15,14 @@ export class FakeNativePluginActivator implements NativePluginActivator {
   available: boolean;
   readonly addedMarketplaces: string[] = [];
   readonly removedMarketplaces: string[] = [];
+  readonly forcedRemovals: boolean[] = [];
   readonly enabledPlugins: string[] = [];
   upgradeCount = 0;
   private readonly failOnPlugins: ReadonlySet<string>;
   private readonly conflictOnAdd: boolean;
   private readonly throwOnRemove: boolean;
   private readonly pluginsEnabledHere: boolean;
+  private readonly state: "live" | "dead" | "unknown";
 
   constructor(
     options: {
@@ -30,6 +32,8 @@ export class FakeNativePluginActivator implements NativePluginActivator {
       throwOnRemove?: boolean;
       /** False for a tool whose plugins are enabled by a file this CLI writes. */
       enablesPlugins?: boolean;
+      /** What the tool answers about a name already registered. */
+      registrationState?: "live" | "dead" | "unknown";
     } = {}
   ) {
     this.available = options.available ?? false;
@@ -37,6 +41,11 @@ export class FakeNativePluginActivator implements NativePluginActivator {
     this.conflictOnAdd = options.conflictOnAdd ?? false;
     this.throwOnRemove = options.throwOnRemove ?? false;
     this.pluginsEnabledHere = options.enablesPlugins ?? true;
+    this.state = options.registrationState ?? "unknown";
+  }
+
+  registrationState(): "live" | "dead" | "unknown" {
+    return this.state;
   }
 
   enablesPlugins(): boolean {
@@ -47,7 +56,7 @@ export class FakeNativePluginActivator implements NativePluginActivator {
     return this.available;
   }
 
-  addMarketplace(source: string): void {
+  addMarketplace(source: string, _scope?: unknown): void {
     if (this.conflictOnAdd && this.removedMarketplaces.length === 0) {
       throw new NativePluginCliError(
         "marketplace is already added from a different source; remove it before adding this source"
@@ -56,7 +65,8 @@ export class FakeNativePluginActivator implements NativePluginActivator {
     this.addedMarketplaces.push(source);
   }
 
-  removeMarketplace(name: string): void {
+  removeMarketplace(name: string, _scope?: unknown, options?: { force?: boolean }): void {
+    this.forcedRemovals.push(options?.force === true);
     if (this.throwOnRemove) {
       throw new NativePluginCliError(
         `marketplace remove ${name} failed: '${name}' is not configured or installed`

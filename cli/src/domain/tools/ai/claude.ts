@@ -120,7 +120,7 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         // of doing the same thing, and would hand a tracked file a second writer.
         nativeActivation: {
           binary: "claude",
-          marketplaceAddArgs: ["--scope", "local"],
+          scopeArgs: { project: ["--scope", "local"], user: ["--scope", "user"] },
         },
         marketplaceSettings: {
           settingsPath: ".claude/settings.json",

@@ -327,7 +327,18 @@ export const copilot: AiTool<
       // auto-install (github/copilot-cli#2249); the project marketplace is also not
       // installable from project scope (#3088). Drive `copilot plugin install` to
       // actually load plugins — the settings file below still surfaces recommendations.
-      nativeActivation: { binary: "copilot", upgradeVerb: "update", enableVerb: "install" },
+      // Copilot's registry is global to the user and keyed by name, so a name can be
+      // held by a project that no longer exists — measured, and it then breaks every
+      // other project's plugin installs. `update` is what tells the two apart: it exits
+      // 1 on a local path that is gone and 0 otherwise, so a dead name can be reclaimed
+      // with `--force` without ever taking one that still resolves.
+      nativeActivation: {
+        binary: "copilot",
+        upgradeVerb: "update",
+        enableVerb: "install",
+        sourceCheckVerb: "update",
+        forceRemoveArgs: ["--force"],
+      },
       // VS Code Copilot reads this file, not the `copilot` CLI — measured: `copilot
       // plugin marketplace add` writes ~/.copilot/settings.json and leaves this one
       // untouched. `chat.plugins.marketplaces` cannot stand in for it either: it has

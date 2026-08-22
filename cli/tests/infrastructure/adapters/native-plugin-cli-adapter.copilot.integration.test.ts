@@ -42,7 +42,12 @@ describe("CopilotCliAdapter", () => {
       rmSync(dir, { recursive: true, force: true });
     };
 
-    expect(new NativePluginCliAdapter("copilot", "update", "install").isAvailable()).toBe(true);
+    expect(
+      new NativePluginCliAdapter("copilot", {
+        upgradeVerb: "update",
+        enableVerb: "install",
+      }).isAvailable()
+    ).toBe(true);
     expect(mockSpawnSync).not.toHaveBeenCalled();
   });
 
@@ -55,13 +60,21 @@ describe("CopilotCliAdapter", () => {
       rmSync(emptyDir, { recursive: true, force: true });
     };
 
-    expect(new NativePluginCliAdapter("copilot", "update", "install").isAvailable()).toBe(false);
+    expect(
+      new NativePluginCliAdapter("copilot", {
+        upgradeVerb: "update",
+        enableVerb: "install",
+      }).isAvailable()
+    ).toBe(false);
   });
 
   it("registers a marketplace via `copilot plugin marketplace add <source>`", () => {
     mockSpawnSync.mockReturnValue(makeResult({}));
 
-    new NativePluginCliAdapter("copilot", "update", "install").addMarketplace("/abs/mkt");
+    new NativePluginCliAdapter("copilot", {
+      upgradeVerb: "update",
+      enableVerb: "install",
+    }).addMarketplace("/abs/mkt", "project");
 
     expect(mockSpawnSync).toHaveBeenCalledWith(
       "copilot",
@@ -73,7 +86,10 @@ describe("CopilotCliAdapter", () => {
   it("refreshes marketplaces via `copilot plugin marketplace update`", () => {
     mockSpawnSync.mockReturnValue(makeResult({}));
 
-    new NativePluginCliAdapter("copilot", "update", "install").upgradeMarketplaces();
+    new NativePluginCliAdapter("copilot", {
+      upgradeVerb: "update",
+      enableVerb: "install",
+    }).upgradeMarketplaces();
 
     expect(mockSpawnSync).toHaveBeenCalledWith(
       "copilot",
@@ -85,9 +101,10 @@ describe("CopilotCliAdapter", () => {
   it("installs a plugin via `copilot plugin install <ref>`", () => {
     mockSpawnSync.mockReturnValue(makeResult({}));
 
-    new NativePluginCliAdapter("copilot", "update", "install").enablePlugin(
-      "aidd-context@aidd-framework"
-    );
+    new NativePluginCliAdapter("copilot", {
+      upgradeVerb: "update",
+      enableVerb: "install",
+    }).enablePlugin("aidd-context@aidd-framework");
 
     expect(mockSpawnSync).toHaveBeenCalledWith(
       "copilot",
@@ -100,10 +117,16 @@ describe("CopilotCliAdapter", () => {
     mockSpawnSync.mockReturnValue(makeResult({ status: 1, stderr: 'Marketplace "m1" not found' }));
 
     expect(() =>
-      new NativePluginCliAdapter("copilot", "update", "install").enablePlugin("ghost@m1")
+      new NativePluginCliAdapter("copilot", {
+        upgradeVerb: "update",
+        enableVerb: "install",
+      }).enablePlugin("ghost@m1")
     ).toThrow(NativePluginCliError);
     expect(() =>
-      new NativePluginCliAdapter("copilot", "update", "install").enablePlugin("ghost@m1")
+      new NativePluginCliAdapter("copilot", {
+        upgradeVerb: "update",
+        enableVerb: "install",
+      }).enablePlugin("ghost@m1")
     ).toThrow("Marketplace");
   });
 
@@ -111,7 +134,10 @@ describe("CopilotCliAdapter", () => {
     mockSpawnSync.mockReturnValue(makeResult({ error: new Error("spawn EACCES"), status: null }));
 
     expect(() =>
-      new NativePluginCliAdapter("copilot", "update", "install").addMarketplace("/abs/mkt")
+      new NativePluginCliAdapter("copilot", {
+        upgradeVerb: "update",
+        enableVerb: "install",
+      }).addMarketplace("/abs/mkt", "project")
     ).toThrow(NativePluginCliError);
   });
 });

@@ -296,3 +296,26 @@ antislashs sous Windows, alors que ses appelants comparent ces chemins à des ch
 `/` dans les profils et le manifest. Aucun test ne pouvait l'attraper : l'adaptateur en mémoire, lui,
 a toujours produit des `/`, donc les deux implémentations divergeaient exactement là où personne ne
 regardait. Le port déclare maintenant sa forme et l'adaptateur réel s'y tient.
+
+## L'outil clé son registre par le nom du manifeste, pas par le nôtre (2026-08-22)
+
+Deux marketplaces AIDD qui pointent sur la même source produisent deux arbres construits déclarant
+le même `name` dans leur `marketplace.json`. L'outil les voit donc comme un seul, et le second
+enregistrement est refusé — quel que soit le nom qu'AIDD leur a donné, et quel que soit leur scope.
+Repéré en écrivant le contrôle smoke des scopes, qui mesurait cette collision en croyant mesurer le
+scope.
+
+## Un marketplace de scope user se construit dans le projet qui l'enregistre (2026-08-22)
+
+`aidd marketplace add … --scope user` construit son arbre sous
+`<projet>/.aidd/cache/built/<nom>/<outil>`, et c'est ce chemin que la déclaration globale de l'outil
+désigne. Supprimer ce projet tue donc une déclaration censée valoir pour tous. C'est la même maladie
+que le registre global de copilot, un cran plus bas : un scope global qui pointe vers du local.
+Un marketplace de scope user devrait se construire sous le répertoire de configuration utilisateur
+d'AIDD.
+
+## `marketplace refresh` ne revoit pas une source locale modifiée (2026-08-22)
+
+Après édition du `marketplace.json` d'une source locale, `refresh` affiche `Fetching marketplace …`
+puis `ok`, mais l'arbre construit garde l'ancien contenu ; il faut supprimer
+`.aidd/cache/built/<nom>` pour que la modification passe. Repéré en instruisant les scopes.

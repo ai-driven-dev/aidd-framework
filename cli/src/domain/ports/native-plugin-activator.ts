@@ -1,3 +1,5 @@
+import type { MarketplaceScope } from "../models/marketplace.js";
+
 /**
  * Drives a tool's native plugin CLI, so the tool writes its own configuration.
  *
@@ -12,11 +14,18 @@ export interface NativePluginActivator {
   /** Returns true when the tool's CLI binary is callable on PATH. Never throws. */
   isAvailable(): boolean;
   /** Registers a marketplace source (local path, `owner/repo[@ref]`, or git URL). Idempotent. */
-  addMarketplace(source: string): void;
+  addMarketplace(source: string, scope: MarketplaceScope): void;
   /** True when this tool enables plugins through its CLI rather than through a file. */
   enablesPlugins(): boolean;
-  /** Unregisters a marketplace by name. May throw when absent — callers wrap it best-effort. */
-  removeMarketplace(name: string): void;
+  /** Unregisters a marketplace by name, in the scope it was added to. May throw when absent. */
+  removeMarketplace(name: string, scope: MarketplaceScope, options?: { force?: boolean }): void;
+  /**
+   * Whether the registration under this name still resolves to something.
+   * `"unknown"` where the tool offers no way to tell, which callers must read as
+   * "leave it alone": a registration that might belong to a live project elsewhere is
+   * not one to take over.
+   */
+  registrationState(name: string): "live" | "dead" | "unknown";
   /** Refreshes marketplace snapshots so plugin installs pick up new versions. No-op when unsupported. */
   upgradeMarketplaces(): void;
   /** Installs and enables a plugin referenced as `<plugin>@<marketplace>`. Idempotent. */

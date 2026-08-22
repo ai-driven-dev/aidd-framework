@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { accessSync, constants } from "node:fs";
 import { delimiter, join } from "node:path";
 import { NativePluginCliError } from "../../domain/errors.js";
+import type { MarketplaceScope } from "../../domain/models/marketplace.js";
 import type { NativePluginActivator } from "../../domain/ports/native-plugin-activator.js";
 
 // `plugin add/install` may fetch and cache a marketplace snapshot from a git remote.
@@ -31,23 +32,39 @@ export abstract class AbstractNativePluginCliAdapter implements NativePluginActi
     });
   }
 
-  /** Extra arguments the profile appends to `plugin marketplace add`, e.g. a scope. */
-  protected readonly addArgs: readonly string[] = [];
+  /** Scope arguments the profile declares, empty for a tool whose registry is global. */
+  protected abstract scopeArgsFor(scope: MarketplaceScope): readonly string[];
+  /** Arguments that force a removal past installed plugins, empty when unsupported. */
+  protected abstract forceRemoveArgs(): readonly string[];
 
-  addMarketplace(source: string): void {
+  addMarketplace(source: string, scope: MarketplaceScope): void {
     this.run(
-      ["plugin", "marketplace", "add", source, ...this.addArgs],
+      ["plugin", "marketplace", "add", source, ...this.scopeArgsFor(scope)],
       `marketplace add ${source}`
     );
   }
 
-  removeMarketplace(name: string): void {
-    this.run(["plugin", "marketplace", "remove", name], `marketplace remove ${name}`);
+  removeMarketplace(name: string, scope: MarketplaceScope, options?: { force?: boolean }): void {
+    const force = options?.force === true ? this.forceRemoveArgs() : [];
+    this.run(
+      ["plugin", "marketplace", "remove", name, ...this.scopeArgsFor(scope), ...force],
+      `marketplace remove ${name}`
+    );
   }
 
   abstract enablesPlugins(): boolean;
+  abstract registrationState(name: string): "live" | "dead" | "unknown";
   abstract upgradeMarketplaces(): void;
   abstract enablePlugin(pluginRef: string): void;
+
+  /** Runs a command purely for its exit code; never throws. */
+  protected succeeds(args: readonly string[]): boolean {
+    const result = spawnSync(this.binary, [...args], {
+      timeout: COMMAND_TIMEOUT_MS,
+      stdio: ["ignore", "ignore", "ignore"],
+    });
+    return result.error === undefined && result.status === 0;
+  }
 
   protected run(args: readonly string[], label: string): void {
     const result = spawnSync(this.binary, [...args], {

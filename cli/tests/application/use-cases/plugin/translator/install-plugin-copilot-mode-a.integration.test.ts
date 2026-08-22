@@ -124,11 +124,17 @@ describe("install copilot plugin via Mode A (integration)", () => {
     expect(await fs.fileExists(resolve(PROJECT_ROOT, ".github/copilot/settings.json"))).toBe(true);
   });
 
-  it("removes then re-adds when the name is registered from a different source", async () => {
+  it("takes the name back when whoever held it is gone", async () => {
     const fs = new InMemoryFileAdapter();
     const manifestRepo = new InMemoryManifestRepository();
     const registry = new InMemoryMarketplaceRegistry();
-    const activator = new FakeNativePluginActivator({ available: true, conflictOnAdd: true });
+    // The name is held, and the tool reports its source no longer resolves: nobody
+    // alive is behind it, so taking it back breaks nothing.
+    const activator = new FakeNativePluginActivator({
+      available: true,
+      conflictOnAdd: true,
+      registrationState: "dead",
+    });
     await seedCopilotPlugin(manifestRepo, registry);
 
     const useCase = new MarketplaceSyncSettingsUseCase(
@@ -143,21 +149,52 @@ describe("install copilot plugin via Mode A (integration)", () => {
     );
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
-    // First add hits the different-source conflict → remove, then re-add succeeds.
     expect(activator.removedMarketplaces).toEqual([MARKETPLACE_NAME]);
+    // Forced, because a marketplace with plugins installed refuses a plain removal.
+    expect(activator.forcedRemovals).toEqual([true]);
     expect(activator.addedMarketplaces).toEqual(["/built/copilot"]);
     expect(activator.enabledPlugins).toEqual([`aidd-context@${MARKETPLACE_NAME}`]);
   });
 
-  it("traces the speculative remove at debug and surfaces the real error when add did not fail on a conflict", async () => {
+  it("leaves a name alone while it still resolves, whoever holds it", async () => {
     const fs = new InMemoryFileAdapter();
     const manifestRepo = new InMemoryManifestRepository();
     const registry = new InMemoryMarketplaceRegistry();
-    // add keeps failing and the name is absent (remove throws): not a recoverable conflict.
+    // Held, and the source resolves: another project is alive behind it. Taking the
+    // name would break that project, and both would then steal it back on every sync.
     const activator = new FakeNativePluginActivator({
       available: true,
       conflictOnAdd: true,
-      throwOnRemove: true,
+      registrationState: "live",
+    });
+    const logger = new CapturingLogger();
+    await seedCopilotPlugin(manifestRepo, registry);
+
+    await new MarketplaceSyncSettingsUseCase(
+      fs,
+      manifestRepo,
+      registry,
+      new PluginCatalogRepositoryAdapter(fs),
+      new DeterministicHasher(),
+      logger,
+      new Map([["copilot", activator]]),
+      fakeEnsureBuiltMarketplace()
+    ).execute({ projectRoot: PROJECT_ROOT });
+
+    expect(activator.removedMarketplaces).toEqual([]);
+    expect(logger.warnMessages.some((m) => m.includes("register marketplace"))).toBe(true);
+  });
+
+  it("says nothing about taking a name back when it cannot tell who holds it", async () => {
+    const fs = new InMemoryFileAdapter();
+    const manifestRepo = new InMemoryManifestRepository();
+    const registry = new InMemoryMarketplaceRegistry();
+    // The tool offers no way to tell a dead registration from a live one, which must
+    // read as "leave it alone" rather than as permission.
+    const activator = new FakeNativePluginActivator({
+      available: true,
+      conflictOnAdd: true,
+      registrationState: "unknown",
     });
     const logger = new CapturingLogger();
     await seedCopilotPlugin(manifestRepo, registry);
@@ -174,12 +211,9 @@ describe("install copilot plugin via Mode A (integration)", () => {
     );
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
-    // The speculative remove failure is a debug trace, never a scary warn...
-    expect(logger.warnMessages.some((m) => m.includes("unregister stale"))).toBe(false);
-    expect(logger.debugMessages.some((m) => m.includes("not unregistered before re-add"))).toBe(
-      true
-    );
-    // ...and the real re-add failure is surfaced (best-effort warn), not swallowed.
+    expect(activator.removedMarketplaces).toEqual([]);
+    expect(logger.warnMessages.some((m) => m.includes("no longer exists"))).toBe(false);
+    // The failure itself is still surfaced, not swallowed.
     expect(logger.warnMessages.some((m) => m.includes("register marketplace"))).toBe(true);
   });
 });

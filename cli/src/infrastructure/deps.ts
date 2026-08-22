@@ -404,15 +404,7 @@ export async function createDeps(
       const activation = nativeActivationOf(id);
       return activation === undefined
         ? undefined
-        : ([
-            activation.binary,
-            new NativePluginCliAdapter(
-              activation.binary,
-              activation.upgradeVerb,
-              activation.enableVerb,
-              activation.marketplaceAddArgs
-            ),
-          ] as const);
+        : ([activation.binary, new NativePluginCliAdapter(activation.binary, activation)] as const);
     }).filter((entry): entry is NonNullable<typeof entry> => entry !== undefined),
   ]);
   const pluginRemoveUseCase = new PluginRemoveUseCase(fs, manifestRepo);

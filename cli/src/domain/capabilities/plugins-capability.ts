@@ -24,11 +24,35 @@ const DEFAULT_HOOKS_FORMAT: HooksContentFormat = "claude";
 export interface NativeActivation {
   binary: "claude" | "codex" | "copilot";
   /**
-   * Arguments appended to `plugin marketplace add`, when the defaults are wrong.
-   * Claude registers at user scope unless told otherwise, which would declare a
-   * project's marketplace for every project on the machine.
+   * Arguments carrying the scope, for `plugin marketplace add` and `remove` alike.
+   * One mapping serves both so they cannot drift: a remove that omits the scope the
+   * add used would, for Claude, delete the declaration from every scope at once.
+   *
+   * A project-scoped marketplace maps to Claude's **local** scope, not its project
+   * one, and that is not an oversight. The registration names the built tree by
+   * absolute path, so it belongs to one machine; Claude's project scope writes the
+   * shared, committed settings file, where such a path is wrong for everyone else.
+   * Local scope is project-bound and machine-bound at once, which is what the content
+   * actually is.
+   *
+   * Omit for a tool whose registry has no scopes — it is global, and there is nothing
+   * to say.
    */
-  marketplaceAddArgs?: readonly string[];
+  scopeArgs?: Readonly<Record<"project" | "user", readonly string[]>>;
+  /**
+   * Arguments that make `plugin marketplace remove` succeed when plugins are installed
+   * from it. Declaring this permits reclaiming a name, so declare it only where the
+   * tool can also tell a dead registration from a live one — see `sourceCheckVerb`.
+   */
+  forceRemoveArgs?: readonly string[];
+  /**
+   * Verb after `plugin marketplace` whose exit code separates a registration whose
+   * source is gone from one that resolves. Declare only where it truly discriminates:
+   * measured, copilot's `update` exits 1 on a missing local path and 0 otherwise,
+   * while codex's `upgrade` refuses every local marketplace alike and Claude's reports
+   * success on a path that does not exist.
+   */
+  sourceCheckVerb?: string;
   /**
    * Verb this CLI uses to re-index its marketplaces, after `plugin marketplace`.
    * Omit when nothing needs re-indexing because plugins are not enabled through the CLI.

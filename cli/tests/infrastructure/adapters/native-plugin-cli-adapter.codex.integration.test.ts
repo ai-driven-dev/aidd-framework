@@ -50,7 +50,12 @@ describe("CodexCliAdapter", () => {
     const env = pathWithExecutable("codex");
     restorePath = env.restore;
 
-    expect(new NativePluginCliAdapter("codex", "upgrade", "add").isAvailable()).toBe(true);
+    expect(
+      new NativePluginCliAdapter("codex", {
+        upgradeVerb: "upgrade",
+        enableVerb: "add",
+      }).isAvailable()
+    ).toBe(true);
     expect(mockSpawnSync).not.toHaveBeenCalled();
   });
 
@@ -63,13 +68,21 @@ describe("CodexCliAdapter", () => {
       rmSync(emptyDir, { recursive: true, force: true });
     };
 
-    expect(new NativePluginCliAdapter("codex", "upgrade", "add").isAvailable()).toBe(false);
+    expect(
+      new NativePluginCliAdapter("codex", {
+        upgradeVerb: "upgrade",
+        enableVerb: "add",
+      }).isAvailable()
+    ).toBe(false);
   });
 
   it("registers a marketplace via `codex plugin marketplace add <source>`", () => {
     mockSpawnSync.mockReturnValue(makeResult({}));
 
-    new NativePluginCliAdapter("codex", "upgrade", "add").addMarketplace("/abs/mkt");
+    new NativePluginCliAdapter("codex", {
+      upgradeVerb: "upgrade",
+      enableVerb: "add",
+    }).addMarketplace("/abs/mkt", "project");
 
     expect(mockSpawnSync).toHaveBeenCalledWith(
       "codex",
@@ -81,7 +94,10 @@ describe("CodexCliAdapter", () => {
   it("upgrades marketplaces via `codex plugin marketplace upgrade`", () => {
     mockSpawnSync.mockReturnValue(makeResult({}));
 
-    new NativePluginCliAdapter("codex", "upgrade", "add").upgradeMarketplaces();
+    new NativePluginCliAdapter("codex", {
+      upgradeVerb: "upgrade",
+      enableVerb: "add",
+    }).upgradeMarketplaces();
 
     expect(mockSpawnSync).toHaveBeenCalledWith(
       "codex",
@@ -93,7 +109,7 @@ describe("CodexCliAdapter", () => {
   it("enables a plugin via `codex plugin add <ref>`", () => {
     mockSpawnSync.mockReturnValue(makeResult({}));
 
-    new NativePluginCliAdapter("codex", "upgrade", "add").enablePlugin(
+    new NativePluginCliAdapter("codex", { upgradeVerb: "upgrade", enableVerb: "add" }).enablePlugin(
       "aidd-context@aidd-framework"
     );
 
@@ -110,10 +126,16 @@ describe("CodexCliAdapter", () => {
     );
 
     expect(() =>
-      new NativePluginCliAdapter("codex", "upgrade", "add").enablePlugin("ghost@m1")
+      new NativePluginCliAdapter("codex", {
+        upgradeVerb: "upgrade",
+        enableVerb: "add",
+      }).enablePlugin("ghost@m1")
     ).toThrow(NativePluginCliError);
     expect(() =>
-      new NativePluginCliAdapter("codex", "upgrade", "add").enablePlugin("ghost@m1")
+      new NativePluginCliAdapter("codex", {
+        upgradeVerb: "upgrade",
+        enableVerb: "add",
+      }).enablePlugin("ghost@m1")
     ).toThrow("plugin `ghost` was not found");
   });
 
@@ -121,7 +143,10 @@ describe("CodexCliAdapter", () => {
     mockSpawnSync.mockReturnValue(makeResult({ error: new Error("spawn EACCES"), status: null }));
 
     expect(() =>
-      new NativePluginCliAdapter("codex", "upgrade", "add").addMarketplace("/abs/mkt")
+      new NativePluginCliAdapter("codex", {
+        upgradeVerb: "upgrade",
+        enableVerb: "add",
+      }).addMarketplace("/abs/mkt", "project")
     ).toThrow(NativePluginCliError);
   });
 });
