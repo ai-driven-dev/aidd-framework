@@ -165,6 +165,19 @@ of an active session.
   $0.0519, both under the same `turn_id`. Do not use `turn_id` as a primary key
   for billed requests; use it only for the re-read match it exists for.
   **`turn_field`** names which attribute carried it.
+- **`person_id`** is not a tool's own, uncontrolled user attribute. This sink
+  once stored that as `user_id`, mapped straight from whatever `user.id` an
+  export happened to carry, regardless of whether the person using the tool
+  agreed to be named; that field is gone, and an export-provenance record now
+  carries no identity of any kind. `person_id` is the opposite in every way
+  that mattered: an identifier a person generated for themselves, on their own
+  machine, opted into per person rather than defaulted on for a whole export.
+  It is present only on a `provenance: "local-read"` record — the one route
+  guaranteed to run as that person, on that machine — and never on an
+  `"export"` record, since an OTLP receiver is not guaranteed to run on the
+  identified person's own machine. `person_id` is never derived from `user_id`,
+  a git author, an email, or a hostname, in either direction. See `person_id`
+  and `person_display_name` below for what each carries and when.
 
 ## Step attribution
 
@@ -210,6 +223,23 @@ absence means.
 - **If absent**: never absent on a well-formed line; a line missing it, or
   carrying a version a consumer does not recognize, should be set aside rather
   than parsed as if its shape were known.
+
+Adding `person_id` and `person_display_name` was not a version bump: a
+consumer built against version 2 that never wrote or read either field never
+sees them, and neither changes what any field it already understood means —
+the same rule `cost_report_version` follows in `cost-report-contract.md`.
+
+Removing a field is neither of the two cases above — it neither adds
+something ignorable nor changes what a kept field means. Whether it needs a
+bump turns on whether a version has shipped: once a consumer could be reading
+a real line, taking the field away without warning breaks it silently. Before
+that, the risk does not exist — nobody can depend on a field no released
+build ever produced. Removing `user_id` from the allowlist is not a version
+bump for exactly that reason: `sink_schema_version` 2 has never been
+released, so no consumer anywhere has read a real line carrying it. A day
+file a pre-release build already wrote may still carry `user_id` on an old
+line — the sink is append-only (see "Where records live") — and a reader
+ignores it exactly as it would any other field it does not recognize.
 
 #### `kind`
 - **Type**: `"request"` or `"session"`.
@@ -318,12 +348,30 @@ absence means.
 - **If absent**: either the record carries no `project_id` at all, or it
   does and came from the export route.
 
-#### `user_id`
+#### `person_id`
 - **Type**: string.
-- **Present**: conditional — present when the tool's export carries a user
-  identity attribute (`user.id`).
-- **Meaning**: the tool's own identifier for the user.
-- **If absent**: no user identity was available on this record's route.
+- **Present**: conditional — present only on a `provenance: "local-read"`
+  record, and only when the machine that read it holds a file recording that a
+  person opted in. Never present on a `provenance: "export"` record.
+- **Meaning**: a stable identifier a person generated for themselves and chose
+  to attach, on their own machine — never derived from the export route's
+  now-removed `user_id`, a git author, an email, or a hostname. Withdrawing
+  removes the file this comes from; records already written keep whatever
+  they were stamped with, since a day file is never rewritten in place (see
+  "Where records live").
+- **If absent**: nobody opted in on the machine that produced this record —
+  the default for a fresh installation — or the record came from the export
+  route, which never carries this field regardless of any opt-in.
+
+#### `person_display_name`
+- **Type**: string.
+- **Present**: conditional — present only alongside `person_id`, and only once
+  the person separately asked for a display name to be shown. Setting one
+  never happens as part of opting in.
+- **Meaning**: a name the person chose to show beside their figures. Never
+  derived from `person_id`, and never used to derive it.
+- **If absent**: either nobody opted in at all, or they opted in without ever
+  setting a display name — the ordinary state, not an incomplete one.
 
 ### Cost and token counters (conditional)
 

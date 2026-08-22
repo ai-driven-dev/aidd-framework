@@ -20,7 +20,9 @@ export type TelemetrySinkRecordKind = "request" | "session";
 export type TelemetrySinkRecordProvenance = "export" | "local-read";
 
 /** The tool-neutral stored line, and the complete allowlist of what a session may leave
- * behind. `vendor_field` and `turn_field` name the export-side attribute a value came
+ * behind — no identity of any kind on an export-provenance record; a person is named only
+ * via `person_id`, opted into on the local-read route (see `read-local-cost-use-case.ts`).
+ * `vendor_field` and `turn_field` name the export-side attribute a value came
  * from, since that attribute differs per tool — `tool` names the tool itself, so no
  * consumer ever has to reverse that attribute back into an identity. Never optional: an
  * unnamed record is exactly the ambiguity this field exists to remove. */
@@ -52,7 +54,14 @@ export interface TelemetrySinkRecord {
    * `project_id` is set directly from the `aidd.project_id` OTLP attribute, with no
    * journal join to name a source for. */
   readonly project_field?: string;
-  readonly user_id?: string;
+  /** The identifier a person chose to attach to records this machine reads locally - never
+   * derived from `user_id`, a tool's own attribute, and never set on an export-provenance
+   * record (see `read-local-cost-use-case.ts`). Absent whenever nobody opted in, which is
+   * the default. */
+  readonly person_id?: string;
+  /** A separate, later choice from `person_id` - present only once asked for, and never
+   * derived from it or from anything else. */
+  readonly person_display_name?: string;
   readonly cost_usd?: number;
   readonly input_tokens?: number;
   readonly output_tokens?: number;
@@ -96,9 +105,11 @@ type SinkRecordDraft = { -readonly [K in keyof TelemetrySinkRecord]: TelemetrySi
 
 const COST_ATTRIBUTE = "cost_usd";
 
+// Deliberately excludes `user.id`: a tool's own, uncontrolled user attribute, carried
+// whenever an export happens to set it regardless of consent — the opposite of
+// `person_id`, which is opted into per person on the local-read route alone.
 const ATTRIBUTE_ALLOWLIST: ReadonlyMap<string, keyof TelemetrySinkRecord> = new Map([
   ["aidd.project_id", "project_id"],
-  ["user.id", "user_id"],
   [COST_ATTRIBUTE, "cost_usd"],
   ["input_tokens", "input_tokens"],
   ["output_tokens", "output_tokens"],

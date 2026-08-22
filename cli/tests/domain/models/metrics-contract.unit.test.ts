@@ -20,6 +20,7 @@ import {
   CLAUDE_TELEMETRY_SESSION_MEASURES,
   CLAUDE_TELEMETRY_TURN_ATTRIBUTE,
 } from "../../../src/domain/tools/ai/claude-telemetry.js";
+import { NULL_PERSON_IDENTITY_READER } from "../../helpers/ports/in-memory-person-identity-reader.js";
 import { NULL_RUN_JOURNAL_READER } from "../../helpers/ports/in-memory-run-journal-reader.js";
 import { InMemoryTelemetrySink } from "../../helpers/ports/in-memory-telemetry-sink.js";
 
@@ -185,7 +186,8 @@ describe("metrics contract worked example: a re-read appends unless matched", ()
     const useCase = new ReadLocalCostUseCase(
       sink,
       new Map([["claude", { read: async () => ({ records: [candidate], sessionFound: true }) }]]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
 
     await useCase.execute({ sessionId: "s-doc-example" });
@@ -217,7 +219,8 @@ describe("metrics contract worked example: a re-read appends unless matched", ()
           { read: async () => ({ records: [candidateWithNoTurnId], sessionFound: true }) },
         ],
       ]),
-      NULL_RUN_JOURNAL_READER
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
     );
 
     await useCase.execute({ sessionId: "s-doc-example-2" });

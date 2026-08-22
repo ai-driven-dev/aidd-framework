@@ -89,6 +89,7 @@ const NEVER_KEPT_VALUES = [
   "Orca", // terminal.type
   "req_011CeAaRe8Mm7oS7xvfjDPw8", // request_id
   "1a4650df-4623-4bd3-81b3-287d21937040", // client_request_id
+  "0000000000000000000000000000000000000000000000000000000000000000", // user.id
 ];
 
 describe("mapOtlpLogsToSinkRecords()", () => {
@@ -139,7 +140,6 @@ describe("mapOtlpLogsToSinkRecords()", () => {
   it("keeps every allowlisted field present on the real captured payload", () => {
     const [record] = mapOtlpLogsToSinkRecords(logsPayload, [CLAUDE_VENDOR]);
     expect(record.project_id).toBe("aidd-lab/telemetry-proof");
-    expect(record.user_id).toBe("0000000000000000000000000000000000000000000000000000000000000000");
     expect(record.cost_usd).toBeCloseTo(0.0132201, 6);
     expect(record.input_tokens).toBe(2);
     expect(record.output_tokens).toBe(4);
@@ -208,6 +208,8 @@ describe("mapOtlpLogsToSinkRecords()", () => {
     const [record] = mapOtlpLogsToSinkRecords(logsPayload, [CLAUDE_VENDOR]);
     const keys = Object.keys(record);
     for (const forbidden of [
+      "user_id",
+      "user.id",
       "user_email",
       "user.email",
       "user_account_id",
@@ -425,7 +427,7 @@ describe("mapOtlpMetricsToSinkRecords()", () => {
     for (const value of NEVER_KEPT_VALUES) {
       expect(serialized).not.toContain(value);
     }
-    expect(records.every((r) => r.user_id !== undefined)).toBe(true);
+    expect(records.every((r) => !Object.keys(r).includes("user_id"))).toBe(true);
   });
 
   it("drops a metric name no session measure declares", () => {
@@ -488,6 +490,24 @@ describe("parseTelemetrySinkLine()", () => {
     const sessionLine = records.find((r) => r.kind === "session" && r.active_time_s !== undefined);
     expect(sessionLine?.active_time_s).toBeGreaterThan(0);
     expect(sessionLine?.turn_id).toBeUndefined();
+  });
+
+  // `user_id` predates the rule that an export-provenance record carries no identity, and
+  // the fixture still carries it on purpose: the sink is append-only, so a line a pre-removal
+  // build already wrote keeps the field forever. Parsing must not choke on it, and nothing
+  // reads it back out now that it is off the type.
+  it("parses a stored line that still carries the now-removed user_id, inertly", () => {
+    const url = new URL("../../fixtures/telemetry-sink/expected.jsonl", import.meta.url);
+    const lines = readFileSync(fileURLToPath(url), "utf8").trim().split("\n");
+    expect(lines.some((line) => line.includes("user_id"))).toBe(true);
+
+    const records = lines.map(parseTelemetrySinkLine);
+    const legacy = records.find(
+      (r) => (r as unknown as Record<string, unknown>).user_id !== undefined
+    );
+    expect((legacy as unknown as Record<string, unknown>).user_id).toBe(
+      "user_example_hash_0000000000000000"
+    );
   });
 
   it("carries provenance for both routes, on the same fixture", () => {

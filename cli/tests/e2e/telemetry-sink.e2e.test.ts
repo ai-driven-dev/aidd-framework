@@ -33,14 +33,16 @@ const METRICS_FIXTURE = join(
   "otlp-metrics-claude-code.json"
 );
 
-// The redacted values a real capture carried and the sink must never reproduce (task 2 —
-// "no identity attribute beyond user_id"). Kept in step with tests/fixtures/telemetry-sink/*.
+// The redacted values a real capture carried and the sink must never reproduce — an
+// export-provenance record carries no identity attribute at all. Kept in step with
+// tests/fixtures/telemetry-sink/*.
 const NEVER_STORED_VALUES = [
   "person@example.com",
   "user_00EXAMPLEACCOUNTID0000000",
   "00000000-1111-4222-8333-444444444444",
   "00000000-2222-4333-8444-555555555555",
   "Orca",
+  "0000000000000000000000000000000000000000000000000000000000000000", // user.id
 ];
 
 interface RunningReceiver {
@@ -128,7 +130,7 @@ afterEach(async () => {
 });
 
 describe("E2E: telemetry sink", () => {
-  it("stores a real session's figures, survives the receiver's exit, and drops every identity beyond user_id", async () => {
+  it("stores a real session's figures, survives the receiver's exit, and carries no identity of any kind", async () => {
     const { fakeHome, cleanup } = await createTestEnv("telemetry-sink-journey");
     try {
       const env = { ...process.env, HOME: fakeHome, XDG_CONFIG_HOME: join(fakeHome, ".config") };
@@ -156,8 +158,9 @@ describe("E2E: telemetry sink", () => {
       for (const forbidden of NEVER_STORED_VALUES) {
         expect(serialized).not.toContain(forbidden);
       }
-      expect(lines.every((l) => Object.keys(l).every((k) => k !== "user_email"))).toBe(true);
-      expect(lines.some((l) => l.user_id !== undefined)).toBe(true);
+      expect(
+        lines.every((l) => Object.keys(l).every((k) => k !== "user_email" && k !== "user_id"))
+      ).toBe(true);
     } finally {
       await cleanup();
     }
