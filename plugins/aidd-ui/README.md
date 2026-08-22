@@ -2,27 +2,44 @@
 
 # aidd-ui 🚧 alpha
 
-UI and UX concern for the AI-Driven Development framework.
+UI and UX decisions for the AI-Driven Development framework.
 
-> ⚠️ **ALPHA — NOT READY FOR USE.** `0.1.0-alpha.0`. This plugin ships a single smoke-test skill and no real UI/UX capability yet. Do not install it expecting to use it; it exists only to validate the scaffold. APIs, skills, and naming may change or be removed without notice.
+> **Alpha.** The concern is usable but experimental. Skill contracts may change, and the plugin remains off the curated install path.
 
-> Status: alpha (experimental).
+`aidd-ui` turns product intent and current project evidence into reviewable, testable experience decisions. It reads durable project memory as a compact map, confirms it against the repository, and reports drift without changing memory.
 
-This plugin is in alpha (`0.1.0-alpha.0`). It lives on a dedicated branch off `next` and is registered with `recommended: false`, so it stays off the curated install path until it stabilises and graduates to `main`. While it is not in the published marketplace yet, test it from a local checkout of this branch:
-
-```
-claude --plugin-dir plugins/aidd-ui          # zero-marketplace, session-scoped
-# or, persistent:
-/plugin marketplace add .                      # register this checkout as a local marketplace
-/plugin install aidd-ui@aidd-framework
+```text
+product intent + project context
+  → interface decisions
+  → experience contract
+  → engineering implementation
 ```
 
-Then run `aidd-ui:01-hello` to confirm it loads.
-
-One starter skill today; real UI and UX skills land as the concern stabilises.
+Code says what exists. Memory says what is stable. UI decisions say what should happen next.
 
 ## Skills
 
-| Bracket ID | Skill | Description |
-| ---------- | ----- | ----------- |
-| [7.1] | [hello](skills/01-hello/SKILL.md) | Smoke-test skill that confirms the plugin loads. |
+| Skill | Produces |
+| --- | --- |
+| [design](skills/01-design/SKILL.md) | evidence-grounded interface structure and decisions |
+| [review](skills/02-review/SKILL.md) | prioritized experience findings |
+| [system](skills/03-system/SKILL.md) | a current system map or minimal extension |
+| [accessibility](skills/04-accessibility/SKILL.md) | accessibility requirements or findings |
+| [responsive](skills/05-responsive/SKILL.md) | constrained-space behavior or findings |
+| [polish](skills/06-polish/SKILL.md) | bounded refinements after structure is settled |
+| [handoff](skills/07-handoff/SKILL.md) | an implementation-ready `ui.md` experience contract |
+
+Install the alpha plugin explicitly, then invoke the skill matching the required output:
+
+```text
+/plugin install aidd-ui@aidd-framework
+/aidd-ui:01-design <request or requirements>
+```
+
+## Boundaries
+
+- Product requirements remain upstream input.
+- Durable conventions remain in project memory; this plugin never updates them silently.
+- Production components, CSS, and application code remain engineering work.
+- Existing page patterns, composites, primitives, tokens, and layout conventions are reused before extension or creation.
+- No Figma, image generation, browser automation, visual-regression, or component-library infrastructure is bundled.

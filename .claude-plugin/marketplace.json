@@ -52,7 +52,7 @@
     {
       "name": "aidd-ui",
       "source": "./plugins/aidd-ui",
-      "description": "ALPHA, not ready for use. UI and UX concern: design, review, and improve frontend interfaces.",
+      "description": "ALPHA. UI and UX decisions, experience review, interface-system adaptation, accessibility, responsive behavior, polish, and implementation handoff.",
       "strict": true,
       "recommended": false
     }
