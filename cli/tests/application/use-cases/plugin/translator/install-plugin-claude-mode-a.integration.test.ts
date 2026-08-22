@@ -34,7 +34,7 @@ function buildDist(name = "aidd-context"): PluginDistribution {
 }
 
 describe("install claude plugin via Mode A (integration)", () => {
-  it("writes extraKnownMarketplaces in .claude/settings.json after sync", async () => {
+  it("splits the two keys by what each can carry, after sync", async () => {
     const fs = new InMemoryFileAdapter();
     const hasher = new DeterministicHasher();
     const manifestRepo = new InMemoryManifestRepository();
@@ -76,17 +76,27 @@ describe("install claude plugin via Mode A (integration)", () => {
     const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
 
     expect(result.updatedTools).toContain("claude");
-    const settingsPath = resolve(PROJECT_ROOT, ".claude/settings.json");
-    const settings = JSON.parse(await fs.readFile(settingsPath)) as Record<string, unknown>;
-    expect(settings.extraKnownMarketplaces).toBeDefined();
-    // Settings reference the BUILT claude tree, not the raw source.
-    expect((settings.extraKnownMarketplaces as Record<string, unknown>)[MARKETPLACE_NAME]).toEqual({
+    const shared = JSON.parse(
+      await fs.readFile(resolve(PROJECT_ROOT, ".claude/settings.json"))
+    ) as Record<string, unknown>;
+    const machineLocal = JSON.parse(
+      await fs.readFile(resolve(PROJECT_ROOT, ".claude/settings.local.json"))
+    ) as Record<string, unknown>;
+
+    // The registration names the BUILT claude tree by absolute path, so it describes
+    // this machine and goes to the file the CLI writes without committing or hashing it.
+    expect(
+      (machineLocal.extraKnownMarketplaces as Record<string, unknown>)[MARKETPLACE_NAME]
+    ).toEqual({
       source: { source: "directory", path: "/built/claude" },
     });
-    expect(settings.enabledPlugins).toBeDefined();
+    expect(shared.extraKnownMarketplaces).toBeUndefined();
+
+    // Enabled plugins are named, not located, so they stay in the shared file.
     expect(
-      (settings.enabledPlugins as Record<string, boolean>)[`aidd-context@${MARKETPLACE_NAME}`]
+      (shared.enabledPlugins as Record<string, boolean>)[`aidd-context@${MARKETPLACE_NAME}`]
     ).toBe(true);
+    expect(machineLocal.enabledPlugins).toBeUndefined();
   });
 
   it("does not materialize plugin files on disk for Mode A", async () => {
@@ -106,5 +116,73 @@ describe("install claude plugin via Mode A (integration)", () => {
     expect(pluginFiles).toEqual([]);
     const installed = manifest.getPlugins("claude").find((p) => p.name === "aidd-context");
     expect(installed?.files.size).toBe(0);
+  });
+
+  it("takes a registration left in the shared file by an older install out of it", async () => {
+    const fs = new InMemoryFileAdapter();
+    const hasher = new DeterministicHasher();
+    const manifestRepo = new InMemoryManifestRepository();
+    const registry = new InMemoryMarketplaceRegistry();
+    const catalog = new PluginCatalogRepositoryAdapter(fs);
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+
+    await new ModeAMarketplaceTranslator().addPlugin(
+      buildDist(),
+      "claude",
+      { kind: "local", path: "/plugin-source" },
+      PROJECT_ROOT,
+      manifest,
+      MARKETPLACE_NAME,
+      "docs"
+    );
+    await manifestRepo.save(manifest);
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: MARKETPLACE_NAME,
+        source: { kind: "local", path: "/marketplace-source" },
+        scope: "project",
+        addedAt: "2026-01-01T00:00:00Z",
+      })
+    );
+
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      manifestRepo,
+      registry,
+      catalog,
+      hasher,
+      new CapturingLogger(),
+      new Map(),
+      fakeEnsureBuiltMarketplace()
+    );
+
+    // What a project installed before the split looks like: the registration sitting in
+    // the committed file, naming a path that belongs to whoever ran the install.
+    await fs.writeFile(
+      resolve(PROJECT_ROOT, ".claude/settings.json"),
+      JSON.stringify({
+        extraKnownMarketplaces: {
+          [MARKETPLACE_NAME]: { source: { source: "directory", path: "/someone/elses/machine" } },
+        },
+      })
+    );
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    const shared = JSON.parse(
+      await fs.readFile(resolve(PROJECT_ROOT, ".claude/settings.json"))
+    ) as Record<string, unknown>;
+    const machineLocal = JSON.parse(
+      await fs.readFile(resolve(PROJECT_ROOT, ".claude/settings.local.json"))
+    ) as Record<string, unknown>;
+
+    expect(shared.extraKnownMarketplaces).toBeUndefined();
+    expect(
+      (machineLocal.extraKnownMarketplaces as Record<string, unknown>)[MARKETPLACE_NAME]
+    ).toEqual({
+      source: { source: "directory", path: "/built/claude" },
+    });
   });
 });

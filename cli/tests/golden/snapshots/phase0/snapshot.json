@@ -17,6 +17,7 @@
       ".aidd/manifest.json",
       ".aidd/marketplaces.json",
       ".claude/settings.json",
+      ".claude/settings.local.json",
       ".gitignore"
     ],
     "manifest": {
@@ -28,7 +29,7 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "b7669b899b9a72e8ef129510a7da6d62"
+              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
             }
           ],
           "mergeFiles": []
@@ -51,7 +52,7 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "b7669b899b9a72e8ef129510a7da6d62"
+              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
             }
           ],
           "mergeFiles": []
@@ -74,7 +75,7 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "b7669b899b9a72e8ef129510a7da6d62"
+              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
             }
           ],
           "mergeFiles": []
@@ -97,7 +98,7 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "b7669b899b9a72e8ef129510a7da6d62"
+              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
             }
           ],
           "mergeFiles": []
@@ -120,7 +121,7 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "08920761db26ac2e3e03a071a668bd41"
+              "hash": "267dba9c9c9dbe2190d91ae84213c77b"
             }
           ],
           "mergeFiles": [],
@@ -156,7 +157,7 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "08920761db26ac2e3e03a071a668bd41"
+              "hash": "267dba9c9c9dbe2190d91ae84213c77b"
             }
           ],
           "mergeFiles": [],
@@ -203,7 +204,7 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "08920761db26ac2e3e03a071a668bd41"
+              "hash": "267dba9c9c9dbe2190d91ae84213c77b"
             }
           ],
           "mergeFiles": [],
@@ -271,7 +272,7 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "08920761db26ac2e3e03a071a668bd41"
+              "hash": "267dba9c9c9dbe2190d91ae84213c77b"
             }
           ],
           "mergeFiles": [],
@@ -611,7 +612,7 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "b7669b899b9a72e8ef129510a7da6d62"
+              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
             }
           ],
           "mergeFiles": []

@@ -14,6 +14,7 @@ import type { DoctorLayoutUseCase } from "./doctor-layout-use-case.js";
 import type { DoctorMergeFilesUseCase } from "./doctor-merge-files-use-case.js";
 import type { DoctorPluginUseCase } from "./doctor-plugin-use-case.js";
 import type { DoctorReferencesUseCase } from "./doctor-references-use-case.js";
+import type { DoctorRegistrationUseCase } from "./doctor-registration-use-case.js";
 import type { DoctorTrackedFilesUseCase } from "./doctor-tracked-files-use-case.js";
 
 export interface DoctorOptions {
@@ -29,7 +30,8 @@ export class DoctorUseCase {
     private readonly mergeFiles: DoctorMergeFilesUseCase,
     private readonly plugin: DoctorPluginUseCase,
     private readonly references: DoctorReferencesUseCase,
-    private readonly layout: DoctorLayoutUseCase
+    private readonly layout: DoctorLayoutUseCase,
+    private readonly registration: DoctorRegistrationUseCase
   ) {}
 
   async execute(options: DoctorOptions): Promise<DoctorReport> {
@@ -87,6 +89,7 @@ export class DoctorUseCase {
         allowedIds,
         trackedFiles: trackedFileList,
       })),
+      ...(await this.registration.execute({ manifest, projectRoot, allowedIds })),
     ];
     if (!category) issues.push(...(await this.layout.execute({ manifest, projectRoot })));
     return issues;

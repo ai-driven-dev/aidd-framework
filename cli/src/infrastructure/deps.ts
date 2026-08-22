@@ -14,6 +14,7 @@ import { DoctorLayoutUseCase } from "../application/use-cases/doctor/doctor-layo
 import { DoctorMergeFilesUseCase } from "../application/use-cases/doctor/doctor-merge-files-use-case.js";
 import { DoctorPluginUseCase } from "../application/use-cases/doctor/doctor-plugin-use-case.js";
 import { DoctorReferencesUseCase } from "../application/use-cases/doctor/doctor-references-use-case.js";
+import { DoctorRegistrationUseCase } from "../application/use-cases/doctor/doctor-registration-use-case.js";
 import { DoctorTrackedFilesUseCase } from "../application/use-cases/doctor/doctor-tracked-files-use-case.js";
 import { DoctorUseCase } from "../application/use-cases/doctor/doctor-use-case.js";
 import { FrameworkBuildUseCase } from "../application/use-cases/framework/framework-build-use-case.js";
@@ -581,7 +582,8 @@ export async function createDeps(
     doctorMergeFilesUseCase,
     doctorPluginUseCase,
     doctorReferencesUseCase,
-    doctorLayoutUseCase
+    doctorLayoutUseCase,
+    new DoctorRegistrationUseCase(fs, marketplaceRegistry)
   );
   const releaseResolver = new GitHubReleaseResolverAdapter(http, authReader);
   const setupMarketplaceSourceUseCase = new SetupMarketplaceSourceUseCase(

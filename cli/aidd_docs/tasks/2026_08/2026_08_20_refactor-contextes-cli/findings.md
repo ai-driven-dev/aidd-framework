@@ -212,3 +212,32 @@ Le profil claude n'a pas de `nativeActivation` — l'activation native ne devrai
 lui. Le `bestEffort` l'a rattrapée, donc rien n'a cassé, mais la branche prise n'est pas la bonne.
 Repéré en instruisant la phase 5, qui touche exactement ce chemin. Non corrigé : hors du périmètre
 tranché ce jour.
+
+## La suite smoke laisse des marketplaces derrière elle (2026-08-22)
+
+`copilot plugin marketplace list`, hors de tout projet :
+
+```
+Registered marketplaces:
+  • aidd-framework (Local: /private/var/folders/…/aidd-smoke-tools-XXXXXXXX.5XlhflGviM/proj.sxDyTW/.aidd/cache/built/aidd-framework/copilot)
+```
+
+Le répertoire n'existe plus. Les enregistrements de copilot sont **globaux à l'utilisateur**, pas au
+projet, donc chaque exécution de la suite smoke en dépose un qui survit à la suppression du projet
+temporaire. La suite est hermétique pour ce qu'elle écrit sous le projet, pas pour ce qu'elle fait
+écrire aux outils. À corriger dans `scripts/smoke-tools.sh` : désenregistrer en fin de course.
+
+## Copilot porte le même défaut de partage que claude (2026-08-22)
+
+`.github/copilot/settings.json` reçoit lui aussi `extraKnownMarketplaces` avec des chemins absolus,
+et il est committé. Mais le correctif n'a pas la même forme que pour claude : copilot n'a pas de
+convention `settings.local.json` documentée, et la liste ci-dessus montre que son enregistrement
+réel vit dans son magasin global — l'écriture du fichier projet est probablement redondante. Question
+distincte, non traitée par la phase 5a.
+
+## `update` ne synchronise pas les marketplaces (2026-08-22)
+
+`MarketplaceSyncSettingsUseCase` est appelée par `setup`, `install`, `marketplace add/remove/refresh`
+et `plugin install` — pas par `update`. Un projet dont le fichier de réglages de l'outil a dérivé
+n'est donc pas remis d'aplomb par la commande que l'utilisateur associe naturellement à « remets-moi
+à jour ». Antérieur à la phase 5, repéré en la vérifiant.

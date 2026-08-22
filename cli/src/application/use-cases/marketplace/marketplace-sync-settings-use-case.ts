@@ -259,6 +259,10 @@ export class MarketplaceSyncSettingsUseCase {
     return marketplaceChanged || pluginsChanged;
   }
 
+  // The marketplaces key names built trees by absolute path, so a profile may send it
+  // to a file of its own rather than the shared settings file. When it does, that file
+  // is written but never hashed: recording an absolute path in the manifest would make
+  // every other machine read as drift.
   private async syncMarketplacesFile(
     toolId: ToolId,
     projectRoot: string,
@@ -267,22 +271,49 @@ export class MarketplaceSyncSettingsUseCase {
     marketplaces: readonly Marketplace[],
     versionByName: Map<string, string | undefined>
   ): Promise<boolean> {
-    const absPath = resolve(projectRoot, settings.settingsPath);
+    const relativePath = settings.marketplacesSettingsPath ?? settings.settingsPath;
+    const absPath = resolve(projectRoot, relativePath);
     const json = await this.loadSettings(absPath);
     const builtSources = await this.builtSourcesForTool(toolId, marketplaces, projectRoot);
-    if (
-      !this.mergeMarketplaces(
-        json,
-        settings,
-        marketplaces,
-        versionByName,
-        projectRoot,
-        builtSources
-      )
-    )
-      return false;
+    const merged = this.mergeMarketplaces(
+      json,
+      settings,
+      marketplaces,
+      versionByName,
+      projectRoot,
+      builtSources
+    );
+    const evicted = await this.evictMarketplacesFromSharedFile(
+      toolId,
+      projectRoot,
+      manifest,
+      settings
+    );
+    if (!merged) return evicted;
     const content = JSON.stringify(json, null, 2);
     await this.fs.writeFile(absPath, content);
+    if (settings.marketplacesSettingsPath == null) {
+      manifest.updateTrackedFileHash(toolId, settings.settingsPath, this.hasher.hash(content));
+    }
+    return true;
+  }
+
+  // An install made before the key moved left it in the shared, committed file, where
+  // it keeps an absolute path that is wrong for everyone but its author. Take it out
+  // and re-hash, so the move reaches projects that already exist.
+  private async evictMarketplacesFromSharedFile(
+    toolId: ToolId,
+    projectRoot: string,
+    manifest: Manifest,
+    settings: MarketplaceSettings
+  ): Promise<boolean> {
+    if (settings.marketplacesSettingsPath == null) return false;
+    const sharedPath = resolve(projectRoot, settings.settingsPath);
+    const shared = await this.loadSettings(sharedPath);
+    if (!(settings.settingsKey in shared)) return false;
+    delete shared[settings.settingsKey];
+    const content = JSON.stringify(shared, null, 2);
+    await this.fs.writeFile(sharedPath, content);
     manifest.updateTrackedFileHash(toolId, settings.settingsPath, this.hasher.hash(content));
     return true;
   }

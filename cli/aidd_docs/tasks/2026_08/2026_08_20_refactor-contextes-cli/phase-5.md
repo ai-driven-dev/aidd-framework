@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Let each tool own its own configuration
@@ -62,22 +62,34 @@ dans le cas par défaut un chemin vers le dossier que le `.gitignore` exclut. C'
 construit est la forme claude du marketplace, le dépôt amont est agnostique. Tant que ces arbres ne
 sont pas hébergés, l'enregistrement est machine-local par construction.
 
-**Et le même fichier porte des entrées de nature opposée.** Un marketplace tiers déclaré en github
-produit `{source:"github", repo:"anthropics/claude-code"}` — parfaitement partageable, et le committer
-est correct. Vérifié côte à côte dans le même `settings.json`. Le fichier mélange donc, dans un objet
-committé, ce qui ne peut appartenir qu'à une machine et ce qui doit appartenir à l'équipe.
+**Toutes les entrées de marketplace sont machine-locales, sans exception.** Un marketplace tiers
+github semblait produire `{source:"github", repo:"…"}`, partageable — mais c'était un artefact : sa
+construction avait échoué. `mergeMarketplacesMap` lit `builtSources.get(name) ?? m.source`, et
+`builtSourcesForTool` remplace chaque marketplace construit avec succès par `{kind:"local", path:
+builtDir}`, que `resolveSourceForSettings` rend ensuite absolu. Quand la construction réussit — le cas
+normal — la source déclarée n'est jamais utilisée.
+
+Donc la clé `extraKnownMarketplaces` est machine-locale **en entier**, et il n'y a pas à distinguer
+entrée par entrée.
+
+**En revanche, la clé voisine ne l'est pas.** `enabledPlugins` s'écrit `{"plugin@marketplace": true}` :
+des noms, aucun chemin. Elle se partage, et la committer est correct. Le fichier mélange donc deux
+clés de natures opposées, ce qui est la coupe à faire.
 
 ### Ce qui est tranché
 
 **La phase se scinde en deux, et une seule moitié est faisable maintenant.**
 
-**5a — séparer les deux natures d'entrée. Faisable tout de suite, sans hébergement, sans piloter
-aucune commande.** L'enregistrement du framework AIDD part dans `.claude/settings.local.json`, que
-Claude lit déjà et qu'AIDD ajoute à son `.gitignore` ; les marketplaces tiers restent dans
-`.claude/settings.json`, committé. Le critère n'est pas l'outil, c'est ce que l'entrée contient :
-`source.kind === "local"` va au fichier machine-local, `"github"` au fichier partagé, distinction que
-`buildClaudeStyleMarketplaceEntry` fait déjà. AIDD reste l'unique auteur des deux fichiers, donc
-aucune collision d'empreinte, et le hors ligne continue de marcher.
+**5a — séparer les deux clés selon ce qu'elles peuvent porter. Faisable tout de suite, sans
+hébergement, sans piloter aucune commande.** `extraKnownMarketplaces`, faite de chemins absolus, part
+dans `.claude/settings.local.json` — un fichier que Claude lit déjà, qu'AIDD ajoute à son `.gitignore`
+et dont il n'enregistre pas l'empreinte. `enabledPlugins`, faite de noms, reste dans
+`.claude/settings.json` avec la configuration runtime, committée et suivie comme aujourd'hui.
+
+La capability sait déjà exprimer cette coupe : `MarketplaceSettings` porte
+`enabledPluginsSettingsPath` pour envoyer une clé ailleurs. 5a ajoute le miroir pour l'autre clé.
+AIDD reste l'unique auteur des deux fichiers, donc aucune collision d'empreinte, et le hors ligne
+continue de marcher.
 
 Ça corrige un défaut réel et vérifié : aujourd'hui un collègue qui clone récupère un enregistrement
 qui pointe vers un répertoire ne pouvant pas exister chez lui.
@@ -227,11 +239,13 @@ journey
 
 ### `1)` Écrire chaque entrée dans le fichier que sa nature impose
 
-1. `marketplaceSettings` du profil claude gagne une seconde destination : les entrées dont la source
-   est locale vont dans `.claude/settings.local.json`, celles dont la source est distante restent
-   dans `.claude/settings.json`.
-2. AIDD ajoute `.claude/settings.local.json` à son `.gitignore` — Claude ne l'y met pas lui-même,
-   vérifié.
+1. `MarketplaceSettings` gagne `marketplacesSettingsPath`, miroir de `enabledPluginsSettingsPath`
+   qui existe déjà. Le profil claude l'ajuste sur `.claude/settings.local.json`. Quand il est
+   déclaré, la clé y est écrite et son empreinte n'est pas enregistrée.
+2. La clé laissée dans le fichier suivi par une installation antérieure en est retirée, sinon un
+   chemin absolu périmé reste committé.
+3. AIDD ajoute le fichier à son `.gitignore` — Claude ne l'y met pas lui-même, vérifié. Le chemin
+   est lu sur les profils installés, jamais écrit en dur.
 
 ### `2)` Vérifier sans suivre
 
@@ -252,6 +266,23 @@ journey
 
 1. `.claude/settings.local.json` n'entre pas dans le manifest : AIDD l'écrit, ne le suit pas, et
    `status` ne peut donc pas rapporter de dérive dessus.
+
+## Ce que la mise en œuvre a appris
+
+**Le golden a attrapé une régression que la coupe introduisait.** Sortir la clé du fichier suivi
+faisait apparaître `settings.local.json` comme fichier *ajouté* dans `status` : la fausse dérive
+avait simplement changé de forme. `detectAddedFiles` excluait déjà les `.backup` pour cette raison
+exacte, et les fichiers machine-locaux suivent le même précédent, lus sur le profil par
+`machineLocalFilesOf`.
+
+**Le contrôle de `doctor` n'était pas facultatif.** Un fichier suivi signale lui-même ses dégâts, son
+empreinte cesse de correspondre. Un fichier délibérément non suivi ne signale rien : supprimé à la
+main, `doctor` disait « installation saine ». `DoctorRegistrationUseCase` comble exactement cet angle
+mort, et la commande qu'il propose répare vraiment — vérifié.
+
+**`update` n'appelle pas la synchronisation des marketplaces.** Elle tourne sur `setup`, `install`,
+`marketplace add/remove/refresh` et `plugin install`, pas sur `update`. Antérieur à cette phase, non
+corrigé ici, consigné dans `findings.md`.
 
 ## Test acceptance criteria
 

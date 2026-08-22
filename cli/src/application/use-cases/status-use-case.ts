@@ -6,7 +6,11 @@ import type { AiToolId, ToolCategory, ToolId } from "../../domain/models/tool-id
 import type { FileReader } from "../../domain/ports/file-reader.js";
 import type { Hasher } from "../../domain/ports/hasher.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
-import { getToolConfig, toolIdsForCategory } from "../../domain/tools/registry.js";
+import {
+  getToolConfig,
+  machineLocalFilesOf,
+  toolIdsForCategory,
+} from "../../domain/tools/registry.js";
 import { NoManifestError, ToolNotInstalledError } from "../errors.js";
 import type { DetectPluginDriftUseCase } from "./shared/detect-plugin-drift-use-case.js";
 
@@ -108,14 +112,19 @@ export class StatusUseCase {
     drifted.push(...(await this.checkMergeFiles(mergeFiles, projectRoot)));
     const dir = getToolConfig(toolId).directory;
     const trackedSet = manifest.getTrackedPathsInDirectory(dir);
-    drifted.push(...(await this.detectAddedFiles(dir, trackedSet, projectRoot)));
+    drifted.push(
+      ...(await this.detectAddedFiles(dir, trackedSet, projectRoot, machineLocalFilesOf(toolId)))
+    );
     return { toolId, version, drifted };
   }
 
   private async detectAddedFiles(
     directory: string,
     trackedSet: Set<string>,
-    projectRoot: string
+    projectRoot: string,
+    // Written by this CLI on purpose and never tracked, like the `.backup` files
+    // below — reporting either as something the user added would be a lie.
+    machineLocal: readonly string[]
     // User-scope plugin dirs (e.g. ~/.cursor/plugins/local/) are not scanned for added files;
     // only tracked-file drift is detected for user-scope plugins.
   ): Promise<FileDrift[]> {
@@ -126,6 +135,7 @@ export class StatusUseCase {
     for (const diskRelPath of diskFiles) {
       if (diskRelPath.endsWith(".backup")) continue;
       const fullRelPath = `${directory}${diskRelPath}`;
+      if (machineLocal.includes(fullRelPath)) continue;
       if (!trackedSet.has(fullRelPath)) added.push({ relativePath: fullRelPath, status: "added" });
     }
     return added;

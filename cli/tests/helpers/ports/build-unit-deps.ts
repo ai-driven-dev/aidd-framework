@@ -11,6 +11,7 @@ import { DoctorLayoutUseCase } from "../../../src/application/use-cases/doctor/d
 import { DoctorMergeFilesUseCase } from "../../../src/application/use-cases/doctor/doctor-merge-files-use-case.js";
 import { DoctorPluginUseCase } from "../../../src/application/use-cases/doctor/doctor-plugin-use-case.js";
 import { DoctorReferencesUseCase } from "../../../src/application/use-cases/doctor/doctor-references-use-case.js";
+import { DoctorRegistrationUseCase } from "../../../src/application/use-cases/doctor/doctor-registration-use-case.js";
 import { DoctorTrackedFilesUseCase } from "../../../src/application/use-cases/doctor/doctor-tracked-files-use-case.js";
 import { DoctorUseCase } from "../../../src/application/use-cases/doctor/doctor-use-case.js";
 import { InitUseCase } from "../../../src/application/use-cases/init-use-case.js";
@@ -178,7 +179,8 @@ export function buildDoctorUseCase(
     new DoctorMergeFilesUseCase(deps.fs, deps.hasher),
     new DoctorPluginUseCase(new DetectPluginDriftUseCase(deps.fs)),
     new DoctorReferencesUseCase(deps.fs),
-    new DoctorLayoutUseCase(deps.fs, authReader)
+    new DoctorLayoutUseCase(deps.fs, authReader),
+    new DoctorRegistrationUseCase(deps.fs, deps.marketplaceRegistry)
   );
 }
 

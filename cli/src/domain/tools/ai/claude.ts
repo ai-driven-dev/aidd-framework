@@ -117,6 +117,11 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         marketplaceSettings: {
           settingsPath: ".claude/settings.json",
           settingsKey: "extraKnownMarketplaces",
+          // The registered marketplace is the tree this CLI builds under `.aidd/cache/`,
+          // named by absolute path, so the entry describes one machine and must not be
+          // committed. Claude reads this file alongside the shared one, and it is the
+          // file `claude plugin marketplace add --scope local` writes itself.
+          marketplacesSettingsPath: ".claude/settings.local.json",
           enabledPluginsKey: "enabledPlugins",
           toEntry: buildClaudeStyleMarketplaceEntry,
         },

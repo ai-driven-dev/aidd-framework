@@ -31,5 +31,14 @@ export interface MarketplaceSettings {
   valueShape?: "map" | "array";
   enabledPluginsKey?: string;
   enabledPluginsSettingsPath?: string;
+  /**
+   * Where the registered marketplaces go, when that is not `settingsPath`.
+   *
+   * The entries name a built marketplace by absolute path, so they describe one
+   * machine and cannot be committed. Declaring this sends them to a file the tool
+   * still reads but the CLI neither commits nor hashes — the sibling keys, which hold
+   * names rather than paths, stay in `settingsPath` where a team can share them.
+   */
+  marketplacesSettingsPath?: string;
   toEntry(input: MarketplaceSettingsInput): MarketplaceSettingsEntry | null;
 }

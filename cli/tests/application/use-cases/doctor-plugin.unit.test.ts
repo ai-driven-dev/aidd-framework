@@ -7,6 +7,7 @@ import { DoctorLayoutUseCase } from "../../../src/application/use-cases/doctor/d
 import { DoctorMergeFilesUseCase } from "../../../src/application/use-cases/doctor/doctor-merge-files-use-case.js";
 import { DoctorPluginUseCase } from "../../../src/application/use-cases/doctor/doctor-plugin-use-case.js";
 import { DoctorReferencesUseCase } from "../../../src/application/use-cases/doctor/doctor-references-use-case.js";
+import { DoctorRegistrationUseCase } from "../../../src/application/use-cases/doctor/doctor-registration-use-case.js";
 import { DoctorTrackedFilesUseCase } from "../../../src/application/use-cases/doctor/doctor-tracked-files-use-case.js";
 import { DoctorUseCase } from "../../../src/application/use-cases/doctor/doctor-use-case.js";
 import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
@@ -16,6 +17,7 @@ import { Plugin } from "../../../src/domain/models/plugin.js";
 import type { FileReader } from "../../../src/domain/ports/file-reader.js";
 import type { Hasher } from "../../../src/domain/ports/hasher.js";
 import type { ManifestRepository } from "../../../src/domain/ports/manifest-repository.js";
+import { InMemoryMarketplaceRegistry } from "../../helpers/ports/in-memory-marketplace-registry.js";
 
 const EXPECTED_HASH = "abc123abc123abc123abc123abc123ab";
 const DRIFTED_HASH = "def456def456def456def456def456de";
@@ -65,7 +67,8 @@ function makeDoctorUseCase(fs: FileReader, manifest: Manifest): DoctorUseCase {
     new DoctorMergeFilesUseCase(fs, noopHasher),
     new DoctorPluginUseCase(new DetectPluginDriftUseCase(fs)),
     new DoctorReferencesUseCase(fs),
-    new DoctorLayoutUseCase(fs)
+    new DoctorLayoutUseCase(fs),
+    new DoctorRegistrationUseCase(fs, new InMemoryMarketplaceRegistry())
   );
 }
 

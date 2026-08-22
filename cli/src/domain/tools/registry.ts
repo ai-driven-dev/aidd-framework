@@ -107,3 +107,21 @@ export function frameworkBuildModeFor(toolId: ToolId): FrameworkBuildMode {
   const caps = config.capabilities as { plugins?: { mode?: PluginsMode } };
   return caps.plugins?.mode === "flat" ? "flat" : "marketplace";
 }
+
+/**
+ * Files this CLI writes for a tool and deliberately does not track.
+ *
+ * Their content names absolute paths, so they describe one machine: committing them
+ * would hand a teammate a pointer that cannot resolve, and hashing them would make
+ * every other machine read as drift. Untracked is the point, so neither `status` nor
+ * the gitignore should treat them as something the user added.
+ */
+export function machineLocalFilesOf(toolId: ToolId): readonly string[] {
+  const config = getToolConfig(toolId);
+  if (config === undefined || !isAiTool(config)) return [];
+  const caps = config.capabilities as {
+    plugins?: { marketplaceSettings?: { marketplacesSettingsPath?: string } | null };
+  };
+  const path = caps.plugins?.marketplaceSettings?.marketplacesSettingsPath;
+  return path === undefined ? [] : [path];
+}
