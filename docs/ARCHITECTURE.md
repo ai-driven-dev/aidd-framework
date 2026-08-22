@@ -42,6 +42,18 @@ Declared in `plugins/<plugin>/hooks/hooks.json`. They run Node, so users need `n
 | `aidd-context`   | `SessionStart`                            | `hooks/update_memory.js`  | Refresh the project memory block in the AI context files              |
 | `aidd-telemetry` | `SessionStart` · `Stop` · `PostToolUse`   | `hooks/journal.js`        | Journal every session so a unit of work can be tied to what it cost   |
 
+A hook is authored once, with `${CLAUDE_PLUGIN_ROOT}`, and the installer rewrites it to whatever the target tool expands. Which tools run a bundled hook at all, and what each resolves:
+
+| Tool          | Runs bundled hooks | Resolves the plugin root as | Notes                                                                                  |
+| ------------- | ------------------ | --------------------------- | ---------------------------------------------------------------------------------------- |
+| Claude Code   | yes                | `${CLAUDE_PLUGIN_ROOT}`     | The spelling every plugin is authored in, so nothing is substituted                    |
+| Codex         | yes                | `${PLUGIN_ROOT}`            | Measured: it expands `${CLAUDE_PLUGIN_ROOT}` too, and will not run a hook it has not been asked to trust |
+| GitHub Copilot| yes                | `${PLUGIN_ROOT}`            | Declared, never observed against a running hook                                        |
+| Cursor        | declared            | `./`                        | Its own hook format: the converter rewrites the root to a path relative to the plugin before the declared token is ever substituted. Two headless probes fired no plugin hook at all, and what registers a plugin sitting in Cursor's own plugin directory was not identified |
+| OpenCode      | no                 | —                           | Its plugin runtime is JS modules; a declarative `hooks.json` means nothing to it        |
+
+A tool that runs no hook says why, and an install that carries one tells whoever ran it what was skipped.
+
 ## 🧠 Plugin concerns and layers
 
 Every capability lives in exactly one plugin, chosen by **concern**. This taxonomy decides placement; it is only implicit in each `plugin.json`, so it is canonical here.

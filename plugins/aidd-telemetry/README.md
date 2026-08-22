@@ -15,7 +15,7 @@ the skill — what the framework knows and a provider does not.
 ## Install and use
 
 Install the plugin through your tool's own mechanism. Nothing else: no `npm install`, no
-CLI, no account. The two scripts it ships are self-contained and run under plain `node`.
+CLI, no account. The scripts it ships are self-contained and run under plain `node`.
 
 ```bash
 # 1. allow it, once per project
@@ -28,8 +28,8 @@ node <plugin>/skills/01-cost/scripts/telemetry-report.js read
 node <plugin>/skills/01-cost/scripts/telemetry-report.js report
 ```
 
-Or let the skills do it: **init** turns it on and checks it is recording, **cost** answers
-what the work consumed.
+Or let the skills do it: **init** turns it on and verifies the switch, **check** answers
+whether the whole chain is actually recording, **cost** answers what the work consumed.
 
 ```
 period    2026-08-21 to 2026-08-21
