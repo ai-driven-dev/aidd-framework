@@ -13,10 +13,18 @@ on:
     paths:
       - "cli/**"
       - "kanban/**"
+      # The plugin ships the hooks and skills these jobs exercise, and the Windows probe
+      # exists for them in particular - without this, changing any of it runs nothing.
+      - "plugins/aidd-telemetry/**"
+      - "scripts/__tests__/**"
   pull_request:
     paths:
       - "cli/**"
       - "kanban/**"
+      # The plugin ships the hooks and skills these jobs exercise, and the Windows probe
+      # exists for them in particular - without this, changing any of it runs nothing.
+      - "plugins/aidd-telemetry/**"
+      - "scripts/__tests__/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
