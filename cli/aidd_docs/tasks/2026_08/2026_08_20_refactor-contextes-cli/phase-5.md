@@ -1,5 +1,5 @@
 ---
-status: blocked
+status: pending
 ---
 
 # Instruction: Let each tool own its own configuration
@@ -35,11 +35,72 @@ owns.**
 `--scope project` is not optional: the command defaults to **user** scope and would otherwise
 register the marketplace globally, for every project on the machine.
 
-## Reporté (2026-08-21)
+## Décision (2026-08-22)
 
-Cette phase attend une décision produit qui n'est pas prise : ni le comportement hors ligne, ni la
-forme d'hébergement. Elle ne bloque rien — aucune autre phase n'en dépend, et le refactor continue
-en phase 6. Elle reprend quand la forme est tranchée, voir `marketplaces-heberges.md`.
+Tranchée après mesure. La question posée — « que faire hors ligne ? » — n'était pas le vrai blocage,
+et les trois issues qu'elle proposait reposaient sur deux faits faux.
+
+### Ce que la mesure a corrigé
+
+**Le précédent hors ligne existe déjà, et il ne coûte pas ce que la fiche croyait.** `aidd setup --ai
+codex` pose exactement un fichier, `.codex/config.toml`, qui ne contient que `model` et
+`approval_policy` : aucun enregistrement. Le marketplace de codex n'existe que par sa commande. Donc
+codex sans son binaire, aujourd'hui, c'est déjà un setup qui réussit et n'enregistre rien. Claude
+pose lui aussi exactement un fichier. Piloter la commande ne créerait pas un nouveau mode d'échec
+silencieux : il est déjà en place pour un outil sur deux.
+
+**Mais l'enregistrement d'AIDD ne peut pas être partagé, quelle que soit la source.** Mesuré dans les
+deux modes :
+
+| `--source` | ce qui atterrit dans `extraKnownMarketplaces` |
+|---|---|
+| `remote` (défaut) | `{source:"directory", path:"<abs>/.aidd/cache/built/aidd-framework/claude"}` |
+| `local --path <repo>` | `{source:"directory", path:"<abs>/<repo>"}` |
+
+Ce qu'AIDD enregistre n'est jamais le dépôt amont, c'est **l'arbre construit** — un chemin absolu, et
+dans le cas par défaut un chemin vers le dossier que le `.gitignore` exclut. C'est mécanique : l'arbre
+construit est la forme claude du marketplace, le dépôt amont est agnostique. Tant que ces arbres ne
+sont pas hébergés, l'enregistrement est machine-local par construction.
+
+**Et le même fichier porte des entrées de nature opposée.** Un marketplace tiers déclaré en github
+produit `{source:"github", repo:"anthropics/claude-code"}` — parfaitement partageable, et le committer
+est correct. Vérifié côte à côte dans le même `settings.json`. Le fichier mélange donc, dans un objet
+committé, ce qui ne peut appartenir qu'à une machine et ce qui doit appartenir à l'équipe.
+
+### Ce qui est tranché
+
+**La phase se scinde en deux, et une seule moitié est faisable maintenant.**
+
+**5a — séparer les deux natures d'entrée. Faisable tout de suite, sans hébergement, sans piloter
+aucune commande.** L'enregistrement du framework AIDD part dans `.claude/settings.local.json`, que
+Claude lit déjà et qu'AIDD ajoute à son `.gitignore` ; les marketplaces tiers restent dans
+`.claude/settings.json`, committé. Le critère n'est pas l'outil, c'est ce que l'entrée contient :
+`source.kind === "local"` va au fichier machine-local, `"github"` au fichier partagé, distinction que
+`buildClaudeStyleMarketplaceEntry` fait déjà. AIDD reste l'unique auteur des deux fichiers, donc
+aucune collision d'empreinte, et le hors ligne continue de marcher.
+
+Ça corrige un défaut réel et vérifié : aujourd'hui un collègue qui clone récupère un enregistrement
+qui pointe vers un répertoire ne pouvant pas exister chez lui.
+
+**5b — piloter la commande de l'outil. Reste bloqué, et pas pour la raison qu'indiquait la fiche.**
+Le blocage n'est pas le hors ligne, c'est que piloter ne donne pas un résultat meilleur tant que les
+marketplaces ne sont pas hébergés :
+
+- au scope `project`, `claude plugin marketplace add` réécrit `.claude/settings.json`, le fichier
+  qu'AIDD écrit et dont il enregistre l'empreinte — la collision qui avait fait échouer la première
+  tentative revient telle quelle ;
+- au scope `local`, il écrit `.claude/settings.local.json`, un fichier séparé donc sans collision
+  (vérifié : « declared in local settings ») — mais c'est précisément ce que 5a obtient déjà en
+  écrivant le fichier, sans exiger le binaire ;
+- cursor ne peut pas être piloté du tout : sa commande prend une URL git, pas un chemin.
+
+Piloter devient le bon geste quand `add` prend une URL pour les quatre outils, c'est-à-dire après la
+décision d'hébergement. Voir `marketplaces-heberges.md`. 5b y est rattaché.
+
+### Ce que la décision coûte
+
+5a laisse AIDD auteur de la configuration d'un autre outil, ce qui est l'objectif affiché de la
+phase. C'est assumé : l'objectif est en aval de l'hébergement, pas du hors ligne.
 
 ## The decision this phase needs
 
@@ -89,9 +150,13 @@ et n'exposer `--scope` que là où l'outil en accepte un.
 AIDD ajoute une seule ligne au `.gitignore` du projet : `.aidd/cache/`. Ce qui reste versionné :
 `.aidd/manifest.json`, `.aidd/marketplaces.json` et `.claude/settings.json`.
 
-Or `.claude/settings.json` est committé **et** contient le chemin du marketplace enregistré — un
-chemin **absolu** vers `.aidd/cache/built/aidd-framework/claude`, c'est-à-dire vers le dossier
-ignoré. Vérifié sur un projet neuf.
+Or `.claude/settings.json` est committé **et** contient le chemin du marketplace AIDD — un chemin
+**absolu** vers `.aidd/cache/built/aidd-framework/claude`, c'est-à-dire vers le dossier ignoré.
+Vérifié sur un projet neuf, dans les deux modes de `--source`.
+
+Attention à ne pas généraliser : c'est vrai de l'enregistrement d'AIDD, pas de toutes les entrées.
+Un marketplace tiers déclaré en github s'écrit `{source:"github", repo:"…"}` et se partage très bien.
+C'est ce contraste, et non le chemin seul, qui fonde la décision plus bas.
 
 Un collègue qui clone récupère donc un pointeur vers un répertoire qui n'existe pas chez lui et
 n'existera qu'après son propre `setup`. C'est un défaut latent du modèle actuel, indépendant de tout
@@ -155,34 +220,45 @@ journey
 
 ## Tasks to do
 
-### `0)` Settle the offline decision
+### `0)` Settle the offline decision — fait, voir « Décision » plus haut
 
-> The phase cannot be sized before this is answered. It is a product decision, not a technical one.
+> Répondu le 2026-08-22 : la question ne bloquait pas ce qu'elle prétendait bloquer. Ce qui suit est
+> la moitié 5a, réalisable sans hébergement. La moitié 5b est rattachée à `marketplaces-heberges.md`.
 
-1. Choose between requiring the binary, falling back to the file, or waiting for hosted marketplaces.
+### `1)` Écrire chaque entrée dans le fichier que sa nature impose
 
-### `1)` Register through the command
+1. `marketplaceSettings` du profil claude gagne une seconde destination : les entrées dont la source
+   est locale vont dans `.claude/settings.local.json`, celles dont la source est distante restent
+   dans `.claude/settings.json`.
+2. AIDD ajoute `.claude/settings.local.json` à son `.gitignore` — Claude ne l'y met pas lui-même,
+   vérifié.
 
-1. Add `nativeActivation` to the claude profile, with `marketplaceAddArgs: ["--scope", "project"]`
-   or its equivalent — the command's default scope is `user`.
-2. Drop `marketplaceSettings` from the profile so nothing writes the file any more.
+### `2)` Vérifier sans suivre
 
-### `2)` Verify through the command
+> `claude plugin marketplace list` **n'a pas** d'option `--json` — vérifié contre la CLI installée.
+> La fiche en supposait une. La distinction utile n'est pas lire par la commande plutôt que par le
+> fichier, c'est **lire sans enregistrer d'empreinte** : lire pour confirmer ne crée pas de dérive,
+> enregistrer un hachage en crée.
 
-1. Add a read to the activator port: list the registered marketplaces.
-2. `doctor` uses it instead of comparing a tracked hash.
+1. `doctor` confirme l'enregistrement en lisant les deux fichiers, sans suivre celui qui est
+   machine-local.
 
-### `3)` Stop tracking what the tool owns
+### `3)` Ne suivre que ce qui se partage
 
-1. `.claude/settings.json` leaves the manifest. Claude then tracks no file, and `status`, `doctor`
-   and `restore` say so plainly rather than reporting an empty check.
+> Le critère d'origine — « plus aucun fichier sous `.claude/` dans le manifest » — est faux et ne peut
+> pas être atteint : `configOutputPaths: { "settings.json": ".claude/settings.json" }` fait qu'AIDD
+> écrit légitimement ce fichier pour `respectGitignore` et `permissions`. Vérifié sur un projet neuf.
+> Ce qui quitte le fichier suivi, c'est l'entrée machine-local, pas le fichier.
+
+1. `.claude/settings.local.json` n'entre pas dans le manifest : AIDD l'écrit, ne le suit pas, et
+   `status` ne peut donc pas rapporter de dérive dessus.
 
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
 | ---- | ------------------- |
-| 0    | The decision is recorded here before any code changes |
-| 1    | After setup, `claude plugin marketplace list` shows the marketplace at project scope, and the user's global configuration is untouched |
-| 2    | Removing the registration by hand makes `doctor` report it, with the command that fixes it |
-| 3    | No file under `.claude/` appears in the manifest, and no `status` run reports drift on one |
-| all  | The golden diff shows the settings file no longer written and no longer tracked, and nothing else |
+| 0    | La décision est écrite ici avant tout changement de code — fait |
+| 1    | Après setup, `.claude/settings.json` ne contient plus aucun chemin absolu, et l'enregistrement du framework se trouve dans `.claude/settings.local.json`, lui-même gitignoré |
+| 2    | Retirer l'enregistrement à la main fait que `doctor` le signale, avec la commande qui répare |
+| 3    | `settings.local.json` n'apparaît pas dans le manifest, et aucun `status` ne rapporte de dérive dessus |
+| all  | Un projet cloné par un collègue n'hérite plus d'un chemin qui ne peut pas exister chez lui. Le diff golden montre la scission du fichier et rien d'autre |

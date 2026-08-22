@@ -199,3 +199,16 @@ co-possédés, et le régime à lui appliquer n'est tranché nulle part.
 indexé côté serveur. AIDD construit un marketplace **local** ; cette commande ne peut pas le
 prendre. La matérialisation plugin-locale actuelle de Cursor reste la bonne approche.
 
+## Activation native déclenchée pour un outil qui ne la déclare pas (2026-08-22)
+
+`aidd marketplace add cc anthropics/claude-code` sur un projet claude affiche :
+
+```
+Warning: Native plugin activation — build 'cc' for claude skipped: ENOENT: no such file or directory,
+open '…/.aidd/cache/marketplaces/cc/github-anthropics-claude-code-HEAD/plugins/plugin-dev/.claude-plugin/plugin.json'
+```
+
+Le profil claude n'a pas de `nativeActivation` — l'activation native ne devrait pas s'exécuter pour
+lui. Le `bestEffort` l'a rattrapée, donc rien n'a cassé, mais la branche prise n'est pas la bonne.
+Repéré en instruisant la phase 5, qui touche exactement ce chemin. Non corrigé : hors du périmètre
+tranché ce jour.
