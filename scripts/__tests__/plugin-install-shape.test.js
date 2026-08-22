@@ -25,6 +25,7 @@ const GIT_DIR = path.dirname(
 // generic fallback below gives an undiscovered script.
 const KNOWN_INVOCATIONS = {
   "telemetry-switch.js": ["on"],
+  "telemetry-identity.js": ["status"],
   "telemetry-report.js": ["read"],
   "telemetry-check.js": [],
 };
