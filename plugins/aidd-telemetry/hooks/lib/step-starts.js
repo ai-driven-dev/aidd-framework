@@ -32,6 +32,19 @@ function skillNameFromArgument({ toolField, toolName, argumentsField, nameField 
   };
 }
 
+// Runs several argument-family readers in sequence, first name found wins. For one host
+// whose own builder produces more than one payload shape - both genuinely that host's,
+// never a guess at a third - rather than a fallback chain crossing families.
+function skillNameFromAnyArgument(readers) {
+  return (payload) => {
+    for (const reader of readers) {
+      const name = reader(payload);
+      if (name) return name;
+    }
+    return null;
+  };
+}
+
 function* stringsWithin(value) {
   if (typeof value === "string") {
     yield value;
@@ -69,12 +82,26 @@ const STEP_START_BY_HOST = Object.freeze({
     turnIdField: "prompt_id",
   },
   copilot: {
-    skillName: skillNameFromArgument({
-      toolField: "toolName",
-      toolName: "skill",
-      argumentsField: "toolArgs",
-      nameField: "skill",
-    }),
+    // Two shapes, both genuinely Copilot's own (see fixtures/README.md and issue #701).
+    // Canonical builder: toolName/toolArgs, toolArgs a JSON string. _vsCodeCompat builder,
+    // captured 2026-08-22 against a real @github/copilot@1.0.80 skill call: tool_name
+    // stays the canonical "skill" spelling, but tool_input arrives as an object keyed
+    // like Claude Code's own tool_input.skill, not like the canonical builder's
+    // JSON-string toolArgs. Neither was guessed; both came from a captured payload.
+    skillName: skillNameFromAnyArgument([
+      skillNameFromArgument({
+        toolField: "toolName",
+        toolName: "skill",
+        argumentsField: "toolArgs",
+        nameField: "skill",
+      }),
+      skillNameFromArgument({
+        toolField: "tool_name",
+        toolName: "skill",
+        argumentsField: "tool_input",
+        nameField: "skill",
+      }),
+    ]),
     // Copilot carries a turn identifier on its session events, never on a hook payload.
     turnIdField: null,
   },

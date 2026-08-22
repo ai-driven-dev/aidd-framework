@@ -36,9 +36,24 @@ function resolveEventName(argvEvent, payload) {
   return HOOK_EVENT_NAME_TO_CANONICAL[payload && payload.hook_event_name] || null;
 }
 
+// Only on session-start or turn-end - never tool-used, which fires on every tool call and
+// would otherwise pay handleUnrecognisedPayload's git shellout once per call for the life
+// of the session. Every declared host fires session-start at least once (see hooks.json),
+// so an undeclared one wired the same way is caught at parity with a declared host's own
+// per-session cost, not worse; one that fires tool-used alone would go untraced.
+function maybeRecordUnrecognisedPayload(payload, event) {
+  if (!payload || typeof payload !== "object") return;
+  const resolvedEvent = resolveEventName(event, payload);
+  if (resolvedEvent !== "session-start" && resolvedEvent !== "turn-end") return;
+  record.handleUnrecognisedPayload(payload);
+}
+
 function processPayload(payload, event) {
   const host = detectHost(payload);
-  if (!DECLARED_HOSTS.has(host)) return;
+  if (!DECLARED_HOSTS.has(host)) {
+    maybeRecordUnrecognisedPayload(payload, event);
+    return;
+  }
 
   // Read behind the host's own declaration, never one host's spelling promoted to a rule.
   const sessionId = record.readSessionId(host, payload);

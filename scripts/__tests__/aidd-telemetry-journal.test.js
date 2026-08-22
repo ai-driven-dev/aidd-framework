@@ -29,7 +29,11 @@ const {
 
 const { taskFolderRelativePath } = require("../../plugins/aidd-telemetry/hooks/lib/file-writes.js");
 
-const { readSessionId, VENDOR_FIELD_BY_HOST } = require("../../plugins/aidd-telemetry/hooks/lib/record.js");
+const {
+  readSessionId,
+  VENDOR_FIELD_BY_HOST,
+  UNRECOGNISED_FILE_NAME,
+} = require("../../plugins/aidd-telemetry/hooks/lib/record.js");
 
 const { readCwd } = require("../../plugins/aidd-telemetry/hooks/lib/repo.js");
 
@@ -108,6 +112,17 @@ test("detectHost names each recognised host distinctly, not just null-vs-Claude-
   assert.equal(detectHost(loadFixture("cursor-session-start.json")), "cursor");
 });
 
+test("detectHost recognises Copilot's compat shape - session_id and hook_event_name spelled Claude Code's way, told apart by timestamp - on every event that shape sends", () => {
+  assert.equal(detectHost(loadFixture("copilot-compat-session-start.json")), "copilot");
+  assert.equal(detectHost(loadFixture("copilot-compat-post-tool-use.json")), "copilot");
+  assert.equal(detectHost(loadFixture("copilot-compat-turn-end.json")), "copilot");
+});
+
+test("detectHost recognises both of Copilot's shapes as the same host, not one at the other's expense", () => {
+  assert.equal(detectHost(loadFixture("copilot-session-start.json")), "copilot");
+  assert.equal(detectHost(loadFixture("copilot-compat-session-start.json")), "copilot");
+});
+
 test("detectHost yields no host for an empty payload", () => {
   assert.equal(detectHost({}), null);
   assert.equal(detectHost(null), null);
@@ -122,6 +137,39 @@ test("detectHost yields no host when transcript_path matches neither shape", () 
       hook_event_name: "SessionStart",
     }),
     null,
+  );
+});
+
+test("detectHost's compat rule does not claim Codex or Claude Code payloads - neither ever carries timestamp, only Copilot's compat shape does", () => {
+  assert.equal(
+    detectHost({
+      session_id: "cc-1",
+      transcript_path: "/home/user/probe/cc-home/projects/-home-user-probe-project/cc-1.jsonl",
+      cwd: "/home/user/probe/project",
+      hook_event_name: "SessionStart",
+      source: "startup",
+    }),
+    "claude-code",
+    "unchanged by the compat rule: transcript_path claims this payload first",
+  );
+  assert.equal(
+    detectHost({
+      session_id: "codex-1",
+      transcript_path:
+        "/home/user/probe/codex-home/sessions/2026/08/14/rollout-2026-08-14T10-11-20-codex-1.jsonl",
+      cwd: "/home/user/probe/project",
+      hook_event_name: "SessionStart",
+      model: "probe-stub",
+      permission_mode: "bypassPermissions",
+      source: "startup",
+    }),
+    "codex",
+    "unchanged by the compat rule: transcript_path claims this payload first",
+  );
+  assert.equal(
+    detectHost({ session_id: "x", hook_event_name: "SessionStart" }),
+    null,
+    "hook_event_name and session_id alone, with no timestamp and no transcript_path, must stay unrecognised - this is the exact shape the compat rule must not over-match",
   );
 });
 
@@ -187,6 +235,22 @@ test("replaying the Claude Code fixture exits 0 and prints nothing", () => {
 for (const name of ["codex-session-start.json", "copilot-session-start.json", "cursor-session-start.json"]) {
   test(`replaying the ${name} fixture exits 0 and prints nothing`, () => {
     const result = replay(readFixture(name));
+    assert.equal(result.status, 0);
+    assert.equal(result.stdout, "");
+    assert.equal(result.stderr, "");
+  });
+}
+
+// Copilot's compat shape, one event per fixture, each replayed with the argv its own
+// hooks.json entry passes (see ARGV_EVENT_BY_HOOK_EVENT_NAME) - the untouched capture
+// itself going through journal.js's stdin path, not a payload built to match it.
+for (const [name, event] of [
+  ["copilot-compat-session-start.json", "session-start"],
+  ["copilot-compat-post-tool-use.json", "tool-used"],
+  ["copilot-compat-turn-end.json", "turn-end"],
+]) {
+  test(`replaying the ${name} fixture exits 0 and prints nothing`, () => {
+    const result = replay(readFixture(name), event);
     assert.equal(result.status, 0);
     assert.equal(result.stdout, "");
     assert.equal(result.stderr, "");
@@ -490,6 +554,32 @@ function replayIn(payload, event = ARGV_EVENT_BY_HOOK_EVENT_NAME[payload.hook_ev
   const args = event ? [script, event] : [script];
   return spawnSync(process.execPath, args, {
     cwd: root,
+    encoding: "utf8",
+    input: JSON.stringify(payload),
+    env: { ...CLEAN_ENV, AIDD_RUNS_DIR: "" },
+  });
+}
+
+// No payload at all - empty stdin, so `readStdin` yields "" and `payload` stays null. The
+// counterpart to replayIn: proves the "no payload arrived" state, not merely one host
+// among several failing to recognise a shape.
+function replayEmpty(event = "session-start") {
+  return spawnSync(process.execPath, [script, event], {
+    cwd: root,
+    encoding: "utf8",
+    input: "",
+    env: { ...CLEAN_ENV, AIDD_RUNS_DIR: "" },
+  });
+}
+
+// Spawned with the process's own cwd set to the target repo, unlike replayIn (which always
+// runs from `root` and relies on the payload naming its own cwd) - the one way to prove
+// handleUnrecognisedPayload's process.cwd() fallback, which reads the hook's own cwd, not
+// a field in the payload.
+function replayInAt(cwd, payload, event) {
+  const args = event ? [script, event] : [script];
+  return spawnSync(process.execPath, args, {
+    cwd,
     encoding: "utf8",
     input: JSON.stringify(payload),
     env: { ...CLEAN_ENV, AIDD_RUNS_DIR: "" },
@@ -1349,6 +1439,31 @@ test("file-written shells out to git zero times for a tool it does not track - t
   }
 });
 
+test("an unrecognised payload shells out to git zero times on tool-used, unlike session-start or turn-end - tool-used fires on every tool call and has no cheap pre-filter of its own", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/unrecognised-shellout-count.git" });
+  try {
+    withEnv({ AIDD_RUNS_DIR: "" }, () => {
+      const unrecognised = { session_id: "x", cwd: repo };
+
+      const callsForToolUsed = countGitInvocations(() => {
+        processPayload({ ...unrecognised, hook_event_name: "PostToolUse" }, "tool-used");
+      });
+      assert.equal(
+        callsForToolUsed,
+        0,
+        "tool-used must reject before any git shellout, or an unrecognised host's every call would pay one",
+      );
+
+      const callsForSessionStart = countGitInvocations(() => {
+        processPayload({ ...unrecognised, hook_event_name: "SessionStart" }, "session-start");
+      });
+      assert.ok(callsForSessionStart > 0, "session-start must still resolve the repo root via git");
+    });
+  } finally {
+    cleanup(repo);
+  }
+});
+
 test("turn-end's and file-written's in-process work stay under 200ms at p95 over 100 invocations each, against a directory holding several hundred run files", () => {
   const harness = path.join(__dirname, "aidd-telemetry-journal-perf-harness.js");
   // Spawned so this spawnSync can enforce a real kill on a hang: node:test's
@@ -2105,14 +2220,30 @@ function makeCodexPayload({ cwd, sessionId, event, turnId }) {
 }
 
 function makeCopilotPayload({ cwd, sessionId }) {
-  // Never carries hook_event_name - not observed in any capture, on any event (see
-  // fixtures/README.md). The event name can only ever come from argv for this host.
+  // Copilot's canonical builder - never carries hook_event_name, on any event (see
+  // fixtures/README.md). The event name can only ever come from argv for this shape.
+  // The other shape Copilot can send, _vsCodeCompat, does carry hook_event_name - see
+  // makeCopilotCompatPayload below and fixtures/copilot-compat-*.json.
   return {
     sessionId,
     timestamp: Date.now(),
     cwd,
     source: "new",
     initialPrompt: "reply with the single word ok",
+  };
+}
+
+// Copilot's other builder, _vsCodeCompat (see lib/host.js): Claude Code's own event
+// spelling reused verbatim (session_id, hook_event_name) instead of sessionId, plus a
+// timestamp field neither Codex nor Claude Code ever carries. Mirrors the shape measured
+// 2026-08-21 against a real @github/copilot@1.0.80 session - see
+// fixtures/copilot-compat-*.json for the untouched capture this builder is shaped from.
+function makeCopilotCompatPayload({ cwd, sessionId, event }) {
+  return {
+    hook_event_name: event,
+    session_id: sessionId,
+    timestamp: new Date().toISOString(),
+    cwd,
   };
 }
 
@@ -2249,6 +2380,11 @@ test("Cursor's per-host declaration is correct on its own terms: readSessionId r
   );
 });
 
+test("Copilot's readSessionId reads whichever shape the payload carries: sessionId for the canonical builder, session_id for _vsCodeCompat", () => {
+  assert.equal(readSessionId("copilot", { sessionId: "copilot-canonical-1" }), "copilot-canonical-1");
+  assert.equal(readSessionId("copilot", { session_id: "copilot-compat-1" }), "copilot-compat-1");
+});
+
 test("Cursor's real headless end-of-session shape (sessionEnd, captured under out-cursor-skill) resolves to no canonical event at all - #680's gap, stated as a fact about resolveEventName directly", () => {
   assert.equal(
     resolveEventName(undefined, { hook_event_name: "sessionEnd" }),
@@ -2257,19 +2393,20 @@ test("Cursor's real headless end-of-session shape (sessionEnd, captured under ou
   );
 });
 
-test("a Copilot session-start writes nothing when no event resolves - the current, real shape: no capture of any Copilot event ever carries hook_event_name, and nothing here yet supplies a decidable argv either (#681)", () => {
+test("a Copilot canonical session-start writes nothing when no event resolves - that shape never carries hook_event_name, so with no argv there is nothing to fall back to", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/copilot-blocked.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000cop1";
-    // No explicit event: mirrors real Copilot traffic, where hook_event_name is absent and
-    // nothing in this repository yet supplies the missing argv (see fixtures/README.md).
+    // No explicit event: mirrors the canonical shape's real traffic, where hook_event_name
+    // is absent (see fixtures/README.md). Copilot's other shape, _vsCodeCompat, does carry
+    // hook_event_name and is covered separately below.
     const result = replayIn(makeCopilotPayload({ cwd: repo, sessionId }), undefined);
     assert.equal(result.status, 0);
 
     assert.equal(
       readRunFiles(runsDirOf(repo)).length,
       0,
-      "Copilot is declared (see lib/record.js), but no event resolves for it today - #681 is what supplies a decidable event, not a dispatcher change",
+      "the canonical shape supplies no event name of its own, in payload or elsewhere - argv is its only source",
     );
   } finally {
     cleanup(repo);
@@ -2305,7 +2442,109 @@ test("a Copilot session-start with an empty sessionId writes nothing, even given
   }
 });
 
-test("a payload matching no declared host's shape writes nothing and exits 0, in a real switched-on repo", () => {
+test("a Copilot compat session-start writes a session_start line carrying session_id as vendor_id - the other reader #681 required, independent of the canonical sessionId spelling", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/copilot-compat-start.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-0000000cop3";
+    const result = replayIn(
+      makeCopilotCompatPayload({ cwd: repo, sessionId, event: "SessionStart" }),
+      "session-start",
+    );
+    assert.equal(result.status, 0);
+
+    const written = readRunFiles(runsDirOf(repo));
+    assert.equal(written.length, 1);
+    const line = readLines(written[0])[0];
+    assert.deepEqual(Object.keys(line).sort(), SESSION_START_KEYS);
+    assert.equal(line.tool, "copilot");
+    assert.equal(line.vendor_id, sessionId, "vendor_id must be the real id, not the string \"undefined\"");
+    assert.equal(line.vendor_field, "gen_ai.conversation.id");
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a Copilot compat turn-end appends a turn_end line to the file its own session-start opened - one host table, both its shapes", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/copilot-compat-turn-end.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-0000000cop4";
+    replayIn(makeCopilotCompatPayload({ cwd: repo, sessionId, event: "SessionStart" }), "session-start");
+
+    const result = replayIn(
+      makeCopilotCompatPayload({ cwd: repo, sessionId, event: "Stop" }),
+      "turn-end",
+    );
+    assert.equal(result.status, 0);
+
+    const written = readRunFiles(runsDirOf(repo));
+    const lines = readLines(written[0]);
+    assert.equal(lines.length, 2);
+    assert.equal(lines[1].type, "turn_end");
+  } finally {
+    cleanup(repo);
+  }
+});
+
+// Renamed from a title claiming "the two are no longer indistinguishable from outside" -
+// this pair (a run file vs none) is exactly what the criterion says is NOT enough; the real
+// comparison (unrecognised payload vs no payload at all) is asserted separately below.
+test("a Copilot compat session-start writes a run file; an unrecognised payload of the same event writes the unrecognised marker instead, never a run file of its own", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/copilot-compat-vs-unrecognised.git" });
+  try {
+    const recognisedId = "00000000-0000-4000-8000-0000000cop5";
+    const recognised = replayIn(
+      makeCopilotCompatPayload({ cwd: repo, sessionId: recognisedId, event: "SessionStart" }),
+      "session-start",
+    );
+    assert.equal(recognised.status, 0);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 1, "the recognised shape must produce a run file");
+
+    // Same event, same cwd, missing only the field the compat rule requires (timestamp) -
+    // a payload that arrived but matches no known host's shape.
+    const unrecognised = replayIn(
+      { session_id: "00000000-0000-4000-8000-0000000cop6", hook_event_name: "SessionStart", cwd: repo },
+      "session-start",
+    );
+    assert.equal(unrecognised.status, 0);
+    assert.equal(
+      readRunFiles(runsDirOf(repo)).filter((f) => path.basename(f) !== UNRECOGNISED_FILE_NAME).length,
+      1,
+      "still one run file - the unrecognised payload must never mint a session file of its own",
+    );
+    assert.equal(
+      fs.existsSync(path.join(runsDirOf(repo), UNRECOGNISED_FILE_NAME)),
+      true,
+      "the unrecognised payload must still leave its own trace",
+    );
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("an unrecognised payload leaves a trace that no payload at all does not - the two stop being the same observable state", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/unrecognised-vs-silence.git" });
+  const markerPath = path.join(runsDirOf(repo), UNRECOGNISED_FILE_NAME);
+  try {
+    const silent = replayEmpty("session-start");
+    assert.equal(silent.status, 0);
+    assert.equal(fs.existsSync(markerPath), false, "no payload at all must leave no trace of any kind");
+
+    const unrecognised = replayIn(
+      { session_id: "x", transcript_path: "/home/user/somewhere/else/notes.txt", cwd: repo, hook_event_name: "SessionStart" },
+      "session-start",
+    );
+    assert.equal(unrecognised.status, 0);
+    assert.equal(
+      fs.existsSync(markerPath),
+      true,
+      "a payload that arrived and matched no host must leave a trace, distinguishing it from no payload at all",
+    );
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a payload matching no declared host's shape writes no run file, only the unrecognised marker, and exits 0, in a real switched-on repo", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/undeclared-host.git" });
   try {
     const result = replayIn(
@@ -2313,7 +2552,66 @@ test("a payload matching no declared host's shape writes nothing and exits 0, in
       "session-start",
     );
     assert.equal(result.status, 0);
-    assert.equal(readRunFiles(runsDirOf(repo)).length, 0);
+    assert.deepEqual(readRunFiles(runsDirOf(repo)).map((f) => path.basename(f)), [UNRECOGNISED_FILE_NAME]);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a second unrecognised payload in the same repo writes no second line - the marker is bounded to one, not one per tool call", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/unrecognised-bounded.git" });
+  try {
+    const payload = { session_id: "x", cwd: repo, hook_event_name: "SessionStart" };
+    replayIn(payload, "session-start");
+    replayIn(payload, "session-start");
+    replayIn(payload, "session-start");
+
+    const markerPath = path.join(runsDirOf(repo), UNRECOGNISED_FILE_NAME);
+    assert.equal(readLines(markerPath).length, 1, "a whole session of unrecognised calls must still cost one line");
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("an unrecognised payload refreshes the marker's `at` rather than freezing on the first occurrence - a diagnosis that never moved forward would be stale-forever, one file over", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/unrecognised-refreshed.git" });
+  try {
+    const markerPath = path.join(runsDirOf(repo), UNRECOGNISED_FILE_NAME);
+    fs.mkdirSync(path.dirname(markerPath), { recursive: true });
+    fs.writeFileSync(
+      markerPath,
+      `${JSON.stringify({ type: "unrecognised_payload", at: "2020-01-01T00:00:00Z" })}\n`,
+    );
+
+    const result = replayIn({ session_id: "x", cwd: repo, hook_event_name: "SessionStart" }, "session-start");
+    assert.equal(result.status, 0);
+
+    const lines = readLines(markerPath);
+    assert.equal(lines.length, 1, "still exactly one line - refreshed, not appended");
+    assert.notEqual(
+      lines[0].at,
+      "2020-01-01T00:00:00Z",
+      "the marker must carry the moment of the most recent unrecognised payload, not the first",
+    );
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("an unrecognised payload naming no directory of any kind - no cwd, no workspace_roots, nothing - still leaves the marker, falling back to the hook process's own cwd", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/unrecognised-no-cwd-key.git" });
+  try {
+    // The payload's shape is by definition unknown: it may not spell its working
+    // directory `cwd` at all (Cursor, a declared host, already does not), so this proves
+    // the fallback rather than the convention every other test here happens to supply.
+    const result = replayInAt(repo, { totally: "unknown", shape: 1 }, "session-start");
+    assert.equal(result.status, 0);
+
+    assert.equal(
+      fs.existsSync(path.join(runsDirOf(repo), UNRECOGNISED_FILE_NAME)),
+      true,
+      "the marker must exist even though the payload named no directory of any kind",
+    );
   } finally {
     cleanup(repo);
   }
@@ -2464,6 +2762,44 @@ for (const host of Object.keys(STEP_FIXTURE_BY_HOST)) {
     }
   });
 }
+
+test("a skill opened on Copilot's compat payload shape leaves a step_start naming it - the second of Copilot's two shapes, captured separately from the canonical one (issue #701)", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/step-copilot-compat-skill.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-0000000cop7";
+    replayIn(makeCopilotCompatPayload({ cwd: repo, sessionId, event: "SessionStart" }), "session-start");
+
+    const payload = loadFixture("copilot-compat-post-tool-use-skill.json");
+    payload.session_id = sessionId;
+    payload.cwd = repo;
+    const result = replayIn(payload, "tool-used");
+    assert.equal(result.status, 0);
+
+    const steps = stepLinesIn(repo);
+    assert.equal(steps.length, 1);
+    assert.equal(steps[0].skill, "00-init");
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a Bash call on Copilot's compat shape opens no step - only a skill call does, on either of Copilot's two shapes", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/step-copilot-compat-bash.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-0000000cop8";
+    replayIn(makeCopilotCompatPayload({ cwd: repo, sessionId, event: "SessionStart" }), "session-start");
+
+    const payload = loadFixture("copilot-compat-post-tool-use.json");
+    payload.session_id = sessionId;
+    payload.cwd = repo;
+    const result = replayIn(payload, "tool-used");
+    assert.equal(result.status, 0);
+
+    assert.deepEqual(stepLinesIn(repo), []);
+  } finally {
+    cleanup(repo);
+  }
+});
 
 test("two skills interleaved leave three ordered lines and two distinct names - the sticky attribution this whole ticket exists to replace", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/step-interleaved.git" });

@@ -104,6 +104,12 @@ const VENDOR_FIELD_BY_HOST = Object.freeze({
   codex: "conversation.id", // Measured 2026-08-13, on codex.sse_event.
   copilot: "gen_ai.conversation.id", // Measured 2026-08-13, on the invoke_agent span.
   cursor: null,
+  // OpenCode's own opencode.ts declares telemetryExport "unmeasured": session.id is
+  // documented on the ai.streamText span behind experimental.openTelemetry, but no export
+  // has been captured to confirm it - that is #653's probe, not this one. null here is the
+  // same fact Cursor's entry already states: a documented-but-uncaptured attribute name
+  // would be exactly the false figure this field exists to prevent.
+  opencode: null,
 });
 
 // A Codex rollout is named `rollout-<timestamp>-<uuid>.jsonl`, and that trailing uuid is
@@ -149,8 +155,13 @@ const SESSION_ID_READER_BY_HOST = Object.freeze({
   "claude-code": (payload) => payload.session_id,
   codex: (payload) =>
     codexSessionIdFromTranscriptPath(payload.transcript_path) ?? payload.session_id,
-  copilot: (payload) => payload.sessionId,
+  // sessionId is the canonical builder's spelling; session_id is the _vsCodeCompat
+  // builder's (see lib/host.js) - both are Copilot's own, never a fallback guess.
+  copilot: (payload) => payload.sessionId ?? payload.session_id,
   cursor: (payload) => payload.session_id,
+  // opencode-plugin.js builds this payload itself and already names the field session_id -
+  // no vendor spelling to read behind, since there is no vendor payload here at all.
+  opencode: (payload) => payload.session_id,
 });
 
 function readSessionId(host, payload) {
@@ -257,6 +268,35 @@ function handleTurnEnd(payload, host, sessionId) {
   appendLine(filePath, buildTurnEndLine({ at: nowIso(), promptId: payload.prompt_id }));
 }
 
+// A payload's session is only readable behind a known host's own spelling
+// (readSessionId above), so an unrecognised one has no session and therefore no run file
+// to append to; it lands in one file shared by the whole repo instead, named so it can
+// never collide with `<runId>__<vendorId>.jsonl`.
+const UNRECOGNISED_FILE_NAME = "_unrecognised.jsonl";
+
+// Overwritten, not appended: journal.js already keeps this off the tool-used path (the
+// git-shellout gate), so this only ever runs once per session-start or turn-end - but it
+// still stays at exactly one line however many of those arrive, and `at` is always the
+// most recent one rather than freezing on the first. A marker that never moved forward
+// would recreate the stale-forever diagnosis this whole change removed from `hook fired`.
+function handleUnrecognisedPayload(payload) {
+  // An unrecognised payload's own shape is, by definition, unknown - it may spell its
+  // working directory differently, or carry none at all (Cursor already does this among
+  // declared hosts), so payload.cwd is used only when it looks usable. process.cwd()
+  // falls back: a hook always runs inside the project it measures, which is a fact about
+  // where this process runs, not a guess about the payload. Which of the two produced a
+  // given marker is not recorded, since it does not change the answer.
+  const cwd = payload && typeof payload.cwd === "string" && payload.cwd ? payload.cwd : process.cwd();
+  const target = resolveRunsDir(cwd);
+  if (!target) return;
+
+  fs.mkdirSync(target.dir, { recursive: true, mode: PRIVATE_DIR_MODE });
+  const filePath = path.join(target.dir, UNRECOGNISED_FILE_NAME);
+  const line = `${JSON.stringify({ type: "unrecognised_payload", at: nowIso() })}\n`;
+  fs.writeFileSync(filePath, line, { mode: PRIVATE_FILE_MODE });
+  tightenOwnedDir(target.dir);
+}
+
 module.exports = {
   generateUlid,
   ULID_LENGTH,
@@ -279,4 +319,6 @@ module.exports = {
   PRIVATE_FILE_MODE,
   handleSessionStart,
   handleTurnEnd,
+  UNRECOGNISED_FILE_NAME,
+  handleUnrecognisedPayload,
 };

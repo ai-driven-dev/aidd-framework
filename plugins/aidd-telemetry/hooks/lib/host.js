@@ -15,7 +15,7 @@ function normalizeSeparators(value) {
 // entry here, never a branch in the dispatcher - detectHost above stays the only place
 // that decides which host a payload came from; this only decides whether that host is
 // one the journal acts on yet.
-const DECLARED_HOSTS = new Set(["claude-code", "codex", "copilot", "cursor"]);
+const DECLARED_HOSTS = new Set(["claude-code", "codex", "copilot", "cursor", "opencode"]);
 
 function detectHost(payload) {
   if (!payload || typeof payload !== "object") return null;
@@ -38,6 +38,30 @@ function detectHost(payload) {
     if (CODEX_TRANSCRIPT_PATTERN.test(transcriptPath)) return "codex";
     if (CLAUDE_CODE_TRANSCRIPT_PATTERN.test(transcriptPath)) return "claude-code";
   }
+
+  // Copilot's other payload shape: its plugin loader stamps a PascalCase-named
+  // hook `_vsCodeCompat` and switches to a second builder that reuses Claude
+  // Code's own event spelling verbatim (session_id, hook_event_name) instead of
+  // sessionId. Told apart from Claude Code and Codex by `timestamp`, a field
+  // neither of those ever carries, and checked only after their transcript_path
+  // patterns above so a host that does carry one is claimed by its own shape
+  // first. Measured 2026-08-21 against a real @github/copilot@1.0.80 session -
+  // see issue #681 and scripts/__tests__/fixtures/copilot-compat-*.json.
+  if (
+    Object.prototype.hasOwnProperty.call(payload, "timestamp") &&
+    Object.prototype.hasOwnProperty.call(payload, "hook_event_name") &&
+    Object.prototype.hasOwnProperty.call(payload, "session_id")
+  ) {
+    return "copilot";
+  }
+
+  // OpenCode alone names itself, checked last: every shape above was reverse-engineered
+  // from a captured payload nobody here controls, so a vendor host claims a payload it
+  // matches first, and a self-declared "tool" field only wins once none of them did.
+  // OpenCode has no hook payload at all - hooks/opencode-plugin.js builds this one itself,
+  // from inside a JS plugin OpenCode loads in-process (see measurements.md, phase 5) - and
+  // no captured fixture from any other host has ever carried a top-level "tool" key.
+  if (payload.tool === "opencode") return "opencode";
 
   return null;
 }
