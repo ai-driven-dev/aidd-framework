@@ -12,7 +12,8 @@ The path to `telemetry-switch.js`, and whether the switch is already on.
 
    ```bash
    test -n "$CLAUDE_PLUGIN_ROOT" && ls "$CLAUDE_PLUGIN_ROOT/skills/00-init/scripts/telemetry-switch.js" \
-     || find . ~/.claude -type f -path '*00-init/scripts/telemetry-switch.js' 2>/dev/null | head -1
+     || find ~/.claude/plugins ~/.codex/plugins ~/.cursor/plugins .github/plugins .claude/plugins .codex/plugins . \
+        -type f -path '*00-init/scripts/telemetry-switch.js' 2>/dev/null | head -1
    ```
 
 2. **Check node.** Run `node --version`. The script needs it and nothing else, no package manager and no global install.
