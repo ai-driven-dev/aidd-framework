@@ -317,5 +317,313 @@
         ]
       }
     }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-design",
+    "evalName": "xeval-ui-design",
+    "name": "designs from a lightweight UI and explicit visual direction",
+    "setup": {
+      "files": {
+        "package.json": "{ \"name\": \"orders\", \"dependencies\": { \"react\": \"^19.0.0\" } }\n",
+        "src/App.jsx": "export function App() { return <main className=\"page\"><h1>Orders</h1><form><input name=\"query\" /><button>Search</button></form></main>; }\n",
+        "src/styles.css": ".page { max-width: 60rem; margin: 0 auto; padding: 1rem; }\nbutton { min-height: 44px; }\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill to design an order-search results experience for warehouse operators in this small React app. Operators repeatedly search by order ID, need loading, empty, error, and result states, and must keep Search as the primary action. The requested visual direction is brutalist. You are running headless: use the complete requirements above, do not ask questions, do not implement code, and return the final experience decisions.",
+    "expect": {
+      "filesUnchanged": [
+        "package.json",
+        "src/App.jsx",
+        "src/styles.css"
+      ],
+      "filesAbsent": [
+        "aidd_docs/memory/design.md"
+      ],
+      "stdoutContains": [
+        "brutalist",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "judge": "The output reuses the current page shell and 44px button behavior, covers loading/empty/error/result states, treats brutalist styling as a feature-local visual decision, keeps scanner/device context unknown, specifies accessibility as observable behavior rather than unmeasured compliance, and does not prescribe React or CSS implementation code."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "03-system",
+    "evalName": "xeval-ui-system",
+    "name": "discovers the target workspace system and confirms matching memory",
+    "setup": {
+      "files": {
+        "package.json": "{ \"private\": true, \"workspaces\": [\"apps/*\"] }\n",
+        "apps/admin/package.json": "{ \"name\": \"admin\", \"dependencies\": { \"react\": \"^19.0.0\" } }\n",
+        "apps/admin/src/ui/tokens.css": ":root { --space-2: 0.5rem; --color-action: #075985; }\n@media (min-width: 48rem) { :root { --content-columns: 12; } }\n",
+        "apps/admin/src/ui/Button.jsx": "export function Button({ children, disabled }) { return <button className=\"button\" disabled={disabled}>{children}</button>; }\n",
+        "apps/admin/src/ui/Input.jsx": "export function Input(props) { return <input className=\"input\" {...props} />; }\n",
+        "apps/admin/src/screens/Users.jsx": "import { Button } from '../ui/Button';\nimport { Input } from '../ui/Input';\nexport function Users() { return <main><Input aria-label=\"Search users\" /><Button>Invite</Button></main>; }\n",
+        "apps/marketing/src/theme.css": ":root { --MARKETING_ONLY-purple: rebeccapurple; }\n",
+        "aidd_docs/memory/design.md": "# Design\n\n- The admin workspace owns tokens in `apps/admin/src/ui/tokens.css`.\n- Admin actions reuse `apps/admin/src/ui/Button.jsx`.\n- Admin layouts change at 48rem.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in discover mode to map the interface system for the admin Users screen only. This is a monorepo. Confirm memory against implementation, keep other frontend systems separate, modify nothing, and do not wait for input.",
+    "expect": {
+      "filesUnchanged": [
+        "apps/admin/src/ui/tokens.css",
+        "apps/admin/src/ui/Button.jsx",
+        "apps/admin/src/ui/Input.jsx",
+        "aidd_docs/memory/design.md"
+      ],
+      "stdoutContains": [
+        "apps/admin/src/ui/tokens.css",
+        "apps/admin/src/ui/Button.jsx",
+        "aidd_docs/memory/design.md",
+        "48rem"
+      ],
+      "judge": "The system map is scoped to apps/admin, confirms the matching memory with repository paths, and does not treat the marketing workspace's MARKETING_ONLY token as part of the admin system."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "03-system",
+    "evalName": "xeval-ui-system",
+    "name": "reports stale design memory and uses current repository evidence",
+    "setup": {
+      "files": {
+        "package.json": "{ \"name\": \"dashboard\", \"dependencies\": { \"tailwindcss\": \"^4.0.0\" } }\n",
+        "tailwind.config.js": "export default { content: ['./src/**/*.{js,jsx}'], theme: { extend: {} } };\n",
+        "src/App.jsx": "export function App() { return <main className=\"mx-auto max-w-5xl p-4 md:p-8\">Dashboard</main>; }\n",
+        "aidd_docs/memory/design.md": "# Design\n\n- Styling uses styled-components from `src/theme.js`.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in discover mode. Map the current interface system, explicitly report any project-memory contradiction, treat repository evidence as current truth, and modify nothing.",
+    "expect": {
+      "filesUnchanged": [
+        "tailwind.config.js",
+        "src/App.jsx",
+        "aidd_docs/memory/design.md"
+      ],
+      "stdoutContains": [
+        "tailwind.config.js",
+        "styled-components",
+        "aidd_docs/memory/design.md"
+      ],
+      "judge": "The output says Tailwind is current reality, identifies the styled-components memory claim as stale or contradicted, and directs any memory correction to a separate project-memory refresh rather than changing memory."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "03-system",
+    "evalName": "xeval-ui-system",
+    "name": "extends the dominant button system and flags a stable convention",
+    "setup": {
+      "files": {
+        "src/ui/Button.jsx": "export function Button({ variant = 'primary', children }) { return <button data-variant={variant}>{children}</button>; }\n",
+        "src/legacy/LegacyButton.jsx": "export function LegacyButton({ children }) { return <button className=\"legacy-button\">{children}</button>; }\n",
+        "src/screens/Orders.jsx": "import { Button } from '../ui/Button';\nexport function Orders() { return <><Button>Export</Button><Button variant=\"secondary\">Filter</Button></>; }\n",
+        "src/screens/Users.jsx": "import { Button } from '../ui/Button';\nexport function Users() { return <Button>Invite</Button>; }\n",
+        "src/screens/Archive.jsx": "import { LegacyButton } from '../legacy/LegacyButton';\nexport function Archive() { return <LegacyButton>Restore</LegacyButton>; }\n",
+        "aidd_docs/memory/design.md": "# Design\n\n- Shared controls live in `src/ui`.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in extend mode. Orders needs a destructive bulk-delete action with default, hover, focus, disabled, and pending states. Decide the smallest coherent system extension from repository evidence, account for both button systems, identify whether this may become a stable convention, and modify nothing.",
+    "expect": {
+      "filesUnchanged": [
+        "src/ui/Button.jsx",
+        "src/legacy/LegacyButton.jsx",
+        "aidd_docs/memory/design.md"
+      ],
+      "stdoutContains": [
+        "src/ui/Button.jsx",
+        "src/legacy/LegacyButton.jsx",
+        "destructive",
+        "disabled",
+        "pending"
+      ],
+      "judge": "The delta recognizes both button systems, uses the repeated src/ui/Button.jsx pattern as the evidenced dominant/current surface, proposes a bounded destructive extension rather than a parallel button, and flags the stable convention separately for project-memory refresh."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "02-review",
+    "evalName": "xeval-ui-review",
+    "name": "reports prioritized experience findings from observable evidence",
+    "setup": {
+      "files": {
+        "requirements.md": "# Checkout\n\nA shopper must see a recoverable payment error and know when submission is pending.\n",
+        "src/Checkout.jsx": "import { useState } from 'react';\nexport function Checkout() { const [pending, setPending] = useState(false); const [error, setError] = useState(''); return <form onSubmit={() => setPending(true)}><input placeholder=\"Card number\" /><button disabled={pending}>Pay</button>{error ? null : null}</form>; }\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill to review the Checkout interface against requirements.md. No rendered browser is available, so use only observable repository evidence, distinguish unverified runtime behavior, prioritize findings, stay within experience quality, and modify nothing.",
+    "expect": {
+      "filesUnchanged": [
+        "requirements.md",
+        "src/Checkout.jsx"
+      ],
+      "stdoutContains": [
+        "src/Checkout.jsx",
+        "warning",
+        "error",
+        "pending"
+      ],
+      "judge": "Each confirmed finding has observable evidence, user impact, severity, and a bounded recommendation. It catches the hidden payment error and ambiguous pending feedback, avoids generic code-refactoring advice, and labels browser-only claims unverified."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "05-responsive",
+    "evalName": "xeval-ui-responsive",
+    "name": "defines constrained behavior using existing breakpoints",
+    "setup": {
+      "files": {
+        "tailwind.config.js": "export default { theme: { screens: { sm: '40rem', md: '48rem', lg: '64rem' } } };\n",
+        "src/ui/TableShell.jsx": "export function TableShell({ children }) { return <div className=\"overflow-x-auto md:overflow-visible\">{children}</div>; }\n",
+        "requirements.md": "# Orders\n\nThe order ID, status, and primary Review action must remain available. Notes and timestamps are secondary. Long order IDs must remain accessible.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in define mode for an Orders table using the supplied requirements. Define behavior under constrained space, reuse the existing breakpoints and TableShell, cover overflow and touch access, introduce no breakpoint unless evidence proves a gap, and modify nothing.",
+    "expect": {
+      "filesUnchanged": [
+        "tailwind.config.js",
+        "src/ui/TableShell.jsx",
+        "requirements.md"
+      ],
+      "stdoutContains": [
+        "tailwind.config.js",
+        "src/ui/TableShell.jsx",
+        "48rem",
+        "overflow",
+        "Review"
+      ],
+      "judge": "The responsive rules name triggers, behavior changes, preserved priority, and overflow handling; reuse an existing breakpoint and TableShell; and do not invent a new breakpoint or device-specific width."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "04-accessibility",
+    "evalName": "xeval-ui-accessibility",
+    "name": "finds evidenced keyboard and naming defects without claiming runtime compliance",
+    "setup": {
+      "files": {
+        "src/Search.jsx": "export function Search({ openFilters }) { return <section><input placeholder=\"Search orders\" /><div className=\"filter-trigger\" onClick={openFilters}>Filters</div></section>; }\n",
+        "src/styles.css": ".filter-trigger { color: #666; }\n",
+        "aidd_docs/memory/design.md": "# Design\n\n- Interactive controls require visible focus indication and accessible names.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in review mode for Search. Review semantics, accessible naming, keyboard reachability, and focus evidence. A browser and computed contrast values are unavailable: keep runtime-only claims unverified, cite exact controls, and modify nothing.",
+    "expect": {
+      "filesUnchanged": [
+        "src/Search.jsx",
+        "src/styles.css",
+        "aidd_docs/memory/design.md"
+      ],
+      "stdoutContains": [
+        "src/Search.jsx",
+        "Filters",
+        "keyboard",
+        "accessible name",
+        "unverified"
+      ],
+      "judge": "The review identifies the clickable Filters div as a semantic and keyboard defect and the placeholder-only search field as a naming or label defect. It separates unavailable focus/contrast runtime evidence from confirmed findings and makes no unsupported compliance claim."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "06-polish",
+    "evalName": "xeval-ui-polish",
+    "name": "refines a settled interface without restructuring it",
+    "setup": {
+      "files": {
+        "requirements.md": "# Profile summary\n\nStructure is approved: title, account facts, then Edit profile as the primary action. Responsive and accessibility behavior are settled. Do not change region order or task flow.\n",
+        "src/Profile.jsx": "export function Profile() { return <main><h1>Profile</h1><dl><dt>Email</dt><dd>a@example.com</dd></dl><button>Edit profile</button></main>; }\n",
+        "src/tokens.css": ":root { --space-2: 0.5rem; --space-4: 1rem; --font-heading: 1.5rem; --focus-ring: 2px solid #075985; }\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill to produce a polish delta for Profile. The supplied structure and flow are settled. Focus on evidenced spacing, typography, alignment, and affordance refinements using existing tokens; preserve hierarchy and task flow; do not implement or modify files.",
+    "expect": {
+      "filesUnchanged": [
+        "requirements.md",
+        "src/Profile.jsx",
+        "src/tokens.css"
+      ],
+      "stdoutContains": [
+        "--space-2",
+        "--space-4",
+        "Edit profile"
+      ],
+      "judge": "The output is a bounded, prioritized polish delta grounded in existing tokens. It improves expression while explicitly preserving title-account facts-action order and the task flow, and does not redesign or emit implementation code."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "07-handoff",
+    "evalName": "xeval-ui-handoff",
+    "name": "writes a verified contract without source or memory mutation",
+    "setup": {
+      "files": {
+        "src/ui/Button.jsx": "export function Button({ children, disabled }) { return <button disabled={disabled}>{children}</button>; }\n",
+        "aidd_docs/memory/design.md": "# Design\n\n- Actions reuse `src/ui/Button.jsx`.\n- Layouts use the `md` breakpoint from Tailwind.\n",
+        "aidd_docs/tasks/2026_08/2026_08_22_checkout/decisions.md": "# Confirmed checkout decisions\n\nIntent: shoppers submit payment and receive an order confirmation.\nFlow: enter payment, submit, then confirmation.\nReuse `Button` from `src/ui/Button.jsx` for Pay.\nPending: submission disables Pay and changes its accessible name to Processing.\nError: show an inline payment error, move focus to it, then allow retry.\nResponsive: below existing `md`, stack fields and keep Pay after the last field.\nAccessibility: every field has a persistent label; the error is announced once and receives focus.\nNo new primitive is required.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill to compile and verify the confirmed decisions in ./aidd_docs/tasks/2026_08/2026_08_22_checkout/decisions.md. Write ./aidd_docs/tasks/2026_08/2026_08_22_checkout/ui.md. Do not ask questions, invent decisions, write production code, or modify source and project memory.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/tasks/2026_08/2026_08_22_checkout/ui.md"
+      ],
+      "filesUnchanged": [
+        "src/ui/Button.jsx",
+        "aidd_docs/memory/design.md",
+        "aidd_docs/tasks/2026_08/2026_08_22_checkout/decisions.md"
+      ],
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_22_checkout/ui.md": [
+          "# UI Contract",
+          "src/ui/Button.jsx",
+          "Processing",
+          "inline payment error",
+          "md"
+        ]
+      },
+      "fileNotContains": {
+        "aidd_docs/tasks/2026_08/2026_08_22_checkout/ui.md": [
+          "Fill applicable sections",
+          "{feature}",
+          "<Button",
+          "display:"
+        ]
+      },
+      "judge": "Engineering can implement the flow, pending and error recovery, responsive behavior, and accessibility acceptance behavior without guessing. The contract names the existing Button and no new primitive, but contains no React, CSS, or arbitrary implementation prescription."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "03-system",
+    "evalName": "xeval-ui-system",
+    "name": "stops at the backend-only interface boundary",
+    "setup": {
+      "files": {
+        "package.json": "{ \"name\": \"orders-api\", \"dependencies\": { \"express\": \"^5.0.0\" } }\n",
+        "src/server.js": "const express = require('express');\nconst app = express();\napp.get('/orders', (_req, res) => res.json([]));\nmodule.exports = app;\n",
+        "openapi.yaml": "openapi: 3.1.0\ninfo:\n  title: Orders API\n  version: 1.0.0\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in discover mode to inspect this repository. The request is only to discover what interface system already exists, not to create a UI. Report the boundary from evidence, invent nothing, and modify nothing.",
+    "expect": {
+      "filesUnchanged": [
+        "package.json",
+        "src/server.js",
+        "openapi.yaml"
+      ],
+      "filesAbsent": [
+        "aidd_docs/memory/design.md",
+        "src/ui",
+        "tailwind.config.js"
+      ],
+      "stdoutContains": [
+        "src/server.js"
+      ],
+      "judge": "The output recognizes a backend-only repository, reports that no interface system can be discovered, and does not invent UI conventions, recommend a design system, or propose frontend implementation."
+    }
   }
 ]
