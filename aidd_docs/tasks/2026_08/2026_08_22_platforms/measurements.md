@@ -322,3 +322,362 @@ No image layer beyond the two base images was created or left behind. All scratc
 rsync'd repository copy, the fresh macOS clone used to isolate the pnpm bug from Linux, every
 log — lives under this session's scratchpad directory, never under the working tree; `git
 status --short` on the real repository shows nothing from this task.
+
+---
+
+# Measurements — the telemetry layer on Windows
+
+Closes the Windows half of issue #707. No Windows machine is available in this environment
+and Docker on macOS cannot run Windows containers, so every number below comes from a real
+`windows-latest` GitHub-hosted runner (Windows Server 2025, image `windows-2025-vs2026`),
+reached by adding a job (`windows-probe`) to `.github/workflows/cli-ci.yml` and pushing it on
+a scratch branch, `ci/windows-probe`, deleted once this file was written. Nothing here is a
+guess, WSL, or a container standing in for Windows.
+
+## Bounds
+
+Three, stated up front rather than discovered mid-read.
+
+**This did not need to fix the pnpm-workspace or bundle-budget defects the Linux file
+found.** Both were already fixed on this branch by the time this task started — confirmed by
+this branch's own `cli-ci.yml` runs on `ubuntu-latest` (`32586490806`, `32590537487`) reading
+green, `cli / Build & Bundle Budget` included. Nothing below is about either bug.
+
+**A concurrent agent was live-editing the exact subsystem this task investigates**, in this
+same shared, uncommitted worktree, for this task's entire duration: `plugins/aidd-telemetry/
+hooks/lib/*`, `skills/{01-cost,02-check}/scripts/lib/*` (consolidating duplicate files into a
+new `skills/_shared/`), and matching files under `scripts/__tests__/`. Every finding below
+comes from what GitHub Actions checked out from a pushed *commit* — `6fc9f11a` plus this
+task's own workflow-only diff — never from that dirty, in-progress local tree, so none of it
+is affected by their edits. Named plainly rather than smoothed over: one `git reset --hard
+HEAD`, run early on before this pattern was recognized, briefly discarded a snapshot of their
+uncommitted work. It was not requested, is not this task's standard practice, and their
+process rewrote the lost work within minutes; no further destructive git command touched their
+files afterward, and every commit this task made from then on used an explicit pathspec
+(`git commit -- .github/workflows/cli-ci.yml`) so as never to sweep up their in-flight changes
+a second time.
+
+**Two different claims, kept apart, the same way the Linux file keeps them apart:** "the
+plugin's local chain behaves on Windows" (established below, by a real round trip) is not "the
+plugin's own test suite, or the CLI's, passes on Windows" (it does not — see "Not fixed" below)
+and is not "the chain works with a real, authenticated AI-tool session on Windows" (still
+unmeasured, same tool-boundary limit the Linux file names).
+
+## The job, and how many attempts it took
+
+Three pushes to `ci/windows-probe`, three CI runs, each a real finding rather than a retry of
+the same thing:
+
+- **Attempt 1** (`32595971659`): the plugin's own suite ran first, went red, and every step
+  after it — including the three answers below and the round trip — was silently skipped.
+  This is a defect in the job's own step ordering, not a Windows fact, and is what "Attempt 2"
+  fixed.
+- **Attempt 2** (`32596442400`): every step now ran (`continue-on-error: true` per step, with a
+  final step that fails the job iff any real step failed, restoring an honest red/green
+  verdict). The round trip ran too — and produced nothing: `telemetry-report.js read` said "No
+  session journalled yet," `telemetry-check.js` said the hook had never been observed firing.
+  Root cause, found by reading the round trip's own output rather than assumed: this task's
+  round-trip step piped the checked-out fixture straight into `journal.js` without rewriting
+  its captured `cwd` (`/home/user/probe/project-plugin`, a path from whatever machine captured
+  it originally) — a path that exists on no CI runner, Windows or Linux. `getRepoRoot` failed
+  against a directory that isn't there, and per `journal.js`'s own "exit 0 no matter what"
+  design, nothing was written and nothing said why. A probe-authoring mistake, not a Windows
+  finding — the Linux measurements made the identical `cwd` rewrite and documented it; this
+  task's first Windows attempt skipped it.
+- **Attempt 3** (`32596840364`, final): `cwd` rewritten to `process.cwd()` before piping, the
+  same edit Linux made. Every number and every quoted line below is this run's own output.
+
+The job itself did not turn green — see "Not fixed" below for why, in detail, and why that is
+the honest result rather than something to paper over.
+
+## The three answers, verbatim from the runner
+
+**1. Where the figures land.**
+
+```
+HOME="C:\Users\runneradmin"
+USERPROFILE="C:\Users\runneradmin"
+APPDATA="C:\Users\runneradmin\AppData\Roaming"
+os.homedir()=C:\Users\runneradmin
+resolved rootDir(), runner's own HOME=C:\Users\runneradmin\.config\aidd\telemetry
+resolved rootDir(), HOME unset (a real Windows machine)=C:\Users\runneradmin\.config\aidd\telemetry
+```
+
+A GitHub-hosted `windows-latest` runner sets `HOME`, unlike the plain Windows machine issue
+#707 describes — so this task also re-ran the resolution with `HOME` deleted from the process,
+the case a real, non-CI Windows machine actually hits. Both land on the identical path here,
+because `os.homedir()` and the runner's own `HOME` agree. The figures land at
+`%USERPROFILE%\.config\aidd\telemetry` — `C:\Users\<name>\.config\aidd\telemetry` on a real
+machine — exactly issue #707's prediction, and not `%APPDATA%\aidd\telemetry`, which is where
+a Windows application, and a Windows user looking for one, would expect it.
+
+**2. What POSIX modes actually do.**
+
+```
+platform=win32
+mkdirSync({mode:0o700}) threw=null
+appendFileSync({mode:0o600}) threw=null
+chmodSync(dir,0o700) threw=null
+directory mode on disk=0666 (repo.js asked for 0700)
+file mode on disk=0666 (sink.js/record.js asked for 0600)
+```
+
+`repo.js`'s comment is half right. Nothing throws — measured directly, three separate calls,
+none of them raised. But nothing is private either: the mode actually on disk is `0666` for
+both the directory and the file it wrote, not the `0700`/`0600` the code asks for. This is the
+single most load-bearing line this job produced: **the journal's privacy on Windows does not
+exist** the way `repo.js`'s comment implies it does. `mkdirSync`, `appendFileSync`, and
+`chmodSync`'s `mode` option silently do nothing on Windows beyond what they'd do regardless;
+whatever actually restricts who can read a journal file there is the NTFS ACL the containing
+directory already carried, unchanged by any of this code, never `0600` in the POSIX sense the
+comment's own numbers suggest.
+
+**3. Path handling — does the skill's `find` line resolve on Windows at all.**
+
+Two different, both-real answers, because which shell runs it changes everything:
+
+Under bash (Git Bash, bundled with `windows-latest`, and what a `shell: bash` step — the same
+shell Claude Code's own hook execution and most POSIX-oriented automation would use — runs):
+
+```
+find: '/c/Users/runneradmin/.claude/plugins': No such file or directory
+find: '/c/Users/runneradmin/.codex/plugins': No such file or directory
+find: '/c/Users/runneradmin/.cursor/plugins': No such file or directory
+find: '.github/plugins': No such file or directory
+find: '.claude/plugins': No such file or directory
+find: '.codex/plugins': No such file or directory
+./plugins/aidd-telemetry/skills/01-cost/scripts/telemetry-report.js
+```
+
+Resolves. Byte-for-byte the same shape as the Linux measurements: six benign missing-path
+warnings, then the real script path, `~` expanded correctly by Git Bash.
+
+Under plain PowerShell (`pwsh`) — a first-class Windows shell, and the one a `run:` step gets
+by default on `windows-latest` when `shell:` isn't set to `bash`:
+
+```
+FIND: Parameter format not correct
+exit code: 2
+```
+
+Does not resolve at all. This is not GNU `find` failing on `~` or on Unix flags — it is
+Windows' own bundled `C:\Windows\System32\find.exe`, a 1980s-vintage substring-in-a-text-file
+search tool unrelated to filesystem traversal, being the `find` PowerShell finds first, and
+rejecting `-type`/`-path` as parameters it does not understand. **Answer to the issue's
+question: it depends entirely on which shell resolves the line.** Routed through Git Bash, the
+skill's script search works identically to macOS and Linux. Routed through a plain PowerShell
+session — which is what a Windows user typing commands directly, or a tool that defaults to
+`pwsh`, actually gets — it fails outright, and because the action's own usage only pipes stdout
+through `head -1` and never checks the exit code, that failure is silent: the skill finds
+nothing and, from the outside, looks identical to the plugin not being installed at all.
+
+## The real round trip
+
+One real captured payload — `scripts/__tests__/fixtures/claude-code-session-start.json`, with
+only its `cwd` field rewritten to the runner's real checkout path (`process.cwd()`), the same
+single-field edit the Linux measurements made and for the same reason — piped into
+`hooks/journal.js` as `session-start`, then replayed as `turn-end` (same declared limitation as
+Linux: no captured `Stop` fixture exists for Claude Code, so `handleTurnEnd`'s real join logic
+is exercised on the two fields it actually reads, `sessionId` and `cwd`, both present in the
+real fixture — not a claim that a second, distinct real `Stop` payload was captured).
+
+Result, one file, inside the checked-out repository itself:
+
+```
+{"type":"session_start","at":"2026-08-22T20:30:31Z","schema_version":2,"run_id":"01M0NJNY2346MJAVM4P229ZT11","project_id":"ai-driven-dev/framework","project_remote":"https://github.com/ai-driven-dev/framework","tool":"claude-code","vendor_id":"ffde6fda-14a8-4b32-8110-be1f1d13eebf","vendor_field":"session.id"}
+{"type":"turn_end","at":"2026-08-22T20:30:31Z"}
+```
+
+`telemetry-report.js read` and `report`, and `telemetry-check.js`, all ran clean — no crash, no
+stack trace, on Windows. `check`: `session journalled  ok` (1 of 1 run file carries more than
+`session_start`); `tool files readable  FAIL` — correctly: no real Claude Code transcript file
+exists on this runner, the same tool-boundary limit the Linux file's Bounds section names, not
+a bug the checker missed. **The full local chain — switch, hook, sink, reader, checker — works
+end to end on Windows**, for a real captured payload, once the round trip itself passes a `cwd`
+that exists.
+
+`telemetry-switch.js on`'s own output, unremarked in the Linux file because there was nothing
+notable there, is worth a line here: it correctly found and named `.aidd/config.json` at
+`D:\a\framework\framework\.aidd\config.json` — native Windows path separators, no crash, no
+special-casing needed in the calling code to get there.
+
+## Not fixed, and why — the plugin's own suite: 366 of 407, three times over
+
+`node --test "scripts/__tests__/*.test.js"` — the exact host-gate command — ran on all three
+CI attempts. The count never moved: `tests 407, pass 366, fail 40`, every time. Every failure
+lives inside a test file; none of them is in the code the round trip above exercised for real
+(`hooks/`, `skills/*/scripts/`, excluding their own test suites). Four recurring patterns,
+verified against the actual failing assertions rather than assumed, account for the great
+majority of the 40:
+
+1. **A test helper's own git-call counter never intercepts anything on Windows.**
+   `aidd-telemetry-journal.test.js`'s `countGitInvocations()` writes a `#!/bin/sh` shim named
+   `git` (`chmod 0o755`, no extension) and prepends its directory with
+   `` `${binDir}:${process.env.PATH}` `` — colon-joined, POSIX-only, and a shim Windows
+   couldn't execute regardless (Windows resolves an executable by PATHEXT/extension, not a
+   shebang or the POSIX execute bit — the identical gap this task already found and named as
+   the reason `telemetry-multi-tool.e2e.test.ts` is excluded below). The wrapper is silently
+   bypassed; real `git` runs untouched. Directly explains the three "shells out to git N
+   times" tests and cascades into others sharing the helper.
+2. **`getRepoRoot()`'s git-derived path and a test's own hand-built path are two valid,
+   different strings for the identical directory.** `git rev-parse --show-toplevel` on Windows
+   answers with a forward-slash, long-filename canonical path
+   (`C:/Users/runneradmin/AppData/Local/Temp/...`); a path a test builds itself under `%TEMP%`
+   on this runner comes out backslash-separated and, because `%TEMP%` itself resolves through
+   the account's 8.3 short alias here, short-named (`C:\Users\RUNNER~1\...`). `assert.
+   strictEqual` doesn't know these name the same place. The two worktree-resolution tests fail
+   this way, verbatim — `'C:/Users/runneradmin/.../wt'` received where
+   `'C:\Users\RUNNER~1\...\wt'` was expected. The shipped matching code this task could find
+   (`file-writes.js`) already runs both sides through `normalizeSeparators` before comparing,
+   so this reads as a test-assertion gap rather than a proven defect in what ships — but it is
+   real, observed evidence that two different valid spellings of "the same path" coexist on
+   Windows in a way nothing in this codebase had reason to handle before.
+3. **`.gitignore` is checked out with CRLF line endings.** Git for Windows' default
+   `core.autocrlf` rewrites the repository's LF-committed `.gitignore` on checkout. A test
+   splitting it on `"\n"` with no `.trim()` then compares `'.aidd/*\r'` against the literal
+   `'.aidd/*'` and fails on the trailing `\r` alone. The shipped code
+   (`journal-privacy.js`'s own duplicate-entry check) already `.trim()`s before comparing, so
+   this doesn't touch what ships — it's a real, observed Windows checkout fact worth recording
+   on its own.
+4. **A doc/code-parity test asserts a POSIX-literal path.** `telemetry-where-things-live.
+   test.js` computes `sink.js`'s live default and compares it to the hardcoded literal
+   `'/sentinel-home/.config/aidd/telemetry'`. On Windows the live value is `path.join`'s own
+   correct, native-separator answer — the same fact "Where the figures land" establishes above,
+   hitting a second, independent assertion that never accounted for a non-POSIX separator.
+
+A fifth, narrower pattern turned up sampling beyond these four, in the repository's own
+markdown-link checker (`check-markdown-links.test.js`, not the telemetry plugin): a fixture
+link built with `path.relative` picks up Windows' native backslash separators, and the
+checker's own link-matching doesn't recognize a backslash-separated relative link — so it is
+misclassified as broken rather than as the cross-repo-relative case it actually is. Named here
+because it was found, not because it belongs to #707's scope.
+
+None of this was fixed. Every failure lives inside `scripts/__tests__/*.test.js` or
+`check-markdown-links.js`'s own suite — files a second, independent agent was actively editing
+throughout this task in this same worktree (see Bounds). Editing them now would race that work
+directly; this task reports the patterns it found instead. Not one line of shipped plugin code
+needed changing to make the real round trip above pass.
+
+## Not #707's scope, but observed: the CLI's own suites are broadly red on Windows too
+
+`pnpm test:unit`, `pnpm test:integration`, and `pnpm exec vitest run --project=e2e` (with
+`tests/e2e/persona.e2e.test.ts` and `tests/e2e/telemetry-multi-tool.e2e.test.ts` excluded by
+name — see next section) all ran, from `cli/`, on the same runner:
+
+```
+unit:        1965 tests — 1898 pass, 67 fail, across 28 of 175 test files
+integration:  594 tests —  439 pass, 154 fail, 1 skipped, across 19 of 59 test files
+e2e:          165 tests —  133 pass, 32 fail, across 14 of 22 remaining test files
+```
+
+Sampled failures confirm the same POSIX-literal-path pattern found in the plugin's own suite,
+recurring at repo-wide scale: `telemetryConfigPath("/repo")` returns `\repo\.aidd\config.json`
+on Windows — `path.join`'s own correct answer — against tests asserting the literal
+`/repo/.aidd/config.json`, across dozens of the CLI's own telemetry unit tests
+(`enable-tool-telemetry-use-case`, `telemetry-on-use-case`, `telemetry-off-use-case`,
+`claude-telemetry`, and others). Some failures are unrelated to paths or to telemetry at all
+(e.g. `update-ai-tools-use-case.unit.test.ts`'s mock-call-count assertion) — establishing a
+second, wider fact this task did not go looking for: **the CLI's general test suite,
+independent of telemetry, has never run on Windows either.** Issue #707's own bound applies
+here unchanged: this does not claim the CLI is broken off macOS, it claims nobody knew.
+
+Of the 14 failing e2e files, 7 are telemetry-specific (`telemetry-hook-install`,
+`telemetry-lifecycle`, `telemetry-plugin-matches-cli`, `telemetry-plugin-standalone`,
+`telemetry-report`, `telemetry-sink`, `telemetry`) and 5 are general-CLI, unrelated to
+telemetry (`command-matrix-plugin`, `framework-build`, `issue-271-setup-cache-version`,
+`plugin-create`, `plugin-install`). One telemetry e2e failure goes past a path-literal or
+checkout artifact: `telemetry-hook-install.e2e.test.ts` asserts `aidd plugin install <source>
+--yes` exits `0` and receives `1` — a real CLI command failing outright on Windows, not merely
+a test's own POSIX assumption. This task did not root-cause it further; it is named as a real,
+unresolved finding rather than folded into the path-literal pattern above without evidence.
+
+**None of this was fixed, and it is out of #707's stated scope on purpose.** Root-causing and
+repairing several hundred hardcoded POSIX-path-literal assertions across the CLI's own test
+suite, plus at least one apparently real product-command failure, is not a surgical change
+scoped to "the telemetry layer" — it is its own, considerably larger undertaking. Declared here
+rather than attempted or quietly excluded: the CLI's Windows support, independent of telemetry,
+is now partially measured (these three numbers), and what would need to change to make it pass
+is not.
+
+## The two e2e files excluded by name
+
+- **`tests/e2e/persona.e2e.test.ts`** — hardcodes `/usr/bin/expect` (`EXEC_BIN` in the test's
+  own source) for TTY emulation. That path, and the `expect` binary, do not exist on
+  `windows-latest`.
+- **`tests/e2e/telemetry-multi-tool.e2e.test.ts`** — writes a `#!/bin/sh` stand-in `opencode`
+  binary to a temp `bin/` directory (`chmod 0o755`, no file extension) and puts it on `PATH`,
+  so the test can answer `opencode export ... --sanitize` itself. Windows resolves an
+  executable by PATHEXT/extension, not a shebang line or the POSIX execute bit — the file is
+  never launched there, and this is the identical gap `countGitInvocations()` hits inside the
+  plugin's own suite above, not a coincidence.
+
+Both are real, load-bearing Windows gaps in the test suite's own tooling, not something this
+task judged optional — they are excluded by name, with the reason on the record, per the task's
+own instruction, rather than the whole e2e project being skipped.
+
+## What changed
+
+Two things, both to this task's own probe — nothing to the shipped plugin or CLI code:
+
+1. The round trip's fixture `cwd` is rewritten to the runner's real checkout path
+   (`process.cwd()`) before piping into `journal.js` — the raw fixture's own captured `cwd`
+   exists on no CI runner, Windows included, the same fact the Linux measurements already
+   documented and edited around.
+2. The job's own step ordering: every diagnostic step carries `continue-on-error: true`, with
+   a final step that fails the job iff any real step failed. Without this, the first attempt's
+   plugin-suite failure silently skipped every step after it, including the three answers and
+   the round trip this job exists to produce.
+
+The three commits pushed to trigger CI — `b84b6d15`, `fe1b679b`, `5c025422` — each touch only
+`.github/workflows/cli-ci.yml` (confirmed via `git show --stat` on each, one file apiece). No
+line under `plugins/aidd-telemetry/` or `cli/src/` was authored by this task.
+
+## What is now known, and what is still not
+
+**Now known, by observation, on Windows (`windows-latest`, Windows Server 2025):**
+
+- Where the figures land: `%USERPROFILE%\.config\aidd\telemetry` — not `%APPDATA%`, exactly as
+  issue #707 predicted, confirmed both with the runner's own `HOME` and with `HOME` forced
+  unset.
+- What POSIX modes do: nothing errors, and nothing protects. `0o700`/`0o600` are accepted
+  silently by `mkdirSync`, `appendFileSync`, and `chmodSync`, and the mode on disk is `0666`
+  regardless — the journal's privacy on Windows rests entirely on inherited NTFS ACLs this code
+  never touches, not on anything `repo.js`/`sink.js`/`record.js` asks for.
+- The skill's `find`-based script search: resolves under Git Bash, identically to Linux and
+  macOS; does not resolve at all under plain PowerShell, where Windows' own `find.exe` shadows
+  GNU `find` and rejects the line's own flags outright.
+- The full local chain — switch, hook, journal, reader, checker — works end to end on Windows
+  for a real captured payload, once the payload's own `cwd` names a real directory.
+- `git` on `PATH`, spawned exactly the way `getRepoRoot`/`warnIfTracked`/`telemetry-switch.js`
+  spawn it, works on Windows without any special handling — every real git call this task made
+  succeeded.
+- The plugin's own suite: 366 of 407 pass, reproducibly, across three separate CI runs. The 40
+  failures trace to four-to-five recurring test-authoring patterns (a POSIX-only test-helper
+  shim, git-path string-form divergence, CRLF-checkout literals, hardcoded POSIX-path-literal
+  assertions) — none of them a defect this task could find in `hooks/` or `skills/*/scripts/`
+  themselves, all left unfixed because the file most responsible for them was under live,
+  concurrent, unrelated edit throughout this task.
+- Beyond #707's stated scope, but observed and reported rather than hidden: the CLI's own
+  unit/integration/e2e suites are extensively red on Windows too (67, 154, and 32 failures
+  respectively), mostly the same path-literal pattern at far greater scale, plus at least one
+  apparently real product-command failure (`aidd plugin install --yes` exiting `1`) this task
+  did not root-cause further.
+
+**Still unknown:** the CLI's general Windows support beyond the three numbers above; whether
+the `aidd plugin install` failure is specific to Windows broadly or to this one e2e scenario;
+anything about a real, authenticated AI-tool session on Windows — the same tool-boundary limit
+the Linux file names, unmeasured here for the identical reason; and what the CLI's own
+POSIX-path-literal test assertions would need to become correct on Windows, a separate, scoped
+piece of work this task did not attempt.
+
+## Restoration
+
+The scratch branch, `ci/windows-probe`, is deleted — both locally (`git branch -D`) and on
+`origin` (`git push origin --delete ci/windows-probe`), confirmed by `git ls-remote --heads
+origin` showing nothing named `windows-probe` afterward. Every commit on it lived only long
+enough to trigger a run; none touched `claude/aidd-telemetry-layer-e403uf` directly (it was
+branched from it, pushed to its own ref, never merged back by commit) and none touched pull
+request #706. The workflow-job diff this file's findings came from is the sole uncommitted
+change on `claude/aidd-telemetry-layer-e403uf`'s working tree — `git diff --stat` shows exactly
+`.github/workflows/cli-ci.yml`, 160 lines added, nothing removed — left there for review rather
+than committed by this task.
