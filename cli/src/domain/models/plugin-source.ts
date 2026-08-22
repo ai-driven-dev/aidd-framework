@@ -1,3 +1,4 @@
+import { isAbsolute } from "node:path";
 import { InvalidPluginSourceError } from "../errors.js";
 
 export const GITHUB_REPO_REGEX = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
@@ -139,7 +140,9 @@ export function parsePluginSource(raw: unknown): PluginSource {
 }
 
 function parseStringPluginSource(raw: string): PluginSource {
-  if (raw.startsWith("./") || raw.startsWith("/")) return { kind: "local", path: raw };
+  // `isAbsolute` also catches a Windows-rooted path (`C:\...`, `\\server\share`), which
+  // starts with neither `/` nor `./` (#707).
+  if (raw.startsWith("./") || isAbsolute(raw)) return { kind: "local", path: raw };
   if (GITHUB_REPO_REGEX.test(raw)) return { kind: "github", repo: raw };
   throw new InvalidPluginSourceError(`string source "${raw}" is not a recognized path or repo.`);
 }
@@ -169,7 +172,9 @@ const GITLAB_PREFIX = "gitlab:";
 export function parsePluginSourceShorthand(raw: string): PluginSource {
   if (raw.startsWith("https://") || raw.startsWith("http://")) return { kind: "url", url: raw };
   if (raw.startsWith("git@")) return { kind: "url", url: raw };
-  if (raw.startsWith("./") || raw.startsWith("/")) return { kind: "local", path: raw };
+  // `isAbsolute` also catches a Windows-rooted path (`C:\...`, `\\server\share`), which
+  // starts with neither `/` nor `./` (#707).
+  if (raw.startsWith("./") || isAbsolute(raw)) return { kind: "local", path: raw };
   if (raw.startsWith(GITLAB_PREFIX)) return parseGitLabShorthand(raw.slice(GITLAB_PREFIX.length));
   if (GITHUB_REPO_REGEX.test(raw)) return { kind: "github", repo: raw };
   const versioned = parseGitHubVersionedShorthand(raw);
