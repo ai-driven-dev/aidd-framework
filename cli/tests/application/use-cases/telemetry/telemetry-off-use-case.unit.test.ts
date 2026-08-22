@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 // Side-effect imports: TelemetryOffUseCase resolves each tool's telemetry story from the
 // registry, so every AI tool must be registered for these tests to see it.
@@ -15,8 +16,10 @@ import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapt
 import { InMemoryManifestRepository } from "../../../helpers/ports/in-memory-manifest-repository.js";
 
 const PROJECT_ROOT = "/repo";
-const SWITCH_PATH = "/repo/.aidd/config.json";
-const LOCAL_SETTINGS_PATH = "/repo/.claude/settings.local.json";
+const HOME_DIR = "/home/dev";
+const SWITCH_PATH = join(PROJECT_ROOT, ".aidd", "config.json");
+const LOCAL_SETTINGS_PATH = join(PROJECT_ROOT, ".claude", "settings.local.json");
+const HOME_SETTINGS_PATH = join(HOME_DIR, ".claude", "settings.json");
 
 function buildUseCase(manifest: Manifest | null = null, seed: Record<string, string> = {}) {
   const hasher = new DeterministicHasher();
@@ -162,19 +165,18 @@ describe("TelemetryOffUseCase — the inherited --scope user caveat", () => {
   }
 
   it("resolves and cleans the traversal path when the project hasn't moved", async () => {
-    const homeSettingsPath = "/home/dev/.claude/settings.json";
     const before = JSON.stringify(
       { env: { CLAUDE_CODE_ENABLE_TELEMETRY: "1" }, model: "opus" },
       null,
       2
     );
     const { fs, useCase } = buildUseCase(manifestWithUserScopeEntry(), {
-      [homeSettingsPath]: before,
+      [HOME_SETTINGS_PATH]: before,
     });
 
     const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
-    expect(result.removedFiles).toEqual([homeSettingsPath]);
-    const after = JSON.parse(fs.getFile(homeSettingsPath) as string);
+    expect(result.removedFiles).toEqual([HOME_SETTINGS_PATH]);
+    const after = JSON.parse(fs.getFile(HOME_SETTINGS_PATH) as string);
     // An emptied `env` section vanishes entirely rather than lingering as `{}` (merge.ts's
     // own rule) — `model` is what proves the rest of the file survived.
     expect(after.env).toBeUndefined();
@@ -188,9 +190,7 @@ describe("TelemetryOffUseCase — the inherited --scope user caveat", () => {
     expect(result.removedFiles).toEqual([]);
     expect(fs.listAll()).toHaveLength(0);
     expect(
-      logger.warnMessages.some(
-        (m) => m.includes("/home/dev/.claude/settings.json") && m.includes("moved")
-      )
+      logger.warnMessages.some((m) => m.includes(HOME_SETTINGS_PATH) && m.includes("moved"))
     ).toBe(true);
     // Untracked regardless — repeating a resolution that can't succeed helps nobody, but
     // the warning above is what keeps this from being a silent data-loss risk.

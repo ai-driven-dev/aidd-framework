@@ -61,11 +61,17 @@ export class InMemoryTelemetrySink implements TelemetrySink {
     const [fromKey, toKey] = [dayKey(fromDay), dayKey(toDay)].sort();
     const records: TelemetrySinkRecord[] = [];
     const undated: TelemetrySinkRecord[] = [];
+    const projects = new Set<string>();
+    const steps = new Set<string>();
+    const models = new Set<string>();
     for (const record of [...this.files.values()].flat()) {
+      if (record.project_id !== undefined) projects.add(record.project_id);
+      if (record.step !== undefined) steps.add(record.step);
+      if (record.model !== undefined) models.add(record.model);
       const key = telemetrySinkRecordDayKey(record);
       if (key === undefined) undated.push(record);
       else if (key >= fromKey && key <= toKey) records.push(record);
     }
-    return { records, undated, skippedLines: 0 };
+    return { records, undated, skippedLines: 0, knownValues: { projects, steps, models } };
   }
 }

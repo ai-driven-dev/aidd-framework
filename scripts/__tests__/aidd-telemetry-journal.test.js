@@ -1,5 +1,20 @@
 const assert = require("node:assert/strict");
-const { execFileSync, spawnSync, spawn } = require("node:child_process");
+const childProcess = require("node:child_process");
+
+// Patched before repo.js is required below, since repo.js destructures spawnSync at
+// require time - a monkeypatch of child_process's own export applied after that point
+// would never reach repo.js's already-captured reference. This is what lets
+// countGitInvocations() count real git calls in-process, with no PATH shim: a shim
+// script needs a POSIX shebang and the execute bit to run, neither of which Windows
+// honours (it resolves an executable by PATHEXT/extension instead).
+let gitCallCounter = null;
+const realSpawnSync = childProcess.spawnSync;
+childProcess.spawnSync = (command, ...rest) => {
+  if (gitCallCounter && command === "git") gitCallCounter.count += 1;
+  return realSpawnSync(command, ...rest);
+};
+
+const { execFileSync, spawnSync, spawn } = childProcess;
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -517,6 +532,17 @@ function addWorktree(main, dir) {
   execFileSync("git", ["worktree", "add", "-b", "feature", dir], { cwd: main, env: CLEAN_ENV });
 }
 
+// git's --show-toplevel resolves symlinks (macOS's /var, /tmp among them) and, on
+// Windows, always answers with a forward-slash long-filename path - which can differ
+// in spelling from fs.realpathSync() of the same directory when %TEMP% itself
+// resolves through an 8.3 short alias. fs.realpathSync.native asks the OS for the
+// canonical form on every platform, which collapses both differences; lowercased on
+// win32 since NTFS paths are case-insensitive.
+function canonicalPath(target) {
+  const resolved = fs.realpathSync.native(target);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+
 test("getRepoRoot resolves a worktree to itself, never to the repository it shares", () => {
   const main = makeTempRepo();
   const worktree = path.join(makeTempDir("aidd-telemetry-worktree-"), "wt");
@@ -524,10 +550,8 @@ test("getRepoRoot resolves a worktree to itself, never to the repository it shar
 
   const worktreeRoot = getRepoRoot(worktree);
 
-  // git resolves symlinks in --show-toplevel (macOS's /var, /tmp among them), so the
-  // comparison goes through fs.realpathSync rather than the raw temp-dir string.
-  assert.equal(worktreeRoot, fs.realpathSync(worktree));
-  assert.notEqual(worktreeRoot, getRepoRoot(main));
+  assert.equal(canonicalPath(worktreeRoot), canonicalPath(worktree));
+  assert.notEqual(canonicalPath(worktreeRoot), canonicalPath(getRepoRoot(main)));
 });
 
 test("resolveRunsDir writes a worktree's journal under the worktree, not the main checkout", () => {
@@ -540,9 +564,9 @@ test("resolveRunsDir writes a worktree's journal under the worktree, not the mai
   const target = resolveRunsDir(worktree);
 
   assert.ok(target, "resolveRunsDir must resolve inside a worktree");
-  assert.equal(target.repoRoot, fs.realpathSync(worktree));
-  assert.equal(target.dir, runsDirOf(fs.realpathSync(worktree)));
-  assert.notEqual(target.dir, runsDirOf(fs.realpathSync(main)));
+  assert.equal(canonicalPath(target.repoRoot), canonicalPath(worktree));
+  assert.equal(canonicalPath(target.dir), canonicalPath(runsDirOf(worktree)));
+  assert.notEqual(canonicalPath(target.dir), canonicalPath(runsDirOf(main)));
 });
 
 function makeTempDir(prefix) {
@@ -1385,22 +1409,18 @@ function withEnv(overrides, fn) {
   }
 }
 
-// Counts real `git` invocations made while fn() runs, by prepending a
-// logging wrapper script to PATH.
+// Counts real `git` invocations made while fn() runs, via the module-level
+// spawnSync patch above.
 function countGitInvocations(fn) {
-  const binDir = makeTempDir("aidd-telemetry-git-wrapper-");
-  const logFile = path.join(binDir, "calls.log");
-  fs.writeFileSync(logFile, "");
-  const realGit = execFileSync("which", ["git"], { encoding: "utf8" }).trim();
-  fs.writeFileSync(path.join(binDir, "git"), `#!/bin/sh\nprintf '.' >> "${logFile}"\nexec "${realGit}" "$@"\n`);
-  fs.chmodSync(path.join(binDir, "git"), 0o755);
-
+  const counter = { count: 0 };
+  const previous = gitCallCounter;
+  gitCallCounter = counter;
   try {
-    withEnv({ PATH: `${binDir}:${process.env.PATH}` }, fn);
-    return fs.readFileSync(logFile, "utf8").length;
+    fn();
   } finally {
-    cleanup(binDir);
+    gitCallCounter = previous;
   }
+  return counter.count;
 }
 
 test("a Stop shells out to git no more times with several hundred run files on disk than with one", () => {
@@ -2109,7 +2129,9 @@ test("two concurrent sessions in the same checkout each record only their own wr
 // Read once so every test below fails together if a line is renamed or
 // reordered, rather than drifting silently apart from what is committed.
 function readAiddGitignoreBlock() {
-  const lines = fs.readFileSync(path.join(root, ".gitignore"), "utf8").split("\n");
+  // core.autocrlf checks this repository's own .gitignore out with CRLF on Windows;
+  // splitting on a bare "\n" would leave a trailing "\r" on every line.
+  const lines = fs.readFileSync(path.join(root, ".gitignore"), "utf8").split(/\r?\n/u);
   const startIndex = lines.findIndex((line) => line.trim() === ".aidd/*");
   assert.ok(startIndex !== -1, "expected an .aidd/* line in the repository's own .gitignore");
   return lines.slice(startIndex, startIndex + 2);
@@ -2122,7 +2144,8 @@ test("the repository's own .gitignore excludes .aidd/ state but tracks .aidd/con
 // Read once so every test below fails together if a line is renamed or
 // reordered, rather than drifting silently apart from what is committed.
 function readRunsGitignoreBlock() {
-  const lines = fs.readFileSync(path.join(root, ".gitignore"), "utf8").split("\n");
+  // Same CRLF-checkout reason as readAiddGitignoreBlock above.
+  const lines = fs.readFileSync(path.join(root, ".gitignore"), "utf8").split(/\r?\n/u);
   const startIndex = lines.findIndex((line) => line.trim() === "aidd_docs/runs/*");
   assert.ok(startIndex !== -1, "expected an aidd_docs/runs/* line in the repository's own .gitignore");
   return lines.slice(startIndex, startIndex + 3);

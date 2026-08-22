@@ -2,12 +2,22 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
+const { execFileSync, spawnSync } = require("node:child_process");
 const { after, describe, it } = require("node:test");
 
 const PLUGIN_DIR = path.resolve(__dirname, "../../plugins/aidd-telemetry");
 const SKILLS_DIR = path.join(PLUGIN_DIR, "skills");
 const HOOKS_DIR = path.join(PLUGIN_DIR, "hooks");
+
+// A minimal PATH for spawned scripts, containing only git's own directory - never
+// "/usr/bin:/bin", which doesn't hold git on Windows and uses ":" as a separator, not
+// win32's ";". "where"/"which" differ by platform; either answers with the same thing,
+// which is all a minimal PATH here needs (hooks/lib/repo.js shells out to git).
+const GIT_DIR = path.dirname(
+  execFileSync(process.platform === "win32" ? "where" : "which", ["git"], { encoding: "utf8" })
+    .trim()
+    .split(/\r?\n/u)[0],
+);
 
 // Read from each script's own usage banner: `on`/`off` for the switch, `read`/`report` for
 // the reporter, no argv at all for the checker. Invoking a script this way exercises its
@@ -91,8 +101,12 @@ function discoverScripts(skillsRoot) {
 // under must not leak into a script meant to be exercised in isolation.
 function hermeticEnv(home) {
   const { AIDD_RUNS_DIR: _r, CLAUDE_CODE_SESSION_ID: _c, CODEX_THREAD_ID: _t, ...rest } = process.env;
-  const withoutGit = Object.fromEntries(Object.entries(rest).filter(([key]) => !key.startsWith("GIT_")));
-  return { ...withoutGit, HOME: home, PATH: "/usr/bin:/bin" };
+  // process.env's OS-cased PATH key (often "Path" on Windows) must be filtered out too, or
+  // it sits beside PATH below unfiltered, undoing the minimal PATH this function exists for.
+  const withoutGit = Object.fromEntries(
+    Object.entries(rest).filter(([key]) => !key.startsWith("GIT_") && !/^path$/iu.test(key)),
+  );
+  return { ...withoutGit, HOME: home, PATH: GIT_DIR };
 }
 
 function runScript(scriptPath, args, cwd) {

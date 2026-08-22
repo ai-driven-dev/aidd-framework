@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MissingTelemetryEndpointError } from "../../../../src/domain/errors.js";
 import {
@@ -78,19 +79,19 @@ describe("resolveClaudeTelemetrySettingsPath", () => {
 
   it("resolves local scope inside the project (not git-tracked)", () => {
     expect(resolveClaudeTelemetrySettingsPath("local", projectRoot, homeDir)).toBe(
-      "/repo/.claude/settings.local.json"
+      join(projectRoot, ".claude", "settings.local.json")
     );
   });
 
   it("resolves project scope inside the project (git-tracked)", () => {
     expect(resolveClaudeTelemetrySettingsPath("project", projectRoot, homeDir)).toBe(
-      "/repo/.claude/settings.json"
+      join(projectRoot, ".claude", "settings.json")
     );
   });
 
   it("resolves user scope to the home directory, outside the project", () => {
     expect(resolveClaudeTelemetrySettingsPath("user", projectRoot, homeDir)).toBe(
-      "/home/dev/.claude/settings.json"
+      join(homeDir, ".claude", "settings.json")
     );
   });
 });

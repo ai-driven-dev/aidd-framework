@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CleanUseCase } from "../../../../src/application/use-cases/clean-use-case.js";
 import { GitignoreUseCase } from "../../../../src/application/use-cases/shared/gitignore-use-case.js";
@@ -14,7 +15,7 @@ const PROJECT_ROOT = "/repo";
 const HOME_DIR = "/home/dev";
 const ENDPOINT = "https://otel.example.com";
 const PROJECT_ID = "ai-driven-dev/framework";
-const LOCAL_SETTINGS_PATH = "/repo/.claude/settings.local.json";
+const LOCAL_SETTINGS_PATH = join(PROJECT_ROOT, ".claude", "settings.local.json");
 
 const KNOWN_KEYS = [
   "CLAUDE_CODE_ENABLE_TELEMETRY",
@@ -86,8 +87,9 @@ describe("EnableToolTelemetryUseCase — driven by Claude's settings-file activa
       projectId: PROJECT_ID,
       scope: "project",
     });
-    expect(result.settingsPath).toBe("/repo/.claude/settings.json");
-    expect(fs.has("/repo/.claude/settings.json")).toBe(true);
+    const projectSettingsPath = join(PROJECT_ROOT, ".claude", "settings.json");
+    expect(result.settingsPath).toBe(projectSettingsPath);
+    expect(fs.has(projectSettingsPath)).toBe(true);
   });
 
   it("writes user scope under the home directory, outside the project", async () => {
@@ -101,7 +103,7 @@ describe("EnableToolTelemetryUseCase — driven by Claude's settings-file activa
       projectId: PROJECT_ID,
       scope: "user",
     });
-    expect(result.settingsPath).toBe("/home/dev/.claude/settings.json");
+    expect(result.settingsPath).toBe(join(HOME_DIR, ".claude", "settings.json"));
   });
 
   it("preserves unrelated top-level keys already in the settings file", async () => {
@@ -225,7 +227,7 @@ describe("EnableToolTelemetryUseCase — driven by Claude's settings-file activa
 
   it("user scope: records a projectRoot-relative traversal path, and clean restores the home-dir file byte-identical", async () => {
     const { fs, manifestRepo, useCase } = buildDeps();
-    const homeSettingsPath = "/home/dev/.claude/settings.json";
+    const homeSettingsPath = join(HOME_DIR, ".claude", "settings.json");
     const before = JSON.stringify({ model: "opus" }, null, 2);
     fs.setFile(homeSettingsPath, before);
 

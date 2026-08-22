@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { claude } from "../../../../src/domain/tools/ai/claude.js";
 
@@ -145,7 +146,7 @@ describe("claude", () => {
       const activation = claude.telemetry;
       if (activation.kind !== "settings-file") throw new Error("expected settings-file");
       expect(activation.resolveSettingsPath("local", "/repo", "/home/dev")).toBe(
-        "/repo/.claude/settings.local.json"
+        join("/repo", ".claude", "settings.local.json")
       );
     });
   });

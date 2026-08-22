@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildTelemetrySwitchFile,
@@ -8,7 +9,7 @@ import {
 
 describe("telemetryConfigPath", () => {
   it("resolves .aidd/config.json under the project root", () => {
-    expect(telemetryConfigPath("/repo")).toBe("/repo/.aidd/config.json");
+    expect(telemetryConfigPath("/repo")).toBe(join("/repo", ".aidd", "config.json"));
   });
 });
 

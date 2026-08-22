@@ -16,6 +16,16 @@ const { UNRECOGNISED_FILE_NAME } = require("../../plugins/aidd-telemetry/hooks/l
 const { readCodexHookTrust, parseHookTrust, PLUGIN_NAME } = require(path.join(SCRIPTS, "lib/hook-trust.js"));
 const PLUGIN_MANIFEST = require("../../plugins/aidd-telemetry/.claude-plugin/plugin.json");
 
+// A minimal PATH for spawned scripts, containing only git's own directory - never
+// "/usr/bin:/bin", which doesn't hold git on Windows and uses ":" as a separator, not
+// win32's ";". "where"/"which" differ by platform; either answers with the same thing,
+// which is all a minimal PATH here needs (hooks/lib/repo.js shells out to git).
+const GIT_DIR = path.dirname(
+  execFileSync(process.platform === "win32" ? "where" : "which", ["git"], { encoding: "utf8" })
+    .trim()
+    .split(/\r?\n/u)[0],
+);
+
 const journalOf = (boundaries, vendorId = "s-1", at = "2026-08-20T09:00:00Z") => ({
   session: { vendor_id: vendorId, tool: "claude-code", at },
   boundaries,
@@ -564,7 +574,12 @@ describe("the script wired to a real project", () => {
   // case needs both at once, one matching a fixture and one not.
   function run(root, home, sessionId) {
     const { AIDD_RUNS_DIR: _a, CLAUDE_CODE_SESSION_ID: _b, CODEX_THREAD_ID: _c, ...rest } = process.env;
-    const env = Object.fromEntries(Object.entries(rest).filter(([k]) => !k.startsWith("GIT_")));
+    // process.env carries the OS-cased key (often "Path" on Windows) - left in, it would
+    // sit alongside PATH below as a second, unfiltered key and undo the minimal PATH the
+    // next line sets.
+    const env = Object.fromEntries(
+      Object.entries(rest).filter(([k]) => !k.startsWith("GIT_") && !/^path$/iu.test(k)),
+    );
     const anchor =
       typeof sessionId === "string"
         ? { CLAUDE_CODE_SESSION_ID: sessionId }
@@ -575,7 +590,7 @@ describe("the script wired to a real project", () => {
     const result = spawnSync(process.execPath, [SCRIPT], {
       cwd: root,
       encoding: "utf8",
-      env: { ...env, HOME: home, PATH: "/usr/bin:/bin", ...anchor },
+      env: { ...env, HOME: home, PATH: GIT_DIR, ...anchor },
     });
     return result.stdout.trim().split("\n");
   }
@@ -1079,11 +1094,15 @@ describe("running from a tree that ships skills/ and no hooks/ (the OpenCode-sha
     );
 
     const { AIDD_RUNS_DIR: _a, CLAUDE_CODE_SESSION_ID: _b, CODEX_THREAD_ID: _c, ...rest } = process.env;
-    const env = Object.fromEntries(Object.entries(rest).filter(([k]) => !k.startsWith("GIT_")));
+    // See run()'s own comment above: process.env's OS-cased PATH key (often "Path" on
+    // Windows) must be filtered out too, or it sits beside PATH below unfiltered.
+    const env = Object.fromEntries(
+      Object.entries(rest).filter(([k]) => !k.startsWith("GIT_") && !/^path$/iu.test(k)),
+    );
     const result = spawnSync(process.execPath, [script], {
       cwd: root,
       encoding: "utf8",
-      env: { ...env, HOME: home, PATH: "/usr/bin:/bin", CLAUDE_CODE_SESSION_ID: "s-shaped" },
+      env: { ...env, HOME: home, PATH: GIT_DIR, CLAUDE_CODE_SESSION_ID: "s-shaped" },
     });
 
     assert.equal(result.status, 0, result.stderr);

@@ -118,6 +118,7 @@ describe("keeping records a session left behind", () => {
       records: [],
       undated: [],
       skipped: 0,
+      known: { projects: new Set(), steps: new Set(), models: new Set() },
     });
   });
 

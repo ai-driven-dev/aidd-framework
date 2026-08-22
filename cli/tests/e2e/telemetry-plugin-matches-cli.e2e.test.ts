@@ -178,6 +178,102 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
     }
   });
 
+  const REPORTING_PERIOD = ["--from", "2026-07-01", "--to", "2026-08-31"];
+  // The codex session's own remote wins over its `project_id` (metrics-contract.md), so
+  // this - not "acme-widgets" - is what every stored record from it actually carries.
+  const CODEX_PROJECT = "git@github.com:acme/widgets.git";
+
+  it("filters the same way it groups, alone, composed, and against itself grouped", async () => {
+    await bothOf(["read"]);
+
+    for (const args of [
+      ["report", ...REPORTING_PERIOD, "--project", CODEX_PROJECT],
+      ["report", ...REPORTING_PERIOD, "--tool", "codex"],
+      // Composed: project as filter, and a second, unrelated filter narrowing further.
+      [
+        "report",
+        ...REPORTING_PERIOD,
+        "--project",
+        CODEX_PROJECT,
+        "--step",
+        "aidd-dev:02-implement",
+      ],
+      // Filtering and grouping on the same dimension - one row, not an error, on both sides.
+      ["report", ...REPORTING_PERIOD, "--project", CODEX_PROJECT, "--json"],
+    ]) {
+      const [fromCli, fromPlugin] = await bothOf(args);
+      expect(fromPlugin, args.join(" ")).toBe(fromCli);
+    }
+
+    const [, fromPlugin] = await bothOf([
+      "report",
+      ...REPORTING_PERIOD,
+      "--project",
+      CODEX_PROJECT,
+      "--json",
+    ]);
+    expect(JSON.parse(fromPlugin).by_project).toHaveLength(1);
+  });
+
+  /**
+   * `--axis` is the one flag this suite does not hold the two to byte-for-byte: it picks
+   * one artefact rendering, a plugin-only convenience this phase did not extend to the
+   * CLI (a markdown-table renderer, not a filter). Left unaddressed, that gap would be
+   * silent - a CLI told `--axis` today would need to at least refuse it loudly rather
+   * than quietly ignoring it. This pins the refusal down so a future change to flag
+   * parsing cannot regress it into a silent no-op.
+   */
+  it("refuses --axis loudly rather than silently ignoring it - the one flag not held to parity", async () => {
+    const [fromCli, fromPlugin] = await bothOf([
+      "report",
+      ...REPORTING_PERIOD,
+      "--axis",
+      "project",
+    ]);
+
+    expect(fromPlugin).toContain("axis: by project");
+    expect(fromCli).toMatch(/unknown option.*--axis/u);
+    expect(fromCli).not.toBe(fromPlugin);
+  });
+
+  it("names an empty selection the same way, a never-known value and a known-idle one", async () => {
+    await bothOf(["read"]);
+
+    // Unknown: no session anywhere in this sink ever named this project.
+    const [unknownCli, unknownPlugin] = await bothOf([
+      "report",
+      ...REPORTING_PERIOD,
+      "--project",
+      "never-heard-of-this-repo",
+      "--json",
+    ]);
+    expect(unknownPlugin).toBe(unknownCli);
+    expect(JSON.parse(unknownPlugin).empty_selection).toEqual({
+      filter: "project",
+      value: "never-heard-of-this-repo",
+      known: false,
+    });
+
+    // Known: the codex project is real, just not on the one day this narrower period
+    // covers (the codex session ran in July; this asks about one day in August).
+    const [knownCli, knownPlugin] = await bothOf([
+      "report",
+      "--from",
+      "2026-08-05",
+      "--to",
+      "2026-08-05",
+      "--project",
+      CODEX_PROJECT,
+      "--json",
+    ]);
+    expect(knownPlugin).toBe(knownCli);
+    expect(JSON.parse(knownPlugin).empty_selection).toEqual({
+      filter: "project",
+      value: CODEX_PROJECT,
+      known: true,
+    });
+  });
+
   it("answers a program the same way, including what each tool can supply", async () => {
     await bothOf(["read"]);
 

@@ -85,64 +85,89 @@ describe("OpencodeCostReaderAdapter", () => {
     });
   });
 
-  it("reads a well-behaved export into one record per counted message", async () => {
-    const env = installStandIn(WELL_BEHAVED_SCRIPT);
-    restorePath = env.restore;
+  // installStandIn writes a #!/bin/sh script with no file extension and chmods it
+  // executable - Windows resolves an executable by PATHEXT/extension, not a shebang line
+  // or the POSIX execute bit, so the stand-in never launches there (same gap
+  // countGitInvocations hit in the plugin's own suite, and telemetry-multi-tool.e2e.test.ts
+  // hits in cli/tests/e2e/). Every test below that calls installStandIn is skipped on
+  // win32 rather than left to fail for the wrong reason.
+  const skipOnWindows = process.platform === "win32";
 
-    const { records, sessionFound } = await new OpencodeCostReaderAdapter().read(SESSION_ID);
+  it.skipIf(skipOnWindows)(
+    "reads a well-behaved export into one record per counted message",
+    async () => {
+      const env = installStandIn(WELL_BEHAVED_SCRIPT);
+      restorePath = env.restore;
 
-    expect(sessionFound).toBe(true);
-    expect(records).toHaveLength(4);
-    expect(records[0]).toMatchObject({
-      kind: "request",
-      vendor_id: SESSION_ID,
-      vendor_field: "sessionID",
-      model: "claude-sonnet-4-6",
-      input_tokens: 3,
-      output_tokens: 115,
-      cache_read_tokens: 43639,
-      cache_creation_tokens: 3141,
-    });
-    expect(records.every((r) => typeof r.turn_id === "string" && r.turn_id.length > 0)).toBe(true);
-  });
+      const { records, sessionFound } = await new OpencodeCostReaderAdapter().read(SESSION_ID);
 
-  it("says it found no session, not an error, for an unknown session", async () => {
-    const env = installStandIn(UNKNOWN_SESSION_SCRIPT);
-    restorePath = env.restore;
+      expect(sessionFound).toBe(true);
+      expect(records).toHaveLength(4);
+      expect(records[0]).toMatchObject({
+        kind: "request",
+        vendor_id: SESSION_ID,
+        vendor_field: "sessionID",
+        model: "claude-sonnet-4-6",
+        input_tokens: 3,
+        output_tokens: 115,
+        cache_read_tokens: 43639,
+        cache_creation_tokens: 3141,
+      });
+      expect(records.every((r) => typeof r.turn_id === "string" && r.turn_id.length > 0)).toBe(
+        true
+      );
+    }
+  );
 
-    await expect(new OpencodeCostReaderAdapter().read(SESSION_ID)).resolves.toEqual({
-      records: [],
-      sessionFound: false,
-    });
-  });
+  it.skipIf(skipOnWindows)(
+    "says it found no session, not an error, for an unknown session",
+    async () => {
+      const env = installStandIn(UNKNOWN_SESSION_SCRIPT);
+      restorePath = env.restore;
 
-  it("throws OpencodeExportError, and stores nothing, on a non-zero exit unrelated to an unknown session", async () => {
-    const env = installStandIn(GENERIC_FAILURE_SCRIPT);
-    restorePath = env.restore;
+      await expect(new OpencodeCostReaderAdapter().read(SESSION_ID)).resolves.toEqual({
+        records: [],
+        sessionFound: false,
+      });
+    }
+  );
 
-    await expect(new OpencodeCostReaderAdapter().read(SESSION_ID)).rejects.toThrow(
-      OpencodeExportError
-    );
-    await expect(new OpencodeCostReaderAdapter().read(SESSION_ID)).rejects.toThrow(
-      "storage unavailable"
-    );
-  });
+  it.skipIf(skipOnWindows)(
+    "throws OpencodeExportError, and stores nothing, on a non-zero exit unrelated to an unknown session",
+    async () => {
+      const env = installStandIn(GENERIC_FAILURE_SCRIPT);
+      restorePath = env.restore;
 
-  it("throws OpencodeExportError, and stores nothing, when the command exceeds its timeout", async () => {
-    const env = installStandIn(SLOW_SCRIPT);
-    restorePath = env.restore;
+      await expect(new OpencodeCostReaderAdapter().read(SESSION_ID)).rejects.toThrow(
+        OpencodeExportError
+      );
+      await expect(new OpencodeCostReaderAdapter().read(SESSION_ID)).rejects.toThrow(
+        "storage unavailable"
+      );
+    }
+  );
 
-    await expect(new OpencodeCostReaderAdapter(200).read(SESSION_ID)).rejects.toThrow(
-      OpencodeExportError
-    );
-  });
+  it.skipIf(skipOnWindows)(
+    "throws OpencodeExportError, and stores nothing, when the command exceeds its timeout",
+    async () => {
+      const env = installStandIn(SLOW_SCRIPT);
+      restorePath = env.restore;
 
-  it("throws OpencodeExportError when the command answers with something that is not JSON", async () => {
-    const env = installStandIn('#!/bin/sh\necho "not json"\nexit 0\n');
-    restorePath = env.restore;
+      await expect(new OpencodeCostReaderAdapter(200).read(SESSION_ID)).rejects.toThrow(
+        OpencodeExportError
+      );
+    }
+  );
 
-    await expect(new OpencodeCostReaderAdapter().read(SESSION_ID)).rejects.toThrow(
-      OpencodeExportError
-    );
-  });
+  it.skipIf(skipOnWindows)(
+    "throws OpencodeExportError when the command answers with something that is not JSON",
+    async () => {
+      const env = installStandIn('#!/bin/sh\necho "not json"\nexit 0\n');
+      restorePath = env.restore;
+
+      await expect(new OpencodeCostReaderAdapter().read(SESSION_ID)).rejects.toThrow(
+        OpencodeExportError
+      );
+    }
+  );
 });

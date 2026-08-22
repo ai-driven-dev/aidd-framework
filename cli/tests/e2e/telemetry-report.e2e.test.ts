@@ -52,6 +52,69 @@ const CODEX_RECORDS = [
   },
 ] as const;
 
+/** Three records the filter tests narrow over: two inside the period, one on the same
+ * moment `CODEX_RECORDS` uses but carrying a model no in-period record ever names - known
+ * to a sweep of this file, but idle in every selection that stays inside the period. */
+const FILTER_RECORDS = [
+  {
+    kind: "request",
+    vendor_id: "f-1",
+    vendor_field: "session_meta.id",
+    turn_id: "f-turn-1",
+    turn_field: "turn_id",
+    model: "gpt-5.6-sol",
+    event_timestamp: "2026-07-29T15:12:27.889Z",
+    input_tokens: 100,
+    output_tokens: 10,
+    cache_read_tokens: 0,
+    cache_creation_tokens: 0,
+    sink_schema_version: 2,
+    provenance: "local-read",
+    tool: "codex",
+    step_attribution: "tool-stated",
+    step: "implement",
+    project_id: "acme/widgets",
+  },
+  {
+    kind: "request",
+    vendor_id: "f-2",
+    vendor_field: "session_meta.id",
+    turn_id: "f-turn-2",
+    turn_field: "turn_id",
+    model: "gpt-4",
+    event_timestamp: "2026-07-29T15:20:00.000Z",
+    input_tokens: 50,
+    output_tokens: 5,
+    cache_read_tokens: 0,
+    cache_creation_tokens: 0,
+    sink_schema_version: 2,
+    provenance: "local-read",
+    tool: "codex",
+    step_attribution: "unattributed",
+    project_id: "acme/gadgets",
+  },
+  {
+    kind: "request",
+    vendor_id: "f-3",
+    vendor_field: "session_meta.id",
+    turn_id: "f-turn-3",
+    turn_field: "turn_id",
+    model: "haiku",
+    // Outside every period these tests ask for - the sink still opens this file to build
+    // its "ever seen" sets, so "haiku" reads as known without ever being in scope.
+    event_timestamp: "2020-01-01T00:00:00.000Z",
+    input_tokens: 1,
+    output_tokens: 1,
+    cache_read_tokens: 0,
+    cache_creation_tokens: 0,
+    sink_schema_version: 2,
+    provenance: "local-read",
+    tool: "codex",
+    step_attribution: "unattributed",
+    project_id: "acme/old-project",
+  },
+] as const;
+
 const SINK_DAY_FILE = "2026-08-21.jsonl";
 const CODEX_WORK_DAY = "2026-07-29";
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -154,5 +217,111 @@ describe("aidd telemetry report", () => {
 
     expect(result.exitCode).toBe(1);
     expect(`${result.stdout}${result.stderr}`).toContain("--days");
+  });
+
+  it("keeps only the project asked for, saying so in the object it answers with", async () => {
+    const { projectDir, fakeHome } = await seed(FILTER_RECORDS);
+
+    const result = await runCli(
+      ["telemetry", "report", "--days", daysBackToTheWork(), "--project", "acme/widgets", "--json"],
+      projectDir,
+      fakeHome
+    );
+
+    expect(result.exitCode).toBe(0);
+    const envelope = JSON.parse(result.stdout);
+    expect(envelope.filters).toEqual({ project: "acme/widgets" });
+    expect(envelope.totals.requests).toBe(1);
+    expect(envelope.by_project).toEqual([{ project: "acme/widgets", totals: envelope.totals }]);
+  });
+
+  it("narrows two filters to their intersection, project as filter and step as axis", async () => {
+    const { projectDir, fakeHome } = await seed(FILTER_RECORDS);
+
+    const result = await runCli(
+      [
+        "telemetry",
+        "report",
+        "--days",
+        daysBackToTheWork(),
+        "--project",
+        "acme/widgets",
+        "--model",
+        "gpt-5.6-sol",
+        "--json",
+      ],
+      projectDir,
+      fakeHome
+    );
+
+    expect(result.exitCode).toBe(0);
+    const envelope = JSON.parse(result.stdout);
+    expect(envelope.totals.requests).toBe(1);
+    expect(envelope.by_step).toEqual([
+      { step: "implement", attribution: "tool-stated", totals: envelope.totals },
+    ]);
+  });
+
+  it("names a project nobody ever worked in, apart from a total of zero", async () => {
+    const { projectDir, fakeHome } = await seed(FILTER_RECORDS);
+
+    const result = await runCli(
+      [
+        "telemetry",
+        "report",
+        "--days",
+        daysBackToTheWork(),
+        "--project",
+        "never-worked-here",
+        "--json",
+      ],
+      projectDir,
+      fakeHome
+    );
+
+    expect(result.exitCode).toBe(0);
+    const envelope = JSON.parse(result.stdout);
+    expect(envelope.empty_selection).toEqual({
+      filter: "project",
+      value: "never-worked-here",
+      known: false,
+    });
+    expect(result.stdout).not.toContain('"cost_micro_usd"');
+  });
+
+  it("tells a known value idle in this period apart from one never seen at all", async () => {
+    const { projectDir, fakeHome } = await seed(FILTER_RECORDS);
+
+    const result = await runCli(
+      ["telemetry", "report", "--days", daysBackToTheWork(), "--model", "haiku"],
+      projectDir,
+      fakeHome
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("known, but no work here");
+    expect(result.stdout).not.toContain("never named this");
+  });
+
+  it("prints the composed selection in the header a person reads", async () => {
+    const { projectDir, fakeHome } = await seed(FILTER_RECORDS);
+
+    const result = await runCli(
+      [
+        "telemetry",
+        "report",
+        "--days",
+        daysBackToTheWork(),
+        "--project",
+        "acme/widgets",
+        "--step",
+        "implement",
+      ],
+      projectDir,
+      fakeHome
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("filters: project=acme/widgets, step=implement");
   });
 });

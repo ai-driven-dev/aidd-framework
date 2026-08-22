@@ -92,11 +92,15 @@ test("--help documents supported links, exclusions, fixes, and examples", () => 
 test("CLI checks one markdown file covering supported, ignored, and broken forms", () => {
   const tempDir = fs.mkdtempSync(path.join(root, "scripts/__tests__/.tmp-check-markdown-links-"));
   const fixture = path.join(tempDir, "all-cases.md");
-  const readmePath = path.relative(tempDir, path.join(root, "README.md"));
-  const logoPath = path.relative(tempDir, path.join(root, "docs/assets/logo.png"));
-  const claudePath = path.relative(tempDir, path.join(root, "CLAUDE.md"));
-  const contributingPath = path.relative(tempDir, path.join(root, "CONTRIBUTING.md"));
-  const outsidePath = path.relative(tempDir, path.resolve(root, "..", "outside.md"));
+  // A real markdown link is always "/"-separated, like a URL - never path.relative's
+  // platform-native separator. Matches how the checker itself normalises before
+  // reporting (check-markdown-links.js's own repoRelative/relative handling).
+  const relLink = (to) => path.relative(tempDir, to).replaceAll(path.sep, "/");
+  const readmePath = relLink(path.join(root, "README.md"));
+  const logoPath = relLink(path.join(root, "docs/assets/logo.png"));
+  const claudePath = relLink(path.join(root, "CLAUDE.md"));
+  const contributingPath = relLink(path.join(root, "CONTRIBUTING.md"));
+  const outsidePath = relLink(path.resolve(root, "..", "outside.md"));
   const outsideSuggestion = "https://github.com/ai-driven-dev/framework/blob/main/outside.md";
 
   fs.writeFileSync(

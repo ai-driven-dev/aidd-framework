@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 // Side-effect imports: TelemetryOnUseCase now resolves each tool's telemetry story from
 // the registry, so every AI tool must be registered for these tests to see it.
@@ -16,9 +17,9 @@ import { InMemoryManifestRepository } from "../../../helpers/ports/in-memory-man
 
 const PROJECT_ROOT = "/repo";
 const HOME_DIR = "/home/dev";
-const SWITCH_PATH = "/repo/.aidd/config.json";
-const LOCAL_SETTINGS_PATH = "/repo/.claude/settings.local.json";
-const PROJECT_SETTINGS_PATH = "/repo/.claude/settings.json";
+const SWITCH_PATH = join(PROJECT_ROOT, ".aidd", "config.json");
+const LOCAL_SETTINGS_PATH = join(PROJECT_ROOT, ".claude", "settings.local.json");
+const PROJECT_SETTINGS_PATH = join(PROJECT_ROOT, ".claude", "settings.json");
 const ENDPOINT = "https://otel.example.com";
 const STUB_PROJECT_ID = "stub/project";
 

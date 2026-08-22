@@ -646,6 +646,201 @@ describe("breaking a period down by day and by project", () => {
   });
 });
 
+describe("any dimension filters as well as it groups", () => {
+  const AT = "2026-08-18T10:00:00Z";
+  const WIDGETS = [
+    request({ turn_id: "a", cost_usd: 1, model: "opus", step: "impl", step_attribution: "tool-stated", tool: "claude", project_id: "acme/widgets", event_timestamp: AT }),
+    request({ turn_id: "b", cost_usd: 2, model: "sonnet", step: "review", step_attribution: "tool-stated", tool: "codex", project_id: "acme/widgets", event_timestamp: AT }),
+  ];
+  const GADGETS = [
+    request({ turn_id: "c", cost_usd: 4, model: "opus", step: "impl", step_attribution: "tool-stated", tool: "claude", project_id: "acme/gadgets", event_timestamp: AT }),
+  ];
+  const declaredTools = [
+    { tool: "claude", coverage: "covered", capability: NO_CAPABILITY },
+    { tool: "codex", coverage: "covered", capability: NO_CAPABILITY },
+  ];
+  const known = {
+    projects: new Set(["acme/widgets", "acme/gadgets"]),
+    steps: new Set(["impl", "review"]),
+    // "haiku" never appears on a WIDGETS/GADGETS record - known to the sweep (some record,
+    // somewhere, once carried it) but idle in this selection, unlike "nobody-worked-here".
+    models: new Set(["opus", "sonnet", "haiku"]),
+  };
+
+  function narrowed(overrides) {
+    return report({ records: [...WIDGETS, ...GADGETS], declaredTools, knownValues: known, ...overrides });
+  }
+
+  it("keeps only the project asked for, the same as --project would", () => {
+    const built = narrowed({ filters: { project: "acme/widgets" } });
+
+    assert.equal(built.totals.requests, 2);
+    assert.equal(built.totals.costMicroUsd, toMicroUsd(3));
+  });
+
+  it("keeps only the step, the model, or the tool asked for", () => {
+    assert.equal(narrowed({ filters: { step: "impl" } }).totals.requests, 2);
+    assert.equal(narrowed({ filters: { model: "sonnet" } }).totals.requests, 1);
+    assert.equal(narrowed({ filters: { tool: "codex" } }).totals.requests, 1);
+  });
+
+  it("narrows two filters to their intersection, never their union", () => {
+    const built = narrowed({ filters: { project: "acme/widgets", model: "opus" } });
+
+    assert.equal(built.totals.requests, 1);
+    assert.equal(built.totals.costMicroUsd, toMicroUsd(1));
+  });
+
+  it("says which selection it answered, in the header and the envelope", () => {
+    const built = narrowed({ filters: { project: "acme/widgets", step: "impl" } });
+
+    assert.deepEqual(built.filters, { project: "acme/widgets", step: "impl" });
+    assert.match(rendered(built), /filters: project=acme\/widgets, step=impl/u);
+    assert.deepEqual(toEnvelope(built).filters, { project: "acme/widgets", step: "impl" });
+  });
+
+  it("filtering and grouping on the same single-keyed dimension answers with one row", () => {
+    const byProject = narrowed({ filters: { project: "acme/widgets" } });
+    assert.equal(byProject.byProjects.length, 1);
+    assert.equal(byProject.byProjects[0].project, "acme/widgets");
+
+    const byModel = narrowed({ filters: { model: "opus" } });
+    assert.equal(byModel.byModels.length, 1);
+
+    // by_tool is a breakdown of every *declared* tool - a --tool filter has to narrow
+    // that list too, or every excluded tool would still print a row reading "nothing in
+    // this period", indistinguishable from one genuinely measured idle.
+    const byTool = narrowed({ filters: { tool: "codex" } });
+    assert.equal(byTool.byTools.length, 1);
+    assert.equal(byTool.byTools[0].tool, "codex");
+    assert.equal(byTool.byTools[0].totals.requests, 1);
+  });
+
+  it("filtering and grouping on step keeps one row per attribution strength, never merged", () => {
+    const built = narrowed({
+      filters: { step: "impl" },
+      records: [
+        ...WIDGETS,
+        request({ turn_id: "d", cost_usd: 1, step: "impl", step_attribution: "journal-interval", project_id: "acme/widgets" }),
+      ],
+    });
+
+    const implRows = built.bySteps.filter((row) => row.step === "impl");
+    assert.equal(implRows.length, 2, "one row per attribution strength, both named 'impl'");
+  });
+
+  it("reconciles every breakdown to this selection's own total, exactly", () => {
+    const built = narrowed({ filters: { project: "acme/widgets" } });
+    const total = (rows) => rows.reduce((sum, row) => sum + row.totals.requests, 0);
+
+    for (const rows of [built.bySteps, built.byModels, built.byProjects, built.byDays]) {
+      assert.equal(total(rows), built.totals.requests);
+    }
+  });
+
+  it("names the filter that emptied a selection a project nobody ever worked in", () => {
+    const built = narrowed({ filters: { project: "nobody-worked-here" } });
+
+    assert.deepEqual(built.emptySelection, { filter: "project", value: "nobody-worked-here", known: false });
+    assert.match(rendered(built), /no record has ever named this project/u);
+  });
+
+  it("tells that empty apart from a known value with no work in this period", () => {
+    const built = narrowed({ filters: { model: "haiku" } });
+
+    assert.deepEqual(built.emptySelection, { filter: "model", value: "haiku", known: true });
+    assert.match(rendered(built), /known, but no work here/u);
+  });
+
+  it("names the combination, not either filter alone, when both are real but their overlap is empty", () => {
+    const built = narrowed({ filters: { project: "acme/gadgets", model: "sonnet" } });
+
+    assert.deepEqual(built.emptySelection, { filter: "model", value: "sonnet", known: true, combination: true });
+    assert.match(rendered(built), /combined with the rest of this selection/u);
+  });
+
+  it("never reports a filter as the culprit when the period itself has nothing", () => {
+    const built = report({ fromDay: "2020-01-01", toDay: "2020-01-01", filters: { project: "acme/widgets" } });
+
+    assert.equal(built.emptySelection, undefined);
+  });
+
+  it("drops a session-only figure a model or step filter cannot speak to, never as a false zero", () => {
+    const sessionRecord = {
+      kind: "session",
+      vendor_id: "s-2",
+      tool: "claude",
+      provenance: "local-read",
+      active_time_s: 30,
+      project_id: "acme/widgets",
+    };
+    const withModel = narrowed({ filters: { model: "opus" }, records: [...WIDGETS, sessionRecord] });
+    const withProject = narrowed({ filters: { project: "acme/widgets" }, records: [...WIDGETS, sessionRecord] });
+
+    assert.equal(withModel.activeTimeSeconds, undefined);
+    assert.equal(withProject.activeTimeSeconds, 30);
+  });
+
+  it("keeps a session-only figure under a step filter when a journal interval stamped one", () => {
+    // Unlike model, a step can land on a session record: `telemetry-report.js`'s `store()`
+    // runs `attribute()` over every record regardless of kind, so a session record whose
+    // own moment falls inside a `step_start` interval carries `step` too.
+    const sessionRecord = {
+      kind: "session",
+      vendor_id: "s-2",
+      tool: "claude",
+      provenance: "local-read",
+      active_time_s: 30,
+      project_id: "acme/widgets",
+      step: "impl",
+      step_attribution: "journal-interval",
+    };
+
+    const withStep = narrowed({ filters: { step: "impl" }, records: [...WIDGETS, sessionRecord] });
+    const withOtherStep = narrowed({ filters: { step: "review" }, records: [...WIDGETS, sessionRecord] });
+
+    assert.equal(withStep.activeTimeSeconds, 30);
+    assert.equal(withOtherStep.activeTimeSeconds, undefined);
+  });
+
+  it("says a task or a tool was never seen without claiming a record check it never ran", () => {
+    const unknownTool = narrowed({ filters: { tool: "opencode" } });
+    assert.deepEqual(unknownTool.emptySelection, { filter: "tool", value: "opencode", known: false });
+    assert.match(rendered(unknownTool), /it is not one of the tools this build knows/u);
+    assert.ok(!rendered(unknownTool).includes("no record has ever named this tool"));
+  });
+
+  it("calls a zero row 'nothing in this selection', never 'this period', once a filter is active", () => {
+    // Codex only appears on a widgets record - filtered to gadgets alone, its row and
+    // that day's row are both zero, but the selection is why, not real idleness.
+    const text = rendered(narrowed({ filters: { project: "acme/gadgets" } }));
+
+    assert.match(text, /Codex\s+nothing in this selection/u);
+    assert.match(text, /2026-08-1[0-9]\s+nothing in this selection/u);
+    assert.ok(!text.includes("nothing in this period"));
+  });
+
+  it("still calls a zero row 'nothing in this period' when the whole period, not a filter, is why", () => {
+    const text = rendered(report({ records: [] }));
+
+    assert.match(text, /requests\s+nothing in this period/u);
+    assert.ok(!text.includes("nothing in this selection"));
+  });
+
+  it("calls a task selection's own zero rows 'nothing in this selection' too", () => {
+    const journal = { session: { vendor_id: "s-1" }, filesWritten: [{ path: "aidd_docs/tasks/2026_08/2026_08_01_x/plan.md" }] };
+    const text = rendered(
+      report({
+        records: [request({ vendor_id: "s-1", cost_usd: 1, event_timestamp: "2026-08-17T10:00:00Z" })],
+        journals: [journal],
+        task: "2026_08/2026_08_01_x",
+      }),
+    );
+
+    assert.match(text, /2026-08-18\s+nothing in this selection/u);
+  });
+});
+
 describe("what a person reads", () => {
   it("answers the question before any breakdown is read", () => {
     const text = rendered(report({ records: [request({ cost_usd: 4.2, input_tokens: 100, cache_read_tokens: 900 })] }));
@@ -1102,5 +1297,54 @@ describe("a period that has met a hundred sessions", () => {
     assert.equal(envelope.totals.requests, wantedRecords.length);
     assert.equal(envelope.totals.cost_micro_usd, expectedMicroUsd(wantedRecords));
     reconciles(envelope);
+  });
+
+  it("answers a composed selection at the same volume, and every breakdown still reconciles", () => {
+    const wanted = fixtureRecords.filter((r) => r.project_id === "acme/widgets" && r.model === "opus");
+    assert.ok(wanted.length > 0, "fixture built no records for this composed selection");
+
+    const { stdout, elapsedMs } = runCli([
+      "report",
+      "--from",
+      FROM_DAY,
+      "--to",
+      TO_DAY,
+      "--project",
+      "acme/widgets",
+      "--model",
+      "opus",
+      "--json",
+    ]);
+    console.log(`cost-report composed selection (project+model), ${wanted.length} of ${NUM_DAYS} records: ${elapsedMs.toFixed(1)}ms`);
+    const envelope = JSON.parse(stdout);
+
+    assert.deepEqual(envelope.filters, { project: "acme/widgets", model: "opus" });
+    assert.equal(envelope.totals.requests, wanted.length);
+    assert.equal(envelope.totals.cost_micro_usd, expectedMicroUsd(wanted));
+    reconciles(envelope);
+    // Filtering and grouping on the same dimension is one row, not an error, at this volume too.
+    assert.equal(envelope.by_project.length, 1);
+    assert.equal(envelope.by_model.length, 1);
+  });
+
+  it("names the filter responsible when a composed selection at this volume matches nothing", () => {
+    const { stdout } = runCli([
+      "report",
+      "--from",
+      FROM_DAY,
+      "--to",
+      TO_DAY,
+      "--project",
+      "never-worked-in-this-repo",
+      "--json",
+    ]);
+    const envelope = JSON.parse(stdout);
+
+    assert.deepEqual(envelope.empty_selection, {
+      filter: "project",
+      value: "never-worked-in-this-repo",
+      known: false,
+    });
+    assert.equal(envelope.totals.requests, 0);
   });
 });

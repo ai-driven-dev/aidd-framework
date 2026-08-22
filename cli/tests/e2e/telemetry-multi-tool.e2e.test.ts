@@ -265,8 +265,10 @@ describe("aidd telemetry, across every tool that can be read", () => {
     expect(result.exitCode, result.stderr).toBe(0);
     expect(result.stdout).toContain(`task ${TASK}`);
     // Only Claude Code wrote into that folder; Codex's figures must not follow it there.
+    // "in this selection", not "in this period": --task narrows the record set before any
+    // breakdown runs, so Codex's zero here is the task filter's doing, not real idleness.
     expect(result.stdout).not.toContain("183,939");
-    expect(result.stdout).toMatch(/Codex\s+nothing in this period/u);
+    expect(result.stdout).toMatch(/Codex\s+nothing in this selection/u);
   });
 
   it("stores nothing twice when the same sessions are read again", async () => {

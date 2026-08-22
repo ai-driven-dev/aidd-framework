@@ -22,10 +22,13 @@ function actualDefaultRootDir() {
 
 describe("the documented figures location matches what the sink actually writes", () => {
   const actual = actualDefaultRootDir();
-  const documented = actual.replace("/sentinel-home", "~");
+  // Docs are prose, always written with "/" regardless of the platform that built
+  // `actual` - path.join on win32 would answer with "\", so the doc-text comparison
+  // below normalises before substituting the sentinel for "~".
+  const documented = actual.replace(/\\/gu, "/").replace("/sentinel-home", "~");
 
   it("computes the well-known default - a change here means the docs must change too", () => {
-    assert.equal(actual, "/sentinel-home/.config/aidd/telemetry");
+    assert.equal(actual, path.join("/sentinel-home", ".config", "aidd", "telemetry"));
   });
 
   for (const [label, docPath] of [
