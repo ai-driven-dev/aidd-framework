@@ -46,7 +46,15 @@ export class FrameworkBuildUseCase {
 
   private guardPaths(sourceDir: string, outDir: string): void {
     if (sourceDir === outDir) throw new InvalidBuildPathsError(sourceDir, outDir);
-    if (outDir.startsWith(`${sourceDir}/`) || sourceDir.startsWith(`${outDir}/`)) {
+    // "/"-separated comparison: resolve() returns native separators, and on Windows a
+    // hardcoded "/" suffix would never match a backslash-joined path, silently letting a
+    // nested outDir/sourceDir through this guard.
+    const normalizedSource = sourceDir.replace(/\\/g, "/");
+    const normalizedOut = outDir.replace(/\\/g, "/");
+    if (
+      normalizedOut.startsWith(`${normalizedSource}/`) ||
+      normalizedSource.startsWith(`${normalizedOut}/`)
+    ) {
       throw new InvalidBuildPathsError(sourceDir, outDir);
     }
   }

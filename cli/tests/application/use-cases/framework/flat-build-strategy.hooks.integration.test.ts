@@ -22,7 +22,10 @@ import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapt
 import { seedFromDirectory } from "../../../helpers/ports/seed-from-directory.js";
 
 const FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework");
-const ABS_OUT = "/tmp/aidd-flat-hooks-int-test";
+// resolve(), not the bare literal: on Windows path.resolve treats a leading "/" as
+// drive-relative and prepends the current drive, so production's own resolve(outDir)
+// would otherwise write under a different key than this constant's raw string names.
+const ABS_OUT = resolve("/tmp/aidd-flat-hooks-int-test");
 const PLUGIN = "aidd-test";
 // Avoid biome noTemplateCurlyInString
 const CLAUDE_ROOT_VAR = "$" + "{CLAUDE_PLUGIN_ROOT}";
@@ -50,10 +53,12 @@ function makeOpencodeAssetProvider(): AssetProvider {
 }
 
 function makeIsDirectory(fs: InMemoryFileAdapter): (path: string) => Promise<boolean> {
+  // listUnder() normalizes path before comparing; a hand-rolled prefix scan here would
+  // compare a native-separator outDir against the adapter's "/"-only keys and never match
+  // on Windows, where production's resolve(outDir) is backslash-joined.
   return async (path: string): Promise<boolean> => {
     if (fs.has(path)) return false;
-    const prefix = path.endsWith("/") ? path : `${path}/`;
-    return fs.listAll().some((k) => k.startsWith(prefix));
+    return fs.listUnder(path).length > 0;
   };
 }
 

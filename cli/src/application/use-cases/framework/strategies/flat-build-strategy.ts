@@ -297,8 +297,13 @@ export class FlatBuildStrategy implements BuildOutputStrategy {
     return `./${this.resolveSuffixToFlatPath(suffix, pluginName)}`;
   }
 
+  // "/"-joined and separator-normalized: this value is embedded into written JSON content
+  // (an MCP server command, a rewritten CLAUDE_PLUGIN_ROOT), and on Windows this.absOut is
+  // backslash-native - JSON.stringify then escapes each backslash, so a reader comparing
+  // against the plain absOut string never finds it as a substring.
   private resolveClaudeRootAbsolute(suffix: string, pluginName: string): string {
-    return `${this.absOut}/${this.resolveSuffixToFlatPath(suffix, pluginName)}`;
+    const normalizedOut = this.absOut.replace(/\\/g, "/");
+    return `${normalizedOut}/${this.resolveSuffixToFlatPath(suffix, pluginName)}`;
   }
 
   private resolveSuffixToFlatPath(suffix: string, pluginName: string): string {
