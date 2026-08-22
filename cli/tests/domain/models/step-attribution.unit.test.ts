@@ -8,7 +8,7 @@ import {
 import type { RunJournal } from "../../../src/domain/ports/run-journal-reader.js";
 
 function journalOf(...boundaries: RunJournal["boundaries"]): RunJournal {
-  return { boundaries, filesWritten: [] };
+  return { boundaries, filesWritten: [], taskDeclarations: [] };
 }
 
 const A_START = {

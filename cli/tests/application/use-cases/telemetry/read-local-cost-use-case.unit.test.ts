@@ -288,6 +288,7 @@ describe("ReadLocalCostUseCase", () => {
           { type: "turn_end", at: "2026-08-20T10:05:00Z" },
         ],
         filesWritten: [],
+        taskDeclarations: [],
       });
       return journal;
     }
@@ -442,6 +443,7 @@ describe("ReadLocalCostUseCase", () => {
         },
         boundaries: [],
         filesWritten: [],
+        taskDeclarations: [],
       });
       return journal;
     }
@@ -607,6 +609,7 @@ describe("reading every session the journal knows", () => {
       reader.set(vendorId, {
         boundaries: [],
         filesWritten: [],
+        taskDeclarations: [],
         session: {
           type: "session_start",
           at: "2026-08-20T09:00:00Z",
@@ -753,6 +756,7 @@ describe("a failure in a sweep does not disappear behind a success", () => {
       journal.set(vendorId, {
         boundaries: [],
         filesWritten: [],
+        taskDeclarations: [],
         session: {
           type: "session_start",
           at: "2026-08-20T09:00:00Z",

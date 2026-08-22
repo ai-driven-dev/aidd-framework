@@ -398,9 +398,9 @@ describe("the flow a person can actually follow", () => {
     // concluding it from a report that happens to show none.
     expect(capability.codex).toMatchObject({
       local_read: { token_counters: true, amount: false, tool_stated_step: false },
-      task_attributable: false,
+      task_attributable: true,
     });
-    expect(capability.cursor).toMatchObject({ local_read: null, task_attributable: false });
+    expect(capability.cursor).toMatchObject({ local_read: null, task_attributable: true });
     expect(capability.claude).toMatchObject({ task_attributable: true });
   });
 

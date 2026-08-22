@@ -6,6 +6,7 @@ import type {
   RunJournalFileWritten,
   RunJournalReader,
   RunJournalSessionStart,
+  RunJournalTaskDeclared,
 } from "../../domain/ports/run-journal-reader.js";
 
 const ULID_LENGTH = 26; // encodeTime(10) + encodeRandom(16), matching record.js's own ULID_LENGTH.
@@ -104,6 +105,53 @@ function parseFileWritten(parsed: RawJournalLine): RunJournalFileWritten | null 
     : { type: "file_written", at, path: writtenPath };
 }
 
+function parseTaskDeclared(parsed: RawJournalLine): RunJournalTaskDeclared | null {
+  if (parsed.type !== "task_declared") return null;
+  const at = asString(parsed.at);
+  const declaredPath = asString(parsed.path);
+  return at === undefined || declaredPath === undefined
+    ? null
+    : { type: "task_declared", at, path: declaredPath };
+}
+
+/** One journal file's lines, sorted into their buckets as each is read - mutable so
+ * `classifyLine` can fill it one line at a time without every caller threading four
+ * separate arrays through. */
+interface JournalCollector {
+  readonly boundaries: RunJournalBoundary[];
+  readonly filesWritten: RunJournalFileWritten[];
+  readonly taskDeclarations: RunJournalTaskDeclared[];
+  session: RunJournalSessionStart | undefined;
+}
+
+function newJournalCollector(): JournalCollector {
+  return { boundaries: [], filesWritten: [], taskDeclarations: [], session: undefined };
+}
+
+/** One parsed line, sorted into whichever bucket recognises it - the four line types this
+ * port promises, tried in the order they are written most often. A line matching none of
+ * them is the header, kept only the first time it is seen (see the comment below). */
+function classifyLine(collector: JournalCollector, parsed: RawJournalLine): void {
+  const boundary = parseBoundary(parsed);
+  if (boundary) {
+    collector.boundaries.push(boundary);
+    return;
+  }
+  const written = parseFileWritten(parsed);
+  if (written) {
+    collector.filesWritten.push(written);
+    return;
+  }
+  const declared = parseTaskDeclared(parsed);
+  if (declared) {
+    collector.taskDeclarations.push(declared);
+    return;
+  }
+  // The header is written once, first. Keeping the first one read means a second, however
+  // it got there, never silently replaces the identity the file opened with.
+  collector.session ??= parseSessionStart(parsed) ?? undefined;
+}
+
 /**
  * Reads a session's run journal (#663) — the one class in this path allowed to open a file
  * under `aidd_docs/runs`.
@@ -160,26 +208,12 @@ export class RunJournalReaderAdapter implements RunJournalReader {
     } catch {
       return null;
     }
-    const boundaries: RunJournalBoundary[] = [];
-    const filesWritten: RunJournalFileWritten[] = [];
-    let session: RunJournalSessionStart | undefined;
+    const collector = newJournalCollector();
     for (const line of content.split("\n")) {
       const parsed = parseLine(line);
-      if (!parsed) continue;
-      const boundary = parseBoundary(parsed);
-      if (boundary) {
-        boundaries.push(boundary);
-        continue;
-      }
-      const written = parseFileWritten(parsed);
-      if (written) {
-        filesWritten.push(written);
-        continue;
-      }
-      // The header is written once, first. Keeping the first one read means a second,
-      // however it got there, never silently replaces the identity the file opened with.
-      session ??= parseSessionStart(parsed) ?? undefined;
+      if (parsed) classifyLine(collector, parsed);
     }
-    return { boundaries, filesWritten, ...(session ? { session } : {}) };
+    const { boundaries, filesWritten, taskDeclarations, session } = collector;
+    return { boundaries, filesWritten, taskDeclarations, ...(session ? { session } : {}) };
   }
 }

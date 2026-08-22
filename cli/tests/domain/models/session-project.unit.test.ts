@@ -17,7 +17,12 @@ function sessionOf(overrides: Partial<RunJournalSessionStart> = {}): RunJournalS
 }
 
 function journalOf(session?: RunJournalSessionStart): RunJournal {
-  return { boundaries: [], filesWritten: [], ...(session ? { session } : {}) };
+  return {
+    boundaries: [],
+    filesWritten: [],
+    taskDeclarations: [],
+    ...(session ? { session } : {}),
+  };
 }
 
 describe("resolveSessionProject", () => {

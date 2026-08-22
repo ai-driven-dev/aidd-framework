@@ -1,6 +1,16 @@
 import type { TelemetryRouteSupply } from "../capabilities/telemetry-capability.js";
 import { STEP_ATTRIBUTION_SOURCES, type StepAttributionSource } from "./step-attribution.js";
-import { type TaskIdentity, taskIdentitiesFromWrittenPaths } from "./task-identity.js";
+import {
+  momentFallsWithin,
+  TASK_ATTRIBUTION_SOURCES,
+  type TaskAttributionSource,
+  type TaskInterval,
+} from "./task-attribution.js";
+import {
+  type TaskIdentity,
+  taskIdentitiesFromWrittenPaths,
+  taskIdentityFromWrittenPath,
+} from "./task-identity.js";
 import { type TelemetrySinkRecord, telemetrySinkRecordDayKey } from "./telemetry-sink-record.js";
 import type { AiToolId } from "./tool-ids.js";
 
@@ -109,6 +119,13 @@ export interface CostReportAttributionRow {
   readonly totals: CostTotals;
 }
 
+/** The same idea as `CostReportAttributionRow`, one axis over: how much of a `--task`
+ * report's total came from a declared interval versus a written file. */
+export interface CostReportTaskAttributionRow {
+  readonly attribution: TaskAttributionSource;
+  readonly totals: CostTotals;
+}
+
 /** One project's figures, largest first, plus one row for what named none — `project`
  * absent there, the same convention `CostReportStepRow` uses for `unattributed`. Never
  * folded into a neighbour: that would place a figure that was never placed. */
@@ -127,12 +144,15 @@ export interface CostReportDayRow {
 }
 
 /** One session's journal, reduced to what a report needs. Assembling it from the run
- * journal is the caller's job; this module never opens a file. */
+ * journal is the caller's job; this module never opens a file - `taskIntervals` comes
+ * straight from `buildTaskIntervals`, already built once per session rather than re-derived
+ * per record. */
 export interface CostReportSessionJournal {
   readonly vendorId: string;
   readonly tool: string;
   readonly projectId?: string;
   readonly writtenPaths: readonly string[];
+  readonly taskIntervals: readonly TaskInterval[];
 }
 
 export interface CostReportInput {
@@ -168,6 +188,9 @@ export interface CostReport {
   readonly byProjects: readonly CostReportProjectRow[];
   readonly byDays: readonly CostReportDayRow[];
   readonly attributionMix: readonly CostReportAttributionRow[];
+  /** Present only alongside `task`: an unfiltered period carries no per-record task identity
+   * to break down (see metrics-contract.md's "Attributing records to a task"). */
+  readonly taskAttributionMix?: readonly CostReportTaskAttributionRow[];
   readonly undatedRecords: number;
   readonly unreadableLines: number;
 }
@@ -319,10 +342,10 @@ function dayRange(fromDay: string, toDay: string): readonly string[] {
   return days;
 }
 
-/** The vendor ids whose sessions wrote into `task`. A journal that wrote into no task
- * folder matches no task, and is simply absent from a task-filtered report - never folded
- * into one because it happened at the same time. */
-function vendorIdsForTask(
+/** The vendor ids whose sessions wrote into `task` at some point - unchanged from before a
+ * task could be declared at all, and deliberately still whole-session: nothing about the
+ * existing per-file attribution changes for a tool that already has it. */
+function inferredVendorIdsForTask(
   journals: readonly CostReportSessionJournal[],
   task: TaskIdentity
 ): ReadonlySet<string> {
@@ -333,6 +356,58 @@ function vendorIdsForTask(
     }
   }
   return vendorIds;
+}
+
+/** Every session's own declared intervals that name `task`, keyed by vendor id so a
+ * record's session is a lookup rather than a walk of every journal again. A session that
+ * never declared this task carries no entry - what makes an undeclared session read as
+ * belonging to none, never to the last one seen. */
+function declaredIntervalsForTask(
+  journals: readonly CostReportSessionJournal[],
+  task: TaskIdentity
+): ReadonlyMap<string, readonly TaskInterval[]> {
+  const byVendorId = new Map<string, readonly TaskInterval[]>();
+  for (const journal of journals) {
+    const intervals = journal.taskIntervals.filter(
+      (interval) => taskIdentityFromWrittenPath(interval.path) === task
+    );
+    if (intervals.length > 0) byVendorId.set(journal.vendorId, intervals);
+  }
+  return byVendorId;
+}
+
+/** Both routes to `task`, kept apart rather than merged into one vendor-id set: a declared
+ * interval decides per record, at the precision `buildTaskIntervals` bounds it to, while a
+ * written file decides for a session's records as a whole, exactly as it always has.
+ * Merging them would let a session's own zero-width or long-closed declaration - real, but
+ * covering no record - drag in records a written file never touched either. */
+interface TaskMembership {
+  readonly declaredIntervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>;
+  readonly inferredVendorIds: ReadonlySet<string>;
+}
+
+function taskMembership(
+  journals: readonly CostReportSessionJournal[],
+  task: TaskIdentity
+): TaskMembership {
+  return {
+    declaredIntervalsByVendorId: declaredIntervalsForTask(journals, task),
+    inferredVendorIds: inferredVendorIdsForTask(journals, task),
+  };
+}
+
+/** How, if at all, one record belongs to the task `membership` was built for - `undefined`
+ * for neither route, which is what excludes it from a `--task` report entirely. A record
+ * whose own moment falls in a declared interval is `"declared"` even when its session also
+ * wrote into the folder; only a record a declaration does not cover falls back to whether
+ * its whole session did. */
+function taskAttributionOf(
+  record: TelemetrySinkRecord,
+  membership: TaskMembership
+): TaskAttributionSource | undefined {
+  const intervals = membership.declaredIntervalsByVendorId.get(record.vendor_id);
+  if (intervals && momentFallsWithin(intervals, record.event_timestamp)) return "declared";
+  return membership.inferredVendorIds.has(record.vendor_id) ? "inferred" : undefined;
 }
 
 /** Every declared tool gets a row, in the declared order, whether or not it contributed -
@@ -377,6 +452,7 @@ interface Groups {
   readonly tools: Map<AiToolId, TotalsAccumulator>;
   readonly toolSessionTotals: Map<AiToolId, TotalsAccumulator>;
   readonly attributions: Map<StepAttributionSource, TotalsAccumulator>;
+  readonly taskAttributions: Map<TaskAttributionSource, TotalsAccumulator>;
   readonly projects: Map<ProjectKey, TotalsAccumulator>;
   readonly days: Map<string, TotalsAccumulator>;
   activeTimeSeconds?: number;
@@ -392,6 +468,7 @@ function emptyGroups(fromDay: string, toDay: string): Groups {
     tools: new Map(),
     toolSessionTotals: new Map(),
     attributions: new Map(),
+    taskAttributions: new Map(),
     projects: new Map(),
     days,
   };
@@ -401,39 +478,53 @@ function emptyGroups(fromDay: string, toDay: string): Groups {
  * `"request"` record on any tool measured so far carries it, and no `"session"` record's
  * money or tokens are ever added to a total, since they are a flush window's own delta of
  * quantities the request records already report in full. */
+// An export-route "session" record is one periodic flush's own delta - never safe to show
+// as if it were the whole session, and left untouched exactly as before. A local-read
+// "session" record is different in kind, not degree: nothing reads a tool's own file this
+// way except a one-shot, already-complete total (see Copilot, #697), so it is never at risk
+// of being summed with a later flush of the same quantity. Kept off `totals`, `bySteps` and
+// `byDays` regardless - the two-kinds rule forbids summing it with request lines.
+function accumulateSessionRecord(groups: Groups, record: TelemetrySinkRecord): void {
+  if (record.active_time_s !== undefined) {
+    groups.activeTimeSeconds = (groups.activeTimeSeconds ?? 0) + record.active_time_s;
+  }
+  if (record.provenance === "local-read") {
+    accumulateInto(groups.toolSessionTotals, record.tool, record, (accumulator) =>
+      accumulator.addTokensOnly(record)
+    );
+  }
+}
+
+function accumulateRequestRecord(
+  groups: Groups,
+  record: TelemetrySinkRecord,
+  membership: TaskMembership | null
+): void {
+  groups.totals.add(record);
+  addToStepGroup(groups.steps, record);
+  accumulateInto(groups.attributions, record.step_attribution, record);
+  accumulateInto(groups.tools, record.tool, record);
+  if (record.model !== undefined) accumulateInto(groups.models, record.model, record);
+  accumulateInto(groups.projects, projectKeyOf(record), record);
+  const day = telemetrySinkRecordDayKey(record);
+  if (day !== undefined && groups.days.has(day)) groups.days.get(day)?.add(record);
+  const attribution = membership === null ? undefined : taskAttributionOf(record, membership);
+  if (attribution !== undefined) accumulateInto(groups.taskAttributions, attribution, record);
+}
+
 function accumulate(
   records: readonly TelemetrySinkRecord[],
   fromDay: string,
-  toDay: string
+  toDay: string,
+  membership: TaskMembership | null
 ): Groups {
   const groups = emptyGroups(fromDay, toDay);
   for (const record of records) {
     if (record.kind === "session") {
-      if (record.active_time_s !== undefined) {
-        groups.activeTimeSeconds = (groups.activeTimeSeconds ?? 0) + record.active_time_s;
-      }
-      // An export-route "session" record is one periodic flush's own delta - never safe
-      // to show as if it were the whole session, and left untouched exactly as before. A
-      // local-read "session" record is different in kind, not degree: nothing reads a
-      // tool's own file this way except a one-shot, already-complete total (see Copilot,
-      // #697), so it is never at risk of being summed with a later flush of the same
-      // quantity. Kept off `totals`, `bySteps` and `byDays` regardless - the two-kinds
-      // rule forbids summing it with request lines, and this reconciles with neither.
-      if (record.provenance === "local-read") {
-        accumulateInto(groups.toolSessionTotals, record.tool, record, (accumulator) =>
-          accumulator.addTokensOnly(record)
-        );
-      }
+      accumulateSessionRecord(groups, record);
       continue;
     }
-    groups.totals.add(record);
-    addToStepGroup(groups.steps, record);
-    accumulateInto(groups.attributions, record.step_attribution, record);
-    accumulateInto(groups.tools, record.tool, record);
-    if (record.model !== undefined) accumulateInto(groups.models, record.model, record);
-    accumulateInto(groups.projects, projectKeyOf(record), record);
-    const day = telemetrySinkRecordDayKey(record);
-    if (day !== undefined && groups.days.has(day)) groups.days.get(day)?.add(record);
+    accumulateRequestRecord(groups, record, membership);
   }
   return groups;
 }
@@ -451,6 +542,17 @@ function attributionRows(
   return STEP_ATTRIBUTION_SOURCES.map((attribution) => ({
     attribution,
     totals: attributions.get(attribution)?.build() ?? { requests: 0 },
+  }));
+}
+
+/** Both sources, always - the same reason `attributionRows` always gives all three: a
+ * source that accounted for nothing is still a fact about this task, not an absent field. */
+function taskAttributionRows(
+  taskAttributions: ReadonlyMap<TaskAttributionSource, TotalsAccumulator>
+): readonly CostReportTaskAttributionRow[] {
+  return TASK_ATTRIBUTION_SOURCES.map((attribution) => ({
+    attribution,
+    totals: taskAttributions.get(attribution)?.build() ?? { requests: 0 },
   }));
 }
 
@@ -512,11 +614,12 @@ function modelRows(models: ReadonlyMap<string, TotalsAccumulator>): readonly Cos
  * records alone, and active time from `kind: "session"` records alone. Summing across the
  * two kinds counts the same tokens twice and produces a total that looks right.
  */
-export function buildCostReport(input: CostReportInput): CostReport {
-  const wanted = input.task === undefined ? null : vendorIdsForTask(input.journals, input.task);
-  const inScope = input.records.filter((record) => wanted === null || wanted.has(record.vendor_id));
-  const groups = accumulate(inScope, input.fromDay, input.toDay);
-
+function assembleCostReport(
+  input: CostReportInput,
+  inScope: readonly TelemetrySinkRecord[],
+  groups: Groups,
+  membership: TaskMembership | null
+): CostReport {
   return {
     fromDay: input.fromDay,
     toDay: input.toDay,
@@ -532,7 +635,20 @@ export function buildCostReport(input: CostReportInput): CostReport {
     byProjects: projectRows(groups.projects),
     byDays: dayRows(groups.days),
     attributionMix: attributionRows(groups.attributions),
+    ...(membership === null
+      ? {}
+      : { taskAttributionMix: taskAttributionRows(groups.taskAttributions) }),
     undatedRecords: input.undatedRecords,
     unreadableLines: input.unreadableLines,
   };
+}
+
+export function buildCostReport(input: CostReportInput): CostReport {
+  const membership = input.task === undefined ? null : taskMembership(input.journals, input.task);
+  const inScope = input.records.filter(
+    (record) => membership === null || taskAttributionOf(record, membership) !== undefined
+  );
+  const groups = accumulate(inScope, input.fromDay, input.toDay, membership);
+
+  return assembleCostReport(input, inScope, groups, membership);
 }

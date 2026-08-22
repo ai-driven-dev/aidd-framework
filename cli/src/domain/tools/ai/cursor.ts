@@ -153,7 +153,10 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
       kind: "unsupported",
       reason: "It writes no token count in any file it produces.",
     },
-    telemetryTaskAttributable: false,
+    // A declared task no longer needs a written path in the payload at all - it reads a
+    // tool call's own arguments the same way a step's skill name is read, and Cursor's
+    // postToolUse payload carries tool_input on every call, exactly like Claude Code's.
+    telemetryTaskAttributable: true,
     telemetryJournalHost: "cursor",
 
     rewriteContent(content: string, docsDir: string): string {

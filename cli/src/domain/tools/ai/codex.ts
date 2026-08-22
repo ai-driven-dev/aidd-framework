@@ -292,7 +292,10 @@ export const codex: AiTool<
     // running skill - so a step here can only ever come from a run journal interval.
     supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
   },
-  telemetryTaskAttributable: false,
+  // Codex's payload carries no write-path field for any tool (writes go through
+  // apply_patch), but a declaration never needed one - it reads the same Bash command text
+  // its step detection already reads a SKILL.md path out of.
+  telemetryTaskAttributable: true,
   telemetryJournalHost: "codex",
 
   rewriteContent(content: string, docsDir: string): string {

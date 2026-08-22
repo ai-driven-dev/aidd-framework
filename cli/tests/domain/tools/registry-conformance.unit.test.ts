@@ -20,7 +20,7 @@ import {
   journalHostToAiToolId,
 } from "../../../src/domain/tools/registry.js";
 import { telemetryCostReaders } from "../../helpers/telemetry-cost-readers.js";
-import { journalFileWrites, journalHost } from "../../helpers/telemetry-journal-hook.js";
+import { journalHost } from "../../helpers/telemetry-journal-hook.js";
 
 /**
  * Conformance suite for the AiTool contract.
@@ -290,20 +290,22 @@ describe("no parallel list references an unregistered tool", () => {
     expect(journalHostToAiToolId("not-a-host")).toBeNull();
   });
 
-  it("declares task attributability exactly where the journal hook can read a written path", () => {
-    // The hook's table is the truth and lives in a script this side cannot import. A tool
-    // gaining an extractor without a declaration would silently never be attributed to a
-    // task; one declaring it without an extractor would be attributed to none and look
-    // broken. Both fail here, by name.
+  it("declares task attributability exactly where the journal hook ever reaches a tool call", () => {
+    // A task no longer needs a written-path extractor: it can be declared instead, read off
+    // any tool call's own arguments the way step_start reads which skill is running - so
+    // task_declared reaches every host journal.js's tool-used dispatch reaches, not only the
+    // one WRITTEN_PATH_EXTRACTOR_BY_HOST still names. OpenCode is the one declared host that
+    // is not that host: its plugin (hooks/opencode-plugin.js) forwards only session.created
+    // and session.idle, never a tool call, so there is no payload here for a declaration to
+    // read either - a fact about that one file this side cannot import and pins by name.
     for (const [toolId, config] of registeredAiTools) {
       const host = config.telemetryJournalHost;
-      const hookCanRead =
-        host !== undefined && host in journalFileWrites.WRITTEN_PATH_EXTRACTOR_BY_HOST;
+      const hookReachesToolUse = host !== undefined && host !== "opencode";
 
       expect(
         config.telemetryTaskAttributable,
-        `"${toolId}" declares telemetryTaskAttributable ${config.telemetryTaskAttributable}, but the journal hook ${hookCanRead ? "can" : "cannot"} read a written path for host "${host}"`
-      ).toBe(hookCanRead);
+        `"${toolId}" declares telemetryTaskAttributable ${config.telemetryTaskAttributable}, but the journal hook ${hookReachesToolUse ? "does" : "never"} dispatch a tool-used event for host "${host}"`
+      ).toBe(hookReachesToolUse);
     }
   });
 

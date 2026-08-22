@@ -75,13 +75,18 @@ export interface AiTool<C> {
    * declaration rather than carrying a table of four; a fifth host is a fifth declaration.
    * Absent for a tool the journal hook does not run under. */
   readonly telemetryJournalHost?: string;
-  /** Whether this tool's writes can be traced to the task they landed in. True only where
-   * the journal hook can read a written path out of that tool's own hook payload — Codex
-   * writes through an `apply_patch` command string, and Copilot's and Cursor's were never
-   * captured carrying one at all. The truth lives in `WRITTEN_PATH_EXTRACTOR_BY_HOST`,
-   * inside a zero-dependency script the framework build copies verbatim and this side
-   * cannot import, so it is declared here and pinned to that table by a test — the same
-   * arrangement `telemetryJournalHost` already uses for `DECLARED_HOSTS`.
+  /** Whether a session on this tool can be traced to the task it worked on. Once true only
+   * where the journal hook could read a written path out of that tool's own hook payload;
+   * now true for every host `journal.js`'s `tool-used` dispatch reaches at all, because a
+   * task can be *declared* - a tool call's own arguments named a file under a task folder,
+   * read the same way `step_start` reads which skill is running, asking nothing of the
+   * host's payload shape. `false` remains where no tool-used event ever reaches the host in
+   * the first place (OpenCode's plugin observes only session lifecycle events), which a
+   * declaration cannot work around any more than a written path could. The truth lives in
+   * `hooks/lib/task-declared.js` and `hooks/journal.js`'s dispatch, inside a zero-dependency
+   * script the framework build copies verbatim and this side cannot import, so it is
+   * declared here and pinned to `journalAttributable` by a test — the same arrangement
+   * `telemetryJournalHost` already uses for `DECLARED_HOSTS`.
    *
    * A tool declaring `false` is still fully reportable by period, and by step wherever a
    * journal covers it. It simply belongs to no task, which is not the same as having

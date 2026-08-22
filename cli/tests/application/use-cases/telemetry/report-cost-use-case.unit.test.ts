@@ -89,6 +89,7 @@ describe("ReportCostUseCase", () => {
           path: `aidd_docs/tasks/${TASK}/plan.md`,
         },
       ],
+      taskDeclarations: [],
     });
     await store(
       record({ vendor_id: "s-task", cost_usd: 1 }),

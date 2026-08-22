@@ -30,6 +30,108 @@ function taskOf(writtenPath) {
 }
 
 /**
+ * A declared interval runs from its own `task_declared` line to whichever of a later
+ * declaration or a `turn_end` comes next - never to the run file's own end. No tool exposes
+ * when a flow leaves a ticket, so treating an unclosed declaration as boundless would
+ * attribute everything the session goes on to do, for as long as it keeps running, to the
+ * first ticket it ever named - exactly the failure this same file accepts for a step
+ * interval and a task interval must not repeat. An unclosed declaration is capped at the
+ * last moment the journal actually recorded instead: a session that crashes mid-task stops
+ * producing lines entirely, so there is nothing after that moment to misattribute, and a
+ * session that keeps going is bounded by whichever boundary - of any kind - comes next.
+ */
+function buildTaskIntervals(journal) {
+  const timed = (journal.boundaries ?? [])
+    .concat(journal.taskDeclarations ?? [])
+    .map((boundary) => ({ boundary, atMs: Date.parse(boundary.at) }))
+    .filter(({ atMs }) => !Number.isNaN(atMs))
+    .sort((left, right) => left.atMs - right.atMs);
+  const lastMs = timed.length > 0 ? timed[timed.length - 1].atMs : undefined;
+
+  const relevant = timed.filter(
+    ({ boundary }) => boundary.type === "task_declared" || boundary.type === "turn_end"
+  );
+  const intervals = [];
+  for (const [index, { boundary, atMs }] of relevant.entries()) {
+    if (boundary.type !== "task_declared") continue;
+    const next = relevant[index + 1];
+    intervals.push({ path: boundary.path, startMs: atMs, endMs: next ? next.atMs : (lastMs ?? atMs) });
+  }
+  return intervals;
+}
+
+/** Every session whose own declared intervals include one naming `task`, keyed by vendor id
+ * so a record's session is a lookup rather than a walk of every journal again. A session
+ * that never declared this task carries no entry, which is what makes an undeclared session
+ * read as belonging to none. */
+function declaredIntervalsForTask(journals, task) {
+  const byVendorId = new Map();
+  for (const journal of journals) {
+    if (!journal.session) continue;
+    const intervals = buildTaskIntervals(journal).filter((interval) => taskOf(interval.path) === task);
+    if (intervals.length > 0) byVendorId.set(journal.session.vendor_id, intervals);
+  }
+  return byVendorId;
+}
+
+/** The vendor ids whose sessions wrote into `task` at some point - unchanged from before a
+ * task could be declared at all, and deliberately still whole-session: nothing about the
+ * existing per-file attribution changes for a tool that already has it. */
+function inferredVendorIdsForTask(journals, task) {
+  const vendorIds = new Set();
+  for (const journal of journals) {
+    if (!journal.session) continue;
+    const tasks = journal.filesWritten.map((written) => taskOf(written.path));
+    if (tasks.includes(task)) vendorIds.add(journal.session.vendor_id);
+  }
+  return vendorIds;
+}
+
+/** Both routes to `task`, kept apart rather than merged into one vendor-id set: a declared
+ * interval decides per record, at the precision `buildTaskIntervals` bounds it to, while a
+ * written file decides for a session's records as a whole, exactly as it always has. Merging
+ * them into one set would let a session's own zero-width or long-closed declaration - real,
+ * but covering no record - drag in records a written file never touched either. */
+function taskMembership(journals, task) {
+  return {
+    declaredIntervalsByVendorId: declaredIntervalsForTask(journals, task),
+    inferredVendorIds: inferredVendorIdsForTask(journals, task),
+  };
+}
+
+/** Strongest first: a declaration is a flow telling the journal which ticket it is on, and a
+ * written file is this layer noticing one on its own - the same ordering `SOURCES` already
+ * gives a step, for the same reason. */
+const TASK_SOURCES = ["declared", "inferred"];
+
+function fallsWithinDeclaredInterval(record, intervals) {
+  if (typeof record.event_timestamp !== "string") return false;
+  const ms = Date.parse(record.event_timestamp);
+  if (Number.isNaN(ms)) return false;
+  return intervals.some((interval) => ms >= interval.startMs && ms < interval.endMs);
+}
+
+/** How, if at all, this one record belongs to the task `membership` was built for - `null`
+ * for neither route, which is what excludes it from a `--task` report entirely. A record
+ * whose own moment falls in a declared interval is `"declared"` even when its session also
+ * wrote into the folder; only a record a declaration does not cover falls back to whether
+ * its whole session did. */
+function taskAttributionOf(record, membership) {
+  const intervals = membership.declaredIntervalsByVendorId.get(record.vendor_id);
+  if (intervals && fallsWithinDeclaredInterval(record, intervals)) return "declared";
+  return membership.inferredVendorIds.has(record.vendor_id) ? "inferred" : null;
+}
+
+/** Both sources, always - the same reason `attributionRows` always gives all three: a source
+ * that accounted for nothing here is still a fact about this task, not an absent field. */
+function taskAttributionRows(taskAttributions) {
+  return TASK_SOURCES.map((attribution) => ({
+    attribution,
+    totals: taskAttributions.get(attribution) ?? newTotals(),
+  }));
+}
+
+/**
  * Money is carried as whole micro-dollars, never as the floating amount a record stores.
  * The report's claim is that its parts add up exactly, and floating addition does not have
  * that property across two groupings. Rounding once, on the way in, makes every later sum
@@ -118,16 +220,6 @@ function projectKeyOf(record) {
     : NO_KNOWN_PROJECT;
 }
 
-function vendorIdsForTask(journals, task) {
-  const wanted = new Set();
-  for (const journal of journals) {
-    if (!journal.session) continue;
-    const tasks = journal.filesWritten.map((written) => taskOf(written.path));
-    if (tasks.includes(task)) wanted.add(journal.session.vendor_id);
-  }
-  return wanted;
-}
-
 /**
  * Money and the four token counters come from `kind: "request"` records alone, and active
  * time from `kind: "session"` records alone. The two kinds measure overlapping quantities
@@ -135,8 +227,10 @@ function vendorIdsForTask(journals, task) {
  * producing a total that looks right.
  */
 function build(input) {
-  const wanted = input.task === undefined ? null : vendorIdsForTask(input.journals, input.task);
-  const records = input.records.filter((r) => wanted === null || wanted.has(r.vendor_id));
+  const membership = input.task === undefined ? null : taskMembership(input.journals, input.task);
+  const records = input.records.filter(
+    (r) => membership === null || taskAttributionOf(r, membership) !== null
+  );
 
   const totals = newTotals();
   const steps = new Map();
@@ -144,6 +238,7 @@ function build(input) {
   const tools = new Map();
   const toolSessionTotals = new Map();
   const attributions = new Map();
+  const taskAttributions = new Map();
   const projects = new Map();
   const days = new Map();
   for (const day of dayRange(input.fromDay, input.toDay)) days.set(day, newTotals());
@@ -176,6 +271,9 @@ function build(input) {
     group(projects, projectKeyOf(record), record);
     const day = recordDayKey(record);
     if (day !== null && days.has(day)) addTo(days.get(day), record);
+    if (membership !== null) {
+      group(taskAttributions, taskAttributionOf(record, membership), record);
+    }
   }
 
   return {
@@ -194,6 +292,7 @@ function build(input) {
     byProjects: projectRows(projects),
     byDays: dayRows(days),
     attributionMix: attributionRows(attributions),
+    ...(membership === null ? {} : { taskAttributionMix: taskAttributionRows(taskAttributions) }),
     undatedRecords: input.undatedRecords,
     unreadableLines: input.unreadableLines,
   };
@@ -256,4 +355,4 @@ function toolRows(declaredTools, measured, sessionTotals) {
   }));
 }
 
-module.exports = { build, taskOf, tokensOf, toMicroUsd };
+module.exports = { build, taskOf, tokensOf, toMicroUsd, buildTaskIntervals, TASK_SOURCES };

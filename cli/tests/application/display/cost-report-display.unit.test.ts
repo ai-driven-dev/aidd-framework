@@ -219,6 +219,7 @@ describe("printCostReport", () => {
           vendorId: "s-1",
           tool: "claude-code",
           writtenPaths: ["aidd_docs/tasks/2026_08/2026_08_21_cost-reporter/plan.md"],
+          taskIntervals: [],
         },
       ],
       task: "2026_08/2026_08_21_cost-reporter",
@@ -245,6 +246,7 @@ describe("printCostReport", () => {
           tool: "claude-code",
           projectId: "acme-widgets",
           writtenPaths: ["aidd_docs/tasks/2026_08/2026_08_21_cost-reporter/plan.md"],
+          taskIntervals: [],
         },
       ],
     });

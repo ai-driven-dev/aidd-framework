@@ -6,6 +6,7 @@ import {
   type CostReportToolDeclaration,
 } from "../../../domain/models/cost-report.js";
 import type { ResolvedReportPeriod } from "../../../domain/models/report-period.js";
+import { buildTaskIntervals } from "../../../domain/models/task-attribution.js";
 import type { TaskIdentity } from "../../../domain/models/task-identity.js";
 import { AI_TOOL_IDS } from "../../../domain/models/tool-ids.js";
 import type { RunJournal, RunJournalReader } from "../../../domain/ports/run-journal-reader.js";
@@ -60,6 +61,7 @@ function toSessionJournal(journal: RunJournal): CostReportSessionJournal | null 
     tool: journal.session.tool,
     ...(journal.session.project_id === undefined ? {} : { projectId: journal.session.project_id }),
     writtenPaths: journal.filesWritten.map((written) => written.path),
+    taskIntervals: buildTaskIntervals(journal),
   };
 }
 

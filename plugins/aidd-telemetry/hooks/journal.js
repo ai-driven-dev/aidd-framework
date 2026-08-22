@@ -9,6 +9,7 @@ const repo = require("./lib/repo.js");
 const record = require("./lib/record.js");
 const fileWrites = require("./lib/file-writes.js");
 const stepStarts = require("./lib/step-starts.js");
+const taskDeclared = require("./lib/task-declared.js");
 
 function readStdin() {
   try {
@@ -70,10 +71,12 @@ function processPayload(payload, event) {
     fileWrites.handleTaskFilesObserved(payload, host, sessionId);
     record.handleTurnEnd(payload, host, sessionId);
   } else if (resolvedEvent === "tool-used") {
-    // One event, two readings of it. They share nothing else: handleFileWritten returns
-    // early unless the path looks like a task folder, and a skill call has no task path.
+    // One event, three readings of it, sharing nothing else: handleFileWritten returns early
+    // unless the path looks like a task folder, a skill call has no task path, and a task
+    // declaration reads the call's own arguments rather than a named field.
     fileWrites.handleFileWritten(payload, host, sessionId);
     stepStarts.handleStepStart(payload, host, sessionId);
+    taskDeclared.handleTaskDeclared(payload, host, sessionId);
   }
 }
 

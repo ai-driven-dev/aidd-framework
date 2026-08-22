@@ -133,4 +133,8 @@ module.exports = {
   STEP_START_BY_HOST,
   skillNameFromSkillFileRead,
   handleStepStart,
+  // Reused by task-declared.js: a task's own path is read out of a tool call's arguments the
+  // same way a SKILL.md path is - every string in the payload, since which field carries it
+  // differs by host and by tool.
+  stringsWithin,
 };

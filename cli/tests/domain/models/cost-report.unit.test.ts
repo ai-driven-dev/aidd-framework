@@ -373,8 +373,14 @@ describe("buildCostReport — a task is a filter over a period", () => {
       vendorId: "s-task",
       tool: "claude-code",
       writtenPaths: ["aidd_docs/tasks/2026_08/2026_08_21_cost-reporter/plan.md"],
+      taskIntervals: [],
     },
-    { vendorId: "s-other", tool: "claude-code", writtenPaths: ["cli/src/index.ts"] },
+    {
+      vendorId: "s-other",
+      tool: "claude-code",
+      writtenPaths: ["cli/src/index.ts"],
+      taskIntervals: [],
+    },
   ];
   const RECORDS: readonly TelemetrySinkRecord[] = [
     request({ vendor_id: "s-task", cost_usd: 1 }),
@@ -416,6 +422,111 @@ describe("buildCostReport — a task is a filter over a period", () => {
     const built = report({ records: RECORDS, journals: JOURNALS });
 
     expect(built.totals.requests).toBe(3);
+  });
+});
+
+describe("buildCostReport — a task can be declared, not just derived", () => {
+  const WANTED = "2026_08/wanted";
+  const WANTED_PATH = "aidd_docs/tasks/2026_08/wanted/spec.md";
+  const declared = (at: string, path = WANTED_PATH) => ({
+    path,
+    startMs: Date.parse(at),
+    endMs: 0,
+  });
+  const closedAt = (open: string, close: string) => ({
+    ...declared(open),
+    endMs: Date.parse(close),
+  });
+
+  it("attributes a tool whose payloads name no path at all - a declared interval, never a written file", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-declared",
+        tool: "codex",
+        writtenPaths: [],
+        taskIntervals: [closedAt("2026-08-17T10:00:00Z", "2026-08-17T11:00:00Z")],
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({ vendor_id: "s-declared", cost_usd: 1, event_timestamp: "2026-08-17T10:30:00Z" }),
+    ];
+
+    const built = report({ records, journals, task: WANTED });
+
+    expect(built.totals.requests).toBe(1);
+    const mix = Object.fromEntries(
+      (built.taskAttributionMix ?? []).map((row) => [row.attribution, row.totals.requests])
+    );
+    expect(mix).toEqual({ declared: 1, inferred: 0 });
+  });
+
+  it("a session that never declared and never wrote into the folder belongs to none - never the last one seen", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      { vendorId: "s-silent", tool: "codex", writtenPaths: [], taskIntervals: [] },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({ vendor_id: "s-silent", cost_usd: 9, event_timestamp: "2026-08-17T10:30:00Z" }),
+    ];
+
+    expect(report({ records, journals, task: WANTED }).totals.requests).toBe(0);
+  });
+
+  it("a declaration left open by one session does not reach a later, unrelated one", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        // Crashed mid-task: an interval with no closing turn_end, capped at its own start.
+        vendorId: "s-crashed",
+        tool: "codex",
+        writtenPaths: [],
+        taskIntervals: [declared("2026-08-17T10:00:00Z")],
+      },
+      { vendorId: "s-later", tool: "codex", writtenPaths: [], taskIntervals: [] },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({ vendor_id: "s-later", cost_usd: 5, event_timestamp: "2026-08-20T09:00:00Z" }),
+    ];
+
+    expect(report({ records, journals, task: WANTED }).totals.requests).toBe(0);
+  });
+
+  it("an unclosed declaration is capped at the journal's own last recorded moment, never left boundless", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-crashed",
+        tool: "codex",
+        writtenPaths: [],
+        taskIntervals: [declared("2026-08-17T10:00:00Z")],
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      // A re-read stores this later, but it never happened before the crash.
+      request({ vendor_id: "s-crashed", cost_usd: 3, event_timestamp: "2026-08-17T10:30:00Z" }),
+    ];
+
+    expect(report({ records, journals, task: WANTED }).totals.requests).toBe(0);
+  });
+
+  it("a declared interval closes at its own bound - work after it falls back to inferred", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-mixed",
+        tool: "claude",
+        writtenPaths: [WANTED_PATH],
+        taskIntervals: [closedAt("2026-08-17T10:00:00Z", "2026-08-17T10:15:00Z")],
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({ vendor_id: "s-mixed", cost_usd: 1, event_timestamp: "2026-08-17T10:05:00Z" }),
+      request({ vendor_id: "s-mixed", cost_usd: 2, event_timestamp: "2026-08-17T10:20:00Z" }),
+    ];
+
+    const built = report({ records, journals, task: WANTED });
+
+    expect(built.totals.requests).toBe(2);
+    const mix = Object.fromEntries(
+      (built.taskAttributionMix ?? []).map((row) => [row.attribution, row.totals.requests])
+    );
+    expect(mix).toEqual({ declared: 1, inferred: 1 });
   });
 });
 

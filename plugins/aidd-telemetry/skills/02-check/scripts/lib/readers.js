@@ -390,7 +390,10 @@ const TOOLS = [
       localRead: null,
       export: null,
       journalAttributable: true,
-      taskAttributable: false,
+      // A declared task no longer needs a written path in the payload at all - it reads a
+      // tool call's own arguments the same way a step's skill name is read, and Cursor's
+      // postToolUse payload carries tool_input on every call, exactly like Claude Code's.
+      taskAttributable: true,
     },
   },
   {
@@ -410,7 +413,10 @@ const TOOLS = [
       localRead: { tokenCounters: true, amount: false, toolStatedStep: false },
       export: { tokenCounters: false, amount: false, toolStatedStep: false },
       journalAttributable: true,
-      taskAttributable: false,
+      // Copilot's canonical payload carries no tool_input, but a declaration reads its
+      // toolArgs JSON string as plain text instead - the same tolerance that already lets a
+      // step be read off either of Copilot's two shapes (see step-starts.js).
+      taskAttributable: true,
     },
   },
   {
@@ -425,6 +431,12 @@ const TOOLS = [
       localRead: { tokenCounters: true, amount: false, toolStatedStep: false },
       export: null,
       journalAttributable: true,
+      // Unlike the other three, this is not a payload-shape limit: OpenCode's plugin never
+      // observes a single tool call at all, only session.created and session.idle (see
+      // opencode-plugin.js). A declaration needs a tool-used event to read arguments from,
+      // and none ever reaches journal.js for this host - so there is no payload for either a
+      // declaration or a written path to be read out of, and taskAttributable is false for a
+      // different reason than it used to be, not for the same one.
       taskAttributable: false,
     },
   },
@@ -435,7 +447,10 @@ const TOOLS = [
       localRead: { tokenCounters: true, amount: false, toolStatedStep: false },
       export: { tokenCounters: false, amount: false, toolStatedStep: false },
       journalAttributable: true,
-      taskAttributable: false,
+      // Codex's payload carries no write-path field for any tool (writes go through
+      // apply_patch), but a declaration never needed one - it reads the same Bash command
+      // text SKILL_FILE_PATTERN already reads a SKILL.md path out of.
+      taskAttributable: true,
     },
   },
 ];

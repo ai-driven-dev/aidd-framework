@@ -44,6 +44,20 @@ export interface RunJournalFileWritten {
   readonly path: string;
 }
 
+/** A `task_declared` line: a tool call named a file under a task folder, so this session is
+ * on that task from here on — told rather than inferred, the way `step_start` names a
+ * skill. Carries no task identity for the same reason `file_written` does not: `path` is
+ * the same repository-relative shape, and deriving the task from it is `task-identity.ts`'s
+ * job. Deliberately kept out of `RunJournalBoundary` — pairing it into `boundaries` would
+ * let it close a running step early (see `step-attribution.ts`'s `buildStepIntervals`), so
+ * a task interval is built from this array plus `boundaries`' own `turn_end` lines instead,
+ * in `domain/models/task-attribution.ts`. */
+export interface RunJournalTaskDeclared {
+  readonly type: "task_declared";
+  readonly at: string;
+  readonly path: string;
+}
+
 /** What the journal side promises a reader, for one session's run file, in file order —
  * lines read, nothing derived. Deriving intervals from `boundaries` is `domain/models/
  * step-attribution.ts`'s job; deriving a task from `filesWritten` is the cost report's.
@@ -58,6 +72,7 @@ export interface RunJournal {
   readonly boundaries: readonly RunJournalBoundary[];
   readonly session?: RunJournalSessionStart;
   readonly filesWritten: readonly RunJournalFileWritten[];
+  readonly taskDeclarations: readonly RunJournalTaskDeclared[];
 }
 
 /**

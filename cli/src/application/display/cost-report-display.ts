@@ -4,11 +4,13 @@ import type {
   CostReportDayRow,
   CostReportProjectRow,
   CostReportStepRow,
+  CostReportTaskAttributionRow,
   CostReportToolRow,
   CostTotals,
 } from "../../domain/models/cost-report.js";
 import { fromMicroUsd } from "../../domain/models/cost-report.js";
 import type { StepAttributionSource } from "../../domain/models/step-attribution.js";
+import type { TaskAttributionSource } from "../../domain/models/task-attribution.js";
 import { getAiToolConfig } from "../../domain/tools/registry.js";
 import type { CLIOutput } from "../output.js";
 
@@ -20,6 +22,11 @@ const ATTRIBUTION_LABELS: Record<StepAttributionSource, string> = {
   "tool-stated": "stated by the tool",
   "journal-interval": "from a journal interval",
   unattributed: "unattributed",
+};
+
+const TASK_ATTRIBUTION_LABELS: Record<TaskAttributionSource, string> = {
+  declared: "declared by the flow",
+  inferred: "inferred from a written file",
 };
 
 /** Printed where a figure is genuinely not known, never as `$0.00`. A tool whose own files
@@ -186,6 +193,29 @@ interface Basis {
   readonly useCost: boolean;
 }
 
+/** Only where `--task` narrowed the report - a session without one carries no per-record
+ * task identity to break down (see metrics-contract.md), so there is nothing here to print
+ * for the unfiltered period. */
+function printTaskAttribution(output: CLIOutput, report: CostReport, basis: Basis): void {
+  if (report.taskAttributionMix === undefined) return;
+  output.print("");
+  output.print(`  ticket known    ${basis.label}`);
+  printTaskAttributionRows(output, report.taskAttributionMix, basis.of, basis.useCost);
+}
+
+function printTaskAttributionRows(
+  output: CLIOutput,
+  rows: readonly CostReportTaskAttributionRow[],
+  basis: number,
+  useCost: boolean
+): void {
+  for (const row of rows) {
+    output.print(
+      `    ${pad(TASK_ATTRIBUTION_LABELS[row.attribution])}${shareOf(row.totals, basis, useCost)}`
+    );
+  }
+}
+
 function printStepsAndAttribution(output: CLIOutput, report: CostReport, basis: Basis): void {
   if (report.bySteps.length === 0) return;
   output.print("");
@@ -267,6 +297,7 @@ export function printCostReport(output: CLIOutput, report: CostReport): void {
     ...shareBasis(report.totals),
     useCost: report.totals.costMicroUsd !== undefined,
   };
+  printTaskAttribution(output, report, basis);
   printStepsAndAttribution(output, report, basis);
   printModels(output, report, basis);
   printProjects(output, report.byProjects, basis);

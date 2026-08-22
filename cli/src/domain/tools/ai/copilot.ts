@@ -379,7 +379,10 @@ export const copilot: AiTool<
       "Its own file names outputTokens per turn, but session.shutdown carries all four " +
       "counters for the whole session — a session total, never a sum of requests.",
   },
-  telemetryTaskAttributable: false,
+  // Copilot's canonical payload carries no tool_input, but a declaration reads its toolArgs
+  // JSON string as plain text instead - the same tolerance that already lets a step be read
+  // off either of Copilot's two shapes.
+  telemetryTaskAttributable: true,
   telemetryJournalHost: "copilot",
 
   rewriteContent: rewriteCopilotContent,

@@ -25,7 +25,7 @@ function readJournalFile(filePath) {
   } catch {
     return null;
   }
-  const journal = { session: null, boundaries: [], filesWritten: [] };
+  const journal = { session: null, boundaries: [], filesWritten: [], taskDeclarations: [] };
   for (const raw of content.split("\n")) {
     const line = raw.trim() === "" ? null : parseLine(raw);
     if (!line || typeof line.at !== "string") continue;
@@ -37,6 +37,12 @@ function readJournalFile(filePath) {
       journal.boundaries.push(line);
     } else if (line.type === "file_written" && typeof line.path === "string") {
       journal.filesWritten.push(line);
+    } else if (line.type === "task_declared" && typeof line.path === "string") {
+      // Its own array, never boundaries: buildStepIntervals pairs every boundary against
+      // whichever timed one comes next, of any type, so a task line mixed in there would
+      // close a running step early. buildTaskIntervals (report.js) reads this array plus
+      // boundaries' own turn_end lines instead.
+      journal.taskDeclarations.push(line);
     }
   }
   return journal;

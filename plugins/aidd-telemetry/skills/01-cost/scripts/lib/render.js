@@ -18,6 +18,11 @@ const ATTRIBUTION_LABELS = {
   unattributed: "unattributed",
 };
 
+const TASK_ATTRIBUTION_LABELS = {
+  declared: "declared by the flow",
+  inferred: "inferred from a written file",
+};
+
 const NO_KNOWN_PROJECT = "no known project";
 
 // A year asked for by day is 365 rows - the envelope always carries every one of them, but
@@ -97,6 +102,18 @@ function printSteps(out, report, basis) {
   out(`  attribution    ${basis.label}`);
   for (const row of report.attributionMix) {
     out(`    ${pad(ATTRIBUTION_LABELS[row.attribution])}${share(row.totals, basis)}`);
+  }
+}
+
+/** Only where `--task` narrowed the report - a session without one carries no per-record
+ * task identity to break down (see metrics-contract.md), so there is nothing here to print
+ * for the unfiltered period. */
+function printTaskAttribution(out, report, basis) {
+  if (report.taskAttributionMix === undefined) return;
+  out("");
+  out(`  ticket known    ${basis.label}`);
+  for (const row of report.taskAttributionMix) {
+    out(`    ${pad(TASK_ATTRIBUTION_LABELS[row.attribution])}${share(row.totals, basis)}`);
   }
 }
 
@@ -180,6 +197,7 @@ function printReport(out, report) {
   out("");
   printTotals(out, report);
   const basis = basisOf(report.totals);
+  printTaskAttribution(out, report, basis);
   printSteps(out, report, basis);
   printModels(out, report, basis);
   printProjects(out, report, basis);
@@ -263,6 +281,16 @@ function toEnvelope(report) {
       attribution: row.attribution,
       totals: envelopeTotals(row.totals),
     })),
+    // Present only alongside `task`: an unfiltered period carries no per-record task
+    // identity to break down (see metrics-contract.md's "Attributing records to a task").
+    ...(report.taskAttributionMix === undefined
+      ? {}
+      : {
+          task_attribution: report.taskAttributionMix.map((row) => ({
+            attribution: row.attribution,
+            totals: envelopeTotals(row.totals),
+          })),
+        }),
     read: { undated_records: report.undatedRecords, unreadable_lines: report.unreadableLines },
   };
 }

@@ -60,3 +60,19 @@ interface JournalFileWritesModule {
 export const journalFileWrites: JournalFileWritesModule = createRequire(import.meta.url)(
   "../../../plugins/aidd-telemetry/hooks/lib/file-writes.js"
 );
+
+/** The hook's declaration module, for the same reason `journalFileWrites` is exposed: a
+ * task can now be declared on any host `journal.js`'s `tool-used` dispatch reaches, and this
+ * is the one place that reads a tool call's own arguments for it. */
+interface JournalTaskDeclaredModule {
+  declaredTaskPath(payload: Record<string, unknown>): string | null;
+  handleTaskDeclared(
+    payload: Record<string, unknown>,
+    host: string,
+    sessionId: string | undefined
+  ): void;
+}
+
+export const journalTaskDeclared: JournalTaskDeclaredModule = createRequire(import.meta.url)(
+  "../../../plugins/aidd-telemetry/hooks/lib/task-declared.js"
+);

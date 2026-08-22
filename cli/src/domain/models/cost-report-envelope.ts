@@ -1,6 +1,7 @@
 import type { TelemetryRouteSupply } from "../capabilities/telemetry-capability.js";
 import type { CostReport, CostReportToolCoverage, CostTotals } from "./cost-report.js";
 import type { StepAttributionSource } from "./step-attribution.js";
+import type { TaskAttributionSource } from "./task-attribution.js";
 import type { AiToolId } from "./tool-ids.js";
 
 /** Bumped when a consumer that understood the previous shape would misread this one.
@@ -73,6 +74,13 @@ export interface CostReportEnvelopeAttributionRow {
   readonly totals: CostReportEnvelopeTotals;
 }
 
+/** The same idea, one axis over: how much of a `--task` report's total came from a
+ * declared interval versus a written file. */
+export interface CostReportEnvelopeTaskAttributionRow {
+  readonly attribution: TaskAttributionSource;
+  readonly totals: CostReportEnvelopeTotals;
+}
+
 /** One project's figures, largest first, plus one row for what named none — `project`
  * absent there, the same convention the step row uses for `unattributed`. */
 export interface CostReportEnvelopeProjectRow {
@@ -121,6 +129,9 @@ export interface CostReportEnvelope {
   readonly by_day: readonly CostReportEnvelopeDayRow[];
   /** All three strengths, always, strongest first. */
   readonly attribution: readonly CostReportEnvelopeAttributionRow[];
+  /** Present only alongside `task`: an unfiltered period carries no per-record task
+   * identity to break down. */
+  readonly task_attribution?: readonly CostReportEnvelopeTaskAttributionRow[];
   readonly read: CostReportEnvelopeRead;
 }
 
@@ -175,6 +186,33 @@ function totals(from: CostTotals): CostReportEnvelopeTotals {
   };
 }
 
+function projectRow(row: CostReport["byProjects"][number]): CostReportEnvelopeProjectRow {
+  return {
+    ...(row.project === undefined ? {} : { project: row.project }),
+    totals: totals(row.totals),
+  };
+}
+
+function attributionRow(
+  row: CostReport["attributionMix"][number]
+): CostReportEnvelopeAttributionRow {
+  return { attribution: row.attribution, totals: totals(row.totals) };
+}
+
+/** Present only alongside `task`: an unfiltered period carries no per-record task identity
+ * to break down (see metrics-contract.md's "Attributing records to a task"). */
+function taskAttribution(
+  taskAttributionMix: CostReport["taskAttributionMix"]
+): Pick<CostReportEnvelope, "task_attribution"> {
+  if (taskAttributionMix === undefined) return {};
+  return {
+    task_attribution: taskAttributionMix.map((row) => ({
+      attribution: row.attribution,
+      totals: totals(row.totals),
+    })),
+  };
+}
+
 /**
  * The same report a person reads, rendered for a program.
  *
@@ -195,15 +233,10 @@ export function toCostReportEnvelope(report: CostReport): CostReportEnvelope {
     by_step: report.bySteps.map(stepRow),
     by_model: report.byModels.map((row) => ({ model: row.model, totals: totals(row.totals) })),
     by_tool: report.byTools.map(toolRow),
-    by_project: report.byProjects.map((row) => ({
-      ...(row.project === undefined ? {} : { project: row.project }),
-      totals: totals(row.totals),
-    })),
+    by_project: report.byProjects.map(projectRow),
     by_day: report.byDays.map((row) => ({ day: row.day, totals: totals(row.totals) })),
-    attribution: report.attributionMix.map((row) => ({
-      attribution: row.attribution,
-      totals: totals(row.totals),
-    })),
+    attribution: report.attributionMix.map(attributionRow),
+    ...taskAttribution(report.taskAttributionMix),
     read: {
       undated_records: report.undatedRecords,
       unreadable_lines: report.unreadableLines,

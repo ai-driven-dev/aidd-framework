@@ -196,6 +196,11 @@ export const opencode: AiTool<
   // itself and spawns hooks/journal.js with it, over the same stdin contract every other
   // host's own hook already uses.
   telemetryJournalHost: "opencode",
+  // Unlike the other three, this is not a payload-shape limit: the plugin above never
+  // observes a single tool call at all, only session.created and session.idle. A
+  // declaration needs a tool-used event to read arguments from, and none ever reaches
+  // journal.js for this host - so there is no payload for either a declaration or a
+  // written path to be read out of.
   telemetryTaskAttributable: false,
 
   rewriteContent(content: string, docsDir: string): string {

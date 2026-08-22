@@ -220,6 +220,16 @@ function buildStepStartLine({ at, skill, turnId }) {
   return line;
 }
 
+// A start, told rather than inferred, the same way step_start is: a tool call named a task
+// path, so this session is on that task from here. No end on this line either, and for the
+// same reason step_start carries none - closing is the reader's derivation, from whichever
+// turn_end or later task_declared comes next (see report.js's buildTaskIntervals). path is
+// repository-relative like file_written's, never a task_id: the derivation belongs to the
+// reader.
+function buildTaskDeclaredLine({ at, path: declaredPath }) {
+  return { type: "task_declared", at, path: declaredPath };
+}
+
 // Separators and traversal collapse to "-", so a hostile name cannot read as a path or
 // escape its own field. Emptied entirely, it reads "-" rather than vanishing.
 function sanitizeSkillName(skill) {
@@ -315,6 +325,7 @@ module.exports = {
   buildTurnEndLine,
   buildFileWrittenLine,
   buildStepStartLine,
+  buildTaskDeclaredLine,
   sanitizeSkillName,
   PRIVATE_FILE_MODE,
   handleSessionStart,
