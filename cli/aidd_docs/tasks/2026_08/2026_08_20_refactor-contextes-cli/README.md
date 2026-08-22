@@ -56,7 +56,8 @@ Un refactor de cette taille ne tient pas sur la relecture. Chaque phase s'appuie
 | golden du build | une sortie de build différente, cellule par cellule | existant, réduit en phase 4 |
 | e2e, 15 fichiers | les parcours réels, binaire compris | existant |
 | tests d'architecture | les invariants : partage, orchestration, coût d'un outil, doc, carte | livrés |
-| smoke, 77 vérifications, 100% des commandes feuilles | une commande qui casse avec ses vrais arguments, binaire compris | existant, **ne tourne nulle part et il est rouge** — phase 2 |
+| smoke, 98 vérifications, 100% des commandes feuilles | une commande qui casse avec ses vrais arguments, binaire compris | rendu hermétique et branché en CI en phase 2 |
+| non-ré-export | un module qui se met à publier un symbole qu'il ne définit pas | phase 6, nouveau — Biome est aveugle à cette forme |
 | graphe des contextes | une arête latérale entre contextes | phase 12, nouveau |
 | aller-retour du manifest | un modèle qui change et une sortie qui bouge | phase 13, nouveau |
 | équivalence des surfaces | un renommage qui change autre chose que le nom | phase 17, nouveau, temporaire |
