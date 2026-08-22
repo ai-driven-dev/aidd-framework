@@ -7,8 +7,10 @@ import type { AiToolId } from "./tool-ids.js";
  *
  * A version exists so a consumer can refuse rather than guess — the same reason
  * `sink_schema_version` exists on a stored line. Adding a field a consumer may ignore is
- * not a bump; changing what an existing field means is. */
-export const COST_REPORT_ENVELOPE_VERSION = 1;
+ * not a bump; changing what an existing field means is.
+ *
+ * Bumped to 2: `by_project` and `by_day` are new top-level breakdowns. */
+export const COST_REPORT_ENVELOPE_VERSION = 2;
 
 /** Money as whole micro-dollars, the way the report carries it: an integer, so a consumer
  * summing several reports gets the same answer this one did. Divide by 1,000,000 for
@@ -67,6 +69,20 @@ export interface CostReportEnvelopeAttributionRow {
   readonly totals: CostReportEnvelopeTotals;
 }
 
+/** One project's figures, largest first, plus one row for what named none — `project`
+ * absent there, the same convention the step row uses for `unattributed`. */
+export interface CostReportEnvelopeProjectRow {
+  readonly project?: string;
+  readonly totals: CostReportEnvelopeTotals;
+}
+
+/** One UTC day's figures. Every day the period spans, in order, whether or not a record
+ * landed on it — a day with nothing is a row of zeros, never an omitted row. */
+export interface CostReportEnvelopeDayRow {
+  readonly day: string;
+  readonly totals: CostReportEnvelopeTotals;
+}
+
 /** What the read could not do, travelling with what it did. A total assembled from a
  * partial read is indistinguishable from a complete one unless these come with it. */
 export interface CostReportEnvelopeRead {
@@ -95,6 +111,10 @@ export interface CostReportEnvelope {
   readonly by_step: readonly CostReportEnvelopeStepRow[];
   readonly by_model: readonly CostReportEnvelopeModelRow[];
   readonly by_tool: readonly CostReportEnvelopeToolRow[];
+  readonly by_project: readonly CostReportEnvelopeProjectRow[];
+  /** Every day the period spans, always — a long period stays readable by how the text
+   * rendering chooses to show it, never by what this envelope omits. */
+  readonly by_day: readonly CostReportEnvelopeDayRow[];
   /** All three strengths, always, strongest first. */
   readonly attribution: readonly CostReportEnvelopeAttributionRow[];
   readonly read: CostReportEnvelopeRead;
@@ -170,6 +190,11 @@ export function toCostReportEnvelope(report: CostReport): CostReportEnvelope {
     by_step: report.bySteps.map(stepRow),
     by_model: report.byModels.map((row) => ({ model: row.model, totals: totals(row.totals) })),
     by_tool: report.byTools.map(toolRow),
+    by_project: report.byProjects.map((row) => ({
+      ...(row.project === undefined ? {} : { project: row.project }),
+      totals: totals(row.totals),
+    })),
+    by_day: report.byDays.map((row) => ({ day: row.day, totals: totals(row.totals) })),
     attribution: report.attributionMix.map((row) => ({
       attribution: row.attribution,
       totals: totals(row.totals),

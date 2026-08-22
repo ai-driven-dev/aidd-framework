@@ -9,7 +9,7 @@ const SCRIPTS = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-
 const HOOKS_LIB = path.resolve(__dirname, "../../plugins/aidd-telemetry/hooks/lib");
 const { buildIntervals, attribute } = require(path.join(SCRIPTS, "lib/attribution.js"));
 const { build, taskOf, toMicroUsd } = require(path.join(SCRIPTS, "lib/report.js"));
-const { printReport, toEnvelope } = require(path.join(SCRIPTS, "lib/render.js"));
+const { printReport, toEnvelope, buildArtefact, ARTEFACT_AXES } = require(path.join(SCRIPTS, "lib/render.js"));
 const sink = require(path.join(SCRIPTS, "lib/sink.js"));
 const { listJournals } = require(path.join(SCRIPTS, "lib/journal.js"));
 const {
@@ -269,6 +269,175 @@ describe("restricting a period to one task", () => {
   });
 });
 
+// Runs the real `read` command over a real transcript, so this exercises store()'s join
+// end to end - never attribution.js's attribute() in isolation, which the fixture above
+// already covers.
+describe("a session's stored record names the project it ran in", () => {
+  const CLI = path.join(SCRIPTS, "telemetry-report.js");
+  const FIXTURES = path.resolve(__dirname, "../../cli/tests/fixtures/local-cost");
+  const CLAUDE_SESSION = "22222222-2222-4222-8222-222222222222";
+
+  let configDir;
+  let runsDir;
+
+  before(() => {
+    configDir = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-project-sink-"));
+    runsDir = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-project-runs-"));
+  });
+
+  after(() => {
+    fs.rmSync(configDir, { recursive: true, force: true });
+    fs.rmSync(runsDir, { recursive: true, force: true });
+  });
+
+  function writeSessionStart(extra) {
+    const runId = generateUlid();
+    appendLine(
+      path.join(runsDir, runFileName(runId, CLAUDE_SESSION)),
+      buildSessionStartLine({
+        at: "2026-08-05T19:00:00Z",
+        runId,
+        host: "claude-code",
+        vendorId: CLAUDE_SESSION,
+        ...extra,
+      }),
+    );
+  }
+
+  function readAndStore() {
+    const result = spawnSync(process.execPath, [CLI, "read"], {
+      encoding: "utf8",
+      env: { ...process.env, HOME: FIXTURES, PATH: "", AIDD_USER_CONFIG_DIR: configDir, AIDD_RUNS_DIR: runsDir },
+    });
+    assert.equal(result.status, 0, result.stderr);
+  }
+
+  function storedRecords() {
+    const dir = path.join(configDir, "telemetry");
+    return fs
+      .readdirSync(dir)
+      .flatMap((name) => fs.readFileSync(path.join(dir, name), "utf8").trim().split("\n"))
+      .filter((line) => line !== "")
+      .map((line) => JSON.parse(line));
+  }
+
+  it("prefers the remote, and says so", () => {
+    writeSessionStart({ projectId: "widgets", projectRemote: "git@github.com:acme/widgets.git" });
+    readAndStore();
+
+    const records = storedRecords();
+    assert.ok(records.length > 0);
+    for (const record of records) {
+      assert.equal(record.project_id, "git@github.com:acme/widgets.git");
+      assert.equal(record.project_field, "project_remote");
+    }
+  });
+
+  it("falls back to the directory-name field with no remote, and says so", () => {
+    fs.rmSync(configDir, { recursive: true, force: true });
+    fs.rmSync(runsDir, { recursive: true, force: true });
+    configDir = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-project-sink-"));
+    runsDir = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-project-runs-"));
+    writeSessionStart({ projectId: "widgets", projectRemote: null });
+    readAndStore();
+
+    const records = storedRecords();
+    assert.ok(records.length > 0);
+    for (const record of records) {
+      assert.equal(record.project_id, "widgets");
+      assert.equal(record.project_field, "project_id");
+    }
+  });
+
+  it("stores no project for a session with no journal entry at all", () => {
+    fs.rmSync(configDir, { recursive: true, force: true });
+    fs.rmSync(runsDir, { recursive: true, force: true });
+    configDir = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-project-sink-"));
+    runsDir = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-project-runs-"));
+    // No run file is ever written for CLAUDE_SESSION, so the sweep never reaches it -
+    // named directly, the way the CLI already lets a person do.
+    const result = spawnSync(process.execPath, [CLI, "read", "--session", CLAUDE_SESSION], {
+      encoding: "utf8",
+      env: { ...process.env, HOME: FIXTURES, PATH: "", AIDD_USER_CONFIG_DIR: configDir, AIDD_RUNS_DIR: runsDir },
+    });
+    assert.equal(result.status, 0, result.stderr);
+
+    const records = storedRecords();
+    assert.ok(records.length > 0);
+    for (const record of records) {
+      assert.ok(!("project_id" in record), "an unjournalled session must not be attributed a project");
+      assert.ok(!("project_field" in record));
+    }
+  });
+});
+
+describe("breaking a period down by day and by project", () => {
+  // The default period is 2026-08-17..2026-08-21, five UTC days inclusive.
+  it("gives every day in the period a row, a gap included, and reconciles to the total", () => {
+    const built = report({
+      records: [
+        request({ cost_usd: 1, event_timestamp: "2026-08-17T10:00:00Z" }),
+        request({ cost_usd: 3, event_timestamp: "2026-08-19T10:00:00Z" }),
+      ],
+    });
+
+    assert.deepEqual(
+      built.byDays.map((row) => row.day),
+      ["2026-08-17", "2026-08-18", "2026-08-19", "2026-08-20", "2026-08-21"],
+    );
+    const gap = built.byDays.find((row) => row.day === "2026-08-18");
+    assert.deepEqual(gap.totals, { requests: 0 });
+
+    const total = built.byDays.reduce((sum, row) => sum + (row.totals.costMicroUsd ?? 0), 0);
+    assert.equal(total, built.totals.costMicroUsd);
+  });
+
+  it("prints a day with nothing as a row of zeros, never an omitted row", () => {
+    const text = rendered(
+      report({ records: [request({ cost_usd: 1, event_timestamp: "2026-08-17T10:00:00Z" })] }),
+    );
+
+    assert.match(text, /2026-08-18\s+nothing in this period/u);
+  });
+
+  it("gives a record with no project its own row, named as unknown", () => {
+    const built = report({
+      records: [
+        request({ turn_id: "a", cost_usd: 2, project_id: "acme/widgets" }),
+        request({ turn_id: "b", cost_usd: 1 }),
+      ],
+    });
+
+    assert.equal(built.byProjects.length, 2);
+    const unknown = built.byProjects.find((row) => row.project === undefined);
+    assert.equal(unknown.totals.requests, 1);
+    assert.equal(unknown.totals.costMicroUsd, toMicroUsd(1));
+
+    const total = built.byProjects.reduce((sum, row) => sum + (row.totals.costMicroUsd ?? 0), 0);
+    assert.equal(total, built.totals.costMicroUsd);
+  });
+
+  it("never folds a record with no project into one that was actually placed", () => {
+    const text = rendered(
+      report({ records: [request({ project_id: "acme/widgets", cost_usd: 1 }), request({ cost_usd: 1 })] }),
+    );
+
+    assert.match(text, /no known project/u);
+  });
+
+  it("names how many days a long period carries, rather than printing every row", () => {
+    const records = [];
+    for (let i = 0; i < 40; i++) {
+      records.push(request({ turn_id: `t-${i}`, cost_usd: 1, event_timestamp: `2026-01-${String((i % 27) + 1).padStart(2, "0")}T00:00:00Z` }));
+    }
+    const text = rendered(report({ fromDay: "2026-01-01", toDay: "2026-02-09", records }));
+
+    assert.match(text, /40 days in this period/u);
+    assert.match(text, /--json/u);
+    assert.ok(!text.includes("2026-01-15"));
+  });
+});
+
 describe("what a person reads", () => {
   it("answers the question before any breakdown is read", () => {
     const text = rendered(report({ records: [request({ cost_usd: 4.2, input_tokens: 100, cache_read_tokens: 900 })] }));
@@ -319,7 +488,7 @@ describe("what a person reads", () => {
 
 describe("what a program reads", () => {
   it("carries a version so an unrecognised shape can be refused", () => {
-    assert.equal(toEnvelope(report()).cost_report_version, 1);
+    assert.equal(toEnvelope(report()).cost_report_version, 2);
   });
 
   it("carries the period as it resolved, absolutely", () => {
@@ -372,6 +541,150 @@ describe("what a program reads", () => {
   });
 });
 
+// One axis, one artefact - and the assertion that matters most: not a spot check on a
+// figure that happens to look right, but every figure in the artefact walked against the
+// same envelope, in both directions, so neither invents a number nor drops a row.
+describe("an artefact never disagrees with the envelope it came from", () => {
+  const records = [
+    request({
+      turn_id: "a",
+      cost_usd: 1.23,
+      model: "opus",
+      step: "impl",
+      step_attribution: "tool-stated",
+      project_id: "acme/widgets",
+      input_tokens: 500,
+      event_timestamp: "2026-08-17T10:00:00Z",
+    }),
+    request({
+      turn_id: "b",
+      cost_usd: 0.5,
+      model: "haiku",
+      tool: "codex",
+      input_tokens: 200,
+      event_timestamp: "2026-08-19T10:00:00Z",
+    }),
+  ];
+  const declaredTools = [
+    { tool: "claude", coverage: "covered", capability: NO_CAPABILITY },
+    { tool: "codex", coverage: "covered", capability: NO_CAPABILITY },
+    { tool: "cursor", coverage: "not-covered", reason: "It writes no token count.", capability: NO_CAPABILITY },
+  ];
+
+  // A whole-dollar figure at every stop keeps the assertion below exact: `toFixed(2)` and
+  // `Number` agree without a rounding edge to reason about.
+  const dollarsOf = (totals) => (totals.cost_micro_usd === undefined ? undefined : totals.cost_micro_usd / 1e6);
+  const tokensOfRow = (totals) =>
+    (totals.input_tokens ?? 0) +
+    (totals.output_tokens ?? 0) +
+    (totals.cache_read_tokens ?? 0) +
+    (totals.cache_creation_tokens ?? 0);
+
+  function assertRowWalks(artefact, totals) {
+    if (totals.requests === 0) {
+      assert.match(artefact, /nothing in this period/u);
+      return;
+    }
+    const dollars = dollarsOf(totals);
+    assert.match(artefact, dollars === undefined ? /amount unknown/u : new RegExp(`\\$${dollars.toFixed(2)}`, "u"));
+    assert.match(artefact, new RegExp(`${tokensOfRow(totals).toLocaleString("en-US")} tokens`, "u"));
+    assert.match(artefact, new RegExp(`${totals.requests.toLocaleString("en-US")} requests`, "u"));
+  }
+
+  it("states the period and the axis it came from", () => {
+    const envelope = toEnvelope(report({ records, declaredTools }));
+    for (const axis of ARTEFACT_AXES) {
+      const artefact = buildArtefact(envelope, axis);
+      assert.match(artefact, /^period 2026-08-17 to 2026-08-21 — axis: /u);
+      assert.match(artefact, new RegExp(`axis: .*${axis === "total" ? "total" : axis}`, "u"));
+    }
+  });
+
+  it("carries the total axis's one figure straight from totals, nothing summed twice", () => {
+    const envelope = toEnvelope(report({ records, declaredTools }));
+    assertRowWalks(buildArtefact(envelope, "total"), envelope.totals);
+  });
+
+  it("carries every day the period spans, a gap included, with no row invented or dropped", () => {
+    const envelope = toEnvelope(report({ records, declaredTools }));
+    const artefact = buildArtefact(envelope, "day");
+    for (const row of envelope.by_day) {
+      assert.match(artefact, new RegExp(`\\| ${row.day} \\|`, "u"));
+      assertRowWalks(artefact, row.totals);
+    }
+  });
+
+  it("keeps every day of a long period in a file artefact, unlike the terminal's cap", () => {
+    const long = [];
+    for (let i = 0; i < 40; i++) {
+      long.push(
+        request({ turn_id: `t-${i}`, cost_usd: 1, event_timestamp: `2026-01-${String((i % 27) + 1).padStart(2, "0")}T00:00:00Z` }),
+      );
+    }
+    const envelope = toEnvelope(report({ fromDay: "2026-01-01", toDay: "2026-02-09", records: long }));
+    const artefact = buildArtefact(envelope, "day");
+
+    assert.equal(envelope.by_day.length, 40);
+    for (const row of envelope.by_day) {
+      assert.match(artefact, new RegExp(`\\| ${row.day} \\|`, "u"), `${row.day} missing from the file artefact`);
+    }
+  });
+
+  it("gives every step, model, tool and project row its own line, walked against the envelope", () => {
+    const envelope = toEnvelope(report({ records, declaredTools }));
+    const axisRows = {
+      step: envelope.by_step.map((row) => ({ name: row.step ?? "unattributed", totals: row.totals })),
+      model: envelope.by_model.map((row) => ({ name: row.model, totals: row.totals })),
+      project: envelope.by_project.map((row) => ({ name: row.project ?? "no known project", totals: row.totals })),
+    };
+    for (const [axis, rows] of Object.entries(axisRows)) {
+      const artefact = buildArtefact(envelope, axis);
+      assert.ok(rows.length > 0, `fixture must exercise ${axis}`);
+      for (const row of rows) {
+        assert.match(artefact, new RegExp(`\\| ${row.name} \\|`, "u"), `${axis} row '${row.name}' missing`);
+        assertRowWalks(artefact, row.totals);
+      }
+    }
+  });
+
+  it("names a tool nothing can read by its declared reason, never as a zero", () => {
+    const envelope = toEnvelope(report({ records, declaredTools }));
+    const artefact = buildArtefact(envelope, "tool");
+
+    assert.match(artefact, /Cursor \| not covered — It writes no token count\./u);
+    assert.ok(!artefact.includes("$0.00"));
+  });
+
+  it("refuses an axis it does not know, naming the ones it does", () => {
+    const envelope = toEnvelope(report({ records }));
+    assert.throws(() => buildArtefact(envelope, "person"), /Unknown axis 'person'.*total, day, step, model, tool, project/u);
+  });
+
+  it("prints the axis artefact, never JSON, on the script's --axis path", () => {
+    const { stdout } = runReportCli(["--axis", "day", "--from", "2026-08-17", "--to", "2026-08-19"]);
+
+    assert.match(stdout, /^period 2026-08-17 to 2026-08-19 — axis: by day/u);
+    assert.throws(() => JSON.parse(stdout), "the --axis path renders text, not an object");
+  });
+});
+
+function runReportCli(args) {
+  const CLI = path.join(SCRIPTS, "telemetry-report.js");
+  const configDir = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-axis-sink-"));
+  const runsDir = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-axis-runs-"));
+  try {
+    const result = spawnSync(process.execPath, [CLI, "report", ...args], {
+      encoding: "utf8",
+      env: { ...process.env, HOME: configDir, PATH: "", AIDD_USER_CONFIG_DIR: configDir, AIDD_RUNS_DIR: runsDir },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    return { stdout: result.stdout };
+  } finally {
+    fs.rmSync(configDir, { recursive: true, force: true });
+    fs.rmSync(runsDir, { recursive: true, force: true });
+  }
+}
+
 // Everything shipped elsewhere in this suite has met at most three sessions and a handful
 // of day files. This builds a year of day files and a hundred journalled sessions - through
 // sink.append() and record.js's own line builders, never a hand-written fixture - and asks
@@ -388,6 +701,10 @@ describe("a period that has met a hundred sessions", () => {
   const DAY_MS = 24 * 60 * 60 * 1000;
   const SOURCES_CYCLE = ["tool-stated", "journal-interval", "unattributed"];
   const MODELS = ["opus", "sonnet", "haiku"];
+  // Cycled across records, with every seventh carrying none at all - so the fixture proves
+  // both a multi-project breakdown and the row a record with no project gets of its own.
+  const PROJECTS = ["acme/widgets", "acme/gadgets"];
+  const projectOfDay = (day) => (day % 7 === 0 ? null : PROJECTS[day % PROJECTS.length]);
 
   const sessionVendorId = (i) => `sess-${String(i).padStart(3, "0")}`;
   const taskIndexOfSession = (i) => i % NUM_TASKS;
@@ -422,6 +739,7 @@ describe("a period that has met a hundred sessions", () => {
     for (let day = 0; day < NUM_DAYS; day++) {
       const at = new Date(START_MS + day * DAY_MS);
       const attribution = SOURCES_CYCLE[day % SOURCES_CYCLE.length];
+      const project = projectOfDay(day);
       const record = {
         sink_schema_version: 2,
         kind: "request",
@@ -434,6 +752,7 @@ describe("a period that has met a hundred sessions", () => {
         model: MODELS[day % MODELS.length],
         step_attribution: attribution,
         ...(attribution === "unattributed" ? {} : { step: attribution === "tool-stated" ? "implement" : "review" }),
+        ...(project === null ? {} : { project_id: project, project_field: "project_remote" }),
       };
       sink.append(record, at);
       records.push(record);
@@ -484,7 +803,7 @@ describe("a period that has met a hundred sessions", () => {
 
   const reconciles = (built) => {
     const total = (rows) => rows.reduce((sum, row) => sum + (row.totals.cost_micro_usd ?? 0), 0);
-    for (const rows of [built.by_step, built.by_model]) {
+    for (const rows of [built.by_step, built.by_model, built.by_project, built.by_day]) {
       assert.equal(total(rows), built.totals.cost_micro_usd);
     }
   };
@@ -498,6 +817,33 @@ describe("a period that has met a hundred sessions", () => {
     assert.equal(envelope.totals.requests, NUM_DAYS);
     assert.equal(envelope.totals.cost_micro_usd, expectedMicroUsd(fixtureRecords));
     reconciles(envelope);
+
+    // Every day the period spans, one row apiece - this fixture leaves no gap, so the
+    // day-with-nothing case is proven separately, on a period small enough to read by eye.
+    assert.equal(envelope.by_day.length, NUM_DAYS);
+    assert.deepEqual(
+      envelope.by_day.map((row) => row.day),
+      [...envelope.by_day].map((row) => row.day).sort(),
+    );
+
+    // Two named projects, largest first, plus the row for what named none.
+    const projectNames = envelope.by_project.map((row) => row.project);
+    assert.deepEqual(projectNames.filter((name) => name !== undefined).sort(), [...PROJECTS].sort());
+    assert.equal(projectNames.filter((name) => name === undefined).length, 1);
+    const unknownProject = envelope.by_project.find((row) => row.project === undefined);
+    const expectedUnknownRequests = fixtureRecords.filter((r) => r.project_id === undefined).length;
+    assert.equal(unknownProject.totals.requests, expectedUnknownRequests);
+  });
+
+  it("keeps the year's daily breakdown out of the terminal, and says where to find it", () => {
+    const { stdout } = runCli(["report", "--from", FROM_DAY, "--to", TO_DAY]);
+
+    assert.match(stdout, new RegExp(`${NUM_DAYS} days in this period`));
+    assert.match(stdout, /--json/u);
+    // The header names the two boundary days; a day row for every day in between would
+    // add 363 more YYYY-MM-DD occurrences the terminal was never asked to print.
+    const dayLike = stdout.match(/\d{4}-\d{2}-\d{2}/gu) ?? [];
+    assert.equal(dayLike.length, 2, dayLike.join(", "));
   });
 
   it("answers the session sweep, one journalled session at a time", () => {

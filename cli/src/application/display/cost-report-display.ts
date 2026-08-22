@@ -1,6 +1,8 @@
 import type {
   CostReport,
   CostReportAttributionRow,
+  CostReportDayRow,
+  CostReportProjectRow,
   CostReportStepRow,
   CostReportToolRow,
   CostTotals,
@@ -28,6 +30,13 @@ const UNKNOWN_AMOUNT = "amount unknown";
  * only reading the records support. */
 const NOTHING_MEASURED = "nothing in this period";
 const LABEL_WIDTH = 26;
+const NO_KNOWN_PROJECT = "no known project";
+
+// A year asked for by day is 365 rows - the envelope always carries every one of them, but
+// a terminal is not the place to read that many. Above this, the text rendering names the
+// count and points at --json rather than printing a screen nobody can scan. Must match
+// render.js's own MAX_PRINTED_DAYS: the byte-compare e2e test holds the two to it.
+const MAX_PRINTED_DAYS = 31;
 
 function formatCount(value: number): string {
   return value.toLocaleString("en-US");
@@ -188,6 +197,48 @@ function printModels(output: CLIOutput, report: CostReport, basis: Basis): void 
   }
 }
 
+function printProjects(
+  output: CLIOutput,
+  rows: readonly CostReportProjectRow[],
+  basis: Basis
+): void {
+  if (rows.length === 0) return;
+  output.print("");
+  output.print(`  by project    ${basis.label}`);
+  for (const row of rows) {
+    const name = row.project ?? NO_KNOWN_PROJECT;
+    const share = shareOf(row.totals, basis.of, basis.useCost);
+    output.print(`    ${pad(name)}${share}   ${figureFor(row.totals, basis.useCost)}`);
+  }
+}
+
+/** Chronological, never sorted by size: a series read out of order is not a series. Above
+ * `MAX_PRINTED_DAYS`, a person reads a count and where to get the rest - the envelope
+ * still carries every day, since suppressing a row there would be the same false
+ * continuity this layer refuses everywhere else. */
+function printDays(output: CLIOutput, rows: readonly CostReportDayRow[]): void {
+  if (rows.length === 0) return;
+  output.print("");
+  output.print("  by day");
+  if (rows.length > MAX_PRINTED_DAYS) {
+    output.print(
+      `    ${formatCount(rows.length)} days in this period — see --json for the daily breakdown`
+    );
+    return;
+  }
+  for (const row of rows) {
+    if (row.totals.requests === 0) {
+      output.print(`    ${pad(row.day)}${NOTHING_MEASURED}`);
+      continue;
+    }
+    const figure =
+      row.totals.costMicroUsd === undefined
+        ? UNKNOWN_AMOUNT
+        : formatAmount(row.totals.costMicroUsd);
+    output.print(`    ${pad(row.day)}${figure}   ${formatCount(totalTokens(row.totals))} tokens`);
+  }
+}
+
 /**
  * One period's cost, as a person reads it.
  *
@@ -209,8 +260,10 @@ export function printCostReport(output: CLIOutput, report: CostReport): void {
   };
   printStepsAndAttribution(output, report, basis);
   printModels(output, report, basis);
+  printProjects(output, report.byProjects, basis);
   output.print("");
   output.print("  by tool");
   printToolRows(output, report.byTools);
+  printDays(output, report.byDays);
   printCaveats(output, report);
 }

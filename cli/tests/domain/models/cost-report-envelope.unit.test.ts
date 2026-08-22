@@ -129,6 +129,39 @@ describe("toCostReportEnvelope", () => {
     ]);
   });
 
+  it("gives a record with no project its own row, project absent rather than a placeholder", () => {
+    const envelope = envelopeOf({
+      records: [
+        record({ turn_id: "a", cost_usd: 1, project_id: "acme/widgets" }),
+        record({ turn_id: "b", cost_usd: 1 }),
+      ],
+    });
+
+    expect(envelope.by_project.find((row) => row.project === "acme/widgets")).toBeDefined();
+    const unknown = envelope.by_project.find((row) => !("project" in row));
+    expect(unknown?.totals.requests).toBe(1);
+  });
+
+  it("carries every day the period spans, a gap included, never sorted by size", () => {
+    const envelope = envelopeOf({
+      records: [
+        record({ turn_id: "a", cost_usd: 1, event_timestamp: "2026-08-17T10:00:00Z" }),
+        record({ turn_id: "b", cost_usd: 5, event_timestamp: "2026-08-21T10:00:00Z" }),
+      ],
+    });
+
+    expect(envelope.by_day.map((row) => row.day)).toEqual([
+      "2026-08-17",
+      "2026-08-18",
+      "2026-08-19",
+      "2026-08-20",
+      "2026-08-21",
+    ]);
+    expect(envelope.by_day.find((row) => row.day === "2026-08-18")?.totals).toEqual({
+      requests: 0,
+    });
+  });
+
   it("carries what the read could not place and could not parse", () => {
     expect(envelopeOf({ undatedRecords: 3, unreadableLines: 2 }).read).toEqual({
       undated_records: 3,

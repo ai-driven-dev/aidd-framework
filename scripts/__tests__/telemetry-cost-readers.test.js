@@ -6,7 +6,7 @@ const { describe, it, before, after } = require("node:test");
 
 const SCRIPTS = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts");
 const { TOOLS } = require(path.join(SCRIPTS, "lib/readers.js"));
-const { listJournals, readJournal } = require(path.join(SCRIPTS, "lib/journal.js"));
+const { listJournals, readJournal, projectOf } = require(path.join(SCRIPTS, "lib/journal.js"));
 
 const FIXTURES = path.resolve(__dirname, "../../cli/tests/fixtures/local-cost");
 const CLAUDE_SESSION = "22222222-2222-4222-8222-222222222222";
@@ -198,5 +198,39 @@ describe("reading the run journal a session left behind", () => {
   it("lists nothing, rather than failing, when no journal exists", () => {
     assert.deepEqual(listJournals(path.join(projectRoot, "nowhere")), []);
     assert.equal(readJournal(projectRoot, "never-journalled"), null);
+  });
+});
+
+describe("deciding which project a record belongs to", () => {
+  const journalOf = (session) => ({ session, boundaries: [], filesWritten: [] });
+
+  it("names the project from the remote, and says which field it came from", () => {
+    const journal = journalOf({
+      run_id: "r",
+      tool: "claude-code",
+      vendor_id: "s-1",
+      project_id: "widgets",
+      project_remote: "git@github.com:acme/widgets.git",
+    });
+
+    assert.deepEqual(projectOf(journal), {
+      project_id: "git@github.com:acme/widgets.git",
+      project_field: "project_remote",
+    });
+  });
+
+  it("falls back to the directory-name field when no remote exists", () => {
+    const journal = journalOf({ run_id: "r", tool: "claude-code", vendor_id: "s-1", project_id: "widgets" });
+
+    assert.deepEqual(projectOf(journal), { project_id: "widgets", project_field: "project_id" });
+  });
+
+  it("names no project when the session carries neither field", () => {
+    assert.deepEqual(projectOf(journalOf({ run_id: "r", tool: "claude-code", vendor_id: "s-1" })), {});
+  });
+
+  it("names no project for a session with no journal at all", () => {
+    assert.deepEqual(projectOf(null), {});
+    assert.deepEqual(projectOf({ boundaries: [], filesWritten: [] }), {});
   });
 });

@@ -237,6 +237,60 @@ describe("buildCostReport — every breakdown reconciles", () => {
   });
 });
 
+// The default period is 2026-08-17..2026-08-21, five UTC days inclusive.
+describe("buildCostReport — by day and by project", () => {
+  it("gives every day in the period a row, a gap included, and reconciles to the total", () => {
+    const built = report({
+      records: [
+        request({ turn_id: "a", cost_usd: 1, event_timestamp: "2026-08-17T10:00:00Z" }),
+        request({ turn_id: "b", cost_usd: 3, event_timestamp: "2026-08-19T10:00:00Z" }),
+      ],
+    });
+
+    expect(built.byDays.map((row) => row.day)).toEqual([
+      "2026-08-17",
+      "2026-08-18",
+      "2026-08-19",
+      "2026-08-20",
+      "2026-08-21",
+    ]);
+    const gap = built.byDays.find((row) => row.day === "2026-08-18");
+    expect(gap?.totals).toEqual({ requests: 0 });
+
+    const total = built.byDays.reduce((sum, row) => sum + (row.totals.costMicroUsd ?? 0), 0);
+    expect(total).toBe(built.totals.costMicroUsd);
+  });
+
+  it("gives a record with no project its own row, named as unknown", () => {
+    const built = report({
+      records: [
+        request({ turn_id: "a", cost_usd: 2, project_id: "acme/widgets" }),
+        request({ turn_id: "b", cost_usd: 1 }),
+      ],
+    });
+
+    expect(built.byProjects).toHaveLength(2);
+    const unknown = built.byProjects.find((row) => row.project === undefined);
+    expect(unknown?.totals.requests).toBe(1);
+    expect(unknown?.totals.costMicroUsd).toBe(toMicroUsd(1));
+
+    const total = built.byProjects.reduce((sum, row) => sum + (row.totals.costMicroUsd ?? 0), 0);
+    expect(total).toBe(built.totals.costMicroUsd);
+  });
+
+  it("never folds a record with no project into a neighbour's row", () => {
+    const built = report({
+      records: [
+        request({ turn_id: "a", cost_usd: 1, project_id: "acme/widgets" }),
+        request({ turn_id: "b", cost_usd: 1 }),
+      ],
+    });
+    const widgets = built.byProjects.find((row) => row.project === "acme/widgets");
+
+    expect(widgets?.totals.requests).toBe(1);
+  });
+});
+
 describe("buildCostReport — a task is a filter over a period", () => {
   const JOURNALS: readonly CostReportSessionJournal[] = [
     {

@@ -13,6 +13,14 @@ const COUNTERS = {
 const TASK_FOLDER = /^aidd_docs\/tasks\/(\d{4}_\d{2})\/([^/]+)\//u;
 const TASK_FILE = /^aidd_docs\/tasks\/(\d{4}_\d{2})\/([^/]+)\.md$/u;
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const DAY_KEY_LENGTH = "YYYY-MM-DD".length;
+
+// A record with no project is its own group, never folded into one that was actually
+// placed. A symbol can never equal a real `project_id` string, so it is a safe Map key
+// for "unknown" beside every value a record might actually carry.
+const NO_KNOWN_PROJECT = Symbol("no known project");
+
 /** The task a written path belongs to. Derived here rather than stored, so changing the
  * derivation re-reads every past session instead of leaving a stale conclusion behind. */
 function taskOf(writtenPath) {
@@ -73,6 +81,37 @@ function bySize(rows, keyOf) {
   });
 }
 
+/** The UTC day a record's own moment falls on, mirroring sink.js's own `recordDayKey`.
+ * Duplicated rather than imported: this file groups over records already selected by that
+ * function, and the two must agree on every input without a runtime dependency between
+ * them - the same reasoning that keeps `journal.js`'s copy of `sanitizePathSegment`
+ * separate from `repo.js`'s. */
+function recordDayKey(record) {
+  const at = record.event_timestamp;
+  if (typeof at !== "string") return null;
+  if (at.length >= DAY_KEY_LENGTH && at.endsWith("Z")) return at.slice(0, DAY_KEY_LENGTH);
+  const parsed = new Date(at);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, DAY_KEY_LENGTH);
+}
+
+/** Every UTC day from `fromDay` to `toDay`, inclusive - the full period, whether or not a
+ * record ever lands on a given day. A day with nothing is still a row: a gap in a series
+ * reads as continuity, so the row has to exist to be a zero. */
+function dayRange(fromDay, toDay) {
+  const days = [];
+  const end = Date.parse(`${toDay}T00:00:00Z`);
+  for (let at = Date.parse(`${fromDay}T00:00:00Z`); at <= end; at += MS_PER_DAY) {
+    days.push(new Date(at).toISOString().slice(0, DAY_KEY_LENGTH));
+  }
+  return days;
+}
+
+function projectKeyOf(record) {
+  return typeof record.project_id === "string" && record.project_id !== ""
+    ? record.project_id
+    : NO_KNOWN_PROJECT;
+}
+
 function vendorIdsForTask(journals, task) {
   const wanted = new Set();
   for (const journal of journals) {
@@ -98,6 +137,9 @@ function build(input) {
   const models = new Map();
   const tools = new Map();
   const attributions = new Map();
+  const projects = new Map();
+  const days = new Map();
+  for (const day of dayRange(input.fromDay, input.toDay)) days.set(day, newTotals());
   let activeTimeSeconds;
 
   for (const record of records) {
@@ -112,6 +154,9 @@ function build(input) {
     group(attributions, record.step_attribution, record);
     group(tools, record.tool, record);
     if (record.model !== undefined) group(models, record.model, record);
+    group(projects, projectKeyOf(record), record);
+    const day = recordDayKey(record);
+    if (day !== null && days.has(day)) addTo(days.get(day), record);
   }
 
   return {
@@ -127,6 +172,8 @@ function build(input) {
       (row) => row.model
     ),
     byTools: toolRows(input.declaredTools, tools),
+    byProjects: projectRows(projects),
+    byDays: dayRows(days),
     attributionMix: attributionRows(attributions),
     undatedRecords: input.undatedRecords,
     unreadableLines: input.unreadableLines,
@@ -152,6 +199,24 @@ function attributionRows(attributions) {
     attribution,
     totals: attributions.get(attribution) ?? newTotals(),
   }));
+}
+
+/** Every project a record named, largest first, plus one row for what named none - never
+ * folded into a neighbour, since that would place a figure that was never placed.
+ * `project` is absent on that row, the same convention `bySteps` uses for `unattributed`. */
+function projectRows(projects) {
+  const rows = [...projects].map(([key, totals]) => ({
+    ...(key === NO_KNOWN_PROJECT ? {} : { project: key }),
+    totals,
+  }));
+  return bySize(rows, (row) => row.project ?? "");
+}
+
+/** Every day in the period, in order - never sorted by size, unlike every other breakdown
+ * here. A series read out of order is not a series; a day that ran nothing is a row of
+ * zeros, since a gap would read as continuity rather than as the fact it is. */
+function dayRows(days) {
+  return [...days].map(([day, totals]) => ({ day, totals }));
 }
 
 /** Every declared tool, in declared order, contributing or not. A tool missing from the

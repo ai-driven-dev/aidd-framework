@@ -1,8 +1,10 @@
 import type { TelemetryRouteSupply } from "../capabilities/telemetry-capability.js";
 import { STEP_ATTRIBUTION_SOURCES, type StepAttributionSource } from "./step-attribution.js";
 import { type TaskIdentity, taskIdentitiesFromWrittenPaths } from "./task-identity.js";
-import type { TelemetrySinkRecord } from "./telemetry-sink-record.js";
+import { type TelemetrySinkRecord, telemetrySinkRecordDayKey } from "./telemetry-sink-record.js";
 import type { AiToolId } from "./tool-ids.js";
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** Money is carried as whole micro-dollars, never as the floating amount a record stores.
  *
@@ -101,6 +103,23 @@ export interface CostReportAttributionRow {
   readonly totals: CostTotals;
 }
 
+/** One project's figures, largest first, plus one row for what named none — `project`
+ * absent there, the same convention `CostReportStepRow` uses for `unattributed`. Never
+ * folded into a neighbour: that would place a figure that was never placed. */
+export interface CostReportProjectRow {
+  readonly project?: string;
+  readonly totals: CostTotals;
+}
+
+/** One UTC day's figures, in chronological order — every day the period spans, whether or
+ * not a record landed on it. A day with nothing is a row of zeros: the one place in this
+ * report a zero is the measurement rather than the false reading this layer exists to
+ * refuse, because an omitted row would read as continuity a gap is not. */
+export interface CostReportDayRow {
+  readonly day: string;
+  readonly totals: CostTotals;
+}
+
 /** One session's journal, reduced to what a report needs. Assembling it from the run
  * journal is the caller's job; this module never opens a file. */
 export interface CostReportSessionJournal {
@@ -140,6 +159,8 @@ export interface CostReport {
   readonly bySteps: readonly CostReportStepRow[];
   readonly byModels: readonly CostReportModelRow[];
   readonly byTools: readonly CostReportToolRow[];
+  readonly byProjects: readonly CostReportProjectRow[];
+  readonly byDays: readonly CostReportDayRow[];
   readonly attributionMix: readonly CostReportAttributionRow[];
   readonly undatedRecords: number;
   readonly unreadableLines: number;
@@ -263,6 +284,28 @@ function addToStepGroup(groups: Map<string, StepGroup>, record: TelemetrySinkRec
   groups.set(key, created);
 }
 
+// A record with no project is its own group, never folded into one that was actually
+// placed. A symbol can never equal a real `project_id` string, so it is a safe Map key
+// for "unknown" beside every value a record might actually carry.
+const NO_KNOWN_PROJECT = Symbol("no known project");
+type ProjectKey = string | typeof NO_KNOWN_PROJECT;
+
+function projectKeyOf(record: TelemetrySinkRecord): ProjectKey {
+  return record.project_id ?? NO_KNOWN_PROJECT;
+}
+
+/** Every UTC day from `fromDay` to `toDay`, inclusive — the full period, whether or not a
+ * record ever lands on a given day. A day with nothing is still a row: a gap in a series
+ * reads as continuity, so the row has to exist to be a zero. */
+function dayRange(fromDay: string, toDay: string): readonly string[] {
+  const days: string[] = [];
+  const end = Date.parse(`${toDay}T00:00:00Z`);
+  for (let at = Date.parse(`${fromDay}T00:00:00Z`); at <= end; at += MS_PER_DAY) {
+    days.push(new Date(at).toISOString().slice(0, 10));
+  }
+  return days;
+}
+
 /** The vendor ids whose sessions wrote into `task`. A journal that wrote into no task
  * folder matches no task, and is simply absent from a task-filtered report - never folded
  * into one because it happened at the same time. */
@@ -315,16 +358,22 @@ interface Groups {
   readonly models: Map<string, TotalsAccumulator>;
   readonly tools: Map<AiToolId, TotalsAccumulator>;
   readonly attributions: Map<StepAttributionSource, TotalsAccumulator>;
+  readonly projects: Map<ProjectKey, TotalsAccumulator>;
+  readonly days: Map<string, TotalsAccumulator>;
   activeTimeSeconds?: number;
 }
 
-function emptyGroups(): Groups {
+function emptyGroups(fromDay: string, toDay: string): Groups {
+  const days = new Map<string, TotalsAccumulator>();
+  for (const day of dayRange(fromDay, toDay)) days.set(day, new TotalsAccumulator());
   return {
     totals: new TotalsAccumulator(),
     steps: new Map(),
     models: new Map(),
     tools: new Map(),
     attributions: new Map(),
+    projects: new Map(),
+    days,
   };
 }
 
@@ -332,8 +381,12 @@ function emptyGroups(): Groups {
  * `"request"` record on any tool measured so far carries it, and no `"session"` record's
  * money or tokens are ever added to a total, since they are a flush window's own delta of
  * quantities the request records already report in full. */
-function accumulate(records: readonly TelemetrySinkRecord[]): Groups {
-  const groups = emptyGroups();
+function accumulate(
+  records: readonly TelemetrySinkRecord[],
+  fromDay: string,
+  toDay: string
+): Groups {
+  const groups = emptyGroups(fromDay, toDay);
   for (const record of records) {
     if (record.kind === "session") {
       if (record.active_time_s !== undefined) {
@@ -346,6 +399,9 @@ function accumulate(records: readonly TelemetrySinkRecord[]): Groups {
     accumulateInto(groups.attributions, record.step_attribution, record);
     accumulateInto(groups.tools, record.tool, record);
     if (record.model !== undefined) accumulateInto(groups.models, record.model, record);
+    accumulateInto(groups.projects, projectKeyOf(record), record);
+    const day = telemetrySinkRecordDayKey(record);
+    if (day !== undefined && groups.days.has(day)) groups.days.get(day)?.add(record);
   }
   return groups;
 }
@@ -379,6 +435,27 @@ function stepRows(steps: ReadonlyMap<string, StepGroup>): readonly CostReportSte
   );
 }
 
+/** Every project a record named, largest first, plus one row for what named none. */
+function projectRows(
+  projects: ReadonlyMap<ProjectKey, TotalsAccumulator>
+): readonly CostReportProjectRow[] {
+  const rows: CostReportProjectRow[] = [...projects].map(([key, accumulator]) => ({
+    ...(key === NO_KNOWN_PROJECT ? {} : { project: key }),
+    totals: accumulator.build(),
+  }));
+  return bySize(
+    rows,
+    (row) => row.totals,
+    (row) => row.project ?? ""
+  );
+}
+
+/** Every day in the period, in order — never sorted by size, unlike every other breakdown
+ * here. A series read out of order is not a series. */
+function dayRows(days: ReadonlyMap<string, TotalsAccumulator>): readonly CostReportDayRow[] {
+  return [...days].map(([day, accumulator]) => ({ day, totals: accumulator.build() }));
+}
+
 function modelRows(models: ReadonlyMap<string, TotalsAccumulator>): readonly CostReportModelRow[] {
   const rows = [...models].map(([model, accumulator]) => ({
     model,
@@ -406,7 +483,7 @@ function modelRows(models: ReadonlyMap<string, TotalsAccumulator>): readonly Cos
 export function buildCostReport(input: CostReportInput): CostReport {
   const wanted = input.task === undefined ? null : vendorIdsForTask(input.journals, input.task);
   const inScope = input.records.filter((record) => wanted === null || wanted.has(record.vendor_id));
-  const groups = accumulate(inScope);
+  const groups = accumulate(inScope, input.fromDay, input.toDay);
 
   return {
     fromDay: input.fromDay,
@@ -420,6 +497,8 @@ export function buildCostReport(input: CostReportInput): CostReport {
     bySteps: stepRows(groups.steps),
     byModels: modelRows(groups.models),
     byTools: buildToolRows(input.declaredTools, groups.tools),
+    byProjects: projectRows(groups.projects),
+    byDays: dayRows(groups.days),
     attributionMix: attributionRows(groups.attributions),
     undatedRecords: input.undatedRecords,
     unreadableLines: input.unreadableLines,

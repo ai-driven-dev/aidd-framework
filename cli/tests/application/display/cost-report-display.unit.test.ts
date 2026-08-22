@@ -218,4 +218,40 @@ describe("printCostReport", () => {
     expect(out).not.toContain(".md");
     expect(out).not.toContain("acme-widgets");
   });
+
+  it("prints a day with nothing as a row of zeros, never an omitted row", () => {
+    const out = printed({
+      records: [record({ cost_usd: 1, event_timestamp: "2026-08-17T10:00:00Z" })],
+    });
+
+    expect(out).toMatch(/2026-08-18\s+nothing in this period/u);
+  });
+
+  it("names how many days a long period carries, rather than printing every row", () => {
+    const records = Array.from({ length: 40 }, (_, i) =>
+      record({
+        turn_id: `t-${i}`,
+        cost_usd: 1,
+        event_timestamp: `2026-01-${String((i % 27) + 1).padStart(2, "0")}T00:00:00Z`,
+      })
+    );
+    const out = printed({ fromDay: "2026-01-01", toDay: "2026-02-09", records });
+
+    expect(out).toContain("40 days in this period");
+    expect(out).toContain("--json");
+    expect(out).not.toContain("2026-01-15");
+  });
+
+  it("gives a record with no project its own row, named as unknown", () => {
+    const out = printed({
+      records: [
+        record({ turn_id: "a", cost_usd: 2, project_id: "acme/widgets" }),
+        record({ turn_id: "b", cost_usd: 1 }),
+      ],
+    });
+    const projects = out.slice(out.indexOf("by project"));
+
+    expect(projects).toContain("acme/widgets");
+    expect(projects).toContain("no known project");
+  });
 });
