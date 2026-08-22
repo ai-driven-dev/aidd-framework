@@ -39,7 +39,8 @@ for — so a figure taken from a `--days` call can still be cited by the days it
 
 ## Versioning
 
-Every object carries `cost_report_version`, currently `1`.
+Every object carries `cost_report_version`, currently `2` — bumped from `1` when `by_day`
+and `by_project` joined `by_step`, `by_model` and `by_tool` as top-level breakdowns.
 
 **Set aside an object whose version you do not recognise rather than guessing its shape.**
 The number is bumped when a consumer that understood the previous shape would misread this
@@ -49,15 +50,17 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
 
 ```jsonc
 {
-  "cost_report_version": 1,
+  "cost_report_version": 2,
   "period": { "from_day": "2026-07-01", "to_day": "2026-07-31" },
   "task": "2026_08/2026_08_21_cost-reporter",   // absent unless --task was given
   "sessions": 1,
   "totals": { "requests": 2, "input_tokens": 13930, "output_tokens": 4377, "cache_read_tokens": 165632, "cache_creation_tokens": 0 },
   "active_time_s": 2820,                        // absent when no record carried it
-  "by_step":   [{ "step": "aidd-dev:02-implement", "attribution": "journal-interval", "totals": {} }],
-  "by_model":  [{ "model": "gpt-5.6-sol", "totals": {} }],
-  "by_tool":   [{ "tool": "codex", "coverage": "covered", "reason": "…", "capability": {}, "totals": {} }],
+  "by_step":    [{ "step": "aidd-dev:02-implement", "attribution": "journal-interval", "totals": {} }],
+  "by_model":   [{ "model": "gpt-5.6-sol", "totals": {} }],
+  "by_tool":    [{ "tool": "codex", "coverage": "covered", "reason": "…", "capability": {}, "totals": {} }],
+  "by_project": [{ "project": "acme/widgets", "totals": {} }],   // a row with no `project` names none known
+  "by_day":     [{ "day": "2026-07-01", "totals": {} }],         // every day in the period, in order, gaps included
   "attribution": [{ "attribution": "tool-stated", "totals": {} }],
   "read": { "undated_records": 0, "unreadable_lines": 0 }
 }
@@ -82,8 +85,10 @@ reporting tokens; the rates that turn them into money live outside this reposito
 
 ### Breakdowns
 
-`by_step`, `by_model` and `by_tool` are ordered largest first, with a stable tie-break, so
-the biggest thing is the first thing you read.
+`by_step`, `by_model`, `by_tool` and `by_project` are ordered largest first, with a stable
+tie-break, so the biggest thing is the first thing you read. `by_day` is the one exception:
+it is chronological, one row per day the period spans — a series read out of order is not
+a series, and a day nothing ran on is a row of zeros rather than an omitted day.
 
 **Every breakdown sums exactly back to `totals`.** That is asserted, on integers, not
 hoped for.
@@ -91,6 +96,11 @@ hoped for.
 `by_step` is keyed by the step **and** the strength of its attribution: one skill reached
 once from the tool's own statement and once from a journal interval is two rows, because
 they are two different claims. A row with no `step` carries `attribution: "unattributed"`.
+
+`by_project` carries a row with no `project` for a record stored before this field existed,
+or whose session journal named none — never folded into a project the reader happens to be
+standing in. A record's project comes from the run journal that covered its session, not
+from wherever the report itself happens to run.
 
 ### Attribution
 

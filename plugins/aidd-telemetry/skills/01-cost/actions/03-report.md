@@ -1,14 +1,35 @@
-# 03 - Report the figures, and only those
+# 03 - Choose the axis, and hand back the artefact it deserves
 
-Ask the script for its object, and answer the user's question from that alone.
+Read the question, pick the axis it names (SKILL.md's table), ask the script for that
+answer, and render only what that axis calls for - never one shape for every question.
 
 ## Input
 
-The path to `telemetry-report.js`, and the period or task the user asked about.
+The path to `telemetry-report.js`, and the question the user asked, in their own words.
 
 ## Output
 
-An answer in this shape, filled from the object and nothing else.
+**One axis, asked for by name.** Run
+`node <telemetry-report.js> report --axis <total|day|step|model|tool|project> --from <day> --to <day>`,
+never alongside `--json` - the axis flag already picks the one rendering that answers the
+question, printed exactly as the script wrote it:
+
+```
+period <from_day> to <to_day>[, task <task>] — axis: <axis>
+
+<the line, or the table>
+```
+
+Show it inline in the chat when the question named no destination. Write it to a file,
+byte for byte what the script printed, when the question asked for a report, said to
+paste, send, or keep it, or named a path outright - ask where, if it did not say. The
+artefact's own first line already states its period and its axis, so it can still be
+placed once the session that made it is gone.
+
+**Everything at once, read inline.** When the question is broad enough that no single row
+of SKILL.md's table fits - "what did this cost" with nothing narrower, or "where did the
+spend go" with no named axis - answer in this shape, filled from the object and nothing
+else.
 
 ```markdown
 **<what was asked>** — <from_day> to <to_day>
@@ -38,13 +59,23 @@ A breakdown the object leaves empty is a section left out, never a table of zero
 
 ## Process
 
-1. **Ask, always as an object.** Run one of `node <telemetry-report.js> report --json`, `... report --from 2026-08-01 --to 2026-08-31 --json`, or `... report --task 2026_08/2026_08_21_cost-reporter --json`, reading the shape from [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md).
+1. **Choose the axis from the question**, using SKILL.md's table. A question that already
+   names one - "by day", "by project", "per model" - needs no more reading than that. A
+   question asking per person is named as unanswerable there, with what would fix it - stop
+   before running the script.
+2. **Ask, as one axis or as the whole object.**
+   - One axis: `node <telemetry-report.js> report --axis <axis> --from 2026-08-01 --to 2026-08-31`.
+   - Everything: `node <telemetry-report.js> report --from 2026-08-01 --to 2026-08-31 --json`, reading the shape from [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md).
    - The figure will be kept or compared: give `--from` and `--to`, since `--days` resolves against today and two identical calls on two days cover two different periods.
-2. **Refuse an unknown shape.** `cost_report_version` is `1` today.
-   - Anything else: stop, rather than guessing which field means what.
-3. **Fill the shape above from the object.** The headline comes from `totals`, the steps from `by_step`, the models from `by_model`, and none of it needs re-adding since every breakdown already sums to its total.
+3. **Refuse an unknown shape.** `cost_report_version` is `2` today, read from the `--json`
+   path - the `--axis` path prints text the script already built from that same object, so
+   there is no separate version to check there.
+   - Anything else on the `--json` path: stop, rather than guessing which field means what.
+4. **Fill the "everything" shape above from the object**, when that is the path taken. The
+   headline comes from `totals`, the steps from `by_step`, the models from `by_model`, and
+   none of it needs re-adding since every breakdown already sums to its total.
    - A share is of cost when `totals.cost_micro_usd` is present, of tokens otherwise. Say which above the table.
-4. **Read `capability` before explaining an absent figure.** A tool that cannot supply a number and a session that consumed nothing look identical in the numbers.
+5. **Read `capability` before explaining an absent figure.** A tool that cannot supply a number and a session that consumed nothing look identical in the numbers.
 
    | False field | Means |
    | --- | --- |
@@ -53,14 +84,17 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    | `journal_attributable` | the journal never names that tool's sessions, so a sweep never reaches them |
    | `task_attributable` | its writes cannot be traced to a task, so it is absent from a task report without having done nothing |
 
-5. **Keep `unattributed` as itself.** Nothing measured supports reading it as no step having run, and it is never a residual.
-6. **Say when the answer is partial.** A non-zero `read.undated_records` or `read.unreadable_lines` means the total is incomplete, and the reasons are in [telemetry-limits.md](../../../../../docs/telemetry-limits.md).
+6. **Keep `unattributed` as itself.** Nothing measured supports reading it as no step having run, and it is never a residual.
+7. **Say when the answer is partial.** A non-zero `read.undated_records` or `read.unreadable_lines` means the total is incomplete, and the reasons are in [telemetry-limits.md](../../../../../docs/telemetry-limits.md). The `--axis` path already carries this in its own last lines; the `--json` path carries it in `read`.
 
 ## Test
 
 | Case | Pass |
 | --- | --- |
-| A period is asked for | the answer gives tokens, models and steps, and names the days it covered |
+| A question names an axis | the artefact for that axis is printed, and nothing else |
+| A question asks for a report, or to keep or send the figure | the artefact is written to a file, unchanged, stating its period and axis |
+| A question is broad, naming no axis | the answer gives tokens, models and steps, and names the days it covered |
+| A question asks per person | said as unanswerable, with #660, #661 and #656 named |
 | A tool carries no amount | the answer says unknown and never prints a currency zero |
 | A tool is not covered | the answer gives its declared reason instead of a figure |
 | The read was partial | the answer says so before giving the total |

@@ -230,6 +230,6 @@ describe("measurement, from nothing to off and back", () => {
     // Turning measurement off changes what is recorded next, never what a past period
     // answers — a consumer that cached a figure must not see it move.
     expect(afterOff).toEqual(envelope);
-    expect(envelope.cost_report_version).toBe(1);
+    expect(envelope.cost_report_version).toBe(2);
   }, 60_000);
 });

@@ -176,7 +176,7 @@ describe("the plugin measures on its own", () => {
     const result = await measure(["report", ...PERIOD, "--json"]);
     const envelope = JSON.parse(result.stdout);
 
-    expect(envelope.cost_report_version).toBe(1);
+    expect(envelope.cost_report_version).toBe(2);
     expect(envelope.period).toEqual({ from_day: "2026-08-01", to_day: "2026-08-31" });
     expect(envelope.attribution.map((row: { attribution: string }) => row.attribution)).toEqual([
       "tool-stated",

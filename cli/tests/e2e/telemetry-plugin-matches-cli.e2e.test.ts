@@ -73,6 +73,10 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
         run_id: "01ARZ3NDEKTSV4RRFFQ69G5FBW",
         tool: "codex",
         vendor_id: CODEX_SESSION,
+        // Both project fields present, so this session exercises the branch that prefers
+        // the remote - the CLAUDE_SESSION below exercises the no-remote fallback.
+        project_id: "acme-widgets",
+        project_remote: "git@github.com:acme/widgets.git",
       }) +
         line({ type: "step_start", at: "2026-07-29T15:11:00Z", skill: "aidd-dev:02-implement" }) +
         line({ type: "turn_end", at: "2026-07-29T15:30:00Z" })
@@ -85,6 +89,7 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
         run_id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
         tool: "claude-code",
         vendor_id: CLAUDE_SESSION,
+        project_id: "brainstorm-telemetry",
       }) + line({ type: "turn_end", at: "2026-08-05T20:00:00Z" })
     );
   }
@@ -166,7 +171,7 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
 
     expect(fromPlugin).toBe(fromCli);
     const envelope = JSON.parse(fromPlugin);
-    expect(envelope.cost_report_version).toBe(1);
+    expect(envelope.cost_report_version).toBe(2);
     expect(envelope.by_tool.map((row: { tool: string }) => row.tool)).toHaveLength(5);
   });
 
