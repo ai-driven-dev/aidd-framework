@@ -155,6 +155,40 @@ export interface CostReportSessionJournal {
   readonly taskIntervals: readonly TaskInterval[];
 }
 
+/** The four dimensions that narrow on an equal record field - `task` keeps its own route
+ * and its own top-level field, exactly as before this type existed. Every one composes
+ * with the others, and with `task`, by `and`: two given narrow to their intersection,
+ * never their union. */
+export interface CostReportFilters {
+  readonly project?: string;
+  readonly step?: string;
+  readonly model?: string;
+  readonly tool?: string;
+}
+
+export type CostReportFilterName = keyof CostReportFilters | "task";
+
+/** Every value a filterable field has carried, anywhere the caller looked - not only in
+ * the period this report answers. What lets an empty selection tell a value nobody ever
+ * recorded apart from one that simply had no work here. */
+export interface CostReportKnownValues {
+  readonly projects: ReadonlySet<string>;
+  readonly steps: ReadonlySet<string>;
+  readonly models: ReadonlySet<string>;
+}
+
+/** The filter that narrowed a non-empty selection down to nothing - never the period
+ * itself, which is an honest zero rather than a filter's doing. `known` says whether the
+ * value was ever seen anywhere this call could look; `combination` is present only when
+ * the value matched something before any generic filter ran, so the emptiness comes from
+ * its intersection with a filter already applied rather than from the value alone. */
+export interface CostReportEmptySelection {
+  readonly filter: CostReportFilterName;
+  readonly value: string;
+  readonly known: boolean;
+  readonly combination?: boolean;
+}
+
 export interface CostReportInput {
   readonly fromDay: string;
   readonly toDay: string;
@@ -170,12 +204,24 @@ export interface CostReportInput {
    * which is the primary question: a task is a filter over a period, and work that touched
    * no task folder is still fully reportable. */
   readonly task?: TaskIdentity;
+  /** Any of `project`, `step`, `model` and `tool`, each optional and composing with `task`
+   * and each other by `and`. */
+  readonly filters?: CostReportFilters;
+  /** Where a generic filter's value has ever been seen - absent when the caller has none
+   * to offer, which reads the same as a filter never matching it elsewhere. */
+  readonly knownValues?: CostReportKnownValues;
 }
 
 export interface CostReport {
   readonly fromDay: string;
   readonly toDay: string;
   readonly task?: TaskIdentity;
+  /** Only the generic filters actually given, in a fixed order - `task` keeps its own
+   * field above, unchanged. Absent for an unfiltered period. */
+  readonly filters?: CostReportFilters;
+  /** Present only when a filter - never the period itself - is what emptied this
+   * selection. */
+  readonly emptySelection?: CostReportEmptySelection;
   readonly sessions: number;
   readonly totals: CostTotals;
   /** Per session, from `kind: "session"` records alone, and never broken down by step: no
@@ -410,6 +456,137 @@ function taskAttributionOf(
   return membership.inferredVendorIds.has(record.vendor_id) ? "inferred" : undefined;
 }
 
+// The field a generic filter narrows on, and the fixed order they are applied in - after
+// `task`, which already existed and uses its own membership route rather than an equality
+// check. Fixed so two people asking for the same selection always see the same filter
+// named as the one that emptied it.
+const GENERIC_FILTER_FIELDS: Readonly<Record<keyof CostReportFilters, keyof TelemetrySinkRecord>> =
+  {
+    project: "project_id",
+    step: "step",
+    model: "model",
+    tool: "tool",
+  };
+const GENERIC_FILTER_ORDER: readonly (keyof CostReportFilters)[] = [
+  "project",
+  "step",
+  "model",
+  "tool",
+];
+
+interface SelectionStage {
+  readonly name: CostReportFilterName | undefined;
+  readonly value: string | undefined;
+  readonly records: readonly TelemetrySinkRecord[];
+}
+
+/** One stage per active filter, each narrowing what the stage before it kept. Filters
+ * compose by `and` and nothing else: every stage only ever removes records the one before
+ * it was already going to keep, never adds one back. */
+function selectionStages(
+  records: readonly TelemetrySinkRecord[],
+  input: CostReportInput,
+  membership: TaskMembership | null
+): readonly SelectionStage[] {
+  const stages: SelectionStage[] = [{ name: undefined, value: undefined, records }];
+  if (membership !== null) {
+    const kept = records.filter((r) => taskAttributionOf(r, membership) !== undefined);
+    stages.push({ name: "task", value: input.task, records: kept });
+  }
+  for (const name of GENERIC_FILTER_ORDER) {
+    const value = input.filters?.[name];
+    if (value === undefined) continue;
+    const field = GENERIC_FILTER_FIELDS[name];
+    const previous = stages[stages.length - 1]?.records ?? [];
+    stages.push({ name, value, records: previous.filter((r) => r[field] === value) });
+  }
+  return stages;
+}
+
+/** Whether a filter's own value is known at all - anywhere this call can see, not only in
+ * this selection. `task` reads the same membership `buildCostReport` already computed;
+ * `tool` reads the declared list, a closed set no read is needed for; the rest read
+ * `knownValues`, gathered once across every day file the caller looked at, not only the
+ * period's own records. */
+function isKnownFilterValue(
+  name: CostReportFilterName,
+  value: string,
+  input: CostReportInput,
+  membership: TaskMembership | null
+): boolean {
+  if (name === "task") {
+    return (
+      (membership?.declaredIntervalsByVendorId.size ?? 0) > 0 ||
+      (membership?.inferredVendorIds.size ?? 0) > 0
+    );
+  }
+  if (name === "tool") return input.declaredTools.some((tool) => tool.tool === value);
+  const known = input.knownValues ?? { projects: new Set(), steps: new Set(), models: new Set() };
+  const set = { project: known.projects, step: known.steps, model: known.models }[name];
+  return set?.has(value) ?? false;
+}
+
+/** True when the culprit filter's own value matched something before any generic filter
+ * ran, meaning the emptiness comes from its intersection with a filter already applied
+ * rather than from this value alone. `task` has no "alone" reading - it is the only route
+ * to a task, not one of several composed equality checks. */
+function isCombinationCulprit(
+  stages: readonly SelectionStage[],
+  membership: TaskMembership | null,
+  culprit: SelectionStage
+): boolean {
+  if (culprit.name === undefined || culprit.name === "task") return false;
+  const field = GENERIC_FILTER_FIELDS[culprit.name];
+  const baseline = stages[membership === null ? 0 : 1]?.records ?? [];
+  return baseline.some((r) => r[field] === culprit.value);
+}
+
+/** The first filter that narrowed a non-empty selection down to nothing - never the
+ * period itself, which is an honest zero rather than a filter's doing. Stages only ever
+ * shrink, so the first empty one is the whole answer to "which filter emptied it". */
+function emptySelectionOf(
+  stages: readonly SelectionStage[],
+  input: CostReportInput,
+  membership: TaskMembership | null
+): CostReportEmptySelection | undefined {
+  if ((stages[0]?.records.length ?? 0) === 0) return undefined;
+  const culprit = stages.find((stage) => stage.records.length === 0);
+  if (!culprit || culprit.name === undefined || culprit.value === undefined) return undefined;
+  const known = isKnownFilterValue(culprit.name, culprit.value, input, membership);
+  const combination = isCombinationCulprit(stages, membership, culprit);
+  return {
+    filter: culprit.name,
+    value: culprit.value,
+    known,
+    ...(combination ? { combination: true } : {}),
+  };
+}
+
+/** Which of the four generic filters were actually given, in the same fixed order - never
+ * `task`, which keeps its own top-level field unchanged. `undefined` when none were, so
+ * an unfiltered period carries no empty object. */
+function activeFilters(filters: CostReportFilters | undefined): CostReportFilters | undefined {
+  if (!filters) return undefined;
+  const given = GENERIC_FILTER_ORDER.filter((name) => filters[name] !== undefined);
+  if (given.length === 0) return undefined;
+  return Object.fromEntries(given.map((name) => [name, filters[name]]));
+}
+
+/** `by_tool` is a breakdown of every *declared* tool, not only the ones a record touched -
+ * that is what lets an unreadable one show its own reason instead of a false zero. A
+ * `--tool` filter has to narrow that same list, or every tool it excluded would still
+ * print a row reading "nothing in this period" - indistinguishable from one genuinely
+ * measured idle, exactly the lie a filter's whole point is to remove. */
+function declaredToolsInScope(
+  declaredTools: readonly CostReportToolDeclaration[],
+  filters: CostReportFilters | undefined
+): readonly CostReportToolDeclaration[] {
+  const wanted = filters?.tool;
+  return wanted === undefined
+    ? declaredTools
+    : declaredTools.filter((tool) => tool.tool === wanted);
+}
+
 /** Every declared tool gets a row, in the declared order, whether or not it contributed -
  * a tool absent from the output is a tool a reader assumes did nothing, and for an
  * unreadable one that assumption is exactly the false zero this layer exists to prevent. */
@@ -614,16 +791,40 @@ function modelRows(models: ReadonlyMap<string, TotalsAccumulator>): readonly Cos
  * records alone, and active time from `kind: "session"` records alone. Summing across the
  * two kinds counts the same tokens twice and produces a total that looks right.
  */
+/** `task`, `filters` and `emptySelection` together - the selection this report answered,
+ * as opposed to the figures it answered with. Pulled out on its own so the object literal
+ * below reads as one shape, not a wall of conditional spreads. */
+function selectionFields(
+  input: CostReportInput,
+  emptySelection: CostReportEmptySelection | undefined
+): Pick<CostReport, "task" | "filters" | "emptySelection"> {
+  const filters = activeFilters(input.filters);
+  return {
+    ...(input.task === undefined ? {} : { task: input.task }),
+    ...(filters === undefined ? {} : { filters }),
+    ...(emptySelection === undefined ? {} : { emptySelection }),
+  };
+}
+
+function toolRowsInScope(input: CostReportInput, groups: Groups): readonly CostReportToolRow[] {
+  return buildToolRows(
+    declaredToolsInScope(input.declaredTools, input.filters),
+    groups.tools,
+    groups.toolSessionTotals
+  );
+}
+
 function assembleCostReport(
   input: CostReportInput,
   inScope: readonly TelemetrySinkRecord[],
   groups: Groups,
-  membership: TaskMembership | null
+  membership: TaskMembership | null,
+  emptySelection: CostReportEmptySelection | undefined
 ): CostReport {
   return {
     fromDay: input.fromDay,
     toDay: input.toDay,
-    ...(input.task === undefined ? {} : { task: input.task }),
+    ...selectionFields(input, emptySelection),
     sessions: new Set(inScope.map((record) => record.vendor_id)).size,
     totals: groups.totals.build(),
     ...(groups.activeTimeSeconds === undefined
@@ -631,7 +832,7 @@ function assembleCostReport(
       : { activeTimeSeconds: groups.activeTimeSeconds }),
     bySteps: stepRows(groups.steps),
     byModels: modelRows(groups.models),
-    byTools: buildToolRows(input.declaredTools, groups.tools, groups.toolSessionTotals),
+    byTools: toolRowsInScope(input, groups),
     byProjects: projectRows(groups.projects),
     byDays: dayRows(groups.days),
     attributionMix: attributionRows(groups.attributions),
@@ -645,10 +846,10 @@ function assembleCostReport(
 
 export function buildCostReport(input: CostReportInput): CostReport {
   const membership = input.task === undefined ? null : taskMembership(input.journals, input.task);
-  const inScope = input.records.filter(
-    (record) => membership === null || taskAttributionOf(record, membership) !== undefined
-  );
+  const stages = selectionStages(input.records, input, membership);
+  const emptySelection = emptySelectionOf(stages, input, membership);
+  const inScope = stages[stages.length - 1]?.records ?? [];
   const groups = accumulate(inScope, input.fromDay, input.toDay, membership);
 
-  return assembleCostReport(input, inScope, groups, membership);
+  return assembleCostReport(input, inScope, groups, membership, emptySelection);
 }

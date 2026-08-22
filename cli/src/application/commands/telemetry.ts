@@ -122,6 +122,10 @@ export function registerTelemetryCommand(program: Command): void {
       "--task <identity>",
       "Restrict to the sessions that wrote into this task, as <yyyy_mm>/<name>"
     )
+    .option("--project <id>", "Restrict to this project")
+    .option("--step <name>", "Restrict to this step")
+    .option("--model <name>", "Restrict to this model")
+    .option("--tool <id>", "Restrict to this tool")
     .option("--json", "Print one object a program can parse, instead of text for a person")
     .action(
       async (cmdOptions: {
@@ -129,6 +133,10 @@ export function registerTelemetryCommand(program: Command): void {
         to?: string;
         days?: string;
         task?: string;
+        project?: string;
+        step?: string;
+        model?: string;
+        tool?: string;
         json?: boolean;
       }) => {
         const { verbose, output, projectRoot } = parseGlobalOptions(program);
@@ -141,6 +149,12 @@ export function registerTelemetryCommand(program: Command): void {
           const report = await deps.reportCostUseCase.execute({
             period,
             ...(cmdOptions.task === undefined ? {} : { task: cmdOptions.task }),
+            filters: {
+              ...(cmdOptions.project === undefined ? {} : { project: cmdOptions.project }),
+              ...(cmdOptions.step === undefined ? {} : { step: cmdOptions.step }),
+              ...(cmdOptions.model === undefined ? {} : { model: cmdOptions.model }),
+              ...(cmdOptions.tool === undefined ? {} : { tool: cmdOptions.tool }),
+            },
           });
           // One value, two renderings. Neither derives a figure the other cannot see.
           if (cmdOptions.json) output.print(JSON.stringify(toCostReportEnvelope(report), null, 2));

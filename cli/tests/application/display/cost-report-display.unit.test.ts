@@ -85,6 +85,76 @@ describe("printCostReport", () => {
     expect(cost).toContain("$4.20");
   });
 
+  it("says which selection it answered, in the header", () => {
+    const out = printed({
+      records: [record({ cost_usd: 1, project_id: "acme/widgets" })],
+      filters: { project: "acme/widgets" },
+    });
+
+    expect(out.split("\n")[0]).toContain("filters: project=acme/widgets");
+  });
+
+  it("names the filter that emptied a selection, and suppresses the noise under it", () => {
+    const out = printed({
+      records: [record({ cost_usd: 1, project_id: "acme/widgets" })],
+      knownValues: { projects: new Set(["acme/widgets"]), steps: new Set(), models: new Set() },
+      filters: { project: "never-worked-here" },
+    });
+
+    expect(out).toContain("no record has ever named this project");
+    expect(out).not.toContain("by tool");
+    expect(out).not.toContain("by day");
+  });
+
+  it("says a task or a tool was never seen without claiming a record check it never ran", () => {
+    const out = printed({
+      records: [record({ cost_usd: 1 })],
+      filters: { tool: "opencode" },
+    });
+
+    expect(out).toContain("it is not one of the tools this build knows");
+    expect(out).not.toContain("no record has ever named this tool");
+  });
+
+  it("calls a zero row 'nothing in this selection', never 'this period', once a filter is active", () => {
+    // Codex only has a gadgets record - filtered to widgets alone, its row is zero, but
+    // the selection is why, not real idleness.
+    const out = printed({
+      records: [
+        record({ turn_id: "a", cost_usd: 1, tool: "claude", project_id: "acme/widgets" }),
+        record({ turn_id: "b", cost_usd: 1, tool: "codex", project_id: "acme/gadgets" }),
+      ],
+      filters: { project: "acme/widgets" },
+    });
+
+    expect(out).toMatch(/Codex\s+nothing in this selection/u);
+    expect(out).not.toContain("nothing in this period");
+  });
+
+  it("still calls a zero row 'nothing in this period' when the whole period, not a filter, is why", () => {
+    const out = printed({ records: [] });
+
+    expect(out).toContain("nothing in this period");
+    expect(out).not.toContain("nothing in this selection");
+  });
+
+  it("calls a task selection's own zero rows 'nothing in this selection' too", () => {
+    const out = printed({
+      records: [record({ vendor_id: "s-1", cost_usd: 1, event_timestamp: "2026-08-17T10:00:00Z" })],
+      journals: [
+        {
+          vendorId: "s-1",
+          tool: "claude",
+          writtenPaths: ["aidd_docs/tasks/2026_08/2026_08_01_x/plan.md"],
+          taskIntervals: [],
+        },
+      ],
+      task: "2026_08/2026_08_01_x",
+    });
+
+    expect(out).toMatch(/2026-08-18\s+nothing in this selection/u);
+  });
+
   it("labels active time as per-session and keeps it out of every breakdown", () => {
     const out = printed({
       records: [

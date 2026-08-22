@@ -260,6 +260,7 @@ describe("TelemetrySinkAdapter.readRecordsInPeriod", () => {
       records: [],
       undated: [],
       skippedLines: 0,
+      knownValues: { projects: new Set(), steps: new Set(), models: new Set() },
     });
   });
 });

@@ -220,6 +220,89 @@ function projectKeyOf(record) {
     : NO_KNOWN_PROJECT;
 }
 
+// The field a generic filter narrows on, and the fixed order they are applied in - task
+// first (it already existed and uses its own membership route, not an equality check),
+// then these four, always in the same order, so two people asking for the same selection
+// always see the same filter named as the one that emptied it.
+const GENERIC_FILTER_FIELDS = { project: "project_id", step: "step", model: "model", tool: "tool" };
+const GENERIC_FILTER_ORDER = ["project", "step", "model", "tool"];
+
+/** One stage per active filter, each narrowing what the stage before it kept. Filters
+ * compose by `and` and nothing else: every stage only ever removes records the one before
+ * it was already going to keep, never adds one back - the report never grows a query
+ * language past this. */
+function selectionStages(records, input, membership) {
+  const stages = [{ name: null, value: undefined, records }];
+  if (membership !== null) {
+    const kept = records.filter((r) => taskAttributionOf(r, membership) !== null);
+    stages.push({ name: "task", value: input.task, records: kept });
+  }
+  for (const name of GENERIC_FILTER_ORDER) {
+    const value = input.filters ? input.filters[name] : undefined;
+    if (value === undefined) continue;
+    const field = GENERIC_FILTER_FIELDS[name];
+    const previous = stages[stages.length - 1].records;
+    stages.push({ name, value, records: previous.filter((r) => r[field] === value) });
+  }
+  return stages;
+}
+
+/** Whether a filter's own value is known at all - anywhere this call can see, not only in
+ * this selection. `task` reads the same membership `build` already computed for it;
+ * `tool` reads the declared list, a closed set no read is needed for; `project`, `step`
+ * and `model` read `knownValues`, gathered once per sweep across every day file, not only
+ * the period's own records - the same reasoning `sink.js`'s `noteKnownValues` states. */
+function isKnownFilterValue(name, value, input, membership) {
+  if (name === "task") {
+    return membership.declaredIntervalsByVendorId.size > 0 || membership.inferredVendorIds.size > 0;
+  }
+  if (name === "tool") return input.declaredTools.some((tool) => tool.tool === value);
+  const known = input.knownValues ?? { projects: new Set(), steps: new Set(), models: new Set() };
+  return known[`${name}s`].has(value);
+}
+
+/** True when the culprit filter's own value matched something before any generic filter
+ * ran, meaning the emptiness comes from its intersection with a filter already applied
+ * rather than from this value alone. `task` has no "alone" reading - it is the only route
+ * to a task, not one of several composed equality checks - so it is never a combination. */
+function isCombinationCulprit(stages, membership, culprit) {
+  if (culprit.name === "task") return false;
+  const field = GENERIC_FILTER_FIELDS[culprit.name];
+  const baseline = stages[membership === null ? 0 : 1].records;
+  return baseline.some((r) => r[field] === culprit.value);
+}
+
+/** The first filter that narrowed a non-empty selection down to nothing - never the
+ * period itself, which is an honest zero rather than a filter's doing. Stages only ever
+ * shrink, so the first empty one is the whole answer to "which filter emptied it". */
+function emptySelectionOf(stages, input, membership) {
+  if (stages[0].records.length === 0) return undefined;
+  const culprit = stages.find((stage) => stage.records.length === 0);
+  if (!culprit) return undefined;
+  const known = isKnownFilterValue(culprit.name, culprit.value, input, membership);
+  const combination = isCombinationCulprit(stages, membership, culprit);
+  return { filter: culprit.name, value: culprit.value, known, ...(combination ? { combination: true } : {}) };
+}
+
+/** Which of the four generic filters were actually given, in the same fixed order - never
+ * `task`, which keeps its own top-level field exactly as before this change. `undefined`
+ * when none were, so a report answering an unfiltered period carries no empty object. */
+function activeFilters(filters) {
+  if (!filters) return undefined;
+  const given = GENERIC_FILTER_ORDER.filter((name) => filters[name] !== undefined);
+  return given.length === 0 ? undefined : Object.fromEntries(given.map((name) => [name, filters[name]]));
+}
+
+/** `by_tool` is a breakdown of every *declared* tool, not only the ones a record touched -
+ * that is what lets an unreadable one show its own reason instead of a false zero. A
+ * `--tool` filter has to narrow that same list, or every tool it excluded would still
+ * print a row reading "nothing in this period" - indistinguishable from one genuinely
+ * measured idle, exactly the lie a filter's whole point is to remove. */
+function declaredToolsInScope(declaredTools, filters) {
+  const wanted = filters ? filters.tool : undefined;
+  return wanted === undefined ? declaredTools : declaredTools.filter((tool) => tool.tool === wanted);
+}
+
 /**
  * Money and the four token counters come from `kind: "request"` records alone, and active
  * time from `kind: "session"` records alone. The two kinds measure overlapping quantities
@@ -228,9 +311,9 @@ function projectKeyOf(record) {
  */
 function build(input) {
   const membership = input.task === undefined ? null : taskMembership(input.journals, input.task);
-  const records = input.records.filter(
-    (r) => membership === null || taskAttributionOf(r, membership) !== null
-  );
+  const stages = selectionStages(input.records, input, membership);
+  const emptySelection = emptySelectionOf(stages, input, membership);
+  const records = stages[stages.length - 1].records;
 
   const totals = newTotals();
   const steps = new Map();
@@ -280,6 +363,8 @@ function build(input) {
     fromDay: input.fromDay,
     toDay: input.toDay,
     ...(input.task === undefined ? {} : { task: input.task }),
+    ...(activeFilters(input.filters) === undefined ? {} : { filters: activeFilters(input.filters) }),
+    ...(emptySelection === undefined ? {} : { emptySelection }),
     sessions: new Set(records.map((record) => record.vendor_id)).size,
     totals,
     ...(activeTimeSeconds === undefined ? {} : { activeTimeSeconds }),
@@ -288,7 +373,7 @@ function build(input) {
       [...models].map(([model, t]) => ({ model, totals: t })),
       (row) => row.model
     ),
-    byTools: toolRows(input.declaredTools, tools, toolSessionTotals),
+    byTools: toolRows(declaredToolsInScope(input.declaredTools, input.filters), tools, toolSessionTotals),
     byProjects: projectRows(projects),
     byDays: dayRows(days),
     attributionMix: attributionRows(attributions),

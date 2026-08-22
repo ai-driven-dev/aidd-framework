@@ -98,16 +98,22 @@ function readPeriod(fromDay, toDay) {
   const records = [];
   const undated = [];
   let skipped = 0;
+  const projects = new Set();
+  const steps = new Set();
+  const models = new Set();
   for (const fileName of dayFiles()) {
     const read = readDayFile(fileName);
     skipped += read.skipped;
     for (const record of read.records) {
+      if (record.project_id !== undefined) projects.add(record.project_id);
+      if (record.step !== undefined) steps.add(record.step);
+      if (record.model !== undefined) models.add(record.model);
       const key = recordDayKey(record);
       if (key === null) undated.push(record);
       else if (key >= fromDay && key <= toDay) records.push(record);
     }
   }
-  return { records, undated, skipped };
+  return { records, undated, skipped, known: { projects, steps, models } };
 }
 
 module.exports = { SCHEMA_VERSION, append, readForVendor, readPeriod, rootDir };

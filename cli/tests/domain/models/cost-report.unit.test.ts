@@ -624,3 +624,182 @@ describe("buildCostReport — the same records, however they arrive", () => {
     expect(backwards).toEqual(forwards);
   });
 });
+
+describe("buildCostReport — any dimension filters as well as it groups", () => {
+  const AT = "2026-08-18T10:00:00Z";
+  const WIDGETS: readonly TelemetrySinkRecord[] = [
+    request({
+      turn_id: "a",
+      cost_usd: 1,
+      model: "opus",
+      step: "impl",
+      step_attribution: "tool-stated",
+      tool: "claude",
+      project_id: "acme/widgets",
+      event_timestamp: AT,
+    }),
+    request({
+      turn_id: "b",
+      cost_usd: 2,
+      model: "sonnet",
+      step: "review",
+      step_attribution: "tool-stated",
+      tool: "codex",
+      project_id: "acme/widgets",
+      event_timestamp: AT,
+    }),
+  ];
+  const GADGETS: readonly TelemetrySinkRecord[] = [
+    request({
+      turn_id: "c",
+      cost_usd: 4,
+      model: "opus",
+      step: "impl",
+      step_attribution: "tool-stated",
+      tool: "claude",
+      project_id: "acme/gadgets",
+      event_timestamp: AT,
+    }),
+  ];
+  const declaredTools = [
+    { tool: "claude" as const, coverage: "covered" as const, capability: NO_CAPABILITY },
+    { tool: "codex" as const, coverage: "covered" as const, capability: NO_CAPABILITY },
+  ];
+  const knownValues = {
+    projects: new Set(["acme/widgets", "acme/gadgets"]),
+    steps: new Set(["impl", "review"]),
+    // "haiku" never appears on a WIDGETS/GADGETS record - known to the sweep, idle here.
+    models: new Set(["opus", "sonnet", "haiku"]),
+  };
+
+  function narrowed(overrides: Partial<CostReportInput> = {}) {
+    return report({ records: [...WIDGETS, ...GADGETS], declaredTools, knownValues, ...overrides });
+  }
+
+  it("narrows two filters to their intersection, never their union", () => {
+    const built = narrowed({ filters: { project: "acme/widgets", model: "opus" } });
+
+    expect(built.totals.requests).toBe(1);
+    expect(built.totals.costMicroUsd).toBe(toMicroUsd(1));
+  });
+
+  it("says which selection it answered", () => {
+    const built = narrowed({ filters: { project: "acme/widgets", step: "impl" } });
+
+    expect(built.filters).toEqual({ project: "acme/widgets", step: "impl" });
+  });
+
+  it("filtering and grouping on the same single-keyed dimension answers with one row", () => {
+    const byProject = narrowed({ filters: { project: "acme/widgets" } });
+    expect(byProject.byProjects).toHaveLength(1);
+    expect(byProject.byProjects[0]?.project).toBe("acme/widgets");
+
+    const byModel = narrowed({ filters: { model: "opus" } });
+    expect(byModel.byModels).toHaveLength(1);
+
+    // by_tool is a breakdown of every *declared* tool - a --tool filter has to narrow
+    // that list too, or every excluded tool would still print a row reading "nothing in
+    // this period", indistinguishable from one genuinely measured idle.
+    const byTool = narrowed({ filters: { tool: "codex" } });
+    expect(byTool.byTools).toHaveLength(1);
+    expect(byTool.byTools[0]?.tool).toBe("codex");
+    expect(byTool.byTools[0]?.totals.requests).toBe(1);
+  });
+
+  it("keeps a session-only figure under a step filter when a journal interval stamped one", () => {
+    // Unlike model, a step can land on a session record: `resolveStepAttribution` runs
+    // over every candidate regardless of kind, so a session record whose own moment falls
+    // inside a step interval carries `step` too.
+    const sessionRecord: TelemetrySinkRecord = sessionMeasure({
+      vendor_id: "s-3",
+      tool: "claude",
+      active_time_s: 30,
+      project_id: "acme/widgets",
+      step: "impl",
+      step_attribution: "journal-interval",
+    });
+
+    const withStep = narrowed({ filters: { step: "impl" }, records: [...WIDGETS, sessionRecord] });
+    const withOtherStep = narrowed({
+      filters: { step: "review" },
+      records: [...WIDGETS, sessionRecord],
+    });
+
+    expect(withStep.activeTimeSeconds).toBe(30);
+    expect(withOtherStep.activeTimeSeconds).toBeUndefined();
+  });
+
+  it("says a tool was never seen without claiming a record check it never ran", () => {
+    const built = narrowed({ filters: { tool: "opencode" } });
+
+    expect(built.emptySelection).toEqual({ filter: "tool", value: "opencode", known: false });
+  });
+
+  it("reconciles every breakdown to this selection's own total, exactly", () => {
+    const built = narrowed({ filters: { project: "acme/widgets" } });
+    const total = (rows: readonly { readonly totals: CostTotals }[]) =>
+      rows.reduce((sum, row) => sum + row.totals.requests, 0);
+
+    for (const rows of [built.bySteps, built.byModels, built.byProjects, built.byDays]) {
+      expect(total(rows)).toBe(built.totals.requests);
+    }
+  });
+
+  it("names the filter that emptied a selection a project nobody ever worked in", () => {
+    const built = narrowed({ filters: { project: "nobody-worked-here" } });
+
+    expect(built.emptySelection).toEqual({
+      filter: "project",
+      value: "nobody-worked-here",
+      known: false,
+    });
+  });
+
+  it("tells that empty apart from a known value with no work in this period", () => {
+    const built = narrowed({ filters: { model: "haiku" } });
+
+    expect(built.emptySelection).toEqual({ filter: "model", value: "haiku", known: true });
+  });
+
+  it("names the combination, not either filter alone, when both are real but their overlap is empty", () => {
+    const built = narrowed({ filters: { project: "acme/gadgets", model: "sonnet" } });
+
+    expect(built.emptySelection).toEqual({
+      filter: "model",
+      value: "sonnet",
+      known: true,
+      combination: true,
+    });
+  });
+
+  it("never reports a filter as the culprit when the period itself has nothing", () => {
+    const built = report({
+      fromDay: "2020-01-01",
+      toDay: "2020-01-01",
+      filters: { project: "acme/widgets" },
+    });
+
+    expect(built.emptySelection).toBeUndefined();
+  });
+
+  it("drops a session-only figure a model filter cannot speak to, never as a false zero", () => {
+    const sessionRecord: TelemetrySinkRecord = sessionMeasure({
+      vendor_id: "s-2",
+      tool: "claude",
+      active_time_s: 30,
+      project_id: "acme/widgets",
+    });
+
+    const withModel = narrowed({
+      filters: { model: "opus" },
+      records: [...WIDGETS, sessionRecord],
+    });
+    const withProject = narrowed({
+      filters: { project: "acme/widgets" },
+      records: [...WIDGETS, sessionRecord],
+    });
+
+    expect(withModel.activeTimeSeconds).toBeUndefined();
+    expect(withProject.activeTimeSeconds).toBe(30);
+  });
+});

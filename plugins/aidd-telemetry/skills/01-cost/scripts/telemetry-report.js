@@ -23,7 +23,9 @@ const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 const USAGE = [
   "Usage:",
   "  telemetry-report read [--session <id>]",
-  "  telemetry-report report [--from <day>] [--to <day>] [--days <n>] [--task <id>] [--json]",
+  "  telemetry-report report [--from <day>] [--to <day>] [--days <n>] [--json]",
+  "  telemetry-report report ... [--task <id>] [--project <id>] [--step <name>]",
+  "                              [--model <name>] [--tool <id>]",
   `  telemetry-report report ... --axis <${ARTEFACT_AXES.join("|")}>`,
 ].join("\n");
 
@@ -208,6 +210,18 @@ function runRead(argv, projectRoot) {
   }
 }
 
+/** The four filters that narrow on an equal record field, read straight off `argv` beside
+ * `--task`: any of them may be omitted, and each given one composes with the rest by
+ * `and`. */
+function readFilters(argv) {
+  const filters = {};
+  for (const name of ["project", "step", "model", "tool"]) {
+    const value = flag(argv, `--${name}`);
+    if (value !== undefined) filters[name] = value;
+  }
+  return filters;
+}
+
 function runReport(argv, projectRoot) {
   // The clock is read once, here: everything downstream works from two absolute days, so
   // the same call answers the same twice.
@@ -229,6 +243,8 @@ function runReport(argv, projectRoot) {
     undatedRecords: read.undated.length,
     unreadableLines: read.skipped,
     ...(task === undefined ? {} : { task }),
+    filters: readFilters(argv),
+    knownValues: read.known,
   });
   emitReport(out, argv, report);
 }

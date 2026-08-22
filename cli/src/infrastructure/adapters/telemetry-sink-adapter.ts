@@ -97,16 +97,22 @@ export class TelemetrySinkAdapter implements TelemetrySink {
     const records: TelemetrySinkRecord[] = [];
     const undated: TelemetrySinkRecord[] = [];
     let skippedLines = 0;
+    const projects = new Set<string>();
+    const steps = new Set<string>();
+    const models = new Set<string>();
     for (const fileName of await this.listDayFiles()) {
       const read = await this.readAllRecordsFromFile(fileName);
       skippedLines += read.skippedLines;
       for (const record of read.records) {
+        if (record.project_id !== undefined) projects.add(record.project_id);
+        if (record.step !== undefined) steps.add(record.step);
+        if (record.model !== undefined) models.add(record.model);
         const key = telemetrySinkRecordDayKey(record);
         if (key === undefined) undated.push(record);
         else if (key >= fromKey && key <= toKey) records.push(record);
       }
     }
-    return { records, undated, skippedLines };
+    return { records, undated, skippedLines, knownValues: { projects, steps, models } };
   }
 
   private async readAllRecordsFromFile(

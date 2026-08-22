@@ -1,6 +1,7 @@
 import {
   buildCostReport,
   type CostReport,
+  type CostReportFilters,
   type CostReportSessionJournal,
   type CostReportToolCapability,
   type CostReportToolDeclaration,
@@ -20,6 +21,9 @@ export interface ReportCostOptions {
   readonly period: ResolvedReportPeriod;
   /** Restrict to the sessions that wrote into this task. Absent reports the whole period. */
   readonly task?: TaskIdentity;
+  /** Any of `project`, `step`, `model` and `tool` - each optional, composing with `task`
+   * and each other by `and`. */
+  readonly filters?: CostReportFilters;
 }
 
 /** What each tool declares about being read at all, as data the pure report consumes. A
@@ -100,6 +104,8 @@ export class ReportCostUseCase {
       undatedRecords: read.undated.length,
       unreadableLines: read.skippedLines,
       ...(options.task === undefined ? {} : { task: options.task }),
+      ...(options.filters === undefined ? {} : { filters: options.filters }),
+      knownValues: read.knownValues,
     });
   }
 }

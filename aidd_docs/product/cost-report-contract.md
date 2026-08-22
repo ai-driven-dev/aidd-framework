@@ -21,10 +21,77 @@ the whole point: two ways of computing a number is how they start disagreeing.
 aidd telemetry report --json
 aidd telemetry report --from 2026-08-01 --to 2026-08-31 --json
 aidd telemetry report --task 2026_08/2026_08_21_cost-reporter --json
+aidd telemetry report --project acme/widgets --step aidd-dev:02-implement --json
 ```
 
 Prints one JSON object on stdout and exits `0`, including when the period holds nothing.
 A period that is not a period — `--from notaday`, `--days 0` — exits `1` naming the flag.
+A filter naming a value nothing ever recorded still exits `0` — see **Filters** below;
+only a malformed period is a usage error.
+
+## Filters
+
+Six dimensions exist: day, project, task, step, model, tool — an axis says how to
+*group*, a filter says what to *keep*, and every one of them works as either. The period
+(`--from`/`--to`/`--days`) is the day filter; `--task` already existed; `--project`,
+`--step`, `--model` and `--tool` are the other four, each optional:
+
+```bash
+aidd telemetry report --project acme/widgets --json          # this project, whole period
+aidd telemetry report --project acme/widgets --step aidd-dev:02-implement --json
+```
+
+**Filters compose by `and`, never by a query language.** Two given narrow to their
+intersection; there is no `or` and no parentheses — the moment a report needs one it has
+stopped being a report. Filtering and grouping on the same dimension (`--project X` next
+to a `by_project` breakdown that then holds one row) is a legal, boring answer, not an
+error.
+
+**"Axis" above means a breakdown, not a flag.** Every `by_*` array is always present in
+the object, on both `aidd telemetry report --json` and the plugin script, whatever filters
+were given — grouping by any of the six dimensions needs no separate flag; reading the
+matching array is the axis. The plugin script additionally offers `--axis <name>`, which
+picks one of those arrays and renders it alone as a small pasteable artefact (a total, a
+table) instead of the whole object — a convenience for copying one figure out, not a
+second way to group. `aidd telemetry report` does not have this flag: passed `--axis`, it
+refuses the option outright (`error: unknown option '--axis'`, exit `1`) rather than
+silently ignoring it. Every figure `--axis` can show is already in the plain `--json`
+object on both sides; only the one-artefact-at-a-time rendering is plugin-only.
+
+**A filter matching nothing names itself**, in `empty_selection`, rather than the object
+quietly reporting the same shape a genuinely idle period would:
+
+```jsonc
+"empty_selection": { "filter": "project", "value": "acme/ghost", "known": false }
+```
+
+`known: false` means no record this call could see ever carried that value — a project
+nobody ever worked in. `known: true` means the value is real, just idle in this selection;
+an optional `"combination": true` alongside it means the value matches something on its
+own, and it is the intersection with an already-applied filter that emptied the
+selection, not the value itself. `empty_selection` is **never** present for a period that
+is genuinely idle — that case is a row of zeros, because the zero is true; this field
+exists only for the different case, where a filter is what emptied it.
+
+The known/unknown distinction is only as good as what a call could still see: a value
+whose every record has since rotated out of the sink reads as `known: false`, the same as
+one that never existed. It answers "did anything I can still read ever carry this", not
+"did this ever happen".
+
+**A model filter always drops a whole-session figure; a step filter usually does.**
+`active_time_s` and a tool's `session_totals` come from `kind: "session"` records, and
+those never carry a `model` — no reader stamps one on a session-kind record, on any tool
+measured so far. Filtering by model is correct to exclude them: a model selection cannot
+speak to a whole-session figure no model was ever attached to. A `step` is different: a
+session record still gets one wherever its own moment happens to fall inside a journal's
+`step_start` interval, the same attribution every other record gets — so a step filter
+keeps a session record when that interval matches, and drops it otherwise. Either way the
+number does not appear as `0` when dropped; it is simply absent, the same convention every
+other "never observed" quantity in this object uses.
+
+Adding `filters` and `empty_selection` was not a `cost_report_version` bump: a consumer
+built against version 2 that never passes a filter never sees either field, and neither
+changes what any field it already understood means.
 
 ## Determinism
 
@@ -53,6 +120,8 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "cost_report_version": 2,
   "period": { "from_day": "2026-07-01", "to_day": "2026-07-31" },
   "task": "2026_08/2026_08_21_cost-reporter",   // absent unless --task was given
+  "filters": { "project": "acme/widgets" },     // absent unless a generic filter was given
+  "empty_selection": { "filter": "project", "value": "acme/ghost", "known": false },  // absent unless a filter, not the period, emptied this selection
   "sessions": 1,
   "totals": { "requests": 2, "input_tokens": 13930, "output_tokens": 4377, "cache_read_tokens": 165632, "cache_creation_tokens": 0 },
   "active_time_s": 2820,                        // absent when no record carried it

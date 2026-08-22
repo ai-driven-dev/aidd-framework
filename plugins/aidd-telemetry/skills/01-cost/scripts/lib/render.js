@@ -33,9 +33,14 @@ const MAX_PRINTED_DAYS = 31;
 /** Printed where a figure is genuinely not known, never as `$0.00`: a tool whose files
  * carry no amount has an unknown cost, not a free one. */
 const UNKNOWN_AMOUNT = "amount unknown";
-/** A covered tool that measured nothing, and a period holding nothing. The one place a
- * zero really is the measurement. */
+/** A covered tool that measured nothing, and a wholly unfiltered period holding nothing.
+ * The one place a zero really is the measurement of time passing with nothing happening. */
 const NOTHING_MEASURED = "nothing in this period";
+/** The same zero, under a selection narrower than the whole period. `task` and every
+ * generic filter already narrow the record set before any breakdown is computed, so a
+ * zero row under either is caused by the selection, not by real idleness - saying
+ * "period" there would be a false statement about time. */
+const NOTHING_IN_SELECTION = "nothing in this selection";
 /** What a tool's `sessionTotals` figure is called wherever it is printed - never merged
  * into the request-based figure beside it, and never called "cost" or "requests" since it
  * is neither. */
@@ -43,6 +48,51 @@ const SESSION_TOTAL_LABEL = "session total, not requests";
 
 const count = (value) => value.toLocaleString("en-US");
 const amount = (microUsd) => `$${(microUsd / MICRO_USD_PER_USD).toFixed(2)}`;
+
+/** `task` and the four generic filters both narrow the record set before any breakdown
+ * runs, so either one - alone or together - means every zero downstream is the selection
+ * talking, not the period. Every row measured against this reads unambiguously: nothing
+ * a filter can produce here escapes being counted as in-scope or out, so there is no row
+ * this call cannot decide for. */
+function hasSelection(subject) {
+  return subject.task !== undefined || subject.filters !== undefined;
+}
+
+function nothingLabel(subject) {
+  return hasSelection(subject) ? NOTHING_IN_SELECTION : NOTHING_MEASURED;
+}
+
+/** `name=value` for every active generic filter, in the fixed order `report.js` gives
+ * them - empty for an unfiltered period, since a header with nothing to add should add
+ * nothing. */
+function filtersSuffix(filters) {
+  if (!filters) return "";
+  const parts = Object.entries(filters).map(([name, value]) => `${name}=${value}`);
+  return parts.length === 0 ? "" : `    filters: ${parts.join(", ")}`;
+}
+
+// What "never known" means differs by filter: `task` and `tool` are checked against
+// journals and a declared list, never against a record, so saying "no record" for either
+// would claim a check this layer never ran.
+const UNKNOWN_REASON = {
+  task: "no journal has ever declared it or written into it",
+  tool: "it is not one of the tools this build knows",
+};
+
+function unknownReason(filter) {
+  return UNKNOWN_REASON[filter] ?? `no record has ever named this ${filter}`;
+}
+
+/** What a filter matching nothing says, told apart from a period that genuinely holds no
+ * work: that case never reaches here, since `report.js` only ever names an
+ * `emptySelection` when a filter - not the period itself - is what emptied it. */
+function emptySelectionMessage({ filter, value, known, combination }) {
+  if (!known) return `  ${filter} '${value}' matched nothing — ${unknownReason(filter)}`;
+  if (combination) {
+    return `  ${filter} '${value}' matched nothing combined with the rest of this selection`;
+  }
+  return `  ${filter} '${value}' matched nothing in this selection — known, but no work here`;
+}
 const pad = (label) => label.padEnd(LABEL_WIDTH);
 
 /** Shares are of cost where the period has one and of tokens where it does not, so a
@@ -73,7 +123,7 @@ function printTotals(out, report) {
   const { totals } = report;
   out(`  ${pad("sessions")}${count(report.sessions)}`);
   if (totals.requests === 0) {
-    out(`  ${pad("requests")}${NOTHING_MEASURED}`);
+    out(`  ${pad("requests")}${nothingLabel(report)}`);
     return;
   }
   const tokens = tokensOf(totals);
@@ -150,7 +200,7 @@ function printDays(out, report) {
   }
   for (const row of report.byDays) {
     if (row.totals.requests === 0) {
-      out(`    ${pad(row.day)}${NOTHING_MEASURED}`);
+      out(`    ${pad(row.day)}${nothingLabel(report)}`);
       continue;
     }
     const money =
@@ -174,7 +224,7 @@ function printTools(out, report) {
       const tokens = `${count(tokensOf(row.sessionTotals))} tokens (${SESSION_TOTAL_LABEL})`;
       out(`    ${pad(name)}${tokens}${because}`);
     } else if (row.totals.requests === 0) {
-      out(`    ${pad(name)}${NOTHING_MEASURED}${because}`);
+      out(`    ${pad(name)}${nothingLabel(report)}${because}`);
     } else {
       const money =
         row.totals.costMicroUsd === undefined ? UNKNOWN_AMOUNT : amount(row.totals.costMicroUsd);
@@ -193,16 +243,25 @@ function printCaveats(out, report) {
 }
 
 function printReport(out, report) {
-  out(`${report.task === undefined ? "period" : `task ${report.task}`}    ${report.fromDay} to ${report.toDay}`);
+  const scope = report.task === undefined ? "period" : `task ${report.task}`;
+  out(`${scope}    ${report.fromDay} to ${report.toDay}${filtersSuffix(report.filters)}`);
   out("");
+  if (report.emptySelection !== undefined) {
+    out(emptySelectionMessage(report.emptySelection));
+    out("");
+  }
   printTotals(out, report);
-  const basis = basisOf(report.totals);
-  printTaskAttribution(out, report, basis);
-  printSteps(out, report, basis);
-  printModels(out, report, basis);
-  printProjects(out, report, basis);
-  printTools(out, report);
-  printDays(out, report);
+  // A filter-emptied selection has nothing under any breakdown to show - every row would
+  // read "nothing in this period", which is exactly the false zero this layer refuses.
+  if (report.emptySelection === undefined) {
+    const basis = basisOf(report.totals);
+    printTaskAttribution(out, report, basis);
+    printSteps(out, report, basis);
+    printModels(out, report, basis);
+    printProjects(out, report, basis);
+    printTools(out, report);
+    printDays(out, report);
+  }
   printCaveats(out, report);
 }
 
@@ -223,6 +282,14 @@ function envelopeTotals(totals) {
   };
 }
 
+/** `undefined` when the selection matched something, or matched nothing only because the
+ * period itself held none - the same case `toEnvelope` never adds this field for. */
+function envelopeEmptySelection(emptySelection) {
+  if (emptySelection === undefined) return undefined;
+  const { filter, value, known, combination } = emptySelection;
+  return { filter, value, known, ...(combination ? { combination: true } : {}) };
+}
+
 function envelopeSupply(supply) {
   return supply === null
     ? null
@@ -241,6 +308,10 @@ function toEnvelope(report) {
     cost_report_version: ENVELOPE_VERSION,
     period: { from_day: report.fromDay, to_day: report.toDay },
     ...(report.task === undefined ? {} : { task: report.task }),
+    ...(report.filters === undefined ? {} : { filters: report.filters }),
+    ...(report.emptySelection === undefined
+      ? {}
+      : { empty_selection: envelopeEmptySelection(report.emptySelection) }),
     sessions: report.sessions,
     totals: envelopeTotals(report.totals),
     ...(report.activeTimeSeconds === undefined
@@ -311,22 +382,32 @@ function envelopeTokens(totals) {
   );
 }
 
-function artefactFigure(totals) {
-  if (totals.requests === 0) return NOTHING_MEASURED;
+function artefactFigure(totals, envelope) {
+  if (totals.requests === 0) return nothingLabel(envelope);
   const cost = totals.cost_micro_usd === undefined ? UNKNOWN_AMOUNT : amount(totals.cost_micro_usd);
   return `${cost} — ${count(envelopeTokens(totals))} tokens, ${count(totals.requests)} requests`;
 }
 
 /** States the period and the axis on every artefact, so a figure copied out of the session
  * that made it can still be placed - the same reason a chart names its own axes. */
+function artefactFilters(filters) {
+  if (!filters) return "";
+  return `, filters: ${Object.entries(filters)
+    .map(([name, value]) => `${name}=${value}`)
+    .join(", ")}`;
+}
+
+/** States the selection an artefact answered, the same reason it states its period and
+ * axis: a figure copied out has to be placeable without the command that made it. */
 function artefactHeader(envelope, axisLabel) {
   const { from_day, to_day } = envelope.period;
   const task = envelope.task === undefined ? "" : `, task ${envelope.task}`;
-  return `period ${from_day} to ${to_day}${task} — axis: ${axisLabel}`;
+  return `period ${from_day} to ${to_day}${task}${artefactFilters(envelope.filters)} — axis: ${axisLabel}`;
 }
 
 function artefactCaveats(envelope) {
   const lines = [];
+  if (envelope.empty_selection !== undefined) lines.push(emptySelectionMessage(envelope.empty_selection).trim());
   if (envelope.read.undated_records > 0) {
     lines.push(`${count(envelope.read.undated_records)} records carry no moment and are in no period`);
   }
@@ -338,7 +419,7 @@ function artefactCaveats(envelope) {
 
 /** One total, in a line: the answer to "what did this cost". */
 function totalArtefact(envelope) {
-  return [artefactHeader(envelope, "total"), "", artefactFigure(envelope.totals), ...artefactCaveats(envelope)].join(
+  return [artefactHeader(envelope, "total"), "", artefactFigure(envelope.totals, envelope), ...artefactCaveats(envelope)].join(
     "\n"
   );
 }
@@ -348,7 +429,7 @@ function totalArtefact(envelope) {
  * long series belongs, and dropping rows there would be the same false continuity that cap
  * exists to prevent in a terminal. The answer to "what changed". */
 function dayArtefact(envelope) {
-  const rows = envelope.by_day.map((row) => `| ${row.day} | ${artefactFigure(row.totals)} |`);
+  const rows = envelope.by_day.map((row) => `| ${row.day} | ${artefactFigure(row.totals, envelope)} |`);
   return [
     artefactHeader(envelope, "by day"),
     "",
@@ -363,7 +444,7 @@ function dayArtefact(envelope) {
  * go" answer, minus the share and attribution columns the inline reading adds: a table
  * meant to be pasted elsewhere carries the figures, not a computed percentage of them. */
 function breakdownArtefact(envelope, axis, column, nameOf) {
-  const rows = envelope[`by_${axis}`].map((row) => `| ${nameOf(row)} | ${artefactFigure(row.totals)} |`);
+  const rows = envelope[`by_${axis}`].map((row) => `| ${nameOf(row)} | ${artefactFigure(row.totals, envelope)} |`);
   return [
     artefactHeader(envelope, `by ${axis}`),
     "",
@@ -392,7 +473,7 @@ function toolArtefact(envelope) {
     } else if (row.totals.requests === 0 && row.session_totals) {
       value = `${count(envelopeTokens(row.session_totals))} tokens (${SESSION_TOTAL_LABEL})${because}`;
     } else {
-      value = `${artefactFigure(row.totals)}${because}`;
+      value = `${artefactFigure(row.totals, envelope)}${because}`;
     }
     return `| ${DISPLAY_NAME[row.tool]} | ${value} |`;
   });

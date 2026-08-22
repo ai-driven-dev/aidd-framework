@@ -21,10 +21,21 @@ export interface TelemetrySinkAppendResult {
  * `skippedLines` is not diagnostics: a report built from a partial read is
  * indistinguishable from a complete one unless the count travels with the records, and a
  * total that quietly omits lines is the failure this layer exists to prevent. */
+/** Every value a filterable field has carried, anywhere this sweep looked - not only in
+ * the period returned. Telling a filter naming something that never existed apart from
+ * one that simply had no work in this period only stays cheap because these are gathered
+ * from the same bytes `records` already comes from, never a second read. */
+export interface TelemetrySinkKnownValues {
+  readonly projects: ReadonlySet<string>;
+  readonly steps: ReadonlySet<string>;
+  readonly models: ReadonlySet<string>;
+}
+
 export interface TelemetrySinkPeriodRead {
   readonly records: readonly TelemetrySinkRecord[];
   readonly undated: readonly TelemetrySinkRecord[];
   readonly skippedLines: number;
+  readonly knownValues: TelemetrySinkKnownValues;
 }
 
 /** Separate from `FileWriter`/`FileReader`: a day file is append-only for its whole life,

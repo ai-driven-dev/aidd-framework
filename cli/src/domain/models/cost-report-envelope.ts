@@ -1,5 +1,11 @@
 import type { TelemetryRouteSupply } from "../capabilities/telemetry-capability.js";
-import type { CostReport, CostReportToolCoverage, CostTotals } from "./cost-report.js";
+import type {
+  CostReport,
+  CostReportEmptySelection,
+  CostReportFilters,
+  CostReportToolCoverage,
+  CostTotals,
+} from "./cost-report.js";
 import type { StepAttributionSource } from "./step-attribution.js";
 import type { TaskAttributionSource } from "./task-attribution.js";
 import type { AiToolId } from "./tool-ids.js";
@@ -115,6 +121,12 @@ export interface CostReportEnvelope {
   /** The period as it resolved, absolutely — never as it was asked for. */
   readonly period: { readonly from_day: string; readonly to_day: string };
   readonly task?: string;
+  /** Only the generic filters actually given - `task` above keeps its own field,
+   * unchanged. Absent for an unfiltered period. */
+  readonly filters?: CostReportFilters;
+  /** Present only when a filter, never the period itself, is what emptied this
+   * selection - naming which one, and whether its value was ever known at all. */
+  readonly empty_selection?: CostReportEmptySelection;
   readonly sessions: number;
   readonly totals: CostReportEnvelopeTotals;
   /** Per session, and never broken down by step: no active-time measure on any tool
@@ -227,6 +239,8 @@ export function toCostReportEnvelope(report: CostReport): CostReportEnvelope {
     cost_report_version: COST_REPORT_ENVELOPE_VERSION,
     period: { from_day: report.fromDay, to_day: report.toDay },
     ...(report.task === undefined ? {} : { task: report.task }),
+    ...(report.filters === undefined ? {} : { filters: report.filters }),
+    ...(report.emptySelection === undefined ? {} : { empty_selection: report.emptySelection }),
     sessions: report.sessions,
     totals: totals(report.totals),
     ...(report.activeTimeSeconds === undefined ? {} : { active_time_s: report.activeTimeSeconds }),

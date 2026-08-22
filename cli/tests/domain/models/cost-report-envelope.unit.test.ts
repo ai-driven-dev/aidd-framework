@@ -93,6 +93,33 @@ describe("toCostReportEnvelope", () => {
     expect(envelopeOf().period).toEqual({ from_day: "2026-08-17", to_day: "2026-08-21" });
   });
 
+  it("carries no filters object at all for an unfiltered period", () => {
+    expect(envelopeOf().filters).toBeUndefined();
+  });
+
+  it("carries only the generic filters given, snake_case field names untouched", () => {
+    const envelope = envelopeOf({
+      records: [record({ turn_id: "a", cost_usd: 1, project_id: "acme/widgets" })],
+      filters: { project: "acme/widgets" },
+    });
+
+    expect(envelope.filters).toEqual({ project: "acme/widgets" });
+  });
+
+  it("names the filter that emptied a selection, distinguishing known from never seen", () => {
+    const envelope = envelopeOf({
+      records: [record({ turn_id: "a", cost_usd: 1, project_id: "acme/widgets" })],
+      knownValues: { projects: new Set(["acme/widgets"]), steps: new Set(), models: new Set() },
+      filters: { project: "never-worked-here" },
+    });
+
+    expect(envelope.empty_selection).toEqual({
+      filter: "project",
+      value: "never-worked-here",
+      known: false,
+    });
+  });
+
   it("keeps an absent counter absent, never turning it into a zero", () => {
     const envelope = envelopeOf({ records: [record({ input_tokens: 0 })] });
 

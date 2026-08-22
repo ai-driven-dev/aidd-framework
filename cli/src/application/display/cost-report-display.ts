@@ -2,6 +2,9 @@ import type {
   CostReport,
   CostReportAttributionRow,
   CostReportDayRow,
+  CostReportEmptySelection,
+  CostReportFilterName,
+  CostReportFilters,
   CostReportProjectRow,
   CostReportStepRow,
   CostReportTaskAttributionRow,
@@ -32,10 +35,15 @@ const TASK_ATTRIBUTION_LABELS: Record<TaskAttributionSource, string> = {
 /** Printed where a figure is genuinely not known, never as `$0.00`. A tool whose own files
  * carry no amount has an unknown cost, not a free one. */
 const UNKNOWN_AMOUNT = "amount unknown";
-/** A covered tool with no records, and a period with none at all. Distinct from both an
- * unknown amount and a zero: this one really did measure nothing, and saying so is the
- * only reading the records support. */
+/** A covered tool with no records, and a wholly unfiltered period with none at all.
+ * Distinct from both an unknown amount and a zero: this one really did measure nothing,
+ * and saying so is the only reading the records support. */
 const NOTHING_MEASURED = "nothing in this period";
+/** The same zero, under a selection narrower than the whole period. `task` and every
+ * generic filter already narrow the record set before any breakdown is computed, so a
+ * zero row under either is caused by the selection, not by real idleness - saying
+ * "period" there would be a false statement about time. */
+const NOTHING_IN_SELECTION = "nothing in this selection";
 /** What a tool's `sessionTotals` figure is called wherever it is printed - never merged
  * into the request-based figure beside it, and never called "cost" or "requests" since it
  * is neither. */
@@ -90,11 +98,59 @@ function pad(label: string): string {
   return label.padEnd(LABEL_WIDTH);
 }
 
+/** `task` and the four generic filters both narrow the record set before any breakdown
+ * runs, so either one - alone or together - means every zero downstream is the selection
+ * talking, not the period. Every row measured against this reads unambiguously: nothing
+ * a filter can produce here escapes being counted as in-scope or out, so there is no row
+ * this call cannot decide for. */
+function hasSelection(report: Pick<CostReport, "task" | "filters">): boolean {
+  return report.task !== undefined || report.filters !== undefined;
+}
+
+function nothingLabel(report: Pick<CostReport, "task" | "filters">): string {
+  return hasSelection(report) ? NOTHING_IN_SELECTION : NOTHING_MEASURED;
+}
+
+/** `name=value` for every active generic filter, in the fixed order `cost-report.ts`
+ * gives them - empty for an unfiltered period. */
+function filtersSuffix(filters: CostReportFilters | undefined): string {
+  if (!filters) return "";
+  const parts = Object.entries(filters).map(([name, value]) => `${name}=${value}`);
+  return parts.length === 0 ? "" : `    filters: ${parts.join(", ")}`;
+}
+
+// What "never known" means differs by filter: `task` and `tool` are checked against
+// journals and a declared list, never against a record, so saying "no record" for either
+// would claim a check this layer never ran.
+const UNKNOWN_REASON: Partial<Record<CostReportFilterName, string>> = {
+  task: "no journal has ever declared it or written into it",
+  tool: "it is not one of the tools this build knows",
+};
+
+function unknownReason(filter: CostReportFilterName): string {
+  return UNKNOWN_REASON[filter] ?? `no record has ever named this ${filter}`;
+}
+
+/** What a filter matching nothing says, told apart from a period that genuinely holds no
+ * work: that case never reaches here, since the report only ever carries an
+ * `emptySelection` when a filter - not the period itself - is what emptied it. */
+function emptySelectionMessage({
+  filter,
+  value,
+  known,
+  combination,
+}: CostReportEmptySelection): string {
+  if (!known) return `  ${filter} '${value}' matched nothing — ${unknownReason(filter)}`;
+  if (combination)
+    return `  ${filter} '${value}' matched nothing combined with the rest of this selection`;
+  return `  ${filter} '${value}' matched nothing in this selection — known, but no work here`;
+}
+
 function printTotals(output: CLIOutput, report: CostReport): void {
   const { totals } = report;
   if (totals.requests === 0) {
     output.print(`  ${pad("sessions")}${formatCount(report.sessions)}`);
-    output.print(`  ${pad("requests")}${NOTHING_MEASURED}`);
+    output.print(`  ${pad("requests")}${nothingLabel(report)}`);
     return;
   }
   const tokens = totalTokens(totals);
@@ -149,7 +205,11 @@ function printAttributionRows(
 /** Every declared tool, including the ones that can say nothing. A tool missing from this
  * list is a tool a reader takes for one that did nothing, and for an unreadable one that
  * is the false zero this whole layer exists to prevent. */
-function printToolRows(output: CLIOutput, rows: readonly CostReportToolRow[]): void {
+function printToolRows(
+  output: CLIOutput,
+  rows: readonly CostReportToolRow[],
+  report: Pick<CostReport, "task" | "filters">
+): void {
   for (const row of rows) {
     const name = getAiToolConfig(row.tool).displayName;
     if (row.coverage === "not-covered") {
@@ -162,7 +222,9 @@ function printToolRows(output: CLIOutput, rows: readonly CostReportToolRow[]): v
       continue;
     }
     if (row.totals.requests === 0) {
-      output.print(`    ${pad(name)}${NOTHING_MEASURED}${row.reason ? ` — ${row.reason}` : ""}`);
+      output.print(
+        `    ${pad(name)}${nothingLabel(report)}${row.reason ? ` — ${row.reason}` : ""}`
+      );
       continue;
     }
     const figure =
@@ -255,7 +317,11 @@ function printProjects(
  * `MAX_PRINTED_DAYS`, a person reads a count and where to get the rest - the envelope
  * still carries every day, since suppressing a row there would be the same false
  * continuity this layer refuses everywhere else. */
-function printDays(output: CLIOutput, rows: readonly CostReportDayRow[]): void {
+function printDays(
+  output: CLIOutput,
+  rows: readonly CostReportDayRow[],
+  report: Pick<CostReport, "task" | "filters">
+): void {
   if (rows.length === 0) return;
   output.print("");
   output.print("  by day");
@@ -267,7 +333,7 @@ function printDays(output: CLIOutput, rows: readonly CostReportDayRow[]): void {
   }
   for (const row of rows) {
     if (row.totals.requests === 0) {
-      output.print(`    ${pad(row.day)}${NOTHING_MEASURED}`);
+      output.print(`    ${pad(row.day)}${nothingLabel(report)}`);
       continue;
     }
     const figure =
@@ -289,21 +355,29 @@ function printDays(output: CLIOutput, rows: readonly CostReportDayRow[]): void {
  */
 export function printCostReport(output: CLIOutput, report: CostReport): void {
   const scope = report.task === undefined ? "period" : `task ${report.task}`;
-  output.print(`${scope}    ${report.fromDay} to ${report.toDay}`);
+  output.print(`${scope}    ${report.fromDay} to ${report.toDay}${filtersSuffix(report.filters)}`);
   output.print("");
+  if (report.emptySelection !== undefined) {
+    output.print(emptySelectionMessage(report.emptySelection));
+    output.print("");
+  }
   printTotals(output, report);
 
-  const basis: Basis = {
-    ...shareBasis(report.totals),
-    useCost: report.totals.costMicroUsd !== undefined,
-  };
-  printTaskAttribution(output, report, basis);
-  printStepsAndAttribution(output, report, basis);
-  printModels(output, report, basis);
-  printProjects(output, report.byProjects, basis);
-  output.print("");
-  output.print("  by tool");
-  printToolRows(output, report.byTools);
-  printDays(output, report.byDays);
+  // A filter-emptied selection has nothing under any breakdown to show - every row would
+  // read "nothing in this period", which is exactly the false zero this layer refuses.
+  if (report.emptySelection === undefined) {
+    const basis: Basis = {
+      ...shareBasis(report.totals),
+      useCost: report.totals.costMicroUsd !== undefined,
+    };
+    printTaskAttribution(output, report, basis);
+    printStepsAndAttribution(output, report, basis);
+    printModels(output, report, basis);
+    printProjects(output, report.byProjects, basis);
+    output.print("");
+    output.print("  by tool");
+    printToolRows(output, report.byTools, report);
+    printDays(output, report.byDays, report);
+  }
   printCaveats(output, report);
 }
