@@ -241,3 +241,58 @@ distincte, non traitée par la phase 5a.
 et `plugin install` — pas par `update`. Un projet dont le fichier de réglages de l'outil a dérivé
 n'est donc pas remis d'aplomb par la commande que l'utilisateur associe naturellement à « remets-moi
 à jour ». Antérieur à la phase 5, repéré en la vérifiant.
+
+## Deux projets ne peuvent pas cohabiter dans le registre de copilot (2026-08-22)
+
+Les enregistrements de copilot sont **globaux à l'utilisateur et clés par nom**, alors qu'AIDD
+enregistre un arbre construit qui vit **dans un projet**. Un seul emplacement pour le nom
+`aidd-framework`, donc le premier projet le prend et le garde. Quand son répertoire disparaît, tous
+les autres projets cassent :
+
+```
+Native plugin activation — enable plugin 'aidd-vcs@aidd-framework' skipped:
+  copilot plugin install aidd-vcs@aidd-framework failed: Failed to fetch marketplace:
+  Local marketplace path does not exist: …/aidd-smoke-tools-XXXXXXXX…/built/aidd-framework/copilot
+```
+
+La logique de reprise existe pourtant — `registerMarketplace` tente `add`, et sur conflit
+désenregistre puis réenregistre. Elle est bloquée un cran plus loin :
+
+```
+Cannot remove marketplace "aidd-framework".
+Installed plugins from this marketplace: aidd-context, aidd-vcs, aidd-pm, …
+Use --force to remove the marketplace and uninstall all its plugins.
+```
+
+Copilot refuse de désenregistrer un marketplace dont des plugins sont installés. Le `--force` qu'il
+propose **désinstalle tous ces plugins**, y compris ceux que l'utilisateur aurait installés
+lui-même depuis ce marketplace. C'est pour ça que le correctif n'est pas pris ici : il détruit
+quelque chose qui ne nous appartient pas.
+
+Forme proposée, à valider : lire le chemin actuellement enregistré, et ne reprendre l'emplacement
+que s'il pointe vers un répertoire **qui n'existe plus** — un pointeur mort ne détruit rien. S'il
+pointe vers un autre projet vivant, avertir avec la commande, ne pas voler. Cela demande une lecture
+sur le port `NativePluginActivator`, ce que la tâche 2 de la phase 5 avait déjà anticipé.
+
+Au passage, une affirmation du code était fausse et a été corrigée : le commentaire de
+`registerMarketplace` disait que la CLI ne rejette `add` que pour une source différente. Mesuré,
+copilot rejette tout doublon de nom : `Marketplace "aidd-framework" already registered`.
+
+## Un marketplace de scope user atterrit dans le fichier d'un projet (2026-08-22)
+
+`aidd marketplace add usr … --scope user` l'enregistre dans le registre utilisateur d'AIDD, puis la
+synchronisation écrit son entrée dans `.claude/settings.local.json` **du projet courant** — vérifié.
+Le scope d'AIDD décrit donc où AIDD s'en souvient, pas où l'outil l'apprend.
+
+Claude accepte `--scope user` et écrit alors `~/.claude/settings.json` ; les trois autres n'ont pas
+de scope du tout. Une réponse cohérente existe donc, mais elle ferait écrire AIDD dans le répertoire
+personnel de l'utilisateur — exactement le genre d'écriture qui vient d'être retirée de la suite
+smoke. Non prise sans arbitrage.
+
+## Le port `listDirectory` ne tenait pas sa forme sous Windows (2026-08-22, corrigé)
+
+`FileAdapter.listDirectory` renvoyait la sortie brute de `relative()`, donc séparée par des
+antislashs sous Windows, alors que ses appelants comparent ces chemins à des chemins écrits avec des
+`/` dans les profils et le manifest. Aucun test ne pouvait l'attraper : l'adaptateur en mémoire, lui,
+a toujours produit des `/`, donc les deux implémentations divergeaient exactement là où personne ne
+regardait. Le port déclare maintenant sa forme et l'adaptateur réel s'y tient.

@@ -9,7 +9,7 @@ import {
   stat,
   writeFile,
 } from "node:fs/promises";
-import { dirname, join, relative } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 import { stripJsonComments } from "../../domain/formats/jsonc.js";
 import type { FileHash } from "../../domain/models/file.js";
 import {
@@ -95,7 +95,7 @@ export class FileAdapter implements FileReader, FileWriter, FileMerger {
       if (entry.isDirectory()) {
         await this.collectFiles(baseDir, fullPath, results);
       } else {
-        results.push(relative(baseDir, fullPath));
+        results.push(relative(baseDir, fullPath).split(sep).join("/"));
       }
     }
   }

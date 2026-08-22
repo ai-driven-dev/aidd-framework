@@ -328,13 +328,23 @@ export const copilot: AiTool<
       // installable from project scope (#3088). Drive `copilot plugin install` to
       // actually load plugins — the settings file below still surfaces recommendations.
       nativeActivation: { binary: "copilot", upgradeVerb: "update", enableVerb: "install" },
-      // VS Code Copilot: extraKnownMarketplaces in .github/copilot/settings.json.
-      // chat.plugins.marketplaces has application scope and cannot be set in workspace
-      // .vscode/settings.json — VSCode rejects it with "This setting has an application scope".
+      // VS Code Copilot reads this file, not the `copilot` CLI — measured: `copilot
+      // plugin marketplace add` writes ~/.copilot/settings.json and leaves this one
+      // untouched. `chat.plugins.marketplaces` cannot stand in for it either: it has
+      // application scope and VS Code rejects it in workspace .vscode/settings.json.
       // Source: https://code.visualstudio.com/docs/copilot/customization/agent-plugins
+      //
+      // That documentation also states what the file is for: "Projects can recommend
+      // plugins for team members by configuring plugin settings in the workspace
+      // settings". It is a shared, committed recommendation — so `enabledPlugins`,
+      // which names plugins, belongs in it, and the marketplace registrations, which
+      // name an absolute path on the machine that ran the install, do not. Copilot
+      // offers no machine-local project file to hold them, hence `null`: this CLI
+      // writes them nowhere, and drives `copilot plugin install` to register for real.
       marketplaceSettings: {
         settingsPath: ".github/copilot/settings.json",
         settingsKey: "extraKnownMarketplaces",
+        marketplacesSettingsPath: null,
         enabledPluginsKey: "enabledPlugins",
         toEntry: buildClaudeStyleMarketplaceEntry,
       },

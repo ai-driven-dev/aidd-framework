@@ -4,6 +4,7 @@ import { Manifest } from "../../../src/domain/models/manifest.js";
 import { Marketplace } from "../../../src/domain/models/marketplace.js";
 import type { ToolId } from "../../../src/domain/models/tool-ids.js";
 import "../../../src/domain/tools/ai/claude.js";
+import "../../../src/domain/tools/ai/copilot.js";
 import "../../../src/domain/tools/ai/cursor.js";
 import { InMemoryFileAdapter } from "../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryMarketplaceRegistry } from "../../helpers/ports/in-memory-marketplace-registry.js";
@@ -56,5 +57,12 @@ describe("DoctorRegistrationUseCase", () => {
 
   it("stays silent for a tool that keeps its registrations in a tracked file", async () => {
     expect(await issuesFor(null, "cursor")).toEqual([]);
+  });
+
+  // Copilot declares no place at all rather than a path, and `null` once slipped past
+  // a guard that only rejected `undefined` — straight into `join(root, null)`, which
+  // threw and took `plugin doctor` down with it. Caught by the smoke suite.
+  it("stays silent, and does not throw, for a tool that declares no place at all", async () => {
+    await expect(issuesFor(null, "copilot")).resolves.toEqual([]);
   });
 });

@@ -268,6 +268,30 @@ journey
 1. `.claude/settings.local.json` n'entre pas dans le manifest : AIDD l'écrit, ne le suit pas, et
    `status` ne peut donc pas rapporter de dérive dessus.
 
+## La réponse, outil par outil
+
+Chaque outil reçoit ce que son architecture permet, pas une règle uniforme. Ce qui décide, c'est où
+l'outil accepte de lire une déclaration machine-locale.
+
+| outil | ce que son architecture permet | ce qu'AIDD écrit |
+|---|---|---|
+| claude | trois scopes, et `--scope local` écrit `.claude/settings.local.json` — vérifié, c'est le fichier que Claude écrit lui-même | l'enregistrement va dans ce fichier, gitignoré, non suivi ; la config runtime et `enabledPlugins` restent partagés |
+| copilot | aucun jumeau machine-local. `.github/copilot/settings.json` est lu par VS Code et documenté comme la recommandation d'équipe ; `chat.plugins.marketplaces` a une portée application et VS Code la refuse en réglages d'espace de travail | `enabledPlugins` seulement. Aucun enregistrement : un chemin absolu ne peut pas être une recommandation d'équipe. Copilot apprend ses marketplaces par sa propre CLI |
+| codex | pas de réglages de marketplace du tout, tout passe par sa CLI | rien |
+| cursor | idem, et sa commande n'accepte qu'une URL git | rien |
+| opencode | mode plat, pas de plugins natifs | rien |
+
+La capability porte donc trois réponses possibles pour l'emplacement des enregistrements, et non deux :
+dans le fichier partagé, dans un fichier machine-local, ou **nulle part**.
+
+### Ce qui a été écarté, et pourquoi
+
+Un chemin **relatif** rendrait l'entrée identique sur toutes les machines et sur tous les OS, ce qui
+supprimerait le problème à la racine. Deux sondes n'ont pas pu établir que Claude le résout :
+`marketplace list` se contente de réafficher la déclaration, et `marketplace update` répond
+« Successfully updated » sur un chemin cassé. Aucune ne discrimine, donc rien n'est bâti dessus.
+Claude écrit lui-même un chemin absolu au scope local ; suivre sa convention est le choix défendable.
+
 ## Ce que la mise en œuvre a appris
 
 **Le golden a attrapé une régression que la coupe introduisait.** Sortir la clé du fichier suivi

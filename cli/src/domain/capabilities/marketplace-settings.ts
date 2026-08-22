@@ -32,13 +32,19 @@ export interface MarketplaceSettings {
   enabledPluginsKey?: string;
   enabledPluginsSettingsPath?: string;
   /**
-   * Where the registered marketplaces go, when that is not `settingsPath`.
+   * Where the registered marketplaces go. They name a built marketplace by absolute
+   * path, so they describe one machine and one operating system, which decides the
+   * three answers a tool can give:
    *
-   * The entries name a built marketplace by absolute path, so they describe one
-   * machine and cannot be committed. Declaring this sends them to a file the tool
-   * still reads but the CLI neither commits nor hashes — the sibling keys, which hold
-   * names rather than paths, stay in `settingsPath` where a team can share them.
+   * - `undefined` — into `settingsPath`, alongside the rest. Only sound for a tool
+   *   whose settings file is not meant to be shared.
+   * - a path — into a file of its own, which the tool reads but this CLI neither
+   *   commits nor hashes. The sibling keys hold names rather than paths, so they stay
+   *   in `settingsPath` where a team can share them.
+   * - `null` — nowhere. The tool offers no machine-local project file, and its shared
+   *   one is explicitly for recommending plugins to teammates, where a path belonging
+   *   to whoever ran the install is worse than nothing.
    */
-  marketplacesSettingsPath?: string;
+  marketplacesSettingsPath?: string | null;
   toEntry(input: MarketplaceSettingsInput): MarketplaceSettingsEntry | null;
 }

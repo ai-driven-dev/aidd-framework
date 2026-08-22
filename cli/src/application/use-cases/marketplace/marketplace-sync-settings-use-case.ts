@@ -271,6 +271,11 @@ export class MarketplaceSyncSettingsUseCase {
     marketplaces: readonly Marketplace[],
     versionByName: Map<string, string | undefined>
   ): Promise<boolean> {
+    if (settings.marketplacesSettingsPath === null) {
+      // Nowhere to put them, so put them nowhere. The tool learns about its
+      // marketplaces through its own CLI instead; see the profile for why.
+      return this.evictMarketplacesFromSharedFile(toolId, projectRoot, manifest, settings);
+    }
     const relativePath = settings.marketplacesSettingsPath ?? settings.settingsPath;
     const absPath = resolve(projectRoot, relativePath);
     const json = await this.loadSettings(absPath);
@@ -292,7 +297,7 @@ export class MarketplaceSyncSettingsUseCase {
     if (!merged) return evicted;
     const content = JSON.stringify(json, null, 2);
     await this.fs.writeFile(absPath, content);
-    if (settings.marketplacesSettingsPath == null) {
+    if (settings.marketplacesSettingsPath === undefined) {
       manifest.updateTrackedFileHash(toolId, settings.settingsPath, this.hasher.hash(content));
     }
     return true;
@@ -307,7 +312,7 @@ export class MarketplaceSyncSettingsUseCase {
     manifest: Manifest,
     settings: MarketplaceSettings
   ): Promise<boolean> {
-    if (settings.marketplacesSettingsPath == null) return false;
+    if (settings.marketplacesSettingsPath === undefined) return false;
     const sharedPath = resolve(projectRoot, settings.settingsPath);
     const shared = await this.loadSettings(sharedPath);
     if (!(settings.settingsKey in shared)) return false;
@@ -498,10 +503,20 @@ export class MarketplaceSyncSettingsUseCase {
     return { kind: "local", path: resolve(projectRoot, source.path).replace(/\\/g, "/") };
   }
 
+  // These files are co-owned: the tool writes them too, and the machine-local one is
+  // untracked and gitignored, which is exactly the kind of file people hand-edit. A
+  // trailing comma must not take the whole sync down with it — start from empty and
+  // let the merge put back what belongs to this CLI.
   private async loadSettings(absPath: string): Promise<Record<string, unknown>> {
     if (!(await this.fs.fileExists(absPath))) return {};
     const content = await this.fs.readFile(absPath);
-    const parsed = JSON.parse(content) as unknown;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      this.logger.warn(`Ignoring malformed JSON in ${absPath}; rewriting the keys this CLI owns.`);
+      return {};
+    }
     if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
       return parsed as Record<string, unknown>;
     }

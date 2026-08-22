@@ -120,8 +120,10 @@ export function machineLocalFilesOf(toolId: ToolId): readonly string[] {
   const config = getToolConfig(toolId);
   if (config === undefined || !isAiTool(config)) return [];
   const caps = config.capabilities as {
-    plugins?: { marketplaceSettings?: { marketplacesSettingsPath?: string } | null };
+    plugins?: { marketplaceSettings?: { marketplacesSettingsPath?: string | null } | null };
   };
   const path = caps.plugins?.marketplaceSettings?.marketplacesSettingsPath;
-  return path === undefined ? [] : [path];
+  // `null` means the tool has nowhere machine-local to write, so there is no such file
+  // to keep out of `status` or the gitignore either.
+  return typeof path === "string" ? [path] : [];
 }

@@ -62,7 +62,7 @@ function buildDist(name = "aidd-context"): PluginDistribution {
 }
 
 describe("install copilot plugin via Mode A (integration)", () => {
-  it("writes extraKnownMarketplaces in .github/copilot/settings.json after sync", async () => {
+  it("recommends plugins in the shared file and puts no path in it", async () => {
     const fs = new InMemoryFileAdapter();
     const hasher = new DeterministicHasher();
     const manifestRepo = new InMemoryManifestRepository();
@@ -85,12 +85,16 @@ describe("install copilot plugin via Mode A (integration)", () => {
     expect(result.updatedTools).toContain("copilot");
     const settingsPath = resolve(PROJECT_ROOT, ".github/copilot/settings.json");
     const settings = JSON.parse(await fs.readFile(settingsPath)) as Record<string, unknown>;
-    expect(settings.extraKnownMarketplaces).toBeDefined();
-    // Settings reference the BUILT copilot tree, not the raw github source.
-    expect((settings.extraKnownMarketplaces as Record<string, unknown>)[MARKETPLACE_NAME]).toEqual({
-      source: { source: "directory", path: "/built/copilot" },
-    });
+
+    // VS Code reads this file to recommend plugins to teammates, so it carries names.
     expect(settings.enabledPlugins).toBeDefined();
+
+    // It must carry no marketplace registration: that names the built tree by absolute
+    // path, which belongs to whoever ran the install, and copilot offers no
+    // machine-local project file to hold it. Copilot learns its marketplaces from its
+    // own CLI instead.
+    expect(settings.extraKnownMarketplaces).toBeUndefined();
+    expect(JSON.stringify(settings)).not.toContain("/built/copilot");
   });
 
   it("drives the copilot CLI activator and still writes the settings file", async () => {
