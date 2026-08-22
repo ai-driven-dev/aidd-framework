@@ -7,11 +7,10 @@
 
 const fs = require("node:fs");
 
-const { normalizeSeparators } = require("./host.js");
-const { readCwd, resolveRunsDir } = require("./repo.js");
+const { normalizeSeparators, stringsWithin } = require("./host.js");
+const { resolveRunsDir } = require("./repo.js");
+const { readCwd, toolFor } = require("./tools/index.js");
 const { findRunFileByVendorId, appendLine, buildTaskDeclaredLine, nowIso } = require("./record.js");
-const { stringsWithin } = require("./step-starts.js");
-const { WRITTEN_PATH_EXTRACTOR_BY_HOST } = require("./file-writes.js");
 
 // Unanchored, and tolerant of sitting inside a larger string - a quote or whitespace closes
 // it, the same tolerance SKILL_FILE_PATTERN gives a Codex shell command line. Two shapes,
@@ -43,10 +42,12 @@ function declaredTaskPath(payload) {
 // handleFileWritten's claim, not this one's: that reading is exact (a field the host itself
 // populated), where a declaration is only ever an inference from arguments text, and the two
 // firing on the same event would be two claims about one write. Restricted to hosts and tools
-// WRITTEN_PATH_EXTRACTOR_BY_HOST actually names - a Bash write, which no extractor reads on
-// any host, is not excluded here and reaches the declaration below on its own arguments text.
+// whose own hooks/lib/tools/<host>.js names a writtenPath extractor - a Bash write, which no
+// extractor reads on any host, is not excluded here and reaches the declaration below on its
+// own arguments text.
 function statedAsWrittenAlready(payload, host) {
-  const extractWrittenPath = WRITTEN_PATH_EXTRACTOR_BY_HOST[host];
+  const tool = toolFor(host);
+  const extractWrittenPath = tool && tool.writtenPath;
   return typeof extractWrittenPath === "function" && typeof extractWrittenPath(payload) === "string";
 }
 

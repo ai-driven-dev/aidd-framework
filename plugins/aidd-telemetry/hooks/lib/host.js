@@ -11,6 +11,18 @@ function normalizeSeparators(value) {
   return value.replace(/\\/gu, "/");
 }
 
+// Every string reachable inside a payload value, walked because which field carries a
+// path differs by host and by tool - a skill's SKILL.md path, a declared task path. Neutral
+// like normalizeSeparators above: what it walks, not which host's payload it is walking.
+function* stringsWithin(value) {
+  if (typeof value === "string") {
+    yield value;
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  for (const nested of Object.values(value)) yield* stringsWithin(nested);
+}
+
 // The complete set of hosts journal.js will write for. A fifth host becomes one more
 // entry here, never a branch in the dispatcher - detectHost above stays the only place
 // that decides which host a payload came from; this only decides whether that host is
@@ -66,4 +78,4 @@ function detectHost(payload) {
   return null;
 }
 
-module.exports = { detectHost, normalizeSeparators, DECLARED_HOSTS };
+module.exports = { detectHost, normalizeSeparators, stringsWithin, DECLARED_HOSTS };

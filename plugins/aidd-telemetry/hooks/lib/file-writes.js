@@ -5,7 +5,8 @@
 const fs = require("node:fs");
 
 const { normalizeSeparators } = require("./host.js");
-const { readCwd, resolveRunsDir } = require("./repo.js");
+const { resolveRunsDir } = require("./repo.js");
+const { readCwd, toolFor, TOOLS_BY_HOST } = require("./tools/index.js");
 const path = require("node:path");
 const { findRunFileByVendorId, appendLine, buildFileWrittenLine, nowIso } = require("./record.js");
 
@@ -33,29 +34,16 @@ function taskFolderRelativePath(repoRoot, rawPath) {
 }
 
 // The written-path field differs per tool, and Codex has no path field at all - it is
-// inside an apply_patch command string. Hence a per-host extractor.
-
-const CLAUDE_CODE_WRITE_TOOL_PATH_FIELDS = Object.freeze({
-  Write: "file_path",
-  Edit: "file_path",
-  NotebookEdit: "notebook_path",
-});
-
-function extractWrittenPathClaudeCode(payload) {
-  const field = CLAUDE_CODE_WRITE_TOOL_PATH_FIELDS[payload.tool_name];
-  if (!field) return null;
-  const value = payload.tool_input && payload.tool_input[field];
-  return typeof value === "string" && value ? value : null;
-}
-
-// Claude Code alone, and that is a coverage fact rather than an oversight: Copilot and
-// Cursor were never captured handing a path to a hook, and Codex writes through an
-// apply_patch command string. A host with no entry here is not blind to tasks - the
-// observed pass below covers it - but a stated path is exact where an observed one is
-// inferred, so it is preferred wherever it exists.
-const WRITTEN_PATH_EXTRACTOR_BY_HOST = Object.freeze({
-  "claude-code": extractWrittenPathClaudeCode,
-});
+// inside an apply_patch command string. Each host's own hooks/lib/tools/<host>.js states
+// its extractor, or null; gathered here for a caller that wants every host covered rather
+// than one at a time (see cli/tests/helpers/telemetry-journal-hook.ts).
+const WRITTEN_PATH_EXTRACTOR_BY_HOST = Object.freeze(
+  Object.fromEntries(
+    Object.entries(TOOLS_BY_HOST)
+      .filter(([, tool]) => tool.writtenPath)
+      .map(([host, tool]) => [host, tool.writtenPath])
+  )
+);
 
 const TASKS_DIR = "aidd_docs/tasks";
 // A task folder holds documents. A scan that walked node_modules would cost more than the
@@ -215,7 +203,8 @@ function realPathOf(rawPath) {
 
 // The path the host handed us, when it hands one and it looks like a task path at all.
 function statedRawPath(payload, host) {
-  const extractWrittenPath = WRITTEN_PATH_EXTRACTOR_BY_HOST[host];
+  const tool = toolFor(host);
+  const extractWrittenPath = tool && tool.writtenPath;
   if (!extractWrittenPath) return null;
   const rawPath = extractWrittenPath(payload);
   return looksLikeTaskPath(rawPath) ? rawPath : null;

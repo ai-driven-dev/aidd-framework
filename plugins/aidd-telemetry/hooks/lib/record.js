@@ -12,8 +12,8 @@ const {
   resolveWriteTarget,
   tightenOwnedDir,
   PRIVATE_DIR_MODE,
-  readCwd,
 } = require("./repo.js");
+const { TOOLS_BY_HOST, readCwd, readSessionId } = require("./tools/index.js");
 
 // Hand-rolled ULID - 48-bit millisecond timestamp plus 80 bits of randomness, both
 // Crockford base32 - since this plugin ships with no dependencies.
@@ -94,80 +94,20 @@ function findRunFileByVendorId(dir, vendorId) {
 // on session_start, so a reader can tell a file's shape without scanning it.
 const SCHEMA_VERSION = 2;
 
-// Which export-side attribute vendor_id can be joined against, per host - measured, never
-// guessed. `null` on Cursor is a fact, not a gap: its own telemetry export is itself
-// unmeasured (an Enterprise team setting nobody here can turn on), so there is no
-// attribute name to name. A documented-but-uncaptured guess would be exactly the false
-// figure this layer exists to prevent.
-const VENDOR_FIELD_BY_HOST = Object.freeze({
-  "claude-code": "session.id", // CLAUDE_TELEMETRY_IDENTITY_ATTRIBUTE, measured 2026-08-13.
-  codex: "conversation.id", // Measured 2026-08-13, on codex.sse_event.
-  copilot: "gen_ai.conversation.id", // Measured 2026-08-13, on the invoke_agent span.
-  cursor: null,
-  // OpenCode's own opencode.ts declares telemetryExport "unmeasured": session.id is
-  // documented on the ai.streamText span behind experimental.openTelemetry, but no export
-  // has been captured to confirm it - that is #653's probe, not this one. null here is the
-  // same fact Cursor's entry already states: a documented-but-uncaptured attribute name
-  // would be exactly the false figure this field exists to prevent.
-  opencode: null,
-});
+// Which export-side attribute vendor_id can be joined against, per host - each host's own
+// hooks/lib/tools/<host>.js states it, measured or explicitly null; this is that fact
+// gathered into the one shape buildSessionStartLine below already expects.
+const VENDOR_FIELD_BY_HOST = Object.freeze(
+  Object.fromEntries(
+    Object.entries(TOOLS_BY_HOST).map(([host, tool]) => [host, tool.vendorField])
+  )
+);
 
-// A Codex rollout is named `rollout-<timestamp>-<uuid>.jsonl`, and that trailing uuid is
-// the rollout's own `session_meta.id` - measured across every rollout on disk, including
-// resumed ones where it differs from `session_meta.session_id`. The reader side resolves a
-// Codex session on exactly this equality; see CODEX_ROLLOUT_LOCATION in
-// cli/src/domain/formats/codex-rollout.ts, whose `matches` this mirrors. The two parses
-// live apart because hooks/ is copied verbatim by the framework build and can import
-// nothing from cli/ - the same reason sanitizePathSegment is duplicated - so
-// tests/domain/formats/codex-rollout.unit.test.ts pins them to each other and turns red if
-// either moves.
-const CODEX_ROLLOUT_PREFIX = "rollout-";
-const CODEX_ROLLOUT_EXTENSION = ".jsonl";
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
-
-function codexSessionIdFromTranscriptPath(transcriptPath) {
-  if (typeof transcriptPath !== "string" || transcriptPath === "") return undefined;
-  const base = transcriptPath.split(/[\\/]/u).pop() || "";
-  if (!base.startsWith(CODEX_ROLLOUT_PREFIX) || !base.endsWith(CODEX_ROLLOUT_EXTENSION)) {
-    return undefined;
-  }
-  const stem = base.slice(0, -CODEX_ROLLOUT_EXTENSION.length);
-  const candidate = stem.slice(-36);
-  return UUID_PATTERN.test(candidate) && stem.length > 36 ? candidate : undefined;
-}
-
-// How each host names the session id in its own hook payload. journal.js used to read
-// payload.session_id outright - one host's spelling, promoted to a rule. Copilot alone
-// spells it sessionId; every other declared host agrees on session_id.
-//
-// Codex is the one host whose payload spelling cannot simply be trusted: 124 of 330
-// rollouts on this machine are resumed sessions where `session_meta.session_id` holds the
-// parent's identifier rather than the rollout's own, and a vendor_id written from the
-// wrong one joins to nothing while the journal still looks healthy. Its payload carries
-// `transcript_path` - measured 2026-08-21 from the serde field table shipped in the
-// codex-cli 0.145.0 binary, `strings -n 4 <bin> | grep session_id`, which lists
-// `session_id transcript_path hook_event_name reason permission_mode source turn_id
-// agent_transcript_path agent_type last_assistant_message` - so the identity is derived
-// from the rollout the session is actually writing, and the two sides agree by
-// construction instead of by coincidence. `session_id` remains the fallback for a payload
-// carrying no transcript path.
-const SESSION_ID_READER_BY_HOST = Object.freeze({
-  "claude-code": (payload) => payload.session_id,
-  codex: (payload) =>
-    codexSessionIdFromTranscriptPath(payload.transcript_path) ?? payload.session_id,
-  // sessionId is the canonical builder's spelling; session_id is the _vsCodeCompat
-  // builder's (see lib/host.js) - both are Copilot's own, never a fallback guess.
-  copilot: (payload) => payload.sessionId ?? payload.session_id,
-  cursor: (payload) => payload.session_id,
-  // opencode-plugin.js builds this payload itself and already names the field session_id -
-  // no vendor spelling to read behind, since there is no vendor payload here at all.
-  opencode: (payload) => payload.session_id,
-});
-
-function readSessionId(host, payload) {
-  const reader = SESSION_ID_READER_BY_HOST[host];
-  return reader ? reader(payload) : undefined;
-}
+// codexSessionIdFromTranscriptPath and readSessionId(host, payload) live in
+// hooks/lib/tools/ now (codex.js and tools/index.js respectively) and are re-exported
+// below unchanged - CLI tests reach them by exactly these names (see
+// cli/tests/helpers/telemetry-journal-hook.ts).
+const { codexSessionIdFromTranscriptPath } = require("./tools/codex.js");
 
 const PRIVATE_FILE_MODE = 0o600;
 
@@ -317,7 +257,6 @@ module.exports = {
   findRunFileByVendorId,
   SCHEMA_VERSION,
   VENDOR_FIELD_BY_HOST,
-  SESSION_ID_READER_BY_HOST,
   codexSessionIdFromTranscriptPath,
   readSessionId,
   appendLine,
