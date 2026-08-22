@@ -19,7 +19,7 @@ The path to `telemetry-switch.js`, and whether the switch is already on.
 2. **Check node.** Run `node --version`. The script needs it and nothing else, no package manager and no global install.
    - Node is missing: stop, and say the host has no runtime for the plugin's scripts.
 3. **Read the switch.** Read `telemetry.enabled` from `.aidd/config.json`.
-   - Already `true`: go to verify, there is nothing to turn on.
+   - Already `true`: no consent to ask again, but run `node <telemetry-switch.js> on` once more anyway — idempotent on the switch itself, and it is what catches a project turned on before this check existed up on ignoring the journal and naming any of it git already tracks. Relay what it prints, then go to verify.
    - Absent or `false`: go to enable.
 
 ## Test
@@ -28,4 +28,4 @@ The path to `telemetry-switch.js`, and whether the switch is already on.
 | --- | --- |
 | The plugin is installed | the script's path resolves with nothing else installed |
 | The plugin is absent | the run stops and writes nothing |
-| The switch is already on | the run goes straight to verify |
+| The switch is already on | the run goes to verify without asking again, but still catches the journal up on `.gitignore` and names anything already tracked |
