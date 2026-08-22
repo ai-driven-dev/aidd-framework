@@ -73,7 +73,13 @@ export class EnsureBuiltMarketplaceUseCase {
     const memoKey = `${options.marketplace.name}:${options.target}:${sentinel}`;
     const memoized = this.memo.get(memoKey);
     if (memoized !== undefined) return memoized;
-    const result = await this.ensure(options, builtDir, resolve(resolved.localPath), sentinel);
+    const result = await this.ensure(
+      options,
+      builtDir,
+      resolve(resolved.localPath),
+      sentinel,
+      this.versionIsTrustworthy(options)
+    );
     this.memo.set(memoKey, result);
     return result;
   }
@@ -82,14 +88,32 @@ export class EnsureBuiltMarketplaceUseCase {
     return `${this.version.get()}:${catalogVersion ?? UNVERSIONED}`;
   }
 
+  /**
+   * Whether the catalog version can be believed when it says nothing changed.
+   *
+   * For a published source it can: a different content carries a different version.
+   * For a directory on this machine it cannot — someone edits a file and the version
+   * stays put, which is the whole of framework development. And an explicit refresh
+   * asks for the source to be re-read, so believing a cached answer would answer a
+   * different question than the one asked.
+   *
+   * Rebuilding costs about two tenths of a second for the real framework, 434 files,
+   * so the safe answer is also the cheap one.
+   */
+  private versionIsTrustworthy(options: EnsureBuiltMarketplaceOptions): boolean {
+    if (options.forceRefresh === true) return false;
+    return options.marketplace.source.kind !== "local";
+  }
+
   private async ensure(
     options: EnsureBuiltMarketplaceOptions,
     builtDir: string,
     sourceDir: string,
-    sentinel: string
+    sentinel: string,
+    versionIsTrustworthy: boolean
   ): Promise<EnsureBuiltMarketplaceResult> {
     const version = sentinel.split(":")[1];
-    if (await this.isFresh(builtDir, sentinel)) {
+    if (versionIsTrustworthy && (await this.isFresh(builtDir, sentinel))) {
       return { builtDir, version, rebuilt: false };
     }
     await this.build(options.target, options.mode, sourceDir, builtDir);

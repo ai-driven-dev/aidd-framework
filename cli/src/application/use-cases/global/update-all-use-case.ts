@@ -3,6 +3,7 @@ import type { ToolId } from "../../../domain/models/tool-ids.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { VersionReader } from "../../../domain/ports/version-reader.js";
 import type { MarketplaceRefreshUseCase } from "../marketplace/marketplace-refresh-use-case.js";
+import type { MarketplaceSyncSettingsUseCase } from "../marketplace/marketplace-sync-settings-use-case.js";
 import type { PluginUpdateUseCase } from "../plugin/plugin-update-use-case.js";
 import { BulkConflictState } from "../shared/resolve-update-decision-use-case.js";
 import type {
@@ -29,7 +30,8 @@ export class UpdateAllUseCase {
     private readonly versionReader: VersionReader,
     private readonly pluginUpdateUseCase: PluginUpdateUseCase,
     private readonly marketplaceRefreshUseCase: MarketplaceRefreshUseCase,
-    private readonly updateOneToolUseCase: UpdateOneToolUseCase
+    private readonly updateOneToolUseCase: UpdateOneToolUseCase,
+    private readonly marketplaceSyncSettingsUseCase: MarketplaceSyncSettingsUseCase
   ) {}
 
   async execute(input: UpdateAllInput): Promise<UpdateAllResult> {
@@ -88,6 +90,12 @@ export class UpdateAllUseCase {
   ): Promise<boolean> {
     try {
       const { failedCount } = await this.marketplaceRefreshUseCase.execute({ projectRoot });
+      // Refreshing brings the marketplace cache up to date; it does not tell the tools
+      // about it. Without this, `update` — the command a user reaches for to put a
+      // project back in order — left a drifted tool registration exactly as it found it,
+      // and only `marketplace refresh` repaired it. The two belong together, as they
+      // already are in that command.
+      await this.marketplaceSyncSettingsUseCase.execute({ projectRoot });
       return failedCount > 0;
     } catch (err) {
       errors.push({

@@ -235,10 +235,12 @@ convention `settings.local.json` documentée, et la liste ci-dessus montre que s
 réel vit dans son magasin global — l'écriture du fichier projet est probablement redondante. Question
 distincte, non traitée par la phase 5a.
 
-## `update` ne synchronise pas les marketplaces (2026-08-22)
+## `update` ne synchronise pas les marketplaces (2026-08-22, corrigé)
 
-`MarketplaceSyncSettingsUseCase` est appelée par `setup`, `install`, `marketplace add/remove/refresh`
-et `plugin install` — pas par `update`. Un projet dont le fichier de réglages de l'outil a dérivé
+`MarketplaceSyncSettingsUseCase` était appelée par `setup`, `install`, `marketplace add/remove/refresh`
+et `plugin install` — pas par `update`, qui rafraîchissait le cache des marketplaces sans jamais en
+informer les outils. Les deux vont ensemble, comme elles le sont déjà dans la commande
+`marketplace refresh`. Un projet dont le fichier de réglages de l'outil a dérivé
 n'est donc pas remis d'aplomb par la commande que l'utilisateur associe naturellement à « remets-moi
 à jour ». Antérieur à la phase 5, repéré en la vérifiant.
 
@@ -300,10 +302,19 @@ regardait. Le port déclare maintenant sa forme et l'adaptateur réel s'y tient.
 ## L'outil clé son registre par le nom du manifeste, pas par le nôtre (2026-08-22)
 
 Deux marketplaces AIDD qui pointent sur la même source produisent deux arbres construits déclarant
-le même `name` dans leur `marketplace.json`. L'outil les voit donc comme un seul, et le second
-enregistrement est refusé — quel que soit le nom qu'AIDD leur a donné, et quel que soit leur scope.
-Repéré en écrivant le contrôle smoke des scopes, qui mesurait cette collision en croyant mesurer le
-scope.
+le même `name` dans leur `marketplace.json`. L'outil les voit donc comme un seul, quel que soit le
+nom qu'AIDD leur a donné et quel que soit leur scope.
+
+Mesuré, et c'est pire qu'un refus : le second **écrase** silencieusement le premier. Après
+`marketplace add doublon <même source>`, la déclaration nommée `aidd-framework` pointe vers l'arbre
+construit de `doublon`. Le dernier synchronisé gagne, sans un mot.
+
+**Arbitré : hors périmètre.** L'outil garde l'existante, c'est à l'utilisateur de ne pas déclarer
+deux fois la même source. Une détection a été écrite puis retirée : elle lit le nom du catalogue
+depuis `.aidd/cache/marketplaces/`, qui n'existe que pour les sources distantes, donc elle ne se
+serait déclenchée qu'à moitié — silencieuse précisément dans le cas local où la collision arrive.
+Une règle qui ment par omission est pire que pas de règle. La rendre fiable demanderait d'amener la
+résolution de source dans la synchronisation.
 
 ## Un marketplace de scope user se construit dans le projet qui l'enregistre (2026-08-22)
 
@@ -315,8 +326,19 @@ Un marketplace de scope user devrait se construire sous le répertoire de config
 d'AIDD. **Corrigé le 2026-08-22** : il s'y construit désormais, et la déclaration globale de l'outil
 y pointe, indépendamment de tout projet.
 
-## `marketplace refresh` ne revoit pas une source locale modifiée (2026-08-22)
+## `marketplace refresh` ne revoit pas une source locale modifiée (2026-08-22, corrigé)
 
-Après édition du `marketplace.json` d'une source locale, `refresh` affiche `Fetching marketplace …`
-puis `ok`, mais l'arbre construit garde l'ancien contenu ; il faut supprimer
-`.aidd/cache/built/<nom>` pour que la modification passe. Repéré en instruisant les scopes.
+Après édition du `marketplace.json` d'une source locale, `refresh` affichait `Fetching marketplace …`
+puis `ok`, mais l'arbre construit gardait l'ancien contenu ; il fallait supprimer
+`.aidd/cache/built/<nom>` à la main.
+
+Cause : la fraîcheur se juge sur `<version CLI>:<version catalogue>`. Pour une source publiée c'est
+valable — un contenu différent porte une version différente. Pour un répertoire de cette machine,
+non : on édite un fichier et la version ne bouge pas, ce qui est exactement le quotidien du
+développement du framework. La version d'une source locale n'est donc plus crue, et un `refresh`
+explicite ne l'est plus non plus. Une construction réelle coûte 0,4 s pour 434 fichiers, démarrage
+de node compris, donc la réponse sûre est aussi la moins chère.
+
+Effet de bord traité au passage : les diagnostics de construction remontaient dès lors sur chaque
+commande. Ils appartiennent à `aidd framework build`, où l'utilisateur a demandé une construction ;
+la reconstruction de cache les trace désormais en `--verbose`.

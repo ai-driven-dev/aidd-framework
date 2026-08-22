@@ -64,6 +64,16 @@ function makeMarketplace(): Marketplace {
   });
 }
 
+/** A published source: its version changes when its content does, so it can be believed. */
+function makeRemoteMarketplace(): Marketplace {
+  return Marketplace.create({
+    name: "aidd-framework",
+    source: { kind: "github", repo: "ai-driven-dev/framework" },
+    scope: "project",
+    addedAt: "2026-06-29T00:00:00.000Z",
+  });
+}
+
 function makeUserMarketplace(): Marketplace {
   return Marketplace.create({
     name: "shared-mkt",
@@ -130,7 +140,29 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
     expect(fs.getFile(join(r.builtDir, ".build-version"))).toBe("5.0.0:1.0.0");
   });
 
-  it("does not rebuild when the sentinel matches (cliVer:catalogVer)", async () => {
+  it("does not rebuild a published source when the sentinel matches (cliVer:catalogVer)", async () => {
+    const builtDir = builtMarketplaceDir(PROJECT, "aidd-framework", "codex");
+    fs.setFile(join(builtDir, ".build-version"), "5.0.0:1.0.0");
+    const uc = new EnsureBuiltMarketplaceUseCase(
+      fs,
+      fakeResolve("/src/framework", "1.0.0"),
+      buildFor,
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
+    );
+    const r = await uc.execute({
+      projectRoot: PROJECT,
+      marketplace: makeRemoteMarketplace(),
+      target: "codex",
+      mode: "marketplace",
+    });
+    expect(r.rebuilt).toBe(false);
+    expect(builds).toBe(0);
+  });
+
+  // A directory on this machine can change without its version moving — which is all of
+  // framework development — so the version says nothing about freshness there.
+  it("rebuilds a local source even when the sentinel matches", async () => {
     const builtDir = builtMarketplaceDir(PROJECT, "aidd-framework", "codex");
     fs.setFile(join(builtDir, ".build-version"), "5.0.0:1.0.0");
     const uc = new EnsureBuiltMarketplaceUseCase(
@@ -146,8 +178,30 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
       target: "codex",
       mode: "marketplace",
     });
-    expect(r.rebuilt).toBe(false);
-    expect(builds).toBe(0);
+    expect(r.rebuilt).toBe(true);
+    expect(builds).toBe(1);
+  });
+
+  // An explicit refresh asks for the source to be re-read; answering from cache would
+  // answer a different question.
+  it("rebuilds a published source when a refresh was asked for", async () => {
+    const builtDir = builtMarketplaceDir(PROJECT, "aidd-framework", "codex");
+    fs.setFile(join(builtDir, ".build-version"), "5.0.0:1.0.0");
+    const uc = new EnsureBuiltMarketplaceUseCase(
+      fs,
+      fakeResolve("/src/framework", "1.0.0"),
+      buildFor,
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
+    );
+    const r = await uc.execute({
+      projectRoot: PROJECT,
+      marketplace: makeRemoteMarketplace(),
+      target: "codex",
+      mode: "marketplace",
+      forceRefresh: true,
+    });
+    expect(r.rebuilt).toBe(true);
   });
 
   it("rebuilds when the CLI version changed even if catalog version is the same", async () => {
