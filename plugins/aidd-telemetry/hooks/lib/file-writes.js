@@ -191,11 +191,16 @@ function lastWriteMs(filePath) {
 }
 
 // git resolves symlinks in --show-toplevel; the tool's file_path may not have (macOS's
-// /tmp -> /private/tmp). Falls back to the raw path so a file deleted between write and
-// hook does not silently drop a real observation.
+// /tmp -> /private/tmp). `.native` rather than the plain JS realpath: on Windows the JS
+// implementation only walks symlinks and leaves an 8.3 short-name alias (what the CI
+// runner's own temp dir resolves through) untouched, so it never matches getRepoRoot's
+// git-derived, already-canonical path - `.native` calls GetFinalPathNameByHandle, which
+// resolves both symlinks and short-name aliases the same way git itself does (#707).
+// Falls back to the raw path so a file deleted between write and hook does not silently
+// drop a real observation.
 function realPathOf(rawPath) {
   try {
-    return fs.realpathSync(rawPath);
+    return fs.realpathSync.native(rawPath);
   } catch {
     return rawPath;
   }
