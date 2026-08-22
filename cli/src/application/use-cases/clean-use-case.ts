@@ -6,13 +6,13 @@ import {
   removeEntriesFromJson,
 } from "../../domain/models/merge.js";
 import { AIDD_DIR } from "../../domain/models/paths.js";
+import type { ToolId } from "../../domain/models/tool-ids.js";
 import { isAiToolId } from "../../domain/models/tool-ids.js";
 import type { FileReader } from "../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../domain/ports/file-writer.js";
 import type { Logger } from "../../domain/ports/logger.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { Prompter } from "../../domain/ports/prompter.js";
-import type { ToolId } from "../../domain/tools/registry.js";
 import type { GitignoreUseCase } from "./shared/gitignore-use-case.js";
 
 interface CleanOptions {

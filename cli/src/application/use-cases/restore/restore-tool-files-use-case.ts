@@ -2,6 +2,7 @@ import { type FileHash, InstallationFile } from "../../../domain/models/file.js"
 import type { FrameworkDescriptor } from "../../../domain/models/framework.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { MergeFileEntry } from "../../../domain/models/merge.js";
+import type { ToolId } from "../../../domain/models/tool-ids.js";
 import type { AssetProvider } from "../../../domain/ports/asset-provider.js";
 import type { FileMerger } from "../../../domain/ports/file-merger.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
@@ -10,7 +11,7 @@ import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { Logger } from "../../../domain/ports/logger.js";
 import type { Platform } from "../../../domain/ports/platform.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
-import { getToolConfig, type ToolId } from "../../../domain/tools/registry.js";
+import { getToolConfig } from "../../../domain/tools/registry.js";
 import { GenerateToolDistributionUseCase } from "../shared/generate-tool-distribution-use-case.js";
 import { RestoreMergeFilesUseCase } from "../shared/restore-merge-files-use-case.js";
 import { RestoreRegularFilesUseCase } from "../shared/restore-regular-files-use-case.js";

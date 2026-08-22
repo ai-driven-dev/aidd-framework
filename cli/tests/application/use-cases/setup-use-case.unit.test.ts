@@ -9,7 +9,8 @@ import { SetupToolsUseCase } from "../../../src/application/use-cases/setup/setu
 import { SetupUseCase } from "../../../src/application/use-cases/setup-use-case.js";
 import { MarketplaceSourceMode } from "../../../src/domain/models/marketplace-source-mode.js";
 import { SetupFlow } from "../../../src/domain/models/setup-flow.js";
-import { AI_TOOL_IDS, IDE_TOOL_IDS, type ToolId } from "../../../src/domain/tools/registry.js";
+import type { ToolId } from "../../../src/domain/models/tool-ids.js";
+import { AI_TOOL_IDS, IDE_TOOL_IDS } from "../../../src/domain/models/tool-ids.js";
 import { buildUnitDeps, initAndInstall, initProject } from "../../helpers/ports/build-unit-deps.js";
 import { OverwritePrompter, ScriptedPrompter } from "../../helpers/ports/scripted-prompter.js";
 

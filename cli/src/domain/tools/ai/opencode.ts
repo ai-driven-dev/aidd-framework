@@ -10,6 +10,7 @@ import {
   McpConfigError,
   OpencodeDualConfigError,
 } from "../../errors.js";
+import type { UserFileSectionKey } from "../../formats/command.js";
 import {
   buildAiddCommandFilePath,
   convertCommandFrontmatterNoHint,
@@ -27,7 +28,6 @@ import type {
   HasPlugins,
   HasRules,
   HasSkills,
-  UserFileSectionKey,
 } from "../contracts.js";
 import { registerTool } from "../registry.js";
 

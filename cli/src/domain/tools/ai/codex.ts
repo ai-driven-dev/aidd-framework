@@ -5,6 +5,7 @@ import { McpCapability } from "../../capabilities/mcp-capability.js";
 import { PluginsCapability } from "../../capabilities/plugins-capability.js";
 import { RulesCapability } from "../../capabilities/rules-capability.js";
 import { SkillsCapability } from "../../capabilities/skills-capability.js";
+import type { UserFileSectionKey } from "../../formats/command.js";
 import {
   buildAiddCommandFilePath,
   convertCommandFrontmatter,
@@ -24,7 +25,6 @@ import type {
   HasPlugins,
   HasRules,
   HasSkills,
-  UserFileSectionKey,
 } from "../contracts.js";
 import { registerTool } from "../registry.js";
 

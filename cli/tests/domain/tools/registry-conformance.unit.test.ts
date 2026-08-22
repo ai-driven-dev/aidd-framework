@@ -14,6 +14,7 @@ import {
 import { AI_TOOL_IDS } from "../../../src/domain/models/tool-ids.js";
 import type { AiTool } from "../../../src/domain/tools/contracts.js";
 import {
+  frameworkBuildModeFor,
   getAllRegisteredTools,
   getToolConfig,
   isAiTool,
@@ -133,6 +134,26 @@ describe("no parallel list references an unregistered tool", () => {
           `${label} has an entry for format "${probe.format}" (${probe.relativePath}), which is not a registered AI tool (stale entry?)`
         ).toBe(true);
       }
+    }
+  });
+});
+
+describe("frameworkBuildModeFor()", () => {
+  it("gives a flat tool a flat build", () => {
+    expect(frameworkBuildModeFor("opencode")).toBe("flat");
+  });
+
+  it("gives a native tool a marketplace build", () => {
+    expect(frameworkBuildModeFor("claude")).toBe("marketplace");
+  });
+
+  it("reads every tool's mode from its profile, never from its name", () => {
+    for (const toolId of AI_TOOL_IDS) {
+      const config = getToolConfig(toolId);
+      if (!isAiTool(config)) continue;
+      const caps = config.capabilities as { plugins?: { mode?: string } };
+      const expected = caps.plugins?.mode === "flat" ? "flat" : "marketplace";
+      expect(frameworkBuildModeFor(toolId), toolId).toBe(expected);
     }
   });
 });

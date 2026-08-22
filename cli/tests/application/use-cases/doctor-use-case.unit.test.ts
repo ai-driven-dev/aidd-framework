@@ -4,7 +4,7 @@ import {
   extractAtReferences,
   extractMarkdownLinkTargets,
 } from "../../../src/domain/formats/markdown-references.js";
-import type { ToolId } from "../../../src/domain/tools/registry.js";
+import type { ToolId } from "../../../src/domain/models/tool-ids.js";
 import {
   buildDoctorUseCase,
   buildUnitDeps,

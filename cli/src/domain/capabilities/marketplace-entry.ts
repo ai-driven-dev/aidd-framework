@@ -1,4 +1,4 @@
-import type { MarketplaceSettingsEntry, MarketplaceSettingsInput } from "./plugins-capability.js";
+import type { MarketplaceSettingsEntry, MarketplaceSettingsInput } from "./marketplace-settings.js";
 
 /**
  * Shared toEntry implementation for tools that use the Claude Code marketplace schema:

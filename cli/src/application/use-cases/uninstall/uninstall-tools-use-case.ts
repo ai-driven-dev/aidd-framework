@@ -5,10 +5,11 @@ import {
   type MergeFileEntry,
   removeEntriesFromJson,
 } from "../../../domain/models/merge.js";
+import type { ToolId } from "../../../domain/models/tool-ids.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { Logger } from "../../../domain/ports/logger.js";
-import { getToolConfig, isAiTool, type ToolId } from "../../../domain/tools/registry.js";
+import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
 
 export interface UninstallToolsOptions {
   toolIds: ToolId[];

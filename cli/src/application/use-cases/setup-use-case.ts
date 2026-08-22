@@ -23,9 +23,6 @@ import type { SetupPluginsPromptUseCase } from "./setup/setup-plugins-prompt-use
 import type { SetupToolsPromptUseCase } from "./setup/setup-tools-prompt-use-case.js";
 import type { SetupToolsResult, SetupToolsUseCase } from "./setup/setup-tools-use-case.js";
 
-export type { ToolInstallResult } from "./setup/setup-tools-use-case.js";
-export type { SetupToolsResult };
-
 export type SetupResult =
   | { kind: "initialized"; install: SetupToolsResult; context?: ProjectContext }
   | { kind: "up-to-date"; install: SetupToolsResult; context?: ProjectContext };

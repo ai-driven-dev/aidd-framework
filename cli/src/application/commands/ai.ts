@@ -1,8 +1,7 @@
 import type { Command } from "commander";
 import { DOCS_DIR } from "../../domain/models/paths.js";
-import type { AiToolId } from "../../domain/models/tool-ids.js";
+import type { AiToolId, ToolId } from "../../domain/models/tool-ids.js";
 import { AI_TOOL_IDS, isAiToolId } from "../../domain/models/tool-ids.js";
-import type { ToolId } from "../../domain/tools/registry.js";
 import { createDeps, createMenuDeps } from "../../infrastructure/deps.js";
 import { printUnrestorable } from "../display/restore-display.js";
 import { ErrorHandler } from "../error-handler.js";

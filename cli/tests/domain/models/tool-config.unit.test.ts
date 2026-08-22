@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { stripToolSuffix } from "../../../src/domain/formats/command.js";
+import type { AiToolId, ToolId } from "../../../src/domain/models/tool-ids.js";
+import { VALID_TOOL_IDS } from "../../../src/domain/models/tool-ids.js";
 import type { AiTool } from "../../../src/domain/tools/contracts.js";
 import {
-  type AiToolId,
   assertToolIdsMatchCategory,
   getAllRegisteredTools,
   getToolConfig,
   registerTool,
-  type ToolId,
   toolIdsForCategory,
-  VALID_TOOL_IDS,
 } from "../../../src/domain/tools/registry.js";
 
 const makeStubConfig = (toolId: AiToolId, toolSuffix: string): AiTool<unknown> => ({

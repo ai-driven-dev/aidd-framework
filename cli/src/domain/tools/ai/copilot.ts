@@ -6,6 +6,7 @@ import { PluginsCapability } from "../../capabilities/plugins-capability.js";
 import { RulesCapability } from "../../capabilities/rules-capability.js";
 import { SettingsCapability } from "../../capabilities/settings-capability.js";
 import { SkillsCapability } from "../../capabilities/skills-capability.js";
+import type { UserFileSectionKey } from "../../formats/command.js";
 import {
   convertCommandFrontmatter,
   reverseConvertCommandFrontmatter,
@@ -27,7 +28,6 @@ import type {
   HasRules,
   HasSettings,
   HasSkills,
-  UserFileSectionKey,
 } from "../contracts.js";
 import { registerTool } from "../registry.js";
 import { COPILOT_WORKSPACE_DIR } from "./copilot-paths.js";

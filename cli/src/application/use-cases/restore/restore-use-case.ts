@@ -5,6 +5,7 @@ import {
   FrameworkDescriptor,
 } from "../../../domain/models/framework.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
+import type { ToolId } from "../../../domain/models/tool-ids.js";
 import type { AssetProvider } from "../../../domain/ports/asset-provider.js";
 import type { FileMerger } from "../../../domain/ports/file-merger.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
@@ -16,7 +17,6 @@ import type { Platform } from "../../../domain/ports/platform.js";
 import type { PluginDistributionReader } from "../../../domain/ports/plugin-distribution-reader.js";
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
-import type { ToolId } from "../../../domain/tools/registry.js";
 import { NoManifestError } from "../../errors.js";
 import type { BuiltMaterializationDeps } from "../shared/apply-plugin-files-use-case.js";
 import {

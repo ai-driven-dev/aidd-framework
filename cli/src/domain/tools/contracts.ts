@@ -6,14 +6,8 @@ import type { PluginsCapability } from "../capabilities/plugins-capability.js";
 import type { RulesCapability } from "../capabilities/rules-capability.js";
 import type { SettingsCapability } from "../capabilities/settings-capability.js";
 import type { SkillsCapability } from "../capabilities/skills-capability.js";
+import type { UserFileSection, UserFileSectionKey } from "../formats/command.js";
 import type { AiToolId, IdeToolId } from "../models/tool-ids.js";
-
-export type UserFileSection = "agents" | "commands" | "rules" | "skills";
-
-export interface UserFileSectionKey {
-  section: UserFileSection;
-  key: string;
-}
 
 export interface HasAgents {
   readonly agents: AgentsCapability;

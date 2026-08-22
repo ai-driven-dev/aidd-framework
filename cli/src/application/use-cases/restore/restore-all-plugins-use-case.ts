@@ -1,18 +1,14 @@
 import { join } from "node:path";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import { PLUGIN_CACHE_SUBDIR } from "../../../domain/models/paths.js";
+import type { ToolId } from "../../../domain/models/tool-ids.js";
 import { AI_TOOL_IDS } from "../../../domain/models/tool-ids.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { PluginDistributionReader } from "../../../domain/ports/plugin-distribution-reader.js";
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
-import {
-  getToolConfig,
-  isAiTool,
-  type ToolConfig,
-  type ToolId,
-} from "../../../domain/tools/registry.js";
+import { getToolConfig, isAiTool, type ToolConfig } from "../../../domain/tools/registry.js";
 import {
   ApplyPluginFilesUseCase,
   type BuiltMaterializationDeps,

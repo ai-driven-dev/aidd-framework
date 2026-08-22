@@ -1,5 +1,5 @@
+import type { GlobalExecutionError } from "../shared/update-one-tool-use-case.js";
 import type { StatusUseCase } from "../status-use-case.js";
-import type { GlobalExecutionError } from "./update-all-use-case.js";
 
 type StatusReport = Awaited<ReturnType<StatusUseCase["execute"]>>;
 

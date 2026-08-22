@@ -1,10 +1,11 @@
 import { join } from "node:path";
-import type { NativeActivation } from "../capabilities/plugins-capability.js";
+import type { NativeActivation, PluginsMode } from "../capabilities/plugins-capability.js";
 import {
   CategoryMismatchError,
   UnknownToolCategoryError,
   UnregisteredToolError,
 } from "../errors.js";
+import type { FrameworkBuildMode } from "../models/framework-build.js";
 import {
   AI_TOOL_IDS,
   type AiToolId,
@@ -17,9 +18,6 @@ import {
 } from "../models/tool-ids.js";
 import type { FileReader } from "../ports/file-reader.js";
 import type { AiTool, IdeToolConfig } from "./contracts.js";
-
-export type { AiToolId, IdeToolId, ToolCategory, ToolId };
-export { AI_TOOL_IDS, IDE_TOOL_IDS, isAiToolId, VALID_TOOL_IDS };
 
 export type ToolConfig = AiTool<unknown> | IdeToolConfig;
 
@@ -96,4 +94,16 @@ export function nativeActivationOf(toolId: ToolId): NativeActivation | undefined
     plugins?: { nativeActivation?: NativeActivation | null };
   };
   return caps.plugins?.nativeActivation ?? undefined;
+}
+
+/**
+ * How the framework must be built for a tool: flat when the tool's plugins capability
+ * is flat, a marketplace otherwise. Read from the profile rather than branched on the
+ * tool's name, so a sixth flat tool needs no edit outside its own profile.
+ */
+export function frameworkBuildModeFor(toolId: ToolId): FrameworkBuildMode {
+  const config = getToolConfig(toolId);
+  if (config === undefined || !isAiTool(config)) return "marketplace";
+  const caps = config.capabilities as { plugins?: { mode?: PluginsMode } };
+  return caps.plugins?.mode === "flat" ? "flat" : "marketplace";
 }

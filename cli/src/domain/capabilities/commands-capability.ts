@@ -1,5 +1,5 @@
 import { serializeFrontmatter } from "../formats/markdown.js";
-import { AI_TOOL_IDS } from "../tools/registry.js";
+import { AI_TOOL_IDS } from "../models/tool-ids.js";
 
 const ALL_TOOL_SUFFIXES: readonly string[] = AI_TOOL_IDS.map((id) => `.${id}.md`);
 

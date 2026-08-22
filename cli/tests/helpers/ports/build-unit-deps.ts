@@ -24,7 +24,8 @@ import { ResolveUpdateDecisionUseCase } from "../../../src/application/use-cases
 import { UpdateOneToolUseCase } from "../../../src/application/use-cases/shared/update-one-tool-use-case.js";
 import { SyncConflictResolverUseCase } from "../../../src/application/use-cases/sync/sync-conflict-resolver-use-case.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
-import { isIdeToolId, type ToolId } from "../../../src/domain/tools/registry.js";
+import type { ToolId } from "../../../src/domain/models/tool-ids.js";
+import { isIdeToolId } from "../../../src/domain/tools/registry.js";
 import { PluginCatalogRepositoryAdapter } from "../../../src/infrastructure/adapters/plugin-catalog-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "../../../src/infrastructure/adapters/plugin-distribution-reader-adapter.js";
 import { SilentPrompterAdapter } from "../../../src/infrastructure/adapters/prompter-adapter.js";

@@ -3,7 +3,7 @@ import { FileHash, InstallationFile } from "../../../src/domain/models/file.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
 import type { McpExclusion } from "../../../src/domain/models/mcp-exclusion.js";
 import type { MergeFileEntry } from "../../../src/domain/models/merge.js";
-import type { ToolId } from "../../../src/domain/tools/registry.js";
+import type { ToolId } from "../../../src/domain/models/tool-ids.js";
 
 const makeHash = (hex: string): FileHash => new FileHash(hex.padEnd(32, "0"));
 

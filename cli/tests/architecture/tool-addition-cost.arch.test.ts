@@ -17,11 +17,15 @@ const ALLOWED = new Set([
   "src/domain/models/tool-ids.ts",
 ]);
 
-/** Files naming a tool outside its profile today. This list may only shrink. */
+/**
+ * Files naming a tool outside its profile today. This list may only shrink.
+ *
+ * `built-tree-materialization-translator.ts` left it in phase 6: it chose the framework
+ * build mode with `toolId === "opencode" ? ... `, and now reads that mode off the profile.
+ */
 const BASELINE = [
   "src/application/use-cases/framework/strategies/tool-contracts.ts",
   "src/application/use-cases/marketplace/marketplace-sync-settings-use-case.ts",
-  "src/application/use-cases/plugin/translator/built-tree-materialization-translator.ts",
   "src/application/use-cases/restore/restore-use-case.ts",
   "src/domain/capabilities/plugins-capability.ts",
   "src/domain/formats/cursor-hooks.ts",

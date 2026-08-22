@@ -1,6 +1,6 @@
 import type { DoctorReport } from "../../../domain/models/doctor.js";
 import type { DoctorUseCase } from "../doctor/doctor-use-case.js";
-import type { GlobalExecutionError } from "./update-all-use-case.js";
+import type { GlobalExecutionError } from "../shared/update-one-tool-use-case.js";
 
 export interface DoctorAllResult {
   ai: DoctorReport | null;

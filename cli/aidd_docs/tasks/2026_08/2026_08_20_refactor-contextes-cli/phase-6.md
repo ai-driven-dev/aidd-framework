@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Untangle without moving anything
@@ -81,6 +81,29 @@ journey
 
 1. Replace `toolId === "opencode" ? "flat" : "marketplace"` in
    `built-tree-materialization-translator.ts` with a read of `mode` on the tool profile.
+
+## Ce qui a bougé par rapport à la projection
+
+Deux fichiers de plus que prévu, tous deux pour la même raison : le critère demandait quelque chose
+que rien ne surveillait.
+
+**`domain/tools/registry.ts`** reçoit `frameworkBuildModeFor` au lieu de `plugin-helpers.ts`. La
+tâche 4 remplaçait `toolId === "opencode" ? "flat" : "marketplace"` par une lecture du profil, et
+cette lecture avait déjà un jumeau exact à cet endroit : `nativeActivationOf`, qui va chercher
+`plugins.nativeActivation` dans le profil comme celle-ci va chercher `plugins.mode`. La mettre dans
+la couche application l'aurait rendue inaccessible au domaine alors qu'elle ne dépend que de lui.
+
+**`tests/architecture/no-re-export.arch.test.ts`** est nouveau. Le critère 2 nommait Biome comme
+juge, mais Biome ne peut pas rendre ce verdict : `noBarrelFile` ne voit que les fichiers qui ne font
+que ré-exporter, `noReExportAll` ne voit que `export *`. Or la forme qui s'était accumulée ici est
+plus étroite que les deux — `export type { GlobalExecutionError };`, un module qui importe un symbole
+et le ré-exporte. Le critère aurait donc été « vérifié » par un outil aveugle à ce qu'il vérifiait,
+c'est-à-dire exactement la panne que ce refactor existe pour corriger. Il est devenu un ratchet à
+base vide, et il a été éprouvé par injection : ré-introduire un ré-export le fait échouer.
+
+Deux artefacts de la réécriture par script ont aussi été nettoyés : cinq fichiers portaient deux
+`import type` du même module après le déplacement des identifiants d'outils, et `knip --production`
+reste vide.
 
 ## Test acceptance criteria
 

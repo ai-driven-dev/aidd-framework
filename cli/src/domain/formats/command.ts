@@ -1,4 +1,9 @@
-import type { UserFileSection, UserFileSectionKey } from "../tools/contracts.js";
+export type UserFileSection = "agents" | "commands" | "rules" | "skills";
+
+export interface UserFileSectionKey {
+  section: UserFileSection;
+  key: string;
+}
 
 export function stripToolSuffix(suffix: string, fileName: string): string {
   const basename = fileName.split("/").at(-1) ?? fileName;

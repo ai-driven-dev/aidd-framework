@@ -1,4 +1,4 @@
-import type { ToolCategory } from "./tools/registry.js";
+import type { ToolCategory } from "./models/tool-ids.js";
 
 export class CapabilityConfigError extends Error {
   constructor(message: string) {

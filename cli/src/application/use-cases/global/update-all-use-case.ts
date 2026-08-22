@@ -1,7 +1,7 @@
 import { Manifest } from "../../../domain/models/manifest.js";
+import type { ToolId } from "../../../domain/models/tool-ids.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { VersionReader } from "../../../domain/ports/version-reader.js";
-import type { ToolId } from "../../../domain/tools/registry.js";
 import type { MarketplaceRefreshUseCase } from "../marketplace/marketplace-refresh-use-case.js";
 import type { PluginUpdateUseCase } from "../plugin/plugin-update-use-case.js";
 import { BulkConflictState } from "../shared/resolve-update-decision-use-case.js";
@@ -9,8 +9,6 @@ import type {
   GlobalExecutionError,
   UpdateOneToolUseCase,
 } from "../shared/update-one-tool-use-case.js";
-
-export type { GlobalExecutionError };
 
 export interface UpdateAllInput {
   projectRoot: string;

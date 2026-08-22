@@ -14,11 +14,12 @@ import { InstallRuntimeConfigUseCase } from "../../../src/application/use-cases/
 import { GitignoreUseCase } from "../../../src/application/use-cases/shared/gitignore-use-case.js";
 import { PostInstallPipelineUseCase } from "../../../src/application/use-cases/shared/post-install-pipeline-use-case.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
+import type { ToolId } from "../../../src/domain/models/tool-ids.js";
 import type { Platform } from "../../../src/domain/ports/platform.js";
 import type { Prompter } from "../../../src/domain/ports/prompter.js";
 import type { VersionControl } from "../../../src/domain/ports/version-control.js";
 import type { VersionReader } from "../../../src/domain/ports/version-reader.js";
-import { isIdeToolId, type ToolId } from "../../../src/domain/tools/registry.js";
+import { isIdeToolId } from "../../../src/domain/tools/registry.js";
 import { CurrentVersionAdapter } from "../../../src/infrastructure/adapters/current-version-adapter.js";
 import { FileAdapter } from "../../../src/infrastructure/adapters/file-adapter.js";
 import { HasherAdapter } from "../../../src/infrastructure/adapters/hasher-adapter.js";

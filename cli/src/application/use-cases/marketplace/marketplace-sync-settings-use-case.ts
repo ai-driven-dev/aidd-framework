@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import type { MarketplaceSettings } from "../../../domain/capabilities/plugins-capability.js";
+import type { MarketplaceSettings } from "../../../domain/capabilities/marketplace-settings.js";
 import { NativePluginCliError } from "../../../domain/errors.js";
 import type { FrameworkBuildTarget } from "../../../domain/models/framework-build.js";
 import type { Manifest } from "../../../domain/models/manifest.js";

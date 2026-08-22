@@ -1,9 +1,9 @@
 import { join } from "node:path";
 import type { FileHash } from "../../../domain/models/file.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
-import type { AiToolId, IdeToolId } from "../../../domain/models/tool-ids.js";
+import type { AiToolId, IdeToolId, ToolId } from "../../../domain/models/tool-ids.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
-import { getToolConfig, isAiTool, type ToolId } from "../../../domain/tools/registry.js";
+import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
 import { InputRequiredError } from "../../errors.js";
 import type { InstallIdeConfigUseCase } from "../install/install-ide-config-use-case.js";
 import type { InstallRuntimeConfigUseCase } from "../install/install-runtime-config-use-case.js";

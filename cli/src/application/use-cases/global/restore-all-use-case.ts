@@ -3,8 +3,8 @@ import type { ManifestRepository } from "../../../domain/ports/manifest-reposito
 import type { Prompter } from "../../../domain/ports/prompter.js";
 import { NoManifestError } from "../../errors.js";
 import type { RestoreUseCase } from "../restore/restore-use-case.js";
+import type { GlobalExecutionError } from "../shared/update-one-tool-use-case.js";
 import type { StatusUseCase } from "../status-use-case.js";
-import type { GlobalExecutionError } from "./update-all-use-case.js";
 
 export interface RestoreAllResult {
   totalRestored: number;
