@@ -9,6 +9,7 @@ import "../../../src/domain/tools/ai/opencode.js";
 import type { TelemetryRouteSupply } from "../../../src/domain/capabilities/telemetry-capability.js";
 import { mapClaudeCodeTranscriptToSinkRecords } from "../../../src/domain/formats/claude-code-transcript.js";
 import { mapCodexRolloutToSinkRecords } from "../../../src/domain/formats/codex-rollout.js";
+import { mapCopilotEventsToSinkRecords } from "../../../src/domain/formats/copilot-events.js";
 import { mapOpencodeExportToSinkRecords } from "../../../src/domain/formats/opencode-export.js";
 import type { TelemetrySinkRecord } from "../../../src/domain/models/telemetry-sink-record.js";
 import { mapOtlpLogsToSinkRecords } from "../../../src/domain/models/telemetry-sink-record.js";
@@ -28,6 +29,7 @@ function fixture(relativePath: string): string {
 
 const CLAUDE_SESSION = "22222222-2222-4222-8222-222222222222";
 const CODEX_SESSION = "019fae6f-2009-7cd3-86b2-b8f83481b160";
+const COPILOT_SESSION = "33333333-3333-4333-8333-333333333333";
 
 /** Whatever a capture yields, reduced to the three facts a route declares. */
 function observe(records: readonly Partial<TelemetrySinkRecord>[]): TelemetryRouteSupply {
@@ -80,6 +82,16 @@ const CAPTURES: ReadonlyMap<string, () => TelemetryRouteSupply> = new Map([
           fixture(
             `local-cost/.codex/sessions/2026/07/29/rollout-2026-07-29T17-12-26-${CODEX_SESSION}.jsonl`
           )
+        )
+      ),
+  ],
+  [
+    "copilot:local",
+    () =>
+      observe(
+        mapCopilotEventsToSinkRecords(
+          fixture(`local-cost/.copilot/session-state/${COPILOT_SESSION}/events.jsonl`),
+          COPILOT_SESSION
         )
       ),
   ],

@@ -58,7 +58,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "active_time_s": 2820,                        // absent when no record carried it
   "by_step":    [{ "step": "aidd-dev:02-implement", "attribution": "journal-interval", "totals": {} }],
   "by_model":   [{ "model": "gpt-5.6-sol", "totals": {} }],
-  "by_tool":    [{ "tool": "codex", "coverage": "covered", "reason": "…", "capability": {}, "totals": {} }],
+  "by_tool":    [{ "tool": "codex", "coverage": "covered", "reason": "…", "capability": {}, "totals": {}, "session_totals": {} }],  // session_totals absent unless the tool has one (Copilot, today)
   "by_project": [{ "project": "acme/widgets", "totals": {} }],   // a row with no `project` names none known
   "by_day":     [{ "day": "2026-07-01", "totals": {} }],         // every day in the period, in order, gaps included
   "attribution": [{ "attribution": "tool-stated", "totals": {} }],
@@ -101,6 +101,24 @@ they are two different claims. A row with no `step` carries `attribution: "unatt
 or whose session journal named none — never folded into a project the reader happens to be
 standing in. A record's project comes from the run journal that covered its session, not
 from wherever the report itself happens to run.
+
+### `session_totals` — a session total, never a sum of requests
+
+`by_tool` rows carry `totals`, summed from `kind: "request"` records, exactly like every
+other breakdown in this object. A `by_tool` row can also carry `session_totals` — present
+only for a tool whose own file yields one already-complete, per-session figure rather than
+per-request records. Today that is Copilot alone: its `session.shutdown` event reports the
+whole session's four token counters once, at the end, never per call.
+
+**The two are never the same number and are never added together.** `totals.requests`
+counts billed requests; a tool that has none of those (Copilot) reports `requests: 0` there
+regardless of what `session_totals` carries. Read `session_totals` as its own answer to "what
+did this session report", not as a fallback for a zero in `totals`. It carries no
+`cost_usd` — the tool's own file states no billed amount for it, only a session's tokens.
+
+`session_totals` is absent, never present-and-empty, for every tool that has none — reading
+it as `{ "requests": 0 }` by default would claim a session total was measured and found
+empty, which is a different fact from the tool never producing this figure at all.
 
 ### Attribution
 
@@ -146,10 +164,12 @@ supply an amount and a session that cost nothing look identical in the numbers.
 `coverage` is `"covered"` or `"not-covered"`, and `reason` says why when it is the second,
 or what a covered tool's figures cannot be used for.
 
-**Four silences, and only one is a zero.** A tool with `requests: 0` may be: not covered at
+**Five silences, and only one is a zero.** A tool with `requests: 0` may be: not covered at
 all (`coverage: "not-covered"`, read `reason`), covered but unreachable by the sweep
-(`journal_attributable: false`), covered and reached and idle (a real zero), or covered and
-its reader failed (the human output says so; `aidd telemetry read` reports it per tool).
+(`journal_attributable: false`), covered and reached and idle (a real zero), covered and
+its reader failed (the human output says so; `aidd telemetry read` reports it per tool), or
+covered and reporting only a `session_totals` figure — `requests: 0` there is correct and
+permanent for that tool, not a silence to explain away.
 
 ### What the read could not do
 

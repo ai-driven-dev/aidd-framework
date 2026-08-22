@@ -153,6 +153,20 @@ function tightenOwnedDir(dir) {
   }
 }
 
+// Decision, not an inherited default (#693): a worktree keeps its own journal.
+// `getRepoRoot` resolves `--show-toplevel`, the worktree's own root - never
+// `--git-common-dir`'s shared repository, which this deliberately does not read.
+//
+// Two reasons hold it there. First, the layout an agent runner actually gives each agent
+// - Orca sets ORCA_WORKTREE_ID and does exactly this - is a bare clone plus worktrees,
+// which has no main working tree to write into at all: `--git-common-dir` there names the
+// bare `.git`, whose parent is not a checkout. Second, even where a main worktree does
+// exist, writing into it from worktree B would dirty a checkout on a different branch,
+// possibly with uncommitted work of its own, whose `.gitignore` was never asked to carry
+// the entry `telemetry-switch.js on` added when B turned measurement on.
+//
+// Cross-worktree joining - so a report can still see every worktree's sessions together -
+// is #695, a field recorded on `session_start`, not a shared write target.
 function resolveRunsDir(cwd) {
   const repoRoot = getRepoRoot(cwd);
   if (!repoRoot || !telemetryEnabled(repoRoot)) return null;

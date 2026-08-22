@@ -100,6 +100,63 @@ describe("reading what Codex wrote about a session", () => {
   });
 });
 
+describe("reading what Copilot wrote about a session", () => {
+  const read = (sessionId) => readerFor("copilot")(FIXTURES, sessionId);
+  const COPILOT_SESSION = "33333333-3333-4333-8333-333333333333";
+  const COPILOT_EMPTY_SESSION = "44444444-4444-4444-8444-444444444444";
+
+  it("yields one kind: session record, carrying the four counters from session.shutdown", () => {
+    const { records, sessionFound } = read(COPILOT_SESSION);
+
+    assert.equal(sessionFound, true);
+    assert.equal(records.length, 1);
+    const [record] = records;
+    assert.equal(record.kind, "session");
+    assert.equal(record.input_tokens, 10);
+    assert.equal(record.output_tokens, 42);
+    assert.equal(record.cache_read_tokens, 0);
+    assert.equal(record.cache_creation_tokens, 21070);
+  });
+
+  it("never reads modelMetrics.usage.inputTokens, which is inclusive of the cache figure", () => {
+    // Measured: 10 (tokenDetails.input) + 21070 (cache_write) = 21080 (usage.inputTokens).
+    // Reading the latter as input_tokens would double count the cache-write figure.
+    const [record] = read(COPILOT_SESSION).records;
+
+    assert.notEqual(record.input_tokens, 21080);
+  });
+
+  it("never stores totalPremiumRequests as cost_usd", () => {
+    const [record] = read(COPILOT_SESSION).records;
+
+    assert.ok(!("cost_usd" in record));
+  });
+
+  it("names no model - currentModel is only ever the last model a session used", () => {
+    const [record] = read(COPILOT_SESSION).records;
+
+    assert.ok(!("model" in record));
+  });
+
+  it("carries a turn_id stable across a re-read, so a sweep never stores it twice", () => {
+    const [record] = read(COPILOT_SESSION).records;
+
+    assert.equal(record.turn_id, "99ccf9e7-b3ac-4145-a622-31852ec698cb");
+    assert.equal(record.turn_field, "id");
+  });
+
+  it("reads empty, not a record of zeros, when shutdown carried no tokenDetails", () => {
+    const { records, sessionFound } = read(COPILOT_EMPTY_SESSION);
+
+    assert.equal(sessionFound, true);
+    assert.deepEqual(records, []);
+  });
+
+  it("says it found no session for an id no file names", () => {
+    assert.deepEqual(read("no-such-session"), { records: [], sessionFound: false });
+  });
+});
+
 describe("what each tool declares it can supply", () => {
   it("declares a route per tool, and never a bare boolean for both", () => {
     for (const { tool, capability } of TOOLS) {
@@ -114,6 +171,17 @@ describe("what each tool declares it can supply", () => {
       assert.ok(declaration.reason, `${declaration.tool} is unreadable and says nothing`);
       assert.equal(declaration.capability.localRead, null);
     }
+  });
+
+  it("measures, rather than assumes, what Copilot's local read supplies", () => {
+    const copilot = TOOLS.find((t) => t.tool === "copilot");
+
+    assert.deepEqual(copilot.capability.localRead, {
+      tokenCounters: true,
+      amount: false,
+      toolStatedStep: false,
+    });
+    assert.ok(copilot.limitation, "a session-total figure needs a caveat a report can print");
   });
 
   it("says which tools the journal never names, so a sweep cannot look idle", () => {

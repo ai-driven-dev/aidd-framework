@@ -7,6 +7,36 @@ looks like it produced nothing. Both are the failure this layer exists to preven
 
 A figure AIDD cannot produce is named as missing, never printed as `0`.
 
+## Where each thing is written, and why it lives there
+
+Two files, two different owners.
+
+**The run journal** lands in `aidd_docs/runs/`, inside the repository it describes. Every
+line names a repository-relative path or a task folder, so it only reads correctly from
+inside the checkout that produced it — moved outside, it would describe one repository
+with no way to say which. It records who worked on what, for how long, and every file each
+session wrote, and nothing else: no token, no cost, no model. Because it belongs to the
+repository, keeping it out of a commit is the repository's business too — turning
+measurement on, through `aidd setup`, `aidd plugin add`, or the plugin's own
+`telemetry-switch.js on`, adds it to `.gitignore` there and then.
+
+**The stored figures** land under `AIDD_USER_CONFIG_DIR`, or `~/.config/aidd/telemetry/`
+when that variable is unset — with the person, not the checkout. A session's consumption
+belongs to whoever ran it and the machine they ran it on: tied to a checkout instead, the
+same person working from two clones of one project would look like two people. They hold
+token counts, model names and, where a tool's own files carry one, a cost — read out of
+files the tool already wrote, never a prompt, a diff, or code.
+
+### Choosing another location for the figures
+
+`AIDD_USER_CONFIG_DIR` is that choice, offered rather than merely available: point it at a
+directory a team shares, or one a CI owns per repository, and every figure this layer
+writes follows it. The default stays the default — right for the case that is nearly
+everyone, one person on one machine. The cost of moving away from it: nothing outside
+`~/.config/aidd/` is swept together with the rest of a person's figures by anything that
+assumes the default, so a reader pointed at the default alone finds the moved figures
+absent, not elsewhere.
+
 ## Two routes, and neither covers every tool
 
 A tool's consumption reaches AIDD one of two ways.
@@ -57,12 +87,26 @@ again; whether trust can be granted without a terminal at all is not established
 Installing a plugin that ships hooks for Codex now says this, and `aidd telemetry check`
 tells "not trusted" apart from "never fired" wherever the trust state is readable.
 
-## Copilot gives no per-step breakdown
+## Copilot gives one number for the session, and none per step
 
-Copilot's own session file carries `outputTokens` per turn and nothing else. Input, cache
-and reasoning figures arrive **once, at shutdown, for the whole session** — so no
-per-request record can be built from it, and no figure can be placed inside one step rather
-than another.
+Copilot writes its counters **once, at shutdown, for the whole session** —
+`session.shutdown` in `~/.copilot/session-state/<id>/events.jsonl` carries input, output,
+cache read and cache write together. That total is read, and it is the only figure Copilot
+offers: nothing in its files counts a single request, so no amount can be placed inside one
+step rather than another however well the boundary is known.
+
+It is stored as a **session** record and never as a request. The two are never added
+together: one is a billed call, complete in itself; the other is a total that already
+contains every call it covers. A report prints Copilot's row as `N tokens (session total,
+not requests)`, and its request count stays `0` because that is the true answer rather than
+a silence to explain.
+
+Two traps found while reading that file, both avoided. Its `usage.inputTokens` is
+*inclusive* of cache writes where `tokenDetails.input` is exclusive, so only the second is
+read — the first would make Copilot's input look larger than every other tool's for the same
+work. And `currentModel` names the session's **last** model, so no model is stamped on the
+record: attributing a whole session to whichever model happened to answer last is the kind
+of plausible wrong answer this layer exists to refuse.
 
 Its file's own `cost` field is denominated in **premium requests, not currency**. Measured
 across fourteen local sessions: the figure sits at `0.33` for every single-request
@@ -70,8 +114,8 @@ across fourteen local sessions: the figure sits at `0.33` for every single-reque
 output from 46 to 154 tokens. It tracks request count times a per-model multiplier and is
 invariant to what was consumed, so it is never read as an amount.
 
-Only Copilot's OTLP export would close that gap, and only if the user turns it on
-themselves.
+Only Copilot's OTLP export would give a per-request figure, and only if the user turns it
+on themselves.
 
 Its steps, though, are readable. A Copilot session names the skill it is running, on both
 of the payload shapes Copilot itself sends — its own canonical one and the `_vsCodeCompat`

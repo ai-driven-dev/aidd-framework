@@ -633,11 +633,13 @@ describe("the script wired to a real project", () => {
     assert.match(lines[2], /^\s*tool files readable\s+ok/);
     assert.match(lines[3], /^\s*records join\s+ok\s+1 of 1 record/);
     assert.ok(lines.some((line) => line.includes("not covered: cursor")));
-    assert.ok(lines.some((line) => line.includes("not covered: copilot")));
-    // opencode dropped out of "not covered" once its own plugin reached the journal (phase
-    // 5, see measurements.md) - journalAttributable is true and it has a reader, so
-    // reachableViaJournal accepts it like claude, never counting it as a miss.
+    // opencode and copilot both dropped out of "not covered": opencode once its own plugin
+    // reached the journal (phase 5, see measurements.md), copilot once session.shutdown's
+    // own tokenDetails was found readable (#697) - both declare journalAttributable true
+    // and now carry a reader, so reachableViaJournal accepts them like claude, never
+    // counting either as a miss.
     assert.ok(!lines.some((line) => line.includes("not covered: opencode")));
+    assert.ok(!lines.some((line) => line.includes("not covered: copilot")));
   });
 
   it("names the hook never firing when measurement is on and no run file appears", () => {

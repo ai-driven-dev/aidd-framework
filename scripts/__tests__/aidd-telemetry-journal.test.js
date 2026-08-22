@@ -35,7 +35,11 @@ const {
   UNRECOGNISED_FILE_NAME,
 } = require("../../plugins/aidd-telemetry/hooks/lib/record.js");
 
-const { readCwd } = require("../../plugins/aidd-telemetry/hooks/lib/repo.js");
+const {
+  readCwd,
+  getRepoRoot,
+  resolveRunsDir,
+} = require("../../plugins/aidd-telemetry/hooks/lib/repo.js");
 
 // One exact key set per line type (see phase-1.md) - the replacement for the
 // old THE_TEN_KEYS whitelist, which guarded a single mutable record that no
@@ -498,6 +502,46 @@ test("AIDD_RUNS_DIR overrides the in-repo default outright", () => {
   withRunsDirEnv({ set: { AIDD_RUNS_DIR: "/custom/runs" } }, () => {
     assert.equal(runsDir("/repo"), "/custom/runs");
   });
+});
+
+// #693: a worktree gets its own journal by decision, not by accident. This is the test
+// that decision asked for - it also proves --show-toplevel behaves as resolveRunsDir
+// assumes, rather than merely asserting the assumption.
+function addWorktree(main, dir) {
+  execFileSync("git", ["add", "-A"], { cwd: main, env: CLEAN_ENV });
+  execFileSync("git", ["commit", "-q", "-m", "init", "--allow-empty"], {
+    cwd: main,
+    env: CLEAN_ENV,
+  });
+  execFileSync("git", ["worktree", "add", "-b", "feature", dir], { cwd: main, env: CLEAN_ENV });
+}
+
+test("getRepoRoot resolves a worktree to itself, never to the repository it shares", () => {
+  const main = makeTempRepo();
+  const worktree = path.join(makeTempDir("aidd-telemetry-worktree-"), "wt");
+  addWorktree(main, worktree);
+
+  const worktreeRoot = getRepoRoot(worktree);
+
+  // git resolves symlinks in --show-toplevel (macOS's /var, /tmp among them), so the
+  // comparison goes through fs.realpathSync rather than the raw temp-dir string.
+  assert.equal(worktreeRoot, fs.realpathSync(worktree));
+  assert.notEqual(worktreeRoot, getRepoRoot(main));
+});
+
+test("resolveRunsDir writes a worktree's journal under the worktree, not the main checkout", () => {
+  const main = makeTempRepo();
+  const worktree = path.join(makeTempDir("aidd-telemetry-worktree-"), "wt");
+  addWorktree(main, worktree);
+  writeTelemetryConfig(worktree, { enabled: true });
+  fs.mkdirSync(runsDirOf(worktree), { recursive: true });
+
+  const target = resolveRunsDir(worktree);
+
+  assert.ok(target, "resolveRunsDir must resolve inside a worktree");
+  assert.equal(target.repoRoot, fs.realpathSync(worktree));
+  assert.equal(target.dir, runsDirOf(fs.realpathSync(worktree)));
+  assert.notEqual(target.dir, runsDirOf(fs.realpathSync(main)));
 });
 
 function makeTempDir(prefix) {
