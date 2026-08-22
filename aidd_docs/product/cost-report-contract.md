@@ -62,6 +62,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "by_project": [{ "project": "acme/widgets", "totals": {} }],   // a row with no `project` names none known
   "by_day":     [{ "day": "2026-07-01", "totals": {} }],         // every day in the period, in order, gaps included
   "attribution": [{ "attribution": "tool-stated", "totals": {} }],
+  "task_attribution": [{ "attribution": "declared", "totals": {} }],  // present only alongside "task"
   "read": { "undated_records": 0, "unreadable_lines": 0 }
 }
 ```
@@ -137,6 +138,27 @@ measurement — the total is known and none of it came from that source.
 indistinguishable, so the stronger reading would be a fact nobody measured. Do not collapse
 it into anything else, and do not call it a residual.
 
+### Task attribution
+
+`task_attribution` exists only alongside `task` — an unfiltered period carries no
+per-record task identity to break down, so there is nothing here to say for it. Where
+present it always has exactly two rows, in this order:
+
+| `attribution` | Means |
+| --- | --- |
+| `declared` | The record's own moment fell inside an interval a flow explicitly opened, by naming a file under this task's folder in a tool call — a run journal `task_declared` line. Works on every tool the journal hook reaches, not only the one whose payload names a written path. |
+| `inferred` | The record's session wrote into the task folder at some point, with no declared interval covering this specific record. The pre-existing, whole-session route. |
+
+A source that accounts for nothing is present with `requests: 0`, the same convention
+`attribution` uses. There is no `unattributed` row here: every record inside a `--task`
+report already matched one of the two routes, or it would not be in the report at all.
+
+**A declaration is bounded, never boundless.** It closes at whichever of a later
+declaration or a turn boundary comes next; left open by a session that never closed it
+(a crash, most often), it is capped at the last moment that session's journal actually
+recorded — never at "still open," which would let one long-running session's later,
+unrelated work read as this task's cost.
+
 ### Capability, per tool
 
 This is the field that makes the contract the same across tools. **Branch on it. Never
@@ -159,7 +181,7 @@ supply an amount and a session that cost nothing look identical in the numbers.
 | `amount` | That route yields a figure denominated in currency. Never a credit or a premium request. |
 | `tool_stated_step` | The tool names the running step itself. A journal interval is not this. |
 | `journal_attributable` | The run journal names this tool's sessions. **False means two things:** no step can come from an interval, *and* a read that sweeps the journal never reaches one of its sessions — so the tool can be perfectly readable and still report nothing until someone names a session by hand. |
-| `task_attributable` | This tool's writes can be traced to the task they landed in. |
+| `task_attributable` | A session on this tool can be traced to the task it worked on — declared, inferred, or both. False only where the journal hook never reaches a tool call for this host at all (OpenCode's plugin observes session lifecycle events alone, never one), since a declaration needs a tool call's own arguments to read. |
 
 `coverage` is `"covered"` or `"not-covered"`, and `reason` says why when it is the second,
 or what a covered tool's figures cannot be used for.

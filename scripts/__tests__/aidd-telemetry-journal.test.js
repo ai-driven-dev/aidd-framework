@@ -1874,7 +1874,14 @@ test("a Bash call into what looks like a task path (via tool_input.command, not 
 
     const written = readRunFiles(runsDirOf(repo));
     const lines = readLines(written[0]);
-    assert.equal(lines.length, 1);
+    // No file_written: handleFileWritten's gate is unmoved by this change. The command text
+    // reading a real task file is exactly what a declaration exists to catch on a host with
+    // no write-path field at all, so it - and only it - joins session_start.
+    assert.equal(lines.filter((line) => line.type === "file_written").length, 0);
+    assert.deepEqual(
+      lines.map((line) => line.type),
+      ["session_start", "task_declared"],
+    );
   } finally {
     cleanup(repo);
   }
@@ -1899,7 +1906,13 @@ test("a Bash call whose tool_input happens to carry a file_path key still never 
 
     const written = readRunFiles(runsDirOf(repo));
     const lines = readLines(written[0]);
-    assert.equal(lines.length, 1);
+    // No file_written, for the same reason as above: tool_name gates it, not field presence.
+    // A declaration reads the same command text and finds the same real task path in it.
+    assert.equal(lines.filter((line) => line.type === "file_written").length, 0);
+    assert.deepEqual(
+      lines.map((line) => line.type),
+      ["session_start", "task_declared"],
+    );
   } finally {
     cleanup(repo);
   }
@@ -3128,4 +3141,184 @@ test("a turn that wrote nothing into a task folder records nothing", () => {
   } finally {
     cleanup(repo);
   }
+});
+
+// ── Phase 3: a declared task ──────────────────────────────────────────────────
+
+const {
+  TASK_PATH_PATTERN,
+  declaredTaskPath,
+} = require("../../plugins/aidd-telemetry/hooks/lib/task-declared.js");
+const { buildTaskDeclaredLine } = require("../../plugins/aidd-telemetry/hooks/lib/record.js");
+
+const TASK_RELATIVE_PATH = "aidd_docs/tasks/2026_08/2026_08_15_alpha/spec.md";
+
+function taskLinesIn(repo) {
+  const written = readRunFiles(runsDirOf(repo));
+  if (written.length === 0) return [];
+  return readLines(written[0]).filter((line) => line.type === "task_declared");
+}
+
+// One shape per host, each a plain tool call whose own arguments name a task file - never a
+// Skill call, since a declaration asks nothing of the host's skill-loading mechanism at all.
+function readTaskPayload(host, { cwd, sessionId }) {
+  if (host === "claude-code") {
+    return {
+      ...makePayload({ cwd, sessionId, event: "PostToolUse" }),
+      tool_name: "Read",
+      tool_input: { file_path: `${cwd}/${TASK_RELATIVE_PATH}` },
+    };
+  }
+  if (host === "cursor") {
+    return {
+      conversation_id: sessionId,
+      generation_id: sessionId,
+      model: "default",
+      tool_name: "Read",
+      tool_input: { file_path: `${cwd}/${TASK_RELATIVE_PATH}` },
+      session_id: sessionId,
+      hook_event_name: "postToolUse",
+      cursor_version: "2026.08.11-e8db854",
+      workspace_roots: [cwd],
+    };
+  }
+  if (host === "codex") {
+    return {
+      session_id: sessionId,
+      turn_id: "01a01450-e8a4-7fb1-b29d-f67e6cb10fff",
+      transcript_path: `/home/user/probe/codex-home/sessions/2026/08/18/rollout-2026-08-18T12-00-38-${sessionId}.jsonl`,
+      cwd,
+      hook_event_name: "PostToolUse",
+      tool_name: "Bash",
+      tool_input: { command: `sed -n '1,120p' ${TASK_RELATIVE_PATH}` },
+    };
+  }
+  // Copilot's canonical builder: arguments arrive as a JSON string in toolArgs, and no
+  // tool_input field exists at all.
+  return {
+    sessionId,
+    timestamp: 1787047151891,
+    cwd,
+    toolName: "read_file",
+    toolArgs: JSON.stringify({ path: `${cwd}/${TASK_RELATIVE_PATH}` }),
+  };
+}
+
+const DECLARE_SESSION_SUFFIX_BY_HOST = {
+  "claude-code": "dec1",
+  cursor: "dec2",
+  codex: "dec3",
+  copilot: "dec4",
+};
+
+test("TASK_PATH_PATTERN matches a folder task and a single-file task, and stops at a quote or space", () => {
+  assert.equal(TASK_PATH_PATTERN.test(TASK_RELATIVE_PATH), true);
+  assert.equal(TASK_PATH_PATTERN.test("aidd_docs/tasks/2026_08/2026_08_15_alpha.md"), true);
+  assert.equal(TASK_PATH_PATTERN.test("aidd_docs/tasks/2026_08/notes.txt"), false);
+  assert.equal(
+    TASK_PATH_PATTERN.exec(`"${TASK_RELATIVE_PATH}" more text`)[0],
+    TASK_RELATIVE_PATH,
+  );
+});
+
+for (const host of Object.keys(DECLARE_SESSION_SUFFIX_BY_HOST)) {
+  test(`reading a task file on ${host} leaves a task_declared line naming its path - the tool's own arguments, never a field the host has to cooperate on`, () => {
+    const repo = makeTempRepo({ remote: `git@github.com:acme/declare-${host}.git` });
+    try {
+      const sessionId = `00000000-0000-4000-8000-000000000${DECLARE_SESSION_SUFFIX_BY_HOST[host]}`;
+      replayIn(sessionStartPayload(host, { cwd: repo, sessionId }), "session-start");
+      const result = replayIn(readTaskPayload(host, { cwd: repo, sessionId }), "tool-used");
+      assert.equal(result.status, 0);
+
+      const declared = taskLinesIn(repo);
+      assert.equal(declared.length, 1);
+      assert.equal(declared[0].path, TASK_RELATIVE_PATH);
+    } finally {
+      cleanup(repo);
+    }
+  });
+}
+
+test("a Skill call that names no task path declares nothing - opening a step is not declaring a task", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/declare-skill-only.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-00000000dec5";
+    replayIn(sessionStartPayload("claude-code", { cwd: repo, sessionId }), "session-start");
+    replayIn(stepPayload("claude-code", { cwd: repo, sessionId }), "tool-used");
+
+    assert.deepEqual(taskLinesIn(repo), []);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("an ordinary write outside any task folder declares nothing", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/declare-ordinary.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-00000000dec6";
+    replayIn(sessionStartPayload("claude-code", { cwd: repo, sessionId }), "session-start");
+    replayIn(
+      fileWrittenPayload({ cwd: repo, sessionId, filePath: `${repo}/src/index.js` }),
+      "tool-used",
+    );
+
+    assert.deepEqual(taskLinesIn(repo), []);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("reading two different task files across two calls leaves two lines - the writer never dedupes, a reader collapsing them is its own job", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/declare-two-calls.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-00000000dec7";
+    replayIn(sessionStartPayload("claude-code", { cwd: repo, sessionId }), "session-start");
+    replayIn(readTaskPayload("claude-code", { cwd: repo, sessionId }), "tool-used");
+    const second = {
+      ...makePayload({ cwd: repo, sessionId, event: "PostToolUse" }),
+      tool_name: "Read",
+      tool_input: { file_path: `${repo}/aidd_docs/tasks/2026_08/2026_08_16_beta/spec.md` },
+    };
+    replayIn(second, "tool-used");
+
+    const declared = taskLinesIn(repo);
+    assert.deepEqual(
+      declared.map((line) => line.path),
+      [TASK_RELATIVE_PATH, "aidd_docs/tasks/2026_08/2026_08_16_beta/spec.md"],
+    );
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a declaration for a session that was never journaled writes nothing and exits 0", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/declare-no-run-file.git" });
+  try {
+    const result = replayIn(
+      readTaskPayload("claude-code", { cwd: repo, sessionId: "00000000-0000-4000-8000-00000000dec8" }),
+      "tool-used",
+    );
+    assert.equal(result.status, 0);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 0);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a task_declared line carries a path and nothing else task-shaped - no end, no source, no task_id", () => {
+  const line = buildTaskDeclaredLine({ at: "2026-08-20T10:00:00Z", path: TASK_RELATIVE_PATH });
+  assert.deepEqual(Object.keys(line).sort(), ["at", "path", "type"]);
+  assert.equal(line.type, "task_declared");
+});
+
+test("declaredTaskPath reads tool_input first and Copilot's toolArgs string only when tool_input is absent", () => {
+  assert.equal(
+    declaredTaskPath({ tool_input: { file_path: `/repo/${TASK_RELATIVE_PATH}` } }),
+    TASK_RELATIVE_PATH,
+  );
+  assert.equal(
+    declaredTaskPath({ toolArgs: JSON.stringify({ path: `/repo/${TASK_RELATIVE_PATH}` }) }),
+    TASK_RELATIVE_PATH,
+  );
+  assert.equal(declaredTaskPath({ tool_input: { command: "echo hi" } }), null);
 });

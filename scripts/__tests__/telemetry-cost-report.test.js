@@ -368,6 +368,114 @@ describe("restricting a period to one task", () => {
   });
 });
 
+describe("a task can be declared, not just derived", () => {
+  const declared = (at, taskPath) => ({ type: "task_declared", at, path: taskPath });
+  const turnEnd = (at) => ({ type: "turn_end", at });
+  const WANTED = "2026_08/wanted";
+  const WANTED_PATH = "aidd_docs/tasks/2026_08/wanted/spec.md";
+
+  it("attributes a tool whose payloads name no path at all - a declared interval, never a written file", () => {
+    const journals = [
+      {
+        session: { vendor_id: "s-declared", tool: "codex" },
+        filesWritten: [],
+        boundaries: [turnEnd("2026-08-17T11:00:00Z")],
+        taskDeclarations: [declared("2026-08-17T10:00:00Z", WANTED_PATH)],
+      },
+    ];
+    const records = [request({ vendor_id: "s-declared", cost_usd: 1, event_timestamp: "2026-08-17T10:30:00Z" })];
+
+    const built = report({ records, journals, task: WANTED });
+
+    assert.equal(built.totals.requests, 1);
+    assert.equal(built.totals.costMicroUsd, toMicroUsd(1));
+    const mix = Object.fromEntries(built.taskAttributionMix.map((row) => [row.attribution, row.totals.requests]));
+    assert.deepEqual(mix, { declared: 1, inferred: 0 });
+  });
+
+  it("a session that never declared and never wrote into the folder belongs to none - never the last one seen", () => {
+    const journals = [
+      {
+        session: { vendor_id: "s-silent", tool: "codex" },
+        filesWritten: [],
+        boundaries: [turnEnd("2026-08-17T11:00:00Z")],
+        taskDeclarations: [],
+      },
+    ];
+    const records = [request({ vendor_id: "s-silent", cost_usd: 9, event_timestamp: "2026-08-17T10:30:00Z" })];
+
+    assert.equal(report({ records, journals, task: WANTED }).totals.requests, 0);
+  });
+
+  it("a declaration left open by one session does not reach a later, unrelated one", () => {
+    const journals = [
+      {
+        // Crashed mid-task: declared once, then nothing else - no closing turn_end at all.
+        session: { vendor_id: "s-crashed", tool: "codex" },
+        filesWritten: [],
+        boundaries: [],
+        taskDeclarations: [declared("2026-08-17T10:00:00Z", WANTED_PATH)],
+      },
+      {
+        // A wholly different session, later in the same period, that never named this task.
+        session: { vendor_id: "s-later", tool: "codex" },
+        filesWritten: [],
+        boundaries: [turnEnd("2026-08-20T09:05:00Z")],
+        taskDeclarations: [],
+      },
+    ];
+    const records = [
+      request({ vendor_id: "s-later", cost_usd: 5, event_timestamp: "2026-08-20T09:00:00Z" }),
+    ];
+
+    assert.equal(report({ records, journals, task: WANTED }).totals.requests, 0);
+  });
+
+  it("an unclosed declaration is capped at the journal's own last recorded moment, never left boundless", () => {
+    const journals = [
+      {
+        session: { vendor_id: "s-crashed", tool: "codex" },
+        filesWritten: [],
+        boundaries: [],
+        // Nothing follows the declaration - the crash. The interval it derives to must end
+        // at this same moment, not at Infinity.
+        taskDeclarations: [declared("2026-08-17T10:00:00Z", WANTED_PATH)],
+      },
+    ];
+    const records = [
+      // A re-read stores this later, but it did not happen before the crash - the journal
+      // never recorded a moment past 10:00:00Z, so nothing after it can be "declared".
+      request({ vendor_id: "s-crashed", cost_usd: 3, event_timestamp: "2026-08-17T10:30:00Z" }),
+    ];
+
+    assert.equal(report({ records, journals, task: WANTED }).totals.requests, 0);
+  });
+
+  it("a declared interval closes at the next turn_end - work after it falls back to inferred, or out of scope entirely", () => {
+    const journals = [
+      {
+        session: { vendor_id: "s-mixed", tool: "claude-code" },
+        filesWritten: [{ path: WANTED_PATH }],
+        boundaries: [turnEnd("2026-08-17T10:15:00Z")],
+        taskDeclarations: [declared("2026-08-17T10:00:00Z", WANTED_PATH)],
+      },
+    ];
+    const records = [
+      // Inside the declared window.
+      request({ vendor_id: "s-mixed", cost_usd: 1, turn_id: "a", event_timestamp: "2026-08-17T10:05:00Z" }),
+      // After the closing turn_end - the declaration no longer covers it, but the session
+      // still wrote into the task folder at some point, so it falls back to inferred.
+      request({ vendor_id: "s-mixed", cost_usd: 2, turn_id: "b", event_timestamp: "2026-08-17T10:20:00Z" }),
+    ];
+
+    const built = report({ records, journals, task: WANTED });
+
+    assert.equal(built.totals.requests, 2);
+    const mix = Object.fromEntries(built.taskAttributionMix.map((row) => [row.attribution, row.totals.requests]));
+    assert.deepEqual(mix, { declared: 1, inferred: 1 });
+  });
+});
+
 // Runs the real `read` command over a real transcript, so this exercises store()'s join
 // end to end - never attribution.js's attribute() in isolation, which the fixture above
 // already covers.
@@ -605,6 +713,31 @@ describe("what a program reads", () => {
 
     assert.equal(envelope.totals.input_tokens, 0);
     assert.ok(!("output_tokens" in envelope.totals));
+  });
+
+  it("carries how a ticket was known only alongside --task, never for an unfiltered period", () => {
+    assert.ok(!("task_attribution" in toEnvelope(report())));
+
+    const journals = [
+      {
+        session: { vendor_id: "s-1", tool: "codex" },
+        filesWritten: [],
+        boundaries: [{ type: "turn_end", at: "2026-08-17T11:00:00Z" }],
+        taskDeclarations: [{ type: "task_declared", at: "2026-08-17T10:00:00Z", path: "aidd_docs/tasks/2026_08/t/spec.md" }],
+      },
+    ];
+    const withTask = toEnvelope(
+      report({
+        journals,
+        task: "2026_08/t",
+        records: [request({ vendor_id: "s-1", cost_usd: 1, event_timestamp: "2026-08-17T10:30:00Z" })],
+      }),
+    );
+    assert.deepEqual(
+      withTask.task_attribution.map((row) => row.attribution),
+      ["declared", "inferred"],
+    );
+    assert.equal(withTask.task_attribution[0].totals.requests, 1);
   });
 
   it("says what each tool can supply, so a limit is never read from a missing number", () => {

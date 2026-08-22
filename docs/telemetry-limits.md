@@ -123,30 +123,33 @@ one, which spells the tool name Copilot's way and the arguments Claude Code's wa
 value followed from the other, and both were captured rather than inferred. So a Copilot
 session attributes to the step that ran; it simply carries no amount to place inside it.
 
-## Every tool journals; only Claude Code's writes name a task
+## Every tool journals, and four of five can name the ticket
 
-A task is derived from the files a session wrote: the run journal records a repository
-relative path each time a session writes inside a task folder, and the reader turns that
-path into the task's identity.
+A ticket is known two ways, and they are different claims.
 
-All five tools now leave a run journal, each proven by a session that was actually run.
-What differs is what a payload *says* about a write. The journal reads that path from the
-tool's own hook payload, and **only Claude Code's carries one in a readable form**.
-Copilot's and Cursor's were never captured doing so, and Codex writes through an
-`apply_patch` command string that would have to be parsed rather than read.
+**Declared.** A session that opens a plan under `aidd_docs/tasks/` names the ticket by doing
+so — reading it, grepping it, or naming it in a shell command. The journal records that as
+`task_declared`, the same way it already records which skill is running: told, not deduced.
+Nothing about it depends on the shape of a tool's payload, which is why it works where
+inference does not. A report says `declared` beside such a figure.
 
-**However the tool wrote it.** A payload naming a path is exact and is recorded as
-`source: "tool-stated"`. A write made through a shell command, an `apply_patch`, or
-anything else that names no path is caught differently: at the end of every turn the hook
-walks the task tree and records what changed, as `source: "observed"`.
+**Inferred.** A session that writes a file inside a task folder is attributed to that task
+from the path. This needs the tool's own hook payload to name a path in readable form, and
+**only Claude Code's does** — Copilot's and Cursor's were never captured doing so, and Codex
+writes through an `apply_patch` command string that would have to be parsed rather than
+read. It stays, and it covers work done outside any declared ticket. A report says
+`inferred`.
 
-That second pass is an observation, not a statement, and it can in principle attribute a
-file something else on the machine wrote into a task folder during the same turn. A
-consumer that must not risk it filters on `source`.
+Declaration wins where both are available, and neither is ever assumed: a session that
+declared nothing belongs to no ticket rather than to the last one seen. A declaration is
+bounded by the next declaration or the end of the turn, and capped at the journal's own last
+recorded moment — an unclosed one cannot swallow the rest of a week, and cannot reach the
+next session at all, because a run journal belongs to one session.
 
-A session on any other tool is still fully reportable **by period**, and **by step** where
-a run journal covers it. It simply belongs to no task. A Codex session with no task is not
-a session that touched nothing.
+**OpenCode is the exception, for a new reason.** Its plugin receives only the events that
+open and idle a session; no tool call ever reaches the journal, so there is nothing to
+declare from. That is a different limit from the one above — not a payload that fails to
+name a path, but no payload at all.
 
 ## No amount is computed here
 

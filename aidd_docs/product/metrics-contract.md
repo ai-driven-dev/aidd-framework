@@ -480,20 +480,36 @@ enabled here to measure, and its local files carry nothing to read.
 ### Attributing records to a task
 
 A record carries no task identity, on any route. A task is derived by whatever
-reads the records, from the `file_written` lines the run journal records beside
-them — a session that wrote inside a task folder belongs to that task. That
-derivation is deliberately not stored: a conclusion frozen at write time cannot
-be revised, while a derivation re-runs over every past session the day it
-changes.
+reads the records, from two kinds of line the run journal records beside them.
+That derivation is deliberately not stored: a conclusion frozen at write time
+cannot be revised, while a derivation re-runs over every past session the day
+it changes.
 
-**Only Claude Code produces those lines.** The journal hook reads a written
-path from the tool's own hook payload, and only Claude Code's carries one in a
-readable form: Copilot's and Cursor's were never captured doing so, and Codex
-writes through an `apply_patch` command string that would have to be parsed
-rather than read. A session on any other tool is therefore attributable to a
-**period** and, where a journal covers it, to a **step** — but never to a task.
-A consumer prints that as a limit of the tool, exactly as it prints "not
-covered": a Codex session with no task is not a session that touched nothing.
+**A written file.** The journal hook reads a written path from the tool's own
+hook payload, and only Claude Code's carries one in a readable form: Copilot's
+and Cursor's were never captured doing so, and Codex writes through an
+`apply_patch` command string that would have to be parsed rather than read. A
+session whose journal names a written path this way belongs, as a whole, to
+whatever task that path resolves to.
+
+**A declared ticket.** `task_declared` records that a tool call's own
+arguments named a file under a task folder — the same move `step_start`
+already makes for which skill is running, and it asks nothing of a payload's
+shape. It reaches every host the journal hook dispatches a tool-call event
+for, which today is every declared host except OpenCode: its plugin observes
+only session lifecycle events, never an individual tool call, so there is no
+payload for a declaration to read arguments out of. A declaration is an
+interval, not a whole-session fact — it opens where the tool call happened and
+closes at whichever of a later declaration or a turn boundary comes next, or,
+left open, at the last moment that session's journal actually recorded. Only a
+record whose own moment falls inside that interval belongs to the task by
+this route; the rest of the session falls back to whether it wrote into the
+folder, exactly as before.
+
+A session on a tool that produces neither kind of line is attributable to a
+**period** and, where a journal covers it, to a **step** — but never to a
+task. A consumer prints that as a limit of the tool, exactly as it prints "not
+covered": a session with no task is not a session that touched nothing.
 
 The Copilot denomination is measured, though not from anything in this
 repository — it comes from reading that tool's own session files, and is

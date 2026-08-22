@@ -41,6 +41,15 @@ else.
 | Tokens | <total, thousands separated> (<cache share>% cache) |
 | Cost | <amount, or "unknown — no tool read locally reports one"> |
 
+<when the question named a task, from `task_attribution`:>
+
+**How the ticket was known**
+
+| | Share |
+| --- | --- |
+| Declared by the flow | <n>% |
+| Inferred from a written file | <n>% |
+
 **Where it went**
 
 | Step | Share | Tokens | Attribution |
@@ -75,6 +84,8 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    headline comes from `totals`, the steps from `by_step`, the models from `by_model`, and
    none of it needs re-adding since every breakdown already sums to its total.
    - A share is of cost when `totals.cost_micro_usd` is present, of tokens otherwise. Say which above the table.
+   - Include "How the ticket was known" only when `task` is present - `task_attribution`
+     otherwise does not exist on the object at all, never an empty array to render as zeroes.
 5. **Read `capability` before explaining an absent figure.** A tool that cannot supply a number and a session that consumed nothing look identical in the numbers.
 
    | False field | Means |
@@ -82,7 +93,7 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    | `local_read.amount` | that tool's files carry no currency figure, true of every tool read locally today |
    | `local_read.tool_stated_step` | the tool never names the running skill, so its steps come from the journal or from nothing |
    | `journal_attributable` | the journal never names that tool's sessions, so a sweep never reaches them |
-   | `task_attributable` | its writes cannot be traced to a task, so it is absent from a task report without having done nothing |
+   | `task_attributable` | a session on this tool cannot be traced to a task, so it is absent from a task report without having done nothing |
 
 6. **Keep `unattributed` as itself.** Nothing measured supports reading it as no step having run, and it is never a residual.
 7. **Say when the answer is partial.** A non-zero `read.undated_records` or `read.unreadable_lines` means the total is incomplete, and the reasons are in [telemetry-limits.md](../../../../../docs/telemetry-limits.md). The `--axis` path already carries this in its own last lines; the `--json` path carries it in `read`.

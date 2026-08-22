@@ -94,10 +94,12 @@ test("the limits document gives every partly-measurable tool its reason, not jus
     assert.ok(limits.includes(tool), `${tool} is named`);
     assert.ok(limits.includes(reason), `${tool}'s reason, not just its name`);
   }
-  assert.ok(
-    limits.includes("only Claude Code's carries one in a readable form"),
-    "which tool's writes name a task, and which do not",
-  );
+  for (const [claim, why] of [
+    ["only Claude Code's does", "which tool's writes name a task"],
+    ["OpenCode is the exception", "the tool that can declare no ticket at all"],
+  ]) {
+    assert.ok(limits.includes(claim), why);
+  }
 });
 
 test("the measurement script ships inside a skill, where a plugin install carries it", () => {
