@@ -137,6 +137,7 @@ export function buildClaudeContract(): ToolBuildContract {
     synthesizeManifest: (source, presence) =>
       synthesizeDefaultPluginManifest(source, presence, {
         agentsField: true,
+        hooksField: false,
       }),
     manifestSchemaName: "plugin-manifest",
     artifacts: {
@@ -190,6 +191,7 @@ export function buildCursorContract(): ToolBuildContract {
     synthesizeManifest: (source, presence) =>
       synthesizeDefaultPluginManifest(source, presence, {
         agentsField: true,
+        hooksField: true,
       }),
     manifestSchemaName: "plugin-manifest",
     artifacts: {
@@ -243,6 +245,7 @@ export function buildCopilotMarketplaceContract(): ToolBuildContract {
     synthesizeManifest: (source, presence) =>
       synthesizeDefaultPluginManifest(source, presence, {
         agentsField: true,
+        hooksField: true,
       }),
     manifestSchemaName: null, // Copilot does not use AJV for the plugin manifest
     artifacts: {

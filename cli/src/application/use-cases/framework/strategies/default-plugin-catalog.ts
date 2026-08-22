@@ -3,6 +3,16 @@ import type { PluginPresenceFlags } from "./plugin-source-tree-reader.js";
 export interface SynthesizeDefaultPluginManifestOpts {
   /** When true, include `agents` as a list of `./agents/*.md` file paths if agents are present. */
   readonly agentsField: boolean;
+  /**
+   * Whether the tool needs `hooks` to point at the standard `hooks/hooks.json`.
+   *
+   * Codex does. Claude Code loads that path by its own convention and, since 2.1.240,
+   * rejects the plugin outright when a manifest names it as well: "Duplicate hooks file
+   * detected ... The standard hooks/hooks.json is loaded automatically, so manifest.hooks
+   * should only reference additional hook files." The hooks still fire, so the plugin reads
+   * as failed while working — measured, and worse than either honest outcome.
+   */
+  readonly hooksField: boolean;
 }
 
 export function synthesizeDefaultPluginManifest(
@@ -24,7 +34,7 @@ export function synthesizeDefaultPluginManifest(
     manifest.agents = presence.agentsList.map((n) => `./agents/${n}`);
   if (presence.skillsList.length > 0)
     manifest.skills = presence.skillsList.map((n) => `./skills/${n}`);
-  if (presence.hasHooksJson) manifest.hooks = "./hooks/hooks.json";
+  if (opts.hooksField && presence.hasHooksJson) manifest.hooks = "./hooks/hooks.json";
   if (presence.hasMcpJson) manifest.mcpServers = "./.mcp.json";
   return manifest;
 }
