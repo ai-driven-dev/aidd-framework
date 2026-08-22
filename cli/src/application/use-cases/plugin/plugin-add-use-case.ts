@@ -5,11 +5,13 @@ import {
   MissingPluginMetadataError,
   VersionMismatchError,
 } from "../../../domain/errors.js";
+import type { InstallationFile } from "../../../domain/models/file.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import { DOCS_DIR, PLUGIN_CACHE_SUBDIR } from "../../../domain/models/paths.js";
 import { Plugin } from "../../../domain/models/plugin.js";
 import { PluginContentTranslator } from "../../../domain/models/plugin-content-translator.js";
 import type { PluginDistribution } from "../../../domain/models/plugin-distribution.js";
+import type { ReadonlyNoticeList } from "../../../domain/models/plugin-install-notice.js";
 import type { PluginSource } from "../../../domain/models/plugin-source.js";
 import type { ReadonlySkipList } from "../../../domain/models/plugin-translation-skip.js";
 import type { AiToolId } from "../../../domain/models/tool-ids.js";
@@ -192,9 +194,10 @@ export class PluginAddUseCase {
     prevMcpMap: Map<AiToolId, ReadonlyMap<string, string>>
   ): Promise<void> {
     const allSkipped: ReadonlySkipList[] = [];
+    const allNotices: ReadonlyNoticeList[] = [];
     for (const toolId of toolIds) {
       const prev = prevMcpMap.get(toolId) ?? new Map();
-      const { skipped } = await this.addPluginForTool(
+      const { skipped, notices } = await this.addPluginForTool(
         dist,
         toolId,
         source,
@@ -205,8 +208,10 @@ export class PluginAddUseCase {
         prev
       );
       allSkipped.push(skipped);
+      allNotices.push(notices);
     }
     this.emitSkipWarnings(allSkipped.flat());
+    this.emitInstallNotices(allNotices.flat());
   }
 
   private collectPreviousMcpEntries(
@@ -256,12 +261,12 @@ export class PluginAddUseCase {
     marketplace: string | undefined,
     docsDir: string,
     previousMcpEntries: ReadonlyMap<string, string> = new Map()
-  ): Promise<{ skipped: ReadonlySkipList }> {
+  ): Promise<{ skipped: ReadonlySkipList; notices: ReadonlyNoticeList }> {
     const toolConfig = getToolConfig(toolId);
-    if (!isAiTool(toolConfig)) return { skipped: [] };
+    if (!isAiTool(toolConfig)) return { skipped: [], notices: [] };
     const adapter = this.resolveAdapter(toolConfig);
     if (adapter?.mode === "flat") {
-      return adapter.addPlugin(
+      const result = await adapter.addPlugin(
         dist,
         toolId,
         source,
@@ -271,20 +276,65 @@ export class PluginAddUseCase {
         docsDir,
         previousMcpEntries
       );
+      return { ...result, notices: [] };
     }
-    const { files, componentPaths, skipped } = new PluginContentTranslator(
-      this.hasher
-    ).translateWithComponentPaths(dist, toolConfig, docsDir);
-    if (files.length === 0) return { skipped };
+    const translated = new PluginContentTranslator(this.hasher).translateWithComponentPaths(
+      dist,
+      toolConfig,
+      docsDir
+    );
+    return this.materializeNativePlugin(
+      dist,
+      toolId,
+      source,
+      projectRoot,
+      manifest,
+      marketplace,
+      docsDir,
+      adapter,
+      translated
+    );
+  }
+
+  // `notices` survives every branch below, including the marketplace one that discards its
+  // own `translated.skipped` in favor of the adapter's — a delivered hook's trust notice is
+  // a fact about the tool, not about which materialization route happened to run.
+  private async materializeNativePlugin(
+    dist: PluginDistribution,
+    toolId: AiToolId,
+    source: PluginSource,
+    projectRoot: string,
+    manifest: Manifest,
+    marketplace: string | undefined,
+    docsDir: string,
+    adapter: PluginTranslator | null,
+    translated: {
+      files: InstallationFile[];
+      componentPaths: ReadonlyMap<string, string>;
+      skipped: ReadonlySkipList;
+      notices: ReadonlyNoticeList;
+    }
+  ): Promise<{ skipped: ReadonlySkipList; notices: ReadonlyNoticeList }> {
+    const { files, componentPaths, skipped, notices } = translated;
+    if (files.length === 0) return { skipped, notices };
     if (adapter?.mode === "marketplace" && source.kind === "local" && marketplace !== undefined) {
-      return adapter.addPlugin(dist, toolId, source, projectRoot, manifest, marketplace, docsDir);
+      const result = await adapter.addPlugin(
+        dist,
+        toolId,
+        source,
+        projectRoot,
+        manifest,
+        marketplace,
+        docsDir
+      );
+      return { ...result, notices };
     }
     await writePluginFiles(files, projectRoot, this.fs);
     manifest.addPlugin(
       toolId,
       Plugin.fromDistribution(dist, source, files, componentPaths, marketplace)
     );
-    return { skipped };
+    return { skipped, notices };
   }
 
   private emitSkipWarnings(skipped: ReadonlySkipList): void {
@@ -292,6 +342,12 @@ export class PluginAddUseCase {
       this.logger.warn(
         `Plugin "${entry.pluginName}": ${entry.component} skipped for ${entry.toolId} — ${entry.reason}`
       );
+    }
+  }
+
+  private emitInstallNotices(notices: ReadonlyNoticeList): void {
+    for (const entry of notices) {
+      this.logger.info(`Plugin "${entry.pluginName}" (${entry.toolId}): ${entry.message}`);
     }
   }
 

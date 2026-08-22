@@ -1,5 +1,7 @@
 import { convertHooksFormat } from "../formats/cursor-hooks.js";
+import { flatHooksSharedDirPath } from "../formats/flat-paths.js";
 import { parseFrontmatter, serializeFrontmatter } from "../formats/markdown.js";
+import { rewritePluginRootToken } from "../formats/plugin-root-token-rewrite.js";
 import type { Hasher } from "../ports/hasher.js";
 import type {
   AiTool,
@@ -13,11 +15,8 @@ import type { ToolConfig } from "../tools/registry.js";
 import { isAiTool } from "../tools/registry.js";
 import { InstallationFile } from "./file.js";
 import type { PluginComponentFile, PluginDistribution } from "./plugin-distribution.js";
-import {
-  OPENCODE_HOOKS_SKIP_REASON,
-  type PluginTranslationSkip,
-  type ReadonlySkipList,
-} from "./plugin-translation-skip.js";
+import type { PluginInstallNotice, ReadonlyNoticeList } from "./plugin-install-notice.js";
+import type { PluginTranslationSkip, ReadonlySkipList } from "./plugin-translation-skip.js";
 
 const PLUGIN_MANIFEST_PATHS: readonly string[] = [
   ".claude-plugin/plugin.json",
@@ -76,16 +75,17 @@ export class PluginContentTranslator {
     files: InstallationFile[];
     componentPaths: ReadonlyMap<string, string>;
     skipped: ReadonlySkipList;
+    notices: ReadonlyNoticeList;
   } {
     const tool = asPluginTool(toolConfig);
-    if (tool === null) return { files: [], componentPaths: new Map(), skipped: [] };
+    if (tool === null) return { files: [], componentPaths: new Map(), skipped: [], notices: [] };
     const { mode } = tool.capabilities.plugins;
     if (mode === "native") return this.translateNativeWithPaths(dist, tool, docsDir);
     if (mode === "flat") {
       const { files, skipped } = this.translateFlat(dist, tool, docsDir);
-      return { files, componentPaths: new Map(), skipped };
+      return { files, componentPaths: new Map(), skipped, notices: [] };
     }
-    return { files: [], componentPaths: new Map(), skipped: [] };
+    return { files: [], componentPaths: new Map(), skipped: [], notices: [] };
   }
 
   detectFlatCollisions(
@@ -117,30 +117,77 @@ export class PluginContentTranslator {
     files: InstallationFile[];
     componentPaths: ReadonlyMap<string, string>;
     skipped: ReadonlySkipList;
+    notices: ReadonlyNoticeList;
   } {
-    const { pluginsDir, pluginManifestRelativePath } = tool.capabilities.plugins;
-    if (pluginsDir === null) return { files: [], componentPaths: new Map(), skipped: [] };
+    const { pluginsDir } = tool.capabilities.plugins;
+    if (pluginsDir === null) {
+      return { files: [], componentPaths: new Map(), skipped: [], notices: [] };
+    }
     const pluginRoot = `${pluginsDir}${dist.manifest.name}/`;
+    const { files, componentPaths } = this.buildNativeFiles(dist, tool, docsDir, pluginRoot);
+    const notices = this.collectHooksTrustNotices(dist, tool);
+    return { files, componentPaths, skipped: [], notices };
+  }
+
+  private buildNativeFiles(
+    dist: PluginDistribution,
+    tool: AiTool<HasPlugins>,
+    docsDir: string,
+    pluginRoot: string
+  ): { files: InstallationFile[]; componentPaths: ReadonlyMap<string, string> } {
     const result: InstallationFile[] = [];
     const componentPaths = new Map<string, string>();
     for (const file of dist.files) {
       const translated = this.translateFile(file, tool);
       if (translated === null) continue;
       const hooked = this.maybeConvertHooks(file.relativePath, translated.content, tool);
-      const content = translated.verbatim ? hooked : tool.rewriteContent(hooked, docsDir);
+      const content = translated.verbatim ? hooked : this.rewriteProse(hooked, tool, docsDir);
       const installedPath = `${pluginRoot}${translated.relativePath}`;
       result.push(this.makeFile(installedPath, content));
-      if (isComponentFile(file.relativePath)) {
-        componentPaths.set(installedPath, file.relativePath);
-      }
+      if (isComponentFile(file.relativePath)) componentPaths.set(installedPath, file.relativePath);
     }
-    if (pluginManifestRelativePath !== null) {
-      const sourceManifest = findSourceManifestContent(dist);
-      if (sourceManifest !== null) {
-        result.push(this.makeFile(`${pluginRoot}${pluginManifestRelativePath}`, sourceManifest));
-      }
-    }
-    return { files: result, componentPaths, skipped: [] };
+    this.appendManifestFile(dist, tool, pluginRoot, result);
+    return { files: result, componentPaths };
+  }
+
+  private appendManifestFile(
+    dist: PluginDistribution,
+    tool: AiTool<HasPlugins>,
+    pluginRoot: string,
+    result: InstallationFile[]
+  ): void {
+    const { pluginManifestRelativePath } = tool.capabilities.plugins;
+    if (pluginManifestRelativePath === null) return;
+    const sourceManifest = findSourceManifestContent(dist);
+    if (sourceManifest === null) return;
+    result.push(this.makeFile(`${pluginRoot}${pluginManifestRelativePath}`, sourceManifest));
+  }
+
+  // A delivered hook is not a skip: `hooksTrustNotice` names what a person still has to do
+  // before it runs, and only applies when this plugin actually ships one.
+  private collectHooksTrustNotices(
+    dist: PluginDistribution,
+    tool: AiTool<HasPlugins>
+  ): ReadonlyNoticeList {
+    if (dist.components.hooks.length === 0) return [];
+    const { hooksTrustNotice } = tool.capabilities.plugins;
+    if (hooksTrustNotice === null) return [];
+    const entry: PluginInstallNotice = {
+      pluginName: dist.manifest.name,
+      component: "hooks",
+      toolId: tool.toolId,
+      message: hooksTrustNotice,
+    };
+    return [entry];
+  }
+
+  /** A plugin is authored with one spelling of the plugin root and the installer translates
+   * it, exactly as prose is translated. A script carried verbatim keeps its own bytes. */
+  private rewriteProse(content: string, tool: AiTool<HasPlugins>, docsDir: string): string {
+    const rewritten = tool.rewriteContent(content, docsDir);
+    const { pluginRootToken } = tool.capabilities.plugins;
+    if (pluginRootToken === null) return rewritten;
+    return rewritePluginRootToken(rewritten, pluginRootToken);
   }
 
   private maybeConvertHooks(sourcePath: string, content: string, tool: AiTool<HasPlugins>): string {
@@ -162,10 +209,13 @@ export class PluginContentTranslator {
       if (file.relativePath === `${PLUGIN_HOOKS_DIR}/hooks.json`) {
         return { relativePath: cap.hooksRelativePath, content: file.content };
       }
-      const hooksDir = parentDirOf(cap.hooksRelativePath);
-      // Everything under `hooks/` but its own manifest is a script the host runs.
+      // Everything under `hooks/` but its own manifest is a script the host runs. It goes
+      // beside the manifest, and where the manifest sits at the plugin root it keeps its
+      // own directory — a script at the root would leave the command naming `hooks/`
+      // pointing at nothing.
+      const manifestDir = parentDirOf(cap.hooksRelativePath) || PLUGIN_HOOKS_DIR;
       return {
-        relativePath: `${hooksDir}/${pathBelow(PLUGIN_HOOKS_DIR, file.relativePath)}`,
+        relativePath: `${manifestDir}/${pathBelow(PLUGIN_HOOKS_DIR, file.relativePath)}`,
         content: file.content,
         verbatim: true,
       };
@@ -212,18 +262,34 @@ export class PluginContentTranslator {
         if (f !== null) result.push(f);
       }
     }
+    result.push(...this.flatHooksFiles(dist, tool));
     const skipped = this.collectHooksSkips(dist, tool);
     return { files: result, skipped };
   }
 
+  // A flat-mode hook is a runtime module a loader scans for, not a manifest a merge
+  // reads — hooks/hooks.json describes the wrong shape for that and is never delivered;
+  // everything else under hooks/ (the module itself and whatever it requires beside it)
+  // is carried verbatim into flatHooksDir, exactly as native mode carries a hook script.
+  private flatHooksFiles(dist: PluginDistribution, tool: AiTool<HasPlugins>): InstallationFile[] {
+    const { flatHooksDir } = tool.capabilities.plugins;
+    if (flatHooksDir === null) return [];
+    return dist.components.hooks
+      .filter((file) => file.relativePath !== `${PLUGIN_HOOKS_DIR}/hooks.json`)
+      .map((file) =>
+        this.makeFile(flatHooksSharedDirPath(flatHooksDir, file.relativePath), file.content)
+      );
+  }
+
   private collectHooksSkips(dist: PluginDistribution, tool: AiTool<HasPlugins>): ReadonlySkipList {
     if (dist.components.hooks.length === 0) return [];
-    if (tool.capabilities.plugins.acceptsHooks) return [];
+    const { acceptsHooks, hooksUnsupportedReason } = tool.capabilities.plugins;
+    if (acceptsHooks || hooksUnsupportedReason === null) return [];
     const entry: PluginTranslationSkip = {
       pluginName: dist.manifest.name,
       component: "hooks",
       toolId: tool.toolId,
-      reason: OPENCODE_HOOKS_SKIP_REASON,
+      reason: hooksUnsupportedReason,
     };
     return [entry];
   }

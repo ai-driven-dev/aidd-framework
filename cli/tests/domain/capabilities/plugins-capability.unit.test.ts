@@ -11,6 +11,7 @@ describe("PluginsCapability", () => {
   describe("native mode", () => {
     const cap = new PluginsCapability({
       mode: "native",
+      acceptsHooks: true,
       pluginsDir: ".claude/plugins/",
       pluginManifestRelativePath: ".claude-plugin/plugin.json",
     });
@@ -36,9 +37,11 @@ describe("PluginsCapability", () => {
     });
   });
 
-  describe("flat mode", () => {
+  describe("flat mode, hooks unsupported", () => {
     const cap = new PluginsCapability({
       mode: "flat",
+      acceptsHooks: false,
+      hooksUnsupportedReason: "a test double that hosts no plugin directory",
       flatNamespacePrefix: "aidd-",
     });
 
@@ -61,10 +64,42 @@ describe("PluginsCapability", () => {
     it("pluginOutputDir returns null", () => {
       expect(cap.pluginOutputDir("my-plugin")).toBeNull();
     });
+
+    it("flatHooksDir is null", () => {
+      expect(cap.flatHooksDir).toBeNull();
+    });
+
+    it("exposes hooksUnsupportedReason", () => {
+      expect(cap.hooksUnsupportedReason).toBe("a test double that hosts no plugin directory");
+    });
+  });
+
+  describe("flat mode, hooks accepted", () => {
+    const cap = new PluginsCapability({
+      mode: "flat",
+      acceptsHooks: true,
+      flatHooksDir: ".test-tool/plugin/",
+      flatNamespacePrefix: "aidd-",
+    });
+
+    it("acceptsHooks is true", () => {
+      expect(cap.acceptsHooks).toBe(true);
+    });
+
+    it("exposes flatHooksDir", () => {
+      expect(cap.flatHooksDir).toBe(".test-tool/plugin/");
+    });
+
+    it("hooksUnsupportedReason is null", () => {
+      expect(cap.hooksUnsupportedReason).toBeNull();
+    });
   });
 
   describe("unsupported mode", () => {
-    const cap = new PluginsCapability({ mode: "unsupported" });
+    const cap = new PluginsCapability({
+      mode: "unsupported",
+      hooksUnsupportedReason: "a test double that hosts no plugin directory",
+    });
 
     it("exposes mode as unsupported", () => {
       expect(cap.mode).toBe("unsupported");
@@ -90,6 +125,7 @@ describe("PluginsCapability", () => {
   describe("user scope (native mode)", () => {
     const cap = new PluginsCapability({
       mode: "native",
+      acceptsHooks: true,
       pluginsDir: "",
       pluginManifestRelativePath: null,
       installScope: "user",
@@ -110,6 +146,7 @@ describe("PluginsCapability", () => {
   describe("project scope (default)", () => {
     const cap = new PluginsCapability({
       mode: "native",
+      acceptsHooks: true,
       pluginsDir: ".claude/plugins/",
       pluginManifestRelativePath: "plugin.json",
     });
@@ -129,6 +166,7 @@ describe("PluginsCapability", () => {
         () =>
           new PluginsCapability({
             mode: "native",
+            acceptsHooks: true,
             pluginsDir: "",
             pluginManifestRelativePath: null,
             installScope: "user",
@@ -142,6 +180,7 @@ describe("PluginsCapability", () => {
       it("exposes translationMode as marketplace", () => {
         const cap = new PluginsCapability({
           mode: "native",
+          acceptsHooks: true,
           pluginsDir: ".claude/plugins/",
           pluginManifestRelativePath: "plugin.json",
           translationMode: "marketplace",
@@ -155,6 +194,7 @@ describe("PluginsCapability", () => {
       it("exposes translationMode as null (neutral native)", () => {
         const cap = new PluginsCapability({
           mode: "native",
+          acceptsHooks: true,
           pluginsDir: ".claude/plugins/",
           pluginManifestRelativePath: "plugin.json",
         });
@@ -166,6 +206,8 @@ describe("PluginsCapability", () => {
       it("exposes translationMode as flat automatically", () => {
         const cap = new PluginsCapability({
           mode: "flat",
+          acceptsHooks: false,
+          hooksUnsupportedReason: "a test double that hosts no plugin directory",
           flatNamespacePrefix: "aidd-",
         });
         expect(cap.translationMode).toBe("flat");
@@ -174,7 +216,10 @@ describe("PluginsCapability", () => {
 
     describe("unsupported mode", () => {
       it("exposes translationMode as null", () => {
-        const cap = new PluginsCapability({ mode: "unsupported" });
+        const cap = new PluginsCapability({
+          mode: "unsupported",
+          hooksUnsupportedReason: "a test double that hosts no plugin directory",
+        });
         expect(cap.translationMode).toBeNull();
       });
     });
