@@ -45,7 +45,9 @@ describe("the plugin measures on its own", () => {
     configDir = join(tempDir, "config");
     await mkdir(projectDir, { recursive: true });
     await mkdir(fakeHome, { recursive: true });
-    execFileSync("git", ["init", "-q", projectDir]);
+    execFileSync("git", ["init", "-q", projectDir], {
+      env: environmentWithoutGitVariables(process.env),
+    });
     // The tools' own files, exactly as a machine that ran them would hold.
     await execFileAsync("cp", ["-R", `${LOCAL_COST_FIXTURES}/.`, fakeHome]);
   });

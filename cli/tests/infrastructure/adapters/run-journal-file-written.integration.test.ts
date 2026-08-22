@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RunJournalReaderAdapter } from "../../../src/infrastructure/adapters/run-journal-reader-adapter.js";
+import { environmentWithoutGitVariables } from "../../../src/infrastructure/git-environment.js";
 import { journalFileWrites } from "../../helpers/telemetry-journal-hook.js";
 
 // The line phase 2's task derivation rests on, exercised against the hook that writes it
@@ -22,7 +23,9 @@ describe("file_written, from the hook that writes it to the reader that reads it
     // realpath because git resolves symlinks in --show-toplevel and macOS puts tmpdir
     // behind one; the hook compares the two and would otherwise reject every path.
     projectRoot = realpathSync(await mkdtemp(join(tmpdir(), "aidd-file-written-")));
-    execFileSync("git", ["init", "-q", projectRoot]);
+    execFileSync("git", ["init", "-q", projectRoot], {
+      env: environmentWithoutGitVariables(process.env),
+    });
     runsDir = join(projectRoot, "aidd_docs", "runs");
     await mkdir(runsDir, { recursive: true });
     await mkdir(join(projectRoot, "aidd_docs", "tasks", "2026_08", "2026_08_21_cost-reporter"), {

@@ -50,7 +50,9 @@ describe("measurement, from nothing to off and back", () => {
     configDir = join(tempDir, "config");
     await mkdir(projectDir, { recursive: true });
     await mkdir(fakeHome, { recursive: true });
-    execFileSync("git", ["init", "-q", projectDir]);
+    execFileSync("git", ["init", "-q", projectDir], {
+      env: environmentWithoutGitVariables(process.env),
+    });
     // The tool's own transcript, exactly as a machine that ran the session would hold it.
     await execFileAsync("cp", ["-R", `${LOCAL_COST_FIXTURES}/.`, fakeHome]);
   });
