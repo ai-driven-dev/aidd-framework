@@ -91,7 +91,7 @@ and one whose reader failed are four different answers.
 | **Claude Code** | ✅ proven on live sessions | ✅ stated by the tool, and by interval | ✅ |
 | **Codex** | ✅ on captured rollouts | ✅ by interval | ✅ observed |
 | **OpenCode** | ✅ | ❌ no journal entry ([#676](https://github.com/ai-driven-dev/framework/issues/676)) | ❌ |
-| **Copilot** | ❌ no per-request figure on disk | ❌ journal silent ([#681](https://github.com/ai-driven-dev/framework/issues/681)) | ❌ |
+| **Copilot** | ⚠️ session total only, no per-request figure ([#697](https://github.com/ai-driven-dev/framework/issues/697)) | ✅ by interval ([#663](https://github.com/ai-driven-dev/framework/issues/663)) | ❌ |
 | **Cursor** | ❌ no token count in any file it writes | ❌ turn-end never fires headless ([#680](https://github.com/ai-driven-dev/framework/issues/680)) | ❌ |
 
 **No amount, anywhere.** No tool read locally writes a figure in currency. Reports give
@@ -108,6 +108,22 @@ Every limit above, with the measurement behind it →
 - **Nothing leaves your machine.** Sending these figures anywhere is planned and not built.
 - **`off` keeps what you measured.** It stops the recording; delete the two directories to
   remove the history.
+
+## Where things live
+
+**The journal** stays in the repository it describes — `aidd_docs/runs/`, git-ignored the
+moment measurement is turned on, through `aidd setup`, `aidd plugin add`, or this plugin's
+own `telemetry-switch.js on`. It is a property of that repository: every line names a
+repository-relative path or a task folder, and moving it out would leave a file about one
+repository with no way to say which. It records who worked on what, for how long, and
+every file each session wrote — nothing else.
+
+**The figures** stay with the person — `AIDD_USER_CONFIG_DIR`, or `~/.config/aidd/telemetry/`
+when that variable is unset. A session's consumption belongs to whoever ran it, not to
+whichever checkout was open at the time. Point `AIDD_USER_CONFIG_DIR` at a directory a
+team shares, or a CI's own per repository, and every figure this plugin writes follows it
+— at the cost that anything outside the default is not swept together with the rest of a
+person's figures by a reader that assumes it. The default stays the default.
 
 ## Where things are written down
 

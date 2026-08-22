@@ -231,6 +231,105 @@ describe("summing a period without counting anything twice", () => {
   });
 });
 
+describe("a local-read session total, the first record kind: 'session' report figure (#697)", () => {
+  const COPILOT_CAPABILITY = {
+    localRead: { tokenCounters: true, amount: false, toolStatedStep: false },
+    export: { tokenCounters: false, amount: false, toolStatedStep: false },
+    journalAttributable: true,
+    taskAttributable: false,
+  };
+  const copilotSession = (overrides) => ({
+    kind: "session",
+    vendor_id: "s-1",
+    tool: "copilot",
+    provenance: "local-read",
+    input_tokens: 10,
+    output_tokens: 42,
+    cache_read_tokens: 0,
+    cache_creation_tokens: 21070,
+    ...overrides,
+  });
+
+  function reportWithCopilot(overrides = {}) {
+    return build({
+      fromDay: "2026-08-17",
+      toDay: "2026-08-21",
+      records: [],
+      journals: [],
+      declaredTools: [
+        { tool: "claude", coverage: "covered", capability: NO_CAPABILITY },
+        { tool: "copilot", coverage: "covered", capability: COPILOT_CAPABILITY },
+      ],
+      undatedRecords: 0,
+      unreadableLines: 0,
+      ...overrides,
+    });
+  }
+
+  it("carries a session total on the tool's own row, never on the period total", () => {
+    const built = reportWithCopilot({ records: [copilotSession()] });
+    const copilotRow = built.byTools.find((row) => row.tool === "copilot");
+
+    assert.deepEqual(copilotRow.sessionTotals, {
+      requests: 0,
+      inputTokens: 10,
+      outputTokens: 42,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 21070,
+    });
+    // Never summed with a request line's totals: the two-kinds rule forbids it, and this
+    // report never merges the two even where only one kind exists for a tool.
+    assert.deepEqual(built.totals, { requests: 0 });
+  });
+
+  it("never enters by_step or by_day - it reconciles with neither", () => {
+    const built = reportWithCopilot({
+      records: [copilotSession({ event_timestamp: "2026-08-19T10:00:00Z" })],
+    });
+
+    assert.equal(built.bySteps.length, 0);
+    for (const day of built.byDays) assert.deepEqual(day.totals, { requests: 0 });
+  });
+
+  it("prints the session total on the tool's row, not 'nothing in this period'", () => {
+    const text = rendered(reportWithCopilot({ records: [copilotSession()] }));
+
+    assert.match(text, /GitHub Copilot\s+21,122 tokens \(session total, not requests\)/u);
+    assert.ok(!/GitHub Copilot\s+nothing in this period/u.test(text));
+  });
+
+  it("carries session_totals in the envelope, snake_case, beside the ordinary totals", () => {
+    const envelope = toEnvelope(reportWithCopilot({ records: [copilotSession()] }));
+    const copilotRow = envelope.by_tool.find((row) => row.tool === "copilot");
+
+    assert.deepEqual(copilotRow.session_totals, {
+      requests: 0,
+      input_tokens: 10,
+      output_tokens: 42,
+      cache_read_tokens: 0,
+      cache_creation_tokens: 21070,
+    });
+    assert.deepEqual(copilotRow.totals, { requests: 0 });
+  });
+
+  it("stays off every row for a tool with none - session_totals is never a default", () => {
+    const envelope = toEnvelope(reportWithCopilot({ records: [] }));
+
+    for (const row of envelope.by_tool) assert.ok(!("session_totals" in row));
+  });
+
+  it("never folds an export-route session delta into the by-tool session total", () => {
+    // Only a local-read "session" record is a one-shot, already-complete total; an
+    // export-route one is a periodic flush's own delta and is never safe to show this way.
+    const built = reportWithCopilot({
+      records: [copilotSession({ provenance: "export", tool: "claude" })],
+    });
+    const claudeRow = built.byTools.find((row) => row.tool === "claude");
+
+    assert.ok(!("sessionTotals" in claudeRow));
+  });
+});
+
 describe("restricting a period to one task", () => {
   const journals = [
     {

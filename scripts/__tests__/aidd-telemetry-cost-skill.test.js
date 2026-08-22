@@ -88,7 +88,7 @@ test("the limits document gives every partly-measurable tool its reason, not jus
   const limits = fs.readFileSync(path.resolve(__dirname, "../../docs/telemetry-limits.md"), "utf8");
   for (const [tool, reason] of [
     ["Cursor", "no token count in any file"],
-    ["Copilot", "outputTokens"],
+    ["Copilot", "counts a single request"],
     ["Codex", "trust"],
   ]) {
     assert.ok(limits.includes(tool), `${tool} is named`);

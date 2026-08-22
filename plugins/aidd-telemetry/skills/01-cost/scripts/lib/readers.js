@@ -275,6 +275,76 @@ function opencodeRecords(payload, sessionId) {
   return records;
 }
 
+// Copilot ------------------------------------------------------------------------------
+
+// `session.shutdown` fires once, at the end - never per turn. Its own `tokenDetails` is
+// the four-counter breakdown measured on #697, and it is a session total, not a request:
+// `modelMetrics.<model>.usage.inputTokens` is *inclusive* of the cache-write figure while
+// `tokenDetails.input` already excludes it (measured: 10 + 21070 cache-write = 21080). No
+// `model` is stamped - `currentModel` names only the last model a session used, and
+// `session.model_change` is a real event, so attributing a whole session to it would be
+// the same error `attributionSkill`'s stickiness already teaches this reader to avoid.
+// All four or none: every real capture reports them together, and a shape this file has
+// not been taught - a renamed field, a `tokenDetails` present but empty - yields no record
+// rather than one silently missing every counter.
+function copilotCounters(details) {
+  const input = asNumber(details.input && details.input.tokenCount);
+  const output = asNumber(details.output && details.output.tokenCount);
+  const cacheRead = asNumber(details.cache_read && details.cache_read.tokenCount);
+  const cacheWrite = asNumber(details.cache_write && details.cache_write.tokenCount);
+  if (input === undefined || output === undefined) return null;
+  if (cacheRead === undefined || cacheWrite === undefined) return null;
+  return {
+    input_tokens: input,
+    output_tokens: output,
+    cache_read_tokens: cacheRead,
+    cache_creation_tokens: cacheWrite,
+  };
+}
+
+function copilotRecords(content, sessionId) {
+  for (const raw of content.split("\n")) {
+    const line = raw.trim() === "" ? null : parseLine(raw);
+    if (!line || line.type !== "session.shutdown") continue;
+    const details = line.data && line.data.tokenDetails;
+    const counters = details ? copilotCounters(details) : null;
+    if (!counters) continue;
+    return [
+      withCounters(
+        {
+          kind: "session",
+          vendor_id: sessionId,
+          vendor_field: "sessionId",
+          // The shutdown event's own id - stable across a re-read, unlike a synthesised
+          // key, which is what keeps a sweep from storing this line twice.
+          ...(asString(line.id) === undefined
+            ? {}
+            : { turn_id: asString(line.id), turn_field: "id" }),
+          ...(asString(line.timestamp) === undefined
+            ? {}
+            : { event_timestamp: asString(line.timestamp) }),
+        },
+        counters
+      ),
+    ];
+  }
+  return [];
+}
+
+// A session with no shutdown yet, or one that shut down without tokenDetails (a session
+// that made no billed request), both hold no record - `sessionFound: true` still answers
+// correctly for either: the file exists, and it was read.
+function copilotRead(homeDir, sessionId) {
+  const file = path.join(homeDir, ".copilot", "session-state", sessionId, "events.jsonl");
+  let content;
+  try {
+    content = fs.readFileSync(file, "utf8");
+  } catch {
+    return { records: [], sessionFound: false };
+  }
+  return { records: copilotRecords(content, sessionId), sessionFound: true };
+}
+
 // -------------------------------------------------------------------------------------
 
 /**
@@ -325,11 +395,19 @@ const TOOLS = [
   },
   {
     tool: "copilot",
-    reason:
-      "Its file carries outputTokens per turn and nothing else \u2014 no per-request " +
-      "input figure exists to build a record from.",
+    read: copilotRead,
+    // Measured on #697, against a real `~/.copilot/session-state/<id>/events.jsonl`:
+    // `session.shutdown`'s own `tokenDetails` carries all four counters, but once, for the
+    // whole session - never per request, and per-request is what a step breakdown needs.
+    // `totalPremiumRequests` is a count times a per-model multiplier, invariant to
+    // consumption (measured across fourteen sessions: 0.33 for every single-request
+    // claude-haiku-4.5 session regardless of tokens spent), so it is never stored as
+    // `cost_usd`.
+    limitation:
+      "Its own file names outputTokens per turn, but session.shutdown carries all four " +
+      "counters for the whole session \u2014 a session total, never a sum of requests.",
     capability: {
-      localRead: null,
+      localRead: { tokenCounters: true, amount: false, toolStatedStep: false },
       export: { tokenCounters: false, amount: false, toolStatedStep: false },
       journalAttributable: true,
       taskAttributable: false,

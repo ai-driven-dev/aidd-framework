@@ -365,14 +365,19 @@ export const copilot: AiTool<
     supplies: { tokenCounters: false, amount: false, toolStatedStep: false },
   },
 
-  // Measured: Copilot's own local file carries `outputTokens` per turn and nothing else —
-  // no per-request input figure exists on disk, so no per-step record can be built from
-  // it. A gap this deliverable names rather than fills; see spec.md non-goals.
+  // Measured on #697, against a real ~/.copilot/session-state/<id>/events.jsonl:
+  // `session.shutdown`'s own `tokenDetails` carries all four counters, but once, for the
+  // whole session — never per request, so no per-step record can be built from it. No
+  // `transcript` location: the session id names the file exactly
+  // (~/.copilot/session-state/<id>/events.jsonl), so `CopilotCostReaderAdapter` opens it
+  // directly rather than walking a directory to find it — see domain/formats/
+  // copilot-events.ts for the reader and the arithmetic that settles it.
   telemetryLocalRead: {
-    kind: "unsupported",
-    reason:
-      "Its file carries outputTokens per turn and nothing else — no per-request " +
-      "input figure exists to build a record from.",
+    kind: "declared",
+    supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
+    limitation:
+      "Its own file names outputTokens per turn, but session.shutdown carries all four " +
+      "counters for the whole session — a session total, never a sum of requests.",
   },
   telemetryTaskAttributable: false,
   telemetryJournalHost: "copilot",

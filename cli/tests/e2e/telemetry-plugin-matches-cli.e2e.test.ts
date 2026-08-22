@@ -23,6 +23,7 @@ const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost
 
 const CLAUDE_SESSION = "22222222-2222-4222-8222-222222222222";
 const CODEX_SESSION = "019fae6f-2009-7cd3-86b2-b8f83481b160";
+const COPILOT_SESSION = "33333333-3333-4333-8333-333333333333";
 
 /**
  * The plugin's scripts and the CLI are two implementations of one contract. That is a
@@ -59,8 +60,9 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  /** Two journalled sessions, one per readable tool, so the comparison covers both
-   * attribution strengths and both readers. */
+  /** Three journalled sessions, one per readable tool exercised here, so the comparison
+   * covers both attribution strengths and every reader — Copilot's own `kind: "session"`
+   * local-read total (#697) included. */
   async function seedJournals(): Promise<void> {
     const runs = join(projectDir, "aidd_docs", "runs");
     await mkdir(runs, { recursive: true });
@@ -91,6 +93,17 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
         vendor_id: CLAUDE_SESSION,
         project_id: "brainstorm-telemetry",
       }) + line({ type: "turn_end", at: "2026-08-05T20:00:00Z" })
+    );
+    await writeFile(
+      join(runs, `01ARZ3NDEKTSV4RRFFQ69G5FBX__${COPILOT_SESSION}.jsonl`),
+      line({
+        type: "session_start",
+        at: "2026-08-21T14:07:44.991Z",
+        run_id: "01ARZ3NDEKTSV4RRFFQ69G5FBX",
+        tool: "copilot",
+        vendor_id: COPILOT_SESSION,
+        project_id: "brainstorm-telemetry",
+      }) + line({ type: "turn_end", at: "2026-08-21T14:07:49.286Z" })
     );
   }
 
@@ -140,7 +153,15 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
     // Not only the printed answer: the lines that land on disk are what every later report
     // is built from, so a divergence there would outlive the run that caused it.
     expect(storedIn(pluginConfig)).toBe(storedIn(cliConfig));
-    expect(storedIn(cliConfig).trim().split("\n")).toHaveLength(6);
+    expect(storedIn(cliConfig).trim().split("\n")).toHaveLength(7);
+
+    // A re-read must not inflate Copilot's session total: its record's `turn_id` (the
+    // shutdown event's own id) is what a sweep matches on, same mechanism as every other
+    // reader here, now actually exercised for this tool rather than merely asserted present.
+    await bothOf(["read"]);
+
+    expect(storedIn(cliConfig).trim().split("\n")).toHaveLength(7);
+    expect(storedIn(pluginConfig)).toBe(storedIn(cliConfig));
   });
 
   it("answers a person the same way, on every shape of period", async () => {

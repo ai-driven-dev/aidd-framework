@@ -31,6 +31,10 @@ const UNKNOWN_AMOUNT = "amount unknown";
 /** A covered tool that measured nothing, and a period holding nothing. The one place a
  * zero really is the measurement. */
 const NOTHING_MEASURED = "nothing in this period";
+/** What a tool's `sessionTotals` figure is called wherever it is printed - never merged
+ * into the request-based figure beside it, and never called "cost" or "requests" since it
+ * is neither. */
+const SESSION_TOTAL_LABEL = "session total, not requests";
 
 const count = (value) => value.toLocaleString("en-US");
 const amount = (microUsd) => `$${(microUsd / MICRO_USD_PER_USD).toFixed(2)}`;
@@ -149,6 +153,9 @@ function printTools(out, report) {
     const because = row.reason ? ` — ${row.reason}` : "";
     if (row.coverage === "not-covered") {
       out(`    ${pad(name)}not covered${because}`);
+    } else if (row.totals.requests === 0 && row.sessionTotals) {
+      const tokens = `${count(tokensOf(row.sessionTotals))} tokens (${SESSION_TOTAL_LABEL})`;
+      out(`    ${pad(name)}${tokens}${because}`);
     } else if (row.totals.requests === 0) {
       out(`    ${pad(name)}${NOTHING_MEASURED}${because}`);
     } else {
@@ -241,6 +248,9 @@ function toEnvelope(report) {
         task_attributable: row.capability.taskAttributable,
       },
       totals: envelopeTotals(row.totals),
+      ...(row.sessionTotals === undefined
+        ? {}
+        : { session_totals: envelopeTotals(row.sessionTotals) }),
     })),
     by_project: report.byProjects.map((row) => ({
       ...(row.project === undefined ? {} : { project: row.project }),
@@ -342,11 +352,20 @@ const projectArtefact = (envelope) =>
   breakdownArtefact(envelope, "project", "Project", (row) => row.project ?? NO_KNOWN_PROJECT);
 
 /** A tool that cannot be read at all is never a zero: its row says so instead of printing a
- * figure nothing measured. */
+ * figure nothing measured. A tool with only a `session_totals` figure prints that instead
+ * of `nothing in this period` - present because it was measured, absent from `totals`
+ * because it is not a sum of requests. */
 function toolArtefact(envelope) {
   const rows = envelope.by_tool.map((row) => {
     const because = row.reason ? ` — ${row.reason}` : "";
-    const value = row.coverage === "not-covered" ? `not covered${because}` : `${artefactFigure(row.totals)}${because}`;
+    let value;
+    if (row.coverage === "not-covered") {
+      value = `not covered${because}`;
+    } else if (row.totals.requests === 0 && row.session_totals) {
+      value = `${count(envelopeTokens(row.session_totals))} tokens (${SESSION_TOTAL_LABEL})${because}`;
+    } else {
+      value = `${artefactFigure(row.totals)}${because}`;
+    }
     return `| ${DISPLAY_NAME[row.tool]} | ${value} |`;
   });
   return [

@@ -62,6 +62,10 @@ export interface CostReportEnvelopeToolRow {
    * supply an amount and a session that cost nothing look identical in the numbers. */
   readonly capability: CostReportEnvelopeCapability;
   readonly totals: CostReportEnvelopeTotals;
+  /** A local-read `kind: "session"` total, present only for a tool whose own file yields
+   * one already-complete session figure rather than per-request records - today, only
+   * Copilot. Never folded into `totals`, which counts billed requests alone. */
+  readonly session_totals?: CostReportEnvelopeTotals;
 }
 
 export interface CostReportEnvelopeAttributionRow {
@@ -146,6 +150,7 @@ function toolRow(row: CostReport["byTools"][number]): CostReportEnvelopeToolRow 
     ...(row.reason === undefined ? {} : { reason: row.reason }),
     capability: capability(row.capability),
     totals: totals(row.totals),
+    ...(row.sessionTotals === undefined ? {} : { session_totals: totals(row.sessionTotals) }),
   };
 }
 

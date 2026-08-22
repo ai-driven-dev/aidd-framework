@@ -41,6 +41,19 @@ const DECLARED: readonly CostReportToolDeclaration[] = [
       taskAttributable: false,
     },
   },
+  {
+    tool: "copilot",
+    coverage: "covered",
+    reason:
+      "Its own file names outputTokens per turn, but session.shutdown carries all four " +
+      "counters for the whole session — a session total, never a sum of requests.",
+    capability: {
+      localRead: { tokenCounters: true, amount: false, toolStatedStep: false },
+      export: { tokenCounters: false, amount: false, toolStatedStep: false },
+      journalAttributable: true,
+      taskAttributable: false,
+    },
+  },
 ];
 
 function record(overrides: Partial<TelemetrySinkRecord> = {}): TelemetrySinkRecord {
@@ -112,6 +125,34 @@ describe("toCostReportEnvelope", () => {
       journal_attributable: true,
       task_attributable: false,
     });
+  });
+
+  it("carries session_totals snake_case, beside the ordinary totals, only where measured (#697)", () => {
+    const withCopilot = envelopeOf({
+      records: [
+        record({
+          tool: "copilot",
+          kind: "session",
+          provenance: "local-read",
+          input_tokens: 10,
+          output_tokens: 42,
+          cache_read_tokens: 0,
+          cache_creation_tokens: 21070,
+        }),
+      ],
+    });
+    const copilot = withCopilot.by_tool.find((row) => row.tool === "copilot");
+    const claude = withCopilot.by_tool.find((row) => row.tool === "claude");
+
+    expect(copilot?.session_totals).toEqual({
+      requests: 0,
+      input_tokens: 10,
+      output_tokens: 42,
+      cache_read_tokens: 0,
+      cache_creation_tokens: 21070,
+    });
+    expect(copilot?.totals).toEqual({ requests: 0 });
+    expect(claude).not.toHaveProperty("session_totals");
   });
 
   it("carries why an uncovered tool cannot be read", () => {

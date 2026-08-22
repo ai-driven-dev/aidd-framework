@@ -93,6 +93,12 @@ export interface CostReportToolRow {
   readonly reason?: string;
   readonly capability: CostReportToolCapability;
   readonly totals: CostTotals;
+  /** A local-read `kind: "session"` total, present only for a tool whose own file yields a
+   * one-shot, already-complete session figure rather than per-request records — today,
+   * only Copilot (#697). Never folded into `totals`: it answers "what did this session
+   * report" where `totals` answers "what did billed requests sum to", and the two-kinds
+   * rule forbids treating one as the other. */
+  readonly sessionTotals?: CostTotals;
 }
 
 /** How much of the broken-down total each strength accounts for. Printed as three figures
@@ -197,6 +203,12 @@ class TotalsAccumulator {
     if (record.cost_usd !== undefined) {
       this.costMicroUsd = (this.costMicroUsd ?? 0) + toMicroUsd(record.cost_usd);
     }
+    this.addTokensOnly(record);
+  }
+
+  /** Never touches `requests` or `cost_usd`: a `kind: "session"` local-read total is not a
+   * billed request, and the tool never states a cost for one (see #697). */
+  addTokensOnly(record: TelemetrySinkRecord): void {
     for (const field of COUNTER_FIELDS) {
       const value = record[COUNTER_SOURCE[field]];
       if (typeof value === "number") {
@@ -222,15 +234,16 @@ class TotalsAccumulator {
 function accumulateInto<K>(
   groups: Map<K, TotalsAccumulator>,
   key: K,
-  record: TelemetrySinkRecord
+  record: TelemetrySinkRecord,
+  apply: (accumulator: TotalsAccumulator) => void = (accumulator) => accumulator.add(record)
 ): void {
   const existing = groups.get(key);
   if (existing) {
-    existing.add(record);
+    apply(existing);
     return;
   }
   const created = new TotalsAccumulator();
-  created.add(record);
+  apply(created);
   groups.set(key, created);
 }
 
@@ -327,15 +340,20 @@ function vendorIdsForTask(
  * unreadable one that assumption is exactly the false zero this layer exists to prevent. */
 function buildToolRows(
   declaredTools: readonly CostReportToolDeclaration[],
-  measured: ReadonlyMap<AiToolId, TotalsAccumulator>
+  measured: ReadonlyMap<AiToolId, TotalsAccumulator>,
+  sessionTotals: ReadonlyMap<AiToolId, TotalsAccumulator>
 ): readonly CostReportToolRow[] {
-  return declaredTools.map((declaration) => ({
-    tool: declaration.tool,
-    coverage: declaration.coverage,
-    ...(declaration.reason === undefined ? {} : { reason: declaration.reason }),
-    capability: declaration.capability,
-    totals: measured.get(declaration.tool)?.build() ?? { requests: 0 },
-  }));
+  return declaredTools.map((declaration) => {
+    const session = sessionTotals.get(declaration.tool);
+    return {
+      tool: declaration.tool,
+      coverage: declaration.coverage,
+      ...(declaration.reason === undefined ? {} : { reason: declaration.reason }),
+      capability: declaration.capability,
+      totals: measured.get(declaration.tool)?.build() ?? { requests: 0 },
+      ...(session === undefined ? {} : { sessionTotals: session.build() }),
+    };
+  });
 }
 
 /**
@@ -357,6 +375,7 @@ interface Groups {
   readonly steps: Map<string, StepGroup>;
   readonly models: Map<string, TotalsAccumulator>;
   readonly tools: Map<AiToolId, TotalsAccumulator>;
+  readonly toolSessionTotals: Map<AiToolId, TotalsAccumulator>;
   readonly attributions: Map<StepAttributionSource, TotalsAccumulator>;
   readonly projects: Map<ProjectKey, TotalsAccumulator>;
   readonly days: Map<string, TotalsAccumulator>;
@@ -371,6 +390,7 @@ function emptyGroups(fromDay: string, toDay: string): Groups {
     steps: new Map(),
     models: new Map(),
     tools: new Map(),
+    toolSessionTotals: new Map(),
     attributions: new Map(),
     projects: new Map(),
     days,
@@ -391,6 +411,18 @@ function accumulate(
     if (record.kind === "session") {
       if (record.active_time_s !== undefined) {
         groups.activeTimeSeconds = (groups.activeTimeSeconds ?? 0) + record.active_time_s;
+      }
+      // An export-route "session" record is one periodic flush's own delta - never safe
+      // to show as if it were the whole session, and left untouched exactly as before. A
+      // local-read "session" record is different in kind, not degree: nothing reads a
+      // tool's own file this way except a one-shot, already-complete total (see Copilot,
+      // #697), so it is never at risk of being summed with a later flush of the same
+      // quantity. Kept off `totals`, `bySteps` and `byDays` regardless - the two-kinds
+      // rule forbids summing it with request lines, and this reconciles with neither.
+      if (record.provenance === "local-read") {
+        accumulateInto(groups.toolSessionTotals, record.tool, record, (accumulator) =>
+          accumulator.addTokensOnly(record)
+        );
       }
       continue;
     }
@@ -496,7 +528,7 @@ export function buildCostReport(input: CostReportInput): CostReport {
       : { activeTimeSeconds: groups.activeTimeSeconds }),
     bySteps: stepRows(groups.steps),
     byModels: modelRows(groups.models),
-    byTools: buildToolRows(input.declaredTools, groups.tools),
+    byTools: buildToolRows(input.declaredTools, groups.tools, groups.toolSessionTotals),
     byProjects: projectRows(groups.projects),
     byDays: dayRows(groups.days),
     attributionMix: attributionRows(groups.attributions),

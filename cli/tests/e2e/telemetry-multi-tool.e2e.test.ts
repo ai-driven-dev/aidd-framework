@@ -215,11 +215,14 @@ describe("aidd telemetry, across every tool that can be read", () => {
     expect(out).toMatch(/Claude Code\s+amount unknown\s+151,826 tokens/u);
   });
 
-  it("names the two tools nothing here can read, with their measured reasons", async () => {
+  it("names the one tool nothing here can read, with its measured reason", async () => {
     const out = await reportEverything();
 
     expect(out).toMatch(/Cursor\s+not covered — It writes no token count/u);
-    expect(out).toMatch(/GitHub Copilot\s+not covered — Its file carries outputTokens/u);
+    // Copilot is covered (#697), but no session of its own was journalled in this test -
+    // reading as "nothing in this period" is the correct answer, never "not covered".
+    expect(out).toMatch(/GitHub Copilot\s+nothing in this period/u);
+    expect(out).not.toMatch(/GitHub Copilot\s+not covered/u);
   });
 
   it("shows all three attribution strengths at once, each from its own source", async () => {

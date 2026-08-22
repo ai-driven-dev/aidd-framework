@@ -140,6 +140,43 @@ describe("printCostReport", () => {
     expect(out).toContain("not covered — It writes no token count.");
   });
 
+  it("prints a session total on its own tool row, not 'nothing in this period' (#697)", () => {
+    const output = new CapturingOutput();
+    const COPILOT_CAPABILITY = {
+      localRead: { tokenCounters: true, amount: false, toolStatedStep: false },
+      export: { tokenCounters: false, amount: false, toolStatedStep: false },
+      journalAttributable: true,
+      taskAttributable: false,
+    } as const;
+    printCostReport(
+      output,
+      buildCostReport({
+        fromDay: "2026-08-17",
+        toDay: "2026-08-21",
+        records: [
+          record({
+            tool: "copilot",
+            kind: "session",
+            provenance: "local-read",
+            input_tokens: 10,
+            output_tokens: 42,
+            cache_read_tokens: 0,
+            cache_creation_tokens: 21070,
+          }),
+        ],
+        journals: [],
+        declaredTools: [{ tool: "copilot", coverage: "covered", capability: COPILOT_CAPABILITY }],
+        undatedRecords: 0,
+        unreadableLines: 0,
+      })
+    );
+    const out = output.lines.join("\n");
+
+    expect(out).toContain("21,122 tokens (session total, not requests)");
+    const copilotRow = out.split("\n").find((line) => line.includes("Copilot")) ?? "";
+    expect(copilotRow).not.toContain("nothing in this period");
+  });
+
   it("separates a tool that measured nothing from one that could not be read", () => {
     const out = printed({ records: [record({ cost_usd: 1 })] });
     const codexRow = out.split("\n").find((line) => line.includes("Codex")) ?? "";

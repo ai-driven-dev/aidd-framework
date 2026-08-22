@@ -50,6 +50,12 @@ function addTo(totals, record) {
   if (typeof record.cost_usd === "number") {
     totals.costMicroUsd = (totals.costMicroUsd ?? 0) + toMicroUsd(record.cost_usd);
   }
+  addTokensOnly(totals, record);
+}
+
+// Never touches `requests` or `cost_usd`: a `kind: "session"` local-read total is not a
+// billed request, and the tool never states a cost for it (see #697).
+function addTokensOnly(totals, record) {
   for (const [field, source] of Object.entries(COUNTERS)) {
     if (typeof record[source] === "number") {
       totals[field] = (totals[field] ?? 0) + record[source];
@@ -136,6 +142,7 @@ function build(input) {
   const steps = new Map();
   const models = new Map();
   const tools = new Map();
+  const toolSessionTotals = new Map();
   const attributions = new Map();
   const projects = new Map();
   const days = new Map();
@@ -146,6 +153,18 @@ function build(input) {
     if (record.kind === "session") {
       if (typeof record.active_time_s === "number") {
         activeTimeSeconds = (activeTimeSeconds ?? 0) + record.active_time_s;
+      }
+      // An export-route "session" record is one periodic flush's own delta - never safe
+      // to show as if it were the whole session, and left untouched here exactly as
+      // before. A local-read "session" record is different in kind, not degree: nothing
+      // reads a tool's own file this way except a one-shot, already-complete total (see
+      // Copilot, #697), so it is never a delta and never at risk of being summed with a
+      // later flush of the same quantity. Kept off `totals`, `by_step` and `by_day`
+      // regardless - the two-kinds rule forbids summing it with request lines, and this
+      // reconciles with neither.
+      if (record.provenance === "local-read") {
+        if (!toolSessionTotals.has(record.tool)) toolSessionTotals.set(record.tool, newTotals());
+        addTokensOnly(toolSessionTotals.get(record.tool), record);
       }
       continue;
     }
@@ -171,7 +190,7 @@ function build(input) {
       [...models].map(([model, t]) => ({ model, totals: t })),
       (row) => row.model
     ),
-    byTools: toolRows(input.declaredTools, tools),
+    byTools: toolRows(input.declaredTools, tools, toolSessionTotals),
     byProjects: projectRows(projects),
     byDays: dayRows(days),
     attributionMix: attributionRows(attributions),
@@ -220,14 +239,20 @@ function dayRows(days) {
 }
 
 /** Every declared tool, in declared order, contributing or not. A tool missing from the
- * list is one a reader takes for idle, and for an unreadable one that is a false zero. */
-function toolRows(declaredTools, measured) {
+ * list is one a reader takes for idle, and for an unreadable one that is a false zero.
+ * `sessionTotals` is present only for a tool with a local-read `"session"` total to show -
+ * today, only Copilot - and never folds into `totals`: the two answer different questions
+ * and summing them would answer neither correctly. */
+function toolRows(declaredTools, measured, sessionTotals) {
   return declaredTools.map((declaration) => ({
     tool: declaration.tool,
     coverage: declaration.coverage,
     ...(declaration.reason === undefined ? {} : { reason: declaration.reason }),
     capability: declaration.capability,
     totals: measured.get(declaration.tool) ?? newTotals(),
+    ...(sessionTotals.has(declaration.tool)
+      ? { sessionTotals: sessionTotals.get(declaration.tool) }
+      : {}),
   }));
 }
 

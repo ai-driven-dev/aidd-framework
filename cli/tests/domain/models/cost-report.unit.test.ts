@@ -99,6 +99,82 @@ describe("buildCostReport — the two kinds are never summed", () => {
   });
 });
 
+describe("buildCostReport — a local-read session total, the first kind: 'session' report figure (#697)", () => {
+  const COPILOT_CAPABILITY = {
+    localRead: { tokenCounters: true, amount: false, toolStatedStep: false },
+    export: { tokenCounters: false, amount: false, toolStatedStep: false },
+    journalAttributable: true,
+    taskAttributable: false,
+  } as const;
+
+  function reportWithCopilot(overrides: Partial<CostReportInput> = {}) {
+    return buildCostReport({
+      fromDay: "2026-08-17",
+      toDay: "2026-08-21",
+      records: [],
+      journals: [],
+      declaredTools: [
+        { tool: "claude", coverage: "covered", capability: NO_CAPABILITY },
+        { tool: "copilot", coverage: "covered", capability: COPILOT_CAPABILITY },
+      ],
+      undatedRecords: 0,
+      unreadableLines: 0,
+      ...overrides,
+    });
+  }
+
+  const copilotSession = (overrides: Partial<TelemetrySinkRecord> = {}) =>
+    sessionMeasure({
+      tool: "copilot",
+      provenance: "local-read",
+      input_tokens: 10,
+      output_tokens: 42,
+      cache_read_tokens: 0,
+      cache_creation_tokens: 21070,
+      ...overrides,
+    });
+
+  it("carries a session total on the tool's own row, never on the period total", () => {
+    const built = reportWithCopilot({ records: [copilotSession()] });
+    const copilotRow = built.byTools.find((row) => row.tool === "copilot");
+
+    expect(copilotRow?.sessionTotals).toEqual({
+      requests: 0,
+      inputTokens: 10,
+      outputTokens: 42,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 21070,
+    });
+    expect(built.totals).toEqual({ requests: 0 });
+  });
+
+  it("never enters by_step or by_day — it reconciles with neither", () => {
+    const built = reportWithCopilot({
+      records: [copilotSession({ event_timestamp: "2026-08-19T10:00:00Z" })],
+    });
+
+    expect(built.bySteps).toHaveLength(0);
+    for (const day of built.byDays) expect(day.totals).toEqual({ requests: 0 });
+  });
+
+  it("stays off every row for a tool with no session-kind local-read record", () => {
+    const built = reportWithCopilot({ records: [] });
+
+    for (const row of built.byTools) expect(row.sessionTotals).toBeUndefined();
+  });
+
+  it("never folds an export-route session delta into the by-tool session total", () => {
+    // Only a local-read "session" record is a one-shot, already-complete total; an
+    // export-route one is a periodic flush's own delta and is never safe to show this way.
+    const built = reportWithCopilot({
+      records: [copilotSession({ provenance: "export", tool: "claude" })],
+    });
+    const claudeRow = built.byTools.find((row) => row.tool === "claude");
+
+    expect(claudeRow?.sessionTotals).toBeUndefined();
+  });
+});
+
 describe("buildCostReport — an absent quantity stays absent", () => {
   it("reports no amount for a tool whose records carry none, never a zero", () => {
     const built = report({

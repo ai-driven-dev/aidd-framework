@@ -29,6 +29,10 @@ const UNKNOWN_AMOUNT = "amount unknown";
  * unknown amount and a zero: this one really did measure nothing, and saying so is the
  * only reading the records support. */
 const NOTHING_MEASURED = "nothing in this period";
+/** What a tool's `sessionTotals` figure is called wherever it is printed - never merged
+ * into the request-based figure beside it, and never called "cost" or "requests" since it
+ * is neither. */
+const SESSION_TOTAL_LABEL = "session total, not requests";
 const LABEL_WIDTH = 26;
 const NO_KNOWN_PROJECT = "no known project";
 
@@ -143,6 +147,11 @@ function printToolRows(output: CLIOutput, rows: readonly CostReportToolRow[]): v
     const name = getAiToolConfig(row.tool).displayName;
     if (row.coverage === "not-covered") {
       output.print(`    ${pad(name)}not covered${row.reason ? ` — ${row.reason}` : ""}`);
+      continue;
+    }
+    if (row.totals.requests === 0 && row.sessionTotals) {
+      const tokens = `${formatCount(totalTokens(row.sessionTotals))} tokens (${SESSION_TOTAL_LABEL})`;
+      output.print(`    ${pad(name)}${tokens}${row.reason ? ` — ${row.reason}` : ""}`);
       continue;
     }
     if (row.totals.requests === 0) {

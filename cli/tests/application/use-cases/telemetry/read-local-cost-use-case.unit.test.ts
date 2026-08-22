@@ -197,10 +197,8 @@ describe("ReadLocalCostUseCase", () => {
 
     const result = await useCase.execute({ sessionId: SESSION_ID });
 
-    const copilot = result.toolReports.find((r) => r.tool === "copilot");
-    expect(copilot?.status).toBe("not-covered");
-    expect(copilot?.reason).toContain("outputTokens");
     const cursor = result.toolReports.find((r) => r.tool === "cursor");
+    expect(cursor?.status).toBe("not-covered");
     expect(cursor?.reason).toContain("token count");
   });
 
@@ -235,8 +233,8 @@ describe("ReadLocalCostUseCase", () => {
 
     const claude = result.toolReports.find((r) => r.tool === "claude");
     expect(claude).toMatchObject({ status: "empty", recordsFound: 0, recordsStored: 0 });
-    const copilot = result.toolReports.find((r) => r.tool === "copilot");
-    expect(copilot?.status).toBe("not-covered");
+    const cursor = result.toolReports.find((r) => r.tool === "cursor");
+    expect(cursor?.status).toBe("not-covered");
   });
 
   it("stores what a partial read returns without erroring, when a session is still in progress", async () => {
