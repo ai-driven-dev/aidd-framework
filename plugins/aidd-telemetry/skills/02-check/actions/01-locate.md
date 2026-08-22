@@ -8,13 +8,29 @@ The path to `telemetry-check.js`.
 
 ## Process
 
-1. **Resolve the script.** It sits beside this skill, under `scripts/telemetry-check.js`.
+1. **Resolve the script.** It sits beside this skill, under `scripts/telemetry-check.js`. Run
+   whichever of these two matches the shell your commands actually run in - on Windows that
+   is plain PowerShell unless it is Git Bash. `find` is GNU `find` under Git Bash but is
+   Windows' own unrelated `find.exe` under PowerShell, so the bash form silently finds
+   nothing there (#707).
 
    ```bash
    test -n "$CLAUDE_PLUGIN_ROOT" && ls "$CLAUDE_PLUGIN_ROOT/skills/02-check/scripts/telemetry-check.js" \
      || find ~/.claude/plugins ~/.codex/plugins ~/.cursor/plugins .github/plugins .claude/plugins .codex/plugins . \
         -type f -path '*02-check/scripts/telemetry-check.js' 2>/dev/null | head -1
    ```
+
+   ```powershell
+   if ($env:CLAUDE_PLUGIN_ROOT -and (Test-Path "$env:CLAUDE_PLUGIN_ROOT/skills/02-check/scripts/telemetry-check.js")) {
+     "$env:CLAUDE_PLUGIN_ROOT/skills/02-check/scripts/telemetry-check.js"
+   } else {
+     Get-ChildItem -Path "$HOME/.claude/plugins", "$HOME/.codex/plugins", "$HOME/.cursor/plugins", ".github/plugins", ".claude/plugins", ".codex/plugins", "." -Recurse -File -Filter "telemetry-check.js" -ErrorAction SilentlyContinue |
+       Where-Object { $_.FullName -replace '\\', '/' -match '02-check/scripts/telemetry-check.js$' } |
+       Select-Object -First 1 -ExpandProperty FullName
+   }
+   ```
+
+   No output from either form means the script cannot be found.
 
 2. **Hand off.** The script decides on its own whether measurement is on; nothing here needs to check the switch first.
 

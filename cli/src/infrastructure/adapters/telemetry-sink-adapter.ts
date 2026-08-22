@@ -1,5 +1,7 @@
+import { spawnSync } from "node:child_process";
+import { readdirSync } from "node:fs";
 import { access, appendFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
+import { homedir, userInfo } from "node:os";
 import { join } from "node:path";
 import {
   parseTelemetrySinkLine,
@@ -36,20 +38,83 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
+function legacyConfigDir(): string {
+  return join(homedir(), ".config", "aidd");
+}
+
+function hasLegacyTelemetryData(): boolean {
+  try {
+    const entries = readdirSync(join(legacyConfigDir(), "telemetry"));
+    return entries.some((entry) => entry.endsWith(DAY_FILE_EXTENSION));
+  } catch {
+    return false;
+  }
+}
+
+// `%APPDATA%` is where a Windows application puts this, not `.config` (measured on a real
+// windows-latest runner, #707 - the plugin's sink.js mirrors this same rule). A machine
+// that already journalled under the old `.config` default keeps landing there rather than
+// losing access to what it already wrote; only a machine starting fresh gets `%APPDATA%`.
+function defaultConfigDir(): string {
+  if (process.platform !== "win32") return legacyConfigDir();
+  if (hasLegacyTelemetryData()) return legacyConfigDir();
+  return process.env.APPDATA ? join(process.env.APPDATA, "aidd") : legacyConfigDir();
+}
+
+// The identical no-op #707 found in the journal (hooks/lib/repo.js): `mkdir`/`appendFile`'s
+// `mode` option is accepted on Windows without error and does nothing with it. `icacls` is
+// the mechanism that actually restricts a path there. `%APPDATA%` is already the current OS
+// user's own profile, unlike a git checkout that can sit anywhere, so restricting it to that
+// same account narrows nothing that Windows' own convention did not already imply.
+function restrictToCurrentUser(target: string, options: { recursive?: boolean } = {}): void {
+  try {
+    const owner = process.env.USERDOMAIN
+      ? `${process.env.USERDOMAIN}\\${process.env.USERNAME}`
+      : (process.env.USERNAME ?? userInfo().username);
+    if (!owner) return;
+    const grant = options.recursive ? `${owner}:(OI)(CI)F` : `${owner}:F`;
+    const args = [target, "/inheritance:r", "/grant:r", grant];
+    if (options.recursive) args.push("/T");
+    args.push("/C", "/Q");
+    spawnSync("icacls", args, { encoding: "utf8" });
+  } catch {
+    // icacls missing, no resolvable owner, or a domain-policy refusal: leave it as it is.
+  }
+}
+
 /** Every write is `appendFile`. `readRecordsForVendor` is the only method that reads a day
  * file's content, and only to let a local re-read know what is already stored. */
 export class TelemetrySinkAdapter implements TelemetrySink {
   readonly rootDir: string;
+  // A user who names their own location keeps responsibility for its permissions - the
+  // README documents pointing AIDD_USER_CONFIG_DIR at a directory a team shares, and
+  // locking that down to one account on Windows would break exactly the sharing it exists
+  // for.
+  private readonly userNamed: boolean;
 
   constructor(userConfigDir?: string) {
-    const base =
-      userConfigDir ?? process.env.AIDD_USER_CONFIG_DIR ?? join(homedir(), ".config", "aidd");
-    this.rootDir = join(base, "telemetry");
+    const override = userConfigDir ?? process.env.AIDD_USER_CONFIG_DIR;
+    this.userNamed = override !== undefined;
+    this.rootDir = join(override ?? defaultConfigDir(), "telemetry");
+  }
+
+  private tightenDir(): void {
+    if (this.userNamed || process.platform !== "win32") return;
+    restrictToCurrentUser(this.rootDir, { recursive: true });
+  }
+
+  // `/T` on the directory does not reliably carry the grant onto a leaf file it walks into
+  // (measured on a real windows-latest runner, #707), so a day file gets its own pass too -
+  // only the write that creates it, the one `PRIVATE_FILE_MODE` itself only applies to.
+  private tightenFile(filePath: string): void {
+    if (this.userNamed || process.platform !== "win32") return;
+    restrictToCurrentUser(filePath, { recursive: false });
   }
 
   async ensureWritable(): Promise<void> {
     try {
       await mkdir(this.rootDir, { recursive: true });
+      this.tightenDir();
       const probePath = join(this.rootDir, `.write-check-${process.pid}`);
       await writeFile(probePath, "", { mode: PRIVATE_FILE_MODE });
       await rm(probePath, { force: true });
@@ -62,9 +127,11 @@ export class TelemetrySinkAdapter implements TelemetrySink {
     const filePath = join(this.rootDir, dayFileName(at));
     const dayFileIsNew = !(await pathExists(filePath));
     await mkdir(this.rootDir, { recursive: true });
+    this.tightenDir();
     await appendFile(filePath, `${serializeTelemetrySinkRecord(record)}\n`, {
       mode: PRIVATE_FILE_MODE,
     });
+    if (dayFileIsNew) this.tightenFile(filePath);
     return { filePath, dayFileIsNew };
   }
 

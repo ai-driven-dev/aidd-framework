@@ -123,7 +123,10 @@ when that variable is unset. A session's consumption belongs to whoever ran it, 
 whichever checkout was open at the time. Point `AIDD_USER_CONFIG_DIR` at a directory a
 team shares, or a CI's own per repository, and every figure this plugin writes follows it
 — at the cost that anything outside the default is not swept together with the rest of a
-person's figures by a reader that assumes it. The default stays the default.
+person's figures by a reader that assumes it. The default stays the default. On Windows
+that default is `%APPDATA%\aidd\telemetry\` instead — `.config` is not where a Windows
+application puts this — unless a machine already journalled under the old `.config` path,
+which it keeps using rather than losing access to what was already written there.
 
 ## Where things are written down
 

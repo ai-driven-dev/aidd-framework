@@ -11,6 +11,7 @@ const {
   resolveRunsDir,
   resolveWriteTarget,
   tightenOwnedDir,
+  tightenOwnedFile,
   PRIVATE_DIR_MODE,
 } = require("./repo.js");
 const { TOOLS_BY_HOST, readCwd, readSessionId } = require("./tools/index.js");
@@ -201,8 +202,10 @@ function handleSessionStart(payload, host, sessionId) {
   });
 
   fs.mkdirSync(dir, { recursive: true, mode: PRIVATE_DIR_MODE });
-  appendLine(path.join(dir, runFileName(runId, sessionId)), line);
+  const filePath = path.join(dir, runFileName(runId, sessionId));
+  appendLine(filePath, line);
   tightenOwnedDir(dir);
+  tightenOwnedFile(filePath);
 }
 
 // Driven by Stop, not a session-end event: Codex grants a session-end handler one second
@@ -245,6 +248,7 @@ function handleUnrecognisedPayload(payload) {
   const line = `${JSON.stringify({ type: "unrecognised_payload", at: nowIso() })}\n`;
   fs.writeFileSync(filePath, line, { mode: PRIVATE_FILE_MODE });
   tightenOwnedDir(target.dir);
+  tightenOwnedFile(filePath);
 }
 
 module.exports = {

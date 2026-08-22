@@ -2,6 +2,7 @@
 // switch is `.aidd/config.json`'s `telemetry.enabled`, read fresh at every call.
 
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
@@ -109,17 +110,56 @@ function runsDir(repoRoot) {
 }
 
 // What this hook writes is who-worked-on-what-for-how-long, so it is not left
-// world-readable. Windows ignores POSIX modes rather than erroring on them.
+// world-readable. Windows accepts this mode on mkdirSync/appendFileSync/chmodSync
+// without error, but does nothing with it - the directory and every file in it land at
+// 0666 regardless (measured on a real windows-latest runner, #707). Privacy there comes
+// from restrictToCurrentUser below, not from this constant.
 const PRIVATE_DIR_MODE = 0o700;
 
 // `mkdirSync`'s `mode` applies only to a directory it creates, so a checked-out
-// `aidd_docs/runs/` needs this chmod. Never applied to a user-named AIDD_RUNS_DIR.
+// `aidd_docs/runs/` needs this chmod. Never applied to a user-named AIDD_RUNS_DIR - a
+// user who names their own runs directory keeps responsibility for its permissions.
 function tightenOwnedDir(dir) {
   if (process.env.AIDD_RUNS_DIR) return;
+  if (process.platform === "win32") return restrictToCurrentUser(dir, { recursive: true });
   try {
     fs.chmodSync(dir, PRIVATE_DIR_MODE);
   } catch {
-    // Foreign owner, read-only mount, Windows: leave it as it is.
+    // Foreign owner, read-only mount: leave it as it is.
+  }
+}
+
+// POSIX needs no second pass: `appendFileSync`'s own `mode` already set 0600 at the
+// moment it created the file. On Windows, measured on a real windows-latest runner
+// (#707), `tightenOwnedDir`'s `/T` recursion does not reliably carry the current-user
+// grant onto a leaf file it walks into - the file came back with zero ACEs of its own,
+// readable only because the runner's account happened to hold enough privilege to
+// override that. This restricts the file directly instead of trusting `/T` to reach it.
+function tightenOwnedFile(filePath) {
+  if (process.env.AIDD_RUNS_DIR) return;
+  if (process.platform === "win32") restrictToCurrentUser(filePath, { recursive: false });
+}
+
+// The real mechanism on Windows: reset the target's NTFS ACL to inherit nothing and grant
+// Full Control to the current user alone. `recursive` adds `/T` plus the container-inherit
+// flags `(OI)(CI)` so a directory's own future children pick up the same grant; a file
+// gets neither, since a file has no children to inherit anything. `icacls` shelled out to
+// the same way `git` already is above; `/C` keeps it going past one bad entry instead of
+// aborting the whole reset, and its own exit code is not trusted as proof of anything -
+// only a caller reading the ACL back can say whether it worked.
+function restrictToCurrentUser(target, { recursive = false } = {}) {
+  try {
+    const owner = process.env.USERDOMAIN
+      ? `${process.env.USERDOMAIN}\\${process.env.USERNAME}`
+      : process.env.USERNAME || os.userInfo().username;
+    if (!owner) return;
+    const grant = recursive ? `${owner}:(OI)(CI)F` : `${owner}:F`;
+    const args = [target, "/inheritance:r", "/grant:r", grant];
+    if (recursive) args.push("/T");
+    args.push("/C", "/Q");
+    spawnSync("icacls", args, { encoding: "utf8" });
+  } catch {
+    // icacls missing, no resolvable owner, or a domain-policy refusal: leave it as it is.
   }
 }
 
@@ -174,6 +214,7 @@ module.exports = {
   runsDir,
   PRIVATE_DIR_MODE,
   tightenOwnedDir,
+  tightenOwnedFile,
   resolveRunsDir,
   resolveWriteTarget,
 };
