@@ -19,6 +19,7 @@ import {
   isAiTool,
   journalHostToAiToolId,
 } from "../../../src/domain/tools/registry.js";
+import { telemetryCostReaders } from "../../helpers/telemetry-cost-readers.js";
 import { journalFileWrites, journalHost } from "../../helpers/telemetry-journal-hook.js";
 
 /**
@@ -283,6 +284,27 @@ describe("no parallel list references an unregistered tool", () => {
         config.telemetryTaskAttributable,
         `"${toolId}" declares telemetryTaskAttributable ${config.telemetryTaskAttributable}, but the journal hook ${hookCanRead ? "can" : "cannot"} read a written path for host "${host}"`
       ).toBe(hookCanRead);
+    }
+  });
+
+  it("agrees with the plugin's own cost-report declaration on journalAttributable", () => {
+    // Two builds of one fact: the CLI computes journalAttributable from
+    // telemetryJournalHost (report-cost-use-case.ts), and the plugin's standalone scripts
+    // declare it directly in readers.js so a live session can compute the same report
+    // without the `aidd` package. Nothing pinned them together before, and they drifted -
+    // Cursor was declared journal-attributable in one and not in the other. This is that
+    // pin: change either side without the other and this fails, by name.
+    for (const [toolId, config] of registeredAiTools) {
+      const fromCli = config.telemetryJournalHost !== undefined;
+      const fromPlugin = telemetryCostReaders.TOOLS.find((t) => t.tool === toolId);
+      expect(
+        fromPlugin,
+        `"${toolId}" is a registered AI tool with no matching entry in the plugin's readers.js TOOLS`
+      ).toBeDefined();
+      expect(
+        fromPlugin?.capability.journalAttributable,
+        `"${toolId}": CLI computes journalAttributable ${fromCli} from telemetryJournalHost, but the plugin's readers.js declares ${fromPlugin?.capability.journalAttributable}`
+      ).toBe(fromCli);
     }
   });
 

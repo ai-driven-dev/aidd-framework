@@ -121,7 +121,7 @@ describe("what each tool declares it can supply", () => {
     // that tool's sessions - readable, and still empty until a session is named by hand.
     const unreachable = TOOLS.filter((t) => !t.capability.journalAttributable).map((t) => t.tool);
 
-    assert.deepEqual(unreachable, ["opencode"]);
+    assert.deepEqual(unreachable, []);
   });
 });
 

@@ -1,0 +1,154 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { spawnSync } = require("node:child_process");
+const { after, describe, it } = require("node:test");
+
+const PLUGIN_DIR = path.resolve(__dirname, "../../plugins/aidd-telemetry");
+const SKILLS_DIR = path.join(PLUGIN_DIR, "skills");
+const HOOKS_DIR = path.join(PLUGIN_DIR, "hooks");
+
+// Read from each script's own usage banner: `on`/`off` for the switch, `read`/`report` for
+// the reporter, no argv at all for the checker. Invoking a script this way exercises its
+// full require graph rather than stopping at a usage message - a stronger check than the
+// generic fallback below gives an undiscovered script.
+const KNOWN_INVOCATIONS = {
+  "telemetry-switch.js": ["on"],
+  "telemetry-report.js": ["read"],
+  "telemetry-check.js": [],
+};
+
+const STACK_FRAME = /\n\s*at .+:\d+:\d+/u;
+const tempDirs = [];
+
+function makeTempDir(prefix) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
+}
+
+after(() => {
+  for (const dir of tempDirs) fs.rmSync(dir, { recursive: true, force: true });
+});
+
+/** What the flat translation route delivers: `skills/`, and nothing beside it - no
+ * `hooks/`, no repository, no plugin manifest. */
+function buildFlatShape() {
+  const root = makeTempDir("aidd-install-shape-flat-");
+  fs.cpSync(SKILLS_DIR, path.join(root, "skills"), { recursive: true });
+  return root;
+}
+
+/**
+ * The native route, reconstructed rather than observed: driving
+ * cli/src/domain/models/plugin-content-translator.ts from this node:test JS file turned out
+ * impractical. Its constructor takes a TypeScript parameter property, which
+ * `node --experimental-strip-types` refuses ("not supported in strip-only mode"), and past
+ * that its relative imports use a `.js` extension that only resolves against tsup's
+ * compiled output, not against the sibling `.ts` sources - so there is no build-free way to
+ * import it here.
+ *
+ * The shape below instead follows the native layout declared for every native-mode tool
+ * today - checked in cli/src/domain/tools/ai/{claude,codex,copilot,cursor}.ts, against
+ * cli/src/domain/models/plugin-content-translator.ts's own `manifestDir` rule
+ * (`parentDirOf(hooksRelativePath) || "hooks"`). Claude, Codex and Copilot take the default
+ * `hooksRelativePath` of `hooks/hooks.json`; Cursor overrides it to `hooks.json`, whose
+ * parent is `""`, which is falsy and falls back to the same `"hooks"` default. So for all
+ * four, a hook script (as opposed to the manifest itself) installs under `hooks/`, a
+ * sibling of `skills/` directly under the plugin root - the same relationship the plugin's
+ * own source tree already has, just with `.claude/plugins/aidd-telemetry/` (or the
+ * matching prefix for another tool) prepended in front of both.
+ */
+function buildNativeShape() {
+  const root = makeTempDir("aidd-install-shape-native-");
+  const pluginRoot = path.join(root, ".claude", "plugins", "aidd-telemetry");
+  fs.cpSync(SKILLS_DIR, path.join(pluginRoot, "skills"), { recursive: true });
+  fs.cpSync(HOOKS_DIR, path.join(pluginRoot, "hooks"), { recursive: true });
+  return pluginRoot;
+}
+
+// Walks each skill's scripts directory one level deep, so a skill's `scripts/lib/`
+// internals (only ever require()d, never run directly) are left for the scripts that
+// load them to cover.
+function discoverScripts(skillsRoot) {
+  const found = [];
+  for (const skillEntry of fs.readdirSync(skillsRoot, { withFileTypes: true })) {
+    if (!skillEntry.isDirectory()) continue;
+    const scriptsDir = path.join(skillsRoot, skillEntry.name, "scripts");
+    if (!fs.existsSync(scriptsDir)) continue;
+    for (const fileEntry of fs.readdirSync(scriptsDir, { withFileTypes: true })) {
+      if (fileEntry.isFile() && fileEntry.name.endsWith(".js")) {
+        found.push(`${skillEntry.name}/scripts/${fileEntry.name}`);
+      }
+    }
+  }
+  return found.sort();
+}
+
+// A minimal, stripped environment, the same direction the neighbouring telemetry-check
+// tests take: a real CLAUDE_CODE_SESSION_ID or GIT_* var this file happens to be running
+// under must not leak into a script meant to be exercised in isolation.
+function hermeticEnv(home) {
+  const { AIDD_RUNS_DIR: _r, CLAUDE_CODE_SESSION_ID: _c, CODEX_THREAD_ID: _t, ...rest } = process.env;
+  const withoutGit = Object.fromEntries(Object.entries(rest).filter(([key]) => !key.startsWith("GIT_")));
+  return { ...withoutGit, HOME: home, PATH: "/usr/bin:/bin" };
+}
+
+function runScript(scriptPath, args, cwd) {
+  const home = makeTempDir("aidd-install-shape-home-");
+  return spawnSync(process.execPath, [scriptPath, ...args], {
+    cwd,
+    encoding: "utf8",
+    env: hermeticEnv(home),
+  });
+}
+
+/** What a person would check: it started. A `MODULE_NOT_FOUND` or any stack trace on
+ * stderr means it didn't, and a usage message on a non-zero exit still means it did. */
+function assertStarted(result, label) {
+  assert.equal(result.error, undefined, `${label}: could not be spawned (${result.error})`);
+  assert.doesNotMatch(
+    result.stderr,
+    /Cannot find module|MODULE_NOT_FOUND/u,
+    `${label} could not load:\n${result.stderr}`
+  );
+  assert.doesNotMatch(result.stderr, STACK_FRAME, `${label} crashed:\n${result.stderr}`);
+  assert.ok(`${result.stdout}${result.stderr}`.trim().length > 0, `${label} printed nothing`);
+}
+
+function describeShape(name, buildShape) {
+  describe(`every skill script, run from a copy shaped like ${name}`, () => {
+    const skillsRoot = path.join(buildShape(), "skills");
+    const scripts = discoverScripts(skillsRoot);
+
+    it("discovers the scripts known today, so the walk itself is not silently empty", () => {
+      for (const known of Object.keys(KNOWN_INVOCATIONS)) {
+        assert.ok(
+          scripts.some((relative) => relative.endsWith(`/${known}`)),
+          `expected the walk to find ${known}`
+        );
+      }
+    });
+
+    for (const relativeScript of scripts) {
+      const scriptPath = path.join(skillsRoot, relativeScript);
+      const basename = path.basename(relativeScript);
+      const args = KNOWN_INVOCATIONS[basename] ?? [];
+      const invokedWithKnownArgs = basename in KNOWN_INVOCATIONS;
+
+      it(`${relativeScript} starts and prints its own output`, () => {
+        const result = runScript(scriptPath, args, path.dirname(skillsRoot));
+
+        assertStarted(result, relativeScript);
+        if (invokedWithKnownArgs) {
+          assert.equal(result.status, 0, `${relativeScript} exited ${result.status}:\n${result.stderr}`);
+          assert.equal(result.stderr, "", `${relativeScript} wrote to stderr:\n${result.stderr}`);
+        }
+      });
+    }
+  });
+}
+
+describeShape("what the flat translation route delivers (skills/ alone, no hooks/)", buildFlatShape);
+describeShape("what a native install delivers (skills/ beside hooks/, under the plugin root)", buildNativeShape);

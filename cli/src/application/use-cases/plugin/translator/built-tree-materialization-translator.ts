@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { flatHooksSharedDirPath } from "../../../../domain/formats/flat-paths.js";
 import { InstallationFile } from "../../../../domain/models/file.js";
 import type { Manifest } from "../../../../domain/models/manifest.js";
 import { Plugin } from "../../../../domain/models/plugin.js";
@@ -15,6 +16,10 @@ import { isPluginFileAtDesiredState } from "../plugin-file-sync.js";
 import { resolvePluginBaseDir } from "../plugin-target-resolution.js";
 import { ModeBFlatMaterializationTranslator } from "./mode-b-flat-materialization-translator.js";
 import type { PluginTranslator } from "./plugin-translator.js";
+import {
+  ProjectHooksMaterializer,
+  resolvePluginsCapability,
+} from "./project-hooks-materializer.js";
 
 /**
  * Materializes plugin content by copying the per-target BUILT tree verbatim into the
@@ -27,6 +32,7 @@ import type { PluginTranslator } from "./plugin-translator.js";
  */
 export class BuiltTreeMaterializationTranslator implements PluginTranslator {
   readonly mode = "flat" as const;
+  private readonly projectHooks: ProjectHooksMaterializer;
 
   constructor(
     private readonly fs: FileWriter & FileReader,
@@ -34,7 +40,9 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     private readonly homedir: () => string,
     private readonly ensureBuilt: EnsureBuiltMarketplaceUseCase,
     private readonly marketplaceRegistry: MarketplaceRegistry
-  ) {}
+  ) {
+    this.projectHooks = new ProjectHooksMaterializer(fs);
+  }
 
   async addPlugin(
     dist: PluginDistribution,
@@ -67,13 +75,25 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
       target: toolId,
       mode,
     });
-    const files =
+    const builtFiles =
       mode === "flat"
-        ? await this.readFlatFiles(builtDir, dist.manifest.name)
+        ? await this.readFlatFiles(builtDir, dist, toolId)
         : await this.readBuiltFiles(
             join(builtDir, "plugins", dist.manifest.name),
             dist.manifest.name
           );
+    // The built tree still carries a plugin-scoped hooks/hooks.json for a capability
+    // declaring hooksDestination "project" (the marketplace build never learned that
+    // route exists) — dropped here, and materialized through the same project-hooks
+    // side channel the local-source route uses, so both land in the one place the
+    // tool's own declaration names, not wherever this particular build happened to put it.
+    const deliversHooksToProject = resolvePluginsCapability(toolId)?.hooksDestination === "project";
+    const hooksSkips = deliversHooksToProject
+      ? await this.projectHooks.materialize(dist, toolId, projectRoot)
+      : [];
+    const files = deliversHooksToProject
+      ? withoutHooksPrefix(builtFiles, dist.manifest.name)
+      : builtFiles;
     const baseDir =
       mode === "flat" ? projectRoot : resolvePluginBaseDir(toolId, projectRoot, this.homedir);
     const written = await this.writeChangedFiles(files, baseDir);
@@ -81,7 +101,7 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
       toolId,
       Plugin.fromDistribution(dist, source, files, new Map(), marketplace)
     );
-    return { skipped: [], written };
+    return { skipped: hooksSkips, written };
   }
 
   // Verbatim-copies the built subtree, but skips files already matching the built
@@ -116,14 +136,23 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     );
   }
 
-  // Flat build emits the whole marketplace into one workspace, namespaced by
-  // .opencode/<section>/<plugin>-<name>/...; install copies only this plugin's files.
-  private async readFlatFiles(builtDir: string, name: string): Promise<InstallationFile[]> {
+  // Flat build emits the whole marketplace into one workspace. Skills/agents are
+  // namespaced by .opencode/<section>/<plugin>-<name>/...; install copies only this
+  // plugin's files by that prefix. Hooks are not namespaced — flatHooksDir is one
+  // directory the tool's loader scans flat (see flatHooksSharedDirPath) — so this
+  // plugin's own hook filenames are matched by name instead, from its own distribution.
+  private async readFlatFiles(
+    builtDir: string,
+    dist: PluginDistribution,
+    toolId: AiToolId
+  ): Promise<InstallationFile[]> {
+    const name = dist.manifest.name;
+    const hookPaths = this.flatHookOutputPaths(dist, toolId);
     const absPaths = await this.fs.listFilesRecursive(builtDir);
     const files: InstallationFile[] = [];
     for (const abs of absPaths) {
       const rel = abs.slice(builtDir.length + 1);
-      if (!this.belongsToPlugin(rel, name)) continue;
+      if (!this.belongsToPlugin(rel, name) && !hookPaths.has(rel)) continue;
       const content = await this.fs.readFile(abs);
       files.push(
         new InstallationFile({ relativePath: rel, content, hash: this.hasher.hash(content) })
@@ -139,6 +168,16 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     );
   }
 
+  private flatHookOutputPaths(dist: PluginDistribution, toolId: AiToolId): ReadonlySet<string> {
+    const flatHooksDir = resolvePluginsCapability(toolId)?.flatHooksDir;
+    if (flatHooksDir === null || flatHooksDir === undefined) return new Set();
+    return new Set(
+      dist.components.hooks
+        .filter((f) => f.relativePath !== "hooks/hooks.json")
+        .map((f) => flatHooksSharedDirPath(flatHooksDir, f.relativePath))
+    );
+  }
+
   private async findMarketplace(name: string, projectRoot: string) {
     const all = await this.marketplaceRegistry.list(projectRoot);
     return all.find((m) => m.name === name) ?? null;
@@ -147,4 +186,11 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
   private fallback(): ModeBFlatMaterializationTranslator {
     return new ModeBFlatMaterializationTranslator(this.fs, this.hasher, this.homedir);
   }
+}
+
+// readBuiltFiles prefixes every path with "<name>/" (see its own comment above) — a
+// built-tree hooks file therefore always reads "<name>/hooks/<rest>".
+function withoutHooksPrefix(files: InstallationFile[], pluginName: string): InstallationFile[] {
+  const hooksPrefix = `${pluginName}/hooks/`;
+  return files.filter((f) => !f.relativePath.startsWith(hooksPrefix));
 }

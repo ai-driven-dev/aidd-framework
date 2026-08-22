@@ -2,6 +2,10 @@ import { homedir as nodeHomedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { McpCapability } from "../../../domain/capabilities/mcp-capability.js";
 import { PluginNotFoundError } from "../../../domain/errors.js";
+import {
+  cursorProjectHooksScriptDir,
+  unmergeCursorProjectHooksJson,
+} from "../../../domain/formats/cursor-hooks-project-merge.js";
 import { unmergeOpencodeMcp } from "../../../domain/formats/opencode-mcp-merge.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Plugin } from "../../../domain/models/plugin.js";
@@ -16,6 +20,7 @@ import {
   resolvePluginBaseDir,
   resolvePluginToolIds,
 } from "./plugin-target-resolution.js";
+import { resolvePluginsCapability } from "./translator/project-hooks-materializer.js";
 
 export interface PluginRemoveOptions {
   pluginName: string;
@@ -52,10 +57,31 @@ export class PluginRemoveUseCase {
       const baseDir = resolvePluginBaseDir(toolId, projectRoot, nodeHomedir);
       await this.deletePluginFiles(plugin.files, baseDir);
       await this.removeMcpEntries(plugin, toolId, projectRoot);
+      await this.removeProjectHooks(pluginName, toolId, projectRoot);
       manifest.removePlugin(toolId, pluginName);
       removed = true;
     }
     return removed;
+  }
+
+  // The install-time counterpart of ProjectHooksMaterializer: a plugin whose hooks
+  // were merged into the project's own .cursor/hooks.json (never tracked in
+  // Plugin.files — see mode-b-flat-materialization-translator.ts) needs its own
+  // unmerge, not a baseDir-relative file delete. Both destinations are recomputed
+  // from pluginName alone, exactly as install computed them — no extra state to keep
+  // in sync.
+  private async removeProjectHooks(
+    pluginName: string,
+    toolId: AiToolId,
+    projectRoot: string
+  ): Promise<void> {
+    if (resolvePluginsCapability(toolId)?.hooksDestination !== "project") return;
+    const hooksPath = join(projectRoot, ".cursor", "hooks.json");
+    const existing = await this.readExistingJson(hooksPath);
+    if (existing !== null) {
+      await this.fs.writeFile(hooksPath, unmergeCursorProjectHooksJson(existing, pluginName));
+    }
+    await this.fs.deleteDirectory(join(projectRoot, cursorProjectHooksScriptDir(pluginName)));
   }
 
   private async removeMcpEntries(

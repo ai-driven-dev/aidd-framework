@@ -12,6 +12,7 @@ import {
   buildCodexFlatContract,
   buildCopilotFlatContract,
   buildCursorFlatContract,
+  buildOpencodeFlatContract,
 } from "../../../../src/application/use-cases/framework/strategies/tool-contracts.js";
 import type { AssetProvider } from "../../../../src/domain/ports/asset-provider.js";
 import type { JsonSchemaValidator } from "../../../../src/domain/ports/json-schema-validator.js";
@@ -40,6 +41,12 @@ function makeAssetProvider(): AssetProvider {
     },
     loadSchema: () => ({}),
   };
+}
+
+// Opencode's postBuild step reads a base opencode.json asset unconditionally — the other
+// tools' emitConfigArtifact never touches loadConfigAsset, so only this one needs it.
+function makeOpencodeAssetProvider(): AssetProvider {
+  return { ...makeAssetProvider(), loadConfigAsset: () => "{}" };
 }
 
 function makeIsDirectory(fs: InMemoryFileAdapter): (path: string) => Promise<boolean> {
@@ -306,5 +313,62 @@ describe("codex flat hooks (no install-hook leak)", () => {
 
     const scriptPath = `${ABS_OUT}/.codex/hooks/${PLUGIN}/check.sh`;
     expect(memFs.has(scriptPath)).toBe(true);
+  });
+});
+
+// ── opencode flat hooks ─────────────────────────────────────────────────────────
+
+// Regression coverage for the route `aidd setup --ai opencode` and
+// `aidd framework build --target opencode --flat` both drive (finding #1): before this
+// fix `buildOpencodeFlatContract` declared `hooks: { supported: false }` regardless of
+// opencode.ts's own `acceptsHooks: true`, so neither route delivered the plugin module
+// OpenCode's loader scans `.opencode/plugin/` for, and both warned hooks were skipped.
+describe("opencode flat hooks", () => {
+  let memFs: InMemoryFileAdapter;
+  let logger: CapturingLogger;
+
+  beforeEach(async () => {
+    memFs = await makeSeededFs();
+    logger = new CapturingLogger();
+  });
+
+  async function runOpencodeBuild(): Promise<void> {
+    const strategy = new FlatBuildStrategy(
+      memFs,
+      new AjvSchemaValidatorAdapter(),
+      makeOpencodeAssetProvider(),
+      buildOpencodeFlatContract(),
+      false,
+      ABS_OUT,
+      makeIsDirectory(memFs),
+      logger
+    );
+    const useCase = new FrameworkBuildUseCase(
+      memFs,
+      makeValidator(),
+      makeOpencodeAssetProvider(),
+      logger,
+      strategy
+    );
+    await useCase.execute({ sourceDir: FIXTURE_DIR, outDir: ABS_OUT, target: "opencode" });
+  }
+
+  it("delivers the hook script into .opencode/plugin/, with no plugin-name segment", async () => {
+    await runOpencodeBuild();
+
+    expect(memFs.has(`${ABS_OUT}/.opencode/plugin/check.sh`)).toBe(true);
+  });
+
+  it("never writes a hooks.json — opencode's loader reads a runtime module, not a manifest", async () => {
+    await runOpencodeBuild();
+
+    expect(memFs.has(`${ABS_OUT}/.opencode/plugin/hooks.json`)).toBe(false);
+    expect(memFs.has(`${ABS_OUT}/.opencode/plugin/${PLUGIN}.hooks.json`)).toBe(false);
+  });
+
+  it("emits no logger.warn about hooks — they are delivered, not skipped", async () => {
+    await runOpencodeBuild();
+
+    expect(logger.warnMessages.some((w) => w.includes("hooks/"))).toBe(false);
   });
 });

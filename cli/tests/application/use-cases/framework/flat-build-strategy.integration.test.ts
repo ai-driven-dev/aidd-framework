@@ -373,14 +373,18 @@ describe("FlatOutputStrategy integration", () => {
     });
   });
 
-  describe("AC #11: unsupported hooks warn-and-skip (opencode contract)", () => {
+  describe("AC #11: unsupported hooks warn-and-skip", () => {
     it("warns and skips hooks for a hooks-bearing plugin when hooks is unsupported", async () => {
       const captLogger = new CapturingLogger();
+      // No shipped flat contract declares hooks unsupported any more (every tool's
+      // acceptsHooks is true) — this exercises writeHooks's own unsupported branch
+      // directly, on a contract built for that case rather than on any real tool's.
+      const base = buildOpencodeFlatContract();
       const strategy = new FlatBuildStrategy(
         memFs,
         new AjvSchemaValidatorAdapter(),
         makeAssetProvider(),
-        buildOpencodeFlatContract(),
+        { ...base, artifacts: { ...base.artifacts, hooks: { supported: false } } },
         false,
         ABS_OUT,
         makeIsDirectory(memFs),

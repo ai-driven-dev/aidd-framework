@@ -29,13 +29,19 @@ type CodexHooksShape = { hooks?: Record<string, CodexHookEntry[]> };
 
 // ── Event mapping ─────────────────────────────────────────────────────────────
 
-const CURSOR_EVENT_MAP: Record<string, string> = {
-  SessionStart: "sessionStart",
-  UserPromptSubmit: "beforeSubmitPrompt",
-  PreToolUse: "preToolUse",
-  PostToolUse: "postToolUse",
-  Stop: "stop",
-  SubagentStop: "subagentStop",
+// `Stop` fans out to two Cursor events, not one: measured (2026-08-22, see
+// measurements.md Phase 6) interactive sessions fire `stop` and headless sessions
+// fire `sessionEnd` instead — never both from the same run, but which one depends
+// on how the session ends, so both are subscribed. A run file already tolerates
+// more than one `turn_end` line (two real `stop` firings, one interactive session,
+// Phase 4 addendum), so a session that happens to fire both is not a problem.
+const CURSOR_EVENT_MAP: Record<string, readonly string[]> = {
+  SessionStart: ["sessionStart"],
+  UserPromptSubmit: ["beforeSubmitPrompt"],
+  PreToolUse: ["preToolUse"],
+  PostToolUse: ["postToolUse"],
+  Stop: ["stop", "sessionEnd"],
+  SubagentStop: ["subagentStop"],
 };
 
 // ── Claude: merge hooks into .claude/settings.json ────────────────────────────
@@ -135,13 +141,15 @@ export function mergeCursorFlatHooks(
   const warnings: string[] = [];
 
   for (const [claudeEvent, matchers] of Object.entries(pluginHooks)) {
-    const cursorEvent = CURSOR_EVENT_MAP[claudeEvent];
-    if (!cursorEvent) {
+    const cursorEvents = CURSOR_EVENT_MAP[claudeEvent];
+    if (!cursorEvents) {
       warnings.push(`cursor: unmapped event '${claudeEvent}' skipped`);
       continue;
     }
     const entries = extractCursorEntries(matchers);
-    cursor.hooks[cursorEvent] = [...(cursor.hooks[cursorEvent] ?? []), ...entries];
+    for (const cursorEvent of cursorEvents) {
+      cursor.hooks[cursorEvent] = [...(cursor.hooks[cursorEvent] ?? []), ...entries];
+    }
   }
 
   return { content: `${JSON.stringify(cursor, null, 2)}\n`, warnings };

@@ -40,12 +40,16 @@ function firstGitWorkspaceRoot(workspaceRoots) {
 
 // How each host names its working directory in its own hook payload. Every host but
 // Cursor delivers cwd directly; Cursor delivers workspace_roots instead (see
-// fixtures/README.md) and never cwd at all.
+// fixtures/README.md) and never cwd at all. OpenCode is not a stdin hook - its own plugin
+// module builds this payload itself, from the session's own `directory` (session_start) or
+// the plugin's own init-time directory (turn_end, see hooks/opencode-plugin.js) - but reads
+// through the same `cwd` key as every stdin host so the shape stays one shape.
 const CWD_READER_BY_HOST = Object.freeze({
   "claude-code": (payload) => payload.cwd,
   codex: (payload) => payload.cwd,
   copilot: (payload) => payload.cwd,
   cursor: (payload) => firstGitWorkspaceRoot(payload.workspace_roots),
+  opencode: (payload) => payload.cwd,
 });
 
 function readCwd(host, payload) {

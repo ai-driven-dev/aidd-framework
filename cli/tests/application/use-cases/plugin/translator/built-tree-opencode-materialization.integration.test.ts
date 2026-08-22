@@ -21,6 +21,26 @@ function dist(): PluginDistribution {
   });
 }
 
+function distWithHooks(): PluginDistribution {
+  return new PluginDistribution({
+    manifest: { name: "aidd-vcs", version: "1.0.0" },
+    format: "claude",
+    files: [],
+    components: {
+      commands: [],
+      agents: [],
+      rules: [],
+      skills: [],
+      mcp: [],
+      hooks: [
+        { relativePath: "hooks/hooks.json", content: "{}" },
+        { relativePath: "hooks/journal.js", content: "// journal" },
+        { relativePath: "hooks/lib/host.js", content: "// host" },
+      ],
+    },
+  });
+}
+
 async function makeRegistry(): Promise<InMemoryMarketplaceRegistry> {
   const registry = new InMemoryMarketplaceRegistry();
   await registry.save(
@@ -72,5 +92,42 @@ describe("BuiltTreeMaterializationTranslator — opencode (integration)", () => 
     expect(fs.has(`${PROJECT_ROOT}/.build-version`)).toBe(false);
     const installed = manifest.getPlugins("opencode").find((p) => p.name === "aidd-vcs");
     expect(installed?.files.size).toBe(2);
+  });
+
+  // finding #1: the built tree's flat hooks land in one shared, non-namespaced directory
+  // (.opencode/plugin/), not under a "<plugin>-"-prefixed segment like skills/agents —
+  // so belongsToPlugin's naming-convention filter dropped every hook file here, even
+  // though the build itself now delivers them. This plugin's own hook filenames, read
+  // from its distribution, are what scope the copy instead.
+  it("copies this plugin's flat hooks by filename, not by naming convention", async () => {
+    const fs = new InMemoryFileAdapter();
+    fs.setFile(`${BUILT}/.opencode/plugin/journal.js`, "// journal");
+    fs.setFile(`${BUILT}/.opencode/plugin/lib/host.js`, "// host");
+    fs.setFile(`${BUILT}/.opencode/plugin/other-plugin-hook.js`, "OTHER PLUGIN");
+
+    const manifest = Manifest.create();
+    manifest.addTool("opencode", "test", []);
+    const translator = new BuiltTreeMaterializationTranslator(
+      fs,
+      new DeterministicHasher(),
+      () => "/home/u",
+      fakeEnsureBuiltMarketplace(),
+      await makeRegistry()
+    );
+
+    await translator.addPlugin(
+      distWithHooks(),
+      "opencode",
+      { kind: "local", path: "/plugin-source" },
+      PROJECT_ROOT,
+      manifest,
+      "aidd-framework",
+      "docs"
+    );
+
+    expect(fs.getFile(`${PROJECT_ROOT}/.opencode/plugin/journal.js`)).toBe("// journal");
+    expect(fs.getFile(`${PROJECT_ROOT}/.opencode/plugin/lib/host.js`)).toBe("// host");
+    expect(fs.has(`${PROJECT_ROOT}/.opencode/plugin/hooks.json`)).toBe(false);
+    expect(fs.has(`${PROJECT_ROOT}/.opencode/plugin/other-plugin-hook.js`)).toBe(false);
   });
 });

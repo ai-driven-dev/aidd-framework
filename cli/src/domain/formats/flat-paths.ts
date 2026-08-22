@@ -81,3 +81,17 @@ export function genericFlatHooksScriptPath(
 export function flatMcpKeyPrefix(plugin: string): string {
   return `${plugin}-`;
 }
+
+/**
+ * Returns the flat-output path for a hook file under a shared, non-namespaced
+ * `flatHooksDir` — a loader that scans one directory for its own runtime module
+ * (opencode's `.opencode/plugin/`), not a per-plugin subtree. No plugin segment is
+ * added: two plugins delivering the same filename there collide by design, the same
+ * way the tool's own loader would see them.
+ *
+ * @param flatHooksDir       - The tool's declared flat hooks directory, trailing slash included
+ * @param hooksRelativePath  - A hook component's path, e.g. "hooks/journal.js"
+ */
+export function flatHooksSharedDirPath(flatHooksDir: string, hooksRelativePath: string): string {
+  return `${flatHooksDir}${hooksRelativePath.replace(/^hooks\//, "")}`;
+}

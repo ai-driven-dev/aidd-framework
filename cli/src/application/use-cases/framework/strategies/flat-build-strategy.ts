@@ -85,7 +85,9 @@ export class FlatBuildStrategy implements BuildOutputStrategy {
     }
     const hooksSrc = join(pluginSrc, PLUGIN_HOOKS_RELATIVE);
     if (!(await this.fs.fileExists(hooksSrc))) return 0;
-    const jsonCount = await this.writeFlatHooksJson(artifact, pluginName, hooksSrc);
+    const jsonCount = artifact.skipHooksJson
+      ? 0
+      : await this.writeFlatHooksJson(artifact, pluginName, hooksSrc);
     const scriptCount = await this.writeFlatHooksScripts(artifact, pluginName, pluginSrc);
     return jsonCount + scriptCount;
   }

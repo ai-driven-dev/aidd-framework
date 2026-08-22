@@ -300,6 +300,21 @@ const TOOLS = [
   },
   {
     tool: "cursor",
+    // Measured, not assumed: the plugin-scope hooks.json the framework currently installs
+    // to (~/.cursor/plugins/local/<plugin>/) never fired, across three probes that varied
+    // every axis that could explain it away — headless and interactive, auto-discovered
+    // and loaded explicitly with --plugin-dir, with and without a .cursor-plugin/
+    // plugin.json manifest matching Cursor's own schema. Zero of seven declared events
+    // fired on any of them.
+    //
+    // But a project-scope .cursor/hooks.json does fire, and a live interactive session run
+    // through it - the real journal.js, the real command the framework's own `cursor:flat`
+    // build target produces - wrote a genuine run journal file: session_start with Cursor's
+    // real session id, then turn_end from a real `stop`. journalAttributable is a fact
+    // about the journal, not about which directory is currently installed to, and the
+    // journal does reach a Cursor session when the hook is wired to run under it. The
+    // shipped native/plugin-scope install not firing is a route defect - the same class as
+    // the other four tools once had - not a capability limit. See measurements.md, phase 4.
     reason: "It writes no token count in any file it produces.",
     capability: {
       localRead: null,
@@ -323,13 +338,15 @@ const TOOLS = [
   {
     tool: "opencode",
     read: opencodeRead,
-    limitation:
-      "read alone: no captured payload establishes that a hook or plugin sees OpenCode's " +
-      "own session id, so these figures cannot yet be joined to a run journal entry.",
+    // journalAttributable is true on a live capture, not an argument: hooks/opencode-plugin.js,
+    // an OpenCode plugin module loaded in-process (OpenCode has no hooks.json), writes
+    // session_start from `session.created`'s own `info.id` and turn_end from `session.idle`.
+    // A real session created through OpenCode's own HTTP API, with no --session named by hand,
+    // was swept by this reader's own `read` sweep and joined - see measurements.md, phase 5.
     capability: {
       localRead: { tokenCounters: true, amount: false, toolStatedStep: false },
       export: null,
-      journalAttributable: false,
+      journalAttributable: true,
       taskAttributable: false,
     },
   },
