@@ -14,6 +14,7 @@ import {
   stripToolSuffix,
 } from "../../formats/command.js";
 import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
+import { PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token-rewrite.js";
 import { parseToml, stringifyToml } from "../../formats/toml.js";
 import { CONFIG_MCP } from "../../models/framework.js";
 import type {
@@ -112,6 +113,17 @@ export function mergeCodexConfigToml(existing: string, aiddPayload: string): str
   ensureCodexHooks(result);
   return stringifyToml(result);
 }
+
+// Measured on issue #699: four consecutive `codex exec` sessions installed a plugin's
+// hooks, ran clean, and journaled nothing — no warning, no line in the output — until
+// `--dangerously-bypass-hook-trust` made the same install produce all three hooks and its
+// journal. Codex writes one `trusted_hash` per hook under `[hooks.state]` in
+// `~/.codex/config.toml` when a person approves it; a hook with no entry is skipped in
+// silence, and nothing prompts for it outside a terminal.
+const CODEX_HOOKS_TRUST_NOTICE =
+  "Codex will not run this plugin's hooks until each one is trusted — approve the prompt " +
+  "once in an interactive session, or pass --dangerously-bypass-hook-trust to codex exec " +
+  "for a headless run. Until then, a session leaves no run journal and nothing says why.";
 
 const AIDD_HOOK_COMMAND = "node .aidd/scripts/update_memory.cjs";
 
@@ -233,7 +245,14 @@ export const codex: AiTool<
       mode: "native",
       pluginsDir: ".codex/plugins/",
       pluginManifestRelativePath: "plugin.json",
+      acceptsHooks: true,
+      hooksTrustNotice: CODEX_HOOKS_TRUST_NOTICE,
       acceptsMcp: true,
+      // Measured, not read off the docs: a headless session ran five SessionStart hooks
+      // to completion, one written ${PLUGIN_ROOT} and three written ${CLAUDE_PLUGIN_ROOT}.
+      // Codex expands both, and reports a non-zero hook as failed — so completion is the
+      // proof. Either spelling works; this is the one its own plugins are built with.
+      pluginRootToken: PLUGIN_ROOT_TOKEN,
       translationMode: "marketplace",
       // Codex only enables plugins from its user-global config (~/.codex/config.toml)
       // plus its plugin cache (~/.codex/plugins/cache/). A project-local settings file

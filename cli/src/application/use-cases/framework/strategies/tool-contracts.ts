@@ -35,6 +35,7 @@ import {
   mergeCursorFlatHooks,
 } from "../../../../domain/formats/flat-hooks-merge.js";
 import {
+  flatHooksSharedDirPath,
   flatMcpKeyPrefix,
   genericFlatAgentPath,
   genericFlatHooksFile,
@@ -57,12 +58,20 @@ import {
 } from "../../../../domain/models/framework-build.js";
 import type { FileReader } from "../../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../../domain/ports/file-writer.js";
+import { claude } from "../../../../domain/tools/ai/claude.js";
 import {
+  codex,
   mergeCodexConfigToml,
   stripCodexSkillFrontmatter,
 } from "../../../../domain/tools/ai/codex.js";
-import { transformMcpToOpencode } from "../../../../domain/tools/ai/opencode.js";
-import type { PluginPresence, ToolBuildContract } from "../../../../domain/tools/build-contract.js";
+import { copilot } from "../../../../domain/tools/ai/copilot.js";
+import { cursor } from "../../../../domain/tools/ai/cursor.js";
+import { opencode, transformMcpToOpencode } from "../../../../domain/tools/ai/opencode.js";
+import type {
+  ArtifactContract,
+  PluginPresence,
+  ToolBuildContract,
+} from "../../../../domain/tools/build-contract.js";
 import { buildCodexMarketplace, buildCodexMarketplaceEntry } from "./codex-marketplace-catalog.js";
 import {
   buildDefaultCatalogEntry,
@@ -120,12 +129,10 @@ async function buildDefaultEntry(
 export function buildClaudeContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_CLAUDE_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_CLAUDE_MARKETPLACE_RELATIVE;
-  // Split literal to avoid biome's noTemplateCurlyInString warning.
-  const claudeToken = "$" + "{CLAUDE_PLUGIN_ROOT}";
   return {
     manifestDir: ".claude-plugin",
     marketplaceRelative,
-    pluginRootToken: claudeToken,
+    pluginRootToken: claude.capabilities.plugins.pluginRootToken,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: (source, presence) =>
       synthesizeDefaultPluginManifest(source, presence, {
@@ -175,12 +182,10 @@ export function buildClaudeContract(): ToolBuildContract {
 export function buildCursorContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_CURSOR_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_CURSOR_MARKETPLACE_RELATIVE;
-  // Split literal to avoid biome's noTemplateCurlyInString warning.
-  const cursorToken = "$" + "{CURSOR_PLUGIN_ROOT}";
   return {
     manifestDir: ".cursor-plugin",
     marketplaceRelative,
-    pluginRootToken: cursorToken,
+    pluginRootToken: cursor.capabilities.plugins.pluginRootToken,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: (source, presence) =>
       synthesizeDefaultPluginManifest(source, presence, {
@@ -230,12 +235,10 @@ export function buildCursorContract(): ToolBuildContract {
 export function buildCopilotMarketplaceContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_PLUGIN_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_MARKETPLACE_RELATIVE;
-  // Split literal to avoid biome's noTemplateCurlyInString warning.
-  const copilotToken = "$" + "{PLUGIN_ROOT}";
   return {
     manifestDir: ".plugin",
     marketplaceRelative,
-    pluginRootToken: copilotToken,
+    pluginRootToken: copilot.capabilities.plugins.pluginRootToken,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: (source, presence) =>
       synthesizeDefaultPluginManifest(source, presence, {
@@ -337,12 +340,10 @@ function transformCodexSkill(content: string): string {
 export function buildCodexContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_CODEX_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_CODEX_MARKETPLACE_RELATIVE;
-  // Split literal to avoid biome's noTemplateCurlyInString warning.
-  const codexToken = "$" + "{PLUGIN_ROOT}";
   return {
     manifestDir: ".codex-plugin",
     marketplaceRelative,
-    pluginRootToken: codexToken,
+    pluginRootToken: codex.capabilities.plugins.pluginRootToken,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: buildCodexManifest,
     manifestSchemaName: "codex-plugin-manifest",
@@ -733,6 +734,14 @@ function opencodeFlatResolveTarget(plugin: string, rel: string): string {
   return rel;
 }
 
+// OpenCode's loader scans one directory non-recursively (flatHooksDir), so a hook script
+// lands there directly — no plugin-name segment, the same shape `translateFlat` delivers
+// for the install route (plugin-content-translator.ts's flatHooksFiles, via the same
+// flatHooksSharedDirPath).
+function makeOpencodeFlatHooksPath(flatHooksDir: string): (plugin: string, rel: string) => string {
+  return (_plugin, rel) => flatHooksSharedDirPath(flatHooksDir, rel);
+}
+
 function transformOpencodeFlatAgent(content: string, plugin: string, outName: string): string {
   const { frontmatter, body } = parseFrontmatter(content);
   const flatRelPath = opencodeFlatAgentPath(plugin, `agents/${outName}`);
@@ -775,6 +784,20 @@ async function collectOpencodeMcp(
   return incoming;
 }
 
+// Delivers what `aidd plugin install --tool opencode` delivers: `flatHooksDir` is the
+// tool's own declaration (opencode.ts), read here rather than restated, so the two
+// routes cannot fall out of sync the way they did before this fix.
+function buildOpencodeFlatHooksArtifact(): ArtifactContract {
+  const { flatHooksDir } = opencode.capabilities.plugins;
+  if (flatHooksDir === null) return { supported: false };
+  return {
+    supported: true,
+    source: { kind: "hooksBundle", jsonPath: "hooks/hooks.json", scriptDir: "hooks" },
+    path: makeOpencodeFlatHooksPath(flatHooksDir),
+    skipHooksJson: true,
+  };
+}
+
 export function buildOpencodeFlatContract(): ToolBuildContract {
   return {
     manifestDir: null,
@@ -796,7 +819,7 @@ export function buildOpencodeFlatContract(): ToolBuildContract {
         transform: transformOpencodeFlatAgent,
       },
       mcp: { supported: false }, // handled by emitConfigArtifact (opencode.json mcp)
-      hooks: { supported: false }, // opencode has no HasHooks capability
+      hooks: buildOpencodeFlatHooksArtifact(),
       rules: { supported: false },
       commands: { supported: false },
     },

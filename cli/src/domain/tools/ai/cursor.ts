@@ -13,6 +13,7 @@ import {
   stripToolSuffix,
 } from "../../formats/command.js";
 import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
+import { CURSOR_PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token-rewrite.js";
 import { CONFIG_MCP } from "../../models/framework.js";
 import type {
   AiTool,
@@ -114,10 +115,18 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         // (base-relative keys like "aidd-context/commands/foo.md" per D2).
         pluginsDir: "",
         pluginManifestRelativePath: null,
-        // plugin-local: Cursor auto-discovers hooks.json and mcp.json at the plugin root.
+        // plugin-local: Cursor auto-discovers mcp.json at the plugin root, but never a
+        // plugin-scope hooks.json - three probes (headless/interactive, auto-discovered
+        // and explicit --plugin-dir, with and without a manifest) fired zero of seven
+        // events. Only a project-scope .cursor/hooks.json is ever observed firing (see
+        // measurements.md Phase 4/6), so hooksDestination routes hooks there instead of
+        // here; hooksRelativePath/hooksContentFormat stay declared for the shape they
+        // still describe but are no longer read for Cursor's own install.
         acceptsHooks: true,
+        pluginRootToken: CURSOR_PLUGIN_ROOT_TOKEN,
         hooksRelativePath: "hooks.json",
         hooksContentFormat: "cursor",
+        hooksDestination: "project",
         acceptsMcp: true,
         mcpRelativePath: "mcp.json",
         installScope: "user",

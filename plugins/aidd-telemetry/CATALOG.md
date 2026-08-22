@@ -12,6 +12,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 - [`skills`](#skills)
   - [`skills/00-init`](#skills00-init)
   - [`skills/01-cost`](#skills01-cost)
+  - [`skills/02-check`](#skills02-check)
 
 ---
 
@@ -27,6 +28,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 |------|
 | [hooks.json](hooks/hooks.json) |
 | [journal.js](hooks/journal.js) |
+| [opencode-plugin.js](hooks/opencode-plugin.js) |
 
 #### `hooks/lib`
 
@@ -59,4 +61,13 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `actions` | [03-report.md](skills/01-cost/actions/03-report.md) | - |
 | `scripts` | [telemetry-report.js](skills/01-cost/scripts/telemetry-report.js) | - |
 | `-` | [SKILL.md](skills/01-cost/SKILL.md) | `Answers what a period or one task consumed, broken down by step, model and tool, with how strongly each figure was attributed. Use when the user asks what a piece of work cost, where the effort went, or which step or model consumed the most. Not for turning measurement on.` |
+
+#### `skills/02-check`
+
+| Group | File | Description |
+|-------|------|---|
+| `actions` | [01-locate.md](skills/02-check/actions/01-locate.md) | - |
+| `actions` | [02-diagnose.md](skills/02-check/actions/02-diagnose.md) | - |
+| `scripts` | [telemetry-check.js](skills/02-check/scripts/telemetry-check.js) | - |
+| `-` | [SKILL.md](skills/02-check/SKILL.md) | `Answers whether AIDD measurement is actually recording, one independently verifiable line per claim. Use when the user doubts a figure, sees no run file appear, or wants proof the chain is working. Not for turning measurement on or answering what a period cost.` |
 

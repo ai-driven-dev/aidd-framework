@@ -10,6 +10,7 @@ import {
   convertCommandFrontmatter,
   reverseConvertCommandFrontmatter,
 } from "../../formats/command.js";
+import { PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token-rewrite.js";
 import {
   AT_DOCS_PLACEHOLDER,
   AT_TOOLS_PLACEHOLDER,
@@ -322,6 +323,9 @@ export const copilot: AiTool<
       pluginsDir: ".github/plugins/",
       pluginManifestRelativePath: "plugin.json",
       acceptsHooks: true,
+      // Never measured against a running Copilot hook, unlike Codex's. This is what the
+      // build route has been shipping, kept as-is rather than changed on a guess.
+      pluginRootToken: PLUGIN_ROOT_TOKEN,
       acceptsMcp: true,
       translationMode: "marketplace",
       // Copilot treats enabledPlugins in settings.json as a recommendation, not an

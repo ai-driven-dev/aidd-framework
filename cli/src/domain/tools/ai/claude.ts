@@ -13,6 +13,7 @@ import {
   stripToolSuffix,
 } from "../../formats/command.js";
 import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
+import { CLAUDE_PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token-rewrite.js";
 import { CONFIG_MCP } from "../../models/framework.js";
 import type {
   AiTool,
@@ -116,6 +117,7 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         pluginsDir: ".claude/plugins/",
         pluginManifestRelativePath: "plugin.json",
         acceptsHooks: true,
+        pluginRootToken: CLAUDE_PLUGIN_ROOT_TOKEN,
         acceptsMcp: true,
         translationMode: "marketplace",
         marketplaceSettings: {

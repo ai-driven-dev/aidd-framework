@@ -32,6 +32,10 @@ import type {
 import { registerTool } from "../registry.js";
 
 const DIRECTORY = ".opencode/";
+// OpenCode auto-discovers `{plugin,plugins}/*.{ts,js}` under the project root — a
+// non-recursive glob, so a hook's own runtime module has to sit directly here, not
+// namespaced under a per-plugin subdirectory the way commands/agents/rules/skills are.
+const FLAT_HOOKS_DIR = `${DIRECTORY}plugin/`;
 const TOOL_SUFFIX = ".opencode.md";
 
 type RawServer =
@@ -154,6 +158,12 @@ export const opencode: AiTool<
     plugins: new PluginsCapability({
       mode: "flat",
       flatNamespacePrefix: "aidd-",
+      // Measured (2026-08-22, see the telemetry plan's measurements.md, Phase 5 and 7):
+      // OpenCode never runs a CommonJS module placed here, only a genuine ESM export —
+      // hooks/opencode-plugin.js is written that way and delivered verbatim, along with
+      // journal.js and lib/ beside it (its own relative import expects them there).
+      acceptsHooks: true,
+      flatHooksDir: FLAT_HOOKS_DIR,
     }),
   },
 
@@ -170,21 +180,22 @@ export const opencode: AiTool<
   },
 
   // Read via `opencode export <sessionID> --sanitize` (OpencodeCostReaderAdapter),
-  // measured 2026-08-20 on opencode 1.14.20 — see domain/formats/opencode-export.ts.
-  // Unlike the other two local readers, this one cannot yet be joined to a run journal
-  // entry: no hook or plugin payload has ever been captured carrying OpenCode's own
-  // `ses_…` session identity, so there is nothing established to join on. It answers
-  // only what it can answer alone — what a given OpenCode session consumed. Joining it
-  // belongs with #676, which owns whether a plugin can write the journal at all.
+  // measured 2026-08-20 on opencode 1.14.20 — see domain/formats/opencode-export.ts. Joins
+  // to a run journal entry through hooks/opencode-plugin.js (phase 5, see the telemetry
+  // plan's measurements.md): an OpenCode plugin module, loaded in-process since OpenCode has
+  // no hooks.json, writes session_start from `session.created`'s own session id.
   telemetryLocalRead: {
     kind: "declared",
-    limitation:
-      "read alone: no captured payload establishes that a hook or plugin sees OpenCode's own session id, so these figures cannot yet be joined to a run journal entry.",
     // Counters per message, and no amount: `info.cost` is `0` in every message captured
     // and its denomination was never established, so it is deliberately never read. No
     // field names a running skill either.
     supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
   },
+  // The journal hook detects this host by a self-declared `tool: "opencode"` field, not by
+  // a vendor payload shape — OpenCode has none. hooks/opencode-plugin.js builds that payload
+  // itself and spawns hooks/journal.js with it, over the same stdin contract every other
+  // host's own hook already uses.
+  telemetryJournalHost: "opencode",
   telemetryTaskAttributable: false,
 
   rewriteContent(content: string, docsDir: string): string {
