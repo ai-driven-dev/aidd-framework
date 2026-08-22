@@ -10,6 +10,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 - [`hooks`](#hooks)
   - [`hooks/lib`](#hookslib)
 - [`skills`](#skills)
+  - [`skills/_shared`](#skills_shared)
   - [`skills/00-init`](#skills00-init)
   - [`skills/01-cost`](#skills01-cost)
   - [`skills/02-check`](#skills02-check)
@@ -32,16 +33,31 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 
 #### `hooks/lib`
 
-| File |
-|------|
-| [file-writes.js](hooks/lib/file-writes.js) |
-| [host.js](hooks/lib/host.js) |
-| [record.js](hooks/lib/record.js) |
-| [repo.js](hooks/lib/repo.js) |
-| [step-starts.js](hooks/lib/step-starts.js) |
-| [task-declared.js](hooks/lib/task-declared.js) |
+| Group | File |
+|-------|------|
+| `-` | [file-writes.js](hooks/lib/file-writes.js) |
+| `-` | [host.js](hooks/lib/host.js) |
+| `-` | [record.js](hooks/lib/record.js) |
+| `-` | [repo.js](hooks/lib/repo.js) |
+| `-` | [step-starts.js](hooks/lib/step-starts.js) |
+| `-` | [task-declared.js](hooks/lib/task-declared.js) |
+| `tools` | [claude-code.js](hooks/lib/tools/claude-code.js) |
+| `tools` | [codex.js](hooks/lib/tools/codex.js) |
+| `tools` | [copilot.js](hooks/lib/tools/copilot.js) |
+| `tools` | [cursor.js](hooks/lib/tools/cursor.js) |
+| `tools` | [index.js](hooks/lib/tools/index.js) |
+| `tools` | [opencode.js](hooks/lib/tools/opencode.js) |
+| `tools` | [skill-detection.js](hooks/lib/tools/skill-detection.js) |
 
 ### `skills`
+
+#### `skills/_shared`
+
+| File |
+|------|
+| [attribution.js](skills/_shared/attribution.js) |
+| [journal.js](skills/_shared/journal.js) |
+| [readers.js](skills/_shared/readers.js) |
 
 #### `skills/00-init`
 

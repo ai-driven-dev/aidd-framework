@@ -6,12 +6,13 @@ const { spawnSync } = require("node:child_process");
 const { describe, it, before, after } = require("node:test");
 
 const SCRIPTS = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts");
+const SHARED = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/_shared");
 const HOOKS_LIB = path.resolve(__dirname, "../../plugins/aidd-telemetry/hooks/lib");
-const { buildIntervals, attribute } = require(path.join(SCRIPTS, "lib/attribution.js"));
+const { buildIntervals, attribute } = require(path.join(SHARED, "attribution.js"));
 const { build, taskOf, toMicroUsd } = require(path.join(SCRIPTS, "lib/report.js"));
 const { printReport, toEnvelope, buildArtefact, ARTEFACT_AXES } = require(path.join(SCRIPTS, "lib/render.js"));
 const sink = require(path.join(SCRIPTS, "lib/sink.js"));
-const { listJournals } = require(path.join(SCRIPTS, "lib/journal.js"));
+const { listJournals } = require(path.join(SHARED, "journal.js"));
 const {
   buildSessionStartLine,
   buildFileWrittenLine,

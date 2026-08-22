@@ -6,10 +6,11 @@ const { execFileSync, spawnSync } = require("node:child_process");
 const { describe, it } = require("node:test");
 
 const SCRIPTS = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/02-check/scripts");
+const SHARED = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/_shared");
 const SCRIPT = path.join(SCRIPTS, "telemetry-check.js");
 const { diagnose, OK, FAIL, UNKNOWN } = require(path.join(SCRIPTS, "lib/diagnose.js"));
 const { printReport } = require(path.join(SCRIPTS, "lib/render.js"));
-const { TOOLS } = require(path.join(SCRIPTS, "lib/readers.js"));
+const { TOOLS } = require(path.join(SHARED, "readers.js"));
 const { resolveSessionAnchor } = require(path.join(SCRIPTS, "lib/session-anchor.js"));
 const { UNRECOGNISED_FILE_NAME } = require("../../plugins/aidd-telemetry/hooks/lib/record.js");
 const { readCodexHookTrust, parseHookTrust, PLUGIN_NAME } = require(path.join(SCRIPTS, "lib/hook-trust.js"));
@@ -478,17 +479,18 @@ describe("naming what nothing here can read", () => {
   });
 });
 
-describe("keeping the copied libraries in sync with the cost skill's own", () => {
-  // The TOOLS declaration lives once and is copied, not reimplemented: a tool gained or
-  // lost by the cost skill must not silently diverge from what this skill sees.
-  const COST = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts/lib");
+describe("sharing the TOOLS declaration with the cost skill, not copying it", () => {
+  // journal.js/readers.js/attribution.js used to be copied per skill, guarded by a byte-
+  // equality test. They now live once, under skills/_shared/, so a tool gained or lost by
+  // one skill cannot silently diverge from what the other sees - there is only one file to
+  // read.
+  const COST = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts");
 
   for (const name of ["journal.js", "readers.js", "attribution.js"]) {
-    it(`keeps ${name} identical to the cost skill's own copy`, () => {
-      const here = fs.readFileSync(path.join(SCRIPTS, "lib", name), "utf8");
-      const there = fs.readFileSync(path.join(COST, name), "utf8");
-
-      assert.equal(here, there);
+    it(`${name} is not re-copied into either skill's own lib/`, () => {
+      assert.ok(fs.existsSync(path.join(SHARED, name)), `${name} must exist under skills/_shared/`);
+      assert.ok(!fs.existsSync(path.join(SCRIPTS, "lib", name)), `${name} must not be re-copied into 02-check's own lib/`);
+      assert.ok(!fs.existsSync(path.join(COST, "lib", name)), `${name} must not be re-copied into 01-cost's own lib/`);
     });
   }
 });
@@ -1034,16 +1036,20 @@ describe("running from a tree that ships skills/ and no hooks/ (the OpenCode-sha
   // at module load, above its own try/catch. OpenCode's translator (plugin-content-
   // translator.ts's translateFlat) delivers every skills/** file, including this script,
   // and records hooks only as skipped - so that install carries skills/ with no hooks/
-  // directory anywhere it could reach. Reproduced by copying the skill tree on its own into
-  // a temp directory; nothing is deleted from the repository.
+  // directory anywhere it could reach. Reproduced by copying the skill tree - 02-check
+  // plus the plugin-wide skills/_shared/ it now reads TOOLS/journal/attribution from,
+  // exactly what a real translateFlat install carries - into a temp directory; nothing is
+  // deleted from the repository.
   function copyPluginTreeWithoutHooks() {
     const pluginRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-check-opencode-shaped-"));
     fs.mkdirSync(path.join(pluginRoot, "skills"), { recursive: true });
-    fs.cpSync(
-      path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/02-check"),
-      path.join(pluginRoot, "skills", "02-check"),
-      { recursive: true, filter: (src) => !src.endsWith(".orig") },
-    );
+    for (const skillDir of ["02-check", "_shared"]) {
+      fs.cpSync(
+        path.resolve(__dirname, "../../plugins/aidd-telemetry/skills", skillDir),
+        path.join(pluginRoot, "skills", skillDir),
+        { recursive: true, filter: (src) => !src.endsWith(".orig") },
+      );
+    }
     return path.join(pluginRoot, "skills", "02-check", "scripts", "telemetry-check.js");
   }
 

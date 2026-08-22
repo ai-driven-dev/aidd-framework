@@ -10,9 +10,9 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const { listJournals } = require("./lib/journal.js");
-const { TOOLS, homeDir } = require("./lib/readers.js");
-const { buildIntervals, attribute } = require("./lib/attribution.js");
+const { listJournals } = require("../../_shared/journal.js");
+const { TOOLS, homeDir } = require("../../_shared/readers.js");
+const { buildIntervals, attribute } = require("../../_shared/attribution.js");
 const { diagnose } = require("./lib/diagnose.js");
 const { printReport } = require("./lib/render.js");
 const { switchOn } = require("./lib/switch.js");

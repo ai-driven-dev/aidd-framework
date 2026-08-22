@@ -3,7 +3,7 @@
 // Neither derives a figure the other cannot see. Two ways of computing one number is how
 // they start disagreeing.
 
-const { DISPLAY_NAME } = require("./readers.js");
+const { DISPLAY_NAME } = require("../../../_shared/readers.js");
 const { tokensOf } = require("./report.js");
 
 // Bumped from 1: `by_day` and `by_project` are new top-level breakdowns, a shape change a

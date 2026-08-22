@@ -8,9 +8,9 @@
 //   telemetry-report read [--session <id>]
 //   telemetry-report report [--from <day>] [--to <day>] [--days <n>] [--task <id>] [--json]
 
-const { buildIntervals, attribute } = require("./lib/attribution.js");
-const { listJournals, readJournal, projectOf } = require("./lib/journal.js");
-const { TOOLS, DISPLAY_NAME, homeDir } = require("./lib/readers.js");
+const { buildIntervals, attribute } = require("../../_shared/attribution.js");
+const { listJournals, readJournal, projectOf } = require("../../_shared/journal.js");
+const { TOOLS, DISPLAY_NAME, homeDir } = require("../../_shared/readers.js");
 const { printReport, toEnvelope, buildArtefact, ARTEFACT_AXES } = require("./lib/render.js");
 const { build } = require("./lib/report.js");
 const { SCHEMA_VERSION, append, readForVendor, readPeriod } = require("./lib/sink.js");

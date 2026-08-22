@@ -36,10 +36,11 @@ const {
 } = require("../../plugins/aidd-telemetry/hooks/lib/record.js");
 
 const {
-  readCwd,
   getRepoRoot,
   resolveRunsDir,
 } = require("../../plugins/aidd-telemetry/hooks/lib/repo.js");
+
+const { readCwd } = require("../../plugins/aidd-telemetry/hooks/lib/tools/index.js");
 
 // One exact key set per line type (see phase-1.md) - the replacement for the
 // old THE_TEN_KEYS whitelist, which guarded a single mutable record that no
