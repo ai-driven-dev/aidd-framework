@@ -17,3 +17,16 @@ export function builtMarketplaceDir(
 ): string {
   return join(projectRoot, BUILT_CACHE_SUBDIR, marketplaceName, target);
 }
+
+/**
+ * Where a user-scope marketplace's built tree lives: under the CLI's own user
+ * directory, which is already the `.aidd` of the user, so the layout below it repeats
+ * the project one without repeating the `.aidd` segment.
+ */
+export function userBuiltMarketplaceDir(
+  userConfigDir: string,
+  marketplaceName: string,
+  target: string
+): string {
+  return join(userConfigDir, "cache", "built", marketplaceName, target);
+}

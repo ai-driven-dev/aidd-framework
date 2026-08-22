@@ -1,5 +1,4 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import {
   Marketplace,
@@ -8,6 +7,7 @@ import {
 } from "../../domain/models/marketplace.js";
 import { AIDD_DIR } from "../../domain/models/paths.js";
 import type { MarketplaceRegistry } from "../../domain/ports/marketplace-registry.js";
+import { userConfigDir } from "../user-config-dir.js";
 
 const REGISTRY_FILENAME = "marketplaces.json";
 const SCHEMA_VERSION = 1;
@@ -74,9 +74,7 @@ export class MarketplaceRegistryAdapter implements MarketplaceRegistry {
   }
 
   private userPath(): string {
-    const override = process.env.AIDD_USER_CONFIG_DIR;
-    const dir = override ?? join(homedir(), ".config", "aidd");
-    return join(dir, REGISTRY_FILENAME);
+    return join(userConfigDir(), REGISTRY_FILENAME);
   }
 
   private async read(path: string, scope: MarketplaceScope): Promise<Marketplace[]> {

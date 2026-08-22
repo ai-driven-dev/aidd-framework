@@ -64,6 +64,15 @@ function makeMarketplace(): Marketplace {
   });
 }
 
+function makeUserMarketplace(): Marketplace {
+  return Marketplace.create({
+    name: "shared-mkt",
+    source: { kind: "local", path: "/src/framework" },
+    scope: "user",
+    addedAt: "2026-06-29T00:00:00.000Z",
+  });
+}
+
 function fakeResolve(localPath: string, version: string | undefined): ResolveMarketplaceUseCase {
   return {
     execute: async ({ marketplace }: ResolveMarketplaceOptions) => ({
@@ -107,7 +116,8 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
       fs,
       fakeResolve("/src/framework", "1.0.0"),
       buildFor,
-      fakeVersion("5.0.0")
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
     );
     const r = await uc.execute({
       projectRoot: PROJECT,
@@ -127,7 +137,8 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
       fs,
       fakeResolve("/src/framework", "1.0.0"),
       buildFor,
-      fakeVersion("5.0.0")
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
     );
     const r = await uc.execute({
       projectRoot: PROJECT,
@@ -146,7 +157,8 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
       fs,
       fakeResolve("/src/framework", "1.0.0"),
       buildFor,
-      fakeVersion("5.0.0")
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
     );
     const r = await uc.execute({
       projectRoot: PROJECT,
@@ -165,7 +177,8 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
       fs,
       fakeResolve("/src/framework", undefined),
       buildFor,
-      fakeVersion("5.0.0")
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
     );
     const r = await uc.execute({
       projectRoot: PROJECT,
@@ -183,7 +196,8 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
       fs,
       fakeResolve(PROJECT, "1.0.0"),
       buildFor,
-      fakeVersion("5.0.0")
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
     );
     const r = await uc.execute({
       projectRoot: PROJECT,
@@ -202,7 +216,8 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
       fs,
       fakeResolve("/src/framework", "1.0.0"),
       buildFor,
-      fakeVersion("5.0.0")
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
     );
     const opts = {
       projectRoot: PROJECT,
@@ -255,7 +270,8 @@ describe("force behavior at the cache-rebuild path", () => {
       memFs,
       fakeResolve(FIXTURE_DIR, "1.0.0"),
       realBuildFor,
-      fakeVersion("5.0.0")
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
     );
 
     const result = await uc.execute({
@@ -296,7 +312,8 @@ describe("outDir invariant for the cache-rebuild build path", () => {
       memFs,
       fakeResolve("/src/framework", "1.0.0"),
       capturingBuildFor,
-      fakeVersion("5.0.0")
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
     );
     await direct.execute({
       projectRoot: PROJECT,
@@ -311,7 +328,8 @@ describe("outDir invariant for the cache-rebuild build path", () => {
       memFs,
       fakeResolve(PROJECT, "1.0.0"),
       capturingBuildFor,
-      fakeVersion("5.0.0")
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
     );
     await dogfood.execute({
       projectRoot: PROJECT,
@@ -330,5 +348,38 @@ describe("outDir invariant for the cache-rebuild build path", () => {
     }
     // The dogfood call specifically must have gone through the temp dir, not the cache.
     expect(capturedOutDirs[1]?.startsWith(`${tmpRoot}/`)).toBe(true);
+  });
+
+  // A user-scope marketplace is declared once for every project, so building it inside
+  // whichever project happened to register it would tie that declaration to the life of
+  // one of them: delete that project and the registration points at nothing.
+  it("builds a user-scope marketplace outside the project", async () => {
+    const memFs = new InMemoryFileAdapter();
+    const built: string[] = [];
+    const capturing: FrameworkBuildFor = (_t, _m, outDir) =>
+      ({
+        execute: async () => {
+          built.push(outDir);
+          await memFs.writeFile(join(outDir, ".claude-plugin/marketplace.json"), "{}");
+          return { outDir, plugins: [], totalFiles: 1 };
+        },
+      }) as unknown as FrameworkBuildUseCase;
+
+    const uc = new EnsureBuiltMarketplaceUseCase(
+      memFs,
+      fakeResolve("/src/framework", "1.0.0"),
+      capturing,
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
+    );
+    const result = await uc.execute({
+      projectRoot: PROJECT,
+      marketplace: makeUserMarketplace(),
+      target: "claude",
+      mode: "marketplace",
+    });
+
+    expect(result.builtDir.startsWith("/user-cache")).toBe(true);
+    expect(result.builtDir.startsWith(PROJECT)).toBe(false);
   });
 });

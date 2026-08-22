@@ -1,10 +1,10 @@
 import { execSync } from "node:child_process";
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { AuthConfig, AuthCredential, AuthLevel } from "../../domain/models/auth.js";
 import { AIDD_DIR } from "../../domain/models/paths.js";
 import { AuthStorageError } from "../errors.js";
+import { userConfigDir } from "../user-config-dir.js";
 
 interface SaveOptions {
   credential: AuthCredential;
@@ -16,9 +16,7 @@ export class AuthStorage {
   private static readonly AUTH_FILE = "auth.json";
 
   userConfigPath(): string {
-    const override = process.env.AIDD_USER_CONFIG_DIR;
-    const dir = override ?? join(homedir(), ".config", "aidd");
-    return join(dir, AuthStorage.AUTH_FILE);
+    return join(userConfigDir(), AuthStorage.AUTH_FILE);
   }
 
   projectConfigPath(projectRoot: string): string {

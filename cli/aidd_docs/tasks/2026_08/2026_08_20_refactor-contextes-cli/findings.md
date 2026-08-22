@@ -312,7 +312,8 @@ scope.
 désigne. Supprimer ce projet tue donc une déclaration censée valoir pour tous. C'est la même maladie
 que le registre global de copilot, un cran plus bas : un scope global qui pointe vers du local.
 Un marketplace de scope user devrait se construire sous le répertoire de configuration utilisateur
-d'AIDD.
+d'AIDD. **Corrigé le 2026-08-22** : il s'y construit désormais, et la déclaration globale de l'outil
+y pointe, indépendamment de tout projet.
 
 ## `marketplace refresh` ne revoit pas une source locale modifiée (2026-08-22)
 

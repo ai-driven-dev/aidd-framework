@@ -126,6 +126,7 @@ import { SelfUpdaterAdapter } from "./adapters/self-updater-adapter.js";
 import { BundledAssetProviderAdapter } from "./assets/asset-loader.js";
 import { AuthStorage } from "./auth/auth-storage.js";
 import { HttpClient } from "./http/http-client.js";
+import { userConfigDir } from "./user-config-dir.js";
 
 interface GlobalOptions {
   verbose: boolean;
@@ -465,7 +466,8 @@ export async function createDeps(
     fs,
     resolveMarketplaceUseCase,
     frameworkBuildFor,
-    currentVersionProvider
+    currentVersionProvider,
+    userConfigDir
   );
   const marketplaceSyncSettingsUseCase = new MarketplaceSyncSettingsUseCase(
     fs,

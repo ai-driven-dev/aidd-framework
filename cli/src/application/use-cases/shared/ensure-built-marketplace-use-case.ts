@@ -5,7 +5,7 @@ import type {
   FrameworkBuildTarget,
 } from "../../../domain/models/framework-build.js";
 import type { Marketplace } from "../../../domain/models/marketplace.js";
-import { builtMarketplaceDir } from "../../../domain/models/paths.js";
+import { builtMarketplaceDir, userBuiltMarketplaceDir } from "../../../domain/models/paths.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { VersionReader } from "../../../domain/ports/version-reader.js";
@@ -49,15 +49,21 @@ export class EnsureBuiltMarketplaceUseCase {
     private readonly fs: FileReader & FileWriter,
     private readonly resolveMarketplace: ResolveMarketplaceUseCase,
     private readonly buildFor: FrameworkBuildFor,
-    private readonly version: VersionReader
+    private readonly version: VersionReader,
+    /**
+     * Where a user-scope marketplace's built tree belongs. Building it under the
+     * project that happened to register it would tie a declaration meant for every
+     * project to the life of one of them: delete that project and the global
+     * registration points at nothing.
+     */
+    private readonly userCacheRoot: () => string
   ) {}
 
   async execute(options: EnsureBuiltMarketplaceOptions): Promise<EnsureBuiltMarketplaceResult> {
-    const builtDir = builtMarketplaceDir(
-      options.projectRoot,
-      options.marketplace.name,
-      options.target
-    );
+    const builtDir =
+      options.marketplace.scope === "user"
+        ? userBuiltMarketplaceDir(this.userCacheRoot(), options.marketplace.name, options.target)
+        : builtMarketplaceDir(options.projectRoot, options.marketplace.name, options.target);
     const resolved = await this.resolveMarketplace.execute({
       marketplace: options.marketplace,
       projectRoot: options.projectRoot,
