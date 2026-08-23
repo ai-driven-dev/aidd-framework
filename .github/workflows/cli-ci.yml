@@ -9,10 +9,7 @@ name: cli CI
 
 on:
   push:
-    # ci/windows-last: scratch-only addition, dropped before this file leaves that branch -
-    # the PR route hit a merge conflict against main that silently skipped pull_request
-    # triggering, so this pushes directly instead.
-    branches: [main, next, ci/windows-last]
+    branches: [main, next]
     paths:
       - "cli/**"
       - "kanban/**"
