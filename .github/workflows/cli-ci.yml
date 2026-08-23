@@ -250,6 +250,20 @@ jobs:
           node plugins/aidd-telemetry/hooks/journal.js turn-end < payload.json
           find aidd_docs/runs -type f | xargs -I{} cat {}
 
+      - name: 'Round trip - #707 the journal stays private AND git add -A still works'
+        id: rt2acl
+        continue-on-error: true
+        run: |
+          echo "--- icacls aidd_docs/runs (directory ACL) ---"
+          icacls aidd_docs/runs
+          runfile=$(find aidd_docs/runs -maxdepth 1 -type f -name '*.jsonl' | head -1)
+          echo "--- icacls $runfile (journal file ACL) ---"
+          icacls "$runfile"
+          echo "--- git add -A, in the checkout that just wrote the journal above ---"
+          git add -A
+          echo "git add -A exit code: $?"
+          git status --porcelain
+
       - name: Round trip - read it back
         id: rt3
         continue-on-error: true
@@ -299,7 +313,7 @@ jobs:
           for outcome in \
             "${{ steps.answer1.outcome }}" "${{ steps.answer2.outcome }}" \
             "${{ steps.answer3bash.outcome }}" "${{ steps.answer3pwsh.outcome }}" \
-            "${{ steps.rt1.outcome }}" "${{ steps.rt2.outcome }}" "${{ steps.rt3.outcome }}" "${{ steps.rt4.outcome }}" \
+            "${{ steps.rt1.outcome }}" "${{ steps.rt2.outcome }}" "${{ steps.rt2acl.outcome }}" "${{ steps.rt3.outcome }}" "${{ steps.rt4.outcome }}" \
             "${{ steps.pluginsuite.outcome }}" \
             "${{ steps.cliunit.outcome }}" "${{ steps.cliintegration.outcome }}" "${{ steps.clie2e.outcome }}"; do
             if [ "$outcome" = "failure" ]; then

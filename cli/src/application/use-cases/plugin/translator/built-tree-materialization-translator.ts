@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { flatHooksSharedDirPath } from "../../../../domain/formats/flat-paths.js";
 import { InstallationFile } from "../../../../domain/models/file.js";
 import type { Manifest } from "../../../../domain/models/manifest.js";
@@ -128,7 +128,10 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
         const rel = abs.slice(pluginSrc.length + 1);
         const content = await this.fs.readFile(abs);
         return new InstallationFile({
-          relativePath: join(name, rel),
+          // relativePath is always "/"-separated (see withoutHooksPrefix and
+          // belongsToPlugin below, both string-matching on "/") - node:path's platform
+          // `join` would answer with "\" on win32, breaking both.
+          relativePath: posix.join(name, rel),
           content,
           hash: this.hasher.hash(content),
         });

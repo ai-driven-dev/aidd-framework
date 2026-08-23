@@ -46,6 +46,13 @@ interface CommandEntry {
 function normalize(text: string): string {
   return (
     text
+      // A Windows capture spells its separator "\" (or "\\" once JSON-escaped inside the
+      // manifest text below) and carries a drive letter neither placeholder rule expects -
+      // fold both into the same drive-less, "/"-only shape a POSIX capture already has, so
+      // one set of rules covers a run from either platform. The lookbehind keeps a URL's
+      // scheme colon ("https:") alone - only a colon not preceded by a letter is a drive.
+      .replace(/(?<![A-Za-z])[A-Za-z]:(?=[/\\])/g, "")
+      .replace(/\\{1,2}/g, "/")
       // Absolute paths → placeholder. The built-cache path is the project temp dir,
       // which varies per run; strip it before the fixture/root rules.
       .replace(/\/[^\s",'\\]+\/\.aidd\/cache\/built/g, "<BUILT_CACHE>")

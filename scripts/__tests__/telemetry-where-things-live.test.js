@@ -22,13 +22,31 @@ function actualDefaultRootDir() {
 
 describe("the documented figures location matches what the sink actually writes", () => {
   const actual = actualDefaultRootDir();
-  // Docs are prose, always written with "/" regardless of the platform that built
-  // `actual` - path.join on win32 would answer with "\", so the doc-text comparison
-  // below normalises before substituting the sentinel for "~".
-  const documented = actual.replace(/\\/gu, "/").replace("/sentinel-home", "~");
+  const posixDefault = path.join("/sentinel-home", ".config", "aidd", "telemetry");
+  // Docs are prose, always written with "/" and the POSIX default - true regardless of
+  // which platform runs this file, since it is the docs' own text being checked, not
+  // `actual` (which does diverge on win32, see the platform branch below).
+  const documented = posixDefault.replace(/\\/gu, "/").replace("/sentinel-home", "~");
 
-  it("computes the well-known default - a change here means the docs must change too", () => {
-    assert.equal(actual, path.join("/sentinel-home", ".config", "aidd", "telemetry"));
+  it("computes the well-known default for this platform - a change here means the docs must change too", () => {
+    if (process.platform === "win32") {
+      // sink.js's own windowsRootDir: %APPDATA%\aidd\telemetry, unless it falls back to
+      // the POSIX-style path (no APPDATA at all - not expected on a real machine, but
+      // computeRootDir itself falls back rather than erroring, so this mirrors that).
+      const windowsDefault = process.env.APPDATA
+        ? path.join(process.env.APPDATA, "aidd", "telemetry")
+        : posixDefault;
+      assert.equal(actual, windowsDefault);
+      if (process.env.APPDATA) {
+        const readme = fs.readFileSync(PLUGIN_README, "utf8");
+        assert.ok(
+          readme.includes("%APPDATA%\\aidd\\telemetry"),
+          'expected plugins/aidd-telemetry/README.md to name Windows\' own default, "%APPDATA%\\aidd\\telemetry"'
+        );
+      }
+    } else {
+      assert.equal(actual, posixDefault);
+    }
   });
 
   for (const [label, docPath] of [

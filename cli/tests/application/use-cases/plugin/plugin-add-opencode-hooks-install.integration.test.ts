@@ -6,7 +6,7 @@
  * measurements.md, Phase 7.
  */
 
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { describe, expect, it } from "vitest";
 import { PluginAddUseCase } from "../../../../src/application/use-cases/plugin/plugin-add-use-case.js";
 import { PluginDistributionReaderAdapter } from "../../../../src/infrastructure/adapters/plugin-distribution-reader-adapter.js";
@@ -48,9 +48,16 @@ describe("PluginAddUseCase OpenCode hooks install (Phase 7)", () => {
   it("writes every hooks/ script but the manifest under .opencode/plugin/", async () => {
     const { deps } = await installSamplePlugin();
 
+    // deps.fs is the in-memory adapter, whose listUnder() returns its own "/"-normalised
+    // keys regardless of host platform - a native `join` would answer with "\" on win32
+    // and never match one of those keys.
     const writtenPaths = deps.fs.listUnder(PROJECT_ROOT);
-    expect(writtenPaths).toContain(join(PROJECT_ROOT, ".opencode", "plugin", "update_memory.js"));
-    expect(writtenPaths).not.toContain(join(PROJECT_ROOT, ".opencode", "plugin", "hooks.json"));
+    expect(writtenPaths).toContain(
+      posix.join(PROJECT_ROOT, ".opencode", "plugin", "update_memory.js")
+    );
+    expect(writtenPaths).not.toContain(
+      posix.join(PROJECT_ROOT, ".opencode", "plugin", "hooks.json")
+    );
   });
 
   it("emits no logger.warn — hooks are delivered, not skipped", async () => {

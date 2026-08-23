@@ -1,5 +1,5 @@
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { FrameworkBuildUseCase } from "../../../../src/application/use-cases/framework/framework-build-use-case.js";
 import { FlatBuildStrategy } from "../../../../src/application/use-cases/framework/strategies/flat-build-strategy.js";
@@ -50,7 +50,11 @@ function stubAssetProvider(): AssetProvider {
 function makeIsDirectory(memFs: InMemoryFileAdapter): (path: string) => Promise<boolean> {
   return async (path: string): Promise<boolean> => {
     if (memFs.has(path)) return false;
-    const prefix = path.endsWith("/") ? path : `${path}/`;
+    // memFs stores every key "/"-normalised (in-memory-file-adapter.ts's own `norm`) - a
+    // native, backslash-separated `path` on Windows would never prefix-match one of those
+    // keys without the same normalisation here.
+    const normalized = path.replaceAll("\\", "/");
+    const prefix = normalized.endsWith("/") ? normalized : `${normalized}/`;
     return memFs.listAll().some((k) => k.startsWith(prefix));
   };
 }
@@ -80,7 +84,9 @@ function fakeVersion(value: string): VersionReader {
 
 describe("builtMarketplaceDir", () => {
   it("places the per-target tree under .aidd/cache/built/<mkt>/<target>", () => {
-    expect(builtMarketplaceDir("/p", "aidd", "codex")).toBe("/p/.aidd/cache/built/aidd/codex");
+    expect(builtMarketplaceDir("/p", "aidd", "codex")).toBe(
+      join("/p", BUILT_CACHE_SUBDIR, "aidd", "codex")
+    );
   });
 });
 
@@ -324,11 +330,11 @@ describe("outDir invariant for the cache-rebuild build path", () => {
     const cacheRoot = join(PROJECT, BUILT_CACHE_SUBDIR);
     const tmpRoot = tmpdir();
     for (const outDir of capturedOutDirs) {
-      const underCache = outDir === cacheRoot || outDir.startsWith(`${cacheRoot}/`);
-      const underTmp = outDir === tmpRoot || outDir.startsWith(`${tmpRoot}/`);
+      const underCache = outDir === cacheRoot || outDir.startsWith(`${cacheRoot}${sep}`);
+      const underTmp = outDir === tmpRoot || outDir.startsWith(`${tmpRoot}${sep}`);
       expect(underCache || underTmp).toBe(true);
     }
     // The dogfood call specifically must have gone through the temp dir, not the cache.
-    expect(capturedOutDirs[1]?.startsWith(`${tmpRoot}/`)).toBe(true);
+    expect(capturedOutDirs[1]?.startsWith(`${tmpRoot}${sep}`)).toBe(true);
   });
 });

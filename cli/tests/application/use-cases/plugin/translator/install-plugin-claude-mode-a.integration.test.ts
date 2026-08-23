@@ -80,8 +80,15 @@ describe("install claude plugin via Mode A (integration)", () => {
     const settings = JSON.parse(await fs.readFile(settingsPath)) as Record<string, unknown>;
     expect(settings.extraKnownMarketplaces).toBeDefined();
     // Settings reference the BUILT claude tree, not the raw source.
+    // resolveSourceForSettings re-resolves the built dir against projectRoot before
+    // writing it out, so the expectation goes through the same call rather than a
+    // literal - on win32 a drive-less "/built/claude" resolves against the current
+    // drive, which a hand-typed literal would not reflect.
     expect((settings.extraKnownMarketplaces as Record<string, unknown>)[MARKETPLACE_NAME]).toEqual({
-      source: { source: "directory", path: "/built/claude" },
+      source: {
+        source: "directory",
+        path: resolve(PROJECT_ROOT, "/built/claude").replace(/\\/g, "/"),
+      },
     });
     expect(settings.enabledPlugins).toBeDefined();
     expect(

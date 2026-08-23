@@ -116,12 +116,17 @@ function runsDir(repoRoot) {
 // from restrictToCurrentUser below, not from this constant.
 const PRIVATE_DIR_MODE = 0o700;
 
+// Set once this directory's own ACL has been reset, so a repository with many sessions
+// does not reset it again on every single one (#707: it collided with git - see below).
+// Covered by the `aidd_docs/runs/*` gitignore glob like every other record here.
+const ACL_TIGHTENED_MARKER = ".aidd-acl-tightened";
+
 // `mkdirSync`'s `mode` applies only to a directory it creates, so a checked-out
 // `aidd_docs/runs/` needs this chmod. Never applied to a user-named AIDD_RUNS_DIR - a
 // user who names their own runs directory keeps responsibility for its permissions.
 function tightenOwnedDir(dir) {
   if (process.env.AIDD_RUNS_DIR) return;
-  if (process.platform === "win32") return restrictToCurrentUser(dir, { recursive: true });
+  if (process.platform === "win32") return tightenOwnedDirWindows(dir);
   try {
     fs.chmodSync(dir, PRIVATE_DIR_MODE);
   } catch {
@@ -129,34 +134,50 @@ function tightenOwnedDir(dir) {
   }
 }
 
+// Measured on a real windows-latest runner (#707): resetting this directory's ACL with
+// `/T` walked into files this code does not own - a checked-out `.gitkeep` among them -
+// and left at least one with no usable ACE of its own, so an ordinary `git add -A`
+// right after got "Permission denied" opening it. `/T` bought nothing here anyway: a
+// file this code creates gets its own tightenOwnedFile pass below, and `(OI)(CI)` alone
+// makes the directory's own grant apply to anything created in it afterward - so this
+// only ever touches the directory's own ACL, never a file already sitting inside it.
+function tightenOwnedDirWindows(dir) {
+  const marker = path.join(dir, ACL_TIGHTENED_MARKER);
+  if (fs.existsSync(marker)) return;
+  restrictToCurrentUser(dir, { inheritable: true });
+  try {
+    fs.writeFileSync(marker, "");
+  } catch {
+    // Best-effort: a failed write here just means the next write resets it again.
+  }
+}
+
 // POSIX needs no second pass: `appendFileSync`'s own `mode` already set 0600 at the
-// moment it created the file. On Windows, measured on a real windows-latest runner
-// (#707), `tightenOwnedDir`'s `/T` recursion does not reliably carry the current-user
-// grant onto a leaf file it walks into - the file came back with zero ACEs of its own,
-// readable only because the runner's account happened to hold enough privilege to
-// override that. This restricts the file directly instead of trusting `/T` to reach it.
+// moment it created the file. On Windows this is the direct, non-recursive reset every
+// file this code writes gets on its own - never inherited from the directory alone,
+// since `tightenOwnedDirWindows` above deliberately never walks into existing files.
 function tightenOwnedFile(filePath) {
   if (process.env.AIDD_RUNS_DIR) return;
-  if (process.platform === "win32") restrictToCurrentUser(filePath, { recursive: false });
+  if (process.platform === "win32") restrictToCurrentUser(filePath);
 }
 
 // The real mechanism on Windows: reset the target's NTFS ACL to inherit nothing and grant
-// Full Control to the current user alone. `recursive` adds `/T` plus the container-inherit
-// flags `(OI)(CI)` so a directory's own future children pick up the same grant; a file
-// gets neither, since a file has no children to inherit anything. `icacls` shelled out to
+// Full Control to the current user alone. `inheritable` adds the container-inherit flags
+// `(OI)(CI)` so a directory's own future children pick up the same grant; a file gets
+// neither, since a file has no children to inherit anything. Never `/T`: seeded
+// exclusively to this one target's own ACL entry - see tightenOwnedDirWindows above for
+// why walking into existing children is deliberately not done. `icacls` shelled out to
 // the same way `git` already is above; `/C` keeps it going past one bad entry instead of
 // aborting the whole reset, and its own exit code is not trusted as proof of anything -
 // only a caller reading the ACL back can say whether it worked.
-function restrictToCurrentUser(target, { recursive = false } = {}) {
+function restrictToCurrentUser(target, { inheritable = false } = {}) {
   try {
     const owner = process.env.USERDOMAIN
       ? `${process.env.USERDOMAIN}\\${process.env.USERNAME}`
       : process.env.USERNAME || os.userInfo().username;
     if (!owner) return;
-    const grant = recursive ? `${owner}:(OI)(CI)F` : `${owner}:F`;
-    const args = [target, "/inheritance:r", "/grant:r", grant];
-    if (recursive) args.push("/T");
-    args.push("/C", "/Q");
+    const grant = inheritable ? `${owner}:(OI)(CI)F` : `${owner}:F`;
+    const args = [target, "/inheritance:r", "/grant:r", grant, "/C", "/Q"];
     spawnSync("icacls", args, { encoding: "utf8" });
   } catch {
     // icacls missing, no resolvable owner, or a domain-policy refusal: leave it as it is.
