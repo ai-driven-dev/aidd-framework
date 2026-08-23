@@ -42,12 +42,9 @@ function makeFs(fileExists: boolean, diskHash: string): FileReader {
     fileExists: async () => fileExists,
     readFileHash: async () => new FileHash(diskHash),
     readFile: async () => "",
-    writeFile: async () => {},
-    deleteFile: async () => {},
     listDirectory: async () => [],
-    deleteEmptyDirectories: async () => {},
-    copyFile: async () => {},
-  } as unknown as FileReader;
+    listFilesRecursive: async () => [],
+  };
 }
 
 function makeManifestRepo(manifest: Manifest): ManifestRepository {
@@ -141,20 +138,16 @@ describe("DoctorUseCase — plugin integrity", () => {
         })
       );
       const checkedPaths: string[] = [];
-      const fs = {
+      const fs: FileReader = {
         fileExists: async (p: string) => {
           checkedPaths.push(p);
           return true;
         },
         readFileHash: async () => new FileHash(EXPECTED_HASH),
         readFile: async () => "",
-        writeFile: async () => {},
-        deleteFile: async () => {},
         listDirectory: async () => [],
         listFilesRecursive: async () => [],
-        deleteEmptyDirectories: async () => {},
-        copyFile: async () => {},
-      } as unknown as FileReader;
+      };
       const pluginUseCase = new DoctorPluginUseCase(new DetectPluginDriftUseCase(fs));
 
       await pluginUseCase.execute({

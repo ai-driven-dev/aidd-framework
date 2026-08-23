@@ -9,7 +9,7 @@ import { builtMarketplaceDir, pathsOverlap } from "../../../domain/models/paths.
 import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { VersionReader } from "../../../domain/ports/version-reader.js";
-import type { FrameworkBuildUseCase } from "../framework/framework-build-use-case.js";
+import type { FrameworkBuild } from "../framework/framework-build-use-case.js";
 import type { ResolveMarketplaceUseCase } from "./resolve-marketplace-use-case.js";
 
 /** Builds a FrameworkBuildUseCase for a target/mode writing to outDir, or undefined when unsupported. */
@@ -17,7 +17,7 @@ export type FrameworkBuildFor = (
   target: FrameworkBuildTarget,
   mode: FrameworkBuildMode,
   outDir: string
-) => FrameworkBuildUseCase | undefined;
+) => FrameworkBuild | undefined;
 
 export interface EnsureBuiltMarketplaceOptions {
   readonly projectRoot: string;
@@ -42,7 +42,12 @@ const UNVERSIONED = "unversioned";
  * the single source of truth; this owns source resolution, staleness, and the
  * guard-safe outDir (build to temp then copy when the cache nests under the source).
  */
-export class EnsureBuiltMarketplaceUseCase {
+/** Getting a built tree for a target, as its callers need it. */
+export interface EnsureBuiltMarketplace {
+  execute(options: EnsureBuiltMarketplaceOptions): Promise<EnsureBuiltMarketplaceResult>;
+}
+
+export class EnsureBuiltMarketplaceUseCase implements EnsureBuiltMarketplace {
   private readonly memo = new Map<string, EnsureBuiltMarketplaceResult>();
 
   constructor(

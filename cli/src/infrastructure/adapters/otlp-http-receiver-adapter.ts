@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type {
-  ReceiveTelemetryUseCase,
+  ReceiveTelemetry,
   TelemetryOtlpPath,
 } from "../../application/use-cases/telemetry/receive-telemetry-use-case.js";
 import type { Logger } from "../../domain/ports/logger.js";
@@ -54,11 +54,13 @@ export class OtlpHttpReceiverAdapter {
   private server: Server | null = null;
 
   constructor(
-    private readonly useCase: ReceiveTelemetryUseCase,
+    private readonly useCase: ReceiveTelemetry,
     private readonly logger: Logger
   ) {}
 
-  async listen(port: number): Promise<{ readonly port: number }> {
+  /** Reports the address it actually bound - the loopback-only guarantee above is worth
+   * nothing if no caller can see which host the socket ended up on. */
+  async listen(port: number): Promise<{ readonly port: number; readonly host: string }> {
     const server = createServer((req, res) => {
       this.handleRequest(req, res).catch((error: unknown) => {
         this.logger.warn(
@@ -76,8 +78,8 @@ export class OtlpHttpReceiverAdapter {
       server.listen(port, LOOPBACK_HOST, () => resolve());
     });
     const address = server.address();
-    const boundPort = typeof address === "object" && address !== null ? address.port : port;
-    return { port: boundPort };
+    const bound = typeof address === "object" && address !== null ? address : null;
+    return { port: bound?.port ?? port, host: bound?.address ?? LOOPBACK_HOST };
   }
 
   async close(): Promise<void> {

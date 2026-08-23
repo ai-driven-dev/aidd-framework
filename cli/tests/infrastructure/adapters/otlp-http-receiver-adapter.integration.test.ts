@@ -1,23 +1,23 @@
 import { request } from "node:http";
 import { connect } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
+import type { ReceiveTelemetry } from "../../../src/application/use-cases/telemetry/receive-telemetry-use-case.js";
 import { OtlpHttpReceiverAdapter } from "../../../src/infrastructure/adapters/otlp-http-receiver-adapter.js";
 import { CapturingLogger } from "../../helpers/ports/capturing-logger.js";
 
 const received: unknown[] = [];
 
-const useCase = {
-  receive: async (_path: string, payload: unknown) => {
+const useCase: ReceiveTelemetry = {
+  receive: async (_path, payload) => {
     received.push(payload);
   },
-} as unknown as ConstructorParameters<typeof OtlpHttpReceiverAdapter>[0];
+};
 
 let adapter: OtlpHttpReceiverAdapter | null = null;
 
 async function startOnEphemeralPort() {
   adapter = new OtlpHttpReceiverAdapter(useCase, new CapturingLogger());
-  const { port } = await adapter.listen(0);
-  return port;
+  return adapter.listen(0);
 }
 
 afterEach(async () => {
@@ -31,7 +31,7 @@ describe("OtlpHttpReceiverAdapter — the listening surface", () => {
   // interface when no host is given, which would put an open writable sink on the local
   // network — so this asserts the address, not merely that something is listening.
   it("listens on loopback only, never on every interface", async () => {
-    const port = await startOnEphemeralPort();
+    const { port, host } = await startOnEphemeralPort();
     expect(port).toBeGreaterThan(0);
 
     const fromLoopback = await fetch(`http://127.0.0.1:${port}/v1/logs`, {
@@ -40,10 +40,7 @@ describe("OtlpHttpReceiverAdapter — the listening surface", () => {
     });
     expect(fromLoopback.status).toBe(200);
 
-    const address = (
-      adapter as unknown as { server: { address(): { address: string } } }
-    ).server.address();
-    expect(address.address).toBe("127.0.0.1");
+    expect(host).toBe("127.0.0.1");
   });
 
   // Two defenses, each tested where it is observable. A declared oversize is refused before
@@ -52,7 +49,7 @@ describe("OtlpHttpReceiverAdapter — the listening surface", () => {
   // rather than the answer — what matters there is that nothing was stored and the receiver
   // survived.
   it("refuses a declared oversized body before reading it", async () => {
-    const port = await startOnEphemeralPort();
+    const { port } = await startOnEphemeralPort();
 
     const status = await new Promise<number>((resolve, reject) => {
       const socket = connect(port, "127.0.0.1", () => {
@@ -73,7 +70,7 @@ describe("OtlpHttpReceiverAdapter — the listening surface", () => {
   });
 
   it("refuses a stream that grows past the cap, stores nothing, and stays up", async () => {
-    const port = await startOnEphemeralPort();
+    const { port } = await startOnEphemeralPort();
     // Valid OTLP, padded past the cap: a body of junk would be dropped as bad JSON whether
     // or not the cap exists, and the test would pass while proving nothing.
     const oversizedButValid = JSON.stringify({

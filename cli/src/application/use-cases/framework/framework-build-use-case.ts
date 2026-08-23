@@ -20,7 +20,12 @@ import type {
   SourcePluginEntry,
 } from "./strategies/build-output-strategy.js";
 
-export class FrameworkBuildUseCase {
+/** Running one framework build, as its callers need it. */
+export interface FrameworkBuild {
+  execute(options: FrameworkBuildOptions): Promise<FrameworkBuildResult>;
+}
+
+export class FrameworkBuildUseCase implements FrameworkBuild {
   constructor(
     private readonly fs: FileReader & FileWriter,
     private readonly jsonSchemaValidator: JsonSchemaValidator,

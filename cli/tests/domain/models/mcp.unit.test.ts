@@ -9,6 +9,7 @@ import {
 } from "../../../src/domain/models/mcp-exclusion.js";
 import type { MergeFileEntry } from "../../../src/domain/models/merge.js";
 import type { Hasher } from "../../../src/domain/ports/hasher.js";
+import { DeterministicHasher } from "../../helpers/ports/deterministic-hasher.js";
 
 function makeConfig(servers: Record<string, object>): string {
   return JSON.stringify({ mcpServers: servers }, null, 2);
@@ -92,7 +93,7 @@ describe("transformFor()", () => {
 
 // ── Helpers for domain function tests ────────────────────────────────────────
 
-const stubHasher: Hasher = { hash: (v) => v as unknown as ReturnType<Hasher["hash"]> };
+const hasher: Hasher = new DeterministicHasher();
 
 function makeGetEntrySection(
   sectionKey: string | null,
@@ -114,7 +115,7 @@ function makeMcpFile(
   return new InstallationFile({
     relativePath,
     content,
-    hash: content as unknown as ReturnType<Hasher["hash"]>,
+    hash: hasher.hash(content),
     mergeStrategy: "framework-prime",
     frameworkPath,
   });
@@ -124,7 +125,7 @@ function makeRegularFile(relativePath: string): InstallationFile {
   return new InstallationFile({
     relativePath,
     content: "# doc",
-    hash: "h" as unknown as ReturnType<Hasher["hash"]>,
+    hash: hasher.hash("# doc"),
     mergeStrategy: "none",
   });
 }
@@ -172,7 +173,7 @@ describe("filterMcpExclusions()", () => {
   it("removes excluded server keys from file content", () => {
     const file = makeMcpFile(".mcp.json", { github: {}, playwright: {} });
     const exclusions = [{ configPath: ".mcp.json", entryKey: "github" }];
-    const result = filterMcpExclusions([file], mcpGetEntrySection, exclusions, stubHasher);
+    const result = filterMcpExclusions([file], mcpGetEntrySection, exclusions, hasher);
     const parsed = JSON.parse(result[0].content) as { mcpServers: Record<string, unknown> };
     expect(Object.keys(parsed.mcpServers)).toEqual(["playwright"]);
   });
@@ -180,21 +181,21 @@ describe("filterMcpExclusions()", () => {
   it("returns the original array reference when exclusions is empty", () => {
     const file = makeMcpFile(".mcp.json", { github: {} });
     const input = [file];
-    const result = filterMcpExclusions(input, mcpGetEntrySection, [], stubHasher);
+    const result = filterMcpExclusions(input, mcpGetEntrySection, [], hasher);
     expect(result).toBe(input);
   });
 
   it("passes through regular files untouched", () => {
     const regular = makeRegularFile("README.md");
     const exclusions = [{ configPath: "README.md", entryKey: "anything" }];
-    const result = filterMcpExclusions([regular], mcpGetEntrySection, exclusions, stubHasher);
+    const result = filterMcpExclusions([regular], mcpGetEntrySection, exclusions, hasher);
     expect(result[0]).toBe(regular);
   });
 
   it("passes through MCP files with no matching exclusions", () => {
     const file = makeMcpFile(".mcp.json", { github: {}, playwright: {} });
     const exclusions = [{ configPath: ".cursor/mcp.json", entryKey: "github" }];
-    const result = filterMcpExclusions([file], mcpGetEntrySection, exclusions, stubHasher);
+    const result = filterMcpExclusions([file], mcpGetEntrySection, exclusions, hasher);
     expect(result[0].content).toBe(file.content);
   });
 });
@@ -229,7 +230,7 @@ describe("detectNewMcpEntries()", () => {
   const knownEntry: MergeFileEntry = {
     relativePath: ".mcp.json",
     sectionKey: "mcpServers",
-    entries: { github: "hash-g" as unknown as ReturnType<Hasher["hash"]> },
+    entries: { github: hasher.hash("github") },
   };
 
   it("detects entries in distribution not tracked in manifest", () => {

@@ -13,7 +13,7 @@ function createMockOutput(): CLIOutput {
     print: vi.fn(),
     success: vi.fn(),
     error: vi.fn(),
-  } as unknown as CLIOutput;
+  };
 }
 
 describe("ErrorHandler", () => {

@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import { StatusAllUseCase } from "../../../src/application/use-cases/global/status-all-use-case.js";
-import type { StatusUseCase } from "../../../src/application/use-cases/status-use-case.js";
+import type {
+  StatusOptions,
+  StatusQuery,
+  StatusReport,
+} from "../../../src/application/use-cases/status-use-case.js";
 
 const PROJECT_ROOT = "/test-project";
 
-type Report = Awaited<ReturnType<StatusUseCase["execute"]>>;
-type Options = Parameters<StatusUseCase["execute"]>[0];
+type Report = StatusReport;
+type Options = StatusOptions;
 
 const DRIFT = [{ toolId: "claude" as const, pluginName: "sample", driftedFiles: ["a.md"] }];
 
@@ -15,12 +19,12 @@ function report(over: Partial<Report> = {}): Report {
 
 function fakeStatus(byCategory: (o: Options) => Report) {
   const calls: Options[] = [];
-  const useCase = {
+  const useCase: StatusQuery = {
     execute: vi.fn(async (o: Options) => {
       calls.push(o);
       return byCategory(o);
     }),
-  } as unknown as StatusUseCase;
+  };
   return { useCase, calls };
 }
 

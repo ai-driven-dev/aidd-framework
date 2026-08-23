@@ -24,7 +24,7 @@ import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-regi
 import type { PluginDistributionReader } from "../../../domain/ports/plugin-distribution-reader.js";
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
-import type { EnsureBuiltMarketplaceUseCase } from "../shared/ensure-built-marketplace-use-case.js";
+import type { EnsureBuiltMarketplace } from "../shared/ensure-built-marketplace-use-case.js";
 import { loadPluginManifest, writePluginFiles } from "./plugin-file-sync.js";
 import { resolvePluginToolIds } from "./plugin-target-resolution.js";
 import type { PluginTranslator } from "./translator/plugin-translator.js";
@@ -42,7 +42,12 @@ export interface PluginAddOptions {
   replace?: boolean;
 }
 
-export class PluginAddUseCase {
+/** Adding a plugin to the tools that host it, as its callers need it. */
+export interface PluginAdd {
+  execute(options: PluginAddOptions): Promise<void>;
+}
+
+export class PluginAddUseCase implements PluginAdd {
   constructor(
     private readonly fs: FileWriter & FileReader,
     private readonly manifestRepo: ManifestRepository,
@@ -51,7 +56,7 @@ export class PluginAddUseCase {
     private readonly hasher: Hasher,
     private readonly logger: Logger,
     private readonly marketplaceRegistry: MarketplaceRegistry,
-    private readonly ensureBuilt: EnsureBuiltMarketplaceUseCase
+    private readonly ensureBuilt: EnsureBuiltMarketplace
   ) {}
 
   async execute(options: PluginAddOptions): Promise<void> {

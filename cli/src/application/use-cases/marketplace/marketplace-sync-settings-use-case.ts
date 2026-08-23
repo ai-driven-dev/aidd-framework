@@ -16,7 +16,7 @@ import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-regi
 import type { NativePluginActivator } from "../../../domain/ports/native-plugin-activator.js";
 import type { PluginCatalogRepository } from "../../../domain/ports/plugin-catalog-repository.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
-import type { EnsureBuiltMarketplaceUseCase } from "../shared/ensure-built-marketplace-use-case.js";
+import type { EnsureBuiltMarketplace } from "../shared/ensure-built-marketplace-use-case.js";
 
 export interface MarketplaceSyncSettingsOptions {
   projectRoot: string;
@@ -27,7 +27,12 @@ export interface MarketplaceSyncSettingsResult {
 }
 
 // Upserts local marketplace entries (absolute path may change); never removes entries; skips non-local if already present.
-export class MarketplaceSyncSettingsUseCase {
+/** Syncing marketplace settings into the tools that read them, as its callers need it. */
+export interface MarketplaceSyncSettings {
+  execute(options: MarketplaceSyncSettingsOptions): Promise<MarketplaceSyncSettingsResult>;
+}
+
+export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
   constructor(
     private readonly fs: FileReader & FileWriter,
     private readonly manifestRepo: ManifestRepository,
@@ -37,7 +42,7 @@ export class MarketplaceSyncSettingsUseCase {
     private readonly logger: Logger,
     /** Native plugin CLI activators keyed by `NativeActivation.binary` (e.g. "codex", "copilot"). */
     private readonly activators: ReadonlyMap<string, NativePluginActivator>,
-    private readonly ensureBuilt: EnsureBuiltMarketplaceUseCase
+    private readonly ensureBuilt: EnsureBuiltMarketplace
   ) {}
 
   async execute(options: MarketplaceSyncSettingsOptions): Promise<MarketplaceSyncSettingsResult> {

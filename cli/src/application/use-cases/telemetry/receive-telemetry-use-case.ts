@@ -52,7 +52,12 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export class ReceiveTelemetryUseCase {
+/** Taking one OTLP payload off the wire, as the receiver that listens needs it. */
+export interface ReceiveTelemetry {
+  receive(path: TelemetryOtlpPath, payload: unknown, receivedAt?: Date): Promise<void>;
+}
+
+export class ReceiveTelemetryUseCase implements ReceiveTelemetry {
   constructor(
     private readonly sink: TelemetrySink,
     private readonly logger: Logger,

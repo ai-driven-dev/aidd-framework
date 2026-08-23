@@ -2,10 +2,10 @@ import "../../../../src/domain/tools/ai/claude.js";
 import "../../../../src/domain/tools/ai/cursor.js";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import type { PluginAddUseCase } from "../../../../src/application/use-cases/plugin/plugin-add-use-case.js";
-import type { PluginInstallFromMarketplaceUseCase } from "../../../../src/application/use-cases/plugin/plugin-install-from-marketplace-use-case.js";
+import type { PluginAdd } from "../../../../src/application/use-cases/plugin/plugin-add-use-case.js";
+import type { PluginInstallFromMarketplace } from "../../../../src/application/use-cases/plugin/plugin-install-from-marketplace-use-case.js";
 import { PluginInstallUseCase } from "../../../../src/application/use-cases/plugin/plugin-install-use-case.js";
-import type { PluginPickUseCase } from "../../../../src/application/use-cases/plugin/plugin-pick-use-case.js";
+import type { PluginPick } from "../../../../src/application/use-cases/plugin/plugin-pick-use-case.js";
 import {
   InteractiveOnlyError,
   InvalidPluginScopeError,
@@ -32,7 +32,8 @@ function makeSilentPrompter(): Prompter {
     select: vi.fn(),
     checkbox: vi.fn(),
     resolveConflict: vi.fn(),
-  } as unknown as Prompter;
+    resolveConflictBulk: vi.fn(),
+  };
 }
 
 function makeUseCases(overrides?: {
@@ -45,11 +46,11 @@ function makeUseCases(overrides?: {
   const pickExecute = overrides?.pickExecute ?? vi.fn();
   const addExecute = overrides?.addExecute ?? vi.fn();
   const marketplaceExecute = overrides?.marketplaceExecute ?? vi.fn();
-  const pluginPickUseCase = { execute: pickExecute } as unknown as PluginPickUseCase;
-  const pluginAddUseCase = { execute: addExecute } as unknown as PluginAddUseCase;
-  const pluginInstallFromMarketplaceUseCase = {
+  const pluginPickUseCase: PluginPick = { execute: pickExecute };
+  const pluginAddUseCase: PluginAdd = { execute: addExecute };
+  const pluginInstallFromMarketplaceUseCase: PluginInstallFromMarketplace = {
     execute: marketplaceExecute,
-  } as unknown as PluginInstallFromMarketplaceUseCase;
+  };
   const manifestRepo = new InMemoryManifestRepository();
   const trustStore = overrides?.trustStore ?? makeAlwaysTrustStore();
   const prompter = overrides?.prompter ?? makeSilentPrompter();
@@ -210,7 +211,8 @@ describe("PluginInstallUseCase", () => {
         select: vi.fn(),
         checkbox: vi.fn(),
         resolveConflict: vi.fn(),
-      } as unknown as Prompter;
+        resolveConflictBulk: vi.fn(),
+      };
 
       await expect(
         makeUseCase({
@@ -240,7 +242,8 @@ describe("PluginInstallUseCase", () => {
         select: vi.fn(),
         checkbox: vi.fn(),
         resolveConflict: vi.fn(),
-      } as unknown as Prompter;
+        resolveConflictBulk: vi.fn(),
+      };
 
       const result = await makeUseCase({
         addExecute,

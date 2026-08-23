@@ -502,12 +502,13 @@ describe("parseTelemetrySinkLine()", () => {
     expect(lines.some((line) => line.includes("user_id"))).toBe(true);
 
     const records = lines.map(parseTelemetrySinkLine);
-    const legacy = records.find(
-      (r) => (r as unknown as Record<string, unknown>).user_id !== undefined
-    );
-    expect((legacy as unknown as Record<string, unknown>).user_id).toBe(
-      "user_example_hash_0000000000000000"
-    );
+    const legacy = records.find((r) => "user_id" in r);
+    // `in` narrows the parsed record to one that still carries the field, so the value
+    // below is read off a type - and the fixture losing the line fails here, loudly.
+    if (legacy === undefined || !("user_id" in legacy)) {
+      throw new Error("fixture no longer carries a user_id line");
+    }
+    expect(legacy.user_id).toBe("user_example_hash_0000000000000000");
   });
 
   it("carries provenance for both routes, on the same fixture", () => {

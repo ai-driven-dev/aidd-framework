@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import type { MarketplaceRefreshUseCase } from "../../../src/application/use-cases/marketplace/marketplace-refresh-use-case.js";
-import type { MarketplaceRegisterFrameworkUseCase } from "../../../src/application/use-cases/marketplace/marketplace-register-framework-use-case.js";
+import type { MarketplaceRefresh } from "../../../src/application/use-cases/marketplace/marketplace-refresh-use-case.js";
+import type { MarketplaceRegisterFramework } from "../../../src/application/use-cases/marketplace/marketplace-register-framework-use-case.js";
 import { SetupMarketplaceSourceUseCase } from "../../../src/application/use-cases/setup/setup-marketplace-source-use-case.js";
 import { SetupPluginsPromptUseCase } from "../../../src/application/use-cases/setup/setup-plugins-prompt-use-case.js";
 import { SetupToolsPromptUseCase } from "../../../src/application/use-cases/setup/setup-tools-prompt-use-case.js";
@@ -21,19 +21,17 @@ function makeNoOpLatestResolver() {
   } as never;
 }
 
-type RegisterFrameworkMock = MarketplaceRegisterFrameworkUseCase & {
-  execute: ReturnType<typeof vi.fn>;
-};
-type RefreshMock = MarketplaceRefreshUseCase & { execute: ReturnType<typeof vi.fn> };
+type RegisterFrameworkMock = MarketplaceRegisterFramework & { execute: ReturnType<typeof vi.fn> };
+type RefreshMock = MarketplaceRefresh & { execute: ReturnType<typeof vi.fn> };
 
 function makeNoOpMarketplaceRegisterFramework(): RegisterFrameworkMock {
   const execute = vi.fn().mockResolvedValue({ registered: false });
-  return { execute } as unknown as RegisterFrameworkMock;
+  return { execute };
 }
 
 function makeNoOpMarketplaceRefresh(): RefreshMock {
   const execute = vi.fn().mockResolvedValue({ results: [], failedCount: 0 });
-  return { execute } as unknown as RefreshMock;
+  return { execute };
 }
 
 function makeNoOpMarketplaceSyncSettings() {

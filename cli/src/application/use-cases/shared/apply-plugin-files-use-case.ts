@@ -19,7 +19,7 @@ import {
 import { resolvePluginBaseDir } from "../plugin/plugin-target-resolution.js";
 import type { PluginTranslator } from "../plugin/translator/plugin-translator.js";
 import { resolvePluginTranslator } from "../plugin/translator/resolve-plugin-translator.js";
-import type { EnsureBuiltMarketplaceUseCase } from "./ensure-built-marketplace-use-case.js";
+import type { EnsureBuiltMarketplace } from "./ensure-built-marketplace-use-case.js";
 
 interface ApplyPluginFilesOptions {
   toolId: AiToolId;
@@ -34,7 +34,7 @@ interface ApplyPluginFilesOptions {
 
 /** Optional deps that let restore re-materialize via the build pipeline (parity with install). */
 export interface BuiltMaterializationDeps {
-  ensureBuilt: EnsureBuiltMarketplaceUseCase;
+  ensureBuilt: EnsureBuiltMarketplace;
   marketplaceRegistry: MarketplaceRegistry;
   homedir: () => string;
 }

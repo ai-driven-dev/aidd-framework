@@ -12,7 +12,14 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-const SRC = path.join(process.cwd(), "cli", "src");
+const CLI = path.join(process.cwd(), "cli");
+const SRC = path.join(CLI, "src");
+const TESTS = path.join(CLI, "tests");
+
+/** The cast rule holds everywhere; the layering rule is about production layers only.
+ * A test lives outside them and legitimately wires an adapter to a use-case. */
+const CAST_ROOTS = [SRC, TESTS];
+const LAYERING_ROOTS = [SRC];
 
 const IMPORT_PATTERN = /(?:from|import)\s+["']([^"']+)["']/g;
 const WIDENING_CAST = /\bas\s+unknown\s+as\b/;
@@ -33,11 +40,16 @@ const INWARD_ONLY = [
   },
 ];
 
-/** Two pre-existing casts, in code unrelated to the rule's introduction. Listed so the
- * debt is visible and shrinking rather than silently permitted everywhere. */
-const CASTS_ALLOWED = new Set([
-  "application/use-cases/framework/framework-build-use-case.ts",
-  "application/use-cases/framework/strategies/marketplace-build-strategy.ts",
+/** Every cast the type system cannot express away, each with the reason it survives.
+ * Paths are cli-relative. Listed so the debt is visible and shrinking rather than
+ * silently permitted everywhere - adding a line here is a decision, not a default. */
+const CASTS_ALLOWED = new Map([
+  [
+    "src/application/use-cases/framework/framework-build-use-case.ts",
+    "SourceMarketplace carries an index signature beside typed optional members, so no " +
+      "parsed `Record<string, unknown>` can ever satisfy it; narrowing it honestly would " +
+      "mean rejecting catalogs the builder accepts today",
+  ],
 ]);
 
 async function typescriptFilesUnder(dir) {
@@ -48,6 +60,11 @@ async function typescriptFilesUnder(dir) {
     else if (entry.name.endsWith(".ts")) found.push(full);
   }
   return found;
+}
+
+/** Keys are written with `/` so the allow-list reads the same on every platform. */
+function relative(from, file) {
+  return path.relative(from, file).split(path.sep).join("/");
 }
 
 function importedLayers(source) {
@@ -71,17 +88,35 @@ function layeringBreach(relativePath, source) {
   return null;
 }
 
-function castBreach(relativePath, source) {
-  if (!WIDENING_CAST.test(source) || CASTS_ALLOWED.has(relativePath)) return null;
-  return `${relativePath} widens a type through \`as unknown as\` - build the value with the type it claims`;
+function castBreach(cliPath, source) {
+  if (!WIDENING_CAST.test(source) || CASTS_ALLOWED.has(cliPath)) return null;
+  return `cli/${cliPath} widens a type through \`as unknown as\` - build the value with the type it claims`;
 }
 
 const breaches = [];
-for (const file of await typescriptFilesUnder(SRC)) {
-  const relativePath = path.relative(SRC, file);
-  const source = await readFile(file, "utf-8");
-  for (const breach of [layeringBreach(relativePath, source), castBreach(relativePath, source)]) {
+const spentAllowances = new Set();
+
+for (const root of CAST_ROOTS) {
+  for (const file of await typescriptFilesUnder(root)) {
+    const cliPath = relative(CLI, file);
+    const source = await readFile(file, "utf-8");
+    if (WIDENING_CAST.test(source)) spentAllowances.add(cliPath);
+    const breach = castBreach(cliPath, source);
     if (breach) breaches.push(`  ${breach}`);
+  }
+}
+
+for (const root of LAYERING_ROOTS) {
+  for (const file of await typescriptFilesUnder(root)) {
+    const breach = layeringBreach(relative(root, file), await readFile(file, "utf-8"));
+    if (breach) breaches.push(`  ${breach}`);
+  }
+}
+
+// An allowance nobody spends is stale: the cast it excused is gone, so the line goes too.
+for (const cliPath of CASTS_ALLOWED.keys()) {
+  if (!spentAllowances.has(cliPath)) {
+    breaches.push(`  cli/${cliPath} no longer casts - drop its CASTS_ALLOWED entry`);
   }
 }
 

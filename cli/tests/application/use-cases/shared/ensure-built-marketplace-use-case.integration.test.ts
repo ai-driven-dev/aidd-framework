@@ -8,10 +8,8 @@ import {
   EnsureBuiltMarketplaceUseCase,
   type FrameworkBuildFor,
 } from "../../../../src/application/use-cases/shared/ensure-built-marketplace-use-case.js";
-import type {
-  ResolveMarketplaceOptions,
-  ResolveMarketplaceUseCase,
-} from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
+import { FetchMarketplaceSourceUseCase } from "../../../../src/application/use-cases/shared/fetch-marketplace-source-use-case.js";
+import { ResolveMarketplaceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
 import { Marketplace } from "../../../../src/domain/models/marketplace.js";
 import { BUILT_CACHE_SUBDIR, builtMarketplaceDir } from "../../../../src/domain/models/paths.js";
 import type { AssetProvider } from "../../../../src/domain/ports/asset-provider.js";
@@ -69,13 +67,13 @@ function makeMarketplace(): Marketplace {
 }
 
 function fakeResolve(localPath: string, version: string | undefined): ResolveMarketplaceUseCase {
-  return {
-    execute: async ({ marketplace }: ResolveMarketplaceOptions) => ({
-      marketplace,
-      localPath,
-      catalog: version === undefined ? null : { version, plugins: [] },
-    }),
-  } as unknown as ResolveMarketplaceUseCase;
+  return new ResolveMarketplaceUseCase(
+    new FetchMarketplaceSourceUseCase({ fetch: async () => localPath }),
+    {
+      load: async () => (version === undefined ? null : { version, plugins: [] }),
+      loadForeign: async () => [],
+    }
+  );
 }
 
 function fakeVersion(value: string): VersionReader {
@@ -101,14 +99,13 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
   beforeEach(() => {
     fs = new InMemoryFileAdapter();
     builds = 0;
-    buildFor = (_target, _mode, outDir) =>
-      ({
-        execute: async () => {
-          builds += 1;
-          await fs.writeFile(join(outDir, "plugins/aidd-vcs/SKILL.md"), "built content");
-          return { outDir, plugins: [], totalFiles: 1 };
-        },
-      }) as unknown as FrameworkBuildUseCase;
+    buildFor = (_target, _mode, outDir) => ({
+      execute: async () => {
+        builds += 1;
+        await fs.writeFile(join(outDir, "plugins/aidd-vcs/SKILL.md"), "built content");
+        return { outDir, plugins: [], totalFiles: 1 };
+      },
+    });
   });
 
   it("rebuilds and writes a sentinel when none exists", async () => {
@@ -301,7 +298,7 @@ describe("outDir invariant for the cache-rebuild build path", () => {
           await memFs.writeFile(join(outDir, "plugins/aidd-vcs/SKILL.md"), "built content");
           return { outDir, plugins: [], totalFiles: 1 };
         },
-      } as unknown as FrameworkBuildUseCase;
+      };
     };
 
     // Direct path: source lives outside the cache tree → build() writes straight to builtDir.

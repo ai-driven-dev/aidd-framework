@@ -14,9 +14,9 @@ import { AI_TOOL_IDS, type AiToolId } from "../../../domain/models/tool-ids.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { MarketplaceTrustStore } from "../../../domain/ports/marketplace-trust-store.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
-import type { PluginAddUseCase } from "./plugin-add-use-case.js";
-import type { PluginInstallFromMarketplaceUseCase } from "./plugin-install-from-marketplace-use-case.js";
-import type { PluginPickUseCase } from "./plugin-pick-use-case.js";
+import type { PluginAdd } from "./plugin-add-use-case.js";
+import type { PluginInstallFromMarketplace } from "./plugin-install-from-marketplace-use-case.js";
+import type { PluginPick } from "./plugin-pick-use-case.js";
 
 export interface PluginInstallOptions {
   pluginArg: string | undefined;
@@ -36,9 +36,9 @@ export interface PluginInstallResult {
 
 export class PluginInstallUseCase {
   constructor(
-    private readonly pluginPickUseCase: PluginPickUseCase,
-    private readonly pluginAddUseCase: PluginAddUseCase,
-    private readonly pluginInstallFromMarketplaceUseCase: PluginInstallFromMarketplaceUseCase,
+    private readonly pluginPickUseCase: PluginPick,
+    private readonly pluginAddUseCase: PluginAdd,
+    private readonly pluginInstallFromMarketplaceUseCase: PluginInstallFromMarketplace,
     private readonly manifestRepo: ManifestRepository,
     private readonly trustStore: MarketplaceTrustStore,
     private readonly prompter: Prompter

@@ -37,12 +37,9 @@ function makeFs(fileExists: boolean, diskHash: string): FileReader {
     fileExists: async () => fileExists,
     readFileHash: async () => new FileHash(diskHash),
     readFile: async () => "",
-    writeFile: async () => {},
-    deleteFile: async () => {},
     listDirectory: async () => [],
-    deleteEmptyDirectories: async () => {},
-    copyFile: async () => {},
-  } as unknown as FileReader;
+    listFilesRecursive: async () => [],
+  };
 }
 
 function makeManifestRepo(manifest: Manifest): ManifestRepository {
@@ -58,19 +55,16 @@ describe("StatusUseCase — cursor plugin drift (user-scope)", () => {
     it("resolves absolute path from homedir via resolvePluginsBaseDir before checking disk", async () => {
       const manifest = makeManifest(EXPECTED_HASH);
       const checkedPaths: string[] = [];
-      const fs = {
+      const fs: FileReader = {
         fileExists: async (p: string) => {
           checkedPaths.push(p);
           return true;
         },
         readFileHash: async () => new FileHash(DRIFTED_HASH),
         readFile: async () => "",
-        writeFile: async () => {},
-        deleteFile: async () => {},
         listDirectory: async () => [],
-        deleteEmptyDirectories: async () => {},
-        copyFile: async () => {},
-      } as unknown as FileReader;
+        listFilesRecursive: async () => [],
+      };
 
       const useCase = new StatusUseCase(
         fs,

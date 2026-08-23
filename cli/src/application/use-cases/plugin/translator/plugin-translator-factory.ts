@@ -3,7 +3,7 @@ import type { FileReader } from "../../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../../domain/ports/file-writer.js";
 import type { Hasher } from "../../../../domain/ports/hasher.js";
 import type { MarketplaceRegistry } from "../../../../domain/ports/marketplace-registry.js";
-import type { EnsureBuiltMarketplaceUseCase } from "../../shared/ensure-built-marketplace-use-case.js";
+import type { EnsureBuiltMarketplace } from "../../shared/ensure-built-marketplace-use-case.js";
 import { BuiltTreeMaterializationTranslator } from "./built-tree-materialization-translator.js";
 import { ModeAMarketplaceTranslator } from "./mode-a-marketplace-translator.js";
 import type { PluginTranslator } from "./plugin-translator.js";
@@ -12,7 +12,7 @@ export interface TranslatorDeps {
   fs: FileWriter & FileReader;
   hasher: Hasher;
   homedir: () => string;
-  ensureBuilt: EnsureBuiltMarketplaceUseCase;
+  ensureBuilt: EnsureBuiltMarketplace;
   marketplaceRegistry: MarketplaceRegistry;
 }
 
