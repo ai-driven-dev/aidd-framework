@@ -12,8 +12,18 @@ const CLEAN_ENV = Object.fromEntries(
   Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_")),
 );
 
+// Removed when the file finishes, not left behind: a suite that seeds a repository per run
+// and never sweeps fills the machine's temp volume until mkdtemp itself fails with ENOSPC,
+// which is how this was found - 1878 abandoned directories, 37 GB.
+const tempDirs = [];
+test.after(() => {
+  for (const dir of tempDirs) fs.rmSync(dir, { recursive: true, force: true });
+});
+
 function makeTempDir(prefix) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
 }
 
 // Mirrors what a real install delivers: opencode-plugin.js copied verbatim beside
