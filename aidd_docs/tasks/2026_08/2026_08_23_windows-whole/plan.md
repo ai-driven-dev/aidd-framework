@@ -1,6 +1,6 @@
 ---
 objective: "Windows passes because the code handles it, not because the tests stopped asking."
-status: in_progress
+status: done
 ---
 
 # Plan: Windows, taken as one problem
@@ -35,6 +35,24 @@ One dispatch per phase, in order. The reactive rounds that preceded this plan ea
 | The five reactive rounds before it | Counts moved 366 → 394 → 419 on the plugin suite and 50 → 16 → 14 on integration. Real progress, and a tail that kept growing because nobody looked at the set. |
 | `plugins/aidd-telemetry/hooks/lib/repo.js` | The `icacls` reset that made the journal private, and the collision it introduced with git's own handling of a tracked `.gitkeep`. |
 | The measured `%APPDATA%` move | The sink and its CLI mirror already resolve it. The identity feature, written after, does not. |
+
+## Outcome
+
+`cli / Windows Probe (#707)` is green, and green because it passes: `every probe step passed`,
+with the plugin suite at 482 and 0 failing, unit 177/177, integration 59/59, e2e 22/22 on a
+real `windows-latest` runner.
+
+One test is skipped there, and says why in its own name: `SessionStart creates the run
+directory 0700 and the record file 0600 on POSIX # SKIP POSIX mode bits do not apply on
+win32`. Windows privacy is not left unasserted because of it - the probe reads the ACL back
+with `icacls` and finds the current user alone on both the directory and the journal file,
+and `git add -A` succeeds in the same checkout.
+
+Two causes were not in the first reading of the failure set. A fifth, the only one that
+changed an answer rather than a test: `os.homedir()` never reads `$HOME` on Windows, so a
+home a person or a test set was honoured by the plugin and ignored by the CLI. A sixth, the
+last two red steps, were not tests at all - they were the probes that *measured* #707's own
+question, and they had answered it.
 
 ## Decisions
 

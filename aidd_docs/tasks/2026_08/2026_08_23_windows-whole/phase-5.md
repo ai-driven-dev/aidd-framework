@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: done
 ---
 
 # Instruction: A reader finds the file on either platform

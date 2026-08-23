@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: done
 ---
 
 # Spec: Windows, taken as one problem

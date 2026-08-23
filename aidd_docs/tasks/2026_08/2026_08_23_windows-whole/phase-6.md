@@ -1,5 +1,5 @@
 ---
-status: in_progress
+status: done
 ---
 
 # Instruction: An assertion names a location, not a spelling
