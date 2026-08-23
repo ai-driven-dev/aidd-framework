@@ -59,6 +59,26 @@ const CODEX_EVENT_MAP: Record<string, readonly string[]> = {
   Stop: ["SessionEnd"],
 };
 
+/**
+ * Renames a plugin hooks.json's events to the ones Codex delivers, without merging.
+ *
+ * Codex is installed two ways - a built marketplace tree and a merged project config - and
+ * the two have drifted apart three times. Both call this, so the rename cannot land on one
+ * route and not the other, which is exactly how a Codex session came to journal a
+ * session_start with nothing after it (#707).
+ */
+export function renameCodexHookEvents(pluginHooksJson: string): string {
+  const parsed = JSON.parse(pluginHooksJson) as ClaudeHooksShape;
+  if (!parsed.hooks) return pluginHooksJson;
+  const renamed: Record<string, ClaudeMatcherGroup[]> = {};
+  for (const [event, matchers] of Object.entries(parsed.hooks)) {
+    for (const codexEvent of CODEX_EVENT_MAP[event] ?? [event]) {
+      renamed[codexEvent] = [...(renamed[codexEvent] ?? []), ...matchers];
+    }
+  }
+  return `${JSON.stringify({ ...parsed, hooks: renamed }, null, 2)}\n`;
+}
+
 // ── Claude: merge hooks into .claude/settings.json ────────────────────────────
 
 /**

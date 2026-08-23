@@ -33,6 +33,7 @@ import {
   mergeClaudeSettingsHooks,
   mergeCodexFrameworkHooksJson,
   mergeCursorFlatHooks,
+  renameCodexHookEvents,
 } from "../../../../domain/formats/flat-hooks-merge.js";
 import {
   flatHooksSharedDirPath,
@@ -373,6 +374,11 @@ export function buildCodexContract(): ToolBuildContract {
         supported: true,
         source: { kind: "hooksBundle", jsonPath: "hooks/hooks.json", scriptDir: "hooks" },
         path: (_p, rel) => rel,
+        // The same rename the merged install route applies. Codex has no `Stop`, so without
+        // this the built tree subscribes the turn-end hook to an event that never arrives
+        // and the turn is never closed, in silence (#707).
+        transform: (content, _plugin, base) =>
+          base === "hooks.json" ? renameCodexHookEvents(content) : content,
       },
       rules: { supported: false },
       commands: { supported: false },
