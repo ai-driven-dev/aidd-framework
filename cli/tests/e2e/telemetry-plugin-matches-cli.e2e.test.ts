@@ -2,11 +2,11 @@ import { execFile, execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, realpathSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { environmentWithoutGitVariables } from "../../src/infrastructure/git-environment.js";
-import { CLI_PATH, copyFixtureTree, pathWithoutAidd } from "./helpers.js";
+import { CLI_PATH, copyFixtureTree, identityFileIn, pathWithoutAidd } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(process.cwd(), "..");
@@ -173,9 +173,10 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
       }
     }
 
-    await mkdir(join(fakeHome, ".config", "aidd"), { recursive: true });
+    const identityFile = identityFileIn(fakeHome);
+    await mkdir(dirname(identityFile), { recursive: true });
     await writeFile(
-      join(fakeHome, ".config", "aidd", "identity.json"),
+      identityFile,
       JSON.stringify({ person_id: "person-e2e-1", display_name: "Baptiste" })
     );
     await rm(join(cliConfig, "telemetry"), { recursive: true, force: true });
