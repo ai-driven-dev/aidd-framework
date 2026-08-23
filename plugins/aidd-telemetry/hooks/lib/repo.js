@@ -116,17 +116,14 @@ function runsDir(repoRoot) {
 // from restrictToCurrentUser below, not from this constant.
 const PRIVATE_DIR_MODE = 0o700;
 
-// Set once this directory's own ACL has been reset, so a repository with many sessions
-// does not reset it again on every single one (#707: it collided with git - see below).
-// Covered by the `aidd_docs/runs/*` gitignore glob like every other record here.
-const ACL_TIGHTENED_MARKER = ".aidd-acl-tightened";
-
 // `mkdirSync`'s `mode` applies only to a directory it creates, so a checked-out
-// `aidd_docs/runs/` needs this chmod. Never applied to a user-named AIDD_RUNS_DIR - a
-// user who names their own runs directory keeps responsibility for its permissions.
+// `aidd_docs/runs/` needs this chmod - and, on Windows, needs it reset again on every
+// write, since anything (a checkout, an admin, another tool) could have widened it since
+// the last one. Never applied to a user-named AIDD_RUNS_DIR - a user who names their own
+// runs directory keeps responsibility for its permissions.
 function tightenOwnedDir(dir) {
   if (process.env.AIDD_RUNS_DIR) return;
-  if (process.platform === "win32") return tightenOwnedDirWindows(dir);
+  if (process.platform === "win32") return restrictToCurrentUser(dir, { inheritable: true });
   try {
     fs.chmodSync(dir, PRIVATE_DIR_MODE);
   } catch {
@@ -134,28 +131,9 @@ function tightenOwnedDir(dir) {
   }
 }
 
-// Measured on a real windows-latest runner (#707): resetting this directory's ACL with
-// `/T` walked into files this code does not own - a checked-out `.gitkeep` among them -
-// and left at least one with no usable ACE of its own, so an ordinary `git add -A`
-// right after got "Permission denied" opening it. `/T` bought nothing here anyway: a
-// file this code creates gets its own tightenOwnedFile pass below, and `(OI)(CI)` alone
-// makes the directory's own grant apply to anything created in it afterward - so this
-// only ever touches the directory's own ACL, never a file already sitting inside it.
-function tightenOwnedDirWindows(dir) {
-  const marker = path.join(dir, ACL_TIGHTENED_MARKER);
-  if (fs.existsSync(marker)) return;
-  restrictToCurrentUser(dir, { inheritable: true });
-  try {
-    fs.writeFileSync(marker, "");
-  } catch {
-    // Best-effort: a failed write here just means the next write resets it again.
-  }
-}
-
 // POSIX needs no second pass: `appendFileSync`'s own `mode` already set 0600 at the
 // moment it created the file. On Windows this is the direct, non-recursive reset every
-// file this code writes gets on its own - never inherited from the directory alone,
-// since `tightenOwnedDirWindows` above deliberately never walks into existing files.
+// file this code writes gets on its own.
 function tightenOwnedFile(filePath) {
   if (process.env.AIDD_RUNS_DIR) return;
   if (process.platform === "win32") restrictToCurrentUser(filePath);
@@ -164,10 +142,15 @@ function tightenOwnedFile(filePath) {
 // The real mechanism on Windows: reset the target's NTFS ACL to inherit nothing and grant
 // Full Control to the current user alone. `inheritable` adds the container-inherit flags
 // `(OI)(CI)` so a directory's own future children pick up the same grant; a file gets
-// neither, since a file has no children to inherit anything. Never `/T`: seeded
-// exclusively to this one target's own ACL entry - see tightenOwnedDirWindows above for
-// why walking into existing children is deliberately not done. `icacls` shelled out to
-// the same way `git` already is above; `/C` keeps it going past one bad entry instead of
+// neither, since a file has no children to inherit anything. Never `/T`: measured on a
+// real windows-latest runner (#707), `/T` walked into files this code does not own - a
+// checked-out `.gitkeep` among them - and left at least one with no usable ACE of its
+// own, so an ordinary `git add -A` right after got "Permission denied" opening it. It
+// bought nothing here anyway: a file this code creates gets its own tightenOwnedFile
+// pass, and `(OI)(CI)` alone makes the directory's own grant apply to anything created
+// in it afterward - so this now only ever touches the target's own ACL entry, never a
+// file already sitting inside a directory it is applied to. `icacls` shelled out to the
+// same way `git` already is above; `/C` keeps it going past one bad entry instead of
 // aborting the whole reset, and its own exit code is not trusted as proof of anything -
 // only a caller reading the ACL back can say whether it worked.
 function restrictToCurrentUser(target, { inheritable = false } = {}) {
