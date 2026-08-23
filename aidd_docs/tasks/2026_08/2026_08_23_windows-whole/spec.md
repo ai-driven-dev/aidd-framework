@@ -1,5 +1,5 @@
 ---
-status: draft
+status: in_progress
 ---
 
 # Spec: Windows, taken as one problem
@@ -20,6 +20,10 @@ This is that look. It is written after reading every failing assertion from one 
 
 **D — a location the new work did not know about.** The identity feature landed after the last Windows measurement and resolves `~/.config/aidd/identity.json` the way the sink did before it learned `%APPDATA%`. Eleven of its tests fail for that one reason.
 
+**E — a tool file the reader never finds.** Measured after A–D were closed. The report a Windows run prints from the same fixtures reads `43,853` tokens where a POSIX run reads `183,939`, one request where there are several, one tool where there are four, and every record `unattributed`. The records exist; something that matches a path does not match on Windows. This is the only cause in the set that changes an answer rather than a test.
+
+**F — a test written as though one platform existed.** Eleven unit assertions spell a path POSIX-only, either as a literal expectation (`'/home/user/.cursor/plugins/local'`) or as an in-memory store seeded under a `"/"`-spelled key the code then looks up with a `join()`-produced one. No defect behind any of them.
+
 ## What this is not
 
 Twenty independent fixes. Treating it as twenty is how a normalisation gets sprinkled across a codebase until the tests go quiet, which leaves the same mistake available to make again tomorrow.
@@ -32,6 +36,7 @@ It is also not a reason to exclude tests. Every failure here is either a real di
 - A path is compared one way, in one place, and adding a twenty-first comparison cannot reintroduce the bug.
 - A file's content is read the same whichever way its lines end.
 - The identity feature resolves where Windows keeps a person's data, like every other location already does.
+- The same fixtures answer the same figures on either platform, tool for tool and step for step.
 - The Windows job is green, and green because it passes rather than because it stopped asking.
 
 ## The order, and why

@@ -34,10 +34,32 @@ function identityModule() {
   return require(path.join(SHARED, "identity.js"));
 }
 
+// The identity file's own rule, restated rather than imported: a test that asked the code
+// where it put the file could never catch the code putting it in the wrong place. Windows
+// keeps a person's data under %APPDATA%, so the sandbox supplies one inside the temp home
+// - without it these would read, and write, the runner's real profile (#707).
+function appDataIn(home) {
+  return path.join(home, "AppData", "Roaming");
+}
+
+function identityFileIn(home) {
+  return process.platform === "win32"
+    ? path.join(appDataIn(home), "aidd", "identity.json")
+    : path.join(home, ".config", "aidd", "identity.json");
+}
+
+// HOME alone does not sandbox this on Windows, where the file lives under %APPDATA%: a
+// test that only redirected HOME would read the machine owner's real identity file and
+// pass only because that machine happens to have none (#707).
+function sandboxHome(home) {
+  process.env.HOME = home;
+  process.env.APPDATA = appDataIn(home);
+}
+
 describe("who a default installation names: nobody", () => {
   it("reads no identity when nothing was ever written", () => {
     const home = tempDir("aidd-identity-home-");
-    process.env.HOME = home;
+    sandboxHome(home);
     delete process.env.AIDD_USER_CONFIG_DIR;
     assert.equal(identityModule().readIdentity(), null);
   });
@@ -50,7 +72,7 @@ describe("who a default installation names: nobody", () => {
       path.join(elsewhere, "identity.json"),
       JSON.stringify({ person_id: "planted-by-a-shared-dir" })
     );
-    process.env.HOME = home;
+    sandboxHome(home);
     process.env.AIDD_USER_CONFIG_DIR = elsewhere;
     assert.equal(identityModule().readIdentity(), null);
     delete process.env.AIDD_USER_CONFIG_DIR;
@@ -130,20 +152,6 @@ describe("the identifier itself", () => {
     assert.notEqual(first, second, "regenerating must not answer the same value twice");
   });
 });
-
-// The identity file's own rule, restated rather than imported: a test that asked the code
-// where it put the file could never catch the code putting it in the wrong place. Windows
-// keeps a person's data under %APPDATA%, so the sandbox supplies one inside the temp home
-// - without it these would read, and write, the runner's real profile (#707).
-function appDataIn(home) {
-  return path.join(home, "AppData", "Roaming");
-}
-
-function identityFileIn(home) {
-  return process.platform === "win32"
-    ? path.join(appDataIn(home), "aidd", "identity.json")
-    : path.join(home, ".config", "aidd", "identity.json");
-}
 
 function identityEnv(home) {
   const { GIT_DIR: _g, GIT_INDEX_FILE: _i, GIT_WORK_TREE: _w, ...rest } = process.env;

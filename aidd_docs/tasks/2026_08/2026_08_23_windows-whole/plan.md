@@ -1,6 +1,6 @@
 ---
 objective: "Windows passes because the code handles it, not because the tests stopped asking."
-status: pending
+status: in_progress
 ---
 
 # Plan: Windows, taken as one problem
@@ -20,6 +20,10 @@ status: pending
 | 2   | A path is compared one way, in one place     | [`phase-2.md`](./phase-2.md) |
 | 3   | A line ends either way                       | [`phase-3.md`](./phase-3.md) |
 | 4   | A person's file is where Windows keeps it    | [`phase-4.md`](./phase-4.md) |
+| 5   | A reader finds the file on either platform   | [`phase-5.md`](./phase-5.md) |
+| 6   | An assertion names a location, not a spelling | [`phase-6.md`](./phase-6.md) |
+
+Phases 5 and 6 were not in the first reading of the failure set: with A-D closed, the Windows job went from 8 failing integration files to none and from 22 e2e failures to 7, and what was left underneath was two more causes, one of them the only one that changes an answer rather than a test.
 
 One dispatch per phase, in order. The reactive rounds that preceded this plan each read a report and fixed what it named; the point of the order is that phase 2 is the large one and the rest are easier to judge once it is gone.
 
