@@ -231,7 +231,12 @@ describe("force behavior at the cache-rebuild path", () => {
     const memFs = new InMemoryFileAdapter();
     await seedFromDirectory(memFs, FIXTURE_DIR, { useAbsolutePaths: true });
 
-    const builtDir = builtMarketplaceDir(PROJECT, "aidd-framework", "copilot");
+    // FrameworkBuildUseCase.execute() re-resolves the outDir it is given
+    // (framework-build-use-case.ts:33) before ever touching the filesystem through it -
+    // harmless for a real projectRoot (already absolute with a drive letter on Windows),
+    // but this test's own drive-less "/proj" only matches what the strategy actually
+    // checks once this seed goes through the same resolve().
+    const builtDir = resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "copilot"));
     const agentPath = `${builtDir}/.github/agents/${PLUGIN}-code-reviewer.agent.md`;
     memFs.setFile(agentPath, "stale cache content from a previous build");
 
@@ -335,6 +340,15 @@ describe("outDir invariant for the cache-rebuild build path", () => {
       expect(underCache || underTmp).toBe(true);
     }
     // The dogfood call specifically must have gone through the temp dir, not the cache.
+    // Red on Windows (#707, not fixed here): ensure-built-marketplace-use-case.ts's own
+    // nested() compares sourceDir/builtDir with a hardcoded "/" (never path.sep), so on a
+    // real windows-latest runner it never recognises real nesting - the dogfood call
+    // routes straight into runBuild() instead of buildViaTemp(), landing this outDir under
+    // the cache, not tmp. In real use that same source/builtDir pair also differs by
+    // resolve()'s drive letter (sourceDir goes through it at
+    // ensure-built-marketplace-use-case.ts:70, builtDir never does), so fixing the
+    // separator alone would not be enough - both need to compare normalized, equally-
+    // resolved paths.
     expect(capturedOutDirs[1]?.startsWith(`${tmpRoot}${sep}`)).toBe(true);
   });
 });
