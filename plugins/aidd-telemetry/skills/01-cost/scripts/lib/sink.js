@@ -8,6 +8,7 @@ const { spawnSync } = require("node:child_process");
 const SCHEMA_VERSION = 2;
 const DAY_KEY_LENGTH = "YYYY-MM-DD".length;
 const PRIVATE_FILE_MODE = 0o600;
+const PRIVATE_DIR_MODE = 0o700;
 
 function legacyRootDir(home) {
   return path.join(home, ".config", "aidd", "telemetry");
@@ -77,7 +78,17 @@ function restrictToCurrentUser(target, { recursive = false } = {}) {
 
 function tightenFiguresDir(dir) {
   if (process.env.AIDD_USER_CONFIG_DIR) return;
-  if (process.platform === "win32") restrictToCurrentUser(dir, { recursive: true });
+  if (process.platform === "win32") return restrictToCurrentUser(dir, { recursive: true });
+  // POSIX had no branch at all, so the figures landed in a world-listable directory while
+  // the run journal beside them was 0700 - `mkdirSync`'s own `mode` is masked by the
+  // process umask and applies only when it creates the directory, so it cannot be relied on
+  // for one that already exists. A day file's content was already private at 0600; what
+  // leaked was the listing - which days this person worked, and how many.
+  try {
+    fs.chmodSync(dir, PRIVATE_DIR_MODE);
+  } catch {
+    // Someone else's directory, or a filesystem with no modes: the content stays 0600.
+  }
 }
 
 // `/T` on the directory does not reliably carry the grant onto a leaf file it walks into

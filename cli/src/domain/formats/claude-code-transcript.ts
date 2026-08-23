@@ -148,10 +148,22 @@ function buildRecord(
 }
 
 /** One parsed JSONL line, keyed by `message.id` — the identifier that ties together the
- * separate log lines one API call can produce. A real capture showed one assistant call
- * logged as two lines (a `thinking` content block, then a `tool_use` block) sharing one
- * `message.id` and one `requestId`, each carrying the same `usage`. Mapping every such line
- * to its own record would count that single call's tokens twice. */
+ * separate log lines one API call can produce. Mapping every such line to its own record
+ * would count that single call's tokens more than once.
+ *
+ * The lines do NOT all carry the same `usage`, which an earlier version of this comment
+ * claimed. Measured across 1,604 real transcripts on one machine: of 83,626 `message.id`
+ * groups, 25,702 carry differing figures, and in 25,702 of 25,702 the last line's
+ * `output_tokens` is greater than or equal to the first's. Claude Code writes a line when a
+ * message starts and again when it completes, and only the last carries
+ * `output_tokens_details` and `iterations`. Keeping the first kept the placeholder: 37.4% of
+ * every output token on that machine was being discarded, and up to 94% of a
+ * subagent-heavy session's.
+ *
+ * The last line wins, and the figures are never summed. In 25,143 of those 25,702 groups
+ * `input_tokens` and `cache_read_input_tokens` are identical across the lines — they are one
+ * call restated, not two calls — so adding them would multiply the cache counters, which are
+ * by far the largest. */
 function parseAssistantLine(
   line: string
 ): { readonly dedupeKey: string; readonly record: LocalCostCandidateRecord } | null {
@@ -176,18 +188,20 @@ function parseAssistantLine(
 }
 
 class ClaudeCodeTranscriptAccumulator implements TranscriptLineAccumulator {
-  private readonly seen = new Set<string>();
-  private readonly records: LocalCostCandidateRecord[] = [];
+  // Insertion-ordered, and the value is replaced rather than skipped: a later line for a key
+  // already seen is the same call, restated with figures that have grown. The record's
+  // position stays where the call first appeared, so the order a reader sees is the order
+  // the calls happened.
+  private readonly byKey = new Map<string, LocalCostCandidateRecord>();
 
   push(line: string): void {
     const parsed = parseAssistantLine(line);
-    if (!parsed || this.seen.has(parsed.dedupeKey)) return;
-    this.seen.add(parsed.dedupeKey);
-    this.records.push(parsed.record);
+    if (!parsed) return;
+    this.byKey.set(parsed.dedupeKey, parsed.record);
   }
 
   build(): readonly LocalCostCandidateRecord[] {
-    return this.records;
+    return [...this.byKey.values()];
   }
 }
 

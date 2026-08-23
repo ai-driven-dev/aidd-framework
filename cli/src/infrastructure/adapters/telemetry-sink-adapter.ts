@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readdirSync } from "node:fs";
+import { chmodSync, readdirSync } from "node:fs";
 import { access, appendFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { userInfo } from "node:os";
 import { join } from "node:path";
@@ -19,6 +19,7 @@ import { resolveHomeDir } from "../home-dir.js";
 
 const DAY_FILE_EXTENSION = ".jsonl";
 const PRIVATE_FILE_MODE = 0o600;
+const PRIVATE_DIR_MODE = 0o700;
 
 const DAY_KEY_LENGTH = "YYYY-MM-DD".length;
 
@@ -100,8 +101,21 @@ export class TelemetrySinkAdapter implements TelemetrySink {
   }
 
   private tightenDir(): void {
-    if (this.userNamed || process.platform !== "win32") return;
-    restrictToCurrentUser(this.rootDir, { recursive: true });
+    if (this.userNamed) return;
+    if (process.platform === "win32") {
+      restrictToCurrentUser(this.rootDir, { recursive: true });
+      return;
+    }
+    // POSIX had no branch at all, so the figures landed in a world-listable directory while
+    // the run journal beside them was 0700. `mkdir`'s own `mode` is masked by the process
+    // umask and applies only when it creates the directory, so it cannot be relied on for
+    // one that already exists. A day file's content was already private at 0600; what
+    // leaked was the listing - which days this person worked, and how many.
+    try {
+      chmodSync(this.rootDir, PRIVATE_DIR_MODE);
+    } catch {
+      // Someone else's directory, or a filesystem with no modes: the content stays 0600.
+    }
   }
 
   // `/T` on the directory does not reliably carry the grant onto a leaf file it walks into

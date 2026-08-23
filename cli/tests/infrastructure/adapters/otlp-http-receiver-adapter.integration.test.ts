@@ -37,6 +37,7 @@ describe("OtlpHttpReceiverAdapter — the listening surface", () => {
     const fromLoopback = await fetch(`http://127.0.0.1:${port}/v1/logs`, {
       method: "POST",
       body: "{}",
+      headers: { "content-type": "application/json" },
     });
     expect(fromLoopback.status).toBe(200);
 
@@ -48,13 +49,47 @@ describe("OtlpHttpReceiverAdapter — the listening surface", () => {
   // is refused mid-flight, and a client still blasting megabytes sees its own broken pipe
   // rather than the answer — what matters there is that nothing was stored and the receiver
   // survived.
+  // Loopback is not a boundary against a browser: a page the user visits can POST here with
+  // no preflight, because a CORS "simple request" needs only text/plain, form-urlencoded or
+  // multipart. It could not read the answer, so this was never exfiltration - it was every
+  // website the user opens being able to write lines into their own cost report. A real OTLP
+  // exporter sends application/json, which a simple request cannot, and sends no Origin,
+  // which a browser always attaches.
+  it("refuses the drive-by write a web page can make, and stores nothing", async () => {
+    const { port } = await startOnEphemeralPort();
+
+    const driveBy = await fetch(`http://127.0.0.1:${port}/v1/logs`, {
+      method: "POST",
+      body: "{}",
+      headers: { "content-type": "text/plain;charset=UTF-8", origin: "https://evil.example" },
+    });
+
+    expect(driveBy.status).toBe(415);
+    expect(driveBy.headers.get("access-control-allow-origin")).toBeNull();
+    expect(received).toHaveLength(0);
+  });
+
+  it("refuses application/json that still carries an Origin, since no exporter sends one", async () => {
+    const { port } = await startOnEphemeralPort();
+
+    const withOrigin = await fetch(`http://127.0.0.1:${port}/v1/logs`, {
+      method: "POST",
+      body: "{}",
+      headers: { "content-type": "application/json", origin: "https://evil.example" },
+    });
+
+    expect(withOrigin.status).toBe(415);
+    expect(received).toHaveLength(0);
+  });
+
   it("refuses a declared oversized body before reading it", async () => {
     const { port } = await startOnEphemeralPort();
 
     const status = await new Promise<number>((resolve, reject) => {
       const socket = connect(port, "127.0.0.1", () => {
         socket.write(
-          `POST /v1/logs HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: ${64 * 1024 * 1024}\r\n\r\n`
+          `POST /v1/logs HTTP/1.1\r\nHost: 127.0.0.1\r\n` +
+            `Content-Type: application/json\r\nContent-Length: ${64 * 1024 * 1024}\r\n\r\n`
         );
       });
       socket.on("data", (chunk) => {
@@ -95,7 +130,13 @@ describe("OtlpHttpReceiverAdapter — the listening surface", () => {
     });
 
     await new Promise<void>((resolve) => {
-      const req = request({ host: "127.0.0.1", port, path: "/v1/logs", method: "POST" }, (res) => {
+      const req = request({
+          host: "127.0.0.1",
+          port,
+          path: "/v1/logs",
+          method: "POST",
+          headers: { "content-type": "application/json" },
+        }, (res) => {
         res.resume();
         resolve();
       });
@@ -106,7 +147,7 @@ describe("OtlpHttpReceiverAdapter — the listening surface", () => {
 
     expect(received).toHaveLength(0);
 
-    const after = await fetch(`http://127.0.0.1:${port}/v1/logs`, { method: "POST", body: "{}" });
+    const after = await fetch(`http://127.0.0.1:${port}/v1/logs`, { method: "POST", body: "{}", headers: { "content-type": "application/json" } });
     expect(after.status).toBe(200);
     expect(received).toHaveLength(1);
   });

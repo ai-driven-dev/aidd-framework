@@ -36,7 +36,9 @@ describe("mapClaudeCodeTranscriptToSinkRecords", () => {
       turn_field: "requestId",
       model: "claude-sonnet-5",
       effort: "high",
-      event_timestamp: "2026-08-05T19:07:12.838Z",
+      // The completed line's moment, not the one that opened the message: a billed request
+      // happened when it finished, and that is also the moment its day row is keyed on.
+      event_timestamp: "2026-08-05T19:07:15.789Z",
       input_tokens: 2,
       output_tokens: 184,
       cache_read_tokens: 24436,
@@ -234,5 +236,53 @@ describe("createClaudeCodeTranscriptAccumulator", () => {
     for (const line of loadFixture(MAIN_PATH).split("\n")) accumulator.push(line);
 
     expect(accumulator.build()).toEqual(whole);
+  });
+  // Measured on 1,604 real transcripts: Claude Code writes a line when a message starts and
+  // again when it completes, sharing one message.id. 25,702 of 83,626 groups differ, and the
+  // last line's output_tokens is >= the first's in every one. Keeping the first kept the
+  // placeholder and discarded 37.4% of all output tokens. The shape below is a real capture,
+  // trimmed: same input and cache figures, output 3 -> 329.
+  it("keeps the completed line for a message, not the placeholder that opened it", () => {
+    const shared = {
+      type: "assistant",
+      sessionId: "11111111-1111-4111-8111-111111111111",
+      requestId: "req_1",
+      timestamp: "2026-08-23T10:00:00.000Z",
+    };
+    const opening = JSON.stringify({
+      ...shared,
+      message: {
+        id: "msg_1",
+        model: "claude-opus-5",
+        usage: {
+          input_tokens: 2,
+          cache_creation_input_tokens: 37477,
+          cache_read_input_tokens: 0,
+          output_tokens: 3,
+        },
+      },
+    });
+    const completed = JSON.stringify({
+      ...shared,
+      message: {
+        id: "msg_1",
+        model: "claude-opus-5",
+        usage: {
+          input_tokens: 2,
+          cache_creation_input_tokens: 37477,
+          cache_read_input_tokens: 0,
+          output_tokens: 329,
+          output_tokens_details: { thinking_tokens: 49 },
+        },
+      },
+    });
+
+    const records = mapClaudeCodeTranscriptToSinkRecords(`${opening}\n${completed}\n`);
+
+    expect(records).toHaveLength(1);
+    expect(records[0].output_tokens).toBe(329);
+    // Never summed: the two lines are one call restated, so the cache counter must not grow.
+    expect(records[0].cache_creation_tokens).toBe(37477);
+    expect(records[0].input_tokens).toBe(2);
   });
 });

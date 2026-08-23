@@ -99,6 +99,8 @@ export class OtlpHttpReceiverAdapter {
       return;
     }
 
+    if (this.refuseBrowserOrigin(req, res)) return;
+
     const rawBody = await this.readBodyOrRefuse(req, res);
     if (rawBody === null) return;
 
@@ -109,6 +111,30 @@ export class OtlpHttpReceiverAdapter {
 
     res.writeHead(200, { "content-type": "application/json" });
     res.end(EMPTY_JSON_OBJECT);
+  }
+
+  /**
+   * Loopback is not a boundary against a browser. A page the user visits can POST here
+   * without a preflight - a CORS "simple request" needs only `text/plain`, `form-urlencoded`
+   * or `multipart/form-data` - so every website they open could write lines into their own
+   * cost report. The page cannot read the response, so this was never exfiltration; it was
+   * an open write.
+   *
+   * Two checks close it, and a real OTLP exporter passes both: it sends
+   * `content-type: application/json`, which a simple request cannot, and it sends no
+   * `Origin`, which a browser always attaches.
+   */
+  private refuseBrowserOrigin(req: IncomingMessage, res: ServerResponse): boolean {
+    const contentType = req.headers["content-type"]?.split(";")[0]?.trim().toLowerCase();
+    const origin = req.headers.origin;
+    if (contentType === "application/json" && origin === undefined) return false;
+    this.logger.warn(
+      `telemetry receive: refused a request that no OTLP exporter sends — content-type ` +
+        `${contentType ?? "absent"}${origin === undefined ? "" : `, origin ${origin}`}`
+    );
+    res.writeHead(415, { "content-type": "application/json" });
+    res.end(EMPTY_JSON_OBJECT);
+    return true;
   }
 
   private async readBodyOrRefuse(
