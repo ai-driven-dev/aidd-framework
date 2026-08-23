@@ -201,12 +201,36 @@ describe("TelemetryOnUseCase — endpoint resolution", () => {
     expect(fs.listAll()).toHaveLength(0);
   });
 
-  it("reuses the stored endpoint on a second run with no --endpoint flag", async () => {
+  // A collector on this machine is the documented shape, and re-arming it changes nothing
+  // about where the figures go, so it is reused without a word.
+  it("reuses a stored loopback endpoint on a second run with no --endpoint flag", async () => {
+    const local = "http://127.0.0.1:4318";
     const { fs, useCase } = buildUseCase(claudeManifest());
-    await useCase.execute(baseOptions());
+    await useCase.execute(baseOptions({ endpoint: local }));
     const result = await useCase.execute(baseOptions({ endpoint: undefined }));
+    expect(result.endpoint).toBe(local);
+    expect(fs.getFile(SWITCH_PATH)).toContain(local);
+  });
+
+  // `.aidd/config.json` travels with the repository. One person running --endpoint once and
+  // committing it used to arm every later `aidd telemetry on` for everyone who cloned it,
+  // and what a tool exports carries an email address. Typing the flag is a choice; a file
+  // arriving with a checkout is not.
+  it("refuses a stored remote endpoint that nobody typed, naming the file it came from", async () => {
+    const { useCase } = buildUseCase(claudeManifest());
+    await useCase.execute(baseOptions());
+
+    await expect(useCase.execute(baseOptions({ endpoint: undefined }))).rejects.toThrow(
+      /not on this machine/u
+    );
+  });
+
+  it("accepts the same remote endpoint when it is typed, and says what that means", async () => {
+    const { useCase, logger } = buildUseCase(claudeManifest());
+    const result = await useCase.execute(baseOptions({ endpoint: ENDPOINT }));
+
     expect(result.endpoint).toBe(ENDPOINT);
-    expect(fs.getFile(SWITCH_PATH)).toContain(ENDPOINT);
+    expect(logger.warnMessages.join("\n")).toMatch(/not on this machine/u);
   });
 
   it("an explicit --endpoint overrides a previously stored one", async () => {

@@ -466,6 +466,19 @@ export class InvalidTelemetryEndpointError extends Error {
   }
 }
 
+export class UnconfirmedRemoteTelemetryEndpointError extends Error {
+  constructor(value: string, switchPath: string) {
+    super(
+      `Telemetry endpoint '${value}' is not on this machine, and it was read from ` +
+        `${switchPath} rather than typed. That file travels with the repository, so anyone ` +
+        `who runs this would start sending to that host without choosing to — and what a ` +
+        `tool exports carries an email address. Pass --endpoint '${value}' to say you meant ` +
+        `it, or point it at localhost.`
+    );
+    this.name = "UnconfirmedRemoteTelemetryEndpointError";
+  }
+}
+
 export class NativePluginCliError extends Error {
   constructor(message: string) {
     super(message);

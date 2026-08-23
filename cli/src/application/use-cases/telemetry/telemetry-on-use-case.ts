@@ -6,10 +6,12 @@ import type {
 import {
   InvalidTelemetryEndpointError,
   MissingTelemetryEndpointError,
+  UnconfirmedRemoteTelemetryEndpointError,
 } from "../../../domain/errors.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import {
   buildTelemetrySwitchFile,
+  isLoopbackTelemetryEndpoint,
   isValidTelemetryEndpoint,
   parseTelemetrySwitchFile,
   type TelemetrySwitch,
@@ -103,7 +105,7 @@ export class TelemetryOnUseCase {
 
     const existingRaw = await this.readIfExists(switchPath);
     const existingSwitch = existingRaw !== null ? parseTelemetrySwitchFile(existingRaw) : null;
-    const endpoint = this.resolveEndpoint(options.endpoint, existingSwitch);
+    const endpoint = this.resolveEndpoint(options.endpoint, existingSwitch, switchPath);
 
     const switchChanged = await this.writeSwitch(switchPath, existingRaw, existingSwitch, endpoint);
     const toolReports = await this.configureTools(options, endpoint);
@@ -140,13 +142,34 @@ export class TelemetryOnUseCase {
     );
   }
 
+  /**
+   * A remote endpoint has to be typed, not inherited.
+   *
+   * `.aidd/config.json` is a file a repository carries, and this use case reused whatever
+   * endpoint it found there. So one person running `--endpoint https://elsewhere` once, and
+   * committing the result, silently armed every later `aidd telemetry on` for everyone who
+   * cloned it — and what Claude Code exports carries `user.email`. Typing the flag is a
+   * choice; a file arriving with a checkout is not.
+   *
+   * A loopback endpoint is unaffected: it names this machine, which is the documented shape,
+   * and re-arming it changes nothing about where the figures go.
+   */
   private resolveEndpoint(
     flagEndpoint: string | undefined,
-    existing: TelemetrySwitch | null
+    existing: TelemetrySwitch | null,
+    switchPath: string
   ): string {
-    const endpoint = flagEndpoint?.trim() || existing?.endpoint;
+    const typed = flagEndpoint?.trim();
+    const endpoint = typed || existing?.endpoint;
     if (!endpoint) throw new MissingTelemetryEndpointError();
     if (!isValidTelemetryEndpoint(endpoint)) throw new InvalidTelemetryEndpointError(endpoint);
+    if (!isLoopbackTelemetryEndpoint(endpoint)) {
+      if (!typed) throw new UnconfirmedRemoteTelemetryEndpointError(endpoint, switchPath);
+      this.logger.warn(
+        `Telemetry endpoint ${endpoint} is not on this machine. What a tool exports carries ` +
+          "an email address; the local read route sends nothing anywhere."
+      );
+    }
     return endpoint;
   }
 
