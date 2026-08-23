@@ -267,6 +267,39 @@ describe("mergeCursorFlatHooks", () => {
 // ── mergeCodexFrameworkHooksJson ──────────────────────────────────────────────
 
 describe("mergeCodexFrameworkHooksJson", () => {
+  // #707: Codex has no `Stop` event. Its vocabulary, read out of the 0.149.0 binary and
+  // confirmed by a live `codex exec` run with all four subscribed, is SessionStart /
+  // SessionEnd / PostToolUse / PreToolUse and friends - SessionStart and SessionEnd fired,
+  // Stop never did. Subscribing to Stop alone journals a session_start with nothing after
+  // it, in silence. This test fails if that mapping is dropped.
+  it("maps Stop to SessionEnd, the event Codex actually delivers", () => {
+    // Split literal, the same way claude-root-path-rewrite.ts writes one: biome's
+    // noTemplateCurlyInString cannot tell a plugin-root token from a botched template.
+    const command = `node $${"{PLUGIN_ROOT}"}/hooks/journal.js turn-end`;
+    const plugin = JSON.stringify({
+      hooks: { Stop: [{ hooks: [{ type: "command", command }] }] },
+    });
+    const { content } = mergeCodexFrameworkHooksJson(null, plugin);
+    const result = JSON.parse(content) as { hooks: Record<string, unknown[]> };
+
+    expect(Object.keys(result.hooks)).toEqual(["SessionEnd"]);
+    expect(result.hooks).not.toHaveProperty("Stop");
+    expect(JSON.stringify(result.hooks.SessionEnd)).toContain(command);
+  });
+
+  it("leaves the events Codex does share with Claude under their own names", () => {
+    const plugin = JSON.stringify({
+      hooks: {
+        SessionStart: [{ hooks: [{ type: "command", command: "node a.js session-start" }] }],
+        PostToolUse: [{ hooks: [{ type: "command", command: "node a.js tool-used" }] }],
+      },
+    });
+    const { content } = mergeCodexFrameworkHooksJson(null, plugin);
+    const result = JSON.parse(content) as { hooks: Record<string, unknown[]> };
+
+    expect(Object.keys(result.hooks).sort()).toEqual(["PostToolUse", "SessionStart"]);
+  });
+
   it("emits top-level hooks wrapper", () => {
     const plugin = JSON.stringify({
       hooks: {

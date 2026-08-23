@@ -44,6 +44,21 @@ const CURSOR_EVENT_MAP: Record<string, readonly string[]> = {
   SubagentStop: ["subagentStop"],
 };
 
+// Codex keeps Claude's event names, with one exception it does not have: there is no
+// `Stop`. Its vocabulary, read out of the 0.149.0 binary itself, is PreToolUse,
+// PermissionRequest, PostToolUse, PreCompact, PostCompact, SessionStart, SessionEnd,
+// SubagentStart, SubagentStop - and a live probe confirmed it: a `codex exec` run with all
+// four subscribed fired SessionStart and SessionEnd and never Stop, so a turn was never
+// closed and every Codex session journalled a session_start with nothing after it (#707).
+//
+// SessionEnd is coarser than Stop by nature: it bounds the session, not each turn. For
+// `codex exec` the two coincide, and for an interactive session one turn_end bounding the
+// whole session is the honest answer rather than none at all. The journal already tolerates
+// more than one turn_end line, so nothing downstream depends on there being exactly one.
+const CODEX_EVENT_MAP: Record<string, readonly string[]> = {
+  Stop: ["SessionEnd"],
+};
+
 // ── Claude: merge hooks into .claude/settings.json ────────────────────────────
 
 /**
@@ -193,7 +208,12 @@ export function mergeCodexFrameworkHooksJson(
   const pluginHooks = plugin.hooks ?? {};
 
   for (const [event, matchers] of Object.entries(pluginHooks)) {
-    codex.hooks[event] = [...(codex.hooks[event] ?? []), ...convertToCodexEntries(matchers)];
+    for (const codexEvent of CODEX_EVENT_MAP[event] ?? [event]) {
+      codex.hooks[codexEvent] = [
+        ...(codex.hooks[codexEvent] ?? []),
+        ...convertToCodexEntries(matchers),
+      ];
+    }
   }
 
   return {
