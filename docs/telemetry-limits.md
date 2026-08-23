@@ -37,6 +37,24 @@ everyone, one person on one machine. The cost of moving away from it: nothing ou
 assumes the default, so a reader pointed at the default alone finds the moved figures
 absent, not elsewhere.
 
+## A host project that declares `"type": "module"`
+
+Node decides a `.js` file's module system from the nearest `package.json` walking up, and a
+project-scope install puts this plugin's files under the host project's own declaration. In a
+project that declares `"type": "module"`, that used to kill every script this plugin ships at
+its first `require`, before a line of its own ran.
+
+The skills are closed: `skills/package.json` declares `"type": "commonjs"`, so
+`telemetry-switch.js`, `telemetry-report.js` and `telemetry-check.js` run the same in either
+kind of project. Two install-shape suites assert it, and they fail without that one file.
+
+**The hooks are not, and that is a trade rather than an oversight.** `hooks/` holds one
+genuine ESM module, `opencode-plugin.js` — OpenCode runs nothing else, and its loader was
+measured refusing an `.mjs` rename. A `"type": "commonjs"` beside it would fix the hook path
+and break OpenCode's, so the hook scripts still take the host project's declaration. Under an
+ESM project, install the plugin at user scope (`~/.claude/plugins/`, `~/.codex/plugins/`),
+where the host's `package.json` is not above them.
+
 ## Two routes, and neither covers every tool
 
 A tool's consumption reaches AIDD one of two ways.

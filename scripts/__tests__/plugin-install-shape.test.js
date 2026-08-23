@@ -167,3 +167,46 @@ function describeShape(name, buildShape) {
 
 describeShape("what the flat translation route delivers (skills/ alone, no hooks/)", buildFlatShape);
 describeShape("what a native install delivers (skills/ beside hooks/, under the plugin root)", buildNativeShape);
+
+/**
+ * Both shapes again, this time inside a host project that declares `"type": "module"`.
+ *
+ * Node decides a `.js` file's module system from the nearest package.json walking up, so a
+ * project-scope install - `.claude/plugins/`, `.github/plugins/`, `.codex/plugins/`, all
+ * inside the project - puts every script this plugin ships under the host's own declaration.
+ * In an ESM project that made each one die at its first `require` with "require is not
+ * defined in ES module scope", before running a single line of its own. Measured on a real
+ * install, not imagined.
+ *
+ * `skills/package.json` declares `"type": "commonjs"` so the walk stops there. It lives
+ * inside `skills/` rather than at the plugin root because that is what an install actually
+ * carries - a built tree holds `hooks/`, `skills/` and the manifest, and nothing else.
+ *
+ * `hooks/` deliberately gets no such file. It holds one genuine ESM module,
+ * `opencode-plugin.js`, and OpenCode's loader was measured refusing an `.mjs` rename - so a
+ * `"type": "commonjs"` there would trade a working OpenCode for a fixed hook path. The hook
+ * scripts therefore still take the host project's own declaration; a hook run under an ESM
+ * project is the gap this does not close, and it is named in docs/telemetry-limits.md
+ * rather than left to be discovered.
+ */
+function buildEsmHostShape(inner) {
+  return () => {
+    const host = makeTempDir("aidd-install-shape-esm-host-");
+    fs.writeFileSync(
+      path.join(host, "package.json"),
+      `${JSON.stringify({ name: "host-project", type: "module" }, null, 2)}\n`
+    );
+    const pluginRoot = path.join(host, "plugin");
+    fs.cpSync(inner(), pluginRoot, { recursive: true });
+    return pluginRoot;
+  };
+}
+
+describeShape(
+  "the flat route, inside a host project that declares type: module",
+  buildEsmHostShape(buildFlatShape)
+);
+describeShape(
+  "a native install, inside a host project that declares type: module",
+  buildEsmHostShape(buildNativeShape)
+);
