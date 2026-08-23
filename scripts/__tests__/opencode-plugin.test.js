@@ -47,7 +47,17 @@ function makeInstalledRepo() {
     if (entry.name === "hooks.json") continue;
     fs.cpSync(path.join(hooksSrc, entry.name), path.join(pluginDir, entry.name), { recursive: true });
   }
-  return { repo, pluginDir };
+  // A byte-identical `.mjs` twin, for these tests alone. An install carries the plugin as
+  // `.js` because OpenCode auto-discovers `{plugin,plugins}/*.{ts,js}` and nothing else, and
+  // it loads the file with its own runtime, which does not consult Node's `type` field -
+  // measured: with `hooks/`'s `"type": "commonjs"` marker in place, a real OpenCode session
+  // still journals its session_start. These tests `import()` it with plain Node, which does
+  // consult that marker, and a directory-wide override is not available: `journal.js` and
+  // `lib/` are its CommonJS siblings in the same directory. The extension is the only thing
+  // that differs from what ships.
+  const esmTwin = path.join(pluginDir, "opencode-plugin.mjs");
+  fs.copyFileSync(path.join(pluginDir, "opencode-plugin.js"), esmTwin);
+  return { repo, pluginDir, esmTwin };
 }
 
 function runsDirOf(repo) {
@@ -73,8 +83,8 @@ test("opencode-plugin.js: runJournal spawns journal.js by an absolute filesystem
   // resolves it as a bare module specifier relative to its own cwd and dies with
   // MODULE_NOT_FOUND. journal.js silently never ran; no error surfaced anywhere
   // because journal.js's own "exit 0 no matter what" contract hid the spawn failure.
-  const { repo, pluginDir } = makeInstalledRepo();
-  const mod = await import(pathToFileURL(path.join(pluginDir, "opencode-plugin.js")).href);
+  const { repo, pluginDir, esmTwin } = makeInstalledRepo();
+  const mod = await import(pathToFileURL(esmTwin).href);
 
   const hooks = await mod.AiddTelemetry({ directory: repo });
   await hooks.event({
@@ -92,8 +102,8 @@ test("opencode-plugin.js: runJournal spawns journal.js by an absolute filesystem
 });
 
 test("opencode-plugin.js: session.idle writes turn_end for the session session.created named", async () => {
-  const { repo, pluginDir } = makeInstalledRepo();
-  const mod = await import(pathToFileURL(path.join(pluginDir, "opencode-plugin.js")).href);
+  const { repo, pluginDir, esmTwin } = makeInstalledRepo();
+  const mod = await import(pathToFileURL(esmTwin).href);
 
   const hooks = await mod.AiddTelemetry({ directory: repo });
   await hooks.event({

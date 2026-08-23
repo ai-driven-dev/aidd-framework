@@ -178,16 +178,17 @@ describeShape("what a native install delivers (skills/ beside hooks/, under the 
  * defined in ES module scope", before running a single line of its own. Measured on a real
  * install, not imagined.
  *
- * `skills/package.json` declares `"type": "commonjs"` so the walk stops there. It lives
- * inside `skills/` rather than at the plugin root because that is what an install actually
- * carries - a built tree holds `hooks/`, `skills/` and the manifest, and nothing else.
+ * `skills/package.json` and `hooks/package.json` declare `"type": "commonjs"` so the walk
+ * stops there. They live inside those two directories rather than at the plugin root
+ * because those are the two an install actually carries - a built tree holds `hooks/`,
+ * `skills/` and the manifest, and nothing else.
  *
- * `hooks/` deliberately gets no such file. It holds one genuine ESM module,
- * `opencode-plugin.js`, and OpenCode's loader was measured refusing an `.mjs` rename - so a
- * `"type": "commonjs"` there would trade a working OpenCode for a fixed hook path. The hook
- * scripts therefore still take the host project's own declaration; a hook run under an ESM
- * project is the gap this does not close, and it is named in docs/telemetry-limits.md
- * rather than left to be discovered.
+ * The marker in `hooks/` sits beside one genuine ESM module, `opencode-plugin.js`, and does
+ * not disturb it: OpenCode loads that file with its own runtime, which does not consult
+ * Node's `type` field. Measured, after a first attempt got this wrong by changing two things
+ * at once - renaming it `.mjs` broke OpenCode, and the marker was blamed. OpenCode
+ * auto-discovers `{plugin,plugins}/*.{ts,js}`, so the extension was the whole cause; with
+ * the name left alone and the marker in place, a real session journals normally.
  */
 function buildEsmHostShape(inner) {
   return () => {

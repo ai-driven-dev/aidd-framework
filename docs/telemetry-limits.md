@@ -44,16 +44,14 @@ project-scope install puts this plugin's files under the host project's own decl
 project that declares `"type": "module"`, that used to kill every script this plugin ships at
 its first `require`, before a line of its own ran.
 
-The skills are closed: `skills/package.json` declares `"type": "commonjs"`, so
-`telemetry-switch.js`, `telemetry-report.js` and `telemetry-check.js` run the same in either
-kind of project. Two install-shape suites assert it, and they fail without that one file.
+`skills/package.json` and `hooks/package.json` declare `"type": "commonjs"`, so every script
+this plugin ships — the three skill scripts and the journal hook alike — runs the same in
+either kind of project. Two install-shape suites assert it, and they fail without those files.
 
-**The hooks are not, and that is a trade rather than an oversight.** `hooks/` holds one
-genuine ESM module, `opencode-plugin.js` — OpenCode runs nothing else, and its loader was
-measured refusing an `.mjs` rename. A `"type": "commonjs"` beside it would fix the hook path
-and break OpenCode's, so the hook scripts still take the host project's declaration. Under an
-ESM project, install the plugin at user scope (`~/.claude/plugins/`, `~/.codex/plugins/`),
-where the host's `package.json` is not above them.
+The marker in `hooks/` sits beside one genuine ESM module, `opencode-plugin.js`, and does not
+disturb it: OpenCode loads that file with its own runtime, which does not consult Node's
+`type` field. What OpenCode *is* strict about is the name — it auto-discovers
+`{plugin,plugins}/*.{ts,js}` and nothing else, so that file must keep its `.js` extension.
 
 ## Two routes, and neither covers every tool
 
