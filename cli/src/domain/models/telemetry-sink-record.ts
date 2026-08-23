@@ -35,6 +35,15 @@ export interface TelemetrySinkRecord {
   readonly vendor_field: string;
   readonly turn_id?: string;
   readonly turn_field?: string;
+  /** The tool's own identifier for one billed call, not one turn — present only where a
+   * route can name it, and, unlike `turn_id`, guaranteed unique per billed request where it
+   * is present at all. Claude Code names the same call `requestId` on its local transcript
+   * and `request_id` on its export's `api_request` log attribute — the one identifier this
+   * sink has ever measured both routes computing for the same real call. It exists so a
+   * report can collapse two records describing one call, made when both routes are live for
+   * a tool, into one — see "One billed call, both routes" in metrics-contract.md. Never used
+   * for the local-read re-read match `turn_id` exists for. */
+  readonly billed_request_id?: string;
   /** How `step` came to be known. Never optional, for the same reason `provenance` is not:
    * an absent field would be read as "no step ran", which is exactly the assertion nothing
    * on a transcript or a journal can support. See `domain/models/step-attribution.ts`. */
@@ -110,6 +119,7 @@ const COST_ATTRIBUTE = "cost_usd";
 // `person_id`, which is opted into per person on the local-read route alone.
 const ATTRIBUTE_ALLOWLIST: ReadonlyMap<string, keyof TelemetrySinkRecord> = new Map([
   ["aidd.project_id", "project_id"],
+  ["request_id", "billed_request_id"],
   [COST_ATTRIBUTE, "cost_usd"],
   ["input_tokens", "input_tokens"],
   ["output_tokens", "output_tokens"],

@@ -120,6 +120,26 @@ describe("ClaudeCliAdapter", () => {
     );
   });
 
+  it("uninstalls a plugin via `claude plugin uninstall <ref> --scope project --yes`", () => {
+    mockSpawnSync.mockReturnValue(makeResult({}));
+
+    new ClaudeCliAdapter().uninstallPlugin("aidd-telemetry@aidd-framework");
+
+    expect(mockSpawnSync).toHaveBeenCalledWith(
+      "claude",
+      ["plugin", "uninstall", "aidd-telemetry@aidd-framework", "--scope", "project", "--yes"],
+      expect.anything()
+    );
+  });
+
+  it("throws NativePluginCliError when uninstalling an already-absent plugin", () => {
+    mockSpawnSync.mockReturnValue(
+      makeResult({ status: 1, stderr: "plugin `ghost` is not installed" })
+    );
+
+    expect(() => new ClaudeCliAdapter().uninstallPlugin("ghost@m1")).toThrow(NativePluginCliError);
+  });
+
   it("throws NativePluginCliError when the process fails to spawn", () => {
     mockSpawnSync.mockReturnValue(makeResult({ error: new Error("spawn EACCES"), status: null }));
 

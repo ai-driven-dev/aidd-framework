@@ -34,6 +34,7 @@ describe("mapClaudeCodeTranscriptToSinkRecords", () => {
       vendor_field: "sessionId",
       turn_id: "req_011Cdk8FcLJwNkFzLNRR8BpN",
       turn_field: "requestId",
+      billed_request_id: "req_011Cdk8FcLJwNkFzLNRR8BpN",
       model: "claude-sonnet-5",
       effort: "high",
       // The completed line's moment, not the one that opened the message: a billed request
@@ -71,6 +72,7 @@ describe("mapClaudeCodeTranscriptToSinkRecords", () => {
         vendor_field: "sessionId",
         turn_id: "req_011Ce2HDaNo7CVCZKrT8yryX",
         turn_field: "requestId",
+        billed_request_id: "req_011Ce2HDaNo7CVCZKrT8yryX",
         model: "claude-opus-5",
         effort: "high",
         event_timestamp: "2026-08-14T07:54:15.988Z",

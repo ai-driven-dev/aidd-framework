@@ -87,9 +87,13 @@ const NEVER_KEPT_VALUES = [
   "00000000-1111-4222-8333-444444444444", // user.account_uuid
   "00000000-2222-4333-8444-555555555555", // organization.id
   "Orca", // terminal.type
-  "req_011CeAaRe8Mm7oS7xvfjDPw8", // request_id
   "1a4650df-4623-4bd3-81b3-287d21937040", // client_request_id
   "0000000000000000000000000000000000000000000000000000000000000000", // user.id
+  // request_id is deliberately absent from this list: the sink already stores this exact
+  // value today, on every local-read Claude Code record's `turn_id` (`TURN_FIELD =
+  // "requestId"` in claude-code-transcript.ts). Keeping it on the export route too, under
+  // `billed_request_id`, adds no class of information the sink didn't already hold — see
+  // "carries request_id as billed_request_id, unlike every other identity attribute" below.
 ];
 
 describe("mapOtlpLogsToSinkRecords()", () => {
@@ -218,6 +222,9 @@ describe("mapOtlpLogsToSinkRecords()", () => {
       "organization.id",
       "terminal_type",
       "terminal.type",
+      // Never a literal key on the record either way — kept below, but renamed to
+      // `billed_request_id` so nothing downstream can mistake it for the tool's own
+      // export-side attribute name.
       "request_id",
       "client_request_id",
     ]) {
@@ -227,6 +234,15 @@ describe("mapOtlpLogsToSinkRecords()", () => {
     for (const value of NEVER_KEPT_VALUES) {
       expect(serialized).not.toContain(value);
     }
+  });
+
+  // The one attribute this allowlist keeps despite reading like the identity attributes
+  // above: `request_id` names the billed call itself, not the person who made it, and is
+  // the only field measured so far that both an export and a local-read record compute the
+  // same value for — see "One billed call, both routes" in metrics-contract.md.
+  it("carries request_id as billed_request_id, unlike every other identity attribute", () => {
+    const [record] = mapOtlpLogsToSinkRecords(logsPayload, [CLAUDE_VENDOR]);
+    expect(record.billed_request_id).toBe("req_011CeAaRe8Mm7oS7xvfjDPw8");
   });
 
   it("drops an attribute the mapper was never told about, without knowing it exists", () => {

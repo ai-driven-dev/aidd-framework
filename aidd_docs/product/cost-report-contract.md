@@ -8,9 +8,10 @@ could and could not supply.
 > If instead you are building a **pricing service or an aggregator** that consumes stored
 > records directly, read [`metrics-contract.md`](./metrics-contract.md) — the contract for
 > one stored line. The two are deliberately different audiences, and picking the wrong one
-> is expensive: the record contract makes you responsible for the two double-count rules,
-> the split between the two record kinds, and re-read deduplication. This one has already
-> applied all three.
+> is expensive: the record contract makes you responsible for the three double-count rules
+> (the two record kinds, a local re-read, and one billed call seen by both an export and a
+> local read at once — Claude Code today), and re-read deduplication. This one has already
+> applied all four.
 
 **Never reconstruct these figures from stored records.** One computation in one place is
 the whole point: two ways of computing a number is how they start disagreeing.

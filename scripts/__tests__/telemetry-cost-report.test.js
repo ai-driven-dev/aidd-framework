@@ -232,6 +232,126 @@ describe("summing a period without counting anything twice", () => {
   });
 });
 
+// A user who enables the OTLP export and also runs the local read sees every billed
+// request line twice: once from each route. Both fixtures below are real captured export
+// payloads - `otlp-logs-claude-code.json` (one main-agent request) and
+// `otlp-logs-claude-code-subagent.json` (a main-agent request and the subagent request it
+// spawned) - the `claude_code.api_request` attribute sets are read straight off them, never
+// hand-built: three billed calls, matching the defect report's own worked count. The
+// local-read half is what `readers.js`'s `claudeRecords` would produce for those exact
+// same three billed calls: same `billed_request_id` (Claude Code's `requestId`, carried by
+// both routes for the same call), no `cost_usd` (no local reader has ever captured one), a
+// tool-stated `step` the export route never carries at all. `requests` and `inputTokens`
+// below reproduce the defect report's own figures exactly (6 naive, 3 collapsed; 12 naive,
+// 6 collapsed); `outputTokens`/`cacheReadTokens` do not - these two checked-in fixtures
+// carry smaller figures than whatever fuller session the report was written against, so
+// this test checks its own union's true totals rather than asserting numbers these
+// fixtures cannot produce. Mirrors cli/tests/domain/models/cost-report.unit.test.ts.
+describe("one billed call, seen by both routes, counts once", () => {
+  const FIXTURES_DIR = path.resolve(__dirname, "../../cli/tests/fixtures/telemetry-sink");
+
+  function apiRequestsFrom(fixtureName) {
+    const payload = JSON.parse(fs.readFileSync(path.join(FIXTURES_DIR, fixtureName), "utf8"));
+    const records = [];
+    for (const resourceLog of payload.resourceLogs ?? []) {
+      for (const scopeLog of resourceLog.scopeLogs ?? []) {
+        for (const logRecord of scopeLog.logRecords ?? []) {
+          if (logRecord.body?.stringValue !== "claude_code.api_request") continue;
+          const attrs = Object.fromEntries(
+            (logRecord.attributes ?? []).map((a) => [a.key, Object.values(a.value)[0]]),
+          );
+          records.push({
+            kind: "request",
+            tool: "claude",
+            vendor_id: attrs["session.id"],
+            vendor_field: "session.id",
+            billed_request_id: attrs.request_id,
+            step_attribution: "unattributed",
+            cost_usd: attrs.cost_usd,
+            input_tokens: attrs.input_tokens,
+            output_tokens: attrs.output_tokens,
+            cache_read_tokens: attrs.cache_read_tokens,
+            cache_creation_tokens: attrs.cache_creation_tokens,
+            model: attrs.model,
+            event_timestamp: attrs["event.timestamp"],
+          });
+        }
+      }
+    }
+    return records;
+  }
+
+  function exportedApiRequests() {
+    return [
+      ...apiRequestsFrom("otlp-logs-claude-code.json"),
+      ...apiRequestsFrom("otlp-logs-claude-code-subagent.json"),
+    ];
+  }
+
+  function localCounterpartOf(exported) {
+    return {
+      kind: "request",
+      tool: exported.tool,
+      vendor_id: exported.vendor_id,
+      vendor_field: "sessionId",
+      turn_id: exported.billed_request_id,
+      turn_field: "requestId",
+      billed_request_id: exported.billed_request_id,
+      step_attribution: "tool-stated",
+      step: "aidd-dev:02-implement",
+      input_tokens: exported.input_tokens,
+      output_tokens: exported.output_tokens,
+      cache_read_tokens: exported.cache_read_tokens,
+      cache_creation_tokens: exported.cache_creation_tokens,
+      model: exported.model,
+      event_timestamp: exported.event_timestamp,
+    };
+  }
+
+  it("sums a naive union of both routes' records to double - the reproduced defect", () => {
+    const exported = exportedApiRequests();
+    assert.equal(exported.length, 3);
+    const local = exported.map(localCounterpartOf);
+    const naiveUnion = [...exported, ...local];
+
+    assert.equal(naiveUnion.length, 6);
+    const naiveInputTokens = naiveUnion.reduce((sum, r) => sum + (r.input_tokens ?? 0), 0);
+    assert.equal(naiveInputTokens, 12);
+  });
+
+  it("collapses the two routes' records for the same call into one, in the built report", () => {
+    const exported = exportedApiRequests();
+    const local = exported.map(localCounterpartOf);
+    const trueCostMicroUsd = exported.reduce((sum, r) => sum + toMicroUsd(r.cost_usd ?? 0), 0);
+    const trueInputTokens = exported.reduce((sum, r) => sum + (r.input_tokens ?? 0), 0);
+    const trueOutputTokens = exported.reduce((sum, r) => sum + (r.output_tokens ?? 0), 0);
+    const trueCacheReadTokens = exported.reduce((sum, r) => sum + (r.cache_read_tokens ?? 0), 0);
+
+    const union = [...exported, ...local];
+    const built = report({ records: union });
+
+    // One billed call, counted once, whichever route or routes saw it. 3 requests and 6
+    // input tokens match the defect report's own worked numbers exactly.
+    assert.equal(built.totals.requests, 3);
+    assert.equal(trueInputTokens, 6);
+    assert.equal(built.totals.costMicroUsd, trueCostMicroUsd);
+    assert.equal(built.totals.inputTokens, trueInputTokens);
+    assert.equal(built.totals.outputTokens, trueOutputTokens);
+    assert.equal(built.totals.cacheReadTokens, trueCacheReadTokens);
+
+    // Neither route's own strength is thrown away for the other's: the export's money
+    // survives, and so does the local read's tool-stated step.
+    const toolStated = built.attributionMix.find((row) => row.attribution === "tool-stated");
+    assert.equal(toolStated.totals.requests, 3);
+    assert.equal(toolStated.totals.costMicroUsd, trueCostMicroUsd);
+
+    // Order-independent: a re-read's line order is never something a consumer controls,
+    // and neither is which of two duplicate deliveries for one billed call arrives first.
+    const reversed = report({ records: [...union].reverse() });
+    assert.equal(JSON.stringify(reversed), JSON.stringify(built));
+  });
+});
+
 describe("a local-read session total, the first record kind: 'session' report figure (#697)", () => {
   const COPILOT_CAPABILITY = {
     localRead: { tokenCounters: true, amount: false, toolStatedStep: false },

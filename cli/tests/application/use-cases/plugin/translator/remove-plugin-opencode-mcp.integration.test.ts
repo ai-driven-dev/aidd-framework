@@ -8,6 +8,7 @@
 import "../../../../../src/domain/tools/ai/opencode.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { CLIOutput } from "../../../../../src/application/output.js";
 import { PluginRemoveUseCase } from "../../../../../src/application/use-cases/plugin/plugin-remove-use-case.js";
 import { ModeBFlatMaterializationTranslator } from "../../../../../src/application/use-cases/plugin/translator/mode-b-flat-materialization-translator.js";
 import { Manifest } from "../../../../../src/domain/models/manifest.js";
@@ -67,7 +68,12 @@ describe("remove opencode plugin: unmerge MCP entries (Phase 5)", () => {
     );
     await manifestRepo.save(manifest);
 
-    const removeUseCase = new PluginRemoveUseCase(fs, manifestRepo);
+    const removeUseCase = new PluginRemoveUseCase(
+      fs,
+      manifestRepo,
+      new CLIOutput(false),
+      new Map()
+    );
     await removeUseCase.execute({
       pluginName: PLUGIN_NAME,
       toolIds: ["opencode"],
@@ -101,7 +107,12 @@ describe("remove opencode plugin: unmerge MCP entries (Phase 5)", () => {
     );
     await manifestRepo.save(manifest);
 
-    const removeUseCase = new PluginRemoveUseCase(fs, manifestRepo);
+    const removeUseCase = new PluginRemoveUseCase(
+      fs,
+      manifestRepo,
+      new CLIOutput(false),
+      new Map()
+    );
     await removeUseCase.execute({
       pluginName: PLUGIN_NAME,
       toolIds: ["opencode"],
@@ -134,7 +145,12 @@ describe("remove opencode plugin: unmerge MCP entries (Phase 5)", () => {
     await fs.deleteFile(OPENCODE_JSON);
     await manifestRepo.save(manifest);
 
-    const removeUseCase = new PluginRemoveUseCase(fs, manifestRepo);
+    const removeUseCase = new PluginRemoveUseCase(
+      fs,
+      manifestRepo,
+      new CLIOutput(false),
+      new Map()
+    );
     await expect(
       removeUseCase.execute({
         pluginName: PLUGIN_NAME,

@@ -88,12 +88,21 @@ function readCounters(usage: ClaudeUsage | undefined): ClaudeCounters | null {
 function buildIdentity(
   line: ClaudeTranscriptLine,
   vendorId: string
-): Pick<LocalCostCandidateRecord, "vendor_id" | "vendor_field" | "turn_id" | "turn_field"> {
+): Pick<
+  LocalCostCandidateRecord,
+  "vendor_id" | "vendor_field" | "turn_id" | "turn_field" | "billed_request_id"
+> {
   const turnId = asString(line.requestId);
   return {
     vendor_id: vendorId,
     vendor_field: VENDOR_FIELD,
     ...(turnId !== undefined ? { turn_id: turnId, turn_field: TURN_FIELD } : {}),
+    // The same value as `turn_id` on this route — Claude Code's local transcript names one
+    // billed call the same way it names one turn, `requestId`. Stated separately rather
+    // than derived from `turn_id` downstream: `turn_id` is not guaranteed unique per billed
+    // request on every tool and route, and a consumer collapsing two records into one must
+    // never key that on a field with that caveat. See telemetry-sink-record.ts.
+    ...(turnId !== undefined ? { billed_request_id: turnId } : {}),
   };
 }
 

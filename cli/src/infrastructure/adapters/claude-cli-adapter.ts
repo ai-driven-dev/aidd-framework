@@ -32,4 +32,16 @@ export class ClaudeCliAdapter extends AbstractNativePluginCliAdapter {
       `plugin install ${pluginRef}`
     );
   }
+
+  // `install` above registered the plugin at project scope (`--scope project`); `uninstall`
+  // defaults to `user` scope, which would silently miss a project-scoped entry, so the same
+  // scope must be passed back here. `--yes` only gates the `--prune` confirmation prompt, which
+  // this call never requests, but a headless stdin has no TTY to answer any prompt at all — so
+  // pass it unconditionally rather than assume today's uninstall never grows one.
+  uninstallPlugin(pluginRef: string): void {
+    this.run(
+      ["plugin", "uninstall", pluginRef, ...PROJECT_SCOPE_ARGS, "--yes"],
+      `plugin uninstall ${pluginRef}`
+    );
+  }
 }

@@ -16,4 +16,10 @@ export class CopilotCliAdapter extends AbstractNativePluginCliAdapter {
   enablePlugin(pluginRef: string): void {
     this.run(["plugin", "install", pluginRef], `plugin install ${pluginRef}`);
   }
+
+  // The removal counterpart of `plugin install` above: drops the entry from
+  // `~/.copilot/config.json` (`enabled`/`cache_path`) and `~/.copilot/settings.json`.
+  uninstallPlugin(pluginRef: string): void {
+    this.run(["plugin", "uninstall", pluginRef], `plugin uninstall ${pluginRef}`);
+  }
 }

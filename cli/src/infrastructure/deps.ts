@@ -440,7 +440,12 @@ export async function createDeps(
     ["codex", new CodexCliAdapter()],
     ["copilot", new CopilotCliAdapter()],
   ]);
-  const pluginRemoveUseCase = new PluginRemoveUseCase(fs, manifestRepo);
+  const pluginRemoveUseCase = new PluginRemoveUseCase(
+    fs,
+    manifestRepo,
+    logger,
+    nativePluginActivators
+  );
   const pluginListUseCase = new PluginListUseCase(manifestRepo);
   const fetchMarketplaceSource = new FetchMarketplaceSourceUseCase(
     pluginFetcher,

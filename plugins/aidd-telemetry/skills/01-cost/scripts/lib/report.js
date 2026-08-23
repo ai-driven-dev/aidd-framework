@@ -303,6 +303,74 @@ function declaredToolsInScope(declaredTools, filters) {
   return wanted === undefined ? declaredTools : declaredTools.filter((tool) => tool.tool === wanted);
 }
 
+/** A group key only where `billed_request_id` is present - the one field measured so far
+ * to be a stable, cross-route identifier for a single billed call (unlike `turn_id`, which
+ * a main-agent request and its subagent share). A record with none joins nothing and is
+ * left exactly as it arrived. Mirrors cli/src/domain/models/cost-report.ts. */
+function billedRequestKey(record) {
+  return record.billed_request_id === undefined
+    ? null
+    : `${record.tool} ${record.vendor_id} ${record.billed_request_id}`;
+}
+
+/** The same group, from any starting order, always answers the same record - a group's own
+ * order is never guaranteed (OTLP redelivery, or a re-read joining a session's stored
+ * records in whatever order the day files listed them). Picking `group[0]` would make the
+ * survivor depend on that accident; sorting on each candidate's own serialized content does
+ * not. Mirrors cli/src/domain/models/cost-report.ts. */
+function pickDeterministically(candidates) {
+  return [...candidates].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))[0];
+}
+
+/** One billed call, seen once by each of two live routes, collapsed to the one record a
+ * report may safely sum. Never done at write time - the sink is append-only, so a record
+ * already stored can never be corrected in place, only reconciled by whatever reads it
+ * back, which is here. The survivor keeps whichever record carries `cost_usd` - on every
+ * tool measured so far, that is also the one whose four token counters are complete for
+ * the call - then borrows `step_attribution`/`step`/`step_plugin` from a sibling that
+ * resolved one when its own is `"unattributed"`, preferring a tool-stated step over a
+ * journal-interval one, so neither route's one strength is thrown away for the other's.
+ * `person_id`/`person_display_name` are deliberately not backfilled the same way: nothing
+ * in the built report groups or filters on person, so a survivor without them loses no
+ * figure this report shows. Mirrors cli/src/domain/models/cost-report.ts. */
+function mergeBilledRequestGroup(group) {
+  if (group.length === 1) return group[0];
+  const costBearing = group.filter((record) => typeof record.cost_usd === "number");
+  const base = pickDeterministically(costBearing.length > 0 ? costBearing : group);
+  if (base.step_attribution !== "unattributed") return base;
+  const stepDonors = group.filter(
+    (record) => record !== base && record.step_attribution !== "unattributed"
+  );
+  if (stepDonors.length === 0) return base;
+  const toolStated = stepDonors.filter((record) => record.step_attribution === "tool-stated");
+  const donor = pickDeterministically(toolStated.length > 0 ? toolStated : stepDonors);
+  return {
+    ...base,
+    step_attribution: donor.step_attribution,
+    step: donor.step,
+    step_plugin: donor.step_plugin,
+  };
+}
+
+/** `kind: "session"` records are never part of a billed-call group - no metric datapoint
+ * measured so far carries `billed_request_id` at all - so this only ever touches
+ * `kind: "request"` records, and only ones that carry the field. */
+function collapseBilledRequests(records) {
+  const groups = new Map();
+  const rest = [];
+  for (const record of records) {
+    const key = record.kind === "request" ? billedRequestKey(record) : null;
+    if (key === null) {
+      rest.push(record);
+      continue;
+    }
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(record);
+    else groups.set(key, [record]);
+  }
+  return [...rest, ...[...groups.values()].map(mergeBilledRequestGroup)];
+}
+
 /**
  * Money and the four token counters come from `kind: "request"` records alone, and active
  * time from `kind: "session"` records alone. The two kinds measure overlapping quantities
@@ -310,8 +378,9 @@ function declaredToolsInScope(declaredTools, filters) {
  * producing a total that looks right.
  */
 function build(input) {
+  const collapsedRecords = collapseBilledRequests(input.records);
   const membership = input.task === undefined ? null : taskMembership(input.journals, input.task);
-  const stages = selectionStages(input.records, input, membership);
+  const stages = selectionStages(collapsedRecords, input, membership);
   const emptySelection = emptySelectionOf(stages, input, membership);
   const records = stages[stages.length - 1].records;
 

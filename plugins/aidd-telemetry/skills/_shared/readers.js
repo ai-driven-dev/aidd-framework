@@ -99,6 +99,12 @@ function claudeRecords(content, sessionId) {
           vendor_field: "sessionId",
           turn_id: requestId,
           turn_field: "requestId",
+          // Same value as `turn_id` on this route - Claude Code's local transcript names
+          // one billed call the same way it names one turn. Stated separately, never
+          // derived from `turn_id` downstream, since `turn_id` is not guaranteed unique
+          // per billed request on every tool and route. Mirrors
+          // cli/src/domain/formats/claude-code-transcript.ts.
+          billed_request_id: requestId,
           ...(asString(line.message.model) === undefined
             ? {}
             : { model: asString(line.message.model) }),

@@ -19,6 +19,7 @@
 import "../../../../../src/domain/tools/ai/cursor.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { CLIOutput } from "../../../../../src/application/output.js";
 import { PluginRemoveUseCase } from "../../../../../src/application/use-cases/plugin/plugin-remove-use-case.js";
 import { ModeBFlatMaterializationTranslator } from "../../../../../src/application/use-cases/plugin/translator/mode-b-flat-materialization-translator.js";
 import { Manifest } from "../../../../../src/domain/models/manifest.js";
@@ -130,7 +131,12 @@ describe("plugin remove unmerges Cursor project hooks (Phase 7, Task 3)", () => 
     expect(fs.has(SCRIPT_PATH)).toBe(true);
     expect(fs.has(OTHER_SCRIPT_PATH)).toBe(true);
 
-    const removeUseCase = new PluginRemoveUseCase(fs, manifestRepo);
+    const removeUseCase = new PluginRemoveUseCase(
+      fs,
+      manifestRepo,
+      new CLIOutput(false),
+      new Map()
+    );
     await removeUseCase.execute({
       pluginName: PLUGIN_NAME,
       toolIds: ["cursor"],

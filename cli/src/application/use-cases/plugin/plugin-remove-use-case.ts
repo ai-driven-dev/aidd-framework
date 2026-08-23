@@ -1,7 +1,7 @@
 import { homedir as nodeHomedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { McpCapability } from "../../../domain/capabilities/mcp-capability.js";
-import { PluginNotFoundError } from "../../../domain/errors.js";
+import { NativePluginCliError, PluginNotFoundError } from "../../../domain/errors.js";
 import {
   cursorProjectHooksScriptDir,
   unmergeCursorProjectHooksJson,
@@ -12,7 +12,9 @@ import type { Plugin } from "../../../domain/models/plugin.js";
 import type { AiToolId } from "../../../domain/models/tool-ids.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
+import type { Logger } from "../../../domain/ports/logger.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
+import type { NativePluginActivator } from "../../../domain/ports/native-plugin-activator.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
 import { loadPluginManifest } from "./plugin-file-sync.js";
 import {
@@ -31,7 +33,11 @@ export interface PluginRemoveOptions {
 export class PluginRemoveUseCase {
   constructor(
     private readonly fs: FileWriter & FileReader,
-    private readonly manifestRepo: ManifestRepository
+    private readonly manifestRepo: ManifestRepository,
+    private readonly logger: Logger,
+    /** Native plugin CLI activators keyed by `NativeActivation.binary`, mirroring the map
+     * `MarketplaceSyncSettingsUseCase` installs through (see deps.ts). */
+    private readonly activators: ReadonlyMap<string, NativePluginActivator>
   ) {}
 
   async execute(options: PluginRemoveOptions): Promise<void> {
@@ -55,6 +61,7 @@ export class PluginRemoveUseCase {
       const plugin = plugins.find((p) => p.name === pluginName);
       if (plugin === undefined) continue;
       const baseDir = resolvePluginBaseDir(toolId, projectRoot, nodeHomedir);
+      this.removeNativeActivation(plugin, toolId);
       await this.deletePluginFiles(plugin.files, baseDir);
       await this.removeMcpEntries(plugin, toolId, projectRoot);
       await this.removeProjectHooks(pluginName, toolId, projectRoot);
@@ -62,6 +69,45 @@ export class PluginRemoveUseCase {
       removed = true;
     }
     return removed;
+  }
+
+  // The removal counterpart of MarketplaceSyncSettingsUseCase.activateTool: a tool declared
+  // `nativeActivation` (Claude, Codex, Copilot) only loads a plugin once its own CLI registers
+  // it in a user-global registry that install never wrote to directly — so removal must drive
+  // the same CLI, not edit that registry file itself (see deps.ts and the adapters under
+  // infrastructure/adapters/*-cli-adapter.ts). A plugin without a recorded marketplace was
+  // never activated this way at install time either (mirrors
+  // MarketplaceSyncSettingsUseCase.pluginActivation's `marketplace == null` skip), so there is
+  // nothing to undo. Best-effort: a host that can't be reached must warn by name with what is
+  // left behind, never fail the whole removal silently.
+  private removeNativeActivation(plugin: Plugin, toolId: AiToolId): void {
+    const nativeActivation = resolvePluginsCapability(toolId)?.nativeActivation;
+    if (nativeActivation == null || plugin.marketplace === undefined) return;
+    const activator = this.activators.get(nativeActivation.binary);
+    if (activator === undefined) return;
+    const ref = `${plugin.name}@${plugin.marketplace}`;
+    this.uninstallViaActivator(activator, nativeActivation.binary, ref);
+  }
+
+  private uninstallViaActivator(
+    activator: NativePluginActivator,
+    binary: string,
+    ref: string
+  ): void {
+    if (!activator.isAvailable()) {
+      this.logger.warn(
+        `${binary} CLI not found on PATH — '${ref}' was not uninstalled from ${binary}'s own plugin registry and may still be enabled there.`
+      );
+      return;
+    }
+    try {
+      activator.uninstallPlugin(ref);
+    } catch (error) {
+      if (!(error instanceof NativePluginCliError)) throw error;
+      this.logger.warn(
+        `${binary} plugin uninstall '${ref}' failed: ${error.message} — an entry for it may remain in ${binary}'s own plugin registry.`
+      );
+    }
   }
 
   // The install-time counterpart of ProjectHooksMaterializer: a plugin whose hooks

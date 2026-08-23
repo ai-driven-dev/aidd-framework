@@ -59,7 +59,9 @@ export function isLoopbackTelemetryEndpoint(value: string): boolean {
   }
   // `hostname` strips the brackets IPv6 literals carry in a URL, so `[::1]` compares as `::1`.
   const host = url.hostname.toLowerCase();
-  return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "0:0:0:0:0:0:0:1";
+  return (
+    host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "0:0:0:0:0:0:0:1"
+  );
 }
 
 /** Shape-only check, called before ever writing the switch: an invalid endpoint must fail

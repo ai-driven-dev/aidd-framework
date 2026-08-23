@@ -17,4 +17,10 @@ export interface NativePluginActivator {
   upgradeMarketplaces(): void;
   /** Installs and enables a plugin referenced as `<plugin>@<marketplace>`. Idempotent. */
   enablePlugin(pluginRef: string): void;
+  /**
+   * Uninstalls a plugin referenced as `<plugin>@<marketplace>` — the removal
+   * counterpart of {@link enablePlugin}. May throw when the plugin is already
+   * absent from the tool's own registry; callers wrap it best-effort.
+   */
+  uninstallPlugin(pluginRef: string): void;
 }

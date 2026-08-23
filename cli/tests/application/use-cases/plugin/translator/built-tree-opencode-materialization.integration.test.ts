@@ -59,10 +59,11 @@ describe("BuiltTreeMaterializationTranslator — opencode (integration)", () => 
   it("copies only this plugin's flat files into the project, byte-for-byte", async () => {
     const fs = new InMemoryFileAdapter();
     const skill = "Load [assets/x.md](../assets/x.md)";
-    // This plugin's files (namespaced aidd-vcs-*) plus another plugin's (must be ignored).
-    fs.setFile(`${BUILT}/.opencode/skills/aidd-vcs-01-commit/SKILL.md`, skill);
+    // This plugin's skills nest under its own segment (aidd-vcs/...); agents stay
+    // hyphen-prefixed (aidd-vcs-helper.md). Another plugin's files must be ignored.
+    fs.setFile(`${BUILT}/.opencode/skills/aidd-vcs/01-commit/SKILL.md`, skill);
     fs.setFile(`${BUILT}/.opencode/agents/aidd-vcs-helper.md`, "agent body");
-    fs.setFile(`${BUILT}/.opencode/skills/aidd-dev-00-sdlc/SKILL.md`, "OTHER PLUGIN");
+    fs.setFile(`${BUILT}/.opencode/skills/aidd-dev/00-sdlc/SKILL.md`, "OTHER PLUGIN");
     fs.setFile(`${BUILT}/.build-version`, "5.0.0:1.0.0");
 
     const manifest = Manifest.create();
@@ -85,10 +86,10 @@ describe("BuiltTreeMaterializationTranslator — opencode (integration)", () => 
       "docs"
     );
 
-    expect(fs.getFile(`${PROJECT_ROOT}/.opencode/skills/aidd-vcs-01-commit/SKILL.md`)).toBe(skill);
+    expect(fs.getFile(`${PROJECT_ROOT}/.opencode/skills/aidd-vcs/01-commit/SKILL.md`)).toBe(skill);
     expect(fs.getFile(`${PROJECT_ROOT}/.opencode/agents/aidd-vcs-helper.md`)).toBe("agent body");
     // Other plugin's files and the sentinel are NOT installed.
-    expect(fs.has(`${PROJECT_ROOT}/.opencode/skills/aidd-dev-00-sdlc/SKILL.md`)).toBe(false);
+    expect(fs.has(`${PROJECT_ROOT}/.opencode/skills/aidd-dev/00-sdlc/SKILL.md`)).toBe(false);
     expect(fs.has(`${PROJECT_ROOT}/.build-version`)).toBe(false);
     const installed = manifest.getPlugins("opencode").find((p) => p.name === "aidd-vcs");
     expect(installed?.files.size).toBe(2);

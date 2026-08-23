@@ -38,7 +38,12 @@ describe("PluginRemoveUseCase", () => {
       await initAndInstall(deps, PROJECT_ROOT, "claude");
       await installPlugin(deps);
 
-      const removeUseCase = new PluginRemoveUseCase(deps.fs, deps.manifestRepo);
+      const removeUseCase = new PluginRemoveUseCase(
+        deps.fs,
+        deps.manifestRepo,
+        deps.logger,
+        deps.nativePluginActivators
+      );
       await removeUseCase.execute({
         pluginName: "sample-plugin",
         toolIds: ["claude"],
@@ -59,7 +64,12 @@ describe("PluginRemoveUseCase", () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);
       await initAndInstall(deps, PROJECT_ROOT, "claude");
 
-      const removeUseCase = new PluginRemoveUseCase(deps.fs, deps.manifestRepo);
+      const removeUseCase = new PluginRemoveUseCase(
+        deps.fs,
+        deps.manifestRepo,
+        deps.logger,
+        deps.nativePluginActivators
+      );
       await expect(
         removeUseCase.execute({
           pluginName: "nonexistent-plugin",

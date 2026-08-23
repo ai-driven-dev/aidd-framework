@@ -139,11 +139,15 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     );
   }
 
-  // Flat build emits the whole marketplace into one workspace. Skills/agents are
-  // namespaced by .opencode/<section>/<plugin>-<name>/...; install copies only this
-  // plugin's files by that prefix. Hooks are not namespaced — flatHooksDir is one
-  // directory the tool's loader scans flat (see flatHooksSharedDirPath) — so this
-  // plugin's own hook filenames are matched by name instead, from its own distribution.
+  // Flat build emits the whole marketplace into one workspace. Agents are namespaced
+  // by .opencode/agents/<plugin>-<name>...; skills instead nest the whole subtree
+  // under .opencode/skills/<plugin>/... (genericFlatSkillTreePath — a skill's own
+  // script can require() a sibling by relative path, which only keeps resolving
+  // when nothing under the plugin's skills/ subtree gets renamed). Install copies
+  // only this plugin's files by whichever convention its section uses. Hooks are not
+  // namespaced — flatHooksDir is one directory the tool's loader scans flat (see
+  // flatHooksSharedDirPath) — so this plugin's own hook filenames are matched by name
+  // instead, from its own distribution.
   private async readFlatFiles(
     builtDir: string,
     dist: PluginDistribution,
@@ -166,9 +170,11 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
 
   private belongsToPlugin(rel: string, name: string): boolean {
     const segments = rel.split("/");
-    return (
-      segments[0] === ".opencode" && segments.length >= 3 && segments[2].startsWith(`${name}-`)
-    );
+    if (segments[0] !== ".opencode" || segments.length < 3) return false;
+    // skills/ nests the whole plugin under one exactly-named segment (see the comment
+    // above); every other flat section still hyphen-prefixes the leaf segment.
+    if (segments[1] === "skills") return segments[2] === name;
+    return segments[2].startsWith(`${name}-`);
   }
 
   private flatHookOutputPaths(dist: PluginDistribution, toolId: AiToolId): ReadonlySet<string> {

@@ -41,6 +41,7 @@ export abstract class AbstractNativePluginCliAdapter implements NativePluginActi
 
   abstract upgradeMarketplaces(): void;
   abstract enablePlugin(pluginRef: string): void;
+  abstract uninstallPlugin(pluginRef: string): void;
 
   protected run(args: readonly string[], label: string): void {
     const result = spawnSync(this.binary, [...args], {

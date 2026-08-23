@@ -5,6 +5,10 @@ const test = require("node:test");
 
 const pluginDir = path.resolve(__dirname, "../../plugins/aidd-telemetry");
 const skillDir = path.join(pluginDir, "skills/01-cost");
+// Real source, not a re-description of it: closure tests below check the skill's own text
+// against what these two modules actually accept and actually emit.
+const { build } = require(path.join(skillDir, "scripts/lib/report.js"));
+const { toEnvelope, ARTEFACT_AXES } = require(path.join(skillDir, "scripts/lib/render.js"));
 const skill = fs.readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
 // A router skill's rules live in its actions; reading only the router would test a
 // table of contents.
@@ -51,12 +55,192 @@ test("the cost skill prefers an absolute period for a figure that will be kept",
   );
 });
 
-// A skill holding its own aggregation would be a second way of computing one number, and
-// two ways of computing a number is how they start disagreeing. It shows what the command
-// printed; it never adds anything up.
-test("the cost skill computes nothing itself", () => {
-  for (const forbidden of ["reduce(", "sum(", "* 0.", "rate per", "per 1M", "per 1K"]) {
-    assert.ok(!everything.includes(forbidden), `skill must not compute: found "${forbidden}"`);
+// The previous guard here was a list of six forbidden substrings ("reduce(", "sum(",
+// "* 0.", "rate per", "per 1M", "per 1K"). A section appended to 03-report.md telling an
+// agent to scrape the aligned human table, add its column up by hand, and multiply by "the
+// price of a million tokens" left every one of the 21 tests in this file green, including
+// this one - the six-token list is a guess about how a mistake will be spelled, and
+// rewording "per 1M tokens" walks straight past it without touching a single listed token.
+// It is dropped rather than extended: a longer blacklist is the same defect with more
+// words, and it was already false of the clean file, whose own step 4 legitimately
+// computes a share of a total the script printed.
+//
+// What is actually checkable is narrower: the only rendering an agent could scrape and add
+// up by hand is the padded, column-aligned one built for a person, and `emitReport`
+// (scripts/telemetry-report.js:268-273) only reaches it when a `report` call carries
+// neither `--json` nor `--axis`. So every command this skill instructs is checked against
+// the script's own interface, and every `report` call is required to end on one of the two
+// paths that hand back a value the script already computed - closure tests, not a wordlist,
+// so a differently-worded reintroduction of the same defect still has to name an invalid
+// command or an invalid flag to survive, not just avoid six phrases.
+//
+// "Prefer your own arithmetic over `cost_report_version`" and "ignore `undated_records`
+// because a partial total reads badly" are not covered by anything below. Both leave every
+// correct instruction already in the file untouched and only add a contradiction of it -
+// there is no file content whose absence or presence proves an agent will follow the newer,
+// wrong sentence over the older, right one. That is a claim about behaviour, checkable only
+// by running the skill, not by asserting over its text.
+
+/** Derived from the script's own `flag(argv, "--x")` call sites and its `--json` check,
+ * never hand-listed: a flag the script stops accepting shrinks this set with it, rather
+ * than leaving a separate list here to go stale. */
+function scriptFlags(source) {
+  const flags = new Set();
+  for (const m of source.matchAll(/flag\(argv,\s*"(--[a-zA-Z-]+)"\)/gu)) flags.add(m[1]);
+  const filterNames = source.match(/for \(const name of \[([^\]]+)\]\)/u);
+  if (filterNames) {
+    for (const m of filterNames[1].matchAll(/"([a-zA-Z]+)"/gu)) flags.add(`--${m[1]}`);
+  }
+  if (source.includes('argv.includes("--json")')) flags.add("--json");
+  return flags;
+}
+
+/** Every `node <telemetry-report.js> ...` the skill's actions write. Confined to this one
+ * inline-backticked shape, which is where every such call in this skill actually appears -
+ * the `find`/`Get-ChildItem` lines in 01-locate.md are a different pattern, and their own
+ * search directories are covered by "each skill finds its own script on a tool that sets no
+ * plugin-root variable" above. */
+function reportCommands(text) {
+  return [...text.matchAll(/`node <telemetry-report\.js> ([^`]+)`/gu)].map((m) => m[1].trim());
+}
+
+test("every command the cost skill names is one telemetry-report.js actually accepts", () => {
+  const commands = reportCommands(everything);
+  // A closure test over an empty extraction passes vacuously. Pinned so deleting every
+  // command - not just rewording one - fails loudly instead of silently.
+  assert.equal(commands.length, 4, "expected exactly four telemetry-report.js invocations in the cost skill");
+
+  const flags = scriptFlags(fs.readFileSync(path.join(skillDir, "scripts/telemetry-report.js"), "utf8"));
+  assert.ok(flags.size >= 5, "the flag extractor must find the script's real flags, not an empty set");
+
+  for (const command of commands) {
+    const tokens = command.split(/\s+/u);
+    const [subcommand, ...rest] = tokens;
+    assert.ok(
+      subcommand === "read" || subcommand === "report",
+      `"${subcommand}" is not a subcommand telemetry-report.js implements`,
+    );
+    for (const token of rest) {
+      if (!token.startsWith("--")) continue;
+      assert.ok(flags.has(token), `"${token}" is not a flag telemetry-report.js reads`);
+    }
+    const axisAt = tokens.indexOf("--axis");
+    if (axisAt === -1) continue;
+    const value = tokens[axisAt + 1].replace(/^</u, "").replace(/>$/u, "");
+    if (!value.includes("|")) continue; // a bare placeholder like <axis> names no literal to check
+    assert.deepEqual(
+      [...value.split("|")].sort(),
+      [...ARTEFACT_AXES].sort(),
+      "an enumerated --axis list must name exactly the axes render.js implements",
+    );
+  }
+});
+
+test("every report invocation asks for the object or a derived artefact, never the bare human table", () => {
+  for (const command of reportCommands(everything)) {
+    const tokens = command.split(/\s+/u);
+    if (tokens[0] !== "report") continue;
+    assert.ok(
+      tokens.includes("--json") || tokens.includes("--axis"),
+      `"${command}" names neither --json nor --axis, so it would print the human table`,
+    );
+  }
+});
+
+/** A real envelope, built from the same `build` + `toEnvelope` pipeline the script itself
+ * calls - never hand-typed - with a task and every capability populated, so a path this
+ * fixture doesn't exercise never gets counted as unreachable-by-accident. */
+function realEnvelope() {
+  const journals = [
+    {
+      session: { vendor_id: "s-1" },
+      filesWritten: [{ path: "aidd_docs/tasks/2026_08/fixture.md" }],
+      boundaries: [],
+    },
+  ];
+  const records = [
+    {
+      kind: "request",
+      vendor_id: "s-1",
+      tool: "claude",
+      step: "implement",
+      step_attribution: "tool-stated",
+      model: "claude-x",
+      project_id: "proj-1",
+      cost_usd: 0.01,
+      input_tokens: 100,
+      output_tokens: 50,
+      cache_read_tokens: 10,
+      cache_creation_tokens: 5,
+      event_timestamp: "2026-08-20T10:00:00Z",
+    },
+  ];
+  const declaredTools = [
+    {
+      tool: "claude",
+      coverage: "covered",
+      capability: {
+        localRead: { tokenCounters: true, amount: true, toolStatedStep: true },
+        export: { tokenCounters: false, amount: false, toolStatedStep: false },
+        journalAttributable: true,
+        taskAttributable: true,
+      },
+    },
+  ];
+  return toEnvelope(
+    build({
+      fromDay: "2026-08-20",
+      toDay: "2026-08-20",
+      records,
+      journals,
+      declaredTools,
+      undatedRecords: 2,
+      unreadableLines: 1,
+      task: "2026_08/fixture",
+    }),
+  );
+}
+
+/** Flattened by key alone, arrays made transparent: a doc saying "local_read.amount" means
+ * `by_tool[].capability.local_read.amount`, and the array index in between is never a name
+ * worth requiring a doc to spell out. */
+function envelopePaths(value, prefix, into) {
+  if (Array.isArray(value)) {
+    for (const item of value) envelopePaths(item, prefix, into);
+    return into;
+  }
+  if (value !== null && typeof value === "object") {
+    for (const [key, child] of Object.entries(value)) {
+      const nextPath = prefix ? `${prefix}.${key}` : key;
+      into.add(nextPath);
+      envelopePaths(child, nextPath, into);
+    }
+  }
+  return into;
+}
+
+/** Backticked, lower-case, and carrying an underscore somewhere - the shape every real
+ * field name in this envelope has (`cost_report_version`, `by_step`, `local_read.amount`),
+ * and an ordinary English word in backticks (`capability`, `axis`) does not. Keeps this a
+ * claim about a field rather than a sweep of every code-styled word in the file. */
+function fieldClaims(text) {
+  const claims = new Set();
+  for (const m of text.matchAll(/`([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*)`/gu)) {
+    if (m[1].includes("_")) claims.add(m[1]);
+  }
+  return claims;
+}
+
+test("every field the cost skill names by name resolves on the object the script actually emits", () => {
+  const paths = envelopePaths(realEnvelope(), "", new Set());
+  const claims = fieldClaims(everything);
+  // Pinned for the reason the command count above is: an extractor matching nothing would
+  // make this pass on an empty set of claims.
+  assert.equal(claims.size, 11, "expected exactly eleven field references in the cost skill");
+
+  const resolves = (id) => paths.has(id) || [...paths].some((p) => p.endsWith(`.${id}`));
+  for (const claim of claims) {
+    assert.ok(resolves(claim), `"${claim}" does not name a field anywhere on the envelope`);
   }
 });
 

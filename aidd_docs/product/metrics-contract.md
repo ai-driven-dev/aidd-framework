@@ -8,11 +8,11 @@ session's usage without reading this repository's source.
 > **Writing a skill, or anything that reports on AIDD work?** Read
 > [`cost-report-contract.md`](./cost-report-contract.md) instead. It describes the object
 > `aidd telemetry report --json` prints, with the rules below already applied. Reading raw
-> records makes you responsible for the two double-count rules, the split between the two
+> records makes you responsible for the three double-count rules, the split between the two
 > record kinds, and re-read deduplication — which is worth doing once, in one place, and
 > that place already exists. Everything a correct
 consumer needs is below: the file layout, every field's meaning and presence
-condition, the two ways a naive reader double counts, and what each tool can and
+condition, the three ways a naive reader double counts, and what each tool can and
 cannot supply.
 
 ## Where records live
@@ -125,6 +125,43 @@ A consumer aggregating raw appends from the sink file without replicating this
 own files rather than consuming this sink — will double, triple, or *N*-times
 count any record whose route has no stable per-record identifier, once per read
 of an active session.
+
+## A third way to double count: one billed call, seen by both routes
+
+A tool whose export and local read are both declared and measured — today,
+only Claude Code — can have both routes live for the same session at once: the
+OTLP export streams `api_request` as each call completes, and a local read of
+the same session's transcript, run at any point, sees the same calls in the
+tool's own file. Each route names the call in a namespace the other never
+reads — export's `turn_id` is `prompt.id`, one user turn, which a main-agent
+request and the subagent it spawned can share (see `turn_id` below); local's
+`turn_id` is `requestId`, one billed call — so matching on `turn_id` alone, as
+the re-read rule above does, never catches this: the two routes' records for
+the same real call never share that key, and a consumer that only guards
+against the re-read case sums both. **Measured on this repository's own
+captured export fixture** (`otlp-logs-claude-code-subagent.json`, a
+main-agent request and the subagent request it spawned): naively unioning
+those two export records with what a local read of the same two calls would
+produce doubles every figure — four `"request"` lines instead of two, every
+token counter twice its true value.
+
+**The fix is not a write-time match.** The sink is append-only (see "Where
+records live"): a record already stored can never be corrected in place, only
+reconciled by whatever reads it back. `billed_request_id` is the field that
+makes the reconciliation possible — the one identifier measured so far that
+both routes compute the same value for, for the same real call (see
+`billed_request_id` below). A consumer building a session's true totals groups
+`"request"` records sharing `tool`, `vendor_id` and `billed_request_id` and
+treats them as one billed call: keep the group's `cost_usd` and four token
+counters from whichever record carries `cost_usd` at all (on every tool
+measured so far, that record's counters are also the complete ones for the
+call), and take `step_attribution`/`step`/`step_plugin` from whichever record
+resolved one, so a call seen by both routes still shows the export's money and
+the local read's tool-stated step, never one thrown away for the other. A
+record with no `billed_request_id` joins no group and is counted exactly as it
+arrived — the same rule an unmatched `turn_id` follows for the re-read case.
+`cost-report-contract.md` calls this the third of the double-count rules
+`aidd telemetry report --json` has already applied.
 
 ## Identity and joins
 
@@ -308,6 +345,27 @@ ignores it exactly as it would any other field it does not recognize.
 - **Meaning**: which attribute on the source payload carried `turn_id`
   (`requestId`, `prompt.id`, `turn_id`, `id`, depending on tool and route).
 - **If absent**: `turn_id` is also absent on this record.
+
+#### `billed_request_id`
+- **Type**: string.
+- **Present**: conditional — measured so far only for Claude Code, on both routes:
+  its export names it via the `request_id` attribute on the `api_request` log
+  record, and its local transcript names it via `requestId` — the same
+  attribute the local route already uses for `turn_id`. No other tool or route
+  has ever been measured naming a billed call this way.
+- **Meaning**: the tool's own identifier for one billed call, and, unlike
+  `turn_id`, **guaranteed unique per billed request where it is present at
+  all** — a main-agent request and the subagent request it spawns each carry
+  their own. It exists so a consumer can collapse two records describing one
+  real call — made when both an export and a local read are live for the same
+  tool at once — into one, instead of summing both. See "One billed call,
+  both routes" below. Never used for the local-read re-read match `turn_id`
+  exists for, and never a primary key for anything beyond that collapse.
+- **If absent**: this record's route has no stable per-call identifier to
+  offer beyond `turn_id`, or the record's tool has never been measured
+  carrying one. A record with no `billed_request_id` is never collapsed with
+  any other — it is kept exactly as it arrived, the same rule an unmatched
+  `turn_id` already follows for a local re-read.
 
 #### `step`
 - **Type**: string.
@@ -516,7 +574,7 @@ from silence.
 
 | Tool | Export route | Local-read route |
 | ---- | ------------- | ------------------ |
-| **Claude Code** | Declared and measured: full request-level counters via `/v1/logs`, plus the six `"session"`-kind delta metrics via `/v1/metrics` every 10 seconds. `cost_usd` is only ever available through this route — no local file carries it. | Declared and measured: complete token counters per assistant message, keyed on `requestId`. Step is stated by the tool itself (`attributionSkill`), exact per message — the strongest attribution any tool or route offers. No `cost_usd`. |
+| **Claude Code** | Declared and measured: full request-level counters via `/v1/logs`, plus the six `"session"`-kind delta metrics via `/v1/metrics` every 10 seconds. `cost_usd` is only ever available through this route — no local file carries it. Also the only route measured naming `billed_request_id` (its `request_id` attribute). | Declared and measured: complete token counters per assistant message, keyed on `requestId`. Step is stated by the tool itself (`attributionSkill`), exact per message — the strongest attribution any tool or route offers. No `cost_usd`. Also names `billed_request_id` (the same `requestId`). **The one tool measured by both routes at once**: when both are live for a session, both routes append a record for the same billed call under two different `turn_id`s (`prompt.id` here, `requestId` there) — collapse on `billed_request_id` before summing, or every figure doubles. See "A third way to double count." |
 | **Codex** | Declared (`conversation.id` measured, zero-token, to verify the identifier only). Turn identifier and any metrics export are unmeasured — no counters, no cost, flow through this route today. | Declared and measured: complete counters per turn, keyed on `turn_id`, from the rollout's `token_count` events paired with the preceding `turn_context`. No tool-stated step — attribution is only ever a run-journal interval, or unattributed. No `cost_usd`. |
 | **OpenCode** | Unmeasured — no export payload has ever been captured for this tool. | Declared and measured, via `opencode export <sessionID> --sanitize`: counters per request (message), keyed on the message's own `id`. No established join to a run-journal entry — no captured hook or plugin payload has ever carried OpenCode's own session identity, so nothing exists to join on; these figures answer only what a session consumed, alone. `info.cost` is deliberately never read: it is `0` in every message captured, and its denomination (which currency, computed vs. billed) has never been established — a figure whose meaning is unknown is worse than an absent one. Records carry `event_timestamp` from the message's `time.created`, so they can be placed in a period; step attribution stays out of reach regardless, since there is no join to a run journal to attribute against. |
 | **Copilot** | Declared (`gen_ai.conversation.id` measured, zero-credit, to verify the identifier only) — but that attribute lives on the `invoke_agent` *span*, not on a log record or a metric, and this receiver only listens on `/v1/logs` and `/v1/metrics`. A receiver limited to those two paths never sees the one attribute that identifies a Copilot session, so this route yields nothing in practice today. | Supported at **session** granularity only: `session.shutdown` in `~/.copilot/session-state/<id>/events.jsonl` carries input, output, cache read and cache write together, once, for the whole session. Nothing in its files counts a single request, so it yields a `session` record and never a `request` one, and no amount can be placed inside a step. Read `tokenDetails`, never `usage` — the latter is inclusive of cache writes where every other reader's input is exclusive. No model is stamped: `currentModel` names the session's last model, not the one that spent. Separately, its file's own `cost` field is denominated in premium requests, not currency, so it could not be treated as `cost_usd` even where it is present. |
@@ -575,14 +633,19 @@ To compute one session's true totals from a set of stored records:
 
 1. Group records by matching `tool` and `vendor_id` — that pair names one real
    session, regardless of which `provenance` produced any individual record.
-2. Sum `cost_usd`, `input_tokens`, `output_tokens`, `cache_read_tokens`, and
-   `cache_creation_tokens` from `kind: "request"` records in that group only.
-   Never include `kind: "session"` records in this sum.
-3. Sum `active_time_s` from `kind: "session"` records in that group only — no
+2. Within that group, collapse every `kind: "request"` record sharing a
+   `billed_request_id` into one before summing anything — see "A third way to
+   double count: one billed call, seen by both routes." A record with no
+   `billed_request_id` is never collapsed with another.
+3. Sum `cost_usd`, `input_tokens`, `output_tokens`, `cache_read_tokens`, and
+   `cache_creation_tokens` from the collapsed `kind: "request"` records in that
+   group only. Never include `kind: "session"` records in this sum.
+4. Sum `active_time_s` from `kind: "session"` records in that group only — no
    `"request"` record carries it.
-4. Do not key anything on `turn_id` beyond what it is documented for here: it is
+5. Do not key anything on `turn_id` beyond what it is documented for here: it is
    a write-time match key for local-read re-reads, not a unique identifier for
-   a billed request.
-5. Where a tool's row above says a route is not covered, or covered without an
+   a billed request. `billed_request_id`, not `turn_id`, is what step 2 above
+   collapses on, precisely because `turn_id` lacks that guarantee.
+6. Where a tool's row above says a route is not covered, or covered without an
    amount, report that plainly rather than defaulting the missing figure to
    zero.

@@ -130,16 +130,19 @@ describe("OtlpHttpReceiverAdapter — the listening surface", () => {
     });
 
     await new Promise<void>((resolve) => {
-      const req = request({
+      const req = request(
+        {
           host: "127.0.0.1",
           port,
           path: "/v1/logs",
           method: "POST",
           headers: { "content-type": "application/json" },
-        }, (res) => {
-        res.resume();
-        resolve();
-      });
+        },
+        (res) => {
+          res.resume();
+          resolve();
+        }
+      );
       req.on("error", () => resolve());
       req.write(oversizedButValid);
       req.end();
@@ -147,7 +150,11 @@ describe("OtlpHttpReceiverAdapter — the listening surface", () => {
 
     expect(received).toHaveLength(0);
 
-    const after = await fetch(`http://127.0.0.1:${port}/v1/logs`, { method: "POST", body: "{}", headers: { "content-type": "application/json" } });
+    const after = await fetch(`http://127.0.0.1:${port}/v1/logs`, {
+      method: "POST",
+      body: "{}",
+      headers: { "content-type": "application/json" },
+    });
     expect(after.status).toBe(200);
     expect(received).toHaveLength(1);
   });

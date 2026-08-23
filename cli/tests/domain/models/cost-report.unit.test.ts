@@ -8,7 +8,10 @@ import {
   type CostTotals,
   toMicroUsd,
 } from "../../../src/domain/models/cost-report.js";
-import type { TelemetrySinkRecord } from "../../../src/domain/models/telemetry-sink-record.js";
+import {
+  mapOtlpLogsToSinkRecords,
+  type TelemetrySinkRecord,
+} from "../../../src/domain/models/telemetry-sink-record.js";
 import { AI_TOOL_IDS } from "../../../src/domain/models/tool-ids.js";
 
 const BASE: TelemetrySinkRecord = {
@@ -96,6 +99,113 @@ describe("buildCostReport — the two kinds are never summed", () => {
 
   it("reports no active time at all, rather than zero, when no record carried it", () => {
     expect(report({ records: [request({ cost_usd: 1 })] }).activeTimeSeconds).toBeUndefined();
+  });
+});
+
+// A user who enables the OTLP export and also runs the local read sees every billed
+// request line twice: once from each route. Both fixtures below are real captured export
+// payloads — `otlp-logs-claude-code.json` (one main-agent request) and
+// `otlp-logs-claude-code-subagent.json` (a main-agent request and the subagent request it
+// spawned) — mapped through the real production mapper, never hand-built: three billed
+// calls, matching the defect report's own worked count. The local-read half is what
+// `read-local-cost-use-case.ts` would produce for those exact same three billed calls: same
+// `billed_request_id` (Claude Code's `requestId`, carried by both routes for the same
+// call), no `cost_usd` (no local reader has ever captured one), a tool-stated `step` the
+// export route never carries at all. `requests` and `inputTokens` below reproduce the
+// defect report's own figures exactly (6 naive, 3 collapsed; 12 naive, 6 collapsed);
+// `outputTokens`/`cacheReadTokens` do not — these two checked-in fixtures carry smaller
+// figures than whatever fuller session the report was written against, so this test checks
+// its own union's true totals rather than asserting numbers these fixtures cannot produce.
+describe("buildCostReport — one billed call, seen by both routes, counts once", () => {
+  const EXPORT_VENDORS = [
+    { tool: "claude" as const, identityAttribute: "session.id", turnAttribute: "prompt.id" },
+  ];
+  const FIXTURES_DIR = new URL("../../fixtures/telemetry-sink/", import.meta.url);
+
+  function loadFixture(name: string): unknown {
+    return JSON.parse(readFileSync(fileURLToPath(new URL(name, FIXTURES_DIR)), "utf8"));
+  }
+
+  function exportedApiRequests(): readonly TelemetrySinkRecord[] {
+    return [
+      ...mapOtlpLogsToSinkRecords(loadFixture("otlp-logs-claude-code.json"), EXPORT_VENDORS),
+      ...mapOtlpLogsToSinkRecords(
+        loadFixture("otlp-logs-claude-code-subagent.json"),
+        EXPORT_VENDORS
+      ),
+    ];
+  }
+
+  function localCounterpartOf(exported: TelemetrySinkRecord): TelemetrySinkRecord {
+    return {
+      sink_schema_version: exported.sink_schema_version,
+      kind: "request",
+      provenance: "local-read",
+      tool: exported.tool,
+      vendor_id: exported.vendor_id,
+      vendor_field: "sessionId",
+      turn_id: exported.billed_request_id,
+      turn_field: "requestId",
+      billed_request_id: exported.billed_request_id,
+      step_attribution: "tool-stated",
+      step: "aidd-dev:02-implement",
+      input_tokens: exported.input_tokens,
+      output_tokens: exported.output_tokens,
+      cache_read_tokens: exported.cache_read_tokens,
+      cache_creation_tokens: exported.cache_creation_tokens,
+      model: exported.model,
+      event_timestamp: exported.event_timestamp,
+    };
+  }
+
+  it("sums a naive union of both routes' records to double — the reproduced defect", () => {
+    const exported = exportedApiRequests();
+    expect(exported).toHaveLength(3);
+    expect(exported.every((r) => r.billed_request_id !== undefined)).toBe(true);
+    const local = exported.map(localCounterpartOf);
+
+    // What a naive reader gets by concatenating every route's records with no collapse:
+    // six request lines for three real billed calls — money and tokens read double. Six
+    // and twelve are the defect report's own figures, from these same two fixtures.
+    const naiveUnion = [...exported, ...local];
+    expect(naiveUnion).toHaveLength(6);
+    const naiveInputTokens = naiveUnion.reduce((sum, r) => sum + (r.input_tokens ?? 0), 0);
+    expect(naiveInputTokens).toBe(12);
+  });
+
+  it("collapses the two routes' records for the same call into one, in the built report", () => {
+    const exported = exportedApiRequests();
+    const local = exported.map(localCounterpartOf);
+    const trueCostMicroUsd = exported.reduce((sum, r) => sum + toMicroUsd(r.cost_usd ?? 0), 0);
+    const trueInputTokens = exported.reduce((sum, r) => sum + (r.input_tokens ?? 0), 0);
+    const trueOutputTokens = exported.reduce((sum, r) => sum + (r.output_tokens ?? 0), 0);
+    const trueCacheReadTokens = exported.reduce((sum, r) => sum + (r.cache_read_tokens ?? 0), 0);
+
+    const union = [...exported, ...local];
+    const built = report({ records: union });
+
+    // One billed call, counted once, whichever route or routes saw it — never the naive
+    // union's six, and never the true figures doubled. 3 requests and 6 input tokens match
+    // the defect report's own worked numbers exactly.
+    expect(built.totals.requests).toBe(3);
+    expect(trueInputTokens).toBe(6);
+    expect(built.totals.costMicroUsd).toBe(trueCostMicroUsd);
+    expect(built.totals.inputTokens).toBe(trueInputTokens);
+    expect(built.totals.outputTokens).toBe(trueOutputTokens);
+    expect(built.totals.cacheReadTokens).toBe(trueCacheReadTokens);
+
+    // Neither route's own strength is thrown away for the other's: the export's money
+    // survives, and so does the local read's tool-stated step — which the export record
+    // alone could never have supplied (metrics-contract.md, "Step attribution").
+    const toolStated = built.attributionMix.find((row) => row.attribution === "tool-stated");
+    expect(toolStated?.totals.requests).toBe(3);
+    expect(toolStated?.totals.costMicroUsd).toBe(trueCostMicroUsd);
+
+    // Order-independent, the same guarantee `accumulate` already gives every other record:
+    // a re-read's line order is never something a consumer controls, and neither is which
+    // of two duplicate deliveries for one billed call arrives first.
+    const reversed = report({ records: [...union].reverse() });
+    expect(JSON.stringify(reversed)).toBe(JSON.stringify(built));
   });
 });
 

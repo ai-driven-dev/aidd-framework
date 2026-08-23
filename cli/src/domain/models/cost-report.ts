@@ -844,9 +844,89 @@ function assembleCostReport(
   };
 }
 
+/** A group key only where `billed_request_id` is present — the one field measured so far
+ * to be a stable, cross-route identifier for a single billed call (unlike `turn_id`, which
+ * a main-agent request and its subagent share). A record with none joins nothing and is
+ * left exactly as it arrived, the same rule an unmatched `turn_id` already follows for a
+ * local re-read. */
+function billedRequestKey(record: TelemetrySinkRecord): string | null {
+  return record.billed_request_id === undefined
+    ? null
+    : `${record.tool} ${record.vendor_id} ${record.billed_request_id}`;
+}
+
+/** The same group, from any starting order, always answers the same record — the same
+ * property `accumulate` already guarantees for the records it is handed (see "the same
+ * records, however they arrive" below). A group's own order is never guaranteed: OTLP
+ * redelivery can duplicate an export record, and a re-read joins a session's already-stored
+ * records in whatever order the day files listed them, not the order they were billed in.
+ * Picking `group[0]` would make the survivor depend on that accident; sorting on each
+ * candidate's own serialized content does not. */
+function pickDeterministically(candidates: readonly TelemetrySinkRecord[]): TelemetrySinkRecord {
+  return [...candidates].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))[0];
+}
+
+/** One billed call, seen once by each of two live routes, collapsed to the one record a
+ * report may safely sum. Never done at write time: the sink is append-only (see
+ * metrics-contract.md, "Where records live"), so a record already stored can never be
+ * corrected in place — only reconciled by whatever reads it back, which is here.
+ *
+ * The survivor keeps whichever record carries `cost_usd` — on every tool measured so far,
+ * that is also the one whose four token counters are complete for the call
+ * (metrics-contract.md, "Cost and token counters"), so nothing about the group's money is
+ * ever summed from more than one record. It then borrows `step_attribution`/`step`/
+ * `step_plugin` from a sibling that resolved one, when its own is `"unattributed"` — the
+ * export route never states a step at all, so leaving it as the survivor by default would
+ * throw away the one thing the local-read route in the same group did know, preferring a
+ * tool-stated step over a journal-interval one where both exist.
+ *
+ * `person_id`/`person_display_name` are deliberately not backfilled the same way: nothing
+ * in `CostReport` groups or filters on person, so a survivor without them loses no figure
+ * this report shows. Revisit this the day a person-scoped view is added. */
+function mergeBilledRequestGroup(group: readonly TelemetrySinkRecord[]): TelemetrySinkRecord {
+  if (group.length === 1) return group[0];
+  const costBearing = group.filter((record) => record.cost_usd !== undefined);
+  const base = pickDeterministically(costBearing.length > 0 ? costBearing : group);
+  if (base.step_attribution !== "unattributed") return base;
+  const stepDonors = group.filter(
+    (record) => record !== base && record.step_attribution !== "unattributed"
+  );
+  if (stepDonors.length === 0) return base;
+  const toolStated = stepDonors.filter((record) => record.step_attribution === "tool-stated");
+  const donor = pickDeterministically(toolStated.length > 0 ? toolStated : stepDonors);
+  return {
+    ...base,
+    step_attribution: donor.step_attribution,
+    step: donor.step,
+    step_plugin: donor.step_plugin,
+  };
+}
+
+/** `kind: "session"` records are never part of a billed-call group — no metric datapoint
+ * measured so far carries `billed_request_id` at all — so this only ever touches
+ * `kind: "request"` records, and only ones that carry the field. */
+function collapseBilledRequests(
+  records: readonly TelemetrySinkRecord[]
+): readonly TelemetrySinkRecord[] {
+  const groups = new Map<string, TelemetrySinkRecord[]>();
+  const rest: TelemetrySinkRecord[] = [];
+  for (const record of records) {
+    const key = record.kind === "request" ? billedRequestKey(record) : null;
+    if (key === null) {
+      rest.push(record);
+      continue;
+    }
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(record);
+    else groups.set(key, [record]);
+  }
+  return [...rest, ...[...groups.values()].map(mergeBilledRequestGroup)];
+}
+
 export function buildCostReport(input: CostReportInput): CostReport {
+  const records = collapseBilledRequests(input.records);
   const membership = input.task === undefined ? null : taskMembership(input.journals, input.task);
-  const stages = selectionStages(input.records, input, membership);
+  const stages = selectionStages(records, input, membership);
   const emptySelection = emptySelectionOf(stages, input, membership);
   const inScope = stages[stages.length - 1]?.records ?? [];
   const groups = accumulate(inScope, input.fromDay, input.toDay, membership);
