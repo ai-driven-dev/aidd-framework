@@ -17,6 +17,18 @@ import type {
 const VENDOR_FIELD = "sessionId";
 const TURN_FIELD = "requestId";
 
+// Claude Code writes its own fabricated assistant messages into the transcript with this
+// literal in `message.model` - a session-limit notice, an "API Error: your computer went
+// to sleep" notice (#686). They are messages the tool composed, not calls anyone was
+// billed for, so they yield no record at all.
+//
+// The filter is the marker, never all-counters-zero: measured 2026-08-23 across every
+// transcript in ~/.claude/projects, all 251 `<synthetic>` messages carried four zero
+// counters and `<synthetic>` was the only such placeholder any of them used for a model.
+// A genuinely billed call that happened to read zero on all four - improbable, not
+// impossible - is still an observation, and still yields its record.
+const SYNTHETIC_MODEL = "<synthetic>";
+
 interface ClaudeUsage {
   readonly input_tokens?: unknown;
   readonly cache_creation_input_tokens?: unknown;
@@ -152,6 +164,9 @@ function parseAssistantLine(
     return null;
   }
   if (parsed.type !== "assistant") return null;
+  // Before the dedupe key is computed: a line that is not a request must not consume a
+  // key either, or the first real call sharing it would be dropped as a duplicate.
+  if (parsed.message?.model === SYNTHETIC_MODEL) return null;
   const vendorId = asString(parsed.sessionId);
   if (vendorId === undefined) return null;
   const counters = readCounters(parsed.message?.usage);

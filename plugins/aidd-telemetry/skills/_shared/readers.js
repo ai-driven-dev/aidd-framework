@@ -60,6 +60,14 @@ function withCounters(record, counters) {
 
 // Claude Code -----------------------------------------------------------------------
 
+// Claude Code writes its own fabricated assistant messages into the transcript with this
+// literal in `message.model` - a session-limit notice, an "API Error: your computer went
+// to sleep" notice (#686). They are messages the tool composed, not calls anyone was
+// billed for, so they yield no record at all. The filter is the marker, never
+// all-counters-zero: a genuinely billed call that happened to read zero on all four is
+// still an observation. Mirrors cli/src/domain/formats/claude-code-transcript.ts.
+const CLAUDE_SYNTHETIC_MODEL = "<synthetic>";
+
 // One assistant message per line, but several lines can share a `requestId` - one billed
 // call streamed in parts. Keyed on it, so a call counted once is a call counted once.
 function claudeRecords(content, sessionId) {
@@ -67,6 +75,9 @@ function claudeRecords(content, sessionId) {
   for (const raw of content.split("\n")) {
     const line = raw.trim() === "" ? null : parseLine(raw);
     if (!line || line.type !== "assistant") continue;
+    // Before the map is keyed: a line that is not a request must not claim a `requestId`
+    // either, or the first real call sharing it would be dropped as a duplicate.
+    if (line.message && line.message.model === CLAUDE_SYNTHETIC_MODEL) continue;
     const requestId = asString(line.requestId);
     const usage = line.message && line.message.usage;
     if (!requestId || !usage || byRequest.has(requestId)) continue;

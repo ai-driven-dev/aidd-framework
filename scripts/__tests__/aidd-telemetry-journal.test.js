@@ -3346,3 +3346,132 @@ test("declaredTaskPath reads tool_input first and Copilot's toolArgs string only
   );
   assert.equal(declaredTaskPath({ tool_input: { command: "echo hi" } }), null);
 });
+
+// #695 - a session says which worktree it ran in ------------------------------------
+
+// A linked worktree of `repo`, switched on, with its own runs directory. The seed commit
+// is what `git worktree add` needs a HEAD for; makeTempRepo leaves the repo empty.
+function makeWorktree(repo, name) {
+  execFileSync("git", ["commit", "-q", "--allow-empty", "-m", "seed"], { cwd: repo, env: CLEAN_ENV });
+  const worktree = path.join(path.dirname(repo), `${path.basename(repo)}-${name}`);
+  execFileSync("git", ["worktree", "add", "--quiet", "-b", name, worktree], {
+    cwd: repo,
+    env: CLEAN_ENV,
+  });
+  fs.mkdirSync(runsDirOf(worktree), { recursive: true });
+  writeTelemetryConfig(worktree, { enabled: true });
+  return worktree;
+}
+
+function sessionStartLineIn(dir) {
+  const [file] = readRunFiles(runsDirOf(dir));
+  assert.ok(file, `no run file was written under ${runsDirOf(dir)}`);
+  return readLines(file)[0];
+}
+
+test("a session in a linked worktree names the worktree it ran in and the repository those worktrees share", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/worktree-named.git" });
+  const worktree = makeWorktree(repo, "alpha");
+  try {
+    withEnv({ AIDD_RUNS_DIR: "" }, () => {
+      processPayload(
+        makePayload({ cwd: worktree, sessionId: "wt-named-session", event: "SessionStart" }),
+      );
+    });
+
+    const line = sessionStartLineIn(worktree);
+    assert.equal(line.worktree_id, path.basename(worktree));
+    assert.equal(line.worktree_repo_id, path.basename(repo));
+  } finally {
+    cleanup(repo, worktree);
+  }
+});
+
+test("two sessions from two worktrees of one repository are distinguishable in the journal, and still say they belong together", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/worktree-two.git" });
+  const first = makeWorktree(repo, "alpha");
+  const second = makeWorktree(repo, "beta");
+  try {
+    withEnv({ AIDD_RUNS_DIR: "" }, () => {
+      processPayload(makePayload({ cwd: first, sessionId: "wt-alpha", event: "SessionStart" }));
+      processPayload(makePayload({ cwd: second, sessionId: "wt-beta", event: "SessionStart" }));
+    });
+
+    const alpha = sessionStartLineIn(first);
+    const beta = sessionStartLineIn(second);
+    assert.notEqual(alpha.worktree_id, beta.worktree_id);
+    // Both worktrees carry the same repository. Without this field they would not: with no
+    // remote, project_id falls back to each worktree's own directory name.
+    assert.equal(alpha.worktree_repo_id, beta.worktree_repo_id);
+  } finally {
+    cleanup(repo, first, second);
+  }
+});
+
+test("a session in a plain checkout carries no worktree field at all - not null, not an empty string, absent", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/worktree-absent.git" });
+  try {
+    withEnv({ AIDD_RUNS_DIR: "" }, () => {
+      processPayload(
+        makePayload({ cwd: repo, sessionId: "plain-checkout-session", event: "SessionStart" }),
+      );
+    });
+
+    const line = sessionStartLineIn(repo);
+    // An empty string would gather every plain checkout into one group as though they were
+    // the same worktree; the exact key set is what proves neither key is there at all.
+    assert.deepEqual(Object.keys(line).sort(), SESSION_START_KEYS);
+    assert.equal("worktree_id" in line, false);
+    assert.equal("worktree_repo_id" in line, false);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("naming the worktree costs a plain checkout no extra git call - the two words are read off the rev-parse it already paid for", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/worktree-shellout.git" });
+  const worktree = makeWorktree(repo, "alpha");
+  try {
+    withEnv({ AIDD_RUNS_DIR: "" }, () => {
+      const callsForPlain = countGitInvocations(() => {
+        processPayload(makePayload({ cwd: repo, sessionId: "count-plain", event: "SessionStart" }));
+      });
+      const callsForWorktree = countGitInvocations(() => {
+        processPayload(
+          makePayload({ cwd: worktree, sessionId: "count-worktree", event: "SessionStart" }),
+        );
+      });
+
+      // Two, and the same two either way: one `rev-parse` resolving the root and the two
+      // worktree directories together, then one `remote get-url` for the project fields.
+      assert.equal(callsForPlain, 2);
+      assert.equal(callsForWorktree, callsForPlain);
+    });
+  } finally {
+    cleanup(repo, worktree);
+  }
+});
+
+test("a plain checkout that happens to live in a directory named 'worktrees' is still a plain checkout", () => {
+  // The layout `<common>/worktrees/<name>` is what identifies a linked worktree, so a
+  // repository sitting at `.../worktrees` would pass that test on its own and be recorded
+  // as a worktree named ".git".
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-telemetry-wt-trap-"));
+  const repo = path.join(parent, "worktrees");
+  try {
+    fs.mkdirSync(repo);
+    execFileSync("git", ["init", "-q"], { cwd: repo, env: CLEAN_ENV });
+    fs.mkdirSync(runsDirOf(repo), { recursive: true });
+    writeTelemetryConfig(repo, { enabled: true });
+
+    withEnv({ AIDD_RUNS_DIR: "" }, () => {
+      processPayload(
+        makePayload({ cwd: repo, sessionId: "worktrees-named-repo", event: "SessionStart" }),
+      );
+    });
+
+    assert.deepEqual(Object.keys(sessionStartLineIn(repo)).sort(), SESSION_START_KEYS);
+  } finally {
+    cleanup(parent);
+  }
+});

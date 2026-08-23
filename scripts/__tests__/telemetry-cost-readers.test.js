@@ -54,6 +54,61 @@ describe("reading what Claude Code wrote about a session", () => {
   it("says it found no session for an id no file names", () => {
     assert.deepEqual(read("no-such-session"), { records: [], sessionFound: false });
   });
+
+  // #686. The fixture carries one captured `<synthetic>` line - a session-limit notice
+  // Claude Code composed itself, four zero counters, its own requestId. Not a billed call.
+  it("yields no record for a message the tool marked <synthetic>", () => {
+    const { records } = read(CLAUDE_SESSION);
+
+    assert.equal(
+      records.some((record) => record.model === "<synthetic>"),
+      false,
+    );
+    assert.equal(
+      records.some((record) => record.turn_id === "req_011CdhNELnGn9e99rkVfSSSc"),
+      false,
+    );
+  });
+
+  // The filter is the marker, never the symptom: a real call reading zero on all four
+  // counters is improbable, not impossible, and is still an observation.
+  it("still yields a record for all-zero counters on a message that is not synthetic", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-synthetic-"));
+    try {
+      const sessionId = "55555555-5555-4555-8555-555555555555";
+      const dir = path.join(home, ".claude", "projects", "fake-project");
+      fs.mkdirSync(dir, { recursive: true });
+      const zeroUsage = {
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 0,
+      };
+      fs.writeFileSync(
+        path.join(dir, `${sessionId}.jsonl`),
+        `${JSON.stringify({
+          type: "assistant",
+          sessionId,
+          requestId: "req_synthetic",
+          message: { model: "<synthetic>", id: "msg_synthetic", usage: zeroUsage },
+        })}\n${JSON.stringify({
+          type: "assistant",
+          sessionId,
+          requestId: "req_all_zero",
+          message: { model: "claude-opus-5", id: "msg_all_zero", usage: zeroUsage },
+        })}\n`,
+      );
+
+      const { records } = readerFor("claude")(home, sessionId);
+
+      assert.equal(records.length, 1);
+      assert.equal(records[0].model, "claude-opus-5");
+      assert.equal(records[0].turn_id, "req_all_zero");
+      assert.equal(records[0].output_tokens, 0);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("reading what Codex wrote about a session", () => {

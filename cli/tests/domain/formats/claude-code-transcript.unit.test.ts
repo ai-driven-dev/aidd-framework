@@ -24,8 +24,9 @@ describe("mapClaudeCodeTranscriptToSinkRecords", () => {
     const records = mapClaudeCodeTranscriptToSinkRecords(loadFixture(MAIN_PATH));
 
     // The fixture holds a queue-operation, a user turn, a tool_result turn (none carry
-    // counters) and three real API calls — one of them logged as two JSONL lines (a
-    // `thinking` block then a `tool_use` block) sharing one `requestId` and `message.id`.
+    // counters), one `<synthetic>` notice Claude Code wrote itself, and three real API
+    // calls — one of them logged as two JSONL lines (a `thinking` block then a `tool_use`
+    // block) sharing one `requestId` and `message.id`.
     expect(records).toHaveLength(3);
     expect(records[0]).toEqual({
       kind: "request",
@@ -130,6 +131,94 @@ describe("mapClaudeCodeTranscriptToSinkRecords", () => {
     const records = mapClaudeCodeTranscriptToSinkRecords(moved);
 
     expect(records).toHaveLength(0);
+  });
+
+  // #686. The fixture's synthetic line is a captured one: a session-limit notice Claude
+  // Code composed itself, `model: "<synthetic>"`, four zero counters, its own `requestId`.
+  it("yields no record for a message the tool marked <synthetic>", () => {
+    const records = mapClaudeCodeTranscriptToSinkRecords(loadFixture(MAIN_PATH));
+
+    expect(records.some((r) => r.model === "<synthetic>")).toBe(false);
+    expect(records.some((r) => r.turn_id === "req_011CdhNELnGn9e99rkVfSSSc")).toBe(false);
+    expect(records.map((r) => r.model)).toEqual([
+      "claude-sonnet-5",
+      "claude-sonnet-5",
+      "claude-sonnet-5",
+    ]);
+  });
+
+  // The filter is the marker, not the symptom: all-counters-zero on a real model is
+  // improbable, not impossible, and dropping it would be a real call lost with nothing
+  // downstream able to tell it was ever there.
+  it("still yields a record for all-zero counters on a message that is not synthetic", () => {
+    const line = JSON.stringify({
+      type: "assistant",
+      sessionId: SID,
+      requestId: "req_all_zero",
+      timestamp: "2026-08-05T19:08:00.000Z",
+      message: {
+        model: "claude-opus-5",
+        id: "msg_all_zero",
+        usage: {
+          input_tokens: 0,
+          output_tokens: 0,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+        },
+      },
+    });
+
+    const records = mapClaudeCodeTranscriptToSinkRecords(line);
+
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({
+      turn_id: "req_all_zero",
+      model: "claude-opus-5",
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_read_tokens: 0,
+      cache_creation_tokens: 0,
+    });
+  });
+
+  // A skipped line must not claim the key either: the next real call sharing it would
+  // otherwise be dropped as a duplicate of something that was never a call.
+  it("leaves the dedupe key free for a real call sharing the synthetic line's requestId", () => {
+    const synthetic = JSON.stringify({
+      type: "assistant",
+      sessionId: SID,
+      requestId: "req_shared",
+      message: {
+        model: "<synthetic>",
+        id: "msg_shared",
+        usage: {
+          input_tokens: 0,
+          output_tokens: 0,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+        },
+      },
+    });
+    const real = JSON.stringify({
+      type: "assistant",
+      sessionId: SID,
+      requestId: "req_shared",
+      message: {
+        model: "claude-opus-5",
+        id: "msg_shared",
+        usage: {
+          input_tokens: 7,
+          output_tokens: 9,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+        },
+      },
+    });
+
+    const records = mapClaudeCodeTranscriptToSinkRecords(`${synthetic}\n${real}\n`);
+
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ model: "claude-opus-5", output_tokens: 9 });
   });
 
   it("touches no filesystem — a string in, an array out", () => {

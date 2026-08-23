@@ -271,6 +271,30 @@ describe("aidd telemetry, across every tool that can be read", () => {
     expect(result.stdout).toMatch(/Codex\s+nothing in this selection/u);
   });
 
+  // #686. The Claude Code transcript this reads carries a captured `<synthetic>` line —
+  // a notice the tool composed itself, not a call anyone was billed for. It used to reach
+  // the sink and sit in this breakdown beside the real models, as though it were one.
+  it("breaks a real session down by model and lists only models", async () => {
+    await journalClaudeSession();
+    await journalCodexSessionBackdated();
+    await readEveryTool();
+
+    const result = await cli([
+      "telemetry",
+      "report",
+      "--days",
+      daysBackToTheOldestWork(),
+      "--json",
+    ]);
+    expect(result.exitCode, result.stderr).toBe(0);
+    const parsed = JSON.parse(result.stdout) as { by_model: readonly { model?: string }[] };
+    const models = parsed.by_model.map((row) => row.model);
+
+    expect(models.length).toBeGreaterThan(0);
+    expect(models).not.toContain("<synthetic>");
+    for (const model of models) expect(model).not.toMatch(/^</u);
+  });
+
   it("stores nothing twice when the same sessions are read again", async () => {
     await journalClaudeSession();
     await journalCodexSessionBackdated();

@@ -33,6 +33,14 @@ export interface RunJournalSessionStart {
    * none. Carried beside `project_id` rather than replacing it, the same shape
    * `record.js`'s own `session_start` line writes. */
   readonly project_remote?: string;
+  /** Git's own name for the linked worktree this session ran in (#695), so two worktrees
+   * of one repository are distinguishable in a journal. Absent — never `""` — for a plain
+   * checkout, which is the common case and is not an unknown worktree. */
+  readonly worktree_id?: string;
+  /** The repository those worktrees share, named from `--git-common-dir`. Recorded beside
+   * `worktree_id` rather than left to `project_id`, which falls back to the worktree's own
+   * directory name when a clone has no remote. Absent whenever `worktree_id` is. */
+  readonly worktree_repo_id?: string;
 }
 
 /** A `file_written` line: a repository-relative, "/"-separated path a session wrote inside

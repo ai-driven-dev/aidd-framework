@@ -28,6 +28,80 @@ function getRepoRoot(cwd) {
   }
 }
 
+// Where a linked worktree's git directory always sits: `<git-common-dir>/worktrees/<name>`.
+const WORKTREES_SEGMENT = "worktrees";
+const GIT_DIR_NAME = ".git";
+
+// #695. The worktree a session ran in, named so two worktrees of one repository can be
+// told apart in a journal - taken from git, never from an agent runner's own variable,
+// which names that runner's concept rather than the repository's.
+//
+// A plain checkout gets NEITHER field: absent, never null and never "". An absent value is
+// the only one a reader cannot mistake for a worktree that happens to be called something;
+// an empty string would gather every plain checkout on earth into one group as though they
+// were the same worktree. That is the error `cost-report.ts`'s `NO_KNOWN_PROJECT` symbol
+// exists to prevent for a record naming no project, and it is prevented here the same way -
+// by the field not being there at all.
+//
+// The layout is the test, never a comparison of the two directories: two spellings of one
+// path (a Windows drive letter cased differently in each) would compare unequal and write
+// a worktree field on a plain checkout. `path.basename` reads "/" and "\" alike on Windows,
+// and `path.resolve` is applied first because `git rev-parse` prints these two relative to
+// the cwd it ran in for a plain checkout and absolute for a linked worktree.
+function worktreeFields(cwd, commonDir, gitDir) {
+  if (!commonDir || !gitDir) return {};
+  const resolvedGitDir = path.resolve(cwd, gitDir);
+  // A plain checkout's git directory is always the literal `.git` inside the working tree,
+  // whatever that tree is called - so a repository that happens to live in a directory
+  // named `worktrees` would otherwise pass the layout test below and be recorded as a
+  // worktree named ".git". The linked worktree's git directory is named for the worktree
+  // and is never `.git`.
+  if (path.basename(resolvedGitDir) === GIT_DIR_NAME) return {};
+  if (path.basename(path.dirname(resolvedGitDir)) !== WORKTREES_SEGMENT) return {};
+  const repoName = repositoryNameFromCommonDir(path.resolve(cwd, commonDir));
+  return {
+    worktreeId: sanitizePathSegment(path.basename(resolvedGitDir)),
+    ...(repoName === null ? {} : { worktreeRepoId: repoName }),
+  };
+}
+
+// The repository every worktree of one clone shares, named from the directory that holds
+// it: `<repo>/.git` and a bare `<repo>.git` both answer `<repo>`. Recorded beside the
+// worktree rather than left to `project_id`, which falls back to the *worktree's* own
+// directory name when a clone has no remote - so two worktrees of a remote-less clone
+// carry two different `project_id` values and nothing else on the line would say they
+// belong together.
+function repositoryNameFromCommonDir(commonDir) {
+  const base = path.basename(commonDir);
+  const name =
+    base === GIT_DIR_NAME ? path.basename(path.dirname(commonDir)) : base.replace(/\.git$/u, "");
+  return name === "" || name === "." || name === ".." ? null : sanitizePathSegment(name);
+}
+
+// One `git rev-parse`, never three: a plain checkout pays exactly the shellout it paid
+// before #695 existed, and reads two more words from the same stdout. `getRepoRoot` above
+// is left alone - it is exported, and asking it for more than the root would change what
+// its name promises.
+function getRepoLocation(cwd) {
+  if (typeof cwd !== "string" || !cwd) return null;
+  try {
+    const result = spawnSync(
+      "git",
+      ["rev-parse", "--show-toplevel", "--git-common-dir", "--git-dir"],
+      { cwd, encoding: "utf8", env: gitEnv() }
+    );
+    if (result.status !== 0) return null;
+    // A git too old for one of the later options fails the whole call, so this only ever
+    // reads short output when git answered something unexpected - in which case the
+    // worktree fields stay absent rather than being guessed at.
+    const [root, commonDir, gitDir] = String(result.stdout).split("\n").map((part) => part.trim());
+    if (!root) return null;
+    return { repoRoot: root, ...worktreeFields(cwd, commonDir, gitDir) };
+  } catch {
+    return null;
+  }
+}
+
 // `aidd framework build` copies hooks/ verbatim with no install step, so JSON.parse is
 // the only parser available.
 function readTelemetryConfig(repoRoot) {
@@ -180,11 +254,12 @@ function restrictToCurrentUser(target, { inheritable = false } = {}) {
 // the entry `telemetry-switch.js on` added when B turned measurement on.
 //
 // Cross-worktree joining - so a report can still see every worktree's sessions together -
-// is #695, a field recorded on `session_start`, not a shared write target.
+// is #695: `worktreeFields` above names the worktree on `session_start`, and the write
+// target stays exactly where this function has always put it.
 function resolveRunsDir(cwd) {
-  const repoRoot = getRepoRoot(cwd);
-  if (!repoRoot || !telemetryEnabled(repoRoot)) return null;
-  return { repoRoot, dir: runsDir(repoRoot) };
+  const location = getRepoLocation(cwd);
+  if (!location || !telemetryEnabled(location.repoRoot)) return null;
+  return { ...location, dir: runsDir(location.repoRoot) };
 }
 
 // A token-authenticated clone leaves a live credential in the remote's userinfo
@@ -207,6 +282,7 @@ function resolveWriteTarget(cwd) {
 
 module.exports = {
   getRepoRoot,
+  getRepoLocation,
   readTelemetryConfig,
   telemetryEnabled,
   getRemoteUrl,

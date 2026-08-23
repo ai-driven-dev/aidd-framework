@@ -47,6 +47,8 @@ interface RawJournalLine {
   readonly vendor_id?: unknown;
   readonly project_id?: unknown;
   readonly project_remote?: unknown;
+  readonly worktree_id?: unknown;
+  readonly worktree_repo_id?: unknown;
   readonly path?: unknown;
 }
 
@@ -71,6 +73,20 @@ function parseBoundary(parsed: RawJournalLine): RunJournalBoundary | null {
   return skill !== undefined ? { type: "step_start", at, skill } : null;
 }
 
+/** The worktree a session ran in (#695), where the line names one. A plain checkout writes
+ * neither key, and neither is read here — `asString` already rejects `""`, so a torn or
+ * empty value reads as "not stated" rather than as a worktree named nothing. */
+function parseWorktree(
+  parsed: RawJournalLine
+): Pick<RunJournalSessionStart, "worktree_id" | "worktree_repo_id"> {
+  const worktreeId = asString(parsed.worktree_id);
+  const worktreeRepoId = asString(parsed.worktree_repo_id);
+  return {
+    ...(worktreeId === undefined ? {} : { worktree_id: worktreeId }),
+    ...(worktreeRepoId === undefined ? {} : { worktree_repo_id: worktreeRepoId }),
+  };
+}
+
 /** The header line, or `null` when the line is not one or is missing a field a join needs.
  * `run_id`, `tool` and `vendor_id` are all required: a header naming two of the three
  * cannot say which session it belongs to, and a half-read header is worse than none. */
@@ -93,6 +109,7 @@ function parseSessionStart(parsed: RawJournalLine): RunJournalSessionStart | nul
     vendor_id: vendorId,
     ...(projectId === undefined ? {} : { project_id: projectId }),
     ...(projectRemote === undefined ? {} : { project_remote: projectRemote }),
+    ...parseWorktree(parsed),
   };
 }
 

@@ -118,7 +118,23 @@ function appendLine(filePath, line) {
   fs.appendFileSync(filePath, `${JSON.stringify(line)}\n`, { mode: PRIVATE_FILE_MODE });
 }
 
-function buildSessionStartLine({ at, runId, projectId, projectRemote, host, vendorId }) {
+// worktree_id / worktree_repo_id are omitted entirely, never written as null or "", for a
+// session that is not in a linked worktree - the common case, a plain checkout. See
+// `worktreeFields` in hooks/lib/repo.js for why absence is the only honest answer there:
+// an empty string would gather every plain checkout into one group as though they were the
+// same worktree. They are appended after the fields that were already on this line, so a
+// reader keyed on order sees no existing key move. No schema_version bump: an optional
+// field a reader may not know about is exactly what an optional field is for.
+function buildSessionStartLine({
+  at,
+  runId,
+  projectId,
+  projectRemote,
+  host,
+  vendorId,
+  worktreeId,
+  worktreeRepoId,
+}) {
   return {
     type: "session_start",
     at,
@@ -129,6 +145,8 @@ function buildSessionStartLine({ at, runId, projectId, projectRemote, host, vend
     tool: host,
     vendor_id: vendorId,
     vendor_field: VENDOR_FIELD_BY_HOST[host],
+    ...(worktreeId === undefined ? {} : { worktree_id: worktreeId }),
+    ...(worktreeRepoId === undefined ? {} : { worktree_repo_id: worktreeRepoId }),
   };
 }
 
@@ -185,7 +203,7 @@ function sanitizeSkillName(skill) {
 function handleSessionStart(payload, host, sessionId) {
   const target = resolveWriteTarget(readCwd(host, payload));
   if (!target) return;
-  const { projectId, projectRemote, dir } = target;
+  const { projectId, projectRemote, dir, worktreeId, worktreeRepoId } = target;
 
   // SessionStart is not documented to fire once per session_id - `source` takes values
   // beyond `startup` - so this guard prevents a second file for one vendor_id.
@@ -199,6 +217,8 @@ function handleSessionStart(payload, host, sessionId) {
     projectRemote,
     host,
     vendorId: sessionId,
+    worktreeId,
+    worktreeRepoId,
   });
 
   fs.mkdirSync(dir, { recursive: true, mode: PRIVATE_DIR_MODE });
