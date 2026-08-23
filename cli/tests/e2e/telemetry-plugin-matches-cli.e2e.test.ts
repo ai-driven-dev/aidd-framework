@@ -114,6 +114,13 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
       ...environmentWithoutGitVariables(process.env),
       PATH: pathWithoutAidd(),
       HOME: fakeHome,
+      // HOME alone only sandboxes POSIX. `os.homedir()` never reads it on Windows - it
+      // reads USERPROFILE - and both sides resolve a person's own file under %APPDATA%
+      // there. Left at the runner's real values, this "sandboxed" home reads the machine
+      // owner's actual identity file, and a session read after the opt-in below came back
+      // unnamed on Windows only (#707).
+      USERPROFILE: fakeHome,
+      APPDATA: join(fakeHome, "AppData", "Roaming"),
       AIDD_USER_CONFIG_DIR: configDir,
     };
   }
