@@ -131,9 +131,23 @@ describe("the identifier itself", () => {
   });
 });
 
+// The identity file's own rule, restated rather than imported: a test that asked the code
+// where it put the file could never catch the code putting it in the wrong place. Windows
+// keeps a person's data under %APPDATA%, so the sandbox supplies one inside the temp home
+// - without it these would read, and write, the runner's real profile (#707).
+function appDataIn(home) {
+  return path.join(home, "AppData", "Roaming");
+}
+
+function identityFileIn(home) {
+  return process.platform === "win32"
+    ? path.join(appDataIn(home), "aidd", "identity.json")
+    : path.join(home, ".config", "aidd", "identity.json");
+}
+
 function identityEnv(home) {
   const { GIT_DIR: _g, GIT_INDEX_FILE: _i, GIT_WORK_TREE: _w, ...rest } = process.env;
-  return { ...rest, HOME: home };
+  return { ...rest, HOME: home, APPDATA: appDataIn(home) };
 }
 
 function runIdentity(home, args) {
@@ -152,7 +166,7 @@ describe("choosing, and taking it back", () => {
     assert.match(result.stdout, /Attaches to:/u);
     assert.match(result.stdout, /Never attaches to:/u);
     const stored = JSON.parse(
-      fs.readFileSync(path.join(home, ".config", "aidd", "identity.json"), "utf8")
+      fs.readFileSync(identityFileIn(home), "utf8")
     );
     assert.match(stored.person_id, UUID_V4);
     assert.ok(!("display_name" in stored), "opting in alone must not set a display name");
@@ -162,11 +176,11 @@ describe("choosing, and taking it back", () => {
     const home = tempDir("aidd-identity-home-");
     runIdentity(home, ["on"]);
     const first = JSON.parse(
-      fs.readFileSync(path.join(home, ".config", "aidd", "identity.json"), "utf8")
+      fs.readFileSync(identityFileIn(home), "utf8")
     ).person_id;
     runIdentity(home, ["on"]);
     const second = JSON.parse(
-      fs.readFileSync(path.join(home, ".config", "aidd", "identity.json"), "utf8")
+      fs.readFileSync(identityFileIn(home), "utf8")
     ).person_id;
     assert.equal(second, first);
   });
@@ -176,7 +190,7 @@ describe("choosing, and taking it back", () => {
     runIdentity(home, ["on"]);
     runIdentity(home, ["name", "Baptiste"]);
     const stored = JSON.parse(
-      fs.readFileSync(path.join(home, ".config", "aidd", "identity.json"), "utf8")
+      fs.readFileSync(identityFileIn(home), "utf8")
     );
     assert.match(stored.person_id, UUID_V4);
     assert.equal(stored.display_name, "Baptiste");
@@ -187,13 +201,13 @@ describe("choosing, and taking it back", () => {
     const result = runIdentity(home, ["name", "Baptiste"]);
 
     assert.equal(result.status, 1);
-    assert.ok(!fs.existsSync(path.join(home, ".config", "aidd", "identity.json")));
+    assert.ok(!fs.existsSync(identityFileIn(home)));
   });
 
   it("withdrawing is one action, stops new records, and says what stays", () => {
     const home = tempDir("aidd-identity-home-");
     runIdentity(home, ["on"]);
-    const filePath = path.join(home, ".config", "aidd", "identity.json");
+    const filePath = identityFileIn(home);
     assert.ok(fs.existsSync(filePath));
 
     const result = runIdentity(home, ["off"]);
@@ -208,19 +222,19 @@ describe("choosing, and taking it back", () => {
     const result = runIdentity(home, ["off"]);
 
     assert.equal(result.status, 0, result.stderr);
-    assert.ok(!fs.existsSync(path.join(home, ".config", "aidd", "identity.json")));
+    assert.ok(!fs.existsSync(identityFileIn(home)));
   });
 
   it("opting in again after withdrawing mints a fresh identifier, never the old one", () => {
     const home = tempDir("aidd-identity-home-");
     runIdentity(home, ["on"]);
     const before = JSON.parse(
-      fs.readFileSync(path.join(home, ".config", "aidd", "identity.json"), "utf8")
+      fs.readFileSync(identityFileIn(home), "utf8")
     ).person_id;
     runIdentity(home, ["off"]);
     runIdentity(home, ["on"]);
     const after = JSON.parse(
-      fs.readFileSync(path.join(home, ".config", "aidd", "identity.json"), "utf8")
+      fs.readFileSync(identityFileIn(home), "utf8")
     ).person_id;
     assert.notEqual(after, before);
   });
@@ -345,7 +359,7 @@ describe("a choice made today does not reach backwards", () => {
 
     runIdentity(home, ["on"]);
     const personId = JSON.parse(
-      fs.readFileSync(path.join(home, ".config", "aidd", "identity.json"), "utf8")
+      fs.readFileSync(identityFileIn(home), "utf8")
     ).person_id;
 
     // A second journalled session, read for the first time only now that this person has
