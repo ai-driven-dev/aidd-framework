@@ -217,21 +217,36 @@ jobs:
           console.log("file mode on disk=0" + fileMode + " (sink.js/record.js asked for 0600)");
           EOF
 
-      - name: '#707 answer 3 - the script search line exactly as 01-locate.md writes it, under bash'
+      # These two ran the raw `find` line to measure #707's question, and answered it: under
+      # Git Bash `find` exits non-zero for every plugin directory a fresh machine does not
+      # have, and under PowerShell `find` is Windows' own unrelated FIND.exe ("Parameter
+      # format not correct", exit 2). 01-locate.md now carries a form per shell. These steps
+      # run those forms, so the documented instruction is what gets checked from here on -
+      # a step that only records a defect stops being useful the moment the defect is fixed.
+      - name: '#707 answer 3 - the bash form 01-locate.md documents finds the script'
         id: answer3bash
         continue-on-error: true
         run: |
-          find ~/.claude/plugins ~/.codex/plugins ~/.cursor/plugins .github/plugins .claude/plugins .codex/plugins . \
-            -type f -path '*01-cost/scripts/telemetry-report.js' 2>&1
-          echo "exit code: ${PIPESTATUS[0]}"
+          found=$(test -n "$CLAUDE_PLUGIN_ROOT" && ls "$CLAUDE_PLUGIN_ROOT/skills/01-cost/scripts/telemetry-report.js" \
+            || find ~/.claude/plugins ~/.codex/plugins ~/.cursor/plugins .github/plugins .claude/plugins .codex/plugins . \
+               -type f -path '*01-cost/scripts/telemetry-report.js' 2>/dev/null | head -1 || true)
+          echo "found: $found"
+          test -n "$found"
 
-      - name: '#707 answer 3 - the identical line under pwsh (what a PowerShell user gets)'
+      - name: '#707 answer 3 - the PowerShell form finds it too (find.exe would not)'
         id: answer3pwsh
         continue-on-error: true
         shell: pwsh
         run: |
-          find ~/.claude/plugins ~/.codex/plugins ~/.cursor/plugins .github/plugins .claude/plugins .codex/plugins . -type f -path '*01-cost/scripts/telemetry-report.js' 2>&1
-          Write-Output "exit code: $LASTEXITCODE"
+          $found = if ($env:CLAUDE_PLUGIN_ROOT -and (Test-Path "$env:CLAUDE_PLUGIN_ROOT/skills/01-cost/scripts/telemetry-report.js")) {
+            "$env:CLAUDE_PLUGIN_ROOT/skills/01-cost/scripts/telemetry-report.js"
+          } else {
+            Get-ChildItem -Path "$HOME/.claude/plugins", "$HOME/.codex/plugins", "$HOME/.cursor/plugins", ".github/plugins", ".claude/plugins", ".codex/plugins", "." -Recurse -File -Filter "telemetry-report.js" -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -replace '\\', '/' -match '01-cost/scripts/telemetry-report.js$' } |
+              Select-Object -First 1 -ExpandProperty FullName
+          }
+          Write-Output "found: $found"
+          if (-not $found) { exit 1 }
 
       - name: Round trip - switch telemetry on
         id: rt1
