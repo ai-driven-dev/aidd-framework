@@ -106,6 +106,7 @@ function replay(input, event = "session-start") {
 const FIXTURE_NAMES = [
   "claude-code-session-start.json",
   "codex-session-start.json",
+  "codex-session-end.json",
   "copilot-session-start.json",
   "cursor-session-start.json",
   "claude-code-post-tool-use-write.json",
@@ -376,6 +377,45 @@ for (const name of [
     assert.equal(result.stderr, "");
   });
 }
+
+// Codex has no `Stop` event. Its own vocabulary, read out of the 0.149.0 binary and
+// confirmed by a live `codex exec`, is SessionStart / SessionEnd / PostToolUse and friends -
+// SessionStart and SessionEnd fired, Stop never did, so every Codex session journalled a
+// session_start with nothing after it (#707). Both fixtures below are real captures from
+// that run with the home path redacted; this test replays the SessionEnd one as the
+// turn-end hook receives it, and fails if a Codex turn ever stops closing.
+test("Codex's own SessionEnd payload closes the turn, since Codex never sends a Stop", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/codex-session-end.git" });
+  try {
+    const start = { ...loadFixture("codex-session-start.json"), cwd: repo };
+    const end = { ...loadFixture("codex-session-end.json"), cwd: repo };
+    assert.equal(replayIn(start, "session-start").status, 0);
+    assert.equal(replayIn(end, "turn-end").status, 0);
+
+    const written = readRunFiles(runsDirOf(repo));
+    assert.equal(written.length, 1, "one run file, not one per event");
+    const lines = readLines(written[0]);
+    assert.equal(lines[0].type, "session_start");
+    assert.equal(lines[0].tool, "codex");
+    assert.ok(
+      lines.some((line) => line.type === "turn_end"),
+      "SessionEnd must append a turn_end line - without it nothing downstream has a boundary"
+    );
+  } finally {
+    cleanup(repo);
+  }
+});
+
+// The two events carry the same session, so a turn_end joins the session_start it closes.
+// SessionEnd carries session_id, transcript_path, cwd, hook_event_name and reason - the
+// first two are what readSessionId reads, in that order.
+test("Codex's SessionEnd names the same session its SessionStart did", () => {
+  const start = loadFixture("codex-session-start.json");
+  const end = loadFixture("codex-session-end.json");
+  assert.equal(end.hook_event_name, "SessionEnd");
+  assert.equal(end.session_id, start.session_id);
+  assert.equal(end.transcript_path, start.transcript_path);
+});
 
 test("a session-start replay with hook_event_name stripped still mints a record - argv alone drives dispatch", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/argv-only-start.git" });
