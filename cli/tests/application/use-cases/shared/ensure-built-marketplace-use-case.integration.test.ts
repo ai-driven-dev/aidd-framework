@@ -127,7 +127,7 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
   });
 
   it("does not rebuild when the sentinel matches (cliVer:catalogVer)", async () => {
-    const builtDir = builtMarketplaceDir(PROJECT, "aidd-framework", "codex");
+    const builtDir = resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "codex"));
     fs.setFile(join(builtDir, ".build-version"), "5.0.0:1.0.0");
     const uc = new EnsureBuiltMarketplaceUseCase(
       fs,
@@ -146,7 +146,7 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
   });
 
   it("rebuilds when the CLI version changed even if catalog version is the same", async () => {
-    const builtDir = builtMarketplaceDir(PROJECT, "aidd-framework", "codex");
+    const builtDir = resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "codex"));
     fs.setFile(join(builtDir, ".build-version"), "4.0.0:1.0.0");
     const uc = new EnsureBuiltMarketplaceUseCase(
       fs,
@@ -165,7 +165,7 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
   });
 
   it("always rebuilds when catalog version is undefined", async () => {
-    const builtDir = builtMarketplaceDir(PROJECT, "aidd-framework", "codex");
+    const builtDir = resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "codex"));
     fs.setFile(join(builtDir, ".build-version"), "5.0.0:unversioned");
     const uc = new EnsureBuiltMarketplaceUseCase(
       fs,
@@ -197,7 +197,7 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
       target: "codex",
       mode: "marketplace",
     });
-    expect(r.builtDir).toBe(builtMarketplaceDir(PROJECT, "aidd-framework", "codex"));
+    expect(r.builtDir).toBe(resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "codex")));
     expect(fs.getFile(join(r.builtDir, "plugins/aidd-vcs/SKILL.md"))).toBe("built content");
     // temp dir cleaned up
     expect(fs.listUnder(tmpdir()).length).toBe(0);
@@ -338,16 +338,10 @@ describe("outDir invariant for the cache-rebuild build path", () => {
       const underTmp = outDir === tmpRoot || outDir.startsWith(`${tmpRoot}${sep}`);
       expect(underCache || underTmp).toBe(true);
     }
-    // The dogfood call specifically must have gone through the temp dir, not the cache.
-    // Red on Windows (#707, not fixed here): ensure-built-marketplace-use-case.ts's own
-    // nested() compares sourceDir/builtDir with a hardcoded "/" (never path.sep), so on a
-    // real windows-latest runner it never recognises real nesting - the dogfood call
-    // routes straight into runBuild() instead of buildViaTemp(), landing this outDir under
-    // the cache, not tmp. In real use that same source/builtDir pair also differs by
-    // resolve()'s drive letter (sourceDir goes through it at
-    // ensure-built-marketplace-use-case.ts:70, builtDir never does), so fixing the
-    // separator alone would not be enough - both need to compare normalized, equally-
-    // resolved paths.
+    // The dogfood call specifically must have gone through the temp dir, not the cache
+    // (#707): nested() now compares "/"-normalized paths, and both sourceDir and builtDir
+    // are resolve()'d before it sees them, so a drive-less-vs-drive-qualified or
+    // "\"-vs-"/" mismatch can no longer hide real nesting on Windows.
     expect(capturedOutDirs[1]?.startsWith(`${tmpRoot}${sep}`)).toBe(true);
   });
 });

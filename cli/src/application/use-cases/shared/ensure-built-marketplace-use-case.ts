@@ -115,11 +115,16 @@ export class EnsureBuiltMarketplaceUseCase {
     await this.runBuild(target, mode, sourceDir, builtDir);
   }
 
+  // "/"-separated comparison, matching FrameworkBuildUseCase.guardPaths(): both dirs are
+  // native-separated (resolve() returns "\" on Windows), so a hardcoded "/" suffix would
+  // never match, silently missing genuine nesting.
   private nested(sourceDir: string, builtDir: string): boolean {
+    const normalizedSource = sourceDir.replace(/\\/g, "/");
+    const normalizedBuilt = builtDir.replace(/\\/g, "/");
     return (
-      sourceDir === builtDir ||
-      builtDir.startsWith(`${sourceDir}/`) ||
-      sourceDir.startsWith(`${builtDir}/`)
+      normalizedSource === normalizedBuilt ||
+      normalizedBuilt.startsWith(`${normalizedSource}/`) ||
+      normalizedSource.startsWith(`${normalizedBuilt}/`)
     );
   }
 
