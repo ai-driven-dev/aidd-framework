@@ -125,7 +125,22 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
     };
   }
 
-  async function capture(command: readonly string[], configDir: string): Promise<string> {
+  /**
+   * The output AND the exit status. Returning text alone made every test in this file blind
+   * to failure: a script printing the right answer and exiting non-zero read exactly like one
+   * that succeeded, and two sides failing with identical text compared equal. Proven by
+   * making the plugin's `main()` return 3 while printing byte-identical output — all eleven
+   * tests stayed green.
+   *
+   * The status is asserted here rather than returned to each caller, because what this file
+   * claims is that the two sides *answer the same*, and a non-zero exit is not an answer.
+   */
+  async function capture(
+    command: readonly string[],
+    configDir: string,
+    refusalExpected = false
+  ): Promise<string> {
+    const label = command[0] === CLI_PATH ? "the CLI" : "the plugin script";
     try {
       const { stdout, stderr } = await execFileAsync(process.execPath, [...command], {
         cwd: projectDir,
@@ -133,8 +148,13 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
       });
       return `${stdout}${stderr}`;
     } catch (error) {
-      const failed = error as { stdout?: string; stderr?: string };
-      return `${failed.stdout ?? ""}${failed.stderr ?? ""}`;
+      const failed = error as { stdout?: string; stderr?: string; code?: number };
+      const output = `${failed.stdout ?? ""}${failed.stderr ?? ""}`;
+      // A refusal is an answer, and this file compares refusals too. Anything else is not.
+      if (refusalExpected) return output;
+      throw new Error(
+        `${label} exited ${failed.code ?? "non-zero"} for [${command.slice(1).join(" ")}]:\n${output}`
+      );
     }
   }
 
@@ -142,6 +162,14 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
     return Promise.all([
       capture([CLI_PATH, "telemetry", ...args], cliConfig),
       capture([PLUGIN_SCRIPT, ...args], pluginConfig),
+    ]);
+  }
+
+  /** For the two tests that drive an invalid invocation on purpose and compare the refusal. */
+  function bothRefusing(args: readonly string[]): Promise<[string, string]> {
+    return Promise.all([
+      capture([CLI_PATH, "telemetry", ...args], cliConfig, true),
+      capture([PLUGIN_SCRIPT, ...args], pluginConfig, true),
     ]);
   }
 
@@ -296,7 +324,7 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
    * parsing cannot regress it into a silent no-op.
    */
   it("refuses --axis loudly rather than silently ignoring it - the one flag not held to parity", async () => {
-    const [fromCli, fromPlugin] = await bothOf([
+    const [fromCli, fromPlugin] = await bothRefusing([
       "report",
       ...REPORTING_PERIOD,
       "--axis",
@@ -390,14 +418,14 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
       ["report", "--days", "0"],
       ["report", "--days", "many"],
     ]) {
-      const [fromCli, fromPlugin] = await bothOf(args);
+      const [fromCli, fromPlugin] = await bothRefusing(args);
       expect(fromPlugin, args.join(" ")).toBe(fromCli);
       expect(fromPlugin).toMatch(/Invalid --/u);
     }
   });
 
   it("reports one named session the same way as the sweep would", async () => {
-    const [fromCli, fromPlugin] = await bothOf(["read", "--session", CODEX_SESSION]);
+    const [fromCli, fromPlugin] = await bothRefusing(["read", "--session", CODEX_SESSION]);
 
     expect(fromPlugin).toBe(fromCli);
     expect(storedIn(pluginConfig)).toBe(storedIn(cliConfig));

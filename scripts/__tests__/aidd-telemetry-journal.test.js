@@ -407,14 +407,21 @@ test("Codex's own SessionEnd payload closes the turn, since Codex never sends a 
 });
 
 // The two events carry the same session, so a turn_end joins the session_start it closes.
-// SessionEnd carries session_id, transcript_path, cwd, hook_event_name and reason - the
-// first two are what readSessionId reads, in that order.
-test("Codex's SessionEnd names the same session its SessionStart did", () => {
+// Asserted through the code that does the joining, not by comparing the two fixtures to each
+// other: a test whose three assertions only read fixtures executes no product code and can
+// only fail if someone edits a fixture. readSessionId reads transcript_path first and
+// session_id second, and a real SessionEnd carries both.
+test("Codex's SessionEnd resolves to the same session its SessionStart did", () => {
+  const { readSessionId } = require("../../plugins/aidd-telemetry/hooks/lib/tools/codex.js");
   const start = loadFixture("codex-session-start.json");
   const end = loadFixture("codex-session-end.json");
+
   assert.equal(end.hook_event_name, "SessionEnd");
-  assert.equal(end.session_id, start.session_id);
-  assert.equal(end.transcript_path, start.transcript_path);
+  assert.equal(readSessionId(end), readSessionId(start));
+  // Not merely equal to each other: the resolved value is the session, not a stray field.
+  assert.equal(readSessionId(end), start.session_id);
+  // The fallback is exercised too - a SessionEnd with no transcript_path still resolves.
+  assert.equal(readSessionId({ ...end, transcript_path: undefined }), end.session_id);
 });
 
 test("a session-start replay with hook_event_name stripped still mints a record - argv alone drives dispatch", () => {

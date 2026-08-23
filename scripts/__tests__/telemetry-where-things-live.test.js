@@ -8,6 +8,22 @@ const SINK = path.join(ROOT, "plugins/aidd-telemetry/skills/01-cost/scripts/lib/
 const LIMITS_DOC = path.join(ROOT, "docs/telemetry-limits.md");
 const PLUGIN_README = path.join(ROOT, "plugins/aidd-telemetry/README.md");
 
+/** `process.platform` is read inside computeRootDir on every call, so stating it here is
+ * enough. Pinned on any platform rather than only on a Windows runner: where the figures land
+ * is a pure resolution, and a test only a runner we rarely have can fail is a test that lets
+ * this regress silently. The identity tests next door already work this way (#707); this file
+ * did not, and a planted defect sending the Windows sink to `.config` stayed green here and
+ * across the whole plugin suite. */
+function withPlatform(platform, run) {
+  const original = Object.getOwnPropertyDescriptor(process, "platform");
+  Object.defineProperty(process, "platform", { value: platform, configurable: true });
+  try {
+    return run();
+  } finally {
+    Object.defineProperty(process, "platform", original);
+  }
+}
+
 /** Re-required so it reads the sentinel HOME set just before, the same way its own
  * per-call `process.env` read works when the real hook runs it. */
 function actualDefaultRootDir() {
@@ -47,6 +63,45 @@ describe("the documented figures location matches what the sink actually writes"
     } else {
       assert.equal(actual, posixDefault);
     }
+  });
+
+  it("Windows keeps the figures under %APPDATA%, not under .config - asserted on any platform", () => {
+    const appData = path.join("/sentinel-appdata");
+    const previousAppData = process.env.APPDATA;
+    process.env.APPDATA = appData;
+    delete process.env.AIDD_USER_CONFIG_DIR;
+    const previousHome = process.env.HOME;
+    process.env.HOME = "/sentinel-home";
+
+    const resolved = withPlatform("win32", () => {
+      delete require.cache[require.resolve(SINK)];
+      return require(SINK).rootDir();
+    });
+
+    process.env.HOME = previousHome;
+    if (previousAppData === undefined) delete process.env.APPDATA;
+    else process.env.APPDATA = previousAppData;
+
+    assert.equal(resolved, path.join(appData, "aidd", "telemetry"));
+    const readme = fs.readFileSync(PLUGIN_README, "utf8");
+    assert.ok(
+      readme.includes("%APPDATA%\\aidd\\telemetry"),
+      'expected plugins/aidd-telemetry/README.md to name Windows\' own default, "%APPDATA%\\aidd\\telemetry"'
+    );
+  });
+
+  it("a POSIX machine keeps them under the OS user's own .config - asserted on any platform", () => {
+    delete process.env.AIDD_USER_CONFIG_DIR;
+    const previousHome = process.env.HOME;
+    process.env.HOME = "/sentinel-home";
+
+    const resolved = withPlatform("linux", () => {
+      delete require.cache[require.resolve(SINK)];
+      return require(SINK).rootDir();
+    });
+
+    process.env.HOME = previousHome;
+    assert.equal(resolved, posixDefault);
   });
 
   for (const [label, docPath] of [
