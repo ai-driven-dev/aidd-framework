@@ -1,7 +1,13 @@
-// Four independently verifiable claims about the measurement chain, each answered from
-// what was actually read, never inferred from the others. A claim this chain has nothing
-// to evaluate reads `--`, distinct from both `ok` and `FAIL`: it is not evidence either way,
+// Six independently verifiable claims about the measurement chain, each answered from what
+// was actually read, never inferred from the others. A claim this chain has nothing to
+// evaluate reads `--`, distinct from both `ok` and `FAIL`: it is not evidence either way,
 // and must never be read as one more broken link.
+//
+// Two routes, four claims then two: `hook fired` -> `session journalled` -> `tool files
+// readable` -> `records join` reads the local route - has the hook run, did the run close,
+// can this tool's own files be read, do they join a step. `export configured` ->
+// `identifier joinable` reads a second, independent route - the tool's OTLP export - whose
+// own configuration and whose own sink are read fresh, never through the first four's data.
 
 const OK = "ok";
 const FAIL = "FAIL";
@@ -238,13 +244,95 @@ function claimRecordsJoin(toolReads) {
   return { label: "records join", ...joinedVerdict(records) };
 }
 
-/** The four claims, always in this order, and never a fifth line that summarises them. */
-function diagnose({ journals, toolReads, runsDirLabel, currentSessionId, unrecognisedPayload, hookTrust }) {
+// Read from export-config.js, never from the local route above: `exportConfig` is `null`
+// when resolveCurrentTool (session-anchor.js) named no tool at all - there is no session
+// anchor to say whose export settings to check, the same reason claimHookFired's own
+// noAnchorClaim reads `--` rather than guessing.
+function claimExportConfigured(exportConfig) {
+  if (!exportConfig) {
+    return {
+      label: "export configured",
+      verdict: UNKNOWN,
+      detail: "no session anchor available to tell whose export settings to check",
+    };
+  }
+  if (!exportConfig.configured) {
+    return { label: "export configured", verdict: FAIL, detail: exportConfig.missingDetail };
+  }
+  return { label: "export configured", verdict: OK, detail: exportConfig.configuredDetail };
+}
+
+// A record that fails identity resolution is dropped before the sink ever stores it
+// (telemetry-sink-record.ts's resolveIdentity, called from receive-telemetry-use-case.ts)
+// - so "records arrived but could not be joined" leaves no trace the sink can be read for.
+// The only place that fault stays legible is the setting that causes it, which is why this
+// claim reads `exportConfig.identityDisabled` - read directly off the tool's own
+// configuration in export-config.js - ahead of ever looking at the sink: a known-broken
+// setting is a stronger, more specific claim than an absence of data, the same
+// specific-beats-generic rule untrustedHookClaim already follows above.
+//
+// Where no export is configured at all, this reads `--`, never FAIL: there is nothing to
+// join, which is not the same as a broken join.
+function claimIdentifierJoinable(exportConfig, exportedRecord) {
+  if (!exportConfig || !exportConfig.configured) {
+    return {
+      label: "identifier joinable",
+      verdict: UNKNOWN,
+      detail: "no export configured to join a record from - see export configured",
+    };
+  }
+  if (exportConfig.identityDisabled) {
+    return { label: "identifier joinable", verdict: FAIL, detail: exportConfig.identityDisabledDetail };
+  }
+  if (exportedRecord) {
+    // `vendor_field` is what buildBaseRecord (telemetry-sink-record.ts) always stamps on a
+    // record that survived resolveIdentity - present on every real one, but never trusted
+    // blindly: an absent field prints as itself, never as the literal string "undefined".
+    const attribute =
+      typeof exportedRecord.vendor_field === "string" && exportedRecord.vendor_field !== ""
+        ? exportedRecord.vendor_field
+        : "an identity attribute";
+    return {
+      label: "identifier joinable",
+      verdict: OK,
+      detail: `${attribute} present on an exported record for this session`,
+    };
+  }
+  return {
+    label: "identifier joinable",
+    verdict: UNKNOWN,
+    detail: "export configured but no exported record has reached the sink yet for this session",
+  };
+}
+
+// Placed after `records join`, not interleaved with the local route's four claims: each
+// route's own claims read cleanly top-to-bottom on their own (config -> join, same shape as
+// hook -> journal -> files -> join), and appending the second route keeps both progressions
+// contiguous rather than interleaved, so a reader who only cares about one route reads two
+// adjacent lines. #617's own illustrative output interleaves "export configured" and
+// "identifier joinable" between "hook observed" and "sessions journaled", but that block
+// predates the four-claim refactor into the route-scoped claims above - it names coarser,
+// differently-labelled lines ("plugin installed", "step names readable") that were never
+// built this way, so it is read here as an example of the answer these claims owe, not as
+// a binding position in the list.
+/** The six claims, always in this order, and never a seventh line that summarises them. */
+function diagnose({
+  journals,
+  toolReads,
+  runsDirLabel,
+  currentSessionId,
+  unrecognisedPayload,
+  hookTrust,
+  exportConfig,
+  exportedRecord,
+}) {
   return [
     claimHookFired(journals, runsDirLabel, currentSessionId, unrecognisedPayload, hookTrust),
     claimSessionJournalled(journals),
     claimToolsReadable(journals, toolReads),
     claimRecordsJoin(toolReads),
+    claimExportConfigured(exportConfig),
+    claimIdentifierJoinable(exportConfig, exportedRecord),
   ];
 }
 

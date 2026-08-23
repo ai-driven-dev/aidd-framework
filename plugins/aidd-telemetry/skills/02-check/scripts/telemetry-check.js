@@ -17,9 +17,11 @@ const { diagnose } = require("./lib/diagnose.js");
 const { printReport } = require("./lib/render.js");
 const { switchOn } = require("./lib/switch.js");
 const { isGitRepo } = require("./lib/repo.js");
-const { resolveSessionAnchor } = require("./lib/session-anchor.js");
+const { resolveSessionAnchor, resolveCurrentTool } = require("./lib/session-anchor.js");
 const { readCodexHookTrust } = require("./lib/hook-trust.js");
 const { UNRECOGNISED_FILE_NAME } = require("./lib/unrecognised.js");
+const { readExportConfig } = require("./lib/export-config.js");
+const { findExportedRecordForSession } = require("./lib/export-sink.js");
 
 const out = (line) => process.stdout.write(`${line}\n`);
 
@@ -124,6 +126,13 @@ function main() {
   // running under any other tool has nothing to read here, and asks nothing of it - the
   // same "told nothing" rule the install-time notice follows.
   const hookTrust = process.env.CODEX_THREAD_ID ? readCodexHookTrust(homeDir()) : null;
+  // Read fresh, from the export route, never from `journals`/`toolReads` above: resolved
+  // from the same two anchor variables session-anchor.js already probes for `currentSessionId`,
+  // but naming which tool rather than which session, since export-config.js reads settings
+  // per tool, not per session.
+  const currentTool = resolveCurrentTool(process.env);
+  const exportConfig = readExportConfig(currentTool, projectRoot, homeDir());
+  const exportedRecord = currentSessionId ? findExportedRecordForSession(currentSessionId) : undefined;
   const claims = diagnose({
     journals,
     toolReads,
@@ -131,6 +140,8 @@ function main() {
     currentSessionId,
     unrecognisedPayload,
     hookTrust,
+    exportConfig,
+    exportedRecord,
   });
   printReport(out, { claims, uncovered });
   return 0;

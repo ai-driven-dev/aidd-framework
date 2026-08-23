@@ -34,4 +34,16 @@ function resolveSessionAnchor(env) {
   return env.CODEX_THREAD_ID || env.CLAUDE_CODE_SESSION_ID;
 }
 
-module.exports = { resolveSessionAnchor };
+// Same two variables, same precedence, naming which tool set the one that matched - the
+// export-route claims (export-config.js) need to know whose settings to read, independent
+// of whether the run journal itself ever gets read: a tool this returns is one of the only
+// two ever measured this way, so it is also the only two export-config.js has any business
+// reading. Spelled to match TOOLS[].tool (readers.js) directly, "claude" not "claude-code" -
+// picking one spelling at this one boundary rather than translating it again downstream.
+function resolveCurrentTool(env) {
+  if (env.CODEX_THREAD_ID) return "codex";
+  if (env.CLAUDE_CODE_SESSION_ID) return "claude";
+  return undefined;
+}
+
+module.exports = { resolveSessionAnchor, resolveCurrentTool };

@@ -11,7 +11,14 @@ const SCRIPT = path.join(SCRIPTS, "telemetry-check.js");
 const { diagnose, OK, FAIL, UNKNOWN } = require(path.join(SCRIPTS, "lib/diagnose.js"));
 const { printReport } = require(path.join(SCRIPTS, "lib/render.js"));
 const { TOOLS } = require(path.join(SHARED, "readers.js"));
-const { resolveSessionAnchor } = require(path.join(SCRIPTS, "lib/session-anchor.js"));
+const { resolveSessionAnchor, resolveCurrentTool } = require(path.join(SCRIPTS, "lib/session-anchor.js"));
+const { rootDir: exportSinkRootDir, findExportedRecordForSession } = require(
+  path.join(SCRIPTS, "lib/export-sink.js"),
+);
+const { readClaudeExportConfig, readCodexExportConfig } = require(path.join(SCRIPTS, "lib/export-config.js"));
+const { rootDir: costSinkRootDir } = require(
+  path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts/lib/sink.js"),
+);
 const { UNRECOGNISED_FILE_NAME } = require("../../plugins/aidd-telemetry/hooks/lib/record.js");
 const { readCodexHookTrust, parseHookTrust, PLUGIN_NAME } = require(path.join(SCRIPTS, "lib/hook-trust.js"));
 const PLUGIN_MANIFEST = require("../../plugins/aidd-telemetry/.claude-plugin/plugin.json");
@@ -72,6 +79,34 @@ describe("resolving which session is actually running this script", () => {
   it("reads no anchor for a host neither variable was measured against", () => {
     // Copilot and Cursor were not probed this way: absent evidence, not assumed absence.
     assert.equal(resolveSessionAnchor({ COPILOT_SESSION_ID: "whatever" }), undefined);
+  });
+});
+
+describe("naming which tool is currently running, for the export-route claims", () => {
+  it("reads codex when only Codex's own variable is set", () => {
+    assert.equal(resolveCurrentTool({ CODEX_THREAD_ID: "codex-1" }), "codex");
+  });
+
+  it("reads claude when only Claude Code's own variable is set", () => {
+    assert.equal(resolveCurrentTool({ CLAUDE_CODE_SESSION_ID: "claude-1" }), "claude");
+  });
+
+  it("prefers Codex when both are set, the same nested-session reasoning resolveSessionAnchor follows", () => {
+    const env = { CODEX_THREAD_ID: "codex-nested", CLAUDE_CODE_SESSION_ID: "claude-parent" };
+
+    assert.equal(resolveCurrentTool(env), "codex");
+  });
+
+  it("names no tool at all when neither anchor is set", () => {
+    assert.equal(resolveCurrentTool({}), undefined);
+  });
+
+  // Pinned against TOOLS (readers.js), the same source of truth hook-trust.js's own
+  // hardcoded PLUGIN_NAME is pinned against: the two ids resolveCurrentTool can ever return
+  // must stay ones export-config.js actually has a branch for, or that branch is dead code.
+  it("only ever names a tool id TOOLS itself declares", () => {
+    assert.ok(TOOLS.some((declaration) => declaration.tool === "claude"));
+    assert.ok(TOOLS.some((declaration) => declaration.tool === "codex"));
   });
 });
 
@@ -145,6 +180,245 @@ describe("reading Codex's own hook trust state", () => {
 
       assert.equal(result.readable, false);
       assert.match(result.reason, /config\.toml/);
+    });
+  });
+});
+
+describe("reading Claude Code's own export configuration", () => {
+  function tempClaudeProject() {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-export-config-"));
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-export-config-home-"));
+    return { root, home };
+  }
+
+  function writeSettings(dir, content) {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "settings.json"), JSON.stringify(content));
+  }
+
+  it("names it unconfigured when none of the three files carry an env block at all", () => {
+    const { root, home } = tempClaudeProject();
+
+    const result = readClaudeExportConfig(root, home);
+
+    assert.equal(result.configured, false);
+    assert.match(result.missingDetail, /CLAUDE_CODE_ENABLE_TELEMETRY/);
+    assert.equal(result.identityDisabled, false);
+  });
+
+  it("reads configured off the local settings file, naming the endpoint it found", () => {
+    const { root, home } = tempClaudeProject();
+    writeSettings(path.join(root, ".claude"), {});
+    fs.writeFileSync(
+      path.join(root, ".claude", "settings.local.json"),
+      JSON.stringify({ env: { CLAUDE_CODE_ENABLE_TELEMETRY: "1", OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318" } }),
+    );
+
+    const result = readClaudeExportConfig(root, home);
+
+    assert.equal(result.configured, true);
+    assert.match(result.configuredDetail, /127\.0\.0\.1:4318/);
+  });
+
+  it("names only the enable flag missing when the endpoint is already set", () => {
+    const { root, home } = tempClaudeProject();
+    fs.mkdirSync(path.join(root, ".claude"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, ".claude", "settings.local.json"),
+      JSON.stringify({ env: { OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318" } }),
+    );
+
+    const result = readClaudeExportConfig(root, home);
+
+    assert.equal(result.configured, false);
+    assert.match(result.missingDetail, /CLAUDE_CODE_ENABLE_TELEMETRY/);
+    assert.doesNotMatch(result.missingDetail, /OTEL_EXPORTER_OTLP_ENDPOINT/);
+  });
+
+  it("names only the endpoint missing when the enable flag is already set", () => {
+    const { root, home } = tempClaudeProject();
+    fs.mkdirSync(path.join(root, ".claude"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, ".claude", "settings.local.json"),
+      JSON.stringify({ env: { CLAUDE_CODE_ENABLE_TELEMETRY: "1" } }),
+    );
+
+    const result = readClaudeExportConfig(root, home);
+
+    assert.equal(result.configured, false);
+    assert.match(result.missingDetail, /OTEL_EXPORTER_OTLP_ENDPOINT/);
+    assert.doesNotMatch(result.missingDetail, /CLAUDE_CODE_ENABLE_TELEMETRY=1 is not set/);
+  });
+
+  it("names a split configuration as such, not as either key missing, when each is set in a different file", () => {
+    const { root, home } = tempClaudeProject();
+    fs.mkdirSync(path.join(root, ".claude"), { recursive: true });
+    fs.mkdirSync(path.join(home, ".claude"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, ".claude", "settings.local.json"),
+      JSON.stringify({ env: { CLAUDE_CODE_ENABLE_TELEMETRY: "1" } }),
+    );
+    fs.writeFileSync(
+      path.join(home, ".claude", "settings.json"),
+      JSON.stringify({ env: { OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318" } }),
+    );
+
+    const result = readClaudeExportConfig(root, home);
+
+    assert.equal(result.configured, false);
+    assert.match(result.missingDetail, /not together in the one file/);
+    assert.match(result.missingDetail, /not measured here/);
+  });
+
+  it("names the disabling setting when OTEL_METRICS_INCLUDE_SESSION_ID=false is present, the exact case #617 names", () => {
+    const { root, home } = tempClaudeProject();
+    fs.mkdirSync(path.join(root, ".claude"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, ".claude", "settings.local.json"),
+      JSON.stringify({
+        env: {
+          CLAUDE_CODE_ENABLE_TELEMETRY: "1",
+          OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+          OTEL_METRICS_INCLUDE_SESSION_ID: "false",
+        },
+      }),
+    );
+
+    const result = readClaudeExportConfig(root, home);
+
+    assert.equal(result.configured, true);
+    assert.equal(result.identityDisabled, true);
+    assert.match(result.identityDisabledDetail, /OTEL_METRICS_INCLUDE_SESSION_ID=false/);
+  });
+
+  it("does not read the disabling setting as present when it is anything other than the literal string \"false\"", () => {
+    const { root, home } = tempClaudeProject();
+    fs.mkdirSync(path.join(root, ".claude"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, ".claude", "settings.local.json"),
+      JSON.stringify({
+        env: {
+          CLAUDE_CODE_ENABLE_TELEMETRY: "1",
+          OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+          OTEL_METRICS_INCLUDE_SESSION_ID: "true",
+        },
+      }),
+    );
+
+    const result = readClaudeExportConfig(root, home);
+
+    assert.equal(result.identityDisabled, false);
+  });
+});
+
+describe("reading Codex's own export configuration", () => {
+  function writeCodexConfig(home, content) {
+    const dir = path.join(home, ".codex");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "config.toml"), content);
+  }
+
+  it("names it unconfigured, never having read a fault, when config.toml does not exist at all", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-codex-export-"));
+
+    const result = readCodexExportConfig(home);
+
+    assert.equal(result.configured, false);
+    assert.match(result.missingDetail, /\[otel\]/);
+  });
+
+  it("names it unconfigured while the default statsig exporter is still in place, the third party nobody chose", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-codex-export-"));
+    writeCodexConfig(home, '[otel]\nmetrics_exporter = "statsig"\n');
+
+    const result = readCodexExportConfig(home);
+
+    assert.equal(result.configured, false);
+    assert.match(result.missingDetail, /statsig/);
+  });
+
+  it("reads configured once metrics_exporter is set to anything other than the default", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-codex-export-"));
+    writeCodexConfig(home, '[otel]\nmetrics_exporter = "otlp"\n');
+
+    const result = readCodexExportConfig(home);
+
+    assert.equal(result.configured, true);
+    assert.match(result.configuredDetail, /otlp/);
+  });
+
+  it("does not read a metrics_exporter key that sits under a different table", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-codex-export-"));
+    writeCodexConfig(home, '[some_other_table]\nmetrics_exporter = "otlp"\n');
+
+    const result = readCodexExportConfig(home);
+
+    assert.equal(result.configured, false);
+  });
+});
+
+describe("export-sink.js's rootDir stays identical to 01-cost's own sink.js", () => {
+  // Both compute the same directory from the same env - pinned the same way switch.js's
+  // predicate and lib/repo.js's git check are pinned against the hook's own copies, so a
+  // change to one cannot silently leave the other reading a different machine's sink.
+  it("resolves the same directory for the same HOME", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-sink-pin-"));
+    const originalHome = process.env.HOME;
+    const originalOverride = process.env.AIDD_USER_CONFIG_DIR;
+    delete process.env.AIDD_USER_CONFIG_DIR;
+    process.env.HOME = home;
+
+    try {
+      assert.equal(exportSinkRootDir(), costSinkRootDir());
+    } finally {
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      if (originalOverride === undefined) delete process.env.AIDD_USER_CONFIG_DIR;
+      else process.env.AIDD_USER_CONFIG_DIR = originalOverride;
+    }
+  });
+});
+
+describe("reading an export-provenance record for a session, from the sink itself", () => {
+  function withSinkHome(fn) {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-sink-read-"));
+    const originalHome = process.env.HOME;
+    const originalOverride = process.env.AIDD_USER_CONFIG_DIR;
+    delete process.env.AIDD_USER_CONFIG_DIR;
+    process.env.HOME = home;
+    try {
+      fn(home);
+    } finally {
+      if (originalHome === undefined) delete process.env.HOME;
+      else process.env.HOME = originalHome;
+      if (originalOverride === undefined) delete process.env.AIDD_USER_CONFIG_DIR;
+      else process.env.AIDD_USER_CONFIG_DIR = originalOverride;
+    }
+  }
+
+  it("finds an export-provenance record naming this session, among others that do not", () => {
+    withSinkHome((home) => {
+      const dir = path.join(home, ".config", "aidd", "telemetry");
+      fs.mkdirSync(dir, { recursive: true });
+      const lines = [
+        { provenance: "local-read", vendor_id: "s-1" },
+        { provenance: "export", vendor_id: "s-other" },
+        { provenance: "export", vendor_id: "s-1", vendor_field: "session.id" },
+      ];
+      fs.writeFileSync(
+        path.join(dir, "2026-08-20.jsonl"),
+        lines.map((line) => `${JSON.stringify(line)}\n`).join(""),
+      );
+
+      const found = findExportedRecordForSession("s-1");
+
+      assert.equal(found.vendor_field, "session.id");
+    });
+  });
+
+  it("finds nothing when no day file exists at all, rather than throwing", () => {
+    withSinkHome(() => {
+      assert.equal(findExportedRecordForSession("s-1"), undefined);
     });
   });
 });
@@ -403,10 +677,101 @@ describe("naming whether the journal and the tool's records join", () => {
   });
 });
 
+// exportConfig fixtures below are hand-built to the shape export-config.js's two readers
+// actually return (checked/configured/configuredDetail/missingDetail/identityDisabled/
+// identityDisabledDetail) - proven wired to the real readers by the end-to-end suite further
+// down, the same split the four claims above already draw between pure-verdict and wiring
+// tests.
+describe("naming whether the tool's own export is configured", () => {
+  it("reads ok once the tool's own settings carry a working endpoint", () => {
+    const exportConfig = { configured: true, configuredDetail: "OTLP to 127.0.0.1:4318 (.claude/settings.local.json)" };
+
+    const [, , , , claim] = diagnose({ journals: [], toolReads: [], exportConfig });
+
+    assert.equal(claim.verdict, OK);
+    assert.match(claim.detail, /127\.0\.0\.1:4318/);
+  });
+
+  it("names the missing setting, not a generic failure, when the tool has a route but nothing turned it on", () => {
+    const exportConfig = {
+      configured: false,
+      missingDetail: "CLAUDE_CODE_ENABLE_TELEMETRY=1 and OTEL_EXPORTER_OTLP_ENDPOINT not both set, across a, b, c",
+    };
+
+    const [, , , , claim] = diagnose({ journals: [], toolReads: [], exportConfig });
+
+    assert.equal(claim.verdict, FAIL);
+    assert.match(claim.detail, /CLAUDE_CODE_ENABLE_TELEMETRY/);
+  });
+
+  it("cannot tell whose settings to check without a session anchor, and says so rather than guessing ok", () => {
+    const [, , , , claim] = diagnose({ journals: [], toolReads: [], exportConfig: null });
+
+    assert.equal(claim.verdict, UNKNOWN);
+    assert.match(claim.detail, /no session anchor/);
+  });
+});
+
+describe("naming whether an exported record can be joined back to this session", () => {
+  it("reads ok off the sink's own record, naming the attribute it actually joined on", () => {
+    const exportConfig = { configured: true, identityDisabled: false };
+    const exportedRecord = { vendor_id: "s-1", vendor_field: "session.id", provenance: "export" };
+
+    const [, , , , , claim] = diagnose({ journals: [], toolReads: [], exportConfig, exportedRecord });
+
+    assert.equal(claim.verdict, OK);
+    assert.match(claim.detail, /session\.id/);
+  });
+
+  it("never prints the literal string \"undefined\" when a matched record carries no vendor_field", () => {
+    const exportConfig = { configured: true, identityDisabled: false };
+    const exportedRecord = { vendor_id: "s-1", provenance: "export" };
+
+    const [, , , , , claim] = diagnose({ journals: [], toolReads: [], exportConfig, exportedRecord });
+
+    assert.equal(claim.verdict, OK);
+    assert.doesNotMatch(claim.detail, /undefined/);
+  });
+
+  it("names the disabling setting - the OTEL_METRICS_INCLUDE_SESSION_ID=false case #617 names - not a plain miss", () => {
+    const exportConfig = {
+      configured: true,
+      identityDisabled: true,
+      identityDisabledDetail:
+        "OTEL_METRICS_INCLUDE_SESSION_ID=false in .claude/settings.local.json strips the identifier from every metric datapoint and event record it exports",
+    };
+
+    const [, , , , , claim] = diagnose({ journals: [], toolReads: [], exportConfig, exportedRecord: undefined });
+
+    assert.equal(claim.verdict, FAIL);
+    assert.match(claim.detail, /OTEL_METRICS_INCLUDE_SESSION_ID=false/);
+  });
+
+  it("has nothing to join when no export is configured at all - not the same claim as a broken join", () => {
+    const [, , , , , claim] = diagnose({
+      journals: [],
+      toolReads: [],
+      exportConfig: { configured: false },
+      exportedRecord: undefined,
+    });
+
+    assert.equal(claim.verdict, UNKNOWN);
+  });
+
+  it("has nothing to join yet when export is configured but no record has reached the sink", () => {
+    const exportConfig = { configured: true, identityDisabled: false };
+
+    const [, , , , , claim] = diagnose({ journals: [], toolReads: [], exportConfig, exportedRecord: undefined });
+
+    assert.equal(claim.verdict, UNKNOWN);
+    assert.match(claim.detail, /no exported record has reached the sink/);
+  });
+});
+
 // The requirement this milestone exists for: each failure induced alone must not read as
-// any of the other three (or, since the unrecognised-payload split, the other four). A
-// cascading design would show two FAILs for one broken link.
-describe("the six failures, each induced alone", () => {
+// any of the others (five now, or six counting the unrecognised-payload split as its own
+// fault). A cascading design would show two FAILs for one broken link.
+describe("the eight failures, each induced alone", () => {
   const onlyFail = (claims) => claims.filter((c) => c.verdict === FAIL).map((c) => c.label);
 
   it("names the hook never firing, and nothing else, when no run file exists", () => {
@@ -427,6 +792,10 @@ describe("the six failures, each induced alone", () => {
     assert.match(claims[0].detail, /matched no known host/);
     assert.equal(claims[1].verdict, UNKNOWN);
     assert.equal(claims[2].verdict, UNKNOWN);
+    // The export route reads no session anchor here either (none was passed), so it must
+    // stay UNKNOWN for its own reason - not cascade off the local route's failure.
+    assert.equal(claims[4].verdict, UNKNOWN);
+    assert.equal(claims[5].verdict, UNKNOWN);
   });
 
   it("names this session as having left no run file, and nothing else, while an old one reads healthy by every other measure", () => {
@@ -466,6 +835,39 @@ describe("the six failures, each induced alone", () => {
     });
 
     assert.deepEqual(onlyFail(claims), ["records join"]);
+  });
+
+  it("names the export not configured, and nothing else, when a healthy local route sits beside a route nobody turned on", () => {
+    const journals = [journalOf([step("2026-08-20T09:00:00Z", "a"), turnEnd("2026-08-20T09:05:00Z")])];
+    const toolReads = [toolRead({ sessionFound: true, hasIntervals: true, records: [record("journal-interval")] })];
+
+    const claims = diagnose({
+      journals,
+      toolReads,
+      currentSessionId: "s-1",
+      exportConfig: { configured: false, missingDetail: "not configured anywhere checked" },
+    });
+
+    assert.deepEqual(onlyFail(claims), ["export configured"]);
+  });
+
+  it("names the identifier unjoinable, and nothing else, when the disabling setting is present beside an otherwise healthy install", () => {
+    const journals = [journalOf([step("2026-08-20T09:00:00Z", "a"), turnEnd("2026-08-20T09:05:00Z")])];
+    const toolReads = [toolRead({ sessionFound: true, hasIntervals: true, records: [record("journal-interval")] })];
+
+    const claims = diagnose({
+      journals,
+      toolReads,
+      currentSessionId: "s-1",
+      exportConfig: {
+        configured: true,
+        configuredDetail: "OTLP to 127.0.0.1:4318",
+        identityDisabled: true,
+        identityDisabledDetail: "OTEL_METRICS_INCLUDE_SESSION_ID=false in .claude/settings.local.json strips the identifier",
+      },
+    });
+
+    assert.deepEqual(onlyFail(claims), ["identifier joinable"]);
   });
 });
 
@@ -572,13 +974,28 @@ describe("the script wired to a real project", () => {
   // `sessionId` is a plain string for the common case (Claude Code's anchor), or
   // `{ claude, codex }` when a test needs to set either or both explicitly - the nested
   // case needs both at once, one matching a fixture and one not.
-  function run(root, home, sessionId) {
-    const { AIDD_RUNS_DIR: _a, CLAUDE_CODE_SESSION_ID: _b, CODEX_THREAD_ID: _c, ...rest } = process.env;
+  //
+  // Every OTEL_* variable and CLAUDE_CODE_ENABLE_TELEMETRY are stripped by default for the
+  // identical reason: a developer with telemetry actually enabled on this machine would
+  // otherwise leak a real endpoint into the spawn and silently make "export configured"
+  // read differently than the fixture the test built. AIDD_USER_CONFIG_DIR is stripped too -
+  // left in, the sink read (export-sink.js) would escape the temp `home` this test controls
+  // and read (or write) a real machine's sink instead. A test that cares passes `extraEnv`.
+  function run(root, home, sessionId, extraEnv = {}) {
+    const {
+      AIDD_RUNS_DIR: _a,
+      CLAUDE_CODE_SESSION_ID: _b,
+      CODEX_THREAD_ID: _c,
+      AIDD_USER_CONFIG_DIR: _d,
+      ...rest
+    } = process.env;
     // process.env carries the OS-cased key (often "Path" on Windows) - left in, it would
     // sit alongside PATH below as a second, unfiltered key and undo the minimal PATH the
     // next line sets.
     const env = Object.fromEntries(
-      Object.entries(rest).filter(([k]) => !k.startsWith("GIT_") && !/^path$/iu.test(k)),
+      Object.entries(rest).filter(
+        ([k]) => !k.startsWith("GIT_") && !k.startsWith("OTEL_") && k !== "CLAUDE_CODE_ENABLE_TELEMETRY" && !/^path$/iu.test(k),
+      ),
     );
     const anchor =
       typeof sessionId === "string"
@@ -590,9 +1007,21 @@ describe("the script wired to a real project", () => {
     const result = spawnSync(process.execPath, [SCRIPT], {
       cwd: root,
       encoding: "utf8",
-      env: { ...env, HOME: home, PATH: GIT_DIR, ...anchor },
+      env: { ...env, HOME: home, PATH: GIT_DIR, ...anchor, ...extraEnv },
     });
     return result.stdout.trim().split("\n");
+  }
+
+  function writeClaudeExportSettings(root, env) {
+    const dir = path.join(root, ".claude");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "settings.local.json"), JSON.stringify({ env }));
+  }
+
+  function writeExportSinkRecord(home, record, day = "2026-08-20") {
+    const dir = path.join(home, ".config", "aidd", "telemetry");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(path.join(dir, `${day}.jsonl`), `${JSON.stringify(record)}\n`);
   }
 
   const assistantLine = (requestId, timestamp) => ({
@@ -642,6 +1071,22 @@ describe("the script wired to a real project", () => {
       { type: "turn_end", at: "2026-08-20T09:05:00Z" },
     ]);
     writeClaudeTranscript(home, "s-healthy", [assistantLine("req-h1", "2026-08-20T09:02:00Z")]);
+    // The export route's own two claims, grown alongside the local route's four (#617): a
+    // healthy install now also has its export configured and a record the sink can join back
+    // to this same session.
+    writeClaudeExportSettings(root, {
+      CLAUDE_CODE_ENABLE_TELEMETRY: "1",
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+    });
+    writeExportSinkRecord(home, {
+      sink_schema_version: 2,
+      kind: "session",
+      provenance: "export",
+      tool: "claude",
+      vendor_id: "s-healthy",
+      vendor_field: "session.id",
+      step_attribution: "unattributed",
+    });
 
     const lines = run(root, home, "s-healthy");
 
@@ -649,6 +1094,8 @@ describe("the script wired to a real project", () => {
     assert.match(lines[1], /^\s*session journalled\s+ok/);
     assert.match(lines[2], /^\s*tool files readable\s+ok/);
     assert.match(lines[3], /^\s*records join\s+ok\s+1 of 1 record/);
+    assert.match(lines[4], /^\s*export configured\s+ok\s+OTLP to http:\/\/127\.0\.0\.1:4318/);
+    assert.match(lines[5], /^\s*identifier joinable\s+ok\s+session\.id/);
     assert.ok(lines.some((line) => line.includes("not covered: cursor")));
     // opencode and copilot both dropped out of "not covered": opencode once its own plugin
     // reached the journal (phase 5, see measurements.md), copilot once session.shutdown's
@@ -657,6 +1104,69 @@ describe("the script wired to a real project", () => {
     // counting either as a miss.
     assert.ok(!lines.some((line) => line.includes("not covered: opencode")));
     assert.ok(!lines.some((line) => line.includes("not covered: copilot")));
+  });
+
+  it("names the export not configured, and the join with nothing to join, when nothing turned the export on", () => {
+    // Every other line above still names a healthy install - only the export route, added
+    // for #617, is left unconfigured here to prove the pin above is not an accident of the
+    // fixture always carrying both.
+    const { root, home } = tempProject();
+    writeConfig(root, true);
+    writeRunFile(root, "01ARZ3NDEKTSV4RRFFQ69G5FBH__s-healthy.jsonl", [
+      {
+        type: "session_start",
+        at: "2026-08-20T09:00:00Z",
+        run_id: "01ARZ3NDEKTSV4RRFFQ69G5FBH",
+        tool: "claude-code",
+        vendor_id: "s-healthy",
+      },
+      { type: "step_start", at: "2026-08-20T09:00:00Z", skill: "alpha" },
+      { type: "turn_end", at: "2026-08-20T09:05:00Z" },
+    ]);
+    writeClaudeTranscript(home, "s-healthy", [assistantLine("req-h1", "2026-08-20T09:02:00Z")]);
+
+    const lines = run(root, home, "s-healthy");
+
+    assert.match(lines[4], /^\s*export configured\s+FAIL/);
+    assert.match(lines[5], /^\s*identifier joinable\s+--/);
+  });
+
+  it("names the identifier unjoinable when OTEL_METRICS_INCLUDE_SESSION_ID=false sits beside an otherwise complete Claude Code export - the exact case #617 names", () => {
+    const { root, home } = tempProject();
+    writeConfig(root, true);
+    writeRunFile(root, "01ARZ3NDEKTSV4RRFFQ69G5FBH__s-healthy.jsonl", [
+      {
+        type: "session_start",
+        at: "2026-08-20T09:00:00Z",
+        run_id: "01ARZ3NDEKTSV4RRFFQ69G5FBH",
+        tool: "claude-code",
+        vendor_id: "s-healthy",
+      },
+      { type: "step_start", at: "2026-08-20T09:00:00Z", skill: "alpha" },
+      { type: "turn_end", at: "2026-08-20T09:05:00Z" },
+    ]);
+    writeClaudeTranscript(home, "s-healthy", [assistantLine("req-h1", "2026-08-20T09:02:00Z")]);
+    writeClaudeExportSettings(root, {
+      CLAUDE_CODE_ENABLE_TELEMETRY: "1",
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
+      OTEL_METRICS_INCLUDE_SESSION_ID: "false",
+    });
+
+    const lines = run(root, home, "s-healthy");
+
+    assert.match(lines[4], /^\s*export configured\s+ok/);
+    assert.match(lines[5], /^\s*identifier joinable\s+FAIL/);
+    assert.match(lines[5], /OTEL_METRICS_INCLUDE_SESSION_ID=false/);
+  });
+
+  it("reads Codex's own [otel] table when CODEX_THREAD_ID names the session, never Claude's settings files", () => {
+    const { root, home } = tempProject();
+    writeConfig(root, true);
+    writeCodexConfig(home, '[otel]\nmetrics_exporter = "otlp"\n');
+
+    const lines = run(root, home, { codex: "codex-1" });
+
+    assert.match(lines[4], /^\s*export configured\s+ok\s+otel\.metrics_exporter="otlp"/);
   });
 
   it("names the hook never firing when measurement is on and no run file appears", () => {
