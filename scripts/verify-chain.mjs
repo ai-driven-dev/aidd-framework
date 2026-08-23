@@ -316,9 +316,31 @@ function turnEndUntrustedReason(toolId) {
   );
 }
 
+// One route's inability to be journalled at all, declared before the run rather than read
+// off its result. `opencode run` starts its own server, so it is always that server's first
+// session, and the plugin is loaded by the very request that creates it - session.created is
+// published before any handler exists to receive it. Nothing fails and nothing says so, which
+// is why it is written down here, in docs/telemetry-limits.md and in the PR. Every session
+// after the first journals normally, which the free serve+curl proof above demonstrates.
+const RUN_FILE_EXPECTATION = {
+  "opencode/run (real)":
+    "OpenCode's plugin is loaded lazily by the request that creates the session, so the " +
+    "event announcing it is published before a handler exists. A one-shot `opencode run` " +
+    "starts its own server and is therefore always a first session. Not a race a retry " +
+    "closes, and the plugin is handed no session id it could use to recover the one it " +
+    "missed (docs/telemetry-limits.md).",
+};
+
 function assertRunFile(toolId, variant, projectDir, vendorId) {
   if (vendorId === null) {
-    return claim(toolId, variant, "run file exists", FAIL, "no vendor session id was captured for this session");
+    const declared = RUN_FILE_EXPECTATION[`${toolId}/${variant}`];
+    return claim(
+      toolId,
+      variant,
+      "run file exists",
+      declared ? SKIP(declared) : FAIL,
+      "no vendor session id was captured for this session"
+    );
   }
   const found = findRunFileForSession(projectDir, vendorId);
   if (!found) {
@@ -667,7 +689,17 @@ function opencodeServeProof(projectDir) {
 function opencodeRun(projectDir, ticketPath) {
   const before = listRunFiles(projectDir);
   const prompt = `Read the file ${ticketPath} and then reply with exactly the word PONG.`;
-  const result = run("opencode", ["run", prompt], { cwd: projectDir, env: baseEnv(), timeoutMs: 180000 });
+  // Named rather than left to the default, the same way the Codex path names its model:
+  // whichever model `opencode run` picks on its own varies per machine and per account, and
+  // this run failed for two rounds with `build · big-pickle ... exit -1` before a named,
+  // free model answered. AIDD_VERIFY_OPENCODE_MODEL overrides it for an account whose
+  // catalog differs; `opencode models` lists what a machine actually has.
+  const model = process.env.AIDD_VERIFY_OPENCODE_MODEL ?? "opencode/nemotron-3.5-lightning-free";
+  const result = run("opencode", ["run", "--model", model, prompt], {
+    cwd: projectDir,
+    env: baseEnv(),
+    timeoutMs: 180000,
+  });
   const vendorId = extractVendorId(projectDir, before);
   return { vendorId, note: `exit ${result.code}`, failed: result.code !== 0, error: result.stderr.trim().slice(-500) };
 }
