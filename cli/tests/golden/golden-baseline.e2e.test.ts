@@ -46,13 +46,15 @@ interface CommandEntry {
 function normalize(text: string): string {
   return (
     text
-      // A Windows capture spells its separator "\" (or "\\" once JSON-escaped inside the
-      // manifest text below) and carries a drive letter neither placeholder rule expects -
-      // fold both into the same drive-less, "/"-only shape a POSIX capture already has, so
-      // one set of rules covers a run from either platform. The lookbehind keeps a URL's
-      // scheme colon ("https:") alone - only a colon not preceded by a letter is a drive.
+      // A Windows capture spells its separator "\" and carries a drive letter neither
+      // placeholder rule expects - fold both into the same drive-less, "/"-only shape a
+      // POSIX capture already has, so one set of rules covers a run from either platform.
+      // The lookbehind keeps a URL's scheme colon ("https:") alone - only a colon not
+      // preceded by a letter is a drive. Only ever called on a raw string (see
+      // normalizeManifest below for why the manifest is walked before, not after,
+      // JSON.stringify) so there is no JSON escaping here to corrupt.
       .replace(/(?<![A-Za-z])[A-Za-z]:(?=[/\\])/g, "")
-      .replace(/\\{1,2}/g, "/")
+      .replace(/\\/g, "/")
       // Absolute paths → placeholder. The built-cache path is the project temp dir,
       // which varies per run; strip it before the fixture/root rules.
       .replace(/\/[^\s",'\\]+\/\.aidd\/cache\/built/g, "<BUILT_CACHE>")
@@ -65,6 +67,25 @@ function normalize(text: string): string {
   );
 }
 
+// Walks the parsed manifest and normalizes each string value directly, rather than
+// normalizing after JSON.stringify - a Windows path's "\" is a single character in a real
+// string but two once JSON-escapes it, and a blanket text replace big enough to fold both
+// forms would just as readily mangle every other escape (`\"`, `\n`) the same encoding
+// produces, corrupting content `JSON.parse` would then fail on rather than merely miscompare.
+function normalizeManifest(value: unknown): unknown {
+  if (typeof value === "string") return normalize(value);
+  if (Array.isArray(value)) return value.map(normalizeManifest);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, v]) => [
+        key,
+        normalizeManifest(v),
+      ])
+    );
+  }
+  return value;
+}
+
 function normalizeEntry(entry: CommandEntry): CommandEntry {
   return {
     command: normalize(entry.command),
@@ -72,8 +93,7 @@ function normalizeEntry(entry: CommandEntry): CommandEntry {
     stdout: normalize(entry.stdout),
     stderr: normalize(entry.stderr),
     filesWritten: entry.filesWritten.map(normalize).sort(),
-    manifest:
-      entry.manifest === null ? null : JSON.parse(normalize(JSON.stringify(entry.manifest))),
+    manifest: entry.manifest === null ? null : normalizeManifest(entry.manifest),
   };
 }
 
@@ -134,11 +154,23 @@ async function recomputeFileHashes(files: unknown, projectDir: string): Promise<
       const e = entry as Record<string, unknown>;
       if (typeof e.relativePath !== "string") return entry;
       const content = await readFile(join(projectDir, e.relativePath), "utf-8").catch(() => "");
-      const normalizedContent = normalize(content);
+      const normalizedContent = normalizeFileContent(content, e.relativePath);
       const hash = createHash("md5").update(normalizedContent, "utf-8").digest("hex");
       return { ...e, hash };
     })
   );
+}
+
+// A .json file's raw bytes escape a real path separator as two literal backslash
+// characters, never one - un-escape that pairing before the shared normalize() below,
+// which expects a genuine single "\" the same way a parsed string (or raw stdout/stderr)
+// already has it. Any other file's bytes are not JSON-encoded, so a literal "\" in them
+// already is one; normalize() alone is correct as-is. This only ever un-escapes a real
+// path separator correctly if the .json file's own string values carry no other escape
+// (`\"`, `\n`, ...) - true of every settings.json this matrix writes today (path, repo,
+// and plugin-name values only, per marketplace-entry.ts), not a general JSON un-escaper.
+function normalizeFileContent(content: string, relativePath: string): string {
+  return normalize(relativePath.endsWith(".json") ? content.replace(/\\\\/g, "\\") : content);
 }
 
 /** Run a command and return a single CommandEntry (raw, not normalized). */
