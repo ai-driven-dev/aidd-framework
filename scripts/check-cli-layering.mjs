@@ -22,7 +22,15 @@ const CAST_ROOTS = [SRC, TESTS];
 const LAYERING_ROOTS = [SRC];
 
 const IMPORT_PATTERN = /(?:from|import)\s+["']([^"']+)["']/g;
-const WIDENING_CAST = /\bas\s+unknown\s+as\b/;
+
+/** Both spellings of the same lie: `as unknown as T` walks up to `unknown` and back down,
+ * `as never` walks down to the bottom type, which is assignable to everything. `\bas` is
+ * what keeps prose out - "was never" has no word boundary before its "as". */
+const WIDENING_CASTS = [/\bas\s+unknown\s+as\b/, /\bas\s+never\b/];
+
+function widensAType(source) {
+  return WIDENING_CASTS.some((pattern) => pattern.test(source));
+}
 
 /** Layers may only reach inward. `application/commands/` is the composition root's caller:
  * it exists to hand `createDeps` to a use-case, which is the one place the wiring happens. */
@@ -89,8 +97,8 @@ function layeringBreach(relativePath, source) {
 }
 
 function castBreach(cliPath, source) {
-  if (!WIDENING_CAST.test(source) || CASTS_ALLOWED.has(cliPath)) return null;
-  return `cli/${cliPath} widens a type through \`as unknown as\` - build the value with the type it claims`;
+  if (!widensAType(source) || CASTS_ALLOWED.has(cliPath)) return null;
+  return `cli/${cliPath} widens a type through \`as unknown as\` or \`as never\` - build the value with the type it claims`;
 }
 
 const breaches = [];
@@ -100,7 +108,7 @@ for (const root of CAST_ROOTS) {
   for (const file of await typescriptFilesUnder(root)) {
     const cliPath = relative(CLI, file);
     const source = await readFile(file, "utf-8");
-    if (WIDENING_CAST.test(source)) spentAllowances.add(cliPath);
+    if (widensAType(source)) spentAllowances.add(cliPath);
     const breach = castBreach(cliPath, source);
     if (breach) breaches.push(`  ${breach}`);
   }
@@ -126,4 +134,4 @@ if (breaches.length > 0) {
   process.exit(1);
 }
 
-console.log("Dependencies point inward, and no type is widened through unknown.");
+console.log("Dependencies point inward, and no type is widened through unknown or never.");

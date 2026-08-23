@@ -42,10 +42,13 @@ wire an adapter to a use-case; only the type-honesty rule holds over both trees.
 
 ## Type honesty
 
-- No type is widened through `as unknown as`, in `tests/` as much as in `src/`
+- No type is widened through `as unknown as` or `as never`, in `tests/` as much as in `src/` —
+  one walks up to `unknown` and back down, the other down to the bottom type; both stop the
+  compiler checking
 - A double that cannot satisfy its port is a signal to implement the port or narrow it;
-  swapping the cast for `as any`, `as never`, `@ts-expect-error` or `@ts-ignore` is the
-  same hole under another name
+  swapping the cast for `as any`, `@ts-expect-error` or `@ts-ignore` is the same hole under
+  another name
+- A double still answers with what its contract promises: build a real value, not `{}`
 - A deliberately malformed input is taken in as the widest honest type the function accepts
 - `scripts/check-cli-layering.mjs` enforces this over both trees; a cast the type system
   genuinely cannot express is listed in its `CASTS_ALLOWED` with the reason it survives

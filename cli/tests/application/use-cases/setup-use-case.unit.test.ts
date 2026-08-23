@@ -2,23 +2,31 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { MarketplaceRefresh } from "../../../src/application/use-cases/marketplace/marketplace-refresh-use-case.js";
 import type { MarketplaceRegisterFramework } from "../../../src/application/use-cases/marketplace/marketplace-register-framework-use-case.js";
+import type { MarketplaceSyncSettings } from "../../../src/application/use-cases/marketplace/marketplace-sync-settings-use-case.js";
+import type { PluginInstallFromMarketplace } from "../../../src/application/use-cases/plugin/plugin-install-from-marketplace-use-case.js";
+import type { PluginPick } from "../../../src/application/use-cases/plugin/plugin-pick-use-case.js";
 import { SetupMarketplaceSourceUseCase } from "../../../src/application/use-cases/setup/setup-marketplace-source-use-case.js";
 import { SetupPluginsPromptUseCase } from "../../../src/application/use-cases/setup/setup-plugins-prompt-use-case.js";
 import { SetupToolsPromptUseCase } from "../../../src/application/use-cases/setup/setup-tools-prompt-use-case.js";
 import { SetupToolsUseCase } from "../../../src/application/use-cases/setup/setup-tools-use-case.js";
 import { SetupUseCase } from "../../../src/application/use-cases/setup-use-case.js";
+import type { ResolveMarketplace } from "../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
+import { FRAMEWORK_MARKETPLACE_NAME, Marketplace } from "../../../src/domain/models/marketplace.js";
 import { MarketplaceSourceMode } from "../../../src/domain/models/marketplace-source-mode.js";
+import type { PluginCatalogEntry } from "../../../src/domain/models/plugin-catalog.js";
 import { SetupFlow } from "../../../src/domain/models/setup-flow.js";
+import type { LatestReleaseResolver } from "../../../src/domain/ports/latest-release-resolver.js";
 import { AI_TOOL_IDS, IDE_TOOL_IDS, type ToolId } from "../../../src/domain/tools/registry.js";
 import { buildUnitDeps, initAndInstall, initProject } from "../../helpers/ports/build-unit-deps.js";
+import { InMemoryMarketplaceRegistry } from "../../helpers/ports/in-memory-marketplace-registry.js";
 import { OverwritePrompter, ScriptedPrompter } from "../../helpers/ports/scripted-prompter.js";
 
-function makeNoOpLatestResolver() {
+function makeNoOpLatestResolver(): LatestReleaseResolver {
   return {
     resolveLatest: vi.fn().mockResolvedValue(null),
     listRootReleases: vi.fn().mockResolvedValue([]),
     isRepoPublic: vi.fn().mockResolvedValue(true),
-  } as never;
+  };
 }
 
 type RegisterFrameworkMock = MarketplaceRegisterFramework & { execute: ReturnType<typeof vi.fn> };
@@ -34,29 +42,49 @@ function makeNoOpMarketplaceRefresh(): RefreshMock {
   return { execute };
 }
 
-function makeNoOpMarketplaceSyncSettings() {
-  return { execute: vi.fn().mockResolvedValue(undefined) } as never;
+function makeNoOpMarketplaceSyncSettings(): MarketplaceSyncSettings {
+  return { execute: vi.fn().mockResolvedValue({ updatedTools: [] }) };
 }
 
-function makeNoOpPluginPick() {
-  return { execute: vi.fn().mockResolvedValue({ marketplace: {}, installed: [] }) } as never;
-}
-
-function makeNoOpPluginInstallFromMarketplace() {
-  return { execute: vi.fn().mockResolvedValue({ marketplace: {}, entry: {} }) } as never;
-}
-
-function makeNoOpMarketplaceRegistry() {
-  return { list: vi.fn().mockResolvedValue([]) } as never;
-}
-
-function makeNoOpResolveMarketplace() {
+function makeNoOpPluginPick(): PluginPick {
   return {
-    execute: vi.fn().mockResolvedValue({ marketplace: {}, localPath: "", catalog: null }),
-  } as never;
+    execute: vi.fn().mockResolvedValue({ marketplace: FRAMEWORK_MARKETPLACE, installed: [] }),
+  };
+}
+
+function makeNoOpPluginInstallFromMarketplace(): PluginInstallFromMarketplace {
+  return {
+    execute: vi
+      .fn()
+      .mockResolvedValue({ marketplace: FRAMEWORK_MARKETPLACE, entry: CATALOG_ENTRY }),
+  };
+}
+
+function makeNoOpResolveMarketplace(): ResolveMarketplace {
+  return {
+    execute: vi
+      .fn()
+      .mockResolvedValue({ marketplace: FRAMEWORK_MARKETPLACE, localPath: "", catalog: null }),
+  };
 }
 
 const PROJECT_ROOT = "/test-project";
+
+// Real values, not empty objects: a no-op double still has to answer with what its
+// contract promises, so a caller that starts reading the answer breaks here first.
+const FRAMEWORK_MARKETPLACE = Marketplace.create({
+  name: FRAMEWORK_MARKETPLACE_NAME,
+  source: { kind: "local", path: "/framework" },
+  scope: "project",
+  addedAt: "2026-08-20T00:00:00.000Z",
+});
+
+const CATALOG_ENTRY: PluginCatalogEntry = {
+  name: "aidd-context",
+  source: { kind: "local", path: "/framework/plugins/aidd-context" },
+  recommended: false,
+  strict: false,
+};
 
 async function buildUseCase(setupToolsPromptUseCase?: SetupToolsPromptUseCase) {
   const deps = await buildUnitDeps(PROJECT_ROOT);
@@ -73,7 +101,7 @@ async function buildUseCase(setupToolsPromptUseCase?: SetupToolsPromptUseCase) {
   const setupPluginsPromptUseCase = new SetupPluginsPromptUseCase(
     makeNoOpPluginPick(),
     makeNoOpPluginInstallFromMarketplace(),
-    makeNoOpMarketplaceRegistry(),
+    new InMemoryMarketplaceRegistry(),
     makeNoOpResolveMarketplace()
   );
   const marketplaceRegisterFramework = makeNoOpMarketplaceRegisterFramework();

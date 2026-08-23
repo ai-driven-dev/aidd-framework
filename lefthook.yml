@@ -104,9 +104,11 @@ pre-commit:
       run: cd cli && pnpm lint
     cli-layering:
       # The two invariants biome cannot express: dependencies point inward, and no type is
-      # widened through `unknown`. Measured, not assumed — a noRestrictedImports rule written
-      # against "../../infrastructure" never fired on a violation planted in src/domain.
-      glob: "cli/src/**"
+      # widened through `unknown` or `never`. Measured, not assumed — a noRestrictedImports
+      # rule written against "../../infrastructure" never fired on a violation planted in
+      # src/domain. The glob covers `cli/**`, not `cli/src/**`: the cast half of the check
+      # reads `cli/tests` too, and a test-only commit must not slip past it.
+      glob: "cli/**"
       run: node scripts/check-cli-layering.mjs
     cli-typecheck:
       # The CLI type-checks `kanban/` too, so that folder's dependencies must be

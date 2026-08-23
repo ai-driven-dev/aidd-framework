@@ -16,7 +16,7 @@ import type {
   MarketplaceRegisterFramework,
   MarketplaceRegisterFrameworkOptions,
 } from "./marketplace/marketplace-register-framework-use-case.js";
-import type { MarketplaceSyncSettingsUseCase } from "./marketplace/marketplace-sync-settings-use-case.js";
+import type { MarketplaceSyncSettings } from "./marketplace/marketplace-sync-settings-use-case.js";
 import type { ProjectContextDetectorUseCase } from "./setup/project-context-detector-use-case.js";
 import type { SetupMarketplaceSourceUseCase } from "./setup/setup-marketplace-source-use-case.js";
 import type { SetupPluginsPromptUseCase } from "./setup/setup-plugins-prompt-use-case.js";
@@ -37,7 +37,7 @@ export class SetupUseCase {
     private readonly setupMarketplaceSourceUseCase: SetupMarketplaceSourceUseCase,
     private readonly marketplaceRegisterFrameworkUseCase: MarketplaceRegisterFramework,
     private readonly marketplaceRefreshUseCase: MarketplaceRefresh,
-    private readonly marketplaceSyncSettingsUseCase: MarketplaceSyncSettingsUseCase,
+    private readonly marketplaceSyncSettingsUseCase: MarketplaceSyncSettings,
     private readonly setupToolsUseCase: SetupToolsUseCase,
     private readonly setupPluginsPromptUseCase: SetupPluginsPromptUseCase,
     private readonly currentVersionProvider: VersionReader,

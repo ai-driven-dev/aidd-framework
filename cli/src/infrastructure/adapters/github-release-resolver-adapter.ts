@@ -6,7 +6,7 @@ import {
 import type { LatestReleaseResolver } from "../../domain/ports/latest-release-resolver.js";
 import type { TokenProvider } from "../../domain/ports/token-provider.js";
 import { HttpNotFoundError } from "../errors.js";
-import type { HttpClient } from "../http/http-client.js";
+import type { HttpGet } from "../http/http-client.js";
 
 const GITHUB_API_BASE = "https://api.github.com";
 
@@ -15,7 +15,7 @@ const ROOT_RELEASE_TAG_REGEX = /^v\d/;
 
 export class GitHubReleaseResolverAdapter implements LatestReleaseResolver {
   constructor(
-    private readonly http: HttpClient,
+    private readonly http: HttpGet,
     private readonly tokenProvider?: TokenProvider
   ) {}
 
