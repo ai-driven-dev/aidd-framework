@@ -231,11 +231,10 @@ describe("force behavior at the cache-rebuild path", () => {
     const memFs = new InMemoryFileAdapter();
     await seedFromDirectory(memFs, FIXTURE_DIR, { useAbsolutePaths: true });
 
-    // FrameworkBuildUseCase.execute() re-resolves the outDir it is given
-    // (framework-build-use-case.ts:33) before ever touching the filesystem through it -
-    // harmless for a real projectRoot (already absolute with a drive letter on Windows),
-    // but this test's own drive-less "/proj" only matches what the strategy actually
-    // checks once this seed goes through the same resolve().
+    // EnsureBuiltMarketplaceUseCase.execute() resolves builtDir before handing it to
+    // buildFor(), so FlatBuildStrategy's write target (absOut) is always drive-qualified on
+    // Windows - mirror that resolve() here so this test's drive-less PROJECT seeds the same
+    // path the real write lands on.
     const builtDir = resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "copilot"));
     const agentPath = `${builtDir}/.github/agents/${PLUGIN}-code-reviewer.agent.md`;
     memFs.setFile(agentPath, "stale cache content from a previous build");

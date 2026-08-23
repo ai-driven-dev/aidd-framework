@@ -53,10 +53,13 @@ export class EnsureBuiltMarketplaceUseCase {
   ) {}
 
   async execute(options: EnsureBuiltMarketplaceOptions): Promise<EnsureBuiltMarketplaceResult> {
-    const builtDir = builtMarketplaceDir(
-      options.projectRoot,
-      options.marketplace.name,
-      options.target
+    // resolve(), matching sourceDir below: builtMarketplaceDir() joins with the platform
+    // separator, and on Windows a drive-less projectRoot yields a drive-less builtDir here
+    // while FrameworkBuildUseCase.execute() resolves its own outDir copy for validation only
+    // - leaving FlatBuildStrategy's write target (captured unresolved at construction) to
+    // diverge from the path that gets checked.
+    const builtDir = resolve(
+      builtMarketplaceDir(options.projectRoot, options.marketplace.name, options.target)
     );
     const resolved = await this.resolveMarketplace.execute({
       marketplace: options.marketplace,
