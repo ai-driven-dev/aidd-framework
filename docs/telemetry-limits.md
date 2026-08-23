@@ -49,6 +49,19 @@ A tool's consumption reaches AIDD one of two ways.
 Coverage differs per route, per tool. `aidd telemetry report` prints a row for every tool,
 including the ones nothing can read, with the reason.
 
+The chain check answers two questions about the export route, and each has a limit worth
+knowing before you read its verdict.
+
+**`export configured` on Codex checks which exporter was chosen, not where it points.** A
+`metrics_exporter` other than the default reads `ok`, even if the endpoint sends your metrics
+somewhere you did not intend. No endpoint key under Codex's `[otel]` table has ever been
+measured here, so nothing checks one.
+
+**A Cursor or an OpenCode session reaches both export claims as `--`, by the general reason
+rather than a per-tool one.** Only Codex and Claude Code publish a session anchor this check
+can read, so under those two tools it cannot tell whose settings to look at. `--` means it had
+nothing to evaluate, which is the honest answer — it is not a claim that the export is fine.
+
 ## Cursor journals, and still yields no figure
 
 Cursor writes **no token count in any file it produces**, so there is nothing on disk for a
@@ -211,6 +224,12 @@ worktree is where the work actually ran, so its sessions are journalled under th
 checkout therefore does not see them, and one asked from the worktree sees only its own. Nothing
 joins the two today: reading a worktree's sessions means asking from inside it, or naming the
 session directly.
+
+What has changed is that a reader who gathers several journals can now tell them apart. A session
+started inside a linked worktree records `worktree_id` and `worktree_repo_id` on its `session_start`
+line, so two worktrees of one repository are no longer indistinguishable. A plain checkout records
+neither key, which is what keeps "no worktree" from reading as a worktree named nothing. No report
+groups on the field yet.
 
 A session can still be named directly, which is how one outside a journal is reached:
 
