@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "you-web",
+  "version": "1.0.0",
+  "description": "You.com web search integration: current web search, URL content extraction, and research synthesis with citations",
+  "author": {
+    "name": "You.com",
+    "url": "https://github.com/youdotcom-oss"
+  },
+  "skills": [
+    "./skills/01-search",
+    "./skills/02-contents", 
+    "./skills/03-research"
+  ],
+  "keywords": [
+    "web-search",
+    "research",
+    "content-extraction",
+    "citations",
+    "you.com"
+  ],
+  "repository": "https://github.com/youdotcom-oss/agent-skills",
+  "homepage": "https://you.com/docs?utm_source=aidd&utm_medium=plugin&utm_campaign=aidd-framework",
+  "license": "MIT"
+}
