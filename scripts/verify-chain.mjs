@@ -290,6 +290,32 @@ function assertGitStatusHidesJournal(toolId, projectDir) {
 // Step 4/5 — one variant's own run file: session_start + turn boundary, and task_declared
 // ---------------------------------------------------------------------------------------
 
+// Codex keys hook trust per entry, not per plugin: measured on a real config.toml (#707),
+// the key is "<plugin>@<marketplace>:hooks/hooks.json:<event>:<matcher>:<hook>" with the
+// event spelled snake_case. So a renamed or newly added event is a NEW key and inherits no
+// approval - and until someone approves it, the session journals a session_start with no
+// turn_end, which is indistinguishable at a glance from the mapping bug #707 fixed. This
+// tells those two apart instead of reporting the same FAIL for both.
+function turnEndUntrustedReason(toolId) {
+  if (toolId !== "codex") return null;
+  let toml;
+  try {
+    toml = readFileSync(join(REAL_HOME, ".codex", "config.toml"), "utf8");
+  } catch {
+    return null;
+  }
+  // Scoped to this plugin's own key, never a bare "session_end": another plugin's approval
+  // is not this one's, and a substring match on the shared suffix would read someone else's
+  // trusted hook as proof about ours.
+  if (toml.includes('aidd-telemetry@aidd-framework:hooks/hooks.json:session_end:')) return null;
+  return (
+    "issue #699 — Codex has no trusted_hash for this plugin's session_end hook yet, and " +
+    "trust is per entry: approving `stop` before the rename approved nothing for " +
+    "`session_end`. Approve it once interactively, or use the bypass variant below, which " +
+    "does close the turn."
+  );
+}
+
 function assertRunFile(toolId, variant, projectDir, vendorId) {
   if (vendorId === null) {
     return claim(toolId, variant, "run file exists", FAIL, "no vendor session id was captured for this session");
@@ -301,11 +327,12 @@ function assertRunFile(toolId, variant, projectDir, vendorId) {
   const start = found.lines.find((l) => l.type === "session_start");
   const boundary = found.lines.find((l) => l.type === "turn_end");
   const ok = Boolean(start) && Boolean(boundary);
+  const untrusted = !ok && start && !boundary ? turnEndUntrustedReason(toolId) : null;
   claim(
     toolId,
     variant,
     "run file exists",
-    ok ? PASS : FAIL,
+    ok ? PASS : untrusted ? SKIP(untrusted) : FAIL,
     ok
       ? `${found.path.split("/").pop()} carries session_start + turn_end`
       : `session_start ${Boolean(start)}, turn_end ${Boolean(boundary)} in ${found.path.split("/").pop()}`
@@ -548,7 +575,18 @@ function runCodexSession(projectDir, ticketPath, bypassTrust) {
   ];
   const result = run("codex", args, { cwd: projectDir, env: baseEnv(), input: "", timeoutMs: 180000 });
   const vendorId = extractVendorId(projectDir, before);
-  return { vendorId, note: `exit ${result.code}${result.code !== 0 ? `: ${result.stderr.trim().slice(-300)}` : ""}` };
+  // A session the account was not allowed to run made no model call and therefore no tool
+  // call, so nothing downstream can ask what it declared. Reported as its own reason rather
+  // than as a missing line, which is what "an unknown is never a zero" means for a verifier.
+  const output = `${result.stdout}${result.stderr}`;
+  const blocked = /hit your usage limit|quota|insufficient_quota/i.test(output)
+    ? output.match(/[^\n]*usage limit[^\n]*/i)?.[0]?.trim() ?? "the account could not run this session"
+    : null;
+  return {
+    vendorId,
+    blocked,
+    note: `exit ${result.code}${result.code !== 0 ? `: ${result.stderr.trim().slice(-300)}` : ""}`,
+  };
 }
 
 function runCopilotSession(projectDir, ticketPath) {
@@ -652,9 +690,12 @@ const TASK_DECLARED_EXPECTATION = {
   },
 };
 
-function runVariant(toolId, variant, projectDir, vendorId) {
+function runVariant(toolId, variant, projectDir, vendorId, blocked = null) {
   const found = assertRunFile(toolId, variant, projectDir, vendorId);
-  assertTaskDeclared(toolId, variant, found, TASK_DECLARED_EXPECTATION[toolId]);
+  const expectation = blocked
+    ? { possible: false, reason: `the session made no model call, so it made no tool call: ${blocked}` }
+    : TASK_DECLARED_EXPECTATION[toolId];
+  assertTaskDeclared(toolId, variant, found, expectation);
 }
 
 function orchestrateClaude(projectDir, ticketPath) {
@@ -665,7 +706,7 @@ function orchestrateClaude(projectDir, ticketPath) {
 function orchestrateCodex(projectDir, ticketPath) {
   const untrusted = runCodexSession(projectDir, ticketPath, false);
   if (untrusted.vendorId) {
-    runVariant("codex", "default (no bypass)", projectDir, untrusted.vendorId);
+    runVariant("codex", "default (no bypass)", projectDir, untrusted.vendorId, untrusted.blocked);
   } else {
     claim(
       "codex",
@@ -676,7 +717,7 @@ function orchestrateCodex(projectDir, ticketPath) {
     );
   }
   const trusted = runCodexSession(projectDir, ticketPath, true);
-  runVariant("codex", "bypass-hook-trust", projectDir, trusted.vendorId);
+  runVariant("codex", "bypass-hook-trust", projectDir, trusted.vendorId, trusted.blocked);
 }
 
 function orchestrateCopilot(projectDir, ticketPath) {

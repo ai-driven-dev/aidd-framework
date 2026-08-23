@@ -87,6 +87,15 @@ reverse. Both are subscribed, so each mode records exactly one turn boundary.
 
 ## Codex will not run a hook nobody approved, and says nothing
 
+**Trust is per hook entry, not per plugin, and a renamed event is a new entry.** Codex keys
+each approval as `<plugin>@<marketplace>:hooks/hooks.json:<event>:<matcher>:<hook>`. Approving
+a plugin's `session_start` approves nothing for its `session_end`, and an event that changes
+name inherits nothing from the name it had. The symptom is the one worth recognising: the
+session journals a `session_start` and no `turn_end`, which looks exactly like a hook wired to
+the wrong event. `aidd telemetry check` tells the two apart, and so does
+`scripts/verify-chain.mjs`.
+
+
 Codex keeps a trust hash per hook and skips any it has not been asked to trust. It prints
 no warning when it does. Four consecutive sessions ran clean and journalled nothing before
 the difference became visible, and from the outside that silence is identical to a session
