@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { copyFile, cp, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { CLIOutput } from "../../src/application/output.js";
 import { InitUseCase } from "../../src/application/use-cases/init-use-case.js";
@@ -51,7 +51,50 @@ export async function createTestEnv(prefix: string): Promise<{
   };
 }
 
-function sandboxedEnv(
+/** Copies a fixture directory's contents into a sandboxed home — what `cp -R "$src/." dest`
+ * did before this, ported off a binary that only exists on POSIX: there is no `cp` on
+ * Windows, so every caller that shelled out to it failed `beforeEach` outright there before
+ * a single assertion ran, which is why the suites built on top of it failed wholesale. */
+export async function copyFixtureTree(sourceDir: string, destDir: string): Promise<void> {
+  await cp(sourceDir, destDir, { recursive: true });
+}
+
+function hasExecutable(dir: string, name: string): boolean {
+  const exeName = process.platform === "win32" ? `${name}.exe` : name;
+  return existsSync(join(dir, exeName));
+}
+
+/** The first `PATH` directory carrying `git` but not `aidd` — skipping, never stopping at,
+ * one that carries both. On this very machine `git` and a globally-linked `aidd` sit in the
+ * same Homebrew directory; returning it unfiltered would silently readmit the binary these
+ * tests exist to prove unnecessary. */
+function findGitDirWithoutAidd(): string | undefined {
+  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
+    if (dir === "") continue;
+    if (hasExecutable(dir, "git") && !hasExecutable(dir, "aidd")) return dir;
+  }
+  return undefined;
+}
+
+/** A `PATH` holding only node's own directory, wherever `git` actually lives, and the
+ * platform's own essential system directories — never a directory holding `aidd` or this
+ * repository's own `node_modules` binaries. `/usr/bin` and `/bin` are POSIX paths; Windows
+ * has neither, so a `PATH` built from them alone leaves a spawned process unable to find
+ * `git.exe` (hooks/lib/repo.js shells out to it) or anything the OS loader itself needs. */
+export function pathWithoutAidd(): string {
+  const dirs = [dirname(process.execPath)];
+  const gitDir = findGitDirWithoutAidd();
+  if (gitDir) dirs.push(gitDir);
+  if (process.platform === "win32") {
+    const systemRoot = process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows";
+    dirs.push(join(systemRoot, "System32"), systemRoot);
+  } else {
+    dirs.push("/usr/bin", "/bin");
+  }
+  return dirs.join(delimiter);
+}
+
+export function sandboxedEnv(
   fakeHome: string,
   extra?: Record<string, string>,
   options?: { realHome?: boolean }
@@ -65,6 +108,13 @@ function sandboxedEnv(
     ...extra,
     HOME: fakeHome,
     XDG_CONFIG_HOME: join(fakeHome, ".config"),
+    // `HOME` alone only sandboxes POSIX: `os.homedir()` never reads it on Windows, where it
+    // reads `USERPROFILE` instead, and the CLI/plugin's own Windows config-dir rule reads
+    // `APPDATA` ahead of that. Left at the real runner's values, both leak every test's
+    // "sandboxed" home straight onto the machine's real profile. Harmless on POSIX, where
+    // neither variable is consulted.
+    USERPROFILE: fakeHome,
+    APPDATA: join(fakeHome, "AppData", "Roaming"),
   };
 }
 

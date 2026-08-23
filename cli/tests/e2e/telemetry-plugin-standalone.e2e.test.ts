@@ -3,11 +3,11 @@ import { readdirSync, readFileSync, realpathSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { builtinModules } from "node:module";
 import { tmpdir } from "node:os";
-import { delimiter, dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { environmentWithoutGitVariables } from "../../src/infrastructure/git-environment.js";
-import { CLI_PATH } from "./helpers.js";
+import { CLI_PATH, copyFixtureTree, pathWithoutAidd } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(process.cwd(), "..");
@@ -24,13 +24,6 @@ const HOOK_FIXTURES = join(REPO_ROOT, "scripts", "__tests__", "fixtures");
 
 const CLAUDE_SESSION = "22222222-2222-4222-8222-222222222222";
 const PERIOD = ["--from", "2026-08-01", "--to", "2026-08-31"] as const;
-
-/** No directory holding `aidd`, and no directory holding the repository's `node_modules`
- * binaries — only node's own. The point of this file is that nothing else is needed. */
-function pathWithoutAidd(): string {
-  const nodeDir = dirname(process.execPath);
-  return [nodeDir, "/usr/bin", "/bin"].join(delimiter);
-}
 
 describe("the plugin measures on its own", () => {
   let projectDir: string;
@@ -49,7 +42,7 @@ describe("the plugin measures on its own", () => {
       env: environmentWithoutGitVariables(process.env),
     });
     // The tools' own files, exactly as a machine that ran them would hold.
-    await execFileAsync("cp", ["-R", `${LOCAL_COST_FIXTURES}/.`, fakeHome]);
+    await copyFixtureTree(LOCAL_COST_FIXTURES, fakeHome);
   });
 
   afterEach(async () => {

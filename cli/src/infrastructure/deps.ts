@@ -153,6 +153,7 @@ import { TelemetrySinkAdapter } from "./adapters/telemetry-sink-adapter.js";
 import { TranscriptCostReaderAdapter } from "./adapters/transcript-cost-reader-adapter.js";
 import { BundledAssetProviderAdapter } from "./assets/asset-loader.js";
 import { AuthStorage } from "./auth/auth-storage.js";
+import { resolveHomeDir } from "./home-dir.js";
 import { HttpClient } from "./http/http-client.js";
 
 interface GlobalOptions {
@@ -725,6 +726,8 @@ export async function createDeps(
   const otlpHttpReceiverAdapter = new OtlpHttpReceiverAdapter(receiveTelemetryUseCase, logger);
   // This is the one place allowed to map a tool that declares `telemetryLocalRead: {
   // kind: "declared" }` to the adapter that reads it.
+  // `resolveHomeDir()`, not a bare `homedir()`: this must land on the same directory the
+  // plugin's own `readers.js` resolves for the same tool, on every platform.
   const localCostReaders: ReadonlyMap<AiToolId, SessionCostReader> = new Map<
     AiToolId,
     SessionCostReader
@@ -733,7 +736,7 @@ export async function createDeps(
     [
       "claude",
       new TranscriptCostReaderAdapter(
-        homedir(),
+        resolveHomeDir(),
         CLAUDE_CODE_TRANSCRIPT_LOCATION,
         createClaudeCodeTranscriptAccumulator
       ),
@@ -741,12 +744,12 @@ export async function createDeps(
     [
       "codex",
       new TranscriptCostReaderAdapter(
-        homedir(),
+        resolveHomeDir(),
         CODEX_ROLLOUT_LOCATION,
         createCodexRolloutAccumulator
       ),
     ],
-    ["copilot", new CopilotCostReaderAdapter(homedir())],
+    ["copilot", new CopilotCostReaderAdapter(resolveHomeDir())],
   ]);
   const runJournalReader = new RunJournalReaderAdapter(projectRoot);
   const personIdentityReader = new PersonIdentityAdapter();

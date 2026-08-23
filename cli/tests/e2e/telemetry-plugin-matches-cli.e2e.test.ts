@@ -2,11 +2,11 @@ import { execFile, execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, realpathSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { delimiter, dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { environmentWithoutGitVariables } from "../../src/infrastructure/git-environment.js";
-import { CLI_PATH } from "./helpers.js";
+import { CLI_PATH, copyFixtureTree, pathWithoutAidd } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(process.cwd(), "..");
@@ -52,7 +52,7 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
     await mkdir(projectDir, { recursive: true });
     await mkdir(fakeHome, { recursive: true });
     execFileSync("git", ["init", "-q", projectDir]);
-    await execFileAsync("cp", ["-R", `${LOCAL_COST_FIXTURES}/.`, fakeHome]);
+    await copyFixtureTree(LOCAL_COST_FIXTURES, fakeHome);
     await seedJournals();
   });
 
@@ -112,7 +112,7 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
   function env(configDir: string): NodeJS.ProcessEnv {
     return {
       ...environmentWithoutGitVariables(process.env),
-      PATH: [dirname(process.execPath), "/usr/bin", "/bin"].join(delimiter),
+      PATH: pathWithoutAidd(),
       HOME: fakeHome,
       AIDD_USER_CONFIG_DIR: configDir,
     };

@@ -5,7 +5,14 @@ import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 import { environmentWithoutGitVariables as withoutGitEnv } from "../../src/infrastructure/git-environment.js";
-import { CLI_PATH, createTestEnv, gitInit, gitSetOriginRemote, runCli } from "./helpers.js";
+import {
+  CLI_PATH,
+  createTestEnv,
+  gitInit,
+  gitSetOriginRemote,
+  runCli,
+  sandboxedEnv,
+} from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(process.cwd(), "..");
@@ -133,7 +140,7 @@ describe("E2E: telemetry sink", () => {
   it("stores a real session's figures, survives the receiver's exit, and carries no identity of any kind", async () => {
     const { fakeHome, cleanup } = await createTestEnv("telemetry-sink-journey");
     try {
-      const env = { ...process.env, HOME: fakeHome, XDG_CONFIG_HOME: join(fakeHome, ".config") };
+      const env = sandboxedEnv(fakeHome);
       const receiver = await startReceiver(env);
       activeReceivers.push(receiver);
 
@@ -169,7 +176,7 @@ describe("E2E: telemetry sink", () => {
   it("answers a malformed body, writes nothing for it, and stays up for the next payload", async () => {
     const { fakeHome, cleanup } = await createTestEnv("telemetry-sink-malformed");
     try {
-      const env = { ...process.env, HOME: fakeHome, XDG_CONFIG_HOME: join(fakeHome, ".config") };
+      const env = sandboxedEnv(fakeHome);
       const receiver = await startReceiver(env);
       activeReceivers.push(receiver);
 
@@ -198,12 +205,7 @@ describe("E2E: telemetry sink", () => {
     const { fakeHome, tempDir, cleanup } = await createTestEnv("telemetry-sink-config-dir");
     try {
       const overrideDir = join(tempDir, "elsewhere", "aidd-config");
-      const env = {
-        ...process.env,
-        HOME: fakeHome,
-        XDG_CONFIG_HOME: join(fakeHome, ".config"),
-        AIDD_USER_CONFIG_DIR: overrideDir,
-      };
+      const env = sandboxedEnv(fakeHome, { AIDD_USER_CONFIG_DIR: overrideDir });
       const receiver = await startReceiver(env);
       activeReceivers.push(receiver);
 

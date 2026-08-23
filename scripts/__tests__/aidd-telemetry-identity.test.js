@@ -272,9 +272,14 @@ describe("the choice belongs to the person, not the repository", () => {
 
 // --- Stamping what actually gets stored, end to end -----------------------------------
 
+// APPDATA for the same reason identityEnv carries one: the report script looks a person's
+// identity up on its own, and on Windows it looks under %APPDATA%. Redirecting HOME alone
+// sent it to the machine's real profile, so a session read after an opt-in came back
+// unnamed there and named everywhere else (#707). AIDD_USER_CONFIG_DIR still points the
+// sink at its own directory - identity deliberately ignores that variable.
 function reportEnv(home, configDir) {
   const { GIT_DIR: _g, GIT_INDEX_FILE: _i, GIT_WORK_TREE: _w, ...rest } = process.env;
-  return { ...rest, HOME: home, AIDD_USER_CONFIG_DIR: configDir };
+  return { ...rest, HOME: home, APPDATA: appDataIn(home), AIDD_USER_CONFIG_DIR: configDir };
 }
 
 function seedJournal(projectDir, runId, vendorId, tool, sessionStartAt, turnEndAt) {

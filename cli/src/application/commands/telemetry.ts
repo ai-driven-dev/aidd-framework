@@ -1,4 +1,3 @@
-import { homedir } from "node:os";
 import type { Command } from "commander";
 import {
   DEFAULT_TELEMETRY_SCOPE,
@@ -8,6 +7,7 @@ import {
 import { toCostReportEnvelope } from "../../domain/models/cost-report-envelope.js";
 import { DEFAULT_REPORT_DAYS, resolveReportPeriod } from "../../domain/models/report-period.js";
 import { createDeps } from "../../infrastructure/deps.js";
+import { resolveHomeDir } from "../../infrastructure/home-dir.js";
 import { printCostReport } from "../display/cost-report-display.js";
 import {
   printLocalCostReadReport,
@@ -54,7 +54,7 @@ export function registerTelemetryCommand(program: Command): void {
         const deps = await createDeps(projectRoot, { verbose }, output);
         const result = await deps.telemetryOnUseCase.execute({
           projectRoot,
-          homeDir: homedir(),
+          homeDir: resolveHomeDir(),
           endpoint: cmdOptions.endpoint,
           scope,
           confirmProjectScope: cmdOptions.yes,

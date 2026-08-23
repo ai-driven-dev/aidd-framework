@@ -2,10 +2,11 @@ import { execFile, execFileSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { delimiter, dirname, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { environmentWithoutGitVariables } from "../../src/infrastructure/git-environment.js";
+import { copyFixtureTree, pathWithoutAidd } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(process.cwd(), "..");
@@ -54,7 +55,7 @@ describe("measurement, from nothing to off and back", () => {
       env: environmentWithoutGitVariables(process.env),
     });
     // The tool's own transcript, exactly as a machine that ran the session would hold it.
-    await execFileAsync("cp", ["-R", `${LOCAL_COST_FIXTURES}/.`, fakeHome]);
+    await copyFixtureTree(LOCAL_COST_FIXTURES, fakeHome);
   });
 
   afterEach(async () => {
@@ -66,7 +67,7 @@ describe("measurement, from nothing to off and back", () => {
   function env(): NodeJS.ProcessEnv {
     return {
       ...environmentWithoutGitVariables(process.env),
-      PATH: [dirname(process.execPath), "/usr/bin", "/bin"].join(delimiter),
+      PATH: pathWithoutAidd(),
       HOME: fakeHome,
       AIDD_USER_CONFIG_DIR: configDir,
     };

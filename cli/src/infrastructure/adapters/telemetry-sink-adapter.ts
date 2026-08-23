@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { access, appendFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { homedir, userInfo } from "node:os";
+import { userInfo } from "node:os";
 import { join } from "node:path";
 import {
   parseTelemetrySinkLine,
@@ -15,6 +15,7 @@ import type {
   TelemetrySinkPeriodRead,
 } from "../../domain/ports/telemetry-sink.js";
 import { TelemetrySinkUnwritableError } from "../errors.js";
+import { resolveHomeDir } from "../home-dir.js";
 
 const DAY_FILE_EXTENSION = ".jsonl";
 const PRIVATE_FILE_MODE = 0o600;
@@ -39,7 +40,7 @@ async function pathExists(path: string): Promise<boolean> {
 }
 
 function legacyConfigDir(): string {
-  return join(homedir(), ".config", "aidd");
+  return join(resolveHomeDir(), ".config", "aidd");
 }
 
 function hasLegacyTelemetryData(): boolean {
