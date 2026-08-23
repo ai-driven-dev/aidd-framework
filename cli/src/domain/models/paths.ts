@@ -18,3 +18,20 @@ export function builtMarketplaceDir(
 ): string {
   return join(projectRoot, BUILT_CACHE_SUBDIR, marketplaceName, target);
 }
+
+// One directory is the other, or contains it. Two callers guard on this - a build refusing
+// to write into the tree it reads from, and the cache-rebuild path deciding whether it
+// needs the temp-dir detour - and each spelled the comparison itself with a hardcoded "/",
+// so on Windows neither ever recognised real nesting (#707). Named once here so the
+// question has an answer to point at rather than a habit to repeat. Both sides are
+// expected already resolved: this compares spelling, it does not resolve.
+export function pathContainsOrEquals(outer: string, inner: string): boolean {
+  const normalizedOuter = outer.replace(/\\/g, "/");
+  const normalizedInner = inner.replace(/\\/g, "/");
+  return normalizedOuter === normalizedInner || normalizedInner.startsWith(`${normalizedOuter}/`);
+}
+
+/** Either direction: neither may sit inside the other. */
+export function pathsOverlap(a: string, b: string): boolean {
+  return pathContainsOrEquals(a, b) || pathContainsOrEquals(b, a);
+}

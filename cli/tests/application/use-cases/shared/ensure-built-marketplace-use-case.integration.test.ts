@@ -85,7 +85,10 @@ function fakeVersion(value: string): VersionReader {
 describe("builtMarketplaceDir", () => {
   it("places the per-target tree under .aidd/cache/built/<mkt>/<target>", () => {
     expect(builtMarketplaceDir("/p", "aidd", "codex")).toBe(
-      join("/p", BUILT_CACHE_SUBDIR, "aidd", "codex")
+      // The layout stays spelled out segment by segment, not taken from the same
+      // constant the implementation uses - that would only assert the code agrees with
+      // itself. join() so the claim is about the layout, not the separator (#707).
+      join("/p", ".aidd", "cache", "built", "aidd", "codex")
     );
   });
 });

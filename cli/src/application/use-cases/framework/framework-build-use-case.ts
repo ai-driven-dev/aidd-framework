@@ -8,6 +8,7 @@ import {
   SOURCE_MARKETPLACE_RELATIVE,
   SOURCE_PLUGIN_MANIFEST_RELATIVE,
 } from "../../../domain/models/framework-build.js";
+import { pathsOverlap } from "../../../domain/models/paths.js";
 import type { AssetProvider } from "../../../domain/ports/asset-provider.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
@@ -45,18 +46,7 @@ export class FrameworkBuildUseCase {
   }
 
   private guardPaths(sourceDir: string, outDir: string): void {
-    if (sourceDir === outDir) throw new InvalidBuildPathsError(sourceDir, outDir);
-    // "/"-separated comparison: resolve() returns native separators, and on Windows a
-    // hardcoded "/" suffix would never match a backslash-joined path, silently letting a
-    // nested outDir/sourceDir through this guard.
-    const normalizedSource = sourceDir.replace(/\\/g, "/");
-    const normalizedOut = outDir.replace(/\\/g, "/");
-    if (
-      normalizedOut.startsWith(`${normalizedSource}/`) ||
-      normalizedSource.startsWith(`${normalizedOut}/`)
-    ) {
-      throw new InvalidBuildPathsError(sourceDir, outDir);
-    }
+    if (pathsOverlap(sourceDir, outDir)) throw new InvalidBuildPathsError(sourceDir, outDir);
   }
 
   private async readSourceMarketplace(sourceDir: string): Promise<SourceMarketplace> {

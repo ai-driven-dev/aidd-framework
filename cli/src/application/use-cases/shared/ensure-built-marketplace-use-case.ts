@@ -5,7 +5,7 @@ import type {
   FrameworkBuildTarget,
 } from "../../../domain/models/framework-build.js";
 import type { Marketplace } from "../../../domain/models/marketplace.js";
-import { builtMarketplaceDir } from "../../../domain/models/paths.js";
+import { builtMarketplaceDir, pathsOverlap } from "../../../domain/models/paths.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { VersionReader } from "../../../domain/ports/version-reader.js";
@@ -115,17 +115,8 @@ export class EnsureBuiltMarketplaceUseCase {
     await this.runBuild(target, mode, sourceDir, builtDir);
   }
 
-  // "/"-separated comparison, matching FrameworkBuildUseCase.guardPaths(): both dirs are
-  // native-separated (resolve() returns "\" on Windows), so a hardcoded "/" suffix would
-  // never match, silently missing genuine nesting.
   private nested(sourceDir: string, builtDir: string): boolean {
-    const normalizedSource = sourceDir.replace(/\\/g, "/");
-    const normalizedBuilt = builtDir.replace(/\\/g, "/");
-    return (
-      normalizedSource === normalizedBuilt ||
-      normalizedBuilt.startsWith(`${normalizedSource}/`) ||
-      normalizedSource.startsWith(`${normalizedBuilt}/`)
-    );
+    return pathsOverlap(sourceDir, builtDir);
   }
 
   private async buildViaTemp(

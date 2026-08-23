@@ -57,6 +57,70 @@ describe("who a default installation names: nobody", () => {
   });
 });
 
+// `process.platform` is read inside identityDir() on every call, so stating it here is
+// enough - no re-require needed. Pinned on any platform rather than only on a Windows
+// runner: where a person's file lands is a pure resolution, and a test only a runner we
+// rarely have can fail is a test that lets this regress silently (#707).
+function withPlatform(platform, run) {
+  const original = Object.getOwnPropertyDescriptor(process, "platform");
+  Object.defineProperty(process, "platform", { value: platform, configurable: true });
+  try {
+    run();
+  } finally {
+    Object.defineProperty(process, "platform", original);
+  }
+}
+
+describe("where a person's own file lands", () => {
+  it("Windows keeps it under %APPDATA%, not under .config", () => {
+    const appData = tempDir("aidd-identity-appdata-");
+    const home = tempDir("aidd-identity-home-");
+    const previousAppData = process.env.APPDATA;
+    process.env.HOME = home;
+    process.env.APPDATA = appData;
+    withPlatform("win32", () => {
+      assert.equal(
+        identityModule().identityFilePath(),
+        path.join(appData, "aidd", "identity.json")
+      );
+    });
+    if (previousAppData === undefined) delete process.env.APPDATA;
+    else process.env.APPDATA = previousAppData;
+  });
+
+  it("a POSIX machine keeps it under the OS user's own .config", () => {
+    const home = tempDir("aidd-identity-home-");
+    process.env.HOME = home;
+    withPlatform("linux", () => {
+      assert.equal(
+        identityModule().identityFilePath(),
+        path.join(home, ".config", "aidd", "identity.json")
+      );
+    });
+  });
+
+  it("the shared-location variable stays ignored on both", () => {
+    const home = tempDir("aidd-identity-home-");
+    const elsewhere = tempDir("aidd-identity-elsewhere-");
+    const appData = tempDir("aidd-identity-appdata-");
+    const previousAppData = process.env.APPDATA;
+    process.env.HOME = home;
+    process.env.APPDATA = appData;
+    process.env.AIDD_USER_CONFIG_DIR = elsewhere;
+    for (const platform of ["win32", "linux"]) {
+      withPlatform(platform, () => {
+        assert.ok(
+          !identityModule().identityFilePath().startsWith(elsewhere),
+          `AIDD_USER_CONFIG_DIR must not relocate a person's own choice on ${platform}`
+        );
+      });
+    }
+    delete process.env.AIDD_USER_CONFIG_DIR;
+    if (previousAppData === undefined) delete process.env.APPDATA;
+    else process.env.APPDATA = previousAppData;
+  });
+});
+
 describe("the identifier itself", () => {
   it("is random, not derived from anything that identifies the person elsewhere", () => {
     const { generatePersonId } = identityModule();
