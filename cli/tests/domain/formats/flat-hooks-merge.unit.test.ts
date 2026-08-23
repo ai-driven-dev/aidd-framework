@@ -166,6 +166,25 @@ describe("mergeCursorFlatHooks", () => {
     expect(result.hooks).toHaveProperty("beforeSubmitPrompt");
   });
 
+  // #680: the only reason a Cursor session closes a turn headlessly. Measured 2026-08-22:
+  // an interactive session fires `stop` and a headless one fires `sessionEnd` instead,
+  // never both from one run - so subscribing to `stop` alone journals nothing headless,
+  // in silence. This test fails if either name stops being emitted.
+  it("maps Stop → both stop and sessionEnd, because Cursor fires one or the other", () => {
+    const command = "node ./.cursor/hooks/plugin/turn-end.js";
+    const plugin = JSON.stringify({
+      hooks: { Stop: [{ hooks: [{ type: "command", command }] }] },
+    });
+    const { content } = mergeCursorFlatHooks(null, plugin);
+    const result = JSON.parse(content) as { hooks: Record<string, unknown[]> };
+
+    expect(Object.keys(result.hooks).sort()).toEqual(["sessionEnd", "stop"]);
+    expect(result.hooks).not.toHaveProperty("Stop");
+    // Both must carry the same command: a turn closed either way journals the same line.
+    expect(JSON.stringify(result.hooks.sessionEnd)).toBe(JSON.stringify(result.hooks.stop));
+    expect(JSON.stringify(result.hooks.stop)).toContain(command);
+  });
+
   it("emits version:1 wrapper", () => {
     const plugin = JSON.stringify({ hooks: {} });
     const { content } = mergeCursorFlatHooks(null, plugin);

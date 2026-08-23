@@ -205,6 +205,13 @@ Which matters more than it first reads: a one-shot `opencode run` starts its own
 **every** one-shot session is a first session. Journaling covers someone working against a running
 server, and not someone invoking OpenCode a command at a time.
 
+**A git worktree keeps its own journal, and that is a decision rather than an accident.** A
+worktree is where the work actually ran, so its sessions are journalled under the worktree's own
+`aidd_docs/runs/`, not under the checkout it shares history with. A report asked from the main
+checkout therefore does not see them, and one asked from the worktree sees only its own. Nothing
+joins the two today: reading a worktree's sessions means asking from inside it, or naming the
+session directly.
+
 A session can still be named directly, which is how one outside a journal is reached:
 
 ```bash
