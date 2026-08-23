@@ -52,6 +52,17 @@ const FLAT_TARGETS = ["claude", "cursor", "copilot", "codex", "opencode"] as con
  */
 const FROZEN_CELLS = new Set(["claude"]);
 
+// This repo carries no .gitattributes, so a Windows checkout's core.autocrlf converts
+// every text file's LF to CRLF on write to disk (#707) - hashing those raw bytes would
+// diff on line endings alone against the LF-committed stored baseline. Fold CRLF -> LF
+// before hashing; skip anything that doesn't round-trip through UTF-8 (this tree's
+// outputs are all .md/.json/.yml/.js today) so a future binary asset isn't corrupted.
+function normalizeLineEndings(content: Buffer): Buffer {
+  const text = content.toString("utf-8");
+  if (Buffer.byteLength(text, "utf-8") !== content.length) return content;
+  return Buffer.from(text.replace(/\r\n/g, "\n"), "utf-8");
+}
+
 async function hashDirectory(dir: string): Promise<TargetSnapshot> {
   const result: TargetSnapshot = {};
   const entries = await readdir(dir, { recursive: true });
@@ -59,7 +70,8 @@ async function hashDirectory(dir: string): Promise<TargetSnapshot> {
     const fullPath = join(dir, entry);
     try {
       const content = await readFile(fullPath);
-      result[entry.replace(/\\/g, "/")] = createHash("sha256").update(content).digest("hex");
+      const normalized = normalizeLineEndings(content);
+      result[entry.replace(/\\/g, "/")] = createHash("sha256").update(normalized).digest("hex");
     } catch {
       // skip directories
     }
