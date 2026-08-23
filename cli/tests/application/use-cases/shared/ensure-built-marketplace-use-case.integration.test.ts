@@ -331,7 +331,8 @@ describe("outDir invariant for the cache-rebuild build path", () => {
     });
 
     expect(capturedOutDirs).toHaveLength(2);
-    const cacheRoot = join(PROJECT, BUILT_CACHE_SUBDIR);
+    // resolve(): execute() always resolves builtDir before this capture sees it (#707).
+    const cacheRoot = resolve(join(PROJECT, BUILT_CACHE_SUBDIR));
     const tmpRoot = tmpdir();
     for (const outDir of capturedOutDirs) {
       const underCache = outDir === cacheRoot || outDir.startsWith(`${cacheRoot}${sep}`);
