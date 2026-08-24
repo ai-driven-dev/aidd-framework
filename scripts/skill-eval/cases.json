@@ -319,39 +319,242 @@
     }
   },
   {
-    "plugin": "aidd-ui",
-    "skill": "01-design",
-    "evalName": "xeval-ui-design",
-    "name": "designs from a lightweight UI and explicit visual direction",
+    "plugin": "aidd-dev",
+    "skill": "01-plan",
+    "evalName": "xeval-dev-plan-ui-contract",
+    "name": "plans frontend work from a ready versioned UI contract",
     "setup": {
       "files": {
-        "package.json": "{ \"name\": \"orders\", \"dependencies\": { \"react\": \"^19.0.0\" } }\n",
-        "src/App.jsx": "export function App() { return <main className=\"page\"><h1>Orders</h1><form><input name=\"query\" /><button>Search</button></form></main>; }\n",
-        "src/styles.css": ".page { max-width: 60rem; margin: 0 auto; padding: 1rem; }\nbutton { min-height: 44px; }\n"
+        "src/Checkout.jsx": "export function Checkout() { return <main>Current checkout</main>; }\n",
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 1\nstatus: active\nscope:\n  - src\nsources:\n  - src/Checkout.jsx\nsupersedes: null\n---\n\n# UI System: App\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/requirement.md": "# Checkout\n\nImplement the approved checkout interface contract.\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/ui.md": "---\nid: checkout\nrevision: 2\nstatus: ready\nsystems:\n  - id: app\n    revision: 1\nrequired_deltas: []\nsupersedes: checkout@1\n---\n\n# UI Contract: Checkout\n\n## Intent\n\n- Task: submit payment and recover from errors\n\n## Interaction States\n\n| State | Trigger | Feedback | Recovery or next action |\n| --- | --- | --- | --- |\n| pending | submit | Processing | wait |\n| error | payment fails | inline error | retry |\n"
       }
     },
-    "prompt": "Use the {{SKILL}} skill to design an order-search results experience for warehouse operators in this small React app. Operators repeatedly search by order ID, need loading, empty, error, and result states, and must keep Search as the primary action. The requested visual direction is brutalist. You are running headless: use the complete requirements above, do not ask questions, do not implement code, and return the final experience decisions.",
+    "prompt": "Use the {{SKILL}} skill to plan aidd_docs/tasks/2026_08/2026_08_23_checkout/requirement.md. This is frontend work and its current ready UI contract is beside the requirement. Run headlessly, consume that contract without redesigning it, and write the plan and phases in the same task folder.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/plan.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/phase-1.md"
+      ],
+      "filesUnchanged": [
+        "src/Checkout.jsx",
+        "aidd_docs/ui/systems/app.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/requirement.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/ui.md"
+      ],
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/phase-1.md": [
+          "## UI Contract",
+          "ui.md@2",
+          "app@1"
+        ]
+      },
+      "fileNotContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/phase-1.md": [
+          "## Wireframe"
+        ]
+      },
+      "judgeFiles": [
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/plan.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/phase-1.md"
+      ],
+      "judge": "The implementation plan consumes checkout ui.md revision 2 and app system revision 1, preserves the experience decisions by reference, and does not invent a wireframe or modify normative UI artifacts."
+    }
+  },
+  {
+    "plugin": "aidd-dev",
+    "skill": "02-implement",
+    "evalName": "xeval-dev-implement-ui-drift",
+    "name": "stops before implementation when a UI dependency drifts",
+    "setup": {
+      "files": {
+        "src/Checkout.jsx": "export function Checkout() { return <main>unchanged</main>; }\n",
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 2\nstatus: active\nscope:\n  - src\nsources:\n  - src/Checkout.jsx\nsupersedes: app@1\n---\n\n# UI System: App\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/ui.md": "---\nid: checkout\nrevision: 3\nstatus: ready\nsystems:\n  - id: app\n    revision: 2\nrequired_deltas:\n  - aidd_docs/tasks/2026_08/2026_08_23_checkout/system-delta-app-errors.md\nsupersedes: checkout@2\n---\n\n# UI Contract: Checkout\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/system-delta-app-errors.md": "---\nid: errors\nsystem: app\nbase_revision: 1\nmode: extend\nstatus: superseded\napproval_source: user\nverification_commit: null\ntarget_scope:\n  - src\nexpected_sources:\n  - src/Checkout.jsx\nverified_sources: []\n---\n\n# UI System Delta: Errors\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/plan.md": "---\nobjective: Implement checkout\nstatus: pending\n---\n\n# Plan: Checkout\n\n## Phases\n\n| # | Phase | File |\n| --- | --- | --- |\n| 1 | checkout | [phase-1.md](./phase-1.md) |\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/phase-1.md": "---\nstatus: pending\n---\n\n# Instruction: Checkout\n\n## UI Contract\n\n- Contract: `aidd_docs/tasks/2026_08/2026_08_23_checkout/ui.md@3`\n- Systems: app@2\n- Implement deltas: aidd_docs/tasks/2026_08/2026_08_23_checkout/system-delta-app-errors.md\n- Consume deltas: none\n- Depends on phases: none\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill on aidd_docs/tasks/2026_08/2026_08_23_checkout/plan.md. Revalidate the referenced UI graph before any implementation and stop deterministically on drift.",
     "expect": {
       "filesUnchanged": [
-        "package.json",
-        "src/App.jsx",
-        "src/styles.css"
-      ],
-      "filesAbsent": [
-        "aidd_docs/memory/design.md"
+        "src/Checkout.jsx",
+        "aidd_docs/ui/systems/app.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/ui.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/system-delta-app-errors.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/plan.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/phase-1.md"
       ],
       "stdoutContains": [
-        "brutalist",
-        "loading",
-        "empty",
-        "error"
+        "replan needed",
+        "superseded"
       ],
-      "judge": "The output reuses the current page shell and 44px button behavior, covers loading/empty/error/result states, treats brutalist styling as a feature-local visual decision, keeps scanner/device context unknown, specifies accessibility as observable behavior rather than unmeasured compliance, and does not prescribe React or CSS implementation code."
+      "judge": "Implementation stops before branch, status, phase, or source mutation because a required UI system delta is superseded."
     }
   },
   {
     "plugin": "aidd-ui",
-    "skill": "03-system",
+    "skill": "02-design",
+    "evalName": "xeval-ui-design",
+    "name": "designs from a lightweight UI and explicit visual direction",
+    "providers": [
+      {
+        "plugin": "aidd-ui",
+        "skill": "04-accessibility",
+        "evalName": "xeval-ui-a11y-provider"
+      },
+      {
+        "plugin": "aidd-ui",
+        "skill": "05-adapt",
+        "evalName": "xeval-ui-adapt-provider"
+      }
+    ],
+    "setup": {
+      "files": {
+        "package.json": "{ \"name\": \"orders\", \"dependencies\": { \"react\": \"^19.0.0\" } }\n",
+        "public/warehouse-mark.png": "existing-asset-fixture\n",
+        "src/App.jsx": "export function App() { return <main className=\"page\"><h1>Orders</h1><form><input name=\"query\" /><button>Search</button></form></main>; }\n",
+        "src/styles.css": ".page { max-width: 60rem; margin: 0 auto; padding: 1rem; }\nbutton { min-height: 44px; }\nbutton:focus-visible { outline: 2px solid currentColor; }\n@media (min-width: 48rem) { .page { padding: 2rem; } }\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_order_search/requirements.md": "# Order search\n\nWarehouse operators use a keyboard, not a scanner, to repeatedly search by order ID. Search stays primary. Results show order ID, status, destination, and Review. Use exact result status copy `Ready to review`. Cover loading, empty, recoverable error, and result states. Reveal fresh results with a motion cue as feedback, but remove that cue under the reduced-motion preference. Long IDs remain fully accessible. Below the existing 48rem breakpoint, stack result metadata while keeping Review adjacent to its order. Every field has a persistent label and status feedback is announced. Reuse `public/warehouse-mark.png` in the header. The empty state requires a feature-local illustration that depicts an empty sorting tray, remains legible at constrained widths, and has an acceptance requirement, but no binary asset is supplied or requested from this capability. Use a brutalist visual direction.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in create mode with aidd_docs/tasks/2026_08/2026_08_23_order_search/requirements.md. Discover and use the installed accessibility and adaptation providers. Write aidd_docs/tasks/2026_08/2026_08_23_order_search/ui.md. You are running headless: do not ask questions or implement code.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/tasks/2026_08/2026_08_23_order_search/ui.md"
+      ],
+      "filesUnchanged": [
+        "package.json",
+        "public/warehouse-mark.png",
+        "src/App.jsx",
+        "src/styles.css",
+        "aidd_docs/tasks/2026_08/2026_08_23_order_search/requirements.md"
+      ],
+      "filesAbsent": [
+        "aidd_docs/memory/design.md",
+        "public/order-empty.png"
+      ],
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_order_search/ui.md": [
+          "status: ready",
+          "brutalist",
+          "loading",
+          "empty",
+          "error",
+          "Ready to review",
+          "public/warehouse-mark.png",
+          "empty sorting tray",
+          "fresh results",
+          "feedback",
+          "reduced-motion",
+          "Accessibility",
+          "Adaptation",
+          "xeval-ui-a11y-provider",
+          "xeval-ui-adapt-provider"
+        ]
+      },
+      "fileNotContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_order_search/ui.md": [
+          "{feature-id}",
+          "<button",
+          "display:"
+        ]
+      },
+      "judgeFiles": [
+        "aidd_docs/tasks/2026_08/2026_08_23_order_search/ui.md"
+      ],
+      "judge": "The ready contract reuses the current page shell, button evidence, and warehouse mark; contracts the missing empty-state illustration without producing it; preserves exact result copy and specialist-owned reduced-motion behavior; covers required states; keeps brutalist direction feature-local; and contains no production implementation."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-system",
+    "evalName": "xeval-ui-establish",
+    "name": "establishes only the minimum system for an ad hoc UI",
+    "setup": {
+      "files": {
+        "src/App.jsx": "export function App() { return <main><h1>Invoices</h1><button>New invoice</button></main>; }\n",
+        "src/styles.css": "main { max-width: 50rem; margin: auto; }\nbutton { padding: 0.5rem 1rem; }\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_invoice/requirement.md": "# Invoice list\n\nThe invoice list and create form need one shared action style, field treatment, spacing rhythm, and visible focus behavior. No design system exists.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in establish mode for aidd_docs/tasks/2026_08/2026_08_23_invoice/requirement.md. Reuse coherent current CSS and write only the minimum draft system to aidd_docs/tasks/2026_08/2026_08_23_invoice/system-delta-invoices-foundation.md. Do not approve it or modify source.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/tasks/2026_08/2026_08_23_invoice/system-delta-invoices-foundation.md"
+      ],
+      "filesUnchanged": [
+        "src/App.jsx",
+        "src/styles.css"
+      ],
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_invoice/system-delta-invoices-foundation.md": [
+          "mode: establish",
+          "base_revision: null",
+          "status: draft",
+          "target_scope",
+          "expected_sources",
+          "src/styles.css"
+        ]
+      },
+      "fileNotContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_invoice/system-delta-invoices-foundation.md": [
+          "status: approved",
+          "enterprise",
+          "complete token taxonomy"
+        ]
+      },
+      "judgeFiles": [
+        "aidd_docs/tasks/2026_08/2026_08_23_invoice/system-delta-invoices-foundation.md"
+      ],
+      "judge": "The draft establishes only conventions needed by the invoice work, reuses coherent current CSS, leaves specialist gaps unresolved, and does not invent a broad design system or implementation code."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "02-design",
+    "evalName": "xeval-ui-provider-missing",
+    "name": "keeps a feature draft when a required specialist is unavailable",
+    "setup": {
+      "files": {
+        "src/ResetPassword.jsx": "export function ResetPassword() { return <form><input type=\"password\" /><button>Reset password</button></form>; }\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_reset/requirements.md": "# Reset password\n\nA user enters a new password, submits it, and sees validation errors or success. Keyboard and accessible error behavior are required.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in create mode from aidd_docs/tasks/2026_08/2026_08_23_reset/requirements.md. Write aidd_docs/tasks/2026_08/2026_08_23_reset/ui.md. No specialist provider is installed: do not invent its verdict and do not implement code.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/tasks/2026_08/2026_08_23_reset/ui.md"
+      ],
+      "filesUnchanged": [
+        "src/ResetPassword.jsx",
+        "aidd_docs/tasks/2026_08/2026_08_23_reset/requirements.md"
+      ],
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_reset/ui.md": [
+          "status: draft"
+        ]
+      },
+      "fileMatches": {
+        "aidd_docs/tasks/2026_08/2026_08_23_reset/ui.md": "status: draft[\\s\\S]*(unverified|unresolved)"
+      },
+      "fileNotContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_reset/ui.md": [
+          "status: ready",
+          "WCAG compliant"
+        ]
+      },
+      "judgeFiles": [
+        "aidd_docs/tasks/2026_08/2026_08_23_reset/ui.md"
+      ],
+      "judge": "The UI contract remains draft because accessibility is applicable but its provider is unavailable. It identifies the gap without generating a substitute accessibility verdict or implementation code."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-system",
     "evalName": "xeval-ui-system",
     "name": "discovers the target workspace system and confirms matching memory",
     "setup": {
@@ -385,7 +588,7 @@
   },
   {
     "plugin": "aidd-ui",
-    "skill": "03-system",
+    "skill": "01-system",
     "evalName": "xeval-ui-system",
     "name": "reports stale design memory and uses current repository evidence",
     "setup": {
@@ -413,7 +616,7 @@
   },
   {
     "plugin": "aidd-ui",
-    "skill": "03-system",
+    "skill": "01-system",
     "evalName": "xeval-ui-system",
     "name": "extends the dominant button system and flags a stable convention",
     "setup": {
@@ -423,56 +626,94 @@
         "src/screens/Orders.jsx": "import { Button } from '../ui/Button';\nexport function Orders() { return <><Button>Export</Button><Button variant=\"secondary\">Filter</Button></>; }\n",
         "src/screens/Users.jsx": "import { Button } from '../ui/Button';\nexport function Users() { return <Button>Invite</Button>; }\n",
         "src/screens/Archive.jsx": "import { LegacyButton } from '../legacy/LegacyButton';\nexport function Archive() { return <LegacyButton>Restore</LegacyButton>; }\n",
-        "aidd_docs/memory/design.md": "# Design\n\n- Shared controls live in `src/ui`.\n"
+        "aidd_docs/memory/design.md": "# Design\n\n- Active UI system: `aidd_docs/ui/systems/app.md`, revision 2.\n",
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 2\nstatus: active\nscope:\n  - src\nsources:\n  - src/ui/Button.jsx\nsupersedes: app@1\n---\n\n# UI System: App\n\n## Surfaces\n\n| Pattern, component, or token | Contract | States | Source |\n| --- | --- | --- | --- |\n| Button | Shared actions use Button variants | default, hover, focus, disabled | src/ui/Button.jsx |\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_bulk_delete/requirement.md": "# Bulk delete\n\nOrders needs a destructive bulk-delete action with default, hover, focus, disabled, and pending states.\n"
       }
     },
-    "prompt": "Use the {{SKILL}} skill in extend mode. Orders needs a destructive bulk-delete action with default, hover, focus, disabled, and pending states. Decide the smallest coherent system extension from repository evidence, account for both button systems, identify whether this may become a stable convention, and modify nothing.",
+    "prompt": "Use the {{SKILL}} skill in extend mode from aidd_docs/tasks/2026_08/2026_08_23_bulk_delete/requirement.md. Resolve the active system, account for both button implementations, and write the draft to aidd_docs/tasks/2026_08/2026_08_23_bulk_delete/system-delta-app-button-destructive.md. Do not approve it, modify code, or change memory.",
     "expect": {
+      "filesExist": [
+        "aidd_docs/tasks/2026_08/2026_08_23_bulk_delete/system-delta-app-button-destructive.md"
+      ],
       "filesUnchanged": [
         "src/ui/Button.jsx",
         "src/legacy/LegacyButton.jsx",
-        "aidd_docs/memory/design.md"
+        "aidd_docs/memory/design.md",
+        "aidd_docs/ui/systems/app.md"
       ],
-      "stdoutContains": [
-        "src/ui/Button.jsx",
-        "src/legacy/LegacyButton.jsx",
-        "destructive",
-        "disabled",
-        "pending"
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_bulk_delete/system-delta-app-button-destructive.md": [
+          "system: app",
+          "base_revision: 2",
+          "mode: extend",
+          "status: draft",
+          "target_scope",
+          "expected_sources",
+          "src/ui/Button.jsx",
+          "src/legacy/LegacyButton.jsx",
+          "destructive",
+          "pending"
+        ]
+      },
+      "judgeFiles": [
+        "aidd_docs/tasks/2026_08/2026_08_23_bulk_delete/system-delta-app-button-destructive.md"
       ],
-      "judge": "The delta recognizes both button systems, uses the repeated src/ui/Button.jsx pattern as the evidenced dominant/current surface, proposes a bounded destructive extension rather than a parallel button, and flags the stable convention separately for project-memory refresh."
+      "judge": "The draft recognizes both button systems, extends the active Button instead of creating a parallel control, records the exact base revision, remains unapproved, and contains no production code."
     }
   },
   {
     "plugin": "aidd-ui",
-    "skill": "02-review",
+    "skill": "03-review",
     "evalName": "xeval-ui-review",
     "name": "reports prioritized experience findings from observable evidence",
+    "providers": [
+      {
+        "plugin": "aidd-ui",
+        "skill": "04-accessibility",
+        "evalName": "xeval-review-a11y-provider"
+      },
+      {
+        "plugin": "aidd-ui",
+        "skill": "05-adapt",
+        "evalName": "xeval-review-adapt-provider"
+      }
+    ],
     "setup": {
       "files": {
-        "requirements.md": "# Checkout\n\nA shopper must see a recoverable payment error and know when submission is pending.\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/requirements.md": "# Checkout\n\nA shopper must see a recoverable payment error and know when submission is pending.\n",
         "src/Checkout.jsx": "import { useState } from 'react';\nexport function Checkout() { const [pending, setPending] = useState(false); const [error, setError] = useState(''); return <form onSubmit={() => setPending(true)}><input placeholder=\"Card number\" /><button disabled={pending}>Pay</button>{error ? null : null}</form>; }\n"
       }
     },
-    "prompt": "Use the {{SKILL}} skill to review the Checkout interface against requirements.md. No rendered browser is available, so use only observable repository evidence, distinguish unverified runtime behavior, prioritize findings, stay within experience quality, and modify nothing.",
+    "prompt": "Use the {{SKILL}} skill to review src/Checkout.jsx against aidd_docs/tasks/2026_08/2026_08_23_checkout/requirements.md. Discover the installed accessibility and adaptation providers. No browser is available. Write aidd_docs/tasks/2026_08/2026_08_23_checkout/ui-review.md without changing source or normative UI artifacts.",
     "expect": {
+      "filesExist": [
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/ui-review.md"
+      ],
       "filesUnchanged": [
-        "requirements.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/requirements.md",
         "src/Checkout.jsx"
       ],
-      "stdoutContains": [
-        "src/Checkout.jsx",
-        "warning",
-        "error",
-        "pending"
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/ui-review.md": [
+          "normative: false",
+          "src/Checkout.jsx",
+          "error",
+          "pending",
+          "xeval-review-a11y-provider",
+          "xeval-review-adapt-provider"
+        ]
+      },
+      "judgeFiles": [
+        "aidd_docs/tasks/2026_08/2026_08_23_checkout/ui-review.md"
       ],
-      "judge": "Each confirmed finding has observable evidence, user impact, severity, and a bounded recommendation. It catches the hidden payment error and ambiguous pending feedback, avoids generic code-refactoring advice, and labels browser-only claims unverified."
+      "judge": "The non-normative review catches the hidden payment error and ambiguous pending feedback, preserves specialist provenance, prioritizes user impact, separates unverified browser behavior, and contains no implementation refactor advice."
     }
   },
   {
     "plugin": "aidd-ui",
-    "skill": "05-responsive",
-    "evalName": "xeval-ui-responsive",
+    "skill": "05-adapt",
+    "evalName": "xeval-ui-adapt",
     "name": "defines constrained behavior using existing breakpoints",
     "setup": {
       "files": {
@@ -481,7 +722,7 @@
         "requirements.md": "# Orders\n\nThe order ID, status, and primary Review action must remain available. Notes and timestamps are secondary. Long order IDs must remain accessible.\n"
       }
     },
-    "prompt": "Use the {{SKILL}} skill in define mode for an Orders table using the supplied requirements. Define behavior under constrained space, reuse the existing breakpoints and TableShell, cover overflow and touch access, introduce no breakpoint unless evidence proves a gap, and modify nothing.",
+    "prompt": "Use the {{SKILL}} skill in define mode for an Orders table using requirements.md. Return typed adaptation fragments for constrained space and overflow. Reuse existing breakpoints and TableShell, introduce no breakpoint unless evidence proves a gap, and modify nothing.",
     "expect": {
       "filesUnchanged": [
         "tailwind.config.js",
@@ -495,7 +736,7 @@
         "overflow",
         "Review"
       ],
-      "judge": "The responsive rules name triggers, behavior changes, preserved priority, and overflow handling; reuse an existing breakpoint and TableShell; and do not invent a new breakpoint or device-specific width."
+      "judge": "Each adaptation fragment has the required typed fields, preserves task priority, reuses an existing breakpoint and TableShell, covers overflow, and invents no device width or accessibility verdict."
     }
   },
   {
@@ -510,7 +751,7 @@
         "aidd_docs/memory/design.md": "# Design\n\n- Interactive controls require visible focus indication and accessible names.\n"
       }
     },
-    "prompt": "Use the {{SKILL}} skill in review mode for Search. Review semantics, accessible naming, keyboard reachability, and focus evidence. A browser and computed contrast values are unavailable: keep runtime-only claims unverified, cite exact controls, and modify nothing.",
+    "prompt": "Use the {{SKILL}} skill in assess mode for Search. Return typed accessibility finding fragments for semantics, accessible naming, keyboard reachability, and focus evidence. A browser and computed contrast values are unavailable: keep runtime-only claims unverified, cite exact controls, and modify nothing.",
     "expect": {
       "filesUnchanged": [
         "src/Search.jsx",
@@ -518,71 +759,124 @@
         "aidd_docs/memory/design.md"
       ],
       "stdoutContains": [
+        "accessibility",
         "src/Search.jsx",
         "Filters",
         "keyboard",
         "accessible name",
         "unverified"
       ],
-      "judge": "The review identifies the clickable Filters div as a semantic and keyboard defect and the placeholder-only search field as a naming or label defect. It separates unavailable focus/contrast runtime evidence from confirmed findings and makes no unsupported compliance claim."
+      "judge": "Typed accessibility fragments identify the clickable Filters div and placeholder-only field defects, include observable acceptance behavior and system impact, separate runtime evidence gaps, and assign no overall review priority."
     }
   },
   {
     "plugin": "aidd-ui",
-    "skill": "06-polish",
-    "evalName": "xeval-ui-polish",
-    "name": "refines a settled interface without restructuring it",
+    "skill": "02-design",
+    "evalName": "xeval-ui-revise",
+    "name": "revises expression without taking a second polish domain",
+    "providers": [
+      {
+        "plugin": "aidd-ui",
+        "skill": "04-accessibility",
+        "evalName": "xeval-revise-a11y-provider"
+      },
+      {
+        "plugin": "aidd-ui",
+        "skill": "05-adapt",
+        "evalName": "xeval-revise-adapt-provider"
+      }
+    ],
     "setup": {
       "files": {
-        "requirements.md": "# Profile summary\n\nStructure is approved: title, account facts, then Edit profile as the primary action. Responsive and accessibility behavior are settled. Do not change region order or task flow.\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_profile/requirements.md": "# Profile summary\n\nStructure is approved: title, account facts, then Edit profile as the primary action. Adaptation and accessibility behavior are settled. Do not change region order or task flow.\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_profile/ui.md": "---\nid: profile-summary\nrevision: 1\nstatus: ready\nsystems: []\nrequired_deltas: []\nsupersedes: null\n---\n\n# UI Contract: Profile summary\n\n## Intent\n\n- User: account holder\n- Task: inspect account facts and edit the profile\n- Outcome: facts remain readable and Edit profile starts editing\n\n## Screens\n\n| Screen or region | Responsibility | Primary action |\n| --- | --- | --- |\n| Profile | title, account facts, then Edit profile | Edit profile |\n\n## Adaptation\n\n- Preserve the region order at constrained widths.\n\n## Accessibility\n\n- Preserve semantic heading and description-list structure with visible button focus.\n",
         "src/Profile.jsx": "export function Profile() { return <main><h1>Profile</h1><dl><dt>Email</dt><dd>a@example.com</dd></dl><button>Edit profile</button></main>; }\n",
         "src/tokens.css": ":root { --space-2: 0.5rem; --space-4: 1rem; --font-heading: 1.5rem; --focus-ring: 2px solid #075985; }\n"
       }
     },
-    "prompt": "Use the {{SKILL}} skill to produce a polish delta for Profile. The supplied structure and flow are settled. Focus on evidenced spacing, typography, alignment, and affordance refinements using existing tokens; preserve hierarchy and task flow; do not implement or modify files.",
+    "prompt": "Use the {{SKILL}} skill in revise mode for aidd_docs/tasks/2026_08/2026_08_23_profile/ui.md. Improve spacing, typography, alignment, and affordance with existing tokens while preserving intent, hierarchy, and flow. Discover the installed specialists, archive revision 1, and write revision 2. Do not implement code.",
     "expect": {
+      "filesExist": [
+        "aidd_docs/tasks/2026_08/2026_08_23_profile/.ui-history/profile-summary@1.md"
+      ],
       "filesUnchanged": [
-        "requirements.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_profile/requirements.md",
         "src/Profile.jsx",
         "src/tokens.css"
       ],
-      "stdoutContains": [
-        "--space-2",
-        "--space-4",
-        "Edit profile"
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_profile/ui.md": [
+          "revision: 2",
+          "supersedes: profile-summary@1",
+          "space-2",
+          "space-4",
+          "Edit profile",
+          "xeval-revise-a11y-provider",
+          "xeval-revise-adapt-provider"
+        ],
+        "aidd_docs/tasks/2026_08/2026_08_23_profile/.ui-history/profile-summary@1.md": [
+          "revision: 1",
+          "title, account facts, then Edit profile"
+        ]
+      },
+      "judgeFiles": [
+        "aidd_docs/tasks/2026_08/2026_08_23_profile/ui.md"
       ],
-      "judge": "The output is a bounded, prioritized polish delta grounded in existing tokens. It improves expression while explicitly preserving title-account facts-action order and the task flow, and does not redesign or emit implementation code."
+      "judge": "Revision 2 performs bounded polish inside design, preserves title-account facts-action order and task flow, uses existing tokens, preserves specialist authority, and archives the exact prior contract."
     }
   },
   {
     "plugin": "aidd-ui",
-    "skill": "07-handoff",
-    "evalName": "xeval-ui-handoff",
-    "name": "writes a verified contract without source or memory mutation",
+    "skill": "02-design",
+    "evalName": "xeval-ui-contract",
+    "name": "owns its implementation-ready contract without a handoff skill",
+    "providers": [
+      {
+        "plugin": "aidd-ui",
+        "skill": "04-accessibility",
+        "evalName": "xeval-contract-a11y-provider"
+      },
+      {
+        "plugin": "aidd-ui",
+        "skill": "05-adapt",
+        "evalName": "xeval-contract-adapt-provider"
+      }
+    ],
     "setup": {
       "files": {
-        "src/ui/Button.jsx": "export function Button({ children, disabled }) { return <button disabled={disabled}>{children}</button>; }\n",
-        "aidd_docs/memory/design.md": "# Design\n\n- Actions reuse `src/ui/Button.jsx`.\n- Layouts use the `md` breakpoint from Tailwind.\n",
-        "aidd_docs/tasks/2026_08/2026_08_22_checkout/decisions.md": "# Confirmed checkout decisions\n\nIntent: shoppers submit payment and receive an order confirmation.\nFlow: enter payment, submit, then confirmation.\nReuse `Button` from `src/ui/Button.jsx` for Pay.\nPending: submission disables Pay and changes its accessible name to Processing.\nError: show an inline payment error, move focus to it, then allow retry.\nResponsive: below existing `md`, stack fields and keep Pay after the last field.\nAccessibility: every field has a persistent label; the error is announced once and receives focus.\nNo new primitive is required.\n"
+        "src/ui/Button.jsx": "import './button.css';\nexport function Button({ children, disabled }) { return <button className=\"button\" disabled={disabled}>{children}</button>; }\n",
+        "src/ui/button.css": ".button { min-height: 44px; color: #fff; background: #075985; }\n.button:focus-visible { outline: 2px solid #000; outline-offset: 2px; }\n",
+        "src/ui/input.css": ".field input { min-height: 44px; }\n.field input:focus-visible { outline: 2px solid #000; outline-offset: 2px; }\n",
+        "tailwind.config.js": "export default { theme: { screens: { md: '48rem' } } };\n",
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 1\nstatus: active\nscope:\n  - src\nsources:\n  - src/ui/Button.jsx\n  - src/ui/button.css\n  - src/ui/input.css\n  - tailwind.config.js\nsupersedes: null\n---\n\n# UI System: App\n\n## Surfaces\n\n| Pattern, component, or token | Contract | States | Source |\n| --- | --- | --- | --- |\n| Button | shared actions | default, focus, disabled | src/ui/Button.jsx |\n| Field | shared labeled inputs | default, focus, invalid | src/ui/input.css |\n\n## Adaptation\n\n| Provider | Target and scope | Evidence | Required transformation | Acceptance |\n| --- | --- | --- | --- | --- |\n| existing system | checkout form below md | tailwind.config.js | stack fields in source order | source order remains unchanged |\n\n## Accessibility\n\n| Provider | Target and scope | Evidence | Required behavior | Acceptance |\n| --- | --- | --- | --- | --- |\n| existing system | form controls | src/ui/button.css; src/ui/input.css | persistent label, visible focus, and 44px minimum target | label and focus remain visible; computed height is at least 44px |\n| existing system | status feedback | active convention | announce state changes once | screen reader receives one status update |\n",
+        "aidd_docs/memory/design.md": "# Design\n\n- Active UI system: `aidd_docs/ui/systems/app.md`, revision 1.\n",
+        "aidd_docs/tasks/2026_08/2026_08_22_checkout/decisions.md": "# Confirmed checkout decisions\n\nIntent: shoppers submit payment and receive an order confirmation.\nFlow: enter cardholder name, card number, expiry, and security code; submit; then confirmation.\nReuse `Button` from `src/ui/Button.jsx` for Pay.\nPending: submission disables Pay, changes its accessible name to Processing, and announces progress once.\nError: show one inline payment error associated with the invalid field, move focus to the error summary, then allow retry.\nAdaptation: below the existing `md` breakpoint from `tailwind.config.js`, stack fields in source order and keep Pay after the last field; at and above `md`, use two columns while preserving the same order.\nAccessibility: every field has a persistent label and described error; the error summary is announced once and receives focus; reuse the active system focus and target-size behavior.\nNo new primitive or system delta is required.\n"
       }
     },
-    "prompt": "Use the {{SKILL}} skill to compile and verify the confirmed decisions in ./aidd_docs/tasks/2026_08/2026_08_22_checkout/decisions.md. Write ./aidd_docs/tasks/2026_08/2026_08_22_checkout/ui.md. Do not ask questions, invent decisions, write production code, or modify source and project memory.",
+    "prompt": "Use the {{SKILL}} skill in create mode from ./aidd_docs/tasks/2026_08/2026_08_22_checkout/decisions.md. Discover the installed accessibility and adaptation providers. Write and verify ./aidd_docs/tasks/2026_08/2026_08_22_checkout/ui.md. Do not ask questions, invent decisions, write production code, or modify source and project memory.",
     "expect": {
       "filesExist": [
         "aidd_docs/tasks/2026_08/2026_08_22_checkout/ui.md"
       ],
       "filesUnchanged": [
         "src/ui/Button.jsx",
+        "src/ui/button.css",
+        "src/ui/input.css",
+        "tailwind.config.js",
+        "aidd_docs/ui/systems/app.md",
         "aidd_docs/memory/design.md",
         "aidd_docs/tasks/2026_08/2026_08_22_checkout/decisions.md"
       ],
       "fileContains": {
         "aidd_docs/tasks/2026_08/2026_08_22_checkout/ui.md": [
           "# UI Contract",
+          "status: ready",
           "src/ui/Button.jsx",
           "Processing",
-          "inline payment error",
-          "md"
+          "error",
+          "md",
+          "xeval-contract-a11y-provider",
+          "xeval-contract-adapt-provider"
         ]
       },
       "fileNotContains": {
@@ -593,12 +887,227 @@
           "display:"
         ]
       },
-      "judge": "Engineering can implement the flow, pending and error recovery, responsive behavior, and accessibility acceptance behavior without guessing. The contract names the existing Button and no new primitive, but contains no React, CSS, or arbitrary implementation prescription."
+      "judgeFiles": [
+        "aidd_docs/tasks/2026_08/2026_08_22_checkout/ui.md"
+      ],
+      "judge": "The design-owned ready contract lets engineering implement the flow, pending and error recovery, adaptation, and accessibility behavior without guessing. It names existing evidence, preserves specialist decisions, and contains no implementation code."
     }
   },
   {
     "plugin": "aidd-ui",
-    "skill": "03-system",
+    "skill": "01-system",
+    "evalName": "xeval-ui-system",
+    "name": "promotes a verified delta and preserves the pinned revision",
+    "setup": {
+      "git": true,
+      "files": {
+        "src/ui/Button.jsx": "export function Button({ variant = 'primary', children }) { const allowed = ['primary', 'secondary', 'destructive']; if (!allowed.includes(variant)) throw new Error('invalid variant'); return <button data-variant={variant}>{children}</button>; }\n",
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 2\nstatus: active\nscope:\n  - src\nsources:\n  - src/ui/Button.jsx\nsupersedes: app@1\n---\n\n# UI System: App\n\n## Surfaces\n\n| Pattern, component, or token | Contract | States | Source |\n| --- | --- | --- | --- |\n| Button | primary and secondary shared actions | default, hover, focus, disabled | src/ui/Button.jsx |\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_button/system-delta-app-button-destructive.md": "---\nid: button-destructive\nsystem: app\nbase_revision: 2\nmode: extend\nstatus: verified\napproval_source: user approval recorded in requirement.md\nverification_commit: {{COMMIT}}\ntarget_scope:\n  - src\nexpected_sources:\n  - src/ui/Button.jsx\nverified_sources:\n  - src/ui/Button.jsx\n---\n\n# UI System Delta: Destructive Button\n\n## Need\n\nShared destructive actions need an explicit Button variant.\n\n## Change\n\n| Decision | Evidence | Consequence |\n| --- | --- | --- |\n| Add destructive Button variant | approved requirement and src/ui/Button.jsx at {{COMMIT}} | Button contract includes destructive intent |\n\n## Verification\n\n- src/ui/Button.jsx at {{COMMIT}} implements the approved variant.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in promote mode for aidd_docs/tasks/2026_08/2026_08_23_button/system-delta-app-button-destructive.md. Resolve its real verification commit and current implementation, promote it into the app contract, archive revision 2, and preserve code and memory. Do not reinterpret the approved decision.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/ui/systems/.history/app@2.md"
+      ],
+      "filesUnchanged": [
+        "src/ui/Button.jsx"
+      ],
+      "fileContains": {
+        "aidd_docs/ui/systems/app.md": [
+          "revision: 3",
+          "supersedes: app@2",
+          "destructive"
+        ],
+        "aidd_docs/ui/systems/.history/app@2.md": [
+          "revision: 2",
+          "primary and secondary shared actions"
+        ],
+        "aidd_docs/tasks/2026_08/2026_08_23_button/system-delta-app-button-destructive.md": [
+          "status: promoted",
+          "base_revision: 2"
+        ]
+      },
+      "judgeFiles": [
+        "aidd_docs/ui/systems/app.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_button/system-delta-app-button-destructive.md"
+      ],
+      "judge": "Promotion advances the active contract exactly once, preserves the prior revision immutably, marks the same verified delta promoted, and does not modify implementation or memory."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-system",
+    "evalName": "xeval-ui-system",
+    "name": "adopts a mature implemented system with specialist provenance",
+    "providers": [
+      {
+        "plugin": "aidd-ui",
+        "skill": "04-accessibility",
+        "evalName": "xeval-adopt-a11y-provider"
+      },
+      {
+        "plugin": "aidd-ui",
+        "skill": "05-adapt",
+        "evalName": "xeval-adopt-adapt-provider"
+      }
+    ],
+    "setup": {
+      "files": {
+        "apps/admin/src/ui/tokens.css": ":root { --space-2: 0.5rem; --action: #075985; }\n@media (min-width: 48rem) { .shell { grid-template-columns: 14rem 1fr; } }\n",
+        "apps/admin/src/ui/Button.jsx": "export function Button({ children, disabled }) { return <button disabled={disabled}>{children}</button>; }\n",
+        "apps/admin/src/ui/Input.jsx": "export function Input({ label, ...props }) { return <label>{label}<input {...props} /></label>; }\n",
+        "apps/admin/src/Users.jsx": "import { Button } from './ui/Button';\nimport { Input } from './ui/Input';\nexport function Users() { return <main className=\"shell\"><Input label=\"Search users\" /><Button>Invite</Button></main>; }\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in adopt mode for apps/admin. This prompt explicitly authorizes adoption as system id admin. Discover the installed accessibility and adaptation providers, record only confirmed implemented conventions, and write aidd_docs/ui/systems/admin.md at revision 1. Do not modify source or memory.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/ui/systems/admin.md"
+      ],
+      "filesUnchanged": [
+        "apps/admin/src/ui/tokens.css",
+        "apps/admin/src/ui/Button.jsx",
+        "apps/admin/src/ui/Input.jsx",
+        "apps/admin/src/Users.jsx"
+      ],
+      "fileContains": {
+        "aidd_docs/ui/systems/admin.md": [
+          "id: admin",
+          "revision: 1",
+          "status: active",
+          "apps/admin",
+          "xeval-adopt-a11y-provider",
+          "xeval-adopt-adapt-provider"
+        ]
+      },
+      "judgeFiles": [
+        "aidd_docs/ui/systems/admin.md"
+      ],
+      "judge": "The adopted contract contains only implemented shared conventions, records exact sources and specialist provenance, excludes unsupported claims, and does not modify implementation or memory."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-system",
+    "evalName": "xeval-ui-adopt-nested",
+    "name": "adopts a strictly nested workspace system",
+    "providers": [
+      {
+        "plugin": "aidd-ui",
+        "skill": "04-accessibility",
+        "evalName": "xeval-nested-a11y-provider"
+      },
+      {
+        "plugin": "aidd-ui",
+        "skill": "05-adapt",
+        "evalName": "xeval-nested-adapt-provider"
+      }
+    ],
+    "setup": {
+      "files": {
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 2\nstatus: active\nscope:\n  - apps\nsources:\n  - apps/shared.css\nsupersedes: app@1\n---\n\n# UI System: App\n",
+        "apps/shared.css": ":root { --space-2: 0.5rem; }\n",
+        "apps/admin/ui.css": ":root { --admin-accent: #075985; }\n.admin-action:focus-visible { outline: 2px solid currentColor; }\n",
+        "apps/admin/Button.jsx": "export function Button({ children }) { return <button className=\"admin-action\">{children}</button>; }\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in adopt mode for implemented system id admin scoped to apps/admin. The active app system owns parent scope apps, so admin is an unambiguous more-specific system. This prompt authorizes the exact evidenced revision 1 contract. Discover the installed specialists, write aidd_docs/ui/systems/admin.md, and modify no source or parent contract.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/ui/systems/admin.md"
+      ],
+      "filesUnchanged": [
+        "aidd_docs/ui/systems/app.md",
+        "apps/shared.css",
+        "apps/admin/ui.css",
+        "apps/admin/Button.jsx"
+      ],
+      "fileContains": {
+        "aidd_docs/ui/systems/admin.md": [
+          "id: admin",
+          "revision: 1",
+          "status: active",
+          "apps/admin",
+          "apps/admin/ui.css"
+        ]
+      },
+      "judge": "A strictly nested implemented system is adopted at revision 1 because most-specific scope resolution is unambiguous, while the active parent contract and all implementation sources remain unchanged."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-system",
+    "evalName": "xeval-ui-reconcile",
+    "name": "supersedes a delta whose base revision is stale",
+    "setup": {
+      "files": {
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 3\nstatus: active\nscope:\n  - src\nsources:\n  - src/ui/Button.jsx\nsupersedes: app@2\n---\n\n# UI System: App\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_stale/system-delta-app-spacing.md": "---\nid: spacing\nsystem: app\nbase_revision: 2\nmode: extend\nstatus: approved\napproval_source: user\nverification_commit: null\ntarget_scope:\n  - src\nexpected_sources:\n  - src/ui/tokens.css\nverified_sources: []\n---\n\n# UI System Delta: Spacing\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in reconcile mode for aidd_docs/tasks/2026_08/2026_08_23_stale/system-delta-app-spacing.md against the current app contract. Classify the stale base deterministically and modify no other file.",
+    "expect": {
+      "filesUnchanged": [
+        "aidd_docs/ui/systems/app.md"
+      ],
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_stale/system-delta-app-spacing.md": [
+          "base_revision: 2",
+          "status: superseded"
+        ]
+      },
+      "judge": "The approved delta is marked superseded because app revision 3 is active, is never rebased or promoted, and the active contract remains unchanged."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-system",
+    "evalName": "xeval-ui-retire",
+    "name": "approves retirement with consumers as migration dependencies",
+    "setup": {
+      "files": {
+        "apps/legacy/App.jsx": "export function App() { return <main>Legacy checkout</main>; }\n",
+        "aidd_docs/ui/systems/legacy.md": "---\nid: legacy\nrevision: 4\nstatus: active\nscope:\n  - apps/legacy\nsources:\n  - apps/legacy/App.jsx\nsupersedes: legacy@3\n---\n\n# UI System: Legacy\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_retire/ui.md": "---\nid: legacy-checkout\nrevision: 1\nstatus: ready\nsystems:\n  - id: legacy\n    revision: 4\nrequired_deltas: []\nsupersedes: null\n---\n\n# UI Contract: Legacy checkout\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_retire/requirement.md": "# Retire legacy UI\n\nUser approval: retire the legacy system after migrating legacy-checkout to apps/new. The existing consumer is required migration work, not a reason to delay approval.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in retire mode from aidd_docs/tasks/2026_08/2026_08_23_retire/requirement.md. The user explicitly approves the retirement. Write aidd_docs/tasks/2026_08/2026_08_23_retire/system-delta-legacy-retire.md, list the current UI contract as a migration dependency, leave verification blocked until migration, and modify no source or active contract.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/tasks/2026_08/2026_08_23_retire/system-delta-legacy-retire.md"
+      ],
+      "filesUnchanged": [
+        "apps/legacy/App.jsx",
+        "aidd_docs/ui/systems/legacy.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_retire/ui.md"
+      ],
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_retire/system-delta-legacy-retire.md": [
+          "mode: retire",
+          "status: approved",
+          "base_revision: 4",
+          "ui.md",
+          "apps/new"
+        ]
+      },
+      "fileNotContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_retire/system-delta-legacy-retire.md": [
+          "status: verified",
+          "status: promoted"
+        ]
+      },
+      "judgeFiles": [
+        "aidd_docs/tasks/2026_08/2026_08_23_retire/system-delta-legacy-retire.md"
+      ],
+      "judge": "The retirement delta is approved despite an active consumer, names that consumer as required migration work, remains unverified until migration, and leaves source and the active contract unchanged."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-system",
     "evalName": "xeval-ui-system",
     "name": "stops at the backend-only interface boundary",
     "setup": {
@@ -620,10 +1129,756 @@
         "src/ui",
         "tailwind.config.js"
       ],
-      "stdoutContains": [
-        "src/server.js"
+      "stdoutMatches": [
+        "(no (ui|interface) system|backend-only)"
       ],
       "judge": "The output recognizes a backend-only repository, reports that no interface system can be discovered, and does not invent UI conventions, recommend a design system, or propose frontend implementation."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-system",
+    "evalName": "xeval-ui-retire-promote",
+    "name": "promotes a verified retirement after sources are removed",
+    "setup": {
+      "git": true,
+      "files": {
+        "apps/new/App.jsx": "export function App() { return <main>Current checkout</main>; }\n",
+        "aidd_docs/ui/systems/legacy.md": "---\nid: legacy\nrevision: 4\nstatus: active\nscope:\n  - apps/legacy\nsources:\n  - apps/legacy/App.jsx\nsupersedes: legacy@3\n---\n\n# UI System: Legacy\n\n## Surfaces\n\n| Pattern, component, or token | Contract | States | Source |\n| --- | --- | --- | --- |\n| Legacy shell | checkout layout | default | apps/legacy/App.jsx |\n",
+        "aidd_docs/ui/systems/new.md": "---\nid: new\nrevision: 1\nstatus: active\nscope:\n  - apps/new\nsources:\n  - apps/new/App.jsx\nsupersedes: null\n---\n\n# UI System: New\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_retire/system-delta-legacy-retire.md": "---\nid: retire\nsystem: legacy\nbase_revision: 4\nmode: retire\nstatus: verified\napproval_source: user\nverification_commit: {{COMMIT}}\ntarget_scope:\n  - apps/legacy\nexpected_sources:\n  - apps/new/App.jsx\nverified_sources:\n  - apps/new/App.jsx\n---\n\n# UI System Delta: Retire Legacy\n\n## Dependencies\n\n- Replacement system new@1\n\n## Verification\n\n- No current UI contract consumes legacy@4.\n- apps/legacy/App.jsx is absent.\n- apps/new/App.jsx at {{COMMIT}} is the replacement.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in promote mode for aidd_docs/tasks/2026_08/2026_08_23_retire/system-delta-legacy-retire.md. Promote the verified retirement, retain historical source provenance, and do not recreate the removed legacy source.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/ui/systems/.history/legacy@4.md"
+      ],
+      "filesAbsent": [
+        "apps/legacy/App.jsx"
+      ],
+      "filesUnchanged": [
+        "apps/new/App.jsx",
+        "aidd_docs/ui/systems/new.md"
+      ],
+      "fileContains": {
+        "aidd_docs/ui/systems/legacy.md": [
+          "revision: 5",
+          "status: retired",
+          "apps/legacy/App.jsx"
+        ],
+        "aidd_docs/tasks/2026_08/2026_08_23_retire/system-delta-legacy-retire.md": [
+          "status: promoted"
+        ]
+      },
+      "judge": "Retirement promotion succeeds although the retired source is absent, archives revision 4, retains its path as historical provenance, and leaves the replacement implementation unchanged."
+    }
+  },
+  {
+    "plugin": "aidd-dev",
+    "skill": "01-plan",
+    "evalName": "xeval-dev-plan-recover-ui",
+    "name": "recovers a draft UI contract through capability discovery",
+    "providers": [
+      {
+        "plugin": "aidd-ui",
+        "skill": "02-design",
+        "evalName": "xeval-ui-contract-provider"
+      },
+      {
+        "plugin": "aidd-ui",
+        "skill": "04-accessibility",
+        "evalName": "xeval-ui-a11y-recovery"
+      },
+      {
+        "plugin": "aidd-ui",
+        "skill": "05-adapt",
+        "evalName": "xeval-ui-adapt-recovery"
+      }
+    ],
+    "setup": {
+      "files": {
+        "src/Status.jsx": "export function Status() { return <main><h1>Service status</h1></main>; }\n",
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 1\nstatus: active\nscope:\n  - src\nsources:\n  - src/Status.jsx\nsupersedes: null\n---\n\n# UI System: App\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_status/requirement.md": "# Service status\n\nOperators must see current service health and a loading, available, or unavailable state. Status changes are announced. The same information remains visible in constrained space using the existing app system.\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_status/ui.md": "---\nid: status\nrevision: 1\nstatus: draft\nsystems:\n  - id: app\n    revision: 1\nrequired_deltas: []\nsupersedes: null\n---\n\n# UI Contract: Status\n\n## Unresolved\n\n- States and specialist behavior not yet defined.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill to plan aidd_docs/tasks/2026_08/2026_08_23_status/requirement.md. The adjacent UI contract is draft. Discover the UI contract provider, revise it, then plan only if it becomes ready. Run headlessly and do not implement source.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/tasks/2026_08/2026_08_23_status/plan.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_status/phase-1.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_status/.ui-history/status@1.md"
+      ],
+      "filesUnchanged": [
+        "src/Status.jsx",
+        "aidd_docs/ui/systems/app.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_status/requirement.md"
+      ],
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_status/ui.md": [
+          "revision: 2",
+          "status: ready",
+          "xeval-ui-a11y-recovery",
+          "xeval-ui-adapt-recovery"
+        ],
+        "aidd_docs/tasks/2026_08/2026_08_23_status/phase-1.md": [
+          "ui.md@2",
+          "app@1"
+        ]
+      },
+      "fileNotContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_status/phase-1.md": [
+          "## Wireframe"
+        ]
+      },
+      "judge": "Planning recovers the draft through the discovered UI capability, consumes the new ready revision by reference, and does not redesign or implement the source itself."
+    }
+  },
+  {
+    "plugin": "aidd-dev",
+    "skill": "01-plan",
+    "evalName": "xeval-dev-plan-fallback",
+    "name": "uses the bounded wireframe fallback without a UI provider",
+    "setup": {
+      "files": {
+        "src/Profile.jsx": "export function Profile() { return <main>Profile</main>; }\n",
+        "requirement.md": "# Profile\n\nAdd an account profile form with Save as the primary action.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill to plan requirement.md in aidd_docs/tasks/2026_08/2026_08_23_profile. This is frontend work and no UI capability provider is installed. Preserve the compatibility behavior without creating a normative UI contract or implementing source.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/tasks/2026_08/2026_08_23_profile/plan.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_profile/phase-1.md"
+      ],
+      "filesUnchanged": [
+        "src/Profile.jsx",
+        "requirement.md"
+      ],
+      "filesAbsent": [
+        "aidd_docs/ui/systems/app.md"
+      ],
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_profile/phase-1.md": [
+          "## Wireframe",
+          "compatibility"
+        ]
+      },
+      "fileNotContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_profile/phase-1.md": [
+          "## UI Contract"
+        ]
+      },
+      "judge": "With no UI provider, planning emits only a structure wireframe explicitly marked as compatibility fallback, creates no UI contract, and leaves source unchanged."
+    }
+  },
+  {
+    "plugin": "aidd-dev",
+    "skill": "02-implement",
+    "evalName": "xeval-dev-implement-establish",
+    "name": "implements one approved establishment delta in its owning phase",
+    "setup": {
+      "git": true,
+      "files": {
+        "package.json": "{\"scripts\":{\"test\":\"node --test\"}}\n",
+        "test/button.test.js": "const test = require('node:test');\nconst assert = require('node:assert/strict');\ntest('destructive is a supported button intent', () => {\n  const { buttonIntent } = require('../src/ui/Button.js');\n  assert.equal(buttonIntent('destructive'), 'button button--destructive');\n});\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_button/ui.md": "---\nid: button\nrevision: 1\nstatus: ready\nsystems: []\nrequired_deltas:\n  - aidd_docs/tasks/2026_08/2026_08_23_button/system-delta-app-establish.md\nsupersedes: null\n---\n\n# UI Contract: Button\n\n## Intent\n\n- Task: render a destructive action with an explicit shared intent\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_button/system-delta-app-establish.md": "---\nid: establish\nsystem: app\nbase_revision: null\nmode: establish\nstatus: approved\napproval_source: user\nverification_commit: null\ntarget_scope:\n  - src\nexpected_sources:\n  - src/ui/Button.js\nverified_sources: []\n---\n\n# UI System Delta: Establish App\n\n## Change\n\n| Decision | Evidence | Consequence | Rejected alternative |\n| --- | --- | --- | --- |\n| Export buttonIntent with primary and destructive intents | approved requirement | shared Button intent naming | one-off class names |\n\n## Verification\n\n- npm test passes.\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_button/plan.md": "---\nobjective: Establish the minimum shared Button intent\nstatus: pending\n---\n\n# Plan: Button\n\n## Phases\n\n| # | Phase | File |\n| --- | --- | --- |\n| 1 | button | [phase-1.md](./phase-1.md) |\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_button/phase-1.md": "---\nstatus: pending\n---\n\n# Instruction: Establish Button intent\n\n## Architecture projection\n\n```txt\nsrc/ui/Button.js create\n```\n\n## UI Contract\n\n- Contract: `aidd_docs/tasks/2026_08/2026_08_23_button/ui.md@1`\n- Systems: none\n- Implement deltas: aidd_docs/tasks/2026_08/2026_08_23_button/system-delta-app-establish.md\n- Consume deltas: none\n- Depends on phases: none\n\n## Tasks to do\n\n### `1)` Establish Button intent\n\n1. Create src/ui/Button.js with buttonIntent for primary and destructive.\n2. Run npm test.\n\n## Test acceptance criteria\n\n| Task | Acceptance criteria |\n| --- | --- |\n| 1 | npm test proves destructive resolves to button button--destructive |\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill on aidd_docs/tasks/2026_08/2026_08_23_button/plan.md. Implement the approved establishment delta only in its owning phase, run the stated test, and leave UI artifacts and delta lifecycle status unchanged.",
+    "expect": {
+      "filesExist": [
+        "src/ui/Button.js"
+      ],
+      "filesUnchanged": [
+        "aidd_docs/tasks/2026_08/2026_08_23_button/ui.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_button/system-delta-app-establish.md",
+        "test/button.test.js"
+      ],
+      "fileContains": {
+        "src/ui/Button.js": [
+          "destructive"
+        ],
+        "aidd_docs/tasks/2026_08/2026_08_23_button/plan.md": [
+          "status: implemented"
+        ],
+        "aidd_docs/tasks/2026_08/2026_08_23_button/phase-1.md": [
+          "status: done"
+        ]
+      },
+      "fileNotContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_button/system-delta-app-establish.md": [
+          "status: verified"
+        ]
+      },
+      "judge": "Implementation creates the approved minimum system source in exactly one owning phase, passes the test, and leaves verification and promotion to the UI system lifecycle."
+    }
+  },
+  {
+    "plugin": "aidd-dev",
+    "skill": "02-implement",
+    "evalName": "xeval-dev-implement-verified",
+    "name": "consumes a verified delta without reimplementing it",
+    "setup": {
+      "git": true,
+      "files": {
+        "package.json": "{\"scripts\":{\"test\":\"node --test\"}}\n",
+        "src/ui/Button.js": "function buttonIntent(intent) { return `button button--${intent}`; }\nmodule.exports = { buttonIntent };\n",
+        "test/button.test.js": "const test = require('node:test');\nconst assert = require('node:assert/strict');\nconst { buttonIntent } = require('../src/ui/Button.js');\ntest('destructive', () => assert.equal(buttonIntent('destructive'), 'button button--destructive'));\n",
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 1\nstatus: active\nscope:\n  - src\nsources:\n  - src/ui/Button.js\nsupersedes: null\n---\n\n# UI System: App\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_button/ui.md": "---\nid: button\nrevision: 1\nstatus: ready\nsystems:\n  - id: app\n    revision: 1\nrequired_deltas:\n  - aidd_docs/tasks/2026_08/2026_08_23_button/system-delta-app-destructive.md\nsupersedes: null\n---\n\n# UI Contract: Button\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_button/system-delta-app-destructive.md": "---\nid: destructive\nsystem: app\nbase_revision: 1\nmode: extend\nstatus: verified\napproval_source: user\nverification_commit: {{COMMIT}}\ntarget_scope:\n  - src\nexpected_sources:\n  - src/ui/Button.js\nverified_sources:\n  - src/ui/Button.js\n---\n\n# UI System Delta: Destructive\n\n## Verification\n\n- src/ui/Button.js at {{COMMIT}} implements destructive.\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_button/plan.md": "---\nobjective: Consume the verified Button behavior\nstatus: pending\n---\n\n# Plan: Button\n\n## Phases\n\n| # | Phase | File |\n| --- | --- | --- |\n| 1 | verify | [phase-1.md](./phase-1.md) |\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_button/phase-1.md": "---\nstatus: pending\n---\n\n# Instruction: Verify Button behavior\n\n## UI Contract\n\n- Contract: `aidd_docs/tasks/2026_08/2026_08_23_button/ui.md@1`\n- Systems: app@1\n- Implement deltas: none\n- Consume deltas: aidd_docs/tasks/2026_08/2026_08_23_button/system-delta-app-destructive.md\n- Depends on phases: none\n\n## Tasks to do\n\n### `1)` Verify\n\n1. Run npm test without changing the implemented Button.\n\n## Test acceptance criteria\n\n| Task | Acceptance criteria |\n| --- | --- |\n| 1 | npm test passes |\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill on aidd_docs/tasks/2026_08/2026_08_23_button/plan.md. Consume and assert the verified delta without reimplementing it.",
+    "expect": {
+      "filesUnchanged": [
+        "src/ui/Button.js",
+        "test/button.test.js",
+        "aidd_docs/ui/systems/app.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_button/ui.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_button/system-delta-app-destructive.md"
+      ],
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_23_button/plan.md": [
+          "status: implemented"
+        ],
+        "aidd_docs/tasks/2026_08/2026_08_23_button/phase-1.md": [
+          "status: done"
+        ]
+      },
+      "judge": "The verified delta is treated as a read-only dependency: source and lifecycle artifact remain byte-identical while its acceptance test is run."
+    }
+  },
+  {
+    "plugin": "aidd-dev",
+    "skill": "02-implement",
+    "evalName": "xeval-dev-implement-historical",
+    "name": "rejects a historical system revision before mutation",
+    "setup": {
+      "git": true,
+      "files": {
+        "src/App.jsx": "export function App() { return <main>unchanged</main>; }\n",
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 2\nstatus: active\nscope:\n  - src\nsources:\n  - src/App.jsx\nsupersedes: app@1\n---\n\n# UI System: App\n",
+        "aidd_docs/ui/systems/.history/app@1.md": "---\nid: app\nrevision: 1\nstatus: active\nscope:\n  - src\nsources:\n  - src/App.jsx\nsupersedes: null\n---\n\n# UI System: App\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_app/ui.md": "---\nid: app-feature\nrevision: 1\nstatus: ready\nsystems:\n  - id: app\n    revision: 1\nrequired_deltas: []\nsupersedes: null\n---\n\n# UI Contract: App feature\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_app/plan.md": "---\nobjective: Implement app feature\nstatus: pending\n---\n\n# Plan: App\n\n## Phases\n\n| # | Phase | File |\n| --- | --- | --- |\n| 1 | app | [phase-1.md](./phase-1.md) |\n",
+        "aidd_docs/tasks/2026_08/2026_08_23_app/phase-1.md": "---\nstatus: pending\n---\n\n# Instruction: App\n\n## UI Contract\n\n- Contract: `aidd_docs/tasks/2026_08/2026_08_23_app/ui.md@1`\n- Systems: app@1\n- Implement deltas: none\n- Consume deltas: none\n- Depends on phases: none\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill on aidd_docs/tasks/2026_08/2026_08_23_app/plan.md. Revalidate the UI graph and stop before mutation because the contract pins a historical system revision.",
+    "expect": {
+      "filesUnchanged": [
+        "src/App.jsx",
+        "aidd_docs/ui/systems/app.md",
+        "aidd_docs/ui/systems/.history/app@1.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_app/ui.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_app/plan.md",
+        "aidd_docs/tasks/2026_08/2026_08_23_app/phase-1.md"
+      ],
+      "stdoutContains": [
+        "replan needed",
+        "app@1"
+      ],
+      "judge": "Implementation rejects the resolvable but historical app revision before branch, status, phase, or source mutation."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "04-accessibility",
+    "evalName": "xeval-ui-a11y-define",
+    "name": "defines accessibility requirements without an active UI system",
+    "setup": {
+      "files": {
+        "src/Profile.jsx": "export function Profile() { return <form><input name=\"email\" /><button>Save</button></form>; }\n",
+        "requirement.md": "# Profile form\n\nEmail has a persistent label. Save remains keyboard reachable. Validation identifies the field and recovery. Status feedback is announced.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in define mode for requirement.md and src/Profile.jsx. No UI system contract exists. Return only sourced accessibility requirement fragments and modify nothing.",
+    "expect": {
+      "filesUnchanged": [
+        "src/Profile.jsx",
+        "requirement.md"
+      ],
+      "stdoutContains": [
+        "persistent label",
+        "acceptance"
+      ],
+      "judge": "The output defines observable accessibility requirements from the requirement and repository evidence without requiring or inventing a UI system revision."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "04-accessibility",
+    "evalName": "xeval-ui-a11y-confirm",
+    "name": "confirms only implemented shared accessibility behavior",
+    "setup": {
+      "files": {
+        "src/ui/Input.jsx": "export function Input({ label, error, ...props }) { return <label>{label}<input aria-describedby={error ? 'error' : undefined} {...props} />{error && <span id=\"error\">{error}</span>}</label>; }\n",
+        "src/Profile.jsx": "import { Input } from './ui/Input'; export function Profile() { return <Input label=\"Email\" />; }\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in confirm mode for the shared Input in src/ui/Input.jsx. Return only shared behavior proven by canonical source evidence, keep gaps separate, and modify nothing.",
+    "expect": {
+      "filesUnchanged": [
+        "src/ui/Input.jsx",
+        "src/Profile.jsx"
+      ],
+      "stdoutContains": [
+        "src/ui/Input.jsx",
+        "label",
+        "confirmed"
+      ],
+      "judge": "The output confirms only accessibility behavior directly implemented by the canonical shared Input and does not convert unsupported runtime behavior into a rule."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "05-adapt",
+    "evalName": "xeval-ui-adapt-assess",
+    "name": "finds an evidenced constrained-space adaptation defect",
+    "setup": {
+      "files": {
+        "src/Orders.jsx": "export function Orders() { return <main className=\"orders\"><div className=\"row\">A-VERY-LONG-ORDER-ID Review</div></main>; }\n",
+        "src/styles.css": ".orders { width: 900px; } .row { white-space: nowrap; }\n",
+        "requirement.md": "# Orders\n\nAt 320px wide, every order ID and its Review action remain accessible without page-level horizontal scrolling.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in assess mode for the Orders interface using the supplied 320px requirement and implementation evidence. Return an adaptation finding only when supported and modify nothing.",
+    "expect": {
+      "filesUnchanged": [
+        "src/Orders.jsx",
+        "src/styles.css",
+        "requirement.md"
+      ],
+      "stdoutContains": [
+        "320px",
+        "horizontal",
+        "impact"
+      ],
+      "judge": "The output identifies the fixed width and nowrap behavior as evidence for constrained-space failure, names user impact and required behavior, and makes no accessibility verdict."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "05-adapt",
+    "evalName": "xeval-ui-adapt-confirm",
+    "name": "confirms a canonical shared adaptation rule",
+    "setup": {
+      "files": {
+        "src/ui/shell.css": ".shell { display: grid; grid-template-columns: 1fr; } @media (min-width: 48rem) { .shell { grid-template-columns: 14rem 1fr; } }\n",
+        "src/Users.jsx": "export function Users() { return <main className=\"shell\">Users</main>; }\n",
+        "src/Orders.jsx": "export function Orders() { return <main className=\"shell\">Orders</main>; }\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in confirm mode for the canonical shell rule in src/ui/shell.css. Confirm only the implemented shared transformation and modify nothing.",
+    "expect": {
+      "filesUnchanged": [
+        "src/ui/shell.css",
+        "src/Users.jsx",
+        "src/Orders.jsx"
+      ],
+      "stdoutContains": [
+        "48rem",
+        "src/ui/shell.css",
+        "confirmed"
+      ],
+      "judge": "The output confirms the sourced one-column to two-column shared transformation and does not add device dimensions or unrelated accessibility rules."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-system",
+    "evalName": "xeval-ui-reconcile-verified",
+    "name": "verifies an approved delta from committed implementation evidence",
+    "setup": {
+      "git": true,
+      "files": {
+        "src/ui/Button.jsx": "export function Button({ intent = 'primary', children }) { return <button data-intent={intent}>{children}</button>; }\n",
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 1\nstatus: active\nscope:\n  - src\nsources:\n  - src/ui/Button.jsx\nsupersedes: null\n---\n\n# UI System: App\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_button/system-delta-app-intent.md": "---\nid: intent\nsystem: app\nbase_revision: 1\nmode: extend\nstatus: approved\napproval_source: user\nverification_commit: null\ntarget_scope:\n  - src\nexpected_sources:\n  - src/ui/Button.jsx\nverified_sources: []\n---\n\n# UI System Delta: Button Intent\n\n## Change\n\n| Decision | Evidence | Consequence | Rejected alternative |\n| --- | --- | --- | --- |\n| Add a shared intent property | approved requirement | Button exposes intent | one-off classes |\n\n## Verification\n\n- src/ui/Button.jsx exposes intent and npm-free static inspection proves it.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in reconcile mode for aidd_docs/tasks/2026_08/2026_08_24_button/system-delta-app-intent.md. Verify it only from the current committed implementation evidence and modify no other file.",
+    "expect": {
+      "filesUnchanged": [
+        "src/ui/Button.jsx",
+        "aidd_docs/ui/systems/app.md"
+      ],
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_24_button/system-delta-app-intent.md": [
+          "status: verified",
+          "src/ui/Button.jsx"
+        ]
+      },
+      "fileNotContains": {
+        "aidd_docs/tasks/2026_08/2026_08_24_button/system-delta-app-intent.md": [
+          "verification_commit: null"
+        ]
+      },
+      "judge": "Reconciliation moves the exact approved delta to verified only because its acceptance is proven at a real commit, recording the commit and source without changing the contract or code."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-system",
+    "evalName": "xeval-ui-promote-establish",
+    "name": "promotes a verified establishment into revision one",
+    "setup": {
+      "git": true,
+      "files": {
+        "src/ui/Button.js": "function buttonIntent(intent) { return `button button--${intent}`; } module.exports = { buttonIntent };\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_system/system-delta-app-establish.md": "---\nid: establish\nsystem: app\nbase_revision: null\nmode: establish\nstatus: verified\napproval_source: user\nverification_commit: {{COMMIT}}\ntarget_scope:\n  - src\nexpected_sources:\n  - src/ui/Button.js\nverified_sources:\n  - src/ui/Button.js\n---\n\n# UI System Delta: Establish App\n\n## Change\n\n| Decision | Evidence | Consequence | Rejected alternative |\n| --- | --- | --- | --- |\n| Share Button intents | requirement and src/ui/Button.js at {{COMMIT}} | app system owns Button intent | one-off classes |\n\n## Verification\n\n- src/ui/Button.js at {{COMMIT}} proves the rule.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in promote mode for aidd_docs/tasks/2026_08/2026_08_24_system/system-delta-app-establish.md. Create app revision 1 from the verified establishment and release the operation lock.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/ui/systems/app.md"
+      ],
+      "filesAbsent": [
+        ".aidd-ui-systems.lock"
+      ],
+      "filesUnchanged": [
+        "src/ui/Button.js"
+      ],
+      "fileContains": {
+        "aidd_docs/ui/systems/app.md": [
+          "id: app",
+          "revision: 1",
+          "status: active",
+          "src/ui/Button.js"
+        ],
+        "aidd_docs/tasks/2026_08/2026_08_24_system/system-delta-app-establish.md": [
+          "status: promoted"
+        ]
+      },
+      "judge": "Promotion creates exactly revision 1 from the verified no-base delta, marks that delta promoted, leaves implementation unchanged, and leaves no operation lock."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-system",
+    "evalName": "xeval-ui-reject",
+    "name": "rejects an exact approved delta only from explicit authorization",
+    "setup": {
+      "files": {
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 1\nstatus: active\nscope:\n  - src\nsources:\n  - src/styles.css\nsupersedes: null\n---\n\n# UI System: App\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_color/system-delta-app-accent.md": "---\nid: accent\nsystem: app\nbase_revision: 1\nmode: extend\nstatus: approved\napproval_source: prior user approval\nverification_commit: null\ntarget_scope:\n  - src\nexpected_sources:\n  - src/styles.css\nverified_sources: []\n---\n\n# UI System Delta: Accent\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill to reject aidd_docs/tasks/2026_08/2026_08_24_color/system-delta-app-accent.md. This prompt explicitly authorizes rejection of that exact delta. Modify no other artifact.",
+    "expect": {
+      "filesUnchanged": [
+        "aidd_docs/ui/systems/app.md"
+      ],
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_24_color/system-delta-app-accent.md": [
+          "status: rejected",
+          "base_revision: 1"
+        ]
+      },
+      "judge": "The exact approved delta becomes rejected from explicit authorization without changing its base, the active contract, or implementation."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-system",
+    "evalName": "xeval-ui-retired-id",
+    "name": "blocks establishment over a retired system id",
+    "setup": {
+      "files": {
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 3\nstatus: retired\nscope:\n  - src\nsources:\n  - src/legacy.css\nsupersedes: app@2\n---\n\n# UI System: Retired App\n",
+        "requirement.md": "# New app system\n\nEstablish a minimal shared Button system under id app for src.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in establish mode for requirement.md with proposed system id app and scope src. Stop because that current id is retired, do not reactivate or overwrite it, and modify nothing.",
+    "expect": {
+      "filesUnchanged": [
+        "aidd_docs/ui/systems/app.md",
+        "requirement.md"
+      ],
+      "filesAbsent": [
+        "aidd_docs/tasks/2026_08/2026_08_24_new-app-system/system-delta-app-establish.md"
+      ],
+      "stdoutContains": [
+        "retired",
+        "app"
+      ],
+      "judge": "Establishment is blocked because a retired current head already owns the id, preserving its revision history and proposing no silent revision 1 replacement."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-system",
+    "evalName": "xeval-ui-replace-retired-scope",
+    "name": "establishes a new id after the prior scoped system is retired",
+    "setup": {
+      "files": {
+        "aidd_docs/ui/systems/legacy.md": "---\nid: legacy\nrevision: 4\nstatus: retired\nscope:\n  - src\nsources:\n  - src/legacy.css\nsupersedes: legacy@3\n---\n\n# UI System: Legacy\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_replacement/requirement.md": "# Replacement system\n\nEstablish only a shared Button intent convention under new system id app for src. Reuse the existing button naming.\n",
+        "src/button.css": ".button-primary { font: inherit; }\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in establish mode for aidd_docs/tasks/2026_08/2026_08_24_replacement/requirement.md. Draft system delta id establish for new system id app and scope src. The legacy system on that scope is retired, so it must remain immutable and must not block this new id. Do not implement or promote the delta.",
+    "expect": {
+      "filesUnchanged": [
+        "aidd_docs/ui/systems/legacy.md",
+        "src/button.css"
+      ],
+      "filesExist": [
+        "aidd_docs/tasks/2026_08/2026_08_24_replacement/system-delta-app-establish.md"
+      ],
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_24_replacement/system-delta-app-establish.md": [
+          "system: app",
+          "base_revision: null",
+          "mode: establish",
+          "src"
+        ]
+      },
+      "judge": "A retired contract keeps its immutable head but no longer owns active scope resolution, so a different system id can draft a minimal establishment delta without implementation or promotion."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-system",
+    "evalName": "xeval-ui-adopt-lock",
+    "name": "stops adoption when the systems lock is held",
+    "setup": {
+      "files": {
+        ".aidd-ui-systems.lock/owner": "other-operation\n",
+        "src/ui/Button.jsx": "export function Button({ children }) { return <button>{children}</button>; }\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in adopt mode for system id app and scope src. I authorize the exact evidenced revision 1 contract, but the systems mutation lock is held. Stop without changing the lock or creating a contract.",
+    "expect": {
+      "filesUnchanged": [
+        ".aidd-ui-systems.lock/owner",
+        "src/ui/Button.jsx"
+      ],
+      "filesAbsent": [
+        "aidd_docs/ui/systems/app.md"
+      ],
+      "stdoutContains": [
+        "lock"
+      ],
+      "judge": "Adoption obeys the shared systems mutation lock and creates no competing revision while another system operation owns it."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-system",
+    "evalName": "xeval-ui-reconcile-lock",
+    "name": "stops delta reconciliation when the systems lock is held",
+    "setup": {
+      "git": true,
+      "files": {
+        ".aidd-ui-systems.lock/owner": "other-operation\n",
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 1\nstatus: active\nscope:\n  - src\nsources:\n  - src/ui/Button.jsx\nsupersedes: null\n---\n\n# UI System: App\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_button/system-delta-app-intent.md": "---\nid: intent\nsystem: app\nbase_revision: 1\nmode: extend\nstatus: approved\napproval_source: user\nverification_commit: null\ntarget_scope:\n  - src\nexpected_sources:\n  - src/ui/Button.jsx\nverified_sources: []\n---\n\n# UI System Delta: Intent\n\n## Verification\n\n- Button intent is implemented at one commit.\n",
+        "src/ui/Button.jsx": "export function Button({ intent, children }) { return <button data-intent={intent}>{children}</button>; }\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in reconcile mode for aidd_docs/tasks/2026_08/2026_08_24_button/system-delta-app-intent.md. The implementation matches, but the systems mutation lock is held. Stop without changing the delta, contract, source, or lock.",
+    "expect": {
+      "filesUnchanged": [
+        ".aidd-ui-systems.lock/owner",
+        "aidd_docs/ui/systems/app.md",
+        "aidd_docs/tasks/2026_08/2026_08_24_button/system-delta-app-intent.md",
+        "src/ui/Button.jsx"
+      ],
+      "stdoutContains": [
+        "lock"
+      ],
+      "judge": "Reconciliation cannot transition delta state while another system operation owns the shared mutation lock."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "01-system",
+    "evalName": "xeval-ui-promote-lock",
+    "name": "stops promotion when the system lock is held",
+    "setup": {
+      "git": true,
+      "files": {
+        "src/ui/Button.jsx": "export function Button({ intent, children }) { return <button data-intent={intent}>{children}</button>; }\n",
+        ".aidd-ui-systems.lock/owner": "other-operation\n",
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 1\nstatus: active\nscope:\n  - src\nsources:\n  - src/ui/Button.jsx\nsupersedes: null\n---\n\n# UI System: App\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_lock/system-delta-app-intent.md": "---\nid: intent\nsystem: app\nbase_revision: 1\nmode: extend\nstatus: verified\napproval_source: user\nverification_commit: {{COMMIT}}\ntarget_scope:\n  - src\nexpected_sources:\n  - src/ui/Button.jsx\nverified_sources:\n  - src/ui/Button.jsx\n---\n\n# UI System Delta: Intent\n\n## Verification\n\n- src/ui/Button.jsx at {{COMMIT}} proves intent.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in promote mode for aidd_docs/tasks/2026_08/2026_08_24_lock/system-delta-app-intent.md. Respect the existing systems mutation lock and stop without mutation.",
+    "expect": {
+      "filesUnchanged": [
+        "src/ui/Button.jsx",
+        ".aidd-ui-systems.lock/owner",
+        "aidd_docs/ui/systems/app.md",
+        "aidd_docs/tasks/2026_08/2026_08_24_lock/system-delta-app-intent.md"
+      ],
+      "filesAbsent": [
+        "aidd_docs/ui/systems/.history/app@1.md"
+      ],
+      "stdoutContains": [
+        "lock"
+      ],
+      "judge": "Promotion observes the preexisting exclusive lock, changes no contract, delta, archive, source, or lock owner, and reports contention."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "02-design",
+    "evalName": "xeval-ui-write-lock",
+    "name": "stops UI revision when the feature lock is held",
+    "setup": {
+      "files": {
+        "src/Profile.jsx": "export function Profile() { return <main>Profile</main>; }\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_profile/.ui.lock/owner": "other-operation\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_profile/requirement.md": "# Profile\n\nClarify the current profile status copy without changing flow.\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_profile/ui.md": "---\nid: profile\nrevision: 1\nstatus: ready\nsystems: []\nrequired_deltas: []\nsupersedes: null\n---\n\n# UI Contract: Profile\n\n## Intent\n\n- Task: view profile status\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill in revise mode for aidd_docs/tasks/2026_08/2026_08_24_profile/ui.md from its adjacent requirement. Respect the existing feature lock and stop without mutation.",
+    "expect": {
+      "filesUnchanged": [
+        "src/Profile.jsx",
+        "aidd_docs/tasks/2026_08/2026_08_24_profile/.ui.lock/owner",
+        "aidd_docs/tasks/2026_08/2026_08_24_profile/requirement.md",
+        "aidd_docs/tasks/2026_08/2026_08_24_profile/ui.md"
+      ],
+      "filesAbsent": [
+        "aidd_docs/tasks/2026_08/2026_08_24_profile/.ui-history/profile@1.md"
+      ],
+      "stdoutContains": [
+        "lock"
+      ],
+      "judge": "UI revision stops at the exclusive feature lock without changing source, requirement, current contract, history, or lock owner."
+    }
+  },
+  {
+    "plugin": "aidd-dev",
+    "skill": "01-plan",
+    "evalName": "xeval-dev-plan-stale-no-provider",
+    "name": "does not bypass an invalid UI contract without a provider",
+    "setup": {
+      "files": {
+        "src/Profile.jsx": "export function Profile() { return <main>Profile</main>; }\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_profile/requirement.md": "# Profile\n\nImplement the profile UI only from a ready contract.\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_profile/ui.md": "---\nid: profile\nrevision: 1\nstatus: draft\nsystems: []\nrequired_deltas: []\nsupersedes: null\n---\n\n# UI Contract: Profile\n\n## Unresolved\n\n- Required states are missing.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill to plan aidd_docs/tasks/2026_08/2026_08_24_profile/requirement.md. No UI provider is installed and the adjacent UI contract is draft. Stop instead of replacing it with a compatibility wireframe.",
+    "expect": {
+      "filesUnchanged": [
+        "src/Profile.jsx",
+        "aidd_docs/tasks/2026_08/2026_08_24_profile/requirement.md",
+        "aidd_docs/tasks/2026_08/2026_08_24_profile/ui.md"
+      ],
+      "filesAbsent": [
+        "aidd_docs/tasks/2026_08/2026_08_24_profile/plan.md",
+        "aidd_docs/tasks/2026_08/2026_08_24_profile/phase-1.md"
+      ],
+      "stdoutContains": [
+        "UI revision needed"
+      ],
+      "judge": "Planning refuses to bypass an existing draft UI contract when no provider can revise it, preserving the normative graph and producing no fallback plan."
+    }
+  },
+  {
+    "plugin": "aidd-dev",
+    "skill": "01-plan",
+    "evalName": "xeval-dev-plan-reconcile-first",
+    "name": "requires reconciliation before planning an already implemented approved delta",
+    "setup": {
+      "files": {
+        "src/ui/Button.jsx": "export function Button({ intent, children }) { return <button data-intent={intent}>{children}</button>; }\n",
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 1\nstatus: active\nscope:\n  - src\nsources:\n  - src/ui/Button.jsx\nsupersedes: null\n---\n\n# UI System: App\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_button/requirement.md": "# Button\n\nUse the approved shared intent behavior.\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_button/ui.md": "---\nid: button\nrevision: 1\nstatus: ready\nsystems:\n  - id: app\n    revision: 1\nrequired_deltas:\n  - aidd_docs/tasks/2026_08/2026_08_24_button/system-delta-app-intent.md\nsupersedes: null\n---\n\n# UI Contract: Button\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_button/system-delta-app-intent.md": "---\nid: intent\nsystem: app\nbase_revision: 1\nmode: extend\nstatus: approved\napproval_source: user\nverification_commit: null\ntarget_scope:\n  - src\nexpected_sources:\n  - src/ui/Button.jsx\nverified_sources: []\n---\n\n# UI System Delta: Intent\n\n## Verification\n\n- Button exposes the intent property.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill to plan aidd_docs/tasks/2026_08/2026_08_24_button/requirement.md. Repository evidence already satisfies the approved delta. Stop for UI system reconciliation instead of assigning implementation again.",
+    "expect": {
+      "filesUnchanged": [
+        "src/ui/Button.jsx",
+        "aidd_docs/ui/systems/app.md",
+        "aidd_docs/tasks/2026_08/2026_08_24_button/requirement.md",
+        "aidd_docs/tasks/2026_08/2026_08_24_button/ui.md",
+        "aidd_docs/tasks/2026_08/2026_08_24_button/system-delta-app-intent.md"
+      ],
+      "filesAbsent": [
+        "aidd_docs/tasks/2026_08/2026_08_24_button/plan.md"
+      ],
+      "stdoutContains": [
+        "reconciliation"
+      ],
+      "judge": "Planning recognizes that code already satisfies the approved delta, requests system reconciliation, and does not schedule duplicate implementation or mutate lifecycle state."
+    }
+  },
+  {
+    "plugin": "aidd-ui",
+    "skill": "03-review",
+    "evalName": "xeval-ui-review-flow",
+    "name": "records an evidence-pinned flow review with no invented findings",
+    "providers": [
+      {
+        "plugin": "aidd-ui",
+        "skill": "04-accessibility",
+        "evalName": "xeval-review-flow-a11y"
+      },
+      {
+        "plugin": "aidd-ui",
+        "skill": "05-adapt",
+        "evalName": "xeval-review-flow-adapt"
+      }
+    ],
+    "setup": {
+      "git": true,
+      "files": {
+        "src/Search.jsx": "export function Search() { return <main><h1>Orders</h1><form><label>Order ID<input name=\"id\" /></label><button>Search</button></form><p role=\"status\">Ready</p></main>; }\n",
+        "aidd_docs/ui/systems/app.md": "---\nid: app\nrevision: 1\nstatus: active\nscope:\n  - src\nsources:\n  - src/Search.jsx\nsupersedes: null\n---\n\n# UI System: App\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_search/requirement.md": "# Search flow\n\nAn operator enters an order ID, activates Search, and receives announced status. The form remains usable in constrained space.\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_search/ui.md": "---\nid: search\nrevision: 1\nstatus: ready\nsystems:\n  - id: app\n    revision: 1\nrequired_deltas: []\nsupersedes: null\n---\n\n# UI Contract: Search\n\n## User Flow\n\n1. Enter order ID.\n2. Activate Search.\n3. Receive status feedback.\n",
+        "aidd_docs/tasks/2026_08/2026_08_24_search/runtime-observations.md": "# Runtime observations\n\nAt 1280px and 320px, the form remains visible without horizontal overflow. Keyboard order is heading, input, Search. Activating Search updates the role=status region. No failure was observed in the required flow.\n"
+      }
+    },
+    "prompt": "Use the {{SKILL}} skill to review the complete search flow against its requirement, UI contract, source, and runtime-observations.md. Discover both specialist providers. Write ui-review.md, preserve a no-findings result when evidence supports it, and modify nothing else.",
+    "expect": {
+      "filesExist": [
+        "aidd_docs/tasks/2026_08/2026_08_24_search/ui-review.md"
+      ],
+      "filesUnchanged": [
+        "src/Search.jsx",
+        "aidd_docs/ui/systems/app.md",
+        "aidd_docs/tasks/2026_08/2026_08_24_search/requirement.md",
+        "aidd_docs/tasks/2026_08/2026_08_24_search/ui.md",
+        "aidd_docs/tasks/2026_08/2026_08_24_search/runtime-observations.md"
+      ],
+      "fileContains": {
+        "aidd_docs/tasks/2026_08/2026_08_24_search/ui-review.md": [
+          "normative: false",
+          "worktree_fingerprint: clean",
+          "## Findings",
+          "xeval-review-flow-a11y",
+          "xeval-review-flow-adapt"
+        ]
+      },
+      "fileNotContains": {
+        "aidd_docs/tasks/2026_08/2026_08_24_search/ui-review.md": [
+          "### blocker",
+          "### important",
+          "### minor"
+        ]
+      },
+      "judge": "The review pins the clean commit and exact UI revisions, preserves specialist provenance, records assessed runtime contexts, and invents no defect when the supplied flow evidence satisfies the contract."
     }
   }
 ]
