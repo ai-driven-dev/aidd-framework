@@ -189,6 +189,39 @@ open and idle a session; no tool call ever reaches the journal, so there is noth
 declare from. That is a different limit from the one above — not a payload that fails to
 name a path, but no payload at all.
 
+## These are raw counters, and a tool's own usage screen may not be
+
+Every figure here is the counter the tool wrote, added up. That is not always the same
+quantity a tool shows you, and the difference is not an error on either side.
+
+Measured against Claude Code's own `/usage` over one real session (15,684 billed calls):
+
+| | read here | `/usage` |
+| --- | --- | --- |
+| output | 7.34m | 7.53m |
+| cache read | 3,003m | 3,119m |
+| cache write | 41m | 80m |
+| input | 0.03m | 24.6m |
+
+Output and cache-read agree within a few percent. The other two do not, and both are
+definitional:
+
+- **`input_tokens` in a transcript really is tiny** — two or three tokens on a cached call,
+  because everything else arrived as cache. `/usage`'s "input" is the whole prompt.
+- **A cache write is billed by how long it lives.** The transcript's
+  `cache_creation_input_tokens` equals the sum of its own `ephemeral_5m` and `ephemeral_1h`
+  breakdown exactly, so the field read here is the right one; weighting the 1h half the way
+  the price does lands on `/usage`'s figure instead.
+
+So a number here that differs from a tool's own screen is worth checking against this section
+before it is treated as a defect. What this layer counts is unweighted, unpriced, and the
+same shape for every tool — which is what makes tools comparable at all.
+
+**What no measurement here can settle:** whether the tool's own file matches what the
+provider counted. Everything is read from what the tools write. On a subscription there is no
+per-token invoice to compare against, so that question stays open, and this layer says
+`amount unknown` rather than inventing an answer to it.
+
 ## No amount is computed here
 
 The rates that turn tokens into money live in a separate service. This repository reports
