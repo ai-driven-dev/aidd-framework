@@ -10,6 +10,7 @@ import {
 } from "../../../src/domain/models/cost-report.js";
 import {
   mapOtlpLogsToSinkRecords,
+  parseTelemetrySinkLine,
   type TelemetrySinkRecord,
 } from "../../../src/domain/models/telemetry-sink-record.js";
 import { AI_TOOL_IDS } from "../../../src/domain/models/tool-ids.js";
@@ -205,6 +206,135 @@ describe("buildCostReport — one billed call, seen by both routes, counts once"
     // a re-read's line order is never something a consumer controls, and neither is which
     // of two duplicate deliveries for one billed call arrives first.
     const reversed = report({ records: [...union].reverse() });
+    expect(JSON.stringify(reversed)).toBe(JSON.stringify(built));
+  });
+});
+
+// A Codex turn read while it was still open, then read again once more of it had arrived —
+// the exact shape `storeNewCandidates` can now leave in the sink (phase-1, "A turn read
+// while it runs is not the last word"): two `kind: "request"`, `provenance: "local-read"`
+// lines sharing one `tool`/`vendor_id`/`turn_id`, neither an edit of the other.
+describe("buildCostReport — a still-open local-read turn is superseded, never doubled", () => {
+  const partial = request({
+    turn_id: "turn-1",
+    input_tokens: 2816,
+    output_tokens: 1401,
+    cache_read_tokens: 48896,
+    cache_creation_tokens: 0,
+  });
+  const complete = request({
+    turn_id: "turn-1",
+    input_tokens: 5032,
+    output_tokens: 3550,
+    cache_read_tokens: 99840,
+    cache_creation_tokens: 0,
+  });
+
+  it("keeps the larger reading, and does not sum the two into a figure neither reported", () => {
+    const built = report({ records: [partial, complete] });
+
+    // One request, not two — a naive union would double-count a turn read twice.
+    expect(built.totals.requests).toBe(1);
+    // The complete reading's own figures, never partial + complete summed (which would
+    // read 7848/4951/148736/0 — a combination the tool's file never actually reported).
+    expect(built.totals.inputTokens).toBe(5032);
+    expect(built.totals.outputTokens).toBe(3550);
+    expect(built.totals.cacheReadTokens).toBe(99840);
+  });
+
+  it("answers the same whichever order the two readings arrive in", () => {
+    const forward = report({ records: [partial, complete] });
+    const backward = report({ records: [complete, partial] });
+
+    expect(JSON.stringify(backward)).toBe(JSON.stringify(forward));
+  });
+
+  it("never lets a smaller reading of the same turn win, in either arrival order", () => {
+    const built = report({ records: [complete, partial] });
+
+    expect(built.totals.cacheReadTokens).toBe(99840);
+    expect(built.totals.outputTokens).toBe(3550);
+  });
+
+  it("never collapses the export route's own turn_id, which several billed calls share", () => {
+    // prompt.id-shaped: a main-agent request and a subagent request under one turn_id,
+    // each its own billed call — collapsing here the same way would merge two real calls
+    // into one, exactly the trap task 1's plan warns against.
+    const mainAgent = request({
+      provenance: "export",
+      turn_id: "prompt-1",
+      input_tokens: 100,
+      output_tokens: 10,
+    });
+    const subagent = request({
+      provenance: "export",
+      turn_id: "prompt-1",
+      input_tokens: 40,
+      output_tokens: 5,
+    });
+
+    const built = report({ records: [mainAgent, subagent] });
+
+    expect(built.totals.requests).toBe(2);
+    expect(built.totals.inputTokens).toBe(140);
+    expect(built.totals.outputTokens).toBe(15);
+  });
+
+  it("never collapses a kind: 'session' record sharing a turn_id (Copilot's shutdown total)", () => {
+    // Copilot's own session-kind record is keyed on the shutdown event's own id, which a
+    // re-read matches on the same way every other reader's turn_id is matched — but it is
+    // a one-shot cumulative figure, never a growing per-turn snapshot, and must never be
+    // treated as one more corrigible turn.
+    const first = sessionMeasure({ turn_id: "shutdown-1", cache_read_tokens: 5 });
+    const second = sessionMeasure({ turn_id: "shutdown-1", cache_read_tokens: 7 });
+
+    const built = report({ records: [first, second] });
+
+    const claude = built.byTools.find((row) => row.tool === "claude");
+    // Both counted, exactly as any two `kind: "session"` datapoints would be — proof
+    // nothing here diverted them into the turn-supersede path.
+    expect(claude?.sessionTotals?.cacheReadTokens).toBe(12);
+  });
+
+  it("prefers an observed zero over an unmentioned counter when two readings tie on weight", () => {
+    // Codex sometimes omits `cache_write_input_tokens` from its earliest events for a turn
+    // and starts reporting it as `0` once a later event states it explicitly (see
+    // codex-rollout.ts's own "omits a counter never observed" test). Two readings of that
+    // turn can end up with the same `counterWeight` — 0 contributes nothing either way —
+    // so the weight alone cannot break the tie, and picking the wrong side would report
+    // "unknown" for a counter the tool actually measured as zero.
+    // `model` is set on both, deliberately smaller on the less-defined reading: appending a
+    // key to an otherwise-identical object always makes its serialization sort first (a
+    // `,"key":…` continuing the string sorts below the `}` that would have closed it), so
+    // without the tie-break `pickDeterministically`'s plain JSON-string sort would already
+    // happen to favor whichever record has the extra key — masking exactly the bug this
+    // test exists to catch. Giving the less-defined reading the earlier-sorting `model`
+    // value forces the ordinary sort to prefer *it*, so only `definedCounterCount` can save
+    // the observed zero.
+    const missesTheCounter = request({
+      turn_id: "turn-2",
+      model: "aaa",
+      input_tokens: 100,
+      output_tokens: 10,
+      cache_read_tokens: 5,
+      // cache_creation_tokens intentionally absent — never observed by this reading.
+    });
+    const statesItAsZero = request({
+      turn_id: "turn-2",
+      model: "zzz",
+      input_tokens: 100,
+      output_tokens: 10,
+      cache_read_tokens: 5,
+      cache_creation_tokens: 0,
+    });
+
+    const built = report({ records: [missesTheCounter, statesItAsZero] });
+
+    // An observed zero, not an absent field: the two mean different things, and only one
+    // of the two candidates actually measured this counter.
+    expect(built.totals.cacheCreationTokens).toBe(0);
+
+    const reversed = report({ records: [statesItAsZero, missesTheCounter] });
     expect(JSON.stringify(reversed)).toBe(JSON.stringify(built));
   });
 });
@@ -421,6 +551,33 @@ describe("buildCostReport — every breakdown reconciles", () => {
 
     expect(built.byModels.map((row) => row.model)).toEqual(["big", "small"]);
   });
+
+  // Every tool this report has ever seen runs at 90%-plus cache, so a weight blind to the
+  // two cache counters orders a costless breakdown by the sliver of its volume nobody reads
+  // it for - here, backwards. `heavy-cache` moves far less input/output than `light-cache`,
+  // but consumes forty times the total tokens once cache is counted: the honest "largest
+  // first" answer, and the one `render.js`'s own `tokensOf` already prints beside the row.
+  it("weighs a costless row by all four counters, cache included - not input and output alone", () => {
+    const built = report({
+      records: [
+        request({
+          turn_id: "light-cache",
+          model: "light-cache",
+          input_tokens: 500,
+          output_tokens: 500,
+        }),
+        request({
+          turn_id: "heavy-cache",
+          model: "heavy-cache",
+          input_tokens: 10,
+          output_tokens: 5,
+          cache_read_tokens: 900_000,
+        }),
+      ],
+    });
+
+    expect(built.byModels.map((row) => row.model)).toEqual(["heavy-cache", "light-cache"]);
+  });
 });
 
 // The default period is 2026-08-17..2026-08-21, five UTC days inclusive.
@@ -474,6 +631,84 @@ describe("buildCostReport — by day and by project", () => {
     const widgets = built.byProjects.find((row) => row.project === "acme/widgets");
 
     expect(widgets?.totals.requests).toBe(1);
+  });
+
+  // `project_id: ""` is not a name - it is what a tool writes when it has none to give.
+  // Treating it as its own project row would print a row nobody can act on, and would
+  // disagree with the plugin's own `projectKeyOf`, which already reads it as unknown.
+  it("treats an empty-string project_id the same as no project at all", () => {
+    const built = report({
+      records: [
+        request({ turn_id: "a", cost_usd: 1, project_id: "acme/widgets" }),
+        request({ turn_id: "b", cost_usd: 2, project_id: "" }),
+        request({ turn_id: "c", cost_usd: 3 }),
+      ],
+    });
+
+    expect(built.byProjects).toHaveLength(2);
+    const unknown = built.byProjects.find((row) => row.project === undefined);
+    expect(unknown?.totals.requests).toBe(2);
+    expect(unknown?.totals.costMicroUsd).toBe(toMicroUsd(5));
+  });
+});
+
+describe("buildCostReport — an unknown keeps its row, never a zero", () => {
+  // `bySteps` already has `unattributed` and `byProjects` already has an unknown row for
+  // exactly this reason. Both the Codex and OpenCode readers permit a request record with
+  // no model, so without this row `byModels` stopped reconciling to its own total with
+  // nothing naming the gap - the fixtures below carry no model on purpose, which is the
+  // whole point: the reconciliation test above never reaches this branch because every one
+  // of its fixtures carries one.
+  it("gives a record with no model its own row in byModels, and it still reconciles", () => {
+    const built = report({
+      records: [
+        request({ turn_id: "a", cost_usd: 2, model: "opus" }),
+        request({ turn_id: "b", cost_usd: 1 }),
+      ],
+    });
+
+    expect(built.byModels).toHaveLength(2);
+    const unknown = built.byModels.find((row) => row.model === undefined);
+    expect(unknown?.totals.requests).toBe(1);
+    expect(unknown?.totals.costMicroUsd).toBe(toMicroUsd(1));
+
+    const total = built.byModels.reduce((sum, row) => sum + (row.totals.costMicroUsd ?? 0), 0);
+    expect(total).toBe(built.totals.costMicroUsd);
+  });
+
+  // `JSON.stringify(NaN)` is `null`, which round-trips through `parseTelemetrySinkLine` as
+  // `null !== undefined` - the exact path that made a token-counter-style guard
+  // (`typeof value === "number"`) necessary for `cost_usd` too, not just `!== undefined`.
+  it("reads a non-numeric cost as unknown, never as a zero", () => {
+    const damaged = parseTelemetrySinkLine(
+      JSON.stringify({ ...request({ turn_id: "x" }), cost_usd: Number.NaN })
+    );
+    expect(damaged.cost_usd).toBeNull();
+
+    const built = report({ records: [damaged] });
+
+    expect(built.totals.requests).toBe(1);
+    expect(built.totals.costMicroUsd).toBeUndefined();
+  });
+
+  // `telemetrySinkRecordDayKey` answers `undefined` for a string merely shaped like a
+  // moment (see its own unit tests) - this is that answer reaching the report: the record
+  // stays in `totals` but invents no day row, rather than filing into a fragment nothing on
+  // the calendar matches.
+  it("gives a damaged moment no day row, while the total still holds it", () => {
+    const damaged = parseTelemetrySinkLine(
+      JSON.stringify({
+        ...request({ turn_id: "y", cost_usd: 5 }),
+        event_timestamp: "not-a-momentZ",
+      })
+    );
+    const built = report({ records: [damaged] });
+
+    expect(built.totals.requests).toBe(1);
+    expect(built.totals.costMicroUsd).toBe(toMicroUsd(5));
+    const total = built.byDays.reduce((sum, row) => sum + (row.totals.costMicroUsd ?? 0), 0);
+    expect(total).toBe(0);
+    expect(built.byDays.every((row) => row.totals.requests === 0)).toBe(true);
   });
 });
 

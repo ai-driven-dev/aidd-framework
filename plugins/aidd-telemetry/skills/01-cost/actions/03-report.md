@@ -76,7 +76,7 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    - One axis: `node <telemetry-report.js> report --axis <axis> --from 2026-08-01 --to 2026-08-31`.
    - Everything: `node <telemetry-report.js> report --from 2026-08-01 --to 2026-08-31 --json`, reading the shape from [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md).
    - The figure will be kept or compared: give `--from` and `--to`, since `--days` resolves against today and two identical calls on two days cover two different periods.
-3. **Refuse an unknown shape.** `cost_report_version` is `2` today, read from the `--json`
+3. **Refuse an unknown shape.** `cost_report_version` is `3` today, read from the `--json`
    path - the `--axis` path prints text the script already built from that same object, so
    there is no separate version to check there.
    - Anything else on the `--json` path: stop, rather than guessing which field means what.

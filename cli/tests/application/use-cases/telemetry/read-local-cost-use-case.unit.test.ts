@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 // Side-effect imports: the use-case resolves each tool's local-read declaration from the
 // registry, so every AI tool must be registered for these tests to see it.
@@ -7,7 +9,9 @@ import "../../../../src/domain/tools/ai/copilot.js";
 import "../../../../src/domain/tools/ai/cursor.js";
 import "../../../../src/domain/tools/ai/opencode.js";
 import { ReadLocalCostUseCase } from "../../../../src/application/use-cases/telemetry/read-local-cost-use-case.js";
+import { mapCodexRolloutToSinkRecords } from "../../../../src/domain/formats/codex-rollout.js";
 import type { AiToolId } from "../../../../src/domain/models/tool-ids.js";
+import type { RunJournal } from "../../../../src/domain/ports/run-journal-reader.js";
 import type {
   LocalCostCandidateRecord,
   SessionCostReader,
@@ -33,6 +37,53 @@ function stubReader(records: readonly LocalCostCandidateRecord[]): SessionCostRe
         ? { records, sessionFound: true }
         : { records: [], sessionFound: false },
   };
+}
+
+function journalWithTurnEnd(at: string): RunJournal {
+  return {
+    boundaries: [{ type: "turn_end", at }],
+    filesWritten: [],
+    taskDeclarations: [],
+  };
+}
+
+// The same real, redacted rollout excerpt codex-rollout.unit.test.ts asserts against
+// (captured 2026-08-20 on Codex CLI 0.145.0-alpha.27) — its last turn's two `token_count`
+// lines are cut down to one, to stand in for "read while the session was still running":
+// only the first of the turn's two token increments has landed on disk yet.
+const CODEX_TARGET_ID = "019fae6f-2009-7cd3-86b2-b8f83481b160";
+const CODEX_FIXTURE_PATH =
+  ".codex/sessions/2026/07/29/rollout-2026-07-29T17-12-26-019fae6f-2009-7cd3-86b2-b8f83481b160.jsonl";
+const CODEX_LAST_TURN_ID = "019fae71-ae8b-7850-a982-78d7cd9dba52";
+
+function loadCodexFixture(): string {
+  const url = new URL(`../../../fixtures/local-cost/${CODEX_FIXTURE_PATH}`, import.meta.url);
+  return readFileSync(fileURLToPath(url), "utf8");
+}
+
+/** The real Codex reader, fed a different snapshot of the rollout's own bytes on each
+ * successive call — exactly what `CodexCostReaderAdapter` sees re-opening the same growing
+ * file. The last snapshot repeats once the sequence is exhausted, for a session that has
+ * stopped changing. */
+function growingCodexReader(...snapshots: readonly string[]): SessionCostReader {
+  let call = 0;
+  return {
+    read: async (sessionId: string) => {
+      if (sessionId !== CODEX_TARGET_ID) return { records: [], sessionFound: false };
+      const content = snapshots[Math.min(call, snapshots.length - 1)];
+      call++;
+      return { records: mapCodexRolloutToSinkRecords(content), sessionFound: true };
+    },
+  };
+}
+
+// The full fixture's last turn (see codex-rollout.unit.test.ts) is `019fae71-...`'s two
+// `token_count` lines summing to input 5032 / output 3550 / cache-read 99840 / cache-write
+// 0. Dropping the fixture's own final line leaves only the first of those two increments —
+// input 2816 / output 1401 / cache-read 48896 / cache-write 0 — standing in for "read while
+// the session was still running, before the rest of this turn had landed on disk".
+function truncatedCodexFixture(): string {
+  return loadCodexFixture().split("\n").slice(0, 7).join("\n");
 }
 
 // Shaped like a real Claude Code transcript reader's output (see
@@ -366,6 +417,170 @@ describe("ReadLocalCostUseCase", () => {
     for (const stored of [...sink.files.values()].flat()) {
       expect(stored.turn_id).toBeUndefined();
     }
+  });
+
+  // The defect this task fixes: `codex-rollout.ts:156` flushes the pending turn
+  // unconditionally, so a Codex turn read while its session is still running is stored
+  // partial, and — before this task — `storeNewCandidates` matched the completed reading's
+  // `turn_id` against that partial record and dropped it, permanently.
+  describe("a Codex turn read while it runs is not the last word", () => {
+    it("lands the completed figures once the rest of the turn arrives", async () => {
+      const sink = new InMemoryTelemetrySink();
+      const reader = growingCodexReader(truncatedCodexFixture(), loadCodexFixture());
+      const useCase = new ReadLocalCostUseCase(
+        sink,
+        new Map([["codex", reader]]),
+        NULL_RUN_JOURNAL_READER,
+        NULL_PERSON_IDENTITY_READER
+      );
+
+      const first = await useCase.execute({ sessionId: CODEX_TARGET_ID });
+      const beforeTurn = [...sink.files.values()]
+        .flat()
+        .find((r) => r.turn_id === CODEX_LAST_TURN_ID);
+      // The partial reading: only the turn's first token_count increment had landed.
+      expect(beforeTurn).toMatchObject({ cache_read_tokens: 48896, output_tokens: 1401 });
+      expect(first.toolReports.find((r) => r.tool === "codex")?.recordsStored).toBe(2);
+
+      const second = await useCase.execute({ sessionId: CODEX_TARGET_ID });
+      const turnRecords = [...sink.files.values()]
+        .flat()
+        .filter((r) => r.turn_id === CODEX_LAST_TURN_ID);
+
+      // The correction landed as a second line — the sink is append-only — carrying the
+      // complete figures the fixture's own unit test asserts for this turn.
+      expect(second.toolReports.find((r) => r.tool === "codex")?.recordsStored).toBe(1);
+      expect(turnRecords).toHaveLength(2);
+      expect(turnRecords[1]).toMatchObject({
+        cache_read_tokens: 99840,
+        output_tokens: 3550,
+        input_tokens: 5032,
+      });
+      // The earlier, partial reading is still there — the sink never edits a stored line —
+      // but the built report (cost-report.ts's `collapseSupersededTurns`) is what a
+      // consumer actually reads, and it keeps only the larger of the two.
+    });
+
+    it("stops re-appending once a re-read brings nothing new", async () => {
+      const sink = new InMemoryTelemetrySink();
+      const full = loadCodexFixture();
+      const reader = growingCodexReader(full, full, full);
+      const useCase = new ReadLocalCostUseCase(
+        sink,
+        new Map([["codex", reader]]),
+        NULL_RUN_JOURNAL_READER,
+        NULL_PERSON_IDENTITY_READER
+      );
+
+      await useCase.execute({ sessionId: CODEX_TARGET_ID });
+      const second = await useCase.execute({ sessionId: CODEX_TARGET_ID });
+      const third = await useCase.execute({ sessionId: CODEX_TARGET_ID });
+
+      // A finished turn read twice (or three times) is counted once, and its figures do
+      // not change — the same reading offers no improvement over what is already stored.
+      expect(second.toolReports.find((r) => r.tool === "codex")?.recordsStored).toBe(0);
+      expect(third.toolReports.find((r) => r.tool === "codex")?.recordsStored).toBe(0);
+      expect(
+        [...sink.files.values()].flat().filter((r) => r.turn_id === CODEX_LAST_TURN_ID)
+      ).toHaveLength(1);
+    });
+
+    it("never lets a later, smaller reading of the same turn replace the larger one", async () => {
+      const sink = new InMemoryTelemetrySink();
+      const reader = growingCodexReader(loadCodexFixture(), truncatedCodexFixture());
+      const useCase = new ReadLocalCostUseCase(
+        sink,
+        new Map([["codex", reader]]),
+        NULL_RUN_JOURNAL_READER,
+        NULL_PERSON_IDENTITY_READER
+      );
+
+      await useCase.execute({ sessionId: CODEX_TARGET_ID });
+      const second = await useCase.execute({ sessionId: CODEX_TARGET_ID });
+
+      expect(second.toolReports.find((r) => r.tool === "codex")?.recordsStored).toBe(0);
+      const turnRecords = [...sink.files.values()]
+        .flat()
+        .filter((r) => r.turn_id === CODEX_LAST_TURN_ID);
+      expect(turnRecords).toHaveLength(1);
+      expect(turnRecords[0]).toMatchObject({ cache_read_tokens: 99840, output_tokens: 3550 });
+    });
+
+    it("lands the completed figures even once the run journal's own turn_end has been seen", async () => {
+      // A `turn_end` line only ever says no *more* growth is coming — it must never be
+      // read as a reason to refuse a candidate that is strictly larger than what is
+      // stored. A strictly larger candidate is itself proof the stored reading was not
+      // final, whatever the journal's clock says. (This is the exact trap the fix's first
+      // draft fell into: gating the correction on `turn_end` re-created the defect by
+      // freezing the partial reading the moment a `turn_end` line existed at all.)
+      const sink = new InMemoryTelemetrySink();
+      const journalReader = new InMemoryRunJournalReader();
+      // The last turn opens at 2026-07-29T15:15:13.692Z (codex-rollout.unit.test.ts); this
+      // turn_end lands after that.
+      journalReader.set(CODEX_TARGET_ID, journalWithTurnEnd("2026-07-29T15:20:00Z"));
+      const reader = growingCodexReader(truncatedCodexFixture(), loadCodexFixture());
+      const useCase = new ReadLocalCostUseCase(
+        sink,
+        new Map([["codex", reader]]),
+        journalReader,
+        NULL_PERSON_IDENTITY_READER
+      );
+
+      await useCase.execute({ sessionId: CODEX_TARGET_ID });
+      const second = await useCase.execute({ sessionId: CODEX_TARGET_ID });
+
+      expect(second.toolReports.find((r) => r.tool === "codex")?.recordsStored).toBe(1);
+      const turnRecords = [...sink.files.values()]
+        .flat()
+        .filter((r) => r.turn_id === CODEX_LAST_TURN_ID);
+      expect(turnRecords).toHaveLength(2);
+      expect(turnRecords[1]).toMatchObject({ cache_read_tokens: 99840, output_tokens: 3550 });
+    });
+  });
+
+  it("never re-appends a kind: 'session' record sharing a turn_id, even once corrections exist for kind: 'request'", async () => {
+    declareClaudeReadable();
+    const sessionCandidate: LocalCostCandidateRecord = {
+      kind: "session",
+      vendor_id: SESSION_ID,
+      vendor_field: "sessionId",
+      turn_id: "shutdown-1",
+      turn_field: "id",
+      cache_read_tokens: 5,
+    };
+    const grownSessionCandidate: LocalCostCandidateRecord = {
+      ...sessionCandidate,
+      cache_read_tokens: 7,
+    };
+    const sink = new InMemoryTelemetrySink();
+    const reader: SessionCostReader = {
+      read: async (sessionId: string) => {
+        if (sessionId !== SESSION_ID) return { records: [], sessionFound: false };
+        return { records: [grownSessionCandidate], sessionFound: true };
+      },
+    };
+    await new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([sessionCandidate])]]),
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
+    ).execute({ sessionId: SESSION_ID });
+
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", reader]]),
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER
+    );
+    const second = await useCase.execute({ sessionId: SESSION_ID });
+
+    // A `kind: "session"` record is a one-shot cumulative total, never a growing per-turn
+    // snapshot — a re-read matching its turn_id is dropped exactly as it always was,
+    // never treated as a correction opportunity.
+    expect(second.toolReports.find((r) => r.tool === "claude")?.recordsStored).toBe(0);
+    expect([...sink.files.values()].flat().filter((r) => r.turn_id === "shutdown-1")).toHaveLength(
+      1
+    );
   });
 
   describe("step attribution", () => {

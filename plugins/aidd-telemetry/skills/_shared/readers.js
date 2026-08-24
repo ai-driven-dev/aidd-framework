@@ -269,11 +269,24 @@ function opencodeRead(_homeDir, sessionId) {
 // `info.cost` is deliberately never read: it is `0` in every message captured, and its
 // denomination was never established. A figure whose meaning is unknown is worse than an
 // absent one.
+//
+// A message OpenCode created but never billed carries `tokens` with every counter at `0`
+// and no `total` key at all — reproduced 2026-08-24 by SIGINT-ing an `opencode run`
+// mid-response and exporting the session, the same shape as this repo's own fixture's
+// fourth assistant message. Counting it would add a call that never happened to the
+// request count, so `total`'s absence, not the counters' zero-ness, is the gate: a message
+// that completed with genuinely zero usage still carries `total: 0` and still yields a
+// record.
+function wasBilled(tokens) {
+  return asNumber(tokens.total) !== undefined;
+}
+
 function opencodeRecords(payload, sessionId) {
   const records = [];
   for (const message of payload.messages ?? []) {
     const info = message.info ?? {};
     if (info.tokens === undefined) continue;
+    if (!wasBilled(info.tokens)) continue;
     const created = asNumber(info.time && info.time.created);
     const turnId = asString(info.id);
     records.push(
@@ -452,6 +465,16 @@ const TOOLS = [
     // session_start from `session.created`'s own `info.id` and turn_end from `session.idle`.
     // A real session created through OpenCode's own HTTP API, with no --session named by hand,
     // was swept by this reader's own `read` sweep and joined - see measurements.md, phase 5.
+    //
+    // Measured 2026-08-20: `input` is exclusive of `cache.read` for providerID "anthropic",
+    // matching that API's own documented behaviour. A second provider was probed
+    // 2026-08-24 (providerID "opencode") and reconciled the same way, but never exercised
+    // its cache across two turns of one session - no capture puts a large `cache.read`
+    // beside `input` for a non-Anthropic provider, so that probe corroborates without
+    // confirming. See docs/telemetry-limits.md.
+    limitation:
+      "Its four counters are measured correct for the anthropic provider — not " +
+      "independently confirmed for any other provider OpenCode can route to.",
     capability: {
       localRead: { tokenCounters: true, amount: false, toolStatedStep: false },
       export: null,

@@ -363,4 +363,17 @@ describe("printCostReport", () => {
     expect(projects).toContain("acme/widgets");
     expect(projects).toContain("no known project");
   });
+
+  it("gives a record with no model its own row, named as unknown, rather than vanishing", () => {
+    const out = printed({
+      records: [
+        record({ turn_id: "a", cost_usd: 2, model: "opus" }),
+        record({ turn_id: "b", cost_usd: 1 }),
+      ],
+    });
+    const models = out.slice(out.indexOf("by model"), out.indexOf("by project"));
+
+    expect(models).toContain("opus");
+    expect(models).toContain("no known model");
+  });
 });

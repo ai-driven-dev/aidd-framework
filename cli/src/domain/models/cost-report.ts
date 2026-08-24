@@ -60,8 +60,13 @@ export interface CostReportStepRow {
   readonly totals: CostTotals;
 }
 
+/** One model's figures, largest first, plus one row for what named none - `model` absent
+ * there, the same convention `CostReportProjectRow` uses for what named no project. Both
+ * the Codex and OpenCode readers permit a request record with no model, so this row is what
+ * lets `byModels` keep reconciling to the total exactly the way `bySteps`'s `unattributed`
+ * and `byProjects`'s unknown row already do. */
 export interface CostReportModelRow {
-  readonly model: string;
+  readonly model?: string;
   readonly totals: CostTotals;
 }
 
@@ -269,7 +274,11 @@ class TotalsAccumulator {
 
   add(record: TelemetrySinkRecord): void {
     this.requests += 1;
-    if (record.cost_usd !== undefined) {
+    // Gated the same way every token counter is gated below, not on `!== undefined`: a
+    // record read off disk is never guaranteed to hold the type its own field declares, and
+    // `JSON.stringify(NaN)` is `null` - which is `!== undefined` and would have read as a
+    // known, free cost rather than the unknown one this layer exists to keep distinct.
+    if (typeof record.cost_usd === "number") {
       this.costMicroUsd = (this.costMicroUsd ?? 0) + toMicroUsd(record.cost_usd);
     }
     this.addTokensOnly(record);
@@ -316,6 +325,22 @@ function accumulateInto<K>(
   groups.set(key, created);
 }
 
+/** Every token a row counted, across all four disjoint counters. The weight `bySize` falls
+ * back to for a costless row - never `inputTokens + outputTokens` alone: every tool this
+ * report has ever seen runs at 90%-plus cache, so a weight blind to the two cache counters
+ * would order a costless breakdown by the sliver of its volume nobody reads it for, and
+ * invert the order a reader actually wants. It is also the same sum `render.js`'s `tokensOf`
+ * already prints beside a costless row, on both sides - weighing by anything else would sort
+ * a row by a number the report never shows. */
+function tokensOf(totals: CostTotals): number {
+  return (
+    (totals.inputTokens ?? 0) +
+    (totals.outputTokens ?? 0) +
+    (totals.cacheReadTokens ?? 0) +
+    (totals.cacheCreationTokens ?? 0)
+  );
+}
+
 /** Largest first, so the biggest thing is the first thing read. Weighted by amount where
  * one exists and by tokens where none does, since a tool with no amount would otherwise
  * sort as if it had cost nothing. Ties fall back to the row's own key, so the same records
@@ -327,7 +352,7 @@ function bySize<T>(
 ): T[] {
   const weight = (row: T): number => {
     const totals = totalsOf(row);
-    return totals.costMicroUsd ?? (totals.inputTokens ?? 0) + (totals.outputTokens ?? 0);
+    return totals.costMicroUsd ?? tokensOf(totals);
   };
   return [...rows].sort(
     (left, right) => weight(right) - weight(left) || keyOf(left).localeCompare(keyOf(right))
@@ -372,8 +397,29 @@ function addToStepGroup(groups: Map<string, StepGroup>, record: TelemetrySinkRec
 const NO_KNOWN_PROJECT = Symbol("no known project");
 type ProjectKey = string | typeof NO_KNOWN_PROJECT;
 
+// An empty string is not a name - it is what a tool writes when it has none to give, the
+// same reading `report.js`'s own `projectKeyOf` already gives it. Treating it as its own
+// project would print a nameless row a person cannot act on, and would disagree with the
+// plugin about where that record belongs. `typeof` guards a field only declared `string` by
+// its type: a record read off disk carries whatever its own line actually held.
 function projectKeyOf(record: TelemetrySinkRecord): ProjectKey {
-  return record.project_id ?? NO_KNOWN_PROJECT;
+  return typeof record.project_id === "string" && record.project_id !== ""
+    ? record.project_id
+    : NO_KNOWN_PROJECT;
+}
+
+// The same idea, one dimension over: a record with no model is its own group, never
+// dropped. `bySteps` has `unattributed` and `byProjects` has the row above for exactly this
+// reason - both the Codex and OpenCode readers permit a request record with no model, so
+// without this row `byModels` would stop reconciling to its own total with nothing naming
+// the gap. Deliberately narrower than `projectKeyOf`: nothing measured so far ever writes
+// an empty-string `model`, so unlike `project_id` this stays an `undefined` check rather
+// than also folding in `""` - a rule this module has no evidence for yet.
+const NO_KNOWN_MODEL = Symbol("no known model");
+type ModelKey = string | typeof NO_KNOWN_MODEL;
+
+function modelKeyOf(record: TelemetrySinkRecord): ModelKey {
+  return record.model === undefined ? NO_KNOWN_MODEL : record.model;
 }
 
 /** Every UTC day from `fromDay` to `toDay`, inclusive — the full period, whether or not a
@@ -625,7 +671,7 @@ function buildToolRows(
 interface Groups {
   readonly totals: TotalsAccumulator;
   readonly steps: Map<string, StepGroup>;
-  readonly models: Map<string, TotalsAccumulator>;
+  readonly models: Map<ModelKey, TotalsAccumulator>;
   readonly tools: Map<AiToolId, TotalsAccumulator>;
   readonly toolSessionTotals: Map<AiToolId, TotalsAccumulator>;
   readonly attributions: Map<StepAttributionSource, TotalsAccumulator>;
@@ -681,7 +727,7 @@ function accumulateRequestRecord(
   addToStepGroup(groups.steps, record);
   accumulateInto(groups.attributions, record.step_attribution, record);
   accumulateInto(groups.tools, record.tool, record);
-  if (record.model !== undefined) accumulateInto(groups.models, record.model, record);
+  accumulateInto(groups.models, modelKeyOf(record), record);
   accumulateInto(groups.projects, projectKeyOf(record), record);
   const day = telemetrySinkRecordDayKey(record);
   if (day !== undefined && groups.days.has(day)) groups.days.get(day)?.add(record);
@@ -767,15 +813,18 @@ function dayRows(days: ReadonlyMap<string, TotalsAccumulator>): readonly CostRep
   return [...days].map(([day, accumulator]) => ({ day, totals: accumulator.build() }));
 }
 
-function modelRows(models: ReadonlyMap<string, TotalsAccumulator>): readonly CostReportModelRow[] {
-  const rows = [...models].map(([model, accumulator]) => ({
-    model,
+/** Every model a record named, largest first, plus one row for what named none. */
+function modelRows(
+  models: ReadonlyMap<ModelKey, TotalsAccumulator>
+): readonly CostReportModelRow[] {
+  const rows: CostReportModelRow[] = [...models].map(([key, accumulator]) => ({
+    ...(key === NO_KNOWN_MODEL ? {} : { model: key }),
     totals: accumulator.build(),
   }));
   return bySize(
     rows,
     (row) => row.totals,
-    (row) => row.model
+    (row) => row.model ?? ""
   );
 }
 
@@ -842,6 +891,90 @@ function assembleCostReport(
     undatedRecords: input.undatedRecords,
     unreadableLines: input.unreadableLines,
   };
+}
+
+/** A group key only for a `kind: "request"`, `provenance: "local-read"` record carrying a
+ * `turn_id` — the shape a local re-read of a still-running turn produces more than one of
+ * (see `read-local-cost-use-case.ts`'s `storeNewCandidates`, and metrics-contract.md's "The
+ * other way to double count"). Restricted to `kind: "request"`: a `kind: "session"` record
+ * can carry a `turn_id` too — Copilot's shutdown total is keyed on the shutdown event's own
+ * id — but it is a one-shot cumulative figure with no provisional reading to collapse,
+ * grouping it here would treat a whole-session total as one more corrigible turn.
+ * Restricted to `provenance: "local-read"`: on the export route the same field is a prompt
+ * id several billed calls share (see `billedRequestKey` below), so the identical key there
+ * would merge distinct calls instead of two readings of one. */
+function localReadTurnKey(record: TelemetrySinkRecord): string | null {
+  if (record.kind !== "request" || record.provenance !== "local-read") return null;
+  return record.turn_id === undefined
+    ? null
+    : `${record.tool} ${record.vendor_id} ${record.turn_id}`;
+}
+
+/** How much of a group a record accounts for, used only to pick the largest of several
+ * readings of the same still-growing turn — never stored, never itself summed into a
+ * total. */
+function counterWeight(record: TelemetrySinkRecord): number {
+  return COUNTER_FIELDS.reduce((sum, field) => {
+    const value = record[COUNTER_SOURCE[field]];
+    return sum + (typeof value === "number" ? value : 0);
+  }, 0);
+}
+
+/** How many of the four counters a record states at all, whether zero or not — the
+ * tie-break `mergeSupersededTurnGroup` needs beyond `counterWeight` alone, since an
+ * *observed* zero (Codex sometimes reports `cache_write_input_tokens: 0` once a later
+ * event states it) and a counter never mentioned both add zero to the weight, and only
+ * this distinguishes them. Preferring the record that states more never risks preferring a
+ * shrink: `strictlyImprovesOn`'s write-time guard already refused any candidate that would
+ * have dropped a counter the stored one had, so within one group nothing here ever loses
+ * a counter a heavier-weighted sibling also states. */
+function definedCounterCount(record: TelemetrySinkRecord): number {
+  return COUNTER_FIELDS.reduce(
+    (count, field) => count + (typeof record[COUNTER_SOURCE[field]] === "number" ? 1 : 0),
+    0
+  );
+}
+
+/**
+ * One Codex-shaped turn, read more than once while it was still open, collapsed to the one
+ * record carrying the most complete counters. Never done at write time: the sink is
+ * append-only, so an earlier, partial reading of a turn is never edited in place — only
+ * reconciled by whatever reads it back, which is here, the same way `mergeBilledRequestGroup`
+ * reconciles two routes seeing one call.
+ *
+ * Unlike that merge, every record in this group came from the *same* route reading the
+ * *same* file at different moments, so the survivor is simply whichever carries the largest
+ * counters — never a blend of two, which would state a combination of token counts the
+ * tool's own file never actually reported together. A later record that reads smaller than
+ * an earlier one (a shrink, not a correction) is never picked over the larger one this way,
+ * whatever order the two arrived in. */
+function mergeSupersededTurnGroup(group: readonly TelemetrySinkRecord[]): TelemetrySinkRecord {
+  if (group.length === 1) return group[0];
+  const heaviest = Math.max(...group.map(counterWeight));
+  const largest = group.filter((record) => counterWeight(record) === heaviest);
+  const mostDefined = Math.max(...largest.map(definedCounterCount));
+  return pickDeterministically(
+    largest.filter((record) => definedCounterCount(record) === mostDefined)
+  );
+}
+
+/** Every other kind and route passes through untouched — see `localReadTurnKey`. */
+function collapseSupersededTurns(
+  records: readonly TelemetrySinkRecord[]
+): readonly TelemetrySinkRecord[] {
+  const groups = new Map<string, TelemetrySinkRecord[]>();
+  const rest: TelemetrySinkRecord[] = [];
+  for (const record of records) {
+    const key = localReadTurnKey(record);
+    if (key === null) {
+      rest.push(record);
+      continue;
+    }
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(record);
+    else groups.set(key, [record]);
+  }
+  return [...rest, ...[...groups.values()].map(mergeSupersededTurnGroup)];
 }
 
 /** A group key only where `billed_request_id` is present — the one field measured so far
@@ -924,7 +1057,11 @@ function collapseBilledRequests(
 }
 
 export function buildCostReport(input: CostReportInput): CostReport {
-  const records = collapseBilledRequests(input.records);
+  // Turn-supersede first, billed-request-collapse second: the first reconciles two readings
+  // of one local-read record before the second ever has to reconcile two routes seeing one
+  // call, so a still-open Codex turn is already down to one record by the time a billed-call
+  // group is formed. Order between them is otherwise inert — the two key on disjoint fields.
+  const records = collapseBilledRequests(collapseSupersededTurns(input.records));
   const membership = input.task === undefined ? null : taskMembership(input.journals, input.task);
   const stages = selectionStages(records, input, membership);
   const emptySelection = emptySelectionOf(stages, input, membership);

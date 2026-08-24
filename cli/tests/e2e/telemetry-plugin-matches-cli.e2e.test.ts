@@ -1,6 +1,6 @@
 import { execFile, execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, realpathSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -179,6 +179,33 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
       .sort()
       .map((name) => readFileSync(join(dir, name), "utf8"))
       .join("");
+  }
+
+  /** Writes the same day file straight into both sinks, bypassing `read` - the read path
+   * depends on a real per-tool transcript, and the tests below are about the report layer
+   * disagreeing on order and placement, not about reading. Mirrors
+   * cli/tests/e2e/telemetry-report.e2e.test.ts's own `seedSink`. */
+  async function seedBothSinks(records: readonly Record<string, unknown>[]): Promise<void> {
+    const content = `${records.map((record) => JSON.stringify(record)).join("\n")}\n`;
+    for (const configDir of [cliConfig, pluginConfig]) {
+      const dir = join(configDir, "telemetry");
+      await mkdir(dir, { recursive: true });
+      await writeFile(join(dir, "2026-08-21.jsonl"), content, "utf8");
+    }
+  }
+
+  function seededRequest(overrides: Record<string, unknown>): Record<string, unknown> {
+    return {
+      sink_schema_version: 2,
+      kind: "request",
+      provenance: "local-read",
+      tool: "claude",
+      vendor_id: "seed-1",
+      vendor_field: "sessionId",
+      step_attribution: "unattributed",
+      event_timestamp: "2026-08-18T10:00:00Z",
+      ...overrides,
+    };
   }
 
   it("stores the same records, field for field and in the same order", async () => {
@@ -388,7 +415,7 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
 
     expect(fromPlugin).toBe(fromCli);
     const envelope = JSON.parse(fromPlugin);
-    expect(envelope.cost_report_version).toBe(2);
+    expect(envelope.cost_report_version).toBe(3);
     expect(envelope.by_tool.map((row: { tool: string }) => row.tool)).toHaveLength(5);
   });
 
@@ -429,5 +456,126 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
 
     expect(fromPlugin).toBe(fromCli);
     expect(storedIn(pluginConfig)).toBe(storedIn(cliConfig));
+  });
+
+  /**
+   * Two fixtures a real captured transcript never happens to produce, seeded straight into
+   * the sink: a costless breakdown weighted almost entirely by cache, and an empty-string
+   * `project_id`. Both are internally-consistent divergences - each side computed its own
+   * answer correctly by its own (previously disagreeing) rule - which is exactly why the
+   * existing byte-for-byte comparison above never saw either: nothing in `LOCAL_COST_FIXTURES`
+   * ever reaches either branch.
+   */
+  describe("row order and placement, where a real transcript never happens to diverge", () => {
+    const HEAVY_CACHE = seededRequest({
+      turn_id: "heavy-cache",
+      model: "heavy-cache",
+      input_tokens: 10,
+      output_tokens: 5,
+      cache_read_tokens: 900_000,
+    });
+    const LIGHT_CACHE = seededRequest({
+      turn_id: "light-cache",
+      model: "light-cache",
+      input_tokens: 500,
+      output_tokens: 500,
+    });
+
+    it("weighs a costless breakdown by all four counters, identically and in the same order", async () => {
+      await seedBothSinks([HEAVY_CACHE, LIGHT_CACHE]);
+
+      const [fromCli, fromPlugin] = await bothOf(["report", ...REPORTING_PERIOD, "--json"]);
+      expect(fromPlugin).toBe(fromCli);
+      expect(
+        (JSON.parse(fromPlugin).by_model as { model?: string }[]).map((row) => row.model)
+      ).toEqual(["heavy-cache", "light-cache"]);
+    });
+
+    it("places an empty-string project_id the same way as no project at all, on both sides", async () => {
+      await seedBothSinks([
+        seededRequest({ turn_id: "a", project_id: "acme/widgets", cost_usd: 1 }),
+        seededRequest({ turn_id: "b", project_id: "", cost_usd: 2 }),
+        seededRequest({ turn_id: "c", cost_usd: 3 }),
+      ]);
+
+      const [fromCli, fromPlugin] = await bothOf(["report", ...REPORTING_PERIOD, "--json"]);
+      expect(fromPlugin).toBe(fromCli);
+      const byProject = JSON.parse(fromPlugin).by_project as {
+        project?: string;
+        totals: { requests: number };
+      }[];
+      expect(byProject).toHaveLength(2);
+      const unknown = byProject.find((row) => row.project === undefined);
+      expect(unknown?.totals.requests).toBe(2);
+
+      const [textCli, textPlugin] = await bothOf(["report", ...REPORTING_PERIOD]);
+      expect(textPlugin).toBe(textCli);
+      expect(textPlugin).toContain("no known project");
+    });
+
+    /** A copy of the plugin's own scripts, with `bySize`'s comparator flipped from largest-
+     * first to smallest-first — an order-only change: every row keeps the same fields and
+     * figures, only their position moves. Copies the whole `skills/` tree, not just
+     * `01-cost/`, since `report.js` reaches `../../_shared/attribution.js` by a relative
+     * path that only resolves correctly with `_shared` still a sibling. */
+    async function patchedPluginScript(): Promise<string> {
+      const patchedSkillsDir = join(tempDir, "patched-plugin-skills");
+      await copyFixtureTree(
+        join(REPO_ROOT, "plugins", "aidd-telemetry", "skills"),
+        patchedSkillsDir
+      );
+      const reportJsPath = join(patchedSkillsDir, "01-cost", "scripts", "lib", "report.js");
+      const original = await readFile(reportJsPath, "utf8");
+      const comparator = "weight(right) - weight(left) || keyOf(left).localeCompare(keyOf(right));";
+      if (!original.includes(comparator)) {
+        throw new Error(
+          "bySize's comparator text has moved - update this planted-divergence patch to match"
+        );
+      }
+      await writeFile(
+        reportJsPath,
+        original.replace(
+          comparator,
+          "weight(left) - weight(right) || keyOf(left).localeCompare(keyOf(right));"
+        ),
+        "utf8"
+      );
+      return join(patchedSkillsDir, "01-cost", "scripts", "telemetry-report.js");
+    }
+
+    /**
+     * Proves the extension above actually reaches order, rather than merely claiming to:
+     * a divergence planted in the plugin alone, nowhere near a field value, still turns the
+     * byte-for-byte comparison red. Without this, "the suite now sees order" is asserted,
+     * not demonstrated.
+     */
+    it("goes red for an order-only divergence planted in the plugin alone", async () => {
+      await seedBothSinks([HEAVY_CACHE, LIGHT_CACHE]);
+      const patchedScript = await patchedPluginScript();
+
+      const fromCli = await capture(
+        [CLI_PATH, "telemetry", "report", ...REPORTING_PERIOD, "--json"],
+        cliConfig
+      );
+      const fromPatchedPlugin = await capture(
+        [patchedScript, "report", ...REPORTING_PERIOD, "--json"],
+        pluginConfig
+      );
+
+      // Same rows, same figures - sorted back to one canonical order before comparing, so
+      // this confirms the planted patch changed nothing but position.
+      const byModel = (text: string) =>
+        [...(JSON.parse(text).by_model as { model?: string }[])].sort((left, right) =>
+          (left.model ?? "").localeCompare(right.model ?? "")
+        );
+      expect(byModel(fromPatchedPlugin)).toEqual(byModel(fromCli));
+
+      // The order itself is reversed, and the comparison this whole file makes - byte for
+      // byte on the rendered answer - catches it.
+      expect(
+        (JSON.parse(fromPatchedPlugin).by_model as { model?: string }[]).map((row) => row.model)
+      ).toEqual(["light-cache", "heavy-cache"]);
+      expect(fromPatchedPlugin).not.toBe(fromCli);
+    });
   });
 });

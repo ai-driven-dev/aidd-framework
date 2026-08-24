@@ -100,6 +100,57 @@ function isPresent(value: string | undefined): value is string {
   return value !== undefined;
 }
 
+/** Every already-stored record for this session, keyed on its own `turn_id` — a record
+ * with none is not indexed, the same as it is never matched by a re-read. */
+function groupByTurnId(
+  records: readonly TelemetrySinkRecord[]
+): ReadonlyMap<string, readonly TelemetrySinkRecord[]> {
+  const groups = new Map<string, TelemetrySinkRecord[]>();
+  for (const record of records) {
+    if (record.turn_id === undefined) continue;
+    const bucket = groups.get(record.turn_id);
+    if (bucket) bucket.push(record);
+    else groups.set(record.turn_id, [record]);
+  }
+  return groups;
+}
+
+const LOCAL_READ_TURN_COUNTER_KEYS = [
+  "input_tokens",
+  "output_tokens",
+  "cache_read_tokens",
+  "cache_creation_tokens",
+] as const;
+
+/** How much of a turn a record accounts for — used only to find the largest of several
+ * still-open readings of it, never stored, never itself summed into a total. */
+function counterWeight(record: TelemetrySinkRecord): number {
+  return LOCAL_READ_TURN_COUNTER_KEYS.reduce((sum, key) => sum + (record[key] ?? 0), 0);
+}
+
+/** Whether `candidate` genuinely improves on `stored` — every counter at least as large,
+ * and at least one strictly larger. A candidate that would drop a counter `stored` already
+ * carried, or read smaller on any one, is never an improvement: the sink keeps the larger
+ * reading rather than letting a figure fall back silently (metrics-contract.md, "The other
+ * way to double count"). */
+function strictlyImprovesOn(
+  stored: TelemetrySinkRecord,
+  candidate: LocalCostCandidateRecord
+): boolean {
+  let improved = false;
+  for (const key of LOCAL_READ_TURN_COUNTER_KEYS) {
+    const before = stored[key];
+    const after = candidate[key];
+    if (before === undefined) {
+      if (after !== undefined) improved = true;
+      continue;
+    }
+    if (after === undefined || after < before) return false;
+    if (after > before) improved = true;
+  }
+  return improved;
+}
+
 /** The strongest answer a tool gave anywhere in the sweep.
  *
  * A tool that read one session and could not read another reports as `found`: the figures
@@ -286,7 +337,14 @@ export class ReadLocalCostUseCase {
   /** Matches each candidate against what the sink already holds for this session, on
    * `turn_id` alone — never a hash of the line, since the tool's own file keeps growing
    * as the same record is read again. A candidate with no `turn_id` cannot be matched and
-   * is always appended: the reader's contract forbids inventing a key for it. */
+   * is always appended: the reader's contract forbids inventing a key for it.
+   *
+   * A candidate whose `turn_id` *is* already stored is dropped — unless it is a
+   * `kind: "request"` local-read record correcting an earlier, still-open reading of the
+   * same turn (`isLocalReadTurnCorrection`), the one case this match used to refuse
+   * outright. The correction lands as a second line, never an edit: the sink is
+   * append-only, and `cost-report.ts`'s `collapseSupersededTurns` is what later reconciles
+   * the two readings into one. */
   private async storeNewCandidates(
     tool: AiToolId,
     sessionId: string,
@@ -295,17 +353,37 @@ export class ReadLocalCostUseCase {
     attribution: LocalReadAttribution
   ): Promise<number> {
     if (candidates.length === 0) return 0;
-    const existing = await this.sink.readRecordsForVendor(sessionId);
-    const storedTurnIds = new Set(
-      existing.map((record) => record.turn_id).filter((id): id is string => id !== undefined)
-    );
+    const byTurnId = groupByTurnId(await this.sink.readRecordsForVendor(sessionId));
     let stored = 0;
     for (const candidate of candidates) {
-      if (candidate.turn_id !== undefined && storedTurnIds.has(candidate.turn_id)) continue;
+      const prior = candidate.turn_id === undefined ? undefined : byTurnId.get(candidate.turn_id);
+      if (prior && !this.isLocalReadTurnCorrection(candidate, prior)) continue;
       await this.sink.appendRecord(this.stampProvenanceAndTool(tool, candidate, attribution), at);
       stored++;
     }
     return stored;
+  }
+
+  /** Whether `candidate` should land as a correction to `prior` — every record already
+   * stored under this `turn_id`. Never for a `kind: "session"` record: Copilot's shutdown
+   * total shares this match (it is keyed on the shutdown event's own id), but it is a
+   * one-shot cumulative figure with no provisional reading to correct, and matching it here
+   * would let a re-read start doubling it. Otherwise, only when the candidate strictly
+   * improves on the largest already stored — never gated on whether the run journal's own
+   * `turn_end` has been seen: a strictly larger candidate is itself proof the stored reading
+   * was not final, whatever the journal says about the clock, and a re-read that brings
+   * nothing larger is already a no-op without needing to ask the journal anything. */
+  private isLocalReadTurnCorrection(
+    candidate: LocalCostCandidateRecord,
+    prior: readonly TelemetrySinkRecord[]
+  ): boolean {
+    if (candidate.kind !== "request") return false;
+    const priorReads = prior.filter((r) => r.kind === "request" && r.provenance === "local-read");
+    if (priorReads.length === 0) return false;
+    const largest = priorReads.reduce((best, r) =>
+      counterWeight(r) > counterWeight(best) ? r : best
+    );
+    return strictlyImprovesOn(largest, candidate);
   }
 
   // The caller asked this tool's reader by name — that is the fact this stamps, never

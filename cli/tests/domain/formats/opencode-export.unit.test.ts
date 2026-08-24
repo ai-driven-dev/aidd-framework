@@ -15,12 +15,13 @@ function loadFixture(name: string): unknown {
 }
 
 describe("mapOpencodeExportToSinkRecords", () => {
-  it("yields one record per counted message, by value, under the stored field names", () => {
+  it("yields one record per billed message, by value, under the stored field names", () => {
     const records = mapOpencodeExportToSinkRecords(loadFixture("opencode-export.json"), SESSION_ID);
 
-    // The fixture holds 5 user turns (no `tokens`) and 4 assistant turns (`tokens` present,
-    // one of them all-zero) — only the 4 assistant turns are counted messages.
-    expect(records).toHaveLength(4);
+    // The fixture holds 5 user turns (no `tokens`), 3 billed assistant turns (`tokens` with a
+    // `total`), and 1 assistant turn OpenCode created but never billed (`tokens` present, every
+    // counter 0, no `total`) — only the 3 billed turns are counted messages.
+    expect(records).toHaveLength(3);
     expect(records).toEqual([
       {
         kind: "request",
@@ -61,13 +62,49 @@ describe("mapOpencodeExportToSinkRecords", () => {
         cache_read_tokens: 46956,
         cache_creation_tokens: 4074,
       },
+    ]);
+  });
+
+  it("yields no record for a message OpenCode created but never billed — no total, even though tokens is present and every counter reads 0", () => {
+    const payload = {
+      messages: [
+        {
+          info: {
+            role: "assistant",
+            id: "msg_aborted",
+            sessionID: SESSION_ID,
+            time: { created: 1773638379047 },
+            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          },
+        },
+      ],
+    };
+
+    expect(mapOpencodeExportToSinkRecords(payload, SESSION_ID)).toEqual([]);
+  });
+
+  it("keeps the record for a billed message that genuinely used 0 tokens — total is present, even at 0", () => {
+    const payload = {
+      messages: [
+        {
+          info: {
+            role: "assistant",
+            id: "msg_zero_billed",
+            sessionID: SESSION_ID,
+            time: { created: 1773638379047 },
+            tokens: { total: 0, input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          },
+        },
+      ],
+    };
+
+    expect(mapOpencodeExportToSinkRecords(payload, SESSION_ID)).toEqual([
       {
         kind: "request",
         vendor_id: SESSION_ID,
         vendor_field: "sessionID",
-        turn_id: "msg_cf515e6270019kLPJWNgcnoVSu",
+        turn_id: "msg_zero_billed",
         turn_field: "id",
-        model: "claude-sonnet-4-6",
         event_timestamp: "2026-03-16T05:19:39.047Z",
         input_tokens: 0,
         output_tokens: 0,

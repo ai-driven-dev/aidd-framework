@@ -137,7 +137,19 @@ function buildRecord(vendorId: string, pending: PendingTurn): LocalCostCandidate
 
 /** Pairs each `turn_context` with the `token_count` events that follow it, up to the next
  * `turn_context` (or end of file), and emits one record per turn — never per line, since a
- * `token_count` event alone carries no model, no request id, and only a cumulative figure. */
+ * `token_count` event alone carries no model, no request id, and only a cumulative figure.
+ *
+ * `build()`'s own final `flush()` cannot tell "the session ended here" from "the session is
+ * still running and this turn is not done yet" apart — a rollout has no line that says a
+ * turn, or the session, is finished; a turn is closed only by the *next* `turn_context`, and
+ * a still-running session's last turn has none. This module does not attempt that
+ * distinction itself: it always emits whatever the counters sum to so far, and does not need
+ * to say anything more than what it counted. Whether a later read's own record for the same
+ * `turn_id` is a genuine correction is decided downstream, in `read-local-cost-use-case.ts`'s
+ * `storeNewCandidates` — by comparing it against what is already stored, never by asking
+ * whether the session "should" be finished by now: a candidate whose counters are strictly
+ * larger than what is stored is itself the only proof this module's own file can ever offer
+ * that an earlier reading was not the last word. */
 class CodexRolloutAccumulator implements TranscriptLineAccumulator {
   private vendorId: string | undefined;
   private pending: PendingTurn | undefined;

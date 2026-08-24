@@ -6,9 +6,13 @@
 const { DISPLAY_NAME } = require("../../../_shared/readers.js");
 const { tokensOf } = require("./report.js");
 
-// Bumped from 1: `by_day` and `by_project` are new top-level breakdowns, a shape change a
-// consumer built against version 1 could not have anticipated.
-const ENVELOPE_VERSION = 2;
+// Bumped from 2: `by_model`'s `model` is now absent on the row for a record neither reader
+// that permits a model-less request could name - a consumer that read it as always a
+// string on every prior version would misread this one. Bumped from 1: `by_day` and
+// `by_project` are new top-level breakdowns, a shape change a consumer built against
+// version 1 could not have anticipated. Mirrors
+// cli/src/domain/models/cost-report-envelope.ts's COST_REPORT_ENVELOPE_VERSION.
+const ENVELOPE_VERSION = 3;
 const MICRO_USD_PER_USD = 1e6;
 const LABEL_WIDTH = 26;
 
@@ -24,6 +28,7 @@ const TASK_ATTRIBUTION_LABELS = {
 };
 
 const NO_KNOWN_PROJECT = "no known project";
+const NO_KNOWN_MODEL = "no known model";
 
 // A year asked for by day is 365 rows - the envelope always carries every one of them, but
 // a terminal is not the place to read that many. Above this, the text rendering names the
@@ -172,7 +177,8 @@ function printModels(out, report, basis) {
   out("");
   out(`  by model    ${basis.label}`);
   for (const row of report.byModels) {
-    out(`    ${pad(row.model)}${share(row.totals, basis)}   ${figure(row.totals, basis)}`);
+    const name = row.model ?? NO_KNOWN_MODEL;
+    out(`    ${pad(name)}${share(row.totals, basis)}   ${figure(row.totals, basis)}`);
   }
 }
 
@@ -323,7 +329,7 @@ function toEnvelope(report) {
       totals: envelopeTotals(row.totals),
     })),
     by_model: report.byModels.map((row) => ({
-      model: row.model,
+      ...(row.model === undefined ? {} : { model: row.model }),
       totals: envelopeTotals(row.totals),
     })),
     by_tool: report.byTools.map((row) => ({
@@ -456,7 +462,8 @@ function breakdownArtefact(envelope, axis, column, nameOf) {
 }
 
 const stepArtefact = (envelope) => breakdownArtefact(envelope, "step", "Step", (row) => row.step ?? "unattributed");
-const modelArtefact = (envelope) => breakdownArtefact(envelope, "model", "Model", (row) => row.model);
+const modelArtefact = (envelope) =>
+  breakdownArtefact(envelope, "model", "Model", (row) => row.model ?? NO_KNOWN_MODEL);
 const projectArtefact = (envelope) =>
   breakdownArtefact(envelope, "project", "Project", (row) => row.project ?? NO_KNOWN_PROJECT);
 

@@ -102,29 +102,65 @@ sees every turn the file holds so far, not just what is new since the last read.
 To keep a re-read from storing the same turn twice, the writer matches each
 candidate record against what is already stored for that session, on `turn_id`
 alone (never on line content, never on arrival order — a hash of the line changes
-the moment the tool appends anything else to that same record). A candidate whose
-`turn_id` is already stored is not written again.
+the moment the tool appends anything else to that same record).
 
 **This match requires a `turn_id`.** A candidate with no `turn_id` cannot be
 matched against anything, and is appended again on every read that sees it — by
 design, not by omission: inventing an unstable key would be worse than leaving it
 unmatched.
 
+**A matched candidate is not always dropped — a still-open turn can correct
+itself.** Some tools (Codex's rollout is the one measured so far) emit a
+`kind: "request"` record for a turn before the tool itself has said the turn is
+finished: a Codex turn is closed by the *next* `turn_context` line, and the last
+turn in a file whose session is still running has none, so a rollout read while
+its session runs is stored with whatever counters had arrived by then — partial,
+and, without this rule, permanently so, since the next read's completed figures
+would match the same `turn_id` and be silently dropped. Instead: a matched
+candidate lands as a second line — the sink is append-only, so this is never an
+edit of the stored one — whenever it is a `kind: "request"` local-read record
+that **strictly improves** on the largest already stored for that `turn_id`
+(every counter at least as large, at least one larger). Nothing else gates it:
+a run journal's `turn_end` line, where one exists, says only that no further
+growth is coming — it is never asked before accepting a correction, because a
+candidate that strictly improves is itself the only proof needed that an
+earlier reading was not final, whatever a journal's own clock says about it.
+Idempotence — a re-read that brings nothing larger stores nothing new — falls
+out of "strictly improves" alone, the same property an unmatched-then-matched
+`turn_id` already had; nothing here depends on a session ever being confirmed
+finished. A `kind: "session"` record sharing a `turn_id` (Copilot's shutdown
+total, keyed on the shutdown event's own id) is never treated as a correction
+opportunity: it is a one-shot cumulative figure with no provisional reading to
+correct, and is dropped on a re-read exactly as before.
+
+Because more than one record can now legitimately share a `turn_id` on the
+sink, a consumer reading raw records must also collapse them before summing —
+see "Consuming a session correctly" below. The largest wins, never a sum of two:
+a later record that reads *smaller* than one already stored is never written at
+all, so a stored `turn_id` group never needs to guard against a shrink, only
+against counting more than one of its members.
+
 **Worked example**, mirroring the tested behavior of the local-read use case: one
 turn's transcript line carries 10 input tokens and 20 output tokens, under
 `turn_id: "req_1"`. A first read appends it — 30 tokens stored. The session
 continues and the same transcript file is read again (a re-read, same turn still
-present in the file). Because `req_1` is already stored, the second read matches
-it and stores nothing new. **Stored total after the second read: 30 tokens, not
-60.** Had the same candidate carried no `turn_id`, the second read would have
-appended it again, and the stored total would have become 60 tokens for one real
-turn.
+present in the file, no larger reading of it yet). Because `req_1` is already
+stored and the new reading offers nothing more, the second read matches it and
+stores nothing new. **Stored total after the second read: 30 tokens, not 60.**
+Had the same candidate carried no `turn_id`, the second read would have appended
+it again, and the stored total would have become 60 tokens for one real turn.
+Had the second read's own transcript line instead carried 15 input tokens and 25
+output tokens for the same still-open turn, it would land as a second,
+correcting line, and the group's true total would be 40 tokens — the larger
+reading, not 30, not 70.
 
 A consumer aggregating raw appends from the sink file without replicating this
 `turn_id` match — for example, re-implementing a local reader against a tool's
 own files rather than consuming this sink — will double, triple, or *N*-times
 count any record whose route has no stable per-record identifier, once per read
-of an active session.
+of an active session; and, for a route whose turns can be re-read while still
+open, will sum a turn's own successive readings of itself rather than keeping
+only the largest.
 
 ## A third way to double count: one billed call, seen by both routes
 
@@ -162,6 +198,30 @@ record with no `billed_request_id` joins no group and is counted exactly as it
 arrived — the same rule an unmatched `turn_id` follows for the re-read case.
 `cost-report-contract.md` calls this the third of the double-count rules
 `aidd telemetry report --json` has already applied.
+
+**The same collapse also absorbs a retried OTLP delivery.** `/v1/logs` and
+`/v1/metrics` are received unconditionally — nothing at write time recognizes a
+redelivered payload, because OTLP delivery is itself at-least-once and a
+receiver refusing a delivery it cannot prove is a duplicate would risk refusing
+a real one. A redelivered `api_request` names the same `billed_request_id` as
+the first delivery, so the group it joins on read has two (or more) identical
+records instead of one, and the same "keep one, never sum" rule that reconciles
+two routes reconciles two deliveries of one route just as well.
+
+**This protection requires `billed_request_id`, and most declared exports do
+not carry one.** Measured so far, only Claude Code's export names it (its
+`request_id` log attribute). Codex's and Copilot's exports are declared —
+`identityAttribute` is real, measured from a captured session — but neither has
+ever been measured carrying a `request_id`, or any counter at all through this
+route; Cursor's and OpenCode's exports are not even declared (`kind:
+"unmeasured"`), so this receiver never resolves an identity for either and
+stores nothing from them regardless. A route with no `billed_request_id` has no
+group to collapse into: a retried delivery for it is indistinguishable from two
+real calls, and doubles every counter it carries. Today this is a latent gap,
+not an observed one — the one route currently seen carrying real counters
+(Claude Code's) is also the one route that is protected — but a consumer must
+not assume a future export automatically inherits this collapse; it inherits it
+only once that route is measured naming `billed_request_id` too.
 
 ## Identity and joins
 
@@ -328,12 +388,20 @@ ignores it exactly as it would any other field it does not recognize.
 - **Type**: string.
 - **Present**: conditional — when the producing route can name a stable
   identifier for this specific turn or request. Present on most `"request"`
-  lines measured so far (Claude Code, Codex, OpenCode); never present on any
-  `"session"` line, since no metric datapoint measured so far carries a turn
-  identifier at all.
+  lines measured so far (Claude Code, Codex, OpenCode). Never present on any
+  export-route metric datapoint (no `"session"`-kind OTLP datapoint measured so
+  far carries a turn identifier), but present on Copilot's local-read
+  `"session"` line — its one-shot shutdown total is keyed on the shutdown
+  event's own id, so a re-read can match it the same way a `"request"` line's
+  is matched.
 - **Meaning**: the tool's own turn/request identifier, and the key a local
   re-read is matched on. **Not guaranteed unique per billed request** — a
-  main-agent request and the subagent request it spawns can share one `turn_id`.
+  main-agent request and the subagent request it spawns can share one `turn_id`
+  on the export route. A `kind: "request"`, `provenance: "local-read"` turn is
+  the one shape that can also be *corrected*, not just matched — see "A re-read
+  appends unless matched" above; a `"session"`-kind turn (Copilot's) and an
+  export-route turn are never corrected this way, only matched-and-dropped or
+  left unmatched.
 - **If absent**: this record's route has no stable per-record identifier to
   offer. It cannot be matched by a re-read, and will be appended again, once per
   read, for as long as the session's underlying file keeps being re-read — see
@@ -575,7 +643,7 @@ from silence.
 | Tool | Export route | Local-read route |
 | ---- | ------------- | ------------------ |
 | **Claude Code** | Declared and measured: full request-level counters via `/v1/logs`, plus the six `"session"`-kind delta metrics via `/v1/metrics` every 10 seconds. `cost_usd` is only ever available through this route — no local file carries it. Also the only route measured naming `billed_request_id` (its `request_id` attribute). | Declared and measured: complete token counters per assistant message, keyed on `requestId`. Step is stated by the tool itself (`attributionSkill`), exact per message — the strongest attribution any tool or route offers. No `cost_usd`. Also names `billed_request_id` (the same `requestId`). **The one tool measured by both routes at once**: when both are live for a session, both routes append a record for the same billed call under two different `turn_id`s (`prompt.id` here, `requestId` there) — collapse on `billed_request_id` before summing, or every figure doubles. See "A third way to double count." |
-| **Codex** | Declared (`conversation.id` measured, zero-token, to verify the identifier only). Turn identifier and any metrics export are unmeasured — no counters, no cost, flow through this route today. | Declared and measured: complete counters per turn, keyed on `turn_id`, from the rollout's `token_count` events paired with the preceding `turn_context`. No tool-stated step — attribution is only ever a run-journal interval, or unattributed. No `cost_usd`. |
+| **Codex** | Declared (`conversation.id` measured, zero-token, to verify the identifier only). Turn identifier and any metrics export are unmeasured — no counters, no cost, flow through this route today. | Declared and measured: complete counters per turn, keyed on `turn_id`, from the rollout's `token_count` events paired with the preceding `turn_context`. A turn read while its session is still running is stored with whatever counters had arrived so far, and corrected — never edited, a second line — once a later read brings a larger reading of the same `turn_id`; see "A re-read appends unless matched." No tool-stated step — attribution is only ever a run-journal interval, or unattributed. No `cost_usd`. |
 | **OpenCode** | Unmeasured — no export payload has ever been captured for this tool. | Declared and measured, via `opencode export <sessionID> --sanitize`: counters per request (message), keyed on the message's own `id`. No established join to a run-journal entry — no captured hook or plugin payload has ever carried OpenCode's own session identity, so nothing exists to join on; these figures answer only what a session consumed, alone. `info.cost` is deliberately never read: it is `0` in every message captured, and its denomination (which currency, computed vs. billed) has never been established — a figure whose meaning is unknown is worse than an absent one. Records carry `event_timestamp` from the message's `time.created`, so they can be placed in a period; step attribution stays out of reach regardless, since there is no join to a run journal to attribute against. |
 | **Copilot** | Declared (`gen_ai.conversation.id` measured, zero-credit, to verify the identifier only) — but that attribute lives on the `invoke_agent` *span*, not on a log record or a metric, and this receiver only listens on `/v1/logs` and `/v1/metrics`. A receiver limited to those two paths never sees the one attribute that identifies a Copilot session, so this route yields nothing in practice today. | Supported at **session** granularity only: `session.shutdown` in `~/.copilot/session-state/<id>/events.jsonl` carries input, output, cache read and cache write together, once, for the whole session. Nothing in its files counts a single request, so it yields a `session` record and never a `request` one, and no amount can be placed inside a step. Read `tokenDetails`, never `usage` — the latter is inclusive of cache writes where every other reader's input is exclusive. No model is stamped: `currentModel` names the session's last model, not the one that spent. Separately, its file's own `cost` field is denominated in premium requests, not currency, so it could not be treated as `cost_usd` even where it is present. |
 | **Cursor** | Unmeasured — no payload has ever been captured. Cursor's own documentation names `cursor.conversation.id`, but a name read from documentation is a guess, and enabling the export to verify it is a team setting on an Enterprise plan, in beta, that nobody outside a Cursor admin can turn on — so it is declared unmeasured rather than declared from an unverified guess. | Unsupported (probed): Cursor writes no token count in any file it produces — there is nothing on disk for a local reader to find. |
@@ -633,19 +701,33 @@ To compute one session's true totals from a set of stored records:
 
 1. Group records by matching `tool` and `vendor_id` — that pair names one real
    session, regardless of which `provenance` produced any individual record.
-2. Within that group, collapse every `kind: "request"` record sharing a
-   `billed_request_id` into one before summing anything — see "A third way to
-   double count: one billed call, seen by both routes." A record with no
-   `billed_request_id` is never collapsed with another.
-3. Sum `cost_usd`, `input_tokens`, `output_tokens`, `cache_read_tokens`, and
+2. Within that group, collapse every `kind: "request"`, `provenance: "local-read"`
+   record sharing a `turn_id` into the one carrying the largest `input_tokens` +
+   `output_tokens` + `cache_read_tokens` + `cache_creation_tokens` — never a sum
+   of the group, which would state a combination of counters the tool's own file
+   never actually reported together. This is what a still-open turn re-read more
+   than once (Codex, so far) leaves behind — see "A re-read appends unless
+   matched." Restricted to `kind: "request"` and `provenance: "local-read"`: a
+   `"session"`-kind turn (Copilot's) is a one-shot total with nothing to
+   collapse, and an export-route `turn_id` is a prompt id several distinct
+   billed calls can share, so applying this step there would merge them.
+3. Then collapse every `kind: "request"` record sharing a `billed_request_id`
+   into one before summing anything — see "A third way to double count: one
+   billed call, seen by both routes." A record with no `billed_request_id` is
+   never collapsed with another. Order between steps 2 and 3 does not matter —
+   the two key on disjoint fields — but doing step 2 first means a still-open
+   local-read turn is already down to one record before it is ever compared
+   against the export route's record for the same call.
+4. Sum `cost_usd`, `input_tokens`, `output_tokens`, `cache_read_tokens`, and
    `cache_creation_tokens` from the collapsed `kind: "request"` records in that
    group only. Never include `kind: "session"` records in this sum.
-4. Sum `active_time_s` from `kind: "session"` records in that group only — no
+5. Sum `active_time_s` from `kind: "session"` records in that group only — no
    `"request"` record carries it.
-5. Do not key anything on `turn_id` beyond what it is documented for here: it is
-   a write-time match key for local-read re-reads, not a unique identifier for
-   a billed request. `billed_request_id`, not `turn_id`, is what step 2 above
-   collapses on, precisely because `turn_id` lacks that guarantee.
-6. Where a tool's row above says a route is not covered, or covered without an
+6. Do not key anything else on `turn_id` beyond what it is documented for here:
+   it is a write-time match-and-correct key for local-read re-reads, not a
+   unique identifier for a billed request. `billed_request_id`, not `turn_id`,
+   is what step 3 above collapses on, precisely because `turn_id` lacks that
+   guarantee.
+7. Where a tool's row above says a route is not covered, or covered without an
    amount, report that plainly rather than defaulting the missing figure to
    zero.

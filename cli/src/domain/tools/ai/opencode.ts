@@ -190,6 +190,16 @@ export const opencode: AiTool<
     // and its denomination was never established, so it is deliberately never read. No
     // field names a running skill either.
     supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
+    // Measured 2026-08-20: `input` is exclusive of `cache.read` for providerID "anthropic",
+    // matching that API's own documented behaviour. A second provider was probed 2026-08-24
+    // (providerID "opencode") and reconciled the same way, but never exercised its cache
+    // across two turns of one session — no capture puts a large `cache.read` beside `input`
+    // for a non-Anthropic provider, so that probe corroborates without confirming. A
+    // provider that reports prompt tokens inclusive of the cached ones, the way native
+    // OpenAI's usage does, has never been captured here. See docs/telemetry-limits.md.
+    limitation:
+      "Its four counters are measured correct for the anthropic provider — not " +
+      "independently confirmed for any other provider OpenCode can route to.",
   },
   // The journal hook detects this host by a self-declared `tool: "opencode"` field, not by
   // a vendor payload shape — OpenCode has none. hooks/opencode-plugin.js builds that payload

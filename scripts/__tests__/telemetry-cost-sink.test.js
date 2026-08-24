@@ -82,6 +82,21 @@ describe("keeping records a session left behind", () => {
     assert.deepEqual(read.undated.map((r) => r.vendor_id), ["undated"]);
   });
 
+  // A string merely shaped like a moment ("not-a-momentZ") is ten-or-more characters ending
+  // in "Z" - the fast path `recordDayKey` takes for a real one. Answering a sliced fragment
+  // there instead of `null` would place the record in whatever period happened to contain
+  // that fragment, rather than handing it back undated the way a genuinely unparseable
+  // moment already is above. Mirrors report.js's own `recordDayKey` and
+  // cli/src/domain/models/telemetry-sink-record.ts's `telemetrySinkRecordDayKey`.
+  it("hands back a record whose moment is merely shaped like one, undated - never a sliced fragment", () => {
+    store({ vendor_id: "damaged", event_timestamp: "not-a-momentZ" });
+
+    const read = period("2000-01-01", "2099-12-31");
+
+    assert.deepEqual(read.records, []);
+    assert.deepEqual(read.undated.map((r) => r.vendor_id), ["damaged"]);
+  });
+
   it("keeps a day's other lines when one of them is torn", () => {
     store({ vendor_id: "whole", event_timestamp: "2026-08-17T10:00:00.000Z" });
     fs.appendFileSync(path.join(sink.rootDir(), "2026-08-21.jsonl"), '{"sink_schema_v');

@@ -8,7 +8,9 @@ import {
   parseTelemetrySinkLine,
   SINK_SCHEMA_VERSION,
   type TelemetrySessionMeasure,
+  type TelemetrySinkRecord,
   type TelemetryVendorIdentity,
+  telemetrySinkRecordDayKey,
 } from "../../../src/domain/models/telemetry-sink-record.js";
 
 function loadFixture(name: string): unknown {
@@ -393,6 +395,40 @@ describe("mapOtlpLogsToSinkRecords()", () => {
     };
     expect(mapOtlpLogsToSinkRecords(payload, [CLAUDE_VENDOR])).toHaveLength(0);
   });
+
+  // `Number("")` and `Number(false)` are both `0`, not `NaN` - so a numeric field fed a
+  // stray `stringValue: ""` or `boolValue: false` (an attribute type mismatch no producer
+  // measured so far actually sends, but nothing here guarantees it never will) would
+  // otherwise fabricate a known, free amount rather than leaving it unknown. Reachable
+  // without ever going near the `NaN` -> `null` round-trip cost-report.ts's own guard
+  // exists for.
+  it("fabricates no amount from a numeric field an attribute mismatches - an empty string or a boolean", () => {
+    const payloadWith = (value: { stringValue?: string; boolValue?: boolean }) => ({
+      resourceLogs: [
+        {
+          resource: { attributes: [] },
+          scopeLogs: [
+            {
+              logRecords: [
+                {
+                  attributes: [
+                    { key: "session.id", value: { stringValue: "s-1" } },
+                    { key: "cost_usd", value },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    for (const value of [{ stringValue: "" }, { boolValue: false }]) {
+      const [record] = mapOtlpLogsToSinkRecords(payloadWith(value), [CLAUDE_VENDOR]);
+      expect(record.cost_usd).toBeUndefined();
+      expect(Object.keys(record)).not.toContain("cost_usd");
+    }
+  });
 });
 
 describe("mapOtlpMetricsToSinkRecords()", () => {
@@ -533,5 +569,42 @@ describe("parseTelemetrySinkLine()", () => {
     const records = lines.map(parseTelemetrySinkLine);
     expect(records.some((r) => r.provenance === "export")).toBe(true);
     expect(records.some((r) => r.provenance === "local-read")).toBe(true);
+  });
+});
+
+describe("telemetrySinkRecordDayKey()", () => {
+  const BASE: TelemetrySinkRecord = {
+    sink_schema_version: SINK_SCHEMA_VERSION,
+    kind: "request",
+    provenance: "local-read",
+    tool: "claude",
+    vendor_id: "s-1",
+    vendor_field: "sessionId",
+    step_attribution: "unattributed",
+  };
+
+  it("answers the UTC day for a real moment, the fast path and the parsed one alike", () => {
+    expect(telemetrySinkRecordDayKey({ ...BASE, event_timestamp: "2026-08-18T01:00:00Z" })).toBe(
+      "2026-08-18"
+    );
+    // No `Z` offset - the parsed path, not the sliced one.
+    expect(
+      telemetrySinkRecordDayKey({ ...BASE, event_timestamp: "2026-08-18T01:00:00+05:00" })
+    ).toBe("2026-08-17");
+  });
+
+  it("answers undefined for no moment at all", () => {
+    expect(telemetrySinkRecordDayKey({ ...BASE })).toBeUndefined();
+  });
+
+  // The latent defect: ten-or-more characters ending in "Z" took the fast slice path
+  // unconditionally, so a string merely shaped like a moment answered a fragment nothing on
+  // the calendar matches ("not-a-mome") instead of the `undefined` this function's own
+  // docstring promises. A day file mistakenly filed under a fragment like that would leave
+  // the record in `totals` while it vanished from `byDays` - the two silently disagreeing.
+  it("answers undefined for a string merely shaped like a moment, never a sliced fragment", () => {
+    expect(
+      telemetrySinkRecordDayKey({ ...BASE, event_timestamp: "not-a-momentZ" })
+    ).toBeUndefined();
   });
 });

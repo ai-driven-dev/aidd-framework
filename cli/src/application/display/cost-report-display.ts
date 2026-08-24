@@ -50,6 +50,7 @@ const NOTHING_IN_SELECTION = "nothing in this selection";
 const SESSION_TOTAL_LABEL = "session total, not requests";
 const LABEL_WIDTH = 26;
 const NO_KNOWN_PROJECT = "no known project";
+const NO_KNOWN_MODEL = "no known model";
 
 // A year asked for by day is 365 rows - the envelope always carries every one of them, but
 // a terminal is not the place to read that many. Above this, the text rendering names the
@@ -293,8 +294,9 @@ function printModels(output: CLIOutput, report: CostReport, basis: Basis): void 
   output.print("");
   output.print(`  by model    ${basis.label}`);
   for (const row of report.byModels) {
+    const name = row.model ?? NO_KNOWN_MODEL;
     const share = shareOf(row.totals, basis.of, basis.useCost);
-    output.print(`    ${pad(row.model)}${share}   ${figureFor(row.totals, basis.useCost)}`);
+    output.print(`    ${pad(name)}${share}   ${figureFor(row.totals, basis.useCost)}`);
   }
 }
 

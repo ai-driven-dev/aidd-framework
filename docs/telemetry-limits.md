@@ -161,6 +161,57 @@ one, which spells the tool name Copilot's way and the arguments Claude Code's wa
 value followed from the other, and both were captured rather than inferred. So a Copilot
 session attributes to the step that ran; it simply carries no amount to place inside it.
 
+## OpenCode's four counters are measured for one provider, and declared unverified for the rest
+
+Every OpenCode message captured here reconciles exactly: `total == input + output +
+cache.read + cache.write` (plus `reasoning`, on a message that reports one). **Measured
+2026-08-20** on opencode 1.14.20, against three real assistant turns, every one carrying
+`providerID: "anthropic"` — `input` sitting at 1–3 tokens beside a `cache.read` in the tens
+of thousands, matching the Anthropic Messages API's own documented behaviour (`input_tokens`
+excludes `cache_read_input_tokens`; corroborated elsewhere in this file against Claude Code's
+own `/usage`). Where a provider reports prompt tokens *inclusive* of the ones it served from
+cache, this same arithmetic would count `cache.read` twice — once inside `input`, once as its
+own counter — and the resulting figure would look exactly like a measured one, which is what
+makes the question worth closing rather than assuming shut.
+
+**Probed again 2026-08-24**, against a second, genuinely different provider obtained on this
+machine: only an Anthropic OAuth credential is configured here, but OpenCode's own free "zen"
+models need none, so `opencode run --model opencode/big-pickle "reply with the single word:
+pong"` produced a real second capture — `providerID: "opencode"`, served over
+`@ai-sdk/openai-compatible`, not another Anthropic call under a different name. Its `total`
+reconciled the same way (`14072 == 13926 + 13 + 128 + 0 + 5`), but that reconciliation does
+not, by itself, distinguish an exclusive `input` from an inclusive one — the one comparison
+that would is a large `cache.read` sitting beside a correspondingly small `input`, the way the
+Anthropic captures show it. A second, continued turn in the same session (`--session
+<id>`, same model) never engaged the cache at all — `cache.read: 0, cache.write: 0` — so no
+capture obtained here ever produced that comparison for a non-Anthropic provider. The probe
+corroborates the reconciliation; it does not confirm exclusivity.
+
+So one providerID is measured, not every one OpenCode can route to. A provider reached
+through its own native SDK — `openai`, `google`, and the rest — needs a real API key this
+machine does not hold, so no such capture is obtainable here. Whether OpenCode normalizes a
+native inclusive count before writing `tokens.input`, or passes it through unchanged, remains
+open. `opencode.ts`'s `telemetryLocalRead.limitation` names this narrower claim, and a report
+carries it as the reason beside OpenCode's row — the same mechanism Cursor's `not covered`
+line uses, just for a figure that is right for one provider rather than covered by none.
+
+## An OpenCode message with no `total` was never billed
+
+A message can exist — a row OpenCode created, `time.created` set — without ever having been
+sent to a model. Interrupting a run mid-response does this. **Reproduced 2026-08-24** on this
+machine: `opencode run` was sent `SIGINT` mid-response and the session then exported. The
+interrupted assistant message carries `tokens: {input: 0, output: 0, reasoning: 0, cache:
+{read: 0, write: 0}}`, no `total` key, no `finish`, and no `time.completed` — the same shape
+as the fourth assistant message in this repository's own `opencode-export.json` fixture.
+[anomalyco/opencode#33687](https://github.com/anomalyco/opencode/issues/33687) names the
+mechanism from the other side: a message that halts on abort is not reliably given a `finish`
+either, so `total`'s absence is the signal to read, not a gap waiting on an upstream fix.
+
+`mapOpencodeExportToSinkRecords` now treats a message with no `total` as never billed and
+yields no record for it — counting it would add a call that never happened to the request
+count. A message that completed with genuinely zero usage still carries `total: 0`, and still
+yields a record: that is an unlikely observation, not an absent one, and it keeps its row.
+
 ## Every tool journals, and four of five can name the ticket
 
 A ticket is known two ways, and they are different claims.

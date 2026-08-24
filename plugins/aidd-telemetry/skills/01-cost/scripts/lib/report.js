@@ -21,6 +21,15 @@ const DAY_KEY_LENGTH = "YYYY-MM-DD".length;
 // for "unknown" beside every value a record might actually carry.
 const NO_KNOWN_PROJECT = Symbol("no known project");
 
+// The same idea, one dimension over: a record with no model is its own group, never
+// dropped. Both the Codex and OpenCode readers permit a request record with no model, so
+// without this row `byModels` would stop reconciling to its own total with nothing naming
+// the gap - the same reason `NO_KNOWN_PROJECT` exists. Deliberately narrower than
+// `projectKeyOf`: nothing measured so far ever writes an empty-string `model`, so unlike
+// `project_id` this stays an `undefined` check rather than also folding in `""`. Mirrors
+// cli/src/domain/models/cost-report.ts.
+const NO_KNOWN_MODEL = Symbol("no known model");
+
 /** The task a written path belongs to. Derived here rather than stored, so changing the
  * derivation re-reads every past session instead of leaving a stale conclusion behind. */
 function taskOf(writtenPath) {
@@ -197,9 +206,13 @@ function bySize(rows, keyOf) {
 function recordDayKey(record) {
   const at = record.event_timestamp;
   if (typeof at !== "string") return null;
-  if (at.length >= DAY_KEY_LENGTH && at.endsWith("Z")) return at.slice(0, DAY_KEY_LENGTH);
+  // The parse is checked first, always - a string merely shaped like a moment
+  // ("not-a-momentZ") must answer `null`, not the fragment slicing it blind would produce.
+  // Mirrors cli/src/domain/models/telemetry-sink-record.ts's `telemetrySinkRecordDayKey`.
   const parsed = new Date(at);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, DAY_KEY_LENGTH);
+  if (Number.isNaN(parsed.getTime())) return null;
+  if (at.length >= DAY_KEY_LENGTH && at.endsWith("Z")) return at.slice(0, DAY_KEY_LENGTH);
+  return parsed.toISOString().slice(0, DAY_KEY_LENGTH);
 }
 
 /** Every UTC day from `fromDay` to `toDay`, inclusive - the full period, whether or not a
@@ -303,6 +316,68 @@ function declaredToolsInScope(declaredTools, filters) {
   return wanted === undefined ? declaredTools : declaredTools.filter((tool) => tool.tool === wanted);
 }
 
+/** A group key only for a `kind: "request"`, `provenance: "local-read"` record carrying a
+ * `turn_id` - the shape a local re-read of a still-running turn produces more than one of
+ * (see telemetry-report.js's `store()` and metrics-contract.md's "The other way to double
+ * count"). Restricted to `kind: "request"`: a `kind: "session"` record can carry a
+ * `turn_id` too - Copilot's shutdown total is keyed on the shutdown event's own id - but it
+ * is a one-shot cumulative figure with no provisional reading to collapse. Restricted to
+ * `provenance: "local-read"`: on the export route the same field is a prompt id several
+ * billed calls share (see `billedRequestKey` below), so the identical key there would merge
+ * distinct calls instead of two readings of one. Mirrors cli/src/domain/models/cost-report.ts. */
+function localReadTurnKey(record) {
+  if (record.kind !== "request" || record.provenance !== "local-read") return null;
+  return record.turn_id === undefined ? null : `${record.tool} ${record.vendor_id} ${record.turn_id}`;
+}
+
+/** How much of a group a record accounts for, used only to pick the largest of several
+ * readings of the same still-growing turn - never stored, never itself summed into a
+ * total. Mirrors cli/src/domain/models/cost-report.ts. */
+function counterWeight(record) {
+  return Object.values(COUNTERS).reduce((sum, field) => sum + (record[field] ?? 0), 0);
+}
+
+/** How many of the four counters a record states at all, whether zero or not - the
+ * tie-break `mergeSupersededTurnGroup` needs beyond `counterWeight` alone, since an
+ * observed zero and a counter never mentioned both add zero to the weight. Mirrors
+ * cli/src/domain/models/cost-report.ts. */
+function definedCounterCount(record) {
+  return Object.values(COUNTERS).reduce(
+    (count, field) => count + (typeof record[field] === "number" ? 1 : 0),
+    0,
+  );
+}
+
+/** One Codex-shaped turn, read more than once while it was still open, collapsed to the one
+ * record carrying the most complete counters - never a blend of two, which would state a
+ * combination of token counts the tool's own file never actually reported together.
+ * Mirrors cli/src/domain/models/cost-report.ts. */
+function mergeSupersededTurnGroup(group) {
+  if (group.length === 1) return group[0];
+  const heaviest = Math.max(...group.map(counterWeight));
+  const largest = group.filter((record) => counterWeight(record) === heaviest);
+  const mostDefined = Math.max(...largest.map(definedCounterCount));
+  return pickDeterministically(largest.filter((record) => definedCounterCount(record) === mostDefined));
+}
+
+/** Every other kind and route passes through untouched - see `localReadTurnKey`. Mirrors
+ * cli/src/domain/models/cost-report.ts. */
+function collapseSupersededTurns(records) {
+  const groups = new Map();
+  const rest = [];
+  for (const record of records) {
+    const key = localReadTurnKey(record);
+    if (key === null) {
+      rest.push(record);
+      continue;
+    }
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(record);
+    else groups.set(key, [record]);
+  }
+  return [...rest, ...[...groups.values()].map(mergeSupersededTurnGroup)];
+}
+
 /** A group key only where `billed_request_id` is present - the one field measured so far
  * to be a stable, cross-route identifier for a single billed call (unlike `turn_id`, which
  * a main-agent request and its subagent share). A record with none joins nothing and is
@@ -378,7 +453,10 @@ function collapseBilledRequests(records) {
  * producing a total that looks right.
  */
 function build(input) {
-  const collapsedRecords = collapseBilledRequests(input.records);
+  // Turn-supersede first, billed-request-collapse second - the first reconciles two
+  // readings of one local-read record before the second ever has to reconcile two routes
+  // seeing one call. Mirrors cli/src/domain/models/cost-report.ts's buildCostReport.
+  const collapsedRecords = collapseBilledRequests(collapseSupersededTurns(input.records));
   const membership = input.task === undefined ? null : taskMembership(input.journals, input.task);
   const stages = selectionStages(collapsedRecords, input, membership);
   const emptySelection = emptySelectionOf(stages, input, membership);
@@ -419,7 +497,7 @@ function build(input) {
     group(steps, `${record.step_attribution} ${record.step ?? ""}`, record);
     group(attributions, record.step_attribution, record);
     group(tools, record.tool, record);
-    if (record.model !== undefined) group(models, record.model, record);
+    group(models, record.model === undefined ? NO_KNOWN_MODEL : record.model, record);
     group(projects, projectKeyOf(record), record);
     const day = recordDayKey(record);
     if (day !== null && days.has(day)) addTo(days.get(day), record);
@@ -438,10 +516,7 @@ function build(input) {
     totals,
     ...(activeTimeSeconds === undefined ? {} : { activeTimeSeconds }),
     bySteps: stepRows(steps),
-    byModels: bySize(
-      [...models].map(([model, t]) => ({ model, totals: t })),
-      (row) => row.model
-    ),
+    byModels: modelRows(models),
     byTools: toolRows(declaredToolsInScope(input.declaredTools, input.filters), tools, toolSessionTotals),
     byProjects: projectRows(projects),
     byDays: dayRows(days),
@@ -482,6 +557,17 @@ function projectRows(projects) {
     totals,
   }));
   return bySize(rows, (row) => row.project ?? "");
+}
+
+/** Every model a record named, largest first, plus one row for what named none - the same
+ * convention `projectRows` uses for what named no project. Mirrors
+ * cli/src/domain/models/cost-report.ts. */
+function modelRows(models) {
+  const rows = [...models].map(([key, totals]) => ({
+    ...(key === NO_KNOWN_MODEL ? {} : { model: key }),
+    totals,
+  }));
+  return bySize(rows, (row) => row.model ?? "");
 }
 
 /** Every day in the period, in order - never sorted by size, unlike every other breakdown

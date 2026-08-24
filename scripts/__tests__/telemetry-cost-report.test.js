@@ -232,6 +232,78 @@ describe("summing a period without counting anything twice", () => {
   });
 });
 
+// Mirrors cli/tests/domain/models/cost-report.unit.test.ts's "buildCostReport - an unknown
+// keeps its row, never a zero". The reconciliation fixtures above all carry a model, a cost
+// and a step - the reason none of them ever reach the branches below.
+describe("an unknown keeps its row, never a zero", () => {
+  it("gives a record with no model its own row in byModels, and it still reconciles", () => {
+    const built = report({
+      records: [
+        request({ turn_id: "a", cost_usd: 2, model: "opus" }),
+        request({ turn_id: "b", cost_usd: 1 }),
+      ],
+    });
+
+    assert.equal(built.byModels.length, 2);
+    const unknown = built.byModels.find((row) => row.model === undefined);
+    assert.equal(unknown.totals.requests, 1);
+    assert.equal(unknown.totals.costMicroUsd, toMicroUsd(1));
+
+    const total = built.byModels.reduce((sum, row) => sum + (row.totals.costMicroUsd ?? 0), 0);
+    assert.equal(total, built.totals.costMicroUsd);
+  });
+
+  // `JSON.stringify(NaN)` is `null` - the same round trip a record takes through sink.js's
+  // own `append`/`readDayFile`, so this is not a synthetic value: it is what a damaged
+  // `cost_usd` looks like once it has actually been written to and read back from disk.
+  it("reads a non-numeric cost as unknown, never as a zero", () => {
+    const damaged = JSON.parse(JSON.stringify({ ...request({ turn_id: "x" }), cost_usd: Number.NaN }));
+    assert.equal(damaged.cost_usd, null);
+
+    const built = report({ records: [damaged] });
+
+    assert.equal(built.totals.requests, 1);
+    assert.ok(!("costMicroUsd" in built.totals));
+  });
+
+  it("gives a damaged moment no day row, while the total still holds it", () => {
+    const damaged = {
+      ...request({ turn_id: "y", cost_usd: 5 }),
+      event_timestamp: "not-a-momentZ",
+    };
+    const built = report({ records: [damaged] });
+
+    assert.equal(built.totals.requests, 1);
+    assert.equal(built.totals.costMicroUsd, toMicroUsd(5));
+    const total = built.byDays.reduce((sum, row) => sum + (row.totals.costMicroUsd ?? 0), 0);
+    assert.equal(total, 0);
+    assert.ok(built.byDays.every((row) => row.totals.requests === 0));
+  });
+
+  // Every tool this report has ever seen runs at 90%-plus cache, so a weight blind to the
+  // two cache counters orders a costless breakdown by the sliver of its volume nobody reads
+  // it for - here, backwards. Mirrors cli/tests/domain/models/cost-report.unit.test.ts.
+  it("weighs a costless row by all four counters, cache included - not input and output alone", () => {
+    const built = report({
+      records: [
+        request({ turn_id: "light-cache", model: "light-cache", input_tokens: 500, output_tokens: 500 }),
+        request({
+          turn_id: "heavy-cache",
+          model: "heavy-cache",
+          input_tokens: 10,
+          output_tokens: 5,
+          cache_read_tokens: 900_000,
+        }),
+      ],
+    });
+
+    assert.deepEqual(
+      built.byModels.map((row) => row.model),
+      ["heavy-cache", "light-cache"],
+    );
+  });
+});
+
 // A user who enables the OTLP export and also runs the local read sees every billed
 // request line twice: once from each route. Both fixtures below are real captured export
 // payloads - `otlp-logs-claude-code.json` (one main-agent request) and
@@ -745,6 +817,23 @@ describe("breaking a period down by day and by project", () => {
     assert.equal(total, built.totals.costMicroUsd);
   });
 
+  // An empty string is not a name - it is what a tool writes when it has none to give.
+  // Mirrors cli/tests/domain/models/cost-report.unit.test.ts.
+  it("treats an empty-string project_id the same as no project at all", () => {
+    const built = report({
+      records: [
+        request({ turn_id: "a", cost_usd: 1, project_id: "acme/widgets" }),
+        request({ turn_id: "b", cost_usd: 2, project_id: "" }),
+        request({ turn_id: "c", cost_usd: 3 }),
+      ],
+    });
+
+    assert.equal(built.byProjects.length, 2);
+    const unknown = built.byProjects.find((row) => row.project === undefined);
+    assert.equal(unknown.totals.requests, 2);
+    assert.equal(unknown.totals.costMicroUsd, toMicroUsd(5));
+  });
+
   it("never folds a record with no project into one that was actually placed", () => {
     const text = rendered(
       report({ records: [request({ project_id: "acme/widgets", cost_usd: 1 }), request({ cost_usd: 1 })] }),
@@ -1011,7 +1100,7 @@ describe("what a person reads", () => {
 
 describe("what a program reads", () => {
   it("carries a version so an unrecognised shape can be refused", () => {
-    assert.equal(toEnvelope(report()).cost_report_version, 2);
+    assert.equal(toEnvelope(report()).cost_report_version, 3);
   });
 
   it("carries the period as it resolved, absolutely", () => {

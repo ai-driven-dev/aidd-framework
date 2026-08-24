@@ -94,7 +94,7 @@ describe("OpencodeCostReaderAdapter", () => {
   const skipOnWindows = process.platform === "win32";
 
   it.skipIf(skipOnWindows)(
-    "reads a well-behaved export into one record per counted message",
+    "reads a well-behaved export into one record per billed message",
     async () => {
       const env = installStandIn(WELL_BEHAVED_SCRIPT);
       restorePath = env.restore;
@@ -102,7 +102,9 @@ describe("OpencodeCostReaderAdapter", () => {
       const { records, sessionFound } = await new OpencodeCostReaderAdapter().read(SESSION_ID);
 
       expect(sessionFound).toBe(true);
-      expect(records).toHaveLength(4);
+      // The fixture's fourth assistant message carries no `total` — never billed — so it
+      // yields no record; see opencode-export.unit.test.ts for that boundary directly.
+      expect(records).toHaveLength(3);
       expect(records[0]).toMatchObject({
         kind: "request",
         vendor_id: SESSION_ID,

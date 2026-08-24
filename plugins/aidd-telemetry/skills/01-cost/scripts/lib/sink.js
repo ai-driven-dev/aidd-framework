@@ -165,9 +165,14 @@ function readForVendor(vendorId) {
 function recordDayKey(record) {
   const at = record.event_timestamp;
   if (typeof at !== "string") return null;
-  if (at.length >= DAY_KEY_LENGTH && at.endsWith("Z")) return at.slice(0, DAY_KEY_LENGTH);
+  // The parse is checked first, always - a string merely shaped like a moment
+  // ("not-a-momentZ") must answer `null`, not the fragment slicing it blind would produce.
+  // Mirrors this same file's own `report.js`'s `recordDayKey`, and
+  // cli/src/domain/models/telemetry-sink-record.ts's `telemetrySinkRecordDayKey`.
   const parsed = new Date(at);
-  return Number.isNaN(parsed.getTime()) ? null : dayKey(parsed);
+  if (Number.isNaN(parsed.getTime())) return null;
+  if (at.length >= DAY_KEY_LENGTH && at.endsWith("Z")) return at.slice(0, DAY_KEY_LENGTH);
+  return dayKey(parsed);
 }
 
 /** Every value a filterable field has ever carried, gathered across every day file this

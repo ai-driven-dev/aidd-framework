@@ -12,7 +12,20 @@ export const SINK_SCHEMA_VERSION = 2;
  * session-level measure never does — metric datapoints carry no turn identifier on any
  * tool measured so far. `turn_id`, when present, is also the key a re-read is deduplicated
  * on: the tool's own identifier for that record, never a hash of the line, since a hash
- * changes the moment the tool appends anything else to the same record. */
+ * changes the moment the tool appends anything else to the same record.
+ *
+ * No field here says a `kind: "request"` local-read record was still provisional when it
+ * was stored — a record read while its turn might still be running looks exactly like one
+ * read after it finished. That is deliberate: a stored line is never later confirmed closed
+ * or reopened, because there is nothing to confirm it against that outlives the moment a
+ * read happened — a run journal's own `turn_end` line says only that no further growth is
+ * coming, never that a given stored reading already saw all of it, and gating a correction
+ * on it would risk freezing a partial reading the instant a `turn_end` line existed at all.
+ * What *is* stored is every reading a later read judged a genuine, strictly larger
+ * improvement on the last — never a smaller one, and never a redundant one once a re-read
+ * brings nothing more (see `read-local-cost-use-case.ts`'s `storeNewCandidates` and
+ * `cost-report.ts`'s `collapseSupersededTurns`, which then keeps only the largest of
+ * however many readings a turn accumulated). */
 export type TelemetrySinkRecordKind = "request" | "session";
 
 /** Which route produced this line. Never optional: a default meaning "the old route"
@@ -274,12 +287,32 @@ function resolveIdentity(
   return null;
 }
 
+/** `value` arrives as whatever OTLP shape a payload actually carried for the attribute -
+ * never guaranteed to be the numeric kind a numeric field expects. `Number("")` and
+ * `Number(false)` both return `0` rather than `NaN`, so calling `Number` on an
+ * already-numeric-looking value unconditionally would fabricate a zero for a field this
+ * layer promises to leave unknown instead - the same fabrication `cost-report.ts` is
+ * written to refuse on the read side, reachable here on the write side before a reader ever
+ * gets a chance to guard against it. A string is only accepted non-empty, and a boolean is
+ * never accepted at all. */
+function numericAttributeValue(value: AttributeValue): number | undefined {
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value !== "string" || value.trim() === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 function setAllowlistedField(
   draft: SinkRecordDraft,
   field: keyof TelemetrySinkRecord,
   value: AttributeValue
 ): void {
-  Object.assign(draft, { [field]: NUMERIC_FIELDS.has(field) ? Number(value) : String(value) });
+  if (!NUMERIC_FIELDS.has(field)) {
+    Object.assign(draft, { [field]: String(value) });
+    return;
+  }
+  const numeric = numericAttributeValue(value);
+  if (numeric !== undefined) Object.assign(draft, { [field]: numeric });
 }
 
 function buildBaseRecord(
@@ -440,9 +473,15 @@ const DAY_KEY_LENGTH = "YYYY-MM-DD".length;
 export function telemetrySinkRecordDayKey(record: TelemetrySinkRecord): string | undefined {
   const at = record.event_timestamp;
   if (at === undefined) return undefined;
-  if (at.length >= DAY_KEY_LENGTH && at.endsWith("Z")) return at.slice(0, DAY_KEY_LENGTH);
+  // The parse is checked first, always - the fast slice below is only ever a faster way to
+  // read a moment already known to parse, never a substitute for checking it does. Slicing
+  // first and parsing only for the rest let a string merely shaped like a moment
+  // ("not-a-momentZ") answer a fragment nothing on the calendar matches, instead of the
+  // `undefined` this function's whole contract promises for anything that isn't one.
   const parsed = new Date(at);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString().slice(0, DAY_KEY_LENGTH);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  if (at.length >= DAY_KEY_LENGTH && at.endsWith("Z")) return at.slice(0, DAY_KEY_LENGTH);
+  return parsed.toISOString().slice(0, DAY_KEY_LENGTH);
 }
 
 export function serializeTelemetrySinkRecord(record: TelemetrySinkRecord): string {

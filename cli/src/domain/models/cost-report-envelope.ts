@@ -16,8 +16,13 @@ import type { AiToolId } from "./tool-ids.js";
  * `sink_schema_version` exists on a stored line. Adding a field a consumer may ignore is
  * not a bump; changing what an existing field means is.
  *
+ * Bumped to 3: `by_model`'s `model` is now absent on the row for a record neither reader
+ * that permits a model-less request could name - a consumer that read it as always a
+ * string on every prior version would misread this one, the same reasoning that bumped
+ * `by_project`'s `project` to optional back when that row was added.
+ *
  * Bumped to 2: `by_project` and `by_day` are new top-level breakdowns. */
-export const COST_REPORT_ENVELOPE_VERSION = 2;
+export const COST_REPORT_ENVELOPE_VERSION = 3;
 
 /** Money as whole micro-dollars, the way the report carries it: an integer, so a consumer
  * summing several reports gets the same answer this one did. Divide by 1,000,000 for
@@ -37,8 +42,10 @@ export interface CostReportEnvelopeStepRow {
   readonly totals: CostReportEnvelopeTotals;
 }
 
+/** One model's figures, largest first, plus one row for what named none - `model` absent
+ * there, the same convention `CostReportEnvelopeProjectRow` uses for what named none. */
 export interface CostReportEnvelopeModelRow {
-  readonly model: string;
+  readonly model?: string;
   readonly totals: CostReportEnvelopeTotals;
 }
 
@@ -205,6 +212,13 @@ function projectRow(row: CostReport["byProjects"][number]): CostReportEnvelopePr
   };
 }
 
+function modelRow(row: CostReport["byModels"][number]): CostReportEnvelopeModelRow {
+  return {
+    ...(row.model === undefined ? {} : { model: row.model }),
+    totals: totals(row.totals),
+  };
+}
+
 function attributionRow(
   row: CostReport["attributionMix"][number]
 ): CostReportEnvelopeAttributionRow {
@@ -245,7 +259,7 @@ export function toCostReportEnvelope(report: CostReport): CostReportEnvelope {
     totals: totals(report.totals),
     ...(report.activeTimeSeconds === undefined ? {} : { active_time_s: report.activeTimeSeconds }),
     by_step: report.bySteps.map(stepRow),
-    by_model: report.byModels.map((row) => ({ model: row.model, totals: totals(row.totals) })),
+    by_model: report.byModels.map(modelRow),
     by_tool: report.byTools.map(toolRow),
     by_project: report.byProjects.map(projectRow),
     by_day: report.byDays.map((row) => ({ day: row.day, totals: totals(row.totals) })),

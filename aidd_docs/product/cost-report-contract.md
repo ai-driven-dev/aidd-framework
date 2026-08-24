@@ -9,9 +9,10 @@ could and could not supply.
 > records directly, read [`metrics-contract.md`](./metrics-contract.md) — the contract for
 > one stored line. The two are deliberately different audiences, and picking the wrong one
 > is expensive: the record contract makes you responsible for the three double-count rules
-> (the two record kinds, a local re-read, and one billed call seen by both an export and a
-> local read at once — Claude Code today), and re-read deduplication. This one has already
-> applied all four.
+> (the two record kinds, a local re-read — including correcting, never summing, a still-open
+> turn a later read completes — and one billed call seen by both an export and a local read
+> at once — Claude Code today), and re-read deduplication. This one has already applied all
+> four.
 
 **Never reconstruct these figures from stored records.** One computation in one place is
 the whole point: two ways of computing a number is how they start disagreeing.
@@ -107,8 +108,11 @@ for — so a figure taken from a `--days` call can still be cited by the days it
 
 ## Versioning
 
-Every object carries `cost_report_version`, currently `2` — bumped from `1` when `by_day`
-and `by_project` joined `by_step`, `by_model` and `by_tool` as top-level breakdowns.
+Every object carries `cost_report_version`, currently `3` — bumped from `2` when `by_model`
+gained a row with no `model`, for a record neither reader that permits one could name (a
+consumer that read `row.model` as always a string on every prior version would misread this
+one). Bumped from `1` to `2` when `by_day` and `by_project` joined `by_step`, `by_model` and
+`by_tool` as top-level breakdowns.
 
 **Set aside an object whose version you do not recognise rather than guessing its shape.**
 The number is bumped when a consumer that understood the previous shape would misread this
@@ -118,7 +122,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
 
 ```jsonc
 {
-  "cost_report_version": 2,
+  "cost_report_version": 3,
   "period": { "from_day": "2026-07-01", "to_day": "2026-07-31" },
   "task": "2026_08/2026_08_21_cost-reporter",   // absent unless --task was given
   "filters": { "project": "acme/widgets" },     // absent unless a generic filter was given
@@ -127,7 +131,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "totals": { "requests": 2, "input_tokens": 13930, "output_tokens": 4377, "cache_read_tokens": 165632, "cache_creation_tokens": 0 },
   "active_time_s": 2820,                        // absent when no record carried it
   "by_step":    [{ "step": "aidd-dev:02-implement", "attribution": "journal-interval", "totals": {} }],
-  "by_model":   [{ "model": "gpt-5.6-sol", "totals": {} }],
+  "by_model":   [{ "model": "gpt-5.6-sol", "totals": {} }],  // a row with no "model" names none known
   "by_tool":    [{ "tool": "codex", "coverage": "covered", "reason": "…", "capability": {}, "totals": {}, "session_totals": {} }],  // session_totals absent unless the tool has one (Copilot, today)
   "by_project": [{ "project": "acme/widgets", "totals": {} }],   // a row with no `project` names none known
   "by_day":     [{ "day": "2026-07-01", "totals": {} }],         // every day in the period, in order, gaps included
@@ -157,9 +161,12 @@ reporting tokens; the rates that turn them into money live outside this reposito
 ### Breakdowns
 
 `by_step`, `by_model`, `by_tool` and `by_project` are ordered largest first, with a stable
-tie-break, so the biggest thing is the first thing you read. `by_day` is the one exception:
-it is chronological, one row per day the period spans — a series read out of order is not
-a series, and a day nothing ran on is a row of zeros rather than an omitted day.
+tie-break, so the biggest thing is the first thing you read. Ordered by `cost_micro_usd`
+where a row has one, and by all four token counters summed where it does not — never by
+`input_tokens` and `output_tokens` alone, which every tool here dwarfs with cache. `by_day`
+is the one exception: it is chronological, one row per day the period spans — a series read
+out of order is not a series, and a day nothing ran on is a row of zeros rather than an
+omitted day.
 
 **Every breakdown sums exactly back to `totals`.** That is asserted, on integers, not
 hoped for.
@@ -171,7 +178,12 @@ they are two different claims. A row with no `step` carries `attribution: "unatt
 `by_project` carries a row with no `project` for a record stored before this field existed,
 or whose session journal named none — never folded into a project the reader happens to be
 standing in. A record's project comes from the run journal that covered its session, not
-from wherever the report itself happens to run.
+from wherever the report itself happens to run. An empty string is treated the same as no
+project at all - never its own row.
+
+`by_model` carries a row with no `model` the same way: both the Codex and OpenCode readers
+permit a request with no model, and that record gets its own row rather than vanishing from
+the breakdown while staying in `totals`.
 
 ### `session_totals` — a session total, never a sum of requests
 

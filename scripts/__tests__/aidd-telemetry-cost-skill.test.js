@@ -8,7 +8,7 @@ const skillDir = path.join(pluginDir, "skills/01-cost");
 // Real source, not a re-description of it: closure tests below check the skill's own text
 // against what these two modules actually accept and actually emit.
 const { build } = require(path.join(skillDir, "scripts/lib/report.js"));
-const { toEnvelope, ARTEFACT_AXES } = require(path.join(skillDir, "scripts/lib/render.js"));
+const { toEnvelope, ARTEFACT_AXES, ENVELOPE_VERSION } = require(path.join(skillDir, "scripts/lib/render.js"));
 const skill = fs.readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
 // A router skill's rules live in its actions; reading only the router would test a
 // table of contents.
@@ -436,9 +436,16 @@ test("the cost skill names per-person as unanswerable, and what would fix it", (
 // The version bug this pins against: render.js bumped `ENVELOPE_VERSION` to 2 when
 // `by_day` and `by_project` landed, and the skill kept telling itself to refuse anything
 // but version 1 - which would have made it stop on every object the script now prints.
+// Read off the live constant rather than a hardcoded number, so the same drift cannot
+// recur silently the next time `ENVELOPE_VERSION` bumps.
 test("the cost skill checks the envelope version it actually gets, not a stale one", () => {
-  assert.ok(!everything.includes("is `1` today"), "must not still expect version 1");
-  assert.ok(everything.includes("`2`"), "must expect the version render.js actually sends");
+  for (let stale = 1; stale < ENVELOPE_VERSION; stale++) {
+    assert.ok(!everything.includes(`is \`${stale}\` today`), `must not still expect version ${stale}`);
+  }
+  assert.ok(
+    everything.includes(`\`${ENVELOPE_VERSION}\``),
+    "must expect the version render.js actually sends",
+  );
 });
 
 // A total to quote and a table to paste are different things - a rendering suited to the
@@ -450,4 +457,58 @@ test("the cost skill writes an artefact to a file when a file is what was asked 
     /states its period and (its )?axis/u.test(everything) || everything.includes("period and its axis"),
     "an artefact must name the period and axis it came from",
   );
+});
+
+// Mirrors cli/tests/domain/models/cost-report.unit.test.ts's "a still-open local-read
+// turn is superseded, never doubled" — the plugin's own `build()` must answer the same
+// way the CLI's `buildCostReport` does, since both read the same day files (phase-1,
+// "A turn read while it runs is not the last word").
+test("report.js's build() supersedes a still-open local-read turn, never doubles it", () => {
+  const declaredTools = [
+    {
+      tool: "codex",
+      coverage: "covered",
+      capability: {
+        localRead: { tokenCounters: true, amount: false, toolStatedStep: false },
+        export: { tokenCounters: false, amount: false, toolStatedStep: false },
+        journalAttributable: true,
+        taskAttributable: true,
+      },
+    },
+  ];
+  const base = {
+    kind: "request",
+    provenance: "local-read",
+    tool: "codex",
+    vendor_id: "s-codex-1",
+    turn_id: "turn-1",
+    step_attribution: "unattributed",
+  };
+  const partial = { ...base, input_tokens: 2816, output_tokens: 1401, cache_read_tokens: 48896 };
+  const complete = { ...base, input_tokens: 5032, output_tokens: 3550, cache_read_tokens: 99840 };
+
+  const report = build({
+    fromDay: "2026-07-29",
+    toDay: "2026-07-29",
+    records: [partial, complete],
+    journals: [],
+    declaredTools,
+    undatedRecords: 0,
+    unreadableLines: 0,
+  });
+
+  assert.equal(report.totals.requests, 1, "one turn read twice must count once");
+  assert.equal(report.totals.cacheReadTokens, 99840, "must keep the larger reading");
+  assert.equal(report.totals.outputTokens, 3550, "must not sum partial and complete");
+
+  const reversed = build({
+    fromDay: "2026-07-29",
+    toDay: "2026-07-29",
+    records: [complete, partial],
+    journals: [],
+    declaredTools,
+    undatedRecords: 0,
+    unreadableLines: 0,
+  });
+  assert.deepEqual(reversed, report, "either arrival order must answer the same report");
 });
