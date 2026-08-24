@@ -19,10 +19,10 @@
 // Local / opt-in only: needs an authenticated `claude` CLI and spends tokens.
 // Not a CI gate.
 
-import { mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync, readFileSync, existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -62,13 +62,34 @@ function runClaude(prompt, cwd) {
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (out += d));
     child.on("error", ko);
-    child.on("close", () => ok(out));
+    child.on("close", (code, signal) => {
+      if (code === 0 && !signal) return ok(out);
+      const cause = signal ? `signal ${signal}` : `exit ${code}`;
+      ko(new Error(`claude failed with ${cause}\n${out.slice(-2000)}`));
+    });
     child.stdin.end();
   });
 }
 
 function has(haystack, needle) {
   return haystack.toLowerCase().includes(String(needle).toLowerCase());
+}
+
+function snapshotFiles(root) {
+  const files = {};
+  const walk = (rel = "") => {
+    for (const entry of readdirSync(join(root, rel), { withFileTypes: true })) {
+      const next = join(rel, entry.name);
+      if (!rel && [".claude", ".git"].includes(entry.name)) continue;
+      if (entry.isDirectory()) {
+        files[`${next}/`] = "<directory>";
+        walk(next);
+      }
+      else if (entry.isFile()) files[next] = readFileSync(join(root, next)).toString("base64");
+    }
+  };
+  walk();
+  return files;
 }
 
 // One assertion = { ok: boolean, label: string }
@@ -110,6 +131,20 @@ async function evaluate(expect, ctx) {
     checks.push({ ok: new RegExp(re, "i").test(ctx.stdout), label: `stdout matches /${re}/` });
   }
 
+  const after = snapshotFiles(ctx.tmp);
+  const allowed = new Set([
+    ...(expect.filesExist || []),
+    ...Object.keys(expect.fileContains || {}),
+    ...Object.keys(expect.fileNotContains || {}),
+    ...(expect.allowMutations || []),
+  ]);
+  for (const name of new Set([...Object.keys(ctx.snapshot), ...Object.keys(after)])) {
+    const allowedDirectory = name.endsWith("/") && [...allowed].some((file) => file.startsWith(name));
+    if (ctx.snapshot[name] !== after[name] && !allowed.has(name) && !allowedDirectory) {
+      checks.push({ ok: false, label: `unexpected mutation: ${name}` });
+    }
+  }
+
   if (expect.judge) {
     if (!JUDGE) {
       checks.push({ ok: true, skipped: true, label: `judge (skipped, pass --judge): ${expect.judge}` });
@@ -128,23 +163,50 @@ async function evaluate(expect, ctx) {
 
 function setupCase(c) {
   const tmp = mkdtempSync(join(tmpdir(), "skilleval-"));
-  const skillDst = join(tmp, ".claude", "skills", c.evalName);
-  mkdirSync(skillDst, { recursive: true });
-  cpSync(join(skillsDir(c), c.skill), skillDst, { recursive: true });
-  // A skill may run a script its plugin bundles. Stage it next to the skill so
-  // the sandbox matches an installed plugin rather than a skill copied alone.
-  const hooks = join(ROOT, "plugins", c.plugin || "aidd-refine", "hooks");
-  if (existsSync(hooks)) cpSync(hooks, join(skillDst, "hooks"), { recursive: true });
-  // Rewrite the frontmatter name so it matches the unique eval folder.
-  const skillMd = join(skillDst, "SKILL.md");
-  const rewritten = readFileSync(skillMd, "utf8").replace(/^name:.*$/m, `name: ${c.evalName}`);
-  writeFileSync(skillMd, rewritten);
+  const setup = { ...(c.setup?.files || {}) };
+  const stageSkill = (spec) => {
+    const plugin = spec.plugin || c.plugin || "aidd-refine";
+    const skillDst = join(tmp, ".claude", "skills", spec.evalName);
+    mkdirSync(skillDst, { recursive: true });
+    cpSync(join(ROOT, "plugins", plugin, "skills", spec.skill), skillDst, { recursive: true });
+    // A skill may run a script its plugin bundles. Stage it next to the skill so
+    // the sandbox matches an installed plugin rather than a skill copied alone.
+    const hooks = join(ROOT, "plugins", plugin, "hooks");
+    if (existsSync(hooks)) cpSync(hooks, join(skillDst, "hooks"), { recursive: true });
+    // Rewrite frontmatter so each staged capability has a unique project name.
+    const skillMd = join(skillDst, "SKILL.md");
+    const rewritten = readFileSync(skillMd, "utf8").replace(/^name:.*$/m, `name: ${spec.evalName}`);
+    writeFileSync(skillMd, rewritten);
+  };
+  stageSkill(c);
+  for (const provider of c.providers || []) stageSkill(provider);
   for (const [rel, content] of Object.entries(c.setup?.files || {})) {
     const dst = join(tmp, rel);
     mkdirSync(dirname(dst), { recursive: true });
     writeFileSync(dst, content);
   }
-  return tmp;
+  if (c.setup?.git) {
+    execFileSync("git", ["init", "-q", "-b", "main"], { cwd: tmp });
+    execFileSync("git", ["config", "user.name", "Skill Eval"], { cwd: tmp });
+    execFileSync("git", ["config", "user.email", "skill-eval@example.invalid"], { cwd: tmp });
+    execFileSync("git", ["add", "."], { cwd: tmp });
+    execFileSync("git", ["commit", "-qm", "fixture"], { cwd: tmp });
+    const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: tmp, encoding: "utf8" }).trim();
+    for (const rel of Object.keys(c.setup?.files || {})) {
+      const dst = join(tmp, rel);
+      const content = readFileSync(dst, "utf8");
+      if (content.includes("{{COMMIT}}")) {
+        const resolved = content.replaceAll("{{COMMIT}}", commit);
+        writeFileSync(dst, resolved);
+        setup[rel] = resolved;
+      }
+    }
+    if (execFileSync("git", ["status", "--short"], { cwd: tmp, encoding: "utf8" }).trim()) {
+      execFileSync("git", ["add", "."], { cwd: tmp });
+      execFileSync("git", ["commit", "-qm", "fixture metadata"], { cwd: tmp });
+    }
+  }
+  return { tmp, setup, snapshot: snapshotFiles(tmp) };
 }
 
 async function runCase(c) {
@@ -154,10 +216,11 @@ async function runCase(c) {
   let checks;
   let stdout = "";
   try {
-    tmp = setupCase(c);
+    const fixture = setupCase(c);
+    tmp = fixture.tmp;
     const prompt = c.prompt.replaceAll("{{SKILL}}", c.evalName);
     stdout = await runClaude(prompt, tmp);
-    checks = await evaluate(c.expect, { tmp, stdout, setup: c.setup?.files || {} });
+    checks = await evaluate(c.expect, { tmp, stdout, setup: fixture.setup, snapshot: fixture.snapshot });
   } catch (err) {
     checks = [{ ok: false, label: `run error: ${err.message}` }];
   }

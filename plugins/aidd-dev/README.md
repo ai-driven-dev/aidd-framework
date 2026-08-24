@@ -14,7 +14,7 @@ Covers code transformation: planning, implementation, assertions, audits, code r
 
 | Bracket ID | Skill | Description |
 |---|---|---|
-| [2.1] | [plan](skills/01-plan/SKILL.md) | Turn a request, ticket, or file into a phased implementation plan, gathering the source first and optionally wireframing a screen before planning. |
+| [2.1] | [plan](skills/01-plan/SKILL.md) | Turn a request, ticket, or file into a phased implementation plan, resolving a ready UI contract for frontend work with a bounded compatibility fallback while the UI provider is optional. |
 | [2.2] | [implement](skills/02-implement/SKILL.md) | Execute an implementation plan phase by phase, recipe-style, iterating until 100% completeness. |
 | [2.3] | [assert](skills/03-assert/SKILL.md) | Assert features work as intended - general assertions, architecture conformance, and frontend UI validation. |
 | [2.4] | [audit](skills/04-audit/SKILL.md) | Perform deep codebase analysis to identify technical debt, dead code, and improvement opportunities. |

@@ -1,25 +1,23 @@
 # Design
 
-The visual language: the design system, tokens, and UI conventions. What it looks like, not how it is coded.
+Compact pointers to stable UI knowledge. Current code remains implementation truth; an active UI system contract remains decision authority.
 
-## System
+## UI System Authority
 
-- <Design-system approach (tokens, library, ad hoc) and where it lives>
-- <Styling method (CSS-in-JS, utility classes, modules)>
+- <Active contract path, id, and scope; or "none">
 
-## Tokens
+## Current Implementation
 
-- <Where colors, spacing, and typography are defined. Point to the file>
+- <UI system maturity and styling method>
+- <Canonical token, theme, component, layout, and asset source paths>
 
-## Components
+## Stable Context
 
-- <The shared component patterns and their states>
-
-## Accessibility
-
-- <The a11y bar (contrast, focus, ARIA) and how it is met>
+- <Stable convention not already normative in the active contract>
+- <Known contract, implementation, or external-document drift>
 
 <!--
-Capture: the design system, where tokens live, the a11y bar.
-Skip: per-component CSS. Point to the theme file. Remove this comment when filled.
+When an active UI system contract exists, point to it instead of copying its token, component, adaptation, or accessibility decisions.
+When none exists, summarize only stable implemented conventions and their source paths.
+Skip feature-local decisions and per-component values. Remove this comment when filled.
 -->

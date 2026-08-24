@@ -10,6 +10,7 @@ opening it again.
 | -------------------------------------------- | -------------------------------------------- |
 | the manifest, and a lockfile beside it        | the stack, the workspaces, the published name |
 | the root README, then any `docs/`             | what it does, for whom, its domain words      |
+| current contracts under `aidd_docs/ui/systems/` | accepted shared UI authority, ids, and scopes |
 | the top-level directories                     | the shape, and which areas own what           |
 | the entry points the manifest declares        | where execution starts                        |
 | every file under the VCS platform's own directory | how it ships, and what runs on its own schedule |
@@ -37,6 +38,8 @@ wrote stays whatever the verdicts below say.
 | anything true of every project built this way                 | drop    |
 | a work item, a live value, a technical id                     | drop    |
 | a plan, a wish, a thing not shipped                           | drop    |
+
+For a current UI system contract, keep only its path, immutable id, and normalized scope. The path resolves the current revision; do not copy its decisions or retain the revision number in memory.
 
 ## Depth
 
