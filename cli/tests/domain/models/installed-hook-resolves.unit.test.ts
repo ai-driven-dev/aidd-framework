@@ -27,13 +27,13 @@ const translator = new PluginContentTranslator(stubHasher);
 
 const PLUGIN = "aidd-telemetry";
 const SOURCE_TOKEN = claude.capabilities.plugins.pluginRootToken ?? "";
-const SCRIPTS = ["hooks/journal.js", "hooks/lib/record.js"];
+const SCRIPTS = ["hooks/journal.cjs", "hooks/lib/record.cjs"];
 const HOOKS_JSON = JSON.stringify({
   hooks: {
     SessionStart: [
       {
         hooks: [
-          { type: "command", command: `node ${SOURCE_TOKEN}/hooks/journal.js session-start` },
+          { type: "command", command: `node ${SOURCE_TOKEN}/hooks/journal.cjs session-start` },
         ],
       },
     ],
@@ -138,7 +138,7 @@ describe("the two ways a plugin gets installed", () => {
         tool,
         "docs"
       );
-      const carriesHooks = files.some((file) => file.relativePath.endsWith(".js"));
+      const carriesHooks = files.some((file) => file.relativePath.endsWith(".cjs"));
 
       expect(carriesHooks, tool.toolId).toBe(tool.capabilities.plugins.acceptsHooks);
       expect(skipped.length > 0, tool.toolId).toBe(!tool.capabilities.plugins.acceptsHooks);

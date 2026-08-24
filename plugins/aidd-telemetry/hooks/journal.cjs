@@ -4,12 +4,12 @@
 
 const fs = require("node:fs");
 
-const { detectHost, DECLARED_HOSTS } = require("./lib/host.js");
-const repo = require("./lib/repo.js");
-const record = require("./lib/record.js");
-const fileWrites = require("./lib/file-writes.js");
-const stepStarts = require("./lib/step-starts.js");
-const taskDeclared = require("./lib/task-declared.js");
+const { detectHost, DECLARED_HOSTS } = require("./lib/host.cjs");
+const repo = require("./lib/repo.cjs");
+const record = require("./lib/record.cjs");
+const fileWrites = require("./lib/file-writes.cjs");
+const stepStarts = require("./lib/step-starts.cjs");
+const taskDeclared = require("./lib/task-declared.cjs");
 
 function readStdin() {
   try {

@@ -131,8 +131,8 @@ describe("PluginContentTranslator.translate()", () => {
     it("keeps a hook script's own directories, which its requires resolve against", () => {
       const hooksFiles = [
         makeFile("hooks/hooks.json", hooksJsonContent),
-        makeFile("hooks/journal.js", 'require("./lib/repo.js");'),
-        makeFile("hooks/lib/repo.js", "module.exports = {};"),
+        makeFile("hooks/journal.cjs", 'require("./lib/repo.js");'),
+        makeFile("hooks/lib/repo.cjs", "module.exports = {};"),
       ];
       const dist = makeDist({
         files: [...hooksFiles, makeFile(".claude-plugin/plugin.json", claudeManifestContent)],
@@ -146,9 +146,9 @@ describe("PluginContentTranslator.translate()", () => {
         },
       });
       const paths = pathsFor(claude, dist);
-      expect(paths).toContain(".claude/plugins/sample-plugin/hooks/journal.js");
-      expect(paths).toContain(".claude/plugins/sample-plugin/hooks/lib/repo.js");
-      expect(paths).not.toContain(".claude/plugins/sample-plugin/hooks/repo.js");
+      expect(paths).toContain(".claude/plugins/sample-plugin/hooks/journal.cjs");
+      expect(paths).toContain(".claude/plugins/sample-plugin/hooks/lib/repo.cjs");
+      expect(paths).not.toContain(".claude/plugins/sample-plugin/hooks/repo.cjs");
     });
   });
 

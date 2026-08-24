@@ -4,11 +4,11 @@ Find this skill's script, and check the project is measuring at all.
 
 ## Output
 
-The path to `telemetry-report.js`, or a stop with the reason.
+The path to `telemetry-report.cjs`, or a stop with the reason.
 
 ## Process
 
-1. **Resolve the script.** It sits beside this skill, under `scripts/telemetry-report.js`. Run
+1. **Resolve the script.** It sits beside this skill, under `scripts/telemetry-report.cjs`. Run
    whichever of these two matches the shell your commands actually run in - on Windows that
    is plain PowerShell unless it is Git Bash. `find` is GNU `find` under Git Bash but is
    Windows' own unrelated `find.exe` under PowerShell, so the bash form silently finds
@@ -18,17 +18,17 @@ The path to `telemetry-report.js`, or a stop with the reason.
    that stops on one (#707).
 
    ```bash
-   test -n "$CLAUDE_PLUGIN_ROOT" && ls "$CLAUDE_PLUGIN_ROOT/skills/01-cost/scripts/telemetry-report.js" \
+   test -n "$CLAUDE_PLUGIN_ROOT" && ls "$CLAUDE_PLUGIN_ROOT/skills/01-cost/scripts/telemetry-report.cjs" \
      || find ~/.claude/plugins ~/.codex/plugins ~/.cursor/plugins .github/plugins .claude/plugins .codex/plugins . \
-        -type f -path '*01-cost/scripts/telemetry-report.js' 2>/dev/null | head -1 || true
+        -type f -path '*01-cost/scripts/telemetry-report.cjs' 2>/dev/null | head -1 || true
    ```
 
    ```powershell
-   if ($env:CLAUDE_PLUGIN_ROOT -and (Test-Path "$env:CLAUDE_PLUGIN_ROOT/skills/01-cost/scripts/telemetry-report.js")) {
-     "$env:CLAUDE_PLUGIN_ROOT/skills/01-cost/scripts/telemetry-report.js"
+   if ($env:CLAUDE_PLUGIN_ROOT -and (Test-Path "$env:CLAUDE_PLUGIN_ROOT/skills/01-cost/scripts/telemetry-report.cjs")) {
+     "$env:CLAUDE_PLUGIN_ROOT/skills/01-cost/scripts/telemetry-report.cjs"
    } else {
-     Get-ChildItem -Path "$HOME/.claude/plugins", "$HOME/.codex/plugins", "$HOME/.cursor/plugins", ".github/plugins", ".claude/plugins", ".codex/plugins", "." -Recurse -File -Filter "telemetry-report.js" -ErrorAction SilentlyContinue |
-       Where-Object { $_.FullName -replace '\\', '/' -match '01-cost/scripts/telemetry-report.js$' } |
+     Get-ChildItem -Path "$HOME/.claude/plugins", "$HOME/.codex/plugins", "$HOME/.cursor/plugins", ".github/plugins", ".claude/plugins", ".codex/plugins", "." -Recurse -File -Filter "telemetry-report.cjs" -ErrorAction SilentlyContinue |
+       Where-Object { $_.FullName -replace '\\', '/' -match '01-cost/scripts/telemetry-report.cjs$' } |
        Select-Object -First 1 -ExpandProperty FullName
    }
    ```

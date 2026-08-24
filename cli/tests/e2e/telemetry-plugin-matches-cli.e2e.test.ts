@@ -17,7 +17,7 @@ const PLUGIN_SCRIPT = join(
   "skills",
   "01-cost",
   "scripts",
-  "telemetry-report.js"
+  "telemetry-report.cjs"
 );
 const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
 
@@ -523,7 +523,7 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
         join(REPO_ROOT, "plugins", "aidd-telemetry", "skills"),
         patchedSkillsDir
       );
-      const reportJsPath = join(patchedSkillsDir, "01-cost", "scripts", "lib", "report.js");
+      const reportJsPath = join(patchedSkillsDir, "01-cost", "scripts", "lib", "report.cjs");
       const original = await readFile(reportJsPath, "utf8");
       const comparator = "weight(right) - weight(left) || keyOf(left).localeCompare(keyOf(right));";
       if (!original.includes(comparator)) {
@@ -539,7 +539,7 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
         ),
         "utf8"
       );
-      return join(patchedSkillsDir, "01-cost", "scripts", "telemetry-report.js");
+      return join(patchedSkillsDir, "01-cost", "scripts", "telemetry-report.cjs");
     }
 
     /**

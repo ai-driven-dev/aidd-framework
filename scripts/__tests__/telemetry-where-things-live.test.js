@@ -4,7 +4,7 @@ const path = require("node:path");
 const { describe, it } = require("node:test");
 
 const ROOT = path.resolve(__dirname, "../..");
-const SINK = path.join(ROOT, "plugins/aidd-telemetry/skills/01-cost/scripts/lib/sink.js");
+const SINK = path.join(ROOT, "plugins/aidd-telemetry/skills/01-cost/scripts/lib/sink.cjs");
 const PLUGIN_README = path.join(ROOT, "plugins/aidd-telemetry/README.md");
 
 /** `process.platform` is read inside computeRootDir on every call, so stating it here is
@@ -45,7 +45,7 @@ describe("the documented figures location matches what the sink actually writes"
 
   it("computes the well-known default for this platform - a change here means the docs must change too", () => {
     if (process.platform === "win32") {
-      // sink.js's own windowsRootDir: %APPDATA%\aidd\telemetry, unless it falls back to
+      // sink.cjs's own windowsRootDir: %APPDATA%\aidd\telemetry, unless it falls back to
       // the POSIX-style path (no APPDATA at all - not expected on a real machine, but
       // computeRootDir itself falls back rather than erroring, so this mirrors that).
       const windowsDefault = process.env.APPDATA
@@ -127,8 +127,8 @@ describe("a library a skill needs is carried by that skill, identically", () => 
   const CANONICAL = path.join(SKILLS, "01-cost/scripts/lib");
 
   for (const [skill, files] of [
-    ["00-init", ["identity.js"]],
-    ["02-check", ["readers.js", "journal.js", "attribution.js"]],
+    ["00-init", ["identity.cjs"]],
+    ["02-check", ["readers.cjs", "journal.cjs", "attribution.cjs"]],
   ]) {
     for (const file of files) {
       it(`${skill}'s ${file} is byte-for-byte 01-cost's`, () => {
@@ -161,11 +161,28 @@ describe("a library a skill needs is carried by that skill, identically", () => 
     assert.deepEqual(offenders, []);
   });
 
-  it("every skill folder carries its own commonjs marker, which the rename keeps reachable", () => {
-    for (const skill of fs.readdirSync(SKILLS)) {
-      const marker = path.join(SKILLS, skill, "package.json");
-      assert.ok(fs.existsSync(marker), `${skill} must carry package.json`);
-      assert.equal(JSON.parse(fs.readFileSync(marker, "utf8")).type, "commonjs");
-    }
+  /** No `package.json` marker anywhere: every CommonJS file this plugin ships is named
+   * `.cjs`, which Node reads as CommonJS whatever the host project declares. A marker is a
+   * property of a directory and a rename can move a file out from under it; an extension
+   * travels with the file. The one exception is the ESM entry OpenCode discovers by glob
+   * (`{plugin,plugins}/*.{ts,js}`), which must stay `.js` and is genuine ESM anyway. */
+  it("declares its module system per file, so no directory marker can be lost", () => {
+    const PLUGIN = path.join(ROOT, "plugins/aidd-telemetry");
+    const scripts = [];
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (/\.(js|cjs|mjs)$/u.test(entry.name)) scripts.push(path.relative(PLUGIN, full));
+        else if (entry.name === "package.json" && dir !== PLUGIN) {
+          assert.fail(`${path.relative(PLUGIN, full)}: no directory marker, name the file .cjs`);
+        }
+      }
+    };
+    walk(PLUGIN);
+    assert.deepEqual(
+      scripts.filter((f) => f.endsWith(".js")),
+      ["hooks/opencode-plugin.js"]
+    );
   });
 });

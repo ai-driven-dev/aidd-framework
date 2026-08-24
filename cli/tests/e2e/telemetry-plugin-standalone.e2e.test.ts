@@ -16,9 +16,9 @@ const REPO_ROOT = resolve(process.cwd(), "..");
  * translation carries `skills/` and drops directories it does not know. Splitting them in
  * two is what lets neither skill open a file belonging to the other. */
 const SKILLS = join(REPO_ROOT, "plugins", "aidd-telemetry", "skills");
-const SWITCH_BIN = join(SKILLS, "00-init", "scripts", "telemetry-switch.js");
-const REPORT_BIN = join(SKILLS, "01-cost", "scripts", "telemetry-report.js");
-const JOURNAL_HOOK = join(REPO_ROOT, "plugins", "aidd-telemetry", "hooks", "journal.js");
+const SWITCH_BIN = join(SKILLS, "00-init", "scripts", "telemetry-switch.cjs");
+const REPORT_BIN = join(SKILLS, "01-cost", "scripts", "telemetry-report.cjs");
+const JOURNAL_HOOK = join(REPO_ROOT, "plugins", "aidd-telemetry", "hooks", "journal.cjs");
 const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
 const HOOK_FIXTURES = join(REPO_ROOT, "scripts", "__tests__", "fixtures");
 
@@ -254,8 +254,8 @@ describe("what the plugin ships is readable", () => {
 
     // Not a style rule: the generated bundle this replaced was 4,183 lines, and the number
     // exists so that drifting back toward it is noticed here. Bumped twice, each time for a
-    // stated reason rather than to make it pass: once for report.js's interval logic and
-    // render.js's breakdown of it, and once when readers/journal/attribution/identity moved
+    // stated reason rather than to make it pass: once for report.cjs's interval logic and
+    // render.cjs's breakdown of it, and once when readers/journal/attribution/identity moved
     // in from `skills/_shared/`. That move added 771 lines to this count and none to what
     // the plugin ships - those files were always installed, they just sat in a directory
     // this measurement did not look at.

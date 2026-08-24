@@ -94,7 +94,7 @@ describe("the route that builds a marketplace bundle", () => {
   });
 
   it("leaves a command alone for the tool whose variable is the one authors write", () => {
-    const authored = `node ${pluginsOf("claude")?.pluginRootToken}/hooks/journal.js`;
+    const authored = `node ${pluginsOf("claude")?.pluginRootToken}/hooks/journal.cjs`;
 
     const token = buildClaudeContract().pluginRootToken;
 

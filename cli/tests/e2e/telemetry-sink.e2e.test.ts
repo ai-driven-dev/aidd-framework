@@ -17,7 +17,7 @@ import {
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(process.cwd(), "..");
 const PLUGIN_SOURCE = join(REPO_ROOT, "plugins", "aidd-telemetry");
-const JOURNAL_HOOK_RELATIVE = join(".claude", "plugins", "aidd-telemetry", "hooks", "journal.js");
+const JOURNAL_HOOK_RELATIVE = join(".claude", "plugins", "aidd-telemetry", "hooks", "journal.cjs");
 const SESSION_START_FIXTURE = join(
   REPO_ROOT,
   "scripts",

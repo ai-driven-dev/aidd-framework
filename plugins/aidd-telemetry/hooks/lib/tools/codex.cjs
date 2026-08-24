@@ -4,7 +4,7 @@
 // written-path extractor - a write reaches the journal through an apply_patch command
 // string, which no field here names.
 
-const { skillNameFromSkillFileRead } = require("./skill-detection.js");
+const { skillNameFromSkillFileRead } = require("./skill-detection.cjs");
 
 // A Codex rollout is named `rollout-<timestamp>-<uuid>.jsonl`, and that trailing uuid is
 // the rollout's own `session_meta.id` - measured across every rollout on disk, including

@@ -7,26 +7,26 @@ const { describe, it } = require("node:test");
 
 const SCRIPTS = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/02-check/scripts");
 const SHARED = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/02-check/scripts/lib");
-const SCRIPT = path.join(SCRIPTS, "telemetry-check.js");
-const { diagnose, OK, FAIL, UNKNOWN } = require(path.join(SCRIPTS, "lib/diagnose.js"));
-const { printReport } = require(path.join(SCRIPTS, "lib/render.js"));
-const { TOOLS } = require(path.join(SHARED, "readers.js"));
-const { resolveSessionAnchor, resolveCurrentTool } = require(path.join(SCRIPTS, "lib/session-anchor.js"));
+const SCRIPT = path.join(SCRIPTS, "telemetry-check.cjs");
+const { diagnose, OK, FAIL, UNKNOWN } = require(path.join(SCRIPTS, "lib/diagnose.cjs"));
+const { printReport } = require(path.join(SCRIPTS, "lib/render.cjs"));
+const { TOOLS } = require(path.join(SHARED, "readers.cjs"));
+const { resolveSessionAnchor, resolveCurrentTool } = require(path.join(SCRIPTS, "lib/session-anchor.cjs"));
 const { rootDir: exportSinkRootDir, findExportedRecordForSession } = require(
-  path.join(SCRIPTS, "lib/export-sink.js"),
+  path.join(SCRIPTS, "lib/export-sink.cjs"),
 );
-const { readClaudeExportConfig, readCodexExportConfig } = require(path.join(SCRIPTS, "lib/export-config.js"));
+const { readClaudeExportConfig, readCodexExportConfig } = require(path.join(SCRIPTS, "lib/export-config.cjs"));
 const { rootDir: costSinkRootDir } = require(
-  path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts/lib/sink.js"),
+  path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts/lib/sink.cjs"),
 );
-const { UNRECOGNISED_FILE_NAME } = require("../../plugins/aidd-telemetry/hooks/lib/record.js");
-const { readCodexHookTrust, parseHookTrust, PLUGIN_NAME } = require(path.join(SCRIPTS, "lib/hook-trust.js"));
+const { UNRECOGNISED_FILE_NAME } = require("../../plugins/aidd-telemetry/hooks/lib/record.cjs");
+const { readCodexHookTrust, parseHookTrust, PLUGIN_NAME } = require(path.join(SCRIPTS, "lib/hook-trust.cjs"));
 const PLUGIN_MANIFEST = require("../../plugins/aidd-telemetry/.claude-plugin/plugin.json");
 
 // A minimal PATH for spawned scripts, containing only git's own directory - never
 // "/usr/bin:/bin", which doesn't hold git on Windows and uses ":" as a separator, not
 // win32's ";". "where"/"which" differ by platform; either answers with the same thing,
-// which is all a minimal PATH here needs (hooks/lib/repo.js shells out to git).
+// which is all a minimal PATH here needs (hooks/lib/repo.cjs shells out to git).
 const GIT_DIR = path.dirname(
   execFileSync(process.platform === "win32" ? "where" : "which", ["git"], { encoding: "utf8" })
     .trim()
@@ -65,7 +65,7 @@ describe("resolving which session is actually running this script", () => {
 
   it("prefers Codex's variable when both are set, because that is the nested case", () => {
     // A Codex process launched inside a Claude Code session inherits CLAUDE_CODE_SESSION_ID
-    // from its parent (measured in hooks/lib/host.js already), so seeing both set is not
+    // from its parent (measured in hooks/lib/host.cjs already), so seeing both set is not
     // ambiguous - it names exactly the process actually running this script.
     const env = { CODEX_THREAD_ID: "codex-nested", CLAUDE_CODE_SESSION_ID: "claude-parent" };
 
@@ -101,9 +101,9 @@ describe("naming which tool is currently running, for the export-route claims", 
     assert.equal(resolveCurrentTool({}), undefined);
   });
 
-  // Pinned against TOOLS (readers.js), the same source of truth hook-trust.js's own
+  // Pinned against TOOLS (readers.cjs), the same source of truth hook-trust.cjs's own
   // hardcoded PLUGIN_NAME is pinned against: the two ids resolveCurrentTool can ever return
-  // must stay ones export-config.js actually has a branch for, or that branch is dead code.
+  // must stay ones export-config.cjs actually has a branch for, or that branch is dead code.
   it("only ever names a tool id TOOLS itself declares", () => {
     assert.ok(TOOLS.some((declaration) => declaration.tool === "claude"));
     assert.ok(TOOLS.some((declaration) => declaration.tool === "codex"));
@@ -357,9 +357,9 @@ describe("reading Codex's own export configuration", () => {
   });
 });
 
-describe("export-sink.js's rootDir stays identical to 01-cost's own sink.js", () => {
-  // Both compute the same directory from the same env - pinned the same way switch.js's
-  // predicate and lib/repo.js's git check are pinned against the hook's own copies, so a
+describe("export-sink.cjs's rootDir stays identical to 01-cost's own sink.cjs", () => {
+  // Both compute the same directory from the same env - pinned the same way switch.cjs's
+  // predicate and lib/repo.cjs's git check are pinned against the hook's own copies, so a
   // change to one cannot silently leave the other reading a different machine's sink.
   it("resolves the same directory for the same HOME", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-sink-pin-"));
@@ -677,7 +677,7 @@ describe("naming whether the journal and the tool's records join", () => {
   });
 });
 
-// exportConfig fixtures below are hand-built to the shape export-config.js's two readers
+// exportConfig fixtures below are hand-built to the shape export-config.cjs's two readers
 // actually return (checked/configured/configuredDetail/missingDetail/identityDisabled/
 // identityDisabledDetail) - proven wired to the real readers by the end-to-end suite further
 // down, the same split the four claims above already draw between pure-verdict and wiring
@@ -900,7 +900,7 @@ describe("the TOOLS declaration the checker reads is the one the cost skill read
   // lost by one skill still cannot diverge from what the other sees.
   const COST = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts");
 
-  for (const name of ["journal.js", "readers.js", "attribution.js"]) {
+  for (const name of ["journal.cjs", "readers.cjs", "attribution.cjs"]) {
     it(`${name} reads the same in the checker as in the cost skill`, () => {
       assert.equal(
         fs.readFileSync(path.join(SHARED, name), "utf8"),
@@ -920,7 +920,7 @@ describe("the script wired to a real project", () => {
     return Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_")));
   }
 
-  // The script now shells out to `git rev-parse` (see lib/repo.js), so every project this
+  // The script now shells out to `git rev-parse` (see lib/repo.cjs), so every project this
   // suite hands it needs to actually be one, or every claim below the gate reads as
   // "not a git repository" instead of the case each test means to exercise.
   function tempProject() {
@@ -982,7 +982,7 @@ describe("the script wired to a real project", () => {
   // identical reason: a developer with telemetry actually enabled on this machine would
   // otherwise leak a real endpoint into the spawn and silently make "export configured"
   // read differently than the fixture the test built. AIDD_USER_CONFIG_DIR is stripped too -
-  // left in, the sink read (export-sink.js) would escape the temp `home` this test controls
+  // left in, the sink read (export-sink.cjs) would escape the temp `home` this test controls
   // and read (or write) a real machine's sink instead. A test that cares passes `extraEnv`.
   function run(root, home, sessionId, extraEnv = {}) {
     const {
@@ -1043,7 +1043,7 @@ describe("the script wired to a real project", () => {
     assert.deepEqual(lines, ["measurement is off — nothing to check until it is turned on"]);
   });
 
-  // The defect this reproduces: resolveRunsDir (hooks/lib/record.js -> hooks/lib/repo.js)
+  // The defect this reproduces: resolveRunsDir (hooks/lib/record.cjs -> hooks/lib/repo.cjs)
   // gates writes on getRepoRoot, but until now nothing here checked the same thing, so a
   // hook that fired outside a repository and structurally could not write read as
   // "hook fired FAIL — never been observed firing" - a claim about the hook, not the repo.
@@ -1185,7 +1185,7 @@ describe("the script wired to a real project", () => {
   it("names an unrecognised payload, not a hook that never ran, when only the unrecognised marker exists", () => {
     const { root, home } = tempProject();
     writeConfig(root, true);
-    // Written the same way handleUnrecognisedPayload does (hooks/lib/record.js): one line,
+    // Written the same way handleUnrecognisedPayload does (hooks/lib/record.cjs): one line,
     // no session_start, at the exact path it writes to - not a reimplementation of it.
     writeRunFile(root, UNRECOGNISED_FILE_NAME, [{ type: "unrecognised_payload", at: "2026-08-20T09:00:00Z" }]);
 
@@ -1249,7 +1249,7 @@ describe("the script wired to a real project", () => {
 
       // The exact case reported: a payload with no cwd, no workspace_roots, nothing that
       // names a directory at all - run from inside root, as a real hook invocation would be.
-      const hookScript = path.join(SCRIPTS, "../../../hooks/journal.js");
+      const hookScript = path.join(SCRIPTS, "../../../hooks/journal.cjs");
       const hookResult = spawnSync(process.execPath, [hookScript, "session-start"], {
         cwd: root,
         encoding: "utf8",
@@ -1483,9 +1483,9 @@ describe("the script wired to a real project", () => {
   });
 });
 
-describe("switch.js's predicate stays identical to the hook's own", () => {
-  // A fourth copy of the switch predicate, alongside journal.js/readers.js/attribution.js -
-  // but not a whole-file copy of hooks/lib/repo.js, which also carries git-remote logic this
+describe("switch.cjs's predicate stays identical to the hook's own", () => {
+  // A fourth copy of the switch predicate, alongside journal.cjs/readers.cjs/attribution.cjs -
+  // but not a whole-file copy of hooks/lib/repo.cjs, which also carries git-remote logic this
   // skill has no reason to duplicate. What must never drift, pinned as three separate
   // fragments since the two files wrap them in differently-named functions: the same config
   // path, the same strict `=== true`, and the same swallowed catch.
@@ -1493,52 +1493,52 @@ describe("switch.js's predicate stays identical to the hook's own", () => {
   const CONFIG_PATH = ', ".aidd", "config.json"), "utf8")';
   const SWALLOWED_CATCH = "} catch {";
 
-  it("carries the same predicate expression as hooks/lib/repo.js's telemetryEnabled", () => {
-    const here = fs.readFileSync(path.join(SCRIPTS, "lib/switch.js"), "utf8");
+  it("carries the same predicate expression as hooks/lib/repo.cjs's telemetryEnabled", () => {
+    const here = fs.readFileSync(path.join(SCRIPTS, "lib/switch.cjs"), "utf8");
     const there = fs.readFileSync(
-      path.resolve(__dirname, "../../plugins/aidd-telemetry/hooks/lib/repo.js"),
+      path.resolve(__dirname, "../../plugins/aidd-telemetry/hooks/lib/repo.cjs"),
       "utf8",
     );
 
     for (const fragment of [PREDICATE, CONFIG_PATH, SWALLOWED_CATCH]) {
-      assert.ok(here.includes(fragment), `switch.js must carry ${fragment}`);
-      assert.ok(there.includes(fragment), `repo.js must carry ${fragment}`);
+      assert.ok(here.includes(fragment), `switch.cjs must carry ${fragment}`);
+      assert.ok(there.includes(fragment), `repo.cjs must carry ${fragment}`);
     }
   });
 });
 
-describe("lib/repo.js's git check stays identical to the hook's own", () => {
-  // Same shape as the switch.js predicate above: a copy, not a require, of getRepoRoot's
-  // command from hooks/lib/repo.js - pinned so a changed argv there cannot silently leave
+describe("lib/repo.cjs's git check stays identical to the hook's own", () => {
+  // Same shape as the switch.cjs predicate above: a copy, not a require, of getRepoRoot's
+  // command from hooks/lib/repo.cjs - pinned so a changed argv there cannot silently leave
   // this one answering a different question.
   const ARGV = '["rev-parse", "--show-toplevel"]';
 
-  it("carries the same git argv as hooks/lib/repo.js's getRepoRoot", () => {
-    const here = fs.readFileSync(path.join(SCRIPTS, "lib/repo.js"), "utf8");
+  it("carries the same git argv as hooks/lib/repo.cjs's getRepoRoot", () => {
+    const here = fs.readFileSync(path.join(SCRIPTS, "lib/repo.cjs"), "utf8");
     const there = fs.readFileSync(
-      path.resolve(__dirname, "../../plugins/aidd-telemetry/hooks/lib/repo.js"),
+      path.resolve(__dirname, "../../plugins/aidd-telemetry/hooks/lib/repo.cjs"),
       "utf8",
     );
 
-    assert.ok(here.includes(ARGV), `lib/repo.js must carry ${ARGV}`);
-    assert.ok(there.includes(ARGV), `hooks/lib/repo.js must carry ${ARGV}`);
+    assert.ok(here.includes(ARGV), `lib/repo.cjs must carry ${ARGV}`);
+    assert.ok(there.includes(ARGV), `hooks/lib/repo.cjs must carry ${ARGV}`);
   });
 });
 
-describe("lib/unrecognised.js's marker name stays identical to the hook's own", () => {
-  // The fix for the critical finding: telemetry-check.js used to require
-  // hooks/lib/record.js across the skill/hooks boundary for this one constant, which dies
+describe("lib/unrecognised.cjs's marker name stays identical to the hook's own", () => {
+  // The fix for the critical finding: telemetry-check.cjs used to require
+  // hooks/lib/record.cjs across the skill/hooks boundary for this one constant, which dies
   // at load on an install that ships skills/ without hooks/ (see the OpenCode-shaped tree
   // test below). This proves the copy that replaced it cannot drift from the value
-  // hooks/lib/record.js actually writes.
-  it("carries the same value as hooks/lib/record.js's own UNRECOGNISED_FILE_NAME", () => {
-    const { UNRECOGNISED_FILE_NAME: here } = require(path.join(SCRIPTS, "lib/unrecognised.js"));
+  // hooks/lib/record.cjs actually writes.
+  it("carries the same value as hooks/lib/record.cjs's own UNRECOGNISED_FILE_NAME", () => {
+    const { UNRECOGNISED_FILE_NAME: here } = require(path.join(SCRIPTS, "lib/unrecognised.cjs"));
 
     assert.equal(here, UNRECOGNISED_FILE_NAME);
   });
 });
 
-describe("the uncovered fallback render.js actually prints", () => {
+describe("the uncovered fallback render.cjs actually prints", () => {
   // opencode was the one declaration with `limitation` and no `reason`, proving
   // `reason ?? limitation` reaches its second half against a real declaration rather than
   // only the stub below. Phase 5 (see measurements.md) made opencode's own plugin reach the
@@ -1560,7 +1560,7 @@ describe("the uncovered fallback render.js actually prints", () => {
 });
 
 describe("running from a tree that ships skills/ and no hooks/ (the OpenCode-shaped install)", () => {
-  // The critical finding: telemetry-check.js used to require("../../../hooks/lib/record.js")
+  // The critical finding: telemetry-check.cjs used to require("../../../hooks/lib/record.cjs")
   // at module load, above its own try/catch. OpenCode's translator (plugin-content-
   // translator.ts's translateFlat) delivers every skills/** file, including this script,
   // and records hooks only as skipped - so that install carries skills/ with no hooks/
@@ -1578,7 +1578,7 @@ describe("running from a tree that ships skills/ and no hooks/ (the OpenCode-sha
         { recursive: true, filter: (src) => !src.endsWith(".orig") },
       );
     }
-    return path.join(pluginRoot, "skills", "02-check", "scripts", "telemetry-check.js");
+    return path.join(pluginRoot, "skills", "02-check", "scripts", "telemetry-check.cjs");
   }
 
   it("prints a real report, not a Node stack trace, with no hooks/ anywhere it could reach", () => {

@@ -293,7 +293,7 @@ describe("no parallel list references an unregistered tool", () => {
   it("declares task attributability exactly where the journal hook ever reaches a tool call", () => {
     // A task no longer needs a written-path extractor: it can be declared instead, read off
     // any tool call's own arguments the way step_start reads which skill is running - so
-    // task_declared reaches every host journal.js's tool-used dispatch reaches, not only the
+    // task_declared reaches every host journal.cjs's tool-used dispatch reaches, not only the
     // one WRITTEN_PATH_EXTRACTOR_BY_HOST still names. OpenCode is the one declared host that
     // is not that host: its plugin (hooks/opencode-plugin.js) forwards only session.created
     // and session.idle, never a tool call, so there is no payload here for a declaration to
@@ -312,7 +312,7 @@ describe("no parallel list references an unregistered tool", () => {
   it("agrees with the plugin's own cost-report declaration on journalAttributable", () => {
     // Two builds of one fact: the CLI computes journalAttributable from
     // telemetryJournalHost (report-cost-use-case.ts), and the plugin's standalone scripts
-    // declare it directly in readers.js so a live session can compute the same report
+    // declare it directly in readers.cjs so a live session can compute the same report
     // without the `aidd` package. Nothing pinned them together before, and they drifted -
     // Cursor was declared journal-attributable in one and not in the other. This is that
     // pin: change either side without the other and this fails, by name.
@@ -321,11 +321,11 @@ describe("no parallel list references an unregistered tool", () => {
       const fromPlugin = telemetryCostReaders.TOOLS.find((t) => t.tool === toolId);
       expect(
         fromPlugin,
-        `"${toolId}" is a registered AI tool with no matching entry in the plugin's readers.js TOOLS`
+        `"${toolId}" is a registered AI tool with no matching entry in the plugin's readers.cjs TOOLS`
       ).toBeDefined();
       expect(
         fromPlugin?.capability.journalAttributable,
-        `"${toolId}": CLI computes journalAttributable ${fromCli} from telemetryJournalHost, but the plugin's readers.js declares ${fromPlugin?.capability.journalAttributable}`
+        `"${toolId}": CLI computes journalAttributable ${fromCli} from telemetryJournalHost, but the plugin's readers.cjs declares ${fromPlugin?.capability.journalAttributable}`
       ).toBe(fromCli);
     }
   });

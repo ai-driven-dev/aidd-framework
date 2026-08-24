@@ -329,7 +329,7 @@ function accumulateInto<K>(
  * back to for a costless row - never `inputTokens + outputTokens` alone: every tool this
  * report has ever seen runs at 90%-plus cache, so a weight blind to the two cache counters
  * would order a costless breakdown by the sliver of its volume nobody reads it for, and
- * invert the order a reader actually wants. It is also the same sum `render.js`'s `tokensOf`
+ * invert the order a reader actually wants. It is also the same sum `render.cjs`'s `tokensOf`
  * already prints beside a costless row, on both sides - weighing by anything else would sort
  * a row by a number the report never shows. */
 function tokensOf(totals: CostTotals): number {
@@ -398,7 +398,7 @@ const NO_KNOWN_PROJECT = Symbol("no known project");
 type ProjectKey = string | typeof NO_KNOWN_PROJECT;
 
 // An empty string is not a name - it is what a tool writes when it has none to give, the
-// same reading `report.js`'s own `projectKeyOf` already gives it. Treating it as its own
+// same reading `report.cjs`'s own `projectKeyOf` already gives it. Treating it as its own
 // project would print a nameless row a person cannot act on, and would disagree with the
 // plugin about where that record belongs. `typeof` guards a field only declared `string` by
 // its type: a record read off disk carries whatever its own line actually held.

@@ -60,7 +60,7 @@ shapes carry but no other host does. Which builder a session gets depends on how
 hooks are declared (PascalCase event keys trigger the compat rewrite - see #681's
 source-read chain); a real install can produce either, so `detectHost` recognises both.
 
-`lib/step-starts.js`'s `STEP_START_BY_HOST.copilot` used to read only the canonical
+`lib/step-starts.cjs`'s `STEP_START_BY_HOST.copilot` used to read only the canonical
 shape's `toolName`/`toolArgs` - a compat `PostToolUse` never opened a step line, skill or
 not. Left unfixed by #681 on purpose: that ticket's own scope was `detectHost` and the
 session id it feeds, and closing the gap needed a capture #681 never took - a session that
@@ -105,7 +105,7 @@ the Claude Code pattern.
 
 ## Hosts declared vs. hosts that currently write
 
-All four hosts are declared in `lib/host.js`'s `DECLARED_HOSTS` and `lib/record.js`'s per-host
+All four hosts are declared in `lib/host.cjs`'s `DECLARED_HOSTS` and `lib/record.cjs`'s per-host
 tables — declaring a host's session-id spelling and export-side `vendor_field` is independent
 of whether the journal writes for it today:
 
@@ -113,7 +113,7 @@ of whether the journal writes for it today:
   was read from a bundle, not a payload (issue #681); a real capture refuted it — the compat
   shape carries `hook_event_name` with Claude Code's own spelling (`SessionStart`,
   `PostToolUse`, `Stop`). What was true, and stays true: neither shape's payload carries an
-  event name journal.js's own dispatch reads from, since it dispatches from argv (the event
+  event name journal.cjs's own dispatch reads from, since it dispatches from argv (the event
   name `hooks.json` passes on its command line), and every replay in this suite drives that
   argv the same way. `resolveEventName` reading `hook_event_name` is only ever the fallback
   for a payload replayed with no argv at all.
@@ -122,6 +122,6 @@ of whether the journal writes for it today:
   writes normally. `vendor_field` is `null` for Cursor specifically because its telemetry
   export itself is unmeasured (an Enterprise team setting), not because of either open issue.
   Cursor's own payload carries no `cwd` at all, only `workspace_roots` (a multi-root
-  workspace can list several, not all of them git repositories) — `lib/repo.js`'s
+  workspace can list several, not all of them git repositories) — `lib/repo.cjs`'s
   `readCwd`/`CWD_READER_BY_HOST` resolves the first entry that actually is one, the same way
-  `lib/record.js`'s `readSessionId` resolves Cursor's differently-spelled session id.
+  `lib/record.cjs`'s `readSessionId` resolves Cursor's differently-spelled session id.

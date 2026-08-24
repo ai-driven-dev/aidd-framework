@@ -4,11 +4,11 @@
 
 const fs = require("node:fs");
 
-const { normalizeSeparators } = require("./host.js");
-const { resolveRunsDir } = require("./repo.js");
-const { readCwd, toolFor, TOOLS_BY_HOST } = require("./tools/index.js");
+const { normalizeSeparators } = require("./host.cjs");
+const { resolveRunsDir } = require("./repo.cjs");
+const { readCwd, toolFor, TOOLS_BY_HOST } = require("./tools/index.cjs");
 const path = require("node:path");
-const { findRunFileByVendorId, appendLine, buildFileWrittenLine, nowIso } = require("./record.js");
+const { findRunFileByVendorId, appendLine, buildFileWrittenLine, nowIso } = require("./record.cjs");
 
 // Unanchored pre-filter, tested before any git shellout. A task is a folder of files or a
 // single .md file - both shapes exist side by side, so matching only the folder would

@@ -23,7 +23,7 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-const JOURNAL_SCRIPT = fileURLToPath(new URL("./journal.js", import.meta.url));
+const JOURNAL_SCRIPT = fileURLToPath(new URL("./journal.cjs", import.meta.url));
 
 // Never `process.execPath`: OpenCode ships as its own standalone binary, so that path names
 // `opencode` itself, not a Node runtime that can run journal.js.

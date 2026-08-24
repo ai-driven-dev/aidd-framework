@@ -161,7 +161,7 @@ export const opencode: AiTool<
       // Measured (2026-08-22, see the telemetry plan's measurements.md, Phase 5 and 7):
       // OpenCode never runs a CommonJS module placed here, only a genuine ESM export —
       // hooks/opencode-plugin.js is written that way and delivered verbatim, along with
-      // journal.js and lib/ beside it (its own relative import expects them there).
+      // journal.cjs and lib/ beside it (its own relative import expects them there).
       acceptsHooks: true,
       flatHooksDir: FLAT_HOOKS_DIR,
     }),
@@ -203,13 +203,13 @@ export const opencode: AiTool<
   },
   // The journal hook detects this host by a self-declared `tool: "opencode"` field, not by
   // a vendor payload shape — OpenCode has none. hooks/opencode-plugin.js builds that payload
-  // itself and spawns hooks/journal.js with it, over the same stdin contract every other
+  // itself and spawns hooks/journal.cjs with it, over the same stdin contract every other
   // host's own hook already uses.
   telemetryJournalHost: "opencode",
   // Unlike the other three, this is not a payload-shape limit: the plugin above never
   // observes a single tool call at all, only session.created and session.idle. A
   // declaration needs a tool-used event to read arguments from, and none ever reaches
-  // journal.js for this host - so there is no payload for either a declaration or a
+  // journal.cjs for this host - so there is no payload for either a declaration or a
   // written path to be read out of.
   telemetryTaskAttributable: false,
 

@@ -15,8 +15,8 @@ function hooksJson(command: string): string {
   });
 }
 
-const PLUGIN_A_HOOKS = hooksJson(`node ${PLUGIN_ROOT_VAR}/hooks/journal.js`);
-const PLUGIN_B_HOOKS = hooksJson(`node ${PLUGIN_ROOT_VAR}/hooks/journal.js`);
+const PLUGIN_A_HOOKS = hooksJson(`node ${PLUGIN_ROOT_VAR}/hooks/journal.cjs`);
+const PLUGIN_B_HOOKS = hooksJson(`node ${PLUGIN_ROOT_VAR}/hooks/journal.cjs`);
 
 describe("mergeCursorProjectHooksJson — repeat install (Phase 7, Task 3)", () => {
   it("installing the same plugin twice leaves one copy of its commands, not two", () => {
@@ -30,7 +30,7 @@ describe("mergeCursorProjectHooksJson — repeat install (Phase 7, Task 3)", () 
     const parsed = JSON.parse(afterSecond) as { hooks: Record<string, Array<{ command: string }>> };
     expect(parsed.hooks.postToolUse).toHaveLength(1);
     expect(parsed.hooks.postToolUse[0].command).toContain(
-      cursorProjectHooksScriptPath("aidd-a", "hooks/journal.js")
+      cursorProjectHooksScriptPath("aidd-a", "hooks/journal.cjs")
     );
   });
 

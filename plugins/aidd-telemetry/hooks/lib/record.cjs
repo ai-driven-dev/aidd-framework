@@ -13,8 +13,8 @@ const {
   tightenOwnedDir,
   tightenOwnedFile,
   PRIVATE_DIR_MODE,
-} = require("./repo.js");
-const { TOOLS_BY_HOST, readCwd, readSessionId } = require("./tools/index.js");
+} = require("./repo.cjs");
+const { TOOLS_BY_HOST, readCwd, readSessionId } = require("./tools/index.cjs");
 
 // Hand-rolled ULID - 48-bit millisecond timestamp plus 80 bits of randomness, both
 // Crockford base32 - since this plugin ships with no dependencies.
@@ -108,7 +108,7 @@ const VENDOR_FIELD_BY_HOST = Object.freeze(
 // hooks/lib/tools/ now (codex.js and tools/index.js respectively) and are re-exported
 // below unchanged - CLI tests reach them by exactly these names (see
 // cli/tests/helpers/telemetry-journal-hook.ts).
-const { codexSessionIdFromTranscriptPath } = require("./tools/codex.js");
+const { codexSessionIdFromTranscriptPath } = require("./tools/codex.cjs");
 
 const PRIVATE_FILE_MODE = 0o600;
 

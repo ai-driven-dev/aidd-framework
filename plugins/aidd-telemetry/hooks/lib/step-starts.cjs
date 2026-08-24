@@ -3,10 +3,10 @@
 // measured so far exposes when a skill's work finishes, so the interval is the reader's
 // derivation from the lines that follow.
 
-const { resolveRunsDir } = require("./repo.js");
-const { readCwd, toolFor, TOOLS_BY_HOST } = require("./tools/index.js");
-const { findRunFileByVendorId, appendLine, buildStepStartLine, nowIso } = require("./record.js");
-const { SKILL_FILE_PATTERN } = require("./tools/skill-detection.js");
+const { resolveRunsDir } = require("./repo.cjs");
+const { readCwd, toolFor, TOOLS_BY_HOST } = require("./tools/index.cjs");
+const { findRunFileByVendorId, appendLine, buildStepStartLine, nowIso } = require("./record.cjs");
+const { SKILL_FILE_PATTERN } = require("./tools/skill-detection.cjs");
 
 // Gathered from the per-host declarations for a caller that wants every host covered
 // rather than one at a time (see cli/tests/helpers/telemetry-journal-hook.ts and

@@ -45,7 +45,7 @@ approximating a person from a project, a tool or a machine, none of which is one
 
 ## Transversal rules
 
-- Run only `scripts/telemetry-report.js`, beside this skill. Never a script belonging to another skill, and never the `aidd` command.
+- Run only `scripts/telemetry-report.cjs`, beside this skill. Never a script belonging to another skill, and never the `aidd` command.
 - Report what the script printed. Recomputing a figure a second way is how two figures start disagreeing.
 - An absent number is not a zero. Say the figure is unknown and give what is known instead.
 - Turning measurement on belongs elsewhere. Stop and say so rather than doing it here.

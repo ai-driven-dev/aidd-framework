@@ -80,7 +80,7 @@ function findGitDirWithoutAidd(): string | undefined {
  * platform's own essential system directories — never a directory holding `aidd` or this
  * repository's own `node_modules` binaries. `/usr/bin` and `/bin` are POSIX paths; Windows
  * has neither, so a `PATH` built from them alone leaves a spawned process unable to find
- * `git.exe` (hooks/lib/repo.js shells out to it) or anything the OS loader itself needs. */
+ * `git.exe` (hooks/lib/repo.cjs shells out to it) or anything the OS loader itself needs. */
 export function pathWithoutAidd(): string {
   const dirs = [dirname(process.execPath)];
   const gitDir = findGitDirWithoutAidd();
@@ -97,7 +97,7 @@ export function pathWithoutAidd(): string {
 // Where a person's own identity file lands under sandboxedEnv, restated rather than
 // imported from the adapter: a test that asked the code where it wrote the file could not
 // catch the code writing it somewhere the other side never looks. Mirrors both
-// `person-identity-adapter.ts` and the plugin's `skills/00-init/scripts/lib/identity.js` (#707).
+// `person-identity-adapter.ts` and the plugin's `skills/00-init/scripts/lib/identity.cjs` (#707).
 export function identityFileIn(fakeHome: string): string {
   return process.platform === "win32"
     ? join(fakeHome, "AppData", "Roaming", "aidd", "identity.json")

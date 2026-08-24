@@ -275,7 +275,7 @@ describe("mergeCodexFrameworkHooksJson", () => {
   it("maps Stop to SessionEnd, the event Codex actually delivers", () => {
     // Split literal, the same way claude-root-path-rewrite.ts writes one: biome's
     // noTemplateCurlyInString cannot tell a plugin-root token from a botched template.
-    const command = `node $${"{PLUGIN_ROOT}"}/hooks/journal.js turn-end`;
+    const command = `node $${"{PLUGIN_ROOT}"}/hooks/journal.cjs turn-end`;
     const plugin = JSON.stringify({
       hooks: { Stop: [{ hooks: [{ type: "command", command }] }] },
     });

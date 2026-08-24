@@ -1,5 +1,5 @@
 /** One `step_start` line from a session's run journal: a step's own start, and the
- * skill name recorded for it. Mirrors what `plugins/aidd-telemetry/hooks/lib/record.js`'s
+ * skill name recorded for it. Mirrors what `plugins/aidd-telemetry/hooks/lib/record.cjs`'s
  * `buildStepStartLine` writes. No end is ever carried — the journal was deliberately
  * written without one, since no tool measured so far exposes when a skill's work finishes;
  * an interval's end is the reader's own derivation, not a fact on this line. */
@@ -31,7 +31,7 @@ export interface RunJournalSessionStart {
   readonly project_id?: string;
   /** The git remote this session's repository resolved to, absent for a repository with
    * none. Carried beside `project_id` rather than replacing it, the same shape
-   * `record.js`'s own `session_start` line writes. */
+   * `record.cjs`'s own `session_start` line writes. */
   readonly project_remote?: string;
   /** Git's own name for the linked worktree this session ran in, so two worktrees
    * of one repository are distinguishable in a journal. Absent — never `""` — for a plain

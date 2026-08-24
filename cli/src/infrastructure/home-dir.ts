@@ -9,8 +9,8 @@ import { homedir as osHomedir } from "node:os";
  * sets under Git Bash/MSYS2, or a test sandboxes a process under, is silently ignored by a
  * bare `homedir()` call there.
  *
- * This is the same rule the plugin's own `skills/01-cost/scripts/lib/readers.js` (`homeDir`) and
- * `skills/00-init/scripts/lib/identity.js` apply. Every site here that has to agree with the plugin on
+ * This is the same rule the plugin's own `skills/01-cost/scripts/lib/readers.cjs` (`homeDir`) and
+ * `skills/00-init/scripts/lib/identity.cjs` apply. Every site here that has to agree with the plugin on
  * which directory holds a tool's session files, the telemetry sink, or this machine's
  * identity file must resolve it through this function rather than `node:os`'s `homedir()`
  * directly — otherwise the two sides answer different questions on Windows while looking

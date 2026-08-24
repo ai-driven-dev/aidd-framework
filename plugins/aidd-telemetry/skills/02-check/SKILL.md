@@ -26,7 +26,7 @@ Run the flow above. Read only the next action file.
 ## Transversal rules
 
 - Checking that a hook fired is not the same as checking that a file exists. A run file with only `session_start` is not evidence of anything closed.
-- Run only `scripts/telemetry-check.js`, beside this skill. Never a script belonging to another skill, and never the `aidd` command.
+- Run only `scripts/telemetry-check.cjs`, beside this skill. Never a script belonging to another skill, and never the `aidd` command.
 - Present every printed line. A line this skill leaves out is a claim the user cannot check.
 - `ok`, `FAIL` and `--` are three different answers. `--` means there was nothing to evaluate, not that the chain is healthy.
 - The script cannot be found: say so and check nothing.

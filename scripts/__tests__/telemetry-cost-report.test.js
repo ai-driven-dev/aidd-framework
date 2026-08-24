@@ -8,18 +8,18 @@ const { describe, it, before, after } = require("node:test");
 const SCRIPTS = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts");
 const SHARED = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts/lib");
 const HOOKS_LIB = path.resolve(__dirname, "../../plugins/aidd-telemetry/hooks/lib");
-const { buildIntervals, attribute } = require(path.join(SHARED, "attribution.js"));
-const { build, taskOf, toMicroUsd } = require(path.join(SCRIPTS, "lib/report.js"));
-const { printReport, toEnvelope, buildArtefact, ARTEFACT_AXES } = require(path.join(SCRIPTS, "lib/render.js"));
-const sink = require(path.join(SCRIPTS, "lib/sink.js"));
-const { listJournals } = require(path.join(SHARED, "journal.js"));
+const { buildIntervals, attribute } = require(path.join(SHARED, "attribution.cjs"));
+const { build, taskOf, toMicroUsd } = require(path.join(SCRIPTS, "lib/report.cjs"));
+const { printReport, toEnvelope, buildArtefact, ARTEFACT_AXES } = require(path.join(SCRIPTS, "lib/render.cjs"));
+const sink = require(path.join(SCRIPTS, "lib/sink.cjs"));
+const { listJournals } = require(path.join(SHARED, "journal.cjs"));
 const {
   buildSessionStartLine,
   buildFileWrittenLine,
   appendLine,
   runFileName,
   generateUlid,
-} = require(path.join(HOOKS_LIB, "record.js"));
+} = require(path.join(HOOKS_LIB, "record.cjs"));
 
 const NO_CAPABILITY = {
   localRead: null,
@@ -253,7 +253,7 @@ describe("an unknown keeps its row, never a zero", () => {
     assert.equal(total, built.totals.costMicroUsd);
   });
 
-  // `JSON.stringify(NaN)` is `null` - the same round trip a record takes through sink.js's
+  // `JSON.stringify(NaN)` is `null` - the same round trip a record takes through sink.cjs's
   // own `append`/`readDayFile`, so this is not a synthetic value: it is what a damaged
   // `cost_usd` looks like once it has actually been written to and read back from disk.
   it("reads a non-numeric cost as unknown, never as a zero", () => {
@@ -310,7 +310,7 @@ describe("an unknown keeps its row, never a zero", () => {
 // `otlp-logs-claude-code-subagent.json` (a main-agent request and the subagent request it
 // spawned) - the `claude_code.api_request` attribute sets are read straight off them, never
 // hand-built: three billed calls, matching the defect report's own worked count. The
-// local-read half is what `readers.js`'s `claudeRecords` would produce for those exact
+// local-read half is what `readers.cjs`'s `claudeRecords` would produce for those exact
 // same three billed calls: same `billed_request_id` (Claude Code's `requestId`, carried by
 // both routes for the same call), no `cost_usd` (no local reader has ever captured one), a
 // tool-stated `step` the export route never carries at all. `requests` and `inputTokens`
@@ -670,10 +670,10 @@ describe("a task can be declared, not just derived", () => {
 });
 
 // Runs the real `read` command over a real transcript, so this exercises store()'s join
-// end to end - never attribution.js's attribute() in isolation, which the fixture above
+// end to end - never attribution.cjs's attribute() in isolation, which the fixture above
 // already covers.
 describe("a session's stored record names the project it ran in", () => {
-  const CLI = path.join(SCRIPTS, "telemetry-report.js");
+  const CLI = path.join(SCRIPTS, "telemetry-report.cjs");
   const FIXTURES = path.resolve(__dirname, "../../cli/tests/fixtures/local-cost");
   const CLAUDE_SESSION = "22222222-2222-4222-8222-222222222222";
 
@@ -991,7 +991,7 @@ describe("any dimension filters as well as it groups", () => {
   });
 
   it("keeps a session-only figure under a step filter when a journal interval stamped one", () => {
-    // Unlike model, a step can land on a session record: `telemetry-report.js`'s `store()`
+    // Unlike model, a step can land on a session record: `telemetry-report.cjs`'s `store()`
     // runs `attribute()` over every record regardless of kind, so a session record whose
     // own moment falls inside a `step_start` interval carries `step` too.
     const sessionRecord = {
@@ -1306,7 +1306,7 @@ describe("an artefact never disagrees with the envelope it came from", () => {
 });
 
 function runReportCli(args) {
-  const CLI = path.join(SCRIPTS, "telemetry-report.js");
+  const CLI = path.join(SCRIPTS, "telemetry-report.cjs");
   const configDir = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-axis-sink-"));
   const runsDir = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-axis-runs-"));
   try {
@@ -1324,11 +1324,11 @@ function runReportCli(args) {
 
 // Everything shipped elsewhere in this suite has met at most three sessions and a handful
 // of day files. This builds a year of day files and a hundred journalled sessions - through
-// sink.append() and record.js's own line builders, never a hand-written fixture - and asks
+// sink.append() and record.cjs's own line builders, never a hand-written fixture - and asks
 // the CLI the three questions a person actually runs: the period, the sweep, and one task's
 // breakdown. Numbers: aidd_docs/tasks/2026_08/2026_08_21_telemetry-v1-close/measurements.md.
 describe("a period that has met a hundred sessions", () => {
-  const CLI = path.join(SCRIPTS, "telemetry-report.js");
+  const CLI = path.join(SCRIPTS, "telemetry-report.cjs");
   const NUM_SESSIONS = 100;
   const NUM_TASKS = 25;
   const NUM_DAYS = 365;
@@ -1419,7 +1419,7 @@ describe("a period that has met a hundred sessions", () => {
     }
   });
 
-  // No git shellout in the read path of telemetry-report.js, so no repo needs setting up -
+  // No git shellout in the read path of telemetry-report.cjs, so no repo needs setting up -
   // only readPeriod() and listJournals(), both of which already respect these two env vars.
   // HOME points at an empty directory and PATH is stripped so claudeRead, codexRead and
   // opencodeRead all fail fast rather than walking a real machine's session files, or - for
@@ -1432,7 +1432,7 @@ describe("a period that has met a hundred sessions", () => {
       timeout: 30_000,
     });
     const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
-    assert.equal(result.status, 0, `telemetry-report.js ${args.join(" ")} exited ${result.status}: ${result.stderr}`);
+    assert.equal(result.status, 0, `telemetry-report.cjs ${args.join(" ")} exited ${result.status}: ${result.stderr}`);
     return { stdout: result.stdout, elapsedMs };
   }
 

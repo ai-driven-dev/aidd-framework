@@ -1,6 +1,6 @@
 // One period's records, reduced to a report whose every breakdown sums to its total.
 
-const { SOURCES } = require("./attribution.js");
+const { SOURCES } = require("./attribution.cjs");
 
 const MICRO_USD_PER_USD = 1e6;
 const COUNTERS = {

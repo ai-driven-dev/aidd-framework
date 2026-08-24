@@ -8,13 +8,13 @@
 //   telemetry-report read [--session <id>]
 //   telemetry-report report [--from <day>] [--to <day>] [--days <n>] [--task <id>] [--json]
 
-const { buildIntervals, attribute } = require("./lib/attribution.js");
-const { listJournals, readJournal, projectOf } = require("./lib/journal.js");
-const { readIdentity } = require("./lib/identity.js");
-const { TOOLS, DISPLAY_NAME, homeDir } = require("./lib/readers.js");
-const { printReport, toEnvelope, buildArtefact, ARTEFACT_AXES } = require("./lib/render.js");
-const { build } = require("./lib/report.js");
-const { SCHEMA_VERSION, append, readForVendor, readPeriod } = require("./lib/sink.js");
+const { buildIntervals, attribute } = require("./lib/attribution.cjs");
+const { listJournals, readJournal, projectOf } = require("./lib/journal.cjs");
+const { readIdentity } = require("./lib/identity.cjs");
+const { TOOLS, DISPLAY_NAME, homeDir } = require("./lib/readers.cjs");
+const { printReport, toEnvelope, buildArtefact, ARTEFACT_AXES } = require("./lib/render.cjs");
+const { build } = require("./lib/report.cjs");
+const { SCHEMA_VERSION, append, readForVendor, readPeriod } = require("./lib/sink.cjs");
 
 const DEFAULT_DAYS = 7;
 const MAX_DAYS = 3650;

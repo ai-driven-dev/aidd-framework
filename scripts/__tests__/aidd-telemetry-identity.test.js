@@ -7,8 +7,8 @@ const { describe, it, after } = require("node:test");
 
 const SHARED = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/00-init/scripts/lib");
 const SCRIPTS = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills");
-const IDENTITY_SCRIPT = path.join(SCRIPTS, "00-init/scripts/telemetry-identity.js");
-const REPORT_SCRIPT = path.join(SCRIPTS, "01-cost/scripts/telemetry-report.js");
+const IDENTITY_SCRIPT = path.join(SCRIPTS, "00-init/scripts/telemetry-identity.cjs");
+const REPORT_SCRIPT = path.join(SCRIPTS, "01-cost/scripts/telemetry-report.cjs");
 const FIXTURES = path.resolve(__dirname, "../../cli/tests/fixtures/local-cost");
 
 const CLAUDE_SESSION = "22222222-2222-4222-8222-222222222222";
@@ -28,10 +28,10 @@ function tempDir(prefix) {
 }
 
 /** Re-required per call so it reads whichever sentinel HOME/APPDATA was just set, the same
- * pattern telemetry-where-things-live.test.js uses for sink.js. */
+ * pattern telemetry-where-things-live.test.js uses for sink.cjs. */
 function identityModule() {
-  delete require.cache[require.resolve(path.join(SHARED, "identity.js"))];
-  return require(path.join(SHARED, "identity.js"));
+  delete require.cache[require.resolve(path.join(SHARED, "identity.cjs"))];
+  return require(path.join(SHARED, "identity.cjs"));
 }
 
 // The identity file's own rule, restated rather than imported: a test that asked the code

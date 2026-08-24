@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// aidd-telemetry-journal-perf-harness.js - measures journal.js's in-process
+// aidd-telemetry-journal-perf-harness.js - measures journal.cjs's in-process
 // turn-end and file-written latency; run as a child process of the p95 tests
 // in aidd-telemetry-journal.test.js. Not itself a *.test.js file, so node
 // --test does not pick it up.
@@ -14,7 +14,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 
-const { processPayload, generateUlid } = require("../../plugins/aidd-telemetry/hooks/journal.js");
+const { processPayload, generateUlid } = require("../../plugins/aidd-telemetry/hooks/journal.cjs");
 
 // Under a git hook, git exports GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE, which
 // would point every child git call here at the real repository instead of the

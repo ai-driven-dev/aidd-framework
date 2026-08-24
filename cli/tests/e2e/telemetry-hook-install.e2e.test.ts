@@ -48,7 +48,7 @@ describe("E2E: the journal hook runs from where installation puts it", () => {
         "plugins",
         "aidd-telemetry",
         "hooks",
-        "journal.js"
+        "journal.cjs"
       );
       const hook = execFileAsync(process.execPath, [hookPath, "session-start"]);
       hook.child.stdin?.end(JSON.stringify(payload));

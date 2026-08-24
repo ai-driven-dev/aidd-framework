@@ -9,10 +9,10 @@ import type {
   RunJournalTaskDeclared,
 } from "../../domain/ports/run-journal-reader.js";
 
-const ULID_LENGTH = 26; // encodeTime(10) + encodeRandom(16), matching record.js's own ULID_LENGTH.
+const ULID_LENGTH = 26; // encodeTime(10) + encodeRandom(16), matching record.cjs's own ULID_LENGTH.
 const RUN_FILE_EXTENSION = ".jsonl";
 
-// Mirrors plugins/aidd-telemetry/hooks/lib/repo.js's own `sanitizePathSegment`, character
+// Mirrors plugins/aidd-telemetry/hooks/lib/repo.cjs's own `sanitizePathSegment`, character
 // for character, so a vendor id sanitized there on write matches what is sanitized here on
 // read. Not a shared runtime import: the hook is a zero-dependency CommonJS script the
 // framework build copies verbatim (see telemetry-project-id.ts's doc comment for the same
@@ -24,7 +24,7 @@ export function sanitizePathSegment(segment: string): string {
   return cleaned === "" || cleaned === "." || cleaned === ".." ? "-" : cleaned;
 }
 
-// Mirrors record.js's parseRunFileName: split on the fixed ULID length, never on "__",
+// Mirrors record.cjs's parseRunFileName: split on the fixed ULID length, never on "__",
 // since a sanitized vendor id can itself contain that substring.
 function matchesVendorId(entry: string, wantedSegment: string): boolean {
   if (!entry.endsWith(RUN_FILE_EXTENSION)) return false;

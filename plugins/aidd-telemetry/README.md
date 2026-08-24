@@ -19,13 +19,13 @@ CLI, no account. The scripts it ships are self-contained and run under plain `no
 
 ```bash
 # 1. allow it, once per project
-node <plugin>/skills/00-init/scripts/telemetry-switch.js on
+node <plugin>/skills/00-init/scripts/telemetry-switch.cjs on
 
 # 2. work
 
 # 3. read what your tools wrote, then ask
-node <plugin>/skills/01-cost/scripts/telemetry-report.js read
-node <plugin>/skills/01-cost/scripts/telemetry-report.js report
+node <plugin>/skills/01-cost/scripts/telemetry-report.cjs read
+node <plugin>/skills/01-cost/scripts/telemetry-report.cjs report
 ```
 
 Or let the skills do it: **init** turns it on and verifies the switch, **check** answers
@@ -126,7 +126,7 @@ tokens; turning tokens into money is a separate service's job.
 
 **The journal** stays in the repository it describes — `aidd_docs/runs/`, git-ignored the
 moment measurement is turned on, through `aidd setup`, `aidd plugin add`, or this plugin's
-own `telemetry-switch.js on`. It is a property of that repository: every line names a
+own `telemetry-switch.cjs on`. It is a property of that repository: every line names a
 repository-relative path or a task folder, and moving it out would leave a file about one
 repository with no way to say which. It records who worked on what, for how long, and
 every file each session wrote — nothing else.

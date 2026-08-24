@@ -8,7 +8,7 @@ import { createTestEnv, gitInit, runCliFast } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(process.cwd(), "..");
-const JOURNAL_HOOK = resolve(REPO_ROOT, "plugins/aidd-telemetry/hooks/journal.js");
+const JOURNAL_HOOK = resolve(REPO_ROOT, "plugins/aidd-telemetry/hooks/journal.cjs");
 const SETUP_ARGS = [
   "setup",
   "--source",

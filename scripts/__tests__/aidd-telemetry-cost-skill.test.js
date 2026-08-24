@@ -7,8 +7,8 @@ const pluginDir = path.resolve(__dirname, "../../plugins/aidd-telemetry");
 const skillDir = path.join(pluginDir, "skills/01-cost");
 // Real source, not a re-description of it: closure tests below check the skill's own text
 // against what these two modules actually accept and actually emit.
-const { build } = require(path.join(skillDir, "scripts/lib/report.js"));
-const { toEnvelope, ARTEFACT_AXES, ENVELOPE_VERSION } = require(path.join(skillDir, "scripts/lib/render.js"));
+const { build } = require(path.join(skillDir, "scripts/lib/report.cjs"));
+const { toEnvelope, ARTEFACT_AXES, ENVELOPE_VERSION } = require(path.join(skillDir, "scripts/lib/render.cjs"));
 const skill = fs.readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
 // A router skill's rules live in its actions; reading only the router would test a
 // table of contents.
@@ -19,7 +19,7 @@ const actions = fs
 const everything = `${skill}\n${actions}`;
 
 test("the cost skill calls the plugin's own binary, never the CLI", () => {
-  assert.ok(everything.includes("telemetry-report.js"), "must call the script the plugin ships");
+  assert.ok(everything.includes("telemetry-report.cjs"), "must call the script the plugin ships");
   assert.ok(
     !/\baidd telemetry\b/u.test(everything),
     "must not depend on the CLI: the plugin measures on its own",
@@ -67,7 +67,7 @@ test("the cost skill prefers an absolute period for a figure that will be kept",
 //
 // What is actually checkable is narrower: the only rendering an agent could scrape and add
 // up by hand is the padded, column-aligned one built for a person, and `emitReport`
-// (scripts/telemetry-report.js:268-273) only reaches it when a `report` call carries
+// (scripts/telemetry-report.cjs:268-273) only reaches it when a `report` call carries
 // neither `--json` nor `--axis`. So every command this skill instructs is checked against
 // the script's own interface, and every `report` call is required to end on one of the two
 // paths that hand back a value the script already computed - closure tests, not a wordlist,
@@ -95,22 +95,22 @@ function scriptFlags(source) {
   return flags;
 }
 
-/** Every `node <telemetry-report.js> ...` the skill's actions write. Confined to this one
+/** Every `node <telemetry-report.cjs> ...` the skill's actions write. Confined to this one
  * inline-backticked shape, which is where every such call in this skill actually appears -
  * the `find`/`Get-ChildItem` lines in 01-locate.md are a different pattern, and their own
  * search directories are covered by "each skill finds its own script on a tool that sets no
  * plugin-root variable" above. */
 function reportCommands(text) {
-  return [...text.matchAll(/`node <telemetry-report\.js> ([^`]+)`/gu)].map((m) => m[1].trim());
+  return [...text.matchAll(/`node <telemetry-report\.cjs> ([^`]+)`/gu)].map((m) => m[1].trim());
 }
 
-test("every command the cost skill names is one telemetry-report.js actually accepts", () => {
+test("every command the cost skill names is one telemetry-report.cjs actually accepts", () => {
   const commands = reportCommands(everything);
   // A closure test over an empty extraction passes vacuously. Pinned so deleting every
   // command - not just rewording one - fails loudly instead of silently.
-  assert.equal(commands.length, 4, "expected exactly four telemetry-report.js invocations in the cost skill");
+  assert.equal(commands.length, 4, "expected exactly four telemetry-report.cjs invocations in the cost skill");
 
-  const flags = scriptFlags(fs.readFileSync(path.join(skillDir, "scripts/telemetry-report.js"), "utf8"));
+  const flags = scriptFlags(fs.readFileSync(path.join(skillDir, "scripts/telemetry-report.cjs"), "utf8"));
   assert.ok(flags.size >= 5, "the flag extractor must find the script's real flags, not an empty set");
 
   for (const command of commands) {
@@ -118,11 +118,11 @@ test("every command the cost skill names is one telemetry-report.js actually acc
     const [subcommand, ...rest] = tokens;
     assert.ok(
       subcommand === "read" || subcommand === "report",
-      `"${subcommand}" is not a subcommand telemetry-report.js implements`,
+      `"${subcommand}" is not a subcommand telemetry-report.cjs implements`,
     );
     for (const token of rest) {
       if (!token.startsWith("--")) continue;
-      assert.ok(flags.has(token), `"${token}" is not a flag telemetry-report.js reads`);
+      assert.ok(flags.has(token), `"${token}" is not a flag telemetry-report.cjs reads`);
     }
     const axisAt = tokens.indexOf("--axis");
     if (axisAt === -1) continue;
@@ -131,7 +131,7 @@ test("every command the cost skill names is one telemetry-report.js actually acc
     assert.deepEqual(
       [...value.split("|")].sort(),
       [...ARTEFACT_AXES].sort(),
-      "an enumerated --axis list must name exactly the axes render.js implements",
+      "an enumerated --axis list must name exactly the axes render.cjs implements",
     );
   }
 });
@@ -289,9 +289,9 @@ test("the measurement script ships inside a skill, where a plugin install carrie
   // else is silently never installed.
   assert.ok(!fs.existsSync(path.join(pluginDir, "bin")), "no top-level bin/, which is dropped");
   for (const script of [
-    "skills/00-init/scripts/telemetry-switch.js",
-    "skills/01-cost/scripts/telemetry-report.js",
-    "skills/02-check/scripts/telemetry-check.js",
+    "skills/00-init/scripts/telemetry-switch.cjs",
+    "skills/01-cost/scripts/telemetry-report.cjs",
+    "skills/02-check/scripts/telemetry-check.cjs",
   ]) {
     const full = path.join(pluginDir, script);
     assert.ok(fs.existsSync(full), `${script} must live under the skill that owns it`);
@@ -307,9 +307,9 @@ test("each skill finds its own script on a tool that sets no plugin-root variabl
   // nothing. A search that only knows Claude Code's directory finds nothing there, and the
   // skill would report its own script missing on a tool where it is installed.
   const searched = [
-    ["skills/00-init/actions/01-check.md", "telemetry-switch.js"],
-    ["skills/01-cost/actions/01-locate.md", "telemetry-report.js"],
-    ["skills/02-check/actions/01-locate.md", "telemetry-check.js"],
+    ["skills/00-init/actions/01-check.md", "telemetry-switch.cjs"],
+    ["skills/01-cost/actions/01-locate.md", "telemetry-report.cjs"],
+    ["skills/02-check/actions/01-locate.md", "telemetry-check.cjs"],
   ];
   for (const [action, script] of searched) {
     const text = fs.readFileSync(path.join(pluginDir, action), "utf8");
@@ -346,7 +346,7 @@ test("the init skill owns turning measurement on, and asks first", () => {
     .map((name) => fs.readFileSync(path.join(initDir, "actions", name), "utf8"))
     .join("\n");
 
-  assert.ok(init.includes("telemetry-switch.js> on"), "must be the place that turns it on");
+  assert.ok(init.includes("telemetry-switch.cjs> on"), "must be the place that turns it on");
   assert.ok(/[Aa]sk/u.test(init), "must ask before measuring someone's project");
   assert.ok(!/\baidd telemetry\b/u.test(init), "must not depend on the CLI");
 });
@@ -383,7 +383,7 @@ test("the check skill calls the plugin's own binary, never the CLI", () => {
     .concat(fs.readFileSync(path.join(checkDir, "SKILL.md"), "utf8"))
     .join("\n");
 
-  assert.ok(check.includes("telemetry-check.js"), "must call the script the plugin ships");
+  assert.ok(check.includes("telemetry-check.cjs"), "must call the script the plugin ships");
   assert.ok(
     !/\baidd telemetry\b/u.test(check),
     "must not depend on the CLI: the plugin measures on its own",
@@ -430,7 +430,7 @@ test("the cost skill names per-person as unanswerable, and what would fix it", (
   }
 });
 
-// The version bug this pins against: render.js bumped `ENVELOPE_VERSION` to 2 when
+// The version bug this pins against: render.cjs bumped `ENVELOPE_VERSION` to 2 when
 // `by_day` and `by_project` landed, and the skill kept telling itself to refuse anything
 // but version 1 - which would have made it stop on every object the script now prints.
 // Read off the live constant rather than a hardcoded number, so the same drift cannot
@@ -441,7 +441,7 @@ test("the cost skill checks the envelope version it actually gets, not a stale o
   }
   assert.ok(
     everything.includes(`\`${ENVELOPE_VERSION}\``),
-    "must expect the version render.js actually sends",
+    "must expect the version render.cjs actually sends",
   );
 });
 
@@ -460,7 +460,7 @@ test("the cost skill writes an artefact to a file when a file is what was asked 
 // turn is superseded, never doubled" — the plugin's own `build()` must answer the same
 // way the CLI's `buildCostReport` does, since both read the same day files (phase-1,
 // "A turn read while it runs is not the last word").
-test("report.js's build() supersedes a still-open local-read turn, never doubles it", () => {
+test("report.cjs's build() supersedes a still-open local-read turn, never doubles it", () => {
   const declaredTools = [
     {
       tool: "codex",

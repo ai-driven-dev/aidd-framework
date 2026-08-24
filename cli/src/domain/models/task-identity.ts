@@ -7,7 +7,7 @@
  *
  * Two shapes exist side by side and both are real tasks — a folder of files, and a single
  * `.md` file — so matching only the folder would leave half of them unattributable. The
- * anchoring mirrors `plugins/aidd-telemetry/hooks/lib/file-writes.js`'s own
+ * anchoring mirrors `plugins/aidd-telemetry/hooks/lib/file-writes.cjs`'s own
  * `TASK_PATH_ANCHOR_PATTERN`, which is the gate that decides whether a write is journalled
  * at all: a path this module refuses would never have produced a line to read.
  */

@@ -37,14 +37,14 @@ function pluginFile(relativePath: string): string {
 }
 
 const ARTEFACTS = [
-  "skills/00-init/scripts/telemetry-switch.js",
-  "skills/01-cost/scripts/telemetry-report.js",
-  "hooks/journal.js",
-  "hooks/lib/record.js",
-  "hooks/lib/repo.js",
-  "hooks/lib/file-writes.js",
-  "hooks/lib/step-starts.js",
-  "hooks/lib/host.js",
+  "skills/00-init/scripts/telemetry-switch.cjs",
+  "skills/01-cost/scripts/telemetry-report.cjs",
+  "hooks/journal.cjs",
+  "hooks/lib/record.cjs",
+  "hooks/lib/repo.cjs",
+  "hooks/lib/file-writes.cjs",
+  "hooks/lib/step-starts.cjs",
+  "hooks/lib/host.cjs",
 ] as const;
 
 describe("a plugin's executable files survive being installed", () => {
@@ -69,7 +69,7 @@ describe("a plugin's executable files survive being installed", () => {
 /** The decisive check: not "would a rewrite damage it", but "does installing the plugin
  * actually put it there, unchanged". Everything above is a guard; this is the proof. */
 describe("installing the plugin carries its measurement script, on every tool", () => {
-  const SCRIPT = "skills/01-cost/scripts/telemetry-report.js";
+  const SCRIPT = "skills/01-cost/scripts/telemetry-report.cjs";
   const translator = new PluginContentTranslator({ hash: () => new FileHash("a".repeat(32)) });
 
   function distributionOf(): PluginDistribution {
@@ -79,7 +79,7 @@ describe("installing the plugin carries its measurement script, on every tool", 
     ];
     const hooks = [
       { relativePath: "hooks/hooks.json", content: pluginFile("hooks/hooks.json") },
-      { relativePath: "hooks/journal.js", content: pluginFile("hooks/journal.js") },
+      { relativePath: "hooks/journal.cjs", content: pluginFile("hooks/journal.cjs") },
     ];
     return new PluginDistribution({
       manifest: { name: "aidd-telemetry", version: "0.1.0" },
@@ -93,7 +93,7 @@ describe("installing the plugin carries its measurement script, on every tool", 
     it(`${tool.toolId} installs it byte for byte`, () => {
       const installed = translator
         .translate(distributionOf(), tool, "aidd_docs")
-        .find((file) => file.relativePath.endsWith("01-cost/scripts/telemetry-report.js"));
+        .find((file) => file.relativePath.endsWith("01-cost/scripts/telemetry-report.cjs"));
 
       expect(installed, `${tool.toolId} drops the script entirely`).toBeDefined();
       expect(installed?.content).toBe(pluginFile(SCRIPT));
@@ -141,7 +141,7 @@ describe("installing the plugin carries its measurement script, on every tool", 
 
       const installed = translator
         .translate(distributionWithScript(script), tool, "aidd_docs")
-        .find((file) => file.relativePath.endsWith("01-cost/scripts/telemetry-report.js"));
+        .find((file) => file.relativePath.endsWith("01-cost/scripts/telemetry-report.cjs"));
 
       expect(installed?.content).toBe(script);
     });
@@ -153,7 +153,7 @@ describe("installing the plugin carries its measurement script, on every tool", 
     // happens to leave it alone — luck, which this pins down.
     const installed = translator
       .translate(distributionOf(), opencode, "aidd_docs")
-      .find((file) => file.relativePath.endsWith("01-cost/scripts/telemetry-report.js"));
+      .find((file) => file.relativePath.endsWith("01-cost/scripts/telemetry-report.cjs"));
 
     expect(installed, "opencode drops the script entirely").toBeDefined();
     expect(installed?.content).toBe(pluginFile(SCRIPT));

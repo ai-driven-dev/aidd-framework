@@ -3,8 +3,8 @@
 // Neither derives a figure the other cannot see. Two ways of computing one number is how
 // they start disagreeing.
 
-const { DISPLAY_NAME } = require("./readers.js");
-const { tokensOf } = require("./report.js");
+const { DISPLAY_NAME } = require("./readers.cjs");
+const { tokensOf } = require("./report.cjs");
 
 // Bumped from 2: `by_model`'s `model` is now absent on the row for a record neither reader
 // that permits a model-less request could name - a consumer that read it as always a

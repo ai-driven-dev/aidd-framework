@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/journal.js session-start"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/journal.cjs session-start"
           }
         ]
       }
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/journal.js turn-end"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/journal.cjs turn-end"
           }
         ]
       }
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/journal.js tool-used"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/journal.cjs tool-used"
           }
         ]
       }

@@ -732,7 +732,7 @@ export async function createDeps(
   // This is the one place allowed to map a tool that declares `telemetryLocalRead: {
   // kind: "declared" }` to the adapter that reads it.
   // `resolveHomeDir()`, not a bare `homedir()`: this must land on the same directory the
-  // plugin's own `readers.js` resolves for the same tool, on every platform.
+  // plugin's own `readers.cjs` resolves for the same tool, on every platform.
   const localCostReaders: ReadonlyMap<AiToolId, SessionCostReader> = new Map<
     AiToolId,
     SessionCostReader

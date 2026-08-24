@@ -4,8 +4,8 @@
 // never captured handing a path to a hook. Its own telemetry export is itself unmeasured
 // (an Enterprise team setting nobody here can turn on), so vendorField names nothing.
 
-const { getRepoRoot } = require("../repo.js");
-const { skillNameFromSkillFileRead } = require("./skill-detection.js");
+const { getRepoRoot } = require("../repo.cjs");
+const { skillNameFromSkillFileRead } = require("./skill-detection.cjs");
 
 // The first workspace_roots entry getRepoRoot actually resolves - a multi-root workspace
 // carries several entries and only some of them are git repositories, so index zero is not

@@ -2,7 +2,7 @@
 // declaration, so it lives here rather than in any single one of them. Neither shape below
 // names a host; each tool file passes in the field names its own payload actually uses.
 
-const { normalizeSeparators, stringsWithin } = require("../host.js");
+const { normalizeSeparators, stringsWithin } = require("../host.cjs");
 
 // Anchored on a `skills/` segment, so an ordinary file named SKILL.md opens nothing. The
 // tail accepts end-of-string or a quote/space, because on Codex the path sits inside a

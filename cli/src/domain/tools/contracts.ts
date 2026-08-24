@@ -77,13 +77,13 @@ export interface AiTool<C> {
   readonly telemetryJournalHost?: string;
   /** Whether a session on this tool can be traced to the task it worked on. Once true only
    * where the journal hook could read a written path out of that tool's own hook payload;
-   * now true for every host `journal.js`'s `tool-used` dispatch reaches at all, because a
+   * now true for every host `journal.cjs`'s `tool-used` dispatch reaches at all, because a
    * task can be *declared* - a tool call's own arguments named a file under a task folder,
    * read the same way `step_start` reads which skill is running, asking nothing of the
    * host's payload shape. `false` remains where no tool-used event ever reaches the host in
    * the first place (OpenCode's plugin observes only session lifecycle events), which a
    * declaration cannot work around any more than a written path could. The truth lives in
-   * `hooks/lib/task-declared.js` and `hooks/journal.js`'s dispatch, inside a zero-dependency
+   * `hooks/lib/task-declared.cjs` and `hooks/journal.cjs`'s dispatch, inside a zero-dependency
    * script the framework build copies verbatim and this side cannot import, so it is
    * declared here and pinned to `journalAttributable` by a test — the same arrangement
    * `telemetryJournalHost` already uses for `DECLARED_HOSTS`.

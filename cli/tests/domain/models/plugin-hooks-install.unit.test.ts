@@ -19,7 +19,7 @@ const stubHasher = { hash: (_content: string) => new FileHash("a".repeat(32)) };
 const translator = new PluginContentTranslator(stubHasher);
 
 const SOURCE_TOKEN = claude.capabilities.plugins.pluginRootToken ?? "";
-const HOOK_COMMAND = `node ${SOURCE_TOKEN}/hooks/journal.js session-start`;
+const HOOK_COMMAND = `node ${SOURCE_TOKEN}/hooks/journal.cjs session-start`;
 const SCRIPT = `#!/usr/bin/env node\n// carries ${SOURCE_TOKEN} in a comment\n`;
 const HOOKS_JSON = JSON.stringify({
   hooks: { SessionStart: [{ hooks: [{ type: "command", command: HOOK_COMMAND }] }] },
@@ -34,7 +34,7 @@ const MCP_JSON = JSON.stringify({
 function pluginWithHookAndScript(): PluginDistribution {
   const hooks = [
     { relativePath: "hooks/hooks.json", content: HOOKS_JSON },
-    { relativePath: "hooks/journal.js", content: SCRIPT },
+    { relativePath: "hooks/journal.cjs", content: SCRIPT },
   ];
   const mcp = [{ relativePath: ".mcp.json", content: MCP_JSON }];
   return new PluginDistribution({
@@ -81,7 +81,7 @@ describe("installing a plugin that ships hooks", () => {
     // hooks could not be observed running, so neither answer has been checked against it.
     const manifest = contentEndingWith(installedFor(cursor), "hooks.json") ?? "";
 
-    expect(manifest).toContain('"command": "node ./hooks/journal.js session-start"');
+    expect(manifest).toContain('"command": "node ./hooks/journal.cjs session-start"');
     expect(manifest).not.toContain(SOURCE_TOKEN);
     expect(cursor.capabilities.plugins.pluginRootToken).not.toBe("./");
   });
@@ -90,7 +90,7 @@ describe("installing a plugin that ships hooks", () => {
     // Measured: rewriting a script's content changed it by six bytes on one tool and lost
     // one on another. A script is carried, never translated.
     for (const tool of HOOK_HOSTS) {
-      expect(contentEndingWith(installedFor(tool), "journal.js"), tool.toolId).toBe(SCRIPT);
+      expect(contentEndingWith(installedFor(tool), "journal.cjs"), tool.toolId).toBe(SCRIPT);
     }
   });
 
@@ -116,7 +116,7 @@ describe("installing a plugin that ships hooks", () => {
 
     expect(result.skipped).toEqual([]);
     const flatHooksDir = opencode.capabilities.plugins.flatHooksDir ?? "";
-    expect(contentEndingWith(result, "journal.js")).toBe(SCRIPT);
+    expect(contentEndingWith(result, "journal.cjs")).toBe(SCRIPT);
     expect(result.files.some((file) => file.relativePath === `${flatHooksDir}hooks.json`)).toBe(
       false
     );

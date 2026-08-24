@@ -10,18 +10,18 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const { listJournals } = require("./lib/journal.js");
-const { TOOLS, homeDir } = require("./lib/readers.js");
-const { buildIntervals, attribute } = require("./lib/attribution.js");
-const { diagnose } = require("./lib/diagnose.js");
-const { printReport } = require("./lib/render.js");
-const { switchOn } = require("./lib/switch.js");
-const { isGitRepo } = require("./lib/repo.js");
-const { resolveSessionAnchor, resolveCurrentTool } = require("./lib/session-anchor.js");
-const { readCodexHookTrust } = require("./lib/hook-trust.js");
-const { UNRECOGNISED_FILE_NAME } = require("./lib/unrecognised.js");
-const { readExportConfig } = require("./lib/export-config.js");
-const { findExportedRecordForSession } = require("./lib/export-sink.js");
+const { listJournals } = require("./lib/journal.cjs");
+const { TOOLS, homeDir } = require("./lib/readers.cjs");
+const { buildIntervals, attribute } = require("./lib/attribution.cjs");
+const { diagnose } = require("./lib/diagnose.cjs");
+const { printReport } = require("./lib/render.cjs");
+const { switchOn } = require("./lib/switch.cjs");
+const { isGitRepo } = require("./lib/repo.cjs");
+const { resolveSessionAnchor, resolveCurrentTool } = require("./lib/session-anchor.cjs");
+const { readCodexHookTrust } = require("./lib/hook-trust.cjs");
+const { UNRECOGNISED_FILE_NAME } = require("./lib/unrecognised.cjs");
+const { readExportConfig } = require("./lib/export-config.cjs");
+const { findExportedRecordForSession } = require("./lib/export-sink.cjs");
 
 const out = (line) => process.stdout.write(`${line}\n`);
 

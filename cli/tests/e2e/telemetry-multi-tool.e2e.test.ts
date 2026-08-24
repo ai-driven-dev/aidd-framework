@@ -18,7 +18,7 @@ import { createTestEnv, gitInit, runCli } from "./helpers.js";
 const REPO_ROOT = resolve(process.cwd(), "..");
 const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
 const HOOK_FIXTURES = join(REPO_ROOT, "scripts", "__tests__", "fixtures");
-const JOURNAL_HOOK = join(REPO_ROOT, "plugins", "aidd-telemetry", "hooks", "journal.js");
+const JOURNAL_HOOK = join(REPO_ROOT, "plugins", "aidd-telemetry", "hooks", "journal.cjs");
 const OPENCODE_EXPORT_FIXTURE = join(
   process.cwd(),
   "tests",

@@ -39,8 +39,8 @@ Declared in `plugins/<plugin>/hooks/hooks.json`. They run Node, so users need `n
 
 | Plugin           | Event                                    | Runs                      | Purpose                                                              |
 | ---------------- | ----------------------------------------- | ------------------------- | --------------------------------------------------------------------- |
-| `aidd-context`   | `SessionStart`                            | `hooks/update_memory.js`  | Refresh the project memory block in the AI context files              |
-| `aidd-telemetry` | `SessionStart` · `Stop` · `PostToolUse`   | `hooks/journal.js`        | Journal every session so a unit of work can be tied to what it cost   |
+| `aidd-context`   | `SessionStart`                            | `hooks/update_memory.cjs`  | Refresh the project memory block in the AI context files              |
+| `aidd-telemetry` | `SessionStart` · `Stop` · `PostToolUse`   | `hooks/journal.cjs`        | Journal every session so a unit of work can be tied to what it cost   |
 
 A hook is authored once, with `${CLAUDE_PLUGIN_ROOT}`, and the installer rewrites it to whatever the target tool expands. Which tools run a bundled hook at all, and what each resolves:
 

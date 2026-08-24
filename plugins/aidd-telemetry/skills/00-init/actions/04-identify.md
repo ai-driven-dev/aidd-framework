@@ -6,7 +6,7 @@ separate choice, made or declined independently of the project switch.
 
 ## Input
 
-The path to `telemetry-identity.js`, resolved the same way `telemetry-switch.js` is (see
+The path to `telemetry-identity.cjs`, resolved the same way `telemetry-switch.cjs` is (see
 01-check) — beside it, under this same skill's `scripts/`.
 
 ## Output
@@ -16,7 +16,7 @@ person can withdraw at any time, and a user who knows exactly what it does and d
 
 ## Process
 
-1. **Check first.** Run `node <telemetry-identity.js> status`.
+1. **Check first.** Run `node <telemetry-identity.cjs> status`.
    - Already on: relay it and stop — no consent to ask again for a choice already made.
 2. **Say what it attaches, before asking.** Turning this on attaches one stable, random
    identifier — never an email, a git author, or a hostname — to records this machine reads
@@ -26,12 +26,12 @@ person can withdraw at any time, and a user who knows exactly what it does and d
    separate, later choice; turning this on alone sets none.
 3. **Ask.** Wait for a yes.
    - Declines: stop, and write nothing.
-4. **Turn it on.** Run `node <telemetry-identity.js> on` and relay what it prints.
+4. **Turn it on.** Run `node <telemetry-identity.cjs> on` and relay what it prints.
 5. **Offer a display name, separately.** Ask whether they also want a display name shown
    beside their figures. Only on a yes, ask for the value and run
-   `node <telemetry-identity.js> name "<value>"`. A no here is not a smaller yes to the
+   `node <telemetry-identity.cjs> name "<value>"`. A no here is not a smaller yes to the
    identifier question — nothing beyond the identifier is set.
-6. **Say it is reversible.** `node <telemetry-identity.js> off` stops new records carrying
+6. **Say it is reversible.** `node <telemetry-identity.cjs> off` stops new records carrying
    it; what is already stored keeps the identifier it was written with.
 
 ## Test

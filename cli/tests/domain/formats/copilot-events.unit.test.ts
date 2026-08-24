@@ -8,7 +8,7 @@ const EMPTY_SESSION = "44444444-4444-4444-8444-444444444444";
 
 // Both fixtures are real, redacted excerpts of a captured `@github/copilot@1.0.80` file —
 // system.message, user.message, assistant.message and every reasoning field stripped, per
-// #697's acceptance criterion. See readers.js's own copy of this measurement for the
+// #697's acceptance criterion. See readers.cjs's own copy of this measurement for the
 // prose, and copilot-events.ts's own header comment for the arithmetic it rests on.
 function loadFixture(relativePath: string): string {
   const url = new URL(`../../fixtures/local-cost/${relativePath}`, import.meta.url);

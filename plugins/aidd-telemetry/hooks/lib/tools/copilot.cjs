@@ -4,7 +4,7 @@
 // turn identifier ever arrives on a hook payload, and no written-path extractor - Copilot
 // was never captured handing a path to a hook.
 
-const { skillNameFromArgument, skillNameFromAnyArgument } = require("./skill-detection.js");
+const { skillNameFromArgument, skillNameFromAnyArgument } = require("./skill-detection.cjs");
 
 module.exports = {
   // sessionId is the canonical builder's spelling; session_id is the _vsCodeCompat

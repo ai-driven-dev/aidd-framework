@@ -125,7 +125,7 @@ export function flatMcpKeyPrefix(plugin: string): string {
  * way the tool's own loader would see them.
  *
  * @param flatHooksDir       - The tool's declared flat hooks directory, trailing slash included
- * @param hooksRelativePath  - A hook component's path, e.g. "hooks/journal.js"
+ * @param hooksRelativePath  - A hook component's path, e.g. "hooks/journal.cjs"
  */
 export function flatHooksSharedDirPath(flatHooksDir: string, hooksRelativePath: string): string {
   return `${flatHooksDir}${hooksRelativePath.replace(/^hooks\//, "")}`;

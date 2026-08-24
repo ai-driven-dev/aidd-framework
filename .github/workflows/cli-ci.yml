@@ -170,24 +170,24 @@ jobs:
       # The chain end to end, on the platform where a home directory, a line ending and an
       # absolute path all resolve differently than they do on the Linux jobs above.
       - name: Chain - switch telemetry on
-        run: node plugins/aidd-telemetry/skills/00-init/scripts/telemetry-switch.js on
+        run: node plugins/aidd-telemetry/skills/00-init/scripts/telemetry-switch.cjs on
       - name: Chain - journal a captured payload
         run: |
           # The fixture's own cwd is a path from whatever machine captured it - rewritten to
           # this checkout's real path so getRepoRoot resolves a repository that exists here.
           node -e "const p=require('./scripts/__tests__/fixtures/claude-code-session-start.json'); p.cwd=process.cwd(); require('fs').writeFileSync('payload.json', JSON.stringify(p));"
-          node plugins/aidd-telemetry/hooks/journal.js session-start < payload.json
-          node plugins/aidd-telemetry/hooks/journal.js turn-end < payload.json
+          node plugins/aidd-telemetry/hooks/journal.cjs session-start < payload.json
+          node plugins/aidd-telemetry/hooks/journal.cjs turn-end < payload.json
       - name: Chain - the journal stays private and git add -A still works
         run: |
           git add -A
           git status --porcelain >/dev/null
       - name: Chain - read it back
         run: |
-          node plugins/aidd-telemetry/skills/01-cost/scripts/telemetry-report.js read
-          node plugins/aidd-telemetry/skills/01-cost/scripts/telemetry-report.js report
+          node plugins/aidd-telemetry/skills/01-cost/scripts/telemetry-report.cjs read
+          node plugins/aidd-telemetry/skills/01-cost/scripts/telemetry-report.cjs report
       - name: Chain - diagnose
-        run: node plugins/aidd-telemetry/skills/02-check/scripts/telemetry-check.js
+        run: node plugins/aidd-telemetry/skills/02-check/scripts/telemetry-check.cjs
 
       - name: Plugin suite
         run: node --test "scripts/__tests__/*.test.js"

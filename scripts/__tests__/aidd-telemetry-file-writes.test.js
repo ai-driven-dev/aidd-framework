@@ -6,8 +6,8 @@ const test = require("node:test");
 const { spawnSync } = require("node:child_process");
 
 const root = path.resolve(__dirname, "../..");
-const FILE_WRITES = path.join(root, "plugins/aidd-telemetry/hooks/lib/file-writes.js");
-const RECORD = path.join(root, "plugins/aidd-telemetry/hooks/lib/record.js");
+const FILE_WRITES = path.join(root, "plugins/aidd-telemetry/hooks/lib/file-writes.cjs");
+const RECORD = path.join(root, "plugins/aidd-telemetry/hooks/lib/record.cjs");
 
 // Under a git hook, git exports GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE, which would
 // point every child git call here at the real repository instead of the temporary one.

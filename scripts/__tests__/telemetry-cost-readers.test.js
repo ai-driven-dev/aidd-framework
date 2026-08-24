@@ -6,8 +6,8 @@ const { describe, it, before, after } = require("node:test");
 
 const SCRIPTS = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts");
 const SHARED = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts/lib");
-const { TOOLS } = require(path.join(SHARED, "readers.js"));
-const { listJournals, readJournal, projectOf } = require(path.join(SHARED, "journal.js"));
+const { TOOLS } = require(path.join(SHARED, "readers.cjs"));
+const { listJournals, readJournal, projectOf } = require(path.join(SHARED, "journal.cjs"));
 
 const FIXTURES = path.resolve(__dirname, "../../cli/tests/fixtures/local-cost");
 const CLAUDE_SESSION = "22222222-2222-4222-8222-222222222222";

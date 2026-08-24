@@ -5,7 +5,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { ignoreRunsDir, warnIfTracked } = require("./lib/journal-privacy.js");
+const { ignoreRunsDir, warnIfTracked } = require("./lib/journal-privacy.cjs");
 
 // `.aidd/config.json`'s `telemetry.enabled` is the single switch every component reads
 // fresh at the moment it acts, so turning it off takes effect on the very next write.

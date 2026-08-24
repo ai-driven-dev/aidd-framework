@@ -7,10 +7,10 @@
 
 const fs = require("node:fs");
 
-const { normalizeSeparators, stringsWithin } = require("./host.js");
-const { resolveRunsDir } = require("./repo.js");
-const { readCwd, toolFor } = require("./tools/index.js");
-const { findRunFileByVendorId, appendLine, buildTaskDeclaredLine, nowIso } = require("./record.js");
+const { normalizeSeparators, stringsWithin } = require("./host.cjs");
+const { resolveRunsDir } = require("./repo.cjs");
+const { readCwd, toolFor } = require("./tools/index.cjs");
+const { findRunFileByVendorId, appendLine, buildTaskDeclaredLine, nowIso } = require("./record.cjs");
 
 // Unanchored, and tolerant of sitting inside a larger string - a quote or whitespace closes
 // it, the same tolerance SKILL_FILE_PATTERN gives a Codex shell command line. Two shapes,

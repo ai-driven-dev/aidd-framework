@@ -38,10 +38,10 @@ function skillFile(relativePath: string, content = "// stub"): PluginComponentFi
 
 function makeTelemetryLikeDist(): PluginDistribution {
   const skills = [
-    skillFile("shared/attribution.js"),
+    skillFile("shared/attribution.cjs"),
     skillFile("package.json", `{ "type": "commonjs" }`),
     skillFile("01-cost/SKILL.md", `---\nname: 01-cost\ndescription: Cost skill\n---\n\nBody.\n`),
-    skillFile("01-cost/scripts/telemetry-report.js", `require("../../shared/attribution.js");`),
+    skillFile("01-cost/scripts/telemetry-report.cjs", `require("../../shared/attribution.cjs");`),
   ];
   return new PluginDistribution({
     manifest: { name: PLUGIN_NAME, version: "1.0.0" },
@@ -75,9 +75,9 @@ describe("opencode flat skills — built-tree route agrees with mode-B install r
     expect(builtTree).toEqual(modeB);
     expect(modeB).toEqual([
       ".opencode/skills/aidd-telemetry/01-cost/SKILL.md",
-      ".opencode/skills/aidd-telemetry/01-cost/scripts/telemetry-report.js",
+      ".opencode/skills/aidd-telemetry/01-cost/scripts/telemetry-report.cjs",
       ".opencode/skills/aidd-telemetry/package.json",
-      ".opencode/skills/aidd-telemetry/shared/attribution.js",
+      ".opencode/skills/aidd-telemetry/shared/attribution.cjs",
     ]);
   });
 });

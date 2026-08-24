@@ -5,7 +5,7 @@ const path = require("node:path");
 const { describe, it, beforeEach, afterEach } = require("node:test");
 
 const SCRIPTS = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts");
-const SINK = path.join(SCRIPTS, "lib/sink.js");
+const SINK = path.join(SCRIPTS, "lib/sink.cjs");
 
 /** The sink reads its directory from the environment at call time, so each test gets its
  * own and nothing is shared between them. `require` is re-run so the module picks it up. */
@@ -86,7 +86,7 @@ describe("keeping records a session left behind", () => {
   // in "Z" - the fast path `recordDayKey` takes for a real one. Answering a sliced fragment
   // there instead of `null` would place the record in whatever period happened to contain
   // that fragment, rather than handing it back undated the way a genuinely unparseable
-  // moment already is above. Mirrors report.js's own `recordDayKey` and
+  // moment already is above. Mirrors report.cjs's own `recordDayKey` and
   // cli/src/domain/models/telemetry-sink-record.ts's `telemetrySinkRecordDayKey`.
   it("hands back a record whose moment is merely shaped like one, undated - never a sliced fragment", () => {
     store({ vendor_id: "damaged", event_timestamp: "not-a-momentZ" });

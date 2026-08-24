@@ -4,7 +4,7 @@ Ask the script whether the chain is recording, and hand back exactly what it fou
 
 ## Input
 
-The path to `telemetry-check.js`, from locate.
+The path to `telemetry-check.cjs`, from locate.
 
 ## Output
 
@@ -12,7 +12,7 @@ Every line the script printed, unchanged, or the one line it prints when measure
 
 ## Process
 
-1. **Run it.** `node <telemetry-check.js>` takes no arguments and reads the current project.
+1. **Run it.** `node <telemetry-check.cjs>` takes no arguments and reads the current project.
 2. **Measurement off stops here.** If the only line says measurement is off, relay that line and stop — there is nothing to check until it is turned on, and no failure to report.
 3. **Not a git repository stops here too.** If the only line says so, relay it and stop. The hook writes into the repository's own tree; outside one it has nowhere to write, which is a fact about the project, not a hook that failed to fire — never relay it as "hook fired FAIL".
 4. **Present every line, in the order printed.** Four claims, then any tool nothing here can read. Add nothing that sums them: a line summarising the others is where a failure hides.

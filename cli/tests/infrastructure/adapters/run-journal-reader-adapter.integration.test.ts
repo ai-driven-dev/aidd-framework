@@ -9,7 +9,7 @@ import {
 import { journalRepo } from "../../helpers/telemetry-journal-hook.js";
 
 // A real-shaped ULID (26 Crockford-base32 characters), matching what
-// plugins/aidd-telemetry/hooks/lib/record.js's generateUlid mints — the adapter splits a
+// plugins/aidd-telemetry/hooks/lib/record.cjs's generateUlid mints — the adapter splits a
 // run file's name on this fixed length, never on "__", so the id itself must be genuine.
 const RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
 const SESSION_ID = "22222222-2222-4222-8222-222222222222";
@@ -108,7 +108,7 @@ describe("RunJournalReaderAdapter", () => {
 });
 
 // Duplicated on purpose, not shared at runtime — see the adapter's own doc comment for
-// why. This is what proves the duplication stays honest: if repo.js's regex ever moves,
+// why. This is what proves the duplication stays honest: if repo.cjs's regex ever moves,
 // this test turns red before a session id merely fails to match its own journal file,
 // silently, with every other test still green.
 describe("sanitizePathSegment — agrees with the journal hook's own function", () => {

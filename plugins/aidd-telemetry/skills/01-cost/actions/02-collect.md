@@ -4,7 +4,7 @@ Join each tool's own transcript to the run journal, and store the result.
 
 ## Input
 
-The path to `telemetry-report.js`, from locate.
+The path to `telemetry-report.cjs`, from locate.
 
 ## Output
 
@@ -12,7 +12,7 @@ A stored set of this project's sessions, and a note of anything unreadable.
 
 ## Process
 
-1. **Read every journalled session.** Run `node <telemetry-report.js> read`, which needs no session identifier because the journal already holds every one of them.
+1. **Read every journalled session.** Run `node <telemetry-report.cjs> read`, which needs no session identifier because the journal already holds every one of them.
 2. **Read the answer, one line per tool.** Five answers, and only one of them is a zero.
 
    | Reads | Means |

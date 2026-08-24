@@ -34,8 +34,8 @@ function distWithHooks(): PluginDistribution {
       mcp: [],
       hooks: [
         { relativePath: "hooks/hooks.json", content: "{}" },
-        { relativePath: "hooks/journal.js", content: "// journal" },
-        { relativePath: "hooks/lib/host.js", content: "// host" },
+        { relativePath: "hooks/journal.cjs", content: "// journal" },
+        { relativePath: "hooks/lib/host.cjs", content: "// host" },
       ],
     },
   });
@@ -102,8 +102,8 @@ describe("BuiltTreeMaterializationTranslator — opencode (integration)", () => 
   // from its distribution, are what scope the copy instead.
   it("copies this plugin's flat hooks by filename, not by naming convention", async () => {
     const fs = new InMemoryFileAdapter();
-    fs.setFile(`${BUILT}/.opencode/plugin/journal.js`, "// journal");
-    fs.setFile(`${BUILT}/.opencode/plugin/lib/host.js`, "// host");
+    fs.setFile(`${BUILT}/.opencode/plugin/journal.cjs`, "// journal");
+    fs.setFile(`${BUILT}/.opencode/plugin/lib/host.cjs`, "// host");
     fs.setFile(`${BUILT}/.opencode/plugin/other-plugin-hook.js`, "OTHER PLUGIN");
 
     const manifest = Manifest.create();
@@ -126,8 +126,8 @@ describe("BuiltTreeMaterializationTranslator — opencode (integration)", () => 
       "docs"
     );
 
-    expect(fs.getFile(`${PROJECT_ROOT}/.opencode/plugin/journal.js`)).toBe("// journal");
-    expect(fs.getFile(`${PROJECT_ROOT}/.opencode/plugin/lib/host.js`)).toBe("// host");
+    expect(fs.getFile(`${PROJECT_ROOT}/.opencode/plugin/journal.cjs`)).toBe("// journal");
+    expect(fs.getFile(`${PROJECT_ROOT}/.opencode/plugin/lib/host.cjs`)).toBe("// host");
     expect(fs.has(`${PROJECT_ROOT}/.opencode/plugin/hooks.json`)).toBe(false);
     expect(fs.has(`${PROJECT_ROOT}/.opencode/plugin/other-plugin-hook.js`)).toBe(false);
   });

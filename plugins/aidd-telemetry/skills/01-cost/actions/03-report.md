@@ -5,12 +5,12 @@ answer, and render only what that axis calls for - never one shape for every que
 
 ## Input
 
-The path to `telemetry-report.js`, and the question the user asked, in their own words.
+The path to `telemetry-report.cjs`, and the question the user asked, in their own words.
 
 ## Output
 
 **One axis, asked for by name.** Run
-`node <telemetry-report.js> report --axis <total|day|step|model|tool|project> --from <day> --to <day>`,
+`node <telemetry-report.cjs> report --axis <total|day|step|model|tool|project> --from <day> --to <day>`,
 never alongside `--json` - the axis flag already picks the one rendering that answers the
 question, printed exactly as the script wrote it:
 
@@ -73,8 +73,8 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    question asking per person is named as unanswerable there, with what would fix it - stop
    before running the script.
 2. **Ask, as one axis or as the whole object.**
-   - One axis: `node <telemetry-report.js> report --axis <axis> --from 2026-08-01 --to 2026-08-31`.
-   - Everything: `node <telemetry-report.js> report --from 2026-08-01 --to 2026-08-31 --json`, reading the shape from [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md).
+   - One axis: `node <telemetry-report.cjs> report --axis <axis> --from 2026-08-01 --to 2026-08-31`.
+   - Everything: `node <telemetry-report.cjs> report --from 2026-08-01 --to 2026-08-31 --json`, reading the shape from [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md).
    - The figure will be kept or compared: give `--from` and `--to`, since `--days` resolves against today and two identical calls on two days cover two different periods.
 3. **Refuse an unknown shape.** `cost_report_version` is `3` today, read from the `--json`
    path - the `--axis` path prints text the script already built from that same object, so

@@ -12,7 +12,7 @@ const HOOKS_DIR = path.join(PLUGIN_DIR, "hooks");
 // A minimal PATH for spawned scripts, containing only git's own directory - never
 // "/usr/bin:/bin", which doesn't hold git on Windows and uses ":" as a separator, not
 // win32's ";". "where"/"which" differ by platform; either answers with the same thing,
-// which is all a minimal PATH here needs (hooks/lib/repo.js shells out to git).
+// which is all a minimal PATH here needs (hooks/lib/repo.cjs shells out to git).
 const GIT_DIR = path.dirname(
   execFileSync(process.platform === "win32" ? "where" : "which", ["git"], { encoding: "utf8" })
     .trim()
@@ -24,10 +24,10 @@ const GIT_DIR = path.dirname(
 // full require graph rather than stopping at a usage message - a stronger check than the
 // generic fallback below gives an undiscovered script.
 const KNOWN_INVOCATIONS = {
-  "telemetry-switch.js": ["on"],
-  "telemetry-identity.js": ["status"],
-  "telemetry-report.js": ["read"],
-  "telemetry-check.js": [],
+  "telemetry-switch.cjs": ["on"],
+  "telemetry-identity.cjs": ["status"],
+  "telemetry-report.cjs": ["read"],
+  "telemetry-check.cjs": [],
 };
 
 const STACK_FRAME = /\n\s*at .+:\d+:\d+/u;
@@ -89,7 +89,7 @@ function discoverScripts(skillsRoot) {
     const scriptsDir = path.join(skillsRoot, skillEntry.name, "scripts");
     if (!fs.existsSync(scriptsDir)) continue;
     for (const fileEntry of fs.readdirSync(scriptsDir, { withFileTypes: true })) {
-      if (fileEntry.isFile() && fileEntry.name.endsWith(".js")) {
+      if (fileEntry.isFile() && fileEntry.name.endsWith(".cjs")) {
         found.push(`${skillEntry.name}/scripts/${fileEntry.name}`);
       }
     }

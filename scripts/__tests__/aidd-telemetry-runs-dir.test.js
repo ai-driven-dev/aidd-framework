@@ -25,7 +25,7 @@ function writeTelemetryConfig(repo) {
 test("AIDD_RUNS_DIR overrides where runs are written", () => {
   const os = require("node:os");
   const { spawnSync } = require("node:child_process");
-  const script = path.join(root, "plugins/aidd-telemetry/hooks/journal.js");
+  const script = path.join(root, "plugins/aidd-telemetry/hooks/journal.cjs");
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-override-"));
   const runs = path.join(repo, "local-runs");
   const defaultRunsDir = path.join(repo, "aidd_docs", "runs");
@@ -58,7 +58,7 @@ test("a user-named AIDD_RUNS_DIR keeps the permissions its owner gave it", () =>
   if (process.platform === "win32") return;
   const os = require("node:os");
   const { spawnSync } = require("node:child_process");
-  const script = path.join(root, "plugins/aidd-telemetry/hooks/journal.js");
+  const script = path.join(root, "plugins/aidd-telemetry/hooks/journal.cjs");
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-mode-"));
   const runs = path.join(repo, "shared-runs");
 
@@ -90,7 +90,7 @@ test("a user-named AIDD_RUNS_DIR keeps the permissions its owner gave it", () =>
 });
 
 test("a task written as a single .md file is recorded like a folder - the path is returned whole, not reduced to a task_id", () => {
-  const { taskFolderRelativePath } = require("../../plugins/aidd-telemetry/hooks/lib/file-writes.js");
+  const { taskFolderRelativePath } = require("../../plugins/aidd-telemetry/hooks/lib/file-writes.cjs");
   const repo = "/repo";
   assert.equal(
     taskFolderRelativePath(repo, "/repo/aidd_docs/tasks/2026_08/2026_08_14_telemetry-v1/plan.md"),

@@ -40,6 +40,6 @@ Run the flow above. Read only the next action file.
 
 - Measuring someone's project is theirs to allow. Ask before turning it on, always.
 - Naming a person is theirs alone to allow, separately from the project switch above — never assumed from the project being measured, never asked on someone else's behalf.
-- Run only `scripts/telemetry-switch.js` and `scripts/telemetry-identity.js`, beside this skill. Never a script belonging to another skill, and never the `aidd` command.
-- `telemetry-identity.js` never reads `.aidd/config.json` or `AIDD_USER_CONFIG_DIR` — both are settings a repository or a CI job can set, and this choice is not theirs to make. It reads and writes only this machine's own user profile.
+- Run only `scripts/telemetry-switch.cjs` and `scripts/telemetry-identity.cjs`, beside this skill. Never a script belonging to another skill, and never the `aidd` command.
+- `telemetry-identity.cjs` never reads `.aidd/config.json` or `AIDD_USER_CONFIG_DIR` — both are settings a repository or a CI job can set, and this choice is not theirs to make. It reads and writes only this machine's own user profile.
 - The script cannot be found: say so and change nothing.

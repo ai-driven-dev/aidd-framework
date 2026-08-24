@@ -1,6 +1,6 @@
 /**
  * Mirrors the journal hook's own `parseOwnerRepoFromRemote` + `sanitizeProjectId`
- * (`plugins/aidd-telemetry/hooks/lib/repo.js`) character-for-character, so
+ * (`plugins/aidd-telemetry/hooks/lib/repo.cjs`) character-for-character, so
  * `aidd.project_id` agrees on both sides. Not a shared runtime import: the hook is a
  * zero-dependency CommonJS script the framework build copies verbatim, and bundling its
  * raw `require("fs")` calls into the CLI's ESM output has no `require` at runtime —

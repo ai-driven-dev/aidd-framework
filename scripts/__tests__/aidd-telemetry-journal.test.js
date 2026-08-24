@@ -1,9 +1,9 @@
 const assert = require("node:assert/strict");
 const childProcess = require("node:child_process");
 
-// Patched before repo.js is required below, since repo.js destructures spawnSync at
+// Patched before repo.cjs is required below, since repo.cjs destructures spawnSync at
 // require time - a monkeypatch of child_process's own export applied after that point
-// would never reach repo.js's already-captured reference. This is what lets
+// would never reach repo.cjs's already-captured reference. This is what lets
 // countGitInvocations() count real git calls in-process, with no PATH shim: a shim
 // script needs a POSIX shebang and the execute bit to run, neither of which Windows
 // honours (it resolves an executable by PATHEXT/extension instead).
@@ -40,22 +40,22 @@ const {
   resolveEventName,
   runsDir,
   telemetryEnabled,
-} = require("../../plugins/aidd-telemetry/hooks/journal.js");
+} = require("../../plugins/aidd-telemetry/hooks/journal.cjs");
 
-const { taskFolderRelativePath } = require("../../plugins/aidd-telemetry/hooks/lib/file-writes.js");
+const { taskFolderRelativePath } = require("../../plugins/aidd-telemetry/hooks/lib/file-writes.cjs");
 
 const {
   readSessionId,
   VENDOR_FIELD_BY_HOST,
   UNRECOGNISED_FILE_NAME,
-} = require("../../plugins/aidd-telemetry/hooks/lib/record.js");
+} = require("../../plugins/aidd-telemetry/hooks/lib/record.cjs");
 
 const {
   getRepoRoot,
   resolveRunsDir,
-} = require("../../plugins/aidd-telemetry/hooks/lib/repo.js");
+} = require("../../plugins/aidd-telemetry/hooks/lib/repo.cjs");
 
-const { readCwd } = require("../../plugins/aidd-telemetry/hooks/lib/tools/index.js");
+const { readCwd } = require("../../plugins/aidd-telemetry/hooks/lib/tools/index.cjs");
 
 // One exact key set per line type (see phase-1.md) - the replacement for the
 // old THE_TEN_KEYS whitelist, which guarded a single mutable record that no
@@ -80,7 +80,7 @@ const TURN_END_WITH_PROMPT_KEYS = ["type", "at", "prompt_id"].sort();
 const FILE_WRITTEN_KEYS = ["at", "path", "source", "type"];
 
 const root = path.resolve(__dirname, "../..");
-const script = path.join(root, "plugins/aidd-telemetry/hooks/journal.js");
+const script = path.join(root, "plugins/aidd-telemetry/hooks/journal.cjs");
 const fixturesDir = path.join(__dirname, "fixtures");
 
 function readFixture(name) {
@@ -264,7 +264,7 @@ for (const name of ["codex-session-start.json", "copilot-session-start.json", "c
 
 // Copilot's compat shape, one event per fixture, each replayed with the argv its own
 // hooks.json entry passes (see ARGV_EVENT_BY_HOOK_EVENT_NAME) - the untouched capture
-// itself going through journal.js's stdin path, not a payload built to match it.
+// itself going through journal.cjs's stdin path, not a payload built to match it.
 for (const [name, event] of [
   ["copilot-compat-session-start.json", "session-start"],
   ["copilot-compat-post-tool-use.json", "tool-used"],
@@ -412,7 +412,7 @@ test("Codex's own SessionEnd payload closes the turn, since Codex never sends a 
 // only fail if someone edits a fixture. readSessionId reads transcript_path first and
 // session_id second, and a real SessionEnd carries both.
 test("Codex's SessionEnd resolves to the same session its SessionStart did", () => {
-  const { readSessionId } = require("../../plugins/aidd-telemetry/hooks/lib/tools/codex.js");
+  const { readSessionId } = require("../../plugins/aidd-telemetry/hooks/lib/tools/codex.cjs");
   const start = loadFixture("codex-session-start.json");
   const end = loadFixture("codex-session-end.json");
 
@@ -1529,7 +1529,7 @@ test("file-written shells out to git zero times for a tool it does not track - t
           cwd: repo,
           hook_event_name: "PostToolUse",
           tool_name: "Write",
-          tool_input: { file_path: path.join(repo, "src", "index.js"), content: "x" },
+          tool_input: { file_path: path.join(repo, "src", "index.cjs"), content: "x" },
         });
       });
       assert.equal(callsForUnrelatedWrite, 0, "a path outside any task folder must reject before any git shellout");
@@ -1736,7 +1736,7 @@ test("a session whose only write lands outside any task folder appends no file_w
     const written = readRunFiles(runsDirOf(repo));
     const before = fs.readFileSync(written[0]);
 
-    const filePath = path.join(repo, "src", "index.js");
+    const filePath = path.join(repo, "src", "index.cjs");
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, "x\n");
     replayIn(fileWrittenPayload({ cwd: repo, sessionId, filePath }));
@@ -2082,26 +2082,26 @@ test("a truncated final line leaves every earlier line readable", () => {
   }
 });
 
-test("no source file in hooks/lib/ reads a run file's contents back - record.js and file-writes.js never read a file at all", () => {
-  // Scoped to record.js and file-writes.js, not repo.js: repo.js legitimately
+test("no source file in hooks/lib/ reads a run file's contents back - record.cjs and file-writes.cjs never read a file at all", () => {
+  // Scoped to record.cjs and file-writes.cjs, not repo.cjs: repo.cjs legitimately
   // reads .aidd/config.json, which is not a run file. This is the static
   // half of the hard constraint (append never reads); the dynamic half is
   // exercised above by the corrupted-content and byte-identity tests, which
   // would fail immediately if a read-modify-write crept back in.
   const recordSrc = fs.readFileSync(
-    path.join(root, "plugins/aidd-telemetry/hooks/lib/record.js"),
+    path.join(root, "plugins/aidd-telemetry/hooks/lib/record.cjs"),
     "utf8",
   );
   const fileWritesSrc = fs.readFileSync(
-    path.join(root, "plugins/aidd-telemetry/hooks/lib/file-writes.js"),
+    path.join(root, "plugins/aidd-telemetry/hooks/lib/file-writes.cjs"),
     "utf8",
   );
   // Every way of reading a file, not just the one in use today: a regression
   // reintroducing read-modify-write through fs.readFile or a stream would
   // otherwise slip past a guard that only knows one name.
   const ANY_READ = /\b(readFileSync|readFile|createReadStream|openSync|promises\s*\.\s*readFile)\b/u;
-  assert.doesNotMatch(recordSrc, ANY_READ, "record.js must never read a run file back in order to append to it");
-  assert.doesNotMatch(fileWritesSrc, ANY_READ, "file-writes.js must never read a run file back in order to append to it");
+  assert.doesNotMatch(recordSrc, ANY_READ, "record.cjs must never read a run file back in order to append to it");
+  assert.doesNotMatch(fileWritesSrc, ANY_READ, "file-writes.cjs must never read a run file back in order to append to it");
 });
 
 // Runs the hook as a real, non-blocking child process so two sessions can
@@ -2294,7 +2294,7 @@ test("a credential in the remote never reaches the journal", () => {
 });
 
 test("remoteWithoutCredentials strips userinfo from a scheme URL and leaves scp-style whole", () => {
-  const { remoteWithoutCredentials } = require("../../plugins/aidd-telemetry/hooks/lib/repo.js");
+  const { remoteWithoutCredentials } = require("../../plugins/aidd-telemetry/hooks/lib/repo.cjs");
   assert.equal(
     remoteWithoutCredentials("https://user:pass@github.com/o/r.git"),
     "https://github.com/o/r.git",
@@ -2361,7 +2361,7 @@ function makeCopilotPayload({ cwd, sessionId }) {
   };
 }
 
-// Copilot's other builder, _vsCodeCompat (see lib/host.js): Claude Code's own event
+// Copilot's other builder, _vsCodeCompat (see lib/host.cjs): Claude Code's own event
 // spelling reused verbatim (session_id, hook_event_name) instead of sessionId, plus a
 // timestamp field neither Codex nor Claude Code ever carries. Mirrors the shape measured
 // 2026-08-21 against a real @github/copilot@1.0.80 session - see
@@ -2377,8 +2377,8 @@ function makeCopilotCompatPayload({ cwd, sessionId, event }) {
 
 // Cursor's own captured payload (fixtures/cursor-session-start.json - the exact shape the
 // probe measured, per plan.md) carries no top-level cwd at all, only workspace_roots.
-// repo.js's resolveWriteTarget/resolveRunsDir read payload.cwd unconditionally, and
-// repo.js is outside phase-1's architecture projection - translating workspace_roots into a
+// repo.cjs's resolveWriteTarget/resolveRunsDir read payload.cwd unconditionally, and
+// repo.cjs is outside phase-1's architecture projection - translating workspace_roots into a
 // usable cwd is not this phase's work to invent. So this builder mirrors the real shape
 // exactly; it must NOT grow a cwd field just to make a happy-path test pass, or the test
 // would assert a capability the code does not have.
@@ -2786,8 +2786,8 @@ test("every fixture in the directory is free of a real email address, a real hom
 const {
   SKILL_FILE_PATTERN,
   STEP_START_BY_HOST,
-} = require("../../plugins/aidd-telemetry/hooks/lib/step-starts.js");
-const { buildStepStartLine } = require("../../plugins/aidd-telemetry/hooks/lib/record.js");
+} = require("../../plugins/aidd-telemetry/hooks/lib/step-starts.cjs");
+const { buildStepStartLine } = require("../../plugins/aidd-telemetry/hooks/lib/record.cjs");
 
 // Each entry is a real captured payload, edited only where a test needs its own repo,
 // session or skill name. The shapes themselves are never hand-written: Copilot delivering
@@ -3113,11 +3113,11 @@ test("adding a fifth host is a table entry, not an edit to the handler", () => {
   }
 });
 
-// The word hooks.json ships and the word journal.js accepts are two halves of one
+// The word hooks.json ships and the word journal.cjs accepts are two halves of one
 // contract, and nothing else checks they agree. The journal was already dead on every
 // real installation once, for a mismatch of exactly this shape that 2250 tests missed
 // because they all ran from the source tree.
-test("every argv word hooks.json ships is one journal.js recognises", () => {
+test("every argv word hooks.json ships is one journal.cjs recognises", () => {
   const declared = JSON.parse(
     fs.readFileSync(path.join(root, "plugins/aidd-telemetry/hooks/hooks.json"), "utf8")
   );
@@ -3135,7 +3135,7 @@ test("every argv word hooks.json ships is one journal.js recognises", () => {
     assert.equal(
       resolveEventName(word, {}),
       word,
-      `journal.js does not recognise the argv word "${word}" that hooks.json ships`
+      `journal.cjs does not recognise the argv word "${word}" that hooks.json ships`
     );
   }
 });
@@ -3219,8 +3219,8 @@ test("a turn that wrote nothing into a task folder records nothing", () => {
 const {
   TASK_PATH_PATTERN,
   declaredTaskPath,
-} = require("../../plugins/aidd-telemetry/hooks/lib/task-declared.js");
-const { buildTaskDeclaredLine } = require("../../plugins/aidd-telemetry/hooks/lib/record.js");
+} = require("../../plugins/aidd-telemetry/hooks/lib/task-declared.cjs");
+const { buildTaskDeclaredLine } = require("../../plugins/aidd-telemetry/hooks/lib/record.cjs");
 
 const TASK_RELATIVE_PATH = "aidd_docs/tasks/2026_08/2026_08_15_alpha/spec.md";
 

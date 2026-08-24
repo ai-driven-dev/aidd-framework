@@ -30,7 +30,7 @@ export class GitAdapter implements VersionControl {
     await this.fs.chmodExecutable(hookPath);
   }
 
-  // Mirrors the journal hook's own `getRemoteUrl` (plugins/aidd-telemetry/hooks/lib/repo.js)
+  // Mirrors the journal hook's own `getRemoteUrl` (plugins/aidd-telemetry/hooks/lib/repo.cjs)
   // exactly, so `aidd telemetry on` derives the same `aidd.project_id` the journal does.
   async getRemoteUrl(repoRoot: string): Promise<string | null> {
     try {

@@ -55,7 +55,7 @@ const NO_KNOWN_MODEL = "no known model";
 // A year asked for by day is 365 rows - the envelope always carries every one of them, but
 // a terminal is not the place to read that many. Above this, the text rendering names the
 // count and points at --json rather than printing a screen nobody can scan. Must match
-// render.js's own MAX_PRINTED_DAYS: the byte-compare e2e test holds the two to it.
+// render.cjs's own MAX_PRINTED_DAYS: the byte-compare e2e test holds the two to it.
 const MAX_PRINTED_DAYS = 31;
 
 function formatCount(value: number): string {

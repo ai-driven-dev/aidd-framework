@@ -11,9 +11,9 @@ import { copyFixtureTree, pathWithoutAidd } from "./helpers.js";
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(process.cwd(), "..");
 const PLUGIN = join(REPO_ROOT, "plugins", "aidd-telemetry");
-const SWITCH_BIN = join(PLUGIN, "skills", "00-init", "scripts", "telemetry-switch.js");
-const REPORT_BIN = join(PLUGIN, "skills", "01-cost", "scripts", "telemetry-report.js");
-const JOURNAL_HOOK = join(PLUGIN, "hooks", "journal.js");
+const SWITCH_BIN = join(PLUGIN, "skills", "00-init", "scripts", "telemetry-switch.cjs");
+const REPORT_BIN = join(PLUGIN, "skills", "01-cost", "scripts", "telemetry-report.cjs");
+const JOURNAL_HOOK = join(PLUGIN, "hooks", "journal.cjs");
 const HOOK_FIXTURES = join(REPO_ROOT, "scripts", "__tests__", "fixtures");
 const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
 

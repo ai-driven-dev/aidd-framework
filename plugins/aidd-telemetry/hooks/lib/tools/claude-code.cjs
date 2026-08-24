@@ -2,7 +2,7 @@
 // payload, tool_input.file_path/notebook_path naming a write, tool_name "Skill" naming its
 // own step with prompt_id as the turn it belongs to.
 
-const { skillNameFromArgument } = require("./skill-detection.js");
+const { skillNameFromArgument } = require("./skill-detection.cjs");
 
 const WRITE_TOOL_PATH_FIELDS = Object.freeze({
   Write: "file_path",

@@ -54,7 +54,7 @@ function hasLegacyTelemetryData(): boolean {
 }
 
 // `%APPDATA%` is where a Windows application puts this, not `.config` (measured on a real
-// windows-latest runner - the plugin's sink.js mirrors this same rule). A machine
+// windows-latest runner - the plugin's sink.cjs mirrors this same rule). A machine
 // that already journalled under the old `.config` default keeps landing there rather than
 // losing access to what it already wrote; only a machine starting fresh gets `%APPDATA%`.
 function defaultConfigDir(): string {
@@ -63,7 +63,7 @@ function defaultConfigDir(): string {
   return process.env.APPDATA ? join(process.env.APPDATA, "aidd") : legacyConfigDir();
 }
 
-// The identical no-op in the journal (hooks/lib/repo.js): `mkdir`/`appendFile`'s
+// The identical no-op in the journal (hooks/lib/repo.cjs): `mkdir`/`appendFile`'s
 // `mode` option is accepted on Windows without error and does nothing with it. `icacls` is
 // the mechanism that actually restricts a path there. `%APPDATA%` is already the current OS
 // user's own profile, unlike a git checkout that can sit anywhere, so restricting it to that

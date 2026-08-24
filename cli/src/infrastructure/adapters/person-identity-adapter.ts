@@ -6,7 +6,7 @@ import type {
 } from "../../domain/ports/person-identity-reader.js";
 import { resolveHomeDir } from "../home-dir.js";
 
-// Mirrors the plugin's own `skills/00-init/scripts/lib/identity.js`, field for field and path for
+// Mirrors the plugin's own `skills/00-init/scripts/lib/identity.cjs`, field for field and path for
 // path - the two must agree on where this file lives and what it holds, or the same person
 // reads as two people depending on which side ran the local read.
 function identityDir(): string {
@@ -37,7 +37,7 @@ function parseIdentity(raw: string): PersonIdentity | null {
 }
 
 /** Reads only this machine's own user profile - `resolveHomeDir()` honors `HOME` on every
- * platform, the same way the plugin's `readers.js`/`identity.js` resolve it, and this
+ * platform, the same way the plugin's `readers.cjs`/`identity.cjs` resolve it, and this
  * adapter never reads `AIDD_USER_CONFIG_DIR`. That variable is documented as a location a
  * team or a CI can point every figure at; a choice reachable that way would not be this
  * person's own. */

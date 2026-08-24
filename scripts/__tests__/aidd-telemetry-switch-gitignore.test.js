@@ -13,7 +13,7 @@ const CLEAN_ENV = Object.fromEntries(
 
 const SWITCH = path.resolve(
   __dirname,
-  "../../plugins/aidd-telemetry/skills/00-init/scripts/telemetry-switch.js",
+  "../../plugins/aidd-telemetry/skills/00-init/scripts/telemetry-switch.cjs",
 );
 const RUNS_ENTRY = "aidd_docs/runs/";
 const tempDirs = [];

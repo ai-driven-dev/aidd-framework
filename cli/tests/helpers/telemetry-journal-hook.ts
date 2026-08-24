@@ -18,11 +18,11 @@ interface JournalRepoModule {
 }
 
 export const journalRepo: JournalRepoModule = createRequire(import.meta.url)(
-  "../../../plugins/aidd-telemetry/hooks/lib/repo.js"
+  "../../../plugins/aidd-telemetry/hooks/lib/repo.cjs"
 );
 
 /**
- * The same reach into `record.js`, for the one derivation the reader side must agree with:
+ * The same reach into `record.cjs`, for the one derivation the reader side must agree with:
  * a Codex session's identity, taken from the rollout the hook is told the session writes.
  */
 interface JournalRecordModule {
@@ -31,7 +31,7 @@ interface JournalRecordModule {
 }
 
 export const journalRecord: JournalRecordModule = createRequire(import.meta.url)(
-  "../../../plugins/aidd-telemetry/hooks/lib/record.js"
+  "../../../plugins/aidd-telemetry/hooks/lib/record.cjs"
 );
 
 /** The hook's own list of the hosts it writes for, so a conformance test can compare it
@@ -41,7 +41,7 @@ interface JournalHostModule {
 }
 
 export const journalHost: JournalHostModule = createRequire(import.meta.url)(
-  "../../../plugins/aidd-telemetry/hooks/lib/host.js"
+  "../../../plugins/aidd-telemetry/hooks/lib/host.cjs"
 );
 
 /** The hook's file-writes module, for the one line phase 2's task derivation rests on.
@@ -58,11 +58,11 @@ interface JournalFileWritesModule {
 }
 
 export const journalFileWrites: JournalFileWritesModule = createRequire(import.meta.url)(
-  "../../../plugins/aidd-telemetry/hooks/lib/file-writes.js"
+  "../../../plugins/aidd-telemetry/hooks/lib/file-writes.cjs"
 );
 
 /** The hook's declaration module, for the same reason `journalFileWrites` is exposed: a
- * task can now be declared on any host `journal.js`'s `tool-used` dispatch reaches, and this
+ * task can now be declared on any host `journal.cjs`'s `tool-used` dispatch reaches, and this
  * is the one place that reads a tool call's own arguments for it. */
 interface JournalTaskDeclaredModule {
   declaredTaskPath(payload: Record<string, unknown>): string | null;
@@ -74,5 +74,5 @@ interface JournalTaskDeclaredModule {
 }
 
 export const journalTaskDeclared: JournalTaskDeclaredModule = createRequire(import.meta.url)(
-  "../../../plugins/aidd-telemetry/hooks/lib/task-declared.js"
+  "../../../plugins/aidd-telemetry/hooks/lib/task-declared.cjs"
 );

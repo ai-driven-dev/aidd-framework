@@ -9,7 +9,7 @@ const {
   writeIdentity,
   forgetIdentity,
   generatePersonId,
-} = require("./lib/identity.js");
+} = require("./lib/identity.cjs");
 
 function status() {
   const identity = readIdentity();

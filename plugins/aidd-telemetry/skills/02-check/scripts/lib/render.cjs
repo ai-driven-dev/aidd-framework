@@ -2,7 +2,7 @@
 // whole answer reads every line, because the line that would save them the trouble is
 // exactly where a false "ok" hides.
 
-const { UNKNOWN } = require("./diagnose.js");
+const { UNKNOWN } = require("./diagnose.cjs");
 
 const LABEL_WIDTH = 22;
 const pad = (label) => label.padEnd(LABEL_WIDTH);
