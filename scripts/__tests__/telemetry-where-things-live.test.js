@@ -173,7 +173,8 @@ describe("a library a skill needs is carried by that skill, identically", () => 
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) walk(full);
-        else if (/\.(js|cjs|mjs)$/u.test(entry.name)) scripts.push(path.relative(PLUGIN, full));
+        else if (/\.(js|cjs|mjs)$/u.test(entry.name))
+          scripts.push(path.relative(PLUGIN, full).split(path.sep).join("/"));
         else if (entry.name === "package.json" && dir !== PLUGIN) {
           assert.fail(`${path.relative(PLUGIN, full)}: no directory marker, name the file .cjs`);
         }
