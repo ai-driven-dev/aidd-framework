@@ -25,7 +25,7 @@ Severity (shared rubric across every audit pillar, so a full audit ranks consist
 - 🟢 minor - nit or cleanup. Fix when convenient.
 
 Effort: `S` (under 1h), `M` (under 1d), `L` (over 1d).
-Category (the audit pillar, one of): `code-quality`, `architecture`, `security`, `dependencies`, `performance`, `tests`, `ui`.
+Category (the engineering pillar, one of): `code-quality`, `architecture`, `security`, `dependencies`, `performance`, `tests`. UI experience findings remain in their delegated report because they use a different evidence and priority contract.
 
 | Sev | Category     | Location                  | Issue                                  | Suggested fix                        | Effort |
 | --- | ------------ | ------------------------- | -------------------------------------- | ------------------------------------ | ------ |
@@ -35,11 +35,15 @@ Category (the audit pillar, one of): `code-quality`, `architecture`, `security`,
 
 ## Top actions
 
-Highest impact first. Each action names the finding rows it resolves and, when a fix is wanted, the act-skill to hand off to (refactor, test, impeccable - the audit itself never edits code).
+Highest impact first. Each action names the finding rows it resolves and, when a fix is wanted, the implementation capability to hand off to. The audit itself never edits code.
 
 1. {{action_1}}
 2. {{action_2}}
 3. {{action_3}}
+
+## Delegated reports
+
+- UI experience: {{project-relative ui-review.md path, unavailable, or not requested}}
 
 ## Coverage
 

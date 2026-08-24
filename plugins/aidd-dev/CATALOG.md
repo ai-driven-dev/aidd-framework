@@ -44,7 +44,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 |-------|------|---|
 | `actions` | [01-gather.md](skills/01-plan/actions/01-gather.md) | - |
 | `actions` | [02-explore.md](skills/01-plan/actions/02-explore.md) | - |
-| `actions` | [03-wireframe.md](skills/01-plan/actions/03-wireframe.md) | - |
+| `actions` | [03-experience.md](skills/01-plan/actions/03-experience.md) | - |
 | `actions` | [04-plan.md](skills/01-plan/actions/04-plan.md) | - |
 | `assets` | [phase-template.md](skills/01-plan/assets/phase-template.md) | - |
 | `assets` | [plan-template.md](skills/01-plan/assets/plan-template.md) | - |
@@ -84,7 +84,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `actions` | [06-tests.md](skills/04-audit/actions/06-tests.md) | - |
 | `actions` | [07-ui.md](skills/04-audit/actions/07-ui.md) | - |
 | `assets` | [audit-template.md](skills/04-audit/assets/audit-template.md) | `Codebase audit report template` |
-| `-` | [SKILL.md](skills/04-audit/SKILL.md) | `Audit a codebase read-only across seven quality pillars into one ranked report. Use when the user wants to assess, health-check, or audit a codebase or one pillar. Not for fixing findings, reviewing a change, or checking a feature works.` |
+| `-` | [SKILL.md](skills/04-audit/SKILL.md) | `Audit a codebase read-only across six engineering pillars plus delegated UI experience review. Use when the user wants to assess, health-check, or audit a codebase or one pillar. Not for fixing findings, reviewing a change, or checking a feature works.` |
 
 #### `skills/05-review`
 

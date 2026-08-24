@@ -52,7 +52,7 @@
     {
       "name": "aidd-ui",
       "source": "./plugins/aidd-ui",
-      "description": "ALPHA. UI and UX decisions, experience review, interface-system adaptation, accessibility, responsive behavior, polish, and implementation handoff.",
+      "description": "ALPHA. Shared UI systems, feature experience contracts, UX review, accessibility, and interface adaptation.",
       "strict": true,
       "recommended": false
     }

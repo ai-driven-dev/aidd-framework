@@ -1,26 +1,32 @@
 # 01 - Inspect
 
-Collect the accessibility evidence for the target interface.
+Collect accessibility evidence for the target interface.
 
 ## Input
 
-An interface proposal or existing interface plus its relevant project area.
+An interface proposal or existing interface, its UI system revision when one exists, and the relevant project area.
 
 ## Output
 
-The confirmed accessibility bar, interaction model, semantic structure, states, and evidence gaps.
+The confirmed accessibility bar, interaction model, semantic and state evidence, runtime observations, and evidence gaps.
 
 ## Process
 
-1. **Read.** Check project memory, requirements, shared components, and interface implementation for an existing accessibility bar.
-2. **Observe.** Inspect rendered keyboard, focus, naming, state announcement, contrast, touch, and reduced-motion behavior when available.
-3. **Confirm.** Support each claim with repository or runtime evidence and report memory drift.
-4. **Bound.** Mark unavailable behavior as unverified rather than inferring compliance.
+1. **Read.** Inspect requirements, shared components, implementation, project-memory pointers, and the pinned UI system when one exists.
+2. **Select.** Keep only semantics, keyboard, focus, naming, contrast, errors, labels, target size, announcements, or reduced motion that apply.
+3. **Observe.** Use runtime evidence when assessing existing behavior that cannot be proven statically.
+4. **Bound.** Classify evidence by the requested mode.
+   - `define`: use requirements and repository evidence when no system exists.
+   - `assess` or `confirm`: mark unavailable runtime evidence unverified.
+   - Any mode: report contract or memory drift without resolving it.
 
 ## Test
 
 | Case | Pass |
 | --- | --- |
-| Existing bar | its source and implementation evidence are named |
-| Runtime unavailable | behavior that requires runtime observation is marked unverified |
-| Memory conflicts | repository evidence wins and memory remains unchanged |
+| Existing accessibility bar | its exact system revision and sources are named |
+| Runtime unavailable in assess mode | runtime-only behavior is unverified |
+| Prospective behavior in define mode | an observable acceptance condition can resolve it without current runtime proof |
+| No active system | requirements and repository evidence remain usable |
+| Concern irrelevant | it is omitted rather than emitted as boilerplate |
+| Drift | conflicting evidence remains explicit and no artifact changes |

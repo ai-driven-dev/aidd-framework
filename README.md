@@ -11,7 +11,7 @@ _(Already tested on `Legacy` codebases)_
 [![Made in France](https://img.shields.io/badge/made%20in-France-0055A4?labelColor=EF4135)](https://www.ai-driven-dev.fr/)
 
 <p>
-  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>53 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
+  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>51 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
 </p>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -277,9 +277,9 @@ Synchronous feature flow, async issue-to-PR automation, and product backlog.
 
 ### 🎨 [aidd-ui](plugins/aidd-ui/README.md) 🚧
 
-`7 skills` · **alpha**
+`5 skills` · **alpha**
 
-UI / UX decisions, review, system adaptation, and engineering handoff.
+Versioned UI system contracts, feature experience decisions, specialist verdicts, and evidence-pinned review.
 
 </td>
 <td width="33%" valign="top"></td>

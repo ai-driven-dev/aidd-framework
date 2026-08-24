@@ -46,12 +46,22 @@ journey
     {cleanup or reset action} => {baseline restored}: 5: {channel}
 ```
 
-## Wireframe
+## UI Contract
 
 <!-- UI phase only. No UI => omit the section, don't invent one. -->
 
+- Contract: `{project-relative ui.md path}@{revision}`
+- Systems: {system ids and revisions}
+- Implement deltas: {approved delta paths owned by this phase or none}
+- Consume deltas: {verified delta paths and approved delta paths owned by an earlier phase, or none}
+- Depends on phases: {owners of consumed approved deltas or none}
+
+## Wireframe
+
+<!-- Compatibility fallback only when no UI provider is installed. Omit when UI Contract is present. -->
+
 ```txt
-{the confirmed wireframe}
+{structure-only wireframe}
 ```
 
 ## Tasks to do

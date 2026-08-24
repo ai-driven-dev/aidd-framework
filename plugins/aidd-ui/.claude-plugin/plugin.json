@@ -2,19 +2,17 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "aidd-ui",
   "version": "0.2.1-alpha.0",
-  "description": "ALPHA. UI and UX decisions, experience review, interface-system adaptation, accessibility, responsive behavior, polish, and implementation handoff.",
+  "description": "ALPHA. Versioned UI systems, feature experience contracts, evidence reviews, accessibility, and interface adaptation.",
   "author": {
     "name": "AI-Driven Dev",
     "url": "https://github.com/ai-driven-dev"
   },
   "skills": [
-    "./skills/01-design",
-    "./skills/02-review",
-    "./skills/03-system",
+    "./skills/01-system",
+    "./skills/02-design",
+    "./skills/03-review",
     "./skills/04-accessibility",
-    "./skills/05-responsive",
-    "./skills/06-polish",
-    "./skills/07-handoff"
+    "./skills/05-adapt"
   ],
   "keywords": [
     "ui",

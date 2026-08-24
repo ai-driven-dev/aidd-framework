@@ -38,10 +38,10 @@ Code transformation: plan, implement, assert, audit, review, test, refactor, deb
 
 | Skill           | Role                                                                       | Actions                                                                         |
 | --------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `01-plan`       | Turn a request, ticket, or file into a phased implementation plan: gather, explore, wireframe, plan | `01-gather`, `02-explore`, `03-wireframe`, `04-plan`          |
+| `01-plan`       | Turn a request, ticket, or file into a phased implementation plan and resolve ready UI decisions | `01-gather`, `02-explore`, `03-experience`, `04-plan`          |
 | `02-implement`  | Execute a plan phase by phase until 100% complete                          | `01-implement`                                                                   |
 | `03-assert`     | Assert features work - general, architecture, frontend UI                  | `01-assert`, `02-assert-architecture`, `03-assert-frontend`                      |
-| `04-audit`      | Read-only codebase audit across quality pillars                            | `01-code-quality`, `02-architecture`, `03-security`, `04-dependencies`, `05-performance`, `06-tests`, `07-ui` |
+| `04-audit`      | Read-only codebase audit; UI experience is delegated to its owning concern | `01-code-quality`, `02-architecture`, `03-security`, `04-dependencies`, `05-performance`, `06-tests`, `07-ui` |
 | `05-review`     | Read-only review of a diff - code quality and feature behavior             | `01-review-code`, `02-review-functional`                                         |
 | `06-test`       | Write and iterate tests, validate user journeys in the browser             | `01-test`, `02-test-journey`                                                     |
 | `07-refactor`   | Improve code without changing behavior across four axes                    | `01-performance`, `02-security`, `03-cleanup`, `04-architecture`                 |
@@ -102,14 +102,12 @@ Runs synchronous feature delivery, optional async issue automation, and the prod
 
 ## 🎨 aidd-ui
 
-🚧 **Alpha.** UI / UX decisions and implementation handoff. Off the curated install path.
+🚧 **Alpha.** Shared UI systems and feature experience decisions. Off the curated install path.
 
 | Skill | Role | Actions |
 | --- | --- | --- |
-| `01-design` | Design or redesign an interface from intent and evidence | `frame`, `inspect`, `structure`, `compose`, `validate` |
-| `02-review` | Review experience quality | `inspect`, `assess` |
-| `03-system` | Discover or minimally extend an interface system | `inspect`, `map`, `decide` |
-| `04-accessibility` | Define or review accessibility behavior | `inspect`, `specify`, `assess` |
-| `05-responsive` | Define or review constrained-space behavior | `inspect`, `specify`, `assess` |
-| `06-polish` | Refine a settled interface without restructuring | `refine` |
-| `07-handoff` | Write and verify an engineering experience contract | `compile`, `verify` |
+| `01-system` | Manage shared UI system contracts and deltas | `inspect`, `map`, `specialize`, `adopt`, `establish`, `extend`, `retire`, `reconcile`, `promote` |
+| `02-design` | Create or revise a feature UI contract | `frame`, `inspect`, `specialize`, `structure`, `compose`, `write`, `verify` |
+| `03-review` | Diagnose and prioritize experience defects | `inspect`, `specialize`, `assess`, `write` |
+| `04-accessibility` | Own accessibility requirements and verdicts | `inspect`, `specify`, `evaluate` |
+| `05-adapt` | Own space, input, and platform transformations | `inspect`, `specify`, `evaluate` |

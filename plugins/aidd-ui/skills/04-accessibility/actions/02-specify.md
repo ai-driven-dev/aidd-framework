@@ -1,25 +1,27 @@
 # 02 - Specify
 
-Define the accessibility behavior the proposed interface must preserve.
+Define observable accessibility behavior for a proposed interface.
 
 ## Input
 
-The interface proposal and accessibility evidence from `01-inspect`.
+The proposal and evidence from [01-inspect.md](01-inspect.md).
 
 ## Output
 
-Applicable requirements, each naming the user interaction, required behavior, and observable acceptance condition.
+Requirement fragments conforming to [fragments.md](../references/fragments.md).
 
 ## Process
 
-1. **Select.** Keep applicable semantics, keyboard reachability, focus behavior, accessible naming, contrast, error handling, labels, touch targets, announcements, and reduced motion.
-2. **Align.** Reuse confirmed project patterns and name any required extension.
-3. **Write.** Express each requirement as observable behavior without prescribing component code.
+1. **Align.** Reuse the pinned accessibility bar and existing interaction patterns.
+2. **Specify.** State the user interaction, required behavior, and observable acceptance condition.
+3. **Classify.** Set system impact only for a shared convention change.
+4. **Defer.** List missing evidence or a missing shared system decision outside the fragment.
 
 ## Test
 
 | Case | Pass |
 | --- | --- |
-| Requirement produced | it names an interaction and an observable acceptance condition |
-| Existing convention fits | the requirement reuses it by source |
-| Concern does not apply | no boilerplate requirement is emitted for it |
+| Fragment produced | every required field is present and evidence is cited |
+| Existing convention fits | no system extension is claimed |
+| Shared behavior changes | system impact names the exact gap, not its solution |
+| Unsupported compliance claim | it is absent |

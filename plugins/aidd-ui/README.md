@@ -2,44 +2,49 @@
 
 # aidd-ui 🚧 alpha
 
-UI and UX decisions for the AI-Driven Development framework.
+UI experience and shared interface-system decisions for the AI-Driven Development framework.
 
-> **Alpha.** The concern is usable but experimental. Skill contracts may change, and the plugin remains off the curated install path.
+> **Alpha.** Contracts may change, and the plugin remains off the curated install path.
 
-`aidd-ui` turns product intent and current project evidence into reviewable, testable experience decisions. It reads durable project memory as a compact map, confirms it against the repository, and reports drift without changing memory.
+`aidd-ui` owns what an interface and its shared UI system must preserve. It consumes product intent and hands implementation ready decisions to engineering.
 
 ```text
-product intent + project context
-  → interface decisions
-  → experience contract
+product intent + current evidence
+  → shared UI system contract
+  → feature UI contract
   → engineering implementation
+  → experience review
 ```
 
-Code says what exists. Memory says what is stable. UI decisions say what should happen next.
+Code is current implementation truth. Project memory is a compact stable map. UI contracts are decision authority.
 
 ## Skills
 
-| Skill | Produces |
-| --- | --- |
-| [design](skills/01-design/SKILL.md) | evidence-grounded interface structure and decisions |
-| [review](skills/02-review/SKILL.md) | prioritized experience findings |
-| [system](skills/03-system/SKILL.md) | a current system map or minimal extension |
-| [accessibility](skills/04-accessibility/SKILL.md) | accessibility requirements or findings |
-| [responsive](skills/05-responsive/SKILL.md) | constrained-space behavior or findings |
-| [polish](skills/06-polish/SKILL.md) | bounded refinements after structure is settled |
-| [handoff](skills/07-handoff/SKILL.md) | an implementation-ready `ui.md` experience contract |
+| Skill | Owns | Produces |
+| --- | --- | --- |
+| [system](skills/01-system/SKILL.md) | shared UI system lifecycle | system maps, versioned contracts, and lifecycle deltas |
+| [design](skills/02-design/SKILL.md) | feature experience decisions | versioned `ui.md` |
+| [review](skills/03-review/SKILL.md) | feature experience diagnosis and priority | non-normative `ui-review.md` |
+| [accessibility](skills/04-accessibility/SKILL.md) | accessibility requirements and verdicts | typed specialist fragments |
+| [adapt](skills/05-adapt/SKILL.md) | space, input, and platform transformations | typed specialist fragments |
 
-Install the alpha plugin explicitly, then invoke the skill matching the required output:
+`01-system` stores the current shared contract at `aidd_docs/ui/systems/<system-id>.md`, immutable prior revisions under `.history/`, and one task local `system-delta-<system-id>-<delta-id>.md` per proposed change. It decides the system. Engineering implements its sources and verification conditions.
+
+Install explicitly, then invoke the capability matching the decision owner:
 
 ```text
 /plugin install aidd-ui@aidd-framework
-/aidd-ui:01-design <request or requirements>
+/aidd-ui:01-system discover
+/aidd-ui:02-design create
 ```
 
 ## Boundaries
 
-- Product requirements remain upstream input.
-- Durable conventions remain in project memory; this plugin never updates them silently.
-- Production components, CSS, and application code remain engineering work.
+- Product requirements are consumed, not authored here.
+- Project memory is read only. Drift is reported for a separate refresh.
+- Shared system and feature experience contracts are owned here, not source code.
+- Engineering consumes ready contracts and owns implementation correctness.
+- External design documents are evidence until explicitly adopted.
 - Existing page patterns, composites, primitives, tokens, and layout conventions are reused before extension or creation.
-- No Figma, image generation, browser automation, visual-regression, or component-library infrastructure is bundled.
+- Assets may be contracted by role, source, constraints, and acceptance. Binary production remains outside this plugin.
+- No design tool integration, image generation, browser automation, visual regression, component library, or token build pipeline is bundled.

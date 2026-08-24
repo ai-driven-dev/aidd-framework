@@ -1,32 +1,36 @@
 ---
 name: 04-accessibility
-description: Defines interface accessibility requirements or reviews an interface against observable evidence. Use when the user wants focused semantic, keyboard, focus, naming, contrast, error, touch, or motion decisions.
-argument-hint: define | review
+description: Returns provider fragments for AIDD UI contracts, system deltas, or reviews. Use when the user wants to define, assess, or confirm accessibility behavior with evidence. Not for overall review priority, artifact composition, or source implementation.
+argument-hint: define | assess | confirm
 ---
 
 # Accessibility
 
 ```mermaid
 flowchart LR
-  define([define]) --> inspect --> specify --> requirements([accessibility requirements])
-  review([review]) --> inspect --> assess
-  assess -->|defects| findings([accessibility findings])
-  assess -->|none observed| clean([no findings])
-  inspect -. no-evidence .-> unknown([evidence gap])
+  define([define]) --> inspect
+  assess([assess]) --> inspect
+  confirm([confirm]) --> inspect
+  inspect -->|required evidence missing| unverified([unverified])
+  inspect -->|define| specify --> requirements([requirement fragments])
+  inspect -->|assess or confirm| evaluate
+  evaluate -->|assess| findings([finding fragments])
+  evaluate -->|confirm| rules([confirmed-rule fragments])
+  evaluate -->|none supported| none([no supported fragment])
 ```
 
 ## Actions
 
 Read only the next action file required by the flow above.
 
-| Action  | Does                                      |
-| ------- | ----------------------------------------- |
-| inspect | collect interface accessibility evidence |
-| specify | define applicable accessibility behavior |
-| assess  | report evidenced accessibility defects   |
+| Action | Does |
+| --- | --- |
+| inspect | collect applicable accessibility evidence |
+| specify | return requirement fragments |
+| evaluate | return findings or confirmed rules |
 
 ## Transversal rules
 
-- Enforce the project's confirmed accessibility bar before adding a new one.
-- Evaluate only concerns that apply to the interface and available evidence.
-- Never modify application source or project memory.
+- Own accessibility requirements and verdicts.
+- Do not own overall review priority or artifact composition.
+- Never modify application source, UI artifacts, or project memory.
