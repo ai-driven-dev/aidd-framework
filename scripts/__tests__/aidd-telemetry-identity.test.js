@@ -5,7 +5,7 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { describe, it, after } = require("node:test");
 
-const SHARED = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/_shared");
+const SHARED = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/00-init/scripts/lib");
 const SCRIPTS = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills");
 const IDENTITY_SCRIPT = path.join(SCRIPTS, "00-init/scripts/telemetry-identity.js");
 const REPORT_SCRIPT = path.join(SCRIPTS, "01-cost/scripts/telemetry-report.js");

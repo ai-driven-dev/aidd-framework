@@ -253,9 +253,12 @@ describe("what the plugin ships is readable", () => {
       .reduce((sum, count) => sum + count, 0);
 
     // Not a style rule: the generated bundle this replaced was 4,183 lines, and the number
-    // exists so that drifting back toward it is noticed here. Bumped for a declared task -
-    // report.js's interval logic and render.js's own breakdown of it - a real feature, not
-    // drift.
-    expect(lines).toBeLessThan(1950);
+    // exists so that drifting back toward it is noticed here. Bumped twice, each time for a
+    // stated reason rather than to make it pass: once for report.js's interval logic and
+    // render.js's breakdown of it, and once when readers/journal/attribution/identity moved
+    // in from `skills/_shared/`. That move added 771 lines to this count and none to what
+    // the plugin ships - those files were always installed, they just sat in a directory
+    // this measurement did not look at.
+    expect(lines).toBeLessThan(2550);
   });
 });

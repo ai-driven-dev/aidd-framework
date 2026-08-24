@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 /**
  * The plugin's own cost-report declarations are zero-dependency CommonJS, bundled verbatim
  * into every tool's installed plugin directory so a live session can compute a report
- * without the `aidd` package — see `plugins/aidd-telemetry/skills/_shared/readers.js`,
+ * without the `aidd` package — see `plugins/aidd-telemetry/skills/01-cost/scripts/lib/readers.js`,
  * shared as-is between the cost and check skills. Tests reach it here rather than
  * duplicating its `TOOLS` table, the same pattern `telemetry-journal-hook.ts` uses for the
  * hook side: a field the plugin stops declaring becomes a read of `undefined`, which fails
@@ -22,5 +22,5 @@ interface TelemetryCostReadersModule {
 }
 
 export const telemetryCostReaders: TelemetryCostReadersModule = createRequire(import.meta.url)(
-  "../../../plugins/aidd-telemetry/skills/_shared/readers.js"
+  "../../../plugins/aidd-telemetry/skills/01-cost/scripts/lib/readers.js"
 );

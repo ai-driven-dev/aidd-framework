@@ -6,7 +6,7 @@ const { execFileSync, spawnSync } = require("node:child_process");
 const { describe, it } = require("node:test");
 
 const SCRIPTS = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/02-check/scripts");
-const SHARED = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/_shared");
+const SHARED = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/02-check/scripts/lib");
 const SCRIPT = path.join(SCRIPTS, "telemetry-check.js");
 const { diagnose, OK, FAIL, UNKNOWN } = require(path.join(SCRIPTS, "lib/diagnose.js"));
 const { printReport } = require(path.join(SCRIPTS, "lib/render.js"));
@@ -891,18 +891,21 @@ describe("naming what nothing here can read", () => {
   });
 });
 
-describe("sharing the TOOLS declaration with the cost skill, not copying it", () => {
-  // journal.js/readers.js/attribution.js used to be copied per skill, guarded by a byte-
-  // equality test. They now live once, under skills/_shared/, so a tool gained or lost by
-  // one skill cannot silently diverge from what the other sees - there is only one file to
-  // read.
+describe("the TOOLS declaration the checker reads is the one the cost skill reads", () => {
+  // These three were shared once, under a `skills/_shared/` sibling. They cannot be: the
+  // hyphen-flat install contracts rename every immediate child of `skills/` on its own, so a
+  // require reaching a sibling folder resolved to a name that no longer existed and the
+  // script died at load. Each skill carries its own copy, and
+  // telemetry-where-things-live.test.js pins the copies byte-identical - so a tool gained or
+  // lost by one skill still cannot diverge from what the other sees.
   const COST = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts");
 
   for (const name of ["journal.js", "readers.js", "attribution.js"]) {
-    it(`${name} is not re-copied into either skill's own lib/`, () => {
-      assert.ok(fs.existsSync(path.join(SHARED, name)), `${name} must exist under skills/_shared/`);
-      assert.ok(!fs.existsSync(path.join(SCRIPTS, "lib", name)), `${name} must not be re-copied into 02-check's own lib/`);
-      assert.ok(!fs.existsSync(path.join(COST, "lib", name)), `${name} must not be re-copied into 01-cost's own lib/`);
+    it(`${name} reads the same in the checker as in the cost skill`, () => {
+      assert.equal(
+        fs.readFileSync(path.join(SHARED, name), "utf8"),
+        fs.readFileSync(path.join(COST, "lib", name), "utf8")
+      );
     });
   }
 });
@@ -1562,13 +1565,13 @@ describe("running from a tree that ships skills/ and no hooks/ (the OpenCode-sha
   // translator.ts's translateFlat) delivers every skills/** file, including this script,
   // and records hooks only as skipped - so that install carries skills/ with no hooks/
   // directory anywhere it could reach. Reproduced by copying the skill tree - 02-check
-  // plus the plugin-wide skills/_shared/ it now reads TOOLS/journal/attribution from,
+  // including its own scripts/lib/ copies of TOOLS, journal and attribution,
   // exactly what a real translateFlat install carries - into a temp directory; nothing is
   // deleted from the repository.
   function copyPluginTreeWithoutHooks() {
     const pluginRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-check-opencode-shaped-"));
     fs.mkdirSync(path.join(pluginRoot, "skills"), { recursive: true });
-    for (const skillDir of ["02-check", "_shared"]) {
+    for (const skillDir of ["02-check"]) {
       fs.cpSync(
         path.resolve(__dirname, "../../plugins/aidd-telemetry/skills", skillDir),
         path.join(pluginRoot, "skills", skillDir),

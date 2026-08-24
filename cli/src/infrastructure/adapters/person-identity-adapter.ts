@@ -6,7 +6,7 @@ import type {
 } from "../../domain/ports/person-identity-reader.js";
 import { resolveHomeDir } from "../home-dir.js";
 
-// Mirrors the plugin's own `skills/_shared/identity.js`, field for field and path for
+// Mirrors the plugin's own `skills/00-init/scripts/lib/identity.js`, field for field and path for
 // path - the two must agree on where this file lives and what it holds, or the same person
 // reads as two people depending on which side ran the local read.
 function identityDir(): string {

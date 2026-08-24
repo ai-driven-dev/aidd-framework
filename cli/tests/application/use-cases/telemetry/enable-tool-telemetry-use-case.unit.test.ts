@@ -131,7 +131,7 @@ describe("EnableToolTelemetryUseCase — driven by Claude's settings-file activa
     await enableLocal(useCase);
     const joined = logger.infoMessages.join("\n");
     expect(joined).toContain(LOCAL_SETTINGS_PATH);
-    expect(joined).toContain("#663");
+    expect(joined).toContain("Per-step cost comes from the run journal");
     expect(joined).toContain("no Bash command, MCP tool name, or tool input is logged");
   });
 

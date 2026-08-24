@@ -19,7 +19,7 @@ const makeStubConfig = (toolId: AiToolId, toolSuffix: string): AiTool<unknown> =
   toolSuffix,
   signalDir: `.${toolId}/commands`,
   displayName: toolId,
-  telemetry: { kind: "planned", trackedIn: "#653" },
+  telemetry: { kind: "planned", missing: "not measured" },
   telemetryExport: { kind: "unmeasured" },
   telemetryLocalRead: { kind: "unmeasured" },
   telemetryTaskAttributable: false,

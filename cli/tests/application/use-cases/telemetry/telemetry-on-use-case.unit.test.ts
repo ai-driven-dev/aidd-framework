@@ -97,13 +97,13 @@ describe("TelemetryOnUseCase — per-tool honesty", () => {
     expect(after.length).toBe(before.length + 2);
   });
 
-  it("reports codex and opencode as not yet supported, tracked in #653", async () => {
+  it("reports codex and opencode as not yet supported, saying what is missing", async () => {
     const { useCase } = buildUseCase(manifestWith("claude", "codex", "opencode"));
     const result = await useCase.execute(baseOptions());
     for (const tool of ["codex", "opencode"] as const) {
       const report = result.toolReports.find((r) => r.tool === tool);
       expect(report?.status).toBe("not-yet-supported");
-      expect(report?.detail).toContain("#653");
+      expect(report?.detail).toContain("no export route of its own has been measured");
     }
   });
 

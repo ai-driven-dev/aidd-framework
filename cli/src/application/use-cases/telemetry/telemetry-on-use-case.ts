@@ -75,10 +75,7 @@ function staticStatusAndDetail(
           "AIDD does not set environment variables.",
       ];
     case "planned":
-      return [
-        "not-yet-supported",
-        `Not yet supported by AIDD — ${activation.missing}.`,
-      ];
+      return ["not-yet-supported", `Not yet supported by AIDD — ${activation.missing}.`];
     case "external":
       return ["cannot-enable", `${activation.reason} ${activation.remedy}`];
   }

@@ -6,7 +6,7 @@ const { spawnSync } = require("node:child_process");
 const { describe, it, before, after } = require("node:test");
 
 const SCRIPTS = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts");
-const SHARED = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/_shared");
+const SHARED = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts/lib");
 const HOOKS_LIB = path.resolve(__dirname, "../../plugins/aidd-telemetry/hooks/lib");
 const { buildIntervals, attribute } = require(path.join(SHARED, "attribution.js"));
 const { build, taskOf, toMicroUsd } = require(path.join(SCRIPTS, "lib/report.js"));

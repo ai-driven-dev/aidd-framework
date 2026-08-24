@@ -5,7 +5,7 @@ const path = require("node:path");
 const { describe, it, before, after } = require("node:test");
 
 const SCRIPTS = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts");
-const SHARED = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/_shared");
+const SHARED = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts/lib");
 const { TOOLS } = require(path.join(SHARED, "readers.js"));
 const { listJournals, readJournal, projectOf } = require(path.join(SHARED, "journal.js"));
 
