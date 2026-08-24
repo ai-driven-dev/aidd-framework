@@ -567,7 +567,7 @@ test("AIDD_RUNS_DIR overrides the in-repo default outright", () => {
   });
 });
 
-// #693: a worktree gets its own journal by decision, not by accident. This is the test
+// a worktree gets its own journal by decision, not by accident. This is the test
 // that decision asked for - it also proves --show-toplevel behaves as resolveRunsDir
 // assumes, rather than merely asserting the assumption.
 function addWorktree(main, dir) {
@@ -2513,7 +2513,7 @@ test("Copilot's readSessionId reads whichever shape the payload carries: session
   assert.equal(readSessionId("copilot", { session_id: "copilot-compat-1" }), "copilot-compat-1");
 });
 
-test("Cursor's real headless end-of-session shape (sessionEnd, captured under out-cursor-skill) resolves to no canonical event at all - #680's gap, stated as a fact about resolveEventName directly", () => {
+test("Cursor's real headless end-of-session shape (sessionEnd, captured under out-cursor-skill) resolves to no canonical event at all - stated as a fact about resolveEventName directly", () => {
   assert.equal(
     resolveEventName(undefined, { hook_event_name: "sessionEnd" }),
     null,
@@ -2541,7 +2541,7 @@ test("a Copilot canonical session-start writes nothing when no event resolves - 
   }
 });
 
-test("a Copilot session-start, given a resolvable event, writes a session_start line carrying sessionId as vendor_id - proves the camelCase reader on its own, independent of #681's argv gap", () => {
+test("a Copilot session-start, given a resolvable event, writes a session_start line carrying sessionId as vendor_id - proves the camelCase reader on its own, independent of the argv gap", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/copilot-camelcase.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000cop2";
@@ -2570,7 +2570,7 @@ test("a Copilot session-start with an empty sessionId writes nothing, even given
   }
 });
 
-test("a Copilot compat session-start writes a session_start line carrying session_id as vendor_id - the other reader #681 required, independent of the canonical sessionId spelling", () => {
+test("a Copilot compat session-start writes a session_start line carrying session_id as vendor_id - the other reader required, independent of the canonical sessionId spelling", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/copilot-compat-start.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000cop3";
@@ -3394,7 +3394,7 @@ test("declaredTaskPath reads tool_input first and Copilot's toolArgs string only
   assert.equal(declaredTaskPath({ tool_input: { command: "echo hi" } }), null);
 });
 
-// #695 - a session says which worktree it ran in ------------------------------------
+// a session says which worktree it ran in ------------------------------------
 
 // A linked worktree of `repo`, switched on, with its own runs directory. The seed commit
 // is what `git worktree add` needs a HEAD for; makeTempRepo leaves the repo empty.

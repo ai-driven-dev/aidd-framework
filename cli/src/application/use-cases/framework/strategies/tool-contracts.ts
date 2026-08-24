@@ -734,10 +734,9 @@ function opencodeFlatAgentPath(plugin: string, rel: string): string {
   return genericFlatAgentPath(".opencode/agents/", plugin, rel.replace(/^agents\//, ""), ".md");
 }
 
-// Nested, not hyphen-flat like the other four tools' skill paths: aidd-telemetry ships
-// non-skill children under skills/ (_shared/, package.json) whose relative requires
-// only survive when the whole subtree is carried intact — see
-// genericFlatSkillTreePath's doc comment. Must produce the same relative paths as
+// Nested, not hyphen-flat like the other four tools' skill paths — see
+// genericFlatSkillTreePath's doc comment. This is the shape already installed for OpenCode,
+// so it stays; nothing under skills/ depends on it any more. Must produce the same relative paths as
 // `aidd plugin install --tool opencode`'s route (PluginContentTranslator.translateFlat,
 // mode-b-flat-materialization-translator.ts), pinned equal by
 // built-tree-vs-modeb-skills-agree.unit.test.ts.

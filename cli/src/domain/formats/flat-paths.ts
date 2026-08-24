@@ -62,13 +62,15 @@ export function genericFlatSkillPath(
  * subtree under one `<plugin>/` directory segment instead of hyphenating each
  * immediate child independently (contrast `genericFlatSkillPath`).
  *
- * A skill's own script can `require()` a sibling outside its own folder — e.g. a
- * `_shared/` helper directory reached via `../../_shared/...` — and that call is never
- * rewritten (see plugin-content-translator.ts's `TranslatedFile.verbatim` doc). The
- * relative path only keeps resolving if every name below `skillsPrefix` survives
- * untouched, which nesting under one added segment guarantees and per-child
- * hyphenation does not. Same shape as `genericFlatHooksScriptPath`, which nests a
- * hook's own subtree for the identical reason.
+ * Nothing below `skillsPrefix` is renamed: one segment is added in front of the tree and
+ * every name under it survives. `genericFlatSkillPath` renames each immediate child instead,
+ * and a script's `require()` is never rewritten (see plugin-content-translator.ts's
+ * `TranslatedFile.verbatim` doc), so any path crossing a renamed name stops resolving there.
+ *
+ * This is the shape OpenCode installs today, and the one `genericFlatHooksScriptPath` uses
+ * for a hook's own subtree. It does not license sharing code between skills: the four other
+ * contracts do rename per child, and a plugin that relies on the tree staying intact is
+ * installable by one tool out of five.
  *
  * @param skillsPrefix - Full prefix for skills dir (e.g. ".opencode/skills/")
  * @param plugin       - Plugin name (used as the nesting directory)

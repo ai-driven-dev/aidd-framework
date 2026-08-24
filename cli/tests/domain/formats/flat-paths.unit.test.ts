@@ -63,8 +63,8 @@ describe("genericFlatSkillTreePath", () => {
 
   it("keeps a non-skill top-level child's own name intact", () => {
     expect(
-      genericFlatSkillTreePath(".opencode/skills/", "aidd-telemetry", "_shared/attribution.js")
-    ).toBe(".opencode/skills/aidd-telemetry/_shared/attribution.js");
+      genericFlatSkillTreePath(".opencode/skills/", "aidd-telemetry", "shared/attribution.js")
+    ).toBe(".opencode/skills/aidd-telemetry/shared/attribution.js");
     expect(genericFlatSkillTreePath(".opencode/skills/", "aidd-telemetry", "package.json")).toBe(
       ".opencode/skills/aidd-telemetry/package.json"
     );

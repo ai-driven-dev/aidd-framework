@@ -270,7 +270,7 @@ describe("reading Claude Code's own export configuration", () => {
     assert.match(result.missingDetail, /not measured here/);
   });
 
-  it("names the disabling setting when OTEL_METRICS_INCLUDE_SESSION_ID=false is present, the exact case #617 names", () => {
+  it("names the disabling setting when OTEL_METRICS_INCLUDE_SESSION_ID=false is present, the exact case that matters", () => {
     const { root, home } = tempClaudeProject();
     fs.mkdirSync(path.join(root, ".claude"), { recursive: true });
     fs.writeFileSync(
@@ -498,7 +498,7 @@ describe("naming whether the hook fired", () => {
     assert.match(claim.detail, /no session anchor available/);
   });
 
-  // The fix for #699: an untrusted Codex hook and a hook that never fired both leave the
+  // The fix: an untrusted Codex hook and a hook that never fired both leave the
   // exact same empty journal - only reading the trust state itself tells them apart.
   it("names an untrusted hook, not never having fired, when Codex's own config says so", () => {
     const [claim] = diagnose({
@@ -733,7 +733,7 @@ describe("naming whether an exported record can be joined back to this session",
     assert.doesNotMatch(claim.detail, /undefined/);
   });
 
-  it("names the disabling setting - the OTEL_METRICS_INCLUDE_SESSION_ID=false case #617 names - not a plain miss", () => {
+  it("names the disabling setting - the OTEL_METRICS_INCLUDE_SESSION_ID=false case - not a plain miss", () => {
     const exportConfig = {
       configured: true,
       identityDisabled: true,
@@ -1111,7 +1111,7 @@ describe("the script wired to a real project", () => {
 
   it("names the export not configured, and the join with nothing to join, when nothing turned the export on", () => {
     // Every other line above still names a healthy install - only the export route, added
-    // for #617, is left unconfigured here to prove the pin above is not an accident of the
+    //, is left unconfigured here to prove the pin above is not an accident of the
     // fixture always carrying both.
     const { root, home } = tempProject();
     writeConfig(root, true);
@@ -1134,7 +1134,7 @@ describe("the script wired to a real project", () => {
     assert.match(lines[5], /^\s*identifier joinable\s+--/);
   });
 
-  it("names the identifier unjoinable when OTEL_METRICS_INCLUDE_SESSION_ID=false sits beside an otherwise complete Claude Code export - the exact case #617 names", () => {
+  it("names the identifier unjoinable when OTEL_METRICS_INCLUDE_SESSION_ID=false sits beside an otherwise complete Claude Code export - the exact case that matters", () => {
     const { root, home } = tempProject();
     writeConfig(root, true);
     writeRunFile(root, "01ARZ3NDEKTSV4RRFFQ69G5FBH__s-healthy.jsonl", [

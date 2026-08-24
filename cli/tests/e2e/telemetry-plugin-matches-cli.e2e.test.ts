@@ -515,9 +515,8 @@ describe("the plugin's scripts answer exactly what the CLI answers", () => {
 
     /** A copy of the plugin's own scripts, with `bySize`'s comparator flipped from largest-
      * first to smallest-first — an order-only change: every row keeps the same fields and
-     * figures, only their position moves. Copies the whole `skills/` tree, not just
-     * `01-cost/`, since `report.js` reaches `../../_shared/attribution.js` by a relative
-     * path that only resolves correctly with `_shared` still a sibling. */
+     * figures, only their position moves. Copies the whole `skills/` tree so the copy is
+     * shaped like an install rather than like one skill lifted out of one. */
     async function patchedPluginScript(): Promise<string> {
       const patchedSkillsDir = join(tempDir, "patched-plugin-skills");
       await copyFixtureTree(

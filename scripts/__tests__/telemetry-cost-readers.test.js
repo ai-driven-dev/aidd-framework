@@ -55,7 +55,7 @@ describe("reading what Claude Code wrote about a session", () => {
     assert.deepEqual(read("no-such-session"), { records: [], sessionFound: false });
   });
 
-  // #686. The fixture carries one captured `<synthetic>` line - a session-limit notice
+  // The fixture carries one captured `<synthetic>` line - a session-limit notice
   // Claude Code composed itself, four zero counters, its own requestId. Not a billed call.
   it("yields no record for a message the tool marked <synthetic>", () => {
     const { records } = read(CLAUDE_SESSION);

@@ -294,7 +294,7 @@ function assertGitStatusHidesJournal(toolId, projectDir) {
 // the key is "<plugin>@<marketplace>:hooks/hooks.json:<event>:<matcher>:<hook>" with the
 // event spelled snake_case. So a renamed or newly added event is a NEW key and inherits no
 // approval - and until someone approves it, the session journals a session_start with no
-// turn_end, which is indistinguishable at a glance from the mapping bug #707 fixed. This
+// turn_end, which is indistinguishable at a glance from the mapping bug already fixed. This
 // tells those two apart instead of reporting the same FAIL for both.
 function turnEndUntrustedReason(toolId) {
   if (toolId !== "codex") return null;
@@ -309,7 +309,7 @@ function turnEndUntrustedReason(toolId) {
   // trusted hook as proof about ours.
   if (toml.includes('aidd-telemetry@aidd-framework:hooks/hooks.json:session_end:')) return null;
   return (
-    "issue #699 — Codex has no trusted_hash for this plugin's session_end hook yet, and " +
+    "Codex has no trusted_hash for this plugin's session_end hook yet, and " +
     "trust is per entry: approving `stop` before the rename approved nothing for " +
     "`session_end`. Approve it once interactively, or use the bypass variant below, which " +
     "does close the turn."
@@ -744,7 +744,7 @@ function orchestrateCodex(projectDir, ticketPath) {
       "codex",
       "default (no bypass)",
       "run file exists",
-      SKIP("issue #699 — the honest default: no run journal is written until the hook is trusted"),
+      SKIP("the honest default: no run journal is written until the hook is trusted"),
       untrusted.note
     );
   }
