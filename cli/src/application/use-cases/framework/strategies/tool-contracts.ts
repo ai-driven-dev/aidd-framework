@@ -377,7 +377,7 @@ export function buildCodexContract(): ToolBuildContract {
         path: (_p, rel) => rel,
         // The same rename the merged install route applies. Codex has no `Stop`, so without
         // this the built tree subscribes the turn-end hook to an event that never arrives
-        // and the turn is never closed, in silence (#707).
+        // and the turn is never closed, in silence.
         transform: (content, _plugin, base) =>
           base === "hooks.json" ? renameCodexHookEvents(content) : content,
       },

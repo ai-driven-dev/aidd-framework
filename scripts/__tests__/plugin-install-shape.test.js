@@ -165,7 +165,33 @@ function describeShape(name, buildShape) {
   });
 }
 
+/**
+ * What the four hyphen-flat contracts actually deliver (claude, cursor, codex, copilot -
+ * `genericFlatSkillPath` in cli/src/domain/formats/flat-paths.ts): every immediate child of
+ * `skills/` renamed `<plugin>-<child>`, each carrying its own subtree intact.
+ *
+ * The rename is per child, so a script that reaches a sibling outside its own skill folder
+ * by a relative path resolves to a name that no longer exists. `buildFlatShape` above copies
+ * `skills/` verbatim and cannot see that; this shape can, and it is why nothing under
+ * `skills/` is shared between skills.
+ */
+function buildHyphenFlatShape() {
+  const root = makeTempDir("aidd-install-shape-hyphen-flat-");
+  const skills = path.join(root, "skills");
+  fs.mkdirSync(skills, { recursive: true });
+  for (const entry of fs.readdirSync(SKILLS_DIR)) {
+    fs.cpSync(path.join(SKILLS_DIR, entry), path.join(skills, `aidd-telemetry-${entry}`), {
+      recursive: true,
+    });
+  }
+  return root;
+}
+
 describeShape("what the flat translation route delivers (skills/ alone, no hooks/)", buildFlatShape);
+describeShape(
+  "what the hyphen-flat route delivers (each child of skills/ renamed <plugin>-<child>)",
+  buildHyphenFlatShape
+);
 describeShape("what a native install delivers (skills/ beside hooks/, under the plugin root)", buildNativeShape);
 
 /**
@@ -178,10 +204,11 @@ describeShape("what a native install delivers (skills/ beside hooks/, under the 
  * defined in ES module scope", before running a single line of its own. Measured on a real
  * install, not imagined.
  *
- * `skills/package.json` and `hooks/package.json` declare `"type": "commonjs"` so the walk
- * stops there. They live inside those two directories rather than at the plugin root
- * because those are the two an install actually carries - a built tree holds `hooks/`,
- * `skills/` and the manifest, and nothing else.
+ * Each skill folder carries its own `package.json` declaring `"type": "commonjs"`, and
+ * `hooks/package.json` declares it for the hooks, so the walk stops before reaching the
+ * host's own declaration. The marker sits inside each skill rather than beside them because
+ * the hyphen-flat route renames every immediate child of `skills/`, so a marker at that
+ * level would not stay where the scripts under it can reach it.
  *
  * The marker in `hooks/` sits beside one genuine ESM module, `opencode-plugin.js`, and does
  * not disturb it: OpenCode loads that file with its own runtime, which does not consult

@@ -1,4 +1,4 @@
-/** One `step_start` line from a session's run journal (#663): a step's own start, and the
+/** One `step_start` line from a session's run journal: a step's own start, and the
  * skill name recorded for it. Mirrors what `plugins/aidd-telemetry/hooks/lib/record.js`'s
  * `buildStepStartLine` writes. No end is ever carried — the journal was deliberately
  * written without one, since no tool measured so far exposes when a skill's work finishes;
@@ -33,7 +33,7 @@ export interface RunJournalSessionStart {
    * none. Carried beside `project_id` rather than replacing it, the same shape
    * `record.js`'s own `session_start` line writes. */
   readonly project_remote?: string;
-  /** Git's own name for the linked worktree this session ran in (#695), so two worktrees
+  /** Git's own name for the linked worktree this session ran in, so two worktrees
    * of one repository are distinguishable in a journal. Absent — never `""` — for a plain
    * checkout, which is the common case and is not an unknown worktree. */
   readonly worktree_id?: string;
@@ -84,7 +84,7 @@ export interface RunJournal {
 }
 
 /**
- * What a run-journal reader promises: the boundaries #663 recorded for one session, or
+ * What a run-journal reader promises: the boundaries recorded for one session, or
  * `null` when nothing can be said about it — no run file for this session, an unreadable
  * runs directory, telemetry that was never enabled. Never throws: a missing, unreadable or
  * truncated journal costs attribution, not the read itself, so a session with no journal at

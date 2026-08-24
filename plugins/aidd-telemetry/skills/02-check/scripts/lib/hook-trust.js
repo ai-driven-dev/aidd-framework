@@ -1,7 +1,7 @@
 // Whether Codex has trusted this plugin's hook, read the way Codex itself decides it: a
 // `[hooks.state."<plugin>@<marketplace>:hooks/hooks.json:<event>:0:0"]` table carrying a
 // `trusted_hash`, in `~/.codex/config.toml`. A hook with no such table has simply never
-// been approved - Codex skips it in silence rather than refusing (#699) - so this file is
+// been approved - Codex skips it in silence rather than refusing - so this file is
 // the only thing that tells "not trusted" apart from "never fired": both leave the same
 // empty run journal behind. Measured live: an installed, registered plugin's hooks never
 // wrote a run file and never gained a `[hooks.state...]` entry across three real

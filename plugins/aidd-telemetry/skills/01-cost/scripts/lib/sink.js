@@ -23,7 +23,7 @@ function hasLegacyData(dir) {
 }
 
 // `%APPDATA%` is where a Windows application puts this, not `.config` (measured on a real
-// windows-latest runner, #707: `HOME`/`os.homedir()` both land at `.config\aidd`, which
+// windows-latest runner: `HOME`/`os.homedir()` both land at `.config\aidd`, which
 // nothing on Windows expects to find). A machine that already journalled under that old
 // default keeps landing there - not silently losing access to what it already wrote -
 // only a machine starting fresh gets `%APPDATA%`.
@@ -49,8 +49,7 @@ function rootDir() {
   return cachedRootDir;
 }
 
-// The journal's `mode` option is the identical no-op on Windows (#707,
-// hooks/lib/repo.js) - `mkdirSync`/`appendFileSync` accept 0700/0600 without error and do
+// The journal's `mode` option is the identical no-op on Windows (// hooks/lib/repo.js) - `mkdirSync`/`appendFileSync` accept 0700/0600 without error and do
 // nothing with it. `icacls` is the mechanism that actually restricts a path there,
 // duplicated rather than required from hooks/lib/repo.js since this script ships inside a
 // skill, installed independently of hooks/, and has to bring everything it needs itself.
@@ -92,7 +91,7 @@ function tightenFiguresDir(dir) {
 }
 
 // `/T` on the directory does not reliably carry the grant onto a leaf file it walks into
-// (measured on a real windows-latest runner, #707), so a day file gets its own pass too -
+// (measured on a real windows-latest runner), so a day file gets its own pass too -
 // only the append that creates it, the one write `PRIVATE_FILE_MODE` itself only applies to.
 function tightenFiguresFile(filePath) {
   if (process.env.AIDD_USER_CONFIG_DIR) return;

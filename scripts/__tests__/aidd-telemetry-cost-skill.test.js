@@ -258,7 +258,6 @@ test("the cost skill never turns unattributed into a claim that no step ran", ()
 });
 
 test("the cost skill states the limits a reader will ask about", () => {
-  assert.ok(fs.existsSync(path.resolve(__dirname, "../../docs/telemetry-limits.md")));
   // Named where the skill acts on them, not only linked: a limit a reader has to go and
   // look up is a limit that gets read as a zero.
   for (const limit of ["not covered", "unattributed", "unknown"]) {
@@ -266,24 +265,22 @@ test("the cost skill states the limits a reader will ask about", () => {
   }
 });
 
-test("the limits document gives every partly-measurable tool its reason, not just its name", () => {
+test("the plugin README gives every partly-measurable tool its reason, not just its name", () => {
   // Pinned on the reason rather than on a heading: the headings have already had to change
   // once, when a tool that "cannot be measured at all" turned out to journal fine.
-  const limits = fs.readFileSync(path.resolve(__dirname, "../../docs/telemetry-limits.md"), "utf8");
+  const readme = fs.readFileSync(path.join(pluginDir, "README.md"), "utf8");
   for (const [tool, reason] of [
     ["Cursor", "no token count in any file"],
-    ["Copilot", "counts a single request"],
+    ["Copilot", "session total only, no per-request figure"],
     ["Codex", "trust"],
   ]) {
-    assert.ok(limits.includes(tool), `${tool} is named`);
-    assert.ok(limits.includes(reason), `${tool}'s reason, not just its name`);
+    assert.ok(readme.includes(tool), `${tool} is named`);
+    assert.ok(readme.includes(reason), `${tool}'s reason, not just its name`);
   }
-  for (const [claim, why] of [
-    ["only Claude Code's does", "which tool's writes name a task"],
-    ["OpenCode is the exception", "the tool that can declare no ticket at all"],
-  ]) {
-    assert.ok(limits.includes(claim), why);
-  }
+  assert.ok(
+    readme.includes("Only Claude Code names the ticket"),
+    "which tool's writes name a task"
+  );
 });
 
 test("the measurement script ships inside a skill, where a plugin install carries it", () => {
@@ -428,8 +425,8 @@ test("the cost skill names per-person as unanswerable, and what would fix it", (
     everything.includes("identity"),
     "must say why: nothing records an identity anywhere",
   );
-  for (const issue of ["#660", "#661", "#656"]) {
-    assert.ok(everything.includes(issue), `must name ${issue} as what would make it answerable`);
+  for (const missing of ["records an identity", "across tools and machines"]) {
+    assert.ok(everything.includes(missing), `must name "${missing}" as what would make it answerable`);
   }
 });
 

@@ -424,7 +424,7 @@ describe("one billed call, seen by both routes, counts once", () => {
   });
 });
 
-describe("a local-read session total, the first record kind: 'session' report figure (#697)", () => {
+describe("a local-read session total, the first record kind: 'session' report figure", () => {
   const COPILOT_CAPABILITY = {
     localRead: { tokenCounters: true, amount: false, toolStatedStep: false },
     export: { tokenCounters: false, amount: false, toolStatedStep: false },

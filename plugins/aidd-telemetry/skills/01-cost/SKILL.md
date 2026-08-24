@@ -39,10 +39,9 @@ menu and ask them to pick.
 | per person, who spent, which teammate | none - unanswerable | said plainly, with what would fix it |
 
 **Per person cannot be answered today.** Nothing records an identity anywhere in what this
-plugin measures. It becomes answerable once #660 (anonymous and named measurement) and
-#661 (resolving one identity across tools and machines) exist, feeding #656 (report per
-person, team and epic) - name that path rather than approximating a person from a project,
-a tool or a machine, none of which is one.
+plugin measures. It becomes answerable only once measurement records an identity at all and
+resolves one identity across tools and machines - name that missing path rather than
+approximating a person from a project, a tool or a machine, none of which is one.
 
 ## Transversal rules
 

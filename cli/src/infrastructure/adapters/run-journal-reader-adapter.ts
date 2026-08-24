@@ -73,7 +73,7 @@ function parseBoundary(parsed: RawJournalLine): RunJournalBoundary | null {
   return skill !== undefined ? { type: "step_start", at, skill } : null;
 }
 
-/** The worktree a session ran in (#695), where the line names one. A plain checkout writes
+/** The worktree a session ran in, where the line names one. A plain checkout writes
  * neither key, and neither is read here — `asString` already rejects `""`, so a torn or
  * empty value reads as "not stated" rather than as a worktree named nothing. */
 function parseWorktree(
@@ -170,7 +170,7 @@ function classifyLine(collector: JournalCollector, parsed: RawJournalLine): void
 }
 
 /**
- * Reads a session's run journal (#663) — the one class in this path allowed to open a file
+ * Reads a session's run journal — the one class in this path allowed to open a file
  * under `aidd_docs/runs`.
  * Never throws: no run file for this session, an unreadable runs directory, or a truncated
  * final line all answer `null` or an empty boundary list, since a missing or damaged

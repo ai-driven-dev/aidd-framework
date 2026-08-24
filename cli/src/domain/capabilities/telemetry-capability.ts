@@ -39,7 +39,7 @@ export interface TelemetryEnvironmentVariableActivation {
 /** AIDD has no writer for this tool's telemetry config yet. */
 export interface TelemetryPlannedActivation {
   readonly kind: "planned";
-  readonly trackedIn: string;
+  readonly missing: string;
 }
 
 /** Enabling this tool's telemetry requires an action AIDD cannot perform (a dashboard

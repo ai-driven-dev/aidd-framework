@@ -58,7 +58,7 @@ function detectHost(payload) {
   // neither of those ever carries, and checked only after their transcript_path
   // patterns above so a host that does carry one is claimed by its own shape
   // first. Measured 2026-08-21 against a real @github/copilot@1.0.80 session -
-  // see issue #681 and scripts/__tests__/fixtures/copilot-compat-*.json.
+  // see scripts/__tests__/fixtures/copilot-compat-*.json.
   if (
     Object.prototype.hasOwnProperty.call(payload, "timestamp") &&
     Object.prototype.hasOwnProperty.call(payload, "hook_event_name") &&

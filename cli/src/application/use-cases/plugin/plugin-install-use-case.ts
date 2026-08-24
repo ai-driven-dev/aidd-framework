@@ -67,7 +67,7 @@ export class PluginInstallUseCase {
   private isSourceArg(arg: string): boolean {
     // `isAbsolute` also catches a Windows-rooted path (`C:\...`, `\\server\share`), which
     // `startsWith("/")` never does - without it, a local Windows source falls through to
-    // the marketplace branch below and is looked up as a package name instead (#707).
+    // the marketplace branch below and is looked up as a package name instead.
     return arg.includes("://") || arg.startsWith("./") || isAbsolute(arg);
   }
 

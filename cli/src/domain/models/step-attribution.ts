@@ -27,7 +27,7 @@ const UNATTRIBUTED: StepAttribution = { source: "unattributed" };
 
 /** One `step_start`, closed by whichever boundary — another `step_start` or a `turn_end` —
  * comes next in file order, or left open if none does. `endMs` is exclusive, matching the
- * half-open interval #663 itself defines. */
+ * half-open interval the run journal itself defines. */
 export interface StepInterval {
   readonly skill: string;
   readonly startMs: number;

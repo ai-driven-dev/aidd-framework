@@ -97,8 +97,21 @@ and one whose reader failed are four different answers.
 **No amount, anywhere.** No tool read locally writes a figure in currency. Reports give
 tokens; turning tokens into money is a separate service's job.
 
-Every limit above, with the measurement behind it →
-[Known limits](../../docs/telemetry-limits.md).
+### What the numbers do not say
+
+- **Codex needs one interactive approval.** Its hook trust is per entry, and a headless run
+  never sees the prompt — so a Codex session journals nothing until someone approves once,
+  in an interactive session, and says nothing while it does not.
+- **OpenCode misses a server process's first session**, and `opencode run` is always a first
+  session.
+- **Only Claude Code names the ticket.** The others report by period and by step, never by
+  task, because nothing they write carries one.
+- **These are raw counters, not your tool's usage screen.** A vendor's own page weights a
+  cached token by what it charges for it; these figures are the counts the tool wrote down.
+  The two disagree on cache lines by construction, and neither is wrong.
+- **A period means when the work ran**, not when it was billed.
+- **A sweep reaches a session only where the journal was installed.** Work done before you
+  turned measurement on is not there, and nothing reconstructs it.
 
 ## Privacy
 
@@ -136,4 +149,3 @@ which it keeps using rather than losing access to what was already written there
   a skill consumes.
 - [`metrics-contract.md`](../../aidd_docs/product/metrics-contract.md) — one stored line,
   for a service that prices them.
-- [`telemetry-limits.md`](../../docs/telemetry-limits.md) — what cannot be measured, and why.

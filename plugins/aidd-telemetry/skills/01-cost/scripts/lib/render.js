@@ -3,7 +3,7 @@
 // Neither derives a figure the other cannot see. Two ways of computing one number is how
 // they start disagreeing.
 
-const { DISPLAY_NAME } = require("../../../_shared/readers.js");
+const { DISPLAY_NAME } = require("./readers.js");
 const { tokensOf } = require("./report.js");
 
 // Bumped from 2: `by_model`'s `model` is now absent on the row for a record neither reader

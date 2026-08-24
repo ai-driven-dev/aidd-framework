@@ -77,7 +77,7 @@ function staticStatusAndDetail(
     case "planned":
       return [
         "not-yet-supported",
-        `Not yet supported by AIDD — tracked in ${activation.trackedIn}.`,
+        `Not yet supported by AIDD — ${activation.missing}.`,
       ];
     case "external":
       return ["cannot-enable", `${activation.reason} ${activation.remedy}`];

@@ -290,7 +290,7 @@ function assertGitStatusHidesJournal(toolId, projectDir) {
 // Step 4/5 — one variant's own run file: session_start + turn boundary, and task_declared
 // ---------------------------------------------------------------------------------------
 
-// Codex keys hook trust per entry, not per plugin: measured on a real config.toml (#707),
+// Codex keys hook trust per entry, not per plugin: measured on a real config.toml,
 // the key is "<plugin>@<marketplace>:hooks/hooks.json:<event>:<matcher>:<hook>" with the
 // event spelled snake_case. So a renamed or newly added event is a NEW key and inherits no
 // approval - and until someone approves it, the session journals a session_start with no

@@ -110,7 +110,7 @@ export interface CostReportToolRow {
   readonly totals: CostTotals;
   /** A local-read `kind: "session"` total, present only for a tool whose own file yields a
    * one-shot, already-complete session figure rather than per-request records — today,
-   * only Copilot (#697). Never folded into `totals`: it answers "what did this session
+   * only Copilot. Never folded into `totals`: it answers "what did this session
    * report" where `totals` answers "what did billed requests sum to", and the two-kinds
    * rule forbids treating one as the other. */
   readonly sessionTotals?: CostTotals;
@@ -285,7 +285,7 @@ class TotalsAccumulator {
   }
 
   /** Never touches `requests` or `cost_usd`: a `kind: "session"` local-read total is not a
-   * billed request, and the tool never states a cost for one (see #697). */
+   * billed request, and the tool never states a cost for one. */
   addTokensOnly(record: TelemetrySinkRecord): void {
     for (const field of COUNTER_FIELDS) {
       const value = record[COUNTER_SOURCE[field]];
@@ -704,7 +704,7 @@ function emptyGroups(fromDay: string, toDay: string): Groups {
 // An export-route "session" record is one periodic flush's own delta - never safe to show
 // as if it were the whole session, and left untouched exactly as before. A local-read
 // "session" record is different in kind, not degree: nothing reads a tool's own file this
-// way except a one-shot, already-complete total (see Copilot, #697), so it is never at risk
+// way except a one-shot, already-complete total (see Copilot), so it is never at risk
 // of being summed with a later flush of the same quantity. Kept off `totals`, `bySteps` and
 // `byDays` regardless - the two-kinds rule forbids summing it with request lines.
 function accumulateSessionRecord(groups: Groups, record: TelemetrySinkRecord): void {

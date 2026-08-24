@@ -309,7 +309,7 @@ function claimIdentifierJoinable(exportConfig, exportedRecord) {
 // route's own claims read cleanly top-to-bottom on their own (config -> join, same shape as
 // hook -> journal -> files -> join), and appending the second route keeps both progressions
 // contiguous rather than interleaved, so a reader who only cares about one route reads two
-// adjacent lines. #617's own illustrative output interleaves "export configured" and
+// adjacent lines. The illustrative output interleaves "export configured" and
 // "identifier joinable" between "hook observed" and "sessions journaled", but that block
 // predates the four-claim refactor into the route-scoped claims above - it names coarser,
 // differently-labelled lines ("plugin installed", "step names readable") that were never

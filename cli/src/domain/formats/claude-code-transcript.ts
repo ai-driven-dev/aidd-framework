@@ -19,7 +19,7 @@ const TURN_FIELD = "requestId";
 
 // Claude Code writes its own fabricated assistant messages into the transcript with this
 // literal in `message.model` - a session-limit notice, an "API Error: your computer went
-// to sleep" notice (#686). They are messages the tool composed, not calls anyone was
+// to sleep" notice. They are messages the tool composed, not calls anyone was
 // billed for, so they yield no record at all.
 //
 // The filter is the marker, never all-counters-zero: measured 2026-08-23 across every

@@ -50,8 +50,8 @@ const CLAUDE_PROJECT_RELATIVE_SETTINGS_PATH: Record<Exclude<TelemetryScope, "use
 // The skill name on `skill_activated` comes only with OTEL_LOG_TOOL_DETAILS, which also
 // logs every Bash command line, MCP tool name, and tool input.
 export const CLAUDE_TELEMETRY_POST_ENABLE_NOTICE =
-  "Per-step cost is unavailable until #663 lands. OTEL_LOG_TOOL_DETAILS is not set — " +
-  "no Bash command, MCP tool name, or tool input is logged.";
+  "Per-step cost comes from the run journal, not from this export. OTEL_LOG_TOOL_DETAILS " +
+  "is not set — no Bash command, MCP tool name, or tool input is logged.";
 
 /** The `env` block Claude Code needs to emit OTLP metrics and logs. An absent endpoint is
  * a caller error: there is no default, not even localhost. */

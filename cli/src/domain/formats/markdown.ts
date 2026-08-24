@@ -7,7 +7,7 @@ export function parseFrontmatter(content: string): {
   // A line ends either way: a Windows checkout (no .gitattributes here) hands this the
   // same document with CRLF, and the key/value patterns below are `$`-anchored, so a
   // trailing carriage return made every one of them miss — `allowed_tools:` matched as a
-  // key with no items and the document came back all but empty (#707). Splitting on
+  // key with no items and the document came back all but empty. Splitting on
   // either ending is not the same as stripping every `\r`: one inside a value is content,
   // and stays.
   const lines = content.split(/\r?\n/);

@@ -141,7 +141,7 @@ export function parsePluginSource(raw: unknown): PluginSource {
 
 function parseStringPluginSource(raw: string): PluginSource {
   // `isAbsolute` also catches a Windows-rooted path (`C:\...`, `\\server\share`), which
-  // starts with neither `/` nor `./` (#707).
+  // starts with neither `/` nor `./`.
   if (raw.startsWith("./") || isAbsolute(raw)) return { kind: "local", path: raw };
   if (GITHUB_REPO_REGEX.test(raw)) return { kind: "github", repo: raw };
   throw new InvalidPluginSourceError(`string source "${raw}" is not a recognized path or repo.`);
@@ -173,7 +173,7 @@ export function parsePluginSourceShorthand(raw: string): PluginSource {
   if (raw.startsWith("https://") || raw.startsWith("http://")) return { kind: "url", url: raw };
   if (raw.startsWith("git@")) return { kind: "url", url: raw };
   // `isAbsolute` also catches a Windows-rooted path (`C:\...`, `\\server\share`), which
-  // starts with neither `/` nor `./` (#707).
+  // starts with neither `/` nor `./`.
   if (raw.startsWith("./") || isAbsolute(raw)) return { kind: "local", path: raw };
   if (raw.startsWith(GITLAB_PREFIX)) return parseGitLabShorthand(raw.slice(GITLAB_PREFIX.length));
   if (GITHUB_REPO_REGEX.test(raw)) return { kind: "github", repo: raw };

@@ -1,6 +1,6 @@
 // One period's records, reduced to a report whose every breakdown sums to its total.
 
-const { SOURCES } = require("../../../_shared/attribution.js");
+const { SOURCES } = require("./attribution.js");
 
 const MICRO_USD_PER_USD = 1e6;
 const COUNTERS = {
@@ -165,7 +165,7 @@ function addTo(totals, record) {
 }
 
 // Never touches `requests` or `cost_usd`: a `kind: "session"` local-read total is not a
-// billed request, and the tool never states a cost for it (see #697).
+// billed request, and the tool never states a cost for it.
 function addTokensOnly(totals, record) {
   for (const [field, source] of Object.entries(COUNTERS)) {
     if (typeof record[source] === "number") {
@@ -483,7 +483,7 @@ function build(input) {
       // to show as if it were the whole session, and left untouched here exactly as
       // before. A local-read "session" record is different in kind, not degree: nothing
       // reads a tool's own file this way except a one-shot, already-complete total (see
-      // Copilot, #697), so it is never a delta and never at risk of being summed with a
+      // Copilot), so it is never a delta and never at risk of being summed with a
       // later flush of the same quantity. Kept off `totals`, `by_step` and `by_day`
       // regardless - the two-kinds rule forbids summing it with request lines, and this
       // reconciles with neither.

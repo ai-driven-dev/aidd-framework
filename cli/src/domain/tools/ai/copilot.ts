@@ -330,7 +330,7 @@ export const copilot: AiTool<
       translationMode: "marketplace",
       // Copilot treats enabledPlugins in settings.json as a recommendation, not an
       // auto-install (github/copilot-cli#2249); the project marketplace is also not
-      // installable from project scope (#3088). Drive `copilot plugin install` to
+      // installable from project scope. Drive `copilot plugin install` to
       // actually load plugins — the settings file below still surfaces recommendations.
       nativeActivation: { binary: "copilot" },
       // VS Code Copilot: extraKnownMarketplaces in .github/copilot/settings.json.
@@ -365,7 +365,7 @@ export const copilot: AiTool<
     supplies: { tokenCounters: false, amount: false, toolStatedStep: false },
   },
 
-  // Measured on #697, against a real ~/.copilot/session-state/<id>/events.jsonl:
+  // Measured, against a real ~/.copilot/session-state/<id>/events.jsonl:
   // `session.shutdown`'s own `tokenDetails` carries all four counters, but once, for the
   // whole session — never per request, so no per-step record can be built from it. No
   // `transcript` location: the session id names the file exactly

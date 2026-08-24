@@ -301,5 +301,5 @@ A period that reports nothing usually means its sessions have not been read yet.
 
 ## Known limits
 
-[`docs/telemetry-limits.md`](../../docs/telemetry-limits.md) states what each tool can and
+[The plugin README](../../plugins/aidd-telemetry/README.md) states what each tool can and
 cannot be measured for, and why. Read it before explaining a missing figure.

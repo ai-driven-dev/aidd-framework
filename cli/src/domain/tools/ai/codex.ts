@@ -114,7 +114,7 @@ export function mergeCodexConfigToml(existing: string, aiddPayload: string): str
   return stringifyToml(result);
 }
 
-// Measured on issue #699: four consecutive `codex exec` sessions installed a plugin's
+// Measured: four consecutive `codex exec` sessions installed a plugin's
 // hooks, ran clean, and journaled nothing — no warning, no line in the output — until
 // `--dangerously-bypass-hook-trust` made the same install produce all three hooks and its
 // journal. Codex writes one `trusted_hash` per hook under `[hooks.state]` in
@@ -266,7 +266,7 @@ export const codex: AiTool<
   // `[otel]` block, or enabling telemetry silently ships metrics off-project.
   telemetry: {
     kind: "planned",
-    trackedIn: "#653",
+    missing: "no export route of its own has been measured for this tool",
   },
 
   // Measured 2026-08-13: `conversation.id` on `codex.sse_event`, zero-token to verify —

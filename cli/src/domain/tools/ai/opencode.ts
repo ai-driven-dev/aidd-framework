@@ -169,7 +169,7 @@ export const opencode: AiTool<
 
   telemetry: {
     kind: "planned",
-    trackedIn: "#653",
+    missing: "no export route of its own has been measured for this tool",
   },
 
   // `session.id` on `ai.streamText` spans is documented behind `experimental.openTelemetry`,
@@ -196,7 +196,7 @@ export const opencode: AiTool<
     // across two turns of one session — no capture puts a large `cache.read` beside `input`
     // for a non-Anthropic provider, so that probe corroborates without confirming. A
     // provider that reports prompt tokens inclusive of the cached ones, the way native
-    // OpenAI's usage does, has never been captured here. See docs/telemetry-limits.md.
+    // OpenAI's usage does, has never been captured here. See plugins/aidd-telemetry/README.md.
     limitation:
       "Its four counters are measured correct for the anthropic provider — not " +
       "independently confirmed for any other provider OpenCode can route to.",

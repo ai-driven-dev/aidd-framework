@@ -49,7 +49,7 @@ const CURSOR_EVENT_MAP: Record<string, readonly string[]> = {
 // PermissionRequest, PostToolUse, PreCompact, PostCompact, SessionStart, SessionEnd,
 // SubagentStart, SubagentStop - and a live probe confirmed it: a `codex exec` run with all
 // four subscribed fired SessionStart and SessionEnd and never Stop, so a turn was never
-// closed and every Codex session journalled a session_start with nothing after it (#707).
+// closed and every Codex session journalled a session_start with nothing after it.
 //
 // SessionEnd is coarser than Stop by nature: it bounds the session, not each turn. For
 // `codex exec` the two coincide, and for an interactive session one turn_end bounding the
@@ -65,7 +65,7 @@ const CODEX_EVENT_MAP: Record<string, readonly string[]> = {
  * Codex is installed two ways - a built marketplace tree and a merged project config - and
  * the two have drifted apart three times. Both call this, so the rename cannot land on one
  * route and not the other, which is exactly how a Codex session came to journal a
- * session_start with nothing after it (#707).
+ * session_start with nothing after it.
  */
 export function renameCodexHookEvents(pluginHooksJson: string): string {
   const parsed = JSON.parse(pluginHooksJson) as ClaudeHooksShape;

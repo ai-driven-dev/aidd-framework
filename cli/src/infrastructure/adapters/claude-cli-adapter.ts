@@ -3,7 +3,7 @@ import { AbstractNativePluginCliAdapter } from "./abstract-native-plugin-cli-ada
 const PROJECT_SCOPE_ARGS = ["--scope", "project"];
 
 /**
- * Activates plugins through the `claude` CLI. Measured on #703: a project-local
+ * Activates plugins through the `claude` CLI. Measured: a project-local
  * `.claude/settings.json` declares `extraKnownMarketplaces`/`enabledPlugins`, but the
  * runtime only loads a plugin once it's in the user-global registry
  * (`~/.claude/plugins/known_marketplaces.json` and `installed_plugins.json`), which only

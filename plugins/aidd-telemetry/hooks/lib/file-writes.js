@@ -195,7 +195,7 @@ function lastWriteMs(filePath) {
 // implementation only walks symlinks and leaves an 8.3 short-name alias (what the CI
 // runner's own temp dir resolves through) untouched, so it never matches getRepoRoot's
 // git-derived, already-canonical path - `.native` calls GetFinalPathNameByHandle, which
-// resolves both symlinks and short-name aliases the same way git itself does (#707).
+// resolves both symlinks and short-name aliases the same way git itself does.
 // Falls back to the raw path so a file deleted between write and hook does not silently
 // drop a real observation.
 function realPathOf(rawPath) {

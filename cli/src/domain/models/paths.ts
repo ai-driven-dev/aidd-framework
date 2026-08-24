@@ -22,7 +22,7 @@ export function builtMarketplaceDir(
 // One directory is the other, or contains it. Two callers guard on this - a build refusing
 // to write into the tree it reads from, and the cache-rebuild path deciding whether it
 // needs the temp-dir detour - and each spelled the comparison itself with a hardcoded "/",
-// so on Windows neither ever recognised real nesting (#707). Named once here so the
+// so on Windows neither ever recognised real nesting. Named once here so the
 // question has an answer to point at rather than a habit to repeat. Both sides are
 // expected already resolved: this compares spelling, it does not resolve.
 export function pathContainsOrEquals(outer: string, inner: string): boolean {

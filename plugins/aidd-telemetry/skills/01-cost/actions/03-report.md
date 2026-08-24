@@ -96,7 +96,7 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    | `task_attributable` | a session on this tool cannot be traced to a task, so it is absent from a task report without having done nothing |
 
 6. **Keep `unattributed` as itself.** Nothing measured supports reading it as no step having run, and it is never a residual.
-7. **Say when the answer is partial.** A non-zero `read.undated_records` or `read.unreadable_lines` means the total is incomplete, and the reasons are in [telemetry-limits.md](../../../../../docs/telemetry-limits.md). The `--axis` path already carries this in its own last lines; the `--json` path carries it in `read`.
+7. **Say when the answer is partial.** A non-zero `read.undated_records` or `read.unreadable_lines` means the total is incomplete, and the reasons are in [the plugin README](../../../README.md). The `--axis` path already carries this in its own last lines; the `--json` path carries it in `read`.
 
 ## Test
 
@@ -105,7 +105,7 @@ A breakdown the object leaves empty is a section left out, never a table of zero
 | A question names an axis | the artefact for that axis is printed, and nothing else |
 | A question asks for a report, or to keep or send the figure | the artefact is written to a file, unchanged, stating its period and axis |
 | A question is broad, naming no axis | the answer gives tokens, models and steps, and names the days it covered |
-| A question asks per person | said as unanswerable, with #660, #661 and #656 named |
+| A question asks per person | said as unanswerable, naming what is missing |
 | A tool carries no amount | the answer says unknown and never prints a currency zero |
 | A tool is not covered | the answer gives its declared reason instead of a figure |
 | The read was partial | the answer says so before giving the total |

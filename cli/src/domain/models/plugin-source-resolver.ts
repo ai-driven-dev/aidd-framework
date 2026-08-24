@@ -24,7 +24,7 @@ export function resolvePluginSourceFromMarketplace(
 
 // isAbsolute(), never a leading "/": a Windows path is absolute and starts with its drive
 // letter, so the "/" test read "D:\\gh-mkt\\sample-plugin" as already-relative and handed
-// the whole absolute path back as the git subdir (#707).
+// the whole absolute path back as the git subdir.
 function toRelativePath(sourcePath: string, localBase: string): string | null {
   if (!isAbsolute(sourcePath)) {
     const stripped = sourcePath.startsWith("./") ? sourcePath.slice(2) : sourcePath;

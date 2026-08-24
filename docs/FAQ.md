@@ -48,51 +48,25 @@ You can write your own Claude Code skills — nothing stops you. AIDD exists bec
 
 **Off unless you turn it on, and nothing leaves your machine.**
 
-The `aidd-telemetry` plugin is not part of the curated install. Even installed, it records
-nothing until a project's `.aidd/config.json` carries `telemetry.enabled: true` — read
-fresh at every write, so turning it off takes effect immediately.
+The `aidd-telemetry` plugin is not part of the curated install, and even installed it records
+nothing until you allow it. Ask your AI tool for the plugin's `00-init` skill: it turns
+measurement on for the current project and tells you what is now recorded.
 
-```bash
-node <plugin>/skills/00-init/scripts/telemetry-switch.js on
-node <plugin>/skills/00-init/scripts/telemetry-switch.js off
-```
-
-Nothing else is needed: no account, no server, no second tool to install.
-
-### What it records, and where
+Then work as usual, and ask `01-cost` what a period or a task consumed. No account, no
+server, no second tool to install.
 
 | Where | What |
 | --- | --- |
 | `aidd_docs/runs/` in your repository, git-ignored | which session served which task, which skill was running when, and which files inside a task folder changed |
-| `~/.config/aidd/telemetry/` | token counts, model names and, where your AI tool records one, an amount — read out of the transcript your tool already wrote |
+| `~/.config/aidd/telemetry/` | token counts and model names, read out of the transcript your AI tool already wrote |
 
-The second only happens when you ask for it. Reading is a command you run; a session never
-does it for you.
+**No prompt, no code, no diff** — the stored shape is an allowlist, field by field, in
+[`metrics-contract.md`](../aidd_docs/product/metrics-contract.md).
 
-### What it never records
-
-**No prompt. No code. No diff.** Counters, model names, skill names and file paths inside
-task folders — nothing else. The stored shape is an allowlist, written down field by field
-in [`metrics-contract.md`](../aidd_docs/product/metrics-contract.md), and a field not on
-that list cannot be stored.
-
-### What leaves your machine
-
-**Nothing, today.** Everything above is written locally and read locally.
-
-Sending these figures to a service that prices them is planned and is not built. When it
-is, it will be a separate, stated choice — never a side effect of measuring.
-
-### Turning it off keeps what you measured
-
-`off` stops the recording from that moment. Sessions already measured stay measured and
-still report. To remove them, delete `aidd_docs/runs/` and
-`~/.config/aidd/telemetry/` — they are ordinary files.
-
-### What it cannot tell you
-
-Coverage differs per AI tool, and a tool that cannot be measured is named as such rather
-than shown as a zero. See [Known limits](./telemetry-limits.md).
+Turning it off stops the recording and keeps what you already measured; both directories are
+ordinary files you can delete. Coverage differs per AI tool, and a tool that cannot be
+measured is named rather than shown as a zero →
+[the plugin's README](../plugins/aidd-telemetry/README.md).
 
 ## 🆘 Still stuck?
 

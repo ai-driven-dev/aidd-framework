@@ -1071,7 +1071,7 @@ describe("the script wired to a real project", () => {
       { type: "turn_end", at: "2026-08-20T09:05:00Z" },
     ]);
     writeClaudeTranscript(home, "s-healthy", [assistantLine("req-h1", "2026-08-20T09:02:00Z")]);
-    // The export route's own two claims, grown alongside the local route's four (#617): a
+    // The export route's own two claims, grown alongside the local route's four: a
     // healthy install now also has its export configured and a record the sink can join back
     // to this same session.
     writeClaudeExportSettings(root, {
@@ -1099,7 +1099,7 @@ describe("the script wired to a real project", () => {
     assert.ok(lines.some((line) => line.includes("not covered: cursor")));
     // opencode and copilot both dropped out of "not covered": opencode once its own plugin
     // reached the journal (phase 5, see measurements.md), copilot once session.shutdown's
-    // own tokenDetails was found readable (#697) - both declare journalAttributable true
+    // own tokenDetails was found readable - both declare journalAttributable true
     // and now carry a reader, so reachableViaJournal accepts them like claude, never
     // counting either as a miss.
     assert.ok(!lines.some((line) => line.includes("not covered: opencode")));

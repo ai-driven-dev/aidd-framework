@@ -107,7 +107,7 @@ function parseLine(line: string): CopilotEventLine | null {
 
 /**
  * One record at most, from `session.shutdown`'s own `tokenDetails` — never per turn, since
- * no per-request figure exists on this tool's file at all (see #697). A session that never
+ * no per-request figure exists on this tool's file at all. A session that never
  * shut down, or one that shut down with no billed request (no `tokenDetails` at all,
  * `modelMetrics: {}`), yields nothing: a session held and found empty, never a record of
  * zeros. Only the first matching line is kept — `session.shutdown` fires once.

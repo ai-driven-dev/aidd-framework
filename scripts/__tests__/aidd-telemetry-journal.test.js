@@ -381,7 +381,7 @@ for (const name of [
 // Codex has no `Stop` event. Its own vocabulary, read out of the 0.149.0 binary and
 // confirmed by a live `codex exec`, is SessionStart / SessionEnd / PostToolUse and friends -
 // SessionStart and SessionEnd fired, Stop never did, so every Codex session journalled a
-// session_start with nothing after it (#707). Both fixtures below are real captures from
+// session_start with nothing after it. Both fixtures below are real captures from
 // that run with the home path redacted; this test replays the SessionEnd one as the
 // turn-end hook receives it, and fails if a Codex turn ever stops closing.
 test("Codex's own SessionEnd payload closes the turn, since Codex never sends a Stop", () => {
@@ -1317,7 +1317,7 @@ test("a session that never produces a git commit still yields a complete session
   }
 });
 
-// `parent_run_id is present and null` (#620) is gone: the field itself left
+// `parent_run_id is present and null` is gone: the field itself left
 // the written form. Measured reason, from plan.md - a subagent shares its
 // parent's session_id, and SubagentStart/SubagentStop carry an agent_id, so
 // nesting is inside a run, not between runs; there is nothing left for the
@@ -2891,7 +2891,7 @@ for (const host of Object.keys(STEP_FIXTURE_BY_HOST)) {
   });
 }
 
-test("a skill opened on Copilot's compat payload shape leaves a step_start naming it - the second of Copilot's two shapes, captured separately from the canonical one (issue #701)", () => {
+test("a skill opened on Copilot's compat payload shape leaves a step_start naming it - the second of Copilot's two shapes, captured separately from the canonical one", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/step-copilot-compat-skill.git" });
   try {
     const sessionId = "00000000-0000-4000-8000-0000000cop7";

@@ -13,7 +13,7 @@ on:
     paths:
       - "cli/**"
       - "kanban/**"
-      # The plugin ships the hooks and skills these jobs exercise, and the Windows probe
+      # The plugin ships the hooks and skills these jobs exercise, and the Windows job
       # exists for them in particular - without this, changing any of it runs nothing.
       - "plugins/aidd-telemetry/**"
       - "scripts/__tests__/**"
@@ -21,7 +21,7 @@ on:
     paths:
       - "cli/**"
       - "kanban/**"
-      # The plugin ships the hooks and skills these jobs exercise, and the Windows probe
+      # The plugin ships the hooks and skills these jobs exercise, and the Windows job
       # exists for them in particular - without this, changing any of it runs nothing.
       - "plugins/aidd-telemetry/**"
       - "scripts/__tests__/**"
@@ -149,13 +149,10 @@ jobs:
       - run: cd kanban && pnpm lint
       - run: cd kanban && pnpm test
 
-  windows-probe:
-    # Answers issue #707's Windows half: nothing in the telemetry layer had ever run on
-    # Windows. Runs under bash (Git Bash, bundled on windows-latest) so every command below
-    # is the same command the Linux measurements in
-    # aidd_docs/tasks/2026_08/2026_08_22_platforms/measurements.md ran, not a PowerShell
-    # rewrite of it.
-    name: cli / Windows Probe (#707)
+  windows:
+    # Runs under bash (Git Bash, bundled on windows-latest) so every command is the one the
+    # Linux jobs run, not a PowerShell rewrite of it.
+    name: cli / Windows
     runs-on: windows-latest
     defaults:
       run:
@@ -170,170 +167,42 @@ jobs:
         with:
           node-version: "22"
 
-      # Answers and the round trip run before the suites below, and each has its own
-      # continue-on-error: this job exists to gather every finding in one pass, not to stop
-      # at the first red step - the final "Fail the job..." step below restores an accurate
-      # pass/fail conclusion from what actually happened.
-
-      - name: '#707 answer 1 - where the figures land'
-        id: answer1
-        continue-on-error: true
-        run: |
-          node <<'EOF'
-          const os = require("node:os");
-          const path = require("node:path");
-          console.log("HOME=" + JSON.stringify(process.env.HOME));
-          console.log("USERPROFILE=" + JSON.stringify(process.env.USERPROFILE));
-          console.log("APPDATA=" + JSON.stringify(process.env.APPDATA));
-          console.log("os.homedir()=" + os.homedir());
-          const sinkPath = path.resolve("plugins/aidd-telemetry/skills/01-cost/scripts/lib/sink.js");
-          console.log("resolved rootDir(), runner's own HOME=" + require(sinkPath).rootDir());
-          delete process.env.HOME;
-          delete require.cache[require.resolve(sinkPath)];
-          console.log("resolved rootDir(), HOME unset (a real Windows machine)=" + require(sinkPath).rootDir());
-          EOF
-
-      - name: '#707 answer 2 - what POSIX modes actually do'
-        id: answer2
-        continue-on-error: true
-        run: |
-          node <<'EOF'
-          const fs = require("node:fs");
-          const path = require("node:path");
-          const os = require("node:os");
-          const dir = path.join(os.tmpdir(), "aidd-mode-probe-" + Date.now());
-          let dirErr = null, fileErr = null, chmodErr = null;
-          try { fs.mkdirSync(dir, { recursive: true, mode: 0o700 }); } catch (e) { dirErr = e.message; }
-          const file = path.join(dir, "probe.jsonl");
-          try { fs.appendFileSync(file, "{}\n", { mode: 0o600 }); } catch (e) { fileErr = e.message; }
-          try { fs.chmodSync(dir, 0o700); } catch (e) { chmodErr = e.message; }
-          const dirMode = (fs.statSync(dir).mode & 0o777).toString(8);
-          const fileMode = (fs.statSync(file).mode & 0o777).toString(8);
-          console.log("platform=" + process.platform);
-          console.log("mkdirSync({mode:0o700}) threw=" + dirErr);
-          console.log("appendFileSync({mode:0o600}) threw=" + fileErr);
-          console.log("chmodSync(dir,0o700) threw=" + chmodErr);
-          console.log("directory mode on disk=0" + dirMode + " (repo.js asked for 0700)");
-          console.log("file mode on disk=0" + fileMode + " (sink.js/record.js asked for 0600)");
-          EOF
-
-      # These two ran the raw `find` line to measure #707's question, and answered it: under
-      # Git Bash `find` exits non-zero for every plugin directory a fresh machine does not
-      # have, and under PowerShell `find` is Windows' own unrelated FIND.exe ("Parameter
-      # format not correct", exit 2). 01-locate.md now carries a form per shell. These steps
-      # run those forms, so the documented instruction is what gets checked from here on -
-      # a step that only records a defect stops being useful the moment the defect is fixed.
-      - name: '#707 answer 3 - the bash form 01-locate.md documents finds the script'
-        id: answer3bash
-        continue-on-error: true
-        run: |
-          found=$(test -n "$CLAUDE_PLUGIN_ROOT" && ls "$CLAUDE_PLUGIN_ROOT/skills/01-cost/scripts/telemetry-report.js" \
-            || find ~/.claude/plugins ~/.codex/plugins ~/.cursor/plugins .github/plugins .claude/plugins .codex/plugins . \
-               -type f -path '*01-cost/scripts/telemetry-report.js' 2>/dev/null | head -1 || true)
-          echo "found: $found"
-          test -n "$found"
-
-      - name: '#707 answer 3 - the PowerShell form finds it too (find.exe would not)'
-        id: answer3pwsh
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          $found = if ($env:CLAUDE_PLUGIN_ROOT -and (Test-Path "$env:CLAUDE_PLUGIN_ROOT/skills/01-cost/scripts/telemetry-report.js")) {
-            "$env:CLAUDE_PLUGIN_ROOT/skills/01-cost/scripts/telemetry-report.js"
-          } else {
-            Get-ChildItem -Path "$HOME/.claude/plugins", "$HOME/.codex/plugins", "$HOME/.cursor/plugins", ".github/plugins", ".claude/plugins", ".codex/plugins", "." -Recurse -File -Filter "telemetry-report.js" -ErrorAction SilentlyContinue |
-              Where-Object { $_.FullName -replace '\\', '/' -match '01-cost/scripts/telemetry-report.js$' } |
-              Select-Object -First 1 -ExpandProperty FullName
-          }
-          Write-Output "found: $found"
-          if (-not $found) { exit 1 }
-
-      - name: Round trip - switch telemetry on
-        id: rt1
-        continue-on-error: true
+      # The chain end to end, on the platform where a home directory, a line ending and an
+      # absolute path all resolve differently than they do on the Linux jobs above.
+      - name: Chain - switch telemetry on
         run: node plugins/aidd-telemetry/skills/00-init/scripts/telemetry-switch.js on
-
-      - name: Round trip - journal a captured payload
-        id: rt2
-        continue-on-error: true
+      - name: Chain - journal a captured payload
         run: |
           # The fixture's own cwd is a path from whatever machine captured it - rewritten to
-          # this checkout's real path, the same edit the Linux measurements made, so
-          # getRepoRoot resolves a repository that actually exists on this runner.
+          # this checkout's real path so getRepoRoot resolves a repository that exists here.
           node -e "const p=require('./scripts/__tests__/fixtures/claude-code-session-start.json'); p.cwd=process.cwd(); require('fs').writeFileSync('payload.json', JSON.stringify(p));"
           node plugins/aidd-telemetry/hooks/journal.js session-start < payload.json
           node plugins/aidd-telemetry/hooks/journal.js turn-end < payload.json
-          find aidd_docs/runs -type f | xargs -I{} cat {}
-
-      - name: 'Round trip - #707 the journal stays private AND git add -A still works'
-        id: rt2acl
-        continue-on-error: true
+      - name: Chain - the journal stays private and git add -A still works
         run: |
-          echo "--- icacls aidd_docs/runs (directory ACL) ---"
-          icacls aidd_docs/runs
-          runfile=$(find aidd_docs/runs -maxdepth 1 -type f -name '*.jsonl' | head -1)
-          echo "--- icacls $runfile (journal file ACL) ---"
-          icacls "$runfile"
-          echo "--- git add -A, in the checkout that just wrote the journal above ---"
           git add -A
-          echo "git add -A exit code: $?"
-          git status --porcelain
-
-      - name: Round trip - read it back
-        id: rt3
-        continue-on-error: true
+          git status --porcelain >/dev/null
+      - name: Chain - read it back
         run: |
           node plugins/aidd-telemetry/skills/01-cost/scripts/telemetry-report.js read
           node plugins/aidd-telemetry/skills/01-cost/scripts/telemetry-report.js report
-
-      - name: Round trip - telemetry-check.js
-        id: rt4
-        continue-on-error: true
+      - name: Chain - diagnose
         run: node plugins/aidd-telemetry/skills/02-check/scripts/telemetry-check.js
 
-      - name: Plugin's own suite
-        id: pluginsuite
-        continue-on-error: true
+      - name: Plugin suite
         run: node --test "scripts/__tests__/*.test.js"
 
       - run: cd kanban && pnpm install --frozen-lockfile
       - run: cd cli && pnpm install --frozen-lockfile
-      - name: cli unit
-        id: cliunit
-        continue-on-error: true
-        run: cd cli && pnpm test:unit
-      - name: cli integration
-        id: cliintegration
-        continue-on-error: true
-        run: cd cli && pnpm test:integration
-      - name: cli e2e (excluding two Windows-infeasible files, by name)
-        id: clie2e
-        continue-on-error: true
+      - run: cd cli && pnpm test:unit
+      - run: cd cli && pnpm test:integration
+      - name: cli e2e
         run: |
           cd cli
           pnpm build
           pnpm exec vitest run --project=e2e \
             --exclude "tests/e2e/persona.e2e.test.ts" \
             --exclude "tests/e2e/telemetry-multi-tool.e2e.test.ts"
-        # persona.e2e.test.ts: hardcodes /usr/bin/expect for TTY emulation - that path and
-        # binary do not exist on windows-latest.
-        # telemetry-multi-tool.e2e.test.ts: writes a `#!/bin/sh` stand-in `opencode` binary
-        # (chmod 0o755, no file extension) and puts it on PATH. Windows resolves an
-        # executable by PATHEXT/extension, not a shebang line or the POSIX execute bit, so
-        # this stand-in never launches there.
-
-      - name: Fail the job if any real step above failed
-        if: always()
-        run: |
-          for outcome in \
-            "${{ steps.answer1.outcome }}" "${{ steps.answer2.outcome }}" \
-            "${{ steps.answer3bash.outcome }}" "${{ steps.answer3pwsh.outcome }}" \
-            "${{ steps.rt1.outcome }}" "${{ steps.rt2.outcome }}" "${{ steps.rt2acl.outcome }}" "${{ steps.rt3.outcome }}" "${{ steps.rt4.outcome }}" \
-            "${{ steps.pluginsuite.outcome }}" \
-            "${{ steps.cliunit.outcome }}" "${{ steps.cliintegration.outcome }}" "${{ steps.clie2e.outcome }}"; do
-            if [ "$outcome" = "failure" ]; then
-              echo "at least one probe step failed - see above"
-              exit 1
-            fi
-          done
-          echo "every probe step passed"
+        # persona.e2e.test.ts hardcodes /usr/bin/expect for TTY emulation, which windows-latest
+        # does not carry. telemetry-multi-tool.e2e.test.ts puts a `#!/bin/sh` stand-in binary
+        # with no extension on PATH; Windows resolves an executable by PATHEXT, never a shebang.

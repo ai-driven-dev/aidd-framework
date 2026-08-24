@@ -1,6 +1,7 @@
 ---
 paths:
-  - "src/**/*.ts"
+  - "src/application/use-cases/**/*.ts"
+  - "src/domain/**/*.ts"
 ---
 
 # Method Size Limit

@@ -26,7 +26,7 @@ import type { LocalCostCandidateRecord } from "../ports/session-cost-reader.js";
 // Messages API, corroborated elsewhere in this repo against Claude Code's own `/usage`) —
 // so it alone is measured. Whether a provider that reports prompt tokens *inclusive* of
 // cached ones (the way native OpenAI's Chat Completions usage does) would double-count
-// through this same mapping remains open. See docs/telemetry-limits.md for the declaration
+// through this same mapping remains open. See plugins/aidd-telemetry/README.md for the declaration
 // this keeps beside the limit.
 //
 // That open question does not reopen the choice above to never read `info.providerID`: a

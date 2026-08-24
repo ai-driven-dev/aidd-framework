@@ -26,7 +26,7 @@ const CLAUDE_ENABLE_VALUE = "1";
 const CLAUDE_ENDPOINT_KEY = "OTEL_EXPORTER_OTLP_ENDPOINT";
 // Never written by AIDD's own installer - buildClaudeTelemetryEnv sets no such key. Reading
 // it is reading a person's own manual addition: the OTEL_METRICS_INCLUDE_SESSION_ID=false
-// case #617 names by name, the one setting that survives identity resolution
+// the one case that matters by name, the setting that survives identity resolution
 // (telemetry-sink-record.ts's resolveIdentity) failing without ever leaving a trace in the
 // sink - the dropped record is never stored, so this is the only place that fault is legible.
 const CLAUDE_INCLUDE_SESSION_ID_KEY = "OTEL_METRICS_INCLUDE_SESSION_ID";

@@ -23,7 +23,7 @@ const files = (p) =>
 const plugins = dirs(PLUGINS).sort();
 // A directory under skills/ is a skill only once it carries a SKILL.md - the same test
 // the CLI's own plugin-source-tree-reader.ts uses. Without it, a plugin-wide directory
-// like aidd-telemetry's skills/_shared/ (shared code, no SKILL.md) counts as a skill.
+// that carries no SKILL.md would count as a skill.
 const skillsOf = (name) =>
   dirs(`${PLUGINS}/${name}/skills`).filter((skill) =>
     existsSync(`${PLUGINS}/${name}/skills/${skill}/SKILL.md`)

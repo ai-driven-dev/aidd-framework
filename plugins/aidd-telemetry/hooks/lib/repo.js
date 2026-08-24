@@ -32,7 +32,7 @@ function getRepoRoot(cwd) {
 const WORKTREES_SEGMENT = "worktrees";
 const GIT_DIR_NAME = ".git";
 
-// #695. The worktree a session ran in, named so two worktrees of one repository can be
+// The worktree a session ran in, named so two worktrees of one repository can be
 // told apart in a journal - taken from git, never from an agent runner's own variable,
 // which names that runner's concept rather than the repository's.
 //
@@ -79,7 +79,7 @@ function repositoryNameFromCommonDir(commonDir) {
 }
 
 // One `git rev-parse`, never three: a plain checkout pays exactly the shellout it paid
-// before #695 existed, and reads two more words from the same stdout. `getRepoRoot` above
+// before worktrees were named, and reads two more words from the same stdout. `getRepoRoot` above
 // is left alone - it is exported, and asking it for more than the root would change what
 // its name promises.
 function getRepoLocation(cwd) {
@@ -186,7 +186,7 @@ function runsDir(repoRoot) {
 // What this hook writes is who-worked-on-what-for-how-long, so it is not left
 // world-readable. Windows accepts this mode on mkdirSync/appendFileSync/chmodSync
 // without error, but does nothing with it - the directory and every file in it land at
-// 0666 regardless (measured on a real windows-latest runner, #707). Privacy there comes
+// 0666 regardless (measured on a real windows-latest runner). Privacy there comes
 // from restrictToCurrentUser below, not from this constant.
 const PRIVATE_DIR_MODE = 0o700;
 
@@ -217,7 +217,7 @@ function tightenOwnedFile(filePath) {
 // Full Control to the current user alone. `inheritable` adds the container-inherit flags
 // `(OI)(CI)` so a directory's own future children pick up the same grant; a file gets
 // neither, since a file has no children to inherit anything. Never `/T`: measured on a
-// real windows-latest runner (#707), `/T` walked into files this code does not own - a
+// real windows-latest runner, `/T` walked into files this code does not own - a
 // checked-out `.gitkeep` among them - and left at least one with no usable ACE of its
 // own, so an ordinary `git add -A` right after got "Permission denied" opening it. It
 // bought nothing here anyway: a file this code creates gets its own tightenOwnedFile
@@ -241,7 +241,7 @@ function restrictToCurrentUser(target, { inheritable = false } = {}) {
   }
 }
 
-// Decision, not an inherited default (#693): a worktree keeps its own journal.
+// Decision, not an inherited default: a worktree keeps its own journal.
 // `getRepoRoot` resolves `--show-toplevel`, the worktree's own root - never
 // `--git-common-dir`'s shared repository, which this deliberately does not read.
 //
@@ -254,7 +254,7 @@ function restrictToCurrentUser(target, { inheritable = false } = {}) {
 // the entry `telemetry-switch.js on` added when B turned measurement on.
 //
 // Cross-worktree joining - so a report can still see every worktree's sessions together -
-// is #695: `worktreeFields` above names the worktree on `session_start`, and the write
+// `worktreeFields` above names the worktree on `session_start`, and the write
 // target stays exactly where this function has always put it.
 function resolveRunsDir(cwd) {
   const location = getRepoLocation(cwd);

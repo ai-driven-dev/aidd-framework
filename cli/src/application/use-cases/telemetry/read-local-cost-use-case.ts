@@ -257,7 +257,7 @@ export class ReadLocalCostUseCase {
   }
 
   /** Every session the journal names, oldest file first. A person has no other way to
-   * learn a session identifier, and the journal has recorded every one of them since #663. */
+   * learn a session identifier, and the journal has recorded every one of them. */
   private async journalledSessionIds(): Promise<readonly string[]> {
     const journals = await this.runJournalReader.list();
     const ids = journals.map((journal) => journal.session?.vendor_id).filter(isPresent);

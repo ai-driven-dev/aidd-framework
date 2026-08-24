@@ -37,7 +37,7 @@ function identityModule() {
 // The identity file's own rule, restated rather than imported: a test that asked the code
 // where it put the file could never catch the code putting it in the wrong place. Windows
 // keeps a person's data under %APPDATA%, so the sandbox supplies one inside the temp home
-// - without it these would read, and write, the runner's real profile (#707).
+// - without it these would read, and write, the runner's real profile.
 function appDataIn(home) {
   return path.join(home, "AppData", "Roaming");
 }
@@ -50,7 +50,7 @@ function identityFileIn(home) {
 
 // HOME alone does not sandbox this on Windows, where the file lives under %APPDATA%: a
 // test that only redirected HOME would read the machine owner's real identity file and
-// pass only because that machine happens to have none (#707).
+// pass only because that machine happens to have none.
 function sandboxHome(home) {
   process.env.HOME = home;
   process.env.APPDATA = appDataIn(home);
@@ -82,7 +82,7 @@ describe("who a default installation names: nobody", () => {
 // `process.platform` is read inside identityDir() on every call, so stating it here is
 // enough - no re-require needed. Pinned on any platform rather than only on a Windows
 // runner: where a person's file lands is a pure resolution, and a test only a runner we
-// rarely have can fail is a test that lets this regress silently (#707).
+// rarely have can fail is a test that lets this regress silently.
 function withPlatform(platform, run) {
   const original = Object.getOwnPropertyDescriptor(process, "platform");
   Object.defineProperty(process, "platform", { value: platform, configurable: true });
@@ -275,7 +275,7 @@ describe("the choice belongs to the person, not the repository", () => {
 // APPDATA for the same reason identityEnv carries one: the report script looks a person's
 // identity up on its own, and on Windows it looks under %APPDATA%. Redirecting HOME alone
 // sent it to the machine's real profile, so a session read after an opt-in came back
-// unnamed there and named everywhere else (#707). AIDD_USER_CONFIG_DIR still points the
+// unnamed there and named everywhere else. AIDD_USER_CONFIG_DIR still points the
 // sink at its own directory - identity deliberately ignores that variable.
 function reportEnv(home, configDir) {
   const { GIT_DIR: _g, GIT_INDEX_FILE: _i, GIT_WORK_TREE: _w, ...rest } = process.env;
