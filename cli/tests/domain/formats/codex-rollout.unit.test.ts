@@ -233,9 +233,7 @@ describe("a token_count re-emitted with an unmoved cumulative", () => {
     expect(records[0]?.cache_read_tokens).toBe(9000);
     expect(records[0]?.output_tokens).toBe(220);
     // And it reconciles with the cumulative the tool itself states at the turn's end.
-    expect(
-      (records[0]?.input_tokens ?? 0) + (records[0]?.cache_read_tokens ?? 0)
-    ).toBe(41554);
+    expect((records[0]?.input_tokens ?? 0) + (records[0]?.cache_read_tokens ?? 0)).toBe(41554);
   });
 
   it("still counts an event that states no cumulative at all, rather than assuming nothing happened", () => {
