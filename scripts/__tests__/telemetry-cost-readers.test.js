@@ -114,6 +114,55 @@ describe("reading what Claude Code wrote about a session", () => {
 describe("reading what Codex wrote about a session", () => {
   const read = (sessionId) => readerFor("codex")(FIXTURES, sessionId);
 
+  // Measured on 400 real rollouts on 2026-08-26: the last `token_count` of a turn is
+  // sometimes re-emitted verbatim - same increment, cumulative unchanged. 291 of 16,415
+  // events across 38 rollouts, ~0.9% over-count on input and cache-read, ~1.2% on output.
+  // The CLI's own guard is pinned by codex-rollout.unit.test.ts; this is its mirror.
+  it("counts a re-emitted token_count once, because an unmoved cumulative was never billed", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-codex-dup-"));
+    try {
+      const dir = path.join(home, ".codex", "sessions", "2026", "08", "05");
+      fs.mkdirSync(dir, { recursive: true });
+      const usage = (input, cached, output) => ({
+        input_tokens: input,
+        cached_input_tokens: cached,
+        cache_write_input_tokens: 0,
+        output_tokens: output,
+      });
+      const tokenCount = (last, total) =>
+        JSON.stringify({
+          type: "event_msg",
+          timestamp: "2026-08-05T09:42:40.000Z",
+          payload: { type: "token_count", info: { last_token_usage: last, total_token_usage: total } },
+        });
+      const sessionId = "019fd0df-c784-7c31-b470-000000000001";
+      fs.writeFileSync(
+        path.join(dir, `rollout-2026-08-05T09-42-34-${sessionId}.jsonl`),
+        [
+          JSON.stringify({ type: "session_meta", payload: { id: sessionId } }),
+          JSON.stringify({
+            type: "turn_context",
+            timestamp: "2026-08-05T09:42:34.000Z",
+            payload: { turn_id: "t-1", model: "gpt-5.4" },
+          }),
+          tokenCount(usage(19468, 4000, 100), usage(19468, 4000, 100)),
+          tokenCount(usage(22086, 5000, 120), usage(41554, 9000, 220)),
+          tokenCount(usage(22086, 5000, 120), usage(41554, 9000, 220)),
+        ].join("\n")
+      );
+
+      const [only] = readerFor("codex")(home, sessionId).records;
+
+      assert.equal(only.input_tokens, 19468 - 4000 + (22086 - 5000));
+      assert.equal(only.cache_read_tokens, 9000);
+      assert.equal(only.output_tokens, 220);
+      // and it reconciles with the cumulative the tool itself states at the turn's end
+      assert.equal(only.input_tokens + only.cache_read_tokens, 41554);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it("sums each turn's own increments, never its running total", () => {
     // Real captured last_token_usage for turn one: {22229,20224,0,231}, {24692,21248,0,206},
     // {27769,24320,0,390} as input, cached, cache_write, output. Summing total_token_usage

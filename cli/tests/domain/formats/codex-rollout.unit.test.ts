@@ -189,3 +189,70 @@ describe("CODEX_ROLLOUT_LOCATION", () => {
     ).toBe(TARGET_ID);
   });
 });
+
+// Measured on 400 real rollouts in ~/.codex/sessions on 2026-08-26: the last `token_count`
+// of a turn is sometimes re-emitted verbatim — the same `last_token_usage` arrives twice
+// while `total_token_usage` does not move. 291 of 16,415 events (1.8%) across 38 of the 400
+// rollouts. Summing every increment therefore over-counted this tool by ~0.9% on input and
+// cache-read and ~1.2% on output. Reproduced from
+// rollout-2026-08-05T09-42-34-019fd0df-c784-7c31-b470, whose shape this fixture reproduces:
+// last=45800 / total=121055 arrives, then arrives again unchanged.
+describe("a token_count re-emitted with an unmoved cumulative", () => {
+  const usage = (input: number, cached: number, output: number) => ({
+    input_tokens: input,
+    cached_input_tokens: cached,
+    cache_write_input_tokens: 0,
+    output_tokens: output,
+  });
+  const tokenCount = (last: object, total: object) =>
+    JSON.stringify({
+      type: "event_msg",
+      timestamp: "2026-08-05T09:42:40.000Z",
+      payload: { type: "token_count", info: { last_token_usage: last, total_token_usage: total } },
+    });
+
+  const rollout = [
+    JSON.stringify({ type: "session_meta", payload: { id: "s-1" } }),
+    JSON.stringify({
+      type: "turn_context",
+      timestamp: "2026-08-05T09:42:34.000Z",
+      payload: { turn_id: "t-1", model: "gpt-5.4", effort: "high" },
+    }),
+    tokenCount(usage(19468, 4000, 100), usage(19468, 4000, 100)),
+    tokenCount(usage(22086, 5000, 120), usage(41554, 9000, 220)),
+    // The re-emission: identical increment, and a cumulative that has not moved.
+    tokenCount(usage(22086, 5000, 120), usage(41554, 9000, 220)),
+  ].join("\n");
+
+  it("counts it once, because a cumulative that has not moved was never billed", () => {
+    const records = mapCodexRolloutToSinkRecords(rollout);
+
+    expect(records).toHaveLength(1);
+    // input is made exclusive of cache: (19468-4000) + (22086-5000) = 32554.
+    expect(records[0]?.input_tokens).toBe(32554);
+    expect(records[0]?.cache_read_tokens).toBe(9000);
+    expect(records[0]?.output_tokens).toBe(220);
+    // And it reconciles with the cumulative the tool itself states at the turn's end.
+    expect(
+      (records[0]?.input_tokens ?? 0) + (records[0]?.cache_read_tokens ?? 0)
+    ).toBe(41554);
+  });
+
+  it("still counts an event that states no cumulative at all, rather than assuming nothing happened", () => {
+    const withoutTotal = [
+      JSON.stringify({ type: "session_meta", payload: { id: "s-2" } }),
+      JSON.stringify({
+        type: "turn_context",
+        timestamp: "2026-08-05T09:42:34.000Z",
+        payload: { turn_id: "t-2" },
+      }),
+      tokenCount(usage(100, 0, 10), usage(100, 0, 10)),
+      JSON.stringify({
+        type: "event_msg",
+        payload: { type: "token_count", info: { last_token_usage: usage(100, 0, 10) } },
+      }),
+    ].join("\n");
+
+    expect(mapCodexRolloutToSinkRecords(withoutTotal)[0]?.output_tokens).toBe(20);
+  });
+});

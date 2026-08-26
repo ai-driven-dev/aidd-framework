@@ -155,13 +155,32 @@ function claudeRead(homeDir, sessionId) {
 // Codex -----------------------------------------------------------------------------
 
 // `last_token_usage` is this call's own increment; `total_token_usage` is cumulative, and
-// summing the totals would count every call after the first again. `input_tokens` here is
+// summing the totals would count every call after the first again. But the last
+// `token_count` of a turn is sometimes re-emitted verbatim - the same increment twice while
+// the cumulative does not move - so an event whose cumulative is unchanged is skipped: a
+// cumulative that has not moved cannot carry consumption that was billed. Measured on 400
+// real rollouts: 291 of 16,415 events across 38 rollouts, ~0.9% over-count on input and
+// cache-read. An event stating no cumulative at all is still counted. `input_tokens` here is
 // *inclusive* of `cached_input_tokens`, unlike Claude Code's - subtracting is what keeps
 // the field meaning the same thing across tools. `reasoning_output_tokens` is a subset of
 // `output_tokens`, never a sibling.
+// The cumulative as a comparable string, or null when the event states none.
+function codexCumulativeKey(usage) {
+  if (!usage) return null;
+  const parts = [
+    asNumber(usage.input_tokens),
+    asNumber(usage.cached_input_tokens),
+    asNumber(usage.cache_write_input_tokens),
+    asNumber(usage.output_tokens),
+  ];
+  if (parts.every((part) => part === undefined)) return null;
+  return parts.map((part) => (part === undefined ? "" : String(part))).join("/");
+}
+
 function codexRecords(content, sessionId) {
   const records = [];
   let pending = null;
+  let lastCumulative;
   const flush = () => {
     if (pending && pending.counted) records.push(pending.record);
     pending = null;
@@ -204,6 +223,9 @@ function codexRecords(content, sessionId) {
       line.payload.info &&
       line.payload.info.last_token_usage;
     if (!usage || !pending) continue;
+    const key = codexCumulativeKey(line.payload.info.total_token_usage);
+    if (key !== null && key === lastCumulative) continue;
+    if (key !== null) lastCumulative = key;
     pending.counted = true;
     addCodexUsage(pending.record, usage);
   }
