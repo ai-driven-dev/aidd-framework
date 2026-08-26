@@ -92,7 +92,18 @@ journey
 3. `name` refuses when nothing was opted into, naming `on` as the missing step.
 4. `off` removes the identity and says that new records will carry no person, never that past ones lose theirs.
 
-### `3)` Wire the subcommand and pin it against the script
+### `3)` Restore the two suites phase 1 had to move here
+
+> Phase 1 deleted `01-cost`'s reporter, and two suites in
+> `scripts/__tests__/aidd-telemetry-identity.test.js` drove `read` through it: *"what a
+> default install actually stores, proven from the stored bytes"* and *"a choice made today
+> does not reach backwards"*. Reading the stored bytes is a stronger claim than the unit
+> tests that currently hold the behaviour, and this is the phase that can restore it.
+
+1. Rebuild both as e2e tests against `aidd telemetry read`, with a journal and a fixture home.
+2. Assert from the stored lines themselves, not from a stubbed sink.
+
+### `4)` Wire the subcommand and pin it against the script
 
 > The script is still present in this phase, which is the only chance to compare them.
 
@@ -106,4 +117,5 @@ journey
 | ---- | ------------------------------------------------------------------------------------------------------------------------- |
 | 1    | The identity file lands in the OS user's own profile with `0600`/`0700`, and `AIDD_USER_CONFIG_DIR` does not move it.      |
 | 2    | A second `on` reports the same identifier as the first; `name` before `on` refuses and names `on`; `off` states that only new records are affected. |
-| 3    | For each of the four verbs, the file the CLI writes is byte-identical to the file the script writes from the same starting state, and an unreadable file surfaces as an error rather than as "no identity". |
+| 3    | A default install stores no person field, proven by reading the lines `aidd telemetry read` wrote; records stored before opting in stay unnamed. |
+| 4    | For each of the four verbs, the file the CLI writes is byte-identical to the file the script writes from the same starting state, and an unreadable file surfaces as an error rather than as "no identity". |

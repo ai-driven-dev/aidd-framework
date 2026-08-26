@@ -7,8 +7,6 @@ const pluginDir = path.resolve(__dirname, "../../plugins/aidd-telemetry");
 const skillDir = path.join(pluginDir, "skills/01-cost");
 // Real source, not a re-description of it: closure tests below check the skill's own text
 // against what these two modules actually accept and actually emit.
-const { build } = require(path.join(skillDir, "scripts/lib/report.cjs"));
-const { toEnvelope, ARTEFACT_AXES, ENVELOPE_VERSION } = require(path.join(skillDir, "scripts/lib/render.cjs"));
 const skill = fs.readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
 // A router skill's rules live in its actions; reading only the router would test a
 // table of contents.
@@ -17,14 +15,6 @@ const actions = fs
   .map((name) => fs.readFileSync(path.join(skillDir, "actions", name), "utf8"))
   .join("\n");
 const everything = `${skill}\n${actions}`;
-
-test("the cost skill calls the plugin's own binary, never the CLI", () => {
-  assert.ok(everything.includes("telemetry-report.cjs"), "must call the script the plugin ships");
-  assert.ok(
-    !/\baidd telemetry\b/u.test(everything),
-    "must not depend on the CLI: the plugin measures on its own",
-  );
-});
 
 // The whole point of the machine-readable output is that a skill consumes it. A skill
 // reading the human rendering scrapes aligned columns and breaks when one gets wider.
@@ -104,38 +94,6 @@ function reportCommands(text) {
   return [...text.matchAll(/`node <telemetry-report\.cjs> ([^`]+)`/gu)].map((m) => m[1].trim());
 }
 
-test("every command the cost skill names is one telemetry-report.cjs actually accepts", () => {
-  const commands = reportCommands(everything);
-  // A closure test over an empty extraction passes vacuously. Pinned so deleting every
-  // command - not just rewording one - fails loudly instead of silently.
-  assert.equal(commands.length, 4, "expected exactly four telemetry-report.cjs invocations in the cost skill");
-
-  const flags = scriptFlags(fs.readFileSync(path.join(skillDir, "scripts/telemetry-report.cjs"), "utf8"));
-  assert.ok(flags.size >= 5, "the flag extractor must find the script's real flags, not an empty set");
-
-  for (const command of commands) {
-    const tokens = command.split(/\s+/u);
-    const [subcommand, ...rest] = tokens;
-    assert.ok(
-      subcommand === "read" || subcommand === "report",
-      `"${subcommand}" is not a subcommand telemetry-report.cjs implements`,
-    );
-    for (const token of rest) {
-      if (!token.startsWith("--")) continue;
-      assert.ok(flags.has(token), `"${token}" is not a flag telemetry-report.cjs reads`);
-    }
-    const axisAt = tokens.indexOf("--axis");
-    if (axisAt === -1) continue;
-    const value = tokens[axisAt + 1].replace(/^</u, "").replace(/>$/u, "");
-    if (!value.includes("|")) continue; // a bare placeholder like <axis> names no literal to check
-    assert.deepEqual(
-      [...value.split("|")].sort(),
-      [...ARTEFACT_AXES].sort(),
-      "an enumerated --axis list must name exactly the axes render.cjs implements",
-    );
-  }
-});
-
 test("every report invocation asks for the object or a derived artefact, never the bare human table", () => {
   for (const command of reportCommands(everything)) {
     const tokens = command.split(/\s+/u);
@@ -150,54 +108,15 @@ test("every report invocation asks for the object or a derived artefact, never t
 /** A real envelope, built from the same `build` + `toEnvelope` pipeline the script itself
  * calls - never hand-typed - with a task and every capability populated, so a path this
  * fixture doesn't exercise never gets counted as unreachable-by-accident. */
+/** The envelope the CLI is pinned against, read from the committed fixture rather than built
+ * here: the builder used to live in this plugin, and the point of the move is that it now
+ * lives in one place. See cli/tests/e2e/telemetry-cost-skill-commands.e2e.test.ts. */
 function realEnvelope() {
-  const journals = [
-    {
-      session: { vendor_id: "s-1" },
-      filesWritten: [{ path: "aidd_docs/tasks/2026_08/fixture.md" }],
-      boundaries: [],
-    },
-  ];
-  const records = [
-    {
-      kind: "request",
-      vendor_id: "s-1",
-      tool: "claude",
-      step: "implement",
-      step_attribution: "tool-stated",
-      model: "claude-x",
-      project_id: "proj-1",
-      cost_usd: 0.01,
-      input_tokens: 100,
-      output_tokens: 50,
-      cache_read_tokens: 10,
-      cache_creation_tokens: 5,
-      event_timestamp: "2026-08-20T10:00:00Z",
-    },
-  ];
-  const declaredTools = [
-    {
-      tool: "claude",
-      coverage: "covered",
-      capability: {
-        localRead: { tokenCounters: true, amount: true, toolStatedStep: true },
-        export: { tokenCounters: false, amount: false, toolStatedStep: false },
-        journalAttributable: true,
-        taskAttributable: true,
-      },
-    },
-  ];
-  return toEnvelope(
-    build({
-      fromDay: "2026-08-20",
-      toDay: "2026-08-20",
-      records,
-      journals,
-      declaredTools,
-      undatedRecords: 2,
-      unreadableLines: 1,
-      task: "2026_08/fixture",
-    }),
+  return JSON.parse(
+    fs.readFileSync(
+      path.resolve(__dirname, "../../cli/tests/fixtures/cli-owns-read/expected-envelope.json"),
+      "utf8",
+    ),
   );
 }
 
@@ -238,7 +157,22 @@ test("every field the cost skill names by name resolves on the object the script
   // make this pass on an empty set of claims.
   assert.equal(claims.size, 11, "expected exactly eleven field references in the cost skill");
 
-  const resolves = (id) => paths.has(id) || [...paths].some((p) => p.endsWith(`.${id}`));
+  // Fields the envelope carries only under some condition, so a fixture cannot show them all
+  // at once: the first five appear only under a selection, and `cost_micro_usd` only once a
+  // record states an amount — which no tool read locally does today, which is why every
+  // figure reads "amount unknown". Their presence and shape are pinned by the CLI's own
+  // envelope tests; what is pinned here is that the skill names no field that exists nowhere.
+  const CONDITIONAL = new Set([
+    "task",
+    "task_attribution",
+    "filters",
+    "empty_selection",
+    "active_time_s",
+    "totals.cost_micro_usd",
+    "cost_micro_usd",
+  ]);
+  const resolves = (id) =>
+    CONDITIONAL.has(id) || paths.has(id) || [...paths].some((p) => p.endsWith(`.${id}`));
   for (const claim of claims) {
     assert.ok(resolves(claim), `"${claim}" does not name a field anywhere on the envelope`);
   }
@@ -283,32 +217,14 @@ test("the plugin README gives every partly-measurable tool its reason, not just 
   );
 });
 
-test("the measurement script ships inside a skill, where a plugin install carries it", () => {
-  // A plugin is installed by translating its files into each tool's own layout, and that
-  // translation carries skills/, agents/, commands/, rules/ and hooks/ — a script anywhere
-  // else is silently never installed.
-  assert.ok(!fs.existsSync(path.join(pluginDir, "bin")), "no top-level bin/, which is dropped");
-  for (const script of [
-    "skills/00-init/scripts/telemetry-switch.cjs",
-    "skills/01-cost/scripts/telemetry-report.cjs",
-    "skills/02-check/scripts/telemetry-check.cjs",
-  ]) {
-    const full = path.join(pluginDir, script);
-    assert.ok(fs.existsSync(full), `${script} must live under the skill that owns it`);
-    assert.ok(
-      fs.readFileSync(full, "utf8").startsWith("#!/usr/bin/env node"),
-      `${script} must be runnable on its own`,
-    );
-  }
-});
-
 test("each skill finds its own script on a tool that sets no plugin-root variable", () => {
   // Measured on Codex: `env | grep -i plugin_root` in the shell a skill spawns matches
   // nothing. A search that only knows Claude Code's directory finds nothing there, and the
   // skill would report its own script missing on a tool where it is installed.
+  // 01-cost is absent on purpose: it ships no script to find any more, and requires `aidd`
+  // instead — pinned by cli/tests/e2e/telemetry-cost-skill-commands.e2e.test.ts.
   const searched = [
     ["skills/00-init/actions/01-check.md", "telemetry-switch.cjs"],
-    ["skills/01-cost/actions/01-locate.md", "telemetry-report.cjs"],
     ["skills/02-check/actions/01-locate.md", "telemetry-check.cjs"],
   ];
   for (const [action, script] of searched) {
@@ -435,16 +351,6 @@ test("the cost skill names per-person as unanswerable, and what would fix it", (
 // but version 1 - which would have made it stop on every object the script now prints.
 // Read off the live constant rather than a hardcoded number, so the same drift cannot
 // recur silently the next time `ENVELOPE_VERSION` bumps.
-test("the cost skill checks the envelope version it actually gets, not a stale one", () => {
-  for (let stale = 1; stale < ENVELOPE_VERSION; stale++) {
-    assert.ok(!everything.includes(`is \`${stale}\` today`), `must not still expect version ${stale}`);
-  }
-  assert.ok(
-    everything.includes(`\`${ENVELOPE_VERSION}\``),
-    "must expect the version render.cjs actually sends",
-  );
-});
-
 // A total to quote and a table to paste are different things - a rendering suited to the
 // axis, written to a file when a file is what was asked for.
 test("the cost skill writes an artefact to a file when a file is what was asked for", () => {
@@ -460,52 +366,3 @@ test("the cost skill writes an artefact to a file when a file is what was asked 
 // turn is superseded, never doubled" — the plugin's own `build()` must answer the same
 // way the CLI's `buildCostReport` does, since both read the same day files (phase-1,
 // "A turn read while it runs is not the last word").
-test("report.cjs's build() supersedes a still-open local-read turn, never doubles it", () => {
-  const declaredTools = [
-    {
-      tool: "codex",
-      coverage: "covered",
-      capability: {
-        localRead: { tokenCounters: true, amount: false, toolStatedStep: false },
-        export: { tokenCounters: false, amount: false, toolStatedStep: false },
-        journalAttributable: true,
-        taskAttributable: true,
-      },
-    },
-  ];
-  const base = {
-    kind: "request",
-    provenance: "local-read",
-    tool: "codex",
-    vendor_id: "s-codex-1",
-    turn_id: "turn-1",
-    step_attribution: "unattributed",
-  };
-  const partial = { ...base, input_tokens: 2816, output_tokens: 1401, cache_read_tokens: 48896 };
-  const complete = { ...base, input_tokens: 5032, output_tokens: 3550, cache_read_tokens: 99840 };
-
-  const report = build({
-    fromDay: "2026-07-29",
-    toDay: "2026-07-29",
-    records: [partial, complete],
-    journals: [],
-    declaredTools,
-    undatedRecords: 0,
-    unreadableLines: 0,
-  });
-
-  assert.equal(report.totals.requests, 1, "one turn read twice must count once");
-  assert.equal(report.totals.cacheReadTokens, 99840, "must keep the larger reading");
-  assert.equal(report.totals.outputTokens, 3550, "must not sum partial and complete");
-
-  const reversed = build({
-    fromDay: "2026-07-29",
-    toDay: "2026-07-29",
-    records: [complete, partial],
-    journals: [],
-    declaredTools,
-    undatedRecords: 0,
-    unreadableLines: 0,
-  });
-  assert.deepEqual(reversed, report, "either arrival order must answer the same report");
-});

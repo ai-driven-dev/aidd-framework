@@ -1,5 +1,5 @@
 ---
-status: pending
+status: implemented
 ---
 
 # Instruction: `01-cost` calls the CLI
@@ -75,14 +75,22 @@ journey
 
 ## Tasks to do
 
-### `1)` Capture the reference, from a session that has figures
+### `1)` Capture the reference, in two artefacts that prove different things
 
-> Once the scripts are gone there is nothing left to compare against, and an empty session
-> would make the pin vacuous rather than green.
+> Once the scripts are gone there is nothing left to compare against. A committed fixture has
+> to be reproducible in CI, and it must not be somebody's real usage: this repository is
+> public, and the layer's own rule is that nothing leaves the machine.
 
-1. Journal a session that reaches at least two distinct steps and produces a non-zero total, from a real run rather than a hand-written file — this is the phase's confrontation with data the code has never seen.
-2. Run `telemetry-report.cjs read` then `report --json` against it, and commit the envelope as the fixture.
-3. Assert the fixture is non-empty at commit time, so a later vacuous pin fails loudly.
+1. **Committed, synthetic.** Build a sink covering every shape the readers produce — `request`
+   and `session` kinds, a record with a model and one without, a stated step and an
+   unattributed one, several tools and several days. Run `telemetry-report.cjs report --json`
+   over it and commit both the sink and the envelope.
+2. Assert the fixture carries at least two distinct steps and a non-zero total, so a later
+   vacuous pin fails loudly rather than passing on emptiness.
+3. **Not committed, real.** Run the script and the CLI over the machine's own sink and compare
+   the two envelopes. A synthetic fixture agrees with the code that reads it; only data nobody
+   authored for this test can disagree. Record the outcome in the phase's notes, as evidence
+   rather than as a test CI can rerun.
 
 ### `2)` Rewrite what `01-cost` tells the agent to run
 
@@ -112,7 +120,7 @@ journey
 
 | Task | Acceptance criteria                                                                                                              |
 | ---- | -------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | The committed fixture holds at least two step rows and a non-zero total, and a fixture that does not fails the suite.             |
+| 1    | The committed fixture is synthetic, holds at least two step rows and a non-zero total, and a fixture that does not fails the suite. The real-sink comparison was run and its outcome written down. |
 | 2    | No file under `01-cost/` names a `.cjs` path, and with `aidd` absent the skill stops naming the CLI and stating that recording is unaffected — never an empty or zero result. |
 | 3    | `plugins/aidd-telemetry/skills/01-cost/scripts/` no longer exists, and the whole suite is green without the deleted guards.       |
 | 4    | The CLI's envelope equals the task-1 fixture field for field, and every command extracted from `01-cost` is accepted by the CLI.  |

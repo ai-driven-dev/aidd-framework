@@ -1,13 +1,12 @@
 import { execFile, execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, realpathSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { builtinModules } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { environmentWithoutGitVariables } from "../../src/infrastructure/git-environment.js";
-import { CLI_PATH, copyFixtureTree, pathWithoutAidd } from "./helpers.js";
+import { copyFixtureTree, pathWithoutAidd } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(process.cwd(), "..");
@@ -17,13 +16,12 @@ const REPO_ROOT = resolve(process.cwd(), "..");
  * two is what lets neither skill open a file belonging to the other. */
 const SKILLS = join(REPO_ROOT, "plugins", "aidd-telemetry", "skills");
 const SWITCH_BIN = join(SKILLS, "00-init", "scripts", "telemetry-switch.cjs");
-const REPORT_BIN = join(SKILLS, "01-cost", "scripts", "telemetry-report.cjs");
 const JOURNAL_HOOK = join(REPO_ROOT, "plugins", "aidd-telemetry", "hooks", "journal.cjs");
 const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
 const HOOK_FIXTURES = join(REPO_ROOT, "scripts", "__tests__", "fixtures");
 
 const CLAUDE_SESSION = "22222222-2222-4222-8222-222222222222";
-const PERIOD = ["--from", "2026-08-01", "--to", "2026-08-31"] as const;
+const _PERIOD = ["--from", "2026-08-01", "--to", "2026-08-31"] as const;
 
 describe("the plugin measures on its own", () => {
   let projectDir: string;
@@ -83,10 +81,6 @@ describe("the plugin measures on its own", () => {
     return run(SWITCH_BIN, [state]);
   }
 
-  function measure(args: readonly string[]) {
-    return run(REPORT_BIN, args);
-  }
-
   async function replayHook(fixture: string, event: string, extra: object): Promise<void> {
     const payload = JSON.parse(await readFile(join(HOOK_FIXTURES, `${fixture}.json`), "utf8"));
     execFileSync(process.execPath, [JOURNAL_HOOK, event], {
@@ -139,126 +133,33 @@ describe("the plugin measures on its own", () => {
     expect(config.telemetry.enabled).toBe(false);
   });
 
-  it("runs the whole chain on Claude Code with no aidd on the path", async () => {
+  // Recording, with no `aidd` anywhere. This is the half of the promise that survives the
+  // read path moving into the CLI, and the reason the hooks stayed plain node: a session
+  // measured now is readable later, by a CLI that was not installed when it ran. Answering is
+  // pinned separately, in telemetry-cost-skill-commands.e2e.test.ts.
+  it("journals a whole Claude Code session with no aidd on the path", async () => {
     expect(await switchTo("on")).toMatchObject({ exitCode: 0 });
     await replayHook("claude-code-session-start", "session-start", {});
     await replayHook("claude-code-post-tool-use-skill", "tool-used", {
       tool_input: { skill: "aidd-dev:02-implement" },
     });
 
-    const read = await measure(["read"]);
-    expect(read.exitCode, read.stderr).toBe(0);
-    expect(read.stdout).toContain("1 session read");
-    expect(read.stdout).toContain("Claude Code: read (4 new of 4)");
-
-    const report = await measure(["report", ...PERIOD]);
-    expect(report.exitCode, report.stderr).toBe(0);
-    // Four billed requests from the captured transcript, and the skill the tool named
-    // itself on the subagent's own line.
-    expect(report.stdout).toContain("151,826");
-    expect(report.stdout).toContain("probe-echo");
-    expect(report.stdout).toContain("stated by the tool");
-    // No tool read locally carries a currency figure; a zero here would read as free.
-    expect(report.stdout).toContain("amount unknown");
-    expect(report.stdout).not.toContain("$0.00");
-  });
-
-  it("answers a program with the object the contract describes", async () => {
-    await switchTo("on");
-    await replayHook("claude-code-session-start", "session-start", {});
-    await measure(["read"]);
-
-    const result = await measure(["report", ...PERIOD, "--json"]);
-    const envelope = JSON.parse(result.stdout);
-
-    expect(envelope.cost_report_version).toBe(3);
-    expect(envelope.period).toEqual({ from_day: "2026-08-01", to_day: "2026-08-31" });
-    expect(envelope.attribution.map((row: { attribution: string }) => row.attribution)).toEqual([
-      "tool-stated",
-      "journal-interval",
-      "unattributed",
-    ]);
-    const claude = envelope.by_tool.find((row: { tool: string }) => row.tool === "claude");
-    expect(claude.capability).toMatchObject({
-      task_attributable: true,
-      journal_attributable: true,
-    });
-  });
-
-  it("answers exactly what the CLI answers, for the same inputs", async () => {
-    // Two builds of one contract is the failure this whole layer exists to prevent. They
-    // wire the same classes, so this holds by construction — and is asserted so that it
-    // keeps holding.
-    await switchTo("on");
-    await replayHook("claude-code-session-start", "session-start", {});
-    await measure(["read"]);
-
-    const fromPlugin = await measure(["report", ...PERIOD, "--json"]);
-    const { stdout: fromCli } = await execFileAsync(
-      process.execPath,
-      [CLI_PATH, "telemetry", "report", ...PERIOD, "--json"],
-      { cwd: projectDir, env: { ...env(), PATH: process.env.PATH ?? "" } }
+    const journals = readdirSync(join(projectDir, "aidd_docs", "runs")).filter((name) =>
+      name.endsWith(".jsonl")
     );
+    expect(journals).toHaveLength(1);
 
-    expect(fromPlugin.stdout).toBe(fromCli);
-  });
-
-  it("prints usage and exits 1 for a subcommand it does not have", async () => {
-    const result = await measure(["explode"]);
-
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain("Usage:");
+    const lines = readFileSync(join(projectDir, "aidd_docs", "runs", journals[0] ?? ""), "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { type: string });
+    expect(lines.map((line) => line.type)).toContain("session_start");
+    expect(lines.map((line) => line.type)).toContain("step_start");
   });
 });
 
 describe("what the plugin ships is readable", () => {
-  it("keeps both scripts hand-written, so what runs can be read", () => {
-    // A generated file in someone else's repository is a reason not to trust it. Both are
-    // plain CommonJS now, and a rebuild is not a thing that can go stale.
-    for (const bin of [SWITCH_BIN, REPORT_BIN]) {
-      const source = readFileSync(bin, "utf8");
-
-      expect(source.startsWith("#!/usr/bin/env node"), bin).toBe(true);
-      expect(source, bin).not.toContain("Generated from");
-    }
-  });
-
   it("keeps the switch short enough to read before allowing anything", () => {
     expect(readFileSync(SWITCH_BIN, "utf8").split("\n").length).toBeLessThan(80);
-  });
-
-  it("requires nothing but node's own modules, across every file it ships", () => {
-    // A dependency would need `node_modules` beside the plugin, which a plugin copied
-    // verbatim into someone's project will never have.
-    const libDir = join(SKILLS, "01-cost", "scripts", "lib");
-    const files = [SWITCH_BIN, REPORT_BIN, ...readdirSync(libDir).map((n) => join(libDir, n))];
-
-    for (const file of files) {
-      const specifiers = [...readFileSync(file, "utf8").matchAll(/require\("([^"]+)"\)/gu)].map(
-        (match) => match[1] ?? ""
-      );
-      const external = specifiers.filter(
-        (specifier) =>
-          !specifier.startsWith(".") && !builtinModules.includes(specifier.replace(/^node:/u, ""))
-      );
-
-      expect(external, file).toEqual([]);
-    }
-  });
-
-  it("stays small enough that nobody skips reading it", () => {
-    const libDir = join(SKILLS, "01-cost", "scripts", "lib");
-    const lines = [SWITCH_BIN, REPORT_BIN, ...readdirSync(libDir).map((n) => join(libDir, n))]
-      .map((file) => readFileSync(file, "utf8").split("\n").length)
-      .reduce((sum, count) => sum + count, 0);
-
-    // Not a style rule: the generated bundle this replaced was 4,183 lines, and the number
-    // exists so that drifting back toward it is noticed here. Bumped twice, each time for a
-    // stated reason rather than to make it pass: once for report.cjs's interval logic and
-    // render.cjs's breakdown of it, and once when readers/journal/attribution/identity moved
-    // in from `skills/_shared/`. That move added 771 lines to this count and none to what
-    // the plugin ships - those files were always installed, they just sat in a directory
-    // this measurement did not look at.
-    expect(lines).toBeLessThan(2550);
   });
 });

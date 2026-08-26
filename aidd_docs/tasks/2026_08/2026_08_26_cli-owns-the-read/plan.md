@@ -16,7 +16,7 @@ status: pending
 
 | #   | Phase                                                     | File                         |
 | --- | --------------------------------------------------------- | ---------------------------- |
-| 1   | `01-cost` calls the CLI                                    | [`phase-1.md`](./phase-1.md) |
+| 1   | `01-cost` calls the CLI ✅                                  | [`phase-1.md`](./phase-1.md) |
 | 2   | `aidd telemetry identity`                                  | [`phase-2.md`](./phase-2.md) |
 | 3   | `00-init` calls the CLI                                    | [`phase-3.md`](./phase-3.md) |
 | 4   | `aidd telemetry check` — the local claims                  | [`phase-4.md`](./phase-4.md) |

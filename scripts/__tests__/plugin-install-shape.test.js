@@ -26,7 +26,6 @@ const GIT_DIR = path.dirname(
 const KNOWN_INVOCATIONS = {
   "telemetry-switch.cjs": ["on"],
   "telemetry-identity.cjs": ["status"],
-  "telemetry-report.cjs": ["read"],
   "telemetry-check.cjs": [],
 };
 

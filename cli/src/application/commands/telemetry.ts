@@ -8,6 +8,7 @@ import { toCostReportEnvelope } from "../../domain/models/cost-report-envelope.j
 import { DEFAULT_REPORT_DAYS, resolveReportPeriod } from "../../domain/models/report-period.js";
 import { createDeps } from "../../infrastructure/deps.js";
 import { resolveHomeDir } from "../../infrastructure/home-dir.js";
+import { ARTEFACT_AXES, buildCostReportArtefact } from "../display/cost-report-artefact.js";
 import { printCostReport } from "../display/cost-report-display.js";
 import {
   printLocalCostReadReport,
@@ -126,6 +127,10 @@ export function registerTelemetryCommand(program: Command): void {
     .option("--step <name>", "Restrict to this step")
     .option("--model <name>", "Restrict to this model")
     .option("--tool <id>", "Restrict to this tool")
+    .option(
+      "--axis <axis>",
+      `Print one axis as a table to paste elsewhere: ${ARTEFACT_AXES.join(" | ")}`
+    )
     .option("--json", "Print one object a program can parse, instead of text for a person")
     .action(
       async (cmdOptions: {
@@ -137,6 +142,7 @@ export function registerTelemetryCommand(program: Command): void {
         step?: string;
         model?: string;
         tool?: string;
+        axis?: string;
         json?: boolean;
       }) => {
         const { verbose, output, projectRoot } = parseGlobalOptions(program);
@@ -156,8 +162,12 @@ export function registerTelemetryCommand(program: Command): void {
               ...(cmdOptions.tool === undefined ? {} : { tool: cmdOptions.tool }),
             },
           });
-          // One value, two renderings. Neither derives a figure the other cannot see.
+          // One value, three renderings. None derives a figure the others cannot see:
+          // `--json` and `--axis` both read the envelope, and the terminal rendering reads
+          // the report the envelope is built from.
           if (cmdOptions.json) output.print(JSON.stringify(toCostReportEnvelope(report), null, 2));
+          else if (cmdOptions.axis !== undefined)
+            output.print(buildCostReportArtefact(toCostReportEnvelope(report), cmdOptions.axis));
           else printCostReport(output, report);
         } catch (error) {
           errorHandler.handle(error);

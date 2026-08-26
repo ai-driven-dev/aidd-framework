@@ -6,13 +6,12 @@ import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { environmentWithoutGitVariables } from "../../src/infrastructure/git-environment.js";
-import { copyFixtureTree, pathWithoutAidd } from "./helpers.js";
+import { CLI_PATH, copyFixtureTree, pathWithoutAidd } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(process.cwd(), "..");
 const PLUGIN = join(REPO_ROOT, "plugins", "aidd-telemetry");
 const SWITCH_BIN = join(PLUGIN, "skills", "00-init", "scripts", "telemetry-switch.cjs");
-const REPORT_BIN = join(PLUGIN, "skills", "01-cost", "scripts", "telemetry-report.cjs");
 const JOURNAL_HOOK = join(PLUGIN, "hooks", "journal.cjs");
 const HOOK_FIXTURES = join(REPO_ROOT, "scripts", "__tests__", "fixtures");
 const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
@@ -91,7 +90,9 @@ describe("measurement, from nothing to off and back", () => {
   }
 
   const switchTo = (state: "on" | "off") => run(SWITCH_BIN, [state]);
-  const measure = (args: readonly string[]) => run(REPORT_BIN, args);
+  /** Reading is the CLI's, and only the CLI's, since the plugin's own reporter was deleted:
+   * one implementation answers, and this cycle exercises the one that ships. */
+  const measure = (args: readonly string[]) => run(CLI_PATH, args.slice());
 
   /** One captured hook payload, retargeted at this project and session. The hook decides
    * the host from the payload's own shape, so nothing here tells it which tool it is. */
@@ -152,7 +153,7 @@ describe("measurement, from nothing to off and back", () => {
 
   it("lives the whole sequence, each step meaning what the one before it set up", async () => {
     // 1. Nothing set up at all. Answering must be empty, not broken.
-    const beforeAnything = await measure(["report", ...PERIOD]);
+    const beforeAnything = await measure(["telemetry", "report", ...PERIOD]);
     expect(beforeAnything.exitCode, beforeAnything.stderr).toBe(0);
     expect(beforeAnything.stdout).toContain("nothing in this period");
     expect(existsSync(join(projectDir, ".aidd", "config.json"))).toBe(false);
@@ -170,18 +171,18 @@ describe("measurement, from nothing to off and back", () => {
 
     // 5. Read, and report. The figures carry the step the tool named and the task the
     //    journal recorded.
-    const read = await measure(["read"]);
+    const read = await measure(["telemetry", "read"]);
     expect(read.stdout).toContain("Claude Code: read (4 new of 4)");
-    const reported = await measure(["report", ...PERIOD]);
+    const reported = await measure(["telemetry", "report", ...PERIOD]);
     expect(reported.stdout).toContain(SESSION_TOKENS);
     expect(reported.stdout).toContain("probe-echo");
-    const byTask = await measure(["report", ...PERIOD, "--task", TASK]);
+    const byTask = await measure(["telemetry", "report", ...PERIOD, "--task", TASK]);
     expect(byTask.stdout).toContain(`task ${TASK}`);
     expect(byTask.stdout).toContain(SESSION_TOKENS);
 
     // 6. Turned off. What was measured stays measured; only the recording stops.
     expect((await switchTo("off")).exitCode).toBe(0);
-    const afterOff = await measure(["report", ...PERIOD]);
+    const afterOff = await measure(["telemetry", "report", ...PERIOD]);
     expect(afterOff.stdout).toContain(SESSION_TOKENS);
 
     // 7. A session runs while off. Not one line is journalled — the switch is read at the
@@ -199,9 +200,9 @@ describe("measurement, from nothing to off and back", () => {
     expect(await runFiles()).toHaveLength(1);
 
     // 9. Reading again stores nothing twice.
-    const second = await measure(["read"]);
+    const second = await measure(["telemetry", "read"]);
     expect(second.stdout).toContain("Claude Code: read (0 new of 4)");
-    expect((await measure(["report", ...PERIOD])).stdout).toContain(SESSION_TOKENS);
+    expect((await measure(["telemetry", "report", ...PERIOD])).stdout).toContain(SESSION_TOKENS);
   }, 60_000);
 
   it("leaves the project's own config alone through the whole cycle", async () => {
@@ -224,11 +225,15 @@ describe("measurement, from nothing to off and back", () => {
   it("answers a program the same way through the same cycle", async () => {
     await switchTo("on");
     await aSessionRuns();
-    await measure(["read"]);
+    await measure(["telemetry", "read"]);
 
-    const envelope = JSON.parse((await measure(["report", ...PERIOD, "--json"])).stdout);
+    const envelope = JSON.parse(
+      (await measure(["telemetry", "report", ...PERIOD, "--json"])).stdout
+    );
     await switchTo("off");
-    const afterOff = JSON.parse((await measure(["report", ...PERIOD, "--json"])).stdout);
+    const afterOff = JSON.parse(
+      (await measure(["telemetry", "report", ...PERIOD, "--json"])).stdout
+    );
 
     // Turning measurement off changes what is recorded next, never what a past period
     // answers — a consumer that cached a figure must not see it move.

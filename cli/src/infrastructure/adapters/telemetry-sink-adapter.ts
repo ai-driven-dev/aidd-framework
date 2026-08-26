@@ -54,10 +54,15 @@ function hasLegacyTelemetryData(): boolean {
 }
 
 // `%APPDATA%` is where a Windows application puts this, not `.config` (measured on a real
-// windows-latest runner - the plugin's sink.cjs mirrors this same rule). A machine
-// that already journalled under the old `.config` default keeps landing there rather than
-// losing access to what it already wrote; only a machine starting fresh gets `%APPDATA%`.
-function defaultConfigDir(): string {
+// windows-latest runner). A machine that already journalled under the old `.config` default
+// keeps landing there rather than losing access to what it already wrote; only a machine
+// starting fresh gets `%APPDATA%`.
+//
+// Exported for the test that pins it on any platform rather than only on a Windows runner:
+// where the figures land is a pure resolution, and a rule only a rarely-run job can check is
+// a rule that regresses in silence. It was the plugin's own sink that held this pin until the
+// read path moved here; it holds nothing now, so this is the only place left to hold it.
+export function defaultConfigDir(): string {
   if (process.platform !== "win32") return legacyConfigDir();
   if (hasLegacyTelemetryData()) return legacyConfigDir();
   return process.env.APPDATA ? join(process.env.APPDATA, "aidd") : legacyConfigDir();

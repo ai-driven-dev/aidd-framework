@@ -38,7 +38,7 @@ function pluginFile(relativePath: string): string {
 
 const ARTEFACTS = [
   "skills/00-init/scripts/telemetry-switch.cjs",
-  "skills/01-cost/scripts/telemetry-report.cjs",
+  "hooks/journal.cjs",
   "hooks/journal.cjs",
   "hooks/lib/record.cjs",
   "hooks/lib/repo.cjs",
@@ -69,12 +69,12 @@ describe("a plugin's executable files survive being installed", () => {
 /** The decisive check: not "would a rewrite damage it", but "does installing the plugin
  * actually put it there, unchanged". Everything above is a guard; this is the proof. */
 describe("installing the plugin carries its measurement script, on every tool", () => {
-  const SCRIPT = "skills/01-cost/scripts/telemetry-report.cjs";
+  const SCRIPT = "skills/02-check/scripts/telemetry-check.cjs";
   const translator = new PluginContentTranslator({ hash: () => new FileHash("a".repeat(32)) });
 
   function distributionOf(): PluginDistribution {
     const skills = [
-      { relativePath: "skills/01-cost/SKILL.md", content: pluginFile("skills/01-cost/SKILL.md") },
+      { relativePath: "skills/02-check/SKILL.md", content: pluginFile("skills/02-check/SKILL.md") },
       { relativePath: SCRIPT, content: pluginFile(SCRIPT) },
     ];
     const hooks = [
@@ -93,7 +93,7 @@ describe("installing the plugin carries its measurement script, on every tool", 
     it(`${tool.toolId} installs it byte for byte`, () => {
       const installed = translator
         .translate(distributionOf(), tool, "aidd_docs")
-        .find((file) => file.relativePath.endsWith("01-cost/scripts/telemetry-report.cjs"));
+        .find((file) => file.relativePath.endsWith("02-check/scripts/telemetry-check.cjs"));
 
       expect(installed, `${tool.toolId} drops the script entirely`).toBeDefined();
       expect(installed?.content).toBe(pluginFile(SCRIPT));
@@ -103,12 +103,12 @@ describe("installing the plugin carries its measurement script, on every tool", 
   it("still translates the prose beside it", () => {
     const installed = translator
       .translate(distributionOf(), claude, "aidd_docs")
-      .find((file) => file.relativePath.endsWith("01-cost/SKILL.md"));
+      .find((file) => file.relativePath.endsWith("02-check/SKILL.md"));
 
     // Carrying artefacts verbatim must not turn every skill into an artefact: this one
     // still goes through the frontmatter conversion, so it is not byte-identical.
-    expect(installed?.content).not.toBe(pluginFile("skills/01-cost/SKILL.md"));
-    expect(installed?.content).toContain("Answers what a period or one task consumed");
+    expect(installed?.content).not.toBe(pluginFile("skills/02-check/SKILL.md"));
+    expect(installed?.content).toContain("Answers whether AIDD measurement is actually");
   });
 
   /** A script whose text that tool's own rewrite really does change. Each tool rewrites
@@ -121,7 +121,7 @@ describe("installing the plugin carries its measurement script, on every tool", 
 
   function distributionWithScript(content: string): PluginDistribution {
     const skills = [
-      { relativePath: "skills/01-cost/SKILL.md", content: pluginFile("skills/01-cost/SKILL.md") },
+      { relativePath: "skills/02-check/SKILL.md", content: pluginFile("skills/02-check/SKILL.md") },
       { relativePath: SCRIPT, content },
     ];
     return new PluginDistribution({
@@ -141,7 +141,7 @@ describe("installing the plugin carries its measurement script, on every tool", 
 
       const installed = translator
         .translate(distributionWithScript(script), tool, "aidd_docs")
-        .find((file) => file.relativePath.endsWith("01-cost/scripts/telemetry-report.cjs"));
+        .find((file) => file.relativePath.endsWith("02-check/scripts/telemetry-check.cjs"));
 
       expect(installed?.content).toBe(script);
     });
@@ -153,7 +153,7 @@ describe("installing the plugin carries its measurement script, on every tool", 
     // happens to leave it alone — luck, which this pins down.
     const installed = translator
       .translate(distributionOf(), opencode, "aidd_docs")
-      .find((file) => file.relativePath.endsWith("01-cost/scripts/telemetry-report.cjs"));
+      .find((file) => file.relativePath.endsWith("02-check/scripts/telemetry-check.cjs"));
 
     expect(installed, "opencode drops the script entirely").toBeDefined();
     expect(installed?.content).toBe(pluginFile(SCRIPT));

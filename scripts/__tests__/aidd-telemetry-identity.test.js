@@ -8,7 +8,6 @@ const { describe, it, after } = require("node:test");
 const SHARED = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/00-init/scripts/lib");
 const SCRIPTS = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills");
 const IDENTITY_SCRIPT = path.join(SCRIPTS, "00-init/scripts/telemetry-identity.cjs");
-const REPORT_SCRIPT = path.join(SCRIPTS, "01-cost/scripts/telemetry-report.cjs");
 const FIXTURES = path.resolve(__dirname, "../../cli/tests/fixtures/local-cost");
 
 const CLAUDE_SESSION = "22222222-2222-4222-8222-222222222222";
@@ -322,83 +321,11 @@ function storedLines(configDir) {
     );
 }
 
-describe("what a default install actually stores: reading every line it wrote", () => {
-  it("carries no person field anywhere, proven from the stored bytes", () => {
-    const home = tempDir("aidd-identity-e2e-home-");
-    fs.cpSync(FIXTURES, home, { recursive: true });
-    const projectDir = tempDir("aidd-identity-e2e-project-");
-    const configDir = tempDir("aidd-identity-e2e-sink-");
-    seedJournal(
-      projectDir,
-      "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-      CLAUDE_SESSION,
-      "claude-code",
-      "2026-08-05T19:00:00Z",
-      "2026-08-05T20:00:00Z"
-    );
-
-    const result = runRead(projectDir, home, configDir);
-    assert.equal(result.status, 0, result.stderr);
-
-    const lines = storedLines(configDir);
-    assert.ok(lines.length > 0, "the fixture must have produced stored records");
-    for (const line of lines) {
-      assert.ok(!("person_id" in line), "no default record may carry person_id");
-      assert.ok(!("person_display_name" in line), "no default record may carry person_display_name");
-    }
-  });
-});
-
-describe("a choice made today does not reach backwards", () => {
-  it("records stored before opting in stay unnamed; only later records carry it", () => {
-    const home = tempDir("aidd-identity-e2e-home-");
-    fs.cpSync(FIXTURES, home, { recursive: true });
-    const projectDir = tempDir("aidd-identity-e2e-project-");
-    const configDir = tempDir("aidd-identity-e2e-sink-");
-    seedJournal(
-      projectDir,
-      "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-      CLAUDE_SESSION,
-      "claude-code",
-      "2026-08-05T19:00:00Z",
-      "2026-08-05T20:00:00Z"
-    );
-
-    // First read, anonymous: this is what "before opting in" means.
-    runRead(projectDir, home, configDir);
-    const beforeOptIn = storedLines(configDir);
-    assert.ok(beforeOptIn.length > 0);
-    assert.ok(beforeOptIn.every((line) => !("person_id" in line)));
-
-    runIdentity(home, ["on"]);
-    const personId = JSON.parse(
-      fs.readFileSync(identityFileIn(home), "utf8")
-    ).person_id;
-
-    // A second journalled session, read for the first time only now that this person has
-    // opted in - the direct proof that new records carry it.
-    seedJournal(
-      projectDir,
-      "01ARZ3NDEKTSV4RRFFQ69G5FBW",
-      CODEX_SESSION,
-      "codex",
-      "2026-07-29T15:10:00Z",
-      "2026-07-29T15:30:00Z"
-    );
-    runRead(projectDir, home, configDir);
-    const afterOptIn = storedLines(configDir);
-
-    const claudeLines = afterOptIn.filter((line) => line.vendor_id === CLAUDE_SESSION);
-    const codexLines = afterOptIn.filter((line) => line.vendor_id === CODEX_SESSION);
-    assert.ok(claudeLines.length > 0);
-    assert.ok(codexLines.length > 0);
-    assert.ok(
-      claudeLines.every((line) => !("person_id" in line)),
-      "a session read before the opt-in must stay anonymous even after a later read"
-    );
-    assert.ok(
-      codexLines.every((line) => line.person_id === personId),
-      "a session read after the opt-in must carry the identifier"
-    );
-  });
-});
+// Two suites lived here and are now in phase 2's scope: "what a default install actually
+// stores, proven from the stored bytes" and "a choice made today does not reach backwards".
+// Both drove `read` through the plugin's own reporter, which the CLI now owns; restoring them
+// as e2e tests against `aidd telemetry read` is a task of the phase that adds
+// `aidd telemetry identity`. Until then the behaviour is pinned one level down, in
+// cli/tests/application/use-cases/telemetry/read-local-cost-use-case.unit.test.ts, which
+// asserts no person field by default, the field once opted in, and that records stored before
+// opting in stay unnamed. That is real coverage, and it is not the same as reading the bytes.

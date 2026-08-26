@@ -16,9 +16,6 @@ const { rootDir: exportSinkRootDir, findExportedRecordForSession } = require(
   path.join(SCRIPTS, "lib/export-sink.cjs"),
 );
 const { readClaudeExportConfig, readCodexExportConfig } = require(path.join(SCRIPTS, "lib/export-config.cjs"));
-const { rootDir: costSinkRootDir } = require(
-  path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts/lib/sink.cjs"),
-);
 const { UNRECOGNISED_FILE_NAME } = require("../../plugins/aidd-telemetry/hooks/lib/record.cjs");
 const { readCodexHookTrust, parseHookTrust, PLUGIN_NAME } = require(path.join(SCRIPTS, "lib/hook-trust.cjs"));
 const PLUGIN_MANIFEST = require("../../plugins/aidd-telemetry/.claude-plugin/plugin.json");
@@ -357,11 +354,12 @@ describe("reading Codex's own export configuration", () => {
   });
 });
 
-describe("export-sink.cjs's rootDir stays identical to 01-cost's own sink.cjs", () => {
-  // Both compute the same directory from the same env - pinned the same way switch.cjs's
-  // predicate and lib/repo.cjs's git check are pinned against the hook's own copies, so a
-  // change to one cannot silently leave the other reading a different machine's sink.
-  it("resolves the same directory for the same HOME", () => {
+describe("export-sink.cjs's rootDir is the documented one, on any platform", () => {
+  // It used to be pinned against 01-cost's own sink.cjs. That file is gone: the read path
+  // lives in the CLI now. Both sides are therefore held to the written rule instead, here and
+  // in cli/tests/infrastructure/adapters/telemetry-sink-location.unit.test.ts, so a change to
+  // one still cannot leave the other reading a different machine's sink.
+  it("resolves the OS user's own .config on a POSIX machine", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-sink-pin-"));
     const originalHome = process.env.HOME;
     const originalOverride = process.env.AIDD_USER_CONFIG_DIR;
@@ -369,12 +367,28 @@ describe("export-sink.cjs's rootDir stays identical to 01-cost's own sink.cjs", 
     process.env.HOME = home;
 
     try {
-      assert.equal(exportSinkRootDir(), costSinkRootDir());
+      if (process.platform !== "win32") {
+        assert.equal(exportSinkRootDir(), path.join(home, ".config", "aidd", "telemetry"));
+      }
     } finally {
       if (originalHome === undefined) delete process.env.HOME;
       else process.env.HOME = originalHome;
-      if (originalOverride === undefined) delete process.env.AIDD_USER_CONFIG_DIR;
-      else process.env.AIDD_USER_CONFIG_DIR = originalOverride;
+      if (originalOverride !== undefined) process.env.AIDD_USER_CONFIG_DIR = originalOverride;
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("honours AIDD_USER_CONFIG_DIR ahead of any default", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-sink-override-"));
+    const original = process.env.AIDD_USER_CONFIG_DIR;
+    process.env.AIDD_USER_CONFIG_DIR = dir;
+
+    try {
+      assert.equal(exportSinkRootDir(), path.join(dir, "telemetry"));
+    } finally {
+      if (original === undefined) delete process.env.AIDD_USER_CONFIG_DIR;
+      else process.env.AIDD_USER_CONFIG_DIR = original;
+      fs.rmSync(dir, { recursive: true, force: true });
     }
   });
 });
@@ -889,25 +903,6 @@ describe("naming what nothing here can read", () => {
       assert.equal(verdict, UNKNOWN, `${declaration.tool} must read neither ok nor FAIL`);
     }
   });
-});
-
-describe("the TOOLS declaration the checker reads is the one the cost skill reads", () => {
-  // These three were shared once, under a `skills/_shared/` sibling. They cannot be: the
-  // hyphen-flat install contracts rename every immediate child of `skills/` on its own, so a
-  // require reaching a sibling folder resolved to a name that no longer existed and the
-  // script died at load. Each skill carries its own copy, and
-  // telemetry-where-things-live.test.js pins the copies byte-identical - so a tool gained or
-  // lost by one skill still cannot diverge from what the other sees.
-  const COST = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/01-cost/scripts");
-
-  for (const name of ["journal.cjs", "readers.cjs", "attribution.cjs"]) {
-    it(`${name} reads the same in the checker as in the cost skill`, () => {
-      assert.equal(
-        fs.readFileSync(path.join(SHARED, name), "utf8"),
-        fs.readFileSync(path.join(COST, "lib", name), "utf8")
-      );
-    });
-  }
 });
 
 // The script itself, exercising the real readers and the real journal parser end to end -
