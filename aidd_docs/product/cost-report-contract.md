@@ -50,15 +50,16 @@ to a `by_project` breakdown that then holds one row) is a legal, boring answer, 
 error.
 
 **"Axis" above means a breakdown, not a flag.** Every `by_*` array is always present in
-the object, on both `aidd telemetry report --json` and the plugin script, whatever filters
-were given — grouping by any of the six dimensions needs no separate flag; reading the
-matching array is the axis. The plugin script additionally offers `--axis <name>`, which
-picks one of those arrays and renders it alone as a small pasteable artefact (a total, a
-table) instead of the whole object — a convenience for copying one figure out, not a
-second way to group. `aidd telemetry report` does not have this flag: passed `--axis`, it
-refuses the option outright (`error: unknown option '--axis'`, exit `1`) rather than
-silently ignoring it. Every figure `--axis` can show is already in the plain `--json`
-object on both sides; only the one-artefact-at-a-time rendering is plugin-only.
+the `--json` object, whatever filters were given — grouping by any of the six dimensions
+needs no separate flag; reading the matching array is the axis. `aidd telemetry report`
+also takes `--axis <name>` (`total`, `day`, `step`, `model`, `tool` or `project`), which
+picks one of those arrays and renders it alone as a small pasteable artefact instead of
+the whole object — a convenience for copying one figure out, not a second way to group.
+Every figure `--axis` can show is already in the plain `--json` object; only the
+one-artefact-at-a-time rendering is what it adds. A name outside the six is a usage error
+naming the valid list (`Error: Unknown axis 'bogus'. Expected one of: total, day, step,
+model, tool, project.`, exit `1`), not a silently empty artefact. Given both flags at
+once, `--json` wins and `--axis` is ignored, never the reverse.
 
 **A filter matching nothing names itself**, in `empty_selection`, rather than the object
 quietly reporting the same shape a genuinely idle period would:

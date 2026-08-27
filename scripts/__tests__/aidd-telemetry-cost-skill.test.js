@@ -217,40 +217,23 @@ test("the plugin README gives every partly-measurable tool its reason, not just 
   );
 });
 
-test("each skill finds its own script on a tool that sets no plugin-root variable", () => {
+test("no skill searches plugin directories for its own script any more", () => {
   // Measured on Codex: `env | grep -i plugin_root` in the shell a skill spawns matches
-  // nothing. A search that only knows Claude Code's directory finds nothing there, and the
-  // skill would report its own script missing on a tool where it is installed.
-  // 00-init and 01-cost are both absent on purpose: neither ships a script to find any
-  // more, and both require `aidd` instead — pinned by
-  // cli/tests/e2e/telemetry-init-skill-commands.e2e.test.ts and
-  // cli/tests/e2e/telemetry-cost-skill-commands.e2e.test.ts respectively.
-  const searched = [["skills/02-check/actions/01-locate.md", "telemetry-check.cjs"]];
-  for (const [action, script] of searched) {
-    const text = fs.readFileSync(path.join(pluginDir, action), "utf8");
-    const [search] = text.split("\n").filter((line) => line.includes("find "));
-    assert.ok(search, `${action} must search for ${script}`);
-    // Tokenized, not substring-matched: ".claude/plugins" is a substring of
-    // "~/.claude/plugins" too, and Claude and Codex install project-relative
-    // (`claude.ts`'s and `codex.ts`'s own `pluginsDir`), not under the home directory.
-    const tokens = search.trim().split(/\s+/u);
-    for (const dir of [
-      "~/.claude/plugins",
-      "~/.codex/plugins",
-      "~/.cursor/plugins",
-      ".github/plugins",
-      ".claude/plugins",
-      ".codex/plugins",
-    ]) {
-      assert.ok(tokens.includes(dir), `${action} must look in ${dir}`);
-    }
-    const cwd = tokens.lastIndexOf(".");
-    for (const dir of [".claude/plugins", ".codex/plugins", ".github/plugins"]) {
-      assert.ok(
-        tokens.indexOf(dir) < cwd,
-        `${action} must reach ${dir}, where a project-scope install actually lands, before the working directory`,
-      );
-    }
+  // nothing, which is exactly why this search used to exist — a search that only knew
+  // Claude Code's directory found nothing there, on a tool where the script was actually
+  // installed. 00-init, 01-cost and 02-check have all since moved to `aidd`: none of the
+  // three ships a script to find any more, pinned instead by
+  // cli/tests/e2e/telemetry-init-skill-commands.e2e.test.ts,
+  // cli/tests/e2e/telemetry-cost-skill-commands.e2e.test.ts and
+  // cli/tests/e2e/telemetry-check-skill-commands.e2e.test.ts respectively. This just pins that no
+  // locate/action file resurrects the search.
+  for (const skill of ["00-init", "01-cost", "02-check"]) {
+    const dir = path.join(pluginDir, "skills", skill, "actions");
+    const text = fs
+      .readdirSync(dir)
+      .map((name) => fs.readFileSync(path.join(dir, name), "utf8"))
+      .join("\n");
+    assert.ok(!text.includes("find "), `${skill} must not search plugin directories for a script`);
   }
 });
 
@@ -292,7 +275,9 @@ test("no skill reaches into another skill's directory", () => {
   }
 });
 
-test("the check skill calls the plugin's own binary, never the CLI", () => {
+test("the check skill calls the CLI, never a script of its own", () => {
+  // Phase 5 moved this from a script beside the skill to the CLI — `aidd telemetry check`
+  // is now the place that judges every claim, and the skill names no `.cjs` path any more.
   const checkDir = path.join(pluginDir, "skills/02-check");
   const check = fs
     .readdirSync(path.join(checkDir, "actions"))
@@ -300,11 +285,8 @@ test("the check skill calls the plugin's own binary, never the CLI", () => {
     .concat(fs.readFileSync(path.join(checkDir, "SKILL.md"), "utf8"))
     .join("\n");
 
-  assert.ok(check.includes("telemetry-check.cjs"), "must call the script the plugin ships");
-  assert.ok(
-    !/\baidd telemetry\b/u.test(check),
-    "must not depend on the CLI: the plugin measures on its own",
-  );
+  assert.ok(check.includes("aidd telemetry check"), "must call the CLI's check command");
+  assert.ok(!/\.cjs\b/u.test(check), "must not name a script beside itself any more");
 });
 
 // A skill told to "report what it printed" leaves the shape to the model, and two runs

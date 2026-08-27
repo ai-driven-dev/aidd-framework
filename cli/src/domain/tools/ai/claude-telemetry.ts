@@ -42,6 +42,12 @@ export const CLAUDE_TELEMETRY_SESSION_MEASURES: readonly TelemetrySessionMeasure
 /** Well under the 60s default: a session shorter than a minute must still flush. */
 export const TELEMETRY_METRIC_EXPORT_INTERVAL_MS = "10000";
 
+// Named so `aidd telemetry check`'s export-config reader can look for the same two keys
+// this writer sets, rather than a second copy of the literal strings.
+export const CLAUDE_TELEMETRY_ENABLE_KEY = "CLAUDE_CODE_ENABLE_TELEMETRY";
+export const CLAUDE_TELEMETRY_ENABLE_VALUE = "1";
+export const CLAUDE_TELEMETRY_ENDPOINT_KEY = "OTEL_EXPORTER_OTLP_ENDPOINT";
+
 const CLAUDE_PROJECT_RELATIVE_SETTINGS_PATH: Record<Exclude<TelemetryScope, "user">, string> = {
   local: ".claude/settings.local.json",
   project: ".claude/settings.json",
@@ -62,11 +68,11 @@ export function buildClaudeTelemetryEnv(
   const trimmedEndpoint = endpoint?.trim();
   if (!trimmedEndpoint) throw new MissingTelemetryEndpointError();
   return {
-    CLAUDE_CODE_ENABLE_TELEMETRY: "1",
+    [CLAUDE_TELEMETRY_ENABLE_KEY]: CLAUDE_TELEMETRY_ENABLE_VALUE,
     OTEL_METRICS_EXPORTER: "otlp",
     OTEL_LOGS_EXPORTER: "otlp",
     OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
-    OTEL_EXPORTER_OTLP_ENDPOINT: trimmedEndpoint,
+    [CLAUDE_TELEMETRY_ENDPOINT_KEY]: trimmedEndpoint,
     OTEL_METRIC_EXPORT_INTERVAL: TELEMETRY_METRIC_EXPORT_INTERVAL_MS,
     OTEL_RESOURCE_ATTRIBUTES: `aidd.project_id=${projectId}`,
   };

@@ -292,3 +292,295 @@ all six as live fixtures would have been the duplication `plan.md`'s own Decisio
 | `cli` unit | 2069 | 2068 | −1 (`plugin-asset-translation.unit.test.ts`'s `ARTEFACTS` entry for the deleted script) |
 | `cli` integration | 608 | 608 | unchanged |
 | `cli` e2e | 200 | 196 | +3 (`telemetry-init-skill-commands.e2e.test.ts`, new) +1 (`telemetry-on-runs-privacy.e2e.test.ts`'s `git add -A` test, new) −4 (`telemetry-identity.e2e.test.ts`'s six parity tests collapsed to two fixture pins) −4 (`telemetry-plugin-standalone.e2e.test.ts`'s three switch tests and the script-line-count test removed) |
+
+## Phase 4 — `aidd telemetry check`, the local claims
+
+### The port's shape: reuse over re-implementation
+
+`diagnose.cjs`'s six claims split cleanly into two routes. This phase settles the local
+route (`hook fired` -> `session journalled` -> `tool files readable` -> `records join`) and
+states the export route's two claims (`export configured`, `identifier joinable`) as
+`unjudged` — a fourth verdict, distinct from `unknown`: an `unknown` was checked and came
+back inconclusive, an `unjudged` is a fact this build does not attempt to check at all.
+
+Most of `readers.cjs` (540 lines) and `attribution.cjs` needed no port at all. `aidd
+telemetry read` already reads every covered tool's own files through the exact same
+`SessionCostReader` map, and `domain/models/step-attribution.ts`'s `buildStepIntervals`/
+`attributeMoment` already compute the same join `attribution.cjs` does — both built in
+phase 1 and unchanged here. `domain/ports/run-journal-reader.ts`'s `list()` already returns
+what `journal.cjs`'s `listJournals` returns. `DiagnoseTelemetryUseCase` depends on all three
+directly rather than wrapping them in a second "evidence" adapter, which is why
+`telemetry-evidence-adapter.ts` ended up covering only what neither of those already
+promised: the switch, the unrecognised-payload marker, and Codex's own hook-trust state.
+`isRepository` landed on `VersionControl`/`GitAdapter` instead, beside `listTrackedFiles`
+phase 3 already added there, rather than a second git-shelling implementation.
+
+### A deviation from task 2's own list, and why
+
+Task 2 names four things for the evidence adapter to port: "switch, repository, journal and
+marker." Codex's hook-trust state is not in that list, and it is ported here anyway —
+`hook fired`'s own FAIL can mean "never observed firing" or "Codex has not trusted this
+plugin's hook," two claims task 1 itself requires to stay distinguishable ("no two distinct
+reasons share one verdict"). Reading `~/.codex/config.toml` was the only way to keep that
+promise for the one claim it is exercised by all through, so it is included in
+`telemetry-evidence-adapter.ts` alongside the four the task names — read as an
+under-specification in the task list, not a deliberate exclusion, and confirmed against
+`telemetry-check.test.js`'s own "naming whether the hook fired" suite, which exercises it
+as core `hook-fired` coverage, not export-route coverage.
+
+### Confronted with the script
+
+Three parity tests in `cli/tests/e2e/telemetry-check.e2e.test.ts` run `telemetry-check.cjs`
+and `aidd telemetry check` over the same starting state and diff their first four printed
+lines verbatim: a healthy fixture (switch on, a journalled Claude Code session, the real
+transcript fixture beside it), the hook never having fired at all, and the two gates
+(switch off; outside a git repository). All three came back byte-identical on the first
+run — nothing was recorded to fix. `render.cjs`'s own column widths (`LABEL_WIDTH = 22`,
+verdict padded to 4) are reproduced exactly in `telemetry-check-display.ts` for this reason:
+the parity claim is a printed line, not just a verdict.
+
+### Net test counts
+
+```
+cli unit          2100 passed  (was 2068; +25 telemetry-claim.unit.test.ts, +7 diagnose-telemetry-use-case.unit.test.ts)
+cli integration     608 passed  (unchanged)
+cli e2e             210 passed  (was 201; +9 telemetry-check.e2e.test.ts)
+plugin suite        337 passed  (unchanged — no plugin file touched this phase)
+tsc, biome, check-cli-layering, check-markdown-links   clean
+```
+
+## Phase 5 — `aidd telemetry check`, the export, the trust, and the join
+
+### The port's shape
+
+`export-config.cjs`, `export-sink.cjs` and `hook-trust.cjs` each became one adapter behind
+one new port (`export-config-reader.ts`, `export-sink-reader.ts`, `hook-trust-reader.ts`).
+`telemetry-evidence-adapter.ts` lost `readCodexHookTrust` to its own port rather than
+growing a fourth responsibility — `hook-fired`'s two FAIL reasons (never observed, untrusted
+hook) are read from two different files (the run journal, Codex's `config.toml`) and belong
+behind two different ports on that basis alone. `diagnoseLocalTelemetryClaims` became
+`diagnoseTelemetryClaims`: the `unjudged` verdict phase 4 introduced for the two export
+claims is gone entirely now that both are judged, leaving the three-verdict set
+(`ok`/`fail`/`unknown`) task 1 of phase 4 originally specified.
+
+### Confronted with a machine's real configuration (task 4)
+
+Run against this development machine's own, never-authored-for-this-test configuration:
+a real `~/.codex/config.toml` carrying a genuine `[hooks.state...]` table with a real
+`trusted_hash` entry for this plugin, and a real `~/.claude/settings.json` (~22KB, this
+machine's actual accumulated settings). Anchored once as a Codex session
+(`CODEX_THREAD_ID` set) and once as a Claude Code session (`CLAUDE_CODE_SESSION_ID` set),
+`telemetry-check.cjs` and `aidd telemetry check` were run side by side over both anchors.
+
+**The side-by-side run against these real files caught one divergence.** The ported
+`export-config-reader-adapter.ts` rendered its detail strings with an em dash (`—`) in
+three places — `codexMissingDetail`'s two messages and `readClaudeExportConfig`'s "not
+together in one file" message — where `export-config.cjs` writes a plain hyphen (` - `).
+A synthetic fixture would have agreed with either punctuation, since both sides would have
+been written to match the same test; only comparing against this machine's real files,
+whose exact bytes no test fixture chose, made the mismatch visible. **Settled as a defect
+in the CLI port**, fixed to match the script's punctuation exactly (see
+`export-config-reader-adapter.ts`'s `codexMissingDetail` and `readClaudeExportConfig`).
+The re-run after that fix came back **byte-identical on all six claim lines, on both
+anchors** — nothing left unsettled. This confrontation is now unreproducible by design —
+`telemetry-check.cjs` is deleted as of this same phase's task 5 — which is why it is
+recorded here rather than left as a test CI could ever rerun again.
+
+### Task 5's collateral: three tests that named the deleted script
+
+Deleting `02-check/scripts/telemetry-check.cjs` (13 files, 1,664 lines) broke three tests
+that were not on the plan's own file list, none of which the plan's acceptance criteria
+mention, all fixed as part of leaving no debt from the deletion itself:
+
+- **`cli/tests/domain/models/plugin-asset-translation.unit.test.ts`**'s "installing the
+  plugin carries its measurement script" describe block read `telemetry-check.cjs` off
+  disk to prove the translator carries a skill-nested script byte for byte. Since no skill
+  in this plugin ships a script any more (00-init, 01-cost, and now 02-check all moved to
+  `aidd`), it now borrows real bytes from `hooks/journal.cjs` — a file this plan does not
+  delete — placed at a synthetic skill-nested path (`skills/02-check/scripts/example.cjs`).
+  The path is the fixture; the content is still real, which is what tells "carried
+  verbatim" apart from "compared a string to itself."
+- **`scripts/__tests__/plugin-install-shape.test.js`**'s `KNOWN_INVOCATIONS` map held only
+  `telemetry-check.cjs`; emptying it would have left "discovers the scripts known today"
+  iterating zero keys and passing vacuously — silently indistinguishable from the walk
+  never running at all. Inverted to a direct assertion, once per install shape: `ships no
+  skill scripts, now that every skill calls the CLI instead`, which fails loudly
+  (confirmed red before the deletion, green after) rather than passing by omission.
+- **`scripts/__tests__/aidd-telemetry-cost-skill.test.js`** carried two tests keyed to the
+  soon-to-be-deleted script: `"each skill finds its own script..."` searched
+  `02-check/actions/01-locate.md` for a `find` command across plugin directories — gone now
+  that locate just runs `aidd --version` — replaced with a positive assertion that no
+  skill's actions search for a script that way any more. `"the check skill calls the
+  plugin's own binary, never the CLI"` asserted the opposite of what phase 5 does on
+  purpose; inverted to `"the check skill calls the CLI, never a script of its own"`.
+
+### A gap the plan's own acceptance criteria did not name
+
+`telemetry-check.e2e.test.ts` pins `aidd telemetry check`'s *behaviour* against fixed
+fixtures; it never reads `02-check`'s own markdown, so it could not have caught the
+markdown naming a command the CLI does not accept — exactly the class of defect
+`telemetry-where-things-live.test.js`'s own header describes (a README naming a deleted
+script for two phases, undetected by both existing guards). `00-init` and `01-cost` are
+each held to this by their own `telemetry-*-skill-commands.e2e.test.ts`; `02-check` had no
+equivalent. Added `cli/tests/e2e/telemetry-check-skill-commands.e2e.test.ts`, mirroring the
+same shape: every `` `aidd telemetry …` `` command `02-check`'s markdown names is extracted
+and actually run through the CLI, and the skill is pinned to name no `.cjs` path any more.
+
+`commandsNamedBySkill`'s regex only matches `` `aidd telemetry …` `` — `aidd --version`,
+which `01-locate.md` now depends on, is not covered by this guard. Same limitation as the
+two sibling files it mirrors, so this is consistent with existing coverage, not a new gap;
+worth stating so the guard is not read as broader than it is.
+
+### Net test counts
+
+```
+cli unit          2107 passed  (was 2100 at phase 4's close; −1 verified —
+                                 registry-conformance.unit.test.ts's cross-check against
+                                 readers.cjs, deleted with its `require`-based helper
+                                 telemetry-cost-readers.ts once the file it required is gone;
+                                 the remaining +8 is telemetry-claim.unit.test.ts (31 tests,
+                                 up from phase 4) and diagnose-telemetry-use-case.unit.test.ts
+                                 (9 tests) growing earlier in this phase to cover the export
+                                 route, not from task 5's own collateral fixes —
+                                 plugin-asset-translation.unit.test.ts: 20 tests today; the
+                                 repoint changed fixture content, not test count)
+cli integration     608 passed  (unchanged)
+cli e2e             214 passed  (was 210 at phase 4's close, documented; grew earlier in
+                                 phase 5 to 217 per the prior session's own account, not a
+                                 count this session measured directly; task 5 itself,
+                                 measured: −5 telemetry-check.e2e.test.ts's script-parity
+                                 describe block, its comparison subject deleted; +2 new
+                                 telemetry-check-skill-commands.e2e.test.ts)
+plugin suite        233 passed  (was 337; −104 scripts/__tests__/telemetry-check.test.js,
+                                 the checker it exercised deleted whole)
+tsc, biome, check-cli-layering, check-markdown-links   clean
+node cli/dist/cli.js telemetry check   run once post-build: exits 0, prints the expected
+                                        "measurement is off" gate line — the exact step
+                                        cli-ci.yml's Windows job now runs
+```
+
+## Phase 6 — the promise, and the absent CLI
+
+### Task 1: one wording, pinned
+
+The three locating actions' absent-CLI wording (`00-init/actions/01-check.md`,
+`01-cost/actions/01-locate.md`, `02-check/actions/01-locate.md`) was two hyphens and one
+em dash before this task: phase 5's rewrite of `02-check/actions/01-locate.md` used `—`
+in "**recording is unaffected** — the hooks..." where the other two use ` - `. Fixed to
+match. `scripts/__tests__/telemetry-cli-required.test.js` (new, 4 tests) pins the block
+character for character across all three, confirmed red before the fix and green after by
+temporarily reintroducing the em dash and re-running.
+
+### Task 2: the promise, corrected
+
+- `plugins/aidd-telemetry/README.md` already carried the three-act table from earlier work
+  in this plan, but one sentence still lied: "`02-check` still runs a script this plugin
+  ships, and needs nothing installed" — true before phase 5, false after it deleted
+  `02-check/scripts/`. Corrected to "All three reach the CLI...".
+- `docs/FAQ.md` claimed "No account, no server, no second tool to install" — false since
+  phase 1: turning measurement on and reading it back both need `aidd`. Corrected to name
+  the CLI as required for those two acts, recording excepted.
+- `docs/CATALOG.md`'s `aidd-telemetry` entry named no dependency at all; added the same
+  one-line split.
+- Searched the whole repository (every `.md` file mentioning "telemetry", plus a grep for
+  "no CLI" / "without...CLI" / "nothing installed" / "no second tool") for any remaining
+  false promise. One more found, worse than a stale name:
+  `aidd_docs/product/cost-report-contract.md`'s "Filters" section didn't just say "the
+  plugin script" for a script gone since phase 1 — it asserted `aidd telemetry report`
+  **refuses `--axis`** outright
+  (`error: unknown option '--axis'`), which stopped being true the same phase, when
+  `--axis` was ported onto the CLI directly (`cli/src/application/commands/telemetry.ts`).
+  Verified live against the built CLI before rewriting: `aidd telemetry report --axis
+  bogus` exits `1` with `Error: Unknown axis 'bogus'. Expected one of: total, day, step,
+  model, tool, project.`, and `--axis total --json` together print the JSON object — `--json`
+  wins, `--axis` is silently ignored, never the reverse. The paragraph now states both.
+
+### Task 3: recording survives the CLI's absence — proven end to end
+
+Phase 6's architecture projection lists no new or modified file under `cli/tests/e2e/` for
+this task. On inspection, one existing test proved 3.1 outright, and nothing proved 3.2 in
+the journey's own terms — `telemetry-lifecycle.e2e.test.ts`'s "lives the whole sequence..."
+journals and reads with `aidd` stripped from `PATH` throughout, but every call there
+invokes `dist/cli.js` by its built path, including the switch (`switchTo("on")`); the CLI
+was present and doing the switching the entire time, never absent. Closed by extending
+`telemetry-plugin-standalone.e2e.test.ts`'s existing describe block with a second test,
+"reads a session's figures complete, though the CLI did not exist when it ran":
+
+- Journals a whole session (`session_start`, a skill, a file write into a task folder,
+  `turn_end`) exactly as the first test in that file does, with `aidd` nowhere on `PATH`
+  and no CLI invoked at any point during the write.
+- Only then calls `runCli` — the first and only invocation of `dist/cli.js` in the test,
+  after every write has already happened — to `read`, then `report --json`, `report`, and
+  `report --task <the task just written into>`.
+- The load-bearing assertion is the `--task` one, not the token totals: task identity
+  exists only in the journal's own `file_written` line, which the transcript fixture has
+  no notion of at all. `--task` narrowing to the session's real figures rather than
+  "nothing in this selection" is possible only because `read` consulted that line.
+  `ReadLocalCostOptions`'s own doc comment independently confirms the mechanism: absent a
+  session id, `read` "reads every session the run journal knows about" — the file just
+  written with no CLI present — so even the plain `requests > 0` assertion already implies
+  the journal was consulted, since nothing else tells `read` a session exists at all.
+  Confirmed empirically too: re-running the same fixture with the journal step skipped
+  entirely (transcript present, no run file) returns `requests: 0` / "nothing in this
+  period" even for the plain, unfiltered report — `read` never opens the transcript at
+  all, because the journal is the only thing that tells it a session exists to read.
+
+Full re-run: `pnpm exec vitest run --project=e2e
+tests/e2e/telemetry-plugin-standalone.e2e.test.ts tests/e2e/telemetry-lifecycle.e2e.test.ts`
+→ 5 passed (was 4; the new test alone — this was already the full pair of files, not
+just one).
+
+### Task 4: Windows resolves `aidd` on its own PATH, not just by path
+
+Every existing suite on the Windows job — including the "Chain - diagnose" step this
+phase's predecessor added — invoked `node cli/dist/cli.js ...` directly, which proves
+nothing about whether `aidd` resolves as a command on that platform's `PATH`. The Windows
+job's "Chain - diagnose" step became two steps: build, `pnpm pack`, and
+`npm install -g` the tarball (the same shim generation a real
+`npm install -g @ai-driven-dev/cli` produces), then `aidd --version` followed by
+`aidd telemetry check` — both lifted verbatim from what every skill's own locate action
+names, run through the globally-resolved command rather than a path. A missing shim fails
+`aidd --version` with "command not found" (exit 127), which fails the step and the job.
+
+`cli/package.json` already carries an `install:local` script doing the equivalent (build,
+`pnpm pack`, `npm install -g <tarball> --force`) for a developer's own machine, and the
+CI step was written to call it at first. Not used: `install:local`'s tarball path is
+resolved with `$(node -p "require('./package.json').version")`, bash command
+substitution, but a package.json script runs through pnpm's own configured shell — `cmd.exe`
+on Windows unless `script-shell` says otherwise, which this repository never sets. Under
+`cmd.exe` that substitution is a literal string, not a version lookup, and the install would
+fail in a way no macOS test could surface. The two commands are inlined into the workflow's
+own `run:` block instead, which the job's `defaults.run.shell: bash` guarantees is bash
+regardless, with a glob (`ai-driven-dev-cli-*.tgz`) standing in for the version lookup.
+
+Verified on this machine (macOS, not Windows — the platform-specific `.cmd`/PATHEXT
+resolution this task exists for can only be confirmed by an actual Windows CI run, which
+this session cannot trigger): `npm pack` on the built CLI produces
+`ai-driven-dev-cli-5.2.1.tgz` (matching the workflow's own glob), and
+`npm install -g --prefix <sandbox> ./dist/ai-driven-dev-cli-*.tgz --force` followed by
+`aidd --version` / `aidd telemetry check` resolved and ran correctly (exit 0 both times),
+against a throwaway prefix — never this machine's real global `aidd`. `pnpm pack` itself
+(the same call the workflow's own inlined step makes) could not be exercised locally: it
+runs the package's `prepare: lefthook install` script regardless of who calls it, and this
+checkout is a git worktree whose `core.hooksPath` lefthook refuses by design — a local
+environment quirk this specific machine hits, not something a fresh CI checkout would; a
+plain, non-worktree checkout carries no such override. Substituted
+`npm pack --ignore-scripts` locally to verify the pack-and-install mechanics regardless of
+that one blocked step.
+
+### Net test counts
+
+```
+cli unit          2107 passed  (unchanged from phase 5's close — no cli/src file changed)
+cli integration     608 passed  (unchanged)
+cli e2e             215 passed  (was 214 at phase 5's close; +1
+                                 telemetry-plugin-standalone.e2e.test.ts's new test, closing
+                                 the task 3.2 gap this phase's first pass had only flagged)
+plugin suite         237 passed  (was 233; +4 telemetry-cli-required.test.js, new)
+tsc, biome, check-cli-layering, check-markdown-links   clean
+```
+
+Both follow-ups this phase's first pass flagged and deferred are closed, not carried
+forward: the `cost-report-contract.md` `--axis` claim (task 2) and the task 3.2 recording-
+survives-the-CLI gap (task 3) are both fixed and tested above, in the same phase. No open
+follow-up remains from this phase.

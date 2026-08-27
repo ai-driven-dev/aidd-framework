@@ -35,6 +35,7 @@ export const noGit: VersionControl = {
   installPreCommitDelegate: async () => {},
   getRemoteUrl: async () => null,
   listTrackedFiles: async () => [],
+  isRepository: async () => false,
 };
 
 export { SilentPrompterAdapter as OverwritePrompter };

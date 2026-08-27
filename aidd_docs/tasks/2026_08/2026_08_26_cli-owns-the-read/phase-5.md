@@ -1,5 +1,5 @@
 ---
-status: pending
+status: implemented
 ---
 
 # Instruction: `aidd telemetry check` — the export, the trust, and the join

@@ -53,7 +53,9 @@ nothing until you allow it. Ask your AI tool for the plugin's `00-init` skill: i
 measurement on for the current project and tells you what is now recorded.
 
 Then work as usual, and ask `01-cost` what a period or a task consumed. No account, no
-server, no second tool to install.
+server — but turning it on and asking both need the `aidd` CLI
+(`npm install -g @ai-driven-dev/cli`); recording itself, in between, needs nothing
+installed.
 
 | Where | What |
 | --- | --- |

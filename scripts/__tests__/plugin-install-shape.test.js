@@ -19,14 +19,13 @@ const GIT_DIR = path.dirname(
     .split(/\r?\n/u)[0],
 );
 
-// Read from each script's own usage banner: no argv at all for the checker. Invoking a
-// script this way exercises its full require graph rather than stopping at a usage message
-// - a stronger check than the generic fallback below gives an undiscovered script.
-// `telemetry-switch.cjs` and `telemetry-identity.cjs` are gone as of phase 3 - 00-init
-// ships no script of its own any more, and calls `aidd telemetry` instead.
-const KNOWN_INVOCATIONS = {
-  "telemetry-check.cjs": [],
-};
+// Read from each script's own usage banner: no argv at all for a script known to need
+// none. `telemetry-switch.cjs` and `telemetry-identity.cjs` are gone as of phase 3 -
+// 00-init ships no script of its own any more, and calls `aidd telemetry` instead;
+// `telemetry-check.cjs` is gone as of phase 5, the same move for 02-check. This is empty
+// on purpose: no skill in this plugin ships a script today, and "ships no skill scripts"
+// below is what pins that rather than leaving it silently unexercised.
+const KNOWN_INVOCATIONS = {};
 
 const STACK_FRAME = /\n\s*at .+:\d+:\d+/u;
 const tempDirs = [];
@@ -135,13 +134,12 @@ function describeShape(name, buildShape) {
     const skillsRoot = path.join(buildShape(), "skills");
     const scripts = discoverScripts(skillsRoot);
 
-    it("discovers the scripts known today, so the walk itself is not silently empty", () => {
-      for (const known of Object.keys(KNOWN_INVOCATIONS)) {
-        assert.ok(
-          scripts.some((relative) => relative.endsWith(`/${known}`)),
-          `expected the walk to find ${known}`
-        );
-      }
+    // The actual invariant today: 00-init (phase 3), 01-cost (phase 1) and 02-check
+    // (phase 5) each moved their script to `aidd`, and none of the three left one behind.
+    // Pinned explicitly rather than left to the loop below finding nothing to iterate,
+    // which would pass the same way whether the walk found zero scripts or never ran.
+    it("ships no skill scripts, now that every skill calls the CLI instead", () => {
+      assert.deepEqual(scripts, []);
     });
 
     for (const relativeScript of scripts) {

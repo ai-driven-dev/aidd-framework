@@ -1,0 +1,458 @@
+import type { AiToolId } from "./tool-ids.js";
+
+/**
+ * Six independently verifiable claims about the measurement chain, each answered from
+ * what was actually read, never inferred from the others. Ported from the plugin's own
+ * `diagnose.cjs` — see that file's own doc comment for the two routes this set covers: a
+ * local route (`hook fired` -> `session journalled` -> `tool files readable` ->
+ * `records join`) and an export route (`export configured` -> `identifier joinable`),
+ * whose own configuration and own sink are read fresh, never through the local route's
+ * data.
+ */
+export type TelemetryClaimId =
+  | "hook-fired"
+  | "session-journalled"
+  | "tool-files-readable"
+  | "records-join"
+  | "export-configured"
+  | "identifier-joinable";
+
+export type TelemetryClaimVerdict = "ok" | "fail" | "unknown";
+
+/**
+ * The closed set of reasons a claim can land on a verdict. One claim's `fail` can have
+ * several distinct causes — "no run file" and "untrusted hook" both fail `hook-fired`, and
+ * collapsing them into one reading is exactly what a diagnostic exists to prevent — so the
+ * reason, not the verdict alone, is what a caller must switch on to tell them apart.
+ */
+export type TelemetryClaimReason =
+  | "session-anchored"
+  | "untrusted-codex-hook"
+  | "hook-never-fired"
+  | "unrecognised-payload"
+  | "session-left-no-run-file"
+  | "no-session-anchor"
+  | "turn-closed"
+  | "only-session-start"
+  | "no-run-file-to-read"
+  | "session-found"
+  | "no-session-found-for-any-tool"
+  | "no-session-named"
+  | "records-joined"
+  | "all-unattributed"
+  | "no-record-to-join"
+  | "no-join-material"
+  | "no-session-anchor-for-export"
+  | "export-missing"
+  | "export-configured"
+  | "no-export-to-join"
+  | "identity-disabled"
+  | "identifier-present"
+  | "export-configured-no-record-yet";
+
+export interface TelemetryClaim {
+  readonly claim: TelemetryClaimId;
+  readonly verdict: TelemetryClaimVerdict;
+  readonly reason: TelemetryClaimReason;
+  readonly detail: string;
+}
+
+/** One journalled session, the shape `claimHookFired`/`claimSessionJournalled` need from
+ * it — a fuller run journal (file writes, task declarations) carries nothing these claims
+ * read, so it stays out of this evidence shape entirely. */
+export interface TelemetryClaimJournal {
+  readonly vendorId?: string;
+  readonly sessionStartAt?: string;
+  readonly turnClosed: boolean;
+}
+
+/** One covered tool's attempt to read one journalled session's own files. `records` carries
+ * only the step attribution each one resolved to — `claimRecordsJoin`'s only use for a
+ * record at all — never the counters themselves, which this diagnostic has no business
+ * repeating from the report. */
+export interface TelemetryClaimToolRead {
+  readonly tool: AiToolId;
+  readonly sessionFound: boolean;
+  readonly hasIntervals: boolean;
+  readonly records: readonly {
+    readonly stepAttribution: "tool-stated" | "journal-interval" | "unattributed";
+  }[];
+  readonly error?: string;
+}
+
+/** Whether Codex has trusted this plugin's hook — `undefined` when there is no trust gate
+ * to consult at all (every host but Codex, or a Codex session whose anchor was never
+ * resolved). `readable: false` covers everything short of the config file actually opening
+ * as text; neither direction licenses a guess at trust. */
+export interface TelemetryCodexHookTrust {
+  readonly readable: boolean;
+  readonly trusted?: boolean;
+  readonly configPath?: string;
+  readonly reason?: string;
+}
+
+/** The shape `claimExportConfigured`/`claimIdentifierJoinable` read off a tool's own
+ * export configuration — structurally identical to `domain/ports/export-config-reader.ts`'s
+ * `ExportConfig`, restated here rather than imported so this pure judging module carries
+ * no dependency on the port that happens to produce its evidence. */
+export interface TelemetryExportConfigEvidence {
+  readonly configured: boolean;
+  readonly configuredDetail?: string;
+  readonly missingDetail?: string;
+  readonly identityDisabled: boolean;
+  readonly identityDisabledDetail?: string;
+}
+
+/** The one field `claimIdentifierJoinable` reads off an exported record — never the
+ * counters, which this diagnostic has no business repeating from the report. */
+export interface TelemetryExportedRecordEvidence {
+  readonly vendorField?: string;
+}
+
+export interface TelemetryEvidence {
+  readonly journals: readonly TelemetryClaimJournal[];
+  readonly toolReads: readonly TelemetryClaimToolRead[];
+  readonly runsDirLabel: string;
+  readonly currentSessionId?: string;
+  readonly unrecognisedPayloadAt?: string;
+  readonly hookTrust?: TelemetryCodexHookTrust;
+  readonly exportConfig: TelemetryExportConfigEvidence | null;
+  readonly exportedRecord?: TelemetryExportedRecordEvidence;
+}
+
+function sessionJournalsOf(
+  journals: readonly TelemetryClaimJournal[]
+): readonly TelemetryClaimJournal[] {
+  return journals.filter((journal) => journal.vendorId !== undefined);
+}
+
+function latestSessionStart(journals: readonly TelemetryClaimJournal[]): string {
+  const starts = journals
+    .map((journal) => journal.sessionStartAt)
+    .filter((at): at is string => at !== undefined)
+    .sort();
+  return starts[starts.length - 1] ?? "an unreadable session_start";
+}
+
+function firedForSession(journals: readonly TelemetryClaimJournal[], sessionId: string): boolean {
+  return journals.some((journal) => journal.vendorId === sessionId);
+}
+
+function trustExplainsAbsence(hookTrust: TelemetryCodexHookTrust | undefined): boolean {
+  return Boolean(hookTrust?.readable && !hookTrust.trusted);
+}
+
+function untrustedHookClaim(hookTrust: TelemetryCodexHookTrust): TelemetryClaim {
+  return {
+    claim: "hook-fired",
+    verdict: "fail",
+    reason: "untrusted-codex-hook",
+    detail:
+      "Codex has not trusted this plugin's hook — no trusted_hash for " +
+      `hooks/hooks.json:session_start in ${hookTrust.configPath}. Approve it interactively ` +
+      "once, or pass --dangerously-bypass-hook-trust to codex exec for a headless run.",
+  };
+}
+
+function unreadableTrustSuffix(hookTrust: TelemetryCodexHookTrust | undefined): string {
+  if (!hookTrust || hookTrust.readable) return "";
+  return ` — Codex's own hook trust state could not be read either (${hookTrust.reason}), so this may be the same cause`;
+}
+
+function noRunFileClaim(
+  runsDirLabel: string,
+  hookTrust: TelemetryCodexHookTrust | undefined
+): TelemetryClaim {
+  if (hookTrust && trustExplainsAbsence(hookTrust)) return untrustedHookClaim(hookTrust);
+  return {
+    claim: "hook-fired",
+    verdict: "fail",
+    reason: "hook-never-fired",
+    detail: `no run file in ${runsDirLabel} — the hook has never been observed firing${unreadableTrustSuffix(hookTrust)}`,
+  };
+}
+
+function unrecognisedPayloadClaim(at: string): TelemetryClaim {
+  return {
+    claim: "hook-fired",
+    verdict: "fail",
+    reason: "unrecognised-payload",
+    detail: `a payload arrived and matched no known host at ${at} — this tool is not recognised, not a hook that never ran`,
+  };
+}
+
+function noAnchorClaim(journals: readonly TelemetryClaimJournal[], latest: string): TelemetryClaim {
+  return {
+    claim: "hook-fired",
+    verdict: "unknown",
+    reason: "no-session-anchor",
+    detail: `${journals.length} run file(s), most recent session_start ${latest} — no session anchor available to tell whether this session's hook fired`,
+  };
+}
+
+function sessionAnchoredClaim(
+  journals: readonly TelemetryClaimJournal[],
+  latest: string,
+  currentSessionId: string,
+  hookTrust: TelemetryCodexHookTrust | undefined
+): TelemetryClaim {
+  if (!firedForSession(journals, currentSessionId)) {
+    if (hookTrust && trustExplainsAbsence(hookTrust)) return untrustedHookClaim(hookTrust);
+    return {
+      claim: "hook-fired",
+      verdict: "fail",
+      reason: "session-left-no-run-file",
+      detail: `this session left no run file — the newest one is from ${latest}${unreadableTrustSuffix(hookTrust)}`,
+    };
+  }
+  return {
+    claim: "hook-fired",
+    verdict: "ok",
+    reason: "session-anchored",
+    detail: `${journals.length} run file(s), most recent session_start ${latest}`,
+  };
+}
+
+function claimHookFired(evidence: TelemetryEvidence): TelemetryClaim {
+  const { journals, runsDirLabel, currentSessionId, unrecognisedPayloadAt, hookTrust } = evidence;
+  const sessionJournals = sessionJournalsOf(journals);
+  if (sessionJournals.length === 0) {
+    if (unrecognisedPayloadAt !== undefined) return unrecognisedPayloadClaim(unrecognisedPayloadAt);
+    return noRunFileClaim(runsDirLabel, hookTrust);
+  }
+  const latest = latestSessionStart(sessionJournals);
+  if (currentSessionId === undefined) return noAnchorClaim(sessionJournals, latest);
+  return sessionAnchoredClaim(sessionJournals, latest, currentSessionId, hookTrust);
+}
+
+function claimSessionJournalled(journals: readonly TelemetryClaimJournal[]): TelemetryClaim {
+  const sessionJournals = sessionJournalsOf(journals);
+  if (sessionJournals.length === 0) {
+    return {
+      claim: "session-journalled",
+      verdict: "unknown",
+      reason: "no-run-file-to-read",
+      detail: "no run file to read",
+    };
+  }
+  const closed = sessionJournals.filter((journal) => journal.turnClosed);
+  if (closed.length === 0) {
+    return {
+      claim: "session-journalled",
+      verdict: "fail",
+      reason: "only-session-start",
+      detail: `${sessionJournals.length} run file(s), all carrying only session_start — nothing closed the turn`,
+    };
+  }
+  return {
+    claim: "session-journalled",
+    verdict: "ok",
+    reason: "turn-closed",
+    detail: `${closed.length} of ${sessionJournals.length} run file(s) carry more than session_start`,
+  };
+}
+
+interface ToolTally {
+  attempted: number;
+  found: number;
+  errors: string[];
+}
+
+function tallyByTool(toolReads: readonly TelemetryClaimToolRead[]): Map<AiToolId, ToolTally> {
+  const byTool = new Map<AiToolId, ToolTally>();
+  for (const read of toolReads) {
+    const entry = byTool.get(read.tool) ?? { attempted: 0, found: 0, errors: [] };
+    entry.attempted += 1;
+    entry.found += read.sessionFound ? 1 : 0;
+    if (read.error !== undefined) entry.errors.push(read.error);
+    byTool.set(read.tool, entry);
+  }
+  return byTool;
+}
+
+function readableSummary(toolReads: readonly TelemetryClaimToolRead[]): string {
+  return [...tallyByTool(toolReads).entries()]
+    .map(([tool, tally]) => {
+      const failed = tally.errors.length > 0 ? `, ${tally.errors.length} could not be read` : "";
+      return `${tool}: ${tally.found} of ${tally.attempted} session(s) read${failed}`;
+    })
+    .join("; ");
+}
+
+function errorNote(toolReads: readonly TelemetryClaimToolRead[]): string {
+  const errors = toolReads
+    .map((read) => read.error)
+    .filter((error): error is string => error !== undefined);
+  return errors.length === 0
+    ? ""
+    : ` — ${errors.length} read attempt(s) failed: ${errors[errors.length - 1]}`;
+}
+
+function claimToolsReadable(
+  journals: readonly TelemetryClaimJournal[],
+  toolReads: readonly TelemetryClaimToolRead[]
+): TelemetryClaim {
+  const sessionIds = [...new Set(sessionJournalsOf(journals).map((journal) => journal.vendorId))];
+  if (sessionIds.length === 0) {
+    return {
+      claim: "tool-files-readable",
+      verdict: "unknown",
+      reason: "no-session-named",
+      detail: "no session named by the journal",
+    };
+  }
+  if (!toolReads.some((read) => read.sessionFound)) {
+    const tools = [...new Set(toolReads.map((read) => read.tool))].join(", ");
+    return {
+      claim: "tool-files-readable",
+      verdict: "fail",
+      reason: "no-session-found-for-any-tool",
+      detail: `no session found for any journalled session, across every covered tool (${tools}) — while the journal names ${sessionIds.join(", ")}${errorNote(toolReads)}`,
+    };
+  }
+  return {
+    claim: "tool-files-readable",
+    verdict: "ok",
+    reason: "session-found",
+    detail: readableSummary(toolReads),
+  };
+}
+
+function hasJoinMaterial(
+  toolReads: readonly TelemetryClaimToolRead[],
+  records: readonly { readonly stepAttribution: string }[]
+): boolean {
+  return (
+    toolReads.some((read) => read.hasIntervals) ||
+    records.some((record) => record.stepAttribution === "tool-stated")
+  );
+}
+
+function joinedVerdict(records: readonly { readonly stepAttribution: string }[]): TelemetryClaim {
+  const joined = records.filter((record) => record.stepAttribution !== "unattributed");
+  if (joined.length === 0) {
+    return {
+      claim: "records-join",
+      verdict: "fail",
+      reason: "all-unattributed",
+      detail: `${records.length} record(s) found, joined: 0 — every record unattributed`,
+    };
+  }
+  const rest = records.length - joined.length;
+  return {
+    claim: "records-join",
+    verdict: "ok",
+    reason: "records-joined",
+    detail: `${joined.length} of ${records.length} record(s) joined a step, ${rest} unattributed`,
+  };
+}
+
+function claimRecordsJoin(toolReads: readonly TelemetryClaimToolRead[]): TelemetryClaim {
+  const records = toolReads.flatMap((read) => read.records);
+  if (records.length === 0) {
+    return {
+      claim: "records-join",
+      verdict: "unknown",
+      reason: "no-record-to-join",
+      detail: "no record read to join",
+    };
+  }
+  if (!hasJoinMaterial(toolReads, records)) {
+    return {
+      claim: "records-join",
+      verdict: "unknown",
+      reason: "no-join-material",
+      detail: "no step interval and no tool-stated step — see session journalled",
+    };
+  }
+  return joinedVerdict(records);
+}
+
+// Read from the export-config reader, never from the local route above: `exportConfig` is
+// `null` when `resolveCurrentTool` named no tool at all — there is no session anchor to
+// say whose export settings to check, the same reason `claimHookFired`'s own
+// `noAnchorClaim` reads `unknown` rather than guessing.
+function claimExportConfigured(exportConfig: TelemetryExportConfigEvidence | null): TelemetryClaim {
+  if (!exportConfig) {
+    return {
+      claim: "export-configured",
+      verdict: "unknown",
+      reason: "no-session-anchor-for-export",
+      detail: "no session anchor available to tell whose export settings to check",
+    };
+  }
+  if (!exportConfig.configured) {
+    return {
+      claim: "export-configured",
+      verdict: "fail",
+      reason: "export-missing",
+      detail: exportConfig.missingDetail ?? "",
+    };
+  }
+  return {
+    claim: "export-configured",
+    verdict: "ok",
+    reason: "export-configured",
+    detail: exportConfig.configuredDetail ?? "",
+  };
+}
+
+// A record that fails identity resolution is dropped before the sink ever stores it, so
+// "records arrived but could not be joined" leaves no trace the sink can be read for. The
+// only place that fault stays legible is the setting that causes it, which is why this
+// claim reads `exportConfig.identityDisabled` — read directly off the tool's own
+// configuration — ahead of ever looking at the sink: a known-broken setting is a stronger,
+// more specific claim than an absence of data.
+function identifierPresentClaim(exportedRecord: TelemetryExportedRecordEvidence): TelemetryClaim {
+  const attribute =
+    exportedRecord.vendorField !== undefined && exportedRecord.vendorField !== ""
+      ? exportedRecord.vendorField
+      : "an identity attribute";
+  return {
+    claim: "identifier-joinable",
+    verdict: "ok",
+    reason: "identifier-present",
+    detail: `${attribute} present on an exported record for this session`,
+  };
+}
+
+function claimIdentifierJoinable(
+  exportConfig: TelemetryExportConfigEvidence | null,
+  exportedRecord: TelemetryExportedRecordEvidence | undefined
+): TelemetryClaim {
+  if (!exportConfig?.configured) {
+    return {
+      claim: "identifier-joinable",
+      verdict: "unknown",
+      reason: "no-export-to-join",
+      detail: "no export configured to join a record from - see export configured",
+    };
+  }
+  if (exportConfig.identityDisabled) {
+    return {
+      claim: "identifier-joinable",
+      verdict: "fail",
+      reason: "identity-disabled",
+      detail: exportConfig.identityDisabledDetail ?? "",
+    };
+  }
+  if (exportedRecord) return identifierPresentClaim(exportedRecord);
+  return {
+    claim: "identifier-joinable",
+    verdict: "unknown",
+    reason: "export-configured-no-record-yet",
+    detail: "export configured but no exported record has reached the sink yet for this session",
+  };
+}
+
+/** The six claims, always in this order, and never a seventh line that summarises them. */
+export function diagnoseTelemetryClaims(evidence: TelemetryEvidence): readonly TelemetryClaim[] {
+  return [
+    claimHookFired(evidence),
+    claimSessionJournalled(evidence.journals),
+    claimToolsReadable(evidence.journals, evidence.toolReads),
+    claimRecordsJoin(evidence.toolReads),
+    claimExportConfigured(evidence.exportConfig),
+    claimIdentifierJoinable(evidence.exportConfig, evidence.exportedRecord),
+  ];
+}

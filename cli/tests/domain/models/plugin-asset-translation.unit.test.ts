@@ -66,15 +66,22 @@ describe("a plugin's executable files survive being installed", () => {
 });
 
 /** The decisive check: not "would a rewrite damage it", but "does installing the plugin
- * actually put it there, unchanged". Everything above is a guard; this is the proof. */
-describe("installing the plugin carries its measurement script, on every tool", () => {
-  const SCRIPT = "skills/02-check/scripts/telemetry-check.cjs";
+ * actually put it there, unchanged". Everything above is a guard; this is the proof.
+ *
+ * No skill in this plugin ships a script of its own any more (00-init, 01-cost and
+ * 02-check all moved to `aidd`), so this borrows real bytes from a file the plugin does
+ * still ship — `hooks/journal.cjs` — and places them at a skill-nested path. The path is
+ * the fixture; the content is not, which is what tells apart "carried verbatim" from
+ * "happened to compare a synthetic string to itself". */
+describe("installing the plugin carries a skill's own script, on every tool", () => {
+  const SCRIPT = "skills/02-check/scripts/example.cjs";
+  const SCRIPT_CONTENT = pluginFile("hooks/journal.cjs");
   const translator = new PluginContentTranslator({ hash: () => new FileHash("a".repeat(32)) });
 
   function distributionOf(): PluginDistribution {
     const skills = [
       { relativePath: "skills/02-check/SKILL.md", content: pluginFile("skills/02-check/SKILL.md") },
-      { relativePath: SCRIPT, content: pluginFile(SCRIPT) },
+      { relativePath: SCRIPT, content: SCRIPT_CONTENT },
     ];
     const hooks = [
       { relativePath: "hooks/hooks.json", content: pluginFile("hooks/hooks.json") },
@@ -92,10 +99,10 @@ describe("installing the plugin carries its measurement script, on every tool", 
     it(`${tool.toolId} installs it byte for byte`, () => {
       const installed = translator
         .translate(distributionOf(), tool, "aidd_docs")
-        .find((file) => file.relativePath.endsWith("02-check/scripts/telemetry-check.cjs"));
+        .find((file) => file.relativePath.endsWith("02-check/scripts/example.cjs"));
 
       expect(installed, `${tool.toolId} drops the script entirely`).toBeDefined();
-      expect(installed?.content).toBe(pluginFile(SCRIPT));
+      expect(installed?.content).toBe(SCRIPT_CONTENT);
     });
   }
 
@@ -140,7 +147,7 @@ describe("installing the plugin carries its measurement script, on every tool", 
 
       const installed = translator
         .translate(distributionWithScript(script), tool, "aidd_docs")
-        .find((file) => file.relativePath.endsWith("02-check/scripts/telemetry-check.cjs"));
+        .find((file) => file.relativePath.endsWith("02-check/scripts/example.cjs"));
 
       expect(installed?.content).toBe(script);
     });
@@ -152,10 +159,10 @@ describe("installing the plugin carries its measurement script, on every tool", 
     // happens to leave it alone — luck, which this pins down.
     const installed = translator
       .translate(distributionOf(), opencode, "aidd_docs")
-      .find((file) => file.relativePath.endsWith("02-check/scripts/telemetry-check.cjs"));
+      .find((file) => file.relativePath.endsWith("02-check/scripts/example.cjs"));
 
     expect(installed, "opencode drops the script entirely").toBeDefined();
-    expect(installed?.content).toBe(pluginFile(SCRIPT));
+    expect(installed?.content).toBe(SCRIPT_CONTENT);
   });
   it("guards against a rewrite that some tool really would apply", () => {
     // Without this, every assertion above could pass over content no rewrite touches, and

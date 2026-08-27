@@ -46,6 +46,23 @@ export class GitAdapter implements VersionControl {
     }
   }
 
+  // Mirrors the plugin's own `repo.cjs` (`isGitRepo`): a non-zero exit or a thrown spawn
+  // error both read as "not a repository", never a throw here — `aidd telemetry check`
+  // gates on this before judging anything else, and a gate that could itself throw would
+  // be the exact silent failure this command exists to avoid.
+  async isRepository(cwd: string): Promise<boolean> {
+    try {
+      const result = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+        cwd,
+        encoding: "utf8",
+        env: environmentWithoutGitVariables(),
+      });
+      return result.status === 0 && result.stdout.trim() !== "";
+    } catch {
+      return false;
+    }
+  }
+
   // Mirrors the plugin's own `warnIfTracked` (`journal-privacy.cjs`): a non-zero exit —
   // no repository at all, or git itself missing — reads the same as "nothing tracked",
   // never a throw. Turning telemetry on must not depend on being inside a git repository.

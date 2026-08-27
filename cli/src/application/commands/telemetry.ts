@@ -10,6 +10,7 @@ import { createDeps } from "../../infrastructure/deps.js";
 import { resolveHomeDir } from "../../infrastructure/home-dir.js";
 import { ARTEFACT_AXES, buildCostReportArtefact } from "../display/cost-report-artefact.js";
 import { printCostReport } from "../display/cost-report-display.js";
+import { printTelemetryCheckReport } from "../display/telemetry-check-display.js";
 import {
   printLocalCostReadReport,
   printPersonIdentityName,
@@ -104,6 +105,7 @@ export function registerTelemetryCommand(program: Command): void {
     });
 
   registerTelemetryIdentityCommand(telemetry, program);
+  registerTelemetryCheckCommand(telemetry, program);
 
   telemetry
     .command("report")
@@ -182,6 +184,33 @@ export function registerTelemetryCommand(program: Command): void {
         const deps = await createDeps(projectRoot, { verbose }, output);
         const result = await deps.telemetryOffUseCase.execute({ projectRoot });
         printTelemetryOffReport(output, result);
+      } catch (error) {
+        errorHandler.handle(error);
+      }
+    });
+}
+
+/** Whether the measurement chain is actually recording, not merely installed — a hook
+ * that fired, a session that closed, a tool's own files that can be read, the two
+ * joining, whether a tool's own export is configured, and whether the identifier it
+ * carries can be joined back to this session. Wiring only: gathers through
+ * `deps.diagnoseTelemetryUseCase`, prints through `printTelemetryCheckReport`, and every
+ * failure routes through `errorHandler.handle`. */
+function registerTelemetryCheckCommand(telemetry: Command, program: Command): void {
+  telemetry
+    .command("check")
+    .description("Check whether the measurement chain is actually recording for this project")
+    .action(async () => {
+      const { verbose, output, projectRoot } = parseGlobalOptions(program);
+      const errorHandler = new ErrorHandler(output);
+      try {
+        const deps = await createDeps(projectRoot, { verbose }, output);
+        const result = await deps.diagnoseTelemetryUseCase.execute({
+          projectRoot,
+          homeDir: resolveHomeDir(),
+          env: process.env,
+        });
+        printTelemetryCheckReport(output, result);
       } catch (error) {
         errorHandler.handle(error);
       }

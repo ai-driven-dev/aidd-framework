@@ -113,6 +113,9 @@ Runs synchronous feature delivery, optional async issue automation, and the prod
 
 🚧 **Alpha — not ready for use.** Measurement: bundled hooks journal every session so a unit of work can be tied to what it cost, and three skills turn that on, read it back, and check it is actually recording.
 
+Recording needs nothing installed; turning it on and reading it back both need the `aidd`
+CLI, and each skill says so before doing anything else if it is missing.
+
 | Skill      | Role                                                          | Actions                          |
 | ---------- | -------------------------------------------------------------- | --------------------------------- |
 | `00-init`  | Turn measurement on for a project and prove it is recording    | `01-check`, `02-enable`, `03-verify` |

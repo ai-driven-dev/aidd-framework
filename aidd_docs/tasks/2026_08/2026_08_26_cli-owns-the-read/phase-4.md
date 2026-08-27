@@ -1,5 +1,5 @@
 ---
-status: pending
+status: implemented
 ---
 
 # Instruction: `aidd telemetry check` — the claims it can settle without reading an export

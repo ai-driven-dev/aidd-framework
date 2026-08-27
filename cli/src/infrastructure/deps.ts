@@ -77,6 +77,7 @@ import { ResolveUpdateDecisionUseCase } from "../application/use-cases/shared/re
 import { UpdateOneToolUseCase } from "../application/use-cases/shared/update-one-tool-use-case.js";
 import { StatusUseCase } from "../application/use-cases/status-use-case.js";
 import { SyncConflictResolverUseCase } from "../application/use-cases/sync/sync-conflict-resolver-use-case.js";
+import { DiagnoseTelemetryUseCase } from "../application/use-cases/telemetry/diagnose-telemetry-use-case.js";
 import { EnableToolTelemetryUseCase } from "../application/use-cases/telemetry/enable-tool-telemetry-use-case.js";
 import { PersonIdentityUseCase } from "../application/use-cases/telemetry/person-identity-use-case.js";
 import { ReadLocalCostUseCase } from "../application/use-cases/telemetry/read-local-cost-use-case.js";
@@ -131,6 +132,8 @@ import { CodexCliAdapter } from "./adapters/codex-cli-adapter.js";
 import { CopilotCliAdapter } from "./adapters/copilot-cli-adapter.js";
 import { CopilotCostReaderAdapter } from "./adapters/copilot-cost-reader-adapter.js";
 import { CurrentVersionAdapter } from "./adapters/current-version-adapter.js";
+import { ExportConfigReaderAdapter } from "./adapters/export-config-reader-adapter.js";
+import { ExportSinkReaderAdapter } from "./adapters/export-sink-reader-adapter.js";
 import { FileAdapter } from "./adapters/file-adapter.js";
 import { GhCliAdapter } from "./adapters/gh-cli-adapter.js";
 import { GhTokenAdapter } from "./adapters/gh-token-adapter.js";
@@ -138,6 +141,7 @@ import { GitAdapter } from "./adapters/git-adapter.js";
 import { GitHubRawFetcherAdapter } from "./adapters/github-raw-fetcher-adapter.js";
 import { GitHubReleaseResolverAdapter } from "./adapters/github-release-resolver-adapter.js";
 import { HasherAdapter } from "./adapters/hasher-adapter.js";
+import { HookTrustReaderAdapter } from "./adapters/hook-trust-reader-adapter.js";
 import { ManifestRepositoryAdapter } from "./adapters/manifest-repository-adapter.js";
 import { MarketplaceCacheAdapter } from "./adapters/marketplace-cache-adapter.js";
 import { MarketplaceRegistryAdapter } from "./adapters/marketplace-registry-adapter.js";
@@ -152,6 +156,7 @@ import { PluginFetcherAdapter } from "./adapters/plugin-fetcher-adapter.js";
 import { InquirerPrompterAdapter, SilentPrompterAdapter } from "./adapters/prompter-adapter.js";
 import { RunJournalReaderAdapter } from "./adapters/run-journal-reader-adapter.js";
 import { SelfUpdaterAdapter } from "./adapters/self-updater-adapter.js";
+import { TelemetryEvidenceAdapter } from "./adapters/telemetry-evidence-adapter.js";
 import { TelemetrySinkAdapter } from "./adapters/telemetry-sink-adapter.js";
 import { TranscriptCostReaderAdapter } from "./adapters/transcript-cost-reader-adapter.js";
 import { BundledAssetProviderAdapter } from "./assets/asset-loader.js";
@@ -236,6 +241,7 @@ interface Deps {
   otlpHttpReceiverAdapter: OtlpHttpReceiverAdapter;
   readLocalCostUseCase: ReadLocalCostUseCase;
   personIdentityUseCase: PersonIdentityUseCase;
+  diagnoseTelemetryUseCase: DiagnoseTelemetryUseCase;
   reportCostUseCase: ReportCostUseCase;
 }
 
@@ -772,6 +778,19 @@ export async function createDeps(
     personIdentityAdapter
   );
   const personIdentityUseCase = new PersonIdentityUseCase(personIdentityAdapter);
+  const telemetryEvidenceAdapter = new TelemetryEvidenceAdapter();
+  const hookTrustReaderAdapter = new HookTrustReaderAdapter();
+  const exportConfigReaderAdapter = new ExportConfigReaderAdapter();
+  const exportSinkReaderAdapter = new ExportSinkReaderAdapter(telemetrySink);
+  const diagnoseTelemetryUseCase = new DiagnoseTelemetryUseCase(
+    telemetryEvidenceAdapter,
+    git,
+    runJournalReader,
+    localCostReaders,
+    hookTrustReaderAdapter,
+    exportConfigReaderAdapter,
+    exportSinkReaderAdapter
+  );
   const reportCostUseCase = new ReportCostUseCase(telemetrySink, runJournalReader);
   const deps: Deps = {
     fs,
@@ -846,6 +865,7 @@ export async function createDeps(
     otlpHttpReceiverAdapter,
     readLocalCostUseCase,
     personIdentityUseCase,
+    diagnoseTelemetryUseCase,
     reportCostUseCase,
   };
   _cache.set(projectRoot, deps);

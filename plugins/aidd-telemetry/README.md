@@ -22,10 +22,9 @@ You never type a command yourself:
 - **`01-cost`** — answers what a period or one task consumed.
 - **`02-check`** — answers whether the chain is actually recording.
 
-`00-init` and `01-cost` reach the CLI, and each checks that `aidd` answers before doing
-anything — stopping with the reason when it does not, rather than reporting an empty figure
-in place of a missing tool. `02-check` still runs a script this plugin ships, and needs
-nothing installed.
+All three reach the CLI, and each checks that `aidd` answers before doing anything —
+stopping with the reason when it does not, rather than reporting an empty figure in place
+of a missing tool.
 
 **Three acts, and only the middle one needs nothing.**
 
