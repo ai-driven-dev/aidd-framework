@@ -18,7 +18,14 @@ const execFileAsync = promisify(execFile);
  * This is the guard on that, rather than on the symptom: a test's result must not depend on
  * which AI tools the person running it happens to have installed.
  */
-const TOOL_BINARIES = ["opencode", "claude", "codex", "copilot", "cursor-agent", "gh"] as const;
+/**
+ * AI tools only. `gh` deliberately absent: it is not a tool whose files anything here reads,
+ * it is the CLI's own auth dependency (`gh-cli-adapter.ts` spawns `gh auth token`), the same
+ * standing as `git` and `node` below. Listing it made this guard fail on any runner that
+ * ships GitHub CLI at `/usr/bin/gh` — measured on `cli / Test`, where a machine having `gh`
+ * is the normal case, not the deviation this test exists to catch.
+ */
+const TOOL_BINARIES = ["opencode", "claude", "codex", "copilot", "cursor-agent"] as const;
 
 async function whichUnderSandbox(binary: string, cwd: string, env: NodeJS.ProcessEnv) {
   const finder = process.platform === "win32" ? "where" : "which";

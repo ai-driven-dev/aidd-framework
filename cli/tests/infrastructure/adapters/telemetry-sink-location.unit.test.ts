@@ -1,5 +1,5 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { defaultConfigDir } from "../../../src/infrastructure/adapters/telemetry-sink-adapter.js";
@@ -72,7 +72,10 @@ describe("where the figures land by default", () => {
   });
 
   it("the plugin README states the exact default the code writes", () => {
-    const documented = join(homedir(), ".config", "aidd", "telemetry").replace(homedir(), "~");
+    // Written with forward slashes rather than `join`, which yields `~\\.config\\aidd` on
+    // Windows and fails against prose that is the same on every platform. Documentation
+    // spells a path one way; only the code has a separator that follows the host.
+    const documented = "~/.config/aidd/telemetry";
     const text = readFileSync(PLUGIN_README, "utf8");
 
     expect(text).toContain(documented);
