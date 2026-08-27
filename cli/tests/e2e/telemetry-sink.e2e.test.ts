@@ -294,12 +294,7 @@ describe("E2E: telemetry sink", () => {
         (await runCli(["plugin", "install", PLUGIN_SOURCE, "--yes"], projectDir, fakeHome)).exitCode
       ).toBe(0);
 
-      // Port 4318 is the default nothing is bound to in this sandboxed test run.
-      const on = await runCli(
-        ["telemetry", "on", "--endpoint", "http://127.0.0.1:4318"],
-        projectDir,
-        fakeHome
-      );
+      const on = await runCli(["telemetry", "on"], projectDir, fakeHome);
       expect(on.exitCode).toBe(0);
 
       await mkdir(join(projectDir, ".aidd"), { recursive: true });

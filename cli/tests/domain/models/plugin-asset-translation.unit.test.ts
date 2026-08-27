@@ -37,7 +37,6 @@ function pluginFile(relativePath: string): string {
 }
 
 const ARTEFACTS = [
-  "skills/00-init/scripts/telemetry-switch.cjs",
   "hooks/journal.cjs",
   "hooks/journal.cjs",
   "hooks/lib/record.cjs",

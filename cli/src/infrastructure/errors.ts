@@ -46,6 +46,22 @@ export class TelemetrySinkUnwritableError extends Error {
   }
 }
 
+/** A write or a delete against the identity file failed for a reason other than the file
+ * simply not being there — permission denied, a full disk, and the like. Distinct from
+ * `UnreadableIdentityFileError` (domain/errors.ts): that one names a read that could not
+ * come back, this one a write or a forget that could not go out. */
+export class IdentityWriteError extends Error {
+  /** `action` names what the person was doing, because the sentence reaches them: someone
+   * withdrawing should not be told a write failed. */
+  constructor(filePath: string, cause: unknown, action: "write" | "remove" = "write") {
+    super(
+      `Could not ${action} the identity file at ${filePath} ` +
+        `(${cause instanceof Error ? cause.message : String(cause)}).`
+    );
+    this.name = "IdentityWriteError";
+  }
+}
+
 export class GhCliError extends Error {
   constructor(message: string) {
     super(message);

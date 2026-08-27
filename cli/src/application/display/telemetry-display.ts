@@ -1,14 +1,22 @@
 import { getAiToolConfig } from "../../domain/tools/registry.js";
 import type { CLIOutput } from "../output.js";
 import type {
+  PersonIdentityNameResult,
+  PersonIdentityOffResult,
+  PersonIdentityOnResult,
+  PersonIdentityStatusResult,
+} from "../use-cases/telemetry/person-identity-use-case.js";
+import type {
   LocalCostToolStatus,
   ReadLocalCostResult,
 } from "../use-cases/telemetry/read-local-cost-use-case.js";
-import type { TelemetryOffResult } from "../use-cases/telemetry/telemetry-off-use-case.js";
+import type { TelemetryEndpointClearResult } from "../use-cases/telemetry/telemetry-endpoint-clear-use-case.js";
 import type {
-  TelemetryOnResult,
+  TelemetryEndpointResult,
   TelemetryToolReport,
-} from "../use-cases/telemetry/telemetry-on-use-case.js";
+} from "../use-cases/telemetry/telemetry-endpoint-use-case.js";
+import type { TelemetryOffResult } from "../use-cases/telemetry/telemetry-off-use-case.js";
+import type { TelemetryOnResult } from "../use-cases/telemetry/telemetry-on-use-case.js";
 
 const STATUS_LABELS: Record<TelemetryToolReport["status"], string> = {
   enabled: "enabled",
@@ -33,7 +41,13 @@ const LOCAL_COST_STATUS_LABELS: Record<LocalCostToolStatus, string> = {
 export function printTelemetryOnReport(output: CLIOutput, result: TelemetryOnResult): void {
   const switchLabel = result.switchChanged ? "on" : "already on";
   output.success(`AIDD telemetry: ${switchLabel} (${result.switchPath})`);
-  output.print(`Endpoint: ${result.endpoint}`);
+}
+
+export function printTelemetryEndpointReport(
+  output: CLIOutput,
+  result: TelemetryEndpointResult
+): void {
+  output.success(`AIDD telemetry endpoint: ${result.endpoint}`);
   for (const report of result.toolReports) {
     const name = getAiToolConfig(report.tool).displayName;
     output.print(`  ${name}: ${STATUS_LABELS[report.status]} — ${report.detail}`);
@@ -41,6 +55,19 @@ export function printTelemetryOnReport(output: CLIOutput, result: TelemetryOnRes
   output.print(
     "Run `aidd telemetry receive` to capture what is exported — without it, nothing is stored."
   );
+}
+
+export function printTelemetryEndpointClearReport(
+  output: CLIOutput,
+  result: TelemetryEndpointClearResult
+): void {
+  if (result.removedFiles.length === 0) {
+    output.success("AIDD telemetry endpoint: nothing tracked to remove.");
+  } else {
+    output.success("AIDD telemetry endpoint: cleared.");
+    for (const file of result.removedFiles) output.print(`  Removed telemetry entries: ${file}`);
+  }
+  for (const reminder of result.manualUnsetReminders) output.print(reminder);
 }
 
 export function printLocalCostReadReport(output: CLIOutput, result: ReadLocalCostResult): void {
@@ -76,10 +103,49 @@ export function printLocalCostReadReport(output: CLIOutput, result: ReadLocalCos
 export function printTelemetryOffReport(output: CLIOutput, result: TelemetryOffResult): void {
   const switchLabel = result.switchChanged ? "off" : "already off";
   output.success(`AIDD telemetry: ${switchLabel} (${result.switchPath})`);
-  if (result.removedFiles.length === 0) {
-    output.print("Nothing tracked to remove.");
-  } else {
-    for (const file of result.removedFiles) output.print(`  Removed telemetry entries: ${file}`);
+}
+
+function identityLabel(result: PersonIdentityStatusResult): string {
+  if (result.identity === null) return "off - records carry no person";
+  const name = result.identity.displayName ? `, display name "${result.identity.displayName}"` : "";
+  return `on, ${result.identity.personId}${name} (${result.filePath})`;
+}
+
+export function printPersonIdentityStatus(
+  output: CLIOutput,
+  result: PersonIdentityStatusResult
+): void {
+  output.print(`AIDD identity: ${identityLabel(result)}`);
+}
+
+export function printPersonIdentityOn(output: CLIOutput, result: PersonIdentityOnResult): void {
+  const prefix = result.minted ? "on" : "already on";
+  output.success(`AIDD identity: ${prefix}, ${result.identity.personId} (${result.filePath})`);
+  if (!result.minted) return;
+  output.print("  Attaches to: records this machine reads locally, from now on.");
+  output.print(
+    "  Never attaches to: the run journal, a session already recorded, or a tool's own export."
+  );
+}
+
+export function printPersonIdentityOff(output: CLIOutput, result: PersonIdentityOffResult): void {
+  if (!result.removed) {
+    output.success("AIDD identity: already off - nothing to withdraw");
+    return;
   }
-  for (const reminder of result.manualUnsetReminders) output.print(reminder);
+  output.success(`AIDD identity: off (${result.filePath} removed)`);
+  if (result.discardedDamaged) {
+    output.print(
+      "  The identity file could not be read, so it was discarded rather than left behind."
+    );
+  }
+  output.print("  New records carry no person, from now on.");
+  output.print(
+    "  Records already stored keep the identifier they were written with - none are changed."
+  );
+  output.print("  Opting in again later mints a fresh identifier, never this one back.");
+}
+
+export function printPersonIdentityName(output: CLIOutput, result: PersonIdentityNameResult): void {
+  output.success(`AIDD identity: display name set (${result.filePath})`);
 }

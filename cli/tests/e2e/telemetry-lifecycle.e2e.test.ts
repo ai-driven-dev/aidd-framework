@@ -11,7 +11,6 @@ import { CLI_PATH, copyFixtureTree, pathWithoutAidd } from "./helpers.js";
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(process.cwd(), "..");
 const PLUGIN = join(REPO_ROOT, "plugins", "aidd-telemetry");
-const SWITCH_BIN = join(PLUGIN, "skills", "00-init", "scripts", "telemetry-switch.cjs");
 const JOURNAL_HOOK = join(PLUGIN, "hooks", "journal.cjs");
 const HOOK_FIXTURES = join(REPO_ROOT, "scripts", "__tests__", "fixtures");
 const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
@@ -89,7 +88,11 @@ describe("measurement, from nothing to off and back", () => {
     }
   }
 
-  const switchTo = (state: "on" | "off") => run(SWITCH_BIN, [state]);
+  /** The switch moved from `telemetry-switch.cjs` to `aidd telemetry on|off` in phase 3;
+   * invoked the same way `measure` calls the CLI, by its own built path, so the `PATH`
+   * this file strips `aidd` from still proves nothing about the switch or the reader —
+   * only that the hooks below need neither. */
+  const switchTo = (state: "on" | "off") => run(CLI_PATH, ["telemetry", state]);
   /** Reading is the CLI's, and only the CLI's, since the plugin's own reporter was deleted:
    * one implementation answers, and this cycle exercises the one that ships. */
   const measure = (args: readonly string[]) => run(CLI_PATH, args.slice());

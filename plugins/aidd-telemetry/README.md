@@ -10,26 +10,34 @@ Providers can tell you a developer burned four million tokens on Tuesday. None c
 that `aidd-dev:02-implement` spent 78,188 of them. The difference is the task, the step and
 the skill — what the framework knows and a provider does not.
 
-**Nothing is measured until you say so, and nothing ever leaves your machine.**
+**Nothing is measured until you say so.** Nothing leaves your machine either, unless you
+point it somewhere yourself with `aidd telemetry endpoint` — which nothing else turns on.
 
 ## Install and use
 
-Install the plugin through your tool's own mechanism. Nothing else: no `npm install`, no
-CLI, no account. The scripts it ships are self-contained and run under plain `node`.
+Install the plugin through your tool's own mechanism, then ask your AI tool for a skill.
+You never type a command yourself:
+
+- **`00-init`** — allows measurement for this project, and verifies the switch took.
+- **`01-cost`** — answers what a period or one task consumed.
+- **`02-check`** — answers whether the chain is actually recording.
+
+`00-init` and `01-cost` reach the CLI, and each checks that `aidd` answers before doing
+anything — stopping with the reason when it does not, rather than reporting an empty figure
+in place of a missing tool. `02-check` still runs a script this plugin ships, and needs
+nothing installed.
+
+**Two halves, two requirements.** Recording needs nothing but this plugin: the hooks that
+write the journal are self-contained and run under plain `node`, with no account and nothing
+to install. **Answering needs the `aidd` CLI**, which is where the report is computed —
+once, in one place, so the figure cannot differ depending on who asked.
 
 ```bash
-# 1. allow it, once per project
-node <plugin>/skills/00-init/scripts/telemetry-switch.cjs on
-
-# 2. work
-
-# 3. read what your tools wrote, then ask
-node <plugin>/skills/01-cost/scripts/telemetry-report.cjs read
-node <plugin>/skills/01-cost/scripts/telemetry-report.cjs report
+npm install -g @ai-driven-dev/cli
 ```
 
-Or let the skills do it: **init** turns it on and verifies the switch, **check** answers
-whether the whole chain is actually recording, **cost** answers what the work consumed.
+Your sessions are measured from the moment you allow it, whether or not `aidd` is present.
+Without it you cannot ask what they cost — recording keeps going, and the answer waits.
 
 ```
 period    2026-08-21 to 2026-08-21
@@ -118,15 +126,17 @@ tokens; turning tokens into money is a separate service's job.
 - **Off unless you turn it on**, per project, in a file you commit or do not.
 - **No prompt, no code, no diff.** The stored shape is an allowlist, field by field, in
   [the record contract](../../aidd_docs/product/metrics-contract.md).
-- **Nothing leaves your machine.** Sending these figures anywhere is planned and not built.
+- **Nothing leaves your machine on its own.** One command sends anything anywhere:
+  `aidd telemetry endpoint <url>`, which arms your tools to export to a collector you
+  name. Nothing else turns it on, and `aidd telemetry endpoint clear` undoes it.
 - **`off` keeps what you measured.** It stops the recording; delete the two directories to
   remove the history.
 
 ## Where things live
 
 **The journal** stays in the repository it describes — `aidd_docs/runs/`, git-ignored the
-moment measurement is turned on, through `aidd setup`, `aidd plugin add`, or this plugin's
-own `telemetry-switch.cjs on`. It is a property of that repository: every line names a
+moment measurement is turned on, through `aidd setup`, `aidd plugin add`, or
+`aidd telemetry on`. It is a property of that repository: every line names a
 repository-relative path or a task folder, and moving it out would leave a file about one
 repository with no way to say which. It records who worked on what, for how long, and
 every file each session wrote — nothing else.

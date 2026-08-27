@@ -44,39 +44,100 @@ async function installClaude(projectDir: string, fakeHome: string): Promise<void
   expect(result.exitCode).toBe(0);
 }
 
-describe.concurrent("E2E: aidd telemetry", () => {
-  it("round-trips: on, on again, off leave the local settings file byte-identical, unrelated content included", async () => {
-    const { projectDir, fakeHome, cleanup } = await createTestEnv("telemetry-roundtrip");
+describe.concurrent("E2E: aidd telemetry on/off — the switch alone", () => {
+  it("on succeeds with no endpoint anywhere, and writes no tool's settings file", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("telemetry-on-no-endpoint");
+    try {
+      await gitInit(projectDir);
+      await seedManifest(projectDir);
+      await installClaude(projectDir, fakeHome);
+
+      const on = await runCli(["telemetry", "on"], projectDir, fakeHome);
+
+      expect(on.exitCode, on.stderr).toBe(0);
+      expect(existsSync(join(projectDir, SWITCH_PATH))).toBe(true);
+      expect(existsSync(join(projectDir, LOCAL_SETTINGS_PATH))).toBe(false);
+      const switchFile = JSON.parse(await readFile(join(projectDir, SWITCH_PATH), "utf-8"));
+      expect(switchFile.telemetry).toEqual({ enabled: true });
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("off on a project never turned on leaves the switch absent and every tool untouched", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("telemetry-switch-off");
+    try {
+      await gitInit(projectDir);
+      await seedManifest(projectDir);
+      await installClaude(projectDir, fakeHome);
+      const cursorInstall = await runCli(["ai", "install", "cursor"], projectDir, fakeHome);
+      expect(cursorInstall.exitCode).toBe(0);
+
+      // Never turned on: `telemetry off` must leave every tool's config untouched.
+      const off = await runCli(["telemetry", "off"], projectDir, fakeHome);
+      expect(off.exitCode).toBe(0);
+      expect(off.stdout).toContain("already off");
+
+      expect(existsSync(join(projectDir, SWITCH_PATH))).toBe(false);
+      expect(existsSync(join(projectDir, LOCAL_SETTINGS_PATH))).toBe(false);
+      const projectSettings = await readFile(join(projectDir, PROJECT_SETTINGS_PATH), "utf-8");
+      expect(projectSettings).not.toContain("CLAUDE_CODE_ENABLE_TELEMETRY");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("off leaves an endpoint configuration untouched — the tool settings and the manifest record both survive", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("telemetry-off-endpoint-safe");
+    try {
+      await gitInit(projectDir);
+      await seedManifest(projectDir);
+      await installClaude(projectDir, fakeHome);
+
+      const armed = await runCli(["telemetry", "endpoint", ENDPOINT], projectDir, fakeHome);
+      expect(armed.exitCode, armed.stderr).toBe(0);
+      const settingsAfterArm = await readFile(join(projectDir, LOCAL_SETTINGS_PATH), "utf-8");
+      expect(settingsAfterArm).toContain("CLAUDE_CODE_ENABLE_TELEMETRY");
+
+      const off = await runCli(["telemetry", "off"], projectDir, fakeHome);
+      expect(off.exitCode, off.stderr).toBe(0);
+
+      // The settings file `endpoint` wrote is untouched, byte for byte.
+      const settingsAfterOff = await readFile(join(projectDir, LOCAL_SETTINGS_PATH), "utf-8");
+      expect(settingsAfterOff).toBe(settingsAfterArm);
+
+      // A later `endpoint clear` can still find and undo it — the manifest record survived
+      // `off` too, so this is not a silent no-op.
+      const cleared = await runCli(["telemetry", "endpoint", "clear"], projectDir, fakeHome);
+      expect(cleared.exitCode, cleared.stderr).toBe(0);
+      expect(existsSync(join(projectDir, LOCAL_SETTINGS_PATH))).toBe(false);
+    } finally {
+      await cleanup();
+    }
+  });
+});
+
+describe.concurrent("E2E: aidd telemetry endpoint", () => {
+  it("writes tool settings, and `endpoint clear` restores the file byte-identically", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("telemetry-endpoint-roundtrip");
     try {
       await gitInit(projectDir);
       await seedManifest(projectDir);
       await installClaude(projectDir, fakeHome);
       const before = await seedUnrelatedLocalSettings(projectDir);
 
-      const on1 = await runCli(["telemetry", "on", "--endpoint", ENDPOINT], projectDir, fakeHome);
-      expect(on1.exitCode).toBe(0);
-      const afterOn1 = await readFile(join(projectDir, LOCAL_SETTINGS_PATH), "utf-8");
-      expect(afterOn1).not.toBe(before);
-      expect(afterOn1).toContain("CLAUDE_CODE_ENABLE_TELEMETRY");
-      // Unrelated content survives the first write untouched.
-      expect(afterOn1).toContain('"model": "opus"');
+      const armed = await runCli(["telemetry", "endpoint", ENDPOINT], projectDir, fakeHome);
+      expect(armed.exitCode).toBe(0);
+      const afterArm = await readFile(join(projectDir, LOCAL_SETTINGS_PATH), "utf-8");
+      expect(afterArm).not.toBe(before);
+      expect(afterArm).toContain("CLAUDE_CODE_ENABLE_TELEMETRY");
+      // Unrelated content survives the write untouched.
+      expect(afterArm).toContain('"model": "opus"');
 
-      // Re-enabling with the endpoint reused from .aidd/config.json must not perturb the file.
-      const on2 = await runCli(["telemetry", "on"], projectDir, fakeHome);
-      expect(on2.exitCode).toBe(0);
-      const afterOn2 = await readFile(join(projectDir, LOCAL_SETTINGS_PATH), "utf-8");
-      expect(afterOn2).toBe(afterOn1);
-
-      const off = await runCli(["telemetry", "off"], projectDir, fakeHome);
-      expect(off.exitCode).toBe(0);
-
+      const cleared = await runCli(["telemetry", "endpoint", "clear"], projectDir, fakeHome);
+      expect(cleared.exitCode).toBe(0);
       const after = await readFile(join(projectDir, LOCAL_SETTINGS_PATH), "utf-8");
       expect(after).toBe(before);
-
-      // The switch itself is deliberately NOT byte-identical: `off` sets enabled: false and
-      // preserves the endpoint, it never deletes .aidd/config.json.
-      const switchFile = JSON.parse(await readFile(join(projectDir, SWITCH_PATH), "utf-8"));
-      expect(switchFile.telemetry).toEqual({ enabled: false, endpoint: ENDPOINT });
     } finally {
       await cleanup();
     }
@@ -90,8 +151,8 @@ describe.concurrent("E2E: aidd telemetry", () => {
       await seedManifest(projectDir);
       await installClaude(projectDir, fakeHome);
 
-      const on = await runCli(["telemetry", "on", "--endpoint", ENDPOINT], projectDir, fakeHome);
-      expect(on.exitCode).toBe(0);
+      const result = await runCli(["telemetry", "endpoint", ENDPOINT], projectDir, fakeHome);
+      expect(result.exitCode).toBe(0);
 
       const settings = await readFile(join(projectDir, LOCAL_SETTINGS_PATH), "utf-8");
       expect(settings).toContain(`aidd.project_id=${FAKE_PROJECT_ID}`);
@@ -114,15 +175,13 @@ describe.concurrent("E2E: aidd telemetry", () => {
       );
 
       const result = await runCli(
-        ["telemetry", "on", "--endpoint", ENDPOINT, "--scope", "project"],
+        ["telemetry", "endpoint", ENDPOINT, "--scope", "project"],
         projectDir,
         fakeHome
       );
 
       expect(result.exitCode).not.toBe(0);
       expect(result.stderr).toContain("--yes");
-      // Neither the AIDD switch nor the git-tracked settings file was written.
-      expect(existsSync(join(projectDir, SWITCH_PATH))).toBe(false);
       const projectSettingsAfter = await readFile(join(projectDir, PROJECT_SETTINGS_PATH), "utf-8");
       expect(projectSettingsAfter).toBe(projectSettingsBefore);
     } finally {
@@ -139,7 +198,7 @@ describe.concurrent("E2E: aidd telemetry", () => {
       expect(existsSync(join(projectDir, LOCAL_SETTINGS_PATH))).toBe(false);
 
       const result = await runCli(
-        ["telemetry", "on", "--endpoint", ENDPOINT, "--scope", "project", "--yes"],
+        ["telemetry", "endpoint", ENDPOINT, "--scope", "project", "--yes"],
         projectDir,
         fakeHome
       );
@@ -164,7 +223,7 @@ describe.concurrent("E2E: aidd telemetry", () => {
       await installClaude(projectDir, fakeHome);
 
       const result = await runCli(
-        ["telemetry", "on", "--endpoint", ENDPOINT, "--scope", "user", "--yes"],
+        ["telemetry", "endpoint", ENDPOINT, "--scope", "user", "--yes"],
         projectDir,
         fakeHome
       );
@@ -184,19 +243,6 @@ describe.concurrent("E2E: aidd telemetry", () => {
     }
   });
 
-  it("no endpoint on flag or config is a hard error that writes nothing", async () => {
-    const { projectDir, fakeHome, cleanup } = await createTestEnv("telemetry-no-endpoint");
-    try {
-      const result = await runCli(["telemetry", "on"], projectDir, fakeHome);
-
-      expect(result.exitCode).not.toBe(0);
-      expect(existsSync(join(projectDir, SWITCH_PATH))).toBe(false);
-      expect(existsSync(join(projectDir, LOCAL_SETTINGS_PATH))).toBe(false);
-    } finally {
-      await cleanup();
-    }
-  });
-
   it("reports cursor as not enableable by us, and the run still succeeds", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("telemetry-cursor");
     try {
@@ -206,38 +252,11 @@ describe.concurrent("E2E: aidd telemetry", () => {
       const cursorInstall = await runCli(["ai", "install", "cursor"], projectDir, fakeHome);
       expect(cursorInstall.exitCode).toBe(0);
 
-      const result = await runCli(
-        ["telemetry", "on", "--endpoint", ENDPOINT],
-        projectDir,
-        fakeHome
-      );
+      const result = await runCli(["telemetry", "endpoint", ENDPOINT], projectDir, fakeHome);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("Cursor: cannot be enabled by us");
       expect(result.stdout).not.toMatch(/cursor: enabled/);
-    } finally {
-      await cleanup();
-    }
-  });
-
-  it("off on a project never turned on leaves the switch absent and every tool untouched", async () => {
-    const { projectDir, fakeHome, cleanup } = await createTestEnv("telemetry-switch-off");
-    try {
-      await gitInit(projectDir);
-      await seedManifest(projectDir);
-      await installClaude(projectDir, fakeHome);
-      const cursorInstall = await runCli(["ai", "install", "cursor"], projectDir, fakeHome);
-      expect(cursorInstall.exitCode).toBe(0);
-
-      // Never turned on: `telemetry off` must leave every tool's config untouched.
-      const off = await runCli(["telemetry", "off"], projectDir, fakeHome);
-      expect(off.exitCode).toBe(0);
-      expect(off.stdout).toContain("already off");
-
-      expect(existsSync(join(projectDir, SWITCH_PATH))).toBe(false);
-      expect(existsSync(join(projectDir, LOCAL_SETTINGS_PATH))).toBe(false);
-      const projectSettings = await readFile(join(projectDir, PROJECT_SETTINGS_PATH), "utf-8");
-      expect(projectSettings).not.toContain("CLAUDE_CODE_ENABLE_TELEMETRY");
     } finally {
       await cleanup();
     }

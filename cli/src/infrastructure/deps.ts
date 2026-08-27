@@ -78,9 +78,12 @@ import { UpdateOneToolUseCase } from "../application/use-cases/shared/update-one
 import { StatusUseCase } from "../application/use-cases/status-use-case.js";
 import { SyncConflictResolverUseCase } from "../application/use-cases/sync/sync-conflict-resolver-use-case.js";
 import { EnableToolTelemetryUseCase } from "../application/use-cases/telemetry/enable-tool-telemetry-use-case.js";
+import { PersonIdentityUseCase } from "../application/use-cases/telemetry/person-identity-use-case.js";
 import { ReadLocalCostUseCase } from "../application/use-cases/telemetry/read-local-cost-use-case.js";
 import { ReceiveTelemetryUseCase } from "../application/use-cases/telemetry/receive-telemetry-use-case.js";
 import { ReportCostUseCase } from "../application/use-cases/telemetry/report-cost-use-case.js";
+import { TelemetryEndpointClearUseCase } from "../application/use-cases/telemetry/telemetry-endpoint-clear-use-case.js";
+import { TelemetryEndpointUseCase } from "../application/use-cases/telemetry/telemetry-endpoint-use-case.js";
 import { TelemetryOffUseCase } from "../application/use-cases/telemetry/telemetry-off-use-case.js";
 import { TelemetryOnUseCase } from "../application/use-cases/telemetry/telemetry-on-use-case.js";
 import { UninstallIdeUseCase } from "../application/use-cases/uninstall/uninstall-ide-use-case.js";
@@ -227,9 +230,12 @@ interface Deps {
   checkUpdateUseCase: CheckUpdateUseCase;
   telemetryOnUseCase: TelemetryOnUseCase;
   telemetryOffUseCase: TelemetryOffUseCase;
+  telemetryEndpointUseCase: TelemetryEndpointUseCase;
+  telemetryEndpointClearUseCase: TelemetryEndpointClearUseCase;
   receiveTelemetryUseCase: ReceiveTelemetryUseCase;
   otlpHttpReceiverAdapter: OtlpHttpReceiverAdapter;
   readLocalCostUseCase: ReadLocalCostUseCase;
+  personIdentityUseCase: PersonIdentityUseCase;
   reportCostUseCase: ReportCostUseCase;
 }
 
@@ -718,14 +724,15 @@ export async function createDeps(
     const ownerRepo = remoteUrl !== null ? parseOwnerRepoFromRemote(remoteUrl) : null;
     return sanitizeProjectId(ownerRepo ?? basename(repoRoot));
   };
-  const telemetryOnUseCase = new TelemetryOnUseCase(
-    fs,
+  const telemetryOnUseCase = new TelemetryOnUseCase(fs, logger, gitignoreUseCase, git);
+  const telemetryOffUseCase = new TelemetryOffUseCase(fs, logger);
+  const telemetryEndpointUseCase = new TelemetryEndpointUseCase(
     manifestRepo,
     enableToolTelemetryUseCase,
     logger,
     deriveTelemetryProjectId
   );
-  const telemetryOffUseCase = new TelemetryOffUseCase(fs, manifestRepo, logger);
+  const telemetryEndpointClearUseCase = new TelemetryEndpointClearUseCase(fs, manifestRepo, logger);
   const telemetrySink = new TelemetrySinkAdapter();
   const receiveTelemetryUseCase = new ReceiveTelemetryUseCase(telemetrySink, logger);
   const otlpHttpReceiverAdapter = new OtlpHttpReceiverAdapter(receiveTelemetryUseCase, logger);
@@ -757,13 +764,14 @@ export async function createDeps(
     ["copilot", new CopilotCostReaderAdapter(resolveHomeDir())],
   ]);
   const runJournalReader = new RunJournalReaderAdapter(projectRoot);
-  const personIdentityReader = new PersonIdentityAdapter();
+  const personIdentityAdapter = new PersonIdentityAdapter();
   const readLocalCostUseCase = new ReadLocalCostUseCase(
     telemetrySink,
     localCostReaders,
     runJournalReader,
-    personIdentityReader
+    personIdentityAdapter
   );
+  const personIdentityUseCase = new PersonIdentityUseCase(personIdentityAdapter);
   const reportCostUseCase = new ReportCostUseCase(telemetrySink, runJournalReader);
   const deps: Deps = {
     fs,
@@ -832,9 +840,12 @@ export async function createDeps(
     checkUpdateUseCase,
     telemetryOnUseCase,
     telemetryOffUseCase,
+    telemetryEndpointUseCase,
+    telemetryEndpointClearUseCase,
     receiveTelemetryUseCase,
     otlpHttpReceiverAdapter,
     readLocalCostUseCase,
+    personIdentityUseCase,
     reportCostUseCase,
   };
   _cache.set(projectRoot, deps);

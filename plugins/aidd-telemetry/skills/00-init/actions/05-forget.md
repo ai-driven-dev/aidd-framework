@@ -5,7 +5,7 @@ written under it.
 
 ## Input
 
-The path to `telemetry-identity.cjs`.
+A confirmed `aidd` command.
 
 ## Output
 
@@ -14,9 +14,9 @@ starts fresh.
 
 ## Process
 
-1. **Check first.** Run `node <telemetry-identity.cjs> status`.
+1. **Check first.** Run `aidd telemetry identity status`.
    - Already off: relay it and stop.
-2. **Withdraw.** Run `node <telemetry-identity.cjs> off` and relay everything it prints:
+2. **Withdraw.** Run `aidd telemetry identity off` and relay everything it prints:
    new records carry no person from this moment; records already stored keep the identifier
    they were written with, unchanged — nothing is deleted or rewritten in the sink itself;
    and opting in again later mints a fresh identifier, never the one just withdrawn.

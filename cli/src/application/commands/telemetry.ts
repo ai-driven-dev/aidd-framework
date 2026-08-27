@@ -12,6 +12,12 @@ import { ARTEFACT_AXES, buildCostReportArtefact } from "../display/cost-report-a
 import { printCostReport } from "../display/cost-report-display.js";
 import {
   printLocalCostReadReport,
+  printPersonIdentityName,
+  printPersonIdentityOff,
+  printPersonIdentityOn,
+  printPersonIdentityStatus,
+  printTelemetryEndpointClearReport,
+  printTelemetryEndpointReport,
   printTelemetryOffReport,
   printTelemetryOnReport,
 } from "../display/telemetry-display.js";
@@ -40,31 +46,20 @@ export function registerTelemetryCommand(program: Command): void {
 
   telemetry
     .command("on")
-    .description("Turn on the AIDD telemetry switch and configure installed tools")
-    .option("--endpoint <url>", "OTEL export endpoint (reused from .aidd/config.json when omitted)")
-    .option(
-      "--scope <local|project|user>",
-      "Where a tool's export config is written (default: local)"
-    )
-    .option("--yes", "Confirm writing the git-tracked project-scope settings file", false)
-    .action(async (cmdOptions: { endpoint?: string; scope?: string; yes: boolean }) => {
+    .description("Turn on the AIDD telemetry switch and git-ignore the run journal")
+    .action(async () => {
       const { verbose, output, projectRoot } = parseGlobalOptions(program);
       const errorHandler = new ErrorHandler(output);
       try {
-        const scope = parseTelemetryScope(cmdOptions.scope);
         const deps = await createDeps(projectRoot, { verbose }, output);
-        const result = await deps.telemetryOnUseCase.execute({
-          projectRoot,
-          homeDir: resolveHomeDir(),
-          endpoint: cmdOptions.endpoint,
-          scope,
-          confirmProjectScope: cmdOptions.yes,
-        });
+        const result = await deps.telemetryOnUseCase.execute({ projectRoot });
         printTelemetryOnReport(output, result);
       } catch (error) {
         errorHandler.handle(error);
       }
     });
+
+  registerTelemetryEndpointCommand(telemetry, program);
 
   telemetry
     .command("receive")
@@ -107,6 +102,8 @@ export function registerTelemetryCommand(program: Command): void {
         errorHandler.handle(error);
       }
     });
+
+  registerTelemetryIdentityCommand(telemetry, program);
 
   telemetry
     .command("report")
@@ -177,7 +174,7 @@ export function registerTelemetryCommand(program: Command): void {
 
   telemetry
     .command("off")
-    .description("Turn off the AIDD telemetry switch and remove what `aidd telemetry on` wrote")
+    .description("Turn off the AIDD telemetry switch — any endpoint configuration is left alone")
     .action(async () => {
       const { verbose, output, projectRoot } = parseGlobalOptions(program);
       const errorHandler = new ErrorHandler(output);
@@ -185,6 +182,124 @@ export function registerTelemetryCommand(program: Command): void {
         const deps = await createDeps(projectRoot, { verbose }, output);
         const result = await deps.telemetryOffUseCase.execute({ projectRoot });
         printTelemetryOffReport(output, result);
+      } catch (error) {
+        errorHandler.handle(error);
+      }
+    });
+}
+
+/** Whether installed tools export OTLP telemetry, and where to — never the `on`/`off`
+ * switch beside it. Modeled on `identity`'s noun-with-verbs shape: `endpoint <url>` sets
+ * it, `endpoint clear` undoes it. Wiring only: every verb reads through the matching
+ * `deps.telemetryEndpoint*UseCase`, and every failure routes through `errorHandler.handle`. */
+function registerTelemetryEndpointCommand(telemetry: Command, program: Command): void {
+  const endpoint = telemetry
+    .command("endpoint")
+    .description("Configure installed tools to export OTLP telemetry to a destination");
+
+  endpoint
+    .argument("<url>", "OTEL export endpoint the tools should send to")
+    .option(
+      "--scope <local|project|user>",
+      "Where a tool's export config is written (default: local)"
+    )
+    .option("--yes", "Confirm writing the git-tracked project-scope settings file", false)
+    .action(async (url: string, cmdOptions: { scope?: string; yes: boolean }) => {
+      const { verbose, output, projectRoot } = parseGlobalOptions(program);
+      const errorHandler = new ErrorHandler(output);
+      try {
+        const scope = parseTelemetryScope(cmdOptions.scope);
+        const deps = await createDeps(projectRoot, { verbose }, output);
+        const result = await deps.telemetryEndpointUseCase.execute({
+          projectRoot,
+          homeDir: resolveHomeDir(),
+          endpoint: url,
+          scope,
+          confirmProjectScope: cmdOptions.yes,
+        });
+        printTelemetryEndpointReport(output, result);
+      } catch (error) {
+        errorHandler.handle(error);
+      }
+    });
+
+  endpoint
+    .command("clear")
+    .description("Remove what `aidd telemetry endpoint` wrote from every tool's settings")
+    .action(async () => {
+      const { verbose, output, projectRoot } = parseGlobalOptions(program);
+      const errorHandler = new ErrorHandler(output);
+      try {
+        const deps = await createDeps(projectRoot, { verbose }, output);
+        const result = await deps.telemetryEndpointClearUseCase.execute({ projectRoot });
+        printTelemetryEndpointClearReport(output, result);
+      } catch (error) {
+        errorHandler.handle(error);
+      }
+    });
+}
+
+/** Whether this person's own identifier is attached to what `aidd telemetry read` stores —
+ * never a project's choice, and never the `telemetry on`/`off` switch beside it. Wiring
+ * only: every verb reads through `deps.personIdentityUseCase`, and every failure routes
+ * through `errorHandler.handle`. */
+function registerTelemetryIdentityCommand(telemetry: Command, program: Command): void {
+  const identity = telemetry
+    .command("identity")
+    .description("Whether this person's own identifier is attached to records read locally");
+  identity.action(() => identity.help());
+
+  identity
+    .command("status")
+    .description("Show whether this person opted in, and with what identifier")
+    .action(async () => {
+      const { verbose, output, projectRoot } = parseGlobalOptions(program);
+      const errorHandler = new ErrorHandler(output);
+      try {
+        const deps = await createDeps(projectRoot, { verbose }, output);
+        printPersonIdentityStatus(output, await deps.personIdentityUseCase.status());
+      } catch (error) {
+        errorHandler.handle(error);
+      }
+    });
+
+  identity
+    .command("on")
+    .description("Opt in: mint this person's own identifier, once")
+    .action(async () => {
+      const { verbose, output, projectRoot } = parseGlobalOptions(program);
+      const errorHandler = new ErrorHandler(output);
+      try {
+        const deps = await createDeps(projectRoot, { verbose }, output);
+        printPersonIdentityOn(output, await deps.personIdentityUseCase.on());
+      } catch (error) {
+        errorHandler.handle(error);
+      }
+    });
+
+  identity
+    .command("off")
+    .description("Opt out: new records carry no person, from now on")
+    .action(async () => {
+      const { verbose, output, projectRoot } = parseGlobalOptions(program);
+      const errorHandler = new ErrorHandler(output);
+      try {
+        const deps = await createDeps(projectRoot, { verbose }, output);
+        printPersonIdentityOff(output, await deps.personIdentityUseCase.off());
+      } catch (error) {
+        errorHandler.handle(error);
+      }
+    });
+
+  identity
+    .command("name <value>")
+    .description("Attach a display name to the identifier already opted into")
+    .action(async (value: string) => {
+      const { verbose, output, projectRoot } = parseGlobalOptions(program);
+      const errorHandler = new ErrorHandler(output);
+      try {
+        const deps = await createDeps(projectRoot, { verbose }, output);
+        printPersonIdentityName(output, await deps.personIdentityUseCase.name(value));
       } catch (error) {
         errorHandler.handle(error);
       }

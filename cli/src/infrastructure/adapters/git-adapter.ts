@@ -46,6 +46,23 @@ export class GitAdapter implements VersionControl {
     }
   }
 
+  // Mirrors the plugin's own `warnIfTracked` (`journal-privacy.cjs`): a non-zero exit —
+  // no repository at all, or git itself missing — reads the same as "nothing tracked",
+  // never a throw. Turning telemetry on must not depend on being inside a git repository.
+  async listTrackedFiles(repoRoot: string, pathspec: string): Promise<readonly string[]> {
+    try {
+      const result = spawnSync("git", ["ls-files", "--", pathspec], {
+        cwd: repoRoot,
+        encoding: "utf8",
+        env: environmentWithoutGitVariables(),
+      });
+      if (result.status !== 0) return [];
+      return result.stdout.split("\n").filter((line) => line.trim() !== "");
+    } catch {
+      return [];
+    }
+  }
+
   private async resolveHooksDir(projectRoot: string): Promise<string | null> {
     const gitEntry = join(projectRoot, ".git");
     if (!(await this.fs.fileExists(gitEntry))) return null;

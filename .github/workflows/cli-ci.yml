@@ -167,10 +167,17 @@ jobs:
         with:
           node-version: "22"
 
-      # The chain end to end, on the platform where a home directory, a line ending and an
-      # absolute path all resolve differently than they do on the Linux jobs above.
-      - name: Chain - switch telemetry on
-        run: node plugins/aidd-telemetry/skills/00-init/scripts/telemetry-switch.cjs on
+      # The WRITE path, on the platform where a home directory, a line ending and an absolute
+      # path all resolve differently than they do on the Linux jobs above. It runs before the
+      # CLI is built, on purpose: recording is supposed to need nothing installed, and this is
+      # where that claim is exercised. Reading is the CLI's now, and the e2e project below
+      # covers it on this same runner.
+      - name: Chain - allow measurement, with nothing installed
+        run: |
+          # Written directly rather than through a command: the switch is a file, the hooks
+          # read it fresh at every write, and no binary has to exist for that to work.
+          mkdir -p .aidd
+          node -e "require('fs').writeFileSync('.aidd/config.json', JSON.stringify({ telemetry: { enabled: true } }, null, 2) + '\n');"
       - name: Chain - journal a captured payload
         run: |
           # The fixture's own cwd is a path from whatever machine captured it - rewritten to
@@ -182,10 +189,6 @@ jobs:
         run: |
           git add -A
           git status --porcelain >/dev/null
-      - name: Chain - read it back
-        run: |
-          node plugins/aidd-telemetry/skills/01-cost/scripts/telemetry-report.cjs read
-          node plugins/aidd-telemetry/skills/01-cost/scripts/telemetry-report.cjs report
       - name: Chain - diagnose
         run: node plugins/aidd-telemetry/skills/02-check/scripts/telemetry-check.cjs
 

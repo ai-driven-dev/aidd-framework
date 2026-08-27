@@ -1,27 +1,18 @@
-import { execFile, execFileSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, realpathSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { environmentWithoutGitVariables } from "../../src/infrastructure/git-environment.js";
 import { copyFixtureTree, pathWithoutAidd } from "./helpers.js";
 
-const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(process.cwd(), "..");
-/** Each script ships inside the skill that owns it, not in a shared top-level directory:
- * a plugin is installed by translating its files into each tool's own layout, and that
- * translation carries `skills/` and drops directories it does not know. Splitting them in
- * two is what lets neither skill open a file belonging to the other. */
-const SKILLS = join(REPO_ROOT, "plugins", "aidd-telemetry", "skills");
-const SWITCH_BIN = join(SKILLS, "00-init", "scripts", "telemetry-switch.cjs");
 const JOURNAL_HOOK = join(REPO_ROOT, "plugins", "aidd-telemetry", "hooks", "journal.cjs");
 const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
 const HOOK_FIXTURES = join(REPO_ROOT, "scripts", "__tests__", "fixtures");
 
 const CLAUDE_SESSION = "22222222-2222-4222-8222-222222222222";
-const _PERIOD = ["--from", "2026-08-01", "--to", "2026-08-31"] as const;
 
 describe("the plugin measures on its own", () => {
   let projectDir: string;
@@ -56,29 +47,19 @@ describe("the plugin measures on its own", () => {
     };
   }
 
-  async function run(
-    bin: string,
-    args: readonly string[]
-  ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    try {
-      const { stdout, stderr } = await execFileAsync(process.execPath, [bin, ...args], {
-        cwd: projectDir,
-        env: env(),
-      });
-      return { stdout, stderr, exitCode: 0 };
-    } catch (error) {
-      const failed = error as { stdout?: string; stderr?: string; code?: number };
-      return {
-        stdout: failed.stdout ?? "",
-        stderr: failed.stderr ?? "",
-        exitCode: failed.code ?? 1,
-      };
-    }
-  }
-
-  /** Each skill's own script, named as the skill that owns it would run it. */
-  function switchTo(state: string) {
-    return run(SWITCH_BIN, [state]);
+  /** What used to be `telemetry-switch.cjs on` — the switch moved behind `aidd telemetry
+   * on` in phase 3, so writing the file directly is what proves this section's actual
+   * claim (the hooks record with no CLI on the path) without depending on a binary this
+   * section's own environment deliberately excludes from `PATH`. The switch itself, and
+   * its own edge cases, are pinned in `cli/tests/e2e/telemetry.e2e.test.ts` and
+   * `cli/tests/e2e/telemetry-on-runs-privacy.e2e.test.ts`. */
+  async function enableTelemetry(): Promise<void> {
+    await mkdir(join(projectDir, ".aidd"), { recursive: true });
+    await writeFile(
+      join(projectDir, ".aidd", "config.json"),
+      JSON.stringify({ telemetry: { enabled: true } }),
+      "utf-8"
+    );
   }
 
   async function replayHook(fixture: string, event: string, extra: object): Promise<void> {
@@ -102,43 +83,15 @@ describe("the plugin measures on its own", () => {
     });
   }
 
-  it("turns measurement on without a second tool installed", async () => {
-    const result = await switchTo("on");
-
-    expect(result.exitCode, result.stderr).toBe(0);
-    const config = JSON.parse(await readFile(join(projectDir, ".aidd", "config.json"), "utf8"));
-    expect(config.telemetry.enabled).toBe(true);
-  });
-
-  it("keeps whatever else the project's config already held", async () => {
-    await mkdir(join(projectDir, ".aidd"), { recursive: true });
-    await writeFile(
-      join(projectDir, ".aidd", "config.json"),
-      JSON.stringify({ somethingElse: { kept: true }, telemetry: { endpoint: "http://x" } }),
-      "utf-8"
-    );
-
-    await switchTo("on");
-
-    const config = JSON.parse(await readFile(join(projectDir, ".aidd", "config.json"), "utf8"));
-    expect(config.somethingElse).toEqual({ kept: true });
-    expect(config.telemetry).toEqual({ endpoint: "http://x", enabled: true });
-  });
-
-  it("turns it back off again", async () => {
-    await switchTo("on");
-    await switchTo("off");
-
-    const config = JSON.parse(await readFile(join(projectDir, ".aidd", "config.json"), "utf8"));
-    expect(config.telemetry.enabled).toBe(false);
-  });
-
   // Recording, with no `aidd` anywhere. This is the half of the promise that survives the
   // read path moving into the CLI, and the reason the hooks stayed plain node: a session
   // measured now is readable later, by a CLI that was not installed when it ran. Answering is
-  // pinned separately, in telemetry-cost-skill-commands.e2e.test.ts.
+  // pinned separately, in telemetry-cost-skill-commands.e2e.test.ts. Turning measurement on
+  // moved behind `aidd telemetry on` in phase 3, so it is no longer this section's own claim
+  // — `enableTelemetry` seeds the switch directly, and only the journaling below runs with
+  // no CLI anywhere on `PATH`.
   it("journals a whole Claude Code session with no aidd on the path", async () => {
-    expect(await switchTo("on")).toMatchObject({ exitCode: 0 });
+    await enableTelemetry();
     await replayHook("claude-code-session-start", "session-start", {});
     await replayHook("claude-code-post-tool-use-skill", "tool-used", {
       tool_input: { skill: "aidd-dev:02-implement" },
@@ -155,11 +108,5 @@ describe("the plugin measures on its own", () => {
       .map((line) => JSON.parse(line) as { type: string });
     expect(lines.map((line) => line.type)).toContain("session_start");
     expect(lines.map((line) => line.type)).toContain("step_start");
-  });
-});
-
-describe("what the plugin ships is readable", () => {
-  it("keeps the switch short enough to read before allowing anything", () => {
-    expect(readFileSync(SWITCH_BIN, "utf8").split("\n").length).toBeLessThan(80);
   });
 });

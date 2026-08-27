@@ -221,12 +221,11 @@ test("each skill finds its own script on a tool that sets no plugin-root variabl
   // Measured on Codex: `env | grep -i plugin_root` in the shell a skill spawns matches
   // nothing. A search that only knows Claude Code's directory finds nothing there, and the
   // skill would report its own script missing on a tool where it is installed.
-  // 01-cost is absent on purpose: it ships no script to find any more, and requires `aidd`
-  // instead — pinned by cli/tests/e2e/telemetry-cost-skill-commands.e2e.test.ts.
-  const searched = [
-    ["skills/00-init/actions/01-check.md", "telemetry-switch.cjs"],
-    ["skills/02-check/actions/01-locate.md", "telemetry-check.cjs"],
-  ];
+  // 00-init and 01-cost are both absent on purpose: neither ships a script to find any
+  // more, and both require `aidd` instead — pinned by
+  // cli/tests/e2e/telemetry-init-skill-commands.e2e.test.ts and
+  // cli/tests/e2e/telemetry-cost-skill-commands.e2e.test.ts respectively.
+  const searched = [["skills/02-check/actions/01-locate.md", "telemetry-check.cjs"]];
   for (const [action, script] of searched) {
     const text = fs.readFileSync(path.join(pluginDir, action), "utf8");
     const [search] = text.split("\n").filter((line) => line.includes("find "));
@@ -262,9 +261,11 @@ test("the init skill owns turning measurement on, and asks first", () => {
     .map((name) => fs.readFileSync(path.join(initDir, "actions", name), "utf8"))
     .join("\n");
 
-  assert.ok(init.includes("telemetry-switch.cjs> on"), "must be the place that turns it on");
+  // Phase 3 moved this from a script beside the skill to the CLI — `aidd telemetry on` is
+  // now the place that turns it on, and the skill names no `.cjs` path any more.
+  assert.ok(init.includes("aidd telemetry on"), "must be the place that turns it on");
   assert.ok(/[Aa]sk/u.test(init), "must ask before measuring someone's project");
-  assert.ok(!/\baidd telemetry\b/u.test(init), "must not depend on the CLI");
+  assert.ok(!/\.cjs\b/u.test(init), "must not name a script beside itself any more");
 });
 
 test("the cost skill defers enabling to init rather than doing it itself", () => {

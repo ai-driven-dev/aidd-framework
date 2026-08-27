@@ -1,5 +1,5 @@
 ---
-status: pending
+status: implemented
 ---
 
 # Instruction: `00-init` calls the CLI
@@ -70,9 +70,26 @@ journey
 
 ## Tasks to do
 
+### `0)` Separate the switch from the endpoint, before any swap
+
+> Measured 2026-08-26: `aidd telemetry on` refuses to run without `--endpoint`, and it does not
+> only flip a boolean — it upserts OTLP keys into every installed tool's own settings file. The
+> plugin's `telemetry-switch.cjs on` writes `.aidd/config.json` and a `.gitignore` line, nothing
+> else. Task 1 below was written as a swap; it is not one until this is done.
+
+1. `aidd telemetry on|off` owns the project switch alone: the flag, and git-ignoring the runs
+   directory. It stops requiring `--endpoint`, and stops writing any tool's settings.
+2. A new `aidd telemetry endpoint <url>` owns making the tools emit, and `endpoint clear`
+   undoes it. Named for the destination it sets, not for an export it does not perform — the
+   tool exports, later, on its own.
+3. `off` shrinks to the switch. It must no longer remove tool settings that `on` no longer
+   wrote, or turning off a local journal would silently erase somebody's export configuration.
+4. The consent text in `02-enable.md` keeps its promise: "nothing leaves the machine" stays
+   true for `on`, and becomes false only when someone types `endpoint`.
+
 ### `1)` Rewrite what `00-init` tells the agent to run
 
-> Every `node <script>` becomes an `aidd telemetry` command.
+> Every `node <script>` becomes an `aidd telemetry` command. True as a swap only after task 0.
 
 1. `telemetry-switch.cjs on|off` → `aidd telemetry on|off`.
 2. `telemetry-identity.cjs status|on|off|name` → `aidd telemetry identity …`, from phase 2.
@@ -98,6 +115,7 @@ journey
 
 | Task | Acceptance criteria                                                                                       |
 | ---- | ----------------------------------------------------------------------------------------------------------- |
+| 0    | `aidd telemetry on` succeeds in a project with no endpoint and writes no tool's settings file; `endpoint <url>` writes them and `endpoint clear` removes them; `off` leaves an endpoint configuration untouched. |
 | 1    | No file under `00-init/` names a `.cjs` path, and its absent-CLI wording is identical to `01-cost`'s. |
 | 2    | After `aidd telemetry on`, `aidd_docs/runs/` is git-ignored, `git add -A` succeeds, and the journal is owner-only. |
 | 3    | `plugins/aidd-telemetry/skills/00-init/scripts/` no longer exists and the suite is green without it.          |

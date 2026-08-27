@@ -452,8 +452,8 @@ export class EmptyMarketplaceCacheNameError extends Error {
 export class MissingTelemetryEndpointError extends Error {
   constructor() {
     super(
-      "No OTEL export endpoint given. Telemetry cannot be enabled without one — " +
-        "there is no default, not even localhost."
+      "No OTEL export endpoint given. Arming a tool to export needs one — there is no " +
+        "default, not even localhost. Measuring locally needs none: `aidd telemetry on`."
     );
     this.name = "MissingTelemetryEndpointError";
   }
@@ -463,19 +463,6 @@ export class InvalidTelemetryEndpointError extends Error {
   constructor(value: string) {
     super(`Invalid telemetry endpoint '${value}' — expected an http(s) URL.`);
     this.name = "InvalidTelemetryEndpointError";
-  }
-}
-
-export class UnconfirmedRemoteTelemetryEndpointError extends Error {
-  constructor(value: string, switchPath: string) {
-    super(
-      `Telemetry endpoint '${value}' is not on this machine, and it was read from ` +
-        `${switchPath} rather than typed. That file travels with the repository, so anyone ` +
-        `who runs this would start sending to that host without choosing to — and what a ` +
-        `tool exports carries an email address. Pass --endpoint '${value}' to say you meant ` +
-        `it, or point it at localhost.`
-    );
-    this.name = "UnconfirmedRemoteTelemetryEndpointError";
   }
 }
 
@@ -517,5 +504,15 @@ export class InvalidReportSpanError extends Error {
   constructor(value: string, maxDays: number) {
     super(`Invalid --days '${value}'. Expected an integer between 1 and ${maxDays}.`);
     this.name = "InvalidReportSpanError";
+  }
+}
+
+/** The identity file exists but could not be read back — a read failure (e.g. it is a
+ * directory) or content that does not parse. Distinct from no file at all, which is a
+ * person never having opted in and answers `null` rather than throwing. */
+export class UnreadableIdentityFileError extends Error {
+  constructor(filePath: string, cause: string) {
+    super(`Could not read the identity file at ${filePath} (${cause}).`);
+    this.name = "UnreadableIdentityFileError";
   }
 }

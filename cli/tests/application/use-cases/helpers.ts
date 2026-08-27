@@ -34,6 +34,7 @@ export const win32Platform: Platform = { current: () => "win32" };
 export const noGit: VersionControl = {
   installPreCommitDelegate: async () => {},
   getRemoteUrl: async () => null,
+  listTrackedFiles: async () => [],
 };
 
 export { SilentPrompterAdapter as OverwritePrompter };

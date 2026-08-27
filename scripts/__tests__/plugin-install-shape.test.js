@@ -19,13 +19,12 @@ const GIT_DIR = path.dirname(
     .split(/\r?\n/u)[0],
 );
 
-// Read from each script's own usage banner: `on`/`off` for the switch, `read`/`report` for
-// the reporter, no argv at all for the checker. Invoking a script this way exercises its
-// full require graph rather than stopping at a usage message - a stronger check than the
-// generic fallback below gives an undiscovered script.
+// Read from each script's own usage banner: no argv at all for the checker. Invoking a
+// script this way exercises its full require graph rather than stopping at a usage message
+// - a stronger check than the generic fallback below gives an undiscovered script.
+// `telemetry-switch.cjs` and `telemetry-identity.cjs` are gone as of phase 3 - 00-init
+// ships no script of its own any more, and calls `aidd telemetry` instead.
 const KNOWN_INVOCATIONS = {
-  "telemetry-switch.cjs": ["on"],
-  "telemetry-identity.cjs": ["status"],
   "telemetry-check.cjs": [],
 };
 
