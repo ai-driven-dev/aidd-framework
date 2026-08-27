@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { asPlainObject } from "../../domain/formats/plain-object.js";
 import type { AiToolId } from "../../domain/models/tool-ids.js";
 import type { ExportConfig, ExportConfigReader } from "../../domain/ports/export-config-reader.js";
 import {
@@ -30,12 +31,6 @@ function claudeSettingsPaths(projectRoot: string, homeDir: string): readonly str
   ];
 }
 
-function asObject(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
 // A missing file, an unreadable one, and one with no `env` object at all all read the same
 // way here: nothing to check in this file, never a reason to guess at what it would have
 // said.
@@ -46,8 +41,8 @@ async function readEnvBlock(filePath: string): Promise<Record<string, unknown> |
   } catch {
     return null;
   }
-  const env = asObject(parsed)?.env;
-  return asObject(env);
+  const env = asPlainObject(parsed)?.env;
+  return asPlainObject(env);
 }
 
 function hasEnableFlag(env: Record<string, unknown>): boolean {

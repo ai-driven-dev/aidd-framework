@@ -584,3 +584,171 @@ Both follow-ups this phase's first pass flagged and deferred are closed, not car
 forward: the `cost-report-contract.md` `--axis` claim (task 2) and the task 3.2 recording-
 survives-the-CLI gap (task 3) are both fixed and tested above, in the same phase. No open
 follow-up remains from this phase.
+
+## Assert pass — `/aidd-dev:03-assert`, run after phase 6
+
+A consolidated sweep against `cli/aidd_docs/memory/coding-assertions.md`'s six requirements
+and five before-commit/before-push commands, across every file this whole plan (phases 1-6)
+touched — not just phase 6's own diff.
+
+**One real finding, fixed.** `pnpm jscpd` flagged a clone inside this plan's own files:
+`asObject` — an identical `(value: unknown) => Record<string, unknown> | null` narrowing
+helper — duplicated verbatim between `infrastructure/adapters/telemetry-evidence-adapter.ts`
+(phase 4) and `infrastructure/adapters/export-config-reader-adapter.ts` (phase 5), each with
+its own private copy. Extracted to `src/domain/formats/plain-object.ts` (`asPlainObject`,
+with a doc comment naming exactly this problem), both adapters now import it, and
+`tests/domain/formats/plain-object.unit.test.ts` (4 tests) pins its four cases (object,
+array, null, primitive). Verified: `jscpd`'s clone count dropped 81 → 80, and the remaining
+80 are all pre-existing, none touching any file this plan added or modified.
+
+**Left alone, on purpose.** `infrastructure/adapters/person-identity-adapter.ts` carries its
+own third copy of the same shape, pre-existing and outside this plan's diff — not touched,
+since its contract differs (`{}` on failure, never `null`) and touching a file no phase of
+this plan otherwise names would be scope creep beyond "leave no debt from this plan's own
+changes."
+
+**Checked and judged compliant, no fix needed.** The two adapters' bare `catch { return
+null }` / `catch { return false }` (reading a project's optionally-absent settings or config
+file) were checked against "no silent errors — throw early, fail loudly." The codebase
+already carries a deliberate dual pattern for this exact tension, in the same
+`person-identity-adapter.ts`: a lenient `read()` (bare catch, `null` on anything wrong) beside
+a strict `readStrict()` (rethrows a named `UnreadableIdentityFileError` once the file is
+confirmed to exist but fails to parse). This plan's two adapters follow the lenient shape,
+which matches `aidd telemetry check`'s own design: every claim is a verdict, never a crash,
+so a diagnostic that threw on a malformed `settings.json` would defeat its own purpose.
+**One real UX edge this does accept, named rather than left implicit:** a genuinely
+malformed `.claude/settings.json` (bad JSON, not merely absent) currently reads as "export
+not configured" — the same line as a settings file that was never touched — rather than
+"your settings file is corrupt." Defensible for a diagnostic that must always answer, but a
+person debugging why their own export never turned on would get a less specific message
+than the file's own error could give them. Worth a small follow-up issue if that
+distinction ever matters in practice; not fixed here, since nothing in any of the six
+phases' acceptance criteria asks for it.
+
+**Everything else, verified clean, nothing to fix:** `tsc --noEmit`, `pnpm lint` (biome),
+zero new runtime dependency imported anywhere in this plan's files (the 6-dependency cap
+stands untouched), every domain file this plan added imports only from `domain/` (checked
+by hand and by `check-cli-layering.mjs`), `pnpm build` (554.7 KB, within the 560 KB budget).
+
+### Final sweep, one pass, nothing regressed
+
+```
+cli unit           2111 passed  (was 2107; +4 plain-object.unit.test.ts)
+cli integration      608 passed  (unchanged)
+cli e2e              215 passed  (unchanged)
+pnpm test (all three projects together)   2934 passed
+plugin suite (node --test)                237 passed  (unchanged)
+tsc, biome, knip:production, check-cli-layering, check-markdown-links   clean
+jscpd   80 clones (was 81; the one inside this plan's files fixed, the rest pre-existing
+        and outside every file this plan touches — informational in CI, not a hard gate)
+```
+
+## Review pass — phases 4-6, and the one contract it found unguarded
+
+The phases-4-6 review (`review.md`, verdict **approved**) started from what was *deleted*
+rather than from what shipped: the 99 test titles of `scripts/__tests__/telemetry-check.test.js`
+mapped against their new homes. The deleted suite held three identity guards — `switch.cjs`,
+`repo.cjs` and `unrecognised.cjs` each "stays identical to the hook's own". Two are moot now
+(the CLI reimplements them in TypeScript, and `telemetry-plugin-standalone.e2e.test.ts` drives
+the real hook end to end, which is stronger than a byte comparison). The third was not, and
+nothing had replaced it.
+
+**Found by mutation, not by reading.** `unrecognised_payload` is written in
+`hooks/lib/record.cjs:268` and read in `telemetry-evidence-adapter.ts:30` — two packages, two
+languages, one string. Renaming the hook's literal to `unknown_payload` left
+`telemetry-check.e2e.test.ts` **11/11 green** and `aidd-telemetry-journal.test.js` **186/186
+green**: the plugin side asserts only that the marker *file* exists, never its `type`, and the
+CLI side typed the same literal into its own fixture, so it was checking itself against itself.
+
+The cost was never a failed run — it was a wrong answer. With the marker unread, a payload
+that *did* arrive reports as "the hook has never been observed firing": an unknown printed as
+a nothing, the one thing this layer promises never to do.
+
+**Fixed by making the hook produce the fixture.** A twelfth case in
+`telemetry-check.e2e.test.ts` spawns `hooks/journal.cjs session-start` with a payload matching
+no declared host and reads whatever file the hook writes. Re-mutated to prove the guard bites:
+
+```
+× names an unrecognised payload the real hook wrote, not one this test typed
+  → expected '  hook fired            FAIL  no run ...' to match /matched no known host/u
+```
+
+That failure message *is* the degradation. The cheaper stopgap — asserting the literal from
+`record.cjs` in the plugin suite — was deliberately not taken: it pins the string, not the
+contract.
+
+```
+cli e2e   216 passed / 30 files   (215 before; +1)
+tsc, biome   clean
+plugins/aidd-telemetry/hooks/   restored byte-identical after each mutation, tree clean
+```
+
+
+## Review pass 2 — `/aidd-dev:05-review`, independent, all 6 phases
+
+Run by a fresh `aidd-dev:checker` agent, not the executor who wrote the code — the
+executor's own guardrail forbids judging its own work. Corrected three things about the
+brief it was given: the branch is `claude/telemetry-cli-owns-read`, not
+`claude/aidd-telemetry-layer-e403uf` (a merge-base); the work is already committed
+(`7fe3e101..d08c3d57`, 6 commits) — only the `plain-object.ts` extraction and its adopters,
+the twelfth `telemetry-check.e2e.test.ts` case, and this file were still uncommitted; e2e
+was 216, not 215 (this file's own phase-6 section undercounted by one, written before the
+prior review pass's twelfth case landed).
+
+**Verdict: changes-requested — 0 critical, 4 warning, 2 minor.** All six fixed in this
+pass; each verified independently below, not just re-asserted.
+
+1. **🟡 rot** — `scripts/__tests__/aidd-telemetry-cost-skill.test.js`'s `reportCommands()`
+   still matched `` `node <telemetry-report.cjs> …` ``, a pattern phase 1 deleted every
+   instance of. Zero matches, empty array, the loop asserting "every report call names
+   `--json` or `--axis`" passed by iterating nothing — enforced nowhere. Fixed: the pattern
+   now matches `` `aidd telemetry report <flags>` ``, anchored so a bare mention of the
+   command in prose (SKILL.md's transversal rules) still cannot match, plus an explicit
+   `assert.ok(commands.length > 0)` floor so this exact silent-emptying cannot recur
+   unnoticed. Confirmed non-vacuous: the four real commands in `01-cost`'s markdown are
+   found and checked.
+2. **🟡 code** — `hook-trust-reader-adapter.ts`'s `describeError` read `error.message`
+   where the deleted `hook-trust.cjs:57` read `error.code || error.message`. Live before
+   the fix: `Codex's own hook trust state could not be read either (.../config.toml could
+   not be read (ENOENT: no such file or directory, open '.../config.toml')` — the path
+   twice in one sentence. Fixed to prefer `.code`; live after: `... could not be read
+   (ENOENT))`. Left distinct from `person-identity-adapter.ts`'s own `describeError`
+   (`.message` only) rather than merged into one shared helper — that one describes a JSON
+   parse error, which carries no useful `.code`; unifying them would paper over a real
+   difference in what the two are describing.
+3. **🟡 rot** — `docs/FAQ.md` still said "nothing ever leaves your machine" unqualified in
+   two places, while `README.md`'s own rewrite (this plan) qualified it with "on its own"
+   — the `aidd telemetry endpoint` exception. Both FAQ lines now read "on its own" too.
+4. **🟡 fit — issue #617.** Real, stale rationale, not a lost capability: #617 argues "The
+   CLI keeps one job only: turning the export on. Everything that reads belongs to the
+   plugin," which this plan's own `aidd telemetry check` contradicts by design, and no file
+   in the diff answers that argument. The reviewer independently confirmed the mechanism
+   still works from inside a session (`resolveSessionAnchor` reads the inherited
+   `CODEX_THREAD_ID`/`CLAUDE_CODE_SESSION_ID`) — so #617's *acceptance criteria* are met,
+   only its stated design preference is overridden. **Not resolved by the executor**:
+   commenting on a live GitHub issue is an external side effect outside this session's
+   authority to take unprompted, the same as a commit. A reconciling comment is drafted and
+   held for the user's go-ahead, not posted.
+5. **🟢 rot** — `aidd-telemetry-cost-skill.test.js`'s `scriptFlags()` was dead: defined,
+   never called, parsed a deleted script's source. Removed.
+6. **🟢 code** — noted alongside finding 2 above (`describeError` "duplication" was a
+   byproduct of finding 2's bug, not a separate defect — fixing the semantics diverged the
+   two functions, which is what should have been true from the start).
+
+### Re-verified after the fixes, one pass
+
+```
+cli unit           2111 passed  (unchanged)
+cli integration      608 passed  (unchanged)
+cli e2e              216 passed  (unchanged — the fixes touched no e2e assertion's shape)
+pnpm test (all three projects together)   2935 passed
+plugin suite (node --test)                237 passed  (unchanged — same 19 tests in the
+                                                        fixed file, no longer vacuous)
+tsc, biome, knip:production, check-cli-layering, check-markdown-links   clean
+jscpd   80 clones (unchanged — the describeError pair was already below threshold; fixing
+        it for correctness diverged the two functions rather than removing a counted clone)
+```
+
+Outstanding before merge, unchanged from before this pass: the diff review is now done
+(`review.md`, this section); #617 needs the user's decision on the drafted comment before
+it is posted.

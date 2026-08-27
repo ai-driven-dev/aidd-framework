@@ -71,36 +71,27 @@ test("the cost skill prefers an absolute period for a figure that will be kept",
 // wrong sentence over the older, right one. That is a claim about behaviour, checkable only
 // by running the skill, not by asserting over its text.
 
-/** Derived from the script's own `flag(argv, "--x")` call sites and its `--json` check,
- * never hand-listed: a flag the script stops accepting shrinks this set with it, rather
- * than leaving a separate list here to go stale. */
-function scriptFlags(source) {
-  const flags = new Set();
-  for (const m of source.matchAll(/flag\(argv,\s*"(--[a-zA-Z-]+)"\)/gu)) flags.add(m[1]);
-  const filterNames = source.match(/for \(const name of \[([^\]]+)\]\)/u);
-  if (filterNames) {
-    for (const m of filterNames[1].matchAll(/"([a-zA-Z]+)"/gu)) flags.add(`--${m[1]}`);
-  }
-  if (source.includes('argv.includes("--json")')) flags.add("--json");
-  return flags;
-}
-
-/** Every `node <telemetry-report.cjs> ...` the skill's actions write. Confined to this one
- * inline-backticked shape, which is where every such call in this skill actually appears -
- * the `find`/`Get-ChildItem` lines in 01-locate.md are a different pattern, and their own
- * search directories are covered by "each skill finds its own script on a tool that sets no
- * plugin-root variable" above. */
+/** Every `` `aidd telemetry report <flags>` `` the skill's actions write, flags only - the
+ * subcommand itself is fixed in the pattern, not captured, so a bare `` `aidd telemetry
+ * report` `` naming the command in prose (SKILL.md's own transversal rules) never matches:
+ * that requires a space then at least one more character, which a bare mention has none of.
+ * Phase 1 moved this from the plugin's own `telemetry-report.cjs` to the CLI; the pattern
+ * moved with it, the same way `telemetry-cost-skill-commands.e2e.test.ts` extracts `` `aidd
+ * telemetry …` `` commands to run against the real CLI. */
 function reportCommands(text) {
-  return [...text.matchAll(/`node <telemetry-report\.cjs> ([^`]+)`/gu)].map((m) => m[1].trim());
+  return [...text.matchAll(/`aidd telemetry report ([^`]+)`/gu)].map((m) => m[1].trim());
 }
 
 test("every report invocation asks for the object or a derived artefact, never the bare human table", () => {
-  for (const command of reportCommands(everything)) {
-    const tokens = command.split(/\s+/u);
-    if (tokens[0] !== "report") continue;
+  const commands = reportCommands(everything);
+  // A closure test over an empty extraction passes vacuously - exactly what silently
+  // happened here once the pattern still named the deleted `telemetry-report.cjs`.
+  assert.ok(commands.length > 0, "the extraction must not be vacuous");
+  for (const flags of commands) {
+    const tokens = flags.split(/\s+/u);
     assert.ok(
       tokens.includes("--json") || tokens.includes("--axis"),
-      `"${command}" names neither --json nor --axis, so it would print the human table`,
+      `"report ${flags}" names neither --json nor --axis, so it would print the human table`,
     );
   }
 });

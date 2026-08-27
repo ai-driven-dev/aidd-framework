@@ -33,7 +33,17 @@ function parseHookTrust(content: string): { trusted: boolean } {
   return { trusted: /^trusted_hash\s*=/.test((lines[at + 1] ?? "").trim()) };
 }
 
+// `hook-trust.cjs`'s own `error.code || error.message`: a filesystem failure's `code`
+// (`ENOENT`, `EACCES`) is the concise, meaningful half - `.message` on the same error
+// restates the path this sentence already names, which is the mismatch phase 5's
+// confrontation caught once already for a sibling adapter's punctuation (measurements.md).
+// Not `person-identity-adapter.ts`'s own `describeError`: that one describes a JSON parse
+// error, which carries no `code` worth preferring, so it reads `.message` alone - a
+// different error kind, not a duplicate of this one.
 function describeError(error: unknown): string {
+  if (error instanceof Error && "code" in error && typeof error.code === "string") {
+    return error.code;
+  }
   return error instanceof Error ? error.message : String(error);
 }
 

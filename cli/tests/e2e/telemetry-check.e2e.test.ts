@@ -1,6 +1,8 @@
+import { execFileSync } from "node:child_process";
 import { cp, mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { environmentWithoutGitVariables } from "../../src/infrastructure/git-environment.js";
 import { createTestEnv, gitInit, runCli } from "./helpers.js";
 
 /**
@@ -13,6 +15,8 @@ import { createTestEnv, gitInit, runCli } from "./helpers.js";
  * second process to compare against.
  */
 const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
+const REPO_ROOT = resolve(process.cwd(), "..");
+const JOURNAL_HOOK = join(REPO_ROOT, "plugins", "aidd-telemetry", "hooks", "journal.cjs");
 
 const CLAUDE_SESSION = "22222222-2222-4222-8222-222222222222";
 const CLAUDE_RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
@@ -304,6 +308,45 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
       expect(result.stdout).toMatch(/never been observed firing/u);
       expect(result.stdout).toMatch(/could not be read either/u);
       expect(result.stdout).not.toMatch(/has not trusted/u);
+    } finally {
+      await cleanup();
+    }
+  });
+  /**
+   * The one fact this command shares with the hook, proven by making the hook state it.
+   *
+   * `unrecognised_payload` is written in `hooks/lib/record.cjs` (plain CommonJS, no CLI) and
+   * read in `telemetry-evidence-adapter.ts` (TypeScript, a different package). Every other
+   * case in this file writes the marker by hand, which checks the reader against a literal
+   * the same file typed — it passes whatever the hook actually writes. Measured: renaming the
+   * hook's own literal left this suite 11/11 green and the plugin's 186/186 green, because
+   * the plugin side asserts only that the marker file exists, never its `type`.
+   *
+   * The cost of that blind spot is not a failed run, it is a wrong answer: with the marker
+   * unread, a payload that did arrive reports as "the hook has never been observed firing" —
+   * an unknown printed as a nothing, which is the one thing this layer promises never to do.
+   * So this case seeds nothing. It runs the hook the plugin ships, on a payload matching no
+   * declared host, and lets the file the hook writes be the fixture.
+   */
+  it("names an unrecognised payload the real hook wrote, not one this test typed", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("check-unrecognised-real");
+    try {
+      await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
+
+      // Neither a transcript path nor a timestamp: the shape no declared host matches, and
+      // the same one `aidd-telemetry-journal.test.js` uses to drive this branch.
+      execFileSync(process.execPath, [JOURNAL_HOOK, "session-start"], {
+        input: JSON.stringify({ session_id: "not-a-known-host", cwd: projectDir }),
+        cwd: projectDir,
+        env: environmentWithoutGitVariables(process.env),
+      });
+
+      const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/matched no known host/u);
+      expect(result.stdout).not.toMatch(/never been observed firing/u);
     } finally {
       await cleanup();
     }

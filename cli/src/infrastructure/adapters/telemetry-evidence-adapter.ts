@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { asPlainObject } from "../../domain/formats/plain-object.js";
 import {
   parseTelemetrySwitchFile,
   telemetryConfigPath,
@@ -15,12 +16,6 @@ function runsDir(projectRoot: string): string {
   return process.env.AIDD_RUNS_DIR || join(projectRoot, "aidd_docs", "runs");
 }
 
-function asObject(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
 function parseUnrecognisedPayload(raw: string): TelemetryUnrecognisedPayload | null {
   const line = raw.split("\n").find((candidate) => candidate.trim() !== "");
   if (line === undefined) return null;
@@ -30,7 +25,7 @@ function parseUnrecognisedPayload(raw: string): TelemetryUnrecognisedPayload | n
   } catch {
     return null;
   }
-  const record = asObject(parsed);
+  const record = asPlainObject(parsed);
   const at = record?.at;
   if (record?.type !== "unrecognised_payload" || typeof at !== "string") return null;
   return { at };
