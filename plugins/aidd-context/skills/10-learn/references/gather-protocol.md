@@ -17,6 +17,15 @@ Extract only durable project learning.
 | Signal outside the selected source's scope, even when noticed while reading | Drop |
 | Bug already fixed as part of the current change, unless the user explicitly asked to remember it as a decision | Drop |
 
+## Retrospective lens
+
+For completed work, ask before applying the signal filter:
+
+- What caused avoidable delay, rework, or confusion?
+- What should change next time?
+- What durable context was missing?
+- What should be removed, clarified, or automated?
+
 For each candidate, include:
 
 - Source label.
