@@ -109,7 +109,13 @@ export function sandboxedEnv(
   extra?: Record<string, string>,
   options?: { realHome?: boolean }
 ): NodeJS.ProcessEnv {
-  const base = withoutGitEnv(process.env);
+  // A minimal PATH, not the runner's own. What a spawned `aidd` can reach decides what it
+  // does: the OpenCode reader shells out to an `opencode` binary and waits up to 10s for it,
+  // so a machine that happens to have the tool installed pays a cost a machine without it
+  // does not. That is how `records stored before opting in stay unnamed` swung between 14s
+  // and a 60s timeout across three runs with no code change. A test's result must not depend
+  // on which AI tools the person running it happens to have.
+  const base = { ...withoutGitEnv(process.env), PATH: pathWithoutAidd(), Path: pathWithoutAidd() };
   if (options?.realHome) {
     return { ...base, ...extra, AIDD_USER_CONFIG_DIR: join(fakeHome, ".config", "aidd") };
   }

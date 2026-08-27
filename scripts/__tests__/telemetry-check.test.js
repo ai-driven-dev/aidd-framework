@@ -3,7 +3,22 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { execFileSync, spawnSync } = require("node:child_process");
-const { describe, it } = require("node:test");
+const { after, describe, it } = require("node:test");
+
+// Every directory this suite makes, removed when it ends. It created twenty-one and removed
+// four, so a passing run left seventeen behind - which is how a 460 GB disk filled twice in
+// two days. `scripts/sweep-stale-test-dirs.cjs` catches what a *killed* run strands; this is
+// the leak on the success path, and it belongs at the source.
+const madeTempDirs = [];
+function temp(prefix) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  madeTempDirs.push(dir);
+  return dir;
+}
+after(() => {
+  for (const dir of madeTempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+});
+
 
 const SCRIPTS = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/02-check/scripts");
 const SHARED = path.resolve(__dirname, "../../plugins/aidd-telemetry/skills/02-check/scripts/lib");
@@ -149,7 +164,7 @@ describe("reading Codex's own hook trust state", () => {
     }
 
     it("reads readable and trusted when config.toml carries this plugin's own trusted_hash", () => {
-      const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-hook-trust-"));
+      const home = temp("aidd-hook-trust-");
       writeCodexConfig(home, TRUSTED);
 
       assert.deepEqual(readCodexHookTrust(home), {
@@ -160,7 +175,7 @@ describe("reading Codex's own hook trust state", () => {
     });
 
     it("reads readable and not trusted when config.toml exists with no entry for this hook", () => {
-      const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-hook-trust-"));
+      const home = temp("aidd-hook-trust-");
       writeCodexConfig(home, '[projects."/tmp/x"]\ntrust_level = "trusted"\n');
 
       assert.deepEqual(readCodexHookTrust(home), {
@@ -171,7 +186,7 @@ describe("reading Codex's own hook trust state", () => {
     });
 
     it("says the state could not be read, rather than guessing untrusted, when config.toml does not exist", () => {
-      const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-hook-trust-"));
+      const home = temp("aidd-hook-trust-");
 
       const result = readCodexHookTrust(home);
 
@@ -183,8 +198,8 @@ describe("reading Codex's own hook trust state", () => {
 
 describe("reading Claude Code's own export configuration", () => {
   function tempClaudeProject() {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-export-config-"));
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-export-config-home-"));
+    const root = temp("aidd-export-config-");
+    const home = temp("aidd-export-config-home-");
     return { root, home };
   }
 
@@ -316,7 +331,7 @@ describe("reading Codex's own export configuration", () => {
   }
 
   it("names it unconfigured, never having read a fault, when config.toml does not exist at all", () => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-codex-export-"));
+    const home = temp("aidd-codex-export-");
 
     const result = readCodexExportConfig(home);
 
@@ -325,7 +340,7 @@ describe("reading Codex's own export configuration", () => {
   });
 
   it("names it unconfigured while the default statsig exporter is still in place, the third party nobody chose", () => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-codex-export-"));
+    const home = temp("aidd-codex-export-");
     writeCodexConfig(home, '[otel]\nmetrics_exporter = "statsig"\n');
 
     const result = readCodexExportConfig(home);
@@ -335,7 +350,7 @@ describe("reading Codex's own export configuration", () => {
   });
 
   it("reads configured once metrics_exporter is set to anything other than the default", () => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-codex-export-"));
+    const home = temp("aidd-codex-export-");
     writeCodexConfig(home, '[otel]\nmetrics_exporter = "otlp"\n');
 
     const result = readCodexExportConfig(home);
@@ -345,7 +360,7 @@ describe("reading Codex's own export configuration", () => {
   });
 
   it("does not read a metrics_exporter key that sits under a different table", () => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-codex-export-"));
+    const home = temp("aidd-codex-export-");
     writeCodexConfig(home, '[some_other_table]\nmetrics_exporter = "otlp"\n');
 
     const result = readCodexExportConfig(home);
@@ -360,7 +375,7 @@ describe("export-sink.cjs's rootDir is the documented one, on any platform", () 
   // in cli/tests/infrastructure/adapters/telemetry-sink-location.unit.test.ts, so a change to
   // one still cannot leave the other reading a different machine's sink.
   it("resolves the OS user's own .config on a POSIX machine", () => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-sink-pin-"));
+    const home = temp("aidd-sink-pin-");
     const originalHome = process.env.HOME;
     const originalOverride = process.env.AIDD_USER_CONFIG_DIR;
     delete process.env.AIDD_USER_CONFIG_DIR;
@@ -379,7 +394,7 @@ describe("export-sink.cjs's rootDir is the documented one, on any platform", () 
   });
 
   it("honours AIDD_USER_CONFIG_DIR ahead of any default", () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-sink-override-"));
+    const dir = temp("aidd-sink-override-");
     const original = process.env.AIDD_USER_CONFIG_DIR;
     process.env.AIDD_USER_CONFIG_DIR = dir;
 
@@ -395,7 +410,7 @@ describe("export-sink.cjs's rootDir is the documented one, on any platform", () 
 
 describe("reading an export-provenance record for a session, from the sink itself", () => {
   function withSinkHome(fn) {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-sink-read-"));
+    const home = temp("aidd-sink-read-");
     const originalHome = process.env.HOME;
     const originalOverride = process.env.AIDD_USER_CONFIG_DIR;
     delete process.env.AIDD_USER_CONFIG_DIR;
@@ -919,8 +934,8 @@ describe("the script wired to a real project", () => {
   // suite hands it needs to actually be one, or every claim below the gate reads as
   // "not a git repository" instead of the case each test means to exercise.
   function tempProject() {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-check-"));
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-check-home-"));
+    const root = temp("aidd-check-");
+    const home = temp("aidd-check-home-");
     fs.mkdirSync(path.join(root, ".aidd"), { recursive: true });
     fs.mkdirSync(path.join(root, "aidd_docs", "runs"), { recursive: true });
     fs.mkdirSync(path.join(home, ".claude", "projects"), { recursive: true });
@@ -931,8 +946,8 @@ describe("the script wired to a real project", () => {
   // For the one test that means to exercise the absence of a repository: everything
   // tempProject() sets up, minus the `git init`.
   function tempProjectWithoutGit() {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-check-nogit-"));
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-check-nogit-home-"));
+    const root = temp("aidd-check-nogit-");
+    const home = temp("aidd-check-nogit-home-");
     fs.mkdirSync(path.join(root, ".aidd"), { recursive: true });
     fs.mkdirSync(path.join(root, "aidd_docs", "runs"), { recursive: true });
     fs.mkdirSync(path.join(home, ".claude", "projects"), { recursive: true });
@@ -1228,8 +1243,8 @@ describe("the script wired to a real project", () => {
   });
 
   it("still reads the unrecognised-payload answer, not the never-fired one, for a real payload naming no directory of any kind - the hook falls back to its own process cwd, since an unrecognised shape cannot be assumed to spell cwd, or carry one at all", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-check-nocwd-"));
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-check-nocwd-home-"));
+    const root = temp("aidd-check-nocwd-");
+    const home = temp("aidd-check-nocwd-home-");
     // Stripped the same way aidd-telemetry-journal.test.js does: a git hook exports
     // GIT_DIR/GIT_WORK_TREE into every child process, which would point `git init` and
     // the hook's own shellouts below at the real repository instead of this temp one.
@@ -1564,7 +1579,7 @@ describe("running from a tree that ships skills/ and no hooks/ (the OpenCode-sha
   // exactly what a real translateFlat install carries - into a temp directory; nothing is
   // deleted from the repository.
   function copyPluginTreeWithoutHooks() {
-    const pluginRoot = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-check-opencode-shaped-"));
+    const pluginRoot = temp("aidd-check-opencode-shaped-");
     fs.mkdirSync(path.join(pluginRoot, "skills"), { recursive: true });
     for (const skillDir of ["02-check"]) {
       fs.cpSync(
@@ -1578,8 +1593,8 @@ describe("running from a tree that ships skills/ and no hooks/ (the OpenCode-sha
 
   it("prints a real report, not a Node stack trace, with no hooks/ anywhere it could reach", () => {
     const script = copyPluginTreeWithoutHooks();
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-check-opencode-shaped-project-"));
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-check-opencode-shaped-home-"));
+    const root = temp("aidd-check-opencode-shaped-project-");
+    const home = temp("aidd-check-opencode-shaped-home-");
     const gitSafeEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_")));
     fs.mkdirSync(path.join(root, ".aidd"), { recursive: true });
     fs.mkdirSync(path.join(root, "aidd_docs", "runs"), { recursive: true });

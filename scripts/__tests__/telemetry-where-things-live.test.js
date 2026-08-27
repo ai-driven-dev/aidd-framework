@@ -3,6 +3,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { describe, it } = require("node:test");
 
+// A killed run never fires its `after` hooks, so its temp directories survive. Swept here at
+// module load rather than in a hook: the age bound in the sweep means it can only ever touch
+// a directory from an earlier run, so it is safe wherever in the order this file lands.
+require("../sweep-stale-test-dirs.cjs").sweepStaleTestDirs();
+
 const ROOT = path.resolve(__dirname, "../..");
 
 /** Where the figures land is pinned in cli/tests/infrastructure/adapters/
