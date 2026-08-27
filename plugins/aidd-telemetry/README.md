@@ -27,10 +27,18 @@ anything — stopping with the reason when it does not, rather than reporting an
 in place of a missing tool. `02-check` still runs a script this plugin ships, and needs
 nothing installed.
 
-**Two halves, two requirements.** Recording needs nothing but this plugin: the hooks that
-write the journal are self-contained and run under plain `node`, with no account and nothing
-to install. **Answering needs the `aidd` CLI**, which is where the report is computed —
-once, in one place, so the figure cannot differ depending on who asked.
+**Three acts, and only the middle one needs nothing.**
+
+| | Needs |
+| --- | --- |
+| **Allowing** it, once per project | the `aidd` CLI |
+| **Recording**, every session after that | nothing — the hooks run under plain `node` |
+| **Answering** what it cost | the `aidd` CLI |
+
+Recording is the act that must never depend on anything: it runs on every tool call, and a
+hook that needs an installed binary records nothing, silently, when that binary is missing.
+Allowing and answering can afford the CLI, and answering in particular belongs there — the
+report is computed once, in one place, so the figure cannot differ depending on who asked.
 
 ```bash
 npm install -g @ai-driven-dev/cli

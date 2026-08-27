@@ -15,7 +15,7 @@ status: pending
 │       └── cli-ci.yml                                              ✏️ the Windows job runs a skill's own command
 ├── docs
 │   ├── CATALOG.md                                                  ✏️ the plugin's dependency, stated
-│   └── FAQ.md                                                      ✏️ measuring needs node, answering needs aidd
+│   └── FAQ.md                                                      ✏️ three acts: allowing and answering need aidd, recording does not
 ├── plugins
 │   └── aidd-telemetry
 │       ├── README.md                                               ✏️ drops "no npm install, no CLI, no account"
@@ -78,7 +78,13 @@ journey
 
 > The README's claim became false in phase 1. This is where it is corrected, once, for every doc.
 
-1. `plugins/aidd-telemetry/README.md`: replace "no npm install, no CLI, no account" with what is now true — measuring needs plain node and works from install; answering needs `aidd`.
+1. `plugins/aidd-telemetry/README.md`: replace "no npm install, no CLI, no account" with what is
+   now true. Not two halves — **three acts, and only the middle one needs nothing**: allowing
+   measurement calls `aidd telemetry on`, recording is the hooks under plain `node`, answering
+   calls the CLI again. "Measuring needs nothing" reads as though a person can install the
+   plugin alone and start; they cannot, because they cannot turn it on. (Landed early, in the
+   commit that made the README stop naming deleted scripts — this task now verifies it rather
+   than writing it.)
 2. `docs/FAQ.md` and `docs/CATALOG.md`: the same split, one line each.
 3. Say plainly what is unchanged: nothing leaves the machine, and no amount is computed.
 
