@@ -104,6 +104,22 @@ export function identityFileIn(fakeHome: string): string {
     : join(fakeHome, ".config", "aidd", "identity.json");
 }
 
+/**
+ * Where a sandboxed run's figures actually land, which is not the same directory on every
+ * platform. `sandboxedEnv` below points `APPDATA` inside the fake home, so a Windows run
+ * writes under `AppData\Roaming\aidd`, never under `.config`.
+ *
+ * A test that seeds the sink itself before running is insulated from this by the adapter's
+ * legacy-data fallback — a home that already journalled under `.config` keeps landing there.
+ * A test that lets the CLI create the sink from nothing is not, and asserting the POSIX path
+ * there reads as "nothing was stored" on Windows rather than as a wrong lookup.
+ */
+export function sinkDirIn(fakeHome: string): string {
+  return process.platform === "win32"
+    ? join(fakeHome, "AppData", "Roaming", "aidd", "telemetry")
+    : join(fakeHome, ".config", "aidd", "telemetry");
+}
+
 export function sandboxedEnv(
   fakeHome: string,
   extra?: Record<string, string>,

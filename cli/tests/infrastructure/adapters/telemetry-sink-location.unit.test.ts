@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { defaultConfigDir } from "../../../src/infrastructure/adapters/telemetry-sink-adapter.js";
+import { sandboxedEnv, sinkDirIn } from "../../e2e/helpers.js";
 
 /**
  * Where a person's figures land, pinned on any platform rather than only on a Windows runner.
@@ -81,4 +82,35 @@ describe("where the figures land by default", () => {
     expect(text).toContain(documented);
     expect(text).toContain("AIDD_USER_CONFIG_DIR");
   });
+});
+
+/**
+ * The rule an e2e test needs and cannot see: where a *sandboxed* run's figures land.
+ *
+ * `sandboxedEnv` points `APPDATA` inside the fake home, so a Windows run writes under
+ * `AppData\\Roaming\\aidd` while a POSIX run writes under `.config`. A test that hardcoded
+ * the POSIX path read as "nothing was stored" on Windows instead of as a wrong lookup, and
+ * `cli / Windows` was the only job that could ever say so — it caught exactly this, twice.
+ *
+ * Pinning the helper against the adapter on both platforms is what stops the next test from
+ * hardcoding it again: the two can no longer disagree without failing here, on any machine.
+ */
+describe("a sandboxed run's sink, agreed between the helper and the adapter", () => {
+  for (const platform of ["linux", "win32"] as const) {
+    it(`agrees on ${platform}, whichever platform this suite runs on`, () => {
+      const home = freshHome();
+      const env = sandboxedEnv(home);
+      const previousPlatformAppData = process.env.APPDATA;
+      process.env.APPDATA = env.APPDATA;
+      try {
+        const fromAdapter = join(withPlatform(platform, defaultConfigDir), "telemetry");
+        const fromHelper = withPlatform(platform, () => sinkDirIn(home));
+
+        expect(fromHelper).toBe(fromAdapter);
+      } finally {
+        if (previousPlatformAppData === undefined) delete process.env.APPDATA;
+        else process.env.APPDATA = previousPlatformAppData;
+      }
+    });
+  }
 });

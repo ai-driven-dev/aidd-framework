@@ -1,7 +1,7 @@
 import { cp, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createTestEnv, gitInit, identityFileIn, runCli } from "./helpers.js";
+import { createTestEnv, gitInit, identityFileIn, runCli, sinkDirIn } from "./helpers.js";
 
 /**
  * `aidd telemetry identity` — the CLI's own mint/name/forget of the person identifier that
@@ -46,7 +46,7 @@ async function seedJournal(
 }
 
 async function storedLines(fakeHome: string): Promise<Record<string, unknown>[]> {
-  const dir = join(fakeHome, ".config", "aidd", "telemetry");
+  const dir = sinkDirIn(fakeHome);
   const entries = await readdir(dir).catch(() => []);
   const lines: Record<string, unknown>[] = [];
   for (const entry of [...entries].sort().filter((e) => e.endsWith(".jsonl"))) {
