@@ -1,6 +1,6 @@
 ---
 objective: "A local report counts one human once across tools and machines, and reports every identity it could not place as unresolved rather than merging or dropping it."
-status: in-progress
+status: implemented
 ---
 
 # Plan: resolve one person across tools and machines
