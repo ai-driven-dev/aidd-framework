@@ -78,12 +78,15 @@ a total a tool wrote for itself. A consumer that needs to tell them apart reads
 that field, and no other.
 
 **Measured on one captured session** (Claude Code, `session.id` =
-`22177147-d8cb-4ee1-976f-0ef82bd62491`, captured 2026-08-20):
+`22177147-d8cb-4ee1-976f-0ef82bd62491`, captured 2026-08-20). The export route these
+figures came from, and the two OTLP fixtures below, were deleted in "one route, and every
+sentence about it true" — the figures are kept as historical measurement, on a capture no
+longer in this repository:
 
 | Source                                         | Kind        | Lines | `cost_usd` total |
 | ----------------------------------------------- | ----------- | ----- | ----------------- |
-| `otlp-logs-claude-code-subagent.json` fixture   | `"request"` | 2     | **$0.1605**        |
-| `otlp-metrics-claude-code.json` fixture         | `"session"` | 1 (of 6) | **$0.0151**     |
+| `otlp-logs-claude-code-subagent.json` fixture (deleted) | `"request"` | 2 | **$0.1605** |
+| `otlp-metrics-claude-code.json` fixture (deleted) | `"session"` | 1 (of 6) | **$0.0151** |
 
 This is not a contradiction: the request lines are every billed request the
 session made; the metric line is one 10-second flush window's own delta. Summing
@@ -187,9 +190,9 @@ request and the subagent it spawned can share (see `turn_id` below); local's
 `turn_id` is `requestId`, one billed call — so matching on `turn_id` alone, as
 the re-read rule above does, never catches this: the two routes' records for
 the same real call never share that key, and a consumer that only guards
-against the re-read case sums both. **Measured on this repository's own
-captured export fixture** (`otlp-logs-claude-code-subagent.json`, a
-main-agent request and the subagent request it spawned): naively unioning
+against the re-read case sums both. **Measured on a captured export fixture no longer in
+this repository** (`otlp-logs-claude-code-subagent.json`, deleted with the export route it
+described, a main-agent request and the subagent request it spawned): naively unioning
 those two export records with what a local read of the same two calls would
 produce doubles every figure — four `"request"` lines instead of two, every
 token counter twice its true value.

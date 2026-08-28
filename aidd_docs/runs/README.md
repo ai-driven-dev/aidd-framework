@@ -14,7 +14,7 @@ Every line carries `at` (ISO 8601, UTC, second precision) and `type`:
 | --- | --- | --- |
 | `session_start` | `schema_version`, `run_id`, `project_id`, `project_remote`, `tool`, `vendor_id`, `vendor_field`, plus `worktree_id` and `worktree_repo_id` when the session ran in a linked git worktree | SessionStart |
 | `turn_end` | `prompt_id` when the host provides one, omitted otherwise | Stop |
-| `file_written` | `path`, repository-relative and `/`-separated | PostToolUse, for a write that lands inside a task folder |
+| `file_written` | `path`, repository-relative and `/`-separated, plus `source` (`"tool-stated"` \| `"observed"`) | PostToolUse, for a write that lands inside a task folder |
 | `task_declared` | `path`, repository-relative and `/`-separated | PostToolUse, for a call whose own arguments name a file under a task folder |
 | `step_start` | `skill` (sanitised as a value, never as a path segment), plus `turn_id` when the host provides one | PostToolUse, for a call that names a skill being run — a start only, since no tool exposes when a skill's work finishes |
 | `scan_truncated` | `cap`, `scanned` | Stop, when the sweep for files a task folder gained since the turn began hit its budget before finishing — so a reader can tell "nothing else changed" from "the walk gave up before it could tell" |
@@ -22,6 +22,13 @@ Every line carries `at` (ISO 8601, UTC, second precision) and `type`:
 `step_start` is the line that names which skill was running, and the one this table most
 recently caught up on documenting: complete coverage of what the journal writes is the
 whole reason a report can attribute a token to a step at all.
+
+`file_written`'s `source` says how the path came to be known. `"tool-stated"` is a path the
+host handed over directly — exact, with no false positive. `"observed"` is a file that
+changed inside a task folder while the session was running, the only way a write made
+through a shell command or an `apply_patch` becomes visible at all — and it can, in
+principle, catch a file something else on the machine wrote in the same window. A reader
+that must not risk that filters on this field.
 
 `worktree_id` is git's own name for the linked worktree the session ran in, and `worktree_repo_id` names the repository those worktrees share — read from one `git rev-parse`, never from an agent runner's environment variable, which names that runner's concept rather than the repository's. A plain checkout, the common case, carries **neither key at all**: absent, never `null` and never `""`, because an empty string would gather every plain checkout into one group as though they were the same worktree.
 
