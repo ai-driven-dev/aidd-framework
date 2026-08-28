@@ -83,6 +83,54 @@ tool-name spelling with another host's argument shape.
 skill call opens a step line on either payload, and a non-skill call (`Bash`, per
 `copilot-compat-post-tool-use.json`) still opens none on the compat shape either.
 
+## Copilot's event log is not a payload capture
+
+Copilot writes `~/.copilot/session-state/<id>/events.jsonl`, and each `hook.start` line
+carries an `input` object. It is tempting to read that as "the payload the hook received",
+which would make capturing a shape free — no session to run, no tokens to spend.
+
+**It is not the same object, and reading it that way produces a fixture of a shape no hook
+ever sees.** In `@github/copilot`'s own bundle, the log line is emitted once per *event*,
+from a hard-coded literal, before the per-hook payload builder runs. The `preToolUse` site
+shows both objects a few statements apart:
+
+```js
+// what gets logged
+emitHookStart({ hookInvocationId: r, hookType: "preToolUse",
+                input: { sessionId, cwd, toolCalls: e.toolCalls.map(...) } })
+// what a hook is handed
+{ timestamp: Date.now(), cwd: this.workingDir, toolName: u, toolArgs: d }
+```
+
+Different keys for the same event, and the hook-facing one carries `timestamp` while the
+logged one does not.
+
+The consequence that matters here: **the log always shows the canonical camelCase spelling,
+whichever builder the hook actually gets.** The `_vsCodeCompat` rewrite documented above is
+selected per hook declaration, after the log line is written.
+
+That is not a hypothetical for this plugin. `plugins/aidd-telemetry/hooks/hooks.json`
+declares `SessionStart`, `PostToolUse` and `Stop` — PascalCase, which is exactly what
+triggers the rewrite. So **this framework's own hooks receive the compat snake_case payload**
+while Copilot's event log records their events in camelCase. Counting spellings in that log
+cannot tell the two builders apart, and a count of zero snake_case there is not evidence that
+snake_case never arrives. The compat fixtures above are the direct counter-evidence: captured
+from a hook's own stdin on 1.0.80, running this plugin, carrying `session_id` and
+`hook_event_name`.
+
+Read hook declarations from the plugin, not from whatever else is installed on the machine.
+`~/.copilot/hooks/` can hold files belonging to other applications entirely, and their event
+casing says nothing about this one.
+
+Read on the readable `@github/copilot` 1.0.57 bundle. The 1.0.80 runtime binary is packed —
+`strings` finds no `_vsCodeCompat`, `hookInvocationId` or `hook.start` in it — so the
+architecture is proven on 1.0.57 and corroborated on 1.0.80 only by the stdin captures
+above. Nothing here settles what 1.0.80 does differently, if anything.
+
+**So a Copilot shape fixture still costs a session.** Install the hooks, run one, dump the
+hook's actual stdin. That is what issue #681's own `Bounds` section asks for, and there is
+no cheaper substitute.
+
 ## Redaction
 
 Every fixture differs from what its probe captured in only two kinds of place:
