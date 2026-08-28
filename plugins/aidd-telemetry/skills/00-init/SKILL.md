@@ -33,7 +33,7 @@ Run the flow above. Read only the next action file.
 | check    | confirm the CLI and read the current switch                |
 | enable   | ask, then turn measurement on                              |
 | verify   | prove a session is actually being recorded                 |
-| identify | ask this person, then attach their own identifier          |
+| identify | ask this person, then attach their own identifier, and offer to link another identifier as the same one |
 | forget   | withdraw it, without touching what is already stored       |
 
 ## Transversal rules

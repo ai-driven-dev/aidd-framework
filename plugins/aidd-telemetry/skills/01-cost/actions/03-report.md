@@ -10,7 +10,7 @@ The path to `aidd telemetry`, and the question the user asked, in their own word
 ## Output
 
 **One axis, asked for by name.** Run
-`aidd telemetry report --axis <total|day|step|model|tool|project> --from <day> --to <day>`,
+`aidd telemetry report --axis <total|day|step|model|tool|project|person> --from <day> --to <day>`,
 never alongside `--json` - the axis flag already picks the one rendering that answers the
 question, printed exactly as the script wrote it:
 
@@ -69,16 +69,16 @@ A breakdown the object leaves empty is a section left out, never a table of zero
 ## Process
 
 1. **Choose the axis from the question**, using SKILL.md's table. A question that already
-   names one - "by day", "by project", "per model" - needs no more reading than that. A
-   question asking per person is named as unanswerable there, with what would fix it - stop
-   before running the script.
+   names one - "by day", "by project", "per model", "per person" - needs no more reading
+   than that.
 2. **Ask, as one axis or as the whole object.**
    - One axis: `aidd telemetry report --axis <axis> --from 2026-08-01 --to 2026-08-31`.
    - Everything: `aidd telemetry report --from 2026-08-01 --to 2026-08-31 --json`, reading the shape from [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md).
    - The figure will be kept or compared: give `--from` and `--to`, since `--days` resolves against today and two identical calls on two days cover two different periods.
-3. **Refuse an unknown shape.** `cost_report_version` is `3` today, read from the `--json`
+3. **Refuse an unknown shape.** `cost_report_version` is `4` today, read from the `--json`
    path - the `--axis` path prints text the script already built from that same object, so
-   there is no separate version to check there.
+   there is no separate version to check there. The bump from `3` added `by_person` to the
+   top-level breakdowns and `person_mapping_unreadable` to `read`.
    - Anything else on the `--json` path: stop, rather than guessing which field means what.
 4. **Fill the "everything" shape above from the object**, when that is the path taken. The
    headline comes from `totals`, the steps from `by_step`, the models from `by_model`, and
@@ -105,7 +105,7 @@ A breakdown the object leaves empty is a section left out, never a table of zero
 | A question names an axis | the artefact for that axis is printed, and nothing else |
 | A question asks for a report, or to keep or send the figure | the artefact is written to a file, unchanged, stating its period and axis |
 | A question is broad, naming no axis | the answer gives tokens, models and steps, and names the days it covered |
-| A question asks per person | said as unanswerable, naming what is missing |
+| A question asks per person | the `person` axis is used, one row per resolved person plus every unresolved identity |
 | A tool carries no amount | the answer says unknown and never prints a currency zero |
 | A tool is not covered | the answer gives its declared reason instead of a figure |
 | The read was partial | the answer says so before giving the total |

@@ -158,6 +158,13 @@ that default is `%APPDATA%\aidd\telemetry\` instead — `.config` is not where a
 application puts this — unless a machine already journalled under the old `.config` path,
 which it keeps using rather than losing access to what was already written there.
 
+**The person mapping never follows `AIDD_USER_CONFIG_DIR`.** It is read from the OS
+profile only, on every platform, by design — see `aidd telemetry identity` above. So on a
+sink shared through that variable, every reader still sees a colleague's records as
+`unresolved`: each reader's own profile holds only the identities *they* opted in, never a
+teammate's. Resolving a colleague's identity into a named row requires that colleague's
+own mapping, which lives on their machine and travels nowhere.
+
 ## Where things are written down
 
 - [`aidd_docs/runs/README.md`](../../aidd_docs/runs/README.md) — what the journal records,

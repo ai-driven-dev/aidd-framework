@@ -32,6 +32,18 @@ person can withdraw at any time, and a user who knows exactly what it does and d
    identifier question — nothing beyond the identifier is set.
 6. **Say it is reversible.** `aidd telemetry identity off` stops new records carrying
    it; what is already stored keeps the identifier it was written with.
+7. **Offer to link another identifier, when this person names a second tool or machine.**
+   Once identified here, running `aidd telemetry identity link <identity>` on that other
+   identifier declares it the same person: both fold into one row in every report from
+   then on, instead of printing as two. This writes to the same profile-local
+   `person-mapping.json` (beside `identity.json`, under this machine's own user profile,
+   never `.aidd/config.json` or `AIDD_USER_CONFIG_DIR`) — refused before this step is done,
+   since a mapping entry needs an opted-in identity to anchor it, and refused when another
+   person already claims that identity. Linking one already listed reports it as already
+   listed, not as a second write. `aidd telemetry identity unlink <identity>` removes one
+   identifier from the mapping without touching this person's own identity — reports go
+   back to counting it unresolved. Unlinking one nobody listed reports nothing to remove,
+   never a failure.
 
 ## Test
 
@@ -42,3 +54,7 @@ person can withdraw at any time, and a user who knows exactly what it does and d
 | Already identified | it relays the existing identity and does not ask again |
 | The user declines a display name | the identifier is still set; no display name is |
 | Repository or CI cannot make this choice | `aidd telemetry identity` reads only this machine's own profile, never `.aidd/config.json` or `AIDD_USER_CONFIG_DIR` |
+| A second identifier is linked | `person-mapping.json` lists it under this person; a report folds both into one row |
+| An identifier already listed is linked again | reported as already listed, not written twice |
+| A linked identifier is unlinked | `person-mapping.json` no longer lists it; a report counts it unresolved again |
+| An unlisted identifier is unlinked | reported as nothing to remove, not as a failure |

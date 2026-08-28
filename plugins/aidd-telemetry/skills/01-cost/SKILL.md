@@ -1,6 +1,6 @@
 ---
 name: 01-cost
-description: Answers what a period or one task consumed - a total, a day-by-day series, or a breakdown by step, model, tool or project - and hands back the artefact each question deserves. Use when the user asks what a piece of work cost, what changed, where the effort went, or for which project. Not for turning measurement on, and not for a per-person figure.
+description: Answers what a period or one task consumed - a total, a day-by-day series, or a breakdown by step, model, tool, project or person - and hands back the artefact each question deserves. Use when the user asks what a piece of work cost, what changed, where the effort went, for which project, or who spent it. Not for turning measurement on.
 argument-hint: task | period
 ---
 
@@ -36,12 +36,7 @@ menu and ask them to pick.
 | what changed, which day spiked | day | a series, one row per day |
 | where did it go, which step, model, tool or project took it | step, model, tool or project | a breakdown table |
 | for a report, to paste, to send, to keep | any of the above | the same artefact, written to a file |
-| per person, who spent, which teammate | none - unanswerable | said plainly, with what would fix it |
-
-**Per person cannot be answered today.** Nothing records an identity anywhere in what this
-plugin measures. It becomes answerable only once measurement records an identity at all and
-resolves one identity across tools and machines - name that missing path rather than
-approximating a person from a project, a tool or a machine, none of which is one.
+| per person, who spent, which teammate | person | one row per resolved person plus every unresolved identity, each with the raw identities behind it |
 
 ## Transversal rules
 

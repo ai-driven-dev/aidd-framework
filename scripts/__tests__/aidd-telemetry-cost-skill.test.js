@@ -146,7 +146,7 @@ test("every field the cost skill names by name resolves on the object the script
   const claims = fieldClaims(everything);
   // Pinned for the reason the command count above is: an extractor matching nothing would
   // make this pass on an empty set of claims.
-  assert.equal(claims.size, 11, "expected exactly eleven field references in the cost skill");
+  assert.equal(claims.size, 13, "expected exactly thirteen field references in the cost skill");
 
   // Fields the envelope carries only under some condition, so a fixture cannot show them all
   // at once: the first five appear only under a selection, and `cost_micro_usd` only once a
@@ -297,7 +297,7 @@ test("the cost skill states the shape of its answer", () => {
 // Someone asking what last month cost does not know which axis answers them - the skill
 // has to derive the axis from the question, not hand back a flag for the person to pick.
 test("the cost skill offers its axes in the language of a question", () => {
-  for (const axis of ["total", "day", "step", "model", "tool", "project"]) {
+  for (const axis of ["total", "day", "step", "model", "tool", "project", "person"]) {
     assert.ok(everything.includes(axis), `must name the "${axis}" axis`);
   }
   for (const question of ["what did this cost", "what changed", "where did it go"]) {
@@ -306,18 +306,21 @@ test("the cost skill offers its axes in the language of a question", () => {
   assert.ok(everything.includes("--axis"), "must derive the flag itself, from the question");
 });
 
-// Per person is the one axis nothing can answer today, and the reason is structural, not a
-// missing flag: no identity is recorded anywhere. Saying so plainly is the point - a skill
-// that stayed silent would let the person assume the question just needs a different flag.
-test("the cost skill names per-person as unanswerable, and what would fix it", () => {
-  assert.ok(/per.person/iu.test(everything), "must name the axis that does not exist");
+// Per person used to be the one axis nothing could answer, back when no record carried an
+// identity - #661 resolved one identity across tools and machines and gave the report a
+// `person` axis, so the skill must offer it rather than still claiming the question is
+// structurally unanswerable.
+test("the cost skill answers per person through the person axis, not as unanswerable", () => {
+  assert.ok(/per.person/iu.test(everything), "must still speak in the language of the question");
+  assert.ok(everything.includes("|person>"), "must list person among the --axis choices");
   assert.ok(
-    everything.includes("identity"),
-    "must say why: nothing records an identity anywhere",
+    everything.includes("per person, who spent, which teammate"),
+    "must map the per-person question to an axis in SKILL.md's own table",
   );
-  for (const missing of ["records an identity", "across tools and machines"]) {
-    assert.ok(everything.includes(missing), `must name "${missing}" as what would make it answerable`);
-  }
+  assert.ok(
+    !/unanswerable/iu.test(everything),
+    "must not still claim per-person cannot be answered",
+  );
 });
 
 // The version bug this pins against: render.cjs bumped `ENVELOPE_VERSION` to 2 when
