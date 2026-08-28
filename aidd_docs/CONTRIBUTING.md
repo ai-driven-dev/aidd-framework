@@ -26,7 +26,7 @@ The skill contract itself lives in one file: `aidd-context:04-skill-generate/ref
 
 ## Syncing Across Tools
 
-If the project uses multiple AI tools (e.g. Claude Code plus Cursor), the same content must be available to each. The memory bank is shared automatically via the `<aidd_project_memory>` block kept in sync by `aidd-context:02-project-memory`. Skills are loaded per-plugin by the runtime, so any skill installed via the marketplace is available across tools that support skills.
+If the project uses multiple AI tools (e.g. Claude Code plus Cursor), the same content must be available to each. The memory bank is shared automatically via the project memory block kept in sync by `aidd-context:02-project-memory`. Skills are loaded per-plugin by the runtime, so any skill installed via the marketplace is available across tools that support skills.
 
 When tools differ in syntax (frontmatter, slash command name, references), follow the IDE mapping reference shipped with each plugin.
 

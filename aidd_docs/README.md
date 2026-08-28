@@ -84,7 +84,7 @@ my-project/
 
 ### Memory Block Lifecycle
 
-Each AI context file (`CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, etc.) contains an `<aidd_project_memory>` block. It is:
+Each AI context file (`CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, etc.) contains a project memory block. It is:
 
 1. **Seeded** the first time by `aidd-context:02-project-memory` (the skill creates the block if absent).
 2. **Kept in sync** automatically by a session-start hook (`aidd-context/hooks/update_memory.js`) that scans `aidd_docs/memory/` and writes the current list of `.md` files into the block.
