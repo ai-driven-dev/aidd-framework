@@ -7,8 +7,10 @@ const root = resolve(fileURLToPath(import.meta.url), "../..");
 const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 // The budget exists to make growth visible, not to be a wall: it is raised
 // deliberately when a feature earns it, and the raise is what a reviewer sees.
-// 560 was set when measurement across five tools took the bundle to 500.8 KB,
-// leaving room to grow before the next conversation about it.
+// 560 was set when measurement across five tools took the bundle to 500.8 KB.
+// 590 was set when resolving one person across tools and machines (#661) took
+// the bundle to 567.7 KB - tighter headroom than the 560 raise left, on
+// purpose, rather than padding past what was actually measured.
 const budgetKB = pkg.bundleBudgetKB ?? 500;
 const budgetBytes = budgetKB * 1024;
 

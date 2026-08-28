@@ -131,9 +131,10 @@ export interface CostReportEnvelopePersonRow {
 export interface CostReportEnvelopeRead {
   readonly undated_records: number;
   readonly unreadable_lines: number;
-  /** A mapping existed but could not be read back - never true for a mapping simply not
-   * declared, which is the ordinary, resolved-as-nobody-opted-in state `by_person` already
-   * shows on its own. */
+  /** A mapping existed but could not be used - either it could not be read back, or it
+   * parsed fine but declared an ambiguous claim `readStrict()` refuses. Never true for a
+   * mapping simply not declared, which is the ordinary, resolved-as-nobody-opted-in state
+   * `by_person` already shows on its own. */
   readonly person_mapping_unreadable: boolean;
 }
 

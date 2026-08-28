@@ -110,7 +110,7 @@ describe("buildCostReportArtefact", () => {
     expect(noneRow).not.toContain("unresolved");
   });
 
-  it("prints every figure and a caveat when the mapping could not be read", () => {
+  it("prints every figure and a caveat when the mapping could not be used", () => {
     const envelope = envelopeOf({
       records: [request({ turn_id: "a", cost_usd: 1, person_id: "machine-1" })],
       personMappingUnreadable: true,
@@ -119,6 +119,6 @@ describe("buildCostReportArtefact", () => {
     const artefact = buildCostReportArtefact(envelope, "person");
 
     expect(artefact).toContain("$1.00");
-    expect(artefact).toMatch(/mapping could not be read/u);
+    expect(artefact).toMatch(/mapping could not be used/u);
   });
 });

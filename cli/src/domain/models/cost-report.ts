@@ -242,10 +242,11 @@ export interface CostReportInput {
    * `null` both mean no mapping was declared, which resolves every identifier as
    * `unresolved` rather than failing the report. */
   readonly personMapping?: PersonMapping | null;
-  /** Set when a mapping exists but could not be read back - a damaged or unreadable file,
-   * never a mapping that simply was not declared. Costs the resolution alone: every record
-   * is still counted, with every identifier reported as `unresolved` and this flag saying
-   * why, the same way `unreadableLines` says why a total came from a partial read. */
+  /** Set when a mapping exists but could not be used - a damaged or unreadable file, or one
+   * that parsed fine but declared an ambiguous claim; never a mapping that simply was not
+   * declared. Costs the resolution alone: every record is still counted, with every
+   * identifier reported as `unresolved` and this flag saying why, the same way
+   * `unreadableLines` says why a total came from a partial read. */
   readonly personMappingUnreadable?: boolean;
 }
 
@@ -280,7 +281,7 @@ export interface CostReport {
   readonly taskAttributionMix?: readonly CostReportTaskAttributionRow[];
   readonly undatedRecords: number;
   readonly unreadableLines: number;
-  /** Whether a declared mapping existed but could not be read - see `CostReportInput`'s
+  /** Whether a declared mapping existed but could not be used - see `CostReportInput`'s
    * own field. `false` both when no mapping was declared and when one was read fine;
    * distinguishing those two is `byPeople`'s job, not this flag's. */
   readonly personMappingUnreadable: boolean;

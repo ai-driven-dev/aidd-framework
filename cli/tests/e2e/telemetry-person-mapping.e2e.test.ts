@@ -40,14 +40,17 @@ function record(overrides: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
+/** `sinkDir` is where records actually land - `sinkDirIn(fakeHome)` for the default
+ * profile-resolved sink, or `join(someOtherConfigDir, "telemetry")` for a sink relocated by
+ * `AIDD_USER_CONFIG_DIR`, since that variable moves the sink the same way it moves nothing
+ * else covered by this suite's guarantees. */
 async function seedSink(
-  fakeHome: string,
+  sinkDir: string,
   records: readonly Record<string, unknown>[]
 ): Promise<void> {
-  const dir = sinkDirIn(fakeHome);
-  await mkdir(dir, { recursive: true });
+  await mkdir(sinkDir, { recursive: true });
   await writeFile(
-    join(dir, "2026-08-18.jsonl"),
+    join(sinkDir, "2026-08-18.jsonl"),
     `${records.map((r) => JSON.stringify(r)).join("\n")}\n`,
     "utf8"
   );
@@ -106,7 +109,7 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
   it("two tools under one identifier print one person row", async () => {
     const { projectDir, fakeHome, cleanup: c } = await setUp("person-two-tools");
     cleanup = c;
-    await seedSink(fakeHome, [
+    await seedSink(sinkDirIn(fakeHome), [
       record({ tool: "claude", vendor_id: "s-claude", turn_id: "t-1", person_id: "shared-id" }),
       record({ tool: "codex", vendor_id: "s-codex", turn_id: "t-2", person_id: "shared-id" }),
     ]);
@@ -122,7 +125,7 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
     const { projectDir, fakeHome, cleanup: c } = await setUp("person-two-machines");
     cleanup = c;
     await seedIdentity(fakeHome, "person-a");
-    await seedSink(fakeHome, [
+    await seedSink(sinkDirIn(fakeHome), [
       record({ tool: "claude", vendor_id: "s-1", turn_id: "t-1", person_id: "person-a" }),
       record({ tool: "claude", vendor_id: "s-2", turn_id: "t-2", person_id: "machine-b-id" }),
     ]);
@@ -168,7 +171,7 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
     cleanup = c;
     await seedIdentity(fakeHome, "person-a");
     await runCli(["telemetry", "identity", "link", "machine-b-id"], projectDir, fakeHome);
-    await seedSink(fakeHome, [
+    await seedSink(sinkDirIn(fakeHome), [
       record({ tool: "claude", vendor_id: "s-1", turn_id: "t-1", person_id: "person-a" }),
       record({ tool: "claude", vendor_id: "s-2", turn_id: "t-2", person_id: "machine-b-id" }),
       record({ tool: "claude", vendor_id: "s-3", turn_id: "t-3", person_id: "a-stranger" }),
@@ -204,7 +207,7 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
     const mappingPath = personMappingFileIn(fakeHome);
     await mkdir(dirname(mappingPath), { recursive: true });
     await writeFile(mappingPath, "this is not json{{{", "utf8");
-    await seedSink(fakeHome, [
+    await seedSink(sinkDirIn(fakeHome), [
       record({ tool: "claude", vendor_id: "s-1", turn_id: "t-1", person_id: "machine-1" }),
     ]);
 
@@ -220,17 +223,13 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
       fakeHome
     );
     expect(textResult.exitCode, textResult.stderr).toBe(0);
-    expect(textResult.stdout).toMatch(/mapping could not be read/iu);
+    expect(textResult.stdout).toMatch(/mapping could not be used/iu);
   });
 
   it("a mapping placed under a project-scoped config directory has no effect", async () => {
     const { projectDir, fakeHome, tempDir, cleanup: c } = await setUp("person-project-scope");
     cleanup = c;
     await seedIdentity(fakeHome, "person-a");
-    await seedSink(fakeHome, [
-      record({ tool: "claude", vendor_id: "s-1", turn_id: "t-1", person_id: "person-a" }),
-      record({ tool: "claude", vendor_id: "s-2", turn_id: "t-2", person_id: "machine-b-id" }),
-    ]);
     const decoyDir = join(tempDir, "a-repository-or-a-ci-picked-this");
     await mkdir(decoyDir, { recursive: true });
     await writeFile(
@@ -240,11 +239,20 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
       })}\n`,
       "utf8"
     );
+    // AIDD_USER_CONFIG_DIR also relocates the sink (telemetry-sink-adapter.ts), so the
+    // records this test needs to survive the override have to be seeded under the decoy
+    // directory too - seeding them under the real profile instead would make the report
+    // read empty and let both assertions below pass on nothing.
+    await seedSink(join(decoyDir, "telemetry"), [
+      record({ tool: "claude", vendor_id: "s-1", turn_id: "t-1", person_id: "person-a" }),
+      record({ tool: "claude", vendor_id: "s-2", turn_id: "t-2", person_id: "machine-b-id" }),
+    ]);
 
     const envelope = await reportJson(projectDir, fakeHome, [], {
       AIDD_USER_CONFIG_DIR: decoyDir,
     });
 
+    expect(envelope.totals.requests).toBe(2);
     expect(envelope.by_person.every((row) => row.resolution !== "mapped")).toBe(true);
   });
 });

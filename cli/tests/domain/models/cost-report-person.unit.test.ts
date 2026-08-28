@@ -145,13 +145,19 @@ describe("byPeople — one raw identity resolved per group, never merged or drop
   });
 
   it("summing every person row's own money and tokens equals the report's own total", () => {
+    const tokenFields = {
+      input_tokens: 100,
+      output_tokens: 40,
+      cache_read_tokens: 15,
+      cache_creation_tokens: 5,
+    };
     const built = report({
       personMapping: twoIdentitiesOnePerson(),
       records: [
-        request({ turn_id: "a", person_id: "machine-1", cost_usd: 0.5, input_tokens: 100 }),
-        request({ turn_id: "b", person_id: "machine-2", cost_usd: 0.25, input_tokens: 50 }),
-        request({ turn_id: "c", person_id: "a-stranger", cost_usd: 0.1, input_tokens: 20 }),
-        request({ turn_id: "d", cost_usd: 0.05, input_tokens: 10 }),
+        request({ turn_id: "a", person_id: "machine-1", cost_usd: 0.5, ...tokenFields }),
+        request({ turn_id: "b", person_id: "machine-2", cost_usd: 0.25, ...tokenFields }),
+        request({ turn_id: "c", person_id: "a-stranger", cost_usd: 0.1, ...tokenFields }),
+        request({ turn_id: "d", cost_usd: 0.05, ...tokenFields }),
       ],
     });
 
@@ -160,10 +166,28 @@ describe("byPeople — one raw identity resolved per group, never merged or drop
       (sum, row) => sum + (row.totals.inputTokens ?? 0),
       0
     );
+    const summedOutputTokens = built.byPeople.reduce(
+      (sum, row) => sum + (row.totals.outputTokens ?? 0),
+      0
+    );
+    const summedCacheReadTokens = built.byPeople.reduce(
+      (sum, row) => sum + (row.totals.cacheReadTokens ?? 0),
+      0
+    );
+    const summedCacheCreationTokens = built.byPeople.reduce(
+      (sum, row) => sum + (row.totals.cacheCreationTokens ?? 0),
+      0
+    );
     expect(summedCost).toBe(built.totals.costMicroUsd);
     expect(summedInputTokens).toBe(built.totals.inputTokens);
+    expect(summedOutputTokens).toBe(built.totals.outputTokens);
+    expect(summedCacheReadTokens).toBe(built.totals.cacheReadTokens);
+    expect(summedCacheCreationTokens).toBe(built.totals.cacheCreationTokens);
     expect(built.totals.costMicroUsd).toBe(toMicroUsd(0.9));
-    expect(built.totals.inputTokens).toBe(180);
+    expect(built.totals.inputTokens).toBe(400);
+    expect(built.totals.outputTokens).toBe(160);
+    expect(built.totals.cacheReadTokens).toBe(60);
+    expect(built.totals.cacheCreationTokens).toBe(20);
   });
 
   it("orders mapped rows first, then unresolved, then the no-identifier row last", () => {
@@ -237,6 +261,7 @@ describe("byPeople — a billed call seen by both routes keeps its person", () =
       records: [
         request({
           billed_request_id: "call-1",
+          provenance: "export",
           cost_usd: 1,
           input_tokens: 10,
           // No person_id: the export route's own contract.

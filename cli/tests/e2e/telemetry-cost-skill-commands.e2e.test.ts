@@ -49,7 +49,7 @@ function commandsNamedBySkill(): string[] {
  * first alternative so the command can actually be run, rather than skipped. */
 function runnable(command: string): string[] {
   return command
-    .replace(/<total\|day\|step\|model\|tool\|project>/gu, "step")
+    .replace(/<total\|day\|step\|model\|tool\|project\|person>/gu, "step")
     .replace(/<axis>/gu, "step")
     .replace(/<day>/gu, "2026-01-01")
     .split(/\s+/u)

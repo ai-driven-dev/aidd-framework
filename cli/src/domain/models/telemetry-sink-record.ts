@@ -33,8 +33,13 @@ export type TelemetrySinkRecordKind = "request" | "session";
 export type TelemetrySinkRecordProvenance = "export" | "local-read";
 
 /** The tool-neutral stored line, and the complete allowlist of what a session may leave
- * behind — no identity of any kind on an export-provenance record; a person is named only
- * via `person_id`, opted into on the local-read route (see `read-local-cost-use-case.ts`).
+ * behind — no identity of any kind on a *stored* export-provenance record; a person is
+ * named only via `person_id`, opted into on the local-read route (see
+ * `read-local-cost-use-case.ts`). This is a statement about what is written to disk, not
+ * about every in-memory record with `provenance: "export"`: `cost-report.ts`'s
+ * `withPersonBackfill` is the one place that pairs an export-route record with its
+ * local-read sibling for the same billed call at read time, and copies the sibling's
+ * `person_id` onto it before the report is built — see that function's own doc comment.
  * `vendor_field` and `turn_field` name the export-side attribute a value came
  * from, since that attribute differs per tool — `tool` names the tool itself, so no
  * consumer ever has to reverse that attribute back into an identity. Never optional: an
@@ -77,9 +82,12 @@ export interface TelemetrySinkRecord {
    * journal join to name a source for. */
   readonly project_field?: string;
   /** The identifier a person chose to attach to records this machine reads locally - never
-   * derived from `user_id`, a tool's own attribute, and never set on an export-provenance
-   * record (see `read-local-cost-use-case.ts`). Absent whenever nobody opted in, which is
-   * the default. */
+   * derived from `user_id`, a tool's own attribute, and never *written* onto an
+   * export-provenance record (see `read-local-cost-use-case.ts`). Absent whenever nobody
+   * opted in, which is the default. `cost-report.ts`'s `withPersonBackfill` is the one
+   * read-time exception: it can carry an export-route record's `person_id` in memory,
+   * backfilled from its local-read sibling for the same billed call - see that function's
+   * doc comment and the interface comment above. */
   readonly person_id?: string;
   /** A separate, later choice from `person_id` - present only once asked for, and never
    * derived from it or from anything else. */

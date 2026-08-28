@@ -313,9 +313,12 @@ read.
 
 **Any of the three non-zero (or `true`) means your total is partial.** Say so rather than
 presenting it as whole. `person_mapping_unreadable: true` means a mapping file existed but
-could not be read back — every record is still counted, in `by_person` as `unresolved`,
-never as a reason to drop a figure. It is `false` both when no mapping was ever declared
-and when one was read fine; `by_person`'s own rows are what tells those two apart.
+could not be used for resolution — either it could not be read back, or it parsed fine but
+declared an ambiguous claim (`aidd telemetry identity link` refuses that case by name, so
+the only way it reaches a report is a mapping edited outside the command) — every record is
+still counted, in `by_person` as `unresolved`, never as a reason to drop a figure. It is
+`false` both when no mapping was ever declared and when one was read fine; `by_person`'s
+own rows are what tells those two apart.
 
 ## Filling it
 

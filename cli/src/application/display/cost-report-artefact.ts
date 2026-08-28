@@ -134,7 +134,10 @@ function caveats(envelope: CostReportEnvelope): readonly string[] {
     lines.push(`${count(envelope.read.unreadable_lines)} lines could not be read`);
   }
   if (envelope.read.person_mapping_unreadable) {
-    lines.push("the person mapping could not be read; every identity is reported unresolved");
+    // Covers an unreadable file and a mapping that parsed but declared an ambiguous claim
+    // alike - "could not be used" rather than "could not be read" so the wording does not
+    // claim a narrower cause than the flag actually carries.
+    lines.push("the person mapping could not be used; every identity is reported unresolved");
   }
   return lines;
 }
