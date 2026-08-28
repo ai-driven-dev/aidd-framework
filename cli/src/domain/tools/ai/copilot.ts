@@ -346,25 +346,6 @@ export const copilot: AiTool<
     }),
   },
 
-  telemetry: {
-    kind: "environment-variable",
-    variable: "COPILOT_OTEL_ENABLED",
-    value: "true",
-  },
-
-  // Measured 2026-08-13, zero-credit to verify: `gen_ai.conversation.id` lives on the
-  // `invoke_agent` span, not on a log record or a metric — a receiver that only listens
-  // to /v1/logs and /v1/metrics never sees the one attribute that identifies a Copilot
-  // session.
-  telemetryExport: {
-    kind: "declared",
-    identityAttribute: "gen_ai.conversation.id",
-    // The identifier lives on the `invoke_agent` span, and the receiver listens on
-    // `/v1/logs` and `/v1/metrics` only - so nothing has ever reached storage by this
-    // route, whatever the payload may hold.
-    supplies: { tokenCounters: false, amount: false, toolStatedStep: false },
-  },
-
   // Measured, against a real ~/.copilot/session-state/<id>/events.jsonl:
   // `session.shutdown`'s own `tokenDetails` carries all four counters, but once, for the
   // whole session — never per request, so no per-step record can be built from it. No

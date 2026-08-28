@@ -13,21 +13,8 @@ import type {
   LocalCostToolStatus,
   ReadLocalCostResult,
 } from "../use-cases/telemetry/read-local-cost-use-case.js";
-import type { TelemetryEndpointClearResult } from "../use-cases/telemetry/telemetry-endpoint-clear-use-case.js";
-import type {
-  TelemetryEndpointResult,
-  TelemetryToolReport,
-} from "../use-cases/telemetry/telemetry-endpoint-use-case.js";
 import type { TelemetryOffResult } from "../use-cases/telemetry/telemetry-off-use-case.js";
 import type { TelemetryOnResult } from "../use-cases/telemetry/telemetry-on-use-case.js";
-
-const STATUS_LABELS: Record<TelemetryToolReport["status"], string> = {
-  enabled: "enabled",
-  "not-installed": "not installed",
-  "not-yet-supported": "not yet supported",
-  "not-a-file": "not a file",
-  "cannot-enable": "cannot be enabled by us",
-};
 
 const LOCAL_COST_STATUS_LABELS: Record<LocalCostToolStatus, string> = {
   found: "read",
@@ -45,33 +32,6 @@ export function printTelemetryOnReport(output: CLIOutput, result: TelemetryOnRes
   const switchLabel = result.switchChanged ? "on" : "already on";
   output.success(`AIDD telemetry: ${switchLabel} (${result.switchPath})`);
   output.info(`${result.switchPath} is git-tracked — this applies to everyone who clones.`);
-}
-
-export function printTelemetryEndpointReport(
-  output: CLIOutput,
-  result: TelemetryEndpointResult
-): void {
-  output.success(`AIDD telemetry endpoint: ${result.endpoint}`);
-  for (const report of result.toolReports) {
-    const name = getAiToolConfig(report.tool).displayName;
-    output.print(`  ${name}: ${STATUS_LABELS[report.status]} — ${report.detail}`);
-  }
-  output.print(
-    "Run `aidd telemetry receive` to capture what is exported — without it, nothing is stored."
-  );
-}
-
-export function printTelemetryEndpointClearReport(
-  output: CLIOutput,
-  result: TelemetryEndpointClearResult
-): void {
-  if (result.removedFiles.length === 0) {
-    output.success("AIDD telemetry endpoint: nothing tracked to remove.");
-  } else {
-    output.success("AIDD telemetry endpoint: cleared.");
-    for (const file of result.removedFiles) output.print(`  Removed telemetry entries: ${file}`);
-  }
-  for (const reminder of result.manualUnsetReminders) output.print(reminder);
 }
 
 export function printLocalCostReadReport(output: CLIOutput, result: ReadLocalCostResult): void {

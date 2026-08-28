@@ -59,20 +59,6 @@ export class InvalidCategoryError extends Error {
   }
 }
 
-export class InvalidTelemetryScopeError extends Error {
-  constructor(scope: string) {
-    super(`Invalid --scope '${scope}'. Expected 'local', 'project', or 'user'.`);
-    this.name = "InvalidTelemetryScopeError";
-  }
-}
-
-export class InvalidTelemetryReceivePortError extends Error {
-  constructor(value: string) {
-    super(`Invalid --port '${value}'. Expected an integer between 0 and 65535.`);
-    this.name = "InvalidTelemetryReceivePortError";
-  }
-}
-
 export class InvalidTelemetryPeriodError extends Error {
   constructor(value: string, maxDays: number) {
     super(`Invalid --days '${value}'. Expected an integer between 1 and ${maxDays}.`);

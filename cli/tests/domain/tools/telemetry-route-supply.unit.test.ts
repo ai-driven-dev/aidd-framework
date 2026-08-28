@@ -12,14 +12,16 @@ import { mapCodexRolloutToSinkRecords } from "../../../src/domain/formats/codex-
 import { mapCopilotEventsToSinkRecords } from "../../../src/domain/formats/copilot-events.js";
 import { mapOpencodeExportToSinkRecords } from "../../../src/domain/formats/opencode-export.js";
 import type { TelemetrySinkRecord } from "../../../src/domain/models/telemetry-sink-record.js";
-import { mapOtlpLogsToSinkRecords } from "../../../src/domain/models/telemetry-sink-record.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../src/domain/models/tool-ids.js";
 import { getAiToolConfig } from "../../../src/domain/tools/registry.js";
 
-/** Everything a declared route was measured to produce, from the captures this repository
- * holds. A declaration is checked against these rather than against the documentation, so
- * a route claiming an amount its reader never sets fails here rather than downstream. */
-type Route = "export" | "local";
+/** Everything the local-read route was measured to produce, from the captures this
+ * repository holds. A declaration is checked against these rather than against the
+ * documentation, so a route claiming an amount its reader never sets fails here rather
+ * than downstream. Local read is the only route this system still reads — the export
+ * route (and its own declaration) was deleted in "one route, and every sentence about it
+ * true" (aidd_docs/tasks/2026_08/2026_08_28_one-route-that-is-true/). */
+type Route = "local";
 
 function fixture(relativePath: string): string {
   return readFileSync(fileURLToPath(new URL(`../../fixtures/${relativePath}`, import.meta.url)), {
@@ -66,15 +68,6 @@ const CAPTURES: ReadonlyMap<string, () => TelemetryRouteSupply> = new Map([
       ]),
   ],
   [
-    "claude:export",
-    () =>
-      observe(
-        mapOtlpLogsToSinkRecords(JSON.parse(fixture("telemetry-sink/otlp-logs-claude-code.json")), [
-          { tool: "claude", identityAttribute: "session.id" },
-        ])
-      ),
-  ],
-  [
     "codex:local",
     () =>
       observe(
@@ -107,50 +100,47 @@ const CAPTURES: ReadonlyMap<string, () => TelemetryRouteSupply> = new Map([
   ],
 ]);
 
-function declarationOf(tool: AiToolId, route: Route) {
-  const config = getAiToolConfig(tool);
-  return route === "export" ? config.telemetryExport : config.telemetryLocalRead;
+function declarationOf(tool: AiToolId) {
+  return getAiToolConfig(tool).telemetryLocalRead;
 }
+
+const route: Route = "local";
 
 describe("what a route declares it supplies, against what its reader actually produces", () => {
   for (const tool of AI_TOOL_IDS) {
-    for (const route of ["export", "local"] as const) {
-      const declaration = declarationOf(tool, route);
-      if (declaration.kind !== "declared") continue;
-      const capture = CAPTURES.get(`${tool}:${route}`);
+    const declaration = declarationOf(tool);
+    if (declaration.kind !== "declared") continue;
+    const capture = CAPTURES.get(`${tool}:${route}`);
 
-      if (!capture) {
-        it(`${tool} declares a ${route} route with no capture, so it may claim nothing`, () => {
-          // A declared route nobody ever captured has been measured to carry an identifier
-          // and nothing else. Letting it claim a capability would be documenting a guess as
-          // a fact, which is the one thing this layer exists to prevent.
-          expect(declaration.supplies).toEqual({
-            tokenCounters: false,
-            amount: false,
-            toolStatedStep: false,
-          });
+    if (!capture) {
+      it(`${tool} declares a ${route} route with no capture, so it may claim nothing`, () => {
+        // A declared route nobody ever captured has been measured to carry an identifier
+        // and nothing else. Letting it claim a capability would be documenting a guess as
+        // a fact, which is the one thing this layer exists to prevent.
+        expect(declaration.supplies).toEqual({
+          tokenCounters: false,
+          amount: false,
+          toolStatedStep: false,
         });
-        continue;
-      }
-
-      it(`${tool}'s ${route} route supplies exactly what it declares`, () => {
-        expect(capture()).toEqual(declaration.supplies);
       });
+      continue;
     }
+
+    it(`${tool}'s ${route} route supplies exactly what it declares`, () => {
+      expect(capture()).toEqual(declaration.supplies);
+    });
   }
 
   it("has a capture for every route that claims to supply anything", () => {
     for (const tool of AI_TOOL_IDS) {
-      for (const route of ["export", "local"] as const) {
-        const declaration = declarationOf(tool, route);
-        if (declaration.kind !== "declared") continue;
-        const claimsSomething = Object.values(declaration.supplies).some(Boolean);
+      const declaration = declarationOf(tool);
+      if (declaration.kind !== "declared") continue;
+      const claimsSomething = Object.values(declaration.supplies).some(Boolean);
 
-        expect(
-          !claimsSomething || CAPTURES.has(`${tool}:${route}`),
-          `"${tool}" claims its ${route} route supplies something, with no capture to check it against`
-        ).toBe(true);
-      }
+      expect(
+        !claimsSomething || CAPTURES.has(`${tool}:${route}`),
+        `"${tool}" claims its ${route} route supplies something, with no capture to check it against`
+      ).toBe(true);
     }
   });
 });

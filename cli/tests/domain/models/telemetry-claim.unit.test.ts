@@ -23,7 +23,6 @@ function evidence(overrides: Partial<TelemetryEvidence> = {}): TelemetryEvidence
     journals: [],
     toolReads: [],
     runsDirLabel: RUNS_DIR_LABEL,
-    exportConfig: null,
     ...overrides,
   };
 }
@@ -288,106 +287,22 @@ describe("diagnoseTelemetryClaims — records join", () => {
   });
 });
 
-describe("diagnoseTelemetryClaims — export configured", () => {
-  it("reads ok once the tool's own settings carry a working endpoint", () => {
-    const result = diagnoseTelemetryClaims(
-      evidence({
-        exportConfig: {
-          configured: true,
-          configuredDetail: "OTLP to 127.0.0.1:4318 (.claude/settings.local.json)",
-          identityDisabled: false,
-        },
-      })
-    );
-    const c = claim(result, "export-configured");
-    expect(c?.verdict).toBe("ok");
-    expect(c?.detail).toContain("127.0.0.1:4318");
-  });
-
-  it("names the missing setting, not a generic failure, when nothing turned it on", () => {
-    const result = diagnoseTelemetryClaims(
-      evidence({
-        exportConfig: {
-          configured: false,
-          missingDetail:
-            "CLAUDE_CODE_ENABLE_TELEMETRY=1 is not set, across .claude/settings.local.json",
-          identityDisabled: false,
-        },
-      })
-    );
-    const c = claim(result, "export-configured");
-    expect(c?.verdict).toBe("fail");
-    expect(c?.reason).toBe("export-missing");
-    expect(c?.detail).toContain("CLAUDE_CODE_ENABLE_TELEMETRY");
-  });
-
-  it("has no session anchor to tell whose export settings to check", () => {
-    const result = diagnoseTelemetryClaims(evidence({ exportConfig: null }));
-    const c = claim(result, "export-configured");
-    expect(c?.verdict).toBe("unknown");
-    expect(c?.reason).toBe("no-session-anchor-for-export");
-  });
-});
-
-describe("diagnoseTelemetryClaims — identifier joinable", () => {
-  it("reads ok once an exported record carries the identity attribute", () => {
-    const result = diagnoseTelemetryClaims(
-      evidence({
-        exportConfig: { configured: true, identityDisabled: false },
-        exportedRecord: { vendorField: "session.id" },
-      })
-    );
-    const c = claim(result, "identifier-joinable");
-    expect(c?.verdict).toBe("ok");
-    expect(c?.detail).toContain("session.id");
-  });
-
-  it("names the disabling setting, not an absence of data, when identity is disabled", () => {
-    const result = diagnoseTelemetryClaims(
-      evidence({
-        exportConfig: {
-          configured: true,
-          identityDisabled: true,
-          identityDisabledDetail: "OTEL_METRICS_INCLUDE_SESSION_ID=false strips the identifier",
-        },
-      })
-    );
-    const c = claim(result, "identifier-joinable");
-    expect(c?.verdict).toBe("fail");
-    expect(c?.reason).toBe("identity-disabled");
-    expect(c?.detail).toContain("OTEL_METRICS_INCLUDE_SESSION_ID");
-  });
-
-  it("has nothing to join when no export is configured at all", () => {
-    const result = diagnoseTelemetryClaims(
-      evidence({ exportConfig: { configured: false, identityDisabled: false } })
-    );
-    const c = claim(result, "identifier-joinable");
-    expect(c?.verdict).toBe("unknown");
-    expect(c?.reason).toBe("no-export-to-join");
-  });
-
-  it("has nothing to join yet when export is configured but no record has reached the sink", () => {
-    const result = diagnoseTelemetryClaims(
-      evidence({ exportConfig: { configured: true, identityDisabled: false } })
-    );
-    const c = claim(result, "identifier-joinable");
-    expect(c?.verdict).toBe("unknown");
-    expect(c?.reason).toBe("export-configured-no-record-yet");
-  });
-});
-
 describe("diagnoseTelemetryClaims — the whole set", () => {
-  it("always returns exactly six claims, in the fixed order, none of them ever unjudged", () => {
+  it("always returns exactly four claims, in the fixed order, none of them ever unjudged", () => {
     const result = diagnoseTelemetryClaims(evidence());
     expect(result.map((c) => c.claim)).toEqual([
       "hook-fired",
       "session-journalled",
       "tool-files-readable",
       "records-join",
-      "export-configured",
-      "identifier-joinable",
     ]);
     for (const c of result) expect(["ok", "fail", "unknown"]).toContain(c.verdict);
+  });
+
+  it("no claim mentions exporting, a destination, or an identity attribute", () => {
+    const result = diagnoseTelemetryClaims(evidence());
+    for (const c of result) {
+      expect(c.detail.toLowerCase()).not.toMatch(/export|endpoint|identifier|identity/u);
+    }
   });
 });

@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   buildTelemetrySwitchFile,
-  isValidTelemetryEndpoint,
   parseTelemetrySwitchFile,
   personRefusesTelemetry,
   resolveTelemetryEnabled,
@@ -150,19 +149,6 @@ describe("the hook (repo.cjs) and the CLI agree, for every combination", () => {
       expect(cliResult).toBe(expected);
     });
   }
-});
-
-describe("isValidTelemetryEndpoint", () => {
-  it("accepts http and https URLs", () => {
-    expect(isValidTelemetryEndpoint("https://otel.example.com")).toBe(true);
-    expect(isValidTelemetryEndpoint("http://127.0.0.1:4318")).toBe(true);
-  });
-
-  it("rejects non-http(s) schemes and unparseable values", () => {
-    expect(isValidTelemetryEndpoint("ftp://example.com")).toBe(false);
-    expect(isValidTelemetryEndpoint("not a url")).toBe(false);
-    expect(isValidTelemetryEndpoint("")).toBe(false);
-  });
 });
 
 describe("buildTelemetrySwitchFile", () => {

@@ -9,7 +9,6 @@ import {
   toMicroUsd,
 } from "../../../src/domain/models/cost-report.js";
 import {
-  mapOtlpLogsToSinkRecords,
   parseTelemetrySinkLine,
   type TelemetrySinkRecord,
 } from "../../../src/domain/models/telemetry-sink-record.js";
@@ -104,36 +103,85 @@ describe("buildCostReport — the two kinds are never summed", () => {
 });
 
 // A user who enables the OTLP export and also runs the local read sees every billed
-// request line twice: once from each route. Both fixtures below are real captured export
-// payloads — `otlp-logs-claude-code.json` (one main-agent request) and
-// `otlp-logs-claude-code-subagent.json` (a main-agent request and the subagent request it
-// spawned) — mapped through the real production mapper, never hand-built: three billed
-// calls, matching the defect report's own worked count. The local-read half is what
+// request line twice: once from each route. The export route (the OTLP receiver, the
+// mapper, and the two payloads these three records were originally mapped from —
+// `otlp-logs-claude-code.json` and `otlp-logs-claude-code-subagent.json`) was deleted in
+// "one route, and every sentence about it true"
+// (aidd_docs/tasks/2026_08/2026_08_28_one-route-that-is-true/): three billed calls, matching
+// the defect report's own worked count. These three records are the exact output the real
+// production mapper produced from those two payloads, hand-transcribed here rather than
+// mapped live, because a stored line outlives the code that wrote it — this test proves the
+// double-count rule still holds against a record shaped exactly like one an earlier version
+// of this tool actually wrote to someone's real sink. The local-read half is what
 // `read-local-cost-use-case.ts` would produce for those exact same three billed calls: same
 // `billed_request_id` (Claude Code's `requestId`, carried by both routes for the same
 // call), no `cost_usd` (no local reader has ever captured one), a tool-stated `step` the
-// export route never carries at all. `requests` and `inputTokens` below reproduce the
+// export route never carried at all. `requests` and `inputTokens` below reproduce the
 // defect report's own figures exactly (6 naive, 3 collapsed; 12 naive, 6 collapsed);
-// `outputTokens`/`cacheReadTokens` do not — these two checked-in fixtures carry smaller
-// figures than whatever fuller session the report was written against, so this test checks
-// its own union's true totals rather than asserting numbers these fixtures cannot produce.
+// `outputTokens`/`cacheReadTokens` do not — these two payloads carried smaller figures than
+// whatever fuller session the report was written against, so this test checks its own
+// union's true totals rather than asserting numbers these payloads never produced.
 describe("buildCostReport — one billed call, seen by both routes, counts once", () => {
-  const EXPORT_VENDORS = [
-    { tool: "claude" as const, identityAttribute: "session.id", turnAttribute: "prompt.id" },
-  ];
-  const FIXTURES_DIR = new URL("../../fixtures/telemetry-sink/", import.meta.url);
-
-  function loadFixture(name: string): unknown {
-    return JSON.parse(readFileSync(fileURLToPath(new URL(name, FIXTURES_DIR)), "utf8"));
-  }
-
   function exportedApiRequests(): readonly TelemetrySinkRecord[] {
     return [
-      ...mapOtlpLogsToSinkRecords(loadFixture("otlp-logs-claude-code.json"), EXPORT_VENDORS),
-      ...mapOtlpLogsToSinkRecords(
-        loadFixture("otlp-logs-claude-code-subagent.json"),
-        EXPORT_VENDORS
-      ),
+      {
+        sink_schema_version: 2,
+        kind: "request",
+        provenance: "export",
+        tool: "claude",
+        vendor_id: "7c53f826-fc3e-4729-8e2b-2cba887d3926",
+        vendor_field: "session.id",
+        turn_id: "a4b7b0b6-dc16-4889-b25a-def1d207aec9",
+        turn_field: "prompt.id",
+        step_attribution: "unattributed",
+        project_id: "aidd-lab/telemetry-proof",
+        billed_request_id: "req_011CeAaRe8Mm7oS7xvfjDPw8",
+        cost_usd: 0.013220099999999999,
+        input_tokens: 2,
+        output_tokens: 4,
+        cache_read_tokens: 43847,
+        cache_creation_tokens: 0,
+        model: "claude-sonnet-5",
+        event_timestamp: "2026-08-18T17:04:39.258Z",
+      },
+      {
+        sink_schema_version: 2,
+        kind: "request",
+        provenance: "export",
+        tool: "claude",
+        vendor_id: "22177147-d8cb-4ee1-976f-0ef82bd62491",
+        vendor_field: "session.id",
+        turn_id: "a7294fac-94af-4c32-b02d-d4c9a6d6edaa",
+        turn_field: "prompt.id",
+        step_attribution: "unattributed",
+        billed_request_id: "req_011CeBjuapGBsHnPVLStybgB",
+        cost_usd: 0.10862279999999999,
+        input_tokens: 2,
+        output_tokens: 157,
+        cache_read_tokens: 27506,
+        cache_creation_tokens: 16335,
+        model: "claude-sonnet-5",
+        event_timestamp: "2026-08-19T07:49:37.014Z",
+      },
+      {
+        sink_schema_version: 2,
+        kind: "request",
+        provenance: "export",
+        tool: "claude",
+        vendor_id: "22177147-d8cb-4ee1-976f-0ef82bd62491",
+        vendor_field: "session.id",
+        turn_id: "a7294fac-94af-4c32-b02d-d4c9a6d6edaa",
+        turn_field: "prompt.id",
+        step_attribution: "unattributed",
+        billed_request_id: "req_011CeBjux2xeafVaiUX646Qz",
+        cost_usd: 0.05190105,
+        input_tokens: 2,
+        output_tokens: 4,
+        cache_read_tokens: 14096,
+        cache_creation_tokens: 12695,
+        model: "claude-sonnet-5",
+        event_timestamp: "2026-08-19T07:49:40.427Z",
+      },
     ];
   }
 

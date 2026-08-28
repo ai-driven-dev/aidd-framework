@@ -10,16 +10,7 @@ import "../../../src/domain/tools/ai/copilot.js";
 import "../../../src/domain/tools/ai/cursor.js";
 import "../../../src/domain/tools/ai/opencode.js";
 import { ReadLocalCostUseCase } from "../../../src/application/use-cases/telemetry/read-local-cost-use-case.js";
-import {
-  mapOtlpLogsToSinkRecords,
-  mapOtlpMetricsToSinkRecords,
-} from "../../../src/domain/models/telemetry-sink-record.js";
 import type { LocalCostCandidateRecord } from "../../../src/domain/ports/session-cost-reader.js";
-import {
-  CLAUDE_TELEMETRY_IDENTITY_ATTRIBUTE,
-  CLAUDE_TELEMETRY_SESSION_MEASURES,
-  CLAUDE_TELEMETRY_TURN_ATTRIBUTE,
-} from "../../../src/domain/tools/ai/claude-telemetry.js";
 import { NULL_PERSON_IDENTITY_READER } from "../../helpers/ports/in-memory-person-identity-reader.js";
 import { NULL_RUN_JOURNAL_READER } from "../../helpers/ports/in-memory-run-journal-reader.js";
 import { InMemoryTelemetrySink } from "../../helpers/ports/in-memory-telemetry-sink.js";
@@ -36,14 +27,8 @@ const CONTRACT_DOC_URL = new URL(
   "../../../../aidd_docs/product/metrics-contract.md",
   import.meta.url
 );
-const FIXTURES_DIR = new URL("../../fixtures/telemetry-sink/", import.meta.url);
-
 function readTextFile(url: URL): string {
   return readFileSync(fileURLToPath(url), "utf8");
-}
-
-function loadFixture(name: string): unknown {
-  return JSON.parse(readTextFile(new URL(name, FIXTURES_DIR)));
 }
 
 /** Every field name on `TelemetrySinkRecord`, read straight off the interface's own text —
@@ -96,58 +81,6 @@ describe("metrics contract vs. TelemetrySinkRecord", () => {
     const documentedFields = new Set(documentedFieldNames());
     const stale = [...documentedFields].filter((f) => !recordFields.has(f));
     expect(stale, `documented field(s) no longer on the record: ${stale.join(", ")}`).toEqual([]);
-  });
-});
-
-describe("metrics contract worked example: the two record kinds overlap", () => {
-  const vendors = [
-    {
-      tool: "claude" as const,
-      identityAttribute: CLAUDE_TELEMETRY_IDENTITY_ATTRIBUTE,
-      turnAttribute: CLAUDE_TELEMETRY_TURN_ATTRIBUTE,
-    },
-  ];
-
-  function docDollarFigure(rowNeedle: string): number {
-    const doc = readTextFile(CONTRACT_DOC_URL);
-    const rowStart = doc.indexOf(rowNeedle);
-    if (rowStart === -1) throw new Error(`worked-example row not found in doc: ${rowNeedle}`);
-    const lineEnd = doc.indexOf("\n", rowStart);
-    const match = doc.slice(rowStart, lineEnd).match(/\*\*\$([0-9]+\.[0-9]+)\*\*/);
-    if (!match) throw new Error(`no bolded dollar figure found on row: ${rowNeedle}`);
-    return Number(match[1]);
-  }
-
-  it("recomputes the request-line total from the captured fixture, and it matches the doc", () => {
-    const logs = loadFixture("otlp-logs-claude-code-subagent.json");
-    const records = mapOtlpLogsToSinkRecords(logs, vendors);
-    expect(records.length).toBeGreaterThan(0);
-    expect(records.every((r) => r.kind === "request")).toBe(true);
-    const total = records.reduce((sum, r) => sum + (r.cost_usd ?? 0), 0);
-    const documented = docDollarFigure("`otlp-logs-claude-code-subagent.json`");
-    expect(Number(total.toFixed(4))).toBeCloseTo(documented, 4);
-  });
-
-  it("recomputes the session-line cost delta from the captured fixture, and it matches the doc", () => {
-    const metrics = loadFixture("otlp-metrics-claude-code.json");
-    const records = mapOtlpMetricsToSinkRecords(
-      metrics,
-      vendors,
-      CLAUDE_TELEMETRY_SESSION_MEASURES
-    );
-    expect(records.length).toBeGreaterThan(0);
-    expect(records.every((r) => r.kind === "session")).toBe(true);
-    // "One line per datapoint, never merged" — exactly one of the six lines carries cost_usd.
-    const costLines = records.filter((r) => r.cost_usd !== undefined);
-    expect(costLines).toHaveLength(1);
-    const documented = docDollarFigure("`otlp-metrics-claude-code.json`");
-    expect(Number((costLines[0].cost_usd as number).toFixed(4))).toBeCloseTo(documented, 4);
-  });
-
-  it("documents that the metrics export uses delta aggregation temporality, and the fixture agrees", () => {
-    const raw = readTextFile(new URL("otlp-metrics-claude-code.json", FIXTURES_DIR));
-    expect(raw).toContain('"aggregationTemporality": 1');
-    expect(readTextFile(CONTRACT_DOC_URL)).toContain("aggregationTemporality: 1");
   });
 });
 

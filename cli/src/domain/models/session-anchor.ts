@@ -1,5 +1,3 @@
-import type { AiToolId } from "./tool-ids.js";
-
 /**
  * Which environment variable, if any, names the session actually running this process —
  * `aidd telemetry check`'s "hook fired" claim needs to tell a genuinely dead hook from one
@@ -18,13 +16,4 @@ import type { AiToolId } from "./tool-ids.js";
  */
 export function resolveSessionAnchor(env: NodeJS.ProcessEnv): string | undefined {
   return env.CODEX_THREAD_ID || env.CLAUDE_CODE_SESSION_ID;
-}
-
-/** Same two variables, same precedence, naming which tool set the one that matched —
- * the export-route claims need to know whose settings to check, independent of whether
- * the run journal itself ever gets read. */
-export function resolveCurrentTool(env: NodeJS.ProcessEnv): AiToolId | undefined {
-  if (env.CODEX_THREAD_ID) return "codex";
-  if (env.CLAUDE_CODE_SESSION_ID) return "claude";
-  return undefined;
 }

@@ -1,13 +1,7 @@
 import type { Command } from "commander";
-import {
-  DEFAULT_TELEMETRY_SCOPE,
-  TELEMETRY_SCOPES,
-  type TelemetryScope,
-} from "../../domain/capabilities/telemetry-capability.js";
 import { toCostReportEnvelope } from "../../domain/models/cost-report-envelope.js";
 import { DEFAULT_REPORT_DAYS, resolveReportPeriod } from "../../domain/models/report-period.js";
 import { createDeps } from "../../infrastructure/deps.js";
-import { resolveHomeDir } from "../../infrastructure/home-dir.js";
 import { ARTEFACT_AXES, buildCostReportArtefact } from "../display/cost-report-artefact.js";
 import { printCostReport } from "../display/cost-report-display.js";
 import { printTelemetryCheckReport } from "../display/telemetry-check-display.js";
@@ -20,28 +14,11 @@ import {
   printPersonIdentityStatus,
   printPersonIdentityUnlink,
   printPersonIdentityUse,
-  printTelemetryEndpointClearReport,
-  printTelemetryEndpointReport,
   printTelemetryOffReport,
   printTelemetryOnReport,
 } from "../display/telemetry-display.js";
 import { ErrorHandler } from "../error-handler.js";
-import { InvalidTelemetryReceivePortError, InvalidTelemetryScopeError } from "../errors.js";
 import { parseGlobalOptions } from "./global-options.js";
-
-export function parseTelemetryReceivePort(raw: string): number {
-  const port = Number(raw);
-  if (!Number.isInteger(port) || port < 0 || port > 65535) {
-    throw new InvalidTelemetryReceivePortError(raw);
-  }
-  return port;
-}
-
-export function parseTelemetryScope(raw: string | undefined): TelemetryScope {
-  if (raw === undefined) return DEFAULT_TELEMETRY_SCOPE;
-  if ((TELEMETRY_SCOPES as readonly string[]).includes(raw)) return raw as TelemetryScope;
-  throw new InvalidTelemetryScopeError(raw);
-}
 
 export function registerTelemetryCommand(program: Command): void {
   const telemetry = program
@@ -66,27 +43,6 @@ export function registerTelemetryCommand(program: Command): void {
           confirmed: cmdOptions.yes,
         });
         printTelemetryOnReport(output, result);
-      } catch (error) {
-        errorHandler.handle(error);
-      }
-    });
-
-  registerTelemetryEndpointCommand(telemetry, program);
-
-  telemetry
-    .command("receive")
-    .description("Listen for OTLP telemetry exports and store them under the AIDD telemetry sink")
-    .option("--port <number>", "Port to listen on (default: 4318, the OTLP/HTTP default)", "4318")
-    .action(async (cmdOptions: { port: string }) => {
-      const { verbose, output } = parseGlobalOptions(program);
-      const errorHandler = new ErrorHandler(output);
-      try {
-        const port = parseTelemetryReceivePort(cmdOptions.port);
-        const deps = await createDeps(process.cwd(), { verbose }, output);
-        const { rootDir } = await deps.receiveTelemetryUseCase.start();
-        output.info(`AIDD telemetry sink -> ${rootDir}`);
-        const { port: boundPort } = await deps.otlpHttpReceiverAdapter.listen(port);
-        output.info(`Listening for OTLP telemetry on http://localhost:${boundPort}`);
       } catch (error) {
         errorHandler.handle(error);
       }
@@ -202,11 +158,9 @@ export function registerTelemetryCommand(program: Command): void {
 }
 
 /** Whether the measurement chain is actually recording, not merely installed — a hook
- * that fired, a session that closed, a tool's own files that can be read, the two
- * joining, whether a tool's own export is configured, and whether the identifier it
- * carries can be joined back to this session. Wiring only: gathers through
- * `deps.diagnoseTelemetryUseCase`, prints through `printTelemetryCheckReport`, and every
- * failure routes through `errorHandler.handle`. */
+ * that fired, a session that closed, a tool's own files that can be read, and the two
+ * joining. Wiring only: gathers through `deps.diagnoseTelemetryUseCase`, prints through
+ * `printTelemetryCheckReport`, and every failure routes through `errorHandler.handle`. */
 function registerTelemetryCheckCommand(telemetry: Command, program: Command): void {
   telemetry
     .command("check")
@@ -218,61 +172,9 @@ function registerTelemetryCheckCommand(telemetry: Command, program: Command): vo
         const deps = await createDeps(projectRoot, { verbose }, output);
         const result = await deps.diagnoseTelemetryUseCase.execute({
           projectRoot,
-          homeDir: resolveHomeDir(),
           env: process.env,
         });
         printTelemetryCheckReport(output, result);
-      } catch (error) {
-        errorHandler.handle(error);
-      }
-    });
-}
-
-/** Whether installed tools export OTLP telemetry, and where to — never the `on`/`off`
- * switch beside it. Modeled on `identity`'s noun-with-verbs shape: `endpoint <url>` sets
- * it, `endpoint clear` undoes it. Wiring only: every verb reads through the matching
- * `deps.telemetryEndpoint*UseCase`, and every failure routes through `errorHandler.handle`. */
-function registerTelemetryEndpointCommand(telemetry: Command, program: Command): void {
-  const endpoint = telemetry
-    .command("endpoint")
-    .description("Configure installed tools to export OTLP telemetry to a destination");
-
-  endpoint
-    .argument("<url>", "OTEL export endpoint the tools should send to")
-    .option(
-      "--scope <local|project|user>",
-      "Where a tool's export config is written (default: local)"
-    )
-    .option("--yes", "Confirm writing the git-tracked project-scope settings file", false)
-    .action(async (url: string, cmdOptions: { scope?: string; yes: boolean }) => {
-      const { verbose, output, projectRoot } = parseGlobalOptions(program);
-      const errorHandler = new ErrorHandler(output);
-      try {
-        const scope = parseTelemetryScope(cmdOptions.scope);
-        const deps = await createDeps(projectRoot, { verbose }, output);
-        const result = await deps.telemetryEndpointUseCase.execute({
-          projectRoot,
-          homeDir: resolveHomeDir(),
-          endpoint: url,
-          scope,
-          confirmProjectScope: cmdOptions.yes,
-        });
-        printTelemetryEndpointReport(output, result);
-      } catch (error) {
-        errorHandler.handle(error);
-      }
-    });
-
-  endpoint
-    .command("clear")
-    .description("Remove what `aidd telemetry endpoint` wrote from every tool's settings")
-    .action(async () => {
-      const { verbose, output, projectRoot } = parseGlobalOptions(program);
-      const errorHandler = new ErrorHandler(output);
-      try {
-        const deps = await createDeps(projectRoot, { verbose }, output);
-        const result = await deps.telemetryEndpointClearUseCase.execute({ projectRoot });
-        printTelemetryEndpointClearReport(output, result);
       } catch (error) {
         errorHandler.handle(error);
       }

@@ -6,13 +6,7 @@ import "../../../../src/domain/tools/ai/cursor.js";
 import "../../../../src/domain/tools/ai/opencode.js";
 import { DiagnoseTelemetryUseCase } from "../../../../src/application/use-cases/telemetry/diagnose-telemetry-use-case.js";
 import type { TelemetryCodexHookTrust } from "../../../../src/domain/models/telemetry-claim.js";
-import type { TelemetrySinkRecord } from "../../../../src/domain/models/telemetry-sink-record.js";
 import type { AiToolId } from "../../../../src/domain/models/tool-ids.js";
-import type {
-  ExportConfig,
-  ExportConfigReader,
-} from "../../../../src/domain/ports/export-config-reader.js";
-import type { ExportSinkReader } from "../../../../src/domain/ports/export-sink-reader.js";
 import type { HookTrustReader } from "../../../../src/domain/ports/hook-trust-reader.js";
 import type { RunJournal } from "../../../../src/domain/ports/run-journal-reader.js";
 import type {
@@ -49,22 +43,6 @@ class StubHookTrustReader implements HookTrustReader {
 
   async read(): Promise<TelemetryCodexHookTrust> {
     return this.trust;
-  }
-}
-
-class StubExportConfigReader implements ExportConfigReader {
-  config: ExportConfig | null = null;
-
-  async read(): Promise<ExportConfig | null> {
-    return this.config;
-  }
-}
-
-class StubExportSinkReader implements ExportSinkReader {
-  record: TelemetrySinkRecord | undefined;
-
-  async findExportedRecordForSession(): Promise<TelemetrySinkRecord | undefined> {
-    return this.record;
   }
 }
 
@@ -115,8 +93,6 @@ function buildUseCase(options: {
   journals?: readonly RunJournal[];
   readers?: ReadonlyMap<AiToolId, SessionCostReader>;
   hookTrustReader?: StubHookTrustReader;
-  exportConfigReader?: StubExportConfigReader;
-  exportSinkReader?: StubExportSinkReader;
 }) {
   const evidence = options.evidence ?? new StubEvidenceReader();
   const journalReader = new InMemoryRunJournalReader();
@@ -124,18 +100,14 @@ function buildUseCase(options: {
     journalReader.set(journal.session?.vendor_id ?? `no-session-${index}`, journal);
   }
   const hookTrustReader = options.hookTrustReader ?? new StubHookTrustReader();
-  const exportConfigReader = options.exportConfigReader ?? new StubExportConfigReader();
-  const exportSinkReader = options.exportSinkReader ?? new StubExportSinkReader();
   const useCase = new DiagnoseTelemetryUseCase(
     evidence,
     versionControl(options.isRepository ?? true),
     journalReader,
     options.readers ?? new Map(),
-    hookTrustReader,
-    exportConfigReader,
-    exportSinkReader
+    hookTrustReader
   );
-  return { useCase, evidence, hookTrustReader, exportConfigReader, exportSinkReader };
+  return { useCase, evidence, hookTrustReader };
 }
 
 function runOptions(env: NodeJS.ProcessEnv = {}) {
@@ -240,7 +212,7 @@ describe("DiagnoseTelemetryUseCase — gathering local evidence", () => {
   });
 });
 
-describe("DiagnoseTelemetryUseCase — gathering export evidence", () => {
+describe("DiagnoseTelemetryUseCase — every claim is judged", () => {
   it("never lets absent evidence produce an ok: no claim is ever left unjudged", async () => {
     const { useCase } = buildUseCase({});
 
@@ -248,47 +220,5 @@ describe("DiagnoseTelemetryUseCase — gathering export evidence", () => {
 
     if (result.gate !== undefined) throw new Error("expected the run to pass the gate");
     for (const claim of result.claims) expect(["ok", "fail", "unknown"]).toContain(claim.verdict);
-    expect(result.claims.find((c) => c.claim === "export-configured")?.reason).toBe(
-      "no-session-anchor-for-export"
-    );
-  });
-
-  it("reads the export config for the tool the session anchor names", async () => {
-    const exportConfigReader = new StubExportConfigReader();
-    exportConfigReader.config = {
-      checked: [".claude/settings.local.json"],
-      configured: true,
-      configuredDetail: "OTLP to 127.0.0.1:4318",
-      identityDisabled: false,
-    };
-    const { useCase } = buildUseCase({ exportConfigReader });
-
-    const result = await useCase.execute(runOptions({ CLAUDE_CODE_SESSION_ID: "s-1" }));
-
-    if (result.gate !== undefined) throw new Error("expected the run to pass the gate");
-    expect(result.claims.find((c) => c.claim === "export-configured")?.verdict).toBe("ok");
-  });
-
-  it("reads whether an exported record for this session already reached the sink", async () => {
-    const exportConfigReader = new StubExportConfigReader();
-    exportConfigReader.config = { checked: [], configured: true, identityDisabled: false };
-    const exportSinkReader = new StubExportSinkReader();
-    exportSinkReader.record = {
-      sink_schema_version: 2,
-      provenance: "export",
-      tool: "claude",
-      vendor_id: "s-1",
-      vendor_field: "session.id",
-      kind: "request",
-      step_attribution: "unattributed",
-    };
-    const { useCase } = buildUseCase({ exportConfigReader, exportSinkReader });
-
-    const result = await useCase.execute(runOptions({ CLAUDE_CODE_SESSION_ID: "s-1" }));
-
-    if (result.gate !== undefined) throw new Error("expected the run to pass the gate");
-    const claim = result.claims.find((c) => c.claim === "identifier-joinable");
-    expect(claim?.verdict).toBe("ok");
-    expect(claim?.detail).toContain("session.id");
   });
 });

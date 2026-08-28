@@ -42,7 +42,12 @@ function declaredTools(): readonly CostReportToolDeclaration[] {
     const localRead = config.telemetryLocalRead;
     const capability: CostReportToolCapability = {
       localRead: localRead.kind === "declared" ? localRead.supplies : null,
-      export: config.telemetryExport.kind === "declared" ? config.telemetryExport.supplies : null,
+      // No tool declares an export route any more — "one route, and every sentence about
+      // it true" deleted the OTLP receiver, so nothing configures one and nothing could
+      // ever supply this. Always `null`, the same value a tool with no declaration at all
+      // already carried, rather than a type change that would ripple through the `--json`
+      // contract for a capability that can no longer exist either way.
+      export: null,
       journalAttributable: config.telemetryJournalHost !== undefined,
       taskAttributable: config.telemetryTaskAttributable,
     };

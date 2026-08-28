@@ -89,11 +89,7 @@
           "amount": false,
           "tool_stated_step": true
         },
-        "export": {
-          "token_counters": true,
-          "amount": true,
-          "tool_stated_step": false
-        },
+        "export": null,
         "journal_attributable": true,
         "task_attributable": true
       },
@@ -129,11 +125,7 @@
           "amount": false,
           "tool_stated_step": false
         },
-        "export": {
-          "token_counters": false,
-          "amount": false,
-          "tool_stated_step": false
-        },
+        "export": null,
         "journal_attributable": true,
         "task_attributable": true
       },
@@ -175,11 +167,7 @@
           "amount": false,
           "tool_stated_step": false
         },
-        "export": {
-          "token_counters": false,
-          "amount": false,
-          "tool_stated_step": false
-        },
+        "export": null,
         "journal_attributable": true,
         "task_attributable": true
       },

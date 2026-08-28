@@ -1,21 +1,26 @@
 import type { AiToolId } from "./tool-ids.js";
 
 /**
- * Six independently verifiable claims about the measurement chain, each answered from
+ * Four independently verifiable claims about the measurement chain, each answered from
  * what was actually read, never inferred from the others. Ported from the plugin's own
- * `diagnose.cjs` — see that file's own doc comment for the two routes this set covers: a
+ * `diagnose.cjs` — see that file's own doc comment for the one route this set covers: a
  * local route (`hook fired` -> `session journalled` -> `tool files readable` ->
- * `records join`) and an export route (`export configured` -> `identifier joinable`),
- * whose own configuration and own sink are read fresh, never through the local route's
- * data.
+ * `records join`).
+ *
+ * Two more claims — `export-configured` and `identifier-joinable` — graded a second,
+ * export route. That route (the OTLP receiver, the export config reader, and the mapper
+ * that turned an exported payload into a stored record) was deleted in "one route, and
+ * every sentence about it true" (aidd_docs/tasks/2026_08/2026_08_28_one-route-that-is-true/):
+ * on the machine that built this system, those two claims graded a route that had never
+ * once produced a record, and failed a healthy install by recommending the one action that
+ * sends a person's address off the machine. Every diagnostic claim is now about the one
+ * route that exists.
  */
 export type TelemetryClaimId =
   | "hook-fired"
   | "session-journalled"
   | "tool-files-readable"
-  | "records-join"
-  | "export-configured"
-  | "identifier-joinable";
+  | "records-join";
 
 export type TelemetryClaimVerdict = "ok" | "fail" | "unknown";
 
@@ -41,14 +46,7 @@ export type TelemetryClaimReason =
   | "records-joined"
   | "all-unattributed"
   | "no-record-to-join"
-  | "no-join-material"
-  | "no-session-anchor-for-export"
-  | "export-missing"
-  | "export-configured"
-  | "no-export-to-join"
-  | "identity-disabled"
-  | "identifier-present"
-  | "export-configured-no-record-yet";
+  | "no-join-material";
 
 export interface TelemetryClaim {
   readonly claim: TelemetryClaimId;
@@ -91,24 +89,6 @@ export interface TelemetryCodexHookTrust {
   readonly reason?: string;
 }
 
-/** The shape `claimExportConfigured`/`claimIdentifierJoinable` read off a tool's own
- * export configuration — structurally identical to `domain/ports/export-config-reader.ts`'s
- * `ExportConfig`, restated here rather than imported so this pure judging module carries
- * no dependency on the port that happens to produce its evidence. */
-export interface TelemetryExportConfigEvidence {
-  readonly configured: boolean;
-  readonly configuredDetail?: string;
-  readonly missingDetail?: string;
-  readonly identityDisabled: boolean;
-  readonly identityDisabledDetail?: string;
-}
-
-/** The one field `claimIdentifierJoinable` reads off an exported record — never the
- * counters, which this diagnostic has no business repeating from the report. */
-export interface TelemetryExportedRecordEvidence {
-  readonly vendorField?: string;
-}
-
 export interface TelemetryEvidence {
   readonly journals: readonly TelemetryClaimJournal[];
   readonly toolReads: readonly TelemetryClaimToolRead[];
@@ -116,8 +96,6 @@ export interface TelemetryEvidence {
   readonly currentSessionId?: string;
   readonly unrecognisedPayloadAt?: string;
   readonly hookTrust?: TelemetryCodexHookTrust;
-  readonly exportConfig: TelemetryExportConfigEvidence | null;
-  readonly exportedRecord?: TelemetryExportedRecordEvidence;
 }
 
 function sessionJournalsOf(
@@ -368,91 +346,12 @@ function claimRecordsJoin(toolReads: readonly TelemetryClaimToolRead[]): Telemet
   return joinedVerdict(records);
 }
 
-// Read from the export-config reader, never from the local route above: `exportConfig` is
-// `null` when `resolveCurrentTool` named no tool at all — there is no session anchor to
-// say whose export settings to check, the same reason `claimHookFired`'s own
-// `noAnchorClaim` reads `unknown` rather than guessing.
-function claimExportConfigured(exportConfig: TelemetryExportConfigEvidence | null): TelemetryClaim {
-  if (!exportConfig) {
-    return {
-      claim: "export-configured",
-      verdict: "unknown",
-      reason: "no-session-anchor-for-export",
-      detail: "no session anchor available to tell whose export settings to check",
-    };
-  }
-  if (!exportConfig.configured) {
-    return {
-      claim: "export-configured",
-      verdict: "fail",
-      reason: "export-missing",
-      detail: exportConfig.missingDetail ?? "",
-    };
-  }
-  return {
-    claim: "export-configured",
-    verdict: "ok",
-    reason: "export-configured",
-    detail: exportConfig.configuredDetail ?? "",
-  };
-}
-
-// A record that fails identity resolution is dropped before the sink ever stores it, so
-// "records arrived but could not be joined" leaves no trace the sink can be read for. The
-// only place that fault stays legible is the setting that causes it, which is why this
-// claim reads `exportConfig.identityDisabled` — read directly off the tool's own
-// configuration — ahead of ever looking at the sink: a known-broken setting is a stronger,
-// more specific claim than an absence of data.
-function identifierPresentClaim(exportedRecord: TelemetryExportedRecordEvidence): TelemetryClaim {
-  const attribute =
-    exportedRecord.vendorField !== undefined && exportedRecord.vendorField !== ""
-      ? exportedRecord.vendorField
-      : "an identity attribute";
-  return {
-    claim: "identifier-joinable",
-    verdict: "ok",
-    reason: "identifier-present",
-    detail: `${attribute} present on an exported record for this session`,
-  };
-}
-
-function claimIdentifierJoinable(
-  exportConfig: TelemetryExportConfigEvidence | null,
-  exportedRecord: TelemetryExportedRecordEvidence | undefined
-): TelemetryClaim {
-  if (!exportConfig?.configured) {
-    return {
-      claim: "identifier-joinable",
-      verdict: "unknown",
-      reason: "no-export-to-join",
-      detail: "no export configured to join a record from - see export configured",
-    };
-  }
-  if (exportConfig.identityDisabled) {
-    return {
-      claim: "identifier-joinable",
-      verdict: "fail",
-      reason: "identity-disabled",
-      detail: exportConfig.identityDisabledDetail ?? "",
-    };
-  }
-  if (exportedRecord) return identifierPresentClaim(exportedRecord);
-  return {
-    claim: "identifier-joinable",
-    verdict: "unknown",
-    reason: "export-configured-no-record-yet",
-    detail: "export configured but no exported record has reached the sink yet for this session",
-  };
-}
-
-/** The six claims, always in this order, and never a seventh line that summarises them. */
+/** The four claims, always in this order, and never a fifth line that summarises them. */
 export function diagnoseTelemetryClaims(evidence: TelemetryEvidence): readonly TelemetryClaim[] {
   return [
     claimHookFired(evidence),
     claimSessionJournalled(evidence.journals),
     claimToolsReadable(evidence.journals, evidence.toolReads),
     claimRecordsJoin(evidence.toolReads),
-    claimExportConfigured(evidence.exportConfig),
-    claimIdentifierJoinable(evidence.exportConfig, evidence.exportedRecord),
   ];
 }

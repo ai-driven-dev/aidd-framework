@@ -449,23 +449,6 @@ export class EmptyMarketplaceCacheNameError extends Error {
   }
 }
 
-export class MissingTelemetryEndpointError extends Error {
-  constructor() {
-    super(
-      "No OTEL export endpoint given. Arming a tool to export needs one — there is no " +
-        "default, not even localhost. Measuring locally needs none: `aidd telemetry on`."
-    );
-    this.name = "MissingTelemetryEndpointError";
-  }
-}
-
-export class InvalidTelemetryEndpointError extends Error {
-  constructor(value: string) {
-    super(`Invalid telemetry endpoint '${value}' — expected an http(s) URL.`);
-    this.name = "InvalidTelemetryEndpointError";
-  }
-}
-
 export class NativePluginCliError extends Error {
   constructor(message: string) {
     super(message);

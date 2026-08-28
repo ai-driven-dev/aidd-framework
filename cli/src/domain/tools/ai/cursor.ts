@@ -134,18 +134,6 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
       }),
     },
 
-    telemetry: {
-      kind: "external",
-      reason: "Cannot be enabled by us — a team setting on an Enterprise plan, in beta.",
-      remedy: "Enable it from your Cursor admin dashboard.",
-    },
-
-    // Cursor's documentation names `cursor.conversation.id`, but no payload has ever been
-    // captured: the export is an Enterprise team setting nobody here can turn on. A field
-    // read from documentation is a guess, and a guess declared as measured is the kind of
-    // false figure this whole layer exists to prevent.
-    telemetryExport: { kind: "unmeasured" },
-
     // Measured: Cursor writes no token count in any file it produces — there is nothing
     // on disk for a local reader to find. A gap this deliverable names rather than fills;
     // see spec.md non-goals.

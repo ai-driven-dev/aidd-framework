@@ -1,4 +1,4 @@
-import { resolveCurrentTool, resolveSessionAnchor } from "../../../domain/models/session-anchor.js";
+import { resolveSessionAnchor } from "../../../domain/models/session-anchor.js";
 import { attributeMoment, buildStepIntervals } from "../../../domain/models/step-attribution.js";
 import {
   diagnoseTelemetryClaims,
@@ -7,12 +7,8 @@ import {
   type TelemetryClaimToolRead,
   type TelemetryCodexHookTrust,
   type TelemetryEvidence,
-  type TelemetryExportConfigEvidence,
-  type TelemetryExportedRecordEvidence,
 } from "../../../domain/models/telemetry-claim.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../domain/models/tool-ids.js";
-import type { ExportConfigReader } from "../../../domain/ports/export-config-reader.js";
-import type { ExportSinkReader } from "../../../domain/ports/export-sink-reader.js";
 import type { HookTrustReader } from "../../../domain/ports/hook-trust-reader.js";
 import type { RunJournal, RunJournalReader } from "../../../domain/ports/run-journal-reader.js";
 import type { SessionCostReader } from "../../../domain/ports/session-cost-reader.js";
@@ -41,7 +37,6 @@ export type DiagnoseTelemetryResult =
 
 export interface DiagnoseTelemetryOptions {
   readonly projectRoot: string;
-  readonly homeDir: string;
   readonly env: NodeJS.ProcessEnv;
 }
 
@@ -72,8 +67,8 @@ function uncoveredTools(): readonly DiagnoseTelemetryUncoveredTool[] {
 }
 
 /**
- * Gathers every claim's evidence, local and export alike, then hands it to the pure judge
- * in `domain/models/telemetry-claim.ts`. Never writes anywhere — unlike
+ * Gathers every claim's evidence from the one route this system reads, then hands it to
+ * the pure judge in `domain/models/telemetry-claim.ts`. Never writes anywhere — unlike
  * `ReadLocalCostUseCase`, this never stores a record, since the question is only ever
  * "would a read of this session's figures work", not "read them".
  */
@@ -83,9 +78,7 @@ export class DiagnoseTelemetryUseCase {
     private readonly git: VersionControl,
     private readonly runJournalReader: RunJournalReader,
     private readonly readers: ReadonlyMap<AiToolId, SessionCostReader>,
-    private readonly hookTrustReader: HookTrustReader,
-    private readonly exportConfigReader: ExportConfigReader,
-    private readonly exportSinkReader: ExportSinkReader
+    private readonly hookTrustReader: HookTrustReader
   ) {}
 
   async execute(options: DiagnoseTelemetryOptions): Promise<DiagnoseTelemetryResult> {
@@ -101,10 +94,6 @@ export class DiagnoseTelemetryUseCase {
     const unrecognisedPayload = await this.evidence.readUnrecognisedPayload(options.projectRoot);
     const hookTrust = await this.resolveHookTrust(options.env, currentSessionId);
     const toolReads = await this.gatherToolReads(journals);
-    const { exportConfig, exportedRecord } = await this.gatherExportEvidence(
-      options,
-      currentSessionId
-    );
     return {
       journals: journals.map(toClaimJournal),
       toolReads,
@@ -112,8 +101,6 @@ export class DiagnoseTelemetryUseCase {
       currentSessionId,
       unrecognisedPayloadAt: unrecognisedPayload?.at,
       hookTrust,
-      exportConfig,
-      exportedRecord,
     };
   }
 
@@ -137,30 +124,6 @@ export class DiagnoseTelemetryUseCase {
   ): Promise<TelemetryCodexHookTrust | undefined> {
     if (env.CODEX_THREAD_ID === undefined || currentSessionId === undefined) return undefined;
     return this.hookTrustReader.read();
-  }
-
-  // Read fresh, from the export route, never from the local route's own journals/toolReads
-  // above: resolved from the same two anchor variables `resolveSessionAnchor` already
-  // probes for `currentSessionId`, but naming which tool rather than which session, since
-  // the export-config reader reads settings per tool, not per session.
-  private async gatherExportEvidence(
-    options: DiagnoseTelemetryOptions,
-    currentSessionId: string | undefined
-  ): Promise<{
-    exportConfig: TelemetryExportConfigEvidence | null;
-    exportedRecord: TelemetryExportedRecordEvidence | undefined;
-  }> {
-    const currentTool = resolveCurrentTool(options.env);
-    const exportConfig = await this.exportConfigReader.read(
-      currentTool,
-      options.projectRoot,
-      options.homeDir
-    );
-    const record =
-      currentSessionId === undefined
-        ? undefined
-        : await this.exportSinkReader.findExportedRecordForSession(currentSessionId);
-    return { exportConfig, exportedRecord: record && { vendorField: record.vendor_field } };
   }
 
   private async gatherToolReads(

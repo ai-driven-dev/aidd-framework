@@ -167,18 +167,6 @@ export const opencode: AiTool<
     }),
   },
 
-  telemetry: {
-    kind: "planned",
-    missing: "no export route of its own has been measured for this tool",
-  },
-
-  // `session.id` on `ai.streamText` spans is documented behind `experimental.openTelemetry`,
-  // but no session has been captured to confirm it against the hook-side identifier —
-  // declared unmeasured rather than guessed.
-  telemetryExport: {
-    kind: "unmeasured",
-  },
-
   // Read via `opencode export <sessionID> --sanitize` (OpencodeCostReaderAdapter),
   // measured 2026-08-20 on opencode 1.14.20 — see domain/formats/opencode-export.ts. Joins
   // to a run journal entry through hooks/opencode-plugin.js (phase 5, see the telemetry

@@ -18,8 +18,6 @@ const CLAIM_LABELS: Record<TelemetryClaimId, string> = {
   "session-journalled": "session journalled",
   "tool-files-readable": "tool files readable",
   "records-join": "records join",
-  "export-configured": "export configured",
-  "identifier-joinable": "identifier joinable",
 };
 
 const VERDICT_TOKENS: Record<TelemetryClaimVerdict, string> = {

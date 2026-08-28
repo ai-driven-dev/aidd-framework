@@ -6,11 +6,7 @@ import type { PluginsCapability } from "../capabilities/plugins-capability.js";
 import type { RulesCapability } from "../capabilities/rules-capability.js";
 import type { SettingsCapability } from "../capabilities/settings-capability.js";
 import type { SkillsCapability } from "../capabilities/skills-capability.js";
-import type {
-  TelemetryActivation,
-  TelemetryExport,
-  TelemetryLocalRead,
-} from "../capabilities/telemetry-capability.js";
+import type { TelemetryLocalRead } from "../capabilities/telemetry-capability.js";
 import type { AiToolId, IdeToolId } from "../models/tool-ids.js";
 
 export type UserFileSection = "agents" | "commands" | "rules" | "skills";
@@ -58,15 +54,9 @@ export interface AiTool<C> {
   /** How the vendor writes it. `toolId` is a key, not a name: nothing user-facing
    * should print `copilot` where a person reads "GitHub Copilot". */
   readonly displayName: string;
-  // Not a capability: `capabilities` holds what varies between tools, and every AI tool
-  // has a telemetry story — the union covers the tools AIDD cannot enable.
-  readonly telemetry: TelemetryActivation;
-  /** What the tool's OTLP export actually carries, measured independently of whether
-   * AIDD can enable it — see {@link TelemetryExport}. */
-  readonly telemetryExport: TelemetryExport;
   /** Whether this tool's own file(s) can be read locally for a session's counters — see
-   * {@link TelemetryLocalRead}. Independent of `telemetryExport`: a tool can be readable
-   * by one route, both, or neither. */
+   * {@link TelemetryLocalRead}. This is the one route this system reads: nothing here
+   * declares an export, because nothing configures one any more. */
   readonly telemetryLocalRead: TelemetryLocalRead;
   /** How the run journal's hook names this tool in its own `session_start` line, when the
    * hook writes for it at all. Not the same string as `toolId` — the hook detects a host

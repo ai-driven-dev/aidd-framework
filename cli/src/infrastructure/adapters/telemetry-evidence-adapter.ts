@@ -33,8 +33,8 @@ function parseUnrecognisedPayload(raw: string): TelemetryUnrecognisedPayload | n
 }
 
 /** Evidence `aidd telemetry check` needs beyond the run journal, each tool's own local
- * reader, a tool's own export configuration, and Codex's hook trust — see the port's own
- * doc comment for why those are not repeated here. */
+ * reader, and Codex's hook trust — see the port's own doc comment for why those are not
+ * repeated here. */
 export class TelemetryEvidenceAdapter implements TelemetryEvidenceReader {
   async isTelemetryEnabled(projectRoot: string, env: NodeJS.ProcessEnv): Promise<boolean> {
     let fileSwitch: ReturnType<typeof parseTelemetrySwitchFile> = null;

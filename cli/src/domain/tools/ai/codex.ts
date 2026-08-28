@@ -261,25 +261,6 @@ export const codex: AiTool<
     }),
   },
 
-  // Whoever writes Codex's telemetry activation: its `otel.metrics_exporter` defaults
-  // to `statsig`, a third party nobody chose. Set it explicitly (e.g. "otlp") in the
-  // `[otel]` block, or enabling telemetry silently ships metrics off-project.
-  telemetry: {
-    kind: "planned",
-    missing: "no export route of its own has been measured for this tool",
-  },
-
-  // Measured 2026-08-13: `conversation.id` on `codex.sse_event`, zero-token to verify —
-  // the identifier is minted client-side before any model call. Turn identifier and
-  // metrics export are unmeasured.
-  telemetryExport: {
-    kind: "declared",
-    identityAttribute: "conversation.id",
-    // Declared from a zero-token capture that established the identifier and nothing else:
-    // no counters have ever been observed flowing through this route.
-    supplies: { tokenCounters: false, amount: false, toolStatedStep: false },
-  },
-
   // Measured 2026-08-20: a rollout's `token_count` events carry counters but no model and
   // no request id — those come from the preceding `turn_context` event, keyed on `turn_id`.
   // Resolved by `session_meta.id`, not `session_id`, which a resumed session's rollout can

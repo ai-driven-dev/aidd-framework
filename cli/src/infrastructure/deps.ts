@@ -1,6 +1,5 @@
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename } from "node:path";
 import "../domain/tools/ai/claude.js";
 import "../domain/tools/ai/codex.js";
 import "../domain/tools/ai/copilot.js";
@@ -78,13 +77,9 @@ import { UpdateOneToolUseCase } from "../application/use-cases/shared/update-one
 import { StatusUseCase } from "../application/use-cases/status-use-case.js";
 import { SyncConflictResolverUseCase } from "../application/use-cases/sync/sync-conflict-resolver-use-case.js";
 import { DiagnoseTelemetryUseCase } from "../application/use-cases/telemetry/diagnose-telemetry-use-case.js";
-import { EnableToolTelemetryUseCase } from "../application/use-cases/telemetry/enable-tool-telemetry-use-case.js";
 import { PersonIdentityUseCase } from "../application/use-cases/telemetry/person-identity-use-case.js";
 import { ReadLocalCostUseCase } from "../application/use-cases/telemetry/read-local-cost-use-case.js";
-import { ReceiveTelemetryUseCase } from "../application/use-cases/telemetry/receive-telemetry-use-case.js";
 import { ReportCostUseCase } from "../application/use-cases/telemetry/report-cost-use-case.js";
-import { TelemetryEndpointClearUseCase } from "../application/use-cases/telemetry/telemetry-endpoint-clear-use-case.js";
-import { TelemetryEndpointUseCase } from "../application/use-cases/telemetry/telemetry-endpoint-use-case.js";
 import { TelemetryOffUseCase } from "../application/use-cases/telemetry/telemetry-off-use-case.js";
 import { TelemetryOnUseCase } from "../application/use-cases/telemetry/telemetry-on-use-case.js";
 import { UninstallIdeUseCase } from "../application/use-cases/uninstall/uninstall-ide-use-case.js";
@@ -98,10 +93,6 @@ import {
   CODEX_ROLLOUT_LOCATION,
   createCodexRolloutAccumulator,
 } from "../domain/formats/codex-rollout.js";
-import {
-  parseOwnerRepoFromRemote,
-  sanitizeProjectId,
-} from "../domain/models/telemetry-project-id.js";
 import type { AiToolId } from "../domain/models/tool-ids.js";
 import type { AssetProvider } from "../domain/ports/asset-provider.js";
 import type { CredentialStore } from "../domain/ports/credential-store.js";
@@ -132,8 +123,6 @@ import { CodexCliAdapter } from "./adapters/codex-cli-adapter.js";
 import { CopilotCliAdapter } from "./adapters/copilot-cli-adapter.js";
 import { CopilotCostReaderAdapter } from "./adapters/copilot-cost-reader-adapter.js";
 import { CurrentVersionAdapter } from "./adapters/current-version-adapter.js";
-import { ExportConfigReaderAdapter } from "./adapters/export-config-reader-adapter.js";
-import { ExportSinkReaderAdapter } from "./adapters/export-sink-reader-adapter.js";
 import { FileAdapter } from "./adapters/file-adapter.js";
 import { GhCliAdapter } from "./adapters/gh-cli-adapter.js";
 import { GhTokenAdapter } from "./adapters/gh-token-adapter.js";
@@ -147,7 +136,6 @@ import { MarketplaceCacheAdapter } from "./adapters/marketplace-cache-adapter.js
 import { MarketplaceRegistryAdapter } from "./adapters/marketplace-registry-adapter.js";
 import { MarketplaceTrustStoreAdapter } from "./adapters/marketplace-trust-store-adapter.js";
 import { OpencodeCostReaderAdapter } from "./adapters/opencode-cost-reader-adapter.js";
-import { OtlpHttpReceiverAdapter } from "./adapters/otlp-http-receiver-adapter.js";
 import { PersonIdentityAdapter } from "./adapters/person-identity-adapter.js";
 import { PlatformAdapter } from "./adapters/platform-adapter.js";
 import { PluginCatalogRepositoryAdapter } from "./adapters/plugin-catalog-repository-adapter.js";
@@ -235,10 +223,6 @@ interface Deps {
   checkUpdateUseCase: CheckUpdateUseCase;
   telemetryOnUseCase: TelemetryOnUseCase;
   telemetryOffUseCase: TelemetryOffUseCase;
-  telemetryEndpointUseCase: TelemetryEndpointUseCase;
-  telemetryEndpointClearUseCase: TelemetryEndpointClearUseCase;
-  receiveTelemetryUseCase: ReceiveTelemetryUseCase;
-  otlpHttpReceiverAdapter: OtlpHttpReceiverAdapter;
   readLocalCostUseCase: ReadLocalCostUseCase;
   personIdentityUseCase: PersonIdentityUseCase;
   diagnoseTelemetryUseCase: DiagnoseTelemetryUseCase;
@@ -716,32 +700,9 @@ export async function createDeps(
   const cleanUseCase = new CleanUseCase(fs, manifestRepo, logger, gitignoreUseCase, prompter);
   const doctorAllUseCase = new DoctorAllUseCase(doctorUseCase);
   const checkUpdateUseCase = new CheckUpdateUseCase(cliUpdater, currentVersionProvider, logger, fs);
-  const enableToolTelemetryUseCase = new EnableToolTelemetryUseCase(
-    fs,
-    hasher,
-    manifestRepo,
-    logger
-  );
-  // Mirrors the journal hook's own `deriveProjectId`: same remote-URL parsing, same
-  // sanitizing, same basename fallback — verified by test against the hook's real
-  // functions rather than shared at runtime (see telemetry-project-id.ts's doc comment).
-  const deriveTelemetryProjectId = async (repoRoot: string): Promise<string> => {
-    const remoteUrl = await git.getRemoteUrl(repoRoot);
-    const ownerRepo = remoteUrl !== null ? parseOwnerRepoFromRemote(remoteUrl) : null;
-    return sanitizeProjectId(ownerRepo ?? basename(repoRoot));
-  };
   const telemetryOnUseCase = new TelemetryOnUseCase(fs, logger, gitignoreUseCase, git);
   const telemetryOffUseCase = new TelemetryOffUseCase(fs, logger);
-  const telemetryEndpointUseCase = new TelemetryEndpointUseCase(
-    manifestRepo,
-    enableToolTelemetryUseCase,
-    logger,
-    deriveTelemetryProjectId
-  );
-  const telemetryEndpointClearUseCase = new TelemetryEndpointClearUseCase(fs, manifestRepo, logger);
   const telemetrySink = new TelemetrySinkAdapter();
-  const receiveTelemetryUseCase = new ReceiveTelemetryUseCase(telemetrySink, logger);
-  const otlpHttpReceiverAdapter = new OtlpHttpReceiverAdapter(receiveTelemetryUseCase, logger);
   // This is the one place allowed to map a tool that declares `telemetryLocalRead: {
   // kind: "declared" }` to the adapter that reads it.
   // `resolveHomeDir()`, not a bare `homedir()`: this must land on the same directory the
@@ -780,16 +741,12 @@ export async function createDeps(
   const personIdentityUseCase = new PersonIdentityUseCase(personIdentityAdapter);
   const telemetryEvidenceAdapter = new TelemetryEvidenceAdapter();
   const hookTrustReaderAdapter = new HookTrustReaderAdapter();
-  const exportConfigReaderAdapter = new ExportConfigReaderAdapter();
-  const exportSinkReaderAdapter = new ExportSinkReaderAdapter(telemetrySink);
   const diagnoseTelemetryUseCase = new DiagnoseTelemetryUseCase(
     telemetryEvidenceAdapter,
     git,
     runJournalReader,
     localCostReaders,
-    hookTrustReaderAdapter,
-    exportConfigReaderAdapter,
-    exportSinkReaderAdapter
+    hookTrustReaderAdapter
   );
   const reportCostUseCase = new ReportCostUseCase(
     telemetrySink,
@@ -863,10 +820,6 @@ export async function createDeps(
     checkUpdateUseCase,
     telemetryOnUseCase,
     telemetryOffUseCase,
-    telemetryEndpointUseCase,
-    telemetryEndpointClearUseCase,
-    receiveTelemetryUseCase,
-    otlpHttpReceiverAdapter,
     readLocalCostUseCase,
     personIdentityUseCase,
     diagnoseTelemetryUseCase,

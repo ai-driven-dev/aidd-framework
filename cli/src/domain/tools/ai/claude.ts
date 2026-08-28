@@ -26,14 +26,6 @@ import type {
   UserFileSectionKey,
 } from "../contracts.js";
 import { registerTool } from "../registry.js";
-import {
-  buildClaudeTelemetryEnv,
-  CLAUDE_TELEMETRY_IDENTITY_ATTRIBUTE,
-  CLAUDE_TELEMETRY_POST_ENABLE_NOTICE,
-  CLAUDE_TELEMETRY_SESSION_MEASURES,
-  CLAUDE_TELEMETRY_TURN_ATTRIBUTE,
-  resolveClaudeTelemetrySettingsPath,
-} from "./claude-telemetry.js";
 
 const DIRECTORY = ".claude/";
 const TOOL_SUFFIX = ".claude.md";
@@ -130,31 +122,6 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         // the project-local settings.json declaration above — see claude-cli-adapter.ts.
         nativeActivation: { binary: "claude" },
       }),
-    },
-
-    telemetry: {
-      kind: "settings-file",
-      sectionKey: "env",
-      mergeStrategy: "framework-prime",
-      scopes: ["local", "project", "user"],
-      defaultScope: "local",
-      // .claude/settings.json is git-tracked — writing there turns telemetry on for
-      // everyone who clones. .local.json and the home-dir file are not.
-      trackedScopes: ["project"],
-      resolveSettingsPath: resolveClaudeTelemetrySettingsPath,
-      buildEnv: buildClaudeTelemetryEnv,
-      postEnableNotice: CLAUDE_TELEMETRY_POST_ENABLE_NOTICE,
-    },
-
-    telemetryExport: {
-      kind: "declared",
-      identityAttribute: CLAUDE_TELEMETRY_IDENTITY_ATTRIBUTE,
-      turnAttribute: CLAUDE_TELEMETRY_TURN_ATTRIBUTE,
-      sessionMeasures: CLAUDE_TELEMETRY_SESSION_MEASURES,
-      // The only route on any tool that has ever carried an amount. Its own skill
-      // attribute reads `third-party` for every framework skill, so nothing here states a
-      // step - which is the whole reason the run journal exists.
-      supplies: { tokenCounters: true, amount: true, toolStatedStep: false },
     },
 
     // Measured 2026-08-20: an assistant message in ~/.claude/projects/*/*.jsonl carries

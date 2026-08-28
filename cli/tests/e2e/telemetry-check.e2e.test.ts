@@ -6,13 +6,15 @@ import { environmentWithoutGitVariables } from "../../src/infrastructure/git-env
 import { createTestEnv, gitInit, runCli } from "./helpers.js";
 
 /**
- * `aidd telemetry check` — every claim now: the local route (hook fired, session
- * journalled, tool files readable, records join) from phase 4, and the export route
- * (export configured, identifier joinable) this phase settles. Phase 5 pinned this same
- * suite's claims against the plugin's own `telemetry-check.cjs` while both existed; that
- * script is deleted now (`02-check` calls `aidd telemetry check` instead), so this covers
- * the gate and edge cases phase-4.md's and phase-5.md's own Test Scopes name without a
- * second process to compare against.
+ * `aidd telemetry check` — the local route alone (hook fired, session journalled, tool
+ * files readable, records join). The export route (export configured, identifier
+ * joinable) was deleted in "one route, and every sentence about it true"
+ * (aidd_docs/tasks/2026_08/2026_08_28_one-route-that-is-true/): the OTLP export writer,
+ * and every diagnostic claim that graded it, are gone — a healthy install has nothing
+ * left to grade but the route that actually produces a record. An earlier phase pinned
+ * this same suite's claims against the plugin's own `telemetry-check.cjs` while both
+ * existed; that script is long deleted (`02-check` calls `aidd telemetry check` instead),
+ * so this covers the gate and edge cases without a second process to compare against.
  */
 const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
 const REPO_ROOT = resolve(process.cwd(), "..");
@@ -70,11 +72,6 @@ async function seedUnrecognisedPayload(projectDir: string, at: string): Promise<
   );
 }
 
-async function writeClaudeSettings(projectDir: string, env: Record<string, string>): Promise<void> {
-  await mkdir(join(projectDir, ".claude"), { recursive: true });
-  await writeFile(join(projectDir, ".claude", "settings.local.json"), JSON.stringify({ env }));
-}
-
 /** `~/.codex/config.toml`'s own trust table shape, for one event name. Approving a hook
  * under `eventName` and then checking under a *different* one — the "renamed event" edge
  * case — is exactly why this takes the event name as a parameter rather than hardcoding
@@ -89,11 +86,11 @@ trusted_hash = "deadbeef"
   );
 }
 
-/** Every claim line the union covers — all six, in the fixed order `diagnose.cjs` and
- * `diagnoseTelemetryClaims` both print in — never the "not covered" lines after them,
- * whose count depends on which tools this machine happens to have wired. */
+/** Every claim line the union covers — all four, in the fixed order `diagnoseTelemetryClaims`
+ * prints in — never the "not covered" lines after them, whose count depends on which tools
+ * this machine happens to have wired. */
 function allClaimLines(stdout: string): string[] {
-  return stdout.split("\n").slice(0, 6);
+  return stdout.split("\n").slice(0, 4);
 }
 
 describe("aidd telemetry check — the journey and its edge cases", () => {
@@ -198,49 +195,9 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
 
       expect(result.exitCode, result.stderr).toBe(0);
       expect(result.stdout).not.toMatch(/not yet judged/u);
-      expect(allClaimLines(result.stdout)).toHaveLength(6);
-    } finally {
-      await cleanup();
-    }
-  });
-
-  it("says the export is not configured, not that it failed, when nothing turned it on", async () => {
-    const { projectDir, fakeHome, cleanup } = await createTestEnv("check-export-missing");
-    try {
-      await gitInit(projectDir);
-      await writeSwitch(projectDir, true);
-
-      const result = await runCli(["telemetry", "check"], projectDir, fakeHome, {
-        env: { CLAUDE_CODE_SESSION_ID: "s-1" },
-      });
-
-      expect(result.exitCode, result.stderr).toBe(0);
-      expect(result.stdout).toMatch(/export configured\s+FAIL\s+CLAUDE_CODE_ENABLE_TELEMETRY/u);
-    } finally {
-      await cleanup();
-    }
-  });
-
-  it("names the exact setting that breaks the join, beside an otherwise complete export", async () => {
-    const { projectDir, fakeHome, cleanup } = await createTestEnv("check-identity-disabled");
-    try {
-      await gitInit(projectDir);
-      await writeSwitch(projectDir, true);
-      await writeClaudeSettings(projectDir, {
-        CLAUDE_CODE_ENABLE_TELEMETRY: "1",
-        OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318",
-        OTEL_METRICS_INCLUDE_SESSION_ID: "false",
-      });
-
-      const result = await runCli(["telemetry", "check"], projectDir, fakeHome, {
-        env: { CLAUDE_CODE_SESSION_ID: "s-1" },
-      });
-
-      expect(result.exitCode, result.stderr).toBe(0);
-      expect(result.stdout).toMatch(/export configured\s+ok/u);
-      expect(result.stdout).toMatch(
-        /identifier joinable\s+FAIL\s+OTEL_METRICS_INCLUDE_SESSION_ID=false/u
-      );
+      expect(allClaimLines(result.stdout)).toHaveLength(4);
+      expect(result.stdout).not.toContain("export");
+      expect(result.stdout).not.toContain("identifier joinable");
     } finally {
       await cleanup();
     }
