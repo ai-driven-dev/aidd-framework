@@ -10,7 +10,7 @@ flowchart LR
     notes["internal/ · external/"] -.->|on demand| ai
 ```
 
-The root files load every session through the `<aidd_project_memory>` block in each AI context file. `internal/` and `external/` load only when relevant.
+The root files load every session through the project memory block in each AI context file. `internal/` and `external/` load only when relevant.
 
 ## Files
 

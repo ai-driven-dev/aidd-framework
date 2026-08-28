@@ -37,8 +37,8 @@ Project docs, memory, specs, and plans live in `aidd_docs/`.
 
 ### Project memory
 
-<aidd_project_memory>
-</aidd_project_memory>
+<!-- aidd_project_memory:start -->
+<!-- aidd_project_memory:end -->
 
 - If the block above is empty, run `ls -1tr aidd_docs/memory/` and read each file.
 - Load `aidd_docs/memory/external/*` when the user asks.

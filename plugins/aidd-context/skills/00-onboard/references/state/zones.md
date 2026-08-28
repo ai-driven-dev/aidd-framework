@@ -10,7 +10,7 @@ State-aware order: existing repo (code) => memory first, stack skipped. Greenfie
 | -------------- | ------------------------------------------------------------- | ------------------------ | -------------------------- | -------------------------------- |
 | tech stack     | `INSTALL.md` exists OR repo established (code or synced memory) | —                        | tech stack                 | `aidd-context:01-bootstrap`      |
 | project memory | `aidd_docs/memory/` has real content                          | files empty/placeholder  | project knowledge saved    | `aidd-context:02-project-memory` |
-| memory wiring  | the standard `<aidd_project_memory>` block in each used tool's context file | block present, off shape | knowledge loaded by the AI | `aidd-context:02-project-memory` |
+| memory wiring  | the standard project memory block in each used tool's context file | block present, off shape | knowledge loaded by the AI | `aidd-context:02-project-memory` |
 
 - tech stack missing only on greenfield (no code AND no synced memory).
 - memory wiring: no block or no context file = missing. Drift = a block present but not the standard one that imports the memory files.

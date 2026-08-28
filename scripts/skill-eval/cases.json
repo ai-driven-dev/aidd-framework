@@ -251,7 +251,8 @@
       "fileContains": {
         "CLAUDE.md": [
           "@aidd_docs/memory/architecture.md",
-          "@aidd_docs/memory/vcs.md"
+          "@aidd_docs/memory/vcs.md",
+          "<!-- aidd_project_memory:start -->"
         ]
       }
     }
