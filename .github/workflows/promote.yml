@@ -55,8 +55,13 @@ jobs:
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
           git fetch origin main next --prune
 
-          if git merge-base --is-ancestor origin/next origin/main; then
-            echo "No commits to promote."
+          # Compare trees, not ancestry. After a back-merge, next's tip is a
+          # merge commit main does not carry, so next is never an ancestor of
+          # main even when the two hold identical content. Going by ancestry
+          # would open an empty promote PR, and merging it is a push to main,
+          # which runs release-please for nothing.
+          if [ "$(git rev-parse origin/next^{tree})" = "$(git rev-parse origin/main^{tree})" ]; then
+            echo "next and main already hold the same tree; nothing to promote."
             exit 0
           fi
 
