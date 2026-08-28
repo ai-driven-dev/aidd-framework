@@ -1,5 +1,41 @@
 # Changelog
 
+## [5.9.0](https://github.com/ai-driven-dev/framework/compare/v5.8.1...v5.9.0) (2026-08-28)
+
+
+### Features
+
+* **aidd-context:** add retrospective lens to learn ([#712](https://github.com/ai-driven-dev/framework/issues/712)) ([5449b39](https://github.com/ai-driven-dev/framework/commit/5449b39b4eb1d6c9414aaff6c1de52fb1ae6b494))
+
+
+### Bug Fixes
+
+* **aidd-context:** load the project memory block in Claude Code ([#721](https://github.com/ai-driven-dev/framework/issues/721)) ([87304fb](https://github.com/ai-driven-dev/framework/commit/87304fbca9ce478131320e7e13d093917a05b8dd))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @biomejs/biome from 2.5.7 to 2.5.8 in /cli ([#669](https://github.com/ai-driven-dev/framework/issues/669)) ([a1653c4](https://github.com/ai-driven-dev/framework/commit/a1653c406968c9161515148299e2d33ca8765a0d))
+* **deps-dev:** bump @biomejs/biome from 2.5.8 to 2.5.10 in /cli ([#715](https://github.com/ai-driven-dev/framework/issues/715)) ([48f10e0](https://github.com/ai-driven-dev/framework/commit/48f10e0e994ab329e1a139187c82538d28097333))
+* **deps-dev:** bump @commitlint/cli from 21.2.1 to 21.2.2 ([#667](https://github.com/ai-driven-dev/framework/issues/667)) ([f6570b6](https://github.com/ai-driven-dev/framework/commit/f6570b6b9b98ab677b25aaffe512c058c35bd96c))
+* **deps-dev:** bump @commitlint/cli from 21.2.1 to 21.2.2 in /cli ([#672](https://github.com/ai-driven-dev/framework/issues/672)) ([f11240c](https://github.com/ai-driven-dev/framework/commit/f11240c8ce4781741244aaadffeafadae9ea1ff6))
+* **deps-dev:** bump @commitlint/config-conventional ([c2a80fb](https://github.com/ai-driven-dev/framework/commit/c2a80fb2ec561a1a65d898207248719ce8bd2c3f))
+* **deps-dev:** bump @commitlint/config-conventional from 21.2.0 to 21.2.2 ([#666](https://github.com/ai-driven-dev/framework/issues/666)) ([c2a80fb](https://github.com/ai-driven-dev/framework/commit/c2a80fb2ec561a1a65d898207248719ce8bd2c3f))
+* **deps-dev:** bump @commitlint/config-conventional from 21.2.0 to 21.2.2 in /cli ([#670](https://github.com/ai-driven-dev/framework/issues/670)) ([5650883](https://github.com/ai-driven-dev/framework/commit/5650883f920392790bdc6f8b411aaea38d9ec67a))
+* **deps-dev:** bump @commitlint/config-conventional in /cli ([5650883](https://github.com/ai-driven-dev/framework/commit/5650883f920392790bdc6f8b411aaea38d9ec67a))
+* **deps-dev:** bump js-yaml from 5.2.3 to 5.3.0 ([#668](https://github.com/ai-driven-dev/framework/issues/668)) ([7c64703](https://github.com/ai-driven-dev/framework/commit/7c647034884f1de7e2a06f294dcbd4cc56115063))
+* **deps-dev:** bump jscpd from 5.0.14 to 5.0.15 in /cli ([#671](https://github.com/ai-driven-dev/framework/issues/671)) ([37bfb7e](https://github.com/ai-driven-dev/framework/commit/37bfb7ec2e3683f2f044748c77ecabc387fa80f7))
+* **deps-dev:** bump jscpd from 5.0.15 to 5.0.16 in /cli ([#714](https://github.com/ai-driven-dev/framework/issues/714)) ([35bf977](https://github.com/ai-driven-dev/framework/commit/35bf977af4d88bbe7323c81cc128cc0d4ebb73e4))
+* **deps-dev:** bump knip from 6.32.0 to 6.32.2 in /cli ([#673](https://github.com/ai-driven-dev/framework/issues/673)) ([2fa83ea](https://github.com/ai-driven-dev/framework/commit/2fa83eaf3d6feb2bc8bd6f35f0754868d052d235))
+* **deps:** bump @inquirer/prompts from 8.5.2 to 8.6.0 in /cli ([#713](https://github.com/ai-driven-dev/framework/issues/713)) ([7af7dc0](https://github.com/ai-driven-dev/framework/commit/7af7dc024eee8d2ab07c70dceefaff0109fe3926))
+* **deps:** bump smol-toml from 1.7.1 to 1.8.0 in /cli ([#674](https://github.com/ai-driven-dev/framework/issues/674)) ([095de3e](https://github.com/ai-driven-dev/framework/commit/095de3e9d1cc6627f6884987a0c69957744eb972))
+
+
+### Documentation
+
+* **framework:** position README for enterprise teams ([#664](https://github.com/ai-driven-dev/framework/issues/664)) ([b78339a](https://github.com/ai-driven-dev/framework/commit/b78339a5b19e45699e4f335c216e99062e6d12ce))
+* **readme:** clarify the feature delivery flow ([#717](https://github.com/ai-driven-dev/framework/issues/717)) ([3010630](https://github.com/ai-driven-dev/framework/commit/3010630e394e1b7513b27639a752f52d9105a24c))
+
 ## [5.8.1](https://github.com/ai-driven-dev/framework/compare/v5.8.0...v5.8.1) (2026-08-14)
 
 
