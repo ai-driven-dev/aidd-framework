@@ -11,9 +11,12 @@ export interface PersonIdentityStatusResult {
   readonly mappingFilePath: string;
   /** Every identity mapped to this person, their own canonical one included — present
    * only while opted in, since a withdrawn identity carries no `personId` to resolve.
-   * Read with the mapping's own best-effort `read()`, never `readStrict()`: a damaged
-   * mapping is this call's own business to survive, not a reason to fail `status`
-   * reporting the identity it *does* know about. */
+   * Read with the mapping's own `readStrict()`, never `read()`: `status` is the one place
+   * a person looks to see what is mapped to them, so folding a damaged or ambiguous
+   * mapping into "nothing declared" would hide the exact problem `read()`'s own callers
+   * (the report path) already refuse to hide - `readStrict()`'s throw surfaces it instead,
+   * distinguished by name (`UnreadablePersonMappingFileError`,
+   * `AmbiguousPersonMappingError`) the same way `identity`'s own `readStrict()` does above. */
   readonly mappedIdentities?: readonly string[];
   /** The canonical identifier the mapping resolves this machine's own identifier to.
    * Ordinarily the same value as `identity.personId`, but not always: this machine's own
@@ -101,7 +104,7 @@ export class PersonIdentityUseCase {
     const mappingFilePath = this.mappingStore.filePath;
     const identity = await this.store.readStrict();
     if (identity === null) return { filePath, identity, mappingFilePath };
-    const view = mappingViewFor(await this.mappingStore.read(), identity.personId);
+    const view = mappingViewFor(await this.mappingStore.readStrict(), identity.personId);
     return {
       filePath,
       identity,

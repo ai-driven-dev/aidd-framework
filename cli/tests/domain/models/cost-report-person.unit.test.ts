@@ -245,7 +245,7 @@ describe("the envelope carries by_person for a program to parse", () => {
     expect(envelope.by_person.length).toBeGreaterThan(0);
     const mapped = envelope.by_person.find((row) => row.resolution === "mapped");
     expect(mapped?.identities).toEqual(expect.arrayContaining(["machine-1"]));
-    expect(envelope.read.person_mapping_unreadable).toBe(false);
+    expect(envelope.read.person_mapping_unusable).toBe(false);
   });
 });
 

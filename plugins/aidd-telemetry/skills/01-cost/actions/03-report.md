@@ -78,7 +78,7 @@ A breakdown the object leaves empty is a section left out, never a table of zero
 3. **Refuse an unknown shape.** `cost_report_version` is `4` today, read from the `--json`
    path - the `--axis` path prints text the script already built from that same object, so
    there is no separate version to check there. The bump from `3` added `by_person` to the
-   top-level breakdowns and `person_mapping_unreadable` to `read`.
+   top-level breakdowns and `person_mapping_unusable` to `read`.
    - Anything else on the `--json` path: stop, rather than guessing which field means what.
 4. **Fill the "everything" shape above from the object**, when that is the path taken. The
    headline comes from `totals`, the steps from `by_step`, the models from `by_model`, and

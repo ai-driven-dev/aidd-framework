@@ -8,7 +8,6 @@ Auto-generated framework content: agents, commands, rules, skills, and templates
 
 - [`.claude-plugin`](#claude-plugin)
 - [`hooks`](#hooks)
-  - [`hooks/lib`](#hookslib)
 - [`skills`](#skills)
   - [`skills/00-init`](#skills00-init)
   - [`skills/01-cost`](#skills01-cost)
@@ -27,19 +26,7 @@ Auto-generated framework content: agents, commands, rules, skills, and templates
 | File |
 |------|
 | [hooks.json](../plugins/aidd-telemetry/hooks/hooks.json) |
-| [journal.cjs](../plugins/aidd-telemetry/hooks/journal.cjs) |
 | [opencode-plugin.js](../plugins/aidd-telemetry/hooks/opencode-plugin.js) |
-
-#### `hooks/lib`
-
-| File |
-|------|
-| [file-writes.cjs](../plugins/aidd-telemetry/hooks/lib/file-writes.cjs) |
-| [host.cjs](../plugins/aidd-telemetry/hooks/lib/host.cjs) |
-| [record.cjs](../plugins/aidd-telemetry/hooks/lib/record.cjs) |
-| [repo.cjs](../plugins/aidd-telemetry/hooks/lib/repo.cjs) |
-| [step-starts.cjs](../plugins/aidd-telemetry/hooks/lib/step-starts.cjs) |
-| [task-declared.cjs](../plugins/aidd-telemetry/hooks/lib/task-declared.cjs) |
 
 ### `skills`
 
@@ -53,7 +40,7 @@ Auto-generated framework content: agents, commands, rules, skills, and templates
 
 | File | Description |
 |------|---|
-| [SKILL.md](../plugins/aidd-telemetry/skills/01-cost/SKILL.md) | `Answers what a period or one task consumed - a total, a day-by-day series, or a breakdown by step, model, tool or project - and hands back the artefact each question deserves. Use when the user asks what a piece of work cost, what changed, where the effort went, or for which project. Not for turning measurement on, and not for a per-person figure.` |
+| [SKILL.md](../plugins/aidd-telemetry/skills/01-cost/SKILL.md) | `Answers what a period or one task consumed - a total, a day-by-day series, or a breakdown by step, model, tool, project or person - and hands back the artefact each question deserves. Use when the user asks what a piece of work cost, what changed, where the effort went, for which project, or who spent it. Not for turning measurement on.` |
 
 #### `skills/02-check`
 

@@ -76,7 +76,7 @@ interface PersonReportEnvelope {
     totals: { requests: number };
   }>;
   totals: { requests: number };
-  read: { person_mapping_unreadable: boolean };
+  read: { person_mapping_unusable: boolean };
 }
 
 async function reportJson(
@@ -214,7 +214,7 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
     const envelope = await reportJson(projectDir, fakeHome);
 
     expect(envelope.totals.requests).toBe(1);
-    expect(envelope.read.person_mapping_unreadable).toBe(true);
+    expect(envelope.read.person_mapping_unusable).toBe(true);
     expect(envelope.by_person.every((row) => row.resolution !== "mapped")).toBe(true);
 
     const textResult = await runCli(

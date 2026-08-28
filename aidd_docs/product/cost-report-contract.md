@@ -51,15 +51,17 @@ error.
 
 **"Axis" above means a breakdown, not a flag.** Every `by_*` array is always present in
 the `--json` object, whatever filters were given — grouping by any of the six dimensions
-needs no separate flag; reading the matching array is the axis. `aidd telemetry report`
-also takes `--axis <name>` (`total`, `day`, `step`, `model`, `tool` or `project`), which
-picks one of those arrays and renders it alone as a small pasteable artefact instead of
-the whole object — a convenience for copying one figure out, not a second way to group.
+needs no separate flag; reading the matching array is the axis. `by_person` is a seventh
+axis with no matching filter flag at all — see **`by_person`** below — grouping by who ran
+the work, never a way to keep only one person's records. `aidd telemetry report` also
+takes `--axis <name>` (`total`, `day`, `step`, `model`, `tool`, `project` or `person`),
+which picks one of those arrays and renders it alone as a small pasteable artefact instead
+of the whole object — a convenience for copying one figure out, not a second way to group.
 Every figure `--axis` can show is already in the plain `--json` object; only the
-one-artefact-at-a-time rendering is what it adds. A name outside the six is a usage error
+one-artefact-at-a-time rendering is what it adds. A name outside the seven is a usage error
 naming the valid list (`Error: Unknown axis 'bogus'. Expected one of: total, day, step,
-model, tool, project.`, exit `1`), not a silently empty artefact. Given both flags at
-once, `--json` wins and `--axis` is ignored, never the reverse.
+model, tool, project, person.`, exit `1`), not a silently empty artefact. Given both flags
+at once, `--json` wins and `--axis` is ignored, never the reverse.
 
 **A filter matching nothing names itself**, in `empty_selection`, rather than the object
 quietly reporting the same shape a genuinely idle period would:
@@ -110,7 +112,7 @@ for — so a figure taken from a `--days` call can still be cited by the days it
 ## Versioning
 
 Every object carries `cost_report_version`, currently `4` — bumped from `3` when `by_person`
-joined the top-level breakdowns and `read` gained `person_mapping_unreadable` (a consumer
+joined the top-level breakdowns and `read` gained `person_mapping_unusable` (a consumer
 summing every breakdown's `requests` against `totals.requests` now has a fourth breakdown to
 include). Bumped from `2` to `3` when `by_model` gained a row with no `model`, for a record
 neither reader that permits one could name (a consumer that read `row.model` as always a
@@ -141,7 +143,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "by_person":  [{ "resolution": "mapped", "person": "a-person-id", "identities": ["a-person-id", "a-machine-id"], "totals": {} }],  // mapped rows first, then every unplaced identity, then the one row for records carrying none
   "attribution": [{ "attribution": "tool-stated", "totals": {} }],
   "task_attribution": [{ "attribution": "declared", "totals": {} }],  // present only alongside "task"
-  "read": { "undated_records": 0, "unreadable_lines": 0, "person_mapping_unreadable": false }
+  "read": { "undated_records": 0, "unreadable_lines": 0, "person_mapping_unusable": false }
 }
 ```
 
@@ -303,7 +305,7 @@ permanent for that tool, not a silence to explain away.
 ### What the read could not do
 
 ```jsonc
-"read": { "undated_records": 3, "unreadable_lines": 2, "person_mapping_unreadable": false }
+"read": { "undated_records": 3, "unreadable_lines": 2, "person_mapping_unusable": false }
 ```
 
 `undated_records` are records carrying no moment at all. They belong to **no** period —
@@ -312,7 +314,7 @@ about the work rather than when it happened. `unreadable_lines` are lines no par
 read.
 
 **Any of the three non-zero (or `true`) means your total is partial.** Say so rather than
-presenting it as whole. `person_mapping_unreadable: true` means a mapping file existed but
+presenting it as whole. `person_mapping_unusable: true` means a mapping file existed but
 could not be used for resolution — either it could not be read back, or it parsed fine but
 declared an ambiguous claim (`aidd telemetry identity link` refuses that case by name, so
 the only way it reaches a report is a mapping edited outside the command) — every record is

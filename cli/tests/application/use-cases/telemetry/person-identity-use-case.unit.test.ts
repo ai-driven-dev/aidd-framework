@@ -4,7 +4,11 @@ import {
   IdentityNotOptedInError,
 } from "../../../../src/application/errors.js";
 import { PersonIdentityUseCase } from "../../../../src/application/use-cases/telemetry/person-identity-use-case.js";
-import { UnreadableIdentityFileError } from "../../../../src/domain/errors.js";
+import {
+  AmbiguousPersonMappingError,
+  UnreadableIdentityFileError,
+  UnreadablePersonMappingFileError,
+} from "../../../../src/domain/errors.js";
 import type { PersonMapping } from "../../../../src/domain/models/person-mapping.js";
 import { InMemoryPersonIdentityStore } from "../../../helpers/ports/in-memory-person-identity-store.js";
 import { InMemoryPersonMappingStore } from "../../../helpers/ports/in-memory-person-mapping-store.js";
@@ -79,6 +83,29 @@ describe("PersonIdentityUseCase.status", () => {
     const result = await makeUseCase(store).status();
 
     expect(result).not.toHaveProperty("mappedIdentities");
+  });
+
+  it("throws the mapping's own named error, never a silent unresolved, on a malformed mapping file", async () => {
+    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+    const mappingStore = new InMemoryPersonMappingStore(null);
+    mappingStore.throwOnRead = new UnreadablePersonMappingFileError(
+      mappingStore.filePath,
+      "EISDIR"
+    );
+
+    await expect(new PersonIdentityUseCase(store, mappingStore).status()).rejects.toThrow(
+      UnreadablePersonMappingFileError
+    );
+  });
+
+  it("throws the mapping's own named error, never a silent unresolved, on an ambiguous mapping", async () => {
+    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+    const mappingStore = new InMemoryPersonMappingStore(null);
+    mappingStore.throwOnRead = new AmbiguousPersonMappingError("shared-id", "person-1", "person-2");
+
+    await expect(new PersonIdentityUseCase(store, mappingStore).status()).rejects.toThrow(
+      AmbiguousPersonMappingError
+    );
   });
 
   it("shows the raw identifier and canonical one distinctly when they differ", async () => {

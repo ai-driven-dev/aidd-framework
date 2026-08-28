@@ -39,7 +39,8 @@ export type TelemetrySinkRecordProvenance = "export" | "local-read";
  * about every in-memory record with `provenance: "export"`: `cost-report.ts`'s
  * `withPersonBackfill` is the one place that pairs an export-route record with its
  * local-read sibling for the same billed call at read time, and copies the sibling's
- * `person_id` onto it before the report is built — see that function's own doc comment.
+ * `person_id` and `person_display_name` onto it, as a pair, before the report is built —
+ * see that function's own doc comment.
  * `vendor_field` and `turn_field` name the export-side attribute a value came
  * from, since that attribute differs per tool — `tool` names the tool itself, so no
  * consumer ever has to reverse that attribute back into an identity. Never optional: an
@@ -86,8 +87,9 @@ export interface TelemetrySinkRecord {
    * export-provenance record (see `read-local-cost-use-case.ts`). Absent whenever nobody
    * opted in, which is the default. `cost-report.ts`'s `withPersonBackfill` is the one
    * read-time exception: it can carry an export-route record's `person_id` in memory,
-   * backfilled from its local-read sibling for the same billed call - see that function's
-   * doc comment and the interface comment above. */
+   * backfilled onto it from its local-read sibling for the same billed call, as a pair with
+   * `person_display_name`, never one field from each - see that function's doc comment and
+   * the interface comment above. */
   readonly person_id?: string;
   /** A separate, later choice from `person_id` - present only once asked for, and never
    * derived from it or from anything else. */

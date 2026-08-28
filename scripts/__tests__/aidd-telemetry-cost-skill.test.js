@@ -297,8 +297,12 @@ test("the cost skill states the shape of its answer", () => {
 // Someone asking what last month cost does not know which axis answers them - the skill
 // has to derive the axis from the question, not hand back a flag for the person to pick.
 test("the cost skill offers its axes in the language of a question", () => {
+  // Pin the `--axis <...>` enumeration itself, not a loose substring: "person" is a
+  // substring of prose like "per person" too, so a bare `everything.includes(axis)` would
+  // still pass on docs that never added the axis at all.
+  const axisFlagEnum = /--axis <([^>]+)>/u.exec(everything)?.[1].split("|") ?? [];
   for (const axis of ["total", "day", "step", "model", "tool", "project", "person"]) {
-    assert.ok(everything.includes(axis), `must name the "${axis}" axis`);
+    assert.ok(axisFlagEnum.includes(axis), `must list "${axis}" among the --axis choices`);
   }
   for (const question of ["what did this cost", "what changed", "where did it go"]) {
     assert.ok(everything.includes(question), `must speak in the language of "${question}"`);
@@ -314,8 +318,11 @@ test("the cost skill answers per person through the person axis, not as unanswer
   assert.ok(/per.person/iu.test(everything), "must still speak in the language of the question");
   assert.ok(everything.includes("|person>"), "must list person among the --axis choices");
   assert.ok(
-    everything.includes("per person, who spent, which teammate"),
-    "must map the per-person question to an axis in SKILL.md's own table",
+    // Pin the whole row, axis column included: the question phrase alone also sat in the
+    // old "none - unanswerable" row, so a substring match on the phrase alone would still
+    // pass on fully reverted docs.
+    everything.includes("| per person, who spent, which teammate | person |"),
+    "must map the per-person question to the person axis in SKILL.md's own table",
   );
   assert.ok(
     !/unanswerable/iu.test(everything),

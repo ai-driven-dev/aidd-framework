@@ -18,7 +18,7 @@ import type { AiToolId } from "./tool-ids.js";
  * not a bump; changing what an existing field means is.
  *
  * Bumped to 4: `by_person` is a new top-level breakdown, and `read` gained
- * `person_mapping_unreadable` - a consumer summing every breakdown's requests against
+ * `person_mapping_unusable` - a consumer summing every breakdown's requests against
  * `totals.requests` to check nothing was dropped now has a fourth breakdown to include,
  * the same reasoning that bumped `by_project` and `by_day` in.
  *
@@ -135,7 +135,7 @@ export interface CostReportEnvelopeRead {
    * parsed fine but declared an ambiguous claim `readStrict()` refuses. Never true for a
    * mapping simply not declared, which is the ordinary, resolved-as-nobody-opted-in state
    * `by_person` already shows on its own. */
-  readonly person_mapping_unreadable: boolean;
+  readonly person_mapping_unusable: boolean;
 }
 
 /**
@@ -279,7 +279,7 @@ function readSummary(report: CostReport): CostReportEnvelopeRead {
   return {
     undated_records: report.undatedRecords,
     unreadable_lines: report.unreadableLines,
-    person_mapping_unreadable: report.personMappingUnreadable,
+    person_mapping_unusable: report.personMappingUnreadable,
   };
 }
 

@@ -35,7 +35,9 @@ person can withdraw at any time, and a user who knows exactly what it does and d
 7. **Offer to link another identifier, when this person names a second tool or machine.**
    Once identified here, running `aidd telemetry identity link <identity>` on that other
    identifier declares it the same person: both fold into one row in every report from
-   then on, instead of printing as two. This writes to the same profile-local
+   then on, instead of printing as two. `link` is a declaration the CLI cannot verify -
+   only offer it for an identifier this person actually owns, never one seen on someone
+   else's record. This writes to the same profile-local
    `person-mapping.json` (beside `identity.json`, under this machine's own user profile,
    never `.aidd/config.json` or `AIDD_USER_CONFIG_DIR`) — refused before this step is done,
    since a mapping entry needs an opted-in identity to anchor it, and refused when another

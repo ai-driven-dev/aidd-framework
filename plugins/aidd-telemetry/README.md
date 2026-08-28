@@ -160,10 +160,12 @@ which it keeps using rather than losing access to what was already written there
 
 **The person mapping never follows `AIDD_USER_CONFIG_DIR`.** It is read from the OS
 profile only, on every platform, by design — see `aidd telemetry identity` above. So on a
-sink shared through that variable, every reader still sees a colleague's records as
-`unresolved`: each reader's own profile holds only the identities *they* opted in, never a
-teammate's. Resolving a colleague's identity into a named row requires that colleague's
-own mapping, which lives on their machine and travels nowhere.
+sink shared through that variable, a colleague's records stay `unresolved` in every
+reader's report until that reader deliberately runs `aidd telemetry identity link` on the
+colleague's identifier — nothing about a colleague's own mapping arrives on its own, and
+nothing stops a reader typing an identifier they never opted into. Linking one folds that
+spend into the reader's own row from then on: it declares "this identifier is me", and the
+CLI cannot check the claim against anything the colleague wrote.
 
 ## Where things are written down
 
