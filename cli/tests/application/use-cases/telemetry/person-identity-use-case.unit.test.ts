@@ -30,22 +30,33 @@ describe("PersonIdentityUseCase.status", () => {
   });
 
   it("answers an identity with no name", async () => {
-    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+    const store = new InMemoryPersonIdentityStore({
+      personId: "person-1",
+      origin: "minted",
+      alsoMe: [],
+    });
 
     const result = await makeUseCase(store).status();
 
-    expect(result.identity).toEqual({ personId: "person-1" });
+    expect(result.identity).toEqual({ personId: "person-1", origin: "minted", alsoMe: [] });
   });
 
   it("answers an identity with a name", async () => {
     const store = new InMemoryPersonIdentityStore({
       personId: "person-1",
+      origin: "minted",
+      alsoMe: [],
       displayName: "Baptiste",
     });
 
     const result = await makeUseCase(store).status();
 
-    expect(result.identity).toEqual({ personId: "person-1", displayName: "Baptiste" });
+    expect(result.identity).toEqual({
+      personId: "person-1",
+      origin: "minted",
+      alsoMe: [],
+      displayName: "Baptiste",
+    });
   });
 
   it("throws, never answers 'no identity', when the store cannot be read", async () => {
@@ -56,7 +67,11 @@ describe("PersonIdentityUseCase.status", () => {
   });
 
   it("lists every identity mapped to this person, and where the mapping is read from", async () => {
-    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+    const store = new InMemoryPersonIdentityStore({
+      personId: "person-1",
+      origin: "minted",
+      alsoMe: [],
+    });
     const mapping: PersonMapping = {
       entries: [{ personId: "person-1", identities: ["a-second-machine"] }],
     };
@@ -70,7 +85,11 @@ describe("PersonIdentityUseCase.status", () => {
   });
 
   it("answers just the person's own identifier when no mapping declares more", async () => {
-    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+    const store = new InMemoryPersonIdentityStore({
+      personId: "person-1",
+      origin: "minted",
+      alsoMe: [],
+    });
 
     const result = await makeUseCase(store, null).status();
 
@@ -86,7 +105,11 @@ describe("PersonIdentityUseCase.status", () => {
   });
 
   it("throws the mapping's own named error, never a silent unresolved, on a malformed mapping file", async () => {
-    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+    const store = new InMemoryPersonIdentityStore({
+      personId: "person-1",
+      origin: "minted",
+      alsoMe: [],
+    });
     const mappingStore = new InMemoryPersonMappingStore(null);
     mappingStore.throwOnRead = new UnreadablePersonMappingFileError(
       mappingStore.filePath,
@@ -99,7 +122,11 @@ describe("PersonIdentityUseCase.status", () => {
   });
 
   it("throws the mapping's own named error, never a silent unresolved, on an ambiguous mapping", async () => {
-    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+    const store = new InMemoryPersonIdentityStore({
+      personId: "person-1",
+      origin: "minted",
+      alsoMe: [],
+    });
     const mappingStore = new InMemoryPersonMappingStore(null);
     mappingStore.throwOnRead = new AmbiguousPersonMappingError("shared-id", "person-1", "person-2");
 
@@ -111,7 +138,11 @@ describe("PersonIdentityUseCase.status", () => {
   it("shows the raw identifier and canonical one distinctly when they differ", async () => {
     // This machine's own identifier was linked from elsewhere onto a different person's
     // canonical entry - the case that makes "just show my own personId" the wrong answer.
-    const store = new InMemoryPersonIdentityStore({ personId: "this-machine-id" });
+    const store = new InMemoryPersonIdentityStore({
+      personId: "this-machine-id",
+      origin: "minted",
+      alsoMe: [],
+    });
     const mapping: PersonMapping = {
       entries: [{ personId: "person-b", identities: ["this-machine-id"] }],
     };
@@ -133,17 +164,20 @@ describe("PersonIdentityUseCase.on", () => {
     const result = await makeUseCase(store).on();
 
     expect(result.minted).toBe(true);
-    expect(result.identity).toEqual({ personId: "fresh-id" });
+    expect(result.identity).toEqual({ personId: "fresh-id", origin: "minted", alsoMe: [] });
     expect(store.mintCount).toBe(1);
   });
 
   it("a second on reports the same identifier, never a new one", async () => {
-    const store = new InMemoryPersonIdentityStore({ personId: "existing-id" }, "fresh-id");
+    const store = new InMemoryPersonIdentityStore(
+      { personId: "existing-id", origin: "minted", alsoMe: [] },
+      "fresh-id"
+    );
 
     const result = await makeUseCase(store).on();
 
     expect(result.minted).toBe(false);
-    expect(result.identity).toEqual({ personId: "existing-id" });
+    expect(result.identity).toEqual({ personId: "existing-id", origin: "minted", alsoMe: [] });
     expect(store.mintCount).toBe(0);
   });
 });
@@ -156,23 +190,40 @@ describe("PersonIdentityUseCase.name", () => {
   });
 
   it("refuses an empty or whitespace-only value", async () => {
-    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+    const store = new InMemoryPersonIdentityStore({
+      personId: "person-1",
+      origin: "minted",
+      alsoMe: [],
+    });
 
     await expect(makeUseCase(store).name("   ")).rejects.toThrow(EmptyDisplayNameError);
   });
 
   it("attaches the display name beside the identifier already opted into", async () => {
-    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+    const store = new InMemoryPersonIdentityStore({
+      personId: "person-1",
+      origin: "minted",
+      alsoMe: [],
+    });
 
     await makeUseCase(store).name("Baptiste");
 
-    expect(await store.read()).toEqual({ personId: "person-1", displayName: "Baptiste" });
+    expect(await store.read()).toEqual({
+      personId: "person-1",
+      origin: "minted",
+      alsoMe: [],
+      displayName: "Baptiste",
+    });
   });
 });
 
 describe("PersonIdentityUseCase.off", () => {
   it("states that new records will carry no person, and removes the file", async () => {
-    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+    const store = new InMemoryPersonIdentityStore({
+      personId: "person-1",
+      origin: "minted",
+      alsoMe: [],
+    });
 
     const result = await makeUseCase(store).off();
 
@@ -191,7 +242,10 @@ describe("PersonIdentityUseCase.off", () => {
   });
 
   it("opting in again after withdrawing mints a fresh identifier, never the old one back", async () => {
-    const store = new InMemoryPersonIdentityStore({ personId: "withdrawn-id" }, "fresh-id");
+    const store = new InMemoryPersonIdentityStore(
+      { personId: "withdrawn-id", origin: "minted", alsoMe: [] },
+      "fresh-id"
+    );
     const useCase = makeUseCase(store);
 
     await useCase.off();
@@ -203,7 +257,11 @@ describe("PersonIdentityUseCase.off", () => {
   });
 
   it("discards a damaged identity file rather than leaving a person unable to withdraw", async () => {
-    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+    const store = new InMemoryPersonIdentityStore({
+      personId: "person-1",
+      origin: "minted",
+      alsoMe: [],
+    });
     store.throwOnRead = new UnreadableIdentityFileError(store.filePath, "EISDIR");
 
     const result = await makeUseCase(store).off();
@@ -214,7 +272,11 @@ describe("PersonIdentityUseCase.off", () => {
   });
 
   it("still throws status's own way for anything that is not the store's own unreadable error", async () => {
-    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+    const store = new InMemoryPersonIdentityStore({
+      personId: "person-1",
+      origin: "minted",
+      alsoMe: [],
+    });
     store.throwOnRead = new Error("some other failure entirely");
 
     await expect(makeUseCase(store).off()).rejects.toThrow("some other failure entirely");
@@ -222,7 +284,11 @@ describe("PersonIdentityUseCase.off", () => {
   });
 
   it("says the mapping still lists the identifier just withdrawn, and leaves it standing", async () => {
-    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+    const store = new InMemoryPersonIdentityStore({
+      personId: "person-1",
+      origin: "minted",
+      alsoMe: [],
+    });
     const mapping: PersonMapping = {
       entries: [{ personId: "person-1", identities: ["a-second-machine"] }],
     };
@@ -235,7 +301,11 @@ describe("PersonIdentityUseCase.off", () => {
   });
 
   it("says the mapping does not list it when there was never a mapping at all", async () => {
-    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+    const store = new InMemoryPersonIdentityStore({
+      personId: "person-1",
+      origin: "minted",
+      alsoMe: [],
+    });
 
     const result = await makeUseCase(store, null).off();
 

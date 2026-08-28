@@ -218,7 +218,7 @@ describe("ReadLocalCostUseCase", () => {
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
       NULL_RUN_JOURNAL_READER,
-      new InMemoryPersonIdentityReader({ personId: "person-1" })
+      new InMemoryPersonIdentityReader({ personId: "person-1", origin: "minted", alsoMe: [] })
     );
 
     await useCase.execute({ sessionId: SESSION_ID });
@@ -235,7 +235,12 @@ describe("ReadLocalCostUseCase", () => {
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
       NULL_RUN_JOURNAL_READER,
-      new InMemoryPersonIdentityReader({ personId: "person-1", displayName: "Baptiste" })
+      new InMemoryPersonIdentityReader({
+        personId: "person-1",
+        origin: "minted",
+        alsoMe: [],
+        displayName: "Baptiste",
+      })
     );
 
     await useCase.execute({ sessionId: SESSION_ID });
@@ -259,7 +264,7 @@ describe("ReadLocalCostUseCase", () => {
     );
 
     await useCase.execute({ sessionId: SESSION_ID });
-    identity.set({ personId: "person-1" });
+    identity.set({ personId: "person-1", origin: "minted", alsoMe: [] });
     await useCase.execute({ sessionId: SESSION_ID });
 
     const [stored] = [...sink.files.values()].flat();

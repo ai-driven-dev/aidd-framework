@@ -18,7 +18,11 @@ describe("PersonMappingUseCase.link", () => {
   });
 
   it("declares both identifiers one person", async () => {
-    const identityStore = new InMemoryPersonIdentityStore({ personId: "person-a" });
+    const identityStore = new InMemoryPersonIdentityStore({
+      personId: "person-a",
+      origin: "minted",
+      alsoMe: [],
+    });
     const mappingStore = new InMemoryPersonMappingStore();
     const uc = useCase(identityStore, mappingStore);
 
@@ -31,7 +35,11 @@ describe("PersonMappingUseCase.link", () => {
   });
 
   it("reports an identity already listed as already listed, not as a second write", async () => {
-    const identityStore = new InMemoryPersonIdentityStore({ personId: "person-a" });
+    const identityStore = new InMemoryPersonIdentityStore({
+      personId: "person-a",
+      origin: "minted",
+      alsoMe: [],
+    });
     const mappingStore = new InMemoryPersonMappingStore({
       entries: [{ personId: "person-a", identities: ["machine-2"] }],
     });
@@ -43,7 +51,11 @@ describe("PersonMappingUseCase.link", () => {
   });
 
   it("refuses an identity another person already claims, leaving the mapping as it was", async () => {
-    const identityStore = new InMemoryPersonIdentityStore({ personId: "person-a" });
+    const identityStore = new InMemoryPersonIdentityStore({
+      personId: "person-a",
+      origin: "minted",
+      alsoMe: [],
+    });
     const mappingStore = new InMemoryPersonMappingStore({
       entries: [{ personId: "person-b", identities: ["machine-3"] }],
     });
@@ -58,7 +70,7 @@ describe("PersonMappingUseCase.link", () => {
 describe("PersonMappingUseCase.unlink", () => {
   it("reports nothing to remove for an identity nobody listed, and exits successfully", async () => {
     const uc = useCase(
-      new InMemoryPersonIdentityStore({ personId: "person-a" }),
+      new InMemoryPersonIdentityStore({ personId: "person-a", origin: "minted", alsoMe: [] }),
       new InMemoryPersonMappingStore()
     );
 

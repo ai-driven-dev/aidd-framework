@@ -30,7 +30,7 @@ export class InMemoryPersonIdentityStore implements PersonIdentityStore {
 
   async mint(): Promise<PersonIdentity> {
     this.mintCount++;
-    this.identity = { personId: this.nextPersonId };
+    this.identity = { personId: this.nextPersonId, origin: "minted", alsoMe: [] };
     return this.identity;
   }
 

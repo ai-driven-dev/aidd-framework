@@ -20,23 +20,38 @@ function identityFilePath(): string {
   return join(resolveAiddConfigDir(), "identity.json");
 }
 
+// A file with no `origin` at all is read as `"minted"`, never guessed as anything else:
+// every file written before this change - by this adapter's own earlier shape, or by the
+// plugin's now-deleted `identity.cjs` - is exactly what `"minted"` describes, and `origin`
+// is only ever knowable at the moment an identity is created or adopted, never afterwards.
 function parseIdentity(raw: string): PersonIdentity | null {
   const parsed = asPlainObject(JSON.parse(raw));
   if (typeof parsed.person_id !== "string" || parsed.person_id === "") return null;
-  const identity: { personId: string; displayName?: string } = { personId: parsed.person_id };
+  const identity: { personId: string; origin: "minted" | "adopted"; alsoMe: string[] } = {
+    personId: parsed.person_id,
+    origin: parsed.origin === "adopted" ? "adopted" : "minted",
+    alsoMe: Array.isArray(parsed.also_me)
+      ? parsed.also_me.filter((v) => typeof v === "string")
+      : [],
+  };
   if (typeof parsed.display_name === "string" && parsed.display_name !== "") {
-    identity.displayName = parsed.display_name;
+    return { ...identity, displayName: parsed.display_name };
   }
   return identity;
 }
 
-// The exact on-disk shape `identity.cjs`'s `writeIdentity` produces: `person_id` before
-// `display_name` (from its own `{ ...existing, display_name: value }`), two-space indent,
-// one trailing newline. Byte parity with the script is the claim task 4 pins, and it lives
-// in this one function rather than at every call site.
+// `also_me` is omitted from the written file when empty, the same way `display_name` is
+// omitted when unset - an empty array is what most identities have, and writing it out on
+// every file would make the common case noisier than the shape it describes.
 function serializeIdentity(identity: PersonIdentity): string {
-  const record: { person_id: string; display_name?: string } = { person_id: identity.personId };
+  const record: {
+    person_id: string;
+    origin: "minted" | "adopted";
+    display_name?: string;
+    also_me?: readonly string[];
+  } = { person_id: identity.personId, origin: identity.origin };
   if (identity.displayName !== undefined) record.display_name = identity.displayName;
+  if (identity.alsoMe.length > 0) record.also_me = identity.alsoMe;
   return `${JSON.stringify(record, null, 2)}\n`;
 }
 
@@ -69,7 +84,7 @@ export class PersonIdentityAdapter implements PersonIdentityStore {
   }
 
   async mint(): Promise<PersonIdentity> {
-    const identity: PersonIdentity = { personId: randomUUID() };
+    const identity: PersonIdentity = { personId: randomUUID(), origin: "minted", alsoMe: [] };
     await this.write(identity);
     return identity;
   }
