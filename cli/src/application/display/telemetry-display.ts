@@ -44,6 +44,7 @@ const LOCAL_COST_STATUS_LABELS: Record<LocalCostToolStatus, string> = {
 export function printTelemetryOnReport(output: CLIOutput, result: TelemetryOnResult): void {
   const switchLabel = result.switchChanged ? "on" : "already on";
   output.success(`AIDD telemetry: ${switchLabel} (${result.switchPath})`);
+  output.info(`${result.switchPath} is git-tracked — this applies to everyone who clones.`);
 }
 
 export function printTelemetryEndpointReport(
@@ -106,6 +107,11 @@ export function printLocalCostReadReport(output: CLIOutput, result: ReadLocalCos
 export function printTelemetryOffReport(output: CLIOutput, result: TelemetryOffResult): void {
   const switchLabel = result.switchChanged ? "off" : "already off";
   output.success(`AIDD telemetry: ${switchLabel} (${result.switchPath})`);
+  output.info(
+    "This stops new recording only — sessions already journalled stay in aidd_docs/runs/ " +
+      "and whatever `aidd telemetry read` already stored, and `aidd telemetry report` still " +
+      "reports them."
+  );
 }
 
 const ORIGIN_LABELS: Record<"minted" | "adopted", string> = {

@@ -9,10 +9,15 @@ import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { Logger } from "../../../domain/ports/logger.js";
 import type { VersionControl } from "../../../domain/ports/version-control.js";
+import { TelemetryProjectScopeRequiresYesError } from "../../errors.js";
 import type { GitignoreUseCase } from "../shared/gitignore-use-case.js";
 
 export interface TelemetryOnOptions {
   readonly projectRoot: string;
+  /** Same consequence as `endpoint --scope project`: `.aidd/config.json` is a git-tracked
+   * file, deliberately un-ignored so a fresh clone inherits the project's decision. Refusing
+   * without this is the whole reason a person is ever asked at all. */
+  readonly confirmed: boolean;
 }
 
 export interface TelemetryOnResult {
@@ -37,10 +42,23 @@ export class TelemetryOnUseCase {
 
   async execute(options: TelemetryOnOptions): Promise<TelemetryOnResult> {
     const switchPath = telemetryConfigPath(options.projectRoot);
+    this.guardConfirmed(options);
     this.logger.info(`AIDD telemetry switch -> ${switchPath}`);
     const switchChanged = await this.writeSwitch(switchPath);
     await this.protectRunsDir(options.projectRoot);
     return { switchPath, switchChanged };
+  }
+
+  // `.aidd/config.json` is deliberately git-tracked — un-ignored so a fresh clone inherits
+  // the project's decision — which is exactly the consequence `endpoint --scope project`
+  // already refuses without `--yes`. Same consequence, same sentence, same error: fires
+  // unconditionally, whatever the switch's current state, the same way that guard does.
+  private guardConfirmed(options: TelemetryOnOptions): void {
+    if (options.confirmed) return;
+    throw new TelemetryProjectScopeRequiresYesError(
+      "aidd telemetry on",
+      telemetryConfigPath(options.projectRoot)
+    );
   }
 
   // Every successful `on` re-checks this, switch newly written or not — the same rule
@@ -51,15 +69,17 @@ export class TelemetryOnUseCase {
     const added = await this.gitignoreUseCase.execute(projectRoot, [RUNS_ENTRY]);
     if (added) {
       this.logger.info(
-        `Added ${RUNS_ENTRY} to .gitignore — the journal names who worked on what and for ` +
-          "how long. Delete that line to commit it instead."
+        `Added ${RUNS_ENTRY} to .gitignore — the journal names no person, only the ` +
+          "repository, the task folders written into, the skills run, and their timings. " +
+          "Delete that line to commit it instead."
       );
     }
     const tracked = await this.git.listTrackedFiles(projectRoot, RUNS_ENTRY);
     if (tracked.length === 0) return;
     this.logger.warn(
-      "Already tracked by git — who worked on what, for how long, and every file written:\n" +
-        `${tracked.map((file) => `  ${file}`).join("\n")}\nNothing removed or rewritten — your call.`
+      "Already tracked by git — the repository, the task folders written into, the skills " +
+        `run, and their timings:\n${tracked.map((file) => `  ${file}`).join("\n")}\n` +
+        "Nothing removed or rewritten — your call."
     );
   }
 

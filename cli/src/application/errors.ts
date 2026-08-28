@@ -80,10 +80,15 @@ export class InvalidTelemetryPeriodError extends Error {
   }
 }
 
+/** One sentence for one consequence: writing a git-tracked file that turns telemetry on for
+ * everyone who clones. `endpoint --scope project` and `telemetry on` both have exactly this
+ * consequence — the parameterised `action` and `trackedPath` are the only two things that
+ * differ between them, so they share the one error rather than each writing its own
+ * sentence for the same fact. */
 export class TelemetryProjectScopeRequiresYesError extends Error {
-  constructor(settingsPath: string) {
+  constructor(action: string, trackedPath: string) {
     super(
-      `--scope project writes the git-tracked ${settingsPath}, turning telemetry on for ` +
+      `${action} writes the git-tracked ${trackedPath}, turning telemetry on for ` +
         "everyone who clones. Pass --yes to confirm."
     );
     this.name = "TelemetryProjectScopeRequiresYesError";

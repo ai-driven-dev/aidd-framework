@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { asPlainObject } from "../../domain/formats/plain-object.js";
 import {
   parseTelemetrySwitchFile,
+  resolveTelemetryEnabled,
   telemetryConfigPath,
 } from "../../domain/models/telemetry-switch.js";
 import type {
@@ -35,13 +36,15 @@ function parseUnrecognisedPayload(raw: string): TelemetryUnrecognisedPayload | n
  * reader, a tool's own export configuration, and Codex's hook trust — see the port's own
  * doc comment for why those are not repeated here. */
 export class TelemetryEvidenceAdapter implements TelemetryEvidenceReader {
-  async isTelemetryEnabled(projectRoot: string): Promise<boolean> {
+  async isTelemetryEnabled(projectRoot: string, env: NodeJS.ProcessEnv): Promise<boolean> {
+    let fileSwitch: ReturnType<typeof parseTelemetrySwitchFile> = null;
     try {
       const content = await readFile(telemetryConfigPath(projectRoot), "utf8");
-      return parseTelemetrySwitchFile(content)?.enabled === true;
+      fileSwitch = parseTelemetrySwitchFile(content);
     } catch {
-      return false;
+      fileSwitch = null;
     }
+    return resolveTelemetryEnabled(fileSwitch, env);
   }
 
   async readUnrecognisedPayload(projectRoot: string): Promise<TelemetryUnrecognisedPayload | null> {

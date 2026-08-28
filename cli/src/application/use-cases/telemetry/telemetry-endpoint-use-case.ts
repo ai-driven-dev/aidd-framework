@@ -109,7 +109,7 @@ export class TelemetryEndpointUseCase {
         options.homeDir
       );
       this.logger.info(`${toolId} telemetry (blocked, needs --yes) -> ${wouldBePath}`);
-      throw new TelemetryProjectScopeRequiresYesError(wouldBePath);
+      throw new TelemetryProjectScopeRequiresYesError("--scope project", wouldBePath);
     }
   }
 

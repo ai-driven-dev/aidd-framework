@@ -92,7 +92,8 @@ describe("measurement, from nothing to off and back", () => {
    * invoked the same way `measure` calls the CLI, by its own built path, so the `PATH`
    * this file strips `aidd` from still proves nothing about the switch or the reader —
    * only that the hooks below need neither. */
-  const switchTo = (state: "on" | "off") => run(CLI_PATH, ["telemetry", state]);
+  const switchTo = (state: "on" | "off") =>
+    run(CLI_PATH, state === "on" ? ["telemetry", "on", "--yes"] : ["telemetry", "off"]);
   /** Reading is the CLI's, and only the CLI's, since the plugin's own reporter was deleted:
    * one implementation answers, and this cycle exercises the one that ships. */
   const measure = (args: readonly string[]) => run(CLI_PATH, args.slice());

@@ -34,7 +34,7 @@ describe("aidd telemetry on carries over what the switch script did beyond flipp
     try {
       await gitInit(projectDir);
 
-      const result = await runCli(["telemetry", "on"], projectDir, fakeHome);
+      const result = await runCli(["telemetry", "on", "--yes"], projectDir, fakeHome);
 
       expect(result.exitCode, result.stderr).toBe(0);
       const gitignore = await readGitignore(projectDir);
@@ -50,7 +50,7 @@ describe("aidd telemetry on carries over what the switch script did beyond flipp
       await gitInit(projectDir);
       await writeFile(join(projectDir, ".gitignore"), `node_modules/\n${RUNS_ENTRY}\n`);
 
-      await runCli(["telemetry", "on"], projectDir, fakeHome);
+      await runCli(["telemetry", "on", "--yes"], projectDir, fakeHome);
 
       const gitignore = (await readGitignore(projectDir)) ?? "";
       const matches = gitignore.split("\n").filter((line) => line.trim() === RUNS_ENTRY.trim());
@@ -82,7 +82,7 @@ describe("aidd telemetry on carries over what the switch script did beyond flipp
         projectDir
       );
 
-      const result = await runCli(["telemetry", "on"], projectDir, fakeHome);
+      const result = await runCli(["telemetry", "on", "--yes"], projectDir, fakeHome);
 
       expect(result.exitCode, result.stderr).toBe(0);
       expect(result.stderr).toMatch(/Already tracked by git/u);
@@ -99,7 +99,7 @@ describe("aidd telemetry on carries over what the switch script did beyond flipp
     try {
       await gitInit(projectDir);
 
-      const result = await runCli(["telemetry", "on"], projectDir, fakeHome);
+      const result = await runCli(["telemetry", "on", "--yes"], projectDir, fakeHome);
 
       expect(result.exitCode, result.stderr).toBe(0);
       expect(result.stderr).not.toMatch(/Already tracked by git/u);
@@ -136,7 +136,7 @@ describe("aidd telemetry on carries over what the switch script did beyond flipp
     try {
       await gitInit(projectDir);
 
-      const result = await runCli(["telemetry", "on"], projectDir, fakeHome);
+      const result = await runCli(["telemetry", "on", "--yes"], projectDir, fakeHome);
       expect(result.exitCode, result.stderr).toBe(0);
 
       await mkdir(join(projectDir, "aidd_docs", "runs"), { recursive: true });
@@ -159,7 +159,7 @@ describe("aidd telemetry on carries over what the switch script did beyond flipp
     const dir = await mkdtemp(join(tmpdir(), "aidd-runs-privacy-no-repo-"));
     const { fakeHome, cleanup } = await createTestEnv("runs-privacy-no-repo-home");
     try {
-      const result = await runCli(["telemetry", "on"], dir, fakeHome);
+      const result = await runCli(["telemetry", "on", "--yes"], dir, fakeHome);
 
       expect(result.exitCode, result.stderr).toBe(0);
       expect(result.stderr).toBe("");

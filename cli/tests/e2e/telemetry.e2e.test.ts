@@ -52,7 +52,7 @@ describe.concurrent("E2E: aidd telemetry on/off — the switch alone", () => {
       await seedManifest(projectDir);
       await installClaude(projectDir, fakeHome);
 
-      const on = await runCli(["telemetry", "on"], projectDir, fakeHome);
+      const on = await runCli(["telemetry", "on", "--yes"], projectDir, fakeHome);
 
       expect(on.exitCode, on.stderr).toBe(0);
       expect(existsSync(join(projectDir, SWITCH_PATH))).toBe(true);

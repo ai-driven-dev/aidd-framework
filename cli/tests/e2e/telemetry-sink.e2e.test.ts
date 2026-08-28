@@ -294,7 +294,7 @@ describe("E2E: telemetry sink", () => {
         (await runCli(["plugin", "install", PLUGIN_SOURCE, "--yes"], projectDir, fakeHome)).exitCode
       ).toBe(0);
 
-      const on = await runCli(["telemetry", "on"], projectDir, fakeHome);
+      const on = await runCli(["telemetry", "on", "--yes"], projectDir, fakeHome);
       expect(on.exitCode).toBe(0);
 
       await mkdir(join(projectDir, ".aidd"), { recursive: true });

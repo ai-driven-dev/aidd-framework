@@ -17,8 +17,10 @@ export interface TelemetryUnrecognisedPayload {
  */
 export interface TelemetryEvidenceReader {
   /** `.aidd/config.json`'s `telemetry.enabled`, read the way the hook itself reads it —
-   * strict `=== true`, so a half-written config counts as off, never as on. */
-  isTelemetryEnabled(projectRoot: string): Promise<boolean>;
+   * strict `=== true`, so a half-written config counts as off, never as on — and overridden
+   * to `false` by the person's own refusal (`AIDD_TELEMETRY=0`), which wins unconditionally
+   * over whatever the project's file says. */
+  isTelemetryEnabled(projectRoot: string, env: NodeJS.ProcessEnv): Promise<boolean>;
 
   readUnrecognisedPayload(projectRoot: string): Promise<TelemetryUnrecognisedPayload | null>;
 }

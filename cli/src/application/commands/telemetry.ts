@@ -51,12 +51,20 @@ export function registerTelemetryCommand(program: Command): void {
   telemetry
     .command("on")
     .description("Turn on the AIDD telemetry switch and git-ignore the run journal")
-    .action(async () => {
+    .option(
+      "--yes",
+      "Confirm writing the git-tracked switch — this turns measurement on for everyone who clones",
+      false
+    )
+    .action(async (cmdOptions: { yes: boolean }) => {
       const { verbose, output, projectRoot } = parseGlobalOptions(program);
       const errorHandler = new ErrorHandler(output);
       try {
         const deps = await createDeps(projectRoot, { verbose }, output);
-        const result = await deps.telemetryOnUseCase.execute({ projectRoot });
+        const result = await deps.telemetryOnUseCase.execute({
+          projectRoot,
+          confirmed: cmdOptions.yes,
+        });
         printTelemetryOnReport(output, result);
       } catch (error) {
         errorHandler.handle(error);

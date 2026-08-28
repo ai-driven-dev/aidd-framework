@@ -112,8 +112,28 @@ function readTelemetryConfig(repoRoot) {
   }
 }
 
-// Strict `=== true`, not truthy: a half-written config must read as off, not on.
+// The only refusal available at a person's own scope. Not a second config file: state for
+// "is this measured" already lives in .aidd/config.json (the project's tracked decision),
+// and a file at the person's scope would be a third place the same fact could live, in a
+// change whose point is that there are too many already. An environment variable is
+// refusable per shell, per session and per machine, and needs nothing to be created.
+//
+// Only the literal string "0" counts as a refusal. Unset or empty is not a choice this
+// variable can express - it never turns measurement on by itself, and it never overrides an
+// enabled project. `cli/src/domain/models/telemetry-switch.ts`'s `personRefusesTelemetry`
+// mirrors this exactly, so the hook and the CLI can never disagree about whether a person
+// has refused.
+const TELEMETRY_REFUSAL_VARIABLE = "AIDD_TELEMETRY";
+
+function personRefusesTelemetry() {
+  return process.env[TELEMETRY_REFUSAL_VARIABLE] === "0";
+}
+
+// Strict `=== true`, not truthy: a half-written config must read as off, not on. The
+// person's own refusal is read before the project's file, and wins over it unconditionally -
+// a project that turns measurement on can never out-rank the person running it.
 function telemetryEnabled(repoRoot) {
+  if (personRefusesTelemetry()) return false;
   const config = readTelemetryConfig(repoRoot);
   return Boolean(config && config.telemetry && config.telemetry.enabled === true);
 }
@@ -285,6 +305,8 @@ module.exports = {
   getRepoLocation,
   readTelemetryConfig,
   telemetryEnabled,
+  personRefusesTelemetry,
+  TELEMETRY_REFUSAL_VARIABLE,
   getRemoteUrl,
   remoteWithoutCredentials,
   parseOwnerRepoFromRemote,

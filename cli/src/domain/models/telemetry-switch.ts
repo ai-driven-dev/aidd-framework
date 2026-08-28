@@ -16,6 +16,34 @@ export function telemetryConfigPath(projectRoot: string): string {
   return join(projectRoot, AIDD_DIR, AIDD_CONFIG_FILENAME);
 }
 
+/** The only refusal available at a person's own scope. Not a second config file: state for
+ * "is this measured" already lives in `.aidd/config.json` (the project's tracked decision),
+ * and a file at the person's scope would be a third place the same fact could live, in a
+ * change whose point is that there are too many already. An environment variable is
+ * refusable per shell, per session and per machine, and needs nothing to be created.
+ *
+ * Mirrors `plugins/aidd-telemetry/hooks/lib/repo.cjs`'s `personRefusesTelemetry` exactly -
+ * same variable name, same predicate - so the hook and the CLI can never disagree about
+ * whether a person has refused. Only the literal string `"0"` counts as a refusal: unset or
+ * empty is not a choice this variable can express, and never turns measurement on by
+ * itself. */
+export const TELEMETRY_REFUSAL_VARIABLE = "AIDD_TELEMETRY";
+
+export function personRefusesTelemetry(env: NodeJS.ProcessEnv): boolean {
+  return env[TELEMETRY_REFUSAL_VARIABLE] === "0";
+}
+
+/** Whether measurement is on, from the CLI's side: the person's own refusal read first and
+ * winning unconditionally, the project's tracked switch read only when it does not apply -
+ * the same order and the same verdict `telemetryEnabled` in `repo.cjs` computes. */
+export function resolveTelemetryEnabled(
+  fileSwitch: TelemetrySwitch | null,
+  env: NodeJS.ProcessEnv
+): boolean {
+  if (personRefusesTelemetry(env)) return false;
+  return fileSwitch?.enabled === true;
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)

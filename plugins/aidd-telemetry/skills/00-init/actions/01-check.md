@@ -27,10 +27,11 @@ A confirmed `aidd` command, and whether the switch is already on.
    a tool that writes no token count is not a tool that cost nothing.
 
 2. **Read the switch.** Read `telemetry.enabled` from `.aidd/config.json`.
-   - Already `true`: no consent to ask again, but run `aidd telemetry on` once more anyway —
-     idempotent on the switch itself, and it is what catches a project turned on before this
-     check existed up on ignoring the journal and naming any of it git already tracks. Relay
-     what it prints, then go to verify.
+   - Already `true`: no consent to ask again, but run `aidd telemetry on --yes` once more
+     anyway — idempotent on the switch itself, and it is what catches a project turned on
+     before this check existed up on ignoring the journal and naming any of it git already
+     tracks. The `--yes` here confirms nothing new: this project already made this exact
+     choice, and re-running only catches it up. Relay what it prints, then go to verify.
    - Absent or `false`: go to enable.
 
 ## Test

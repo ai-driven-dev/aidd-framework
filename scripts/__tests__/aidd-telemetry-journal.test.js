@@ -703,6 +703,19 @@ function replayIn(payload, event = ARGV_EVENT_BY_HOOK_EVENT_NAME[payload.hook_ev
   });
 }
 
+// The real hook process, run exactly as replayIn does, except the person running it has set
+// AIDD_TELEMETRY=0 in their own shell - the one refusal available at their scope, which must
+// win even in a repository whose tracked .aidd/config.json turns measurement on.
+function replayInRefusing(payload, event = ARGV_EVENT_BY_HOOK_EVENT_NAME[payload.hook_event_name]) {
+  const args = event ? [script, event] : [script];
+  return spawnSync(process.execPath, args, {
+    cwd: root,
+    encoding: "utf8",
+    input: JSON.stringify(payload),
+    env: { ...CLEAN_ENV, AIDD_RUNS_DIR: "", AIDD_TELEMETRY: "0" },
+  });
+}
+
 // No payload at all - empty stdin, so `readStdin` yields "" and `payload` stays null. The
 // counterpart to replayIn: proves the "no payload arrived" state, not merely one host
 // among several failing to recognise a shape.
@@ -935,6 +948,39 @@ test("telemetryEnabled is off for a repo root with no .aidd/config.json at all",
   }
 });
 
+test("AIDD_TELEMETRY=0 refuses unconditionally, even when the project's own switch is on", () => {
+  const repo = makeTempDir("aidd-telemetry-refusal-");
+  const original = process.env.AIDD_TELEMETRY;
+  try {
+    writeTelemetryConfig(repo, { enabled: true });
+    assert.equal(telemetryEnabled(repo), true, "sanity: on without a refusal");
+
+    process.env.AIDD_TELEMETRY = "0";
+    assert.equal(telemetryEnabled(repo), false, "the refusal wins over the project's file");
+  } finally {
+    if (original === undefined) delete process.env.AIDD_TELEMETRY;
+    else process.env.AIDD_TELEMETRY = original;
+    cleanup(repo);
+  }
+});
+
+test("AIDD_TELEMETRY unset, empty, or any other value is not a choice — never a refusal", () => {
+  const repo = makeTempDir("aidd-telemetry-non-refusal-");
+  const original = process.env.AIDD_TELEMETRY;
+  try {
+    writeTelemetryConfig(repo, { enabled: true });
+    for (const value of [undefined, "", "1", "false", "no"]) {
+      if (value === undefined) delete process.env.AIDD_TELEMETRY;
+      else process.env.AIDD_TELEMETRY = value;
+      assert.equal(telemetryEnabled(repo), true, `AIDD_TELEMETRY=${JSON.stringify(value)} must not refuse`);
+    }
+  } finally {
+    if (original === undefined) delete process.env.AIDD_TELEMETRY;
+    else process.env.AIDD_TELEMETRY = original;
+    cleanup(repo);
+  }
+});
+
 test("a session writes exactly one file directly under aidd_docs/runs/ when opted in, its session_start line carrying exactly the documented keys", () => {
   const repo = makeTempRepo({ remote: "git@github.com:acme/opted-in.git" });
   try {
@@ -961,6 +1007,42 @@ test("a session writes exactly one file directly under aidd_docs/runs/ when opte
     assert.match(line.run_id, /^[0-9A-HJKMNP-TV-Z]{26}$/u);
     assert.equal(path.basename(written[0], ".jsonl"), `${line.run_id}__${sessionId}`);
     assert.match(line.at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("a person's AIDD_TELEMETRY=0 refuses recording end to end, in a repo whose tracked switch turns it on, writing no file and leaving the tree clean", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/refused.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-000000000009";
+    const before = execFileSync("git", ["status", "--porcelain"], { cwd: repo, env: CLEAN_ENV }).toString();
+
+    const result = replayInRefusing(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
+
+    assert.equal(result.status, 0, "a refusal is not an error — the hook still exits clean");
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 0, "nothing is recorded once refused");
+    const after = execFileSync("git", ["status", "--porcelain"], { cwd: repo, env: CLEAN_ENV }).toString();
+    assert.equal(after, before, "refusing changes no file — the working tree stays exactly as it was");
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("removing the refusal records again, in the same repo whose switch never changed", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/re-recorded.git" });
+  try {
+    const refused = replayInRefusing(
+      makePayload({ cwd: repo, sessionId: "00000000-0000-4000-8000-00000000000a", event: "SessionStart" }),
+    );
+    assert.equal(refused.status, 0);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 0);
+
+    const recorded = replayIn(
+      makePayload({ cwd: repo, sessionId: "00000000-0000-4000-8000-00000000000b", event: "SessionStart" }),
+    );
+    assert.equal(recorded.status, 0);
+    assert.equal(readRunFiles(runsDirOf(repo)).length, 1, "recorded again once the refusal is gone");
   } finally {
     cleanup(repo);
   }

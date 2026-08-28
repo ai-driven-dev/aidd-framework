@@ -15,6 +15,7 @@ interface JournalRepoModule {
   sanitizePathSegment(segment: string): string;
   deriveProjectId(repoRoot: string): string;
   telemetryEnabled(repoRoot: string): boolean;
+  personRefusesTelemetry(): boolean;
 }
 
 export const journalRepo: JournalRepoModule = createRequire(import.meta.url)(

@@ -120,7 +120,7 @@ export class DiagnoseTelemetryUseCase {
   // Stops the run before any claim is evaluated: neither fact is evidence about the hook,
   // both are facts about whether there is anything here for it to have written.
   private async gateReason(options: DiagnoseTelemetryOptions): Promise<string | null> {
-    if (!(await this.evidence.isTelemetryEnabled(options.projectRoot))) {
+    if (!(await this.evidence.isTelemetryEnabled(options.projectRoot, options.env))) {
       return "measurement is off — nothing to check until it is turned on";
     }
     if (!(await this.git.isRepository(options.projectRoot))) {
