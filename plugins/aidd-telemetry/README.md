@@ -158,11 +158,11 @@ that default is `%APPDATA%\aidd\telemetry\` instead — `.config` is not where a
 application puts this — unless a machine already journalled under the old `.config` path,
 which it keeps using rather than losing access to what was already written there.
 
-**The person mapping never follows `AIDD_USER_CONFIG_DIR`.** It is read from the OS
+**The identity file never follows `AIDD_USER_CONFIG_DIR`.** It is read from the OS
 profile only, on every platform, by design — see `aidd telemetry identity` above. So on a
 sink shared through that variable, a colleague's records stay `unresolved` in every
 reader's report until that reader deliberately runs `aidd telemetry identity link` on the
-colleague's identifier — nothing about a colleague's own mapping arrives on its own, and
+colleague's identifier — nothing about a colleague's own identity arrives on its own, and
 nothing stops a reader typing an identifier they never opted into. Linking one folds that
 spend into the reader's own row from then on: it declares "this identifier is me", and the
 CLI cannot check the claim against anything the colleague wrote.

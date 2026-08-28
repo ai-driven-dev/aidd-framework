@@ -1,10 +1,13 @@
+import { UnreadableIdentityFileError } from "../../../domain/errors.js";
 import {
   buildCostReport,
   type CostReport,
   type CostReportFilters,
+  type CostReportInput,
   type CostReportSessionJournal,
   type CostReportToolCapability,
   type CostReportToolDeclaration,
+  type PersonIdentityUnusableCause,
 } from "../../../domain/models/cost-report.js";
 import type { ResolvedReportPeriod } from "../../../domain/models/report-period.js";
 import { buildTaskIntervals } from "../../../domain/models/task-attribution.js";
@@ -71,9 +74,9 @@ function toSessionJournal(journal: RunJournal): CostReportSessionJournal | null 
   };
 }
 
-interface PersonMappingFields {
-  readonly personMapping: PersonIdentity | null;
-  readonly personMappingUnreadable: boolean;
+interface PersonIdentityFields {
+  readonly identity: PersonIdentity | null;
+  readonly identityUnusableCause?: PersonIdentityUnusableCause;
 }
 
 /**
@@ -81,20 +84,41 @@ interface PersonMappingFields {
  * the report over it — the same fan-out reasoning `ReadLocalCostUseCase.attemptRead`
  * documents for a local-cost reader failing on one session: a damaged identity file is one
  * dependency's own trouble, never the report's, and the figures must still come back
- * whole. `readStrict()` is what surfaces a damaged identity file as a throw in the first
- * place - `read()` would have folded it into `null` and left nothing to catch here.
+ * whole.
  *
- * The bare `catch` folds every thrown cause into one boolean - phase 3 of the
- * identity-is-the-person rework replaces this with one that names which cause actually
- * fired, distinguishing "could not be read" from "none declared" (the latter is not
- * reachable from a `catch` at all: `readStrict()` answers that with `null`, not a throw).
+ * Names which of the two possible causes actually fired, rather than folding both into one
+ * boolean: `readStrict()` answers "no identity at all" with `null`, never a throw, so that
+ * cause is read off the return value directly - it is not reachable from a `catch`.
+ * `readStrict()` throws `UnreadableIdentityFileError` for a declared file that could not be
+ * read back, which is the one thrown cause this recognises. Anything else thrown is not
+ * this function's to explain and is re-thrown rather than mislabelled as either named
+ * cause - a report that hides an unexpected failure behind a familiar-looking caveat would
+ * be worse than one that surfaces it.
  */
-async function personMappingFields(store: PersonIdentityStore): Promise<PersonMappingFields> {
+async function personIdentityFields(store: PersonIdentityStore): Promise<PersonIdentityFields> {
   try {
-    return { personMapping: await store.readStrict(), personMappingUnreadable: false };
-  } catch {
-    return { personMapping: null, personMappingUnreadable: true };
+    const identity = await store.readStrict();
+    return identity === null ? { identity: null, identityUnusableCause: "absent" } : { identity };
+  } catch (error) {
+    if (error instanceof UnreadableIdentityFileError) {
+      return { identity: null, identityUnusableCause: "unreadable" };
+    }
+    throw error;
   }
+}
+
+/** `identity` and `identityUnusableCause` together, as `buildCostReport` wants them - pulled
+ * out on its own so `execute` reads as one shape assembled from its own reads, not a wall of
+ * field-by-field assignments (the same reason `cost-report.ts`'s own `readFields` exists). */
+function identityInputFields(
+  fields: PersonIdentityFields
+): Pick<CostReportInput, "identity" | "identityUnusableCause"> {
+  return {
+    identity: fields.identity,
+    ...(fields.identityUnusableCause === undefined
+      ? {}
+      : { identityUnusableCause: fields.identityUnusableCause }),
+  };
 }
 
 /**
@@ -123,7 +147,7 @@ export class ReportCostUseCase {
     // the records it is joined to were already selected by their own moments. Filtering the
     // journals as well would only be a second, weaker selection over the same thing.
     const journals = await this.runJournalReader.list();
-    const mapping = await personMappingFields(this.personIdentityStore);
+    const identity = await personIdentityFields(this.personIdentityStore);
 
     return buildCostReport({
       fromDay,
@@ -136,8 +160,7 @@ export class ReportCostUseCase {
       ...(options.task === undefined ? {} : { task: options.task }),
       ...(options.filters === undefined ? {} : { filters: options.filters }),
       knownValues: read.knownValues,
-      personMapping: mapping.personMapping,
-      personMappingUnreadable: mapping.personMappingUnreadable,
+      ...identityInputFields(identity),
     });
   }
 }

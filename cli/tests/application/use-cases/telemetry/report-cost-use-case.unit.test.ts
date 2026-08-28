@@ -7,6 +7,7 @@ import "../../../../src/domain/tools/ai/copilot.js";
 import "../../../../src/domain/tools/ai/cursor.js";
 import "../../../../src/domain/tools/ai/opencode.js";
 import { ReportCostUseCase } from "../../../../src/application/use-cases/telemetry/report-cost-use-case.js";
+import { UnreadableIdentityFileError } from "../../../../src/domain/errors.js";
 import { toMicroUsd } from "../../../../src/domain/models/cost-report.js";
 import type { TelemetrySinkRecord } from "../../../../src/domain/models/telemetry-sink-record.js";
 import { AI_TOOL_IDS } from "../../../../src/domain/models/tool-ids.js";
@@ -158,14 +159,30 @@ describe("ReportCostUseCase", () => {
   });
 
   it("survives an identity that cannot be read, reporting every figure with the caveat set", async () => {
-    identity.throwOnRead = new Error("identity.json does not parse");
+    identity.throwOnRead = new UnreadableIdentityFileError(identity.filePath, "EISDIR");
     await store(record({ vendor_id: "s-1", cost_usd: 1, person_id: "machine-1" }));
 
     const built = await useCase.execute({ period: PERIOD });
 
     expect(built.totals.requests).toBe(1);
-    expect(built.personMappingUnreadable).toBe(true);
+    expect(built.identityUnusableCause).toBe("unreadable");
     expect(built.byPeople.every((row) => row.resolution !== "mapped")).toBe(true);
+  });
+
+  it("reports no identity declared as its own cause, distinct from unreadable", async () => {
+    await store(record({ vendor_id: "s-1", cost_usd: 1, person_id: "machine-1" }));
+
+    const built = await useCase.execute({ period: PERIOD });
+
+    expect(built.identityUnusableCause).toBe("absent");
+  });
+
+  it("re-throws an error it does not recognise rather than mislabelling it as a named cause", async () => {
+    identity.throwOnRead = new Error("some other failure entirely");
+
+    await expect(useCase.execute({ period: PERIOD })).rejects.toThrow(
+      "some other failure entirely"
+    );
   });
 
   it("names no tool, by string literal", () => {

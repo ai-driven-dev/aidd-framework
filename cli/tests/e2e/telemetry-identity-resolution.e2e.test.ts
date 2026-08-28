@@ -1,21 +1,22 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  createTestEnv,
-  gitInit,
-  identityFileIn,
-  personMappingFileIn,
-  runCli,
-  sinkDirIn,
-} from "./helpers.js";
+import { createTestEnv, gitInit, identityFileIn, runCli, sinkDirIn } from "./helpers.js";
 
 /**
- * The guarantees #661 exists to prove: one human counted once across tools and machines,
- * every unplaced identity visible and counted on its own, and the rows always reconciling
- * to the period total — see spec.md and phase-4.md's own Test Scope.
+ * The guarantees #661 exists to prove, now resolved against the one identity file rather
+ * than a separate declaration - see spec.md and phase-3.md's own Test Scope: one human
+ * counted once across tools and machines, every unplaced identity visible and counted on
+ * its own, and the rows always reconciling to the period total. The two-machines journey,
+ * the never-merge assertion and the reconciliation assertion are unchanged from the
+ * previous delivery - they are the point this rework must not disturb.
  *
- * Every seed here writes straight into the sink and the identity/mapping files, the same
+ * Declaring who this machine's user is now goes through `identity use`/`identity link`,
+ * never by writing a separate file directly - the file this suite used to seed by hand
+ * (`person-mapping.json`) no longer exists as its own shape at all.
+ *
+ * Every seed here writes straight into the sink and, where a raw file is unavoidable
+ * (a damaged or repository-supplied identity file), the identity file itself - the same
  * way `telemetry-report.e2e.test.ts` and `telemetry-identity.e2e.test.ts` do: this file's
  * subject is resolution, not any one tool's reader, and going through a real reader would
  * make it depend on whether the machine running it happens to have that tool installed.
@@ -56,10 +57,11 @@ async function seedSink(
   );
 }
 
-async function seedIdentity(fakeHome: string, personId: string): Promise<void> {
-  const filePath = identityFileIn(fakeHome);
-  await mkdir(dirname(filePath), { recursive: true });
-  await writeFile(filePath, `${JSON.stringify({ person_id: personId }, null, 2)}\n`, "utf8");
+/** Declares this machine's own identifier through the CLI, the way a real second machine
+ * would take an identity minted elsewhere - never by writing `identity.json` by hand. */
+async function useIdentity(projectDir: string, fakeHome: string, personId: string): Promise<void> {
+  const result = await runCli(["telemetry", "identity", "use", personId], projectDir, fakeHome);
+  expect(result.exitCode, result.stderr).toBe(0);
 }
 
 async function setUp(prefix: string) {
@@ -76,7 +78,7 @@ interface PersonReportEnvelope {
     totals: { requests: number };
   }>;
   totals: { requests: number };
-  read: { person_mapping_unusable: boolean };
+  read: { identity_unusable?: "unreadable" | "absent" };
 }
 
 async function reportJson(
@@ -124,7 +126,7 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
   it("a second machine's identifier prints unresolved before linking, and merges after", async () => {
     const { projectDir, fakeHome, cleanup: c } = await setUp("person-two-machines");
     cleanup = c;
-    await seedIdentity(fakeHome, "person-a");
+    await useIdentity(projectDir, fakeHome, "person-a");
     await seedSink(sinkDirIn(fakeHome), [
       record({ tool: "claude", vendor_id: "s-1", turn_id: "t-1", person_id: "person-a" }),
       record({ tool: "claude", vendor_id: "s-2", turn_id: "t-2", person_id: "machine-b-id" }),
@@ -134,10 +136,15 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
     expect(before.by_person).toHaveLength(2);
     expect(before.by_person.some((row) => row.resolution === "unresolved")).toBe(true);
 
-    // `seedIdentity` already gave this machine its own identity.json; `on` just confirms
-    // it, minting nothing new, the way "a second on reports the same identifier" pins.
-    const onResult = await runCli(["telemetry", "identity", "on"], projectDir, fakeHome);
-    expect(onResult.exitCode, onResult.stderr).toBe(0);
+    // Taking the identifier already in effect reports it back rather than adopting a
+    // second time, the way "a second on reports the same identifier" pins for `on`.
+    const useAgain = await runCli(
+      ["telemetry", "identity", "use", "person-a"],
+      projectDir,
+      fakeHome
+    );
+    expect(useAgain.exitCode, useAgain.stderr).toBe(0);
+    expect(useAgain.stdout).toMatch(/already in effect/iu);
     const linkResult = await runCli(
       ["telemetry", "identity", "link", "machine-b-id"],
       projectDir,
@@ -169,7 +176,7 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
   it("sums every person row to the period total, and never merges two unmapped identifiers", async () => {
     const { projectDir, fakeHome, cleanup: c } = await setUp("person-reconcile");
     cleanup = c;
-    await seedIdentity(fakeHome, "person-a");
+    await useIdentity(projectDir, fakeHome, "person-a");
     await runCli(["telemetry", "identity", "link", "machine-b-id"], projectDir, fakeHome);
     await seedSink(sinkDirIn(fakeHome), [
       record({ tool: "claude", vendor_id: "s-1", turn_id: "t-1", person_id: "person-a" }),
@@ -189,7 +196,7 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
     expect(new Set(unresolved.flatMap((row) => row.identities)).size).toBe(2);
   });
 
-  it("identity status lists every mapped identity with no report ever run", async () => {
+  it("identity status lists every added identifier with no report ever run", async () => {
     const { projectDir, fakeHome, cleanup: c } = await setUp("person-status-first");
     cleanup = c;
     await runCli(["telemetry", "identity", "on"], projectDir, fakeHome);
@@ -201,12 +208,12 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
     expect(status.stdout).toContain("machine-b-id");
   });
 
-  it("a mapping that does not parse costs the resolution, never one figure", async () => {
-    const { projectDir, fakeHome, cleanup: c } = await setUp("person-corrupt-mapping");
+  it("an identity that does not parse costs the resolution, never one figure", async () => {
+    const { projectDir, fakeHome, cleanup: c } = await setUp("person-corrupt-identity");
     cleanup = c;
-    const mappingPath = personMappingFileIn(fakeHome);
-    await mkdir(dirname(mappingPath), { recursive: true });
-    await writeFile(mappingPath, "this is not json{{{", "utf8");
+    const filePath = identityFileIn(fakeHome);
+    await mkdir(dirname(filePath), { recursive: true });
+    await writeFile(filePath, "this is not json{{{", "utf8");
     await seedSink(sinkDirIn(fakeHome), [
       record({ tool: "claude", vendor_id: "s-1", turn_id: "t-1", person_id: "machine-1" }),
     ]);
@@ -214,7 +221,7 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
     const envelope = await reportJson(projectDir, fakeHome);
 
     expect(envelope.totals.requests).toBe(1);
-    expect(envelope.read.person_mapping_unusable).toBe(true);
+    expect(envelope.read.identity_unusable).toBe("unreadable");
     expect(envelope.by_person.every((row) => row.resolution !== "mapped")).toBe(true);
 
     const textResult = await runCli(
@@ -223,20 +230,70 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
       fakeHome
     );
     expect(textResult.exitCode, textResult.stderr).toBe(0);
-    expect(textResult.stdout).toMatch(/mapping could not be used/iu);
+    expect(textResult.stdout).toMatch(/own identity could not be read/iu);
   });
 
-  it("a mapping placed under a project-scoped config directory has no effect", async () => {
+  it("no identity declared at all still reports every figure, naming that cause", async () => {
+    const { projectDir, fakeHome, cleanup: c } = await setUp("person-no-identity");
+    cleanup = c;
+    await seedSink(sinkDirIn(fakeHome), [
+      record({ tool: "claude", vendor_id: "s-1", turn_id: "t-1", person_id: "machine-1" }),
+    ]);
+
+    const envelope = await reportJson(projectDir, fakeHome);
+
+    expect(envelope.totals.requests).toBe(1);
+    expect(envelope.read.identity_unusable).toBe("absent");
+    expect(envelope.by_person.every((row) => row.resolution !== "mapped")).toBe(true);
+
+    const textResult = await runCli(
+      ["telemetry", "report", ...REPORT_PERIOD, "--axis", "person"],
+      projectDir,
+      fakeHome
+    );
+    expect(textResult.exitCode, textResult.stderr).toBe(0);
+    expect(textResult.stdout).toMatch(/no identity was declared/iu);
+  });
+
+  it("the two causes read as two different caveats end to end", async () => {
+    const unreadable = await setUp("person-cause-unreadable");
+    cleanup = unreadable.cleanup;
+    const filePath = identityFileIn(unreadable.fakeHome);
+    await mkdir(dirname(filePath), { recursive: true });
+    await writeFile(filePath, "not json at all", "utf8");
+    const unreadableText = await runCli(
+      ["telemetry", "report", ...REPORT_PERIOD, "--axis", "person"],
+      unreadable.projectDir,
+      unreadable.fakeHome
+    );
+    await unreadable.cleanup();
+
+    const absent = await setUp("person-cause-absent");
+    cleanup = absent.cleanup;
+    const absentText = await runCli(
+      ["telemetry", "report", ...REPORT_PERIOD, "--axis", "person"],
+      absent.projectDir,
+      absent.fakeHome
+    );
+
+    expect(unreadableText.stdout).not.toBe(absentText.stdout);
+    expect(unreadableText.stdout).toMatch(/could not be read/iu);
+    expect(absentText.stdout).toMatch(/no identity was declared/iu);
+  });
+
+  it("an identity placed under a project-scoped config directory has no effect", async () => {
     const { projectDir, fakeHome, tempDir, cleanup: c } = await setUp("person-project-scope");
     cleanup = c;
-    await seedIdentity(fakeHome, "person-a");
+    await useIdentity(projectDir, fakeHome, "person-a");
     const decoyDir = join(tempDir, "a-repository-or-a-ci-picked-this");
     await mkdir(decoyDir, { recursive: true });
     await writeFile(
-      join(decoyDir, "person-mapping.json"),
-      `${JSON.stringify({
-        entries: [{ person_id: "person-a", identities: ["machine-b-id"] }],
-      })}\n`,
+      join(decoyDir, "identity.json"),
+      `${JSON.stringify(
+        { person_id: "person-a", origin: "adopted", also_me: ["machine-b-id"] },
+        null,
+        2
+      )}\n`,
       "utf8"
     );
     // AIDD_USER_CONFIG_DIR also relocates the sink (telemetry-sink-adapter.ts), so the
@@ -253,6 +310,13 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
     });
 
     expect(envelope.totals.requests).toBe(2);
-    expect(envelope.by_person.every((row) => row.resolution !== "mapped")).toBe(true);
+    // The real profile's own identity ("person-a") still resolves its own row, proving
+    // resolution ran at all - what the decoy must have no effect on is the *claim inside
+    // it*: `machine-b-id` is only listed under the decoy's `also_me`, never the real
+    // profile's, so it must stay unresolved rather than merge into person-a's row.
+    const mapped = envelope.by_person.find((row) => row.resolution === "mapped");
+    expect(mapped?.identities).not.toContain("machine-b-id");
+    const unresolved = envelope.by_person.find((row) => row.identities.includes("machine-b-id"));
+    expect(unresolved?.resolution).toBe("unresolved");
   });
 });

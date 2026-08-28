@@ -12,11 +12,12 @@ import { asPlainObject, describeError, isErrnoException } from "../json-file.js"
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIR_MODE = 0o700;
 
-// Mirrors the plugin's own `skills/00-init/scripts/lib/identity.cjs`, field for field and path for
-// path - the two must agree on where this file lives and what it holds, or the same person
-// reads as two people depending on which side ran the local read. Directory resolution
-// itself lives in `resolveAiddConfigDir` - shared with `person-mapping-adapter.ts`, the
-// other adapter whose contract refuses `AIDD_USER_CONFIG_DIR` for the same reason.
+// The plugin's own plain-node writer this once mirrored (`skills/00-init/scripts/lib/
+// identity.cjs`) was deleted when identity moved to the CLI - this adapter is the sole
+// writer now, and free to carry fields (`origin`, `also_me`) that script never had. Path
+// resolution still lives in `resolveAiddConfigDir`, once shared with the now-deleted
+// `person-mapping-adapter.ts`, kept as its own function since a second reader of this
+// directory is exactly what the identity-is-the-person rework does not rule out.
 function identityFilePath(): string {
   return join(resolveAiddConfigDir(), "identity.json");
 }

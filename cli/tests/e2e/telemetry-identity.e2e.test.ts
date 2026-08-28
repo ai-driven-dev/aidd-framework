@@ -161,8 +161,8 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
     }
   });
 
-  it("off says the mapping still lists an identity that was linked, and names unlink", async () => {
-    const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-off-mapping-stands");
+  it("off removes the whole declaration, stating how many added identifiers went with it", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-off-removes-alsome");
     try {
       await runCli(["telemetry", "identity", "on"], projectDir, fakeHome);
       await runCli(["telemetry", "identity", "link", "a-second-machine"], projectDir, fakeHome);
@@ -170,8 +170,10 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
       const result = await runCli(["telemetry", "identity", "off"], projectDir, fakeHome);
 
       expect(result.exitCode, result.stderr).toBe(0);
-      expect(result.stdout).toMatch(/mapping still lists this identifier/iu);
-      expect(result.stdout).toContain("identity unlink");
+      expect(result.stdout).toMatch(/1 added identifier removed with it/iu);
+
+      const status = await runCli(["telemetry", "identity", "status"], projectDir, fakeHome);
+      expect(status.stdout).not.toContain("a-second-machine");
     } finally {
       await cleanup();
     }
@@ -388,16 +390,20 @@ describe("the on-disk format the deleted script produced", () => {
 
       expect(result.exitCode, result.stderr).toBe(0);
       const file = await readFile(identityFileIn(fakeHome), "utf8");
-      // Captured from `telemetry-identity.cjs name Baptiste` against this exact starting
-      // state, 2026-08-26, before the script was deleted — a literal, not a re-derivation
-      // sharing the adapter's own `JSON.stringify(_, null, 2)` call.
-      expect(file).toBe('{\n  "person_id": "shared-person-id",\n  "display_name": "Baptiste"\n}\n');
+      // `seedIdentity` wrote the script's own no-`origin` shape; reading it back defaults
+      // `origin` to `"minted"` (phase 2 of the identity-is-the-person rework), and every
+      // write from here on carries it - byte parity with the deleted script's own output
+      // ends here by design, not by regression: `origin` is new, required information the
+      // old shape never carried at all.
+      expect(file).toBe(
+        '{\n  "person_id": "shared-person-id",\n  "origin": "minted",\n  "display_name": "Baptiste"\n}\n'
+      );
     } finally {
       await cleanup();
     }
   });
 
-  it("on: from empty, mints a v4 identifier in the script's own on-disk shape and modes", async () => {
+  it("on: from empty, mints a v4 identifier recording how it was obtained", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-format-on-empty");
     try {
       const result = await runCli(["telemetry", "identity", "on"], projectDir, fakeHome);
@@ -406,10 +412,11 @@ describe("the on-disk format the deleted script produced", () => {
       const file = await readFile(identityFileIn(fakeHome), "utf8");
       const personId = (JSON.parse(file) as { person_id: string }).person_id;
       expect(personId).toMatch(UUID_V4);
-      // Captured from `telemetry-identity.cjs on` against an empty profile, 2026-08-26,
-      // before the script was deleted — a literal, with the script's own random uuid
-      // normalized to a placeholder so the shape is comparable across runs.
-      expect(file.replace(personId, "<uuid>")).toBe('{\n  "person_id": "<uuid>"\n}\n');
+      // `mint()` records `origin: "minted"` - the only checkable fact about an identity,
+      // knowable only at the moment it is created, per the identity-is-the-person rework.
+      expect(file.replace(personId, "<uuid>")).toBe(
+        '{\n  "person_id": "<uuid>",\n  "origin": "minted"\n}\n'
+      );
 
       if (process.platform !== "win32") {
         expect((await stat(identityFileIn(fakeHome))).mode & 0o777).toBe(0o600);

@@ -63,7 +63,7 @@ describe("buildCostReportArtefact", () => {
 
   it("prints one row per person with the identities behind it, mapped rows first", () => {
     const envelope = envelopeOf({
-      personMapping: onePersonMapping(),
+      identity: onePersonMapping(),
       records: [request({ turn_id: "a", person_id: "machine-1" })],
     });
 
@@ -75,7 +75,7 @@ describe("buildCostReportArtefact", () => {
 
   it("prints two unplaced identifiers as two labelled rows, never one bucket", () => {
     const envelope = envelopeOf({
-      personMapping: onePersonMapping(),
+      identity: onePersonMapping(),
       records: [
         request({ turn_id: "a", person_id: "a-stranger" }),
         request({ turn_id: "b", person_id: "another-stranger" }),
@@ -92,7 +92,7 @@ describe("buildCostReportArtefact", () => {
 
   it("labels the no-identifier row distinctly from an unresolved one", () => {
     const envelope = envelopeOf({
-      personMapping: onePersonMapping(),
+      identity: onePersonMapping(),
       records: [request({ turn_id: "a" }), request({ turn_id: "b", person_id: "a-stranger" })],
     });
 
@@ -110,15 +110,42 @@ describe("buildCostReportArtefact", () => {
     expect(noneRow).not.toContain("unresolved");
   });
 
-  it("prints every figure and a caveat when the mapping could not be used", () => {
+  it("prints every figure and a caveat when the identity could not be read", () => {
     const envelope = envelopeOf({
       records: [request({ turn_id: "a", cost_usd: 1, person_id: "machine-1" })],
-      personMappingUnreadable: true,
+      identityUnusableCause: "unreadable",
     });
 
     const artefact = buildCostReportArtefact(envelope, "person");
 
     expect(artefact).toContain("$1.00");
-    expect(artefact).toMatch(/mapping could not be used/u);
+    expect(artefact).toMatch(/own identity could not be read/u);
+  });
+
+  it("prints every figure and a different caveat when no identity was declared at all", () => {
+    const envelope = envelopeOf({
+      records: [request({ turn_id: "a", cost_usd: 1, person_id: "machine-1" })],
+      identityUnusableCause: "absent",
+    });
+
+    const artefact = buildCostReportArtefact(envelope, "person");
+
+    expect(artefact).toContain("$1.00");
+    expect(artefact).toMatch(/no identity was declared/u);
+  });
+
+  it("names two different causes with two different caveats", () => {
+    const unreadable = buildCostReportArtefact(
+      envelopeOf({ identityUnusableCause: "unreadable" }),
+      "person"
+    );
+    const absent = buildCostReportArtefact(
+      envelopeOf({ identityUnusableCause: "absent" }),
+      "person"
+    );
+
+    expect(unreadable).not.toBe(absent);
+    expect(unreadable).toMatch(/could not be read/u);
+    expect(absent).toMatch(/no identity was declared/u);
   });
 });

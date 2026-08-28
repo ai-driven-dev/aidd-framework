@@ -457,6 +457,6 @@
   "read": {
     "undated_records": 0,
     "unreadable_lines": 0,
-    "person_mapping_unusable": false
+    "identity_unusable": "absent"
   }
 }

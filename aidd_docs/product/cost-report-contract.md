@@ -112,12 +112,15 @@ for — so a figure taken from a `--days` call can still be cited by the days it
 ## Versioning
 
 Every object carries `cost_report_version`, currently `4` — bumped from `3` when `by_person`
-joined the top-level breakdowns and `read` gained `person_mapping_unusable` (a consumer
+joined the top-level breakdowns and `read` gained `identity_unusable` (a consumer
 summing every breakdown's `requests` against `totals.requests` now has a fourth breakdown to
-include). Bumped from `2` to `3` when `by_model` gained a row with no `model`, for a record
-neither reader that permits one could name (a consumer that read `row.model` as always a
-string on every prior version would misread this one). Bumped from `1` to `2` when `by_day`
-and `by_project` joined `by_step`, `by_model` and `by_tool` as top-level breakdowns.
+include). `identity_unusable` was reshaped from a boolean into a named cause, and the field
+it replaced (`person_mapping_unusable`, over a separate mapping file) was deleted, before
+version 4 ever shipped — no second bump announces either change, since nothing has read
+this version yet. Bumped from `2` to `3` when `by_model` gained a row with no `model`, for a
+record neither reader that permits one could name (a consumer that read `row.model` as
+always a string on every prior version would misread this one). Bumped from `1` to `2` when
+`by_day` and `by_project` joined `by_step`, `by_model` and `by_tool` as top-level breakdowns.
 
 **Set aside an object whose version you do not recognise rather than guessing its shape.**
 The number is bumped when a consumer that understood the previous shape would misread this
@@ -143,7 +146,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "by_person":  [{ "resolution": "mapped", "person": "a-person-id", "identities": ["a-person-id", "a-machine-id"], "totals": {} }],  // mapped rows first, then every unplaced identity, then the one row for records carrying none
   "attribution": [{ "attribution": "tool-stated", "totals": {} }],
   "task_attribution": [{ "attribution": "declared", "totals": {} }],  // present only alongside "task"
-  "read": { "undated_records": 0, "unreadable_lines": 0, "person_mapping_unusable": false }
+  "read": { "undated_records": 0, "unreadable_lines": 0 }  // identity_unusable absent: the identity was read fine
 }
 ```
 
@@ -193,24 +196,28 @@ the breakdown while staying in `totals`.
 
 ### `by_person` — three outcomes, never a merge
 
-`by_person` resolves each record's `person_id` against a mapping the machine's own user
-declared (`aidd telemetry identity link`/`unlink`), never against a git author, an email or
-a hostname. Each row's `resolution` is one of three:
+`by_person` resolves each record's `person_id` against the machine's own identity file
+(`~/.config/aidd/identity.json`, or the platform equivalent — see `aidd telemetry identity`),
+never against a git author, an email or a hostname. That file describes exactly one person:
+its own `person_id`, how it was obtained (`origin`: `"minted"` here or `"adopted"` from
+another machine), and every identifier added onto it with `aidd telemetry identity link`
+(`also_me`). Each row's `resolution` is one of three:
 
 | `resolution` | Means |
 | --- | --- |
-| `mapped` | The identifier is one a person declared as theirs. `person` carries their canonical identifier, and `identities` carries every raw identifier behind the row, including that canonical one. |
-| `unresolved` | The identifier is real, but nobody's mapping covers it. `identities` carries that one raw identifier; `person` is absent. |
-| `none` | The record carried no identifier at all — a different fact from `unresolved`: nobody opted in, rather than somebody did on a machine or tool this mapping has not heard of. |
+| `mapped` | The identifier is this machine's own person — its `person_id` or a member of `also_me`. `person` carries the canonical identifier, and `identities` carries every raw identifier behind the row, including that canonical one. |
+| `unresolved` | The identifier is real, but the identity file does not cover it. `identities` carries that one raw identifier; `person` is absent. |
+| `none` | The record carried no identifier at all — a different fact from `unresolved`: nobody opted in, rather than somebody did on a machine or tool this identity has not heard of. |
 
 **Two raw identifiers one person declared merge into one `mapped` row; two unplaced
-identifiers never merge into each other.** An identity claimed by two different people is a
-mapping error, refused when the mapping is written — a report never guesses which of the
-two it belongs to. Rows are ordered mapped first, then every unresolved identity, then the
-one `none` row last; largest first within the mapped and the unresolved groups.
+identifiers never merge into each other.** The identity file describes exactly one person,
+so there is no shape in which two people could claim one identifier in the first place —
+unlike a lookup table, nothing here can be edited into that state. Rows are ordered mapped
+first, then every unresolved identity, then the one `none` row last; largest first within
+the mapped and the unresolved groups.
 
 `by_person` sums to `totals.requests` exactly like every other breakdown — a damaged or
-undeclared mapping changes how records are labelled, never how many are counted.
+undeclared identity changes how records are labelled, never how many are counted.
 
 ### `session_totals` — a session total, never a sum of requests
 
@@ -305,7 +312,7 @@ permanent for that tool, not a silence to explain away.
 ### What the read could not do
 
 ```jsonc
-"read": { "undated_records": 3, "unreadable_lines": 2, "person_mapping_unusable": false }
+"read": { "undated_records": 3, "unreadable_lines": 2, "identity_unusable": "unreadable" }
 ```
 
 `undated_records` are records carrying no moment at all. They belong to **no** period —
@@ -313,14 +320,13 @@ the only other moment available is the day the line was stored, which is when AI
 about the work rather than when it happened. `unreadable_lines` are lines no parser could
 read.
 
-**Any of the three non-zero (or `true`) means your total is partial.** Say so rather than
-presenting it as whole. `person_mapping_unusable: true` means a mapping file existed but
-could not be used for resolution — either it could not be read back, or it parsed fine but
-declared an ambiguous claim (`aidd telemetry identity link` refuses that case by name, so
-the only way it reaches a report is a mapping edited outside the command) — every record is
-still counted, in `by_person` as `unresolved`, never as a reason to drop a figure. It is
-`false` both when no mapping was ever declared and when one was read fine; `by_person`'s
-own rows are what tells those two apart.
+**Any of the three present or non-zero means your total is partial.** Say so rather than
+presenting it as whole. `identity_unusable` names which of two causes kept this machine's
+own identity from resolving records at all: `"unreadable"` for a declared identity file
+that could not be read back, `"absent"` for no identity declared at all. Either way every
+record is still counted, in `by_person` as `unresolved`, never as a reason to drop a
+figure. The field itself is absent from `read` only when the identity was read back fine -
+`by_person`'s own rows are what shows a resolved identity's effect.
 
 ## Filling it
 

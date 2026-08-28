@@ -1,8 +1,10 @@
 /**
- * Small, shared reading helpers for the two adapters that keep a person's own choice in a
- * hand-editable JSON file under their profile — `person-identity-adapter.ts` and
- * `person-mapping-adapter.ts`. Neither file's own shape is generic enough to live here;
- * only the three questions both ask of raw JSON and a raw filesystem error do.
+ * Small, shared reading helpers for `person-identity-adapter.ts`, which keeps a person's
+ * own choice in a hand-editable JSON file under their profile. Was shared with a second
+ * adapter (`person-mapping-adapter.ts`, over a separate declaration file) that the
+ * identity-is-the-person rework deleted; kept as its own module rather than folded back
+ * inline, since the three questions it answers about raw JSON and a raw filesystem error
+ * are not specific to the one adapter that asks them today.
  */
 
 /** A parsed JSON value, narrowed to a plain object - `null`, an array, or a primitive all

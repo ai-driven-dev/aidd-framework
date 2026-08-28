@@ -148,7 +148,7 @@ export interface CostReportProjectRow {
  * `identities` always carries what produced the row — every raw identifier behind a mapped
  * person, including their own canonical one, or the single raw identifier behind an
  * unresolved row — so a report line naming a person is traceable back to its evidence
- * without a second lookup against the mapping. */
+ * without a second lookup against the identity. */
 export interface CostReportPersonRow {
   readonly resolution: PersonResolution;
   readonly person?: string;
@@ -212,6 +212,12 @@ export interface CostReportEmptySelection {
   readonly combination?: boolean;
 }
 
+/** Why this machine's own identity could not be used to resolve records against - the
+ * two possible causes, named rather than folded into one boolean, so a program reading a
+ * report can tell "the file exists but could not be read" apart from "nobody declared
+ * one at all", exactly as a person reading the caveat can. */
+export type PersonIdentityUnusableCause = "unreadable" | "absent";
+
 export interface CostReportInput {
   readonly fromDay: string;
   readonly toDay: string;
@@ -233,17 +239,18 @@ export interface CostReportInput {
   /** Where a generic filter's value has ever been seen - absent when the caller has none
    * to offer, which reads the same as a filter never matching it elsewhere. */
   readonly knownValues?: CostReportKnownValues;
-  /** A person's own declaration of which identifiers are them, arriving as data rather
-   * than read from a module - the domain stays free of where a mapping lives. Absent or
-   * `null` both mean no mapping was declared, which resolves every identifier as
-   * `unresolved` rather than failing the report. */
-  readonly personMapping?: PersonIdentity | null;
-  /** Set when a mapping exists but could not be used - a damaged or unreadable file, or one
-   * that parsed fine but declared an ambiguous claim; never a mapping that simply was not
-   * declared. Costs the resolution alone: every record is still counted, with every
-   * identifier reported as `unresolved` and this flag saying why, the same way
-   * `unreadableLines` says why a total came from a partial read. */
-  readonly personMappingUnreadable?: boolean;
+  /** This machine's own identity, arriving as data rather than read from a module - the
+   * domain stays free of where the identity file lives. Absent or `null` both mean no
+   * identity was declared, which resolves every identifier as `unresolved` rather than
+   * failing the report - the same reading `identityUnusableCause: "absent"` names below. */
+  readonly identity?: PersonIdentity | null;
+  /** Which of the two possible reasons the identity above could not be used to resolve
+   * records - `"unreadable"` for a declared identity file that could not be read back,
+   * `"absent"` for no identity declared at all. Either way costs the resolution alone:
+   * every record is still counted, with every identifier reported as `unresolved` and
+   * this cause saying why, the same way `unreadableLines` says why a total came from a
+   * partial read. This field itself is absent only when the identity was read back fine. */
+  readonly identityUnusableCause?: PersonIdentityUnusableCause;
 }
 
 export interface CostReport {
@@ -277,10 +284,11 @@ export interface CostReport {
   readonly taskAttributionMix?: readonly CostReportTaskAttributionRow[];
   readonly undatedRecords: number;
   readonly unreadableLines: number;
-  /** Whether a declared mapping existed but could not be used - see `CostReportInput`'s
-   * own field. `false` both when no mapping was declared and when one was read fine;
-   * distinguishing those two is `byPeople`'s job, not this flag's. */
-  readonly personMappingUnreadable: boolean;
+  /** Which cause made this machine's own identity unusable for resolving records - see
+   * `CostReportInput`'s own field of the same name. Absent when the identity was read
+   * back fine; distinguishing a resolved identity from an absent or unreadable one is
+   * `byPeople`'s job, not this field's. */
+  readonly identityUnusableCause?: PersonIdentityUnusableCause;
 }
 
 // Declared as the list first and the type derived from it, rather than the other way
@@ -812,7 +820,7 @@ function accumulateRequestRecord(
   groups: Groups,
   record: TelemetrySinkRecord,
   membership: TaskMembership | null,
-  mapping: PersonIdentity | null
+  identity: PersonIdentity | null
 ): void {
   groups.totals.add(record);
   addToStepGroup(groups.steps, record);
@@ -820,7 +828,7 @@ function accumulateRequestRecord(
   accumulateInto(groups.tools, record.tool, record);
   accumulateInto(groups.models, modelKeyOf(record), record);
   accumulateInto(groups.projects, projectKeyOf(record), record);
-  addToPersonGroup(groups.people, record, resolvePerson(mapping, personRawIdOf(record)));
+  addToPersonGroup(groups.people, record, resolvePerson(identity, personRawIdOf(record)));
   const day = telemetrySinkRecordDayKey(record);
   if (day !== undefined && groups.days.has(day)) groups.days.get(day)?.add(record);
   const attribution = membership === null ? undefined : taskAttributionOf(record, membership);
@@ -832,7 +840,7 @@ function accumulate(
   fromDay: string,
   toDay: string,
   membership: TaskMembership | null,
-  mapping: PersonIdentity | null
+  identity: PersonIdentity | null
 ): Groups {
   const groups = emptyGroups(fromDay, toDay);
   for (const record of records) {
@@ -840,7 +848,7 @@ function accumulate(
       accumulateSessionRecord(groups, record);
       continue;
     }
-    accumulateRequestRecord(groups, record, membership, mapping);
+    accumulateRequestRecord(groups, record, membership, identity);
   }
   return groups;
 }
@@ -991,16 +999,18 @@ function toolRowsInScope(input: CostReportInput, groups: Groups): readonly CostR
   );
 }
 
-/** `undatedRecords`, `unreadableLines` and `personMappingUnreadable` together - what the
+/** `undatedRecords`, `unreadableLines` and `identityUnusableCause` together - what the
  * read could not do, pulled out on its own for the same reason `selectionFields` is: the
  * object literal below reads as one shape, not a wall of field-by-field assignments. */
 function readFields(
   input: CostReportInput
-): Pick<CostReport, "undatedRecords" | "unreadableLines" | "personMappingUnreadable"> {
+): Pick<CostReport, "undatedRecords" | "unreadableLines" | "identityUnusableCause"> {
   return {
     undatedRecords: input.undatedRecords,
     unreadableLines: input.unreadableLines,
-    personMappingUnreadable: input.personMappingUnreadable ?? false,
+    ...(input.identityUnusableCause === undefined
+      ? {}
+      : { identityUnusableCause: input.identityUnusableCause }),
   };
 }
 
@@ -1241,8 +1251,8 @@ export function buildCostReport(input: CostReportInput): CostReport {
   const stages = selectionStages(records, input, membership);
   const emptySelection = emptySelectionOf(stages, input, membership);
   const inScope = stages[stages.length - 1]?.records ?? [];
-  const mapping = input.personMapping ?? null;
-  const groups = accumulate(inScope, input.fromDay, input.toDay, membership, mapping);
+  const identity = input.identity ?? null;
+  const groups = accumulate(inScope, input.fromDay, input.toDay, membership, identity);
 
   return assembleCostReport(input, inScope, groups, membership, emptySelection);
 }

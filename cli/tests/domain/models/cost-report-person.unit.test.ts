@@ -59,7 +59,7 @@ function sumOf(rows: readonly { readonly totals: CostTotals }[]): number {
 describe("byPeople — one raw identity resolved per group, never merged or dropped", () => {
   it("two identifiers one person declared produce one row, not two", () => {
     const built = report({
-      personMapping: twoIdentitiesOnePerson(),
+      identity: twoIdentitiesOnePerson(),
       records: [
         request({ turn_id: "a", person_id: "machine-1" }),
         request({ turn_id: "b", person_id: "machine-2" }),
@@ -73,7 +73,7 @@ describe("byPeople — one raw identity resolved per group, never merged or drop
 
   it("a mapped row names every raw identity behind it", () => {
     const built = report({
-      personMapping: twoIdentitiesOnePerson(),
+      identity: twoIdentitiesOnePerson(),
       records: [
         request({ turn_id: "a", person_id: "machine-1" }),
         request({ turn_id: "b", person_id: "machine-2" }),
@@ -88,7 +88,7 @@ describe("byPeople — one raw identity resolved per group, never merged or drop
 
   it("an identity nobody declared gets its own row, labelled unresolved", () => {
     const built = report({
-      personMapping: twoIdentitiesOnePerson(),
+      identity: twoIdentitiesOnePerson(),
       records: [request({ turn_id: "a", person_id: "a-stranger" })],
     });
 
@@ -99,7 +99,7 @@ describe("byPeople — one raw identity resolved per group, never merged or drop
 
   it("two identifiers nobody declared produce two rows, never one merged bucket", () => {
     const built = report({
-      personMapping: twoIdentitiesOnePerson(),
+      identity: twoIdentitiesOnePerson(),
       records: [
         request({ turn_id: "a", person_id: "a-stranger" }),
         request({ turn_id: "b", person_id: "another-stranger" }),
@@ -116,7 +116,7 @@ describe("byPeople — one raw identity resolved per group, never merged or drop
 
   it("a record with no identifier lands in its own row, distinct from every unresolved one", () => {
     const built = report({
-      personMapping: twoIdentitiesOnePerson(),
+      identity: twoIdentitiesOnePerson(),
       records: [request({ turn_id: "a", person_id: "a-stranger" }), request({ turn_id: "b" })],
     });
 
@@ -129,7 +129,7 @@ describe("byPeople — one raw identity resolved per group, never merged or drop
 
   it("summing every person row's requests equals the report's own total", () => {
     const built = report({
-      personMapping: twoIdentitiesOnePerson(),
+      identity: twoIdentitiesOnePerson(),
       records: [
         request({ turn_id: "a", person_id: "machine-1" }),
         request({ turn_id: "b", person_id: "machine-2" }),
@@ -150,7 +150,7 @@ describe("byPeople — one raw identity resolved per group, never merged or drop
       cache_creation_tokens: 5,
     };
     const built = report({
-      personMapping: twoIdentitiesOnePerson(),
+      identity: twoIdentitiesOnePerson(),
       records: [
         request({ turn_id: "a", person_id: "machine-1", cost_usd: 0.5, ...tokenFields }),
         request({ turn_id: "b", person_id: "machine-2", cost_usd: 0.25, ...tokenFields }),
@@ -190,7 +190,7 @@ describe("byPeople — one raw identity resolved per group, never merged or drop
 
   it("orders mapped rows first, then unresolved, then the no-identifier row last", () => {
     const built = report({
-      personMapping: twoIdentitiesOnePerson(),
+      identity: twoIdentitiesOnePerson(),
       records: [
         request({ turn_id: "a", person_id: "machine-1" }),
         request({ turn_id: "b", person_id: "a-stranger" }),
@@ -205,7 +205,7 @@ describe("byPeople — one raw identity resolved per group, never merged or drop
 describe("byPeople — no mapping declared at all", () => {
   it("resolves every identifier as unresolved, and leaves the figures unchanged", () => {
     const withMapping = report({
-      personMapping: twoIdentitiesOnePerson(),
+      identity: twoIdentitiesOnePerson(),
       records: [request({ turn_id: "a", person_id: "machine-1" })],
     });
     const withoutMapping = report({
@@ -219,19 +219,22 @@ describe("byPeople — no mapping declared at all", () => {
     expect(withoutMapping.totals).toEqual(withMapping.totals);
   });
 
-  it("personMappingUnreadable defaults to false when nothing said otherwise", () => {
-    expect(report().personMappingUnreadable).toBe(false);
+  it("identityUnusableCause is absent when nothing said otherwise", () => {
+    expect(report().identityUnusableCause).toBeUndefined();
   });
 
-  it("carries personMappingUnreadable through when the caller states it", () => {
-    expect(report({ personMappingUnreadable: true }).personMappingUnreadable).toBe(true);
+  it("carries identityUnusableCause through when the caller states it", () => {
+    expect(report({ identityUnusableCause: "unreadable" }).identityUnusableCause).toBe(
+      "unreadable"
+    );
+    expect(report({ identityUnusableCause: "absent" }).identityUnusableCause).toBe("absent");
   });
 });
 
 describe("the envelope carries by_person for a program to parse", () => {
   it("carries the person rows, their identities, and a raised report version", () => {
     const built = report({
-      personMapping: twoIdentitiesOnePerson(),
+      identity: twoIdentitiesOnePerson(),
       records: [
         request({ turn_id: "a", person_id: "machine-1" }),
         request({ turn_id: "b", person_id: "a-stranger" }),
@@ -243,7 +246,7 @@ describe("the envelope carries by_person for a program to parse", () => {
     expect(envelope.by_person.length).toBeGreaterThan(0);
     const mapped = envelope.by_person.find((row) => row.resolution === "mapped");
     expect(mapped?.identities).toEqual(expect.arrayContaining(["machine-1"]));
-    expect(envelope.read.person_mapping_unusable).toBe(false);
+    expect(envelope.read.identity_unusable).toBeUndefined();
   });
 });
 
@@ -255,7 +258,7 @@ describe("byPeople — a billed call seen by both routes keeps its person", () =
   // this exact case would silently drop a mapped person's own work into `"none"`.
   it("backfills the local-read sibling's person_id onto the export-route survivor", () => {
     const built = report({
-      personMapping: twoIdentitiesOnePerson(),
+      identity: twoIdentitiesOnePerson(),
       records: [
         request({
           billed_request_id: "call-1",

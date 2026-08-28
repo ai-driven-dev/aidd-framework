@@ -5,6 +5,7 @@ import type {
   CostReportFilters,
   CostReportToolCoverage,
   CostTotals,
+  PersonIdentityUnusableCause,
 } from "./cost-report.js";
 import type { PersonResolution } from "./person-resolution.js";
 import type { StepAttributionSource } from "./step-attribution.js";
@@ -18,9 +19,11 @@ import type { AiToolId } from "./tool-ids.js";
  * not a bump; changing what an existing field means is.
  *
  * Bumped to 4: `by_person` is a new top-level breakdown, and `read` gained
- * `person_mapping_unusable` - a consumer summing every breakdown's requests against
+ * `identity_unusable` - a consumer summing every breakdown's requests against
  * `totals.requests` to check nothing was dropped now has a fourth breakdown to include,
- * the same reasoning that bumped `by_project` and `by_day` in.
+ * the same reasoning that bumped `by_project` and `by_day` in. `identity_unusable` itself
+ * was reshaped from a boolean into a named cause before this version ever shipped - see
+ * the identity-is-the-person rework - so no second bump announces that change.
  *
  * Bumped to 3: `by_model`'s `model` is now absent on the row for a record neither reader
  * that permits a model-less request could name - a consumer that read it as always a
@@ -131,11 +134,12 @@ export interface CostReportEnvelopePersonRow {
 export interface CostReportEnvelopeRead {
   readonly undated_records: number;
   readonly unreadable_lines: number;
-  /** A mapping existed but could not be used - either it could not be read back, or it
-   * parsed fine but declared an ambiguous claim `readStrict()` refuses. Never true for a
-   * mapping simply not declared, which is the ordinary, resolved-as-nobody-opted-in state
-   * `by_person` already shows on its own. */
-  readonly person_mapping_unusable: boolean;
+  /** Which of the two possible causes made this machine's own identity unusable for
+   * resolving records - `"unreadable"` for a declared identity file that could not be
+   * read back, `"absent"` for no identity declared at all. Absent from this envelope
+   * entirely when the identity was read back fine; `by_person` already shows a resolved
+   * identity's own effect on its own. */
+  readonly identity_unusable?: PersonIdentityUnusableCause;
 }
 
 /**
@@ -279,7 +283,9 @@ function readSummary(report: CostReport): CostReportEnvelopeRead {
   return {
     undated_records: report.undatedRecords,
     unreadable_lines: report.unreadableLines,
-    person_mapping_unusable: report.personMappingUnreadable,
+    ...(report.identityUnusableCause === undefined
+      ? {}
+      : { identity_unusable: report.identityUnusableCause }),
   };
 }
 
