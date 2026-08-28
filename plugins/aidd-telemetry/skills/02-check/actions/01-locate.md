@@ -8,8 +8,8 @@ A confirmed `aidd` command, or a stated reason it cannot answer.
 
 ## Process
 
-1. **Require the CLI.** Answering every claim below — the export route as much as the
-   local one — lives in the `aidd` command, not in a script beside this skill.
+1. **Require the CLI.** Answering every claim below lives in the `aidd` command, not in a
+   script beside this skill.
 
    ```bash
    aidd --version

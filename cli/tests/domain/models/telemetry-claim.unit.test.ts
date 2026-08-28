@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   diagnoseTelemetryClaims,
@@ -304,5 +306,59 @@ describe("diagnoseTelemetryClaims — the whole set", () => {
     for (const c of result) {
       expect(c.detail.toLowerCase()).not.toMatch(/export|endpoint|identifier|identity/u);
     }
+  });
+
+  it("no claim recommends a command the system no longer offers", () => {
+    const result = diagnoseTelemetryClaims(evidence());
+    for (const c of result) {
+      expect(c.detail.toLowerCase()).not.toMatch(/\breceive\b|\bendpoint\b/u);
+    }
+  });
+});
+
+// The failure this guards against, verbatim from the plan: "A shape change whose consumer
+// is not updated in the same commit is how the cost skill was halted by a version pin,
+// twice." The consumer here is `02-check/SKILL.md`'s own stated claim count - this reads
+// it as text, the same way a person or an agent would, rather than trusting that whoever
+// next changes the claim count remembers to touch the skill too.
+describe("the diagnostic skill states the claims the command prints, in the number it prints them", () => {
+  const SKILL_PATH = resolve(
+    process.cwd(),
+    "..",
+    "plugins",
+    "aidd-telemetry",
+    "skills",
+    "02-check",
+    "SKILL.md"
+  );
+
+  const NUMBER_WORDS: Record<string, number> = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+  };
+
+  function statedClaimCount(): number {
+    const text = readFileSync(SKILL_PATH, "utf8");
+    const match = text.match(/\b(one|two|three|four|five|six|seven|eight)\s+claims?\b/iu);
+    if (!match?.[1]) {
+      throw new Error(
+        "02-check/SKILL.md no longer states a claim count in words — update this check's " +
+          "regex (and keep it able to fail) if the wording changed on purpose"
+      );
+    }
+    const count = NUMBER_WORDS[match[1].toLowerCase()];
+    if (count === undefined) throw new Error(`unrecognised claim-count word: ${match[1]}`);
+    return count;
+  }
+
+  it("agrees with the actual number of claims diagnoseTelemetryClaims prints", () => {
+    const actual = diagnoseTelemetryClaims(evidence()).length;
+    expect(statedClaimCount()).toBe(actual);
   });
 });

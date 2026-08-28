@@ -136,6 +136,12 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
       expect(result.exitCode, result.stderr).toBe(0);
       expect(result.stdout).toMatch(/hook fired\s+FAIL\s+no run file/u);
       expect(result.stdout).toMatch(/never been observed firing/u);
+      // "Nothing has run yet" is not "everything is broken": with no journal at all, the
+      // three claims that read from it have no material to judge, and say so - never a
+      // cascade of failures downstream of the one genuine one.
+      expect(result.stdout).toMatch(/session journalled\s+--/u);
+      expect(result.stdout).toMatch(/tool files readable\s+--/u);
+      expect(result.stdout).toMatch(/records join\s+--/u);
     } finally {
       await cleanup();
     }
@@ -198,6 +204,9 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
       expect(allClaimLines(result.stdout)).toHaveLength(4);
       expect(result.stdout).not.toContain("export");
       expect(result.stdout).not.toContain("identifier joinable");
+      // A healthy, working install — everything the chain needs has already happened —
+      // reports no failing claim at all.
+      expect(result.stdout).not.toContain("FAIL");
     } finally {
       await cleanup();
     }

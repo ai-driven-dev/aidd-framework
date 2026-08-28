@@ -11,7 +11,7 @@ flowchart LR
   ask([project]) --> locate --> diagnose
   diagnose -.->|"measurement off"| stopped([stopped])
   diagnose -.->|"not a git repository"| stopped
-  diagnose --> answer([six claims])
+  diagnose --> answer([four claims])
 ```
 
 ## Actions
