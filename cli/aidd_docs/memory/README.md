@@ -4,7 +4,7 @@ Structured context the AI assistant reads at the start of a session, so it does 
 
 ## How it loads
 
-- The files at the root of `memory/` are referenced by the `<aidd_project_memory>` block in the AI context file and load every session.
+- The files at the root of `memory/` are referenced by the project memory block in the AI context file and load every session.
 - `internal/` and `external/` are listed there too, but load on demand, only when relevant.
 
 ## Files
@@ -21,6 +21,10 @@ The list below is refreshed automatically by the memory hook. Do not edit it by 
 - [project-brief.md](project-brief.md)
 - [testing.md](testing.md)
 - [vcs.md](vcs.md)
+
+Read on demand:
+
+- [internal/decisions/self-update-version-source-npm.md](internal/decisions/self-update-version-source-npm.md)
 <!-- files:end -->
 
 ## How to maintain it

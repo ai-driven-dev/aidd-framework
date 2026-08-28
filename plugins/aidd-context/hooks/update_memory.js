@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * update_memory.js - Syncs the <aidd_project_memory> block in AI context files.
+ * update_memory.js - Syncs the project memory block in AI context files.
  *
- * Scans aidd_docs/memory/ and updates the <aidd_project_memory> block in each
+ * Scans aidd_docs/memory/ and updates the block delimited by
+ * <!-- aidd_project_memory:start --> / <!-- aidd_project_memory:end --> in each
  * context file with two tiers:
  *   - Root memory files       -> always loaded, via a tool-appropriate reference.
  *   - internal/ and external/ -> listed (plain paths, no @), read on demand.
@@ -28,8 +29,18 @@
 const DOCS_DIR = "aidd_docs";
 const MEMORY_SUBDIR = "memory";
 const ON_DEMAND_DIRS = ["internal", "external"];
-const BLOCK_OPEN = "<aidd_project_memory>";
-const BLOCK_CLOSE = "</aidd_project_memory>";
+// HTML comment markers, not a bare <aidd_project_memory> tag. A line opening a
+// bare tag starts an HTML block that runs to the next blank line, and an @import
+// inside one is skipped by the context loader exactly like a fenced code block,
+// so the memory silently never loads. A comment closes on its own line.
+const BLOCK_OPEN = "<!-- aidd_project_memory:start -->";
+const BLOCK_CLOSE = "<!-- aidd_project_memory:end -->";
+
+// The shape written before the markers above. Blocks already in a user's context
+// file are rewritten to the new markers on the next run; without that they stop
+// matching, the file is skipped with no output, and the memory stays unloaded.
+const LEGACY_BLOCK_OPEN = "<aidd_project_memory>";
+const LEGACY_BLOCK_CLOSE = "</aidd_project_memory>";
 const ON_DEMAND_NOTE = "<!-- read on demand, not auto-loaded -->";
 const EXCLUDED_FILES = new Set([".gitkeep", "README.md"]);
 
@@ -117,8 +128,12 @@ function buildBlockContent(rootFiles, onDemandFiles, syntax) {
     lines.push("", ON_DEMAND_NOTE);
     for (const f of onDemandFiles) lines.push(`- ${f.replace(/\\/g, "/")}`);
   }
-  if (lines.length === 0) return "";
-  return `\n${lines.join("\n")}\n`;
+  if (lines.length === 0) return "\n";
+  // Blank line on each side of the content. The markers are comments, which
+  // close on their own line, but a context loader that treats any line opening
+  // with `<` as an HTML block running to the next blank line would otherwise
+  // swallow the imports. The blank lines hold under either reading.
+  return `\n\n${lines.join("\n")}\n\n`;
 }
 
 // Replace the text between an open and close marker, leaving the rest intact.
@@ -131,6 +146,58 @@ function updateMarkers(content, open, close, innerContent) {
   const openIdx = content.lastIndexOf(open, closeIdx);
   if (openIdx === -1) return null;
   return content.slice(0, openIdx + open.length) + innerContent + content.slice(closeIdx);
+}
+
+// The real block is the one whose markers each own their line, outside any code
+// fence. Substring search is not enough: the legacy tag is the string every
+// upgrade note and migration doc quotes, and rewriting a quoted pair would
+// mangle that prose while leaving the real block unmigrated and unloaded.
+function findLegacyBlockLines(lines) {
+  let fence = null;
+  let openLine = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+
+    if (fence !== null) {
+      if (trimmed.startsWith(fence)) fence = null;
+      continue;
+    }
+    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
+      fence = trimmed.slice(0, 3);
+      continue;
+    }
+    if (trimmed === LEGACY_BLOCK_OPEN) openLine = i;
+    else if (trimmed === LEGACY_BLOCK_CLOSE && openLine !== -1) {
+      return { openLine, closeLine: i };
+    }
+  }
+
+  return null;
+}
+
+// Rewrite a legacy <aidd_project_memory> block to the comment markers.
+function migrateLegacyMarkers(content) {
+  const lines = content.split("\n");
+  const found = findLegacyBlockLines(lines);
+  if (found === null) return content;
+
+  lines[found.openLine] = lines[found.openLine].replace(LEGACY_BLOCK_OPEN, BLOCK_OPEN);
+  lines[found.closeLine] = lines[found.closeLine].replace(LEGACY_BLOCK_CLOSE, BLOCK_CLOSE);
+  return lines.join("\n");
+}
+
+// A file carrying one marker without its pair can never be filled again. Say so:
+// silence about a block that does not sync is what kept the memory unloaded.
+function reportUnpairedMarkers(filePath, content) {
+  const has = (marker) => content.includes(marker);
+  const unpaired =
+    has(BLOCK_OPEN) !== has(BLOCK_CLOSE) ||
+    has(LEGACY_BLOCK_OPEN) !== has(LEGACY_BLOCK_CLOSE);
+
+  if (unpaired) {
+    console.error(`update_memory: ${filePath} has an unpaired project memory marker, not synced`);
+  }
 }
 
 function updateBlock(content, innerContent) {
@@ -185,6 +252,10 @@ function gitAdd(childProcess, files) {
 
 // ── Main ──────────────────────────────────────────────────────────
 
+// Runs as a script, never imported: no require, no module.exports, and every
+// dependency pulled in with dynamic import(). The file is copied into the user's
+// project by the CLI, so a project declaring "type": "module" decides how it is
+// parsed. CommonJS syntax here would crash the hook on load in any such project.
 (async () => {
   const fs = await import("node:fs");
   const path = await import("node:path");
@@ -210,9 +281,16 @@ function gitAdd(childProcess, files) {
     if (original === null) continue;
 
     const innerContent = buildBlockContent(rootFiles, onDemandFiles, target.syntax);
-    const updated = updateBlock(original, innerContent);
+    // Compare against what is on disk, not against the migrated text: a file
+    // whose memory list is unchanged would otherwise look identical and skip
+    // the write, leaving the legacy markers in place forever.
+    const updated = updateBlock(migrateLegacyMarkers(original), innerContent);
 
-    if (updated === null || updated === original) continue;
+    if (updated === null) {
+      reportUnpairedMarkers(target.path, original);
+      continue;
+    }
+    if (updated === original) continue;
 
     fs.writeFileSync(target.path, updated, "utf8");
     changed.push(target.path);

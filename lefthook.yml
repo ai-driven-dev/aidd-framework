@@ -21,6 +21,14 @@ pre-commit:
           exit 1
         fi
         node scripts/validate-yaml.mjs {files}
+    scripts-tests:
+      glob: "{scripts,plugins/aidd-context/hooks}/**"
+      run: |
+        if ! command -v node >/dev/null 2>&1; then
+          echo "ℹ️  node not available; skipping scripts-tests"
+          exit 0
+        fi
+        node --test 'scripts/__tests__/*.test.js'
     skill-frontmatter:
       glob: "plugins/*/skills/*/SKILL.md"
       run: |
@@ -43,6 +51,14 @@ pre-commit:
           exit 0
         fi
         node scripts/check-skill-argument-hints.mjs
+    context-imports:
+      glob: "{**/,}{CLAUDE,AGENTS,copilot-instructions}.md"
+      run: |
+        if ! command -v node >/dev/null 2>&1; then
+          echo "ℹ️  node not available; skipping context-imports"
+          exit 0
+        fi
+        node scripts/check-context-imports.js
     markdown-links:
       glob: "**/*.md"
       run: |
