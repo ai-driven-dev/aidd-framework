@@ -63,13 +63,38 @@ export function resolvePerson(
   };
 }
 
-/** `identity` with `value` added to `alsoMe`, deduplicated — the one place this rule is
- * written, so the real adapter and its in-memory test double share it rather than each
- * reimplementing the same merge. */
+/** `identity` with `value` added to `alsoMe`, deduplicated, and never the person's own
+ * `personId` — the one place this rule is written, so the real adapter and its in-memory
+ * test double share it rather than each reimplementing the same merge.
+ *
+ * The `personId` half is the invariant `resolvePerson` relies on rather than re-checking:
+ * a person's own identifier is not an identifier *added onto* them. Both writers go
+ * through here, so the shape cannot be written at all. */
 export function withAlsoMeAdded(identity: PersonIdentity, value: string): PersonIdentity {
-  return identity.alsoMe.includes(value)
+  return identity.alsoMe.includes(value) || value === identity.personId
     ? identity
     : { ...identity, alsoMe: [...identity.alsoMe, value] };
+}
+
+/** `current` re-anchored on `personId`, taken from another machine rather than generated
+ * here — keeping whatever was already declared, minus `personId` itself.
+ *
+ * That subtraction is the whole reason this exists instead of a literal in the adapter.
+ * Adding an identifier and then adopting it is an ordinary sequence (`link X`, later
+ * `use X`), and without it the person's own identifier lands in the list of identifiers
+ * added onto them: `status` prints it as added onto themselves, and `resolvePerson` names
+ * it twice as the evidence behind one row. Refused where it would be written, so nothing
+ * downstream has to filter it where it is read. */
+export function withPersonIdAdopted(
+  current: PersonIdentity | null,
+  personId: string
+): PersonIdentity {
+  return {
+    personId,
+    origin: "adopted",
+    alsoMe: (current?.alsoMe ?? []).filter((raw) => raw !== personId),
+    ...(current?.displayName === undefined ? {} : { displayName: current.displayName }),
+  };
 }
 
 /** `identity` with `value` withdrawn from `alsoMe`, wherever it is — an identifier not

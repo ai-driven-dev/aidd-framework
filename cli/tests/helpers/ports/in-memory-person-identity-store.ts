@@ -1,6 +1,7 @@
 import {
   withAlsoMeAdded,
   withAlsoMeRemoved,
+  withPersonIdAdopted,
 } from "../../../src/domain/models/person-resolution.js";
 import type { PersonIdentity } from "../../../src/domain/ports/person-identity-reader.js";
 import type { PersonIdentityStore } from "../../../src/domain/ports/person-identity-store.js";
@@ -50,14 +51,7 @@ export class InMemoryPersonIdentityStore implements PersonIdentityStore {
 
   async adopt(personId: string): Promise<PersonIdentity> {
     this.filePresent = true;
-    this.identity = {
-      personId,
-      origin: "adopted",
-      alsoMe: this.identity?.alsoMe ?? [],
-      ...(this.identity?.displayName === undefined
-        ? {}
-        : { displayName: this.identity.displayName }),
-    };
+    this.identity = withPersonIdAdopted(this.identity, personId);
     return this.identity;
   }
 

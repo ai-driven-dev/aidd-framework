@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolvePerson } from "../../../src/domain/models/person-resolution.js";
+import {
+  resolvePerson,
+  withAlsoMeAdded,
+  withPersonIdAdopted,
+} from "../../../src/domain/models/person-resolution.js";
 import type { PersonIdentity } from "../../../src/domain/ports/person-identity-reader.js";
 
 /**
@@ -127,5 +131,42 @@ describe("resolvePerson", () => {
     };
 
     expect(identity).toBeDefined();
+  });
+
+  // The sequence three supported verbs allow: add an identifier, later adopt it as your
+  // own. Before the invariant moved into the writers, `also_me` kept the newly canonical
+  // identifier and one row named it twice as its own evidence.
+  it("adopting an identifier already added onto this person does not list it as added onto them", () => {
+    const linked = withAlsoMeAdded(
+      { personId: "machine-a", origin: "minted", alsoMe: [] },
+      "machine-b"
+    );
+
+    const adopted = withPersonIdAdopted(linked, "machine-b");
+
+    expect(adopted.personId).toBe("machine-b");
+    expect(adopted.alsoMe).toEqual([]);
+    expect(resolvePerson(adopted, "machine-b").identities).toEqual(["machine-b"]);
+  });
+
+  it("refuses to add a person's own identifier onto themselves", () => {
+    const identity = { personId: "me", origin: "minted" as const, alsoMe: [] };
+
+    expect(withAlsoMeAdded(identity, "me").alsoMe).toEqual([]);
+  });
+
+  it("adopting keeps every other added identifier, and the display name", () => {
+    const current = {
+      personId: "machine-a",
+      origin: "minted" as const,
+      alsoMe: ["machine-b", "machine-c"],
+      displayName: "carried, never produced",
+    };
+
+    const adopted = withPersonIdAdopted(current, "machine-b");
+
+    expect(adopted.alsoMe).toEqual(["machine-c"]);
+    expect(adopted.displayName).toBe("carried, never produced");
+    expect(adopted.origin).toBe("adopted");
   });
 });

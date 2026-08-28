@@ -211,6 +211,41 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
     }
   });
 
+  // Pins the adapter half of `forget()`'s answer, which the use-case tests cannot reach:
+  // with `force: true` restored on the `rm`, this prints the withdrawal message for a
+  // profile that never had a file, and every unit test stays green.
+  it("off on a profile that never had an identity says there was nothing to withdraw", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-off-absent");
+    try {
+      const result = await runCli(["telemetry", "identity", "off"], projectDir, fakeHome);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/nothing to withdraw/iu);
+      expect(result.stdout).not.toMatch(/removed with it/iu);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  // A file naming nobody parses to "nobody chose" while still sitting on disk. Deciding
+  // removal from that read left it there with no verb able to remove it.
+  it("off removes an identity file that exists but names nobody", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-off-nameless");
+    try {
+      const file = identityFileIn(fakeHome);
+      await mkdir(dirname(file), { recursive: true });
+      await writeFile(file, `${JSON.stringify({ person_id: "", origin: "adopted" })}\n`, "utf8");
+
+      const result = await runCli(["telemetry", "identity", "off"], projectDir, fakeHome);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).not.toMatch(/nothing to withdraw/iu);
+      expect(await readIdentityFile(fakeHome)).toBeNull();
+    } finally {
+      await cleanup();
+    }
+  });
+
   // `status`, `on` and `name` are right to error on a damaged file — the edge case above.
   // `off` is not: it is how a person gets out, and there must be no state a damaged file
   // can put someone in that withdrawing cannot get them out of.

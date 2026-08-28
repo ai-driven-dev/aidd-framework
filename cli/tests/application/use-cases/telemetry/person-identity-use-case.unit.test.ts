@@ -374,12 +374,13 @@ describe("PersonIdentityUseCase.off", () => {
     expect(result.identity.personId).not.toBe("withdrawn-id");
   });
 
+  // The store reads back nothing, because the file is a directory - a shape that cannot
+  // also parse to an identity. Seeding one here would let `removed` come from the identity
+  // instead of from the file, which is exactly the confusion `forget()` answering from the
+  // filesystem exists to end.
   it("discards a damaged identity file rather than leaving a person unable to withdraw", async () => {
-    const store = new InMemoryPersonIdentityStore({
-      personId: "person-1",
-      origin: "minted",
-      alsoMe: [],
-    });
+    const store = new InMemoryPersonIdentityStore(null);
+    store.filePresent = true;
     store.throwOnRead = new UnreadableIdentityFileError(store.filePath, "EISDIR");
 
     const result = await useCase(store).off();

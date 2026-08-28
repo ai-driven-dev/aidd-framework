@@ -30,8 +30,8 @@ export function resolveHomeDir(
  * beside `resolveHomeDir`, because its contract refuses `AIDD_USER_CONFIG_DIR` on purpose:
  * that variable is a location a repository or a CI job can set, and reaching the identity
  * file through it would not be this person's own choice to make. The telemetry sink is
- * deliberately not a caller of this function — `telemetry-sink-adapter.ts`'s own
- * `defaultConfigDir` honours that variable, and additionally falls back to a legacy
+ * deliberately not a caller of this function — `TelemetrySinkAdapter`'s own constructor
+ * honours that variable, and its `defaultConfigDir` additionally falls back to a legacy
  * POSIX-shaped directory on Windows, a concern this function has no reason to carry.
  */
 export function resolveAiddConfigDir(): string {

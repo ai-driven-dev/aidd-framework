@@ -2,7 +2,11 @@ import { randomUUID } from "node:crypto";
 import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { UnreadableIdentityFileError } from "../../domain/errors.js";
-import { withAlsoMeAdded, withAlsoMeRemoved } from "../../domain/models/person-resolution.js";
+import {
+  withAlsoMeAdded,
+  withAlsoMeRemoved,
+  withPersonIdAdopted,
+} from "../../domain/models/person-resolution.js";
 import type { PersonIdentity } from "../../domain/ports/person-identity-reader.js";
 import type { PersonIdentityStore } from "../../domain/ports/person-identity-store.js";
 import { IdentityWriteError } from "../errors.js";
@@ -100,13 +104,7 @@ export class PersonIdentityAdapter implements PersonIdentityStore {
   }
 
   async adopt(personId: string): Promise<PersonIdentity> {
-    const current = await this.readStrict();
-    const identity: PersonIdentity = {
-      personId,
-      origin: "adopted",
-      alsoMe: current?.alsoMe ?? [],
-      ...(current?.displayName === undefined ? {} : { displayName: current.displayName }),
-    };
+    const identity = withPersonIdAdopted(await this.readStrict(), personId);
     await this.write(identity);
     return identity;
   }
@@ -141,13 +139,10 @@ export class PersonIdentityAdapter implements PersonIdentityStore {
   // `recursive: true` is what lets this discard a damaged identity file that turns out to
   // be a directory (the Test Scope's own "the identity file is unreadable" edge case) —
   // `off` is a privacy control, and withdrawing must not depend on the damage taking one
-  // particular shape. `force: true` folds "already gone" into success rather than a
-  // separate ENOENT branch.
+  // particular shape. `force: true` is deliberately NOT set: forcing folds "already gone"
+  // into success, and that is the one case this has to report back - see the port.
   async forget(): Promise<boolean> {
     try {
-      // Deliberately not `force: true`: forcing swallows the missing-file case, which is
-      // the one this has to report. `recursive` stays - a test really does leave a
-      // directory at this path.
       await rm(identityFilePath(), { recursive: true });
       return true;
     } catch (error) {
