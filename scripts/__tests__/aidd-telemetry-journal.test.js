@@ -139,6 +139,33 @@ test("detectHost recognises Copilot's compat shape - session_id and hook_event_n
   assert.equal(detectHost(loadFixture("copilot-compat-turn-end.json")), "copilot");
 });
 
+// Captured 2026-08-28 from a real `@github/copilot` 1.0.80 session's own hook stdin, in a
+// project declaring this plugin's own PascalCase events. Two shapes nothing had ever
+// captured, and the reason they matter is what the same session settled about the other
+// three: `copilot-compat-{session-start,post-tool-use-skill,turn-end}.json` were compared
+// key-for-key against that stdin and match exactly. The compat shape is what this plugin's
+// hooks actually receive - not a variant they might.
+test("detectHost recognises the two compat shapes captured last, so all five of Copilot's events are pinned rather than three", () => {
+  assert.equal(detectHost(loadFixture("copilot-compat-user-prompt-submitted.json")), "copilot");
+  assert.equal(detectHost(loadFixture("copilot-compat-pre-tool-use-skill.json")), "copilot");
+});
+
+// Copilot's compat builder renames a built-in tool to Claude Code's own PascalCase spelling
+// - the same session captured `tool_name: "Read"` for a file read - but leaves `skill`
+// lowercase. `STEP_START_BY_HOST.copilot`'s compat branch keys on that exact lowercase
+// spelling, so the asymmetry is load-bearing: were `skill` renamed the way `Read` is, no
+// step would ever open on this shape and a whole session would read as unattributed.
+test("a compat skill call names the tool in lowercase, unlike the PascalCase every built-in tool gets", () => {
+  const preToolUse = loadFixture("copilot-compat-pre-tool-use-skill.json");
+  const postToolUse = loadFixture("copilot-compat-post-tool-use-skill.json");
+
+  assert.equal(preToolUse.tool_name, "skill");
+  assert.equal(postToolUse.tool_name, "skill");
+  // An object, never the JSON string the canonical builder sends.
+  assert.deepEqual(preToolUse.tool_input, { skill: "probe-echo" });
+  assert.equal(typeof postToolUse.tool_input, "object");
+});
+
 test("detectHost recognises both of Copilot's shapes as the same host, not one at the other's expense", () => {
   assert.equal(detectHost(loadFixture("copilot-session-start.json")), "copilot");
   assert.equal(detectHost(loadFixture("copilot-compat-session-start.json")), "copilot");

@@ -127,9 +127,28 @@ Read on the readable `@github/copilot` 1.0.57 bundle. The 1.0.80 runtime binary 
 architecture is proven on 1.0.57 and corroborated on 1.0.80 only by the stdin captures
 above. Nothing here settles what 1.0.80 does differently, if anything.
 
-**So a Copilot shape fixture still costs a session.** Install the hooks, run one, dump the
-hook's actual stdin. That is what issue #681's own `Bounds` section asks for, and there is
-no cheaper substitute.
+**So a Copilot shape fixture costs a session.** That session was run on 2026-08-28, against
+`@github/copilot` 1.0.80, in a throwaway project declaring this plugin's own PascalCase
+events with the hook command replaced by one that dumps stdin verbatim. What it settled:
+
+- **All five events arrive in the compat snake_case shape.** `session_id`,
+  `hook_event_name`, `tool_name`, `tool_input`, `initial_prompt`, `stop_reason`. Not one
+  camelCase `sessionId` on stdin — the exact opposite of what the event log showed for the
+  same events, which is the trap this section exists to name.
+- **The three compat fixtures already here are faithful.** Their key sets were compared
+  against that stdin and match exactly. That had been assumed since 2026-08-21; it is now
+  measured.
+- **Two shapes had never been captured**, and are added from this session:
+  `copilot-compat-user-prompt-submitted.json` and `copilot-compat-pre-tool-use-skill.json`.
+- **`timestamp` is an ISO string on stdin**, where the event log records an integer. One
+  more place the two objects differ.
+- **The compat builder renames built-in tools to Claude Code's PascalCase spelling but
+  leaves `skill` lowercase.** The same session captured `tool_name: "Read"` for a file read
+  and `tool_name: "skill"` for the skill call. `STEP_START_BY_HOST.copilot` keys on that
+  lowercase spelling, so the asymmetry is load-bearing rather than cosmetic.
+- **The chain writes.** Those payloads through `journal.cjs` produce `session_start` (with
+  `vendor_id` equal to the session id Copilot itself printed), `step_start` naming the
+  skill, and `turn_end`.
 
 ## Redaction
 
