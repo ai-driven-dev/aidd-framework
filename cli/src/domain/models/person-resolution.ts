@@ -60,3 +60,18 @@ export function resolvePerson(
       : [identity.personId, ...identity.alsoMe],
   };
 }
+
+/** `identity` with `value` added to `alsoMe`, deduplicated — the one place this rule is
+ * written, so the real adapter and its in-memory test double share it rather than each
+ * reimplementing the same merge. */
+export function withAlsoMeAdded(identity: PersonIdentity, value: string): PersonIdentity {
+  return identity.alsoMe.includes(value)
+    ? identity
+    : { ...identity, alsoMe: [...identity.alsoMe, value] };
+}
+
+/** `identity` with `value` withdrawn from `alsoMe`, wherever it is — an identifier not
+ * listed leaves `alsoMe` unchanged rather than failing. */
+export function withAlsoMeRemoved(identity: PersonIdentity, value: string): PersonIdentity {
+  return { ...identity, alsoMe: identity.alsoMe.filter((raw) => raw !== value) };
+}

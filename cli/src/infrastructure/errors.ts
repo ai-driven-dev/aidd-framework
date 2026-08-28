@@ -62,20 +62,6 @@ export class IdentityWriteError extends Error {
   }
 }
 
-/** A write against the person mapping file failed for a reason other than the file simply
- * not being there — permission denied, a full disk, and the like. Distinct from
- * `UnreadablePersonMappingFileError` (domain/errors.ts): that one names a read that could
- * not come back, this one a write that could not go out. */
-export class PersonMappingWriteError extends Error {
-  constructor(filePath: string, cause: unknown) {
-    super(
-      `Could not write the person mapping at ${filePath} ` +
-        `(${cause instanceof Error ? cause.message : String(cause)}).`
-    );
-    this.name = "PersonMappingWriteError";
-  }
-}
-
 export class GhCliError extends Error {
   constructor(message: string) {
     super(message);

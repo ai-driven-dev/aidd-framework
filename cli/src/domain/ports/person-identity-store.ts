@@ -21,12 +21,36 @@ export interface PersonIdentityStore extends PersonIdentityReader {
 
   /** Generates a fresh identifier and writes it, unconditionally — the caller decides
    * whether one is needed at all; a second mint while one already stands is never this
-   * store's call to make. */
+   * store's call to make. Records `origin: "minted"`. */
   mint(): Promise<PersonIdentity>;
+
+  /** Writes `personId` as this machine's own identifier, taken from elsewhere rather than
+   * generated here — records `origin: "adopted"`, and keeps whatever `alsoMe` and
+   * `displayName` were already declared, since taking a different canonical identifier is
+   * not a reason to forget them. The caller decides whether adopting is the right move at
+   * all — reporting "already in effect" for the identifier already in place, or replacing
+   * one that differs — this store only ever writes what it is told. */
+  adopt(personId: string): Promise<PersonIdentity>;
+
+  /** Adds `identity` to the current identity's `alsoMe`, unconditionally — the caller
+   * decides whether a person exists to add onto at all; this store assumes one does.
+   * A no-op, not a duplicate, when `identity` is already listed. */
+  addAlsoMe(identity: string): Promise<PersonIdentity>;
+
+  /** Withdraws `identity` from the current identity's `alsoMe`, wherever it is. An
+   * identifier not listed is nothing to remove, never a failure. */
+  removeAlsoMe(identity: string): Promise<PersonIdentity>;
 
   /** Writes `identity` back with `displayName` attached, replacing any previous one. */
   setDisplayName(identity: PersonIdentity, displayName: string): Promise<PersonIdentity>;
 
   /** Removes the identity file. A no-op, not a failure, when there was none. */
   forget(): Promise<void>;
+
+  /** The path a stale separate declaration file (`person-mapping.json`) would have lived
+   * at beside this one, checked for existence alone and never read - that file was
+   * introduced and never released, so there is nothing in it to migrate, only a leftover
+   * to name so `status` can say it is ignored and safe to remove. `null` when none is
+   * present. */
+  staleMappingFilePath(): Promise<string | null>;
 }

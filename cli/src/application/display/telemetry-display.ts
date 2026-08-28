@@ -1,15 +1,14 @@
 import { getAiToolConfig } from "../../domain/tools/registry.js";
 import type { CLIOutput } from "../output.js";
 import type {
+  PersonIdentityLinkResult,
   PersonIdentityNameResult,
   PersonIdentityOffResult,
   PersonIdentityOnResult,
   PersonIdentityStatusResult,
+  PersonIdentityUnlinkResult,
+  PersonIdentityUseResult,
 } from "../use-cases/telemetry/person-identity-use-case.js";
-import type {
-  PersonMappingLinkResult,
-  PersonMappingUnlinkResult,
-} from "../use-cases/telemetry/person-mapping-use-case.js";
 import type {
   LocalCostToolStatus,
   ReadLocalCostResult,
@@ -109,10 +108,18 @@ export function printTelemetryOffReport(output: CLIOutput, result: TelemetryOffR
   output.success(`AIDD telemetry: ${switchLabel} (${result.switchPath})`);
 }
 
+const ORIGIN_LABELS: Record<"minted" | "adopted", string> = {
+  minted: "minted on this machine",
+  adopted: "taken from another machine",
+};
+
+const DECLARATION_DISCLAIMER =
+  "This is a declaration the tool cannot check - it never verifies who is running it.";
+
 function identityLabel(result: PersonIdentityStatusResult): string {
   if (result.identity === null) return "off - records carry no person";
   const name = result.identity.displayName ? `, display name "${result.identity.displayName}"` : "";
-  return `on, ${result.identity.personId}${name} (${result.filePath})`;
+  return `on, ${result.identity.personId} (${ORIGIN_LABELS[result.identity.origin]})${name} (${result.filePath})`;
 }
 
 export function printPersonIdentityStatus(
@@ -120,13 +127,14 @@ export function printPersonIdentityStatus(
   result: PersonIdentityStatusResult
 ): void {
   output.print(`AIDD identity: ${identityLabel(result)}`);
-  if (result.identity === null || result.mappedIdentities === undefined) return;
-  output.print(`  Mapping at ${result.mappingFilePath}:`);
-  if (result.canonicalPersonId !== result.identity.personId) {
-    output.print(`    This machine's own identifier: ${result.identity.personId}`);
-    output.print(`    Resolves to: ${result.canonicalPersonId}`);
+  if (result.identity !== null && result.identity.alsoMe.length > 0) {
+    output.print(`  Identifiers added onto this person: ${result.identity.alsoMe.join(", ")}`);
   }
-  output.print(`    Identities mapped to this person: ${result.mappedIdentities.join(", ")}`);
+  if (result.staleMappingFilePath !== undefined) {
+    output.print(
+      `  A separate declaration file at ${result.staleMappingFilePath} is ignored and can be removed.`
+    );
+  }
 }
 
 export function printPersonIdentityOn(output: CLIOutput, result: PersonIdentityOnResult): void {
@@ -137,6 +145,22 @@ export function printPersonIdentityOn(output: CLIOutput, result: PersonIdentityO
   output.print(
     "  Never attaches to: the run journal, a session already recorded, or a tool's own export."
   );
+}
+
+export function printPersonIdentityUse(output: CLIOutput, result: PersonIdentityUseResult): void {
+  if (result.alreadyInEffect) {
+    output.success(
+      `AIDD identity: ${result.identity.personId} is already in effect (${result.filePath})`
+    );
+    return;
+  }
+  const replaced =
+    result.replacedPersonId === undefined ? "" : ` (replacing ${result.replacedPersonId})`;
+  output.success(`AIDD identity: now ${result.identity.personId}${replaced} (${result.filePath})`);
+  if (result.replacedPersonId !== undefined) {
+    output.print("  Records already written keep the identifier they were written with.");
+  }
+  output.print(`  ${DECLARATION_DISCLAIMER}`);
 }
 
 export function printPersonIdentityOff(output: CLIOutput, result: PersonIdentityOffResult): void {
@@ -155,9 +179,8 @@ export function printPersonIdentityOff(output: CLIOutput, result: PersonIdentity
     "  Records already stored keep the identifier they were written with - none are changed."
   );
   output.print("  Opting in again later mints a fresh identifier, never this one back.");
-  if (!result.mappingStillListsIdentity) return;
   output.print(
-    "  The mapping still lists this identifier. Run `aidd telemetry identity unlink <identity>` to stop resolving past records to it."
+    `  ${result.addedIdentifiersRemoved} added identifier${result.addedIdentifiersRemoved === 1 ? "" : "s"} removed with it.`
   );
 }
 
@@ -165,7 +188,7 @@ export function printPersonIdentityName(output: CLIOutput, result: PersonIdentit
   output.success(`AIDD identity: display name set (${result.filePath})`);
 }
 
-export function printPersonMappingLink(output: CLIOutput, result: PersonMappingLinkResult): void {
+export function printPersonIdentityLink(output: CLIOutput, result: PersonIdentityLinkResult): void {
   if (result.alreadyListed) {
     output.success(
       `AIDD identity: '${result.identity}' is already listed under ${result.personId} (${result.filePath})`
@@ -175,11 +198,12 @@ export function printPersonMappingLink(output: CLIOutput, result: PersonMappingL
   output.success(
     `AIDD identity: linked '${result.identity}' to ${result.personId} (${result.filePath})`
   );
+  output.print(`  ${DECLARATION_DISCLAIMER}`);
 }
 
-export function printPersonMappingUnlink(
+export function printPersonIdentityUnlink(
   output: CLIOutput,
-  result: PersonMappingUnlinkResult
+  result: PersonIdentityUnlinkResult
 ): void {
   if (!result.removed) {
     output.success(`AIDD identity: '${result.identity}' was not listed - nothing to remove`);

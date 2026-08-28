@@ -1,29 +1,19 @@
 import { UnreadableIdentityFileError } from "../../../domain/errors.js";
-import { type PersonMapping, resolvePerson } from "../../../domain/models/person-mapping.js";
 import type { PersonIdentity } from "../../../domain/ports/person-identity-reader.js";
 import type { PersonIdentityStore } from "../../../domain/ports/person-identity-store.js";
-import type { PersonMappingStore } from "../../../domain/ports/person-mapping-store.js";
-import { EmptyDisplayNameError, IdentityNotOptedInError } from "../../errors.js";
+import {
+  EmptyDisplayNameError,
+  IdentityNotOptedInError,
+  IdentityRequiredToLinkError,
+} from "../../errors.js";
 
 export interface PersonIdentityStatusResult {
   readonly filePath: string;
   readonly identity: PersonIdentity | null;
-  readonly mappingFilePath: string;
-  /** Every identity mapped to this person, their own canonical one included — present
-   * only while opted in, since a withdrawn identity carries no `personId` to resolve.
-   * Read with the mapping's own `readStrict()`, never `read()`: `status` is the one place
-   * a person looks to see what is mapped to them, so folding a damaged or ambiguous
-   * mapping into "nothing declared" would hide the exact problem `read()`'s own callers
-   * (the report path) already refuse to hide - `readStrict()`'s throw surfaces it instead,
-   * distinguished by name (`UnreadablePersonMappingFileError`,
-   * `AmbiguousPersonMappingError`) the same way `identity`'s own `readStrict()` does above. */
-  readonly mappedIdentities?: readonly string[];
-  /** The canonical identifier the mapping resolves this machine's own identifier to.
-   * Ordinarily the same value as `identity.personId`, but not always: this machine's own
-   * identifier can itself have been linked onto a different canonical entry from another
-   * machine, and a person can only tell which is which if the two are shown distinctly
-   * rather than folded into one label. Present alongside `mappedIdentities`. */
-  readonly canonicalPersonId?: string;
+  /** Present only when a stale separate declaration file is found beside the identity —
+   * that file was introduced and never released, so there is nothing in it to migrate;
+   * this only names it as ignored and safe to remove. */
+  readonly staleMappingFilePath?: string;
 }
 
 export interface PersonIdentityOnResult {
@@ -31,6 +21,19 @@ export interface PersonIdentityOnResult {
   readonly identity: PersonIdentity;
   /** `false` when an identity already stood and this call reports it back, unminted. */
   readonly minted: boolean;
+}
+
+export interface PersonIdentityUseResult {
+  readonly filePath: string;
+  readonly identity: PersonIdentity;
+  /** `true` when `identity.personId` was already this machine's own before this call —
+   * nothing was written. */
+  readonly alreadyInEffect: boolean;
+  /** The identifier this replaced — present only when a different one was in effect
+   * before, absent both when nothing was declared yet and when the same identifier was
+   * already in effect. Records already written keep the identifier they were written
+   * with; taking a different one never rewrites them. */
+  readonly replacedPersonId?: string;
 }
 
 export interface PersonIdentityOffResult {
@@ -41,76 +44,61 @@ export interface PersonIdentityOffResult {
    * `off` is a privacy control, and it must work exactly when a damaged file would
    * otherwise leave a person unable to withdraw. */
   readonly discardedDamaged: boolean;
-  /** `true` when the identifier just withdrawn still appears in the mapping. `off` means
-   * new records carry no person; it is not a mandate to destroy a person's own declaration
-   * of which identifiers are them, so the mapping is never touched here — this says so
-   * rather than leaving it silent. Always `false` when nothing was withdrawn, or a damaged
-   * identity file meant this call never learned which identifier to check. */
-  readonly mappingStillListsIdentity: boolean;
+  /** How many identifiers `alsoMe` carried at the moment of withdrawal — `off` removes the
+   * whole declaration now, this one file included, so every one of them goes with it. `0`
+   * both when none were added and when a damaged file meant this call never learned how
+   * many there were. */
+  readonly addedIdentifiersRemoved: number;
 }
 
 export interface PersonIdentityNameResult {
   readonly filePath: string;
 }
 
-function listsIdentity(mapping: PersonMapping | null, identity: string): boolean {
-  return (
-    mapping?.entries.some(
-      (entry) => entry.personId === identity || entry.identities.includes(identity)
-    ) ?? false
-  );
+export interface PersonIdentityLinkResult {
+  readonly filePath: string;
+  readonly personId: string;
+  readonly identity: string;
+  /** `true` when `identity` already resolved to this same person before this call - a
+   * caller that always calls `link` first, then reports, must be able to tell a no-op
+   * apart from a fresh write. */
+  readonly alreadyListed: boolean;
 }
 
-interface MappingView {
-  readonly canonicalPersonId: string;
-  readonly identities: readonly string[];
-}
-
-/** What the mapping says about `personId` - reusing `resolvePerson`'s own search (so this
- * machine's identifier is found even when it was linked onto a *different* canonical entry
- * from elsewhere, not only when it is an entry's own `personId`), but reading a `null` or
- * non-matching mapping as "just yourself" rather than `resolvePerson`'s `"unresolved"`:
- * `status` is asking "what does the mapping say about me", not "how would a report resolve
- * me", and a report's `"unresolved"` would misdescribe nobody ever having declared one at
- * all as if this person were an unplaced stranger. */
-function mappingViewFor(mapping: PersonMapping | null, personId: string): MappingView {
-  const resolved = mapping === null ? null : resolvePerson(mapping, personId);
-  if (resolved === null || resolved.resolution !== "mapped") {
-    return { canonicalPersonId: personId, identities: [personId] };
-  }
-  return { canonicalPersonId: resolved.personId ?? personId, identities: resolved.identities };
+export interface PersonIdentityUnlinkResult {
+  readonly filePath: string;
+  readonly identity: string;
+  /** `false` when `identity` was never listed at all - reported as nothing to remove,
+   * never as a failure. */
+  readonly removed: boolean;
 }
 
 /**
- * What `aidd telemetry identity`'s four verbs promise. `status` never changes anything;
- * `on` mints once and reports the same identifier on every call after; `name` refuses a
- * display name onto nobody, naming `on` as the missing step; `off` withdraws the file
- * without touching a record already written with the identifier it held, or the mapping
- * that may still list it.
+ * What `aidd telemetry identity`'s verbs promise, all against the one file that is the
+ * whole declaration of who this machine's user is.
  *
- * Depends on `PersonMappingStore` for one reason only — telling a person what their own
- * mapping says about them, and whether it still lists an identifier they just withdrew.
- * Never calls `link`/`unlink` on it: declaring an identity is `PersonMappingUseCase`'s own
- * job, kept separate so this class's four verbs stay about the identity file alone.
+ * `status` never changes anything. `on` mints once and reports the same identifier on
+ * every call after. `use` takes an identifier minted elsewhere, so the same person reads
+ * as one across machines, without a second identity ever being created for them. `link`
+ * and `unlink` add or withdraw an identifier this person did not choose here - a tool's
+ * own pseudonymous identifier, or one kept from before a withdrawal - onto `alsoMe`. `name`
+ * refuses a display name onto nobody, naming `on` as the missing step. `off` withdraws the
+ * whole file, added identifiers included.
+ *
+ * Taking or adding an identifier (`on`, `use`, `link`) is a declaration this tool cannot
+ * check - it never verifies that the person running it is who they claim.
  */
 export class PersonIdentityUseCase {
-  constructor(
-    private readonly store: PersonIdentityStore,
-    private readonly mappingStore: PersonMappingStore
-  ) {}
+  constructor(private readonly store: PersonIdentityStore) {}
 
   async status(): Promise<PersonIdentityStatusResult> {
     const filePath = this.store.filePath;
-    const mappingFilePath = this.mappingStore.filePath;
     const identity = await this.store.readStrict();
-    if (identity === null) return { filePath, identity, mappingFilePath };
-    const view = mappingViewFor(await this.mappingStore.readStrict(), identity.personId);
+    const staleMappingFilePath = await this.store.staleMappingFilePath();
     return {
       filePath,
       identity,
-      mappingFilePath,
-      mappedIdentities: view.identities,
-      canonicalPersonId: view.canonicalPersonId,
+      ...(staleMappingFilePath === null ? {} : { staleMappingFilePath }),
     };
   }
 
@@ -123,23 +111,52 @@ export class PersonIdentityUseCase {
     return { filePath: this.store.filePath, identity, minted: true };
   }
 
+  async use(personId: string): Promise<PersonIdentityUseResult> {
+    const current = await this.store.readStrict();
+    if (current !== null && current.personId === personId) {
+      return { filePath: this.store.filePath, identity: current, alreadyInEffect: true };
+    }
+    const identity = await this.store.adopt(personId);
+    return {
+      filePath: this.store.filePath,
+      identity,
+      alreadyInEffect: false,
+      ...(current === null ? {} : { replacedPersonId: current.personId }),
+    };
+  }
+
+  async link(identity: string): Promise<PersonIdentityLinkResult> {
+    const person = await this.store.readStrict();
+    if (person === null) throw new IdentityRequiredToLinkError();
+    const alreadyListed = person.alsoMe.includes(identity);
+    if (!alreadyListed) await this.store.addAlsoMe(identity);
+    return { filePath: this.store.filePath, personId: person.personId, identity, alreadyListed };
+  }
+
+  async unlink(identity: string): Promise<PersonIdentityUnlinkResult> {
+    const person = await this.store.readStrict();
+    const removed = person?.alsoMe.includes(identity) ?? false;
+    if (removed) await this.store.removeAlsoMe(identity);
+    return { filePath: this.store.filePath, identity, removed };
+  }
+
   /**
-   * The one verb allowed to swallow `readStrict()`'s throw. `status`, `on` and `name` are
-   * right to error on a damaged file — the contract's own "the identity file is unreadable"
-   * edge case. `off` is different: it is how a person gets out, and a file too damaged to
-   * parse is exactly the moment withdrawing must still work. A damaged file is discarded
-   * the same as a readable one, and the result says so rather than staying silent about it.
+   * The one verb allowed to swallow `readStrict()`'s throw. `status`, `on`, `use`, `link`
+   * and `name` are right to error on a damaged file — the contract's own "the identity
+   * file is unreadable" edge case. `off` is different: it is how a person gets out, and a
+   * file too damaged to parse is exactly the moment withdrawing must still work. A damaged
+   * file is discarded the same as a readable one, and the result says so rather than
+   * staying silent about it.
    */
   async off(): Promise<PersonIdentityOffResult> {
     const filePath = this.store.filePath;
     const { existing, discardedDamaged } = await this.readForWithdrawal();
     if (existing === null && !discardedDamaged) {
-      return { filePath, removed: false, discardedDamaged, mappingStillListsIdentity: false };
+      return { filePath, removed: false, discardedDamaged, addedIdentifiersRemoved: 0 };
     }
-    const mappingStillListsIdentity =
-      existing !== null && listsIdentity(await this.mappingStore.read(), existing.personId);
+    const addedIdentifiersRemoved = existing?.alsoMe.length ?? 0;
     await this.store.forget();
-    return { filePath, removed: true, discardedDamaged, mappingStillListsIdentity };
+    return { filePath, removed: true, discardedDamaged, addedIdentifiersRemoved };
   }
 
   async name(displayName: string): Promise<PersonIdentityNameResult> {

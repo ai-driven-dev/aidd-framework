@@ -9,8 +9,8 @@ import {
   COST_REPORT_ENVELOPE_VERSION,
   toCostReportEnvelope,
 } from "../../../src/domain/models/cost-report-envelope.js";
-import type { PersonMapping } from "../../../src/domain/models/person-mapping.js";
 import type { TelemetrySinkRecord } from "../../../src/domain/models/telemetry-sink-record.js";
+import type { PersonIdentity } from "../../../src/domain/ports/person-identity-reader.js";
 
 const NO_CAPABILITY = {
   localRead: null,
@@ -48,10 +48,8 @@ function report(overrides: Partial<CostReportInput> = {}) {
 
 /** One person declared two identifiers, from two different machines - the Test Scope's own
  * setup. */
-function twoIdentitiesOnePerson(): PersonMapping {
-  return {
-    entries: [{ personId: "person-a", identities: ["person-a", "machine-1", "machine-2"] }],
-  };
+function twoIdentitiesOnePerson(): PersonIdentity {
+  return { personId: "person-a", origin: "adopted", alsoMe: ["machine-1", "machine-2"] };
 }
 
 function sumOf(rows: readonly { readonly totals: CostTotals }[]): number {

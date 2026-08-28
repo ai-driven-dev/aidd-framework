@@ -1,10 +1,6 @@
 import type { TelemetryRouteSupply } from "../capabilities/telemetry-capability.js";
-import {
-  type PersonMapping,
-  type PersonResolution,
-  type ResolvedPerson,
-  resolvePerson,
-} from "./person-mapping.js";
+import type { PersonIdentity } from "../ports/person-identity-reader.js";
+import { type PersonResolution, type ResolvedPerson, resolvePerson } from "./person-resolution.js";
 import { STEP_ATTRIBUTION_SOURCES, type StepAttributionSource } from "./step-attribution.js";
 import {
   momentFallsWithin,
@@ -241,7 +237,7 @@ export interface CostReportInput {
    * than read from a module - the domain stays free of where a mapping lives. Absent or
    * `null` both mean no mapping was declared, which resolves every identifier as
    * `unresolved` rather than failing the report. */
-  readonly personMapping?: PersonMapping | null;
+  readonly personMapping?: PersonIdentity | null;
   /** Set when a mapping exists but could not be used - a damaged or unreadable file, or one
    * that parsed fine but declared an ambiguous claim; never a mapping that simply was not
    * declared. Costs the resolution alone: every record is still counted, with every
@@ -816,7 +812,7 @@ function accumulateRequestRecord(
   groups: Groups,
   record: TelemetrySinkRecord,
   membership: TaskMembership | null,
-  mapping: PersonMapping | null
+  mapping: PersonIdentity | null
 ): void {
   groups.totals.add(record);
   addToStepGroup(groups.steps, record);
@@ -836,7 +832,7 @@ function accumulate(
   fromDay: string,
   toDay: string,
   membership: TaskMembership | null,
-  mapping: PersonMapping | null
+  mapping: PersonIdentity | null
 ): Groups {
   const groups = emptyGroups(fromDay, toDay);
   for (const record of records) {

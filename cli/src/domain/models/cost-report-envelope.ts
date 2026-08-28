@@ -6,7 +6,7 @@ import type {
   CostReportToolCoverage,
   CostTotals,
 } from "./cost-report.js";
-import type { PersonResolution } from "./person-mapping.js";
+import type { PersonResolution } from "./person-resolution.js";
 import type { StepAttributionSource } from "./step-attribution.js";
 import type { TaskAttributionSource } from "./task-attribution.js";
 import type { AiToolId } from "./tool-ids.js";

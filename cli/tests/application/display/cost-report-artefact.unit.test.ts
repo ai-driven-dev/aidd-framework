@@ -6,8 +6,8 @@ import {
 } from "../../../src/application/display/cost-report-artefact.js";
 import { buildCostReport, type CostReportInput } from "../../../src/domain/models/cost-report.js";
 import { toCostReportEnvelope } from "../../../src/domain/models/cost-report-envelope.js";
-import type { PersonMapping } from "../../../src/domain/models/person-mapping.js";
 import type { TelemetrySinkRecord } from "../../../src/domain/models/telemetry-sink-record.js";
+import type { PersonIdentity } from "../../../src/domain/ports/person-identity-reader.js";
 
 const NO_CAPABILITY = {
   localRead: null,
@@ -45,8 +45,8 @@ function envelopeOf(overrides: Partial<CostReportInput> = {}) {
   );
 }
 
-function onePersonMapping(): PersonMapping {
-  return { entries: [{ personId: "person-a", identities: ["machine-1"], displayName: "Ada" }] };
+function onePersonMapping(): PersonIdentity {
+  return { personId: "person-a", origin: "adopted", alsoMe: ["machine-1"], displayName: "Ada" };
 }
 
 describe("buildCostReportArtefact", () => {

@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { UnreadableIdentityFileError } from "../../domain/errors.js";
+import { withAlsoMeAdded, withAlsoMeRemoved } from "../../domain/models/person-resolution.js";
 import type { PersonIdentity } from "../../domain/ports/person-identity-reader.js";
 import type { PersonIdentityStore } from "../../domain/ports/person-identity-store.js";
 import { IdentityWriteError } from "../errors.js";
@@ -18,6 +19,13 @@ const PRIVATE_DIR_MODE = 0o700;
 // other adapter whose contract refuses `AIDD_USER_CONFIG_DIR` for the same reason.
 function identityFilePath(): string {
   return join(resolveAiddConfigDir(), "identity.json");
+}
+
+// Never read - `person-mapping.json` was introduced and never released, so there is
+// nothing in an existing one to migrate. Named only so `status` can say it is ignored and
+// safe to remove, the same directory `identityFilePath` resolves.
+function stalePersonMappingPath(): string {
+  return join(resolveAiddConfigDir(), "person-mapping.json");
 }
 
 // A file with no `origin` at all is read as `"minted"`, never guessed as anything else:
@@ -89,10 +97,43 @@ export class PersonIdentityAdapter implements PersonIdentityStore {
     return identity;
   }
 
+  async adopt(personId: string): Promise<PersonIdentity> {
+    const current = await this.readStrict();
+    const identity: PersonIdentity = {
+      personId,
+      origin: "adopted",
+      alsoMe: current?.alsoMe ?? [],
+      ...(current?.displayName === undefined ? {} : { displayName: current.displayName }),
+    };
+    await this.write(identity);
+    return identity;
+  }
+
+  async addAlsoMe(identity: string): Promise<PersonIdentity> {
+    const next = withAlsoMeAdded(await this.requireCurrent("add"), identity);
+    await this.write(next);
+    return next;
+  }
+
+  async removeAlsoMe(identity: string): Promise<PersonIdentity> {
+    const next = withAlsoMeRemoved(await this.requireCurrent("remove"), identity);
+    await this.write(next);
+    return next;
+  }
+
   async setDisplayName(identity: PersonIdentity, displayName: string): Promise<PersonIdentity> {
     const next: PersonIdentity = { ...identity, displayName };
     await this.write(next);
     return next;
+  }
+
+  async staleMappingFilePath(): Promise<string | null> {
+    try {
+      await access(stalePersonMappingPath());
+      return stalePersonMappingPath();
+    } catch {
+      return null;
+    }
   }
 
   // `recursive: true` is what lets this discard a damaged identity file that turns out to
@@ -106,6 +147,20 @@ export class PersonIdentityAdapter implements PersonIdentityStore {
     } catch (error) {
       throw new IdentityWriteError(identityFilePath(), error, "remove");
     }
+  }
+
+  // `addAlsoMe`/`removeAlsoMe` assume a person exists to add onto - the use case that
+  // calls them already refused "nobody opted in" against its own read of the identity
+  // before ever reaching here. This is the defensive fallback for that contract, not a
+  // path a normal call takes.
+  private async requireCurrent(action: "add" | "remove"): Promise<PersonIdentity> {
+    const current = await this.readStrict();
+    if (current !== null) return current;
+    throw new IdentityWriteError(
+      identityFilePath(),
+      new Error(`no identity exists to ${action} an identifier onto`),
+      "write"
+    );
   }
 
   private async readFileOrNull(): Promise<string | null> {

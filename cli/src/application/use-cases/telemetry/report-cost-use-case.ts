@@ -6,12 +6,12 @@ import {
   type CostReportToolCapability,
   type CostReportToolDeclaration,
 } from "../../../domain/models/cost-report.js";
-import type { PersonMapping } from "../../../domain/models/person-mapping.js";
 import type { ResolvedReportPeriod } from "../../../domain/models/report-period.js";
 import { buildTaskIntervals } from "../../../domain/models/task-attribution.js";
 import type { TaskIdentity } from "../../../domain/models/task-identity.js";
 import { AI_TOOL_IDS } from "../../../domain/models/tool-ids.js";
-import type { PersonMappingStore } from "../../../domain/ports/person-mapping-store.js";
+import type { PersonIdentity } from "../../../domain/ports/person-identity-reader.js";
+import type { PersonIdentityStore } from "../../../domain/ports/person-identity-store.js";
 import type { RunJournal, RunJournalReader } from "../../../domain/ports/run-journal-reader.js";
 import type { TelemetrySink } from "../../../domain/ports/telemetry-sink.js";
 import { getAiToolConfig } from "../../../domain/tools/registry.js";
@@ -72,19 +72,24 @@ function toSessionJournal(journal: RunJournal): CostReportSessionJournal | null 
 }
 
 interface PersonMappingFields {
-  readonly personMapping: PersonMapping | null;
+  readonly personMapping: PersonIdentity | null;
   readonly personMappingUnreadable: boolean;
 }
 
 /**
- * Answers what a mapping's own report inputs should be, without ever aborting the report
- * over it — the same fan-out reasoning `ReadLocalCostUseCase.attemptRead` documents for a
- * local-cost reader failing on one session: a damaged mapping is one dependency's own
- * trouble, never the report's, and the figures must still come back whole. `readStrict()`
- * is what surfaces a damaged, unreadable or ambiguous mapping as a throw in the first
+ * Answers what a report's own person-resolution inputs should be, without ever aborting
+ * the report over it — the same fan-out reasoning `ReadLocalCostUseCase.attemptRead`
+ * documents for a local-cost reader failing on one session: a damaged identity file is one
+ * dependency's own trouble, never the report's, and the figures must still come back
+ * whole. `readStrict()` is what surfaces a damaged identity file as a throw in the first
  * place - `read()` would have folded it into `null` and left nothing to catch here.
+ *
+ * The bare `catch` folds every thrown cause into one boolean - phase 3 of the
+ * identity-is-the-person rework replaces this with one that names which cause actually
+ * fired, distinguishing "could not be read" from "none declared" (the latter is not
+ * reachable from a `catch` at all: `readStrict()` answers that with `null`, not a throw).
  */
-async function personMappingFields(store: PersonMappingStore): Promise<PersonMappingFields> {
+async function personMappingFields(store: PersonIdentityStore): Promise<PersonMappingFields> {
   try {
     return { personMapping: await store.readStrict(), personMappingUnreadable: false };
   } catch {
@@ -105,7 +110,7 @@ export class ReportCostUseCase {
   constructor(
     private readonly sink: TelemetrySink,
     private readonly runJournalReader: RunJournalReader,
-    private readonly personMappingStore: PersonMappingStore
+    private readonly personIdentityStore: PersonIdentityStore
   ) {}
 
   async execute(options: ReportCostOptions): Promise<CostReport> {
@@ -118,7 +123,7 @@ export class ReportCostUseCase {
     // the records it is joined to were already selected by their own moments. Filtering the
     // journals as well would only be a second, weaker selection over the same thing.
     const journals = await this.runJournalReader.list();
-    const mapping = await personMappingFields(this.personMappingStore);
+    const mapping = await personMappingFields(this.personIdentityStore);
 
     return buildCostReport({
       fromDay,
