@@ -1,6 +1,6 @@
 ---
 objective: "One file describes a machine's user and every identifier that is them, so resolving a person needs one source of truth instead of two."
-status: in-progress
+status: implemented
 ---
 
 # Plan: the identity file is the person
