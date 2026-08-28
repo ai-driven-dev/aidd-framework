@@ -74,11 +74,12 @@ Versions live in `.release-please-manifest.json`. Forcing a version / pre-releas
 
 ## 🔄 Promotion & recovery
 
-The weekly `next` → `main` promotion **must rebase, never squash**:
+The weekly `next` → `main` promotion **must be a merge commit, never a squash and never a rebase**:
 
-- A squash collapses the batch's conventional commits into one subject from the PR title. If that title isn't a valid conventional type, `Commitlint` fails on `main` and **release-please is skipped** — no release.
-- release-please also reads each commit's type/scope to bump the right package, which a squash hides.
-- Use the **Promote next to main** workflow (it rebase-merges); merging by hand, pick **Rebase and merge**.
+- A squash collapses the batch's conventional commits into one subject from the PR title. If that title isn't a valid conventional type, `Commitlint` fails on `main` and **release-please is skipped** — no release. release-please also reads each commit's type/scope to bump the right package, which a squash hides.
+- A rebase keeps the commits but recopies them under new hashes, so git never records that the branches were reconciled. The merge base between `main` and `next` then goes stale, and every later back-merge conflicts on the release metadata release-please rewrites each time — a conflict with no real content behind it.
+- A merge commit does both jobs: the commits land verbatim, and its second parent keeps a shared merge base so the back-merge stays clean.
+- Use the **Promote next to main** workflow (it merges); merging by hand, pick **Create a merge commit** and give it a conventional subject.
 - The Release PR release-please opens is its own single commit and is fine to squash.
 
 **Recovery** — a bad squashed promote turns `main` red on `Commitlint` and skips **Release Please**. An admin:
@@ -105,7 +106,7 @@ The App: ID in secret `AIDD_BOT_APP_ID`, key in `AIDD_BOT_PRIVATE_KEY`. If the A
 
 Head branches are **not** auto-deleted on merge (`delete_branch_on_merge: false`):
 
-- The promote PR merges `next` into `main` without deleting `next`, so the back-merge that realigns `next` never hits a missing branch. **Do not re-enable** the setting.
+- The promote PR is headed by a disposable `promote/next-to-main-<run_id>` snapshot of `next`, which the workflow deletes on merge. `next` itself is never a head branch, so the back-merge never hits a missing branch.
 - The back-merge runs unattended (bot App `always` bypass on the `next` ruleset). If it can't push, it opens a tracking issue — resync with a `main` → `next` PR.
 - If `next` is ever missing, recreate it: `git push origin main:next`.
 
