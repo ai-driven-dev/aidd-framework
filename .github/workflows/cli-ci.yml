@@ -116,6 +116,32 @@ jobs:
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm knip:production
 
+  identifier-join:
+    name: cli / Identifier join (Claude Code)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+      - run: cd cli && pnpm install --frozen-lockfile
+      - run: cd cli && pnpm build
+      # The probe drives the real tool, so the real tool has to be here. No credentials are
+      # configured and none are needed: it points Claude Code at a dead address with a fake
+      # key, and the session id is minted before any of that matters.
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+      # Re-checks what #632 measured once, by running a session: that the identifier a hook
+      # receives is the one the export carries. Everything in this layer joins on that, and a
+      # tool update can break it with nothing else turning red. Exit 2 means the probe could
+      # not form an opinion and says so rather than blaming the tool.
+      - name: Probe the identifier join
+        run: node scripts/probe-identifier-join.cjs
+
   cli-jscpd:
     name: cli / JSCPD (duplication)
     runs-on: ubuntu-latest
