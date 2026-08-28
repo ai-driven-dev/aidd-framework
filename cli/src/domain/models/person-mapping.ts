@@ -92,11 +92,17 @@ export function resolvePerson(
  * questions, and a caller decides what a refusal costs. A report keeps its figures and
  * shows the offending identifiers as unresolved rather than erroring the whole read; the
  * identity command that would have written the second claim errors outright.
+ *
+ * Checks `personId` itself alongside `identities`, on every entry - `resolvePerson`'s own
+ * lookup treats a match on `personId` exactly like a match inside `identities`, so a
+ * mapping where one entry's `personId` collides with a raw identity another entry claims
+ * is exactly as ambiguous as two entries' `identities` colliding, and has to be refused the
+ * same way.
  */
 export function validatePersonMapping(mapping: PersonMapping): void {
   const claimedBy = new Map<string, string>();
   for (const entry of mapping.entries) {
-    for (const identity of new Set(entry.identities)) {
+    for (const identity of new Set([entry.personId, ...entry.identities])) {
       const existing = claimedBy.get(identity);
       if (existing !== undefined && existing !== entry.personId) {
         throw new AmbiguousPersonMappingError(identity, existing, entry.personId);

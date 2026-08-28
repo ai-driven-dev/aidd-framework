@@ -130,4 +130,18 @@ describe("validatePersonMapping", () => {
   it("a valid mapping with distinct claims across entries is never refused", () => {
     expect(() => validatePersonMapping(twoPeopleMapping())).not.toThrow();
   });
+
+  it("refuses when one entry's personId collides with another entry's raw identity", () => {
+    // resolvePerson matches a raw identifier against `personId` exactly like a match
+    // inside `identities` (see `findEntry`), so this is exactly as ambiguous as two
+    // `identities` arrays colliding and has to be caught the same way.
+    const mapping: PersonMapping = {
+      entries: [
+        { personId: "person-a", identities: ["person-a"] },
+        { personId: "person-b", identities: ["person-b", "person-a"] },
+      ],
+    };
+
+    expect(() => validatePersonMapping(mapping)).toThrow(AmbiguousPersonMappingError);
+  });
 });
