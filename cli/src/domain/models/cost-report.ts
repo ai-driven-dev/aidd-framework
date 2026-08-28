@@ -985,7 +985,7 @@ function collapseSupersededTurns(
 function billedRequestKey(record: TelemetrySinkRecord): string | null {
   return record.billed_request_id === undefined
     ? null
-    : `${record.tool} ${record.vendor_id} ${record.billed_request_id}`;
+    : `${record.tool}\u0000${record.vendor_id}\u0000${record.billed_request_id}`;
 }
 
 /** The same group, from any starting order, always answers the same record — the same
