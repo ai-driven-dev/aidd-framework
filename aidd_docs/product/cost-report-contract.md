@@ -109,11 +109,13 @@ for — so a figure taken from a `--days` call can still be cited by the days it
 
 ## Versioning
 
-Every object carries `cost_report_version`, currently `3` — bumped from `2` when `by_model`
-gained a row with no `model`, for a record neither reader that permits one could name (a
-consumer that read `row.model` as always a string on every prior version would misread this
-one). Bumped from `1` to `2` when `by_day` and `by_project` joined `by_step`, `by_model` and
-`by_tool` as top-level breakdowns.
+Every object carries `cost_report_version`, currently `4` — bumped from `3` when `by_person`
+joined the top-level breakdowns and `read` gained `person_mapping_unreadable` (a consumer
+summing every breakdown's `requests` against `totals.requests` now has a fourth breakdown to
+include). Bumped from `2` to `3` when `by_model` gained a row with no `model`, for a record
+neither reader that permits one could name (a consumer that read `row.model` as always a
+string on every prior version would misread this one). Bumped from `1` to `2` when `by_day`
+and `by_project` joined `by_step`, `by_model` and `by_tool` as top-level breakdowns.
 
 **Set aside an object whose version you do not recognise rather than guessing its shape.**
 The number is bumped when a consumer that understood the previous shape would misread this
@@ -123,7 +125,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
 
 ```jsonc
 {
-  "cost_report_version": 3,
+  "cost_report_version": 4,
   "period": { "from_day": "2026-07-01", "to_day": "2026-07-31" },
   "task": "2026_08/2026_08_21_cost-reporter",   // absent unless --task was given
   "filters": { "project": "acme/widgets" },     // absent unless a generic filter was given
@@ -136,9 +138,10 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "by_tool":    [{ "tool": "codex", "coverage": "covered", "reason": "…", "capability": {}, "totals": {}, "session_totals": {} }],  // session_totals absent unless the tool has one (Copilot, today)
   "by_project": [{ "project": "acme/widgets", "totals": {} }],   // a row with no `project` names none known
   "by_day":     [{ "day": "2026-07-01", "totals": {} }],         // every day in the period, in order, gaps included
+  "by_person":  [{ "resolution": "mapped", "person": "a-person-id", "identities": ["a-person-id", "a-machine-id"], "totals": {} }],  // mapped rows first, then every unplaced identity, then the one row for records carrying none
   "attribution": [{ "attribution": "tool-stated", "totals": {} }],
   "task_attribution": [{ "attribution": "declared", "totals": {} }],  // present only alongside "task"
-  "read": { "undated_records": 0, "unreadable_lines": 0 }
+  "read": { "undated_records": 0, "unreadable_lines": 0, "person_mapping_unreadable": false }
 }
 ```
 
@@ -185,6 +188,27 @@ project at all - never its own row.
 `by_model` carries a row with no `model` the same way: both the Codex and OpenCode readers
 permit a request with no model, and that record gets its own row rather than vanishing from
 the breakdown while staying in `totals`.
+
+### `by_person` — three outcomes, never a merge
+
+`by_person` resolves each record's `person_id` against a mapping the machine's own user
+declared (`aidd telemetry identity link`/`unlink`), never against a git author, an email or
+a hostname. Each row's `resolution` is one of three:
+
+| `resolution` | Means |
+| --- | --- |
+| `mapped` | The identifier is one a person declared as theirs. `person` carries their canonical identifier, and `identities` carries every raw identifier behind the row, including that canonical one. |
+| `unresolved` | The identifier is real, but nobody's mapping covers it. `identities` carries that one raw identifier; `person` is absent. |
+| `none` | The record carried no identifier at all — a different fact from `unresolved`: nobody opted in, rather than somebody did on a machine or tool this mapping has not heard of. |
+
+**Two raw identifiers one person declared merge into one `mapped` row; two unplaced
+identifiers never merge into each other.** An identity claimed by two different people is a
+mapping error, refused when the mapping is written — a report never guesses which of the
+two it belongs to. Rows are ordered mapped first, then every unresolved identity, then the
+one `none` row last; largest first within the mapped and the unresolved groups.
+
+`by_person` sums to `totals.requests` exactly like every other breakdown — a damaged or
+undeclared mapping changes how records are labelled, never how many are counted.
 
 ### `session_totals` — a session total, never a sum of requests
 
@@ -279,7 +303,7 @@ permanent for that tool, not a silence to explain away.
 ### What the read could not do
 
 ```jsonc
-"read": { "undated_records": 3, "unreadable_lines": 2 }
+"read": { "undated_records": 3, "unreadable_lines": 2, "person_mapping_unreadable": false }
 ```
 
 `undated_records` are records carrying no moment at all. They belong to **no** period —
@@ -287,7 +311,11 @@ the only other moment available is the day the line was stored, which is when AI
 about the work rather than when it happened. `unreadable_lines` are lines no parser could
 read.
 
-**Both non-zero means your total is partial.** Say so rather than presenting it as whole.
+**Any of the three non-zero (or `true`) means your total is partial.** Say so rather than
+presenting it as whole. `person_mapping_unreadable: true` means a mapping file existed but
+could not be read back — every record is still counted, in `by_person` as `unresolved`,
+never as a reason to drop a figure. It is `false` both when no mapping was ever declared
+and when one was read fine; `by_person`'s own rows are what tells those two apart.
 
 ## Filling it
 

@@ -6,6 +6,7 @@ import type {
   CostReportToolCoverage,
   CostTotals,
 } from "./cost-report.js";
+import type { PersonResolution } from "./person-mapping.js";
 import type { StepAttributionSource } from "./step-attribution.js";
 import type { TaskAttributionSource } from "./task-attribution.js";
 import type { AiToolId } from "./tool-ids.js";
@@ -16,13 +17,18 @@ import type { AiToolId } from "./tool-ids.js";
  * `sink_schema_version` exists on a stored line. Adding a field a consumer may ignore is
  * not a bump; changing what an existing field means is.
  *
+ * Bumped to 4: `by_person` is a new top-level breakdown, and `read` gained
+ * `person_mapping_unreadable` - a consumer summing every breakdown's requests against
+ * `totals.requests` to check nothing was dropped now has a fourth breakdown to include,
+ * the same reasoning that bumped `by_project` and `by_day` in.
+ *
  * Bumped to 3: `by_model`'s `model` is now absent on the row for a record neither reader
  * that permits a model-less request could name - a consumer that read it as always a
  * string on every prior version would misread this one, the same reasoning that bumped
  * `by_project`'s `project` to optional back when that row was added.
  *
  * Bumped to 2: `by_project` and `by_day` are new top-level breakdowns. */
-export const COST_REPORT_ENVELOPE_VERSION = 3;
+export const COST_REPORT_ENVELOPE_VERSION = 4;
 
 /** Money as whole micro-dollars, the way the report carries it: an integer, so a consumer
  * summing several reports gets the same answer this one did. Divide by 1,000,000 for
@@ -108,11 +114,27 @@ export interface CostReportEnvelopeDayRow {
   readonly totals: CostReportEnvelopeTotals;
 }
 
+/** One person's figures — `person` is the canonical identifier, present only where
+ * `resolution` is `"mapped"`; an unresolved row's raw identifier lives in `identities`
+ * instead. `identities` always carries what produced the row, so a person line is
+ * traceable back to its evidence without a second lookup against the mapping. */
+export interface CostReportEnvelopePersonRow {
+  readonly resolution: PersonResolution;
+  readonly person?: string;
+  readonly display_name?: string;
+  readonly identities: readonly string[];
+  readonly totals: CostReportEnvelopeTotals;
+}
+
 /** What the read could not do, travelling with what it did. A total assembled from a
  * partial read is indistinguishable from a complete one unless these come with it. */
 export interface CostReportEnvelopeRead {
   readonly undated_records: number;
   readonly unreadable_lines: number;
+  /** A mapping existed but could not be read back - never true for a mapping simply not
+   * declared, which is the ordinary, resolved-as-nobody-opted-in state `by_person` already
+   * shows on its own. */
+  readonly person_mapping_unreadable: boolean;
 }
 
 /**
@@ -146,6 +168,9 @@ export interface CostReportEnvelope {
   /** Every day the period spans, always — a long period stays readable by how the text
    * rendering chooses to show it, never by what this envelope omits. */
   readonly by_day: readonly CostReportEnvelopeDayRow[];
+  /** Mapped people first, then every unplaced identity, then the one row for records
+   * carrying none at all - see `CostReport["byPeople"]`. */
+  readonly by_person: readonly CostReportEnvelopePersonRow[];
   /** All three strengths, always, strongest first. */
   readonly attribution: readonly CostReportEnvelopeAttributionRow[];
   /** Present only alongside `task`: an unfiltered period carries no per-record task
@@ -219,6 +244,16 @@ function modelRow(row: CostReport["byModels"][number]): CostReportEnvelopeModelR
   };
 }
 
+function personRow(row: CostReport["byPeople"][number]): CostReportEnvelopePersonRow {
+  return {
+    resolution: row.resolution,
+    ...(row.person === undefined ? {} : { person: row.person }),
+    ...(row.displayName === undefined ? {} : { display_name: row.displayName }),
+    identities: row.identities,
+    totals: totals(row.totals),
+  };
+}
+
 function attributionRow(
   row: CostReport["attributionMix"][number]
 ): CostReportEnvelopeAttributionRow {
@@ -236,6 +271,14 @@ function taskAttribution(
       attribution: row.attribution,
       totals: totals(row.totals),
     })),
+  };
+}
+
+function readSummary(report: CostReport): CostReportEnvelopeRead {
+  return {
+    undated_records: report.undatedRecords,
+    unreadable_lines: report.unreadableLines,
+    person_mapping_unreadable: report.personMappingUnreadable,
   };
 }
 
@@ -263,11 +306,9 @@ export function toCostReportEnvelope(report: CostReport): CostReportEnvelope {
     by_tool: report.byTools.map(toolRow),
     by_project: report.byProjects.map(projectRow),
     by_day: report.byDays.map((row) => ({ day: row.day, totals: totals(row.totals) })),
+    by_person: report.byPeople.map(personRow),
     attribution: report.attributionMix.map(attributionRow),
     ...taskAttribution(report.taskAttributionMix),
-    read: {
-      undated_records: report.undatedRecords,
-      unreadable_lines: report.unreadableLines,
-    },
+    read: readSummary(report),
   };
 }

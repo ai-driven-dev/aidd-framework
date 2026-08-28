@@ -1,4 +1,10 @@
 import type { TelemetryRouteSupply } from "../capabilities/telemetry-capability.js";
+import {
+  type PersonMapping,
+  type PersonResolution,
+  type ResolvedPerson,
+  resolvePerson,
+} from "./person-mapping.js";
 import { STEP_ATTRIBUTION_SOURCES, type StepAttributionSource } from "./step-attribution.js";
 import {
   momentFallsWithin,
@@ -139,6 +145,22 @@ export interface CostReportProjectRow {
   readonly totals: CostTotals;
 }
 
+/** One person's figures — a mapped person, one unplaced identity, or the records that
+ * carried none at all. `person` is the canonical `personId`, present only when `resolution`
+ * is `"mapped"`; the raw identifier that produced an `"unresolved"` row lives in
+ * `identities` instead, since that row was never claimed by anyone to have a canonical form.
+ * `identities` always carries what produced the row — every raw identifier behind a mapped
+ * person, including their own canonical one, or the single raw identifier behind an
+ * unresolved row — so a report line naming a person is traceable back to its evidence
+ * without a second lookup against the mapping. */
+export interface CostReportPersonRow {
+  readonly resolution: PersonResolution;
+  readonly person?: string;
+  readonly displayName?: string;
+  readonly identities: readonly string[];
+  readonly totals: CostTotals;
+}
+
 /** One UTC day's figures, in chronological order — every day the period spans, whether or
  * not a record landed on it. A day with nothing is a row of zeros: the one place in this
  * report a zero is the measurement rather than the false reading this layer exists to
@@ -215,6 +237,16 @@ export interface CostReportInput {
   /** Where a generic filter's value has ever been seen - absent when the caller has none
    * to offer, which reads the same as a filter never matching it elsewhere. */
   readonly knownValues?: CostReportKnownValues;
+  /** A person's own declaration of which identifiers are them, arriving as data rather
+   * than read from a module - the domain stays free of where a mapping lives. Absent or
+   * `null` both mean no mapping was declared, which resolves every identifier as
+   * `unresolved` rather than failing the report. */
+  readonly personMapping?: PersonMapping | null;
+  /** Set when a mapping exists but could not be read back - a damaged or unreadable file,
+   * never a mapping that simply was not declared. Costs the resolution alone: every record
+   * is still counted, with every identifier reported as `unresolved` and this flag saying
+   * why, the same way `unreadableLines` says why a total came from a partial read. */
+  readonly personMappingUnreadable?: boolean;
 }
 
 export interface CostReport {
@@ -238,12 +270,20 @@ export interface CostReport {
   readonly byTools: readonly CostReportToolRow[];
   readonly byProjects: readonly CostReportProjectRow[];
   readonly byDays: readonly CostReportDayRow[];
+  /** Mapped people first, then every unplaced identity, then the one row for records
+   * carrying none at all - a reader sees people before gaps. Within the mapped and the
+   * unresolved groups, largest first; never merged across the three. */
+  readonly byPeople: readonly CostReportPersonRow[];
   readonly attributionMix: readonly CostReportAttributionRow[];
   /** Present only alongside `task`: an unfiltered period carries no per-record task identity
    * to break down (see metrics-contract.md's "Attributing records to a task"). */
   readonly taskAttributionMix?: readonly CostReportTaskAttributionRow[];
   readonly undatedRecords: number;
   readonly unreadableLines: number;
+  /** Whether a declared mapping existed but could not be read - see `CostReportInput`'s
+   * own field. `false` both when no mapping was declared and when one was read fine;
+   * distinguishing those two is `byPeople`'s job, not this flag's. */
+  readonly personMappingUnreadable: boolean;
 }
 
 // Declared as the list first and the type derived from it, rather than the other way
@@ -420,6 +460,57 @@ type ModelKey = string | typeof NO_KNOWN_MODEL;
 
 function modelKeyOf(record: TelemetrySinkRecord): ModelKey {
   return record.model === undefined ? NO_KNOWN_MODEL : record.model;
+}
+
+// A record with no identifier is its own row, keyed on a symbol the same way
+// `NO_KNOWN_PROJECT` keys the row for no known project - never folded into an unresolved
+// row, which the spec's own three-way shape (`PersonResolution`) requires stay distinct.
+const NO_KNOWN_PERSON = Symbol("no known person");
+type PersonRowKey = string | typeof NO_KNOWN_PERSON;
+
+// An empty string reads the same as absent, the same reading `projectKeyOf` already gives
+// an empty `project_id` - a tool writing `person_id: ""` has stated nothing, not named an
+// identity nobody could ever claim.
+function personRawIdOf(record: TelemetrySinkRecord): string | undefined {
+  return typeof record.person_id === "string" && record.person_id !== ""
+    ? record.person_id
+    : undefined;
+}
+
+/** One resolved person's group - keyed once, on whichever field makes two records the same
+ * row: a mapped record's canonical `personId`, so two raw identities one person declared
+ * merge; an unresolved record's own raw identifier, so two unplaced identities never merge
+ * into each other; or the shared `NO_KNOWN_PERSON` symbol for a record with none. */
+interface PersonGroup {
+  readonly resolved: ResolvedPerson;
+  readonly totals: TotalsAccumulator;
+}
+
+function personGroupKey(resolved: ResolvedPerson): PersonRowKey {
+  if (resolved.resolution === "mapped" && resolved.personId !== undefined) {
+    return resolved.personId;
+  }
+  if (resolved.resolution === "unresolved") {
+    const [rawId] = resolved.identities;
+    if (rawId !== undefined) return rawId;
+  }
+  return NO_KNOWN_PERSON;
+}
+
+function addToPersonGroup(
+  groups: Map<PersonRowKey, PersonGroup>,
+  record: TelemetrySinkRecord,
+  resolved: ResolvedPerson
+): void {
+  const key = personGroupKey(resolved);
+  const existing = groups.get(key);
+  if (existing) {
+    existing.totals.add(record);
+    return;
+  }
+  const created: PersonGroup = { resolved, totals: new TotalsAccumulator() };
+  created.totals.add(record);
+  groups.set(key, created);
 }
 
 /** Every UTC day from `fromDay` to `toDay`, inclusive — the full period, whether or not a
@@ -677,6 +768,7 @@ interface Groups {
   readonly attributions: Map<StepAttributionSource, TotalsAccumulator>;
   readonly taskAttributions: Map<TaskAttributionSource, TotalsAccumulator>;
   readonly projects: Map<ProjectKey, TotalsAccumulator>;
+  readonly people: Map<PersonRowKey, PersonGroup>;
   readonly days: Map<string, TotalsAccumulator>;
   activeTimeSeconds?: number;
 }
@@ -693,6 +785,7 @@ function emptyGroups(fromDay: string, toDay: string): Groups {
     attributions: new Map(),
     taskAttributions: new Map(),
     projects: new Map(),
+    people: new Map(),
     days,
   };
 }
@@ -721,7 +814,8 @@ function accumulateSessionRecord(groups: Groups, record: TelemetrySinkRecord): v
 function accumulateRequestRecord(
   groups: Groups,
   record: TelemetrySinkRecord,
-  membership: TaskMembership | null
+  membership: TaskMembership | null,
+  mapping: PersonMapping | null
 ): void {
   groups.totals.add(record);
   addToStepGroup(groups.steps, record);
@@ -729,6 +823,7 @@ function accumulateRequestRecord(
   accumulateInto(groups.tools, record.tool, record);
   accumulateInto(groups.models, modelKeyOf(record), record);
   accumulateInto(groups.projects, projectKeyOf(record), record);
+  addToPersonGroup(groups.people, record, resolvePerson(mapping, personRawIdOf(record)));
   const day = telemetrySinkRecordDayKey(record);
   if (day !== undefined && groups.days.has(day)) groups.days.get(day)?.add(record);
   const attribution = membership === null ? undefined : taskAttributionOf(record, membership);
@@ -739,7 +834,8 @@ function accumulate(
   records: readonly TelemetrySinkRecord[],
   fromDay: string,
   toDay: string,
-  membership: TaskMembership | null
+  membership: TaskMembership | null,
+  mapping: PersonMapping | null
 ): Groups {
   const groups = emptyGroups(fromDay, toDay);
   for (const record of records) {
@@ -747,7 +843,7 @@ function accumulate(
       accumulateSessionRecord(groups, record);
       continue;
     }
-    accumulateRequestRecord(groups, record, membership);
+    accumulateRequestRecord(groups, record, membership, mapping);
   }
   return groups;
 }
@@ -828,6 +924,41 @@ function modelRows(
   );
 }
 
+function personRowOf(group: PersonGroup): CostReportPersonRow {
+  const { resolved } = group;
+  return {
+    resolution: resolved.resolution,
+    ...(resolved.personId === undefined ? {} : { person: resolved.personId }),
+    ...(resolved.displayName === undefined ? {} : { displayName: resolved.displayName }),
+    identities: resolved.identities,
+    totals: group.totals.build(),
+  };
+}
+
+/** Mapped people first, then every unplaced identity, then the one no-identifier row last -
+ * `bySize` alone cannot give this order, since it sorts purely on weight and a large
+ * unresolved row would otherwise outrank a small mapped one. Largest first within the
+ * mapped group and within the unresolved group; the no-identifier row is never sorted
+ * against either, since there is at most one. */
+function personRows(
+  people: ReadonlyMap<PersonRowKey, PersonGroup>
+): readonly CostReportPersonRow[] {
+  const rows = [...people.values()].map(personRowOf);
+  const keyOf = (row: CostReportPersonRow) => row.person ?? row.identities[0] ?? "";
+  const mapped = bySize(
+    rows.filter((row) => row.resolution === "mapped"),
+    (row) => row.totals,
+    keyOf
+  );
+  const unresolved = bySize(
+    rows.filter((row) => row.resolution === "unresolved"),
+    (row) => row.totals,
+    keyOf
+  );
+  const none = rows.filter((row) => row.resolution === "none");
+  return [...mapped, ...unresolved, ...none];
+}
+
 /**
  * One period's records and journals, reduced to a report whose every breakdown sums to the
  * total it belongs to.
@@ -863,6 +994,19 @@ function toolRowsInScope(input: CostReportInput, groups: Groups): readonly CostR
   );
 }
 
+/** `undatedRecords`, `unreadableLines` and `personMappingUnreadable` together - what the
+ * read could not do, pulled out on its own for the same reason `selectionFields` is: the
+ * object literal below reads as one shape, not a wall of field-by-field assignments. */
+function readFields(
+  input: CostReportInput
+): Pick<CostReport, "undatedRecords" | "unreadableLines" | "personMappingUnreadable"> {
+  return {
+    undatedRecords: input.undatedRecords,
+    unreadableLines: input.unreadableLines,
+    personMappingUnreadable: input.personMappingUnreadable ?? false,
+  };
+}
+
 function assembleCostReport(
   input: CostReportInput,
   inScope: readonly TelemetrySinkRecord[],
@@ -884,12 +1028,12 @@ function assembleCostReport(
     byTools: toolRowsInScope(input, groups),
     byProjects: projectRows(groups.projects),
     byDays: dayRows(groups.days),
+    byPeople: personRows(groups.people),
     attributionMix: attributionRows(groups.attributions),
     ...(membership === null
       ? {}
       : { taskAttributionMix: taskAttributionRows(groups.taskAttributions) }),
-    undatedRecords: input.undatedRecords,
-    unreadableLines: input.unreadableLines,
+    ...readFields(input),
   };
 }
 
@@ -999,27 +1143,15 @@ function pickDeterministically(candidates: readonly TelemetrySinkRecord[]): Tele
   return [...candidates].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))[0];
 }
 
-/** One billed call, seen once by each of two live routes, collapsed to the one record a
- * report may safely sum. Never done at write time: the sink is append-only (see
- * metrics-contract.md, "Where records live"), so a record already stored can never be
- * corrected in place — only reconciled by whatever reads it back, which is here.
- *
- * The survivor keeps whichever record carries `cost_usd` — on every tool measured so far,
- * that is also the one whose four token counters are complete for the call
- * (metrics-contract.md, "Cost and token counters"), so nothing about the group's money is
- * ever summed from more than one record. It then borrows `step_attribution`/`step`/
- * `step_plugin` from a sibling that resolved one, when its own is `"unattributed"` — the
- * export route never states a step at all, so leaving it as the survivor by default would
- * throw away the one thing the local-read route in the same group did know, preferring a
- * tool-stated step over a journal-interval one where both exist.
- *
- * `person_id`/`person_display_name` are deliberately not backfilled the same way: nothing
- * in `CostReport` groups or filters on person, so a survivor without them loses no figure
- * this report shows. Revisit this the day a person-scoped view is added. */
-function mergeBilledRequestGroup(group: readonly TelemetrySinkRecord[]): TelemetrySinkRecord {
-  if (group.length === 1) return group[0];
-  const costBearing = group.filter((record) => record.cost_usd !== undefined);
-  const base = pickDeterministically(costBearing.length > 0 ? costBearing : group);
+/** Borrows `step_attribution`/`step`/`step_plugin` from a sibling that resolved one, when
+ * `base`'s own is `"unattributed"` — the export route never states a step at all, so
+ * leaving it as the survivor by default would throw away the one thing the local-read
+ * route in the same group did know, preferring a tool-stated step over a journal-interval
+ * one where both exist. */
+function withStepBackfill(
+  base: TelemetrySinkRecord,
+  group: readonly TelemetrySinkRecord[]
+): TelemetrySinkRecord {
   if (base.step_attribution !== "unattributed") return base;
   const stepDonors = group.filter(
     (record) => record !== base && record.step_attribution !== "unattributed"
@@ -1033,6 +1165,52 @@ function mergeBilledRequestGroup(group: readonly TelemetrySinkRecord[]): Telemet
     step: donor.step,
     step_plugin: donor.step_plugin,
   };
+}
+
+/** `person_id` and `person_display_name`, backfilled onto `base` from the group as a pair —
+ * never one field from each — the day a person-scoped view was added, discharging the note
+ * this function's own doc comment used to carry: "nothing in `CostReport` groups or filters
+ * on person, so a survivor without them loses no figure this report shows. Revisit this the
+ * day a person-scoped view is added." That day is `byPeople`. A local-read record and its
+ * export-route sibling can share one `billed_request_id` (Claude Code's own `requestId`,
+ * stated by both routes — see `telemetry-sink-record.ts`), and only the local-read side
+ * ever carries a person; leaving the survivor without it whenever `pickDeterministically`
+ * happened to keep the export side would silently report a mapped person's own work as
+ * `"none"`, the exact false reading this feature exists to refuse. Independent of
+ * `withStepBackfill`, never chained after it: that helper returns early the moment a step
+ * is already resolved, and person still has to be checked even then. */
+function withPersonBackfill(
+  base: TelemetrySinkRecord,
+  group: readonly TelemetrySinkRecord[]
+): TelemetrySinkRecord {
+  if (base.person_id !== undefined) return base;
+  const donors = group.filter((record) => record.person_id !== undefined);
+  if (donors.length === 0) return base;
+  const donor = pickDeterministically(donors);
+  return {
+    ...base,
+    person_id: donor.person_id,
+    ...(donor.person_display_name === undefined
+      ? {}
+      : { person_display_name: donor.person_display_name }),
+  };
+}
+
+/** One billed call, seen once by each of two live routes, collapsed to the one record a
+ * report may safely sum. Never done at write time: the sink is append-only (see
+ * metrics-contract.md, "Where records live"), so a record already stored can never be
+ * corrected in place — only reconciled by whatever reads it back, which is here.
+ *
+ * The survivor keeps whichever record carries `cost_usd` — on every tool measured so far,
+ * that is also the one whose four token counters are complete for the call
+ * (metrics-contract.md, "Cost and token counters"), so nothing about the group's money is
+ * ever summed from more than one record. `withStepBackfill` and `withPersonBackfill` then
+ * each independently fill in what the survivor itself lacks from a sibling that has it. */
+function mergeBilledRequestGroup(group: readonly TelemetrySinkRecord[]): TelemetrySinkRecord {
+  if (group.length === 1) return group[0];
+  const costBearing = group.filter((record) => record.cost_usd !== undefined);
+  const base = pickDeterministically(costBearing.length > 0 ? costBearing : group);
+  return withPersonBackfill(withStepBackfill(base, group), group);
 }
 
 /** `kind: "session"` records are never part of a billed-call group — no metric datapoint
@@ -1066,7 +1244,8 @@ export function buildCostReport(input: CostReportInput): CostReport {
   const stages = selectionStages(records, input, membership);
   const emptySelection = emptySelectionOf(stages, input, membership);
   const inScope = stages[stages.length - 1]?.records ?? [];
-  const groups = accumulate(inScope, input.fromDay, input.toDay, membership);
+  const mapping = input.personMapping ?? null;
+  const groups = accumulate(inScope, input.fromDay, input.toDay, membership, mapping);
 
   return assembleCostReport(input, inScope, groups, membership, emptySelection);
 }

@@ -234,6 +234,7 @@ describe("toCostReportEnvelope", () => {
     expect(envelopeOf({ undatedRecords: 3, unreadableLines: 2 }).read).toEqual({
       undated_records: 3,
       unreadable_lines: 2,
+      person_mapping_unreadable: false,
     });
   });
 
