@@ -10,10 +10,11 @@ status: done
 .
 └── cli
     ├── src
-    │   ├── domain/ports
-    │   │   ├── person-identity-store.ts                    ✏️
-    │   │   ├── person-mapping-reader.ts                    ❌
-    │   │   └── person-mapping-store.ts                     ❌
+    │   ├── domain
+    │   │   ├── ports/person-identity-store.ts              ✏️
+    │   │   ├── ports/person-mapping-reader.ts               ❌
+    │   │   ├── ports/person-mapping-store.ts                ❌
+    │   │   └── models/person-mapping.ts                     ❌
     │   ├── infrastructure
     │   │   ├── adapters/person-identity-adapter.ts         ✏️
     │   │   ├── adapters/person-mapping-adapter.ts          ❌
@@ -25,10 +26,16 @@ status: done
     │       ├── display/telemetry-display.ts                    ✏️
     │       └── commands/telemetry.ts                           ✏️
     └── tests
+        ├── domain/models/person-mapping.unit.test.ts       ❌
         ├── helpers/ports/in-memory-person-mapping-*.ts     ❌
         ├── infrastructure/adapters/person-mapping-location.unit.test.ts ❌
         └── application/use-cases/telemetry/person-identity-use-case.unit.test.ts ✏️
 ```
+
+`models/person-mapping.ts` and its test were left standing at the end of phase 1 — their
+cases were already ported to `person-resolution.unit.test.ts` there — and are deleted here,
+alongside the rest of the mapping subsystem, so this phase's own deletion is not duplicated
+across two commits.
 
 ## User Journey
 
@@ -76,7 +83,7 @@ journey
 
 1. Extend `PersonIdentityStore` with `adopt(personId)`, `addAlsoMe(identity)` and `removeAlsoMe(identity)`.
 2. `mint()` records `origin: "minted"`; `adopt()` records `origin: "adopted"` and keeps any `alsoMe` already declared.
-3. Delete `person-mapping-reader.ts`, `person-mapping-store.ts`, `person-mapping-adapter.ts`, `person-mapping-use-case.ts`, both in-memory doubles and `person-mapping-location.unit.test.ts`.
+3. Delete `person-mapping-reader.ts`, `person-mapping-store.ts`, `person-mapping-adapter.ts`, `person-mapping-use-case.ts`, `models/person-mapping.ts` and its test (left standing at the end of phase 1), both in-memory doubles and `person-mapping-location.unit.test.ts`.
 4. Fold the on-disk shape into `person-identity-adapter.ts`: `person_id`, `origin`, optional `display_name`, optional `also_me`. Keep the file's private mode and its profile-only resolution unchanged.
 5. Read an identity file with no `origin` as `minted`, and document why: it is what every file written before this change was. Never guess anything else.
 6. Delete `UnreadablePersonMappingFileError` and fold its case into the identity file's own unreadable error, which now covers the one file that exists.

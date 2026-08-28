@@ -3,6 +3,7 @@ import type { PersonIdentity } from "../../../domain/ports/person-identity-reade
 import type { PersonIdentityStore } from "../../../domain/ports/person-identity-store.js";
 import {
   EmptyDisplayNameError,
+  EmptyIdentifierError,
   IdentityNotOptedInError,
   IdentityRequiredToLinkError,
 } from "../../errors.js";
@@ -112,6 +113,7 @@ export class PersonIdentityUseCase {
   }
 
   async use(personId: string): Promise<PersonIdentityUseResult> {
+    if (personId.trim() === "") throw new EmptyIdentifierError("use");
     const current = await this.store.readStrict();
     if (current !== null && current.personId === personId) {
       return { filePath: this.store.filePath, identity: current, alreadyInEffect: true };
@@ -126,9 +128,10 @@ export class PersonIdentityUseCase {
   }
 
   async link(identity: string): Promise<PersonIdentityLinkResult> {
+    if (identity.trim() === "") throw new EmptyIdentifierError("link");
     const person = await this.store.readStrict();
     if (person === null) throw new IdentityRequiredToLinkError();
-    const alreadyListed = person.alsoMe.includes(identity);
+    const alreadyListed = identity === person.personId || person.alsoMe.includes(identity);
     if (!alreadyListed) await this.store.addAlsoMe(identity);
     return { filePath: this.store.filePath, personId: person.personId, identity, alreadyListed };
   }

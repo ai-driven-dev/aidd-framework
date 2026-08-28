@@ -12,12 +12,15 @@ status: done
     ├── src/domain
     │   ├── ports/person-identity-reader.ts                 ✏️
     │   ├── models/person-resolution.ts                     ✅
-    │   ├── models/person-mapping.ts                        ❌
     │   └── errors.ts                                       ✏️
     └── tests/domain/models
-        ├── person-resolution.unit.test.ts                  ✅
-        └── person-mapping.unit.test.ts                     ❌
+        └── person-resolution.unit.test.ts                  ✅
 ```
+
+`models/person-mapping.ts` and `person-mapping.unit.test.ts` are left standing at the end of
+this phase — their cases move into `person-resolution.unit.test.ts` here, but the old files
+are only deleted in phase 2, alongside the rest of the mapping subsystem (`66486466`), so
+that phase's own deletion is not duplicated. See phase-2.md's projection.
 
 ## User Journey
 
@@ -73,7 +76,7 @@ journey
 2. Change `resolvePerson`'s first argument from a mapping to `PersonIdentity | null`. A match is the identity's own `personId` or any member of `alsoMe`.
 3. Keep every outcome exactly as it is: `mapped`, `unresolved` for a real identifier nobody declared, `none` for no identifier at all, and a `null` identity resolving everything to `unresolved` with the identifier still named.
 4. Keep `identities` on the result carrying what produced the row: the person's own identifier plus every added one when mapped, the raw identifier alone when unresolved.
-5. Delete `cli/src/domain/models/person-mapping.ts`.
+5. Leave `cli/src/domain/models/person-mapping.ts` in place for now — deleting it belongs to phase 2, alongside the rest of the mapping subsystem it is part of.
 
 ### `3)` The failure that cannot happen loses its code
 

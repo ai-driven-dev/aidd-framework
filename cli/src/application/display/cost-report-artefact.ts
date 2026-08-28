@@ -119,8 +119,17 @@ function emptySelectionMessage({
 }
 
 /** What the read could not do travels with what it did, on the artefact as on the terminal:
- * a total assembled from a partial read is indistinguishable from a complete one without it. */
-function caveats(envelope: CostReportEnvelope): readonly string[] {
+ * a total assembled from a partial read is indistinguishable from a complete one without it.
+ *
+ * `identity_unusable === "absent"` is the exception: it is every user's ordinary default
+ * state, not a degraded read, so it is never printed as a caveat here. Only the person axis
+ * (`personArtefact`, via `includeAbsentIdentityCaveat: true`) says it, because that is the
+ * one place the reader is already looking at identity resolution and the fact is relevant.
+ * `"unreadable"` is real damage on every axis and always prints. */
+function caveats(
+  envelope: CostReportEnvelope,
+  { includeAbsentIdentityCaveat = false }: { includeAbsentIdentityCaveat?: boolean } = {}
+): readonly string[] {
   const lines: string[] = [];
   if (envelope.empty_selection !== undefined) {
     lines.push(emptySelectionMessage(envelope.empty_selection));
@@ -137,7 +146,7 @@ function caveats(envelope: CostReportEnvelope): readonly string[] {
     lines.push(
       "this machine's own identity could not be read; every identifier is reported unresolved"
     );
-  } else if (envelope.read.identity_unusable === "absent") {
+  } else if (envelope.read.identity_unusable === "absent" && includeAbsentIdentityCaveat) {
     lines.push("no identity was declared; every identifier is reported unresolved");
   }
   return lines;
@@ -228,7 +237,7 @@ function personArtefact(envelope: CostReportEnvelope): string {
     "| Person | Identities | Total |",
     "| --- | --- | --- |",
     ...rows,
-    ...caveats(envelope),
+    ...caveats(envelope, { includeAbsentIdentityCaveat: true }),
   ].join("\n");
 }
 

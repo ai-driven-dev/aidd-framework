@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   EmptyDisplayNameError,
+  EmptyIdentifierError,
   IdentityNotOptedInError,
   IdentityRequiredToLinkError,
 } from "../../../../src/application/errors.js";
@@ -121,6 +122,13 @@ describe("PersonIdentityUseCase.on", () => {
 });
 
 describe("PersonIdentityUseCase.use", () => {
+  it("refuses an empty or whitespace-only identifier, writing nothing", async () => {
+    const store = new InMemoryPersonIdentityStore(null);
+
+    await expect(useCase(store).use("   ")).rejects.toThrow(EmptyIdentifierError);
+    expect(await store.read()).toBeNull();
+  });
+
   it("takes an identifier minted elsewhere, recording it as adopted", async () => {
     const store = new InMemoryPersonIdentityStore(null);
 
@@ -177,11 +185,35 @@ describe("PersonIdentityUseCase.use", () => {
 });
 
 describe("PersonIdentityUseCase.link", () => {
+  it("refuses an empty or whitespace-only identifier, writing nothing", async () => {
+    const store = new InMemoryPersonIdentityStore({
+      personId: "person-a",
+      origin: "minted",
+      alsoMe: [],
+    });
+
+    await expect(useCase(store).link("   ")).rejects.toThrow(EmptyIdentifierError);
+    expect((await store.read())?.alsoMe).toEqual([]);
+  });
+
   it("refuses when nobody opted in, naming the missing step", async () => {
     const uc = useCase(new InMemoryPersonIdentityStore(null));
 
     await expect(uc.link("some-other-machine-id")).rejects.toThrow(IdentityRequiredToLinkError);
     await expect(uc.link("some-other-machine-id")).rejects.toThrow(/telemetry identity on/u);
+  });
+
+  it("reports the person's own identifier as already listed, and appends nothing onto alsoMe", async () => {
+    const store = new InMemoryPersonIdentityStore({
+      personId: "person-a",
+      origin: "minted",
+      alsoMe: [],
+    });
+
+    const result = await useCase(store).link("person-a");
+
+    expect(result.alreadyListed).toBe(true);
+    expect((await store.read())?.alsoMe).toEqual([]);
   });
 
   it("adds the identifier onto this person", async () => {
@@ -212,6 +244,18 @@ describe("PersonIdentityUseCase.link", () => {
 });
 
 describe("PersonIdentityUseCase.unlink", () => {
+  it("reports nothing to remove for an empty identifier, never as a failure - link already refuses to write one", async () => {
+    const store = new InMemoryPersonIdentityStore({
+      personId: "person-a",
+      origin: "minted",
+      alsoMe: [],
+    });
+
+    const result = await useCase(store).unlink("");
+
+    expect(result.removed).toBe(false);
+  });
+
   it("reports nothing to remove for an identifier nobody listed, and exits successfully", async () => {
     const store = new InMemoryPersonIdentityStore({
       personId: "person-a",

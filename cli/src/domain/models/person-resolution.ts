@@ -55,9 +55,11 @@ export function resolvePerson(
     resolution: "mapped",
     personId: identity.personId,
     ...(identity.displayName === undefined ? {} : { displayName: identity.displayName }),
-    identities: identity.alsoMe.includes(identity.personId)
-      ? identity.alsoMe
-      : [identity.personId, ...identity.alsoMe],
+    // `alsoMe` can no longer contain `identity.personId` itself: `link` treats an
+    // identifier equal to the person's own as already listed and refuses to append it
+    // (`PersonIdentityUseCase.link`). No runtime check replaces that guard here either -
+    // do not reintroduce a branch for a shape `link` no longer lets anyone write.
+    identities: [identity.personId, ...identity.alsoMe],
   };
 }
 

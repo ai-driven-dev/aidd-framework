@@ -320,13 +320,17 @@ the only other moment available is the day the line was stored, which is when AI
 about the work rather than when it happened. `unreadable_lines` are lines no parser could
 read.
 
-**Any of the three present or non-zero means your total is partial.** Say so rather than
-presenting it as whole. `identity_unusable` names which of two causes kept this machine's
-own identity from resolving records at all: `"unreadable"` for a declared identity file
-that could not be read back, `"absent"` for no identity declared at all. Either way every
-record is still counted, in `by_person` as `unresolved`, never as a reason to drop a
-figure. The field itself is absent from `read` only when the identity was read back fine -
-`by_person`'s own rows are what shows a resolved identity's effect.
+**`undated_records` or `unreadable_lines` present or non-zero means your total is
+partial.** Say so rather than presenting it as whole. `identity_unusable` is a different
+kind of field and does not make a total partial: it names which of two causes kept this
+machine's own identity from resolving records at all, `"unreadable"` for a declared
+identity file that could not be read back, `"absent"` for no identity declared at all
+(the ordinary state of anyone who has never opted in - not a degraded read). Either way,
+exactly as `by_person`'s own section states, a damaged or undeclared identity changes how
+records are labelled, never how many are counted: every record is still counted, in
+`by_person` as `unresolved`, never as a reason to drop a figure. The field itself is
+absent from `read` only when the identity was read back fine - `by_person`'s own rows are
+what shows a resolved identity's effect.
 
 ## Filling it
 

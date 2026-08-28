@@ -110,3 +110,10 @@ export class IdentityRequiredToLinkError extends Error {
     this.name = "IdentityRequiredToLinkError";
   }
 }
+
+export class EmptyIdentifierError extends Error {
+  constructor(command: "use" | "link") {
+    super(`\`aidd telemetry identity ${command}\` needs a non-empty value.`);
+    this.name = "EmptyIdentifierError";
+  }
+}

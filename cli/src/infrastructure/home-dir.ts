@@ -26,16 +26,13 @@ export function resolveHomeDir(
 
 /**
  * `<profile>/.config/aidd` on POSIX, `%APPDATA%/aidd` on Windows — the directory a
- * *person's own choice* lives under, never a project's. Shared by every adapter whose
- * contract refuses `AIDD_USER_CONFIG_DIR` on purpose (today, the identity file and the
- * person mapping): that variable is a location a repository or a CI job can set, and
- * reaching either file through it would not be this person's own choice to make. The
- * telemetry sink is deliberately not one of these callers — `telemetry-sink-adapter.ts`'s
- * own `defaultConfigDir` honours that variable, and additionally falls back to a legacy
+ * *person's own choice* lives under, never a project's. Isolated as its own function,
+ * beside `resolveHomeDir`, because its contract refuses `AIDD_USER_CONFIG_DIR` on purpose:
+ * that variable is a location a repository or a CI job can set, and reaching the identity
+ * file through it would not be this person's own choice to make. The telemetry sink is
+ * deliberately not a caller of this function — `telemetry-sink-adapter.ts`'s own
+ * `defaultConfigDir` honours that variable, and additionally falls back to a legacy
  * POSIX-shaped directory on Windows, a concern this function has no reason to carry.
- *
- * Restated once, here, so a mapping adapter reuses it rather than a second copy of the
- * platform branch agreeing with the identity adapter by coincidence.
  */
 export function resolveAiddConfigDir(): string {
   if (process.platform === "win32" && process.env.APPDATA) {

@@ -15,9 +15,10 @@ const PRIVATE_DIR_MODE = 0o700;
 // The plugin's own plain-node writer this once mirrored (`skills/00-init/scripts/lib/
 // identity.cjs`) was deleted when identity moved to the CLI - this adapter is the sole
 // writer now, and free to carry fields (`origin`, `also_me`) that script never had. Path
-// resolution still lives in `resolveAiddConfigDir`, once shared with the now-deleted
-// `person-mapping-adapter.ts`, kept as its own function since a second reader of this
-// directory is exactly what the identity-is-the-person rework does not rule out.
+// resolution still lives in `resolveAiddConfigDir` (`home-dir.ts`), kept as its own
+// function there because that isolates its deliberate refusal of `AIDD_USER_CONFIG_DIR`
+// beside `resolveHomeDir`, the other home-dir resolver - not because of any second caller
+// today.
 function identityFilePath(): string {
   return join(resolveAiddConfigDir(), "identity.json");
 }

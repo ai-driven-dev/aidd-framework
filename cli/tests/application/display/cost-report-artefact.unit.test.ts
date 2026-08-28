@@ -134,6 +134,29 @@ describe("buildCostReportArtefact", () => {
     expect(artefact).toMatch(/no identity was declared/u);
   });
 
+  it("prints no person caveat on the total axis when nobody opted in - that is the default state, not a degraded read", () => {
+    const envelope = envelopeOf({
+      records: [request({ turn_id: "a", cost_usd: 1 })],
+      identityUnusableCause: "absent",
+    });
+
+    const artefact = buildCostReportArtefact(envelope, "total");
+
+    expect(artefact).toContain("$1.00");
+    expect(artefact).not.toMatch(/no identity was declared/u);
+  });
+
+  it("still prints the unreadable caveat on the total axis - that one is real damage", () => {
+    const envelope = envelopeOf({
+      records: [request({ turn_id: "a", cost_usd: 1 })],
+      identityUnusableCause: "unreadable",
+    });
+
+    const artefact = buildCostReportArtefact(envelope, "total");
+
+    expect(artefact).toMatch(/own identity could not be read/u);
+  });
+
   it("names two different causes with two different caveats", () => {
     const unreadable = buildCostReportArtefact(
       envelopeOf({ identityUnusableCause: "unreadable" }),
