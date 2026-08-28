@@ -16,6 +16,7 @@ import { AI_TOOL_IDS } from "../../../domain/models/tool-ids.js";
 import type { PersonIdentity } from "../../../domain/ports/person-identity-reader.js";
 import type { PersonIdentityStore } from "../../../domain/ports/person-identity-store.js";
 import type { RunJournal, RunJournalReader } from "../../../domain/ports/run-journal-reader.js";
+import type { TelemetryEvidenceReader } from "../../../domain/ports/telemetry-evidence-reader.js";
 import type { TelemetrySink } from "../../../domain/ports/telemetry-sink.js";
 import { getAiToolConfig } from "../../../domain/tools/registry.js";
 
@@ -29,6 +30,12 @@ export interface ReportCostOptions {
   /** Any of `project`, `step`, `model` and `tool` - each optional, composing with `task`
    * and each other by `and`. */
   readonly filters?: CostReportFilters;
+  /** Where to look for `.aidd/config.json` when asking whether the project switch is on. */
+  readonly projectRoot: string;
+  /** Passed through to the same refusal check the switch itself honours
+   * (`AIDD_TELEMETRY=0`), rather than read from `process.env` down in an adapter a report
+   * cannot otherwise reach the caller's environment through. */
+  readonly env: NodeJS.ProcessEnv;
 }
 
 /** What each tool declares about being read at all, as data the pure report consumes. A
@@ -126,6 +133,32 @@ function identityInputFields(
   };
 }
 
+/** Every gathered read, folded into the one shape `buildCostReport` wants - kept on its own
+ * so `execute` reads as "gather, then assemble," not a wall of field assignments. */
+function toReportInput(
+  options: ReportCostOptions,
+  read: Awaited<ReturnType<TelemetrySink["readRecordsInPeriod"]>>,
+  journals: readonly RunJournal[],
+  identity: PersonIdentityFields,
+  measurementEnabled: boolean
+): CostReportInput {
+  const { fromDay, toDay } = options.period;
+  return {
+    fromDay,
+    toDay,
+    records: read.records,
+    journals: journals.map(toSessionJournal).filter((journal) => journal !== null),
+    declaredTools: declaredTools(),
+    undatedRecords: read.undated.length,
+    unreadableLines: read.skippedLines,
+    ...(options.task === undefined ? {} : { task: options.task }),
+    ...(options.filters === undefined ? {} : { filters: options.filters }),
+    knownValues: read.knownValues,
+    measurementEnabled,
+    ...identityInputFields(identity),
+  };
+}
+
 /**
  * Answers what a period, or one task inside it, cost.
  *
@@ -139,8 +172,15 @@ export class ReportCostUseCase {
   constructor(
     private readonly sink: TelemetrySink,
     private readonly runJournalReader: RunJournalReader,
-    private readonly personIdentityStore: PersonIdentityStore
+    private readonly personIdentityStore: PersonIdentityStore,
+    private readonly telemetryEvidenceReader: TelemetryEvidenceReader
   ) {}
+
+  /** Whether the project switch is on right now - independent of the sink and the journal,
+   * so gathered on its own rather than folded into either of their reads. */
+  private async measurementEnabled(options: ReportCostOptions): Promise<boolean> {
+    return this.telemetryEvidenceReader.isTelemetryEnabled(options.projectRoot, options.env);
+  }
 
   async execute(options: ReportCostOptions): Promise<CostReport> {
     const { fromDay, toDay } = options.period;
@@ -153,19 +193,8 @@ export class ReportCostUseCase {
     // journals as well would only be a second, weaker selection over the same thing.
     const journals = await this.runJournalReader.list();
     const identity = await personIdentityFields(this.personIdentityStore);
+    const measurementEnabled = await this.measurementEnabled(options);
 
-    return buildCostReport({
-      fromDay,
-      toDay,
-      records: read.records,
-      journals: journals.map(toSessionJournal).filter((journal) => journal !== null),
-      declaredTools: declaredTools(),
-      undatedRecords: read.undated.length,
-      unreadableLines: read.skippedLines,
-      ...(options.task === undefined ? {} : { task: options.task }),
-      ...(options.filters === undefined ? {} : { filters: options.filters }),
-      knownValues: read.knownValues,
-      ...identityInputFields(identity),
-    });
+    return buildCostReport(toReportInput(options, read, journals, identity, measurementEnabled));
   }
 }

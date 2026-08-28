@@ -15,6 +15,19 @@ consumer needs is below: the file layout, every field's meaning and presence
 condition, the three ways a naive reader double counts, and what each tool can and
 cannot supply.
 
+> **The export route no longer writes.** The OTLP receiver, the export
+> configuration and the mapper that turned a captured payload into a
+> `provenance: "export"` record were all deleted in "one route, and every
+> sentence about it true" — no code path in this repository can produce a new
+> `"export"` line today. Everything below that describes the export route is
+> kept, unchanged, because `provenance: "export"` stays a valid value on a
+> stored line: the sink is append-only, a line already written under an
+> earlier version of this tool is never rewritten, and a consumer reading a
+> day file that predates this change still needs every rule below to read
+> that line correctly. Read every present-tense sentence about the export
+> route as a description of a stored line's own shape, not of a route still
+> capable of adding to it.
+
 ## Where records live
 
 Records are appended as JSON Lines, one JSON object per line, to a UTC-day file:
@@ -164,11 +177,11 @@ only the largest.
 
 ## A third way to double count: one billed call, seen by both routes
 
-A tool whose export and local read are both declared and measured — today,
-only Claude Code — can have both routes live for the same session at once: the
-OTLP export streams `api_request` as each call completes, and a local read of
-the same session's transcript, run at any point, sees the same calls in the
-tool's own file. Each route names the call in a namespace the other never
+A tool whose export and local read were both declared and measured — only
+Claude Code, ever — could have both routes live for the same session at
+once: the OTLP export streamed `api_request` as each call completed, and a
+local read of the same session's transcript, run at any point, sees the same
+calls in the tool's own file. Each route names the call in a namespace the other never
 reads — export's `turn_id` is `prompt.id`, one user turn, which a main-agent
 request and the subagent it spawned can share (see `turn_id` below); local's
 `turn_id` is `requestId`, one billed call — so matching on `turn_id` alone, as
@@ -199,29 +212,32 @@ arrived — the same rule an unmatched `turn_id` follows for the re-read case.
 `cost-report-contract.md` calls this the third of the double-count rules
 `aidd telemetry report --json` has already applied.
 
-**The same collapse also absorbs a retried OTLP delivery.** `/v1/logs` and
-`/v1/metrics` are received unconditionally — nothing at write time recognizes a
-redelivered payload, because OTLP delivery is itself at-least-once and a
-receiver refusing a delivery it cannot prove is a duplicate would risk refusing
-a real one. A redelivered `api_request` names the same `billed_request_id` as
-the first delivery, so the group it joins on read has two (or more) identical
-records instead of one, and the same "keep one, never sum" rule that reconciles
-two routes reconciles two deliveries of one route just as well.
+**The same collapse also absorbed a retried OTLP delivery, while the receiver
+still ran.** `/v1/logs` and `/v1/metrics` were received unconditionally —
+nothing at write time recognized a redelivered payload, because OTLP delivery
+is itself at-least-once and a receiver refusing a delivery it cannot prove is
+a duplicate would risk refusing a real one. A redelivered `api_request` named
+the same `billed_request_id` as the first delivery, so the group it joined on
+read had two (or more) identical records instead of one, and the same "keep
+one, never sum" rule that reconciles two routes reconciled two deliveries of
+one route just as well. A day file written while the receiver still ran can
+still hold this shape; a consumer reading one applies the same collapse.
 
-**This protection requires `billed_request_id`, and most declared exports do
-not carry one.** Measured so far, only Claude Code's export names it (its
-`request_id` log attribute). Codex's and Copilot's exports are declared —
-`identityAttribute` is real, measured from a captured session — but neither has
-ever been measured carrying a `request_id`, or any counter at all through this
-route; Cursor's and OpenCode's exports are not even declared (`kind:
-"unmeasured"`), so this receiver never resolves an identity for either and
-stores nothing from them regardless. A route with no `billed_request_id` has no
-group to collapse into: a retried delivery for it is indistinguishable from two
-real calls, and doubles every counter it carries. Today this is a latent gap,
-not an observed one — the one route currently seen carrying real counters
-(Claude Code's) is also the one route that is protected — but a consumer must
-not assume a future export automatically inherits this collapse; it inherits it
-only once that route is measured naming `billed_request_id` too.
+**This protection required `billed_request_id`, and most exports never carried
+one.** Measured while the route still existed, only Claude Code's export named
+it (its `request_id` log attribute). Codex's and Copilot's exports were once
+declared — `identityAttribute` was real, measured from a captured session —
+but neither was ever measured carrying a `request_id`, or any counter at all
+through this route; Cursor's and OpenCode's exports were never even declared
+(`kind: "unmeasured"`), so the receiver never resolved an identity for either
+and stored nothing from them regardless. A route with no `billed_request_id`
+has no group to collapse into: a retried delivery for it is indistinguishable
+from two real calls, and doubles every counter it carries. That was always a
+latent gap, not an observed one, on any stored line — the one route ever seen
+carrying real counters (Claude Code's) was also the one route that was
+protected. A consumer reading a stored `"export"` line today reads it against
+exactly the coverage measured while the route ran; no export will ever carry
+`billed_request_id` beyond what is already on disk.
 
 ## Identity and joins
 
@@ -271,7 +287,8 @@ only once that route is measured naming `billed_request_id` too.
   machine, opted into per person rather than defaulted on for a whole export.
   It is present only on a `provenance: "local-read"` record — the one route
   guaranteed to run as that person, on that machine — and never on an
-  `"export"` record, since an OTLP receiver is not guaranteed to run on the
+  `"export"` record: no receiver exists any more to run as that person at
+  all, and even while one did, it was never guaranteed to run on the
   identified person's own machine. `person_id` is never derived from `user_id`,
   a git author, an email, or a hostname, in either direction. See `person_id`
   and `person_display_name` below for what each carries and when.
@@ -640,16 +657,17 @@ same tool. A tool absent from one route is not a zero for that route — it is
 "not covered," and a consumer should print it that way rather than infer a zero
 from silence.
 
-| Tool | Export route | Local-read route |
+| Tool | Export route (removed — historical only) | Local-read route |
 | ---- | ------------- | ------------------ |
-| **Claude Code** | Declared and measured: full request-level counters via `/v1/logs`, plus the six `"session"`-kind delta metrics via `/v1/metrics` every 10 seconds. `cost_usd` is only ever available through this route — no local file carries it. Also the only route measured naming `billed_request_id` (its `request_id` attribute). | Declared and measured: complete token counters per assistant message, keyed on `requestId`. Step is stated by the tool itself (`attributionSkill`), exact per message — the strongest attribution any tool or route offers. No `cost_usd`. Also names `billed_request_id` (the same `requestId`). **The one tool measured by both routes at once**: when both are live for a session, both routes append a record for the same billed call under two different `turn_id`s (`prompt.id` here, `requestId` there) — collapse on `billed_request_id` before summing, or every figure doubles. See "A third way to double count." |
-| **Codex** | Declared (`conversation.id` measured, zero-token, to verify the identifier only). Turn identifier and any metrics export are unmeasured — no counters, no cost, flow through this route today. | Declared and measured: complete counters per turn, keyed on `turn_id`, from the rollout's `token_count` events paired with the preceding `turn_context`. A turn read while its session is still running is stored with whatever counters had arrived so far, and corrected — never edited, a second line — once a later read brings a larger reading of the same `turn_id`; see "A re-read appends unless matched." No tool-stated step — attribution is only ever a run-journal interval, or unattributed. No `cost_usd`. |
+| **Claude Code** | Was declared and measured: full request-level counters via `/v1/logs`, plus the six `"session"`-kind delta metrics via `/v1/metrics` every 10 seconds. `cost_usd` was only ever available through this route — no local file carries it. Also the only route ever measured naming `billed_request_id` (its `request_id` attribute). | Declared and measured: complete token counters per assistant message, keyed on `requestId`. Step is stated by the tool itself (`attributionSkill`), exact per message — the strongest attribution any tool or route offers. No `cost_usd`. Also names `billed_request_id` (the same `requestId`). **The one tool ever measured by both routes at once**: while the export route still ran, both routes could append a record for the same billed call under two different `turn_id`s (`prompt.id` there, `requestId` here) — a consumer reading a day file spanning that period still collapses on `billed_request_id` before summing, or every figure doubles. See "A third way to double count." |
+| **Codex** | Was declared (`conversation.id` measured, zero-token, to verify the identifier only). Turn identifier and any metrics export stayed unmeasured — no counters, no cost, ever flowed through this route. | Declared and measured: complete counters per turn, keyed on `turn_id`, from the rollout's `token_count` events paired with the preceding `turn_context`. A turn read while its session is still running is stored with whatever counters had arrived so far, and corrected — never edited, a second line — once a later read brings a larger reading of the same `turn_id`; see "A re-read appends unless matched." No tool-stated step — attribution is only ever a run-journal interval, or unattributed. No `cost_usd`. |
 | **OpenCode** | Unmeasured — no export payload has ever been captured for this tool. | Declared and measured, via `opencode export <sessionID> --sanitize`: counters per request (message), keyed on the message's own `id`. No established join to a run-journal entry — no captured hook or plugin payload has ever carried OpenCode's own session identity, so nothing exists to join on; these figures answer only what a session consumed, alone. `info.cost` is deliberately never read: it is `0` in every message captured, and its denomination (which currency, computed vs. billed) has never been established — a figure whose meaning is unknown is worse than an absent one. Records carry `event_timestamp` from the message's `time.created`, so they can be placed in a period; step attribution stays out of reach regardless, since there is no join to a run journal to attribute against. |
-| **Copilot** | Declared (`gen_ai.conversation.id` measured, zero-credit, to verify the identifier only) — but that attribute lives on the `invoke_agent` *span*, not on a log record or a metric, and this receiver only listens on `/v1/logs` and `/v1/metrics`. A receiver limited to those two paths never sees the one attribute that identifies a Copilot session, so this route yields nothing in practice today. | Supported at **session** granularity only: `session.shutdown` in `~/.copilot/session-state/<id>/events.jsonl` carries input, output, cache read and cache write together, once, for the whole session. Nothing in its files counts a single request, so it yields a `session` record and never a `request` one, and no amount can be placed inside a step. Read `tokenDetails`, never `usage` — the latter is inclusive of cache writes where every other reader's input is exclusive. No model is stamped: `currentModel` names the session's last model, not the one that spent. Separately, its file's own `cost` field is denominated in premium requests, not currency, so it could not be treated as `cost_usd` even where it is present. |
-| **Cursor** | Unmeasured — no payload has ever been captured. Cursor's own documentation names `cursor.conversation.id`, but a name read from documentation is a guess, and enabling the export to verify it is a team setting on an Enterprise plan, in beta, that nobody outside a Cursor admin can turn on — so it is declared unmeasured rather than declared from an unverified guess. | Unsupported (probed): Cursor writes no token count in any file it produces — there is nothing on disk for a local reader to find. |
+| **Copilot** | Was declared (`gen_ai.conversation.id` measured, zero-credit, to verify the identifier only) — but that attribute lived on the `invoke_agent` *span*, not on a log record or a metric, and the receiver only ever listened on `/v1/logs` and `/v1/metrics`. Limited to those two paths, it never saw the one attribute that identified a Copilot session, so this route yielded nothing in practice for as long as it existed. | Supported at **session** granularity only: `session.shutdown` in `~/.copilot/session-state/<id>/events.jsonl` carries input, output, cache read and cache write together, once, for the whole session. Nothing in its files counts a single request, so it yields a `session` record and never a `request` one, and no amount can be placed inside a step. Read `tokenDetails`, never `usage` — the latter is inclusive of cache writes where every other reader's input is exclusive. No model is stamped: `currentModel` names the session's last model, not the one that spent. Separately, its file's own `cost` field is denominated in premium requests, not currency, so it could not be treated as `cost_usd` even where it is present. |
+| **Cursor** | Was unmeasured — no payload was ever captured. Cursor's own documentation names `cursor.conversation.id`, but a name read from documentation is a guess, and enabling that export to verify it was a team setting on an Enterprise plan, in beta, that nobody outside a Cursor admin could turn on — so it stayed declared unmeasured rather than declared from an unverified guess. | Unsupported (probed): Cursor writes no token count in any file it produces — there is nothing on disk for a local reader to find. |
 
-Cursor is the one tool uncovered by both routes today: its export cannot be
-enabled here to measure, and its local files carry nothing to read.
+Cursor was the one tool uncovered by both routes even before the export route
+was removed: its export was never enabled to measure, and its local files
+carry nothing to read.
 
 ### Attributing records to a task
 

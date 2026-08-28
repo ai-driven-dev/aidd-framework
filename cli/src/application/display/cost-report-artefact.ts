@@ -10,6 +10,7 @@ import type {
   CostReportEnvelopeTotals,
 } from "../../domain/models/cost-report-envelope.js";
 import { getAiToolConfig } from "../../domain/tools/registry.js";
+import { ATTRIBUTION_LABELS } from "./cost-report-display.js";
 
 /**
  * One axis of a report, rendered as something a person pastes elsewhere.
@@ -190,15 +191,26 @@ function dayArtefact(envelope: CostReportEnvelope): string {
   );
 }
 
+/** Two rows can share one step name — the same skill reached once from the tool's own
+ * statement and once from a journal interval is two different claims about the same step,
+ * never one the report is free to merge (`by_step` is keyed on `step` and `attribution`
+ * together; see `cost-report-contract.md`). Dropping the attribution column here would
+ * paste a table where two such rows are indistinguishable from one step double-counted -
+ * so unlike every other axis below, this one carries a third column rather than the
+ * generic `table()` helper's two. */
 function stepArtefact(envelope: CostReportEnvelope): string {
-  return table(
-    envelope,
-    "by step",
-    "Step",
-    envelope.by_step.map(
-      (row) => `| ${row.step ?? "unattributed"} | ${figure(row.totals, envelope)} |`
-    )
-  );
+  const rows = envelope.by_step.map((row) => {
+    const step = row.step ?? "unattributed";
+    return `| ${step} | ${ATTRIBUTION_LABELS[row.attribution]} | ${figure(row.totals, envelope)} |`;
+  });
+  return [
+    header(envelope, "by step"),
+    "",
+    "| Step | Attribution | Total |",
+    "| --- | --- | --- |",
+    ...rows,
+    ...caveats(envelope),
+  ].join("\n");
 }
 
 function modelArtefact(envelope: CostReportEnvelope): string {

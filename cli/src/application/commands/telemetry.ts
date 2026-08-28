@@ -120,6 +120,8 @@ export function registerTelemetryCommand(program: Command): void {
           const deps = await createDeps(projectRoot, { verbose }, output);
           const report = await deps.reportCostUseCase.execute({
             period,
+            projectRoot,
+            env: process.env,
             ...(cmdOptions.task === undefined ? {} : { task: cmdOptions.task }),
             filters: {
               ...(cmdOptions.project === undefined ? {} : { project: cmdOptions.project }),

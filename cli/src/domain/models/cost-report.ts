@@ -251,6 +251,14 @@ export interface CostReportInput {
    * this cause saying why, the same way `unreadableLines` says why a total came from a
    * partial read. This field itself is absent only when the identity was read back fine. */
   readonly identityUnusableCause?: PersonIdentityUnusableCause;
+  /** Whether the project switch is on right now, as data rather than a read this pure
+   * function performs itself - the same reasoning `identity` above documents. Absent
+   * defaults to `true`: every caller that never learned otherwise (most of this file's own
+   * tests among them) is a caller for whom nothing has ever suggested measurement is off,
+   * and a report built from records already has to have come from somewhere that was
+   * measuring at least once. Only `ReportCostUseCase` ever passes `false`, for the one
+   * project switch it actually reads. */
+  readonly measurementEnabled?: boolean;
 }
 
 export interface CostReport {
@@ -289,6 +297,11 @@ export interface CostReport {
    * back fine; distinguishing a resolved identity from an absent or unreadable one is
    * `byPeople`'s job, not this field's. */
   readonly identityUnusableCause?: PersonIdentityUnusableCause;
+  /** Whether the project switch is on right now - never inferred from whether any record
+   * was found, since an empty period and a switched-off one are different facts a reader
+   * must not conflate. Always concrete here, unlike the optional input field it is resolved
+   * from: every report has an answer to this, even the ones that default it. */
+  readonly measurementEnabled: boolean;
 }
 
 // Declared as the list first and the type derived from it, rather than the other way
@@ -1004,10 +1017,14 @@ function toolRowsInScope(input: CostReportInput, groups: Groups): readonly CostR
  * object literal below reads as one shape, not a wall of field-by-field assignments. */
 function readFields(
   input: CostReportInput
-): Pick<CostReport, "undatedRecords" | "unreadableLines" | "identityUnusableCause"> {
+): Pick<
+  CostReport,
+  "undatedRecords" | "unreadableLines" | "identityUnusableCause" | "measurementEnabled"
+> {
   return {
     undatedRecords: input.undatedRecords,
     unreadableLines: input.unreadableLines,
+    measurementEnabled: input.measurementEnabled ?? true,
     ...(input.identityUnusableCause === undefined
       ? {}
       : { identityUnusableCause: input.identityUnusableCause }),

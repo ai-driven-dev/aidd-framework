@@ -32,7 +32,7 @@ menu and ask them to pick.
 
 | The question sounds like | Axis | Artefact |
 | --- | --- | --- |
-| what did this cost, what do we owe | total | one total, in a line |
+| what did this cost, how much did it use | total | one total, in a line |
 | what changed, which day spiked | day | a series, one row per day |
 | where did it go, which step, model, tool or project took it | step, model, tool or project | a breakdown table |
 | for a report, to paste, to send, to keep | any of the above | the same artefact, written to a file |

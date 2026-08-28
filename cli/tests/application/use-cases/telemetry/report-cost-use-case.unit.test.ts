@@ -14,8 +14,13 @@ import { AI_TOOL_IDS } from "../../../../src/domain/models/tool-ids.js";
 import { InMemoryPersonIdentityStore } from "../../../helpers/ports/in-memory-person-identity-store.js";
 import { InMemoryRunJournalReader } from "../../../helpers/ports/in-memory-run-journal-reader.js";
 import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetry-sink.js";
+import { StubTelemetryEvidenceReader } from "../../../helpers/ports/stub-telemetry-evidence-reader.js";
 
 const PERIOD = { fromDay: "2026-08-17", toDay: "2026-08-21" } as const;
+// `execute()` now also asks whether the project switch is on - every test in this file is
+// about what the sink and the journal hold, not about that switch, so it always answers
+// "on" here and passes a fixed root and an empty env just to satisfy the shape.
+const BASE_OPTIONS = { projectRoot: "/project", env: {} } as const;
 const STORED_ON = new Date("2026-08-21T09:00:00Z");
 const TASK = "2026_08/2026_08_21_cost-reporter";
 
@@ -37,13 +42,15 @@ describe("ReportCostUseCase", () => {
   let sink: InMemoryTelemetrySink;
   let journals: InMemoryRunJournalReader;
   let identity: InMemoryPersonIdentityStore;
+  let evidence: StubTelemetryEvidenceReader;
   let useCase: ReportCostUseCase;
 
   beforeEach(() => {
     sink = new InMemoryTelemetrySink();
     journals = new InMemoryRunJournalReader();
     identity = new InMemoryPersonIdentityStore();
-    useCase = new ReportCostUseCase(sink, journals, identity);
+    evidence = new StubTelemetryEvidenceReader();
+    useCase = new ReportCostUseCase(sink, journals, identity, evidence);
   });
 
   async function store(...records: readonly TelemetrySinkRecord[]): Promise<void> {
@@ -56,7 +63,7 @@ describe("ReportCostUseCase", () => {
       record({ vendor_id: "s-2", cost_usd: 0.2 })
     );
 
-    const built = await useCase.execute({ period: PERIOD });
+    const built = await useCase.execute({ ...BASE_OPTIONS, period: PERIOD });
 
     expect(built.sessions).toBe(2);
     expect(built.totals.costMicroUsd).toBe(toMicroUsd(0.3));
@@ -70,7 +77,7 @@ describe("ReportCostUseCase", () => {
       record({ vendor_id: "august", cost_usd: 1 })
     );
 
-    const built = await useCase.execute({ period: PERIOD });
+    const built = await useCase.execute({ ...BASE_OPTIONS, period: PERIOD });
 
     expect(built.totals.costMicroUsd).toBe(toMicroUsd(1));
     expect(built.sessions).toBe(1);
@@ -100,7 +107,7 @@ describe("ReportCostUseCase", () => {
       record({ vendor_id: "s-elsewhere", cost_usd: 8 })
     );
 
-    const built = await useCase.execute({ period: PERIOD, task: TASK });
+    const built = await useCase.execute({ ...BASE_OPTIONS, period: PERIOD, task: TASK });
 
     expect(built.task).toBe(TASK);
     expect(built.totals.costMicroUsd).toBe(toMicroUsd(1));
@@ -109,7 +116,7 @@ describe("ReportCostUseCase", () => {
   it("gives every declared tool a row, with the reason an unreadable one cannot be read", async () => {
     await store(record({ cost_usd: 1 }));
 
-    const built = await useCase.execute({ period: PERIOD });
+    const built = await useCase.execute({ ...BASE_OPTIONS, period: PERIOD });
 
     expect(built.byTools.map((row) => row.tool)).toEqual([...AI_TOOL_IDS]);
     const cursor = built.byTools.find((row) => row.tool === "cursor");
@@ -123,14 +130,14 @@ describe("ReportCostUseCase", () => {
       record({ vendor_id: "no-moment", event_timestamp: undefined })
     );
 
-    const built = await useCase.execute({ period: PERIOD });
+    const built = await useCase.execute({ ...BASE_OPTIONS, period: PERIOD });
 
     expect(built.undatedRecords).toBe(1);
     expect(built.totals.requests).toBe(1);
   });
 
   it("answers an empty period with an empty report and no error", async () => {
-    const built = await useCase.execute({ period: PERIOD });
+    const built = await useCase.execute({ ...BASE_OPTIONS, period: PERIOD });
 
     expect(built.sessions).toBe(0);
     expect(built.totals).toEqual({ requests: 0 });
@@ -140,7 +147,7 @@ describe("ReportCostUseCase", () => {
   it("reports a period whose sessions have no journal at all", async () => {
     await store(record({ cost_usd: 1 }));
 
-    expect((await useCase.execute({ period: PERIOD })).totals.requests).toBe(1);
+    expect((await useCase.execute({ ...BASE_OPTIONS, period: PERIOD })).totals.requests).toBe(1);
   });
 
   it("resolves byPeople against the identity this store holds", async () => {
@@ -149,10 +156,10 @@ describe("ReportCostUseCase", () => {
       origin: "adopted",
       alsoMe: ["machine-1"],
     });
-    useCase = new ReportCostUseCase(sink, journals, identity);
+    useCase = new ReportCostUseCase(sink, journals, identity, evidence);
     await store(record({ vendor_id: "s-1", cost_usd: 1, person_id: "machine-1" }));
 
-    const built = await useCase.execute({ period: PERIOD });
+    const built = await useCase.execute({ ...BASE_OPTIONS, period: PERIOD });
 
     const mapped = built.byPeople.find((row) => row.resolution === "mapped");
     expect(mapped?.person).toBe("person-a");
@@ -162,7 +169,7 @@ describe("ReportCostUseCase", () => {
     identity.throwOnRead = new UnreadableIdentityFileError(identity.filePath, "EISDIR");
     await store(record({ vendor_id: "s-1", cost_usd: 1, person_id: "machine-1" }));
 
-    const built = await useCase.execute({ period: PERIOD });
+    const built = await useCase.execute({ ...BASE_OPTIONS, period: PERIOD });
 
     expect(built.totals.requests).toBe(1);
     expect(built.identityUnusableCause).toBe("unreadable");
@@ -172,15 +179,32 @@ describe("ReportCostUseCase", () => {
   it("reports no identity declared as its own cause, distinct from unreadable", async () => {
     await store(record({ vendor_id: "s-1", cost_usd: 1, person_id: "machine-1" }));
 
-    const built = await useCase.execute({ period: PERIOD });
+    const built = await useCase.execute({ ...BASE_OPTIONS, period: PERIOD });
 
     expect(built.identityUnusableCause).toBe("absent");
+  });
+
+  it("reports whether the project switch is on, from the evidence reader alone", async () => {
+    evidence.enabled = false;
+
+    const built = await useCase.execute({ ...BASE_OPTIONS, period: PERIOD });
+
+    expect(built.measurementEnabled).toBe(false);
+  });
+
+  it("reports the switch as on when the evidence reader says so, even with nothing measured", async () => {
+    evidence.enabled = true;
+
+    const built = await useCase.execute({ ...BASE_OPTIONS, period: PERIOD });
+
+    expect(built.measurementEnabled).toBe(true);
+    expect(built.totals.requests).toBe(0);
   });
 
   it("re-throws an error it does not recognise rather than mislabelling it as a named cause", async () => {
     identity.throwOnRead = new Error("some other failure entirely");
 
-    await expect(useCase.execute({ period: PERIOD })).rejects.toThrow(
+    await expect(useCase.execute({ ...BASE_OPTIONS, period: PERIOD })).rejects.toThrow(
       "some other failure entirely"
     );
   });

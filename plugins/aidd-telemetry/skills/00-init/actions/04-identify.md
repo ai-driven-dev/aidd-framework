@@ -20,8 +20,8 @@ person can withdraw at any time, and a user who knows exactly what it does and d
 2. **Say what it attaches, before asking.** Turning this on attaches one stable, random
    identifier — never an email, a git author, or a hostname — to records this machine reads
    locally, from the moment it is turned on. It never reaches the run journal, never applies
-   to a session already recorded, and never attaches to a tool's own OTLP export, since that
-   route is not guaranteed to run on this person's own machine. A display name is a
+   to a session already recorded, and never leaves this machine — there is no route in this
+   plugin that sends a record, identified or not, anywhere else. A display name is a
    separate, later choice; turning this on alone sets none.
 3. **Ask.** Wait for a yes.
    - Declines: stop, and write nothing.

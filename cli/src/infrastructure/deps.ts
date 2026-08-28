@@ -751,7 +751,8 @@ export async function createDeps(
   const reportCostUseCase = new ReportCostUseCase(
     telemetrySink,
     runJournalReader,
-    personIdentityAdapter
+    personIdentityAdapter,
+    telemetryEvidenceAdapter
   );
   const deps: Deps = {
     fs,

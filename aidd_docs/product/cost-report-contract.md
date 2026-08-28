@@ -10,9 +10,9 @@ could and could not supply.
 > one stored line. The two are deliberately different audiences, and picking the wrong one
 > is expensive: the record contract makes you responsible for the three double-count rules
 > (the two record kinds, a local re-read — including correcting, never summing, a still-open
-> turn a later read completes — and one billed call seen by both an export and a local read
-> at once — Claude Code today), and re-read deduplication. This one has already applied all
-> four.
+> turn a later read completes — and one billed call once seen by both an export and a local
+> read at once, for a stored line old enough to predate the export route's removal), and
+> re-read deduplication. This one has already applied all four.
 
 **Never reconstruct these figures from stored records.** One computation in one place is
 the whole point: two ways of computing a number is how they start disagreeing.
@@ -163,9 +163,14 @@ The same object appears as `totals` everywhere — at the top level and on every
 **An absent counter means never observed, which is not zero.** A tool whose files carry no
 amount has an *unknown* cost, not a free one. Print "unknown", never `$0.00`.
 
-**No amount reaches this object from a local read, on any tool.** Claude Code's `cost_usd`
-exists only on its OTLP export. If you are reporting on locally-read sessions, you are
-reporting tokens; the rates that turn them into money live outside this repository.
+**No amount reaches this object from a local read, on any tool, and no route can add a new
+one going forward.** Claude Code's `cost_usd` only ever existed on its OTLP export, and
+that route was removed — no code path in this repository can produce a new `"export"`
+record. A stored one written before the removal can still be read (the sink is
+append-only), so `cost_micro_usd` can still appear on this object for a period whose
+history includes that data; it will never appear for work measured after the removal. If
+you are reporting on locally-read sessions, you are reporting tokens; the rates that turn
+them into money live outside this repository.
 
 ### Breakdowns
 
@@ -284,7 +289,7 @@ supply an amount and a session that cost nothing look identical in the numbers.
 ```jsonc
 "capability": {
   "local_read": { "token_counters": true, "amount": false, "tool_stated_step": false },
-  "export": { "token_counters": false, "amount": false, "tool_stated_step": false },
+  "export": null,
   "journal_attributable": true,
   "task_attributable": false
 }
@@ -292,7 +297,8 @@ supply an amount and a session that cost nothing look identical in the numbers.
 
 | Field | Meaning |
 | --- | --- |
-| `local_read`, `export` | What that route was **measured** to supply. `null` means the tool declares no such route at all, which is not the same as a declared route supplying nothing. |
+| `local_read` | What that route was **measured** to supply. `null` means the tool declares no such route at all, which is not the same as a declared route supplying nothing. |
+| `export` | **Always `null`, on every tool.** The export route was removed; no tool declares it any more, so there is nothing left to measure a shape for. Kept as a field, rather than dropped from the object, because dropping it would be a `--json` shape change for a capability that used to vary by tool and now simply never does. |
 | `token_counters` | That route yields the four counters. |
 | `amount` | That route yields a figure denominated in currency. Never a credit or a premium request. |
 | `tool_stated_step` | The tool names the running step itself. A journal interval is not this. |

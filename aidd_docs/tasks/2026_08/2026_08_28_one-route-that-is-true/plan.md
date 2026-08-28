@@ -1,6 +1,6 @@
 ---
 objective: "Measurement produces records one way only — reading a tool's own files — with no listener, no egress, a refusal at the person's level, and every shipped sentence about it true."
-status: in-progress
+status: implemented
 ---
 
 # Plan: one route, and every sentence about it true

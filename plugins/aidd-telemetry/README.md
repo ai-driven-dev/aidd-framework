@@ -10,8 +10,8 @@ Providers can tell you a developer burned four million tokens on Tuesday. None c
 that `aidd-dev:02-implement` spent 78,188 of them. The difference is the task, the step and
 the skill — what the framework knows and a provider does not.
 
-**Nothing is measured until you say so.** Nothing leaves your machine either, unless you
-point it somewhere yourself with `aidd telemetry endpoint` — which nothing else turns on.
+**Nothing is measured until you say so.** Nothing leaves your machine, full stop — there is
+no command, no endpoint, and no route in this plugin that sends anything anywhere.
 
 ## Install and use
 
@@ -130,12 +130,15 @@ tokens; turning tokens into money is a separate service's job.
 
 ## Privacy
 
-- **Off unless you turn it on**, per project, in a file you commit or do not.
+- **The switch lives in a file you commit or do not**, per project — which means it is
+  git-tracked the moment someone commits it on, and applies to everyone who clones from
+  then on, not only to whoever ran `aidd telemetry on`. Refuse it for yourself alone with
+  `AIDD_TELEMETRY=0`, which overrides the file unconditionally.
 - **No prompt, no code, no diff.** The stored shape is an allowlist, field by field, in
   [the record contract](../../aidd_docs/product/metrics-contract.md).
-- **Nothing leaves your machine on its own.** One command sends anything anywhere:
-  `aidd telemetry endpoint <url>`, which arms your tools to export to a collector you
-  name. Nothing else turns it on, and `aidd telemetry endpoint clear` undoes it.
+- **Nothing leaves your machine.** There is no command, no endpoint and no code path in
+  this plugin that sends a record anywhere else — everything measured is read back from
+  where it was written, on the same machine that wrote it.
 - **`off` keeps what you measured.** It stops the recording; delete the two directories to
   remove the history.
 
@@ -145,8 +148,8 @@ tokens; turning tokens into money is a separate service's job.
 moment measurement is turned on, through `aidd setup`, `aidd plugin add`, or
 `aidd telemetry on`. It is a property of that repository: every line names a
 repository-relative path or a task folder, and moving it out would leave a file about one
-repository with no way to say which. It records who worked on what, for how long, and
-every file each session wrote — nothing else.
+repository with no way to say which. It records the repository, the task folders written
+into, the skills run, and their timings — nothing else, and no person's name or identity.
 
 **The figures** stay with the person — `AIDD_USER_CONFIG_DIR`, or `~/.config/aidd/telemetry/`
 when that variable is unset. A session's consumption belongs to whoever ran it, not to

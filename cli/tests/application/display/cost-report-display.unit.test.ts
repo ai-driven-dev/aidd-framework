@@ -377,3 +377,31 @@ describe("printCostReport", () => {
     expect(models).toContain("no known model");
   });
 });
+
+describe("printCostReport — measurement is off", () => {
+  it("says the switch is off, on an empty period", () => {
+    const out = printed({ measurementEnabled: false });
+
+    expect(out).toMatch(/measurement is off for this project/u);
+    expect(out).not.toMatch(/\bsessions\s+0\b/u);
+    expect(out).toContain("nothing in this period");
+  });
+
+  it("says nothing about the switch when it is on, even on an empty period", () => {
+    const out = printed({ measurementEnabled: true });
+
+    expect(out).not.toContain("measurement is off");
+    expect(out).not.toMatch(/\bsessions\s+0\b/u);
+  });
+
+  it("still prints every figure when the switch is off but the period holds history", () => {
+    const out = printed({
+      measurementEnabled: false,
+      records: [record({ cost_usd: 4.2, input_tokens: 100 })],
+    });
+
+    expect(out).toMatch(/measurement is off for this project/u);
+    expect(out).toContain("$4.20");
+    expect(out).toMatch(/\bcost\s+\$4\.20/u);
+  });
+});

@@ -14,25 +14,9 @@ import type {
   LocalCostReadResult,
   SessionCostReader,
 } from "../../../../src/domain/ports/session-cost-reader.js";
-import type {
-  TelemetryEvidenceReader,
-  TelemetryUnrecognisedPayload,
-} from "../../../../src/domain/ports/telemetry-evidence-reader.js";
 import type { VersionControl } from "../../../../src/domain/ports/version-control.js";
 import { InMemoryRunJournalReader } from "../../../helpers/ports/in-memory-run-journal-reader.js";
-
-class StubEvidenceReader implements TelemetryEvidenceReader {
-  enabled = true;
-  unrecognisedPayload: TelemetryUnrecognisedPayload | null = null;
-
-  async isTelemetryEnabled(): Promise<boolean> {
-    return this.enabled;
-  }
-
-  async readUnrecognisedPayload(): Promise<TelemetryUnrecognisedPayload | null> {
-    return this.unrecognisedPayload;
-  }
-}
+import { StubTelemetryEvidenceReader as StubEvidenceReader } from "../../../helpers/ports/stub-telemetry-evidence-reader.js";
 
 class StubHookTrustReader implements HookTrustReader {
   trust: TelemetryCodexHookTrust = {

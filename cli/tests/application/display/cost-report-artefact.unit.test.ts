@@ -1,13 +1,26 @@
 import { describe, expect, it } from "vitest";
+import "../../../src/domain/tools/ai/claude.js";
 import {
   ARTEFACT_AXES,
   buildCostReportArtefact,
   isArtefactAxis,
 } from "../../../src/application/display/cost-report-artefact.js";
+import { printCostReport } from "../../../src/application/display/cost-report-display.js";
+import { CLIOutput } from "../../../src/application/output.js";
 import { buildCostReport, type CostReportInput } from "../../../src/domain/models/cost-report.js";
 import { toCostReportEnvelope } from "../../../src/domain/models/cost-report-envelope.js";
 import type { TelemetrySinkRecord } from "../../../src/domain/models/telemetry-sink-record.js";
 import type { PersonIdentity } from "../../../src/domain/ports/person-identity-reader.js";
+
+/** Extends the real output rather than standing in for it — same reasoning as
+ * cost-report-display.unit.test.ts's own `CapturingOutput`. */
+class CapturingOutput extends CLIOutput {
+  readonly lines: string[] = [];
+
+  override print(message: string): void {
+    this.lines.push(message);
+  }
+}
 
 const NO_CAPABILITY = {
   localRead: null,
@@ -170,5 +183,73 @@ describe("buildCostReportArtefact", () => {
     expect(unreadable).not.toBe(absent);
     expect(unreadable).toMatch(/could not be read/u);
     expect(absent).toMatch(/no identity was declared/u);
+  });
+});
+
+// One skill reached once from the tool's own statement and once from a journal interval is
+// two rows sharing one step name (`by_step` is keyed on step + attribution together) - the
+// table this axis pastes elsewhere is the one place that column can be dropped silently,
+// since the terminal rendering carries it inline beside each row already.
+describe("buildCostReportArtefact — by step, two rows sharing one name", () => {
+  const STEP = "aidd-dev:02-implement";
+
+  function ambiguousStepInput(): CostReportInput {
+    return {
+      fromDay: "2026-08-17",
+      toDay: "2026-08-21",
+      records: [
+        request({
+          turn_id: "a",
+          step_attribution: "tool-stated",
+          step: STEP,
+          input_tokens: 1000,
+        }),
+        request({
+          turn_id: "b",
+          step_attribution: "journal-interval",
+          step: STEP,
+          input_tokens: 500,
+        }),
+      ],
+      journals: [],
+      declaredTools: [{ tool: "claude", coverage: "covered", capability: NO_CAPABILITY }],
+      undatedRecords: 0,
+      unreadableLines: 0,
+    };
+  }
+
+  it("carries the attribution on every row, so two rows for one step are distinguishable on their own", () => {
+    const report = buildCostReport(ambiguousStepInput());
+    const artefact = buildCostReportArtefact(toCostReportEnvelope(report), "step");
+
+    const stepLines = artefact.split("\n").filter((line) => line.startsWith(`| ${STEP} |`));
+    expect(stepLines).toHaveLength(2);
+    expect(stepLines.some((line) => line.includes("stated by the tool"))).toBe(true);
+    expect(stepLines.some((line) => line.includes("from a journal interval"))).toBe(true);
+  });
+
+  it("reconciles to what the terminal prints for that step, row for row", () => {
+    const report = buildCostReport(ambiguousStepInput());
+    const artefact = buildCostReportArtefact(toCostReportEnvelope(report), "step");
+    const output = new CapturingOutput();
+    printCostReport(output, report);
+    const terminalText = output.lines.join("\n");
+
+    // Both renderings read the same `bySteps` data; the true total for the step (never
+    // itself printed as one line, by either renderer) is what a reader sums the rows to.
+    expect(terminalText).toContain(STEP);
+    expect(terminalText).toMatch(/stated by the tool/u);
+    expect(terminalText).toMatch(/from a journal interval/u);
+
+    const toolStatedRow = artefact
+      .split("\n")
+      .find((line) => line.startsWith(`| ${STEP} |`) && line.includes("stated by the tool"));
+    const journalIntervalRow = artefact
+      .split("\n")
+      .find((line) => line.startsWith(`| ${STEP} |`) && line.includes("journal interval"));
+    expect(toolStatedRow).toContain("1,000 tokens");
+    expect(journalIntervalRow).toContain("500 tokens");
+    // 1,500 total input tokens across the two records - never printed as one row by either
+    // renderer, but recoverable from the two rows a reader is given.
   });
 });

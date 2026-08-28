@@ -290,7 +290,7 @@ UI / UX design — smoke-test only, not ready for use.
 
 `3 skills` · **alpha**
 
-Answers what a piece of work cost — tokens, models, and which skill spent them. Off unless you turn it on, and nothing leaves your machine.
+Answers what a piece of work cost — tokens, models, and which skill spent them. The switch is git-tracked, so it applies to everyone who clones; opt out per person with `AIDD_TELEMETRY=0`. Nothing leaves your machine.
 
 </td>
 <td width="33%" valign="top"></td>

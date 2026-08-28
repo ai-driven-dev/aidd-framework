@@ -160,6 +160,10 @@ describe("measurement, from nothing to off and back", () => {
     const beforeAnything = await measure(["telemetry", "report", ...PERIOD]);
     expect(beforeAnything.exitCode, beforeAnything.stderr).toBe(0);
     expect(beforeAnything.stdout).toContain("nothing in this period");
+    // Never a literal zero for what nothing measured: no config at all reads as off, the
+    // same as an explicit "off" would, and says so rather than reporting a bare "0".
+    expect(beforeAnything.stdout).toMatch(/measurement is off for this project/u);
+    expect(beforeAnything.stdout).not.toMatch(/\bsessions\s+0\b/u);
     expect(existsSync(join(projectDir, ".aidd", "config.json"))).toBe(false);
 
     // 2. A session runs while measuring is off. The hook must write nothing at all.
@@ -180,6 +184,9 @@ describe("measurement, from nothing to off and back", () => {
     const reported = await measure(["telemetry", "report", ...PERIOD]);
     expect(reported.stdout).toContain(SESSION_TOKENS);
     expect(reported.stdout).toContain("probe-echo");
+    // On: no word about the switch at all — a person reading figures that are visibly
+    // working needs no separate sentence confirming it.
+    expect(reported.stdout).not.toContain("measurement is off");
     const byTask = await measure(["telemetry", "report", ...PERIOD, "--task", TASK]);
     expect(byTask.stdout).toContain(`task ${TASK}`);
     expect(byTask.stdout).toContain(SESSION_TOKENS);
@@ -188,6 +195,9 @@ describe("measurement, from nothing to off and back", () => {
     expect((await switchTo("off")).exitCode).toBe(0);
     const afterOff = await measure(["telemetry", "report", ...PERIOD]);
     expect(afterOff.stdout).toContain(SESSION_TOKENS);
+    // Off, but the period still holds real history: says the switch is off *and* still
+    // shows every figure already measured - neither fact stands in for the other.
+    expect(afterOff.stdout).toMatch(/measurement is off for this project/u);
 
     // 7. A session runs while off. Not one line is journalled — the switch is read at the
     //    moment of every write, not once at startup.

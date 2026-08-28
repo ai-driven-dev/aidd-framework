@@ -21,7 +21,7 @@ import type { CLIOutput } from "../output.js";
  * says nothing could attribute this, and deliberately not that the work ran outside every
  * step: on at least one measured tool the two are indistinguishable, and the stronger
  * reading would be a fact this layer invented. */
-const ATTRIBUTION_LABELS: Record<StepAttributionSource, string> = {
+export const ATTRIBUTION_LABELS: Record<StepAttributionSource, string> = {
   "tool-stated": "stated by the tool",
   "journal-interval": "from a journal interval",
   unattributed: "unattributed",
@@ -147,16 +147,23 @@ function emptySelectionMessage({
   return `  ${filter} '${value}' matched nothing in this selection — known, but no work here`;
 }
 
+/** Never a bare `0`: a period nothing was measured in reads as "nothing in this period"
+ * (or selection), the same refusal `requests` already makes below - a session count is no
+ * less a claim about what was measured than a request count is. */
+function sessionsFigure(report: CostReport): string {
+  return report.sessions === 0 ? nothingLabel(report) : formatCount(report.sessions);
+}
+
 function printTotals(output: CLIOutput, report: CostReport): void {
   const { totals } = report;
   if (totals.requests === 0) {
-    output.print(`  ${pad("sessions")}${formatCount(report.sessions)}`);
+    output.print(`  ${pad("sessions")}${sessionsFigure(report)}`);
     output.print(`  ${pad("requests")}${nothingLabel(report)}`);
     return;
   }
   const tokens = totalTokens(totals);
   const cacheShare = tokens === 0 ? 0 : Math.round(((totals.cacheReadTokens ?? 0) / tokens) * 100);
-  output.print(`  ${pad("sessions")}${formatCount(report.sessions)}`);
+  output.print(`  ${pad("sessions")}${sessionsFigure(report)}`);
   output.print(`  ${pad("requests")}${formatCount(totals.requests)}`);
   output.print(`  ${pad("tokens")}${formatCount(tokens)}    ${cacheShare}% cache`);
   output.print(
@@ -355,31 +362,44 @@ function printDays(
  * Carries no prompt, code, diff or file path - a task appears by its identity, never by
  * the paths it was derived from.
  */
-export function printCostReport(output: CLIOutput, report: CostReport): void {
+function printHeader(output: CLIOutput, report: CostReport): void {
   const scope = report.task === undefined ? "period" : `task ${report.task}`;
   output.print(`${scope}    ${report.fromDay} to ${report.toDay}${filtersSuffix(report.filters)}`);
+  // Only the off state is worth a line: a person reading a report with the switch on
+  // already sees it working, in every figure below - stating "measurement is on" beside
+  // them would be the same noise `identityUnusableCause` avoids by never printing on the
+  // ordinary path. What this refuses is the false continuity of showing a stale or empty
+  // period with no word that nothing new can be recorded right now.
+  if (!report.measurementEnabled) {
+    output.print("measurement is off for this project — turn on with `aidd telemetry on`");
+  }
   output.print("");
   if (report.emptySelection !== undefined) {
     output.print(emptySelectionMessage(report.emptySelection));
     output.print("");
   }
-  printTotals(output, report);
+}
 
-  // A filter-emptied selection has nothing under any breakdown to show - every row would
-  // read "nothing in this period", which is exactly the false zero this layer refuses.
-  if (report.emptySelection === undefined) {
-    const basis: Basis = {
-      ...shareBasis(report.totals),
-      useCost: report.totals.costMicroUsd !== undefined,
-    };
-    printTaskAttribution(output, report, basis);
-    printStepsAndAttribution(output, report, basis);
-    printModels(output, report, basis);
-    printProjects(output, report.byProjects, basis);
-    output.print("");
-    output.print("  by tool");
-    printToolRows(output, report.byTools, report);
-    printDays(output, report.byDays, report);
-  }
+// A filter-emptied selection has nothing under any breakdown to show - every row would
+// read "nothing in this period", which is exactly the false zero this layer refuses.
+function printBreakdowns(output: CLIOutput, report: CostReport): void {
+  const basis: Basis = {
+    ...shareBasis(report.totals),
+    useCost: report.totals.costMicroUsd !== undefined,
+  };
+  printTaskAttribution(output, report, basis);
+  printStepsAndAttribution(output, report, basis);
+  printModels(output, report, basis);
+  printProjects(output, report.byProjects, basis);
+  output.print("");
+  output.print("  by tool");
+  printToolRows(output, report.byTools, report);
+  printDays(output, report.byDays, report);
+}
+
+export function printCostReport(output: CLIOutput, report: CostReport): void {
+  printHeader(output, report);
+  printTotals(output, report);
+  if (report.emptySelection === undefined) printBreakdowns(output, report);
   printCaveats(output, report);
 }
