@@ -10,6 +10,7 @@ import "../../../../src/domain/tools/ai/cursor.js";
 import "../../../../src/domain/tools/ai/opencode.js";
 import { ReadLocalCostUseCase } from "../../../../src/application/use-cases/telemetry/read-local-cost-use-case.js";
 import { mapCodexRolloutToSinkRecords } from "../../../../src/domain/formats/codex-rollout.js";
+import type { TelemetrySinkRecord } from "../../../../src/domain/models/telemetry-sink-record.js";
 import type { AiToolId } from "../../../../src/domain/models/tool-ids.js";
 import type { RunJournal } from "../../../../src/domain/ports/run-journal-reader.js";
 import type {
@@ -1147,5 +1148,65 @@ describe("a failure in a sweep does not disappear behind a success", () => {
 
     expect(claude?.sessionsFailed).toBe(0);
     expect(claude?.failureReason).toBeUndefined();
+  });
+
+  // Retention had exactly one caller — the OTLP receiver — and deleting that route left
+  // the sink pruned by nothing. `read` is now the only thing that writes a day file, so
+  // it is the only thing that can bound how many there are.
+  it("prunes day files outside the retention window, once per sweep", async () => {
+    const sink = new InMemoryTelemetrySink();
+    for (const day of ["2026-01-01", "2026-01-02", "2026-01-03"]) {
+      await sink.appendRecord(
+        {
+          ...CANDIDATE,
+          sink_schema_version: 2,
+          provenance: "local-read",
+          tool: "claude",
+          step_attribution: "unattributed",
+        } as TelemetrySinkRecord,
+        new Date(`${day}T00:00:00Z`)
+      );
+    }
+
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([])]]),
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER,
+      undefined,
+      2
+    );
+    await useCase.execute({ at: new Date("2026-01-03T12:00:00Z") });
+
+    expect(sink.deletedFiles).toEqual(["2026-01-01.jsonl"]);
+  });
+
+  // Housekeeping must never cost the figures the sweep just stored.
+  it("reports its figures even when a day file cannot be deleted", async () => {
+    const sink = new InMemoryTelemetrySink();
+    for (const day of ["2026-01-01", "2026-01-02"]) {
+      await sink.appendRecord(
+        {
+          ...CANDIDATE,
+          sink_schema_version: 2,
+          provenance: "local-read",
+          tool: "claude",
+          step_attribution: "unattributed",
+        } as TelemetrySinkRecord,
+        new Date(`${day}T00:00:00Z`)
+      );
+    }
+    sink.undeletable.add("2026-01-01.jsonl");
+
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER,
+      undefined,
+      1
+    );
+
+    await expect(useCase.execute({ at: new Date("2026-01-02T12:00:00Z") })).resolves.toBeDefined();
   });
 });

@@ -12,7 +12,12 @@ import {
   SINK_SCHEMA_VERSION,
   type TelemetrySinkRecord,
 } from "../../../domain/models/telemetry-sink-record.js";
+import {
+  DEFAULT_TELEMETRY_SINK_RETENTION_DAYS,
+  decideTelemetrySinkRetention,
+} from "../../../domain/models/telemetry-sink-retention.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../domain/models/tool-ids.js";
+import type { Logger } from "../../../domain/ports/logger.js";
 import type {
   PersonIdentity,
   PersonIdentityReader,
@@ -234,12 +239,23 @@ function mergeToolReports(
   return AI_TOOL_IDS.map((tool) => mergeOneTool(tool, sessions));
 }
 
+// Local rather than `infrastructure/json-file.ts`'s `describeError`: this layer does not
+// import infrastructure, and the check at `scripts/check-cli-layering.mjs` enforces it.
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export class ReadLocalCostUseCase {
   constructor(
     private readonly sink: TelemetrySink,
     private readonly readers: ReadonlyMap<AiToolId, SessionCostReader>,
     private readonly runJournalReader: RunJournalReader,
-    private readonly personIdentityReader: PersonIdentityReader
+    private readonly personIdentityReader: PersonIdentityReader,
+    /** Only the retention prune below writes here, and only to warn. Optional because a
+     * caller that does not care about housekeeping warnings should not have to invent a
+     * logger to read its own figures. */
+    private readonly logger: Logger = { debug() {}, info() {}, warn() {} },
+    private readonly retentionDays: number = DEFAULT_TELEMETRY_SINK_RETENTION_DAYS
   ) {}
 
   async execute(options: ReadLocalCostOptions): Promise<ReadLocalCostResult> {
@@ -253,7 +269,40 @@ export class ReadLocalCostUseCase {
     for (const sessionId of sessionIds) {
       sessions.push({ sessionId, toolReports: await this.readOneSession(sessionId, at, person) });
     }
+    await this.pruneOldDayFiles();
     return { sessions, toolReports: mergeToolReports(sessions) };
+  }
+
+  /**
+   * Keeps the sink inside its retention window, once per sweep.
+   *
+   * This ran on the export receiver until that route was deleted, and it was the sink's
+   * only pruning: `read` is now the one thing that writes a day file, so it is the one
+   * thing that can bound how many there are. Once per sweep rather than per new day file,
+   * because a sweep is already the unit a person invokes.
+   *
+   * Every failure is a warning and never a throw, per file: housekeeping must not cost the
+   * figures this sweep just stored, and one undeletable file must not spare every older
+   * one behind it.
+   */
+  private async pruneOldDayFiles(): Promise<void> {
+    let prune: readonly string[];
+    try {
+      prune = decideTelemetrySinkRetention(
+        await this.sink.listDayFiles(),
+        this.retentionDays
+      ).prune;
+    } catch (error) {
+      this.logger.warn(`telemetry read: retention prune failed - ${errorMessage(error)}`);
+      return;
+    }
+    for (const fileName of prune) {
+      try {
+        await this.sink.deleteDayFile(fileName);
+      } catch (error) {
+        this.logger.warn(`telemetry read: could not delete ${fileName} - ${errorMessage(error)}`);
+      }
+    }
   }
 
   /** Every session the journal names, oldest file first. A person has no other way to

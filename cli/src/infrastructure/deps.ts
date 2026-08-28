@@ -736,7 +736,8 @@ export async function createDeps(
     telemetrySink,
     localCostReaders,
     runJournalReader,
-    personIdentityAdapter
+    personIdentityAdapter,
+    logger
   );
   const personIdentityUseCase = new PersonIdentityUseCase(personIdentityAdapter);
   const telemetryEvidenceAdapter = new TelemetryEvidenceAdapter();
