@@ -136,50 +136,52 @@ function buildBlockContent(rootFiles, onDemandFiles, syntax) {
   return `\n\n${lines.join("\n")}\n\n`;
 }
 
-// Replace the text between an open and close marker, leaving the rest intact.
-// Anchor on the close, then take the nearest open before it: a bare marker
-// quoted in hand-written prose above the real block must not become the cut
-// point and splice out everything between it and the block.
-function updateMarkers(content, open, close, innerContent) {
-  const closeIdx = content.indexOf(close);
-  if (closeIdx === -1) return null;
-  const openIdx = content.lastIndexOf(open, closeIdx);
-  if (openIdx === -1) return null;
-  return content.slice(0, openIdx + open.length) + innerContent + content.slice(closeIdx);
-}
-
 // The real block is the one whose markers each own their line, outside any code
-// fence. Substring search is not enough: the legacy tag is the string every
-// upgrade note and migration doc quotes, and rewriting a quoted pair would
-// mangle that prose while leaving the real block unmigrated and unloaded.
-function findLegacyBlockLines(lines) {
+// fence. Substring search is not enough: these markers are the strings every
+// upgrade note and migration doc quotes, and cutting on a quoted one would
+// mangle that prose while leaving the real block untouched and unloaded.
+function findBlockLines(lines, open, close) {
   let fence = null;
   let openLine = -1;
 
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
+    const opener = /^(`{3,}|~{3,})/u.exec(trimmed);
 
     if (fence !== null) {
-      if (trimmed.startsWith(fence)) fence = null;
+      // A fence closes only on the same character, repeated at least as often,
+      // so a ``` inside a ```` example does not end it early.
+      if (opener && opener[1][0] === fence[0] && opener[1].length >= fence.length) fence = null;
       continue;
     }
-    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-      fence = trimmed.slice(0, 3);
+    if (opener) {
+      fence = opener[1];
       continue;
     }
-    if (trimmed === LEGACY_BLOCK_OPEN) openLine = i;
-    else if (trimmed === LEGACY_BLOCK_CLOSE && openLine !== -1) {
-      return { openLine, closeLine: i };
-    }
+    if (trimmed === open) openLine = i;
+    else if (trimmed === close && openLine !== -1) return { openLine, closeLine: i };
   }
 
   return null;
 }
 
+// Replace the text between an open and close marker, leaving the rest intact.
+function updateMarkers(content, open, close, innerContent) {
+  const lines = content.split("\n");
+  const found = findBlockLines(lines, open, close);
+  if (found === null) return null;
+
+  return (
+    lines.slice(0, found.openLine + 1).join("\n") +
+    innerContent +
+    lines.slice(found.closeLine).join("\n")
+  );
+}
+
 // Rewrite a legacy <aidd_project_memory> block to the comment markers.
 function migrateLegacyMarkers(content) {
   const lines = content.split("\n");
-  const found = findLegacyBlockLines(lines);
+  const found = findBlockLines(lines, LEGACY_BLOCK_OPEN, LEGACY_BLOCK_CLOSE);
   if (found === null) return content;
 
   lines[found.openLine] = lines[found.openLine].replace(LEGACY_BLOCK_OPEN, BLOCK_OPEN);
@@ -198,6 +200,7 @@ function reportUnpairedMarkers(filePath, content) {
   if (unpaired) {
     console.error(`update_memory: ${filePath} has an unpaired project memory marker, not synced`);
   }
+  return unpaired;
 }
 
 function updateBlock(content, innerContent) {
@@ -275,6 +278,7 @@ function gitAdd(childProcess, files) {
   const rootFiles = scanRootFiles(fs, path);
   const onDemandFiles = ON_DEMAND_DIRS.flatMap((sub) => scanSubdir(fs, path, sub));
   const changed = [];
+  let unpaired = false;
 
   for (const target of targets) {
     const original = readTextOrNull(fs, target.path);
@@ -287,7 +291,7 @@ function gitAdd(childProcess, files) {
     const updated = updateBlock(migrateLegacyMarkers(original), innerContent);
 
     if (updated === null) {
-      reportUnpairedMarkers(target.path, original);
+      if (reportUnpairedMarkers(target.path, original)) unpaired = true;
       continue;
     }
     if (updated === original) continue;
@@ -313,4 +317,9 @@ function gitAdd(childProcess, files) {
   // so staging its own two would leave a partial index that reads like the whole
   // change. The skill reports instead, and the user stages what they mean to commit.
   if (changed.length > 0 && tools.length === 0) gitAdd(childProcess, changed);
+
+  // Only when tools were named, which means the skill called us and its sync
+  // action stops on a non-zero exit. The auto hook must never fail a session
+  // start over a file the user has yet to repair.
+  if (unpaired && tools.length > 0) process.exit(1);
 })();

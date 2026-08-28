@@ -150,3 +150,43 @@ test("an unknown tool name is rejected", () => {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /unknown tool emacs/u);
 });
+
+test("a new-marker pair quoted in prose above the block does not hijack the splice", () => {
+  const quote = `Upgrade note: the block now uses \`${OPEN}\` and \`${CLOSE}\`.`;
+  const result = run({ context: `${quote}\n\n${OPEN}\n${CLOSE}\n` });
+
+  assert.equal(result.content.split("\n")[0], quote);
+  assert.equal(
+    result.content,
+    `${quote}\n\n${OPEN}\n\n@aidd_docs/memory/architecture.md\n\n${CLOSE}\n`,
+  );
+});
+
+test("a nested fence does not close the example that documents the old shape", () => {
+  const content = run({
+    context: [
+      "````markdown",
+      "```",
+      "<aidd_project_memory>",
+      "</aidd_project_memory>",
+      "```",
+      "````",
+      "",
+      "<aidd_project_memory>",
+      "</aidd_project_memory>",
+      "",
+    ].join("\n"),
+  }).content;
+
+  const lines = content.split("\n");
+  assert.equal(lines[2], "<aidd_project_memory>", "the documented example must stay as written");
+  assert.equal(lines[7], OPEN, "the real block must be the one migrated");
+  assert.match(content, /@aidd_docs\/memory\/architecture\.md/u);
+});
+
+test("an unpaired marker fails the run when the skill named the tools", () => {
+  const result = run({ context: `# P\n\n${OPEN}\n@stale.md\n` });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /unpaired project memory marker/u);
+});
