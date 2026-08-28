@@ -1,12 +1,14 @@
 # 01 - Scope
 
-## Goal
-
 Frame the skill before any file is touched.
 
 ## Input
 
 A free-form request to create a skill.
+
+## Output
+
+The confirmed frame, written nowhere, per [scope-frame.md](../references/scope-frame.md).
 
 ## Process
 
@@ -15,13 +17,12 @@ A free-form request to create a skill.
 3. **Check.** Check the name per [naming.md](../references/naming.md) and surface any overlap.
 4. **Confirm.** Hand the confirmed frame to plan.
 
-## Output
-
-The confirmed frame, written nowhere, per [scope-frame.md](../references/scope-frame.md).
-
 ## Test
 
-- The run writes nothing: `git status --porcelain` reads the same after as before.
-- The installed skills were listed, and every name or trigger overlap was surfaced or noted as none.
-- The user answered one frame field at a time.
-- The target is set and confirmed before the frame is handed to plan.
+| Case | Pass |
+| --- | --- |
+| The action runs to completion | `git status --porcelain` reads the same after as before |
+| A name overlaps an installed skill | the overlap is surfaced before the frame is handed on |
+| No name overlaps | the run states that it found none |
+| A frame field needs the user | one question is asked, and only that one |
+| The frame is handed to plan | its target was confirmed by the user first |

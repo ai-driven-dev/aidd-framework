@@ -1,17 +1,17 @@
 # Integration
 
-How this system integrates with external/third-party services.
+How this system integrates with external/third-party services. The map of every tool around the
+project, this one included, lives in the ecosystem memory.
 
 ## External services
 
-- <Each external service (payments, email, storage), its purpose, integration point>
+- <Each external service, its purpose, and the integration point in the code>
 
-```mermaid
-flowchart LR
-    A[TODO: macro map of this system and its external services]
-```
+## Calling conventions
+
+- <Auth, retries, timeouts, and what happens when a service is down>
 
 <!--
-Capture: the external integrations and the macro map to them.
-Skip: internal module flow (that lives in architecture). Keep the diagram macro. Remove this comment when filled.
+Capture: the integration point and the calling conventions, per service.
+Skip: the macro map, which the ecosystem file owns. Remove this comment when filled.
 -->

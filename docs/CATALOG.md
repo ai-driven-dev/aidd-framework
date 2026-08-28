@@ -20,7 +20,7 @@ Bootstrap, project init, context-artifact generation, diagrams, learning, and ex
 | ---------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `00-onboard`           | Guide the project's journey through AIDD, from first setup to shipping a feature | `01-scan`, `02-assess`, `03-present`, `04-run`                                                            |
 | `01-bootstrap`         | Imagine and validate a new SaaS architecture, output an `INSTALL.md`          | `01-gather-needs`, `02-propose-candidates`, `03-audit-candidates`, `04-pick-and-design`, `05-write-install-md` |
-| `02-project-memory`    | Give the AI a memory of the project, wired into the tools you use              | `01-scan`, `02-generate`, `03-sync`                                                                      |
+| `02-project-memory`    | Give the AI a memory of the project, wired into the tools you use              | `01-scan`, `02-write`, `03-check`, `04-sync`                                                             |
 | `03-context-generate`  | Router that dispatches an artifact-generation request to the dedicated generator below | delegates to `04`–`08` (and plugins / marketplaces)                                            |
 | `04-skill-generate`    | Generate a router-based skill across the host AI tool(s)                       | `01-scope`, `02-plan`, `03-write`, `04-validate`                                                         |
 | `05-rule-generate`     | Generate a coding rule that governs editor and agent behavior                 | `01-capture-rule`, `02-write-rule`, `03-validate`                                                        |
@@ -69,15 +69,14 @@ Product backlog artifacts, refinement, Product Briefs, Epics, User Stories, Task
 
 ## 🪞 aidd-refine
 
-Meta-cognition: brainstorm, challenge, condense, blind-spot scan, fact-check.
+Meta-cognition: brainstorm, challenge, blind-spot scan, fact-check.
 
 | Skill              | Role                                                        | Actions                                                                                       |
 | ------------------ | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `01-brainstorm`    | Clarify a vague product or technical intent through natural discovery | `01-capture`, `02-probe`, `03-integrate`, `04-finalize` |
 | `02-challenge`     | Rethink prior work to verify correctness against a plan    | `01-challenge`                                                                                |
-| `03-condense`      | Toggle terse output mode and report token savings          | `01-condense`, `02-stats`                                                                     |
-| `04-shadow-areas`  | Scan a markdown artifact for blind spots                   | `01-detect`, `02-render-report`, `03-diff`                                                    |
-| `05-fact-check`    | Verify factual claims against sources and cite them        | `01-identify-claims`, `02-verify`, `03-report`                                                |
+| `03-shadow-areas`  | Scan a markdown artifact for blind spots                   | `01-detect`, `02-render-report`, `03-diff`                                                    |
+| `04-fact-check`    | Verify factual claims against sources and cite them        | `01-identify-claims`, `02-verify`, `03-report`                                                |
 
 ## 🌿 aidd-vcs
 

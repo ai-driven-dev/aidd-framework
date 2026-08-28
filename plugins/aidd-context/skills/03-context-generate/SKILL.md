@@ -1,6 +1,7 @@
 ---
 name: 03-context-generate
 description: Route a request to generate a context artifact (skill, rule, agent, command, or hook) to its generator when the kind is unnamed. A named kind triggers its generator directly. Not for listing existing artifacts.
+argument-hint: skill | rule | agent | command | hook
 ---
 
 # Context Generate

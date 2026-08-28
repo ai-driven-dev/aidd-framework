@@ -38,7 +38,7 @@ Skills are grouped into plugins by domain. Install only the plugins you need.
 | Plugin            | Purpose                                                                            | Example skills                                              |
 | ----------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | aidd-context      | Bootstrap, project init, generation of context artifacts (skills, agents, rules, commands, hooks, plugins, marketplaces), mermaid diagrams, learn, discovery | `02-project-memory`, `03-context-generate`, `09-mermaid`      |
-| aidd-refine       | Meta-cognition: brainstorm, challenge prior work, condensed communication mode     | `01-brainstorm`, `02-challenge`, `03-condense`              |
+| aidd-refine       | Meta-cognition: brainstorm, challenge prior work, blind-spot scan, fact-check      | `01-brainstorm`, `02-challenge`, `03-shadow-areas`          |
 | aidd-pm           | Product management: backlog artifacts, refinement, Product Briefs, PRD, spec        | `02-user-stories`, `05-spike`, `07-epic`, `09-defect`, `10-task` |
 | aidd-dev          | Code transformation: plan, implement, assert, audit, review, test, refactor, debug, for-sure | `01-plan`, `02-implement`, `05-review`, `06-test` |
 | aidd-vcs          | VCS workflows: commit, pull/merge request, release tag, issue creation             | `01-commit`, `02-pull-request`, `04-issue-create`           |
@@ -84,7 +84,7 @@ my-project/
 
 ### Memory Block Lifecycle
 
-Each AI context file (`CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, etc.) contains an `<aidd_project_memory>` block. It is:
+Each AI context file (`CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, etc.) contains a project memory block. It is:
 
 1. **Seeded** the first time by `aidd-context:02-project-memory` (the skill creates the block if absent).
 2. **Kept in sync** automatically by a session-start hook (`aidd-context/hooks/update_memory.js`) that scans `aidd_docs/memory/` and writes the current list of `.md` files into the block.
@@ -103,7 +103,7 @@ AIDD is delivered as a plugin marketplace. Pick what you need; do not install ev
 | Plugin       | Skills                                                                                                              |
 | ------------ | ------------------------------------------------------------------------------------------------------------------- |
 | aidd-context | 00-onboard, 01-bootstrap, 02-project-memory, 03-context-generate, 09-mermaid, 10-learn, 11-explore                    |
-| aidd-refine  | 01-brainstorm, 02-challenge, 03-condense, 04-shadow-areas, 05-fact-check                                            |
+| aidd-refine  | 01-brainstorm, 02-challenge, 03-shadow-areas, 04-fact-check                                                        |
 | aidd-dev     | 01-plan, 02-implement, 03-assert, 04-audit, 05-review, 06-test, 07-refactor, 08-debug, 09-for-sure, 10-todo       |
 | aidd-orchestrator | 00-async-dev, 01-sdlc                                                                                         |
 | aidd-vcs     | 01-commit, 02-pull-request, 03-release-tag, 04-issue-create                                                         |

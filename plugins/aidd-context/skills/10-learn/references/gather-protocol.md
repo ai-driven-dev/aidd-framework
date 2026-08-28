@@ -2,21 +2,29 @@
 
 Extract only durable project learning.
 
-Keep:
+| Signal | Verdict |
+| --- | --- |
+| Decision, tradeoff, or consequence | Keep |
+| Convention or recurring project rule | Keep |
+| Pitfall, failed path, or costly pivot | Keep |
+| Reusable workflow worth documenting or automating | Keep |
+| Missing context that should prevent the same confusion later | Keep |
+| Personal preference | Drop |
+| AI behavior preference | Drop |
+| Routine implementation detail | Drop |
+| One-off fact with no reuse | Drop |
+| Item already obviously covered by the source itself | Drop |
+| Signal outside the selected source's scope, even when noticed while reading | Drop |
+| Bug already fixed as part of the current change, unless the user explicitly asked to remember it as a decision | Drop |
 
-- Decision, tradeoff, or consequence.
-- Convention or recurring project rule.
-- Pitfall, failed path, or costly pivot.
-- Reusable workflow worth documenting or automating.
-- Missing context that should prevent the same confusion later.
+## Retrospective lens
 
-Drop:
+For completed work, ask before applying the signal filter:
 
-- Personal preferences.
-- AI behavior preferences.
-- Routine implementation details.
-- One-off facts with no reuse.
-- Items already obviously covered by the source itself.
+- What caused avoidable delay, rework, or confusion?
+- What should change next time?
+- What durable context was missing?
+- What should be removed, clarified, or automated?
 
 For each candidate, include:
 

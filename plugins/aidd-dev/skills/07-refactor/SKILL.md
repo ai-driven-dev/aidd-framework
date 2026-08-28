@@ -1,7 +1,7 @@
 ---
 name: 07-refactor
 description: Improve code across four axes (cleanup, performance, security, architecture) by scanning and fixing, or applying a pushed audit report. Use when the user wants to refactor, optimize, harden, or remove code. Not for read-only diagnosis or adding tests.
-argument-hint: performance | security | cleanup | architecture
+argument-hint: scope | audit
 ---
 
 # Skill: refactor

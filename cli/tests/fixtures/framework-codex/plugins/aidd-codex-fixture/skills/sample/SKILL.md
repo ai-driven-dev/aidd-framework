@@ -1,6 +1,10 @@
 ---
 name: sample
 description: Sample skill for testing reference rewriting.
+allowed_tools:
+  - Read
+model: opus
+unsupported: discard-me
 ---
 
 # Sample Skill

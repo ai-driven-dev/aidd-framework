@@ -18,7 +18,7 @@ flowchart LR
 
 ## Actions
 
-Run the flow above. Read only the next action's file before running it.
+Run the flow above. Read only the next action file.
 
 | Action      | Does                                  |
 | ----------- | ------------------------------------- |

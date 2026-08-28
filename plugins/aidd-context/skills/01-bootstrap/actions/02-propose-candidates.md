@@ -1,6 +1,6 @@
 # 02 - Propose candidates
 
-Derive 2 to 3 candidate stacks from the filled checklist using the heuristics in [stack-heuristics.md](../references/stack-heuristics.md), then render a markdown comparison table.
+Derive 2 to 3 candidate stacks from the filled checklist, then render a markdown comparison table.
 
 ## Input
 

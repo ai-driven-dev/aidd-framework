@@ -1,7 +1,7 @@
 ---
 name: 00-async-dev
 description: Drive the async-dev pipeline from one entry point, whether setup, run, or review. Use when the user wants to install async dev, run a ready issue, or address PR review comments, or on a webhook trigger. Not for plain status checks.
-argument-hint: collect-comments | detect-stop | fix-iteration | finalize | poll-ready | resolve-deps | acquire-lock | check-sdlc | delegate-sdlc | write-audit | detect-context | ask-config | generate-workflow | generate-local-script | write-config | bootstrap-labels | install-user-scope-plugins | configure-remote-secrets | bootstrap-scheduling | commit-and-push | smoke-test
+argument-hint: setup | run | review
 ---
 
 # Async-dev

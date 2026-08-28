@@ -2,21 +2,23 @@
 
 <img src="docs/assets/logo.png" alt="AIDD" width="100" />
 
-# The AI-Driven Dev Framework 🇫🇷
+# AI-Driven Dev Framework
 
-`Open source` agnostic framework **to generate high quality clean code**.
+## Enterprise-grade SDLC for high-quality software development.
 
-_(Already tested on `Legacy` codebases)_
+Unify **engineering teams** around **standardized workflows** and **shared best practices**, across modern stacks and **legacy systems**, while reducing **technical debt**.
 
-[![Made in France](https://img.shields.io/badge/made%20in-France-0055A4?labelColor=EF4135)](https://www.ai-driven-dev.fr/)
+🧱 **IDE agnostic** · 🏗️ **Legacy systems** · 🌱 **Token-optimized** · 🇫🇷 **Made in France**
 
 <p>
-  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>48 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
+  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>47 skills</kbd> · <kbd>2 agents</kbd><!--counts:end-->
 </p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Open Source](https://img.shields.io/badge/Open_Source-Yes-yellow?logo=open-source-initiative&logoColor=white)](https://opensource.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/ai-driven-dev/framework?include_prereleases&sort=semver)](https://github.com/ai-driven-dev/framework/releases)
 [![CI](https://github.com/ai-driven-dev/framework/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ai-driven-dev/framework/actions/workflows/ci.yml)
+
 
 <p>🗺️ <a href="https://github.com/orgs/ai-driven-dev/projects/8"><b>Live roadmap</b></a></p>
 
@@ -36,7 +38,7 @@ Why not just write your own commands? → [FAQ](docs/FAQ.md#-why-aidd-instead-of
 ## ✅ Prerequisites
 
 - **An AI coding tool** — Claude Code (native), or Cursor / Copilot / Codex / OpenCode (see [Compatibility](#-compatibility)).
-- **[Node](https://nodejs.org)** on your `PATH` — for the plugins that ship hooks ([what they do](docs/ARCHITECTURE.md#-bundled-hooks)).
+- **[Node](https://nodejs.org)** on your `PATH` — for the plugin that ships hooks ([what they do](docs/ARCHITECTURE.md#-bundled-hooks)).
 
 ## 🔌 Compatibility
 
@@ -195,17 +197,35 @@ flowchart TD
     end
 
     subgraph loop["② Per feature — repeat"]
-      direction LR
-      B["brainstorm"] --> P["plan"] --> I["implement"] --> R["review"] --> C["commit"] --> PR(["✅ PR"])
+      direction TB
+      subgraph frame["Frame"]
+        direction LR
+        N["functional need<br/>or User Story"] --> T["issue / ticket"] --> P["plan"]
+      end
+      subgraph deliver["Deliver"]
+        direction LR
+        I["implement"] --> V["validate"] --> R["review"]
+      end
+      subgraph ship["Ship"]
+        direction LR
+        PR["PR"] --> S(["✅ production"]) --> L["learn"]
+      end
+      P --> I
+      R --> PR
     end
 
-    Onboard --> Memory --> B
+    Onboard --> Memory --> N
+    L -. next need .-> N
 
     classDef hub fill:#D97757,stroke:#9c4f37,color:#fff;
     classDef done fill:#2ea043,stroke:#1a7f37,color:#fff;
     class Onboard hub;
-    class PR done;
+    class S done;
 ```
+
+Start with a functional need or User Story, then track it as an issue or ticket
+before planning. Shipping follows the project's own delivery process. Capture a
+learning only when it is durable enough to improve the next feature.
 
 > 🍳 **More flows** → bundled recipes: [start a project](plugins/aidd-context/skills/12-cook/assets/recipes/start-a-project.md), [ship a feature](plugins/aidd-context/skills/12-cook/assets/recipes/ship-a-feature.md), and more.
 
@@ -257,9 +277,9 @@ Three Amigos refinement, Product Briefs, Epics, User Stories, Tasks, Spikes, Def
 
 ### 🪞 [aidd-refine](plugins/aidd-refine/README.md)
 
-`5 skills` · stable
+`4 skills` · stable
 
-Brainstorm, challenge, condense, shadow-areas, fact-check.
+Brainstorm, challenge, shadow-areas, fact-check.
 
 </td>
 <td width="33%" valign="top">
@@ -326,7 +346,7 @@ Free and open-source (MIT). If it saves you time, [a ⭐](https://github.com/ai-
 
 <div align="center">
 
-<img src="https://api.star-history.com/svg?repos=ai-driven-dev/framework&type=Date" alt="Star History Chart" width="500" />
+<a href="https://github.com/ai-driven-dev/framework/stargazers"><img src="https://raw.githubusercontent.com/ai-driven-dev/framework/star-history/star-history.svg" alt="Star History Chart" width="500" /></a>
 
 Made with care in France 🇫🇷 · ← [AIDD organisation](https://github.com/ai-driven-dev)
 

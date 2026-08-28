@@ -8,18 +8,23 @@ The project root.
 
 ## Output
 
-The confirmed capabilities, printed nowhere.
+The confirmed capabilities and external tools, printed nowhere.
 
 ## Process
 
-1. **Ground.** Look for something to remember: source code, or anything written about what the project is.
-   - Nothing there: stop, say so, send the user to create something first.
-2. **Find.** Detect the project's capabilities per [capability-signals.md](../references/capability-signals.md), each with its repo evidence.
-3. **Ask.** Show each capability with its evidence. Ask the user to add or drop one. Wait for the answer.
-4. **Confirm.** Keep the confirmed set in context for generate.
+1. **Ground.** Read the project against [reading-sources.md](../references/reading-sources.md), and stop when it holds nothing to read.
+2. **Find.** Detect the capabilities per [capability-signals.md](../references/capability-signals.md), each with its evidence.
+3. **Map.** Detect the external tools per [ecosystem-signals.md](../references/ecosystem-signals.md), which fill the always-on `ecosystem` capability.
+4. **Ask.** Show the scan as [scan-summary.md](../assets/scan-summary.md) does, ask for what the repo cannot prove, and wait.
+5. **Confirm.** Keep what the scan found, plus the user's additions, minus their drops.
 
 ## Test
 
-- The run changes no file: `git status --porcelain` reads the same after as before.
-- A capability reaches the confirmed set only when a file or dependency for it exists in the repo.
-- On a repo with no code and nothing describing it, the run stops at Ground and hands nothing to generate.
+| Case | Pass |
+| --- | --- |
+| Completion | no file under the project changed |
+| Evidence | the path or dependency named for a capability exists |
+| Summary | one row per capability and per tool, each carrying evidence |
+| Tool | one access mode per actor that reaches it |
+| Every run | the same capabilities for the same repo, bank or no bank |
+| Empty repo | the run stops at Ground and hands nothing on |

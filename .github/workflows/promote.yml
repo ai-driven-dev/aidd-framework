@@ -45,23 +45,27 @@ jobs:
           git config user.name "aidd-bot[bot]"
           git config user.email "aidd-bot[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
-          git fetch origin main next --prune
-
           BRANCH="promote/next-to-main-linear"
-          git switch -C "$BRANCH" origin/main
+          git fetch origin main next --prune
+          git fetch origin "+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}" 2>/dev/null || true
 
-          # A "sync commit" marks a point where main's history was already
-          # folded into next by back-merge.yml, so it (and everything before
-          # it) must NOT be replayed onto main again. back-merge.yml lands a
+          if [ "$(git rev-parse origin/main^{tree})" = "$(git rev-parse origin/next^{tree})" ]; then
+            echo "No commits to promote."
+            exit 0
+          fi
+
+          # A "sync commit" marks a point where main's history was folded into
+          # next by back-merge.yml, so the sync itself carries main's own
+          # content and must NOT be replayed onto main. back-merge.yml lands a
           # sync two ways:
           #   - no conflicts: a direct-pushed real merge commit (2 parents)
           #   - conflicts: a PR merged by squash (this repo disallows
           #     merge-commit PRs), whose subject is stamped verbatim from
           #     back-merge.yml's fixed PR title
-          # Both must count as boundaries, or a squash sync gets mistaken for
-          # genuine next-only work and cherry-picked back onto main, colliding
-          # with content main already has. Keep the title prefix below in
-          # sync with back-merge.yml's `gh pr create --title`.
+          # Both must be recognised, or a squash sync gets mistaken for genuine
+          # next-only work and cherry-picked back onto main, colliding with
+          # content main already has. Keep the title prefix below in sync with
+          # back-merge.yml's `gh pr create --title`.
           is_sync_commit() {
             git rev-parse --verify -q "$1^2" >/dev/null 2>&1 && return 0
             local subject
@@ -75,28 +79,68 @@ jobs:
             is_sync_commit "$c" && SYNCS+=("$c")
           done
 
-          if [ "${#SYNCS[@]}" -ge 2 ]; then
-            START="${SYNCS[$((${#SYNCS[@]} - 2))]}"
-          else
-            START="origin/main"
-          fi
+          # Commits main already carries. A promote is a rebase-merge, so main's
+          # copy of a promoted commit keeps the same patch under a new hash, and
+          # `git cherry` marks it "-". Skipping those is what stops an
+          # already-promoted commit from being replayed as an empty cherry-pick
+          # (which would halt the script, since it doesn't pass --allow-empty)
+          # or as a spurious conflict with a later bump to the same lockfile.
+          declare -A ALREADY=()
+          while read -r sign sha; do
+            [ "$sign" = "-" ] && ALREADY["$sha"]=1
+          done < <(git cherry origin/main origin/next)
 
-          COMMITS=()
-          while IFS= read -r c; do
-            is_sync_commit "$c" || COMMITS+=("$c")
-          done < <(git rev-list --first-parent --reverse "${START}..origin/next")
+          # Start the window at the most recent sync and widen to older syncs
+          # until the replayed branch reproduces origin/next exactly. The
+          # narrowest window is right only when every commit before the last
+          # back-merge was already promoted. It is wrong when work landed on
+          # next after the previous promote but before that back-merge: a
+          # back-merge only folds main into next, it never carries next's own
+          # commits to main, so those commits are still owed and a sync-anchored
+          # window silently drops them forever. Widening recovers them, and the
+          # tree comparison against origin/next is the acceptance test.
+          PICKED=()
+          MATCHED=""
+          for ((i = ${#SYNCS[@]} - 1; i >= -1; i--)); do
+            if [ "$i" -ge 0 ]; then
+              START="${SYNCS[$i]}"
+            else
+              START="origin/main"
+            fi
 
-          if [ "${#COMMITS[@]}" -eq 0 ]; then
-            echo "No commits to promote."
-            exit 0
-          fi
+            COMMITS=()
+            while IFS= read -r c; do
+              is_sync_commit "$c" && continue
+              [ -n "${ALREADY[$c]:-}" ] && continue
+              COMMITS+=("$c")
+            done < <(git rev-list --first-parent --reverse "${START}..origin/next")
 
-          git cherry-pick "${COMMITS[@]}"
-          if [ "$(git rev-parse HEAD^{tree})" != "$(git rev-parse origin/next^{tree})" ]; then
-            echo "Linear promotion branch does not match origin/next."
+            if [ "${#COMMITS[@]}" -eq 0 ]; then
+              continue
+            fi
+
+            git cherry-pick --abort >/dev/null 2>&1 || true
+            git switch -C "$BRANCH" origin/main
+            if ! git cherry-pick "${COMMITS[@]}"; then
+              git cherry-pick --abort >/dev/null 2>&1 || true
+              echo "Window from ${START} conflicts on replay; widening."
+              continue
+            fi
+            if [ "$(git rev-parse HEAD^{tree})" = "$(git rev-parse origin/next^{tree})" ]; then
+              PICKED=("${COMMITS[@]}")
+              MATCHED=1
+              break
+            fi
+            echo "Window from ${START} does not reproduce origin/next; widening."
             git diff --stat HEAD origin/next
+          done
+
+          if [ -z "$MATCHED" ]; then
+            echo "No window of next-only commits reproduces origin/next."
+            echo "main and next have diverged beyond a linear replay; back-merge main into next first."
             exit 1
           fi
+          echo "Promoting ${#PICKED[@]} commits."
 
           git push --force-with-lease origin "HEAD:refs/heads/${BRANCH}"
 

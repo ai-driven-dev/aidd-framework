@@ -8,4 +8,4 @@
 | evidence or an explicit decision determines a change | one amendment with `before`, `after`, finding ids, and evidence |
 | anything unresolved | the question stays open; silence, majority, and severity are not approval |
 
-The result records the target, snapshot, verdict, confirmed findings, conflicts, proposed amendments, and open questions. [Assessment](assessment.md) sets the verdict scale.
+The result records the target, snapshot, verdict, confirmed findings, conflicts, proposed amendments, and open questions. `assessment.md` sets the verdict scale.

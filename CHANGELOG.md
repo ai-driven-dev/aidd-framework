@@ -1,5 +1,94 @@
 # Changelog
 
+## [5.8.1](https://github.com/ai-driven-dev/framework/compare/v5.8.0...v5.8.1) (2026-08-14)
+
+
+### Miscellaneous
+
+* **release:** drop the 5.8.0 pin and attribute the breaking change ([#642](https://github.com/ai-driven-dev/framework/issues/642)) ([12aa699](https://github.com/ai-driven-dev/framework/commit/12aa699680a10c94cd74dce465a1f924dbfb222d))
+
+## [5.8.0](https://github.com/ai-driven-dev/framework/compare/v5.7.1...v5.8.0) (2026-08-14)
+
+
+### Notes
+
+* **refine:** removing `aidd-refine:03-condense` and renumbering the skills after it is a breaking change of the `aidd-refine` plugin, released as [aidd-refine 3.0.0](https://github.com/ai-driven-dev/framework/releases/tag/aidd-refine-v3.0.0). The marketplace itself carries no breaking change in this release.
+
+### Features
+
+* **refine:** remove condense skill and its hook ([#624](https://github.com/ai-driven-dev/framework/issues/624)) ([e7e2c43](https://github.com/ai-driven-dev/framework/commit/e7e2c43819ca6e8f976d5d613c0b4dfc23e51019))
+
+
+### Bug Fixes
+
+* **aidd-context:** make 10-learn's recommendation step consistent ([#622](https://github.com/ai-driven-dev/framework/issues/622)) ([56bbb6e](https://github.com/ai-driven-dev/framework/commit/56bbb6e2d88e9d00e8bad304f59049709174389d))
+* **aidd-context:** make 10-learn's recommendation step consistent and enforce scope ([56bbb6e](https://github.com/ai-driven-dev/framework/commit/56bbb6e2d88e9d00e8bad304f59049709174389d)), closes [#561](https://github.com/ai-driven-dev/framework/issues/561)
+* **ci:** promote widens its window until it reproduces next ([#634](https://github.com/ai-driven-dev/framework/issues/634)) ([7090156](https://github.com/ai-driven-dev/framework/commit/70901567b1c66f3481a6f93eb4500e54d07efd9b))
+* **ci:** render the star history chart from the repo's own token ([#627](https://github.com/ai-driven-dev/framework/issues/627)) ([0bbd940](https://github.com/ai-driven-dev/framework/commit/0bbd94027944d3ec3d3fa5ce665e0755b9655f6f))
+* **cli:** transform codex marketplace skills ([#571](https://github.com/ai-driven-dev/framework/issues/571)) ([734c9c3](https://github.com/ai-driven-dev/framework/commit/734c9c39cad9b6f4f9ea181e320ff360d870741f))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @biomejs/biome from 2.5.6 to 2.5.7 in /cli ([#616](https://github.com/ai-driven-dev/framework/issues/616)) ([287a161](https://github.com/ai-driven-dev/framework/commit/287a161c443adbca10fb99c6d5224a1fbe705ed7))
+* **deps-dev:** bump @types/node from 26.1.2 to 26.2.0 in /cli ([#615](https://github.com/ai-driven-dev/framework/issues/615)) ([89fd4ea](https://github.com/ai-driven-dev/framework/commit/89fd4eac5113aa62b9075a91b33e51c386ee4dc3))
+* **deps-dev:** bump fast-check from 4.7.0 to 4.9.0 in /cli ([#607](https://github.com/ai-driven-dev/framework/issues/607)) ([2cd5aa6](https://github.com/ai-driven-dev/framework/commit/2cd5aa676a070def99e73cefc3007290303a8591))
+* **deps-dev:** bump js-yaml from 5.2.2 to 5.2.3 ([#605](https://github.com/ai-driven-dev/framework/issues/605)) ([99f4be1](https://github.com/ai-driven-dev/framework/commit/99f4be15f3f05f36e97cd34feb80c3bfb58bf1bf))
+* **deps-dev:** bump jscpd from 5.0.7 to 5.0.14 in /cli ([#606](https://github.com/ai-driven-dev/framework/issues/606)) ([74c15c2](https://github.com/ai-driven-dev/framework/commit/74c15c2d22067d1065de9bf4991a781394d938cf))
+* **deps-dev:** bump knip from 6.31.0 to 6.32.0 in /cli ([#613](https://github.com/ai-driven-dev/framework/issues/613)) ([6e1f6aa](https://github.com/ai-driven-dev/framework/commit/6e1f6aa3426a94cf2d16a47963b9c0b1453bfbc4))
+* **deps:** bump smol-toml from 1.6.1 to 1.7.1 in /cli ([#614](https://github.com/ai-driven-dev/framework/issues/614)) ([b766a31](https://github.com/ai-driven-dev/framework/commit/b766a3163d4793c36bf22737a6572ead1726c5b8))
+* release main ([#636](https://github.com/ai-driven-dev/framework/issues/636)) ([80baa8c](https://github.com/ai-driven-dev/framework/commit/80baa8ca484de0c67a8bbb57cf45044b3d49da95))
+* **release:** reset the umbrella version and pin it to 5.8.0 ([#639](https://github.com/ai-driven-dev/framework/issues/639)) ([a170c96](https://github.com/ai-driven-dev/framework/commit/a170c96b211fb174616982fd8c28f00eff7eed14))
+
+
+### Refactoring
+
+* **aidd-context:** project memory shows what it would change before writing ([#633](https://github.com/ai-driven-dev/framework/issues/633)) ([a9d5b0b](https://github.com/ai-driven-dev/framework/commit/a9d5b0b20a4812857cff2e15c9f3dfe97456003b))
+* **aidd-pm:** migrate ticket-info, prd, and spec to router contract ([#628](https://github.com/ai-driven-dev/framework/issues/628)) ([f6539e2](https://github.com/ai-driven-dev/framework/commit/f6539e2c1d6564edf55b6fea983acd6362d2dd7e))
+
+## [5.7.1](https://github.com/ai-driven-dev/framework/compare/v5.7.0...v5.7.1) (2026-08-07)
+
+
+### Bug Fixes
+
+* **framework:** leave a fenced block alone when normalising Process steps ([#604](https://github.com/ai-driven-dev/framework/issues/604)) ([019486f](https://github.com/ai-driven-dev/framework/commit/019486f5bc3ab0d91f43a527c05f9a16e322f03a))
+* **orchestrator:** backlog decide waits, apply forwards next step ([#602](https://github.com/ai-driven-dev/framework/issues/602)) ([15d552a](https://github.com/ai-driven-dev/framework/commit/15d552a0e3a551ad75ce75cffbf67ca528835e0b))
+
+
+### Refactoring
+
+* **framework:** one home for the skill contract ([#601](https://github.com/ai-driven-dev/framework/issues/601)) ([415a777](https://github.com/ai-driven-dev/framework/commit/415a77706c84277036dc7470d6dc329f9abde1de))
+
+## [5.7.0](https://github.com/ai-driven-dev/framework/compare/v5.6.0...v5.7.0) (2026-08-06)
+
+
+### Features
+
+* **aidd-pm:** keep a typed product backlog coherent whoever writes to it ([#582](https://github.com/ai-driven-dev/framework/issues/582)) ([fe0eebc](https://github.com/ai-driven-dev/framework/commit/fe0eebc5cf142e6668859f83dfe7ae4a38097435))
+* **framework:** add QA and communication evaluations ([#512](https://github.com/ai-driven-dev/framework/issues/512)) ([871d192](https://github.com/ai-driven-dev/framework/commit/871d1926e9944af231b15951d54bfe6364234536))
+* **kanban:** mount the kanban viewer on aidd as a hidden command ([#573](https://github.com/ai-driven-dev/framework/issues/573)) ([0e73737](https://github.com/ai-driven-dev/framework/commit/0e737371ff9c64e152d40575c29ffc985d31e614))
+
+
+### Bug Fixes
+
+* **ci:** align codeql-action init/analyze pins with autobuild's v4.37.4 ([297d6a6](https://github.com/ai-driven-dev/framework/commit/297d6a669e9e28f84010c0ac374505ce86508b90))
+* **ci:** promote.yml uses the most recent sync commit as its replay boundary ([#593](https://github.com/ai-driven-dev/framework/issues/593)) ([5b83d1b](https://github.com/ai-driven-dev/framework/commit/5b83d1b2bbf262b1c55a02ea3b54e5100fdae631))
+* **ci:** unbreak the framework-local checks after the kanban move ([#574](https://github.com/ai-driven-dev/framework/issues/574)) ([2f69050](https://github.com/ai-driven-dev/framework/commit/2f69050ce7df1059ff0fc337d6e171174a5f46b1))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @biomejs/biome from 2.4.7 to 2.5.6 in /cli ([#577](https://github.com/ai-driven-dev/framework/issues/577)) ([2f31414](https://github.com/ai-driven-dev/framework/commit/2f31414126465138bd62e280be8d909371ae1578))
+* **deps-dev:** bump knip from 6.16.1 to 6.31.0 in /cli ([#578](https://github.com/ai-driven-dev/framework/issues/578)) ([c392ccf](https://github.com/ai-driven-dev/framework/commit/c392ccfe34a28a392270ab322e13c967d7f86e47))
+* **deps:** bump react and @types/react in /cli ([#576](https://github.com/ai-driven-dev/framework/issues/576)) ([cc3659a](https://github.com/ai-driven-dev/framework/commit/cc3659a527cf0d50dbd7b07f703999b3ef13da93))
+
+
+### Refactoring
+
+* **aidd-context:** citations are links at their point of use ([dc85562](https://github.com/ai-driven-dev/framework/commit/dc855624736645325ae49b2df9e9768bbf82320f))
+* **orchestrator:** replace SDLC actions with protocols ([#517](https://github.com/ai-driven-dev/framework/issues/517)) ([ed81604](https://github.com/ai-driven-dev/framework/commit/ed816044709b2b7081cc00ad2103a8571bf0ad6c))
+* **plugins:** action citations use markdown links, not @ ([c5da712](https://github.com/ai-driven-dev/framework/commit/c5da7126ef30354e17d4665300bd88481fc7c816))
+
 ## [5.6.0](https://github.com/ai-driven-dev/framework/compare/v5.5.6...v5.6.0) (2026-07-31)
 
 

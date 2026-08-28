@@ -1,7 +1,7 @@
 ---
 name: 02-pull-request
 description: Create a draft pull or merge request from the current branch, in whatever VCS tool the project uses. Use when the user wants to open a pull or merge request. Not for committing, pushing, or merging a branch.
-argument-hint: collect | draft | create
+argument-hint: base | title
 ---
 
 # Pull Request

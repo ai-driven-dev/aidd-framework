@@ -12,12 +12,18 @@ A learning plan approved by the user and ready to write.
 
 ## Process
 
-1. Apply [assessment](../references/assessment.md), then use [destinations](../references/destinations.md) to propose where each candidate should land.
-2. Score each candidate and reconcile existing coverage.
-3. Show the scored recommendation and ask the user which packets to approve, edit, send to another destination, or skip.
-4. Fill [learning packet](../assets/learning-packet.md) only for user-approved items.
+1. **Score.** Apply [assessment](../references/assessment.md) and [destinations](../references/destinations.md): reason internally to a 0-10 score, reconcile existing coverage, and propose where it lands.
+2. **Show.** State the source in one line, then fill and show the [recommendation table](../assets/recommendation-table.md).
+3. **Confirm.** Ask, per packet: approve, modify, or skip.
+   - When every packet is covered, skip the question.
+4. **Fill.** Fill [learning packet](../assets/learning-packet.md) for approved items only.
 
 ## Test
 
-- Every approved packet has score, approved destination, reconciliation, and user approval.
-- Skipped or covered items are not written.
+| Case | Pass |
+| --- | --- |
+| A packet is approved | it carries score, approved destination, reconciliation, and user approval |
+| An item is skipped or already covered | it is not written |
+| The confirm step runs | only the source line and the table appear before it |
+| The confirm question is asked | it names approve, modify, and skip |
+| Every candidate is covered | the run ends, nothing is asked |

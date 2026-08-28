@@ -31,11 +31,11 @@
     "prepare": "lefthook install || true"
   },
   "devDependencies": {
-    "@commitlint/cli": "^21.2.1",
-    "@commitlint/config-conventional": "^21.2.0",
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
-    "js-yaml": "5.2.2",
+    "js-yaml": "5.3.0",
     "lefthook": "^2.1.10"
   }
 }
