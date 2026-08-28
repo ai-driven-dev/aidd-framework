@@ -14,6 +14,7 @@ import type { LocalCostCandidateRecord } from "../../../src/domain/ports/session
 import { NULL_PERSON_IDENTITY_READER } from "../../helpers/ports/in-memory-person-identity-reader.js";
 import { NULL_RUN_JOURNAL_READER } from "../../helpers/ports/in-memory-run-journal-reader.js";
 import { InMemoryTelemetrySink } from "../../helpers/ports/in-memory-telemetry-sink.js";
+import { StubTelemetryEvidenceReader } from "../../helpers/ports/stub-telemetry-evidence-reader.js";
 
 // This test is the honesty check the contract document promises its own readers: it never
 // trusts a hand-maintained list of fields on either side, only the record's own interface
@@ -120,11 +121,12 @@ describe("metrics contract worked example: a re-read appends unless matched", ()
       sink,
       new Map([["claude", { read: async () => ({ records: [candidate], sessionFound: true }) }]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      new StubTelemetryEvidenceReader()
     );
 
-    await useCase.execute({ sessionId: "s-doc-example" });
-    await useCase.execute({ sessionId: "s-doc-example" }); // the re-read
+    await useCase.execute({ projectRoot: "/repo", env: {}, sessionId: "s-doc-example" });
+    await useCase.execute({ projectRoot: "/repo", env: {}, sessionId: "s-doc-example" }); // the re-read
 
     const storedRecords = [...sink.files.values()].flat();
     const total = storedRecords.reduce(
@@ -153,11 +155,12 @@ describe("metrics contract worked example: a re-read appends unless matched", ()
         ],
       ]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      new StubTelemetryEvidenceReader()
     );
 
-    await useCase.execute({ sessionId: "s-doc-example-2" });
-    await useCase.execute({ sessionId: "s-doc-example-2" }); // the re-read, unmatched
+    await useCase.execute({ projectRoot: "/repo", env: {}, sessionId: "s-doc-example-2" });
+    await useCase.execute({ projectRoot: "/repo", env: {}, sessionId: "s-doc-example-2" }); // the re-read, unmatched
 
     const storedRecords = [...sink.files.values()].flat();
     const total = storedRecords.reduce(

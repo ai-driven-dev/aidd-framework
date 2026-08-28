@@ -9,6 +9,13 @@ import { AIDD_CONFIG_FILENAME, AIDD_DIR } from "./paths.js";
  */
 export interface TelemetrySwitch {
   readonly enabled: boolean;
+  /** A destination `aidd telemetry endpoint` used to write here, before that command and
+   * its targeted undo (`endpoint clear`) were both deleted in "one route, and every
+   * sentence about it true". Nothing in this system sets, clears, or reads this value as a
+   * destination any more — `on` and `off` both preserve it verbatim, purely so neither
+   * silently drops a key it never wrote. A settings file a tool itself still reads for a
+   * real, live export is a different fact this field cannot see — see
+   * `telemetry-export-leftover.ts` for what detects that. */
   readonly endpoint?: string;
 }
 

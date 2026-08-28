@@ -28,10 +28,10 @@ export interface TelemetryOnResult {
 const RUNS_ENTRY = `${DOCS_DIR}/runs/`;
 
 /** Owns the AIDD telemetry switch alone: flips `.aidd/config.json`'s `telemetry.enabled`
- * and git-ignores the run journal. Never touches a tool's own settings file — that is
- * `aidd telemetry endpoint`'s job, because arming a tool to export and recording locally
- * are two different promises. Any endpoint already recorded in the switch file is
- * preserved untouched, since this use case has no opinion about it either way. */
+ * and git-ignores the run journal. Never touches a tool's own settings file — arming a
+ * tool to export and recording locally are two different promises, and no command in this
+ * system writes the former any more. Any `endpoint` already recorded in the switch file is
+ * preserved untouched — see its declaration in `telemetry-switch.ts` for why. */
 export class TelemetryOnUseCase {
   constructor(
     private readonly fs: FileReader & FileWriter,

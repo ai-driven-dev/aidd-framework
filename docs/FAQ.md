@@ -42,11 +42,11 @@ You can write your own Claude Code skills — nothing stops you. AIDD exists bec
 - **Authored for Claude Code.** Other tools install via their native mechanism from the release archives ([Other tools](../README.md#other-tools)); public-marketplace publishing is on the way, native parity is a roadmap item.
 - **Plugins assume their own context.** A skill that expects a git repo, a `package.json`, or a ticketing tool won't work without it — check the plugin's README.
 - **No hosted service.** AIDD is prompt content you install into your own tool; there is no AIDD server and no account.
-- **Measurement is off unless you turn it on.** It records nothing until you do, and nothing leaves your machine on its own → [Measurement](#-measurement).
+- **Measurement is off unless you turn it on.** It records nothing until you do, and nothing leaves your machine → [Measurement](#-measurement).
 
 ## 📊 Measurement
 
-**Off unless you turn it on, and nothing leaves your machine on its own.**
+**The switch is git-tracked, so it applies to everyone who clones; opt out per person with `AIDD_TELEMETRY=0`. Nothing leaves your machine.**
 
 The `aidd-telemetry` plugin is not part of the curated install, and even installed it records
 nothing until you allow it. Ask your AI tool for the plugin's `00-init` skill: it turns

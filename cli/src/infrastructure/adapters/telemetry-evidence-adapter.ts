@@ -2,6 +2,10 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { asPlainObject } from "../../domain/formats/plain-object.js";
 import {
+  findLeftoverExportKeys,
+  type TelemetryExportLeftover,
+} from "../../domain/models/telemetry-export-leftover.js";
+import {
   parseTelemetrySwitchFile,
   resolveTelemetryEnabled,
   telemetryConfigPath,
@@ -10,11 +14,33 @@ import type {
   TelemetryEvidenceReader,
   TelemetryUnrecognisedPayload,
 } from "../../domain/ports/telemetry-evidence-reader.js";
+import { resolveHomeDir } from "../home-dir.js";
 
 const UNRECOGNISED_FILE_NAME = "_unrecognised.jsonl";
 
 function runsDir(projectRoot: string): string {
   return process.env.AIDD_RUNS_DIR || join(projectRoot, "aidd_docs", "runs");
+}
+
+// Only Claude Code ever wrote a real settings-file export: it is the one tool whose
+// (now-deleted) `TelemetryActivation` was `kind: "settings-file"` — every other tool's was
+// `environment-variable`, `planned`, or `external`, none of which land in a file this could
+// ever find stale keys in. `local` is `DEFAULT_TELEMETRY_SCOPE`, the common case; `project`
+// and `user` are the other two scopes `endpoint --scope` ever accepted.
+function claudeSettingsCandidates(projectRoot: string): readonly string[] {
+  return [
+    join(projectRoot, ".claude", "settings.local.json"),
+    join(projectRoot, ".claude", "settings.json"),
+    join(resolveHomeDir(), ".claude", "settings.json"),
+  ];
+}
+
+async function readIfExists(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, "utf8");
+  } catch {
+    return null;
+  }
 }
 
 function parseUnrecognisedPayload(raw: string): TelemetryUnrecognisedPayload | null {
@@ -54,5 +80,14 @@ export class TelemetryEvidenceAdapter implements TelemetryEvidenceReader {
     } catch {
       return null;
     }
+  }
+
+  async findLeftoverExportConfig(projectRoot: string): Promise<readonly TelemetryExportLeftover[]> {
+    const leftovers: TelemetryExportLeftover[] = [];
+    for (const path of claudeSettingsCandidates(projectRoot)) {
+      const keys = findLeftoverExportKeys(await readIfExists(path));
+      if (keys.length > 0) leftovers.push({ path, keys });
+    }
+    return leftovers;
   }
 }

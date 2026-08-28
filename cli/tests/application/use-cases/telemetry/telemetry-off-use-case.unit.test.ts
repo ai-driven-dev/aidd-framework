@@ -4,6 +4,7 @@ import { TelemetryOffUseCase } from "../../../../src/application/use-cases/telem
 import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
 import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
+import { StubTelemetryEvidenceReader } from "../../../helpers/ports/stub-telemetry-evidence-reader.js";
 
 const PROJECT_ROOT = "/repo";
 const SWITCH_PATH = join(PROJECT_ROOT, ".aidd", "config.json");
@@ -12,8 +13,9 @@ function buildUseCase(seed: Record<string, string> = {}) {
   const hasher = new DeterministicHasher();
   const fs = new InMemoryFileAdapter(seed, hasher);
   const logger = new CapturingLogger();
-  const useCase = new TelemetryOffUseCase(fs, logger);
-  return { fs, logger, useCase };
+  const evidence = new StubTelemetryEvidenceReader();
+  const useCase = new TelemetryOffUseCase(fs, logger, evidence);
+  return { fs, logger, evidence, useCase };
 }
 
 describe("TelemetryOffUseCase — never on", () => {
@@ -82,5 +84,36 @@ describe("TelemetryOffUseCase — an endpoint configuration is untouched", () =>
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
     expect(fs.getFile(settingsPath)).toBe(armed);
+  });
+});
+
+// `off` cannot clear a stale export — the writer that could is gone — but silence is
+// exactly the failure this exists to close (see finding 1, review.md). Detection itself
+// lives in `TelemetryEvidenceAdapter` (a real settings file, exercised end to end); this
+// only proves `off` relays what it is told, by name, on `warn`.
+describe("TelemetryOffUseCase — names a leftover export it cannot clear", () => {
+  it("warns with the file and the keys still set, when one is found", async () => {
+    const { logger, evidence, useCase } = buildUseCase();
+    evidence.leftoverExport = [
+      {
+        path: join(PROJECT_ROOT, ".claude", "settings.local.json"),
+        keys: ["CLAUDE_CODE_ENABLE_TELEMETRY", "OTEL_EXPORTER_OTLP_ENDPOINT"],
+      },
+    ];
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(logger.warnMessages).toHaveLength(1);
+    expect(logger.warnMessages[0]).toContain(join(PROJECT_ROOT, ".claude", "settings.local.json"));
+    expect(logger.warnMessages[0]).toContain("CLAUDE_CODE_ENABLE_TELEMETRY");
+    expect(logger.warnMessages[0]).toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
+  });
+
+  it("warns nothing when no leftover export is found", async () => {
+    const { logger, useCase } = buildUseCase();
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(logger.warnMessages).toHaveLength(0);
   });
 });

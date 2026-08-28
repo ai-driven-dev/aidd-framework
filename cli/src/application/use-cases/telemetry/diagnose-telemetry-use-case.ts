@@ -8,6 +8,7 @@ import {
   type TelemetryCodexHookTrust,
   type TelemetryEvidence,
 } from "../../../domain/models/telemetry-claim.js";
+import type { TelemetryExportLeftover } from "../../../domain/models/telemetry-export-leftover.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../domain/models/tool-ids.js";
 import type { HookTrustReader } from "../../../domain/ports/hook-trust-reader.js";
 import type { RunJournal, RunJournalReader } from "../../../domain/ports/run-journal-reader.js";
@@ -26,13 +27,16 @@ export interface DiagnoseTelemetryUncoveredTool {
 /** What `aidd telemetry check` answers with. `gate`, when present, is a reason the run
  * stopped before judging any claim at all — measurement off, or no repository — and is
  * mutually exclusive with `claims`: a gated run judges nothing, the same rule that keeps
- * absent evidence from ever producing an `ok`. */
+ * absent evidence from ever producing an `ok`. `leftoverExportConfig` is neither a claim
+ * nor gated by one: a stale export lives in a tool's own settings file, independent of
+ * whether the local switch is on, so it is gathered and reported either way. */
 export type DiagnoseTelemetryResult =
-  | { readonly gate: string }
+  | { readonly gate: string; readonly leftoverExportConfig: readonly TelemetryExportLeftover[] }
   | {
       readonly gate?: undefined;
       readonly claims: readonly TelemetryClaim[];
       readonly uncovered: readonly DiagnoseTelemetryUncoveredTool[];
+      readonly leftoverExportConfig: readonly TelemetryExportLeftover[];
     };
 
 export interface DiagnoseTelemetryOptions {
@@ -82,10 +86,14 @@ export class DiagnoseTelemetryUseCase {
   ) {}
 
   async execute(options: DiagnoseTelemetryOptions): Promise<DiagnoseTelemetryResult> {
+    // Gathered before the gate, and regardless of it: a stale export in a tool's own
+    // settings file exports whether or not this project's own switch is on, so a person
+    // whose switch is off must still be told about it.
+    const leftoverExportConfig = await this.evidence.findLeftoverExportConfig(options.projectRoot);
     const gate = await this.gateReason(options);
-    if (gate !== null) return { gate };
+    if (gate !== null) return { gate, leftoverExportConfig };
     const claims = diagnoseTelemetryClaims(await this.gatherEvidence(options));
-    return { claims, uncovered: uncoveredTools() };
+    return { claims, uncovered: uncoveredTools(), leftoverExportConfig };
   }
 
   private async gatherEvidence(options: DiagnoseTelemetryOptions): Promise<TelemetryEvidence> {

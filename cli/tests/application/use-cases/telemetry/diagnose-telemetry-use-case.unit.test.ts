@@ -119,6 +119,49 @@ describe("DiagnoseTelemetryUseCase — gating", () => {
   });
 });
 
+// Finding 1 (review.md, "one route, and every sentence about it true"): a stale export in
+// a tool's own settings file exports whether or not this project's own switch is on, so it
+// is gathered and reported on both sides of the gate, never folded into a claim.
+describe("DiagnoseTelemetryUseCase — a leftover export config", () => {
+  const LEFTOVER = [
+    { path: "/repo/.claude/settings.local.json", keys: ["CLAUDE_CODE_ENABLE_TELEMETRY"] },
+  ];
+
+  it("is reported even when the switch is off and the run is gated", async () => {
+    const evidence = new StubEvidenceReader();
+    evidence.enabled = false;
+    evidence.leftoverExport = LEFTOVER;
+    const { useCase } = buildUseCase({ evidence });
+
+    const result = await useCase.execute(runOptions());
+
+    expect(result.gate).toMatch(/measurement is off/u);
+    expect(result.leftoverExportConfig).toEqual(LEFTOVER);
+  });
+
+  it("is reported alongside the four claims when the switch is on", async () => {
+    const evidence = new StubEvidenceReader();
+    evidence.leftoverExport = LEFTOVER;
+    const { useCase } = buildUseCase({ evidence });
+
+    const result = await useCase.execute(runOptions());
+
+    if (result.gate !== undefined) throw new Error("expected the run to pass the gate");
+    expect(result.leftoverExportConfig).toEqual(LEFTOVER);
+    // Never folded into the health count: "no claim mentions exporting" is a hard rule
+    // (telemetry-claim.unit.test.ts) this must not get near.
+    expect(result.claims.some((claim) => claim.claim.toString().includes("export"))).toBe(false);
+  });
+
+  it("reports an empty list on a clean machine, never omitting the field", async () => {
+    const { useCase } = buildUseCase({});
+
+    const result = await useCase.execute(runOptions());
+
+    expect(result.leftoverExportConfig).toEqual([]);
+  });
+});
+
 describe("DiagnoseTelemetryUseCase — gathering local evidence", () => {
   it("reads every covered tool's own files for every journalled session", async () => {
     const journal: RunJournal = {

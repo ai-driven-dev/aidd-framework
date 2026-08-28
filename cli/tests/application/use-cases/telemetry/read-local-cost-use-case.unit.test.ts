@@ -28,8 +28,15 @@ import {
   NULL_RUN_JOURNAL_READER,
 } from "../../../helpers/ports/in-memory-run-journal-reader.js";
 import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetry-sink.js";
+import { StubTelemetryEvidenceReader } from "../../../helpers/ports/stub-telemetry-evidence-reader.js";
 
 const SESSION_ID = "s-1";
+const PROJECT_ROOT = "/repo";
+// Every test in this file is about what the sink, the journal or a reader hold, not about
+// the project switch - it always answers "on" here, the same reasoning
+// `report-cost-use-case.unit.test.ts`'s own `BASE_OPTIONS` documents. The refusal itself is
+// covered on its own, below.
+const TELEMETRY_EVIDENCE_READER = new StubTelemetryEvidenceReader();
 
 function stubReader(records: readonly LocalCostCandidateRecord[]): SessionCostReader {
   return {
@@ -142,10 +149,15 @@ describe("ReadLocalCostUseCase", () => {
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    const result = await useCase.execute({ sessionId: SESSION_ID });
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SESSION_ID,
+    });
 
     const claudeReport = result.toolReports.find((r) => r.tool === "claude");
     expect(claudeReport).toMatchObject({
@@ -161,10 +173,15 @@ describe("ReadLocalCostUseCase", () => {
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    const result = await useCase.execute({ sessionId: SESSION_ID });
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SESSION_ID,
+    });
 
     const claudeReport = result.toolReports.find((r) => r.tool === "claude");
     expect(claudeReport && "reason" in claudeReport).toBe(false);
@@ -177,10 +194,15 @@ describe("ReadLocalCostUseCase", () => {
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    const result = await useCase.execute({ sessionId: SESSION_ID });
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SESSION_ID,
+    });
 
     const claudeReport = result.toolReports.find((r) => r.tool === "claude");
     expect(claudeReport).toMatchObject({ status: "found", recordsFound: 1, recordsStored: 1 });
@@ -202,10 +224,11 @@ describe("ReadLocalCostUseCase", () => {
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    await useCase.execute({ sessionId: SESSION_ID });
+    await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
 
     const [stored] = [...sink.files.values()].flat();
     expect("person_id" in stored).toBe(false);
@@ -219,10 +242,11 @@ describe("ReadLocalCostUseCase", () => {
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
       NULL_RUN_JOURNAL_READER,
-      new InMemoryPersonIdentityReader({ personId: "person-1", origin: "minted", alsoMe: [] })
+      new InMemoryPersonIdentityReader({ personId: "person-1", origin: "minted", alsoMe: [] }),
+      TELEMETRY_EVIDENCE_READER
     );
 
-    await useCase.execute({ sessionId: SESSION_ID });
+    await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
 
     const [stored] = [...sink.files.values()].flat();
     expect(stored.person_id).toBe("person-1");
@@ -241,10 +265,11 @@ describe("ReadLocalCostUseCase", () => {
         origin: "minted",
         alsoMe: [],
         displayName: "Baptiste",
-      })
+      }),
+      TELEMETRY_EVIDENCE_READER
     );
 
-    await useCase.execute({ sessionId: SESSION_ID });
+    await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
 
     const [stored] = [...sink.files.values()].flat();
     expect(stored.person_id).toBe("person-1");
@@ -261,12 +286,13 @@ describe("ReadLocalCostUseCase", () => {
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
       NULL_RUN_JOURNAL_READER,
-      identity
+      identity,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    await useCase.execute({ sessionId: SESSION_ID });
+    await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
     identity.set({ personId: "person-1", origin: "minted", alsoMe: [] });
-    await useCase.execute({ sessionId: SESSION_ID });
+    await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
 
     const [stored] = [...sink.files.values()].flat();
     expect("person_id" in stored).toBe(false);
@@ -282,10 +308,11 @@ describe("ReadLocalCostUseCase", () => {
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    await useCase.execute({ sessionId: SESSION_ID });
+    await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
 
     const [stored] = [...sink.files.values()].flat();
     expect(stored.tool).toBe("claude");
@@ -313,13 +340,18 @@ describe("ReadLocalCostUseCase", () => {
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    await useCase.execute({ sessionId: SESSION_ID });
+    await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
     const afterFirst = JSON.stringify([...sink.files.values()]);
 
-    const second = await useCase.execute({ sessionId: SESSION_ID });
+    const second = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SESSION_ID,
+    });
     const afterSecond = JSON.stringify([...sink.files.values()]);
 
     expect(afterSecond).toBe(afterFirst);
@@ -335,10 +367,15 @@ describe("ReadLocalCostUseCase", () => {
       sink,
       new Map(),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    const result = await useCase.execute({ sessionId: SESSION_ID });
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SESSION_ID,
+    });
 
     const cursor = result.toolReports.find((r) => r.tool === "cursor");
     expect(cursor?.status).toBe("not-covered");
@@ -356,10 +393,15 @@ describe("ReadLocalCostUseCase", () => {
       sink,
       new Map(),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    const result = await useCase.execute({ sessionId: SESSION_ID });
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SESSION_ID,
+    });
 
     const claude = result.toolReports.find((r) => r.tool === "claude");
     expect(claude).toMatchObject({ status: "not-covered" });
@@ -375,10 +417,15 @@ describe("ReadLocalCostUseCase", () => {
       sink,
       new Map([["claude", stubReader([])]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    const result = await useCase.execute({ sessionId: SESSION_ID });
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SESSION_ID,
+    });
 
     const claude = result.toolReports.find((r) => r.tool === "claude");
     expect(claude).toMatchObject({ status: "empty", recordsFound: 0, recordsStored: 0 });
@@ -395,10 +442,13 @@ describe("ReadLocalCostUseCase", () => {
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    await expect(useCase.execute({ sessionId: SESSION_ID })).resolves.toBeDefined();
+    await expect(
+      useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID })
+    ).resolves.toBeDefined();
     expect([...sink.files.values()].flat()).toHaveLength(1);
   });
 
@@ -410,11 +460,16 @@ describe("ReadLocalCostUseCase", () => {
       sink,
       new Map([["claude", stubReader([noIdCandidate])]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    await useCase.execute({ sessionId: SESSION_ID });
-    const second = await useCase.execute({ sessionId: SESSION_ID });
+    await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
+    const second = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SESSION_ID,
+    });
 
     // Both reads store it — undeduplicated, as the port's contract accepts for a tool
     // with no stable per-record identifier, rather than inventing an unstable one.
@@ -437,10 +492,15 @@ describe("ReadLocalCostUseCase", () => {
         sink,
         new Map([["codex", reader]]),
         NULL_RUN_JOURNAL_READER,
-        NULL_PERSON_IDENTITY_READER
+        NULL_PERSON_IDENTITY_READER,
+        TELEMETRY_EVIDENCE_READER
       );
 
-      const first = await useCase.execute({ sessionId: CODEX_TARGET_ID });
+      const first = await useCase.execute({
+        projectRoot: PROJECT_ROOT,
+        env: {},
+        sessionId: CODEX_TARGET_ID,
+      });
       const beforeTurn = [...sink.files.values()]
         .flat()
         .find((r) => r.turn_id === CODEX_LAST_TURN_ID);
@@ -448,7 +508,11 @@ describe("ReadLocalCostUseCase", () => {
       expect(beforeTurn).toMatchObject({ cache_read_tokens: 48896, output_tokens: 1401 });
       expect(first.toolReports.find((r) => r.tool === "codex")?.recordsStored).toBe(2);
 
-      const second = await useCase.execute({ sessionId: CODEX_TARGET_ID });
+      const second = await useCase.execute({
+        projectRoot: PROJECT_ROOT,
+        env: {},
+        sessionId: CODEX_TARGET_ID,
+      });
       const turnRecords = [...sink.files.values()]
         .flat()
         .filter((r) => r.turn_id === CODEX_LAST_TURN_ID);
@@ -475,12 +539,21 @@ describe("ReadLocalCostUseCase", () => {
         sink,
         new Map([["codex", reader]]),
         NULL_RUN_JOURNAL_READER,
-        NULL_PERSON_IDENTITY_READER
+        NULL_PERSON_IDENTITY_READER,
+        TELEMETRY_EVIDENCE_READER
       );
 
-      await useCase.execute({ sessionId: CODEX_TARGET_ID });
-      const second = await useCase.execute({ sessionId: CODEX_TARGET_ID });
-      const third = await useCase.execute({ sessionId: CODEX_TARGET_ID });
+      await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: CODEX_TARGET_ID });
+      const second = await useCase.execute({
+        projectRoot: PROJECT_ROOT,
+        env: {},
+        sessionId: CODEX_TARGET_ID,
+      });
+      const third = await useCase.execute({
+        projectRoot: PROJECT_ROOT,
+        env: {},
+        sessionId: CODEX_TARGET_ID,
+      });
 
       // A finished turn read twice (or three times) is counted once, and its figures do
       // not change — the same reading offers no improvement over what is already stored.
@@ -498,11 +571,16 @@ describe("ReadLocalCostUseCase", () => {
         sink,
         new Map([["codex", reader]]),
         NULL_RUN_JOURNAL_READER,
-        NULL_PERSON_IDENTITY_READER
+        NULL_PERSON_IDENTITY_READER,
+        TELEMETRY_EVIDENCE_READER
       );
 
-      await useCase.execute({ sessionId: CODEX_TARGET_ID });
-      const second = await useCase.execute({ sessionId: CODEX_TARGET_ID });
+      await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: CODEX_TARGET_ID });
+      const second = await useCase.execute({
+        projectRoot: PROJECT_ROOT,
+        env: {},
+        sessionId: CODEX_TARGET_ID,
+      });
 
       expect(second.toolReports.find((r) => r.tool === "codex")?.recordsStored).toBe(0);
       const turnRecords = [...sink.files.values()]
@@ -529,11 +607,16 @@ describe("ReadLocalCostUseCase", () => {
         sink,
         new Map([["codex", reader]]),
         journalReader,
-        NULL_PERSON_IDENTITY_READER
+        NULL_PERSON_IDENTITY_READER,
+        TELEMETRY_EVIDENCE_READER
       );
 
-      await useCase.execute({ sessionId: CODEX_TARGET_ID });
-      const second = await useCase.execute({ sessionId: CODEX_TARGET_ID });
+      await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: CODEX_TARGET_ID });
+      const second = await useCase.execute({
+        projectRoot: PROJECT_ROOT,
+        env: {},
+        sessionId: CODEX_TARGET_ID,
+      });
 
       expect(second.toolReports.find((r) => r.tool === "codex")?.recordsStored).toBe(1);
       const turnRecords = [...sink.files.values()]
@@ -569,16 +652,22 @@ describe("ReadLocalCostUseCase", () => {
       sink,
       new Map([["claude", stubReader([sessionCandidate])]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
-    ).execute({ sessionId: SESSION_ID });
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
+    ).execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
 
     const useCase = new ReadLocalCostUseCase(
       sink,
       new Map([["claude", reader]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
-    const second = await useCase.execute({ sessionId: SESSION_ID });
+    const second = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SESSION_ID,
+    });
 
     // A `kind: "session"` record is a one-shot cumulative total, never a growing per-turn
     // snapshot — a re-read matching its turn_id is dropped exactly as it always was,
@@ -616,10 +705,11 @@ describe("ReadLocalCostUseCase", () => {
         sink,
         new Map([["claude", stubReader([candidate])]]),
         NULL_RUN_JOURNAL_READER,
-        NULL_PERSON_IDENTITY_READER
+        NULL_PERSON_IDENTITY_READER,
+        TELEMETRY_EVIDENCE_READER
       );
 
-      await useCase.execute({ sessionId: SESSION_ID });
+      await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
 
       const [stored] = [...sink.files.values()].flat();
       expect(stored).toMatchObject({
@@ -640,10 +730,11 @@ describe("ReadLocalCostUseCase", () => {
         sink,
         new Map([["claude", stubReader([candidate])]]),
         NULL_RUN_JOURNAL_READER,
-        NULL_PERSON_IDENTITY_READER
+        NULL_PERSON_IDENTITY_READER,
+        TELEMETRY_EVIDENCE_READER
       );
 
-      await useCase.execute({ sessionId: SESSION_ID });
+      await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
 
       const [stored] = [...sink.files.values()].flat();
       expect(stored.step_plugin).toBe("aidd-dev");
@@ -656,10 +747,11 @@ describe("ReadLocalCostUseCase", () => {
         sink,
         new Map([["claude", stubReader([MOMENT_CANDIDATE])]]),
         journalWithOneStep("aidd-dev:06-test"),
-        NULL_PERSON_IDENTITY_READER
+        NULL_PERSON_IDENTITY_READER,
+        TELEMETRY_EVIDENCE_READER
       );
 
-      await useCase.execute({ sessionId: SESSION_ID });
+      await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
 
       const [stored] = [...sink.files.values()].flat();
       expect(stored).toMatchObject({
@@ -675,10 +767,11 @@ describe("ReadLocalCostUseCase", () => {
         sink,
         new Map([["claude", stubReader([CANDIDATE])]]),
         NULL_RUN_JOURNAL_READER,
-        NULL_PERSON_IDENTITY_READER
+        NULL_PERSON_IDENTITY_READER,
+        TELEMETRY_EVIDENCE_READER
       );
 
-      await useCase.execute({ sessionId: SESSION_ID });
+      await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
 
       const [stored] = [...sink.files.values()].flat();
       expect(stored.step_attribution).toBe("unattributed");
@@ -698,10 +791,11 @@ describe("ReadLocalCostUseCase", () => {
         sink,
         new Map([["claude", stubReader([candidate])]]),
         journalWithOneStep("some-other-skill"),
-        NULL_PERSON_IDENTITY_READER
+        NULL_PERSON_IDENTITY_READER,
+        TELEMETRY_EVIDENCE_READER
       );
 
-      await useCase.execute({ sessionId: SESSION_ID });
+      await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
 
       const [stored] = [...sink.files.values()].flat();
       expect(stored).toMatchObject({
@@ -719,18 +813,20 @@ describe("ReadLocalCostUseCase", () => {
         withJournalSink,
         new Map([["claude", stubReader([MOMENT_CANDIDATE])]]),
         journalWithOneStep("aidd-dev:06-test"),
-        NULL_PERSON_IDENTITY_READER
+        NULL_PERSON_IDENTITY_READER,
+        TELEMETRY_EVIDENCE_READER
       );
       const withoutJournalSink = new InMemoryTelemetrySink();
       const withoutJournal = new ReadLocalCostUseCase(
         withoutJournalSink,
         new Map([["claude", stubReader([MOMENT_CANDIDATE])]]),
         NULL_RUN_JOURNAL_READER,
-        NULL_PERSON_IDENTITY_READER
+        NULL_PERSON_IDENTITY_READER,
+        TELEMETRY_EVIDENCE_READER
       );
 
-      await withJournal.execute({ sessionId: SESSION_ID });
-      await withoutJournal.execute({ sessionId: SESSION_ID });
+      await withJournal.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
+      await withoutJournal.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
 
       const [withStored] = [...withJournalSink.files.values()].flat();
       const [withoutStored] = [...withoutJournalSink.files.values()].flat();
@@ -777,10 +873,11 @@ describe("ReadLocalCostUseCase", () => {
         sink,
         new Map([["claude", stubReader([CANDIDATE])]]),
         journalWithProject("acme-widgets", "git@github.com:acme/widgets.git"),
-        NULL_PERSON_IDENTITY_READER
+        NULL_PERSON_IDENTITY_READER,
+        TELEMETRY_EVIDENCE_READER
       );
 
-      await useCase.execute({ sessionId: SESSION_ID });
+      await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
 
       const [stored] = [...sink.files.values()].flat();
       expect(stored.project_id).toBe("git@github.com:acme/widgets.git");
@@ -794,10 +891,11 @@ describe("ReadLocalCostUseCase", () => {
         sink,
         new Map([["claude", stubReader([CANDIDATE])]]),
         journalWithProject("acme-widgets", undefined),
-        NULL_PERSON_IDENTITY_READER
+        NULL_PERSON_IDENTITY_READER,
+        TELEMETRY_EVIDENCE_READER
       );
 
-      await useCase.execute({ sessionId: SESSION_ID });
+      await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
 
       const [stored] = [...sink.files.values()].flat();
       expect(stored.project_id).toBe("acme-widgets");
@@ -811,10 +909,11 @@ describe("ReadLocalCostUseCase", () => {
         sink,
         new Map([["claude", stubReader([CANDIDATE])]]),
         NULL_RUN_JOURNAL_READER,
-        NULL_PERSON_IDENTITY_READER
+        NULL_PERSON_IDENTITY_READER,
+        TELEMETRY_EVIDENCE_READER
       );
 
-      await useCase.execute({ sessionId: SESSION_ID });
+      await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
 
       const [stored] = [...sink.files.values()].flat();
       expect(stored.project_id).toBeUndefined();
@@ -843,10 +942,15 @@ describe("a reader that fails", () => {
         ["claude", stubReader([CANDIDATE])],
       ]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    const result = await useCase.execute({ sessionId: SESSION_ID });
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SESSION_ID,
+    });
 
     const claude = result.toolReports.find((report) => report.tool === "claude");
     expect(claude?.status).toBe("found");
@@ -859,12 +963,13 @@ describe("a reader that fails", () => {
       new InMemoryTelemetrySink(),
       new Map([["opencode", throwingReader()]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    const opencode = (await useCase.execute({ sessionId: SESSION_ID })).toolReports.find(
-      (report) => report.tool === "opencode"
-    );
+    const opencode = (
+      await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID })
+    ).toolReports.find((report) => report.tool === "opencode");
 
     expect(opencode?.status).toBe("unreadable");
     expect(opencode?.reason).toBe(BOOM);
@@ -875,12 +980,13 @@ describe("a reader that fails", () => {
       new InMemoryTelemetrySink(),
       new Map([["opencode", throwingReader()]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    const opencode = (await useCase.execute({ sessionId: SESSION_ID })).toolReports.find(
-      (report) => report.tool === "opencode"
-    );
+    const opencode = (
+      await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID })
+    ).toolReports.find((report) => report.tool === "opencode");
 
     // The four it must not be mistaken for: it billed nothing, it has no trace of the
     // session, it cannot be read at all, or it read fine.
@@ -896,10 +1002,15 @@ describe("a reader that fails", () => {
         ["claude", throwingReader()],
       ]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    const result = await useCase.execute({ sessionId: SESSION_ID });
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SESSION_ID,
+    });
 
     expect([...sink.files.values()].flat()).toEqual([]);
     const failed = result.toolReports.filter((report) =>
@@ -917,17 +1028,23 @@ describe("a reader that fails", () => {
       sink,
       new Map([["claude", throwingReader()]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
-    await failing.execute({ sessionId: SESSION_ID });
+    await failing.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
 
     const recovered = new ReadLocalCostUseCase(
       sink,
       new Map([["claude", stubReader([CANDIDATE])]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
-    const result = await recovered.execute({ sessionId: SESSION_ID });
+    const result = await recovered.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SESSION_ID,
+    });
 
     expect(result.toolReports.find((report) => report.tool === "claude")?.recordsStored).toBe(1);
   });
@@ -978,10 +1095,11 @@ describe("reading every session the journal knows", () => {
         ],
       ]),
       journalNaming("s-a", "s-b"),
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    const result = await useCase.execute({});
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT, env: {} });
 
     expect(result.sessions.map((session) => session.sessionId)).toEqual(["s-a", "s-b"]);
     expect([...sink.files.values()].flat()).toHaveLength(2);
@@ -992,10 +1110,11 @@ describe("reading every session the journal knows", () => {
       new InMemoryTelemetrySink(),
       new Map([["claude", readerFor(new Map([["s-a", [CANDIDATE]]]))]]),
       journalNaming("s-a", "s-b"),
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    const result = await useCase.execute({ sessionId: "s-a" });
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: "s-a" });
 
     expect(result.sessions.map((session) => session.sessionId)).toEqual(["s-a"]);
   });
@@ -1005,10 +1124,14 @@ describe("reading every session the journal knows", () => {
       new InMemoryTelemetrySink(),
       new Map([["claude", stubReader([CANDIDATE])]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    expect(await useCase.execute({})).toEqual({ sessions: [], toolReports: expect.anything() });
+    expect(await useCase.execute({ projectRoot: PROJECT_ROOT, env: {} })).toEqual({
+      sessions: [],
+      toolReports: expect.anything(),
+    });
   });
 
   it("stores nothing new on a second sweep", async () => {
@@ -1020,11 +1143,12 @@ describe("reading every session the journal knows", () => {
       sink,
       readers,
       journalNaming("s-a"),
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
-    await useCase.execute({});
+    await useCase.execute({ projectRoot: PROJECT_ROOT, env: {} });
 
-    const second = await useCase.execute({});
+    const second = await useCase.execute({ projectRoot: PROJECT_ROOT, env: {} });
 
     expect(second.toolReports.find((report) => report.tool === "claude")?.recordsStored).toBe(0);
     expect([...sink.files.values()].flat()).toHaveLength(1);
@@ -1046,10 +1170,11 @@ describe("reading every session the journal knows", () => {
         ],
       ]),
       journalNaming("s-bad", "s-good"),
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    const result = await useCase.execute({});
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT, env: {} });
 
     const bad = result.sessions.find((session) => session.sessionId === "s-bad");
     const good = result.sessions.find((session) => session.sessionId === "s-good");
@@ -1073,10 +1198,11 @@ describe("reading every session the journal knows", () => {
         ],
       ]),
       journalNaming("s-a", "s-b"),
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    const claude = (await useCase.execute({})).toolReports.find(
+    const claude = (await useCase.execute({ projectRoot: PROJECT_ROOT, env: {} })).toolReports.find(
       (report) => report.tool === "claude"
     );
 
@@ -1121,10 +1247,11 @@ describe("a failure in a sweep does not disappear behind a success", () => {
         ],
       ]),
       journal,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    const claude = (await useCase.execute({})).toolReports.find(
+    const claude = (await useCase.execute({ projectRoot: PROJECT_ROOT, env: {} })).toolReports.find(
       (report) => report.tool === "claude"
     );
 
@@ -1139,12 +1266,13 @@ describe("a failure in a sweep does not disappear behind a success", () => {
       new InMemoryTelemetrySink(),
       new Map([["claude", stubReader([CANDIDATE])]]),
       NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
     );
 
-    const claude = (await useCase.execute({ sessionId: SESSION_ID })).toolReports.find(
-      (report) => report.tool === "claude"
-    );
+    const claude = (
+      await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID })
+    ).toolReports.find((report) => report.tool === "claude");
 
     expect(claude?.sessionsFailed).toBe(0);
     expect(claude?.failureReason).toBeUndefined();
@@ -1173,10 +1301,15 @@ describe("a failure in a sweep does not disappear behind a success", () => {
       new Map([["claude", stubReader([])]]),
       NULL_RUN_JOURNAL_READER,
       NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER,
       undefined,
       2
     );
-    await useCase.execute({ at: new Date("2026-01-03T12:00:00Z") });
+    await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      at: new Date("2026-01-03T12:00:00Z"),
+    });
 
     expect(sink.deletedFiles).toEqual(["2026-01-01.jsonl"]);
   });
@@ -1203,10 +1336,71 @@ describe("a failure in a sweep does not disappear behind a success", () => {
       new Map([["claude", stubReader([CANDIDATE])]]),
       NULL_RUN_JOURNAL_READER,
       NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER,
       undefined,
       1
     );
 
-    await expect(useCase.execute({ at: new Date("2026-01-02T12:00:00Z") })).resolves.toBeDefined();
+    await expect(
+      useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, at: new Date("2026-01-02T12:00:00Z") })
+    ).resolves.toBeDefined();
+  });
+});
+
+// Finding 4 (review.md, "one route, and every sentence about it true"): this is the one
+// remaining writer of the sink, so a refusal that does not hold here is cosmetic.
+describe("a refusal holds on the one writer left", () => {
+  it("reads nothing and stores nothing when the project switch is off", async () => {
+    const sink = new InMemoryTelemetrySink();
+    const journal = new InMemoryRunJournalReader();
+    journal.set(SESSION_ID, {
+      boundaries: [],
+      filesWritten: [],
+      taskDeclarations: [],
+      session: {
+        type: "session_start",
+        at: "2026-08-20T09:00:00Z",
+        run_id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        tool: "claude-code",
+        vendor_id: SESSION_ID,
+      },
+    });
+    const refused = new StubTelemetryEvidenceReader();
+    refused.enabled = false;
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      journal,
+      NULL_PERSON_IDENTITY_READER,
+      refused
+    );
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT, env: {} });
+
+    expect(result.sessions).toHaveLength(0);
+    expect(result.refusedReason).toBeDefined();
+    expect([...sink.files.values()].flat()).toHaveLength(0);
+  });
+
+  it("refuses even a direct --session read, which never touches the journal", async () => {
+    const sink = new InMemoryTelemetrySink();
+    const refused = new StubTelemetryEvidenceReader();
+    refused.enabled = false;
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER,
+      refused
+    );
+
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SESSION_ID,
+    });
+
+    expect(result.sessions).toHaveLength(0);
+    expect([...sink.files.values()].flat()).toHaveLength(0);
   });
 });

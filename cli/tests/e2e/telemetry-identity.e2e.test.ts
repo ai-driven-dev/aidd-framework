@@ -45,6 +45,18 @@ async function seedJournal(
   );
 }
 
+// `aidd telemetry read` now refuses the same way `report` and `check` already did (finding
+// 4, review.md "one route, and every sentence about it true") — a sweep this file runs to
+// prove what identity a record carries has to turn measurement on first, the same as a real
+// project would, rather than exploit the gap that let it run unmeasured.
+async function writeSwitch(projectDir: string, enabled: boolean): Promise<void> {
+  await mkdir(join(projectDir, ".aidd"), { recursive: true });
+  await writeFile(
+    join(projectDir, ".aidd", "config.json"),
+    JSON.stringify({ telemetry: { enabled } })
+  );
+}
+
 async function storedLines(fakeHome: string): Promise<Record<string, unknown>[]> {
   const dir = sinkDirIn(fakeHome);
   const entries = await readdir(dir).catch(() => []);
@@ -325,6 +337,7 @@ describe("what a default install actually stores: reading every line it wrote", 
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-default-install");
     try {
       await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
       await cp(LOCAL_COST_FIXTURES, fakeHome, { recursive: true });
       await seedJournal(
         projectDir,
@@ -355,6 +368,7 @@ describe("a choice made today does not reach backwards", () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-no-retro");
     try {
       await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
       await cp(LOCAL_COST_FIXTURES, fakeHome, { recursive: true });
       await seedJournal(
         projectDir,

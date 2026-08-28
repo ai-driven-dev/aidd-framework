@@ -16,8 +16,10 @@ import type { SessionCostReader } from "../../../../src/domain/ports/session-cos
 import { NULL_PERSON_IDENTITY_READER } from "../../../helpers/ports/in-memory-person-identity-reader.js";
 import { NULL_RUN_JOURNAL_READER } from "../../../helpers/ports/in-memory-run-journal-reader.js";
 import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetry-sink.js";
+import { StubTelemetryEvidenceReader } from "../../../helpers/ports/stub-telemetry-evidence-reader.js";
 
 const TRANSCRIPT_SESSION_ID = "22222222-2222-4222-8222-222222222222";
+const PROJECT_ROOT = "/repo";
 
 function loadCapturedTranscript(): string {
   const url = new URL(
@@ -49,9 +51,14 @@ async function readCapturedTranscript(): Promise<{
     sink,
     new Map([["claude", stubReader]]),
     NULL_RUN_JOURNAL_READER,
-    NULL_PERSON_IDENTITY_READER
+    NULL_PERSON_IDENTITY_READER,
+    new StubTelemetryEvidenceReader()
   );
-  await useCase.execute({ sessionId: TRANSCRIPT_SESSION_ID });
+  await useCase.execute({
+    projectRoot: PROJECT_ROOT,
+    env: {},
+    sessionId: TRANSCRIPT_SESSION_ID,
+  });
   return { sink, records: [...sink.files.values()].flat() };
 }
 

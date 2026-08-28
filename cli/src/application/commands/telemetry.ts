@@ -62,9 +62,11 @@ export function registerTelemetryCommand(program: Command): void {
       const errorHandler = new ErrorHandler(output);
       try {
         const deps = await createDeps(projectRoot, { verbose }, output);
-        const result = await deps.readLocalCostUseCase.execute(
-          cmdOptions.session === undefined ? {} : { sessionId: cmdOptions.session }
-        );
+        const result = await deps.readLocalCostUseCase.execute({
+          projectRoot,
+          env: process.env,
+          ...(cmdOptions.session === undefined ? {} : { sessionId: cmdOptions.session }),
+        });
         printLocalCostReadReport(output, result);
       } catch (error) {
         errorHandler.handle(error);
@@ -145,7 +147,9 @@ export function registerTelemetryCommand(program: Command): void {
 
   telemetry
     .command("off")
-    .description("Turn off the AIDD telemetry switch — any endpoint configuration is left alone")
+    .description(
+      "Turn off the AIDD telemetry switch, warning if a tool's own settings file still exports"
+    )
     .action(async () => {
       const { verbose, output, projectRoot } = parseGlobalOptions(program);
       const errorHandler = new ErrorHandler(output);

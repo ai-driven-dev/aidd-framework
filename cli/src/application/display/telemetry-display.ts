@@ -34,7 +34,32 @@ export function printTelemetryOnReport(output: CLIOutput, result: TelemetryOnRes
   output.info(`${result.switchPath} is git-tracked — this applies to everyone who clones.`);
 }
 
+function printLocalCostToolLine(
+  output: CLIOutput,
+  report: ReadLocalCostResult["toolReports"][number]
+): void {
+  const name = getAiToolConfig(report.tool).displayName;
+  const label = LOCAL_COST_STATUS_LABELS[report.status];
+  const counts =
+    report.status === "found" ? ` (${report.recordsStored} new of ${report.recordsFound})` : "";
+  const reason = report.reason ? ` — ${report.reason}` : "";
+  // Never folded into the status: a tool that read most sessions and failed one reports
+  // as read, and a failure visible only in the status would vanish exactly there.
+  const failures =
+    report.sessionsFailed > 0
+      ? ` [${report.sessionsFailed} session${report.sessionsFailed === 1 ? "" : "s"} could not be read: ${report.failureReason}]`
+      : "";
+  output.print(`  ${name}: ${label}${counts}${reason}${failures}`);
+}
+
 export function printLocalCostReadReport(output: CLIOutput, result: ReadLocalCostResult): void {
+  // A refusal reads nothing and stores nothing — see ReadLocalCostUseCase's own doc — so
+  // it is told apart here from "no session journalled yet", which is a fact about the
+  // journal, not about whether the sweep was allowed to run at all.
+  if (result.refusedReason !== undefined) {
+    output.print(`  ${result.refusedReason}`);
+    return;
+  }
   // A sweep prints one line per tool, never one per tool per session: twenty sessions
   // times five tools is a hundred lines nobody reads. How many sessions it covered is the
   // fact that changes, so it leads.
@@ -48,20 +73,7 @@ export function printLocalCostReadReport(output: CLIOutput, result: ReadLocalCos
   output.print(
     `  ${result.sessions.length} session${result.sessions.length === 1 ? "" : "s"} read, ${yielded} with records`
   );
-  for (const report of result.toolReports) {
-    const name = getAiToolConfig(report.tool).displayName;
-    const label = LOCAL_COST_STATUS_LABELS[report.status];
-    const counts =
-      report.status === "found" ? ` (${report.recordsStored} new of ${report.recordsFound})` : "";
-    const reason = report.reason ? ` — ${report.reason}` : "";
-    // Never folded into the status: a tool that read most sessions and failed one reports
-    // as read, and a failure visible only in the status would vanish exactly there.
-    const failures =
-      report.sessionsFailed > 0
-        ? ` [${report.sessionsFailed} session${report.sessionsFailed === 1 ? "" : "s"} could not be read: ${report.failureReason}]`
-        : "";
-    output.print(`  ${name}: ${label}${counts}${reason}${failures}`);
-  }
+  for (const report of result.toolReports) printLocalCostToolLine(output, report);
 }
 
 export function printTelemetryOffReport(output: CLIOutput, result: TelemetryOffResult): void {

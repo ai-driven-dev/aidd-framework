@@ -10,8 +10,12 @@ Providers can tell you a developer burned four million tokens on Tuesday. None c
 that `aidd-dev:02-implement` spent 78,188 of them. The difference is the task, the step and
 the skill — what the framework knows and a provider does not.
 
-**Nothing is measured until you say so.** Nothing leaves your machine, full stop — there is
-no command, no endpoint, and no route in this plugin that sends anything anywhere.
+**Nothing is measured until you say so.** No command, server, or route in this plugin sends
+anything anywhere — the export writer this plugin used to ship is deleted from the code. If
+you ran `aidd telemetry endpoint` on an older version, that is a fact about a settings file
+this plugin can no longer see or touch: `aidd telemetry check` and `aidd telemetry off` both
+detect a settings file still carrying what it wrote, and name exactly what to remove by
+hand.
 
 ## Install and use
 
@@ -136,9 +140,12 @@ tokens; turning tokens into money is a separate service's job.
   `AIDD_TELEMETRY=0`, which overrides the file unconditionally.
 - **No prompt, no code, no diff.** The stored shape is an allowlist, field by field, in
   [the record contract](../../aidd_docs/product/metrics-contract.md).
-- **Nothing leaves your machine.** There is no command, no endpoint and no code path in
-  this plugin that sends a record anywhere else — everything measured is read back from
-  where it was written, on the same machine that wrote it.
+- **Nothing this plugin runs sends a record anywhere else.** Every code path that could —
+  the export writer, its endpoint, the server it once talked to — is deleted; everything
+  measured is read back from where it was written, on the same machine that wrote it. On a
+  machine that ran an older version's `aidd telemetry endpoint`, that settings file is a
+  fact this plugin cannot see or undo any more — `aidd telemetry check` and `aidd telemetry
+  off` both detect it and name what to remove by hand.
 - **`off` keeps what you measured.** It stops the recording; delete the two directories to
   remove the history.
 

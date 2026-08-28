@@ -3,6 +3,7 @@ import type {
   TelemetryClaimId,
   TelemetryClaimVerdict,
 } from "../../domain/models/telemetry-claim.js";
+import type { TelemetryExportLeftover } from "../../domain/models/telemetry-export-leftover.js";
 import type { CLIOutput } from "../output.js";
 import type {
   DiagnoseTelemetryResult,
@@ -41,14 +42,33 @@ function printUncovered(output: CLIOutput, uncovered: DiagnoseTelemetryUncovered
   output.print(`  ${label}${"--".padEnd(4)}  ${uncovered.reason}`);
 }
 
+// Never a claim, and never printed on stdout beside the four: a stale export lives in a
+// tool's own settings file, not in anything the hook, the journal or a reader can see, so
+// it is named on stderr as a warning rather than folded into the health count "no claim
+// mentions exporting" guards. See DiagnoseTelemetryResult's own doc for why it is gathered
+// independently of the gate above.
+function printLeftoverExportConfig(
+  output: CLIOutput,
+  leftovers: readonly TelemetryExportLeftover[]
+): void {
+  for (const leftover of leftovers) {
+    output.warn(
+      `${leftover.path} still sets ${leftover.keys.join(", ")} — delete these keys from ` +
+        "its `env` block by hand to stop that export; nothing here can do it for you."
+    );
+  }
+}
+
 export function printTelemetryCheckReport(
   output: CLIOutput,
   result: DiagnoseTelemetryResult
 ): void {
   if (result.gate !== undefined) {
     output.print(`  ${result.gate}`);
+    printLeftoverExportConfig(output, result.leftoverExportConfig);
     return;
   }
   for (const claim of result.claims) printClaim(output, claim);
   for (const uncovered of result.uncovered) printUncovered(output, uncovered);
+  printLeftoverExportConfig(output, result.leftoverExportConfig);
 }

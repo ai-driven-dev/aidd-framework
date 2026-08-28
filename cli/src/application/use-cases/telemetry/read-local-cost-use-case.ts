@@ -28,6 +28,7 @@ import type {
   LocalCostReadResult,
   SessionCostReader,
 } from "../../../domain/ports/session-cost-reader.js";
+import type { TelemetryEvidenceReader } from "../../../domain/ports/telemetry-evidence-reader.js";
 import type { TelemetrySink } from "../../../domain/ports/telemetry-sink.js";
 import { getAiToolConfig } from "../../../domain/tools/registry.js";
 
@@ -70,6 +71,14 @@ export interface ReadLocalCostOptions {
    * only route a person has, since nothing tells them a session identifier. */
   readonly sessionId?: string;
   readonly at?: Date;
+  /** Where to look for `.aidd/config.json` when asking whether the project switch is on —
+   * the same question `ReportCostUseCase` and `DiagnoseTelemetryUseCase` already ask
+   * before doing anything with what they read. Required, not defaulted: this is the one
+   * route left that writes the sink, and a refusal that does not hold on it is cosmetic. */
+  readonly projectRoot: string;
+  /** Passed through to the same refusal check the switch itself honours
+   * (`AIDD_TELEMETRY=0`), rather than read from `process.env` here. */
+  readonly env: NodeJS.ProcessEnv;
 }
 
 /** What every candidate from one session gets stamped with, gathered once and carried as
@@ -94,6 +103,12 @@ export interface ReadLocalCostResult {
   /** Every tool's answer across every session read, so a caller sees one line per tool
    * rather than one per tool per session. */
   readonly toolReports: readonly LocalCostToolReport[];
+  /** Present only when the sweep refused to run at all — the project switch is off, or the
+   * person refused in their own environment. `sessions` and `toolReports` are both empty in
+   * this case, and never for any other reason a caller could confuse with this one: an
+   * empty sweep with no journal reads differently (see `printLocalCostReadReport`), and
+   * must not be told apart from a refusal by inference. */
+  readonly refusedReason?: string;
 }
 
 /** Reads what every locally-readable tool's own files hold for one session, normalises it
@@ -245,12 +260,16 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+const REFUSED_REASON =
+  "measurement is refused — AIDD_TELEMETRY=0 or the project switch is off; nothing read, nothing stored";
+
 export class ReadLocalCostUseCase {
   constructor(
     private readonly sink: TelemetrySink,
     private readonly readers: ReadonlyMap<AiToolId, SessionCostReader>,
     private readonly runJournalReader: RunJournalReader,
     private readonly personIdentityReader: PersonIdentityReader,
+    private readonly telemetryEvidenceReader: TelemetryEvidenceReader,
     /** Only the retention prune below writes here, and only to warn. Optional because a
      * caller that does not care about housekeeping warnings should not have to invent a
      * logger to read its own figures. */
@@ -259,6 +278,19 @@ export class ReadLocalCostUseCase {
   ) {}
 
   async execute(options: ReadLocalCostOptions): Promise<ReadLocalCostResult> {
+    // The same refusal `ReportCostUseCase` and `DiagnoseTelemetryUseCase` already resolve,
+    // checked here too since this is the sink's one remaining writer: a refusal enforced
+    // only upstream, by the hook never writing a journal, does not hold against
+    // `--session <id>`, which never reads the journal at all. Checked first, before a
+    // single reader runs, so a refused sweep touches neither the sink nor a tool's files.
+    if (
+      !(await this.telemetryEvidenceReader.isTelemetryEnabled(options.projectRoot, options.env))
+    ) {
+      // Told once, by the caller's own display layer (printLocalCostReadReport), not here
+      // too: this.logger exists for housekeeping the figures themselves never surface, the
+      // same reason its own doc restricts it to the retention prune below.
+      return { sessions: [], toolReports: mergeToolReports([]), refusedReason: REFUSED_REASON };
+    }
     const at = options.at ?? new Date();
     const sessionIds =
       options.sessionId === undefined ? await this.journalledSessionIds() : [options.sessionId];

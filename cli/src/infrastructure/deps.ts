@@ -700,8 +700,9 @@ export async function createDeps(
   const cleanUseCase = new CleanUseCase(fs, manifestRepo, logger, gitignoreUseCase, prompter);
   const doctorAllUseCase = new DoctorAllUseCase(doctorUseCase);
   const checkUpdateUseCase = new CheckUpdateUseCase(cliUpdater, currentVersionProvider, logger, fs);
+  const telemetryEvidenceAdapter = new TelemetryEvidenceAdapter();
   const telemetryOnUseCase = new TelemetryOnUseCase(fs, logger, gitignoreUseCase, git);
-  const telemetryOffUseCase = new TelemetryOffUseCase(fs, logger);
+  const telemetryOffUseCase = new TelemetryOffUseCase(fs, logger, telemetryEvidenceAdapter);
   const telemetrySink = new TelemetrySinkAdapter();
   // This is the one place allowed to map a tool that declares `telemetryLocalRead: {
   // kind: "declared" }` to the adapter that reads it.
@@ -737,10 +738,10 @@ export async function createDeps(
     localCostReaders,
     runJournalReader,
     personIdentityAdapter,
+    telemetryEvidenceAdapter,
     logger
   );
   const personIdentityUseCase = new PersonIdentityUseCase(personIdentityAdapter);
-  const telemetryEvidenceAdapter = new TelemetryEvidenceAdapter();
   const hookTrustReaderAdapter = new HookTrustReaderAdapter();
   const diagnoseTelemetryUseCase = new DiagnoseTelemetryUseCase(
     telemetryEvidenceAdapter,
