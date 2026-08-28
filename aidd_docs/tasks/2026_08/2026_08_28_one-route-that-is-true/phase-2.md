@@ -6,6 +6,16 @@ status: done
 
 ## Architecture projection
 
+> Corrected post-hoc (review.md, "one route, and every sentence about it true", finding 9):
+> the original projection below named 14 of the 22 files this phase actually deleted. The
+> other 8 — `enable-tool-telemetry-use-case.ts` and its test, `export-sink-reader.ts` and
+> its adapter, `claude-telemetry.ts` and its test, `telemetry-sink.e2e.test.ts`, and
+> `telemetry-scope-parsing.unit.test.ts` — went out as correct consequences of the same
+> deletion, but a projection that misses a third of what it authorises cannot show what the
+> deletion orphans: the file that wrote (and whose sibling could clear) an export
+> destination, and the caller that pruned the sink, both went out under a projection that
+> named neither. Findings 1 and 4 are what that let escape notice.
+
 ```txt
 .
 └── cli
@@ -14,19 +24,27 @@ status: done
     │   │   ├── use-cases/telemetry/receive-telemetry-use-case.ts        ❌
     │   │   ├── use-cases/telemetry/telemetry-endpoint-use-case.ts       ❌
     │   │   ├── use-cases/telemetry/telemetry-endpoint-clear-use-case.ts ❌
+    │   │   ├── use-cases/telemetry/enable-tool-telemetry-use-case.ts    ❌
     │   │   └── commands/telemetry.ts                                    ✏️
     │   ├── infrastructure
     │   │   ├── adapters/otlp-http-receiver-adapter.ts                   ❌
     │   │   ├── adapters/export-config-reader-adapter.ts                 ❌
+    │   │   ├── adapters/export-sink-reader-adapter.ts                   ❌
     │   │   └── deps.ts                                                  ✏️
     │   └── domain
     │       ├── ports/export-config-reader.ts                            ❌
+    │       ├── ports/export-sink-reader.ts                              ❌
+    │       ├── tools/ai/claude-telemetry.ts                             ❌
     │       ├── tools/contracts.ts                                       ✏️
     │       └── tools/ai/{claude,codex,copilot,cursor,opencode}.ts       ✏️
     └── tests
         ├── infrastructure/adapters/otlp-http-receiver-adapter.integration.test.ts ❌
         ├── application/use-cases/telemetry/telemetry-endpoint*.test.ts   ❌
         ├── application/use-cases/telemetry/receive-telemetry-use-case.unit.test.ts ❌
+        ├── application/use-cases/telemetry/enable-tool-telemetry-use-case.unit.test.ts ❌
+        ├── application/commands/telemetry-scope-parsing.unit.test.ts    ❌
+        ├── domain/tools/ai/claude-telemetry.unit.test.ts                ❌
+        ├── e2e/telemetry-sink.e2e.test.ts                               ❌
         └── e2e/telemetry-stored-export-record.e2e.test.ts               ✅
 ```
 
