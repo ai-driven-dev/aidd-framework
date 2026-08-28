@@ -52,7 +52,11 @@ pre-commit:
         fi
         node scripts/check-skill-argument-hints.mjs
     context-imports:
-      glob: "{**/,}{CLAUDE,AGENTS,copilot-instructions}.md"
+      # Two patterns, because "**/" needs a literal slash and so never matches
+      # a file at the repository root.
+      glob:
+        - "{CLAUDE,AGENTS,copilot-instructions}.md"
+        - "**/{CLAUDE,AGENTS,copilot-instructions}.md"
       run: |
         if ! command -v node >/dev/null 2>&1; then
           echo "ℹ️  node not available; skipping context-imports"
