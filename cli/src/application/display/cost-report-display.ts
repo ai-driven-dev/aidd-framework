@@ -370,8 +370,19 @@ function printHeader(output: CLIOutput, report: CostReport): void {
   // them would be the same noise `identityUnusableCause` avoids by never printing on the
   // ordinary path. What this refuses is the false continuity of showing a stale or empty
   // period with no word that nothing new can be recorded right now.
+  //
+  // Named for what it is, not "measurement is off for this project": the sink this report
+  // reads is scoped to this person, not to this project, so the figures below can be real
+  // work from anywhere the switch was ever on - the category error a person ran into
+  // reading a genuine count under a sentence claiming nothing was measured. This says
+  // exactly what the switch and the figures each actually are, so neither reads as
+  // contradicting the other (review.md, "one route, and every sentence about it true",
+  // finding 2).
   if (!report.measurementEnabled) {
-    output.print("measurement is off for this project — turn on with `aidd telemetry on`");
+    output.print(
+      "this project's own switch is off — the figures below are not scoped to it, they are " +
+        "the whole sink; turn this project's measurement on with `aidd telemetry on`"
+    );
   }
   output.print("");
   if (report.emptySelection !== undefined) {

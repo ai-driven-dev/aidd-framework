@@ -97,10 +97,24 @@ function filtersSuffix(filters: CostReportFilters | undefined): string {
 /** States the period, the selection and the axis on every artefact, for the same reason a
  * chart names its own axes: a figure copied out of the session that made it has to stay
  * placeable without the command that produced it. */
+// Carried on every axis's own header, never only on the terminal rendering: a table meant
+// to leave the session that made it must say this on its own, the same reason the
+// attribution column exists beside it. See cost-report-display.ts's printHeader for why
+// the wording never says "measurement is off" bare — the sink below is scoped to this
+// person, not to this project, so an off switch never contradicts a real figure beside it.
+function measurementSuffix(envelope: CostReportEnvelope): string {
+  return envelope.measurement_enabled
+    ? ""
+    : " — this project's switch is off, figures are the whole sink, not scoped to it";
+}
+
 function header(envelope: CostReportEnvelope, axisLabel: string): string {
   const { from_day, to_day } = envelope.period;
   const task = envelope.task === undefined ? "" : `, task ${envelope.task}`;
-  return `period ${from_day} to ${to_day}${task}${filtersSuffix(envelope.filters)} — axis: ${axisLabel}`;
+  return (
+    `period ${from_day} to ${to_day}${task}${filtersSuffix(envelope.filters)} — axis: ${axisLabel}` +
+    measurementSuffix(envelope)
+  );
 }
 
 function unknownReason(filter: CostReportFilterName): string {

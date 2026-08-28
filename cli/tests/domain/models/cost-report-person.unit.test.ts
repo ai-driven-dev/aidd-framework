@@ -42,6 +42,7 @@ function report(overrides: Partial<CostReportInput> = {}) {
     declaredTools: [{ tool: "claude", coverage: "covered", capability: NO_CAPABILITY }],
     undatedRecords: 0,
     unreadableLines: 0,
+    measurementEnabled: true,
     ...overrides,
   });
 }

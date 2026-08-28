@@ -97,6 +97,7 @@ A breakdown the object leaves empty is a section left out, never a table of zero
 
 6. **Keep `unattributed` as itself.** Nothing measured supports reading it as no step having run, and it is never a residual.
 7. **Say when the answer is partial.** A non-zero `read.undated_records` or `read.unreadable_lines` means the total is incomplete, and the reasons are in [the plugin README](../../../README.md). The `--axis` path already carries this in its own last lines; the `--json` path carries it in `read`.
+8. **Say when this project's own switch is off.** `measurement_enabled: false` on the `--json` path (a "switch is off" line in the `--axis` header) means these figures are not scoped to this project — the sink they come from is scoped to this person, across every project they ever measured. Relay both facts together: the switch is off here, and the figures shown are real, from wherever they were measured. Never read `false` as "these numbers are made up" or drop them for it.
 
 ## Test
 
@@ -110,3 +111,4 @@ A breakdown the object leaves empty is a section left out, never a table of zero
 | A tool is not covered | the answer gives its declared reason instead of a figure |
 | The read was partial | the answer says so before giving the total |
 | Two answers for the same period | they carry the same numbers in the same order |
+| `measurement_enabled` is `false` | the answer says the project's switch is off, alongside the real figures, never in place of them |

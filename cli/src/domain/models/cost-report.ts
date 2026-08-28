@@ -252,13 +252,12 @@ export interface CostReportInput {
    * partial read. This field itself is absent only when the identity was read back fine. */
   readonly identityUnusableCause?: PersonIdentityUnusableCause;
   /** Whether the project switch is on right now, as data rather than a read this pure
-   * function performs itself - the same reasoning `identity` above documents. Absent
-   * defaults to `true`: every caller that never learned otherwise (most of this file's own
-   * tests among them) is a caller for whom nothing has ever suggested measurement is off,
-   * and a report built from records already has to have come from somewhere that was
-   * measuring at least once. Only `ReportCostUseCase` ever passes `false`, for the one
-   * project switch it actually reads. */
-  readonly measurementEnabled?: boolean;
+   * function performs itself - the same reasoning `identity` above documents. Required,
+   * not defaulted: `ReportCostUseCase` is this function's one production caller and always
+   * has a concrete answer, since it is the one thing that reads the switch. A default here
+   * would be reachable only from a test that never bothered to ask - which is exactly the
+   * silent "on" this field exists to rule out. */
+  readonly measurementEnabled: boolean;
 }
 
 export interface CostReport {
@@ -1024,7 +1023,7 @@ function readFields(
   return {
     undatedRecords: input.undatedRecords,
     unreadableLines: input.unreadableLines,
-    measurementEnabled: input.measurementEnabled ?? true,
+    measurementEnabled: input.measurementEnabled,
     ...(input.identityUnusableCause === undefined
       ? {}
       : { identityUnusableCause: input.identityUnusableCause }),

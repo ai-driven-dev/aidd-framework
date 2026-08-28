@@ -64,6 +64,7 @@ function printed(overrides: Partial<CostReportInput> = {}): string {
       ],
       undatedRecords: 0,
       unreadableLines: 0,
+      measurementEnabled: true,
       ...overrides,
     })
   );
@@ -238,6 +239,7 @@ describe("printCostReport", () => {
         declaredTools: [{ tool: "copilot", coverage: "covered", capability: COPILOT_CAPABILITY }],
         undatedRecords: 0,
         unreadableLines: 0,
+        measurementEnabled: true,
       })
     );
     const out = output.lines.join("\n");
@@ -379,10 +381,10 @@ describe("printCostReport", () => {
 });
 
 describe("printCostReport — measurement is off", () => {
-  it("says the switch is off, on an empty period", () => {
+  it("says the project's switch is off, on an empty period", () => {
     const out = printed({ measurementEnabled: false });
 
-    expect(out).toMatch(/measurement is off for this project/u);
+    expect(out).toMatch(/this project's own switch is off/u);
     expect(out).not.toMatch(/\bsessions\s+0\b/u);
     expect(out).toContain("nothing in this period");
   });
@@ -390,17 +392,23 @@ describe("printCostReport — measurement is off", () => {
   it("says nothing about the switch when it is on, even on an empty period", () => {
     const out = printed({ measurementEnabled: true });
 
-    expect(out).not.toContain("measurement is off");
+    expect(out).not.toContain("switch is off");
     expect(out).not.toMatch(/\bsessions\s+0\b/u);
   });
 
-  it("still prints every figure when the switch is off but the period holds history", () => {
+  // Finding 2 (review.md, "one route, and every sentence about it true"): the sink is
+  // person-scoped, the switch is project-scoped - a genuine figure below an "off" claim is
+  // not a contradiction, it is the ordinary case of reporting from a project whose own
+  // switch never applied to work done anywhere else. The sentence must name its own scope
+  // rather than read as denying the figure beside it.
+  it("names the sink's real scope, never denying the figure it sits beside", () => {
     const out = printed({
       measurementEnabled: false,
       records: [record({ cost_usd: 4.2, input_tokens: 100 })],
     });
 
-    expect(out).toMatch(/measurement is off for this project/u);
+    expect(out).toMatch(/this project's own switch is off/u);
+    expect(out).toMatch(/not scoped to it/u);
     expect(out).toContain("$4.20");
     expect(out).toMatch(/\bcost\s+\$4\.20/u);
   });

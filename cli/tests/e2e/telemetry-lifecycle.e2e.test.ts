@@ -162,7 +162,7 @@ describe("measurement, from nothing to off and back", () => {
     expect(beforeAnything.stdout).toContain("nothing in this period");
     // Never a literal zero for what nothing measured: no config at all reads as off, the
     // same as an explicit "off" would, and says so rather than reporting a bare "0".
-    expect(beforeAnything.stdout).toMatch(/measurement is off for this project/u);
+    expect(beforeAnything.stdout).toMatch(/this project's own switch is off/u);
     expect(beforeAnything.stdout).not.toMatch(/\bsessions\s+0\b/u);
     expect(existsSync(join(projectDir, ".aidd", "config.json"))).toBe(false);
 
@@ -197,7 +197,7 @@ describe("measurement, from nothing to off and back", () => {
     expect(afterOff.stdout).toContain(SESSION_TOKENS);
     // Off, but the period still holds real history: says the switch is off *and* still
     // shows every figure already measured - neither fact stands in for the other.
-    expect(afterOff.stdout).toMatch(/measurement is off for this project/u);
+    expect(afterOff.stdout).toMatch(/this project's own switch is off/u);
 
     // 7. A session runs while off. Not one line is journalled — the switch is read at the
     //    moment of every write, not once at startup.
@@ -250,8 +250,16 @@ describe("measurement, from nothing to off and back", () => {
     );
 
     // Turning measurement off changes what is recorded next, never what a past period
-    // answers — a consumer that cached a figure must not see it move.
-    expect(afterOff).toEqual(envelope);
+    // answers — a consumer that cached a figure must not see any of them move.
+    // `measurement_enabled` is the one deliberate exception (finding 2/3, review.md "one
+    // route, and every sentence about it true"): it names the switch's own state right now,
+    // not a fact about the period, so it must move the instant the switch does, and would
+    // be a lie if it did not.
+    expect(envelope.measurement_enabled).toBe(true);
+    expect(afterOff.measurement_enabled).toBe(false);
+    const { measurement_enabled: _before, ...historicalFigures } = envelope;
+    const { measurement_enabled: _after, ...historicalFiguresAfterOff } = afterOff;
+    expect(historicalFiguresAfterOff).toEqual(historicalFigures);
     expect(envelope.cost_report_version).toBe(4);
   }, 60_000);
 });

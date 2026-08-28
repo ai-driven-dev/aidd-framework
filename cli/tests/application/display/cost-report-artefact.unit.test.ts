@@ -53,6 +53,7 @@ function envelopeOf(overrides: Partial<CostReportInput> = {}) {
       declaredTools: [{ tool: "claude", coverage: "covered", capability: NO_CAPABILITY }],
       undatedRecords: 0,
       unreadableLines: 0,
+      measurementEnabled: true,
       ...overrides,
     })
   );
@@ -72,6 +73,20 @@ describe("buildCostReportArtefact", () => {
     expect(() => buildCostReportArtefact(envelopeOf(), "bogus")).toThrow(
       /Unknown axis 'bogus'.*person/su
     );
+  });
+
+  // Finding 3 (review.md, "one route, and every sentence about it true"): `--axis` had no
+  // way to say measurement was off either - a pasted table carried no word of it at all.
+  it("names the project's switch being off in its own header, on every axis", () => {
+    const off = envelopeOf({ measurementEnabled: false });
+    for (const axis of ARTEFACT_AXES) {
+      expect(buildCostReportArtefact(off, axis)).toContain("this project's switch is off");
+    }
+  });
+
+  it("says nothing about the switch in the header when it is on", () => {
+    const on = envelopeOf({ measurementEnabled: true });
+    expect(buildCostReportArtefact(on, "total")).not.toContain("switch is off");
   });
 
   it("prints one row per person with the identities behind it, mapped rows first", () => {
@@ -215,6 +230,7 @@ describe("buildCostReportArtefact — by step, two rows sharing one name", () =>
       declaredTools: [{ tool: "claude", coverage: "covered", capability: NO_CAPABILITY }],
       undatedRecords: 0,
       unreadableLines: 0,
+      measurementEnabled: true,
     };
   }
 

@@ -154,6 +154,13 @@ export interface CostReportEnvelope {
   readonly cost_report_version: number;
   /** The period as it resolved, absolutely — never as it was asked for. */
   readonly period: { readonly from_day: string; readonly to_day: string };
+  /** Whether the project switch is on right now, from `CostReport.measurementEnabled` -
+   * carried here so `--json` and `--axis` can say what the terminal rendering already
+   * does. Never derives "was this really measured" from a figure being zero: a switch off
+   * and a genuinely empty period read identically in every count below, and only this
+   * field tells them apart. Not a `cost_report_version` bump - a consumer that never reads
+   * it sees every field it already understood mean exactly what it always meant. */
+  readonly measurement_enabled: boolean;
   readonly task?: string;
   /** Only the generic filters actually given - `task` above keeps its own field,
    * unchanged. Absent for an unfiltered period. */
@@ -302,6 +309,7 @@ export function toCostReportEnvelope(report: CostReport): CostReportEnvelope {
   return {
     cost_report_version: COST_REPORT_ENVELOPE_VERSION,
     period: { from_day: report.fromDay, to_day: report.toDay },
+    measurement_enabled: report.measurementEnabled,
     ...(report.task === undefined ? {} : { task: report.task }),
     ...(report.filters === undefined ? {} : { filters: report.filters }),
     ...(report.emptySelection === undefined ? {} : { empty_selection: report.emptySelection }),

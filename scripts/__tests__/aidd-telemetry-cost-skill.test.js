@@ -146,7 +146,10 @@ test("every field the cost skill names by name resolves on the object the script
   const claims = fieldClaims(everything);
   // Pinned for the reason the command count above is: an extractor matching nothing would
   // make this pass on an empty set of claims.
-  assert.equal(claims.size, 13, "expected exactly thirteen field references in the cost skill");
+  // 13 -> 14 when the skill's own step 8 (03-report.md) named `measurement_enabled`, added
+  // alongside the CLI envelope gaining that field (review.md, "one route, and every
+  // sentence about it true", findings 2 and 3).
+  assert.equal(claims.size, 14, "expected exactly fourteen field references in the cost skill");
 
   // Fields the envelope carries only under some condition, so a fixture cannot show them all
   // at once: the first five appear only under a selection, and `cost_micro_usd` only once a

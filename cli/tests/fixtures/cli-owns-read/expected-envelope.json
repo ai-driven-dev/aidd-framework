@@ -4,6 +4,7 @@
     "from_day": "2026-01-01",
     "to_day": "2026-01-31"
   },
+  "measurement_enabled": false,
   "sessions": 4,
   "totals": {
     "requests": 4,

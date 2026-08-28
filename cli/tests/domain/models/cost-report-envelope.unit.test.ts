@@ -79,6 +79,7 @@ function envelopeOf(overrides: Partial<CostReportInput> = {}) {
       declaredTools: DECLARED,
       undatedRecords: 0,
       unreadableLines: 0,
+      measurementEnabled: true,
       ...overrides,
     })
   );
@@ -91,6 +92,14 @@ describe("toCostReportEnvelope", () => {
 
   it("carries the period absolutely, as it resolved", () => {
     expect(envelopeOf().period).toEqual({ from_day: "2026-08-17", to_day: "2026-08-21" });
+  });
+
+  // Finding 3 (review.md, "one route, and every sentence about it true"): --json had no
+  // way to say measurement was off at all, breaking the spec's own constraint that a
+  // report says whether measurement is on.
+  it("carries measurement_enabled, the one field the terminal rendering could see and this could not", () => {
+    expect(envelopeOf({ measurementEnabled: true }).measurement_enabled).toBe(true);
+    expect(envelopeOf({ measurementEnabled: false }).measurement_enabled).toBe(false);
   });
 
   it("carries no filters object at all for an unfiltered period", () => {
@@ -291,6 +300,7 @@ describe("the two renderings are one computation", () => {
       declaredTools: DECLARED,
       undatedRecords: 0,
       unreadableLines: 0,
+      measurementEnabled: true,
     });
     const output = new CapturingOutput();
     printCostReport(output, report);

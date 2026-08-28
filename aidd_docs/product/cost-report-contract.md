@@ -111,6 +111,15 @@ for — so a figure taken from a `--days` call can still be cited by the days it
 
 ## Versioning
 
+`measurement_enabled` was added without a bump: a consumer built against version 4 that
+never reads it sees every field it already understood mean exactly what it already meant —
+"adding a field you may ignore" is the rule below, applied to the case that motivated
+writing it down. It says whether this project's own switch is on right now; the sink the
+figures above come from is scoped to this person, not to this project, so `false` beside a
+real count is the ordinary case of reporting from a project whose switch never covered that
+work, never a contradiction (see "Attributing records to a task" for the same scope split
+elsewhere in this object).
+
 Every object carries `cost_report_version`, currently `4` — bumped from `3` when `by_person`
 joined the top-level breakdowns and `read` gained `identity_unusable` (a consumer
 summing every breakdown's `requests` against `totals.requests` now has a fourth breakdown to
@@ -132,6 +141,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
 {
   "cost_report_version": 4,
   "period": { "from_day": "2026-07-01", "to_day": "2026-07-31" },
+  "measurement_enabled": true,                  // this project's own switch, right now — see Versioning
   "task": "2026_08/2026_08_21_cost-reporter",   // absent unless --task was given
   "filters": { "project": "acme/widgets" },     // absent unless a generic filter was given
   "empty_selection": { "filter": "project", "value": "acme/ghost", "known": false },  // absent unless a filter, not the period, emptied this selection
