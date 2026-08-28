@@ -10,6 +10,7 @@ import { ReportCostUseCase } from "../../../../src/application/use-cases/telemet
 import { toMicroUsd } from "../../../../src/domain/models/cost-report.js";
 import type { TelemetrySinkRecord } from "../../../../src/domain/models/telemetry-sink-record.js";
 import { AI_TOOL_IDS } from "../../../../src/domain/models/tool-ids.js";
+import { InMemoryPersonMappingStore } from "../../../helpers/ports/in-memory-person-mapping-store.js";
 import { InMemoryRunJournalReader } from "../../../helpers/ports/in-memory-run-journal-reader.js";
 import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetry-sink.js";
 
@@ -34,12 +35,14 @@ function record(overrides: Partial<TelemetrySinkRecord>): TelemetrySinkRecord {
 describe("ReportCostUseCase", () => {
   let sink: InMemoryTelemetrySink;
   let journals: InMemoryRunJournalReader;
+  let mapping: InMemoryPersonMappingStore;
   let useCase: ReportCostUseCase;
 
   beforeEach(() => {
     sink = new InMemoryTelemetrySink();
     journals = new InMemoryRunJournalReader();
-    useCase = new ReportCostUseCase(sink, journals);
+    mapping = new InMemoryPersonMappingStore();
+    useCase = new ReportCostUseCase(sink, journals, mapping);
   });
 
   async function store(...records: readonly TelemetrySinkRecord[]): Promise<void> {
@@ -137,6 +140,27 @@ describe("ReportCostUseCase", () => {
     await store(record({ cost_usd: 1 }));
 
     expect((await useCase.execute({ period: PERIOD })).totals.requests).toBe(1);
+  });
+
+  it("resolves byPeople against the mapping this store holds", async () => {
+    await mapping.link("person-a", "machine-1");
+    await store(record({ vendor_id: "s-1", cost_usd: 1, person_id: "machine-1" }));
+
+    const built = await useCase.execute({ period: PERIOD });
+
+    const mapped = built.byPeople.find((row) => row.resolution === "mapped");
+    expect(mapped?.person).toBe("person-a");
+  });
+
+  it("survives a mapping that cannot be read, reporting every figure with the caveat set", async () => {
+    mapping.throwOnRead = new Error("person-mapping.json does not parse");
+    await store(record({ vendor_id: "s-1", cost_usd: 1, person_id: "machine-1" }));
+
+    const built = await useCase.execute({ period: PERIOD });
+
+    expect(built.totals.requests).toBe(1);
+    expect(built.personMappingUnreadable).toBe(true);
+    expect(built.byPeople.every((row) => row.resolution !== "mapped")).toBe(true);
   });
 
   it("names no tool, by string literal", () => {

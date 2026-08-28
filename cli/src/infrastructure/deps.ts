@@ -80,6 +80,7 @@ import { SyncConflictResolverUseCase } from "../application/use-cases/sync/sync-
 import { DiagnoseTelemetryUseCase } from "../application/use-cases/telemetry/diagnose-telemetry-use-case.js";
 import { EnableToolTelemetryUseCase } from "../application/use-cases/telemetry/enable-tool-telemetry-use-case.js";
 import { PersonIdentityUseCase } from "../application/use-cases/telemetry/person-identity-use-case.js";
+import { PersonMappingUseCase } from "../application/use-cases/telemetry/person-mapping-use-case.js";
 import { ReadLocalCostUseCase } from "../application/use-cases/telemetry/read-local-cost-use-case.js";
 import { ReceiveTelemetryUseCase } from "../application/use-cases/telemetry/receive-telemetry-use-case.js";
 import { ReportCostUseCase } from "../application/use-cases/telemetry/report-cost-use-case.js";
@@ -149,6 +150,7 @@ import { MarketplaceTrustStoreAdapter } from "./adapters/marketplace-trust-store
 import { OpencodeCostReaderAdapter } from "./adapters/opencode-cost-reader-adapter.js";
 import { OtlpHttpReceiverAdapter } from "./adapters/otlp-http-receiver-adapter.js";
 import { PersonIdentityAdapter } from "./adapters/person-identity-adapter.js";
+import { PersonMappingAdapter } from "./adapters/person-mapping-adapter.js";
 import { PlatformAdapter } from "./adapters/platform-adapter.js";
 import { PluginCatalogRepositoryAdapter } from "./adapters/plugin-catalog-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "./adapters/plugin-distribution-reader-adapter.js";
@@ -241,6 +243,7 @@ interface Deps {
   otlpHttpReceiverAdapter: OtlpHttpReceiverAdapter;
   readLocalCostUseCase: ReadLocalCostUseCase;
   personIdentityUseCase: PersonIdentityUseCase;
+  personMappingUseCase: PersonMappingUseCase;
   diagnoseTelemetryUseCase: DiagnoseTelemetryUseCase;
   reportCostUseCase: ReportCostUseCase;
 }
@@ -771,13 +774,21 @@ export async function createDeps(
   ]);
   const runJournalReader = new RunJournalReaderAdapter(projectRoot);
   const personIdentityAdapter = new PersonIdentityAdapter();
+  const personMappingAdapter = new PersonMappingAdapter();
   const readLocalCostUseCase = new ReadLocalCostUseCase(
     telemetrySink,
     localCostReaders,
     runJournalReader,
     personIdentityAdapter
   );
-  const personIdentityUseCase = new PersonIdentityUseCase(personIdentityAdapter);
+  const personIdentityUseCase = new PersonIdentityUseCase(
+    personIdentityAdapter,
+    personMappingAdapter
+  );
+  const personMappingUseCase = new PersonMappingUseCase(
+    personIdentityAdapter,
+    personMappingAdapter
+  );
   const telemetryEvidenceAdapter = new TelemetryEvidenceAdapter();
   const hookTrustReaderAdapter = new HookTrustReaderAdapter();
   const exportConfigReaderAdapter = new ExportConfigReaderAdapter();
@@ -791,7 +802,11 @@ export async function createDeps(
     exportConfigReaderAdapter,
     exportSinkReaderAdapter
   );
-  const reportCostUseCase = new ReportCostUseCase(telemetrySink, runJournalReader);
+  const reportCostUseCase = new ReportCostUseCase(
+    telemetrySink,
+    runJournalReader,
+    personMappingAdapter
+  );
   const deps: Deps = {
     fs,
     manifestRepo,
@@ -865,6 +880,7 @@ export async function createDeps(
     otlpHttpReceiverAdapter,
     readLocalCostUseCase,
     personIdentityUseCase,
+    personMappingUseCase,
     diagnoseTelemetryUseCase,
     reportCostUseCase,
   };

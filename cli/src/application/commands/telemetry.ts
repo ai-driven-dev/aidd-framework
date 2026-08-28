@@ -17,6 +17,8 @@ import {
   printPersonIdentityOff,
   printPersonIdentityOn,
   printPersonIdentityStatus,
+  printPersonMappingLink,
+  printPersonMappingUnlink,
   printTelemetryEndpointClearReport,
   printTelemetryEndpointReport,
   printTelemetryOffReport,
@@ -329,6 +331,34 @@ function registerTelemetryIdentityCommand(telemetry: Command, program: Command):
       try {
         const deps = await createDeps(projectRoot, { verbose }, output);
         printPersonIdentityName(output, await deps.personIdentityUseCase.name(value));
+      } catch (error) {
+        errorHandler.handle(error);
+      }
+    });
+
+  identity
+    .command("link <identity>")
+    .description("Declare another identifier as this same person - one row, not two, in a report")
+    .action(async (rawIdentity: string) => {
+      const { verbose, output, projectRoot } = parseGlobalOptions(program);
+      const errorHandler = new ErrorHandler(output);
+      try {
+        const deps = await createDeps(projectRoot, { verbose }, output);
+        printPersonMappingLink(output, await deps.personMappingUseCase.link(rawIdentity));
+      } catch (error) {
+        errorHandler.handle(error);
+      }
+    });
+
+  identity
+    .command("unlink <identity>")
+    .description("Withdraw an identifier from this person's mapping")
+    .action(async (rawIdentity: string) => {
+      const { verbose, output, projectRoot } = parseGlobalOptions(program);
+      const errorHandler = new ErrorHandler(output);
+      try {
+        const deps = await createDeps(projectRoot, { verbose }, output);
+        printPersonMappingUnlink(output, await deps.personMappingUseCase.unlink(rawIdentity));
       } catch (error) {
         errorHandler.handle(error);
       }

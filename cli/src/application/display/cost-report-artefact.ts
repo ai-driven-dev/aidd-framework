@@ -6,6 +6,7 @@ import type {
 import { fromMicroUsd } from "../../domain/models/cost-report.js";
 import type {
   CostReportEnvelope,
+  CostReportEnvelopePersonRow,
   CostReportEnvelopeTotals,
 } from "../../domain/models/cost-report-envelope.js";
 import { getAiToolConfig } from "../../domain/tools/registry.js";
@@ -22,7 +23,15 @@ import { getAiToolConfig } from "../../domain/tools/registry.js";
  * consumer already parses, and because that is the shape the plugin script this replaces
  * rendered from — which is how the two were pinned byte-for-byte before the script went.
  */
-export const ARTEFACT_AXES = ["total", "day", "step", "model", "tool", "project"] as const;
+export const ARTEFACT_AXES = [
+  "total",
+  "day",
+  "step",
+  "model",
+  "tool",
+  "project",
+  "person",
+] as const;
 
 export type ArtefactAxis = (typeof ARTEFACT_AXES)[number];
 
@@ -32,6 +41,14 @@ const NOTHING_IN_SELECTION = "nothing in this selection";
 const SESSION_TOTAL_LABEL = "session total, not requests";
 const NO_KNOWN_PROJECT = "no known project";
 const NO_KNOWN_MODEL = "no known model";
+// Distinct on purpose, per the contract's own three-way shape: an unresolved row names an
+// identity that is real but unplaced, and repeats once per such identity since each is its
+// own row; the no-identity row is singular and says nobody opted in at all. Neither label
+// may be swapped for the other, and neither reads as a shared bucket.
+const NO_PERSON_IDENTIFIER = "no identity — nobody opted in";
+function unresolvedPersonLabel(identity: string): string {
+  return `unresolved — not mapped to anyone (${identity})`;
+}
 
 const UNKNOWN_REASON: Partial<Record<CostReportFilterName, string>> = {
   task: "no journal has ever declared it or written into it",
@@ -116,6 +133,9 @@ function caveats(envelope: CostReportEnvelope): readonly string[] {
   if (envelope.read.unreadable_lines > 0) {
     lines.push(`${count(envelope.read.unreadable_lines)} lines could not be read`);
   }
+  if (envelope.read.person_mapping_unreadable) {
+    lines.push("the person mapping could not be read; every identity is reported unresolved");
+  }
   return lines;
 }
 
@@ -179,6 +199,35 @@ function modelArtefact(envelope: CostReportEnvelope): string {
   );
 }
 
+/** A mapped row's own label: its display name when one was set, its canonical identifier
+ * otherwise — never a raw identity, since a mapped row may carry several. */
+function mappedPersonLabel(row: CostReportEnvelopePersonRow): string {
+  return row.display_name ?? row.person ?? "";
+}
+
+function personLabel(row: CostReportEnvelopePersonRow): string {
+  if (row.resolution === "mapped") return mappedPersonLabel(row);
+  if (row.resolution === "unresolved") return unresolvedPersonLabel(row.identities[0] ?? "");
+  return NO_PERSON_IDENTIFIER;
+}
+
+/** A third column beside every other axis's two, because a person line the contract can
+ * audit has to carry its own evidence: the raw identities behind it, not only its label. */
+function personArtefact(envelope: CostReportEnvelope): string {
+  const rows = envelope.by_person.map((row) => {
+    const identities = row.identities.length > 0 ? row.identities.join(", ") : "—";
+    return `| ${personLabel(row)} | ${identities} | ${figure(row.totals, envelope)} |`;
+  });
+  return [
+    header(envelope, "by person"),
+    "",
+    "| Person | Identities | Total |",
+    "| --- | --- | --- |",
+    ...rows,
+    ...caveats(envelope),
+  ].join("\n");
+}
+
 function projectArtefact(envelope: CostReportEnvelope): string {
   return table(
     envelope,
@@ -217,6 +266,7 @@ const BUILDERS: Record<ArtefactAxis, (envelope: CostReportEnvelope) => string> =
   model: modelArtefact,
   tool: toolArtefact,
   project: projectArtefact,
+  person: personArtefact,
 };
 
 export function isArtefactAxis(value: string): value is ArtefactAxis {

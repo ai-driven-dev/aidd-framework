@@ -103,3 +103,10 @@ export class EmptyDisplayNameError extends Error {
     this.name = "EmptyDisplayNameError";
   }
 }
+
+export class IdentityRequiredToLinkError extends Error {
+  constructor() {
+    super("No identity to link onto yet. Run `aidd telemetry identity on` first.");
+    this.name = "IdentityRequiredToLinkError";
+  }
+}

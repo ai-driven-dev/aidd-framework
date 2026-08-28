@@ -517,6 +517,18 @@ export class UnreadableIdentityFileError extends Error {
   }
 }
 
+/** The mapping file exists but could not be read back — a read failure or content that
+ * does not parse. Distinct from no file at all, which is nobody having declared a mapping
+ * and answers `null` from `read()` rather than throwing. Thrown by `readStrict()` alone:
+ * `read()` folds this the same way `PersonIdentityReader.read()` folds a damaged identity
+ * file, so a caller that only wants the mapping is never forced to handle the difference. */
+export class UnreadablePersonMappingFileError extends Error {
+  constructor(filePath: string, cause: string) {
+    super(`Could not read the person mapping at ${filePath} (${cause}).`);
+    this.name = "UnreadablePersonMappingFileError";
+  }
+}
+
 /** One raw identity claimed by two different people's mapping entries — never picked
  * between, since choosing one would be the exact merge the mapping's contract forbids,
  * done silently instead of refused by name. */

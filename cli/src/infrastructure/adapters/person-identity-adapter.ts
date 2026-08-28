@@ -5,33 +5,23 @@ import { UnreadableIdentityFileError } from "../../domain/errors.js";
 import type { PersonIdentity } from "../../domain/ports/person-identity-reader.js";
 import type { PersonIdentityStore } from "../../domain/ports/person-identity-store.js";
 import { IdentityWriteError } from "../errors.js";
-import { resolveHomeDir } from "../home-dir.js";
+import { resolveAiddConfigDir } from "../home-dir.js";
+import { asPlainObject, describeError, isErrnoException } from "../json-file.js";
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIR_MODE = 0o700;
 
 // Mirrors the plugin's own `skills/00-init/scripts/lib/identity.cjs`, field for field and path for
 // path - the two must agree on where this file lives and what it holds, or the same person
-// reads as two people depending on which side ran the local read.
-function identityDir(): string {
-  if (process.platform === "win32" && process.env.APPDATA) {
-    return join(process.env.APPDATA, "aidd");
-  }
-  return join(resolveHomeDir(), ".config", "aidd");
-}
-
+// reads as two people depending on which side ran the local read. Directory resolution
+// itself lives in `resolveAiddConfigDir` - shared with `person-mapping-adapter.ts`, the
+// other adapter whose contract refuses `AIDD_USER_CONFIG_DIR` for the same reason.
 function identityFilePath(): string {
-  return join(identityDir(), "identity.json");
-}
-
-function asObject(value: unknown): Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
+  return join(resolveAiddConfigDir(), "identity.json");
 }
 
 function parseIdentity(raw: string): PersonIdentity | null {
-  const parsed = asObject(JSON.parse(raw));
+  const parsed = asPlainObject(JSON.parse(raw));
   if (typeof parsed.person_id !== "string" || parsed.person_id === "") return null;
   const identity: { personId: string; displayName?: string } = { personId: parsed.person_id };
   if (typeof parsed.display_name === "string" && parsed.display_name !== "") {
@@ -48,14 +38,6 @@ function serializeIdentity(identity: PersonIdentity): string {
   const record: { person_id: string; display_name?: string } = { person_id: identity.personId };
   if (identity.displayName !== undefined) record.display_name = identity.displayName;
   return `${JSON.stringify(record, null, 2)}\n`;
-}
-
-function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error;
-}
-
-function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 /** Reads and writes only this machine's own user profile - `resolveHomeDir()` honors `HOME`

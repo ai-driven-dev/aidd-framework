@@ -7,6 +7,10 @@ import type {
   PersonIdentityStatusResult,
 } from "../use-cases/telemetry/person-identity-use-case.js";
 import type {
+  PersonMappingLinkResult,
+  PersonMappingUnlinkResult,
+} from "../use-cases/telemetry/person-mapping-use-case.js";
+import type {
   LocalCostToolStatus,
   ReadLocalCostResult,
 } from "../use-cases/telemetry/read-local-cost-use-case.js";
@@ -116,6 +120,13 @@ export function printPersonIdentityStatus(
   result: PersonIdentityStatusResult
 ): void {
   output.print(`AIDD identity: ${identityLabel(result)}`);
+  if (result.identity === null || result.mappedIdentities === undefined) return;
+  output.print(`  Mapping at ${result.mappingFilePath}:`);
+  if (result.canonicalPersonId !== result.identity.personId) {
+    output.print(`    This machine's own identifier: ${result.identity.personId}`);
+    output.print(`    Resolves to: ${result.canonicalPersonId}`);
+  }
+  output.print(`    Identities mapped to this person: ${result.mappedIdentities.join(", ")}`);
 }
 
 export function printPersonIdentityOn(output: CLIOutput, result: PersonIdentityOnResult): void {
@@ -144,8 +155,35 @@ export function printPersonIdentityOff(output: CLIOutput, result: PersonIdentity
     "  Records already stored keep the identifier they were written with - none are changed."
   );
   output.print("  Opting in again later mints a fresh identifier, never this one back.");
+  if (!result.mappingStillListsIdentity) return;
+  output.print(
+    "  The mapping still lists this identifier. Run `aidd telemetry identity unlink <identity>` to stop resolving past records to it."
+  );
 }
 
 export function printPersonIdentityName(output: CLIOutput, result: PersonIdentityNameResult): void {
   output.success(`AIDD identity: display name set (${result.filePath})`);
+}
+
+export function printPersonMappingLink(output: CLIOutput, result: PersonMappingLinkResult): void {
+  if (result.alreadyListed) {
+    output.success(
+      `AIDD identity: '${result.identity}' is already listed under ${result.personId} (${result.filePath})`
+    );
+    return;
+  }
+  output.success(
+    `AIDD identity: linked '${result.identity}' to ${result.personId} (${result.filePath})`
+  );
+}
+
+export function printPersonMappingUnlink(
+  output: CLIOutput,
+  result: PersonMappingUnlinkResult
+): void {
+  if (!result.removed) {
+    output.success(`AIDD identity: '${result.identity}' was not listed - nothing to remove`);
+    return;
+  }
+  output.success(`AIDD identity: unlinked '${result.identity}' (${result.filePath})`);
 }

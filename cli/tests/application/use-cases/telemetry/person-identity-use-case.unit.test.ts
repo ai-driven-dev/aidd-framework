@@ -5,11 +5,20 @@ import {
 } from "../../../../src/application/errors.js";
 import { PersonIdentityUseCase } from "../../../../src/application/use-cases/telemetry/person-identity-use-case.js";
 import { UnreadableIdentityFileError } from "../../../../src/domain/errors.js";
+import type { PersonMapping } from "../../../../src/domain/models/person-mapping.js";
 import { InMemoryPersonIdentityStore } from "../../../helpers/ports/in-memory-person-identity-store.js";
+import { InMemoryPersonMappingStore } from "../../../helpers/ports/in-memory-person-mapping-store.js";
+
+function makeUseCase(
+  store: InMemoryPersonIdentityStore,
+  mapping: PersonMapping | null = null
+): PersonIdentityUseCase {
+  return new PersonIdentityUseCase(store, new InMemoryPersonMappingStore(mapping));
+}
 
 describe("PersonIdentityUseCase.status", () => {
   it("answers no identity when nobody opted in", async () => {
-    const useCase = new PersonIdentityUseCase(new InMemoryPersonIdentityStore(null));
+    const useCase = makeUseCase(new InMemoryPersonIdentityStore(null));
 
     const result = await useCase.status();
 
@@ -19,7 +28,7 @@ describe("PersonIdentityUseCase.status", () => {
   it("answers an identity with no name", async () => {
     const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
 
-    const result = await new PersonIdentityUseCase(store).status();
+    const result = await makeUseCase(store).status();
 
     expect(result.identity).toEqual({ personId: "person-1" });
   });
@@ -30,7 +39,7 @@ describe("PersonIdentityUseCase.status", () => {
       displayName: "Baptiste",
     });
 
-    const result = await new PersonIdentityUseCase(store).status();
+    const result = await makeUseCase(store).status();
 
     expect(result.identity).toEqual({ personId: "person-1", displayName: "Baptiste" });
   });
@@ -39,8 +48,53 @@ describe("PersonIdentityUseCase.status", () => {
     const store = new InMemoryPersonIdentityStore(null);
     store.throwOnRead = new Error("identity.json is a directory");
 
-    await expect(new PersonIdentityUseCase(store).status()).rejects.toThrow(
-      "identity.json is a directory"
+    await expect(makeUseCase(store).status()).rejects.toThrow("identity.json is a directory");
+  });
+
+  it("lists every identity mapped to this person, and where the mapping is read from", async () => {
+    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+    const mapping: PersonMapping = {
+      entries: [{ personId: "person-1", identities: ["a-second-machine"] }],
+    };
+
+    const result = await makeUseCase(store, mapping).status();
+
+    expect(result.mappedIdentities).toEqual(
+      expect.arrayContaining(["person-1", "a-second-machine"])
+    );
+    expect(result.mappingFilePath).toBeTruthy();
+  });
+
+  it("answers just the person's own identifier when no mapping declares more", async () => {
+    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+
+    const result = await makeUseCase(store, null).status();
+
+    expect(result.mappedIdentities).toEqual(["person-1"]);
+  });
+
+  it("carries no mapped identities at all when withdrawn - there is no personId to resolve", async () => {
+    const store = new InMemoryPersonIdentityStore(null);
+
+    const result = await makeUseCase(store).status();
+
+    expect(result).not.toHaveProperty("mappedIdentities");
+  });
+
+  it("shows the raw identifier and canonical one distinctly when they differ", async () => {
+    // This machine's own identifier was linked from elsewhere onto a different person's
+    // canonical entry - the case that makes "just show my own personId" the wrong answer.
+    const store = new InMemoryPersonIdentityStore({ personId: "this-machine-id" });
+    const mapping: PersonMapping = {
+      entries: [{ personId: "person-b", identities: ["this-machine-id"] }],
+    };
+
+    const result = await makeUseCase(store, mapping).status();
+
+    expect(result.identity?.personId).toBe("this-machine-id");
+    expect(result.canonicalPersonId).toBe("person-b");
+    expect(result.mappedIdentities).toEqual(
+      expect.arrayContaining(["person-b", "this-machine-id"])
     );
   });
 });
@@ -49,7 +103,7 @@ describe("PersonIdentityUseCase.on", () => {
   it("mints an identifier when none exists", async () => {
     const store = new InMemoryPersonIdentityStore(null, "fresh-id");
 
-    const result = await new PersonIdentityUseCase(store).on();
+    const result = await makeUseCase(store).on();
 
     expect(result.minted).toBe(true);
     expect(result.identity).toEqual({ personId: "fresh-id" });
@@ -59,7 +113,7 @@ describe("PersonIdentityUseCase.on", () => {
   it("a second on reports the same identifier, never a new one", async () => {
     const store = new InMemoryPersonIdentityStore({ personId: "existing-id" }, "fresh-id");
 
-    const result = await new PersonIdentityUseCase(store).on();
+    const result = await makeUseCase(store).on();
 
     expect(result.minted).toBe(false);
     expect(result.identity).toEqual({ personId: "existing-id" });
@@ -69,7 +123,7 @@ describe("PersonIdentityUseCase.on", () => {
 
 describe("PersonIdentityUseCase.name", () => {
   it("refuses when nothing was opted into, naming on as the missing step", async () => {
-    const useCase = new PersonIdentityUseCase(new InMemoryPersonIdentityStore(null));
+    const useCase = makeUseCase(new InMemoryPersonIdentityStore(null));
 
     await expect(useCase.name("Baptiste")).rejects.toThrow(IdentityNotOptedInError);
   });
@@ -77,15 +131,13 @@ describe("PersonIdentityUseCase.name", () => {
   it("refuses an empty or whitespace-only value", async () => {
     const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
 
-    await expect(new PersonIdentityUseCase(store).name("   ")).rejects.toThrow(
-      EmptyDisplayNameError
-    );
+    await expect(makeUseCase(store).name("   ")).rejects.toThrow(EmptyDisplayNameError);
   });
 
   it("attaches the display name beside the identifier already opted into", async () => {
     const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
 
-    await new PersonIdentityUseCase(store).name("Baptiste");
+    await makeUseCase(store).name("Baptiste");
 
     expect(await store.read()).toEqual({ personId: "person-1", displayName: "Baptiste" });
   });
@@ -95,7 +147,7 @@ describe("PersonIdentityUseCase.off", () => {
   it("states that new records will carry no person, and removes the file", async () => {
     const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
 
-    const result = await new PersonIdentityUseCase(store).off();
+    const result = await makeUseCase(store).off();
 
     expect(result.removed).toBe(true);
     expect(store.forgetCount).toBe(1);
@@ -105,7 +157,7 @@ describe("PersonIdentityUseCase.off", () => {
   it("does nothing when already off", async () => {
     const store = new InMemoryPersonIdentityStore(null);
 
-    const result = await new PersonIdentityUseCase(store).off();
+    const result = await makeUseCase(store).off();
 
     expect(result.removed).toBe(false);
     expect(store.forgetCount).toBe(0);
@@ -113,7 +165,7 @@ describe("PersonIdentityUseCase.off", () => {
 
   it("opting in again after withdrawing mints a fresh identifier, never the old one back", async () => {
     const store = new InMemoryPersonIdentityStore({ personId: "withdrawn-id" }, "fresh-id");
-    const useCase = new PersonIdentityUseCase(store);
+    const useCase = makeUseCase(store);
 
     await useCase.off();
     const result = await useCase.on();
@@ -127,7 +179,7 @@ describe("PersonIdentityUseCase.off", () => {
     const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
     store.throwOnRead = new UnreadableIdentityFileError(store.filePath, "EISDIR");
 
-    const result = await new PersonIdentityUseCase(store).off();
+    const result = await makeUseCase(store).off();
 
     expect(result.removed).toBe(true);
     expect(result.discardedDamaged).toBe(true);
@@ -138,9 +190,28 @@ describe("PersonIdentityUseCase.off", () => {
     const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
     store.throwOnRead = new Error("some other failure entirely");
 
-    await expect(new PersonIdentityUseCase(store).off()).rejects.toThrow(
-      "some other failure entirely"
-    );
+    await expect(makeUseCase(store).off()).rejects.toThrow("some other failure entirely");
     expect(store.forgetCount).toBe(0);
+  });
+
+  it("says the mapping still lists the identifier just withdrawn, and leaves it standing", async () => {
+    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+    const mapping: PersonMapping = {
+      entries: [{ personId: "person-1", identities: ["a-second-machine"] }],
+    };
+    const mappingStore = new InMemoryPersonMappingStore(mapping);
+
+    const result = await new PersonIdentityUseCase(store, mappingStore).off();
+
+    expect(result.mappingStillListsIdentity).toBe(true);
+    expect(await mappingStore.read()).toEqual(mapping);
+  });
+
+  it("says the mapping does not list it when there was never a mapping at all", async () => {
+    const store = new InMemoryPersonIdentityStore({ personId: "person-1" });
+
+    const result = await makeUseCase(store, null).off();
+
+    expect(result.mappingStillListsIdentity).toBe(false);
   });
 });
