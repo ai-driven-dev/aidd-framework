@@ -143,10 +143,15 @@ export class PersonIdentityAdapter implements PersonIdentityStore {
   // `off` is a privacy control, and withdrawing must not depend on the damage taking one
   // particular shape. `force: true` folds "already gone" into success rather than a
   // separate ENOENT branch.
-  async forget(): Promise<void> {
+  async forget(): Promise<boolean> {
     try {
-      await rm(identityFilePath(), { recursive: true, force: true });
+      // Deliberately not `force: true`: forcing swallows the missing-file case, which is
+      // the one this has to report. `recursive` stays - a test really does leave a
+      // directory at this path.
+      await rm(identityFilePath(), { recursive: true });
+      return true;
     } catch (error) {
+      if (isErrnoException(error) && error.code === "ENOENT") return false;
       throw new IdentityWriteError(identityFilePath(), error, "remove");
     }
   }

@@ -44,8 +44,14 @@ export interface PersonIdentityStore extends PersonIdentityReader {
   /** Writes `identity` back with `displayName` attached, replacing any previous one. */
   setDisplayName(identity: PersonIdentity, displayName: string): Promise<PersonIdentity>;
 
-  /** Removes the identity file. A no-op, not a failure, when there was none. */
-  forget(): Promise<void>;
+  /** Removes the identity file, answering whether one was actually there. A no-op, not a
+   * failure, when there was none.
+   *
+   * Answers from the filesystem rather than from a parse, because the two disagree: a file
+   * holding an empty `person_id` parses to "nobody chose" while still existing on disk, so
+   * a caller inferring removal from `readStrict()` would leave it there forever with no
+   * verb able to remove it. Only this store can see the file itself. */
+  forget(): Promise<boolean>;
 
   /** The path a stale separate declaration file (`person-mapping.json`) would have lived
    * at beside this one, checked for existence alone and never read - that file was

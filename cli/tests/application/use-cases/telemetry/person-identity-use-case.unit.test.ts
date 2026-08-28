@@ -345,6 +345,20 @@ describe("PersonIdentityUseCase.off", () => {
     expect(result.addedIdentifiersRemoved).toBe(0);
   });
 
+  // A file holding an empty `person_id` parses to "nobody chose" while still sitting on
+  // disk. Deciding removal from that read left it there with no verb able to remove it,
+  // against the contract's own "withdrawing removes the whole declaration".
+  it("removes a file that exists but names nobody, rather than reading it as already off", async () => {
+    const store = new InMemoryPersonIdentityStore(null);
+    store.filePresent = true;
+
+    const result = await useCase(store).off();
+
+    expect(result.removed).toBe(true);
+    expect(store.forgetCount).toBe(1);
+    expect(store.filePresent).toBe(false);
+  });
+
   it("opting in again after withdrawing mints a fresh identifier, never the old one back", async () => {
     const store = new InMemoryPersonIdentityStore(
       { personId: "withdrawn-id", origin: "minted", alsoMe: [] },

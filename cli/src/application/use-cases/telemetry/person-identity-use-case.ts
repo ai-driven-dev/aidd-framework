@@ -154,12 +154,12 @@ export class PersonIdentityUseCase {
   async off(): Promise<PersonIdentityOffResult> {
     const filePath = this.store.filePath;
     const { existing, discardedDamaged } = await this.readForWithdrawal();
-    if (existing === null && !discardedDamaged) {
-      return { filePath, removed: false, discardedDamaged, addedIdentifiersRemoved: 0 };
-    }
     const addedIdentifiersRemoved = existing?.alsoMe.length ?? 0;
-    await this.store.forget();
-    return { filePath, removed: true, discardedDamaged, addedIdentifiersRemoved };
+    // Always asks the store, never decides from the read above: a file holding an empty
+    // `person_id` reads as "nobody chose" and would have been left on disk by a caller
+    // that skipped the removal whenever the read came back empty.
+    const removed = await this.store.forget();
+    return { filePath, removed, discardedDamaged, addedIdentifiersRemoved };
   }
 
   async name(displayName: string): Promise<PersonIdentityNameResult> {

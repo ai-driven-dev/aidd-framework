@@ -14,13 +14,19 @@ import type { PersonIdentityStore } from "../../../src/domain/ports/person-ident
 export class InMemoryPersonIdentityStore implements PersonIdentityStore {
   mintCount = 0;
   forgetCount = 0;
+  /** Whether a file would be on disk. Distinct from `identity` on purpose: a real file
+   * holding an empty `person_id` parses to `null` while still existing, and that is the
+   * case `off` has to keep working for. Seeded from the identity, settable directly. */
+  filePresent: boolean;
   throwOnRead: Error | null = null;
   staleMappingPath: string | null = null;
 
   constructor(
     private identity: PersonIdentity | null = null,
     private readonly nextPersonId = "minted-person-id"
-  ) {}
+  ) {
+    this.filePresent = identity !== null;
+  }
 
   get filePath(): string {
     return "/fake/home/.config/aidd/identity.json";
@@ -36,12 +42,14 @@ export class InMemoryPersonIdentityStore implements PersonIdentityStore {
   }
 
   async mint(): Promise<PersonIdentity> {
+    this.filePresent = true;
     this.mintCount++;
     this.identity = { personId: this.nextPersonId, origin: "minted", alsoMe: [] };
     return this.identity;
   }
 
   async adopt(personId: string): Promise<PersonIdentity> {
+    this.filePresent = true;
     this.identity = {
       personId,
       origin: "adopted",
@@ -54,25 +62,31 @@ export class InMemoryPersonIdentityStore implements PersonIdentityStore {
   }
 
   async addAlsoMe(identity: string): Promise<PersonIdentity> {
+    this.filePresent = true;
     if (this.identity === null) throw new Error("no identity to add onto");
     this.identity = withAlsoMeAdded(this.identity, identity);
     return this.identity;
   }
 
   async removeAlsoMe(identity: string): Promise<PersonIdentity> {
+    this.filePresent = true;
     if (this.identity === null) throw new Error("no identity to remove from");
     this.identity = withAlsoMeRemoved(this.identity, identity);
     return this.identity;
   }
 
   async setDisplayName(identity: PersonIdentity, displayName: string): Promise<PersonIdentity> {
+    this.filePresent = true;
     this.identity = { ...identity, displayName };
     return this.identity;
   }
 
-  async forget(): Promise<void> {
+  async forget(): Promise<boolean> {
     this.forgetCount++;
+    const wasThere = this.filePresent;
     this.identity = null;
+    this.filePresent = false;
+    return wasThere;
   }
 
   async staleMappingFilePath(): Promise<string | null> {
