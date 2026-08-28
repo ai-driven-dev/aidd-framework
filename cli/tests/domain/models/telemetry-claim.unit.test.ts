@@ -318,19 +318,19 @@ describe("diagnoseTelemetryClaims — the whole set", () => {
 
 // The failure this guards against, verbatim from the plan: "A shape change whose consumer
 // is not updated in the same commit is how the cost skill was halted by a version pin,
-// twice." The consumer here is `02-check/SKILL.md`'s own stated claim count - this reads
-// it as text, the same way a person or an agent would, rather than trusting that whoever
-// next changes the claim count remembers to touch the skill too.
+// twice." The consumer here is every file phase 3 named as stating the claim count in
+// prose - `02-check/SKILL.md` and `actions/02-diagnose.md`, the second added after review
+// found the first alone left the file phase 3 itself called out as "the one that hard-coded
+// 'all six claims'" still unguarded (review.md, "one route, and every sentence about it
+// true", finding 7). This reads both as text, the same way a person or an agent would,
+// rather than trusting that whoever next changes the claim count remembers to touch every
+// file that states it.
 describe("the diagnostic skill states the claims the command prints, in the number it prints them", () => {
-  const SKILL_PATH = resolve(
-    process.cwd(),
-    "..",
-    "plugins",
-    "aidd-telemetry",
-    "skills",
-    "02-check",
-    "SKILL.md"
-  );
+  const SKILL_DIR = resolve(process.cwd(), "..", "plugins", "aidd-telemetry", "skills", "02-check");
+  const CLAIM_COUNT_FILES = [
+    resolve(SKILL_DIR, "SKILL.md"),
+    resolve(SKILL_DIR, "actions", "02-diagnose.md"),
+  ];
 
   const NUMBER_WORDS: Record<string, number> = {
     one: 1,
@@ -343,22 +343,35 @@ describe("the diagnostic skill states the claims the command prints, in the numb
     eight: 8,
   };
 
-  function statedClaimCount(): number {
-    const text = readFileSync(SKILL_PATH, "utf8");
-    const match = text.match(/\b(one|two|three|four|five|six|seven|eight)\s+claims?\b/iu);
-    if (!match?.[1]) {
+  // Every cardinal "<word> claim(s)" mention in one file, not only the first: 02-diagnose.md
+  // states the count three times in prose, and a guard that stops at the first match would
+  // leave the second and third free to drift unnoticed, which is exactly how it went stale
+  // the first time.
+  function statedClaimCounts(path: string): readonly number[] {
+    const text = readFileSync(path, "utf8");
+    const matches = [
+      ...text.matchAll(/\b(one|two|three|four|five|six|seven|eight)\s+claims?\b/giu),
+    ];
+    if (matches.length === 0) {
       throw new Error(
-        "02-check/SKILL.md no longer states a claim count in words — update this check's " +
-          "regex (and keep it able to fail) if the wording changed on purpose"
+        `${path} no longer states a claim count in words — update this check's regex ` +
+          "(and keep it able to fail) if the wording changed on purpose"
       );
     }
-    const count = NUMBER_WORDS[match[1].toLowerCase()];
-    if (count === undefined) throw new Error(`unrecognised claim-count word: ${match[1]}`);
-    return count;
+    return matches.map((match) => {
+      const word = match[1]?.toLowerCase() ?? "";
+      const count = NUMBER_WORDS[word];
+      if (count === undefined) throw new Error(`unrecognised claim-count word: ${match[1]}`);
+      return count;
+    });
   }
 
-  it("agrees with the actual number of claims diagnoseTelemetryClaims prints", () => {
+  it("agrees with the actual number of claims diagnoseTelemetryClaims prints, everywhere it is stated", () => {
     const actual = diagnoseTelemetryClaims(evidence()).length;
-    expect(statedClaimCount()).toBe(actual);
+    for (const path of CLAIM_COUNT_FILES) {
+      for (const stated of statedClaimCounts(path)) {
+        expect(stated).toBe(actual);
+      }
+    }
   });
 });
