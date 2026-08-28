@@ -161,6 +161,22 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
     }
   });
 
+  it("off says the mapping still lists an identity that was linked, and names unlink", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-off-mapping-stands");
+    try {
+      await runCli(["telemetry", "identity", "on"], projectDir, fakeHome);
+      await runCli(["telemetry", "identity", "link", "a-second-machine"], projectDir, fakeHome);
+
+      const result = await runCli(["telemetry", "identity", "off"], projectDir, fakeHome);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/mapping still lists this identifier/iu);
+      expect(result.stdout).toContain("identity unlink");
+    } finally {
+      await cleanup();
+    }
+  });
+
   it("naming before opting in refuses and names on as the missing step", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-name-first");
     try {

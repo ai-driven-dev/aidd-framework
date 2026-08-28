@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: the journeys that prove the guarantees

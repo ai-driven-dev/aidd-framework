@@ -104,6 +104,15 @@ export function identityFileIn(fakeHome: string): string {
     : join(fakeHome, ".config", "aidd", "identity.json");
 }
 
+// Beside `identityFileIn`, resolved the same way per platform rather than hardcoding
+// `.config` - that exact mistake already broke Windows CI on this branch once. Mirrors
+// `person-mapping-adapter.ts`'s own `mappingFilePath`.
+export function personMappingFileIn(fakeHome: string): string {
+  return process.platform === "win32"
+    ? join(fakeHome, "AppData", "Roaming", "aidd", "person-mapping.json")
+    : join(fakeHome, ".config", "aidd", "person-mapping.json");
+}
+
 /**
  * Where a sandboxed run's figures actually land, which is not the same directory on every
  * platform. `sandboxedEnv` below points `APPDATA` inside the fake home, so a Windows run
