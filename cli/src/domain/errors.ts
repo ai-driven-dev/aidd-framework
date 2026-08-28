@@ -516,3 +516,16 @@ export class UnreadableIdentityFileError extends Error {
     this.name = "UnreadableIdentityFileError";
   }
 }
+
+/** One raw identity claimed by two different people's mapping entries — never picked
+ * between, since choosing one would be the exact merge the mapping's contract forbids,
+ * done silently instead of refused by name. */
+export class AmbiguousPersonMappingError extends Error {
+  constructor(identity: string, firstPersonId: string, secondPersonId: string) {
+    super(
+      `Identity '${identity}' is claimed by both '${firstPersonId}' and '${secondPersonId}'. ` +
+        "A mapping cannot resolve one identity to two people."
+    );
+    this.name = "AmbiguousPersonMappingError";
+  }
+}
