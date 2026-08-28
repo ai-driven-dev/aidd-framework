@@ -3,6 +3,7 @@ import {
   buildCostReport,
   type CostReportInput,
   type CostTotals,
+  toMicroUsd,
 } from "../../../src/domain/models/cost-report.js";
 import {
   COST_REPORT_ENVELOPE_VERSION,
@@ -143,6 +144,28 @@ describe("byPeople — one raw identity resolved per group, never merged or drop
     expect(built.totals.requests).toBe(4);
   });
 
+  it("summing every person row's own money and tokens equals the report's own total", () => {
+    const built = report({
+      personMapping: twoIdentitiesOnePerson(),
+      records: [
+        request({ turn_id: "a", person_id: "machine-1", cost_usd: 0.5, input_tokens: 100 }),
+        request({ turn_id: "b", person_id: "machine-2", cost_usd: 0.25, input_tokens: 50 }),
+        request({ turn_id: "c", person_id: "a-stranger", cost_usd: 0.1, input_tokens: 20 }),
+        request({ turn_id: "d", cost_usd: 0.05, input_tokens: 10 }),
+      ],
+    });
+
+    const summedCost = built.byPeople.reduce((sum, row) => sum + (row.totals.costMicroUsd ?? 0), 0);
+    const summedInputTokens = built.byPeople.reduce(
+      (sum, row) => sum + (row.totals.inputTokens ?? 0),
+      0
+    );
+    expect(summedCost).toBe(built.totals.costMicroUsd);
+    expect(summedInputTokens).toBe(built.totals.inputTokens);
+    expect(built.totals.costMicroUsd).toBe(toMicroUsd(0.9));
+    expect(built.totals.inputTokens).toBe(180);
+  });
+
   it("orders mapped rows first, then unresolved, then the no-identifier row last", () => {
     const built = report({
       personMapping: twoIdentitiesOnePerson(),
@@ -199,5 +222,39 @@ describe("the envelope carries by_person for a program to parse", () => {
     const mapped = envelope.by_person.find((row) => row.resolution === "mapped");
     expect(mapped?.identities).toEqual(expect.arrayContaining(["machine-1"]));
     expect(envelope.read.person_mapping_unreadable).toBe(false);
+  });
+});
+
+describe("byPeople — a billed call seen by both routes keeps its person", () => {
+  // The export route never carries a person (telemetry-sink-record.ts's own contract), so
+  // the survivor `mergeBilledRequestGroup` picks by `cost_usd` is exactly the export
+  // record - the one sibling in the group with no person_id at all. Discharging the note
+  // `mergeBilledRequestGroup`'s doc comment used to carry: without `withPersonBackfill`,
+  // this exact case would silently drop a mapped person's own work into `"none"`.
+  it("backfills the local-read sibling's person_id onto the export-route survivor", () => {
+    const built = report({
+      personMapping: twoIdentitiesOnePerson(),
+      records: [
+        request({
+          billed_request_id: "call-1",
+          cost_usd: 1,
+          input_tokens: 10,
+          // No person_id: the export route's own contract.
+        }),
+        request({
+          billed_request_id: "call-1",
+          provenance: "local-read",
+          person_id: "machine-1",
+          // No cost_usd: no local reader has ever captured one - never the survivor by
+          // `mergeBilledRequestGroup`'s own cost-bearing rule.
+        }),
+      ],
+    });
+
+    expect(built.totals.requests).toBe(1);
+    const mapped = built.byPeople.find((row) => row.resolution === "mapped");
+    expect(mapped?.person).toBe("person-a");
+    expect(mapped?.totals.requests).toBe(1);
+    expect(built.byPeople.some((row) => row.resolution === "none")).toBe(false);
   });
 });
