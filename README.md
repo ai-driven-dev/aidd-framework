@@ -197,17 +197,35 @@ flowchart TD
     end
 
     subgraph loop["② Per feature — repeat"]
-      direction LR
-      B["brainstorm"] --> P["plan"] --> I["implement"] --> R["review"] --> C["commit"] --> PR(["✅ PR"])
+      direction TB
+      subgraph frame["Frame"]
+        direction LR
+        N["functional need<br/>or User Story"] --> T["issue / ticket"] --> P["plan"]
+      end
+      subgraph deliver["Deliver"]
+        direction LR
+        I["implement"] --> V["validate"] --> R["review"]
+      end
+      subgraph ship["Ship"]
+        direction LR
+        PR["PR"] --> S(["✅ production"]) --> L["learn"]
+      end
+      P --> I
+      R --> PR
     end
 
-    Onboard --> Memory --> B
+    Onboard --> Memory --> N
+    L -. next need .-> N
 
     classDef hub fill:#D97757,stroke:#9c4f37,color:#fff;
     classDef done fill:#2ea043,stroke:#1a7f37,color:#fff;
     class Onboard hub;
-    class PR done;
+    class S done;
 ```
+
+Start with a functional need or User Story, then track it as an issue or ticket
+before planning. Shipping follows the project's own delivery process. Capture a
+learning only when it is durable enough to improve the next feature.
 
 > 🍳 **More flows** → bundled recipes: [start a project](plugins/aidd-context/skills/12-cook/assets/recipes/start-a-project.md), [ship a feature](plugins/aidd-context/skills/12-cook/assets/recipes/ship-a-feature.md), and more.
 

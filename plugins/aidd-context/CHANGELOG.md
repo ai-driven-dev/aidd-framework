@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.7.0](https://github.com/ai-driven-dev/framework/compare/aidd-context-v2.6.2...aidd-context-v2.7.0) (2026-08-28)
+
+
+### Features
+
+* **aidd-context:** add retrospective lens to learn ([#712](https://github.com/ai-driven-dev/framework/issues/712)) ([5449b39](https://github.com/ai-driven-dev/framework/commit/5449b39b4eb1d6c9414aaff6c1de52fb1ae6b494))
+
+
+### Bug Fixes
+
+* **aidd-context:** load the project memory block in Claude Code ([#721](https://github.com/ai-driven-dev/framework/issues/721)) ([87304fb](https://github.com/ai-driven-dev/framework/commit/87304fbca9ce478131320e7e13d093917a05b8dd))
+
 ## [2.6.2](https://github.com/ai-driven-dev/framework/compare/aidd-context-v2.6.1...aidd-context-v2.6.2) (2026-08-14)
 
 

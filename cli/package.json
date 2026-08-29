@@ -1,6 +1,6 @@
 {
   "name": "@ai-driven-dev/cli",
-  "version": "5.2.1",
+  "version": "5.2.2",
   "description": "AI-Driven Development CLI — install AI tool configs and plugins from the AIDD marketplace",
   "license": "MIT",
   "keywords": [
