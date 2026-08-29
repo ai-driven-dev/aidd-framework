@@ -1,30 +1,43 @@
 #!/usr/bin/env node
 /**
  * Re-checks, without spending quota, the assumption the whole telemetry layer rests on:
- * the session identifier a hook receives is the one the tool's own export carries.
+ * the session identifier a hook receives is the one the tool's own files carry, so a cost
+ * read out of those files can be placed against the work the journal recorded.
  *
  * #632 proved it by running one real session. One session is a snapshot, and a tool update
  * can break the join without anything turning red. This is that check, made repeatable.
  *
+ * It used to prove the join over the OTLP export route. That route was deleted — nothing
+ * in this system opens a listener or configures a destination any more — so the probe now
+ * proves it where it actually happens: `aidd telemetry read` opens the transcript Claude
+ * Code wrote for the session the journal named. Same assumption, one fewer moving part,
+ * and no network at all.
+ *
  * **It costs nothing.** Claude Code mints its session identifier, fires `SessionStart` and
- * emits OTLP *before* it ever reaches the API. Pointed at a dead address with a fake key and
- * an empty home, it still does all three and then fails the call. Measured 2026-08-28 on
- * 2.1.250: three runs, three joins, zero tokens and no credentials — which is what lets this
- * run on every pull request rather than nightly.
+ * opens its transcript *before* it ever reaches the API. Pointed at a dead address with a
+ * fake key and an empty home, it still does all three and then fails the call. Measured
+ * 2026-08-29 on 2.1.250: hook, journal and transcript all carried the same identifier,
+ * zero tokens and no credentials — which is what lets this run on every pull request
+ * rather than nightly.
  *
  * Exit codes are the point, not decoration:
  *   0  the join holds
- *   1  the tool changed — everything ran, and the identifiers or attributes disagree
+ *   1  the tool changed — everything ran, and the identifiers disagree
  *   2  the probe is broken — it could not get far enough to have an opinion
  * Never report the second as the first: a missing binary is not evidence about the tool.
  */
-const { spawn, spawnSync } = require("node:child_process");
+const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
 const TOOL_CHANGED = 1;
 const PROBE_BROKEN = 2;
+
+/** How long Claude Code is given before this gives up on it. Generous on purpose: against
+ * a dead address the tool retries, and every artefact this probe reads is written long
+ * before the retries end — so the timeout bounds the run, it does not race it. */
+const RUN_TIMEOUT_MS = 90_000;
 
 /** Attributes this probe actually looked at, printed whichever way the run ends: a silent
  * removal has to be visible in the log, not only in a red cross. */
@@ -48,18 +61,16 @@ function fail(code, message) {
   process.exit(code);
 }
 
-/** A port derived from this process, not asked of the OS: `listen(0)` resolves
- * asynchronously and this probe is deliberately synchronous end to end. A port already in
- * use is not a silent problem — the receiver fails to bind, `waitForListening` times out,
- * and the run exits PROBE BROKEN naming the log, which is the correct classification. */
-function probePort() {
-  return 40000 + (process.pid % 20000);
-}
-
 function resolveCli() {
   const built = path.resolve(__dirname, "..", "cli", "dist", "cli.js");
   if (!fs.existsSync(built)) fail(PROBE_BROKEN, `the CLI is not built at ${built}`);
   return built;
+}
+
+function resolveJournalHook() {
+  const hook = path.resolve(__dirname, "..", "plugins", "aidd-telemetry", "hooks", "journal.cjs");
+  if (!fs.existsSync(hook)) fail(PROBE_BROKEN, `the journal hook is not at ${hook}`);
+  return hook;
 }
 
 function requireClaude() {
@@ -73,7 +84,11 @@ function requireClaude() {
   return (version.stdout || "").trim();
 }
 
-function makeProject(root, port, capture) {
+/** Two hooks on one event, deliberately: the capture hook is this probe's own witness of
+ * what the tool handed over, and the journal hook is the real one whose output `read` will
+ * later have to join. Comparing the probe's witness against the framework's own record is
+ * what makes a disagreement attributable. */
+function makeProject(root, capture, journalHook) {
   const project = path.join(root, "project");
   fs.mkdirSync(path.join(project, ".claude"), { recursive: true });
   fs.mkdirSync(path.join(project, ".aidd"), { recursive: true });
@@ -81,24 +96,20 @@ function makeProject(root, port, capture) {
     path.join(project, ".aidd", "config.json"),
     `${JSON.stringify({ telemetry: { enabled: true } })}\n`
   );
-  const hook = path.join(root, "capture.cjs");
-  fs.writeFileSync(hook, CAPTURE_HOOK);
+  const witness = path.join(root, "capture.cjs");
+  fs.writeFileSync(witness, CAPTURE_HOOK);
   fs.writeFileSync(
     path.join(project, ".claude", "settings.local.json"),
     `${JSON.stringify(
       {
-        env: {
-          CLAUDE_CODE_ENABLE_TELEMETRY: "1",
-          OTEL_METRICS_EXPORTER: "otlp",
-          OTEL_LOGS_EXPORTER: "otlp",
-          OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
-          OTEL_EXPORTER_OTLP_ENDPOINT: `http://127.0.0.1:${port}`,
-          OTEL_METRIC_EXPORT_INTERVAL: "1000",
-          OTEL_RESOURCE_ATTRIBUTES: "aidd.project_id=identifier-join-probe",
-        },
         hooks: {
           SessionStart: [
-            { hooks: [{ type: "command", command: `node ${hook} SessionStart ${capture}` }] },
+            {
+              hooks: [
+                { type: "command", command: `node ${witness} SessionStart ${capture}` },
+                { type: "command", command: `node ${journalHook} session-start` },
+              ],
+            },
           ],
         },
       },
@@ -107,6 +118,9 @@ function makeProject(root, port, capture) {
     )}\n`
   );
   spawnSync("git", ["init", "-q", project]);
+  spawnSync("git", ["remote", "add", "origin", "git@github.com:aidd/identifier-join-probe.git"], {
+    cwd: project,
+  });
   return project;
 }
 
@@ -117,129 +131,130 @@ process.stdin.on("end",()=>{try{fs.mkdirSync(process.argv[3],{recursive:true});
 fs.writeFileSync(path.join(process.argv[3],process.argv[2]+".json"),raw)}catch{}process.exit(0)});
 `;
 
-function waitForListening(logPath, deadlineMs) {
-  const until = Date.now() + deadlineMs;
-  while (Date.now() < until) {
-    if (fs.existsSync(logPath) && /Listening for OTLP/u.test(fs.readFileSync(logPath, "utf8"))) {
-      return true;
-    }
-    spawnSync(process.execPath, ["-e", "setTimeout(()=>{},150)"]);
-  }
-  return false;
+/** Every run file the journal hook left, by name. The name is half the join: the hook
+ * writes `<run id>__<the tool's own session id>.jsonl`. */
+function journalledSessionIds(project) {
+  const dir = path.join(project, "aidd_docs", "runs");
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir)
+    .filter((name) => name.endsWith(".jsonl") && name.includes("__"))
+    .map((name) => name.slice(name.indexOf("__") + 2, -".jsonl".length));
 }
 
-function readSinkRecords(configDir) {
-  const dir = path.join(configDir, "telemetry");
-  if (!fs.existsSync(dir)) return [];
-  const records = [];
-  for (const name of fs.readdirSync(dir).filter((n) => n.endsWith(".jsonl"))) {
-    for (const line of fs.readFileSync(path.join(dir, name), "utf8").split("\n")) {
-      if (!line.trim()) continue;
-      try {
-        records.push(JSON.parse(line));
-      } catch {
-        /* a half-written line is not a verdict about the tool */
-      }
+/** Every transcript Claude Code wrote under this run's own config directory, by the
+ * identifier its file name carries. `claude-code-transcript.ts` locates a session exactly
+ * this way, so this reads the same fact the production reader will. */
+function transcriptSessionIds(configDir) {
+  const root = path.join(configDir, "projects");
+  if (!fs.existsSync(root)) return [];
+  const ids = [];
+  for (const dir of fs.readdirSync(root)) {
+    const full = path.join(root, dir);
+    if (!fs.statSync(full).isDirectory()) continue;
+    for (const name of fs.readdirSync(full)) {
+      if (name.endsWith(".jsonl")) ids.push(name.slice(0, -".jsonl".length));
     }
   }
-  return records;
+  return ids;
 }
 
 function main() {
   const version = requireClaude();
   const cli = resolveCli();
+  const journalHook = resolveJournalHook();
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-join-probe-"));
   const capture = path.join(root, "capture");
-  const configDir = path.join(root, "config");
-  const port = probePort();
-  const project = makeProject(root, port, capture);
-  const logPath = path.join(root, "receive.log");
-  const log = fs.openSync(logPath, "a");
+  const sinkDir = path.join(root, "sink");
+  const home = path.join(root, "home");
+  const configDir = path.join(home, ".claude");
+  const project = makeProject(root, capture, journalHook);
 
-  const receiver = spawn(process.execPath, [cli, "telemetry", "receive", "--port", String(port)], {
-    env: { ...process.env, AIDD_USER_CONFIG_DIR: configDir },
-    stdio: ["ignore", log, log],
-    detached: true,
+  // A dead address, a fake key and an empty home: the session opens, both hooks fire and
+  // the transcript is created before any of the three matter. That is what makes this free.
+  const run = spawnSync("claude", ["-p", "say OK"], {
+    cwd: project,
+    encoding: "utf8",
+    timeout: RUN_TIMEOUT_MS,
+    killSignal: "SIGKILL",
+    env: {
+      ...process.env,
+      HOME: home,
+      CLAUDE_CONFIG_DIR: configDir,
+      ANTHROPIC_BASE_URL: "http://127.0.0.1:9",
+      ANTHROPIC_API_KEY: "sk-ant-probe-not-a-real-key",
+    },
   });
 
-  try {
-    if (!waitForListening(logPath, 15000)) {
-      fail(PROBE_BROKEN, `the OTLP receiver never listened on ${port}; see ${logPath}`);
-    }
-
-    // A dead address, a fake key and an empty home: the session opens, the hook fires and the
-    // export is emitted before any of the three matter. That is what makes this free.
-    const run = spawnSync("claude", ["-p", "say OK"], {
-      cwd: project,
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        HOME: path.join(root, "home"),
-        CLAUDE_CONFIG_DIR: path.join(root, "home", ".claude"),
-        ANTHROPIC_BASE_URL: "http://127.0.0.1:9",
-        ANTHROPIC_API_KEY: "sk-ant-probe-not-a-real-key",
-      },
-    });
-
-    const capturedPath = path.join(capture, "SessionStart.json");
-    if (!fs.existsSync(capturedPath)) {
-      report("SessionStart hook", "MISSING", "no payload captured");
-      fail(
-        TOOL_CHANGED,
-        `the SessionStart hook never fired on ${version}. It fired before the API call on ` +
-          `2.1.250, which is what made this probe free. claude exited ${run.status}.`
-      );
-    }
-    const payload = JSON.parse(fs.readFileSync(capturedPath, "utf8"));
-    const hookId = payload.session_id;
-    if (typeof hookId !== "string" || hookId === "") {
-      report("session_id (hook)", "MISSING", `keys: ${Object.keys(payload).sort().join(", ")}`);
-      fail(TOOL_CHANGED, "the SessionStart payload carries no session_id");
-    }
-    report("session_id (hook)", "present", hookId);
-
-    // The export is flushed on its own interval; give it room before concluding.
-    let records = [];
-    const until = Date.now() + 20000;
-    while (Date.now() < until) {
-      records = readSinkRecords(configDir);
-      if (records.length > 0) break;
-      spawnSync(process.execPath, ["-e", "setTimeout(()=>{},250)"]);
-    }
-    if (records.length === 0) {
-      report("OTLP export", "MISSING", "no record reached the sink");
-      fail(
-        TOOL_CHANGED,
-        `${version} emitted no telemetry against a dead API. It did on 2.1.250; if this is ` +
-          "now deliberate, the probe has to run real sessions and stops being free."
-      );
-    }
-    report("OTLP export", "present", `${records.length} record(s)`);
-
-    const vendorIds = [...new Set(records.map((r) => r.vendor_id).filter(Boolean))];
-    report("vendor_id (export)", vendorIds.length ? "present" : "MISSING", vendorIds.join(", "));
-    report("project_id (export)", "checked", [...new Set(records.map((r) => r.project_id))].join(", "));
-    report("tool (export)", "checked", [...new Set(records.map((r) => r.tool))].join(", "));
-
-    if (!vendorIds.includes(hookId)) {
-      fail(
-        TOOL_CHANGED,
-        `the join is broken on ${version}: the hook saw ${hookId}, the export carries ` +
-          `${vendorIds.join(", ") || "nothing"}. Every attribution in this layer assumes they are one value.`
-      );
-    }
-
-    printReport();
-    process.stdout.write(`\nthe identifier join holds on ${version} — ${hookId}\n`);
-    process.stdout.write("cost: zero tokens, no credentials, no model call reached.\n");
-  } finally {
-    try {
-      process.kill(-receiver.pid);
-    } catch {
-      /* already gone */
-    }
-    fs.closeSync(log);
+  const capturedPath = path.join(capture, "SessionStart.json");
+  if (!fs.existsSync(capturedPath)) {
+    report("SessionStart hook", "MISSING", "no payload captured");
+    fail(
+      TOOL_CHANGED,
+      `the SessionStart hook never fired on ${version}. It fired before the API call on ` +
+        `2.1.250, which is what made this probe free. claude exited ${run.status}.`
+    );
   }
+  const payload = JSON.parse(fs.readFileSync(capturedPath, "utf8"));
+  const hookId = payload.session_id;
+  if (typeof hookId !== "string" || hookId === "") {
+    report("session_id (hook)", "MISSING", `keys: ${Object.keys(payload).sort().join(", ")}`);
+    fail(TOOL_CHANGED, "the SessionStart payload carries no session_id");
+  }
+  report("session_id (hook)", "present", hookId);
+
+  const journalled = journalledSessionIds(project);
+  report("session id (journal)", journalled.length ? "present" : "MISSING", journalled.join(", "));
+  if (!journalled.includes(hookId)) {
+    fail(
+      TOOL_CHANGED,
+      `the journal did not record the identifier the hook was handed on ${version}: the hook ` +
+        `saw ${hookId}, the journal names ${journalled.join(", ") || "nothing"}.`
+    );
+  }
+
+  const transcripts = transcriptSessionIds(configDir);
+  report("session id (transcript)", transcripts.length ? "present" : "MISSING", transcripts.join(", "));
+  if (transcripts.length === 0) {
+    fail(
+      TOOL_CHANGED,
+      `${version} wrote no transcript against a dead API. It did on 2.1.250; if this is now ` +
+        "deliberate, the probe has to run real sessions and stops being free."
+    );
+  }
+  if (!transcripts.includes(hookId)) {
+    fail(
+      TOOL_CHANGED,
+      `the join is broken on ${version}: the hook saw ${hookId}, the transcript is named ` +
+        `${transcripts.join(", ")}. Every attribution in this layer assumes they are one value.`
+    );
+  }
+
+  // The three identifiers agreeing is the join. This last step is what makes it *this
+  // system's* join rather than the probe's own comparison: the shipped reader resolves the
+  // journalled session against the transcript, with no help from anything above.
+  const read = spawnSync(process.execPath, [cli, "telemetry", "read"], {
+    cwd: project,
+    encoding: "utf8",
+    env: { ...process.env, HOME: home, AIDD_USER_CONFIG_DIR: sinkDir },
+  });
+  const stdout = read.stdout || "";
+  // "no session found" is the reader saying the join failed; "read" is it saying the join
+  // held and the session carried no billable record — which is exactly right against a
+  // dead API. The two are different sentences on purpose.
+  const found = /Claude Code:\s*read/u.test(stdout);
+  report("read locates the session", found ? "present" : "MISSING", stdout.trim().split("\n")[1] ?? "");
+  if (!found) {
+    fail(
+      TOOL_CHANGED,
+      `\`aidd telemetry read\` did not locate the session the journal named on ${version}. ` +
+        `It exited ${read.status} and said:\n${stdout}`
+    );
+  }
+
+  printReport();
+  process.stdout.write(`\nthe identifier join holds on ${version} — ${hookId}\n`);
+  process.stdout.write("cost: zero tokens, no credentials, no model call reached.\n");
 }
 
 main();
