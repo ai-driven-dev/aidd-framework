@@ -19,6 +19,11 @@ import { createTestEnv, gitInit, identityFileIn, runCli, sinkDirIn } from "./hel
 const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
 const REPO_ROOT = resolve(process.cwd(), "..");
 const JOURNAL_HOOK = join(REPO_ROOT, "plugins", "aidd-telemetry", "hooks", "journal.cjs");
+// Built from two literals, so this definition itself holds no literal `${...}`: biome's
+// noTemplateCurlyInString flags a bare `${CLAUDE_PLUGIN_ROOT}` inside a plain string as an
+// accidental template placeholder — the same reason the source plugin's own path-rewrite
+// token is built the same way (`plugin-root-token-rewrite.ts`).
+const CLAUDE_PLUGIN_ROOT_TOKEN = "$" + "{CLAUDE_PLUGIN_ROOT}";
 
 const CLAUDE_SESSION = "22222222-2222-4222-8222-222222222222";
 const CLAUDE_RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
@@ -337,6 +342,28 @@ async function writeEnabledPlugin(projectDir: string, pluginKey: string): Promis
   );
 }
 
+// A hooks block a headless CI, or `aidd framework build --target claude --flat`'s own
+// output, can declare directly — never through `enabledPlugins` at all. The route this
+// suite's "declared nowhere" case used to miss entirely (see the defect this covers).
+async function writeClaudeHooksBlock(projectDir: string, command: string): Promise<void> {
+  await mkdir(join(projectDir, ".claude"), { recursive: true });
+  await writeFile(
+    join(projectDir, ".claude", "settings.json"),
+    JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command }] }] } })
+  );
+}
+
+// Cursor's own plugin-scope hooks never fire (see `cursor-hooks-project-merge.ts`'s doc
+// comment) — this project-scope flat file is the only place a Cursor install's hook
+// declaration is ever real.
+async function writeCursorHooksBlock(projectDir: string, command: string): Promise<void> {
+  await mkdir(join(projectDir, ".cursor"), { recursive: true });
+  await writeFile(
+    join(projectDir, ".cursor", "hooks.json"),
+    JSON.stringify({ version: 1, hooks: { sessionStart: [{ command }] } })
+  );
+}
+
 /**
  * The "what is in place" section phase 1 adds ahead of the four claims — a machine that
  * has never been measured still gets an answer, and a person switched off still sees
@@ -422,6 +449,71 @@ describe("aidd telemetry check — what is in place, before any verdict", () => 
       expect(result.exitCode, result.stderr).toBe(0);
       expect(result.stdout).toMatch(/recorder declared\s+yes —/u);
       expect(result.stdout).toContain(join(projectDir, ".claude", "settings.json"));
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("names where the recorder is declared, when a hooks block invokes it directly rather than through enabledPlugins", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("check-setup-declared-hooks");
+    try {
+      await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
+      await writeClaudeHooksBlock(
+        projectDir,
+        `node ${CLAUDE_PLUGIN_ROOT_TOKEN}/hooks/journal.cjs session-start`
+      );
+
+      const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/recorder declared\s+yes —/u);
+      expect(result.stdout).toContain(join(projectDir, ".claude", "settings.json"));
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("names Cursor's project-scope hooks file as a declaration — the only route a Cursor install's hook ever fires from", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv(
+      "check-setup-declared-cursor-hooks"
+    );
+    try {
+      await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
+      await writeCursorHooksBlock(
+        projectDir,
+        "./.cursor/hooks/aidd-telemetry/journal.cjs session-start"
+      );
+
+      const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/recorder declared\s+yes —/u);
+      expect(result.stdout).toContain(join(projectDir, ".cursor", "hooks.json"));
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("stops recognising a hooks block once it stops naming the recorder's own script, proving the match is not a loose substring", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("check-setup-hooks-mutation");
+    try {
+      await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
+      await writeClaudeHooksBlock(
+        projectDir,
+        `node ${CLAUDE_PLUGIN_ROOT_TOKEN}/hooks/journal.cjs session-start`
+      );
+      const declared = await runCli(["telemetry", "check"], projectDir, fakeHome);
+      expect(declared.stdout).toMatch(/recorder declared\s+yes —/u);
+
+      await writeClaudeHooksBlock(
+        projectDir,
+        `node ${CLAUDE_PLUGIN_ROOT_TOKEN}/hooks/unrelated.cjs session-start`
+      );
+      const undeclared = await runCli(["telemetry", "check"], projectDir, fakeHome);
+      expect(undeclared.stdout).toMatch(/recorder declared\s+nowhere this build checks/u);
     } finally {
       await cleanup();
     }

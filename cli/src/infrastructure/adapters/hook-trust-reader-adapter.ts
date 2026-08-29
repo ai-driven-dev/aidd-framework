@@ -16,6 +16,13 @@ export const PLUGIN_NAME = "aidd-telemetry";
 const HOOKS_FILE = "hooks/hooks.json";
 const SESSION_START_EVENT = "session_start";
 
+// The recorder's own hook entry point (`plugins/aidd-telemetry/hooks/hooks.json`'s
+// `command` for every event it registers). Exported alongside `PLUGIN_NAME` so a hooks
+// block found declared in a project's own settings — rather than via `enabledPlugins` —
+// is recognised by the script it actually invokes, not a loose substring: a rename here
+// is the one place `telemetry-evidence-adapter.ts`'s detection needs to follow.
+export const HOOK_ENTRY_SCRIPT = "journal.cjs";
+
 function codexConfigPath(homeDir: string): string {
   return join(homeDir, ".codex", "config.toml");
 }

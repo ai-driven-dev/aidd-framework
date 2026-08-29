@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   flattenCopilotHooksShape,
+  hookCommandsForEvent,
   mergeClaudeSettingsHooks,
   mergeCodexFrameworkHooksJson,
   mergeCursorFlatHooks,
@@ -373,5 +374,54 @@ describe("mergeCodexFrameworkHooksJson", () => {
       hooks: { SessionStart: Array<{ matcher?: string }> };
     };
     expect(result.hooks.SessionStart[0].matcher).toBe("startup");
+  });
+});
+
+// ── hookCommandsForEvent ────────────────────────────────────────────────────────
+
+describe("hookCommandsForEvent", () => {
+  it("reads a command out of Claude's nested matcher-group shape", () => {
+    const content = JSON.stringify({
+      hooks: { SessionStart: [{ hooks: [{ type: "command", command: "run.js" }] }] },
+    });
+    expect(hookCommandsForEvent(content, "SessionStart")).toEqual(["run.js"]);
+  });
+
+  it("reads a command out of Codex's nested shape without Cursor's event rename", () => {
+    const content = JSON.stringify({
+      hooks: { SessionStart: [{ matcher: "startup", hooks: [{ command: "codex-run.js" }] }] },
+    });
+    expect(hookCommandsForEvent(content, "SessionStart")).toEqual(["codex-run.js"]);
+  });
+
+  it("reads a command out of Copilot's flat shape, event name unchanged", () => {
+    const content = JSON.stringify({
+      version: 1,
+      hooks: { SessionStart: [{ type: "command", command: "copilot-run.js" }] },
+    });
+    expect(hookCommandsForEvent(content, "SessionStart")).toEqual(["copilot-run.js"]);
+  });
+
+  it("reads a command out of Cursor's flat shape via CURSOR_EVENT_MAP's renamed event", () => {
+    const content = JSON.stringify({
+      version: 1,
+      hooks: { sessionStart: [{ command: "cursor-run.js" }] },
+    });
+    expect(hookCommandsForEvent(content, "SessionStart")).toEqual(["cursor-run.js"]);
+  });
+
+  it("returns nothing for an event the file never registered", () => {
+    const content = JSON.stringify({
+      hooks: { PostToolUse: [{ hooks: [{ command: "run.js" }] }] },
+    });
+    expect(hookCommandsForEvent(content, "SessionStart")).toEqual([]);
+  });
+
+  it("returns nothing rather than throwing on content this module never wrote", () => {
+    expect(hookCommandsForEvent("not json", "SessionStart")).toEqual([]);
+    expect(hookCommandsForEvent(JSON.stringify({ enabledPlugins: {} }), "SessionStart")).toEqual(
+      []
+    );
+    expect(hookCommandsForEvent(JSON.stringify({ hooks: [] }), "SessionStart")).toEqual([]);
   });
 });

@@ -9,6 +9,8 @@
  * Claude event names (source) are PascalCase; Cursor maps supported events to camelCase.
  */
 
+import { asPlainObject } from "./plain-object.js";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type ClaudeHookItem = { type?: string; command?: string; [key: string]: unknown };
@@ -272,4 +274,51 @@ function buildCodexHookItem(item: ClaudeHookItem): {
   if (typeof item.timeout === "number") entry.timeout = item.timeout;
   if (typeof item.statusMessage === "string") entry.statusMessage = item.statusMessage;
   return entry;
+}
+
+// ── Detection: does an already-written hooks file register a command? ─────────
+
+/**
+ * Every `command` string registered for `claudeEvent` in a hooks file already written in
+ * any of the four shapes this module writes — Claude/Codex's nested matcher groups, or
+ * Copilot/Cursor's flat `{command}` entries — plus whatever alias `CURSOR_EVENT_MAP` maps
+ * `claudeEvent` to (Cursor renames `SessionStart` to `sessionStart`; Codex and Copilot
+ * keep it as written). Malformed content, or a shape none of the four writers produce,
+ * answers `[]` rather than throwing: a shape this module does not recognise is not
+ * evidence of anything.
+ *
+ * The one shape-parsing routine a *reader* needs for "did a hooks block ask for this
+ * command" — `telemetry-evidence-adapter.ts`'s recorder-declaration check calls this
+ * rather than restating the four shapes' knowledge, so a fifth shape recognised here is
+ * recognised there too.
+ */
+export function hookCommandsForEvent(hooksFileContent: string, claudeEvent: string): string[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(hooksFileContent);
+  } catch {
+    return [];
+  }
+  const hooks = asPlainObject(asPlainObject(parsed)?.hooks);
+  if (hooks === null) return [];
+  const commands: string[] = [];
+  for (const eventName of [claudeEvent, ...(CURSOR_EVENT_MAP[claudeEvent] ?? [])]) {
+    const entries = hooks[eventName];
+    if (Array.isArray(entries)) for (const entry of entries) collectCommands(entry, commands);
+  }
+  return commands;
+}
+
+// Handles both known entry depths in one walk: a nested group (`{ hooks: [...] }`,
+// Claude/Codex) recurses one level into its own `hooks` array; a flat entry
+// (`{ command }` or `{ type, command }`, Copilot/Cursor) has none to recurse into and
+// contributes its own command directly.
+function collectCommands(entry: unknown, out: string[]): void {
+  const record = asPlainObject(entry);
+  if (record === null) return;
+  if (Array.isArray(record.hooks)) {
+    for (const nested of record.hooks) collectCommands(nested, out);
+    return;
+  }
+  if (typeof record.command === "string") out.push(record.command);
 }

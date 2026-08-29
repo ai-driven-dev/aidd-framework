@@ -92,11 +92,13 @@ export interface TelemetryRecordsLocationSetup {
 
 /** Whether the recorder — the `aidd-telemetry` plugin whose hook has to fire for anything
  * else here to have material to judge — is declared anywhere this build knows to check:
- * the AIDD manifest a `plugin add` writes, and a tool's own settings file declaring its
- * enabled plugins. A declaration is not proof the hook will fire — see
- * `claude-cli-adapter.ts`'s own measured case, where a declared entry is silently dropped
- * as orphaned when a headless run never registers the plugin — this fact states only that
- * a declaration was found, never that it works. */
+ * the AIDD manifest a `plugin add` writes, a tool's own settings file declaring its
+ * enabled plugins, or a hooks block that invokes the recorder's own entry point directly
+ * (Claude's nested `hooks` key, or Cursor's project-scope flat file — the marketplace
+ * route is not the only one this build can see). A declaration is not proof the hook will
+ * fire — see `claude-cli-adapter.ts`'s own measured case, where a declared entry is
+ * silently dropped as orphaned when a headless run never registers the plugin — this fact
+ * states only that a declaration was found, never that it works. */
 export interface TelemetryRecorderDeclarationSetup {
   readonly declared: boolean;
   /** Where it was found declared — non-empty exactly when `declared` is `true`. */

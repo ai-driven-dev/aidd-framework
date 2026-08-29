@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { hookCommandsForEvent } from "../../domain/formats/flat-hooks-merge.js";
 import { asPlainObject } from "../../domain/formats/plain-object.js";
 import { AIDD_DIR } from "../../domain/models/paths.js";
 import {
@@ -19,7 +20,10 @@ import type {
 } from "../../domain/ports/telemetry-evidence-reader.js";
 import { resolveHomeDir } from "../home-dir.js";
 import { isErrnoException } from "../json-file.js";
-import { PLUGIN_NAME as RECORDER_PLUGIN_NAME } from "./hook-trust-reader-adapter.js";
+import {
+  HOOK_ENTRY_SCRIPT,
+  PLUGIN_NAME as RECORDER_PLUGIN_NAME,
+} from "./hook-trust-reader-adapter.js";
 
 const UNRECOGNISED_FILE_NAME = "_unrecognised.jsonl";
 const MANIFEST_FILENAME = "manifest.json";
@@ -43,6 +47,15 @@ function claudeSettingsCandidates(projectRoot: string): readonly string[] {
     join(projectRoot, ".claude", "settings.json"),
     join(resolveHomeDir(), ".claude", "settings.json"),
   ];
+}
+
+// The project-scope hooks file `ProjectHooksMaterializer`/`cursor-hooks-project-merge.ts`
+// write and merge into for Cursor: Cursor's own plugin-scope hooks never fire (measured,
+// see that module's doc comment), so a Cursor install's only working declaration route is
+// here, in Cursor's flat `version: 1` shape — a hooks block, never `enabledPlugins`, which
+// Cursor has no concept of.
+function cursorHooksJsonPath(projectRoot: string): string {
+  return join(projectRoot, ".cursor", "hooks.json");
 }
 
 async function readIfExists(path: string): Promise<string | null> {
@@ -120,6 +133,26 @@ async function settingsDeclaresPlugin(path: string, pluginName: string): Promise
   return Object.keys(enabledPlugins).some((key) => key.startsWith(prefix));
 }
 
+// Matches `scriptName` as a command's own path leaf — preceded by a path separator or the
+// start of the string, followed by whitespace or the end — never a bare substring: a
+// command that merely mentions the name in an argument, or a script with a longer name
+// that happens to end the same way, is not this recorder's own hook entry point.
+function invokesScript(command: string, scriptName: string): boolean {
+  const escaped = scriptName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|[\\\\/])${escaped}(?:$|\\s)`).test(command);
+}
+
+/** Whether a hooks block written in any of the four shapes `flat-hooks-merge.ts` knows —
+ * Claude's nested settings.json `hooks` key, or Cursor's flat `version: 1` file — invokes
+ * the recorder's own `SessionStart` hook. A hooks block is a declaration exactly like
+ * `enabledPlugins`, never proof: this only reads that the entry point was asked for. */
+async function hooksDeclarePlugin(path: string): Promise<boolean> {
+  const raw = await readIfExists(path);
+  if (raw === null) return false;
+  const commands = hookCommandsForEvent(raw, "SessionStart");
+  return commands.some((command) => invokesScript(command, HOOK_ENTRY_SCRIPT));
+}
+
 function parseUnrecognisedPayload(raw: string): TelemetryUnrecognisedPayload | null {
   const line = raw.split("\n").find((candidate) => candidate.trim() !== "");
   if (line === undefined) return null;
@@ -156,12 +189,19 @@ export class TelemetryEvidenceAdapter implements TelemetryEvidenceReader {
   async readRecorderDeclaration(projectRoot: string): Promise<TelemetryRecorderDeclarationSetup> {
     const manifestFile = manifestPath(projectRoot);
     const settingsFiles = claudeSettingsCandidates(projectRoot);
-    const locationsChecked = [manifestFile, ...settingsFiles];
+    // A hooks block is a second, independent declaration route from `enabledPlugins` —
+    // Cursor's is the only one this build ever writes outside Claude's own settings
+    // files, since Cursor's plugin-scope hooks never fire (see `cursorHooksJsonPath`).
+    const hooksFiles = [...settingsFiles, cursorHooksJsonPath(projectRoot)];
+    const locationsChecked = [manifestFile, ...hooksFiles];
     const declaredAt: string[] = [];
     if (await manifestDeclaresPlugin(projectRoot, RECORDER_PLUGIN_NAME))
       declaredAt.push(manifestFile);
     for (const path of settingsFiles) {
       if (await settingsDeclaresPlugin(path, RECORDER_PLUGIN_NAME)) declaredAt.push(path);
+    }
+    for (const path of hooksFiles) {
+      if (!declaredAt.includes(path) && (await hooksDeclarePlugin(path))) declaredAt.push(path);
     }
     return { declared: declaredAt.length > 0, declaredAt, locationsChecked };
   }
