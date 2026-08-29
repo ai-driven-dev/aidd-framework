@@ -33,7 +33,7 @@ export type TelemetryClaimVerdict = "ok" | "fail" | "unknown";
 export type TelemetryClaimReason =
   | "session-anchored"
   | "untrusted-codex-hook"
-  | "hook-never-fired"
+  | "recorder-declared-nowhere"
   | "recorder-declared-not-yet-fired"
   | "unrecognised-payload"
   | "session-left-no-run-file"
@@ -171,7 +171,7 @@ function recorderNotDeclaredClaim(
   return {
     claim: "hook-fired",
     verdict: "fail",
-    reason: "hook-never-fired",
+    reason: "recorder-declared-nowhere",
     detail:
       `no run file in ${runsDirLabel} — the hook has never been observed firing, and the ` +
       `recorder is declared nowhere this build checks${unreadableTrustSuffix(hookTrust)}`,

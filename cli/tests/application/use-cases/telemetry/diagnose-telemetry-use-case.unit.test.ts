@@ -222,7 +222,7 @@ describe("DiagnoseTelemetryUseCase — gathering local evidence", () => {
     const claudeAnchored = await useCase.execute(runOptions({ CLAUDE_CODE_SESSION_ID: "s-1" }));
     if (claudeAnchored.gate !== undefined) throw new Error("expected the run to pass the gate");
     expect(claudeAnchored.claims.find((c) => c.claim === "hook-fired")?.reason).toBe(
-      "hook-never-fired"
+      "recorder-declared-nowhere"
     );
 
     const codexAnchored = await useCase.execute(runOptions({ CODEX_THREAD_ID: "codex-1" }));

@@ -58,7 +58,7 @@ describe("diagnoseTelemetryClaims — hook fired", () => {
     const result = diagnoseTelemetryClaims(evidence({ currentSessionId: "s-1" }));
     const hookFired = claim(result, "hook-fired");
     expect(hookFired?.verdict).toBe("fail");
-    expect(hookFired?.reason).toBe("hook-never-fired");
+    expect(hookFired?.reason).toBe("recorder-declared-nowhere");
     expect(hookFired?.detail).toMatch(/never been observed firing/u);
   });
 
@@ -77,7 +77,7 @@ describe("diagnoseTelemetryClaims — hook fired", () => {
       evidence({ journals: [journal({ vendorId: undefined })], currentSessionId: "s-1" })
     );
     const hookFired = claim(result, "hook-fired");
-    expect(hookFired?.reason).toBe("hook-never-fired");
+    expect(hookFired?.reason).toBe("recorder-declared-nowhere");
   });
 
   it("names this session as having left no run file when an older one exists but not its own", () => {
@@ -122,7 +122,7 @@ describe("diagnoseTelemetryClaims — hook fired", () => {
         hookTrust: { readable: true, trusted: true, configPath: "/home/.codex/config.toml" },
       })
     );
-    expect(claim(result, "hook-fired")?.reason).toBe("hook-never-fired");
+    expect(claim(result, "hook-fired")?.reason).toBe("recorder-declared-nowhere");
   });
 
   it("says the trust state could not itself be read, rather than guessing", () => {
@@ -136,7 +136,7 @@ describe("diagnoseTelemetryClaims — hook fired", () => {
       })
     );
     const hookFired = claim(result, "hook-fired");
-    expect(hookFired?.reason).toBe("hook-never-fired");
+    expect(hookFired?.reason).toBe("recorder-declared-nowhere");
     expect(hookFired?.detail).toMatch(/could not be read either/u);
   });
 
