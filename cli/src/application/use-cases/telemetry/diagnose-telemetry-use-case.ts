@@ -12,6 +12,7 @@ import type { TelemetryExportLeftover } from "../../../domain/models/telemetry-e
 import {
   buildTelemetryAllowedSetup,
   type TelemetryIdentitySetup,
+  type TelemetryRecorderDeclarationSetup,
   type TelemetrySetup,
 } from "../../../domain/models/telemetry-setup.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../domain/models/tool-ids.js";
@@ -111,7 +112,7 @@ export class DiagnoseTelemetryUseCase {
     const setup = await this.gatherSetup(options);
     const gate = await this.gateReason(options);
     if (gate !== null) return { gate, setup, leftoverExportConfig };
-    const evidence = await this.gatherEvidence(options, setup.recorderDeclaration.declared);
+    const evidence = await this.gatherEvidence(options, setup.recorderDeclaration);
     const claims = diagnoseTelemetryClaims(evidence);
     return { setup, claims, uncovered: uncoveredTools(), leftoverExportConfig };
   }
@@ -145,7 +146,7 @@ export class DiagnoseTelemetryUseCase {
 
   private async gatherEvidence(
     options: DiagnoseTelemetryOptions,
-    recorderDeclared: boolean
+    recorderDeclaration: TelemetryRecorderDeclarationSetup
   ): Promise<TelemetryEvidence> {
     const journals = await this.runJournalReader.list();
     const currentSessionId = resolveSessionAnchor(options.env);
@@ -159,7 +160,8 @@ export class DiagnoseTelemetryUseCase {
       currentSessionId,
       unrecognisedPayloadAt: unrecognisedPayload?.at,
       hookTrust,
-      recorderDeclared,
+      recorderDeclared: recorderDeclaration.declared,
+      recorderDeclarationReadable: recorderDeclaration.unreadable.length === 0,
     };
   }
 

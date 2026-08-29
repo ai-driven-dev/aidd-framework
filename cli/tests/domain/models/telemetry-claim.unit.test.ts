@@ -29,6 +29,9 @@ function evidence(overrides: Partial<TelemetryEvidence> = {}): TelemetryEvidence
     // the recorder, so an empty journal reads as the failure it already did before this
     // fact existed. A test for the declared branch sets this explicitly.
     recorderDeclared: false,
+    // Readable by default — a clean machine where the declaration itself was never in
+    // question. A test for the "could not be read" branch sets this to `false` explicitly.
+    recorderDeclarationReadable: true,
     ...overrides,
   };
 }
@@ -77,7 +80,26 @@ describe("diagnoseTelemetryClaims — hook fired", () => {
       evidence({ journals: [journal({ vendorId: undefined })], currentSessionId: "s-1" })
     );
     const hookFired = claim(result, "hook-fired");
-    expect(hookFired?.reason).toBe("recorder-declared-nowhere");
+    expect(hookFired?.reason).toBe("anchorless-run-file");
+    expect(hookFired?.detail).not.toMatch(/matched no known host/u);
+  });
+
+  it("names an anchorless run file as its own reason, unconditional on the recorder's own declaration", () => {
+    const declared = diagnoseTelemetryClaims(
+      evidence({
+        journals: [journal({ vendorId: undefined })],
+        currentSessionId: "s-1",
+        recorderDeclared: true,
+      })
+    );
+    const hookFired = claim(declared, "hook-fired");
+    // A run file existing at all is direct evidence the recorder ran, so this is a
+    // failure — not "no run file … yet, nothing to evaluate" (`--`), which the recorder's
+    // own declaration cannot turn a demonstrably-existing, unanchored file into.
+    expect(hookFired?.verdict).toBe("fail");
+    expect(hookFired?.reason).toBe("anchorless-run-file");
+    expect(hookFired?.detail).not.toMatch(/nothing to evaluate/u);
+    expect(hookFired?.detail).not.toMatch(/declared nowhere/u);
   });
 
   it("names this session as having left no run file when an older one exists but not its own", () => {
@@ -177,6 +199,21 @@ describe("diagnoseTelemetryClaims — hook fired", () => {
     const hookFired = claim(result, "hook-fired");
     expect(hookFired?.verdict).toBe("fail");
     expect(hookFired?.detail).toMatch(/recorder is declared nowhere/u);
+  });
+
+  it("says it could not tell, never a failure, when the declaration itself could not be read", () => {
+    const result = diagnoseTelemetryClaims(
+      evidence({
+        currentSessionId: "s-1",
+        recorderDeclared: false,
+        recorderDeclarationReadable: false,
+      })
+    );
+    const hookFired = claim(result, "hook-fired");
+    expect(hookFired?.verdict).toBe("unknown");
+    expect(hookFired?.reason).toBe("recorder-declaration-unreadable");
+    expect(hookFired?.detail).toMatch(/could not be read/u);
+    expect(hookFired?.detail).not.toMatch(/declared nowhere/u);
   });
 
   it("lets an untrusted Codex hook explain the absence ahead of either new reason, even when the recorder is declared", () => {

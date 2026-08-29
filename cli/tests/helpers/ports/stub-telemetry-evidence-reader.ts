@@ -25,6 +25,7 @@ export class StubTelemetryEvidenceReader implements TelemetryEvidenceReader {
     declared: false,
     declaredAt: [],
     locationsChecked: ["/repo/.aidd/manifest.json"],
+    unreadable: [],
   };
 
   async isTelemetryEnabled(): Promise<boolean> {

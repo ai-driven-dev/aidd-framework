@@ -30,11 +30,26 @@ export type TelemetryClaimVerdict = "ok" | "fail" | "unknown";
  * collapsing them into one reading is exactly what a diagnostic exists to prevent — so the
  * reason, not the verdict alone, is what a caller must switch on to tell them apart.
  */
+
+/**
+ * The reasons `noRunFileClaim` can land the first claim on — one absence, told apart by
+ * what is actually known about it, never guessed from the absence alone. Its own union so
+ * a fifth cause can only ever be added by extending this type: `TelemetryClaimReason`
+ * composes it in, so a new member here forces every exhaustive `Record` keyed on it
+ * (the diagnostic skill's own drift guard, `telemetry-claim.unit.test.ts`) to name an
+ * account for it or fail to compile — the same failure mode this cluster exists to
+ * prevent is not allowed to reopen quietly through a sixth branch nobody documented.
+ */
+export type NoRunFileReason =
+  | "recorder-declared-nowhere"
+  | "recorder-declared-not-yet-fired"
+  | "recorder-declaration-unreadable"
+  | "anchorless-run-file";
+
 export type TelemetryClaimReason =
   | "session-anchored"
   | "untrusted-codex-hook"
-  | "recorder-declared-nowhere"
-  | "recorder-declared-not-yet-fired"
+  | NoRunFileReason
   | "unrecognised-payload"
   | "session-left-no-run-file"
   | "no-session-anchor"
@@ -105,6 +120,16 @@ export interface TelemetryEvidence {
    * the hook will fire — see `noRunFileClaim`'s own doc for the measured case where a
    * declaration is silently dropped. */
   readonly recorderDeclared: boolean;
+  /** Whether every location `readRecorderDeclaration` checked was actually readable —
+   * `false` only when `recorderDeclared` is `false` *and* at least one checked location
+   * exists but could not be read or parsed (a trailing comma, a `//` comment, unreadable
+   * permissions). A damaged declaring file is not the same absence as a recorder declared
+   * nowhere, the same "could not be read" distinction the switch file and identity already
+   * carry — collapsing it into "not declared" would grade a healthy, merely-unreadable
+   * install `FAIL` for a cause it does not have. Meaningless, and always `true`, when
+   * `recorderDeclared` is `true`: a declaration found at one readable location is real
+   * regardless of what else could not be read. */
+  readonly recorderDeclarationReadable: boolean;
 }
 
 function sessionJournalsOf(
@@ -178,12 +203,54 @@ function recorderNotDeclaredClaim(
   };
 }
 
+// A location that cannot be read says so and costs only itself: this is not proof the
+// recorder is missing, only that whether it is declared could not be determined. Grading
+// `FAIL` off an unreadable file would reinstate, one layer down, the exact bug this
+// diagnostic exists to prevent — a healthy install told it is broken because something
+// about it could not be read.
+function recorderDeclarationUnreadableClaim(runsDirLabel: string): TelemetryClaim {
+  return {
+    claim: "hook-fired",
+    verdict: "unknown",
+    reason: "recorder-declaration-unreadable",
+    detail:
+      `no run file in ${runsDirLabel} yet, and whether the recorder is declared could not ` +
+      "be read — see recorder declared, above, for which location. A damaged declaring " +
+      "file is not the same absence as one that never declared the recorder.",
+  };
+}
+
+// A run file existing at all is direct evidence the recorder did something, whatever the
+// declaration says: reading its absence as "no run file … yet" (nothing to evaluate) or
+// as "the recorder is declared nowhere" (which claims no run file exists) are both wrong
+// about the one fact that is actually known here — a file is present, and it has no
+// session anchor to judge against. Unconditional on the recorder's own declaration: a
+// hooks block that registers PostToolUse/Stop but never SessionStart produces exactly
+// this file while reading "declared nowhere" (`hooksDeclarePlugin` only asks after
+// SessionStart), so gating this on `recorderDeclared` would still print "no run file"
+// about a file that demonstrably exists.
+function anchorlessRunFileClaim(runsDirLabel: string, fileCount: number): TelemetryClaim {
+  return {
+    claim: "hook-fired",
+    verdict: "fail",
+    reason: "anchorless-run-file",
+    detail:
+      `${fileCount} run file(s) in ${runsDirLabel}, but none carry a readable session_start ` +
+      "to anchor them — a torn write, or a hooks block that registers another event " +
+      "without SessionStart, never a hook that has not fired",
+  };
+}
+
 function noRunFileClaim(
   runsDirLabel: string,
   hookTrust: TelemetryCodexHookTrust | undefined,
-  recorderDeclared: boolean
+  recorderDeclared: boolean,
+  recorderDeclarationReadable: boolean,
+  anchorlessFileCount: number
 ): TelemetryClaim {
   if (hookTrust && trustExplainsAbsence(hookTrust)) return untrustedHookClaim(hookTrust);
+  if (anchorlessFileCount > 0) return anchorlessRunFileClaim(runsDirLabel, anchorlessFileCount);
+  if (!recorderDeclarationReadable) return recorderDeclarationUnreadableClaim(runsDirLabel);
   if (recorderDeclared) return recorderDeclaredNotYetFiredClaim(runsDirLabel);
   return recorderNotDeclaredClaim(runsDirLabel, hookTrust);
 }
@@ -229,16 +296,31 @@ function sessionAnchoredClaim(
   };
 }
 
+// Split out of `claimHookFired` to keep both under the line-count limit: everything this
+// branch needs when no journal carries a session anchor at all.
+function noSessionJournalClaim(evidence: TelemetryEvidence): TelemetryClaim {
+  const { journals, runsDirLabel, unrecognisedPayloadAt, hookTrust } = evidence;
+  if (unrecognisedPayloadAt !== undefined) return unrecognisedPayloadClaim(unrecognisedPayloadAt);
+  return noRunFileClaim(
+    runsDirLabel,
+    hookTrust,
+    evidence.recorderDeclared,
+    evidence.recorderDeclarationReadable,
+    journals.length
+  );
+}
+
 function claimHookFired(evidence: TelemetryEvidence): TelemetryClaim {
-  const { journals, runsDirLabel, currentSessionId, unrecognisedPayloadAt, hookTrust } = evidence;
-  const sessionJournals = sessionJournalsOf(journals);
-  if (sessionJournals.length === 0) {
-    if (unrecognisedPayloadAt !== undefined) return unrecognisedPayloadClaim(unrecognisedPayloadAt);
-    return noRunFileClaim(runsDirLabel, hookTrust, evidence.recorderDeclared);
-  }
+  const sessionJournals = sessionJournalsOf(evidence.journals);
+  if (sessionJournals.length === 0) return noSessionJournalClaim(evidence);
   const latest = latestSessionStart(sessionJournals);
-  if (currentSessionId === undefined) return noAnchorClaim(sessionJournals, latest);
-  return sessionAnchoredClaim(sessionJournals, latest, currentSessionId, hookTrust);
+  if (evidence.currentSessionId === undefined) return noAnchorClaim(sessionJournals, latest);
+  return sessionAnchoredClaim(
+    sessionJournals,
+    latest,
+    evidence.currentSessionId,
+    evidence.hookTrust
+  );
 }
 
 function claimSessionJournalled(journals: readonly TelemetryClaimJournal[]): TelemetryClaim {

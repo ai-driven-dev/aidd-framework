@@ -106,4 +106,12 @@ export interface TelemetryRecorderDeclarationSetup {
   /** Every location this build knows to check, so a person can go add it there when
    * `declared` is `false` — the same set regardless of the outcome. */
   readonly locationsChecked: readonly string[];
+  /** Every checked location that exists but could not be read or parsed — a trailing
+   * comma, a `//` comment, unreadable permissions. Mirrors the switch file and identity's
+   * own `readable` fact, the same "a damaged file is not a choice" distinction, just
+   * carried as a list here because more than one location is ever checked at once.
+   * Non-empty only makes sense alongside `declared: false`: a declaration actually found
+   * at one readable location is real regardless of what else could not be read, so a
+   * consumer should only look at this when `declared` is `false`. */
+  readonly unreadable: readonly string[];
 }

@@ -173,7 +173,7 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
     }
   });
 
-  it("names the hook never firing, not an unrecognised payload, for a run file torn before session_start ever parsed", async () => {
+  it("names an anchorless run file as its own failure, not an unrecognised payload, for a run file torn before session_start ever parsed", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("check-torn");
     try {
       await gitInit(projectDir);
@@ -183,8 +183,13 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
       const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
 
       expect(result.exitCode, result.stderr).toBe(0);
-      expect(result.stdout).toMatch(/never been observed firing/u);
+      // A run file demonstrably exists here (torn though it is) — this is never read as
+      // "no run file", declared or not: that would say a file this build can see does not
+      // exist.
+      expect(result.stdout).toMatch(/hook fired\s+FAIL\s+1 run file\(s\)/u);
+      expect(result.stdout).toMatch(/none carry a readable session_start/u);
       expect(result.stdout).not.toMatch(/matched no known host/u);
+      expect(result.stdout).not.toMatch(/no run file in/u);
     } finally {
       await cleanup();
     }
@@ -518,6 +523,90 @@ describe("aidd telemetry check — what is in place, before any verdict", () => 
       await cleanup();
     }
   });
+
+  it("says the declaration could not be read, never that the recorder is missing, for a damaged declaring file", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv(
+      "check-setup-declaration-damaged"
+    );
+    try {
+      await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
+      await mkdir(join(projectDir, ".claude"), { recursive: true });
+      // Trailing comma — valid enabledPlugins content, invalid JSON.
+      await writeFile(
+        join(projectDir, ".claude", "settings.json"),
+        '{"enabledPlugins":{"aidd-telemetry@aidd":true},}'
+      );
+
+      const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/recorder declared\s+could not be read —/u);
+      expect(result.stdout).toContain(join(projectDir, ".claude", "settings.json"));
+      // Never graded as the recorder missing: a damaged file costs only itself.
+      expect(result.stdout).not.toMatch(/recorder declared\s+nowhere this build checks/u);
+      expect(result.stdout).toMatch(/hook fired\s+--\s+no run file/u);
+      expect(result.stdout).not.toContain("FAIL");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("never reads another plugin's own journal.cjs as this recorder being declared", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("check-setup-foreign-journal");
+    try {
+      await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
+      await writeClaudeHooksBlock(projectDir, "node /autre-plugin/hooks/journal.cjs session-start");
+
+      const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/recorder declared\s+nowhere this build checks/u);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("still recognises the recorder's own hooks-block entry point when the command is quoted", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("check-setup-quoted-hooks");
+    try {
+      await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
+      await writeClaudeHooksBlock(
+        projectDir,
+        `node "${CLAUDE_PLUGIN_ROOT_TOKEN}/hooks/journal.cjs" session-start`
+      );
+
+      const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/recorder declared\s+yes —/u);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("names Copilot's own settings file as a declaration route, not one this build never reads", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("check-setup-declared-copilot");
+    try {
+      await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
+      await mkdir(join(projectDir, ".github", "copilot"), { recursive: true });
+      await writeFile(
+        join(projectDir, ".github", "copilot", "settings.json"),
+        JSON.stringify({ enabledPlugins: { "aidd-telemetry@ai-driven-dev/framework": true } })
+      );
+
+      const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/recorder declared\s+yes —/u);
+      expect(result.stdout).toContain(join(projectDir, ".github", "copilot", "settings.json"));
+    } finally {
+      await cleanup();
+    }
+  });
 });
 
 /**
@@ -574,6 +663,32 @@ describe("aidd telemetry check — not yet stops being a failure", () => {
       expect(result.exitCode, result.stderr).toBe(0);
       expect(result.stdout).toMatch(/hook fired\s+ok/u);
       expect(result.stdout).not.toMatch(/recorder is declared nowhere/u);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("keeps the verdict an anchorless run file already earned once the recorder is declared, never nothing to evaluate", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv(
+      "check-not-yet-anchorless-declared"
+    );
+    try {
+      await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
+      await writeEnabledPlugin(projectDir, "aidd-telemetry@ai-driven-dev/framework");
+      // Reachable, not synthetic: a hooks block registering PostToolUse/Stop but never
+      // SessionStart writes exactly this shape — journal lines with no session_start to
+      // anchor them. The recorder demonstrably ran (it wrote the file); the claim must
+      // never say "no run file … yet, nothing to evaluate" about a file this build can see.
+      await seedTornRunFile(projectDir);
+
+      const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/hook fired\s+FAIL\s+1 run file\(s\)/u);
+      expect(result.stdout).toMatch(/none carry a readable session_start/u);
+      expect(result.stdout).not.toMatch(/nothing to evaluate/u);
+      expect(result.stdout).not.toMatch(/no run file in/u);
     } finally {
       await cleanup();
     }

@@ -57,9 +57,19 @@ function describeIdentity(identity: TelemetryIdentitySetup): string {
   return `${identity.attached ? "yes" : "no"} — ${identity.path}`;
 }
 
+function indentedPaths(paths: readonly string[]): string {
+  return paths.map((path) => `\n    ${path}`).join("");
+}
+
 function describeRecorderDeclaration(declaration: TelemetryRecorderDeclarationSetup): string {
   if (declaration.declared) return `yes — ${declaration.declaredAt.join(", ")}`;
-  return `nowhere this build checks — looked in ${declaration.locationsChecked.join(", ")}`;
+  if (declaration.unreadable.length > 0) {
+    return `could not be read — ${declaration.unreadable.join(", ")}`;
+  }
+  // Five absolute paths on one ~500-char line is the hardest possible form to act on —
+  // this is the row a person reads specifically to go add the declaration somewhere, so
+  // each candidate gets its own indented line rather than a single comma-joined run-on.
+  return `nowhere this build checks — looked in:${indentedPaths(declaration.locationsChecked)}`;
 }
 
 // Printed first, and printed whether or not measurement is on — a person switched off
@@ -69,7 +79,11 @@ function describeRecorderDeclaration(declaration: TelemetryRecorderDeclarationSe
 function printSetup(output: CLIOutput, setup: TelemetrySetup): void {
   printSetupRow(output, "measurement allowed", describeAllowed(setup.allowed));
   printSetupRow(output, "identity attached", describeIdentity(setup.identity));
-  printSetupRow(output, "records kept at", setup.recordsLocation.path);
+  printSetupRow(
+    output,
+    "records kept at",
+    `${setup.recordsLocation.path} (override with AIDD_USER_CONFIG_DIR)`
+  );
   printSetupRow(
     output,
     "recorder declared",

@@ -264,6 +264,7 @@ describe("DiagnoseTelemetryUseCase — the first claim reads the same declaratio
       declared: true,
       declaredAt: ["/repo/.claude/settings.json"],
       locationsChecked: ["/repo/.aidd/manifest.json", "/repo/.claude/settings.json"],
+      unreadable: [],
     };
     const { useCase } = buildUseCase({ evidence });
 
@@ -282,6 +283,7 @@ describe("DiagnoseTelemetryUseCase — the first claim reads the same declaratio
       declared: false,
       declaredAt: [],
       locationsChecked: ["/repo/.aidd/manifest.json"],
+      unreadable: [],
     };
     const { useCase } = buildUseCase({ evidence });
 
@@ -292,5 +294,24 @@ describe("DiagnoseTelemetryUseCase — the first claim reads the same declaratio
     const hookFired = result.claims.find((c) => c.claim === "hook-fired");
     expect(hookFired?.verdict).toBe("fail");
     expect(hookFired?.detail).toMatch(/recorder is declared nowhere/u);
+  });
+
+  it("reads unknown, never a failure, when the setup's own recorder declaration could not be read", async () => {
+    const evidence = new StubEvidenceReader();
+    evidence.recorderDeclaration = {
+      declared: false,
+      declaredAt: [],
+      locationsChecked: ["/repo/.aidd/manifest.json", "/repo/.claude/settings.json"],
+      unreadable: ["/repo/.claude/settings.json"],
+    };
+    const { useCase } = buildUseCase({ evidence });
+
+    const result = await useCase.execute(runOptions());
+
+    if (result.gate !== undefined) throw new Error("expected the run to pass the gate");
+    const hookFired = result.claims.find((c) => c.claim === "hook-fired");
+    expect(hookFired?.verdict).toBe("unknown");
+    expect(hookFired?.reason).toBe("recorder-declaration-unreadable");
+    expect(hookFired?.detail).not.toContain("FAIL");
   });
 });
