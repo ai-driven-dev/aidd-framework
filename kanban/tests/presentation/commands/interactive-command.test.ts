@@ -4,9 +4,10 @@ import { join } from "node:path";
 import { Command } from "commander";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { StatusColumnsView } from "../../src/presentation/components/status-columns-view.js";
-import { DOCS_DIRECTORY_NAME } from "../helpers/docs-directory.js";
-import { createTestKanbanDeps } from "../helpers/test-deps.js";
+import { createKanbanRuntime } from "../../../src/composition/kanban-runtime.js";
+import { StatusColumnsView } from "../../../src/presentation/components/status-columns-view.js";
+import { DOCS_DIRECTORY_NAME } from "../../helpers/docs-directory.js";
+import { createTestKanbanDeps } from "../../helpers/test-deps.js";
 
 const { renderMock } = vi.hoisted(() => ({ renderMock: vi.fn() }));
 
@@ -16,15 +17,16 @@ vi.mock("ink", async (importOriginal) => {
 });
 
 const { registerInteractiveCommand } = await import(
-  "../../src/presentation/commands/interactive-command.js"
+  "../../../src/presentation/commands/interactive-command.js"
 );
-const { registerListCommand } = await import("../../src/presentation/commands/list-command.js");
+const { registerListCommand } = await import("../../../src/presentation/commands/list-command.js");
 
 function createProgram(): Command {
   const program = new Command();
   const deps = createTestKanbanDeps();
+  const runtime = createKanbanRuntime({ deps, projectPath: process.cwd() });
   registerInteractiveCommand(program, deps);
-  registerListCommand(program, deps);
+  registerListCommand(program, runtime, deps.onError);
   return program;
 }
 

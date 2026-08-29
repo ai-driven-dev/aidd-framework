@@ -1,10 +1,8 @@
 import Table from "cli-table3";
 import { type Command, Option } from "commander";
-import { ListTaskDocumentsUseCase } from "../../application/use-cases/list-task-documents.js";
+import type { KanbanRuntime } from "../../composition/kanban-runtime.js";
 import { PROGRESS_STATUSES_IN_COLUMN_ORDER } from "../../domain/models/progress-status.js";
 import type { TaskGroup } from "../../domain/models/task-group.js";
-import { FilesystemTaskDocumentRepository } from "../../infrastructure/filesystem/filesystem-task-document-repository.js";
-import type { KanbanCommandDeps } from "../kanban-deps.js";
 import {
   collectDistinctParentStatuses,
   groupTaskGroupsByParentStatus,
@@ -92,12 +90,9 @@ function buildStatusColumnTable(taskGroups: TaskGroup[]): string {
 async function runListCommand(
   path: string,
   options: ListCommandOptions,
-  deps: KanbanCommandDeps
+  runtime: KanbanRuntime
 ): Promise<void> {
-  const taskDocumentRepository = new FilesystemTaskDocumentRepository(deps.docsDirectoryName);
-  const listTaskDocumentsUseCase = new ListTaskDocumentsUseCase(taskDocumentRepository);
-
-  const taskGroups = await listTaskDocumentsUseCase.execute(path, {
+  const taskGroups = await runtime.listTaskDocuments.execute(path, {
     type: options.type,
     status: options.status,
     progress: toProgressStatusFilter(options.progress),
@@ -105,17 +100,21 @@ async function runListCommand(
   });
 
   if (options.json === true) {
-    deps.output.print(JSON.stringify(taskGroups, null, 2));
+    runtime.output.print(JSON.stringify(taskGroups, null, 2));
     return;
   }
 
-  deps.output.print(buildStatusColumnTable(taskGroups));
+  runtime.output.print(buildStatusColumnTable(taskGroups));
 }
 
-export function registerListCommand(program: Command, deps: KanbanCommandDeps): void {
+export function registerListCommand(
+  program: Command,
+  runtime: KanbanRuntime,
+  onError: (error: unknown) => void
+): void {
   program
     .command("list")
-    .argument("[path]", "project path", process.cwd())
+    .argument("[path]", "project path", runtime.projectPath)
     .option("--type <type>", "filter by document type")
     .option("--status <status>", "filter by document status")
     .addOption(
@@ -127,9 +126,9 @@ export function registerListCommand(program: Command, deps: KanbanCommandDeps): 
     .option("--json", "print the task groups as JSON instead of a table")
     .action(async (path: string, options: ListCommandOptions) => {
       try {
-        await runListCommand(path, options, deps);
+        await runListCommand(path, options, runtime);
       } catch (error) {
-        deps.onError(error);
+        onError(error);
       }
     });
 }

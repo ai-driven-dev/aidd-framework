@@ -1,8 +1,5 @@
 import type { Command } from "commander";
-import { registerInteractiveCommand } from "../../../../kanban/src/presentation/commands/interactive-command.js";
-import { registerListCommand } from "../../../../kanban/src/presentation/commands/list-command.js";
-import { registerWebCommand } from "../../../../kanban/src/presentation/commands/web-command.js";
-import type { KanbanCommandDeps } from "../../../../kanban/src/presentation/kanban-deps.js";
+import { type KanbanCommandDeps, registerKanban } from "../../../../kanban/src/index.js";
 import { DOCS_DIR } from "../../domain/models/paths.js";
 import { ErrorHandler } from "../error-handler.js";
 import type { CLIOutput } from "../output.js";
@@ -25,11 +22,5 @@ export function registerKanbanCommand(program: Command): void {
     onError: (error) => new ErrorHandler(resolveOutput()).handle(error),
   };
 
-  // Both views declare the same option names. Mounting the interactive one directly on
-  // `kanban` would make the parent capture `--type`/`--status`/`--progress`/`--all` and
-  // leave `list`'s own options undefined, so it gets its own default subcommand instead:
-  // `aidd kanban [path]` still lands on it, and each view owns its options.
-  registerListCommand(kanban, deps);
-  registerInteractiveCommand(kanban.command("interactive", { isDefault: true }), deps);
-  registerWebCommand(kanban.command("web"), deps);
+  registerKanban(kanban, deps);
 }

@@ -4,11 +4,15 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { registerListCommand } from "../../src/presentation/commands/list-command.js";
-import { DOCS_DIRECTORY_NAME } from "../helpers/docs-directory.js";
-import { createTestKanbanDeps } from "../helpers/test-deps.js";
+import { createKanbanRuntime } from "../../../src/composition/kanban-runtime.js";
+import { registerListCommand } from "../../../src/presentation/commands/list-command.js";
+import { DOCS_DIRECTORY_NAME } from "../../helpers/docs-directory.js";
+import { createTestKanbanDeps } from "../../helpers/test-deps.js";
 
-const FIXTURES_DIRECTORY = join(dirname(fileURLToPath(import.meta.url)), "../fixtures/frontmatter");
+const FIXTURES_DIRECTORY = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../fixtures/frontmatter"
+);
 
 async function writeTaskDocument(
   directoryPath: string,
@@ -24,7 +28,9 @@ async function writeTaskDocument(
 
 function createProgram(): Command {
   const program = new Command();
-  registerListCommand(program, createTestKanbanDeps());
+  const deps = createTestKanbanDeps();
+  const runtime = createKanbanRuntime({ deps, projectPath: process.cwd() });
+  registerListCommand(program, runtime, deps.onError);
   return program;
 }
 
