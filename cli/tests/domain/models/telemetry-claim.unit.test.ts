@@ -25,6 +25,10 @@ function evidence(overrides: Partial<TelemetryEvidence> = {}): TelemetryEvidence
     journals: [],
     toolReads: [],
     runsDirLabel: RUNS_DIR_LABEL,
+    // The conservative default every pre-existing test relies on: nothing here declares
+    // the recorder, so an empty journal reads as the failure it already did before this
+    // fact existed. A test for the declared branch sets this explicitly.
+    recorderDeclared: false,
     ...overrides,
   };
 }
@@ -153,6 +157,38 @@ describe("diagnoseTelemetryClaims — hook fired", () => {
     const hookFired = claim(result, "hook-fired");
     expect(hookFired?.reason).toBe("untrusted-codex-hook");
     expect(hookFired?.detail).not.toMatch(/this session left no run file/u);
+  });
+
+  it("reports nothing to evaluate, never a failure, when the recorder is declared but no run file has appeared", () => {
+    const result = diagnoseTelemetryClaims(
+      evidence({ currentSessionId: "s-1", recorderDeclared: true })
+    );
+    const hookFired = claim(result, "hook-fired");
+    expect(hookFired?.verdict).toBe("unknown");
+    expect(hookFired?.reason).toBe("recorder-declared-not-yet-fired");
+    expect(hookFired?.detail).toMatch(/declaration is not proof/u);
+    expect(hookFired?.detail).toMatch(/claude-cli-adapter\.ts/u);
+  });
+
+  it("names the recorder as what is missing when it is declared nowhere and no run file has appeared", () => {
+    const result = diagnoseTelemetryClaims(
+      evidence({ currentSessionId: "s-1", recorderDeclared: false })
+    );
+    const hookFired = claim(result, "hook-fired");
+    expect(hookFired?.verdict).toBe("fail");
+    expect(hookFired?.detail).toMatch(/recorder is declared nowhere/u);
+  });
+
+  it("lets an untrusted Codex hook explain the absence ahead of either new reason, even when the recorder is declared", () => {
+    const result = diagnoseTelemetryClaims(
+      evidence({
+        currentSessionId: "codex-1",
+        recorderDeclared: true,
+        hookTrust: { readable: true, trusted: false, configPath: "/home/.codex/config.toml" },
+      })
+    );
+    const hookFired = claim(result, "hook-fired");
+    expect(hookFired?.reason).toBe("untrusted-codex-hook");
   });
 });
 

@@ -427,3 +427,63 @@ describe("aidd telemetry check — what is in place, before any verdict", () => 
     }
   });
 });
+
+/**
+ * Phase 2: the same absence — no run file — reads two different ways depending on the
+ * one thing that tells them apart: whether the recorder is declared. Proven here by
+ * mutation, on the same project, so the distinction is shown to actually bite rather than
+ * asserted from two unrelated fixtures.
+ */
+describe("aidd telemetry check — not yet stops being a failure", () => {
+  it("reports nothing to evaluate, never a failure, once the recorder is declared — and a failure naming it before that", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("check-not-yet-mutation");
+    try {
+      await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
+
+      const beforeDeclaring = await runCli(["telemetry", "check"], projectDir, fakeHome);
+      expect(beforeDeclaring.exitCode, beforeDeclaring.stderr).toBe(0);
+      expect(beforeDeclaring.stdout).toMatch(/hook fired\s+FAIL\s+no run file/u);
+      expect(beforeDeclaring.stdout).toMatch(/recorder is declared nowhere/u);
+
+      await writeEnabledPlugin(projectDir, "aidd-telemetry@ai-driven-dev/framework");
+
+      const afterDeclaring = await runCli(["telemetry", "check"], projectDir, fakeHome);
+      expect(afterDeclaring.exitCode, afterDeclaring.stderr).toBe(0);
+      expect(afterDeclaring.stdout).toMatch(/hook fired\s+--\s+no run file/u);
+      expect(afterDeclaring.stdout).toMatch(/nothing to evaluate/u);
+      expect(afterDeclaring.stdout).toMatch(/declaration is not proof/u);
+      expect(afterDeclaring.stdout).not.toContain("FAIL");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("keeps the verdict a run file already earned, whatever the recorder's own declaration says", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("check-not-yet-settled-stays");
+    try {
+      await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
+      // No settings, no manifest — the recorder is declared nowhere — yet a run file
+      // already exists for this very session, so the claim it earns is "ok", never the
+      // new "declared nowhere" failure.
+      await seedJournal(
+        projectDir,
+        CLAUDE_RUN_ID,
+        CLAUDE_SESSION,
+        "2026-08-05T19:00:00Z",
+        "2026-08-05T20:00:00Z"
+      );
+
+      const result = await runCli(["telemetry", "check"], projectDir, fakeHome, {
+        env: { CLAUDE_CODE_SESSION_ID: CLAUDE_SESSION },
+      });
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/hook fired\s+ok/u);
+      expect(result.stdout).not.toMatch(/recorder is declared nowhere/u);
+    } finally {
+      await cleanup();
+    }
+  });
+});

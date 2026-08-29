@@ -253,3 +253,44 @@ describe("DiagnoseTelemetryUseCase — every claim is judged", () => {
     for (const claim of result.claims) expect(["ok", "fail", "unknown"]).toContain(claim.verdict);
   });
 });
+
+// The wiring proof for "not yet" stops being a failure: the same declaration
+// `gatherSetup` already read for the stated half is what the first claim judges by — never
+// the absence of a run file, which looks identical either way.
+describe("DiagnoseTelemetryUseCase — the first claim reads the same declaration setup prints", () => {
+  it("reports nothing to evaluate when the setup's own recorder declaration is true", async () => {
+    const evidence = new StubEvidenceReader();
+    evidence.recorderDeclaration = {
+      declared: true,
+      declaredAt: ["/repo/.claude/settings.json"],
+      locationsChecked: ["/repo/.aidd/manifest.json", "/repo/.claude/settings.json"],
+    };
+    const { useCase } = buildUseCase({ evidence });
+
+    const result = await useCase.execute(runOptions());
+
+    if (result.gate !== undefined) throw new Error("expected the run to pass the gate");
+    expect(result.setup.recorderDeclaration.declared).toBe(true);
+    const hookFired = result.claims.find((c) => c.claim === "hook-fired");
+    expect(hookFired?.verdict).toBe("unknown");
+    expect(hookFired?.reason).toBe("recorder-declared-not-yet-fired");
+  });
+
+  it("fails, naming the recorder, when the setup's own recorder declaration is false", async () => {
+    const evidence = new StubEvidenceReader();
+    evidence.recorderDeclaration = {
+      declared: false,
+      declaredAt: [],
+      locationsChecked: ["/repo/.aidd/manifest.json"],
+    };
+    const { useCase } = buildUseCase({ evidence });
+
+    const result = await useCase.execute(runOptions());
+
+    if (result.gate !== undefined) throw new Error("expected the run to pass the gate");
+    expect(result.setup.recorderDeclaration.declared).toBe(false);
+    const hookFired = result.claims.find((c) => c.claim === "hook-fired");
+    expect(hookFired?.verdict).toBe("fail");
+    expect(hookFired?.detail).toMatch(/recorder is declared nowhere/u);
+  });
+});

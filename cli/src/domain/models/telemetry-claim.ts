@@ -34,6 +34,7 @@ export type TelemetryClaimReason =
   | "session-anchored"
   | "untrusted-codex-hook"
   | "hook-never-fired"
+  | "recorder-declared-not-yet-fired"
   | "unrecognised-payload"
   | "session-left-no-run-file"
   | "no-session-anchor"
@@ -96,6 +97,14 @@ export interface TelemetryEvidence {
   readonly currentSessionId?: string;
   readonly unrecognisedPayloadAt?: string;
   readonly hookTrust?: TelemetryCodexHookTrust;
+  /** Whether the recorder is declared anywhere this build knows to check (the AIDD
+   * manifest, or a tool's own settings) — read the same way `TelemetrySetup`'s own
+   * `recorderDeclaration` fact is, so the claim below can never disagree with what the
+   * stated half already printed. Decides which of two absences an empty journal is: one
+   * still worth naming a failure, one that has simply not happened yet. Never itself proof
+   * the hook will fire — see `noRunFileClaim`'s own doc for the measured case where a
+   * declaration is silently dropped. */
+  readonly recorderDeclared: boolean;
 }
 
 function sessionJournalsOf(
@@ -137,17 +146,46 @@ function unreadableTrustSuffix(hookTrust: TelemetryCodexHookTrust | undefined): 
   return ` — Codex's own hook trust state could not be read either (${hookTrust.reason}), so this may be the same cause`;
 }
 
-function noRunFileClaim(
+// The one absence, two causes this claim exists to tell apart: a recorder never declared
+// anywhere this build reads has nothing that could have written a run file, which is a
+// failure worth naming; a recorder that IS declared may simply not have run yet — that is
+// nothing to evaluate, never a failure, and its detail says so without promising the
+// declaration will actually fire (`claude-cli-adapter.ts` records the one measured case
+// where a headless run silently drops a declared entry as orphaned).
+function recorderDeclaredNotYetFiredClaim(runsDirLabel: string): TelemetryClaim {
+  return {
+    claim: "hook-fired",
+    verdict: "unknown",
+    reason: "recorder-declared-not-yet-fired",
+    detail:
+      `no run file in ${runsDirLabel} yet — nothing to evaluate. The recorder is declared, ` +
+      "but a declaration is not proof it will fire: a headless run can silently drop it " +
+      "without ever registering the plugin (see claude-cli-adapter.ts).",
+  };
+}
+
+function recorderNotDeclaredClaim(
   runsDirLabel: string,
   hookTrust: TelemetryCodexHookTrust | undefined
 ): TelemetryClaim {
-  if (hookTrust && trustExplainsAbsence(hookTrust)) return untrustedHookClaim(hookTrust);
   return {
     claim: "hook-fired",
     verdict: "fail",
     reason: "hook-never-fired",
-    detail: `no run file in ${runsDirLabel} — the hook has never been observed firing${unreadableTrustSuffix(hookTrust)}`,
+    detail:
+      `no run file in ${runsDirLabel} — the hook has never been observed firing, and the ` +
+      `recorder is declared nowhere this build checks${unreadableTrustSuffix(hookTrust)}`,
   };
+}
+
+function noRunFileClaim(
+  runsDirLabel: string,
+  hookTrust: TelemetryCodexHookTrust | undefined,
+  recorderDeclared: boolean
+): TelemetryClaim {
+  if (hookTrust && trustExplainsAbsence(hookTrust)) return untrustedHookClaim(hookTrust);
+  if (recorderDeclared) return recorderDeclaredNotYetFiredClaim(runsDirLabel);
+  return recorderNotDeclaredClaim(runsDirLabel, hookTrust);
 }
 
 function unrecognisedPayloadClaim(at: string): TelemetryClaim {
@@ -196,7 +234,7 @@ function claimHookFired(evidence: TelemetryEvidence): TelemetryClaim {
   const sessionJournals = sessionJournalsOf(journals);
   if (sessionJournals.length === 0) {
     if (unrecognisedPayloadAt !== undefined) return unrecognisedPayloadClaim(unrecognisedPayloadAt);
-    return noRunFileClaim(runsDirLabel, hookTrust);
+    return noRunFileClaim(runsDirLabel, hookTrust, evidence.recorderDeclared);
   }
   const latest = latestSessionStart(sessionJournals);
   if (currentSessionId === undefined) return noAnchorClaim(sessionJournals, latest);

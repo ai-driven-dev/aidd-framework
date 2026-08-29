@@ -111,7 +111,8 @@ export class DiagnoseTelemetryUseCase {
     const setup = await this.gatherSetup(options);
     const gate = await this.gateReason(options);
     if (gate !== null) return { gate, setup, leftoverExportConfig };
-    const claims = diagnoseTelemetryClaims(await this.gatherEvidence(options));
+    const evidence = await this.gatherEvidence(options, setup.recorderDeclaration.declared);
+    const claims = diagnoseTelemetryClaims(evidence);
     return { setup, claims, uncovered: uncoveredTools(), leftoverExportConfig };
   }
 
@@ -142,7 +143,10 @@ export class DiagnoseTelemetryUseCase {
     }
   }
 
-  private async gatherEvidence(options: DiagnoseTelemetryOptions): Promise<TelemetryEvidence> {
+  private async gatherEvidence(
+    options: DiagnoseTelemetryOptions,
+    recorderDeclared: boolean
+  ): Promise<TelemetryEvidence> {
     const journals = await this.runJournalReader.list();
     const currentSessionId = resolveSessionAnchor(options.env);
     const unrecognisedPayload = await this.evidence.readUnrecognisedPayload(options.projectRoot);
@@ -155,6 +159,7 @@ export class DiagnoseTelemetryUseCase {
       currentSessionId,
       unrecognisedPayloadAt: unrecognisedPayload?.at,
       hookTrust,
+      recorderDeclared,
     };
   }
 
