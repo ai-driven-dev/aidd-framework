@@ -25,7 +25,7 @@ function createProgram(): Command {
   const program = new Command();
   const deps = createTestKanbanDeps();
   const runtime = createKanbanRuntime({ deps, projectPath: process.cwd() });
-  registerInteractiveCommand(program, deps);
+  registerInteractiveCommand(program, runtime, deps.onError);
   registerListCommand(program, runtime, deps.onError);
   return program;
 }

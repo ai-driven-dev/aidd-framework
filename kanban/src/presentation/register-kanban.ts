@@ -9,6 +9,10 @@ export function registerKanban(program: Command, deps: KanbanCommandDeps): void 
   const runtime = createKanbanRuntime({ deps, projectPath: process.cwd() });
 
   registerListCommand(program, runtime, deps.onError);
-  registerInteractiveCommand(program.command("interactive", { isDefault: true }), deps);
+  registerInteractiveCommand(
+    program.command("interactive", { isDefault: true }),
+    runtime,
+    deps.onError
+  );
   registerWebCommand(program.command("web"), runtime, deps.onError);
 }

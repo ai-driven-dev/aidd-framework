@@ -7,10 +7,7 @@ const SOURCE_DIRECTORY = join(dirname(fileURLToPath(import.meta.url)), "../../sr
 
 const INFRASTRUCTURE_IMPORT = /from\s+"[^"]*infrastructure\//;
 
-const ALLOWED_INFRASTRUCTURE_IMPORTERS = [
-  "composition/kanban-runtime.ts",
-  "presentation/components/status-columns-view.tsx",
-];
+const ALLOWED_INFRASTRUCTURE_IMPORTERS = ["composition/kanban-runtime.ts"];
 
 function listSourceFiles(directory: string): string[] {
   return readdirSync(directory, { recursive: true, withFileTypes: true })

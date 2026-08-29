@@ -1,11 +1,10 @@
 import { Box, Text, useApp, useInput } from "ink";
 import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
-import {
-  type ListTaskDocumentsFilters,
+import type {
+  ListTaskDocumentsFilters,
   ListTaskDocumentsUseCase,
 } from "../../application/use-cases/list-task-documents.js";
 import type { TaskGroup } from "../../domain/models/task-group.js";
-import { FilesystemTaskDocumentRepository } from "../../infrastructure/filesystem/filesystem-task-document-repository.js";
 import {
   collectDistinctParentStatuses,
   groupTaskGroupsByParentStatus,
@@ -19,8 +18,8 @@ const FOOTER_HINT_TEXT = "↑/↓ select · q quit";
 const EMPTY_FILTERS: ListTaskDocumentsFilters = {};
 
 export interface StatusColumnsViewProps {
+  listTaskDocuments: ListTaskDocumentsUseCase;
   projectPath: string;
-  docsDirectoryName: string;
   filters?: ListTaskDocumentsFilters;
   terminalWidth?: number;
 }
@@ -53,25 +52,21 @@ function describeFetchError(error: unknown): string {
 }
 
 function useFetchedTaskGroups(
+  listTaskDocuments: ListTaskDocumentsUseCase,
   projectPath: string,
-  docsDirectoryName: string,
   filters: ListTaskDocumentsFilters
 ): FetchedTaskGroups {
   const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
   const [fetchError, setFetchError] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    const listTaskDocumentsUseCase = new ListTaskDocumentsUseCase(
-      new FilesystemTaskDocumentRepository(docsDirectoryName)
-    );
-
-    listTaskDocumentsUseCase
+    listTaskDocuments
       .execute(projectPath, filters)
       .then(setTaskGroups)
       .catch((error: unknown) => {
         setFetchError(describeFetchError(error));
       });
-  }, [projectPath, docsDirectoryName, filters]);
+  }, [listTaskDocuments, projectPath, filters]);
 
   return { taskGroups, fetchError };
 }
@@ -223,13 +218,13 @@ function StatusColumnsBoard(layout: StatusColumnsLayout) {
 }
 
 export function StatusColumnsView({
+  listTaskDocuments,
   projectPath,
-  docsDirectoryName,
   filters = EMPTY_FILTERS,
   terminalWidth,
 }: StatusColumnsViewProps) {
   const { exit } = useApp();
-  const { taskGroups, fetchError } = useFetchedTaskGroups(projectPath, docsDirectoryName, filters);
+  const { taskGroups, fetchError } = useFetchedTaskGroups(listTaskDocuments, projectPath, filters);
   const resolvedWidth = terminalWidth ?? process.stdout.columns ?? FALLBACK_TERMINAL_WIDTH;
   const layout = useStatusColumnsLayout(taskGroups, resolvedWidth, exit);
 
