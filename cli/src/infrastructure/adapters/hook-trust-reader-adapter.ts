@@ -9,7 +9,10 @@ import { resolveHomeDir } from "../home-dir.js";
 // a hook is approved. Only the SessionStart hook decides whether a journal opens at all —
 // the claim this exists for — so that is the one event whose trust state actually explains
 // an empty journal.
-const PLUGIN_NAME = "aidd-telemetry";
+//
+// Exported so `telemetry-evidence-adapter.ts` can check the same literal for the recorder
+// declaration fact, rather than a second copy that could drift from this one.
+export const PLUGIN_NAME = "aidd-telemetry";
 const HOOKS_FILE = "hooks/hooks.json";
 const SESSION_START_EVENT = "session_start";
 

@@ -1,9 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { cp, mkdir, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { environmentWithoutGitVariables } from "../../src/infrastructure/git-environment.js";
-import { createTestEnv, gitInit, runCli } from "./helpers.js";
+import { createTestEnv, gitInit, identityFileIn, runCli, sinkDirIn } from "./helpers.js";
 
 /**
  * `aidd telemetry check` — the local route alone (hook fired, session journalled, tool
@@ -86,11 +86,15 @@ trusted_hash = "deadbeef"
   );
 }
 
+// Matched by label, not by position: phase 1 prints a "what is in place" section ahead of
+// the four claims, so slicing the first four lines of stdout no longer lands on them.
+const CLAIM_LINE = /^ {2}(hook fired|session journalled|tool files readable|records join)\b/u;
+
 /** Every claim line the union covers — all four, in the fixed order `diagnoseTelemetryClaims`
  * prints in — never the "not covered" lines after them, whose count depends on which tools
  * this machine happens to have wired. */
 function allClaimLines(stdout: string): string[] {
-  return stdout.split("\n").slice(0, 4);
+  return stdout.split("\n").filter((line) => CLAIM_LINE.test(line));
 }
 
 describe("aidd telemetry check — the journey and its edge cases", () => {
@@ -313,6 +317,111 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
       expect(result.exitCode, result.stderr).toBe(0);
       expect(result.stdout).toMatch(/matched no known host/u);
       expect(result.stdout).not.toMatch(/never been observed firing/u);
+    } finally {
+      await cleanup();
+    }
+  });
+});
+
+async function writeDamagedIdentity(fakeHome: string): Promise<void> {
+  const path = identityFileIn(fakeHome);
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, "not-json");
+}
+
+async function writeEnabledPlugin(projectDir: string, pluginKey: string): Promise<void> {
+  await mkdir(join(projectDir, ".claude"), { recursive: true });
+  await writeFile(
+    join(projectDir, ".claude", "settings.json"),
+    JSON.stringify({ enabledPlugins: { [pluginKey]: true } })
+  );
+}
+
+/**
+ * The "what is in place" section phase 1 adds ahead of the four claims — a machine that
+ * has never been measured still gets an answer, and a person switched off still sees
+ * everything but the verdicts. See spec.md's own Done-when: this is the half that states,
+ * never grades.
+ */
+describe("aidd telemetry check — what is in place, before any verdict", () => {
+  it("states what is in place on a machine that has never measured anything, naming the file behind each fact", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("check-setup-fresh");
+    try {
+      const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/measurement allowed\s+no —/u);
+      expect(result.stdout).toContain(join(projectDir, ".aidd", "config.json"));
+      expect(result.stdout).toMatch(/identity attached\s+no —/u);
+      expect(result.stdout).toContain(identityFileIn(fakeHome));
+      expect(result.stdout).toMatch(/records kept at\s+/u);
+      expect(result.stdout).toContain(sinkDirIn(fakeHome));
+      expect(result.stdout).toMatch(/recorder declared\s+nowhere this build checks/u);
+      expect(result.stdout).toContain(join(projectDir, ".aidd", "manifest.json"));
+      // What is in place is never itself a verdict — no count, no figure, and no FAIL.
+      expect(result.stdout).not.toContain("FAIL");
+      // Never reduced to the one-line gate message alone.
+      expect(result.stdout.trim().split("\n").length).toBeGreaterThan(1);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("distinguishes this person's own refusal from a project nobody switched on", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("check-setup-refusal");
+    try {
+      await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
+
+      const refused = await runCli(["telemetry", "check"], projectDir, fakeHome, {
+        env: { AIDD_TELEMETRY: "0" },
+      });
+      expect(refused.stdout).toMatch(/measurement allowed\s+no — this person's own refusal/u);
+      expect(refused.stdout).toContain("AIDD_TELEMETRY");
+
+      await writeSwitch(projectDir, false);
+      const neverOn = await runCli(["telemetry", "check"], projectDir, fakeHome);
+      expect(neverOn.stdout).toMatch(/measurement allowed\s+no —/u);
+      expect(neverOn.stdout).not.toMatch(/own refusal/u);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("keeps every other stated fact when the identity file cannot be read", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("check-setup-damaged-identity");
+    try {
+      await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
+      await writeDamagedIdentity(fakeHome);
+
+      const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/identity attached\s+could not be read/u);
+      expect(result.stdout).toContain(identityFileIn(fakeHome));
+      // Every other stated fact still appears — one damaged file costs only itself.
+      expect(result.stdout).toMatch(/measurement allowed\s+yes/u);
+      expect(result.stdout).toMatch(/records kept at\s+/u);
+      expect(result.stdout).toMatch(/recorder declared\s+/u);
+      expect(result.stdout).toContain("hook fired");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("names where the recorder is declared, when a tool's own settings say so", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("check-setup-declared");
+    try {
+      await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
+      await writeEnabledPlugin(projectDir, "aidd-telemetry@ai-driven-dev/framework");
+
+      const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(/recorder declared\s+yes —/u);
+      expect(result.stdout).toContain(join(projectDir, ".claude", "settings.json"));
     } finally {
       await cleanup();
     }

@@ -748,7 +748,9 @@ export async function createDeps(
     git,
     runJournalReader,
     localCostReaders,
-    hookTrustReaderAdapter
+    hookTrustReaderAdapter,
+    personIdentityAdapter,
+    telemetrySink
   );
   const reportCostUseCase = new ReportCostUseCase(
     telemetrySink,

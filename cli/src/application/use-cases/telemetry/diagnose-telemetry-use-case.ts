@@ -9,11 +9,18 @@ import {
   type TelemetryEvidence,
 } from "../../../domain/models/telemetry-claim.js";
 import type { TelemetryExportLeftover } from "../../../domain/models/telemetry-export-leftover.js";
+import {
+  buildTelemetryAllowedSetup,
+  type TelemetryIdentitySetup,
+  type TelemetrySetup,
+} from "../../../domain/models/telemetry-setup.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../domain/models/tool-ids.js";
 import type { HookTrustReader } from "../../../domain/ports/hook-trust-reader.js";
+import type { PersonIdentityStore } from "../../../domain/ports/person-identity-store.js";
 import type { RunJournal, RunJournalReader } from "../../../domain/ports/run-journal-reader.js";
 import type { SessionCostReader } from "../../../domain/ports/session-cost-reader.js";
 import type { TelemetryEvidenceReader } from "../../../domain/ports/telemetry-evidence-reader.js";
+import type { TelemetrySink } from "../../../domain/ports/telemetry-sink.js";
 import type { VersionControl } from "../../../domain/ports/version-control.js";
 import { getAiToolConfig } from "../../../domain/tools/registry.js";
 
@@ -29,11 +36,19 @@ export interface DiagnoseTelemetryUncoveredTool {
  * mutually exclusive with `claims`: a gated run judges nothing, the same rule that keeps
  * absent evidence from ever producing an `ok`. `leftoverExportConfig` is neither a claim
  * nor gated by one: a stale export lives in a tool's own settings file, independent of
- * whether the local switch is on, so it is gathered and reported either way. */
+ * whether the local switch is on, so it is gathered and reported either way. `setup` is
+ * gathered the same way, on both sides of the gate: what is in place is exactly what a
+ * person switched off still needs to see, never reduced to the one-line gate message
+ * alone. */
 export type DiagnoseTelemetryResult =
-  | { readonly gate: string; readonly leftoverExportConfig: readonly TelemetryExportLeftover[] }
+  | {
+      readonly gate: string;
+      readonly setup: TelemetrySetup;
+      readonly leftoverExportConfig: readonly TelemetryExportLeftover[];
+    }
   | {
       readonly gate?: undefined;
+      readonly setup: TelemetrySetup;
       readonly claims: readonly TelemetryClaim[];
       readonly uncovered: readonly DiagnoseTelemetryUncoveredTool[];
       readonly leftoverExportConfig: readonly TelemetryExportLeftover[];
@@ -82,18 +97,49 @@ export class DiagnoseTelemetryUseCase {
     private readonly git: VersionControl,
     private readonly runJournalReader: RunJournalReader,
     private readonly readers: ReadonlyMap<AiToolId, SessionCostReader>,
-    private readonly hookTrustReader: HookTrustReader
+    private readonly hookTrustReader: HookTrustReader,
+    private readonly personIdentityStore: PersonIdentityStore,
+    private readonly telemetrySink: TelemetrySink
   ) {}
 
   async execute(options: DiagnoseTelemetryOptions): Promise<DiagnoseTelemetryResult> {
     // Gathered before the gate, and regardless of it: a stale export in a tool's own
     // settings file exports whether or not this project's own switch is on, so a person
-    // whose switch is off must still be told about it.
+    // whose switch is off must still be told about it. `setup` follows the same rule —
+    // what is in place is exactly what a person switched off still needs to see.
     const leftoverExportConfig = await this.evidence.findLeftoverExportConfig(options.projectRoot);
+    const setup = await this.gatherSetup(options);
     const gate = await this.gateReason(options);
-    if (gate !== null) return { gate, leftoverExportConfig };
+    if (gate !== null) return { gate, setup, leftoverExportConfig };
     const claims = diagnoseTelemetryClaims(await this.gatherEvidence(options));
-    return { claims, uncovered: uncoveredTools(), leftoverExportConfig };
+    return { setup, claims, uncovered: uncoveredTools(), leftoverExportConfig };
+  }
+
+  private async gatherSetup(options: DiagnoseTelemetryOptions): Promise<TelemetrySetup> {
+    const [switchSetup, recorderDeclaration] = await Promise.all([
+      this.evidence.readSwitchSetup(options.projectRoot),
+      this.evidence.readRecorderDeclaration(options.projectRoot),
+    ]);
+    return {
+      allowed: buildTelemetryAllowedSetup(switchSetup, options.env),
+      identity: await this.readIdentitySetup(),
+      recordsLocation: { path: this.telemetrySink.rootDir },
+      recorderDeclaration,
+    };
+  }
+
+  // `PersonIdentityStore.readStrict()` promises to throw on a damaged file, unlike the
+  // plain `read()` every other identity consumer uses — this is the one caller that must
+  // tell "nobody chose" apart from "could not be read", so it catches rather than letting
+  // one damaged file cost every other stated fact its own answer.
+  private async readIdentitySetup(): Promise<TelemetryIdentitySetup> {
+    const path = this.personIdentityStore.filePath;
+    try {
+      const identity = await this.personIdentityStore.readStrict();
+      return { attached: identity !== null, path, readable: true };
+    } catch {
+      return { attached: false, path, readable: false };
+    }
   }
 
   private async gatherEvidence(options: DiagnoseTelemetryOptions): Promise<TelemetryEvidence> {

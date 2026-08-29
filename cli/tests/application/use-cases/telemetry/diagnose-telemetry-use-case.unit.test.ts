@@ -15,7 +15,9 @@ import type {
   SessionCostReader,
 } from "../../../../src/domain/ports/session-cost-reader.js";
 import type { VersionControl } from "../../../../src/domain/ports/version-control.js";
+import { InMemoryPersonIdentityStore } from "../../../helpers/ports/in-memory-person-identity-store.js";
 import { InMemoryRunJournalReader } from "../../../helpers/ports/in-memory-run-journal-reader.js";
+import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetry-sink.js";
 import { StubTelemetryEvidenceReader as StubEvidenceReader } from "../../../helpers/ports/stub-telemetry-evidence-reader.js";
 
 class StubHookTrustReader implements HookTrustReader {
@@ -89,7 +91,9 @@ function buildUseCase(options: {
     versionControl(options.isRepository ?? true),
     journalReader,
     options.readers ?? new Map(),
-    hookTrustReader
+    hookTrustReader,
+    new InMemoryPersonIdentityStore(),
+    new InMemoryTelemetrySink()
   );
   return { useCase, evidence, hookTrustReader };
 }

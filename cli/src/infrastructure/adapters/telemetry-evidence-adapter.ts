@@ -1,10 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { asPlainObject } from "../../domain/formats/plain-object.js";
+import { AIDD_DIR } from "../../domain/models/paths.js";
 import {
   findLeftoverExportKeys,
   type TelemetryExportLeftover,
 } from "../../domain/models/telemetry-export-leftover.js";
+import type { TelemetryRecorderDeclarationSetup } from "../../domain/models/telemetry-setup.js";
 import {
   parseTelemetrySwitchFile,
   resolveTelemetryEnabled,
@@ -12,14 +14,22 @@ import {
 } from "../../domain/models/telemetry-switch.js";
 import type {
   TelemetryEvidenceReader,
+  TelemetrySwitchSetupRead,
   TelemetryUnrecognisedPayload,
 } from "../../domain/ports/telemetry-evidence-reader.js";
 import { resolveHomeDir } from "../home-dir.js";
+import { isErrnoException } from "../json-file.js";
+import { PLUGIN_NAME as RECORDER_PLUGIN_NAME } from "./hook-trust-reader-adapter.js";
 
 const UNRECOGNISED_FILE_NAME = "_unrecognised.jsonl";
+const MANIFEST_FILENAME = "manifest.json";
 
 function runsDir(projectRoot: string): string {
   return process.env.AIDD_RUNS_DIR || join(projectRoot, "aidd_docs", "runs");
+}
+
+function manifestPath(projectRoot: string): string {
+  return join(projectRoot, AIDD_DIR, MANIFEST_FILENAME);
 }
 
 // Only Claude Code ever wrote a real settings-file export: it is the one tool whose
@@ -43,6 +53,73 @@ async function readIfExists(path: string): Promise<string | null> {
   }
 }
 
+/** The switch file's own read, factored out so `isTelemetryEnabled` and
+ * `readSwitchSetup` share one parse rather than each restating it — the exact failure this
+ * layer exists to avoid, a diagnostic disagreeing with the thing it describes. An absent
+ * file (`ENOENT`) is `readable: true` with nothing decided yet; any other read failure, or
+ * content that fails to parse as JSON at all, is `readable: false` — a damaged file, not a
+ * choice. A file that parses but carries no (or a malformed) `telemetry` key still reads
+ * `readable: true, fileSwitch: null` — nothing was damaged, nothing was ever set. */
+async function readSwitchFile(projectRoot: string): Promise<{
+  readonly readable: boolean;
+  readonly fileSwitch: ReturnType<typeof parseTelemetrySwitchFile>;
+}> {
+  let content: string;
+  try {
+    content = await readFile(telemetryConfigPath(projectRoot), "utf8");
+  } catch (error) {
+    if (isErrnoException(error) && error.code === "ENOENT") {
+      return { readable: true, fileSwitch: null };
+    }
+    return { readable: false, fileSwitch: null };
+  }
+  try {
+    JSON.parse(content);
+  } catch {
+    return { readable: false, fileSwitch: null };
+  }
+  return { readable: true, fileSwitch: parseTelemetrySwitchFile(content) };
+}
+
+/** Whether the AIDD manifest a `plugin add` writes declares `pluginName`, for any tool —
+ * a lenient, defensive walk of the raw JSON rather than `Manifest.fromJSON`'s own strict
+ * schema, which throws on a shape this read must never crash over. */
+async function manifestDeclaresPlugin(projectRoot: string, pluginName: string): Promise<boolean> {
+  const raw = await readIfExists(manifestPath(projectRoot));
+  if (raw === null) return false;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+  const tools = asPlainObject(asPlainObject(parsed)?.tools);
+  if (tools === null) return false;
+  return Object.values(tools).some((entry) => {
+    const plugins = asPlainObject(entry)?.plugins;
+    return Array.isArray(plugins) && plugins.some((p) => asPlainObject(p)?.name === pluginName);
+  });
+}
+
+/** Whether a tool's own settings file declares `pluginName` enabled — the
+ * `enabledPlugins` map `marketplace-sync-settings-use-case.ts` writes keys like
+ * `"<plugin>@<marketplaceKey>"` into. A prefix match, never a full key match: the
+ * marketplace half of the key is this project's own choice, not the recorder's identity. */
+async function settingsDeclaresPlugin(path: string, pluginName: string): Promise<boolean> {
+  const raw = await readIfExists(path);
+  if (raw === null) return false;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+  const enabledPlugins = asPlainObject(asPlainObject(parsed)?.enabledPlugins);
+  if (enabledPlugins === null) return false;
+  const prefix = `${pluginName}@`;
+  return Object.keys(enabledPlugins).some((key) => key.startsWith(prefix));
+}
+
 function parseUnrecognisedPayload(raw: string): TelemetryUnrecognisedPayload | null {
   const line = raw.split("\n").find((candidate) => candidate.trim() !== "");
   if (line === undefined) return null;
@@ -63,14 +140,30 @@ function parseUnrecognisedPayload(raw: string): TelemetryUnrecognisedPayload | n
  * repeated here. */
 export class TelemetryEvidenceAdapter implements TelemetryEvidenceReader {
   async isTelemetryEnabled(projectRoot: string, env: NodeJS.ProcessEnv): Promise<boolean> {
-    let fileSwitch: ReturnType<typeof parseTelemetrySwitchFile> = null;
-    try {
-      const content = await readFile(telemetryConfigPath(projectRoot), "utf8");
-      fileSwitch = parseTelemetrySwitchFile(content);
-    } catch {
-      fileSwitch = null;
-    }
+    const { fileSwitch } = await readSwitchFile(projectRoot);
     return resolveTelemetryEnabled(fileSwitch, env);
+  }
+
+  async readSwitchSetup(projectRoot: string): Promise<TelemetrySwitchSetupRead> {
+    const { readable, fileSwitch } = await readSwitchFile(projectRoot);
+    return {
+      path: telemetryConfigPath(projectRoot),
+      enabled: readable && fileSwitch?.enabled === true,
+      readable,
+    };
+  }
+
+  async readRecorderDeclaration(projectRoot: string): Promise<TelemetryRecorderDeclarationSetup> {
+    const manifestFile = manifestPath(projectRoot);
+    const settingsFiles = claudeSettingsCandidates(projectRoot);
+    const locationsChecked = [manifestFile, ...settingsFiles];
+    const declaredAt: string[] = [];
+    if (await manifestDeclaresPlugin(projectRoot, RECORDER_PLUGIN_NAME))
+      declaredAt.push(manifestFile);
+    for (const path of settingsFiles) {
+      if (await settingsDeclaresPlugin(path, RECORDER_PLUGIN_NAME)) declaredAt.push(path);
+    }
+    return { declared: declaredAt.length > 0, declaredAt, locationsChecked };
   }
 
   async readUnrecognisedPayload(projectRoot: string): Promise<TelemetryUnrecognisedPayload | null> {
