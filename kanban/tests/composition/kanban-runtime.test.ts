@@ -1,10 +1,15 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createKanbanRuntime } from "../../src/composition/kanban-runtime.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DOCS_DIRECTORY_NAME } from "../helpers/docs-directory.js";
 import { createTestKanbanDeps } from "../helpers/test-deps.js";
+
+vi.mock("../../src/infrastructure/http/frontend-assets.js", () => ({
+  readFrontendAssets: () => ({ indexHtml: "<html></html>", stylesCss: "", appJs: "" }),
+}));
+
+const { createKanbanRuntime } = await import("../../src/composition/kanban-runtime.js");
 
 describe("kanban runtime", () => {
   let projectPath: string;
@@ -44,5 +49,24 @@ describe("kanban runtime", () => {
     const runtime = createKanbanRuntime({ deps: createTestKanbanDeps(), projectPath });
 
     expect(runtime.projectPath).toBe(projectPath);
+  });
+
+  it("serves the project board as a DTO over the web server it builds", async () => {
+    const runtime = createKanbanRuntime({ deps: createTestKanbanDeps(), projectPath });
+    const server = runtime.createWebServer(0);
+    const actualPort = await server.start();
+
+    try {
+      const response = await fetch(`http://localhost:${actualPort}/api/tasks`);
+      const board = (await response.json()) as {
+        columns: { cards: { name: string }[] }[];
+      };
+      const cardNames = board.columns.flatMap((column) => column.cards.map((card) => card.name));
+
+      expect(response.status).toBe(200);
+      expect(cardNames).toEqual(["FID-560"]);
+    } finally {
+      server.stop();
+    }
   });
 });

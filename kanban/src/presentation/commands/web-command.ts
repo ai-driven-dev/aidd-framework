@@ -2,17 +2,33 @@ import { exec } from "node:child_process";
 import { platform } from "node:os";
 import type { Command } from "commander";
 import type { KanbanRuntime } from "../../composition/kanban-runtime.js";
-import {
-  FRONTEND_APP_JS,
-  FRONTEND_INDEX_HTML,
-  FRONTEND_STYLES_CSS,
-} from "../web/frontend-assets.js";
-import { KanbanWebServer } from "../web/http-server.js";
 
 const DEFAULT_PORT = 3000;
+const PORT_RADIX = 10;
 
 interface WebCommandOptions {
   port?: string;
+}
+
+class InvalidPortError extends Error {
+  constructor(rawPort: string) {
+    super(`KANBAN_INVALID_PORT: "${rawPort}" is not a valid port number`);
+    this.name = "InvalidPortError";
+  }
+}
+
+function parsePort(rawPort: string | undefined): number {
+  if (rawPort === undefined) {
+    return DEFAULT_PORT;
+  }
+
+  const port = Number.parseInt(rawPort, PORT_RADIX);
+
+  if (Number.isNaN(port)) {
+    throw new InvalidPortError(rawPort);
+  }
+
+  return port;
 }
 
 function openBrowser(url: string): void {
@@ -23,34 +39,20 @@ function openBrowser(url: string): void {
   exec(command);
 }
 
-function runWebCommand(path: string, options: WebCommandOptions, runtime: KanbanRuntime): void {
-  const port = options.port !== undefined ? Number.parseInt(options.port, 10) : DEFAULT_PORT;
+async function runWebCommand(options: WebCommandOptions, runtime: KanbanRuntime): Promise<void> {
+  const port = parsePort(options.port);
+  const server = runtime.createWebServer(port);
+  const actualPort = await server.start();
 
-  const server = new KanbanWebServer({
-    port,
-    projectPath: path,
-    useCase: runtime.listTaskDocuments,
-    filters: {},
-    watcher: runtime.createWatcher(),
-    output: runtime.output,
-    indexHtml: FRONTEND_INDEX_HTML,
-    stylesCss: FRONTEND_STYLES_CSS,
-    appJs: FRONTEND_APP_JS,
-  });
+  openBrowser(`http://localhost:${actualPort}`);
 
-  server.start().then((actualPort) => {
-    openBrowser(`http://localhost:${actualPort}`);
-  });
-
-  process.on("SIGINT", () => {
+  const stopServer = (): void => {
     server.stop();
     process.exit(0);
-  });
+  };
 
-  process.on("SIGTERM", () => {
-    server.stop();
-    process.exit(0);
-  });
+  process.on("SIGINT", stopServer);
+  process.on("SIGTERM", stopServer);
 }
 
 export function registerWebCommand(
@@ -59,11 +61,10 @@ export function registerWebCommand(
   onError: (error: unknown) => void
 ): void {
   program
-    .argument("[path]", "project path", runtime.projectPath)
     .option("--port <port>", "server port", String(DEFAULT_PORT))
-    .action((path: string, options: WebCommandOptions) => {
+    .action(async (options: WebCommandOptions) => {
       try {
-        runWebCommand(path, options, runtime);
+        await runWebCommand(options, runtime);
       } catch (error) {
         onError(error);
       }

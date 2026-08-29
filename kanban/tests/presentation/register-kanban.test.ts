@@ -13,10 +13,8 @@ vi.mock("ink", async (importOriginal) => {
   return { ...actualInkModule, render: renderMock };
 });
 
-vi.mock("../../src/presentation/web/frontend-assets.js", () => ({
-  FRONTEND_INDEX_HTML: "<html></html>",
-  FRONTEND_STYLES_CSS: "",
-  FRONTEND_APP_JS: "",
+vi.mock("../../src/infrastructure/http/frontend-assets.js", () => ({
+  readFrontendAssets: () => ({ indexHtml: "<html></html>", stylesCss: "", appJs: "" }),
 }));
 
 const { registerKanban } = await import("../../src/presentation/register-kanban.js");

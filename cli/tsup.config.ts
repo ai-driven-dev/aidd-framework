@@ -27,14 +27,17 @@ export default defineConfig({
   async onSuccess() {
     mkdirSync("dist/kanban-frontend", { recursive: true });
     copyFileSync(
-      "../kanban/src/presentation/web/frontend/index.html",
+      "../kanban/src/infrastructure/http/frontend/index.html",
       "dist/kanban-frontend/index.html"
     );
     copyFileSync(
-      "../kanban/src/presentation/web/frontend/styles.css",
+      "../kanban/src/infrastructure/http/frontend/styles.css",
       "dist/kanban-frontend/styles.css"
     );
-    copyFileSync("../kanban/src/presentation/web/frontend/app.js", "dist/kanban-frontend/app.js");
+    copyFileSync(
+      "../kanban/src/infrastructure/http/frontend/app.js",
+      "dist/kanban-frontend/app.js"
+    );
     copyFileSync(
       "assets/schemas/claude-code-plugin-manifest.json",
       "dist/claude-code-plugin-manifest.json"

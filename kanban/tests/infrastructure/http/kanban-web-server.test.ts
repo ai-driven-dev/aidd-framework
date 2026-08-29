@@ -1,24 +1,29 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ListTaskDocumentsUseCase } from "../../src/application/use-cases/list-task-documents.js";
-import type { TaskDocument } from "../../src/domain/models/task-document.js";
-import type { TaskDocumentRepository } from "../../src/domain/ports/task-document-repository.js";
-import type { TaskDocumentWatcher } from "../../src/domain/ports/task-document-watcher.js";
-import { KanbanWebServer } from "../../src/presentation/web/http-server.js";
+import type { TaskDocumentWatcher } from "../../../src/domain/ports/task-document-watcher.js";
+import { KanbanWebServer } from "../../../src/infrastructure/http/kanban-web-server.js";
+import type { BoardDto } from "../../../src/presentation/dto/board-dto.js";
 
-const MOCK_DOCUMENT: TaskDocument = {
-  name: "test-plan",
-  description: "a test plan",
-  type: "plan",
-  status: "pending",
-  progressStatus: "todo",
-  filePath: "/tmp/test/aidd_docs/tasks/plan.md",
+const SAMPLE_BOARD_DTO: BoardDto = {
+  columns: [
+    {
+      progressStatus: "todo",
+      label: "TODO",
+      cards: [
+        {
+          name: "test-plan",
+          status: "pending",
+          type: "plan",
+          progressStatus: "todo",
+          description: "a test plan",
+          path: "aidd_docs/tasks/plan.md",
+          subDocuments: [],
+          doneSubCount: 0,
+          totalSubCount: 0,
+        },
+      ],
+    },
+  ],
 };
-
-function createMockRepository(documents: TaskDocument[] = [MOCK_DOCUMENT]): TaskDocumentRepository {
-  return {
-    findAll: vi.fn().mockResolvedValue(documents),
-  };
-}
 
 function createMockWatcher(): TaskDocumentWatcher & { triggerChange: () => void } {
   let callback: (() => void) | undefined;
@@ -37,7 +42,7 @@ function createMockWatcher(): TaskDocumentWatcher & { triggerChange: () => void 
 
 function createServer(
   overrides: Partial<{
-    repository: TaskDocumentRepository;
+    boardProvider: () => Promise<BoardDto>;
     watcher: ReturnType<typeof createMockWatcher>;
   }> = {}
 ): {
@@ -46,7 +51,7 @@ function createServer(
   output: { messages: string[]; print: (msg: string) => void };
 } {
   const watcher = overrides.watcher ?? createMockWatcher();
-  const repository = overrides.repository ?? createMockRepository();
+  const boardProvider = overrides.boardProvider ?? (async () => SAMPLE_BOARD_DTO);
   const output = {
     messages: [] as string[],
     print(msg: string) {
@@ -57,8 +62,7 @@ function createServer(
   const server = new KanbanWebServer({
     port: 0,
     projectPath: "/tmp/test",
-    useCase: new ListTaskDocumentsUseCase(repository),
-    filters: {},
+    boardProvider,
     watcher,
     output,
     indexHtml: "<html><body>kanban</body></html>",
@@ -116,7 +120,7 @@ describe("KanbanWebServer", () => {
     expect(res.headers.get("content-type")).toContain("application/javascript");
   });
 
-  it("returns the board as JSON on GET /api/tasks", async () => {
+  it("returns the board DTO as JSON on GET /api/tasks", async () => {
     const ctx = createServer();
     server = ctx.server;
     port = await server.start();
@@ -125,11 +129,27 @@ describe("KanbanWebServer", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
-    const body = (await res.json()) as {
-      columns: Array<{ progressStatus: string; taskGroups: Array<{ parent: { name: string } }> }>;
-    };
+    const body = (await res.json()) as BoardDto;
     const todoColumn = body.columns.find((column) => column.progressStatus === "todo");
-    expect(todoColumn?.taskGroups[0]?.parent.name).toBe("test-plan");
+    expect(todoColumn?.cards[0]?.name).toBe("test-plan");
+    expect(todoColumn?.cards[0]?.totalSubCount).toBe(0);
+  });
+
+  it("responds 500 with a generic error body when the board provider throws", async () => {
+    const ctx = createServer({
+      boardProvider: async () => {
+        throw new Error("scan failed");
+      },
+    });
+    server = ctx.server;
+    port = await server.start();
+
+    const res = await fetchFromServer(port, "/api/tasks");
+
+    expect(res.status).toBe(500);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("failed to scan task documents");
+    expect(JSON.stringify(body)).not.toContain("scan failed");
   });
 
   it("opens an SSE connection on GET /events", async () => {

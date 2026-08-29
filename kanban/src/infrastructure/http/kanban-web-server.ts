@@ -1,19 +1,18 @@
 import { createServer, type Server, type ServerResponse } from "node:http";
-import type {
-  ListTaskDocumentsFilters,
-  ListTaskDocumentsUseCase,
-} from "../../application/use-cases/list-task-documents.js";
 import type { TaskDocumentWatcher } from "../../domain/ports/task-document-watcher.js";
-import type { KanbanOutput } from "../kanban-deps.js";
+import type { BoardDto } from "../../presentation/dto/board-dto.js";
 import { SseManager } from "./sse-manager.js";
+
+export interface WebServerOutput {
+  print(message: string): void;
+}
 
 export interface KanbanWebServerDeps {
   port: number;
   projectPath: string;
-  useCase: ListTaskDocumentsUseCase;
-  filters: ListTaskDocumentsFilters;
+  boardProvider: () => Promise<BoardDto>;
   watcher: TaskDocumentWatcher;
-  output: KanbanOutput;
+  output: WebServerOutput;
   indexHtml: string;
   stylesCss: string;
   appJs: string;
@@ -105,8 +104,8 @@ export class KanbanWebServer {
 
   private async handleApiTasks(res: ServerResponse): Promise<void> {
     try {
-      const groups = await this.deps.useCase.execute(this.deps.projectPath, this.deps.filters);
-      serveText(res, CONTENT_TYPES.json, JSON.stringify(groups));
+      const board = await this.deps.boardProvider();
+      serveText(res, CONTENT_TYPES.json, JSON.stringify(board));
     } catch {
       res.writeHead(500, { "Content-Type": CONTENT_TYPES.json });
       res.end(JSON.stringify({ error: "failed to scan task documents" }));
@@ -114,9 +113,9 @@ export class KanbanWebServer {
   }
 
   private fetchAndBroadcast(): void {
-    this.deps.useCase
-      .execute(this.deps.projectPath, this.deps.filters)
-      .then((groups) => this.sseManager.broadcast(groups))
+    this.deps
+      .boardProvider()
+      .then((board) => this.sseManager.broadcast(board))
       .catch(() => {});
   }
 }

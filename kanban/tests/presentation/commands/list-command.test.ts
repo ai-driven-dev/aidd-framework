@@ -273,6 +273,33 @@ describe("list command", () => {
     expect(table).toContain("SPEC-001");
   });
 
+  it("prints the board as a DTO whose columns carry cards with sub-document counts when --json is given", async () => {
+    await writeTaskDocument(join(aiddDocsPath, "task-a"), "plan.md", [
+      "name: FID-560",
+      "type: plan",
+      "status: pending",
+    ]);
+    await writeTaskDocument(join(aiddDocsPath, "task-a"), "phase-1.md", [
+      "name: Phase 1",
+      "status: done",
+    ]);
+
+    await createProgram().parseAsync(["node", "aidd-kanban", "list", projectPath, "--json"]);
+
+    const payload = JSON.parse(printedTable(consoleLogSpy)) as {
+      columns: {
+        progressStatus: string;
+        label: string;
+        cards: { name: string; doneSubCount: number; totalSubCount: number }[];
+      }[];
+    };
+    const todoColumn = payload.columns.find((column) => column.progressStatus === "todo");
+    expect(todoColumn?.cards[0]?.name).toBe("FID-560");
+    expect(todoColumn?.cards[0]?.totalSubCount).toBe(1);
+    expect(todoColumn?.cards[0]?.doneSubCount).toBe(1);
+    expect(JSON.stringify(payload)).not.toContain("taskGroups");
+  });
+
   it("end-to-end: a fixture document's name reaches the table, its unmapped status landing under UNKNOWN", async () => {
     const fixtureContent = await readFile(join(FIXTURES_DIRECTORY, "valid-full.md"), "utf-8");
     await mkdir(join(aiddDocsPath, "task-fixture"), { recursive: true });

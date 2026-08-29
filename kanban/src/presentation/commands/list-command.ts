@@ -4,6 +4,7 @@ import type { KanbanRuntime } from "../../composition/kanban-runtime.js";
 import type { Board } from "../../domain/models/board.js";
 import { PROGRESS_STATUSES_IN_COLUMN_ORDER } from "../../domain/models/progress-status.js";
 import type { TaskGroup } from "../../domain/models/task-group.js";
+import { toBoardDto } from "../dto/board-dto.js";
 import { toProgressStatusFilter } from "./progress-status-filter.js";
 
 const FALLBACK_TERMINAL_WIDTH = 120;
@@ -77,7 +78,7 @@ async function runListCommand(
   });
 
   if (options.json === true) {
-    runtime.output.print(JSON.stringify(board, null, 2));
+    runtime.output.print(JSON.stringify(toBoardDto(board), null, 2));
     return;
   }
 
