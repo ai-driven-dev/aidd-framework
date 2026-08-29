@@ -3,10 +3,12 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   diagnoseTelemetryClaims,
+  type NoRunFileReason,
   type TelemetryClaim,
   type TelemetryClaimId,
   type TelemetryClaimJournal,
   type TelemetryClaimToolRead,
+  type TelemetryClaimVerdict,
   type TelemetryEvidence,
 } from "../../../src/domain/models/telemetry-claim.js";
 
@@ -454,7 +456,26 @@ describe("the diagnostic skill states the claims the command prints, in the numb
 // is read from the live code's own detail text, then required in the skill's prose too —
 // so a change on either side alone (the wording in `telemetry-claim.ts`, or the account in
 // `02-diagnose.md`) fails this test, never only a change to both together.
-describe("the diagnostic skill's account of the declared/nowhere split matches the command's own reasons", () => {
+/**
+ * A guard that actually bites when the skill's account of a verdict disagrees with the
+ * command's own reasons — the whole-file, phrase-presence-anywhere version of this guard
+ * (the one this replaces) proved unable to: inverting which token `02-diagnose.md`'s own
+ * step 6 pairs with which phrase left it green, because the *other* pairing survived
+ * unmutated elsewhere in the same file (the Test table). Two changes fix that:
+ *
+ * 1. Every account below is checked against `02-diagnose.md`'s own step 6 alone — the one
+ *    paragraph that actually teaches the behaviour — not the whole file, so a stray
+ *    correct mention elsewhere can no longer paper over a wrong one here.
+ * 2. The check ties the verdict token to the phrase *in the same sentence* (`reads
+ *    \`TOKEN\`…PHRASE`, non-greedy up to the next period), so swapping which token a
+ *    sentence names — even while keeping the phrase — fails, not just deleting the phrase
+ *    outright.
+ *
+ * The account map itself is keyed by `NoRunFileReason`, `noRunFileClaim`'s own exhaustive
+ * reason union: adding a fifth branch there without adding a fifth entry here is a
+ * compile error (`Record<NoRunFileReason, …>` is exhaustive), not a runtime maybe.
+ */
+describe("the diagnostic skill's account of every no-run-file reason matches the command's own reasons", () => {
   const DIAGNOSE_MD = resolve(
     process.cwd(),
     "..",
@@ -467,28 +488,94 @@ describe("the diagnostic skill's account of the declared/nowhere split matches t
   );
   const DIAGNOSE_TEXT = readFileSync(DIAGNOSE_MD, "utf8");
 
-  function hookFiredDetail(recorderDeclared: boolean): string {
-    const result = diagnoseTelemetryClaims(evidence({ currentSessionId: "s-1", recorderDeclared }));
-    const detail = claim(result, "hook-fired")?.detail;
-    if (detail === undefined) throw new Error("hook-fired claim missing from the result");
-    return detail;
+  // Step 6 alone — from its own header to the next numbered step — the one place that
+  // actually teaches which token pairs with which reason, not the Test table below it
+  // (a reference row restating the same fact is not an account of it).
+  const STEP_SIX_HEADER = "No run file yet is not always a failure";
+  const stepSixMatch = DIAGNOSE_TEXT.match(
+    new RegExp(`${STEP_SIX_HEADER}[\\s\\S]*?\\n\\d+\\.\\s+\\*\\*`, "u")
+  );
+  if (stepSixMatch === null) {
+    throw new Error(`${DIAGNOSE_MD} no longer has a step opening with "${STEP_SIX_HEADER}"`);
+  }
+  const STEP_SIX_TEXT = stepSixMatch[0];
+
+  const VERDICT_TOKEN: Record<TelemetryClaimVerdict, string> = {
+    ok: "ok",
+    fail: "FAIL",
+    unknown: "--",
+  };
+
+  interface NoRunFileAccount {
+    readonly verdict: TelemetryClaimVerdict;
+    readonly phrase: string;
+    readonly evidenceOverrides: Partial<TelemetryEvidence>;
   }
 
-  it("states, on both sides, that a declared recorder with no run file yet is nothing to evaluate", () => {
-    const marker = "nothing to evaluate";
-    expect(hookFiredDetail(true).toLowerCase()).toContain(marker);
-    expect(DIAGNOSE_TEXT.toLowerCase()).toContain(marker);
-  });
+  const ACCOUNTS: Record<NoRunFileReason, NoRunFileAccount> = {
+    "recorder-declared-not-yet-fired": {
+      verdict: "unknown",
+      phrase: "nothing to evaluate",
+      evidenceOverrides: { currentSessionId: "s-1", recorderDeclared: true },
+    },
+    "recorder-declared-nowhere": {
+      verdict: "fail",
+      phrase: "declared nowhere",
+      evidenceOverrides: { currentSessionId: "s-1", recorderDeclared: false },
+    },
+    "recorder-declaration-unreadable": {
+      verdict: "unknown",
+      phrase: "could not be read",
+      evidenceOverrides: {
+        currentSessionId: "s-1",
+        recorderDeclared: false,
+        recorderDeclarationReadable: false,
+      },
+    },
+    "anchorless-run-file": {
+      verdict: "fail",
+      phrase: "none carry a readable session_start",
+      evidenceOverrides: { currentSessionId: "s-1", journals: [journal({ vendorId: undefined })] },
+    },
+  };
 
-  it("states, on both sides, that a declaration is not proof the hook will fire", () => {
-    const marker = "declaration is not proof";
-    expect(hookFiredDetail(true).toLowerCase()).toContain(marker);
-    expect(DIAGNOSE_TEXT.toLowerCase()).toContain(marker);
-  });
+  // The bullet mentioning `phrase`, bounded by the nearest period on either side — one
+  // bullet is exactly one sentence in `02-diagnose.md`'s own step 6, but not always in the
+  // same token-then-phrase order (most read "reads `TOKEN`, phrase"; the anchorless-run-file
+  // one reads "phrase … reads `TOKEN`"), so this bounds the clause instead of assuming an
+  // order, then the caller checks which token actually appears inside it.
+  function clauseContaining(text: string, phrase: string): string {
+    const idx = text.toLowerCase().indexOf(phrase.toLowerCase());
+    if (idx === -1) throw new Error(`step 6 of ${DIAGNOSE_MD} never mentions "${phrase}"`);
+    const start = text.lastIndexOf(".", idx) + 1;
+    const relEnd = text.slice(idx).indexOf(".");
+    const end = relEnd === -1 ? text.length : idx + relEnd + 1;
+    return text.slice(start, end);
+  }
 
-  it("states, on both sides, that a recorder declared nowhere is what is missing", () => {
-    const marker = "declared nowhere";
-    expect(hookFiredDetail(false).toLowerCase()).toContain(marker);
-    expect(DIAGNOSE_TEXT.toLowerCase()).toContain(marker);
-  });
+  for (const [reason, account] of Object.entries(ACCOUNTS) as [
+    NoRunFileReason,
+    NoRunFileAccount,
+  ][]) {
+    describe(reason, () => {
+      it("is what the live code actually produces", () => {
+        const result = diagnoseTelemetryClaims(evidence(account.evidenceOverrides));
+        const hookFired = claim(result, "hook-fired");
+        expect(hookFired?.reason).toBe(reason);
+        expect(hookFired?.verdict).toBe(account.verdict);
+        expect(hookFired?.detail.toLowerCase()).toContain(account.phrase.toLowerCase());
+      });
+
+      it("is what step 6 of the skill teaches, in the same sentence as its own verdict token", () => {
+        const clause = clauseContaining(STEP_SIX_TEXT, account.phrase);
+        expect(clause).toContain(`\`${VERDICT_TOKEN[account.verdict]}\``);
+      });
+
+      it("is never paired with the wrong verdict token in step 6", () => {
+        const wrongToken = account.verdict === "fail" ? "--" : "FAIL";
+        const clause = clauseContaining(STEP_SIX_TEXT, account.phrase);
+        expect(clause).not.toContain(`\`${wrongToken}\``);
+      });
+    });
+  }
 });
