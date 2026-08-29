@@ -43,7 +43,7 @@ describe("FilesystemTaskDocumentRepository", () => {
         type: "plan",
         status: "pending",
         progressStatus: "todo",
-        filePath: join(aiddDocsPath, "plan.md"),
+        filePath: join(DOCS_DIRECTORY_NAME, "plan.md"),
       },
     ]);
   });

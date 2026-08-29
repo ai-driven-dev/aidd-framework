@@ -116,7 +116,7 @@ describe("KanbanWebServer", () => {
     expect(res.headers.get("content-type")).toContain("application/javascript");
   });
 
-  it("returns task groups as JSON on GET /api/tasks", async () => {
+  it("returns the board as JSON on GET /api/tasks", async () => {
     const ctx = createServer();
     server = ctx.server;
     port = await server.start();
@@ -125,10 +125,11 @@ describe("KanbanWebServer", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/json");
-    const body = (await res.json()) as Array<{ parent: { name: string } }>;
-    expect(Array.isArray(body)).toBe(true);
-    expect(body.length).toBeGreaterThan(0);
-    expect(body[0]?.parent.name).toBe("test-plan");
+    const body = (await res.json()) as {
+      columns: Array<{ progressStatus: string; taskGroups: Array<{ parent: { name: string } }> }>;
+    };
+    const todoColumn = body.columns.find((column) => column.progressStatus === "todo");
+    expect(todoColumn?.taskGroups[0]?.parent.name).toBe("test-plan");
   });
 
   it("opens an SSE connection on GET /events", async () => {

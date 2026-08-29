@@ -39,6 +39,16 @@ function printedTable(consoleLogSpy: ReturnType<typeof vi.spyOn>): string {
   return typeof printedCall?.[0] === "string" ? printedCall[0] : "";
 }
 
+const ESCAPE_CHARACTER_CODE = 27;
+const ANSI_SGR_PATTERN = new RegExp(
+  `${String.fromCharCode(ESCAPE_CHARACTER_CODE)}\\[[0-9;]*m`,
+  "g"
+);
+
+function stripAnsi(value: string): string {
+  return value.replace(ANSI_SGR_PATTERN, "");
+}
+
 describe("list command", () => {
   let projectPath: string;
   let aiddDocsPath: string;
@@ -59,7 +69,7 @@ describe("list command", () => {
     await rm(projectPath, { recursive: true, force: true });
   });
 
-  it("shows one column per distinct parent status, headed by that literal status", async () => {
+  it("renders the fixed board columns, each parent under its normalized bucket", async () => {
     await writeTaskDocument(join(aiddDocsPath, "task-a"), "plan.md", [
       "name: FID-560",
       "type: plan",
@@ -74,8 +84,8 @@ describe("list command", () => {
     await createProgram().parseAsync(["node", "aidd-kanban", "list", projectPath]);
 
     const table = printedTable(consoleLogSpy);
-    expect(table).toContain("pending");
-    expect(table).toContain("completed");
+    expect(table).toContain("TODO");
+    expect(table).toContain("UNKNOWN");
     expect(table).toContain("FID-560");
     expect(table).toContain("SPEC-001");
   });
@@ -112,10 +122,10 @@ describe("list command", () => {
     await createProgram().parseAsync(["node", "aidd-kanban", "list", projectPath]);
 
     const table = printedTable(consoleLogSpy);
-    const linesMentioningDone = table.split("\n").filter((line) => line.includes("done"));
+    const linesMentioningDone = table.split("\n").filter((line) => line.includes(": done"));
     expect(linesMentioningDone).toHaveLength(1);
     expect(linesMentioningDone[0]).toContain("Phase 1");
-    expect(table).toContain("pending");
+    expect(table).toContain("TODO");
   });
 
   it("produces a bounded-width table when process.stdout.columns is unavailable (non-TTY)", async () => {
@@ -134,7 +144,7 @@ describe("list command", () => {
         createProgram().parseAsync(["node", "aidd-kanban", "list", projectPath])
       ).resolves.not.toThrow();
 
-      const table = printedTable(consoleLogSpy);
+      const table = stripAnsi(printedTable(consoleLogSpy));
       const longestLine = Math.max(...table.split("\n").map((line) => line.length));
       expect(longestLine).toBeLessThan(200);
     } finally {
@@ -259,11 +269,11 @@ describe("list command", () => {
     await createProgram().parseAsync(["node", "aidd-kanban", "list", projectPath, "--all"]);
 
     const table = printedTable(consoleLogSpy);
-    expect(table).toContain("unknown");
+    expect(table).toContain("UNKNOWN");
     expect(table).toContain("SPEC-001");
   });
 
-  it("end-to-end: a fixture document's name/type/status reach the printed table unaltered", async () => {
+  it("end-to-end: a fixture document's name reaches the table, its unmapped status landing under UNKNOWN", async () => {
     const fixtureContent = await readFile(join(FIXTURES_DIRECTORY, "valid-full.md"), "utf-8");
     await mkdir(join(aiddDocsPath, "task-fixture"), { recursive: true });
     await writeFile(join(aiddDocsPath, "task-fixture", "plan.md"), fixtureContent);
@@ -272,6 +282,6 @@ describe("list command", () => {
 
     const table = printedTable(consoleLogSpy);
     expect(table).toContain("Test name");
-    expect(table).toContain("completed");
+    expect(table).toContain("UNKNOWN");
   });
 });

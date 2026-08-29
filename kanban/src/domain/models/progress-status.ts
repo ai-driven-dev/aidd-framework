@@ -23,6 +23,9 @@ export const PROGRESS_STATUSES_IN_COLUMN_ORDER: readonly ProgressStatus[] = [
 
 const RAW_STATUS_TO_PROGRESS_STATUS: Record<string, ProgressStatus> = {
   pending: PROGRESS_STATUS_TODO,
+  proposed: PROGRESS_STATUS_TODO,
+  open: PROGRESS_STATUS_TODO,
+  reported: PROGRESS_STATUS_TODO,
   "in-progress": PROGRESS_STATUS_IN_PROGRESS,
   done: PROGRESS_STATUS_DONE,
   implemented: PROGRESS_STATUS_DONE,

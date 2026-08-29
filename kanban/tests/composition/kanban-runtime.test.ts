@@ -26,9 +26,12 @@ describe("kanban runtime", () => {
   it("wires a use case that lists the project's task documents", async () => {
     const runtime = createKanbanRuntime({ deps: createTestKanbanDeps(), projectPath });
 
-    const taskGroups = await runtime.listTaskDocuments.execute(projectPath, {});
+    const board = await runtime.listTaskDocuments.execute(projectPath, {});
 
-    expect(taskGroups.map((taskGroup) => taskGroup.parent.name)).toEqual(["FID-560"]);
+    const parentNames = board.columns.flatMap((column) =>
+      column.taskGroups.map((taskGroup) => taskGroup.parent.name)
+    );
+    expect(parentNames).toEqual(["FID-560"]);
   });
 
   it("hands out a fresh watcher instance on every call", () => {

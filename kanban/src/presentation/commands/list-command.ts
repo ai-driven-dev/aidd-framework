@@ -1,12 +1,9 @@
 import Table from "cli-table3";
 import { type Command, Option } from "commander";
 import type { KanbanRuntime } from "../../composition/kanban-runtime.js";
+import type { Board } from "../../domain/models/board.js";
 import { PROGRESS_STATUSES_IN_COLUMN_ORDER } from "../../domain/models/progress-status.js";
 import type { TaskGroup } from "../../domain/models/task-group.js";
-import {
-  collectDistinctParentStatuses,
-  groupTaskGroupsByParentStatus,
-} from "../status-grouping.js";
 import { toProgressStatusFilter } from "./progress-status-filter.js";
 
 const FALLBACK_TERMINAL_WIDTH = 120;
@@ -32,59 +29,39 @@ function resolveTerminalWidth(): number {
   return process.stdout.columns ?? FALLBACK_TERMINAL_WIDTH;
 }
 
-function computeVisibleColumnCount(terminalWidth: number, totalColumnCount: number): number {
-  if (totalColumnCount === 0) {
-    return 0;
-  }
-
-  const maxColumnsThatFit = Math.max(1, Math.floor(terminalWidth / MINIMUM_COLUMN_WIDTH));
-  return Math.min(totalColumnCount, maxColumnsThatFit);
-}
-
 function computeColumnWidths(terminalWidth: number, columnCount: number): number[] {
   const columnWidth = Math.max(MINIMUM_COLUMN_WIDTH, Math.floor(terminalWidth / columnCount));
 
   return new Array(columnCount).fill(columnWidth);
 }
 
-function formatHiddenColumnsNotice(hiddenColumnCount: number): string {
-  return `\n${hiddenColumnCount} status column(s) not shown; widen the terminal to see them.`;
-}
+function buildStatusColumnTable(board: Board): string {
+  const hasAnyTaskGroup = board.columns.some((column) => column.taskGroups.length > 0);
 
-function buildStatusColumnTable(taskGroups: TaskGroup[]): string {
-  const statuses = collectDistinctParentStatuses(taskGroups);
-
-  if (statuses.length === 0) {
+  if (!hasAnyTaskGroup) {
     return "No task documents found.";
   }
 
   const terminalWidth = resolveTerminalWidth();
-  const visibleColumnCount = computeVisibleColumnCount(terminalWidth, statuses.length);
-  const visibleStatuses = statuses.slice(0, visibleColumnCount);
-  const taskGroupsByStatus = groupTaskGroupsByParentStatus(taskGroups, visibleStatuses);
-  const rowCount = Math.max(
-    ...visibleStatuses.map((status) => taskGroupsByStatus.get(status)?.length ?? 0)
-  );
+  const rowCount = Math.max(...board.columns.map((column) => column.taskGroups.length));
 
   const table = new Table({
-    head: visibleStatuses,
-    colWidths: computeColumnWidths(terminalWidth, visibleStatuses.length),
+    head: board.columns.map((column) => column.label),
+    colWidths: computeColumnWidths(terminalWidth, board.columns.length),
     wordWrap: true,
+    wrapOnWordBoundary: false,
   });
 
   for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
     table.push(
-      visibleStatuses.map((status) => {
-        const taskGroup = taskGroupsByStatus.get(status)?.[rowIndex];
+      board.columns.map((column) => {
+        const taskGroup = column.taskGroups[rowIndex];
         return taskGroup === undefined ? "" : formatTaskGroupCell(taskGroup);
       })
     );
   }
 
-  const hiddenColumnCount = statuses.length - visibleStatuses.length;
-  return hiddenColumnCount > 0
-    ? table.toString() + formatHiddenColumnsNotice(hiddenColumnCount)
-    : table.toString();
+  return table.toString();
 }
 
 async function runListCommand(
@@ -92,7 +69,7 @@ async function runListCommand(
   options: ListCommandOptions,
   runtime: KanbanRuntime
 ): Promise<void> {
-  const taskGroups = await runtime.listTaskDocuments.execute(path, {
+  const board = await runtime.listTaskDocuments.execute(path, {
     type: options.type,
     status: options.status,
     progress: toProgressStatusFilter(options.progress),
@@ -100,11 +77,11 @@ async function runListCommand(
   });
 
   if (options.json === true) {
-    runtime.output.print(JSON.stringify(taskGroups, null, 2));
+    runtime.output.print(JSON.stringify(board, null, 2));
     return;
   }
 
-  runtime.output.print(buildStatusColumnTable(taskGroups));
+  runtime.output.print(buildStatusColumnTable(board));
 }
 
 export function registerListCommand(
@@ -123,7 +100,7 @@ export function registerListCommand(
       )
     )
     .option("--all", "include task groups whose parent has no known status")
-    .option("--json", "print the task groups as JSON instead of a table")
+    .option("--json", "print the board as JSON instead of a table")
     .action(async (path: string, options: ListCommandOptions) => {
       try {
         await runListCommand(path, options, runtime);

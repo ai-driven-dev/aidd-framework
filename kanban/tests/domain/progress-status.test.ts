@@ -10,6 +10,17 @@ describe("deriveProgressStatus", () => {
     expect(deriveProgressStatus("pending")).toBe("todo");
   });
 
+  it("maps the kickoff raw statuses proposed, open and reported to the todo progress bucket", () => {
+    expect(deriveProgressStatus("proposed")).toBe("todo");
+    expect(deriveProgressStatus("open")).toBe("todo");
+    expect(deriveProgressStatus("reported")).toBe("todo");
+  });
+
+  it("maps a terminal raw status like superseded to the unknown progress bucket", () => {
+    expect(deriveProgressStatus("superseded")).toBe("unknown");
+    expect(deriveProgressStatus("cancelled")).toBe("unknown");
+  });
+
   it("maps the raw status in-progress to the in-progress progress bucket", () => {
     expect(deriveProgressStatus("in-progress")).toBe("in-progress");
   });

@@ -68,7 +68,7 @@ function renderView(
 const NO_FILTERS: ListTaskDocumentsFilters = {};
 
 describe("StatusColumnsView", () => {
-  it("shows one column per distinct parent status, sub-documents nested beneath their parent", async () => {
+  it("places each parent under its fixed board column, sub-documents nested beneath their parent", async () => {
     const useCase = createUseCase([
       createTaskDocument({ name: "FID-560", filePath: "/p/task-a/plan.md", status: "pending" }),
       createTaskDocument({
@@ -87,11 +87,11 @@ describe("StatusColumnsView", () => {
       }),
     ]);
 
-    const { lastFrame, unmount } = renderView(useCase, NO_FILTERS, 100);
+    const { lastFrame, unmount } = renderView(useCase, NO_FILTERS, 140);
 
     const frame = await waitForFrame(lastFrame, "SPEC-001");
-    expect(frame).toContain("PENDING");
-    expect(frame).toContain("COMPLETED");
+    expect(frame).toContain("TODO");
+    expect(frame).toContain("UNKNOWN");
     expect(frame).toContain("FID-560");
     expect(frame).toContain("- Phase 1: blocked");
 
@@ -113,7 +113,7 @@ describe("StatusColumnsView", () => {
     const { lastFrame, unmount } = renderView(useCase, NO_FILTERS, 20);
 
     const frame = await waitForFrame(lastFrame, "FID-560");
-    expect(frame).toContain("PENDING");
+    expect(frame).toContain("TODO");
     expect(frame).toContain("FID-560");
     expect(frame).not.toContain("- Phase 1: blocked");
 
@@ -181,7 +181,7 @@ describe("StatusColumnsView", () => {
 
     const frame = await waitForFrame(lastFrame, "Test name");
     expect(frame).toContain("Test name");
-    expect(frame).toContain("COMPLETED");
+    expect(frame).toContain("UNKNOWN");
 
     unmount();
     await rm(projectPath, { recursive: true, force: true });
