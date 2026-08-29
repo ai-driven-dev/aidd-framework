@@ -1,6 +1,6 @@
 ---
 objective: "`aidd telemetry check` states what is in place before grading whether anything recorded, and reports a chain that has not run yet as not-yet rather than broken."
-status: in-progress
+status: implemented
 ---
 
 # Plan: the diagnostic says what it is grading
