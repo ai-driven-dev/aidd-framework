@@ -1,14 +1,21 @@
 name: Promote next to main
 
-# One intuitive button to ship `next` to `main` the RIGHT way: a rebase-merge
-# that preserves every conventional commit, so commitlint passes per commit and
-# release-please reads the scopes to bump each plugin. A squash here collapses
-# the commits into one (often non-conventional) message and breaks both, which
-# is exactly the failure this workflow prevents.
+# One intuitive button to ship `next` to `main` the RIGHT way: a merge commit.
 #
-# Run it from the Actions tab (Run workflow). It creates a linear promotion
-# branch from main, opens a PR to main, and enables rebase auto-merge. CI gates
-# it, then it merges itself.
+# The merge commit does two jobs. It carries every conventional commit onto
+# `main` untouched, so commitlint passes and release-please reads each scope to
+# bump the right plugin. And its two parents give `main` and `next` a real merge
+# base, which is the only thing that keeps the back-merge after each release
+# conflict-free.
+#
+# Neither alternative does the second job. A squash collapses the batch into one
+# subject and hides the scopes. A rebase recopies the commits under new hashes,
+# so git never learns the branches were reconciled: the recorded merge base goes
+# stale, and every later back-merge conflicts on the release metadata that
+# release-please rewrites each time. That is the failure this workflow prevents.
+#
+# Run it from the Actions tab (Run workflow). It snapshots `next`, opens a PR to
+# main, and enables merge auto-merge. CI gates it, then it merges itself.
 
 on:
   workflow_dispatch:
@@ -21,7 +28,7 @@ permissions: {}
 
 jobs:
   promote:
-    name: Open and rebase-merge next into main
+    name: Open and merge next into main
     runs-on: ubuntu-latest
     steps:
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
@@ -35,124 +42,54 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
-      - name: Open or reuse the promote PR, enable rebase auto-merge
+      - name: Open the promote PR, enable merge auto-merge
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
 
           git config user.name "aidd-bot[bot]"
           git config user.email "aidd-bot[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
-          BRANCH="promote/next-to-main-linear"
           git fetch origin main next --prune
-          git fetch origin "+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}" 2>/dev/null || true
 
-          if [ "$(git rev-parse origin/main^{tree})" = "$(git rev-parse origin/next^{tree})" ]; then
-            echo "No commits to promote."
+          # Compare trees, not ancestry. After a back-merge, next's tip is a
+          # merge commit main does not carry, so next is never an ancestor of
+          # main even when the two hold identical content. Going by ancestry
+          # would open an empty promote PR, and merging it is a push to main,
+          # which runs release-please for nothing.
+          if [ "$(git rev-parse origin/next^{tree})" = "$(git rev-parse origin/main^{tree})" ]; then
+            echo "next and main already hold the same tree; nothing to promote."
             exit 0
           fi
 
-          # A "sync commit" marks a point where main's history was folded into
-          # next by back-merge.yml, so the sync itself carries main's own
-          # content and must NOT be replayed onto main. back-merge.yml lands a
-          # sync two ways:
-          #   - no conflicts: a direct-pushed real merge commit (2 parents)
-          #   - conflicts: a PR merged by squash (this repo disallows
-          #     merge-commit PRs), whose subject is stamped verbatim from
-          #     back-merge.yml's fixed PR title
-          # Both must be recognised, or a squash sync gets mistaken for genuine
-          # next-only work and cherry-picked back onto main, colliding with
-          # content main already has. Keep the title prefix below in sync with
-          # back-merge.yml's `gh pr create --title`.
-          is_sync_commit() {
-            git rev-parse --verify -q "$1^2" >/dev/null 2>&1 && return 0
-            local subject
-            subject="$(git log -1 --format=%s "$1")"
-            [[ "$subject" == "chore: back-merge main into next"* ]]
-          }
+          # Promote a snapshot of next, never next itself. A PR headed by the
+          # live branch silently widens as work merges into next during review,
+          # so what ships stops matching what was approved. The snapshot points
+          # at next's exact tip, so merging it still makes that commit an
+          # ancestor of main and still refreshes the merge base.
+          BRANCH="promote/next-to-main-${RUN_ID}"
+          git push origin "origin/next:refs/heads/${BRANCH}"
 
-          mapfile -t CANDIDATES < <(git rev-list --first-parent --reverse origin/main..origin/next)
-          SYNCS=()
-          for c in "${CANDIDATES[@]}"; do
-            is_sync_commit "$c" && SYNCS+=("$c")
-          done
-
-          # Commits main already carries. A promote is a rebase-merge, so main's
-          # copy of a promoted commit keeps the same patch under a new hash, and
-          # `git cherry` marks it "-". Skipping those is what stops an
-          # already-promoted commit from being replayed as an empty cherry-pick
-          # (which would halt the script, since it doesn't pass --allow-empty)
-          # or as a spurious conflict with a later bump to the same lockfile.
-          declare -A ALREADY=()
-          while read -r sign sha; do
-            [ "$sign" = "-" ] && ALREADY["$sha"]=1
-          done < <(git cherry origin/main origin/next)
-
-          # Start the window at the most recent sync and widen to older syncs
-          # until the replayed branch reproduces origin/next exactly. The
-          # narrowest window is right only when every commit before the last
-          # back-merge was already promoted. It is wrong when work landed on
-          # next after the previous promote but before that back-merge: a
-          # back-merge only folds main into next, it never carries next's own
-          # commits to main, so those commits are still owed and a sync-anchored
-          # window silently drops them forever. Widening recovers them, and the
-          # tree comparison against origin/next is the acceptance test.
-          PICKED=()
-          MATCHED=""
-          for ((i = ${#SYNCS[@]} - 1; i >= -1; i--)); do
-            if [ "$i" -ge 0 ]; then
-              START="${SYNCS[$i]}"
-            else
-              START="origin/main"
-            fi
-
-            COMMITS=()
-            while IFS= read -r c; do
-              is_sync_commit "$c" && continue
-              [ -n "${ALREADY[$c]:-}" ] && continue
-              COMMITS+=("$c")
-            done < <(git rev-list --first-parent --reverse "${START}..origin/next")
-
-            if [ "${#COMMITS[@]}" -eq 0 ]; then
-              continue
-            fi
-
-            git cherry-pick --abort >/dev/null 2>&1 || true
-            git switch -C "$BRANCH" origin/main
-            if ! git cherry-pick "${COMMITS[@]}"; then
-              git cherry-pick --abort >/dev/null 2>&1 || true
-              echo "Window from ${START} conflicts on replay; widening."
-              continue
-            fi
-            if [ "$(git rev-parse HEAD^{tree})" = "$(git rev-parse origin/next^{tree})" ]; then
-              PICKED=("${COMMITS[@]}")
-              MATCHED=1
-              break
-            fi
-            echo "Window from ${START} does not reproduce origin/next; widening."
-            git diff --stat HEAD origin/next
-          done
-
-          if [ -z "$MATCHED" ]; then
-            echo "No window of next-only commits reproduces origin/next."
-            echo "main and next have diverged beyond a linear replay; back-merge main into next first."
-            exit 1
-          fi
-          echo "Promoting ${#PICKED[@]} commits."
-
-          git push --force-with-lease origin "HEAD:refs/heads/${BRANCH}"
-
-          # Reuse an open linear promote PR if one exists, else open one with a
-          # conventional, squash-safe title.
-          PR=$(gh pr list --repo "$REPO" --base main --head "$BRANCH" --state open --json number --jq '.[0].number' || true)
-          if [ -z "$PR" ]; then
-            PR=$(gh pr create --repo "$REPO" --base main --head "$BRANCH" \
-              --title "chore: promote next to main" \
-              --body "Automated linear promotion of \`next\` to \`main\`. Merged by **rebase** to preserve conventional commits for release-please. Do not squash." \
-              | grep -oE '[0-9]+$')
-          fi
+          PR=$(gh pr create --repo "$REPO" --base main --head "$BRANCH" \
+            --title "ci: promote next to main" \
+            --body "Automated promotion of \`next\` to \`main\`, from a snapshot of next taken at run ${RUN_ID}. Merged as a **merge commit** so \`main\` keeps every conventional commit for release-please, and so both branches keep a shared merge base for the back-merge. Do not squash, do not rebase." \
+            | grep -oE '[0-9]+$')
           echo "Promote PR: #$PR"
-          # Rebase auto-merge: GitHub merges it once CI is green. Never squash.
-          gh pr merge "$PR" --repo "$REPO" --rebase --auto
+
+          # `ci:` on purpose. The type is absent from release-please's
+          # changelog-sections, so this plumbing commit never surfaces in a
+          # released changelog, while commitlint still accepts it.
+          gh pr merge "$PR" --repo "$REPO" --merge --auto --delete-branch \
+            --subject "ci: promote next to main (#${PR})"
+
+          # Without a recorded subject GitHub generates "Merge pull request #N
+          # from ...", which is not conventional. Commitlint lints main's tip on
+          # push, so fail here rather than on main.
+          gh pr view "$PR" --repo "$REPO" --json autoMergeRequest \
+            --jq '.autoMergeRequest.commitHeadline // empty' | grep -q . || {
+            echo "Auto-merge did not record the commit subject; refusing to leave main's tip to chance."
+            exit 1
+          }
