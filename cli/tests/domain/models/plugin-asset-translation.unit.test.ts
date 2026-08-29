@@ -114,7 +114,7 @@ describe("installing the plugin carries a skill's own script, on every tool", ()
     // Carrying artefacts verbatim must not turn every skill into an artefact: this one
     // still goes through the frontmatter conversion, so it is not byte-identical.
     expect(installed?.content).not.toBe(pluginFile("skills/02-check/SKILL.md"));
-    expect(installed?.content).toContain("Answers whether AIDD measurement is actually");
+    expect(installed?.content).toContain("States what is in place");
   });
 
   /** A script whose text that tool's own rewrite really does change. Each tool rewrites

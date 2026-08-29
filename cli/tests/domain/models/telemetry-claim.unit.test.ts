@@ -411,3 +411,47 @@ describe("the diagnostic skill states the claims the command prints, in the numb
     }
   });
 });
+
+// Extends the guard above to the account phase 2 added: two readings of the same absence
+// ("no run file yet"), told apart only by the recorder's own declaration. A marker phrase
+// is read from the live code's own detail text, then required in the skill's prose too —
+// so a change on either side alone (the wording in `telemetry-claim.ts`, or the account in
+// `02-diagnose.md`) fails this test, never only a change to both together.
+describe("the diagnostic skill's account of the declared/nowhere split matches the command's own reasons", () => {
+  const DIAGNOSE_MD = resolve(
+    process.cwd(),
+    "..",
+    "plugins",
+    "aidd-telemetry",
+    "skills",
+    "02-check",
+    "actions",
+    "02-diagnose.md"
+  );
+  const DIAGNOSE_TEXT = readFileSync(DIAGNOSE_MD, "utf8");
+
+  function hookFiredDetail(recorderDeclared: boolean): string {
+    const result = diagnoseTelemetryClaims(evidence({ currentSessionId: "s-1", recorderDeclared }));
+    const detail = claim(result, "hook-fired")?.detail;
+    if (detail === undefined) throw new Error("hook-fired claim missing from the result");
+    return detail;
+  }
+
+  it("states, on both sides, that a declared recorder with no run file yet is nothing to evaluate", () => {
+    const marker = "nothing to evaluate";
+    expect(hookFiredDetail(true).toLowerCase()).toContain(marker);
+    expect(DIAGNOSE_TEXT.toLowerCase()).toContain(marker);
+  });
+
+  it("states, on both sides, that a declaration is not proof the hook will fire", () => {
+    const marker = "declaration is not proof";
+    expect(hookFiredDetail(true).toLowerCase()).toContain(marker);
+    expect(DIAGNOSE_TEXT.toLowerCase()).toContain(marker);
+  });
+
+  it("states, on both sides, that a recorder declared nowhere is what is missing", () => {
+    const marker = "declared nowhere";
+    expect(hookFiredDetail(false).toLowerCase()).toContain(marker);
+    expect(DIAGNOSE_TEXT.toLowerCase()).toContain(marker);
+  });
+});

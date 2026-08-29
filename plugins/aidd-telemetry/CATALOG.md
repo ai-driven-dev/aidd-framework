@@ -56,5 +56,5 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 |-------|------|---|
 | `actions` | [01-locate.md](skills/02-check/actions/01-locate.md) | - |
 | `actions` | [02-diagnose.md](skills/02-check/actions/02-diagnose.md) | - |
-| `-` | [SKILL.md](skills/02-check/SKILL.md) | `Answers whether AIDD measurement is actually recording, one independently verifiable line per claim. Use when the user doubts a figure, sees no run file appear, or wants proof the chain is working. Not for turning measurement on or answering what a period cost.` |
+| `-` | [SKILL.md](skills/02-check/SKILL.md) | `States what is in place — where measurement is allowed from, whether an identity is attached, where records land, whether the recorder is declared — then answers whether AIDD measurement is actually recording, one independently verifiable line per claim. Use when the user doubts a figure, sees no run file appear, wants proof the chain is working, or wants to know what is already configured. Not for turning measurement on or answering what a period cost.` |
 
