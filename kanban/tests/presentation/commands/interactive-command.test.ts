@@ -56,6 +56,22 @@ describe("interactive command wiring", () => {
     expect((renderedElement.props as { projectPath: string }).projectPath).toBe(projectPath);
   });
 
+  it("hands the interactive view a watcher factory when --live is set", async () => {
+    await createProgram().parseAsync(["node", "aidd-kanban", projectPath, "--live"]);
+
+    const [renderedElement] = renderMock.mock.calls[0] as [ReactElement];
+    expect(typeof (renderedElement.props as { createWatcher?: unknown }).createWatcher).toBe(
+      "function"
+    );
+  });
+
+  it("leaves the interactive view without a watcher factory when --live is absent", async () => {
+    await createProgram().parseAsync(["node", "aidd-kanban", projectPath]);
+
+    const [renderedElement] = renderMock.mock.calls[0] as [ReactElement];
+    expect((renderedElement.props as { createWatcher?: unknown }).createWatcher).toBeUndefined();
+  });
+
   it("wires --all into shouldIncludeUnknownStatus for the interactive view", async () => {
     await createProgram().parseAsync(["node", "aidd-kanban", projectPath, "--all"]);
 

@@ -1,10 +1,11 @@
 import { Box, Text, useApp, useInput } from "ink";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type {
   ListTaskDocumentsFilters,
   ListTaskDocumentsUseCase,
 } from "../../application/use-cases/list-task-documents.js";
 import type { Board } from "../../domain/models/board.js";
+import type { TaskDocumentWatcher } from "../../domain/ports/task-document-watcher.js";
 import { StatusColumn } from "./status-column.js";
 
 const FALLBACK_TERMINAL_WIDTH = 100;
@@ -19,6 +20,7 @@ export interface StatusColumnsViewProps {
   projectPath: string;
   filters?: ListTaskDocumentsFilters;
   terminalWidth?: number;
+  createWatcher?: () => TaskDocumentWatcher;
 }
 
 interface FetchedBoard {
@@ -34,12 +36,13 @@ function describeFetchError(error: unknown): string {
 function useFetchedBoard(
   listTaskDocuments: ListTaskDocumentsUseCase,
   projectPath: string,
-  filters: ListTaskDocumentsFilters
+  filters: ListTaskDocumentsFilters,
+  createWatcher: (() => TaskDocumentWatcher) | undefined
 ): FetchedBoard {
   const [board, setBoard] = useState<Board>(EMPTY_BOARD);
   const [fetchError, setFetchError] = useState<string | undefined>(undefined);
 
-  useEffect(() => {
+  const loadBoard = useCallback(() => {
     listTaskDocuments
       .execute(projectPath, filters)
       .then(setBoard)
@@ -48,7 +51,29 @@ function useFetchedBoard(
       });
   }, [listTaskDocuments, projectPath, filters]);
 
+  useEffect(() => {
+    loadBoard();
+  }, [loadBoard]);
+
+  useLiveRefresh(createWatcher, projectPath, loadBoard);
+
   return { board, fetchError };
+}
+
+function useLiveRefresh(
+  createWatcher: (() => TaskDocumentWatcher) | undefined,
+  projectPath: string,
+  onTaskDocumentChange: () => void
+): void {
+  useEffect(() => {
+    if (createWatcher === undefined) {
+      return;
+    }
+    const watcher = createWatcher();
+    watcher.onChange(onTaskDocumentChange);
+    watcher.start(projectPath);
+    return () => watcher.stop();
+  }, [createWatcher, projectPath, onTaskDocumentChange]);
 }
 
 function useQuitControl(exit: () => void): void {
@@ -101,10 +126,16 @@ export function StatusColumnsView({
   projectPath,
   filters = EMPTY_FILTERS,
   terminalWidth,
+  createWatcher,
 }: StatusColumnsViewProps) {
   const { exit } = useApp();
   useQuitControl(exit);
-  const { board, fetchError } = useFetchedBoard(listTaskDocuments, projectPath, filters);
+  const { board, fetchError } = useFetchedBoard(
+    listTaskDocuments,
+    projectPath,
+    filters,
+    createWatcher
+  );
   const resolvedWidth = terminalWidth ?? process.stdout.columns ?? FALLBACK_TERMINAL_WIDTH;
 
   if (fetchError !== undefined) {

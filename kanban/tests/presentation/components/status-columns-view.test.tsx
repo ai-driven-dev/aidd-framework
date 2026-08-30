@@ -12,6 +12,7 @@ import { createKanbanRuntime } from "../../../src/composition/kanban-runtime.js"
 import { UNKNOWN_DOCUMENT_STATUS } from "../../../src/domain/models/document-status.js";
 import type { ProgressStatus } from "../../../src/domain/models/progress-status.js";
 import type { TaskDocument } from "../../../src/domain/models/task-document.js";
+import type { TaskDocumentWatcher } from "../../../src/domain/ports/task-document-watcher.js";
 import { StatusColumnsView } from "../../../src/presentation/components/status-columns-view.js";
 import { DOCS_DIRECTORY_NAME } from "../../helpers/docs-directory.js";
 import { createTestKanbanDeps } from "../../helpers/test-deps.js";
@@ -69,6 +70,28 @@ function renderView(
 }
 
 const NO_FILTERS: ListTaskDocumentsFilters = {};
+
+function createFakeWatcher() {
+  const calls = { start: 0, stop: 0 };
+  let changeCallback: (() => void) | undefined;
+  const watcher: TaskDocumentWatcher = {
+    start: () => {
+      calls.start += 1;
+    },
+    retarget: () => undefined,
+    stop: () => {
+      calls.stop += 1;
+    },
+    onChange: (callback) => {
+      changeCallback = callback;
+    },
+  };
+  return {
+    watcher,
+    calls,
+    emitChange: () => changeCallback?.(),
+  };
+}
 
 describe("StatusColumnsView", () => {
   it("places each parent under its fixed board column, sub-documents nested beneath their parent", async () => {
@@ -163,6 +186,52 @@ describe("StatusColumnsView", () => {
     expect(executeSpy).toHaveBeenCalledWith("/virtual/project", NO_FILTERS);
 
     unmount();
+  });
+
+  it("re-runs the injected use case when the live watcher reports a change and stops it on unmount", async () => {
+    const useCase = createUseCase([
+      createTaskDocument({ name: "FID-560", filePath: "/p/task-a/plan.md", status: "pending" }),
+    ]);
+    const executeSpy = vi.spyOn(useCase, "execute");
+    const fake = createFakeWatcher();
+
+    const { lastFrame, unmount } = render(
+      createElement(StatusColumnsView, {
+        listTaskDocuments: useCase,
+        projectPath: "/virtual/project",
+        filters: NO_FILTERS,
+        terminalWidth: 100,
+        createWatcher: () => fake.watcher,
+      })
+    );
+
+    await waitForFrame(lastFrame, "FID-560");
+    expect(executeSpy).toHaveBeenCalledTimes(1);
+    expect(fake.calls.start).toBe(1);
+
+    fake.emitChange();
+    await vi.waitFor(() => {
+      expect(executeSpy).toHaveBeenCalledTimes(2);
+    });
+
+    unmount();
+    expect(fake.calls.stop).toBe(1);
+  });
+
+  it("never touches a watcher when no live factory is provided", async () => {
+    const useCase = createUseCase([
+      createTaskDocument({ name: "FID-560", filePath: "/p/task-a/plan.md", status: "pending" }),
+    ]);
+    const executeSpy = vi.spyOn(useCase, "execute");
+    const fake = createFakeWatcher();
+
+    const { lastFrame, unmount } = renderView(useCase, NO_FILTERS, 100);
+    await waitForFrame(lastFrame, "FID-560");
+    unmount();
+
+    expect(fake.calls.start).toBe(0);
+    expect(fake.calls.stop).toBe(0);
+    expect(executeSpy).toHaveBeenCalledTimes(1);
   });
 
   it("renders the same board a filesystem-backed use case produces for the fixture project", async () => {

@@ -11,6 +11,7 @@ interface InteractiveCommandOptions {
   status?: string;
   progress?: string;
   all?: boolean;
+  live?: boolean;
 }
 
 function runInteractiveCommand(
@@ -28,6 +29,7 @@ function runInteractiveCommand(
         progress: toProgressStatusFilter(options.progress),
         shouldIncludeUnknownStatus: options.all,
       },
+      createWatcher: options.live ? runtime.createWatcher : undefined,
     })
   );
 }
@@ -47,6 +49,7 @@ export function registerInteractiveCommand(
       )
     )
     .option("--all", "include task groups whose parent has no known status")
+    .option("--live", "refresh the board when a task document changes", false)
     .action((path: string, options: InteractiveCommandOptions) => {
       try {
         runInteractiveCommand(path, options, runtime);
