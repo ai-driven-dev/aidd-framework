@@ -1,6 +1,6 @@
 ---
 objective: "The kanban feature holds a real hexagon: presentation depends only on injected ports, HTTP transport lives in infrastructure, one domain service decides board columns for every surface, and the CLI reaches the feature through a single public entrypoint."
-status: in-progress
+status: implemented
 ---
 
 # Plan: Kanban hexagonal refactor
