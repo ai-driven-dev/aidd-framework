@@ -1,11 +1,15 @@
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
+import type { Command } from "commander";
+import type { KanbanCommandDeps } from "../../../kanban/src/index.js";
 import "../domain/tools/ai/claude.js";
 import "../domain/tools/ai/codex.js";
 import "../domain/tools/ai/copilot.js";
 import "../domain/tools/ai/cursor.js";
 import "../domain/tools/ai/opencode.js";
 import "../domain/tools/ide/vscode.js";
+import { parseGlobalOptions } from "../application/commands/global-options.js";
+import { ErrorHandler } from "../application/error-handler.js";
 import { CLIOutput } from "../application/output.js";
 import { RequireAuthUseCase } from "../application/use-cases/auth/require-auth-use-case.js";
 import { CheckUpdateUseCase } from "../application/use-cases/check-update-use-case.js";
@@ -79,6 +83,7 @@ import { SyncConflictResolverUseCase } from "../application/use-cases/sync/sync-
 import { UninstallIdeUseCase } from "../application/use-cases/uninstall/uninstall-ide-use-case.js";
 import { UninstallToolsUseCase } from "../application/use-cases/uninstall/uninstall-tools-use-case.js";
 import { UninstallUseCase } from "../application/use-cases/uninstall/uninstall-use-case.js";
+import { DOCS_DIR } from "../domain/models/paths.js";
 import type { AssetProvider } from "../domain/ports/asset-provider.js";
 import type { CredentialStore } from "../domain/ports/credential-store.js";
 import type { FileMerger } from "../domain/ports/file-merger.js";
@@ -354,6 +359,17 @@ export function createMenuDeps(projectRoot: string): {
   return {
     manifestRepo: new ManifestRepositoryAdapter(projectRoot),
     prompter: process.stdout.isTTY ? new InquirerPrompterAdapter() : new SilentPrompterAdapter(),
+  };
+}
+
+export function createKanbanCommandDeps(program: Command): KanbanCommandDeps {
+  // Lazy: commander parses `--verbose` after `registerKanbanCommand` returns, so the
+  // output channel must be resolved when the action runs, not at registration time.
+  const resolveOutput = (): CLIOutput => parseGlobalOptions(program).output;
+  return {
+    docsDirectoryName: DOCS_DIR,
+    output: { print: (message: string) => resolveOutput().print(message) },
+    onError: (error: unknown) => new ErrorHandler(resolveOutput()).handle(error),
   };
 }
 
