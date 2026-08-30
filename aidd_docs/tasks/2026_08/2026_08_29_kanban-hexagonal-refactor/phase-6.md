@@ -2,42 +2,41 @@
 status: pending
 ---
 
-# Instruction: CLI boundary hardened around the public entrypoint
+# Instruction: Frontend renders the server board and the project picker
 
-> `kanban/src/index.ts` and the single-import cli consumer already exist (phase 1). This phase moves deps assembly into `deps.ts`, locks the boundary with a gate, and documents it.
+> The frontend still re-implements the domain (progress order, labels, grouping) and
+> reads a fixed project. This phase makes it render straight from `BoardDto.columns`
+> and, when the server is not pinned, exposes a free-form project-path field wired to
+> the `/api/project` endpoints from phase 5.
 
 ## Architecture projection
 
 > Tree of the final files. ✅ create · ✏️ modify · ❌ delete
 
 ```txt
-kanban/src/
-└── index.ts                         ✏️ confirm it exports exactly registerKanban + KanbanCommandDeps + KanbanOutput, nothing deeper
-cli/src/
-├── application/commands/kanban.ts    ✏️ stop building deps inline; call createKanbanCommandDeps(program), pass result to registerKanban(kanban, deps)
-├── infrastructure/deps.ts            ✏️ add createKanbanCommandDeps(program): docsDirectoryName + the lazy output/onError closures
-└── domain/models/paths.ts            (unchanged) DOCS_DIR still the source of docsDirectoryName
-cli/
-├── scripts/check-kanban-boundary.mjs ✅ grep gate: cli/src may reference kanban/src only via index
-├── package.json                      ✏️ wire the gate into a script + the hook list
-└── tsup.config.ts                    (unchanged from phase 4)
-kanban/
-└── README.md                         ✏️ document index.ts as the only entrypoint for hosts
-cli/tests/
-└── e2e/kanban.e2e.test.ts            ✏️ or ✅ — `aidd kanban list` / `web --help` run through the public entrypoint
+kanban/src/infrastructure/http/frontend/
+├── app.js        ✏️ render BoardDto.columns; drop PROGRESS_ORDER / PROGRESS_LABELS / groupByProgress / countDoneSubs; add the project-path control
+├── index.html    ✏️ add the project-path input + Scan button + error slot in the header
+└── styles.css    ✏️ styles for the project-path field and its error line
 ```
 
 ## User Journey
 
 ```mermaid
 flowchart TD
-  A[cli/infrastructure/deps.ts builds KanbanCommandDeps] --> B[cli/application/commands/kanban.ts]
-  B --> C[import registerKanban from kanban/src/index.js]
-  C --> D[registerKanban(program, deps)]
-  D --> E[kanban feature composes its own runtime internally]
-  F[boundary-check script] --> G{any cli/src import of kanban/src/ beyond index?}
-  G -- yes --> H[script exits 1, CI fails]
-  G -- no --> I[pass]
+  A[Page loads] --> B[GET /api/project => path + pinned]
+  B --> C{pinned?}
+  C -- yes --> D[show path as static text, no input]
+  C -- no --> E[show input pre-filled with path + Scan]
+  A --> F[GET /api/tasks => BoardDto]
+  F --> G[renderBoard iterates board.columns in server order]
+  G --> H[column header = column.label, count = column.cards.length]
+  H --> I[each card: name, status, doneSubCount/totalSubCount, sub list]
+  A --> J[EventSource /events => JSON.parse => renderBoard]
+  E --> K[submit path => POST /api/project]
+  K --> L{200?}
+  L -- yes --> M[clear error; board re-renders from the broadcast + a re-fetch]
+  L -- no --> N[show server error message under the input; board unchanged]
 ```
 
 ## Test Scope
@@ -48,54 +47,99 @@ title: Test scope
 ---
 journey
   section Setup
-    Build the cli bundle => dist/cli.js present: 5: system
+    Serve fixture project A with todo, done and one bogus status, pinned false => board has five columns: 5: system
   section Happy path
-    Run aidd kanban list in this repo => the board table prints: 5: cli
-    Run aidd kanban web --help => usage text prints, no server starts: 5: cli
-  section Edge case - boundary gate
-    Add a deep import of kanban/src/presentation in cli/src => the boundary script exits 1: 1: system
-  section Regression
-    grep cli/src for ../../../../kanban/src/ => only index.js matches: 1: system
+    Load the page => columns appear in server order with server labels and counts, and the path input holds project A: 5: browser
+  section Edge case - switch project
+    Type project B's path and Scan => the board re-renders for B and edits under B refresh it: 1: browser
+  section Edge case - bad path
+    Type a path with no docs directory and Scan => the server's error text shows under the input, the board still shows A: 1: browser
+  section Edge case - pinned server
+    Serve with a positional path => the header shows the path as text, no input is rendered: 1: browser
+  section Edge case - all known statuses
+    Fixture with no unknowns => four columns, no unknown header: 1: browser
   section Teardown
-    Revert the probe import => gate green again: 5: system
+    Close the page and stop the server => connection closes: 5: system
 ```
+
+## Wireframe
+
+```txt
+┌ (1) Header ───────────────────────────────────────────── (3) ● connected ─┐
+│  aidd kanban   (2) [ /abs/path/to/project              ] [ Scan ]           │
+│                (8) project not found: no aidd_docs at that path            │
+├──────────┬────────────┬─────────┬──────────┬──────────────────────────────┤
+│ (4) TODO 3 │ IN PROG 1 │ DONE 2  │ BLOCKED 0 │ UNKNOWN 1                    │
+│  ┌───────┐ │ ┌────────┐│         │           │  ┌───────┐                   │
+│  │ (5)   │ │ │ name   ││         │           │  │ name  │                   │
+│  │ name  │ │ │2/4 done││         │           │  │  ???  │                   │
+│  │ stat  │ │ │▓▓░░░░  ││         │           │  └───────┘                   │
+│  └───────┘ │ └────────┘│         │           │                             │
+├────────────┴───────────┴─────────┴───────────┴──────────────────────────────┤
+│ (6) 7 tasks                                        Last updated 12:00:03    │
+└────────────────────────────────────────────────────────────────────────────┘
+
+    ┌ (7) Detail panel (overlay) ──────────┐
+    │  name                          [ x ] │
+    │  Status: pending · plan              │
+    │  Path: aidd_docs/tasks/x/plan.md     │
+    │  Sub-tasks (2/4)  ▓▓░░               │
+    └──────────────────────────────────────┘
+```
+
+1. Header: title; connection dot at right.
+2. Project-path field: text input pre-filled with the active path + Scan action. Rendered only when the server reports `pinned:false`.
+3. Connection indicator: connected / disconnected (unchanged).
+4. Columns: from `BoardDto.columns` in server order, server label + card count.
+5. Card: parent name, raw status, `doneSubCount/totalSubCount` + bar; opens the panel.
+6. Footer: task count + last-updated (unchanged).
+7. Detail panel overlay: name, status + type, relative path, sub-task list — from the card DTO.
+8. Error line: the server's 400 message for a rejected scan; cleared on success. When `pinned:true`, region 2 is the path as static dimmed text and region 8 never appears.
 
 ## Tasks to do
 
-### `1)` Confirm `kanban/src/index.ts` is the whole contract
+### `1)` Render from `BoardDto`
 
-1. Exports are exactly `registerKanban`, `KanbanCommandDeps`, `KanbanOutput` — no re-export reaches into `composition/`, `application/`, `infrastructure/`, or `domain/`.
-2. If phases 2-5 added anything a host needs, add it here explicitly rather than letting the cli deep-import.
+> The server sends columns already ordered and labelled; the page just draws them.
 
-### `2)` Slim `cli/src/application/commands/kanban.ts`
+1. `loadInitialData` / SSE `onmessage`: payload is `{ columns: [...] }`; call `renderBoard(boardDto.columns)`.
+2. `renderBoard(columns)`: iterate `columns` directly; header text = `column.label`, count = `column.cards.length`; for each `card` in `column.cards` call `createCard(card)`.
+3. Empty state: when every column has zero cards, show the existing "No task documents found." message.
 
-1. Import stays the single `import { registerKanban, type KanbanCommandDeps } from "../../../../kanban/src/index.js";`
-2. Remove the inline `deps` construction (currently lines ~19-23); call a `createKanbanCommandDeps(program)` factory and pass its result to `registerKanban(kanban, deps)`.
-3. Keep the command hidden, as today. `cli/src/cli.ts:44 registerKanbanCommand(program)` is unchanged — the factory is called inside `registerKanbanCommand`.
+### `2)` Delete the re-implemented domain logic
 
-### `3)` Assemble kanban deps in `cli/src/infrastructure/deps.ts`
+1. Remove `PROGRESS_ORDER`, `PROGRESS_LABELS`, `groupByProgress`, `countDoneSubs`.
+2. Use `card.doneSubCount` / `card.totalSubCount` from the DTO for the progress summary and bar.
 
-1. Add `createKanbanCommandDeps(program): KanbanCommandDeps` — `docsDirectoryName: DOCS_DIR`, plus the **lazy** `output` / `onError` closures currently inline in `kanban.ts` (`resolveOutput = () => parseGlobalOptions(program).output`). They must stay lazy: `--verbose` is parsed by commander after `registerKanbanCommand` returns, so eager resolution at registration would capture the wrong output. This is deps *construction* moving to `deps.ts`, not a switch to the eager `createDeps` graph.
-2. `kanban.ts` no longer knows `DOCS_DIR`, `ErrorHandler`, or `parseGlobalOptions` directly.
+### `3)` Adjust `createCard` / `openPanel` to the card shape
 
-### `4)` Add the boundary-check gate
+1. `group.parent.X` => `card.X`; `group.subDocuments` => `card.subDocuments`; `group.parent.filePath` => `card.path`.
+2. No visual change intended; keep every class name and DOM id already present.
 
-1. Script (e.g. `cli/scripts/check-kanban-boundary.mjs` or a `package.json` line): `grep -rn "kanban/src/" cli/src | grep -v "kanban/src/index" && exit 1 || exit 0`.
-2. Wire it into `pnpm --dir cli lint` prerequisites or the lefthook `pre-push` list documented in `cli/aidd_docs/memory/deployment.md`.
-3. Note the gate in `kanban/README.md` next to the existing "Nothing here may import from `../cli`."
+### `4)` Add the project-path control
 
-### `5)` Full verification
+1. `index.html`: in the header, add `<input id="project-path-input">`, a Scan `<button id="project-path-scan" type="button">`, and `<span id="project-path-error">`. Keep `#project-path` for the pinned static display.
+2. `app.js` on load: `GET /api/project`. When `pinned` is true, set `#project-path` text to the path and leave the input hidden. When false, show the input pre-filled with `path` and the Scan button.
+3. Submit (Scan click or Enter in the input): `POST /api/project` with `{ path: input.value }`. On `200`, clear `#project-path-error` and call `loadInitialData()` (the server also broadcasts). On a non-200, read `body.error` into `#project-path-error` and leave the board as is.
+4. Toggle `[hidden]` on the input vs the static span; never both visible.
 
-1. `pnpm --dir kanban test`
-2. `pnpm --dir cli typecheck && pnpm --dir cli test && pnpm --dir cli build`
-3. Smoke: from a fresh `/tmp` dir, run the built `aidd kanban list` against a checkout; confirm the table renders.
+### `5)` Styles
+
+1. `styles.css`: minimal rules for `#project-path-input`, `#project-path-scan`, and an error style for `#project-path-error`. Reuse existing header layout classes; no new colour system.
+
+### `6)` Manual verification
+
+1. `pnpm --dir cli build`, then from this repo run `aidd kanban web`: columns, counts, panel, live refresh on a file edit; the path input shows this repo; type another checkout's path, Scan, the board switches and edits there refresh it; a bogus path shows the inline error.
+2. Run `aidd kanban web <path-to-another-checkout>`: the header shows that path as text, no input, and `POST /api/project` from devtools returns 409.
 
 ## Test acceptance criteria
 
-| Task | Acceptance criteria                                                                          |
-| ---- | ------------------------------------------------------------------------------------------ |
-| 1    | `kanban/src/index.ts` exports exactly `registerKanban` + the two types; nothing deeper is re-exported |
-| 2    | `cli/src` contains a single reference to `kanban/src/`, and it is `kanban/src/index.js`; `kanban.ts` no longer builds deps inline |
-| 3    | `aidd kanban list` and `aidd kanban web` work end to end with deps built in `deps.ts`        |
-| 4    | The boundary script exits 1 when a deep `kanban/src/presentation` import is added to `cli/src`, 0 otherwise |
-| 5    | `kanban` tests, `cli` typecheck+test+build all green; smoke `aidd kanban list` prints the board |
+| Task | Acceptance criteria |
+| ---- | ------------------- |
+| 1 | The board shows exactly the columns the server sent, in that order, with the server's labels and counts |
+| 2 | `app.js` contains no status-order array, no label map, no client-side grouping or done-count function |
+| 3 | Card and panel show name, status, type, relative path, and `n/m done` from the DTO with no console error |
+| 4 | On load the page calls `GET /api/project`; with `pinned:false` it renders a path input holding the active path; with `pinned:true` it renders the path as text and no input |
+| 4 | Scanning a valid path posts to `/api/project`, the board re-renders for that project within ~1s, and editing a file there refreshes the board |
+| 4 | Scanning a path with no docs directory shows the server's error message inline and leaves the board unchanged |
+| 6 | `aidd kanban web` switches project from the browser; `aidd kanban web <path>` shows no picker |
