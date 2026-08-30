@@ -173,4 +173,14 @@ describe("FilesystemTaskDocumentRepository", () => {
 
     expect(taskDocuments).toEqual([]);
   });
+
+  it("reports projectExists true only when the docs directory is present", async () => {
+    const repository = new FilesystemTaskDocumentRepository(DOCS_DIRECTORY_NAME);
+
+    expect(await repository.projectExists(projectPath)).toBe(false);
+
+    await mkdir(join(projectPath, DOCS_DIRECTORY_NAME), { recursive: true });
+
+    expect(await repository.projectExists(projectPath)).toBe(true);
+  });
 });

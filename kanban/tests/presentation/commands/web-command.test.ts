@@ -48,7 +48,10 @@ describe("web command wiring", () => {
     await program.parseAsync(["node", "aidd-kanban", "--port", "8080"]);
     await Promise.resolve();
 
-    expect(createWebServerMock).toHaveBeenCalledWith(8080);
+    expect(createWebServerMock).toHaveBeenCalledWith(8080, {
+      projectPath: "/resolved/project/path",
+      pinned: false,
+    });
     expect(startMock).toHaveBeenCalledTimes(1);
     expect(errors).toEqual([]);
   });
@@ -61,7 +64,24 @@ describe("web command wiring", () => {
     await program.parseAsync(["node", "aidd-kanban"]);
     await Promise.resolve();
 
-    expect(createWebServerMock).toHaveBeenCalledWith(3000);
+    expect(createWebServerMock).toHaveBeenCalledWith(3000, {
+      projectPath: "/resolved/project/path",
+      pinned: false,
+    });
+  });
+
+  it("pins the path from the positional argument and hides the picker", async () => {
+    const { runtime, createWebServerMock } = createRuntime();
+    const program = new Command();
+    registerWebCommand(program, runtime, (error) => errors.push(error));
+
+    await program.parseAsync(["node", "aidd-kanban", "/some/dir"]);
+    await Promise.resolve();
+
+    expect(createWebServerMock).toHaveBeenCalledWith(3000, {
+      projectPath: "/some/dir",
+      pinned: true,
+    });
   });
 
   it("routes a non-numeric port to the error handler without starting a server", async () => {

@@ -12,10 +12,15 @@ export interface CreateKanbanRuntimeInput {
   projectPath: string;
 }
 
+export interface WebServerTarget {
+  projectPath: string;
+  pinned: boolean;
+}
+
 export interface KanbanRuntime {
   listTaskDocuments: ListTaskDocumentsUseCase;
   createWatcher: () => TaskDocumentWatcher;
-  createWebServer: (port: number) => KanbanWebServer;
+  createWebServer: (port: number, target: WebServerTarget) => KanbanWebServer;
   output: KanbanOutput;
   projectPath: string;
 }
@@ -31,11 +36,14 @@ export function createKanbanRuntime({
   return {
     listTaskDocuments,
     createWatcher,
-    createWebServer: (port: number) =>
+    createWebServer: (port: number, target: WebServerTarget) =>
       new KanbanWebServer({
         port,
-        projectPath,
-        boardProvider: async () => toBoardDto(await listTaskDocuments.execute(projectPath, {})),
+        projectPath: target.projectPath,
+        pinned: target.pinned,
+        boardProvider: async (targetPath: string) =>
+          toBoardDto(await listTaskDocuments.execute(targetPath, {})),
+        projectValidator: (targetPath: string) => repository.projectExists(targetPath),
         watcher: createWatcher(),
         output: deps.output,
         ...readFrontendAssets(),

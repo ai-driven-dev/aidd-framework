@@ -1,4 +1,4 @@
-import { createServer, type Server, type ServerResponse } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { TaskDocumentWatcher } from "../../domain/ports/task-document-watcher.js";
 import type { BoardDto } from "../../presentation/dto/board-dto.js";
 import { SseManager } from "./sse-manager.js";
@@ -10,7 +10,9 @@ export interface WebServerOutput {
 export interface KanbanWebServerDeps {
   port: number;
   projectPath: string;
-  boardProvider: () => Promise<BoardDto>;
+  pinned: boolean;
+  boardProvider: (projectPath: string) => Promise<BoardDto>;
+  projectValidator: (projectPath: string) => Promise<boolean>;
   watcher: TaskDocumentWatcher;
   output: WebServerOutput;
   indexHtml: string;
@@ -25,35 +27,75 @@ const CONTENT_TYPES: Record<string, string> = {
   json: "application/json; charset=utf-8",
 };
 
+const PROJECT_PINNED_MESSAGE =
+  "KANBAN_PROJECT_PINNED: the project path is fixed by the command line";
+const PROJECT_INVALID_REQUEST_MESSAGE =
+  'KANBAN_PROJECT_INVALID_REQUEST: request body must be a JSON object with a string "path"';
+const PROJECT_NOT_FOUND_MESSAGE =
+  "KANBAN_PROJECT_NOT_FOUND: no task documents directory at the given path";
+
 function serveText(res: ServerResponse, contentType: string, body: string): void {
   res.writeHead(200, { "Content-Type": contentType, "Cache-Control": "no-store" });
   res.end(body);
 }
 
+function serveJson(res: ServerResponse, status: number, payload: unknown): void {
+  res.writeHead(status, { "Content-Type": CONTENT_TYPES.json, "Cache-Control": "no-store" });
+  res.end(JSON.stringify(payload));
+}
+
 function serveNotFound(res: ServerResponse): void {
-  res.writeHead(404, { "Content-Type": CONTENT_TYPES.json });
-  res.end(JSON.stringify({ error: "not found" }));
+  serveJson(res, 404, { error: "not found" });
+}
+
+function readRequestBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
+    req.on("error", reject);
+  });
+}
+
+function parseProjectPath(rawBody: string): string | undefined {
+  let body: unknown;
+
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return undefined;
+  }
+
+  if (typeof body !== "object" || body === null || !("path" in body)) {
+    return undefined;
+  }
+
+  const candidate = body.path;
+
+  return typeof candidate === "string" && candidate.length > 0 ? candidate : undefined;
 }
 
 export class KanbanWebServer {
   private server: Server | undefined;
   private readonly sseManager = new SseManager();
   private readonly deps: KanbanWebServerDeps;
+  private activeProjectPath: string;
 
   constructor(deps: KanbanWebServerDeps) {
     this.deps = deps;
+    this.activeProjectPath = deps.projectPath;
   }
 
   async start(): Promise<number> {
     this.deps.watcher.onChange(() => {
-      this.fetchAndBroadcast();
+      void this.fetchAndBroadcast();
     });
 
-    this.server = createServer(async (req, res) => {
-      await this.handleRequest(req.url ?? "/", res);
+    this.server = createServer((req, res) => {
+      void this.handleRequest(req, res);
     });
 
-    this.deps.watcher.start(this.deps.projectPath);
+    this.deps.watcher.start(this.activeProjectPath);
 
     const server = this.server;
 
@@ -78,8 +120,8 @@ export class KanbanWebServer {
     }
   }
 
-  private async handleRequest(url: string, res: ServerResponse): Promise<void> {
-    const path = url.split("?")[0];
+  private async handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const path = (req.url ?? "/").split("?")[0];
 
     switch (path) {
       case "/":
@@ -94,6 +136,9 @@ export class KanbanWebServer {
       case "/api/tasks":
         await this.handleApiTasks(res);
         return;
+      case "/api/project":
+        await this.handleApiProject(req, res);
+        return;
       case "/events":
         this.sseManager.addClient(res);
         return;
@@ -104,17 +149,57 @@ export class KanbanWebServer {
 
   private async handleApiTasks(res: ServerResponse): Promise<void> {
     try {
-      const board = await this.deps.boardProvider();
+      const board = await this.deps.boardProvider(this.activeProjectPath);
       serveText(res, CONTENT_TYPES.json, JSON.stringify(board));
     } catch {
-      res.writeHead(500, { "Content-Type": CONTENT_TYPES.json });
-      res.end(JSON.stringify({ error: "failed to scan task documents" }));
+      serveJson(res, 500, { error: "failed to scan task documents" });
     }
   }
 
-  private fetchAndBroadcast(): void {
-    this.deps
-      .boardProvider()
+  private async handleApiProject(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (req.method === "GET") {
+      serveJson(res, 200, { path: this.activeProjectPath, pinned: this.deps.pinned });
+      return;
+    }
+
+    if (req.method !== "POST") {
+      serveNotFound(res);
+      return;
+    }
+
+    if (this.deps.pinned) {
+      serveJson(res, 409, { error: PROJECT_PINNED_MESSAGE, code: "KANBAN_PROJECT_PINNED" });
+      return;
+    }
+
+    const requestedPath = parseProjectPath(await readRequestBody(req));
+
+    if (requestedPath === undefined) {
+      serveJson(res, 400, {
+        error: PROJECT_INVALID_REQUEST_MESSAGE,
+        code: "KANBAN_PROJECT_INVALID_REQUEST",
+      });
+      return;
+    }
+
+    if (!(await this.deps.projectValidator(requestedPath))) {
+      serveJson(res, 400, {
+        error: PROJECT_NOT_FOUND_MESSAGE,
+        code: "KANBAN_PROJECT_NOT_FOUND",
+      });
+      return;
+    }
+
+    this.activeProjectPath = requestedPath;
+    this.deps.watcher.retarget(requestedPath);
+    await this.fetchAndBroadcast();
+
+    serveJson(res, 200, { path: requestedPath, pinned: false });
+  }
+
+  private fetchAndBroadcast(): Promise<void> {
+    return this.deps
+      .boardProvider(this.activeProjectPath)
       .then((board) => this.sseManager.broadcast(board))
       .catch(() => {});
   }

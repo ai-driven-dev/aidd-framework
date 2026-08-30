@@ -61,6 +61,10 @@ function toTaskDocument(filePath: string, frontmatter: RawFrontmatter): TaskDocu
 export class FilesystemTaskDocumentRepository implements TaskDocumentRepository {
   constructor(private readonly docsDirectoryName: string) {}
 
+  async projectExists(projectPath: string): Promise<boolean> {
+    return existsSync(join(projectPath, this.docsDirectoryName));
+  }
+
   async findAll(projectPath: string): Promise<TaskDocument[]> {
     const aiddDocsPath = join(projectPath, this.docsDirectoryName);
 

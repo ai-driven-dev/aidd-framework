@@ -30,6 +30,7 @@ function createMockWatcher(): TaskDocumentWatcher & { triggerChange: () => void 
 
   return {
     start: vi.fn(),
+    retarget: vi.fn(),
     stop: vi.fn(),
     onChange: vi.fn().mockImplementation((cb) => {
       callback = cb;
@@ -42,8 +43,10 @@ function createMockWatcher(): TaskDocumentWatcher & { triggerChange: () => void 
 
 function createServer(
   overrides: Partial<{
-    boardProvider: () => Promise<BoardDto>;
+    boardProvider: (projectPath: string) => Promise<BoardDto>;
+    projectValidator: (projectPath: string) => Promise<boolean>;
     watcher: ReturnType<typeof createMockWatcher>;
+    pinned: boolean;
   }> = {}
 ): {
   server: KanbanWebServer;
@@ -52,6 +55,7 @@ function createServer(
 } {
   const watcher = overrides.watcher ?? createMockWatcher();
   const boardProvider = overrides.boardProvider ?? (async () => SAMPLE_BOARD_DTO);
+  const projectValidator = overrides.projectValidator ?? (async () => true);
   const output = {
     messages: [] as string[],
     print(msg: string) {
@@ -62,7 +66,9 @@ function createServer(
   const server = new KanbanWebServer({
     port: 0,
     projectPath: "/tmp/test",
+    pinned: overrides.pinned ?? false,
     boardProvider,
+    projectValidator,
     watcher,
     output,
     indexHtml: "<html><body>kanban</body></html>",
@@ -75,6 +81,25 @@ function createServer(
 
 async function fetchFromServer(port: number, path: string): Promise<Response> {
   return fetch(`http://localhost:${port}${path}`);
+}
+
+async function readNextSseData(stream: ReadableStream<Uint8Array>): Promise<string> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) {
+      throw new Error("SSE stream closed before a data frame arrived");
+    }
+    buffer += decoder.decode(value, { stream: true });
+    const match = buffer.match(/data: (.*)\n\n/);
+    if (match?.[1] !== undefined) {
+      await reader.cancel();
+      return match[1];
+    }
+  }
 }
 
 describe("KanbanWebServer", () => {
@@ -198,5 +223,111 @@ describe("KanbanWebServer", () => {
     server.stop();
 
     expect(ctx.watcher.stop).toHaveBeenCalled();
+  });
+
+  it("reports the active path and the pin flag on GET /api/project", async () => {
+    const ctx = createServer({ pinned: true });
+    server = ctx.server;
+    port = await server.start();
+
+    const res = await fetchFromServer(port, "/api/project");
+    const body = (await res.json()) as { path: string; pinned: boolean };
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ path: "/tmp/test", pinned: true });
+  });
+
+  it("retargets the watcher and shifts the board when POST /api/project switches project", async () => {
+    const boardByPath: Record<string, BoardDto> = {
+      "/tmp/test": SAMPLE_BOARD_DTO,
+      "/tmp/other": { columns: [{ progressStatus: "done", label: "DONE", cards: [] }] },
+    };
+    const ctx = createServer({
+      boardProvider: async (projectPath) => boardByPath[projectPath] ?? SAMPLE_BOARD_DTO,
+      projectValidator: async (projectPath) => projectPath === "/tmp/other",
+    });
+    server = ctx.server;
+    port = await server.start();
+
+    const events = await fetchFromServer(port, "/events");
+    if (events.body === null) {
+      throw new Error("SSE response had no body");
+    }
+    const nextEventData = readNextSseData(events.body);
+
+    const res = await fetch(`http://localhost:${port}/api/project`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "/tmp/other" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect((await res.json()) as { path: string; pinned: boolean }).toEqual({
+      path: "/tmp/other",
+      pinned: false,
+    });
+    expect(ctx.watcher.retarget).toHaveBeenCalledWith("/tmp/other");
+
+    const broadcastPayload = JSON.parse(await nextEventData) as BoardDto;
+    expect(broadcastPayload.columns[0]?.progressStatus).toBe("done");
+
+    const tasks = (await (await fetchFromServer(port, "/api/tasks")).json()) as BoardDto;
+    expect(tasks.columns[0]?.progressStatus).toBe("done");
+  });
+
+  it("rejects a POST to a non-project path with 400 and leaves the active path untouched", async () => {
+    const ctx = createServer({ projectValidator: async () => false });
+    server = ctx.server;
+    port = await server.start();
+
+    const res = await fetch(`http://localhost:${port}/api/project`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "/tmp/not-a-project" }),
+    });
+    const body = (await res.json()) as { error: string; code: string };
+
+    expect(res.status).toBe(400);
+    expect(body.code).toBe("KANBAN_PROJECT_NOT_FOUND");
+    expect(ctx.watcher.retarget).not.toHaveBeenCalled();
+
+    const project = (await (await fetchFromServer(port, "/api/project")).json()) as {
+      path: string;
+    };
+    expect(project.path).toBe("/tmp/test");
+  });
+
+  it("rejects a POST with a missing or non-string path with 400 KANBAN_PROJECT_INVALID_REQUEST", async () => {
+    const ctx = createServer();
+    server = ctx.server;
+    port = await server.start();
+
+    const res = await fetch(`http://localhost:${port}/api/project`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: 42 }),
+    });
+    const body = (await res.json()) as { code: string };
+
+    expect(res.status).toBe(400);
+    expect(body.code).toBe("KANBAN_PROJECT_INVALID_REQUEST");
+    expect(ctx.watcher.retarget).not.toHaveBeenCalled();
+  });
+
+  it("rejects a POST on a pinned server with 409 KANBAN_PROJECT_PINNED", async () => {
+    const ctx = createServer({ pinned: true });
+    server = ctx.server;
+    port = await server.start();
+
+    const res = await fetch(`http://localhost:${port}/api/project`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "/tmp/other" }),
+    });
+    const body = (await res.json()) as { code: string };
+
+    expect(res.status).toBe(409);
+    expect(body.code).toBe("KANBAN_PROJECT_PINNED");
+    expect(ctx.watcher.retarget).not.toHaveBeenCalled();
   });
 });

@@ -68,6 +68,7 @@ const FIXED_TASK_DOCUMENTS: TaskDocument[] = [
 function createFakeRepository(taskDocuments: TaskDocument[]): TaskDocumentRepository {
   return {
     findAll: async () => taskDocuments,
+    projectExists: async () => true,
   };
 }
 

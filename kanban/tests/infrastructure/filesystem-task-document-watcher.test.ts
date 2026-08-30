@@ -102,4 +102,30 @@ describe("FilesystemTaskDocumentWatcher", () => {
     expect(() => watcher.start(projectPath)).not.toThrow();
     watcher.stop();
   });
+
+  it("follows the callback to the new directory after retarget and drops the old one", async () => {
+    const firstProject = await mkdtemp(join(tmpdir(), "aidd-watcher-a-"));
+    const secondProject = await mkdtemp(join(tmpdir(), "aidd-watcher-b-"));
+    const firstDocs = join(firstProject, DOCS_DIRECTORY_NAME, "tasks");
+    const secondDocs = join(secondProject, DOCS_DIRECTORY_NAME, "tasks");
+    await mkdir(firstDocs, { recursive: true });
+    await mkdir(secondDocs, { recursive: true });
+
+    watcher = new FilesystemTaskDocumentWatcher(DOCS_DIRECTORY_NAME);
+    const callback = vi.fn();
+    watcher.onChange(callback);
+    watcher.start(firstProject);
+    watcher.retarget(secondProject);
+
+    await writeFile(join(firstDocs, "old.md"), "---\nstatus: pending\n---\n");
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    expect(callback).not.toHaveBeenCalled();
+
+    await writeFile(join(secondDocs, "new.md"), "---\nstatus: pending\n---\n");
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    expect(callback).toHaveBeenCalledTimes(1);
+
+    await rm(firstProject, { recursive: true, force: true });
+    await rm(secondProject, { recursive: true, force: true });
+  });
 });

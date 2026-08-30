@@ -39,9 +39,16 @@ function openBrowser(url: string): void {
   exec(command);
 }
 
-async function runWebCommand(options: WebCommandOptions, runtime: KanbanRuntime): Promise<void> {
+async function runWebCommand(
+  path: string | undefined,
+  options: WebCommandOptions,
+  runtime: KanbanRuntime
+): Promise<void> {
   const port = parsePort(options.port);
-  const server = runtime.createWebServer(port);
+  const server = runtime.createWebServer(port, {
+    projectPath: path ?? runtime.projectPath,
+    pinned: path !== undefined,
+  });
   const actualPort = await server.start();
 
   openBrowser(`http://localhost:${actualPort}`);
@@ -61,10 +68,11 @@ export function registerWebCommand(
   onError: (error: unknown) => void
 ): void {
   program
+    .argument("[path]", "project path to serve")
     .option("--port <port>", "server port", String(DEFAULT_PORT))
-    .action(async (options: WebCommandOptions) => {
+    .action(async (path: string | undefined, options: WebCommandOptions) => {
       try {
-        await runWebCommand(options, runtime);
+        await runWebCommand(path, options, runtime);
       } catch (error) {
         onError(error);
       }

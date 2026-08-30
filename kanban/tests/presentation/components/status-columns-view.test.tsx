@@ -35,7 +35,10 @@ function createTaskDocument({
 }
 
 function createUseCase(taskDocuments: TaskDocument[]): ListTaskDocumentsUseCase {
-  return new ListTaskDocumentsUseCase({ findAll: async () => taskDocuments });
+  return new ListTaskDocumentsUseCase({
+    findAll: async () => taskDocuments,
+    projectExists: async () => true,
+  });
 }
 
 async function waitForFrame(

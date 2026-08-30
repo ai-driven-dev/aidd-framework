@@ -19,6 +19,15 @@ export class FilesystemTaskDocumentWatcher implements TaskDocumentWatcher {
   }
 
   start(projectPath: string): void {
+    this.watchDirectory(projectPath);
+  }
+
+  retarget(projectPath: string): void {
+    this.stop();
+    this.watchDirectory(projectPath);
+  }
+
+  private watchDirectory(projectPath: string): void {
     const watchPath = join(projectPath, this.docsDirectoryName);
 
     if (!existsSync(watchPath)) {
