@@ -1,6 +1,7 @@
 import type {
   RunJournal,
   RunJournalBoundary,
+  RunJournalFileWritten,
   RunJournalTaskDeclared,
   RunJournalTurnEnd,
 } from "../ports/run-journal-reader.js";
@@ -41,24 +42,35 @@ function timed<T extends { readonly at: string }>(
 }
 
 /**
- * Journal lines in, bounded intervals out. `boundaries` and `taskDeclarations` are merged
- * and sorted by their own moment, then walked once: each `task_declared` closes at whichever
- * of a later declaration or a `turn_end` comes next. Unclosed, it is capped at the *whole*
- * journal's own last recorded moment - step boundaries included, never only the two kinds an
- * interval closes on - so a crash right after a declaration, with a step_start still to
- * follow, is bounded by that step's own moment rather than reopening at Infinity. A session
- * that crashes and produces no further line at all leaves nothing after the declaration
- * itself to misattribute in the first place.
+ * Journal lines in, bounded intervals out. `boundaries`, `taskDeclarations` and
+ * `filesWritten` are merged and sorted by their own moment into one list, then walked once:
+ * each `task_declared` closes at whichever of a later declaration or a `turn_end` comes
+ * next. Unclosed, it is capped at that merged list's own last moment - a written file
+ * included, never only the kinds an interval actually closes on - so a session that is
+ * still running when a report is asked for, with a file written after its declaration and
+ * no `turn_end` yet, is bounded by that write rather than collapsing to `[t, t)` and losing
+ * everything after it. `RunJournalBoundary` itself carries no `file_written`: pairing one in
+ * there would let it close a running *step* early (see `run-journal-reader.ts`), a risk this
+ * merge never runs into because `closers` below is filtered to `task_declared` and
+ * `turn_end` regardless of what else this list holds. A session that crashes and produces no
+ * further line at all still leaves nothing after the declaration itself to misattribute.
+ *
+ * Still never open-ended: widening the last-witnessed moment moves an unclosed interval's
+ * end later, it never removes the cap. An interval closes at what the journal actually
+ * witnessed, not at "still running" read as "forever" - no tool exposes when a flow leaves a
+ * ticket, so a boundless interval would go on attributing a long-running session's every
+ * later record to the first ticket it ever named.
  */
 export function buildTaskIntervals(journal: RunJournal): readonly TaskInterval[] {
-  const everyBoundary = timed<RunJournalBoundary | RunJournalTaskDeclared>([
-    ...journal.boundaries,
-    ...journal.taskDeclarations,
-  ]);
+  const everyWitnessedMoment = timed<
+    RunJournalBoundary | RunJournalTaskDeclared | RunJournalFileWritten
+  >([...journal.boundaries, ...journal.taskDeclarations, ...journal.filesWritten]);
   const lastMs =
-    everyBoundary.length > 0 ? everyBoundary[everyBoundary.length - 1].atMs : undefined;
+    everyWitnessedMoment.length > 0
+      ? everyWitnessedMoment[everyWitnessedMoment.length - 1].atMs
+      : undefined;
 
-  const closers = everyBoundary.filter(
+  const closers = everyWitnessedMoment.filter(
     (entry): entry is TimedBoundary<RunJournalTaskDeclared | RunJournalTurnEnd> =>
       entry.boundary.type === "task_declared" || entry.boundary.type === "turn_end"
   );
@@ -83,4 +95,43 @@ export function momentFallsWithin(
   const momentMs = Date.parse(momentIso);
   if (Number.isNaN(momentMs)) return false;
   return intervals.some((interval) => momentMs >= interval.startMs && momentMs < interval.endMs);
+}
+
+/** Why a record's own moment falls in none of `intervals` - the three, and only three,
+ * distinct facts a person acts on differently. Never called for a moment `momentFallsWithin`
+ * already reads as covered; that caller already knows which interval and needs no reason for
+ * what it found.
+ *
+ * - `"no-declaration"`: this session's journal never declared a task at all.
+ * - `"precedes-declaration"`: a task was declared, but some declared interval starts *after*
+ *   this moment - true both for a record before the session's very first declaration and for
+ *   one landing in the gap a `turn_end` leaves between two declarations, which is a real gap
+ *   in coverage, never the journal falling silent (the journal keeps going right through it).
+ * - `"journal-silent"`: a task was declared, every declared interval starts at or before this
+ *   moment, and still none of them reaches it - the journal's own declared coverage ran out
+ *   before this record's moment did. A record with no moment at all, or an unparseable one,
+ *   reads the same way: nothing here can place it inside coverage the journal did offer, so
+ *   it is as unplaceable as one that arrived after that coverage lapsed. In practice a
+ *   report never hands this function such a record - `report-cost-use-case.ts` splits an
+ *   undated record off before any of this runs - but the function stays correct standalone. */
+export type TaskUnattributedReason = "no-declaration" | "precedes-declaration" | "journal-silent";
+
+/** Fixed and always in this order, the same reason `TASK_ATTRIBUTION_SOURCES` is: a reader
+ * comparing two periods must find the reasons present listed the same way every time, never
+ * ordered by how much of a period each accounted for. */
+export const TASK_UNATTRIBUTED_REASONS: readonly TaskUnattributedReason[] = [
+  "no-declaration",
+  "precedes-declaration",
+  "journal-silent",
+];
+
+export function taskUnattributedReason(
+  intervals: readonly TaskInterval[],
+  momentIso: string | undefined
+): TaskUnattributedReason {
+  if (intervals.length === 0) return "no-declaration";
+  const momentMs = momentIso === undefined ? Number.NaN : Date.parse(momentIso);
+  if (Number.isNaN(momentMs)) return "journal-silent";
+  const somethingDeclaredAfter = intervals.some((interval) => interval.startMs > momentMs);
+  return somethingDeclaredAfter ? "precedes-declaration" : "journal-silent";
 }

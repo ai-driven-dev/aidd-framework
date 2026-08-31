@@ -122,7 +122,14 @@ real count is the ordinary case of reporting from a project whose switch never c
 work, never a contradiction (see "Attributing records to a task" for the same scope split
 elsewhere in this object).
 
-Every object carries `cost_report_version`, currently `5` — bumped from `4` when `by_task`
+Every object carries `cost_report_version`, currently `6` — bumped from `5` when the row
+`by_task` gives for a record that fell in no declared interval stopped being a single row
+and became up to three, one per `reason` actually present in the period
+(`"no-declaration"`, `"precedes-declaration"`, `"journal-silent"` — see "Attributing
+records to a task" and the `by_task` section below). A consumer that read "the one row
+with no `task`" as a single, whole-period fact would misread this version; summing every
+row's `totals` still reconciles to the period total exactly as before, only the count and
+identity of rows with no `task` changes. Bumped from `4` when `by_task`
 joined the top-level breakdowns (a consumer summing every breakdown's `requests` against
 `totals.requests` now has a fifth breakdown to include). `by_task` groups by the same
 closed, declared intervals the pre-existing `--task` filter already reads — never a
@@ -146,7 +153,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
 
 ```jsonc
 {
-  "cost_report_version": 5,
+  "cost_report_version": 6,
   "period": { "from_day": "2026-07-01", "to_day": "2026-07-31" },
   "measurement_enabled": true,                  // this project's own switch, right now — see Versioning
   "task": "2026_08/2026_08_21_cost-reporter",   // absent unless --task was given
@@ -159,7 +166,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "by_model":   [{ "model": "gpt-5.6-sol", "totals": {} }],  // a row with no "model" names none known
   "by_tool":    [{ "tool": "codex", "coverage": "covered", "reason": "…", "capability": {}, "totals": {}, "session_totals": {} }],  // session_totals absent unless the tool has one (Copilot, today)
   "by_project": [{ "project": "acme/widgets", "totals": {} }],   // a row with no `project` names none known
-  "by_task":    [{ "task": "2026_08/2026_08_21_cost-reporter", "attribution": "declared", "totals": {} }],  // a row with no `task` names no declared interval; `attribution` absent there too
+  "by_task":    [{ "task": "2026_08/2026_08_21_cost-reporter", "attribution": "declared", "totals": {} }, { "reason": "precedes-declaration", "totals": {} }],  // a row with no `task` carries `reason` instead, naming which of three facts applies; up to three such rows
   "by_day":     [{ "day": "2026-07-01", "totals": {} }],         // every day in the period, in order, gaps included
   "by_person":  [{ "resolution": "mapped", "person": "a-person-id", "identities": ["a-person-id", "a-machine-id"], "totals": {} }],  // mapped rows first, then every unplaced identity, then the one row for records carrying none
   "attribution": [{ "attribution": "tool-stated", "totals": {} }],
@@ -196,9 +203,11 @@ them into money live outside this repository.
 a stable tie-break, so the biggest thing is the first thing you read. Ordered by
 `cost_micro_usd` where a row has one, and by all four token counters summed where it does
 not — never by `input_tokens` and `output_tokens` alone, which every tool here dwarfs with
-cache. `by_task` places its row for what fell in no declared interval last regardless of
-size, the same convention `by_person` gives its own no-identifier row — a reader sees
-tasks before the remainder. `by_day` is the one exception: it is chronological, one row per
+cache. `by_task` places every row for what fell in no declared interval last regardless of
+size, in `reason`'s own fixed order (`"no-declaration"`, `"precedes-declaration"`,
+`"journal-silent"`) — the same convention `by_person` gives its own no-identifier row, a
+reader sees tasks before the remainder, and the remainder in the same order every time.
+`by_day` is the one exception: it is chronological, one row per
 day the period spans — a series read out of order is not a series, and a day nothing ran on
 is a row of zeros rather than an omitted day.
 
@@ -232,23 +241,32 @@ ever matches, and a record lands in exactly one row.
 
 `attribution` is present, and always `"declared"`, on every row that carries a `task` —
 travelling with the row rather than assumed, so a consumer never has to know which route a
-breakdown reads. The row for what fell in no declared interval — before the first
-declaration, or in a session that never declared one — carries neither `task` nor
-`attribution`. **It is one row, never two**: the run journal records a `task_declared` line
-or it does not, and a session whose declaration could not be read produces the exact same
-absence a session that never declared one does — there is no signal in the journal that
-would tell those two apart, so this row is never split by a cause it cannot observe. Where
-that possibility matters, `read.unreadable_lines` already carries it, for this row as for
+breakdown reads. A row for what fell in no declared interval carries `reason` instead of
+`task` and `attribution`, naming which of three distinct facts applies — never one label
+standing in for all three, and never more than one row per reason:
+
+| `reason` | What it means |
+| --- | --- |
+| `"no-declaration"` | This record's session never declared a task at all. |
+| `"precedes-declaration"` | A task was declared, but some declared interval in this session starts *after* this record's own moment — true both for a record before the session's very first declaration and for one landing in the gap a `turn_end` leaves between two declarations. That gap is real, but it is the journal still going, never the journal falling silent. |
+| `"journal-silent"` | A task was declared, every declared interval starts at or before this record's moment, and none of them reaches it — the journal's own declared coverage ran out before this record's moment did. |
+
+Up to three such rows can appear in one period — one per reason actually present, never
+fewer, and never two different gaps collapsed into one row the way a single, undifferentiated
+"no declared interval" row used to read before `cost_report_version` `6`. A session whose
+declaration could not be read produces the same `"no-declaration"` row a session that never
+declared one does — there is no signal in the journal that would tell those two apart. Where
+that possibility matters, `read.unreadable_lines` already carries it, for these rows as for
 the whole object.
 
 `by_task` sums to `totals.requests` exactly like every other breakdown.
 
-**Alongside a `--task` filter, the no-declared-interval row can still appear, and is not a
+**Alongside a `--task` filter, a row carrying `reason` can still appear, and is not a
 contradiction of the header naming that task.** `--task` also keeps a session's records
 through its own "inferred" route - the whole-session written-file fallback - for a record
 no declared interval covers. `by_task` does not read that route at all, so that same
-record lands in the row with no `task`. Read the row as it is named: no *declared interval*
-covers this record, not "this session never touched a task." Cross-check against
+record lands in whichever `reason` row applies. Read the row as it is named: no *declared
+interval* covers this record, not "this session never touched a task." Cross-check against
 `task_attribution`'s own `declared`/`inferred` split when the distinction matters.
 
 ### `by_person` — three outcomes, never a merge

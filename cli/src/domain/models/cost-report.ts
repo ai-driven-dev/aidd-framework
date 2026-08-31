@@ -5,8 +5,11 @@ import { STEP_ATTRIBUTION_SOURCES, type StepAttributionSource } from "./step-att
 import {
   momentFallsWithin,
   TASK_ATTRIBUTION_SOURCES,
+  TASK_UNATTRIBUTED_REASONS,
   type TaskAttributionSource,
   type TaskInterval,
+  type TaskUnattributedReason,
+  taskUnattributedReason,
 } from "./task-attribution.js";
 import {
   type TaskIdentity,
@@ -146,19 +149,25 @@ export interface CostReportProjectRow {
  * `--task` filter's own, separate route and would let one session's records land in more
  * than one row. `attribution` is always `"declared"` where `task` is present, since a
  * closed interval is the only route this breakdown reads; it travels anyway so a consumer
- * never has to assume a strength this object does not state. The row for what fell in no
- * declared interval carries neither field - named for the record, never for the session:
- * "no task was declared in this session's journal" would be false for a record that falls
- * before a session's first declaration, or between two, even though that same session did
- * declare - so the row is named for what covers this record, not for the session's whole
- * history. Never for a written file this breakdown does not consult, and never split from
- * a declaration the journal simply could not read: the journal records a `task_declared`
- * line or it does not, and those two produce the same absence. Sorted apart from every
- * other breakdown: largest first among named tasks, with this row last, so a reader sees
- * tasks before the remainder. */
+ * never has to assume a strength this object does not state.
+ *
+ * A record that fell in no declared interval carries `reason` instead of `task` -
+ * `TaskUnattributedReason` names which of three distinct facts applies, never one label
+ * standing in for all three: no task was ever declared in that record's session; a task was
+ * declared but this record precedes it (whether every declaration, or the gap a `turn_end`
+ * leaves before the next one); or a task was declared and the journal's own declared
+ * coverage runs out before this record's moment. Never for a written file this breakdown
+ * does not consult, and never split from a declaration the journal simply could not read:
+ * the journal records a `task_declared` line or it does not, and those two read as
+ * `"no-declaration"` alike. Up to three such rows can appear in one period, one per reason
+ * actually present - never collapsed into one, since two different gaps are not one gap.
+ * Sorted apart from every other breakdown: largest first among named tasks, with every
+ * reason row last, in `TASK_UNATTRIBUTED_REASONS`' own fixed order, so a reader sees tasks
+ * before the remainder and the remainder in the same order every time. */
 export interface CostReportTaskRow {
   readonly task?: TaskIdentity;
   readonly attribution?: TaskAttributionSource;
+  readonly reason?: TaskUnattributedReason;
   readonly totals: CostTotals;
 }
 
@@ -502,11 +511,12 @@ function modelKeyOf(record: TelemetrySinkRecord): ModelKey {
 }
 
 // The same idea, for the task a record's own moment fell inside - a record whose session
-// never declared one, or whose moment predates every declaration, is its own group, never
-// dropped. Distinct from `NO_KNOWN_PROJECT` and `NO_KNOWN_MODEL` only in name: same
-// technique, so it can never collide with a real task identity (a string).
-const NO_KNOWN_TASK = Symbol("no known task");
-type TaskRowKey = TaskIdentity | typeof NO_KNOWN_TASK;
+// never declared one, whose moment falls before a declaration, or whose moment the
+// journal's own declared coverage has run out before, is its own group, keyed on *which* of
+// those three this record is, never dropped and never collapsed into one bucket. A plain
+// string, unlike `NO_KNOWN_PROJECT` and `NO_KNOWN_MODEL`: `TaskIdentity` is always
+// `${month}/${name}`, which a reason string never is, so the two can never collide.
+type TaskRowKey = TaskIdentity | TaskUnattributedReason;
 
 /** Every session's own closed intervals, keyed by vendor id - built once from
  * `buildTaskIntervals`'s own output, never a second notion of when a task was running.
@@ -524,21 +534,23 @@ function allTaskIntervalsByVendorId(
 }
 
 /** Which task a record's own moment falls inside, among *all* of its session's declared
- * intervals - `NO_KNOWN_TASK` for a record whose session never declared one, whose moment
- * predates every declaration, or whose moment falls in none. Intervals within one session
- * are closed and never overlap (`buildTaskIntervals`), so at most one ever matches - this
- * never has to choose between two. */
+ * intervals - `taskUnattributedReason` for a record whose moment falls in none. Intervals
+ * within one session are closed and never overlap (`buildTaskIntervals`), so at most one
+ * ever matches - this never has to choose between two. A `task_declared` line is only ever
+ * written for a path the hook already matched against this same folder pattern (see
+ * `task-identity.ts`), so `interval.path` failing to parse here is a defensive branch this
+ * layer has no evidence ever fires - reading it the same as no interval covering the moment
+ * at all keeps the fallback honest rather than inventing a fourth reason for it. */
 function declaredTaskKeyOf(
   record: TelemetrySinkRecord,
   intervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>
 ): TaskRowKey {
-  const intervals = intervalsByVendorId.get(record.vendor_id);
-  if (!intervals) return NO_KNOWN_TASK;
+  const intervals = intervalsByVendorId.get(record.vendor_id) ?? [];
   const interval = intervals.find((candidate) =>
     momentFallsWithin([candidate], record.event_timestamp)
   );
-  if (!interval) return NO_KNOWN_TASK;
-  return taskIdentityFromWrittenPath(interval.path) ?? NO_KNOWN_TASK;
+  const identity = interval && taskIdentityFromWrittenPath(interval.path);
+  return identity ?? taskUnattributedReason(intervals, record.event_timestamp);
 }
 
 // A record with no identifier is its own row, keyed on a symbol the same way
@@ -988,15 +1000,21 @@ function projectRows(
   );
 }
 
-/** Every task a record's own moment fell inside, largest first, with the row for what
- * fell in no declared interval placed last regardless of its size - a reader sees tasks
- * before the remainder, the same convention `personRows` gives its own `none` row. */
+function isTaskUnattributedReason(key: TaskRowKey): key is TaskUnattributedReason {
+  return (TASK_UNATTRIBUTED_REASONS as readonly string[]).includes(key);
+}
+
+/** Every task a record's own moment fell inside, largest first, then one row per reason
+ * actually present for what fell in none - `TASK_UNATTRIBUTED_REASONS`' own fixed order,
+ * always after every named task regardless of size, the same convention `personRows` gives
+ * its own `none` row. Up to three such rows, never fewer than the reasons present: two
+ * different gaps collapsed into one row is the fault this breakdown exists to avoid. */
 function taskRows(tasks: ReadonlyMap<TaskRowKey, TotalsAccumulator>): readonly CostReportTaskRow[] {
   const named: CostReportTaskRow[] = [];
-  let noTask: CostReportTaskRow | undefined;
+  const byReason = new Map<TaskUnattributedReason, CostReportTaskRow>();
   for (const [key, accumulator] of tasks) {
-    if (key === NO_KNOWN_TASK) {
-      noTask = { totals: accumulator.build() };
+    if (isTaskUnattributedReason(key)) {
+      byReason.set(key, { reason: key, totals: accumulator.build() });
       continue;
     }
     named.push({ task: key, attribution: "declared", totals: accumulator.build() });
@@ -1006,7 +1024,10 @@ function taskRows(tasks: ReadonlyMap<TaskRowKey, TotalsAccumulator>): readonly C
     (row) => row.totals,
     (row) => row.task ?? ""
   );
-  return noTask === undefined ? sorted : [...sorted, noTask];
+  const reasonRows = TASK_UNATTRIBUTED_REASONS.map((reason) => byReason.get(reason)).filter(
+    (row): row is CostReportTaskRow => row !== undefined
+  );
+  return [...sorted, ...reasonRows];
 }
 
 /** Every day in the period, in order — never sorted by size, unlike every other breakdown

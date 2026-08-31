@@ -201,6 +201,8 @@ describe("aidd telemetry report — the six questions, over one period", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain(ALPHA_TASK);
     expect(result.stdout).toContain(BETA_TASK);
-    expect(result.stdout).toContain("no declared interval covers this record");
+    // BEFORE_ANY_DECLARATION's own moment (08:30) is earlier than alpha's declaration
+    // (09:00) - one of the three named reasons, never the generic label it replaced.
+    expect(result.stdout).toContain("before the next task this session declares");
   });
 });

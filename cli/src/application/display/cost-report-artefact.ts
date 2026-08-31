@@ -10,7 +10,11 @@ import type {
   CostReportEnvelopeTotals,
 } from "../../domain/models/cost-report-envelope.js";
 import { getAiToolConfig } from "../../domain/tools/registry.js";
-import { ATTRIBUTION_LABELS, TASK_ATTRIBUTION_LABELS } from "./cost-report-display.js";
+import {
+  ATTRIBUTION_LABELS,
+  TASK_ATTRIBUTION_LABELS,
+  TASK_UNATTRIBUTED_LABELS,
+} from "./cost-report-display.js";
 
 /**
  * One axis of a report, rendered as something a person pastes elsewhere.
@@ -43,11 +47,6 @@ const NOTHING_IN_SELECTION = "nothing in this selection";
 const SESSION_TOTAL_LABEL = "session total, not requests";
 const NO_KNOWN_PROJECT = "no known project";
 const NO_KNOWN_MODEL = "no known model";
-// Named for the record, never for the session - see `cost-report-display.ts`'s own
-// constant of this name for why: a session that did declare, just not over this record's
-// own moment, reads as this row too, and "no task declared in this session's journal"
-// would be false exactly there.
-const NO_TASK_DECLARED = "no declared interval covers this record";
 // Distinct on purpose, per the contract's own three-way shape: an unresolved row names an
 // identity that is real but unplaced, and repeats once per such identity since each is its
 // own row; the no-identity row is singular and says nobody opted in at all. Neither label
@@ -235,11 +234,11 @@ function stepArtefact(envelope: CostReportEnvelope): string {
 
 /** A third column beside the generic `table()` helper's two, for the same reason
  * `stepArtefact` carries one: the row for a named task rests on a closed interval, and a
- * pasted table says so on its own rather than only in a document elsewhere. The row for
- * what fell in no declared interval carries no attribution to show. */
+ * pasted table says so on its own rather than only in a document elsewhere. Each row for
+ * what fell in no declared interval carries no attribution to show, only its own reason. */
 function taskArtefact(envelope: CostReportEnvelope): string {
   const rows = envelope.by_task.map((row) => {
-    const task = row.task ?? NO_TASK_DECLARED;
+    const task = row.task ?? (row.reason === undefined ? "" : TASK_UNATTRIBUTED_LABELS[row.reason]);
     const strength = row.attribution === undefined ? "—" : TASK_ATTRIBUTION_LABELS[row.attribution];
     return `| ${task} | ${strength} | ${figure(row.totals, envelope)} |`;
   });

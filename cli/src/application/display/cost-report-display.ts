@@ -14,7 +14,10 @@ import type {
 } from "../../domain/models/cost-report.js";
 import { fromMicroUsd } from "../../domain/models/cost-report.js";
 import type { StepAttributionSource } from "../../domain/models/step-attribution.js";
-import type { TaskAttributionSource } from "../../domain/models/task-attribution.js";
+import type {
+  TaskAttributionSource,
+  TaskUnattributedReason,
+} from "../../domain/models/task-attribution.js";
 import { getAiToolConfig } from "../../domain/tools/registry.js";
 import type { CLIOutput } from "../output.js";
 
@@ -31,6 +34,15 @@ export const ATTRIBUTION_LABELS: Record<StepAttributionSource, string> = {
 export const TASK_ATTRIBUTION_LABELS: Record<TaskAttributionSource, string> = {
   declared: "declared by the flow",
   inferred: "inferred from a written file",
+};
+
+/** What each of the three reasons a record fell in no declared interval is called where a
+ * person reads it - never one label standing in for all three, which is the fault this
+ * breakdown exists to avoid (see `CostReportTaskRow`). */
+export const TASK_UNATTRIBUTED_LABELS: Record<TaskUnattributedReason, string> = {
+  "no-declaration": "no task was ever declared in this session",
+  "precedes-declaration": "before the next task this session declares",
+  "journal-silent": "the journal falls silent before this record",
 };
 
 /** Printed where a figure is genuinely not known, never as `$0.00`. A tool whose own files
@@ -52,14 +64,6 @@ const SESSION_TOTAL_LABEL = "session total, not requests";
 const LABEL_WIDTH = 26;
 const NO_KNOWN_PROJECT = "no known project";
 const NO_KNOWN_MODEL = "no known model";
-// Named for the record, never for the session: a session that declared two tasks back to
-// back still has a gap before its first declaration, and a record landing there is not
-// covered by any interval even though its own session's journal is not silent. Naming this
-// row "no task declared in this session's journal" would read as false exactly there - the
-// journal did declare, just not over this moment. A session that never declared anything at
-// all, and one whose declaration could not be read, both fall in here too - the same
-// absence (see `CostReportTaskRow`) - so the wording has to hold for all three at once.
-const NO_TASK_DECLARED = "no declared interval covers this record";
 
 // A year asked for by day is 365 rows - the envelope always carries every one of them, but
 // a terminal is not the place to read that many. Above this, the text rendering names the
@@ -331,17 +335,18 @@ function printProjects(
   }
 }
 
-/** One row per task a record's own moment fell inside, plus the row for what fell in no
- * declared interval - always last, whatever its size, the same placement `byPeople` gives
- * its own no-identifier row. Carries the attribution beside a named row for the same
- * reason `printStepRows` does: a figure that rests on a closed interval says so next to
- * the number, not only in a document elsewhere. */
+/** One row per task a record's own moment fell inside, plus up to three rows for what fell
+ * in none - one per reason present, always after every named task and in
+ * `TASK_UNATTRIBUTED_REASONS`' own fixed order, the same placement `byPeople` gives its own
+ * no-identifier row. Carries the attribution beside a named row for the same reason
+ * `printStepRows` does: a figure that rests on a closed interval says so next to the
+ * number, not only in a document elsewhere. */
 function printTasks(output: CLIOutput, rows: readonly CostReportTaskRow[], basis: Basis): void {
   if (rows.length === 0) return;
   output.print("");
   output.print(`  by task    ${basis.label}`);
   for (const row of rows) {
-    const name = row.task ?? NO_TASK_DECLARED;
+    const name = row.task ?? (row.reason === undefined ? "" : TASK_UNATTRIBUTED_LABELS[row.reason]);
     const strength =
       row.attribution === undefined ? "" : `    ${TASK_ATTRIBUTION_LABELS[row.attribution]}`;
     output.print(

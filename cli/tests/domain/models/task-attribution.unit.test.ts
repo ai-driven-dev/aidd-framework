@@ -4,14 +4,16 @@ import { describe, expect, it } from "vitest";
 import {
   buildTaskIntervals,
   momentFallsWithin,
+  taskUnattributedReason,
 } from "../../../src/domain/models/task-attribution.js";
 import type { RunJournal } from "../../../src/domain/ports/run-journal-reader.js";
 
 function journalOf(
   taskDeclarations: RunJournal["taskDeclarations"],
-  boundaries: RunJournal["boundaries"] = []
+  boundaries: RunJournal["boundaries"] = [],
+  filesWritten: RunJournal["filesWritten"] = []
 ): RunJournal {
-  return { boundaries, filesWritten: [], taskDeclarations };
+  return { boundaries, filesWritten, taskDeclarations };
 }
 
 const WANTED = {
@@ -105,5 +107,91 @@ describe("task-attribution — pure: journal lines -> bounded intervals", () => 
 
     expect(source).not.toMatch(/from ["']node:fs/);
     expect(source).not.toMatch(/require\(["']node:fs/);
+  });
+
+  // The bug this deliverable exists to fix: a session still running when a report is asked
+  // for has declared a task, written a file after it, and produced no turn_end yet.
+  // `lastMs` used to come only from step starts, turn ends and declarations - none of which
+  // exist here - so the interval collapsed to `[t, t)` and lost every record after it.
+  it("widens an unclosed declaration's end to a written file the journal witnessed after it", () => {
+    const writtenAfter = {
+      type: "file_written",
+      at: "2026-08-17T10:40:00Z",
+      path: "x.md",
+    } as const;
+    const intervals = buildTaskIntervals(journalOf([WANTED], [], [writtenAfter]));
+
+    expect(intervals).toEqual([
+      { path: WANTED.path, startMs: Date.parse(WANTED.at), endMs: Date.parse(writtenAfter.at) },
+    ]);
+    // The record this bug used to lose: after the declaration, before the write, no
+    // turn_end anywhere in sight - the ordinary state of a session still running.
+    expect(momentFallsWithin(intervals, "2026-08-17T10:20:00Z")).toBe(true);
+  });
+
+  it("never lets a written file reach further back than the interval's own last closer", () => {
+    const writtenBefore = {
+      type: "file_written",
+      at: "2026-08-17T09:00:00Z",
+      path: "x.md",
+    } as const;
+    const intervals = buildTaskIntervals(journalOf([WANTED], [TURN_END], [writtenBefore]));
+
+    expect(intervals).toEqual([
+      { path: WANTED.path, startMs: Date.parse(WANTED.at), endMs: Date.parse(TURN_END.at) },
+    ]);
+  });
+
+  it("still never runs away: a written file does not turn the interval open-ended", () => {
+    const writtenAfter = {
+      type: "file_written",
+      at: "2026-08-17T10:40:00Z",
+      path: "x.md",
+    } as const;
+    const intervals = buildTaskIntervals(journalOf([WANTED], [], [writtenAfter]));
+
+    // Long after the last thing the journal witnessed - never attributed, whatever silence
+    // followed the write.
+    expect(momentFallsWithin(intervals, "2026-08-20T00:00:00Z")).toBe(false);
+  });
+});
+
+describe("taskUnattributedReason — which of three distinct facts applies", () => {
+  it("names no-declaration for a session whose journal never declared a task", () => {
+    expect(taskUnattributedReason([], "2026-08-17T10:00:00Z")).toBe("no-declaration");
+  });
+
+  it("names precedes-declaration for a record before the session's only declaration", () => {
+    const intervals = buildTaskIntervals(journalOf([WANTED], [TURN_END]));
+
+    expect(taskUnattributedReason(intervals, "2026-08-17T09:00:00Z")).toBe("precedes-declaration");
+  });
+
+  it("names precedes-declaration for a record in the gap a turn_end leaves before the next declaration - never journal-silent, since the journal keeps going right through it", () => {
+    // WANTED closes at TURN_END (10:15); a further declaration follows once the journal is
+    // alive again, at 11:00, leaving a real gap in between that no interval covers.
+    const laterDeclaration = {
+      type: "task_declared",
+      at: "2026-08-17T11:00:00Z",
+      path: "aidd_docs/tasks/2026_08/later/spec.md",
+    } as const;
+    const intervals = buildTaskIntervals(journalOf([WANTED, laterDeclaration], [TURN_END]));
+
+    // 10:30 falls after WANTED's own interval closed at TURN_END (10:15) and before
+    // laterDeclaration opens at 11:00 - a real gap the journal is not silent through.
+    expect(taskUnattributedReason(intervals, "2026-08-17T10:30:00Z")).toBe("precedes-declaration");
+  });
+
+  it("names journal-silent for a record after the last declared interval's own end", () => {
+    const intervals = buildTaskIntervals(journalOf([WANTED], [TURN_END]));
+
+    expect(taskUnattributedReason(intervals, "2026-08-17T11:00:00Z")).toBe("journal-silent");
+  });
+
+  it("names journal-silent for a record with no moment, once a task was declared", () => {
+    const intervals = buildTaskIntervals(journalOf([WANTED], [TURN_END]));
+
+    expect(taskUnattributedReason(intervals, undefined)).toBe("journal-silent");
+    expect(taskUnattributedReason(intervals, "not-a-date")).toBe("journal-silent");
   });
 });

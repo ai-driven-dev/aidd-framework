@@ -9,7 +9,7 @@ import type {
 } from "./cost-report.js";
 import type { PersonResolution } from "./person-resolution.js";
 import type { StepAttributionSource } from "./step-attribution.js";
-import type { TaskAttributionSource } from "./task-attribution.js";
+import type { TaskAttributionSource, TaskUnattributedReason } from "./task-attribution.js";
 import type { AiToolId } from "./tool-ids.js";
 
 /** Bumped when a consumer that understood the previous shape would misread this one.
@@ -17,6 +17,13 @@ import type { AiToolId } from "./tool-ids.js";
  * A version exists so a consumer can refuse rather than guess — the same reason
  * `sink_schema_version` exists on a stored line. Adding a field a consumer may ignore is
  * not a bump; changing what an existing field means is.
+ *
+ * Bumped to 6: the row `by_task` gives what fell in no declared interval can now be up to
+ * three rows instead of always exactly one - `reason` names which of three distinct facts
+ * applies, and a consumer that read "the one row with no `task`" as a single, whole-period
+ * fact would now silently sum, or read, only part of it. Summing every row's `totals`
+ * still reconciles to the period total exactly as before; only the count and identity of
+ * rows with no `task` changes.
  *
  * Bumped to 5: `by_task` is a new top-level breakdown - a consumer summing every
  * breakdown's requests against `totals.requests` to check nothing was dropped now has a
@@ -38,7 +45,7 @@ import type { AiToolId } from "./tool-ids.js";
  * `by_project`'s `project` to optional back when that row was added.
  *
  * Bumped to 2: `by_project` and `by_day` are new top-level breakdowns. */
-export const COST_REPORT_ENVELOPE_VERSION = 5;
+export const COST_REPORT_ENVELOPE_VERSION = 6;
 
 /** Money as whole micro-dollars, the way the report carries it: an integer, so a consumer
  * summing several reports gets the same answer this one did. Divide by 1,000,000 for
@@ -119,10 +126,12 @@ export interface CostReportEnvelopeProjectRow {
 
 /** One framework task's figures, keyed on the closed interval a record's own moment falls
  * in - see `CostReportTaskRow`. `attribution` is present, and always `"declared"`, only
- * alongside `task`; the row for what fell in no declared interval carries neither. */
+ * alongside `task`; a row for what fell in no declared interval carries `reason` instead,
+ * naming which of three distinct facts applies - never both, and never neither. */
 export interface CostReportEnvelopeTaskRow {
   readonly task?: string;
   readonly attribution?: TaskAttributionSource;
+  readonly reason?: TaskUnattributedReason;
   readonly totals: CostReportEnvelopeTotals;
 }
 
@@ -277,6 +286,7 @@ function taskRow(row: CostReport["byTasks"][number]): CostReportEnvelopeTaskRow 
   return {
     ...(row.task === undefined ? {} : { task: row.task }),
     ...(row.attribution === undefined ? {} : { attribution: row.attribution }),
+    ...(row.reason === undefined ? {} : { reason: row.reason }),
     totals: totals(row.totals),
   };
 }
