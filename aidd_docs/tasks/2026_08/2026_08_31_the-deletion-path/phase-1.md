@@ -11,14 +11,18 @@ status: pending
 └── cli
     ├── src
     │   ├── domain
-    │   │   ├── models/telemetry-removal.ts                     ✅
-    │   │   └── ports/telemetry-sink.ts                         ✏️
-    │   ├── infrastructure/adapters/telemetry-sink-adapter.ts   ✏️
+    │   │   └── models/telemetry-removal.ts                     ✅
     │   └── application/use-cases/telemetry/forget-telemetry-use-case.ts ✅
     └── tests
         ├── domain/models/telemetry-removal.unit.test.ts        ✅
         └── application/use-cases/telemetry/forget-telemetry-use-case.unit.test.ts ✅
 ```
+
+<!-- Corrected post-review (2026_08_31): `domain/ports/telemetry-sink.ts` and
+`infrastructure/adapters/telemetry-sink-adapter.ts` were never touched by this phase — the
+sink's day-file deletion already existed, exactly as `plan.md`'s Resources table says. The
+original projection marked both ✏️; `git diff --stat` against the shipped diff shows
+neither file. -->
 
 ## User Journey
 
