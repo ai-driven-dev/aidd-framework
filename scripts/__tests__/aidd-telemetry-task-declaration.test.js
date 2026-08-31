@@ -2,9 +2,9 @@
 // only against hand-written payloads until now (aidd-telemetry-journal.test.js's own
 // readTaskPayload()), which proves the reader agrees with itself, not with anything a host
 // actually sends - the weakest cell the six-questions audit named. This file replaces that
-// with one real capture per host that can declare, plus a labelled derivation for the one
-// host this environment cannot run live. See fixtures/README.md's "The task-declaration
-// payloads" for exactly what each fixture rests on.
+// with one real, live capture per host that can declare - Codex included, now that
+// codex-cli is runnable in this environment. See fixtures/README.md's "The
+// task-declaration payloads" for exactly what each fixture rests on.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");

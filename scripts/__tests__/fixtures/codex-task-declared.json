@@ -1,7 +1,7 @@
 {
-  "session_id": "01a01450-dc0f-71a3-ae06-7f1698ef866b",
-  "turn_id": "01a01450-e8a4-7fb1-b29d-f67e6cb10fff",
-  "transcript_path": "/home/user/probe/codex-home-task/sessions/2026/08/18/rollout-2026-08-18T12-00-38-01a01450-dc0f-71a3-ae06-7f1698ef866b.jsonl",
+  "session_id": "01a05850-9a3f-7c12-8e64-2b1d6f0a7c53",
+  "turn_id": "01a05850-a4e2-7d23-9f75-3c2e7a1b8d64",
+  "transcript_path": "/home/user/probe/codex-home-task/sessions/2026/08/31/rollout-2026-08-31T16-51-50-01a05850-9a3f-7c12-8e64-2b1d6f0a7c53.jsonl",
   "cwd": "/home/user/probe/project-codex-task",
   "hook_event_name": "PostToolUse",
   "model": "gpt-5.5",

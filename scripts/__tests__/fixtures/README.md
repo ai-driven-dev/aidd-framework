@@ -55,8 +55,8 @@ of tool name or event. Before this set, that reader was tested only against hand
 payloads (see `aidd-telemetry-journal.test.js`'s prior `readTaskPayload()`), which proves the
 reader agrees with itself, not with anything a host actually sends.
 
-`claude-code-task-declared.json`, `copilot-task-declared.json` and
-`cursor-task-declared.json` are real, live captures — 2026-08-31, each host's own current
+`claude-code-task-declared.json`, `copilot-task-declared.json`, `cursor-task-declared.json`
+and `codex-task-declared.json` are real, live captures — 2026-08-31, each host's own current
 plugin installed through `aidd setup --ai <host> --plugins aidd-telemetry` in a throwaway
 project, asked to read a file inside a task folder. Captured by temporarily replacing the
 installed `journal.cjs` entry point with a wrapper that tees its raw stdin to a file and
@@ -81,23 +81,24 @@ touched to take them.
 - **`cursor-task-declared.json`** — a `Read` tool call, `tool_input.file_path`, structurally
   identical to `cursor-post-tool-use-skill-read.json` above but pointed at a task folder
   instead of a `SKILL.md`.
-
-**`codex-task-declared.json` is not a fresh capture.** Codex is not installed in the
-environment this set was captured in (`which codex` finds nothing), which is a physical
-fact, not a judgement call — the same standard `opencode-session-created.json` was held to.
-It is derived from `codex-post-tool-use-skill-read.json`'s real captured shape. Unchanged:
-the key set and the tool name (`Bash`, not `exec_command` — see plan.md). Changed, each for
-a stated reason, not silently: `tool_input.command`'s path (from
-`.agents/skills/probe-echo/SKILL.md` to a task-folder path, in the same
-`sed -n '1,120p' <path>` form Codex's own hook was captured sending — the value the reader
-is under test for); `tool_response` (the SKILL.md body replaced with the redacted task
-file's own content, for the same reason every other fixture's response text matches its own
-request); `transcript_path` and `cwd` (`-skill`→`-task`, the same probe-naming convention
-`claude-code-post-tool-use-skill.json` and its `-write`/`-edit` siblings already use); and
-`tool_use_id` (a distinct synthetic value — two different tool calls cannot share one, and
-the source capture's id would otherwise appear twice in this directory). This is the one
-fixture in this set that a plausible invention could not be told apart from a genuine one by
-inspection alone; it is named here so that gap is never silently assumed closed.
+- **`codex-task-declared.json`** — a `Bash` tool call (Codex has no distinct "Read" tool
+  either; a shell command is the only shape a file read ever takes, exactly as
+  `codex-post-tool-use-skill-read.json` above already shows), `tool_input.command` in the
+  same `sed -n '1,120p' <path>` form. **Codex is now runnable in the environment this set
+  was captured in** (`codex-cli 0.151.0`) — this replaces what was, before 2026-08-31, a
+  derivation from `codex-post-tool-use-skill-read.json`'s shape. The genuine capture landed
+  on exactly the key set the derivation had already guessed: `session_id`, `turn_id`,
+  `transcript_path`, `cwd`, `hook_event_name`, `model`, `permission_mode`, `tool_name`,
+  `tool_input.command`, `tool_response`, `tool_use_id`. Codex gates hooks on trust — a
+  headless `codex exec` run needs `--dangerously-bypass-hook-trust`, or the hook never fires
+  and the run journals nothing; the diagnostic's own untrusted-hook reading
+  (`02-diagnose.md`) describes the same failure. One genuine difference the live capture
+  surfaced and the old derivation could not have known: `tool_use_id` on a real `exec_command`
+  call is shaped `exec-<uuid>`, not the `call_<random>` form the pre-existing sibling
+  fixtures above carry — a version-dependent detail with no bearing on the reader, which
+  never reads `tool_use_id` at all, so the fixture keeps the sibling-consistent `call_`
+  style for this synthesised value rather than introducing a third id shape into the set for
+  a field the code under test never touches.
 
 The negative case — a captured payload whose path names something other than a task folder
 — needs no new capture: `claude-code-post-tool-use-skill.json`, `copilot-post-tool-use-skill.json`,
