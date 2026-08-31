@@ -133,3 +133,120 @@ describe("ForgetTelemetryUseCase.preview() — every location, resolved once, an
     expect(await identity.read()).not.toBeNull();
   });
 });
+
+describe("ForgetTelemetryUseCase.remove() — acts on the value preview() produced, never its own resolution", () => {
+  it("removes exactly the run files, day files and identity the preview named, and reports matching counts", async () => {
+    const { sink, runJournalReader, identity, useCase } = buildUseCase();
+    await sink.appendRecord(RECORD, new Date("2026-08-19T00:00:00.000Z"));
+    await sink.appendRecord(RECORD, new Date("2026-08-20T00:00:00.000Z"));
+    runJournalReader.runFileNames = ["01ARZ3__abc.jsonl"];
+    await identity.mint();
+
+    const preview = await useCase.preview({ projectRoot: PROJECT_ROOT });
+    const result = await useCase.remove(preview);
+
+    expect(result.journal).toEqual({ removed: 1, failed: [] });
+    expect(result.sink).toEqual({ removed: 2, failed: [] });
+    expect(result.identity).toEqual({ removed: 1, failed: [] });
+    expect(await sink.listDayFiles()).toEqual([]);
+    expect(runJournalReader.runFileNames).toEqual([]);
+    expect(await identity.read()).toBeNull();
+  });
+
+  it("a location that refuses removal is reported, and every other location is still emptied", async () => {
+    const { sink, runJournalReader, identity, useCase } = buildUseCase();
+    await sink.appendRecord(RECORD, new Date("2026-08-19T00:00:00.000Z"));
+    await sink.appendRecord(RECORD, new Date("2026-08-20T00:00:00.000Z"));
+    sink.undeletable.add("2026-08-19.jsonl");
+    runJournalReader.runFileNames = ["01ARZ3__abc.jsonl"];
+    await identity.mint();
+
+    const preview = await useCase.preview({ projectRoot: PROJECT_ROOT });
+    const result = await useCase.remove(preview);
+
+    expect(result.sink.removed).toBe(1);
+    expect(result.sink.failed).toEqual([
+      { path: "2026-08-19.jsonl", reason: "cannot delete 2026-08-19.jsonl" },
+    ]);
+    // The other locations were not spared by the sink's failure.
+    expect(result.journal).toEqual({ removed: 1, failed: [] });
+    expect(result.identity).toEqual({ removed: 1, failed: [] });
+    expect(await sink.listDayFiles()).toEqual(["2026-08-19.jsonl"]);
+  });
+
+  it("a journal run file that refuses removal is reported, and the sink still empties", async () => {
+    const { sink, runJournalReader, identity, useCase } = buildUseCase();
+    await sink.appendRecord(RECORD, new Date("2026-08-20T00:00:00.000Z"));
+    runJournalReader.runFileNames = ["01ARZ3__abc.jsonl"];
+    runJournalReader.undeletable.add("01ARZ3__abc.jsonl");
+
+    const preview = await useCase.preview({ projectRoot: PROJECT_ROOT });
+    const result = await useCase.remove(preview);
+
+    expect(result.journal.removed).toBe(0);
+    expect(result.journal.failed).toEqual([
+      { path: "01ARZ3__abc.jsonl", reason: "cannot delete 01ARZ3__abc.jsonl" },
+    ]);
+    expect(result.sink).toEqual({ removed: 1, failed: [] });
+    expect(identity.forgetCount).toBe(1);
+  });
+
+  it("an identity that refuses removal is reported, and the other locations still empty", async () => {
+    const { sink, identity, useCase } = buildUseCase();
+    await sink.appendRecord(RECORD, new Date("2026-08-20T00:00:00.000Z"));
+    await identity.mint();
+    identity.throwOnForget = new Error("permission denied");
+
+    const preview = await useCase.preview({ projectRoot: PROJECT_ROOT });
+    const result = await useCase.remove(preview);
+
+    expect(result.identity).toEqual({
+      removed: 0,
+      failed: [{ path: identity.filePath, reason: "permission denied" }],
+    });
+    expect(result.sink).toEqual({ removed: 1, failed: [] });
+    expect(await sink.listDayFiles()).toEqual([]);
+  });
+
+  it("repeats history unchanged after removing — history is not made reachable by removing the rest", async () => {
+    const sink = new InMemoryTelemetrySink();
+    const runJournalReader = new InMemoryRunJournalReader();
+    const identity = new InMemoryPersonIdentityStore();
+    const git = { ...noGit, listTrackedFiles: async () => ["aidd_docs/runs/committed.jsonl"] };
+    const useCase = new ForgetTelemetryUseCase(sink, runJournalReader, identity, git);
+    runJournalReader.runFileNames = ["committed.jsonl"];
+
+    const preview = await useCase.preview({ projectRoot: PROJECT_ROOT });
+    const result = await useCase.remove(preview);
+
+    expect(result.history).toEqual(preview.history);
+    expect(result.history).toEqual({
+      certainty: "tracked",
+      files: ["aidd_docs/runs/committed.jsonl"],
+    });
+  });
+
+  it("proves the guarantee by mutation: removal acts on the preview's own names, never a fresh directory listing", async () => {
+    const { sink, useCase } = buildUseCase();
+    await sink.appendRecord(RECORD, new Date("2026-08-19T00:00:00.000Z"));
+    await sink.appendRecord(RECORD, new Date("2026-08-20T00:00:00.000Z"));
+    const realPreview = await useCase.preview({ projectRoot: PROJECT_ROOT });
+    expect(realPreview.sink.dayFileNames).toEqual(["2026-08-19.jsonl", "2026-08-20.jsonl"]);
+
+    // A person was shown only one of the two day files - the mutated value below is what
+    // "shown" means for this test, standing in for a preview built before a second day
+    // file appeared. Handing this to `remove()` must delete only what it names.
+    const shownOnlyOneFile = {
+      ...realPreview,
+      sink: { ...realPreview.sink, dayFileNames: ["2026-08-19.jsonl"] },
+    };
+
+    await useCase.remove(shownOnlyOneFile);
+
+    // The file never named in what was shown survives - a fresh `listDayFiles()` inside
+    // `remove()` would have deleted it anyway, which is exactly the failure this design
+    // exists to make impossible.
+    expect(await sink.listDayFiles()).toEqual(["2026-08-20.jsonl"]);
+    expect(sink.deletedFiles).toEqual(["2026-08-19.jsonl"]);
+  });
+});

@@ -77,6 +77,7 @@ import { UpdateOneToolUseCase } from "../application/use-cases/shared/update-one
 import { StatusUseCase } from "../application/use-cases/status-use-case.js";
 import { SyncConflictResolverUseCase } from "../application/use-cases/sync/sync-conflict-resolver-use-case.js";
 import { DiagnoseTelemetryUseCase } from "../application/use-cases/telemetry/diagnose-telemetry-use-case.js";
+import { ForgetTelemetryUseCase } from "../application/use-cases/telemetry/forget-telemetry-use-case.js";
 import { PersonIdentityUseCase } from "../application/use-cases/telemetry/person-identity-use-case.js";
 import { ReadLocalCostUseCase } from "../application/use-cases/telemetry/read-local-cost-use-case.js";
 import { ReportCostUseCase } from "../application/use-cases/telemetry/report-cost-use-case.js";
@@ -227,6 +228,7 @@ interface Deps {
   personIdentityUseCase: PersonIdentityUseCase;
   diagnoseTelemetryUseCase: DiagnoseTelemetryUseCase;
   reportCostUseCase: ReportCostUseCase;
+  forgetTelemetryUseCase: ForgetTelemetryUseCase;
 }
 
 const _cache = new Map<string, Deps>();
@@ -758,6 +760,12 @@ export async function createDeps(
     personIdentityAdapter,
     telemetryEvidenceAdapter
   );
+  const forgetTelemetryUseCase = new ForgetTelemetryUseCase(
+    telemetrySink,
+    runJournalReader,
+    personIdentityAdapter,
+    git
+  );
   const deps: Deps = {
     fs,
     manifestRepo,
@@ -829,6 +837,7 @@ export async function createDeps(
     personIdentityUseCase,
     diagnoseTelemetryUseCase,
     reportCostUseCase,
+    forgetTelemetryUseCase,
   };
   _cache.set(projectRoot, deps);
   return deps;

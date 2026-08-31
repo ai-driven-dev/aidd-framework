@@ -4,10 +4,13 @@ import type { RunJournal, RunJournalReader } from "../../../src/domain/ports/run
  * session the map holds nothing for, mirroring the port's own contract of never throwing.
  * `runFileNames` is settable directly rather than derived from `journals`: a name-only
  * listing must be able to name a file `list()` could never parse, which is exactly the
- * damaged-journal case a caller of `listRunFiles()` needs. */
+ * damaged-journal case a caller of `listRunFiles()` needs. `undeletable`, mirroring
+ * `InMemoryTelemetrySink`, stands in for a run file that refuses removal. */
 export class InMemoryRunJournalReader implements RunJournalReader {
   readonly runsDir = "/fake/project/aidd_docs/runs";
   runFileNames: string[] = [];
+  readonly deletedFiles: string[] = [];
+  readonly undeletable = new Set<string>();
   private readonly journals = new Map<string, RunJournal>();
 
   set(sessionId: string, journal: RunJournal): void {
@@ -25,6 +28,12 @@ export class InMemoryRunJournalReader implements RunJournalReader {
   async listRunFiles(): Promise<readonly string[]> {
     return this.runFileNames;
   }
+
+  async deleteRunFile(fileName: string): Promise<void> {
+    if (this.undeletable.has(fileName)) throw new Error(`cannot delete ${fileName}`);
+    this.runFileNames = this.runFileNames.filter((name) => name !== fileName);
+    this.deletedFiles.push(fileName);
+  }
 }
 
 /** No run file for any session — every candidate falls through to unattributed, exactly as
@@ -34,4 +43,5 @@ export const NULL_RUN_JOURNAL_READER: RunJournalReader = {
   read: async () => null,
   list: async () => [],
   listRunFiles: async () => [],
+  deleteRunFile: async () => {},
 };

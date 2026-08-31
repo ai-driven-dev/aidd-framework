@@ -10,11 +10,14 @@ import type { PersonIdentityStore } from "../../../src/domain/ports/person-ident
  * the real adapter's file would be by `mint`/`adopt`/`addAlsoMe`/`removeAlsoMe`/
  * `setDisplayName`/`forget`. `throwOnRead`, when set, is what `readStrict()` throws instead
  * of answering — standing in for a damaged or unreadable identity file without touching a
- * real one. `staleMappingPath`, when set, is what `staleMappingFilePath()` answers —
- * standing in for a leftover separate declaration file found beside the identity. */
+ * real one. `throwOnForget`, when set, is what `forget()` throws instead of removing —
+ * standing in for a file that refuses deletion. `staleMappingPath`, when set, is what
+ * `staleMappingFilePath()` answers — standing in for a leftover separate declaration file
+ * found beside the identity. */
 export class InMemoryPersonIdentityStore implements PersonIdentityStore {
   mintCount = 0;
   forgetCount = 0;
+  throwOnForget: Error | null = null;
   /** Whether a file would be on disk. Distinct from `identity` on purpose: a real file
    * holding an empty `person_id` parses to `null` while still existing, and that is the
    * case `off` has to keep working for. Seeded from the identity, settable directly. */
@@ -76,6 +79,7 @@ export class InMemoryPersonIdentityStore implements PersonIdentityStore {
   }
 
   async forget(): Promise<boolean> {
+    if (this.throwOnForget) throw this.throwOnForget;
     this.forgetCount++;
     const wasThere = this.filePresent;
     this.identity = null;

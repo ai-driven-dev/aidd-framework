@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { DOCS_DIR, RUNS_SUBDIR } from "../../domain/models/paths.js";
 import type {
@@ -217,6 +217,14 @@ export class RunJournalReaderAdapter implements RunJournalReader {
     } catch {
       return [];
     }
+  }
+
+  // `force: true`, exactly like `TelemetrySinkAdapter.deleteDayFile`: a name already gone
+  // is nothing to remove, never a failure. `join` with `resolveRunsDir()` alone - never a
+  // path handed in by the caller - so a name this method deletes always sits inside the
+  // one directory `listRunFiles`/`list` already named.
+  async deleteRunFile(fileName: string): Promise<void> {
+    await rm(join(this.resolveRunsDir(), fileName), { force: true });
   }
 
   private resolveRunsDir(): string {

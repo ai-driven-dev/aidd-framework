@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { toCostReportEnvelope } from "../../domain/models/cost-report-envelope.js";
 import { DEFAULT_REPORT_DAYS, resolveReportPeriod } from "../../domain/models/report-period.js";
+import { telemetryRemovalIsEmpty } from "../../domain/models/telemetry-removal.js";
 import { createDeps } from "../../infrastructure/deps.js";
 import { ARTEFACT_AXES, buildCostReportArtefact } from "../display/cost-report-artefact.js";
 import { printCostReport } from "../display/cost-report-display.js";
@@ -17,6 +18,11 @@ import {
   printTelemetryOffReport,
   printTelemetryOnReport,
 } from "../display/telemetry-display.js";
+import {
+  printTelemetryForgetPreview,
+  printTelemetryForgetRefused,
+  printTelemetryForgetResult,
+} from "../display/telemetry-forget-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import { parseGlobalOptions } from "./global-options.js";
 
@@ -157,6 +163,36 @@ export function registerTelemetryCommand(program: Command): void {
         const deps = await createDeps(projectRoot, { verbose }, output);
         const result = await deps.telemetryOffUseCase.execute({ projectRoot });
         printTelemetryOffReport(output, result);
+      } catch (error) {
+        errorHandler.handle(error);
+      }
+    });
+
+  telemetry
+    .command("forget")
+    .description(
+      "Irreversibly remove what this tool measured: this project's run journal, this " +
+        "machine's stored records, and this machine's identity file"
+    )
+    .option(
+      "--yes",
+      "Confirm removal after seeing what would go — without it, nothing is removed",
+      false
+    )
+    .action(async (cmdOptions: { yes: boolean }) => {
+      const { verbose, output, projectRoot } = parseGlobalOptions(program);
+      const errorHandler = new ErrorHandler(output);
+      try {
+        const deps = await createDeps(projectRoot, { verbose }, output);
+        const preview = await deps.forgetTelemetryUseCase.preview({ projectRoot });
+        printTelemetryForgetPreview(output, preview);
+        if (telemetryRemovalIsEmpty(preview)) return;
+        if (!cmdOptions.yes) {
+          printTelemetryForgetRefused(output);
+          return;
+        }
+        const result = await deps.forgetTelemetryUseCase.remove(preview);
+        printTelemetryForgetResult(output, result);
       } catch (error) {
         errorHandler.handle(error);
       }

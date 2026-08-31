@@ -110,4 +110,10 @@ export interface RunJournalReader {
    * throws; a missing or unreadable runs directory answers an empty list, the same
    * failure direction as `list()`. */
   listRunFiles(): Promise<readonly string[]>;
+  /** Removes one run file, by the name `listRunFiles()` named it with — mirrors
+   * `TelemetrySink.deleteDayFile`. Never a directory-wide removal: a caller (`forget-
+   * telemetry-use-case.ts`) already has the exact names a person was shown, from
+   * `TelemetryRemovalPreview`, and passes them one at a time rather than this port
+   * re-listing what to remove. A no-op, not a failure, when the name is already gone. */
+  deleteRunFile(fileName: string): Promise<void>;
 }
