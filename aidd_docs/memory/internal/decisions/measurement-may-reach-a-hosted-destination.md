@@ -31,6 +31,10 @@ Issue #660 was opened to resolve this. Its body quotes only the privacy clause, 
 
 4. **The framework exposes; the destination analyses.** Aggregating across people and repositories, saved views, filters and anything pushed to someone belong to a hosted destination. What runs on a machine stays deliberately light: it records, it exposes a documented record, and it answers a small number of direct questions through its skills. This is a boundary, not a staging order — local does not grow into an analytics product while waiting for one.
 
+5. **A person sees their own measurement first, and that is structural while it stays local.** What was measured about someone is read from their own machine, from their own profile, by them. There is no earlier reader, because nothing is sent anywhere — the ordering is not enforced, it is a consequence of where the data lives. A person can also see exactly what is stored, and remove it, without asking anyone.
+
+   **This stops being automatic the day a destination exists**, and that is the destination's obligation to carry, not something the framework can promise on its behalf: whatever a lead can read about a person, that person can read about themselves at least as early, and can find out what was sent. A destination that cannot say this of itself is not one this framework should be pointed at.
+
 **And the constraint that makes the third and fourth clauses safe: the destination is never ours to fix.** A hosted destination is *a* destination, never *the* destination. Concretely, and each of these is testable:
 
 - The destination is named by the person, in configuration. No host is compiled in, defaulted to, or preferred.
