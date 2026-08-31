@@ -9,8 +9,13 @@
  *   - internal/ and external/ -> listed (plain paths, no @), read on demand.
  *
  * Reference syntax for the always-loaded tier:
- *   CLAUDE.md / AGENTS.md        -> @aidd_docs/memory/file.md
+ *   CLAUDE.md                    -> @aidd_docs/memory/file.md
+ *   AGENTS.md                    -> [aidd_docs/memory/file.md](aidd_docs/memory/file.md)
  *   .github/copilot-instructions -> [aidd_docs/memory/file.md](../aidd_docs/memory/file.md)
+ *
+ * Only Claude Code resolves the @ import form. The tools reading AGENTS.md
+ * (codex, cursor, opencode) do not, so an @ line there was inert text; a link
+ * is at least navigable.
  *
  * Usage:
  *   node update_memory.js                  every context file already present
@@ -52,7 +57,7 @@ const TOC_CLOSE = "<!-- files:end -->";
 
 const TARGET_FILES = [
   { path: "CLAUDE.md", syntax: "at" },
-  { path: "AGENTS.md", syntax: "at" },
+  { path: "AGENTS.md", syntax: "link" },
   { path: ".github/copilot-instructions.md", syntax: "link" },
 ];
 
@@ -116,14 +121,23 @@ function scanSubdir(fs, path, sub) {
   return out.sort();
 }
 
-function buildReference(syntax, filePath) {
-  const rel = filePath.replace(/\\/g, "/");
-  return syntax === "link" ? `[${rel}](../${rel})` : `@${rel}`;
+// A markdown link resolves against the file holding it, so it has to climb back
+// out of whatever directory that file sits in. Derived from the target's own
+// depth rather than hardcoded: a root-level AGENTS.md needs no prefix, while
+// .github/copilot-instructions.md needs one "../". Hardcoding one level made
+// every root-level link point outside the repository.
+function relativePrefix(targetPath) {
+  return "../".repeat(targetPath.split("/").length - 1);
 }
 
-function buildBlockContent(rootFiles, onDemandFiles, syntax) {
+function buildReference(syntax, filePath, prefix) {
+  const rel = filePath.replace(/\\/g, "/");
+  return syntax === "link" ? `[${rel}](${prefix}${rel})` : `@${rel}`;
+}
+
+function buildBlockContent(rootFiles, onDemandFiles, syntax, prefix = "") {
   const lines = [];
-  for (const f of rootFiles) lines.push(buildReference(syntax, f));
+  for (const f of rootFiles) lines.push(buildReference(syntax, f, prefix));
   if (onDemandFiles.length > 0) {
     lines.push("", ON_DEMAND_NOTE);
     for (const f of onDemandFiles) lines.push(`- ${f.replace(/\\/g, "/")}`);
@@ -284,7 +298,12 @@ function gitAdd(childProcess, files) {
     const original = readTextOrNull(fs, target.path);
     if (original === null) continue;
 
-    const innerContent = buildBlockContent(rootFiles, onDemandFiles, target.syntax);
+    const innerContent = buildBlockContent(
+      rootFiles,
+      onDemandFiles,
+      target.syntax,
+      relativePrefix(target.path),
+    );
     // Compare against what is on disk, not against the migrated text: a file
     // whose memory list is unchanged would otherwise look identical and skip
     // the write, leaving the legacy markers in place forever.
