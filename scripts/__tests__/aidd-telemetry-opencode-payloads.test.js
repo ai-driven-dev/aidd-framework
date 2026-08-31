@@ -1,10 +1,10 @@
 // Every other tool has between three and eight captures behind its reader. OpenCode had
 // none - its coverage was asserted from a doc comment (`plugin README.md`'s "OpenCode
 // misses a server process's first session"), never from a payload. This file replaces that
-// with two: a real capture of `session.idle`, and `session.created` reconstructed from a
-// verified SDK type declaration plus a genuinely captured sibling event - see
-// fixtures/README.md's "OpenCode's two plugin events" for exactly what each one rests on
-// and does not.
+// with real captures of `session.idle` and a completed tool part, plus `session.created`
+// reconstructed from a verified SDK type declaration plus a genuinely captured sibling
+// event - see fixtures/README.md's "OpenCode's plugin events" for exactly what each one
+// rests on and does not.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -134,4 +134,83 @@ test("an event this plugin does not act on produces no journal call", async () =
   const builder = await journalCallFor();
 
   assert.equal(builder({ type: "message.updated", properties: {} }, new Map(), "/x"), null);
+});
+
+// A completed tool part, captured live (opencode 1.14.20, 2026-08-31, model
+// opencode/ling-3.0-flash-fin-free): the model called its own `read` tool, and the plugin's
+// `event` hook received the part carrying that call's own arguments - see fixtures/README.md's
+// "OpenCode's tool part" for what was measured and what was not. Turns into a tool-used call
+// the same shape Claude Code's Read and Codex's Bash already give the declaration reader.
+test("a completed tool part, captured live, turns into a tool-used call the journal recognises as opencode", async () => {
+  const builder = await journalCallFor();
+  const event = loadFixture("opencode-tool-part-completed.json");
+
+  const call = builder(event, new Map(), "/home/user/probe/project-opencode-task");
+
+  assert.deepEqual(call, {
+    script: "tool-used",
+    payload: {
+      tool: "opencode",
+      session_id: "ses_aaaaaaaaaaaaaaaaaaaaaaaaaa",
+      cwd: "/home/user/probe/project-opencode-task",
+      tool_input: {
+        filePath:
+          "/home/user/probe/project-opencode-task/aidd_docs/tasks/2026_08/2026_08_15_alpha/spec.md",
+      },
+    },
+  });
+  assert.equal(detectHost(call.payload), "opencode");
+});
+
+test("a tool part still pending or running produces no journal call - only a completed one carries settled arguments", async () => {
+  const builder = await journalCallFor();
+  const completed = loadFixture("opencode-tool-part-completed.json");
+  const pending = {
+    ...completed,
+    properties: {
+      ...completed.properties,
+      part: { ...completed.properties.part, state: { status: "pending", input: {}, raw: "" } },
+    },
+  };
+  const running = {
+    ...completed,
+    properties: {
+      ...completed.properties,
+      part: {
+        ...completed.properties.part,
+        state: { ...completed.properties.part.state, status: "running" },
+      },
+    },
+  };
+
+  assert.equal(builder(pending, new Map(), "/x"), null);
+  assert.equal(builder(running, new Map(), "/x"), null);
+});
+
+// The negative, captured live in the same run as the positive above: a completed `bash`
+// tool call, `ls -la`, naming no task folder anywhere in its own arguments. Turns into a
+// tool-used call the reader still recognises as opencode, and that call declares nothing -
+// the same reading a call outside a task folder gets on every other host.
+test("a completed tool part naming no task folder converts to a call, but declaredTaskPath finds nothing in it", async () => {
+  const builder = await journalCallFor();
+  const { declaredTaskPath } = require("../../plugins/aidd-telemetry/hooks/lib/task-declared.cjs");
+  const event = loadFixture("opencode-tool-part-no-task.json");
+
+  const call = builder(event, new Map(), "/home/user/probe/project-opencode-task");
+
+  assert.equal(detectHost(call.payload), "opencode");
+  assert.equal(declaredTaskPath(call.payload), null);
+});
+
+test("a non-tool part update (text, reasoning, patch) produces no journal call", async () => {
+  const builder = await journalCallFor();
+  const event = {
+    type: "message.part.updated",
+    properties: {
+      sessionID: "ses_aaaaaaaaaaaaaaaaaaaaaaaaaa",
+      part: { type: "text", text: "hello" },
+    },
+  };
+
+  assert.equal(builder(event, new Map(), "/x"), null);
 });

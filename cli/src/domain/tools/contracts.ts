@@ -70,13 +70,16 @@ export interface AiTool<C> {
    * now true for every host `journal.cjs`'s `tool-used` dispatch reaches at all, because a
    * task can be *declared* - a tool call's own arguments named a file under a task folder,
    * read the same way `step_start` reads which skill is running, asking nothing of the
-   * host's payload shape. `false` remains where no tool-used event ever reaches the host in
-   * the first place (OpenCode's plugin observes only session lifecycle events), which a
-   * declaration cannot work around any more than a written path could. The truth lives in
-   * `hooks/lib/task-declared.cjs` and `hooks/journal.cjs`'s dispatch, inside a zero-dependency
-   * script the framework build copies verbatim and this side cannot import, so it is
-   * declared here and pinned to `journalAttributable` by a test — the same arrangement
-   * `telemetryJournalHost` already uses for `DECLARED_HOSTS`.
+   * host's payload shape. `false` would remain where no tool-used event ever reaches the
+   * host in the first place, which a declaration cannot work around any more than a written
+   * path could - a case every declared host has cleared as of 2026-08-31, OpenCode included:
+   * its plugin's `event` hook does receive a completed tool call's own arguments
+   * (`hooks/opencode-plugin.js`'s `declaredTaskCallFor`), a bounded measurement settled
+   * rather than assumed either way. The truth lives in `hooks/lib/task-declared.cjs` and
+   * `hooks/journal.cjs`'s dispatch, inside a zero-dependency script the framework build
+   * copies verbatim and this side cannot import, so it is declared here and pinned to
+   * `journalAttributable` by a test — the same arrangement `telemetryJournalHost` already
+   * uses for `DECLARED_HOSTS`.
    *
    * A tool declaring `false` is still fully reportable by period, and by step wherever a
    * journal covers it. It simply belongs to no task, which is not the same as having

@@ -3,8 +3,12 @@
 // readTaskPayload()), which proves the reader agrees with itself, not with anything a host
 // actually sends - the weakest cell the six-questions audit named. This file replaces that
 // with one real, live capture per host that can declare - Codex included, now that
-// codex-cli is runnable in this environment. See fixtures/README.md's "The
-// task-declaration payloads" for exactly what each fixture rests on.
+// codex-cli is runnable in this environment, and OpenCode included, now that a genuine
+// `opencode 1.14.20` capture (2026-08-31) settled the question a bounded measurement was run
+// to answer: a completed tool part's own arguments do reach the plugin's `event` hook, and
+// `hooks/opencode-plugin.js` joins one into a declaration the same way every other host's
+// hook already does. See fixtures/README.md's "The task-declaration payloads" for exactly
+// what each fixture rests on.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -28,6 +32,7 @@ const TASK_DECLARED_FIXTURE_BY_HOST = {
   copilot: "copilot-task-declared.json",
   cursor: "cursor-task-declared.json",
   codex: "codex-task-declared.json",
+  opencode: "opencode-task-declared.json",
 };
 
 for (const [host, fixtureName] of Object.entries(TASK_DECLARED_FIXTURE_BY_HOST)) {
@@ -78,13 +83,12 @@ for (const host of RENAMED_WRAPPER_CASE_BY_HOST) {
   });
 }
 
-// OpenCode cannot declare a task, and that is a property of the host, not a payload shape -
-// its plugin (hooks/opencode-plugin.js) is built from exactly two events, session.created and
-// session.idle, and neither is a tool-call event: there is no arguments text for this reader
-// to ever see. No fixture stands for an event that cannot occur; cli/src/domain/tools/ai/
-// opencode.ts's telemetryTaskAttributable: false states the fact, and
-// registry-conformance.unit.test.ts asserts it stays tied to the journal hook's own
-// tool-used dispatch, not typed in twice by hand.
-test("OpenCode names no fixture here because its plugin never dispatches a tool-used event to declare from", () => {
-  assert.equal(fs.existsSync(path.join(fixturesDir, "opencode-task-declared.json")), false);
-});
+// OpenCode declares a task now: a bounded, three-further-session measurement (opencode
+// 1.14.20, 2026-08-31) found a completed tool part's own arguments do reach the plugin's
+// `event` hook - see fixtures/README.md's "OpenCode's tool part" for what was run, what
+// arrived, and what did not. hooks/opencode-plugin.js's `declaredTaskCallFor` joins one the
+// same way every other host's hook already does, asserted above through
+// TASK_DECLARED_FIXTURE_BY_HOST like every other host. cli/src/domain/tools/ai/opencode.ts's
+// telemetryTaskAttributable flips to true for the same reason, and
+// registry-conformance.unit.test.ts keeps it tied to the journal hook's own tool-used
+// dispatch rather than typed in twice by hand.

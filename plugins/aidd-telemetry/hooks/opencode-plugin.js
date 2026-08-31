@@ -36,11 +36,12 @@ function runJournal(event, payload) {
 }
 
 // `session.created` carries the session's own `info.directory`, set by OpenCode itself;
-// `session.idle` carries only `sessionID`. A single server can outlive many sessions and
-// serve more than one directory (`opencode run --dir`, `--attach`), so `input.directory` -
-// this plugin instance's own init-time directory, fixed once - is not a safe stand-in: a
-// turn-end written to the wrong project's journal finds no run file and silently no-ops.
-// Cached per session id instead, from the one event that actually carries it.
+// `session.idle` and `message.part.updated` carry only `sessionID`. A single server can
+// outlive many sessions and serve more than one directory (`opencode run --dir`,
+// `--attach`), so `input.directory` - this plugin instance's own init-time directory, fixed
+// once - is not a safe stand-in: a turn-end or a declaration written to the wrong project's
+// journal finds no run file and silently no-ops. Cached per session id instead, from the
+// one event that actually carries it.
 //
 // `session.created` was never observed reaching this hook in a live `opencode 1.14.20`
 // measurement (2026-08-31) that discriminates "never published" from "published but not
@@ -48,12 +49,38 @@ function runJournal(event, payload) {
 // attempts that could not distinguish the two.
 //
 // Every `opencode run` invocation is a first session, so this cache stays empty for it in
-// practice today, and `session.idle` falls back to `input.directory` below - this plugin's
-// own init-time directory, which happens to be correct for the single-directory case
-// `opencode run` is. The plugin README already named this limit
+// practice today, and `session.idle`/`message.part.updated` fall back to `input.directory`
+// below - this plugin's own init-time directory, which happens to be correct for the
+// single-directory case `opencode run` is. The plugin README already named this limit
 // ("OpenCode misses a server process's first session"); this comment is the same fact,
 // now anchored to a measurement rather than left as an assertion.
 const directoryBySessionId = new Map();
+
+// A tool call's own arguments, once it has any: `pending` carries `input: {}`, empty and
+// unsearchable, before OpenCode has resolved what the call is even for - only `completed`
+// is read, the moment every argument, and the tool's own output, are settled, the same
+// moment every other host's own PostToolUse-style hook fires at. Reading `running` too
+// would call `handleTaskDeclared` a second time for the one real call already caught at
+// `completed` - never wrong, since a duplicate declaration is a duplicate closed interval
+// pointing at the same path, but a needless one.
+//
+// Measured live, `opencode 1.14.20`, 2026-08-31: a tool part's own `event.properties.part`
+// carries no task identity of any kind - only `tool` (a name: `"read"`, `"bash"`, …) and
+// `state.input`, the call's own arguments, exactly the shape `declaredTaskPath` already
+// reads on every other host as `tool_input`. `state.input.filePath` (a `read` call) and
+// `state.input.command` (a `bash` call) were both observed carrying an absolute path or a
+// shell command line - the same two shapes Claude Code's `Read` and Codex's `Bash` already
+// give this reader, never a new field this reader has to learn.
+function declaredTaskCallFor(event, sessionDirectories, fallbackDirectory) {
+  const part = event.properties.part;
+  if (part?.type !== "tool" || part.state?.status !== "completed") return null;
+  const sessionId = event.properties.sessionID;
+  const cwd = sessionDirectories.get(sessionId) ?? fallbackDirectory;
+  return {
+    script: "tool-used",
+    payload: { tool: "opencode", session_id: sessionId, cwd, tool_input: part.state.input },
+  };
+}
 
 /** One OpenCode event in, the journal call it produces out - or `null` for an event this
  * plugin does not act on. Pure but for the one map mutation `session.created` makes on
@@ -70,6 +97,9 @@ export function journalCallFor(event, sessionDirectories, fallbackDirectory) {
     const sessionId = event.properties.sessionID;
     const cwd = sessionDirectories.get(sessionId) ?? fallbackDirectory;
     return { script: "turn-end", payload: { tool: "opencode", session_id: sessionId, cwd } };
+  }
+  if (event.type === "message.part.updated") {
+    return declaredTaskCallFor(event, sessionDirectories, fallbackDirectory);
   }
   return null;
 }

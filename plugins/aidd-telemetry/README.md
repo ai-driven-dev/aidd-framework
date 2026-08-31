@@ -109,7 +109,7 @@ and one whose reader failed are four different answers.
 | --- | --- | --- | --- |
 | **Claude Code** | ✅ proven on live sessions | ✅ stated by the tool, and by interval | ✅ observed |
 | **Codex** | ✅ on captured rollouts | ✅ by interval | ✅ observed |
-| **OpenCode** | ✅ | ✅ through its own plugin API, not a declarative hook | ❌ |
+| **OpenCode** | ✅ | ✅ through its own plugin API, not a declarative hook | ✅ observed |
 | **Copilot** | ⚠️ session total only, no per-request figure — one cumulative total at `session.shutdown`, never a sum of requests | ✅ by interval ([#663](https://github.com/ai-driven-dev/framework/issues/663)) | ✅ observed |
 | **Cursor** | ❌ no token count in any file it writes | ✅ headless fires `sessionEnd` where interactive fires `stop`; both are mapped | ✅ observed |
 
@@ -127,20 +127,21 @@ tokens; turning tokens into money is a separate service's job.
   types, and its debug log shows `session.created` genuinely published on the bus after the
   plugin loaded — yet it never reached the hook. Two further runs neither confirm nor refute
   this: one without debug logging, one that captured no plugin events at all — see
-  `scripts/__tests__/fixtures/README.md`, "OpenCode's two plugin events" for exactly what
+  `scripts/__tests__/fixtures/README.md`, "OpenCode's plugin events" for exactly what
   each run shows. `session.idle` (the turn-end signal) is unaffected and reaches every
   session.
-- **A task is declared from a tool call's own arguments, on every host but one.** Claude
-  Code, Codex, Copilot and Cursor each hand their hook a tool call whose own arguments can
-  name a file under a task folder — a `Read`, a `Bash` command line, an object keyed
-  `path` — and the journal reads that text rather than asking the host to cooperate; see
-  `scripts/__tests__/fixtures/README.md`, "The task-declaration payloads" for one real
-  capture per host, taken 2026-08-31 (Codex derived, not captured — that host is not
-  installed in the environment this set was taken in; see that same section for what the
-  derivation changes and why). **OpenCode is the one exception**, and not for a
-  payload-shape reason: its plugin (`hooks/opencode-plugin.js`) never observes a tool-call
-  event at all, only `session.created` and `session.idle`, so there is no arguments text
-  for a declaration to read out of.
+- **A task is declared from a tool call's own arguments, on every host now.** Claude Code,
+  Codex, Copilot and Cursor each hand their hook a tool call whose own arguments can name a
+  file under a task folder — a `Read`, a `Bash` command line, an object keyed `path` — and
+  the journal reads that text rather than asking the host to cooperate. **OpenCode joined
+  them 2026-08-31**, settled by a bounded measurement rather than assumed either way: a
+  completed tool part's own arguments do reach the plugin's `event` hook
+  (`message.part.updated`, `part.type: "tool"`, `part.state.status: "completed"`), and
+  `hooks/opencode-plugin.js` reads them the same way. An earlier reading had found no tool
+  part across three sessions; that was a model choosing not to call a tool, not a limit of
+  the plugin surface — see `scripts/__tests__/fixtures/README.md`, "OpenCode's tool part"
+  for what changed the answer and "The task-declaration payloads" for one real capture per
+  host, all five taken live 2026-08-31.
 - **These are raw counters, not your tool's usage screen.** A vendor's own page weights a
   cached token by what it charges for it; these figures are the counts the tool wrote down.
   The two disagree on cache lines by construction, and neither is wrong.

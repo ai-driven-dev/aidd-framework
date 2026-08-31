@@ -237,13 +237,14 @@ describe("no parallel list references an unregistered tool", () => {
     // A task no longer needs a written-path extractor: it can be declared instead, read off
     // any tool call's own arguments the way step_start reads which skill is running - so
     // task_declared reaches every host journal.cjs's tool-used dispatch reaches, not only the
-    // one WRITTEN_PATH_EXTRACTOR_BY_HOST still names. OpenCode is the one declared host that
-    // is not that host: its plugin (hooks/opencode-plugin.js) forwards only session.created
-    // and session.idle, never a tool call, so there is no payload here for a declaration to
-    // read either - a fact about that one file this side cannot import and pins by name.
+    // one WRITTEN_PATH_EXTRACTOR_BY_HOST still names. OpenCode dispatches one too, as of
+    // 2026-08-31: its plugin (hooks/opencode-plugin.js) forwards a completed tool part's own
+    // arguments as a tool-used call, measured live rather than assumed from the two events
+    // it was once built from - a fact about that one file this side cannot import and pins
+    // by name.
     for (const [toolId, config] of registeredAiTools) {
       const host = config.telemetryJournalHost;
-      const hookReachesToolUse = host !== undefined && host !== "opencode";
+      const hookReachesToolUse = host !== undefined;
 
       expect(
         config.telemetryTaskAttributable,

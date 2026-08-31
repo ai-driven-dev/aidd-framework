@@ -373,7 +373,7 @@ supply an amount and a session that cost nothing look identical in the numbers.
 | `amount` | That route yields a figure denominated in currency. Never a credit or a premium request. |
 | `tool_stated_step` | The tool names the running step itself. A journal interval is not this. |
 | `journal_attributable` | The run journal names this tool's sessions. **False means two things:** no step can come from an interval, *and* a read that sweeps the journal never reaches one of its sessions — so the tool can be perfectly readable and still report nothing until someone names a session by hand. |
-| `task_attributable` | A session on this tool can be traced to the task it worked on — declared, inferred, or both. False only where the journal hook never reaches a tool call for this host at all (OpenCode's plugin observes session lifecycle events alone, never one), since a declaration needs a tool call's own arguments to read. |
+| `task_attributable` | A session on this tool can be traced to the task it worked on — declared, inferred, or both. False only where the journal hook never reaches a tool call for this host at all, since a declaration needs a tool call's own arguments to read; true for every declared host today, OpenCode included as of 2026-08-31 (`registry-conformance.unit.test.ts` keeps this tied to the journal hook's own dispatch rather than typed in twice by hand). |
 
 `coverage` is `"covered"` or `"not-covered"`, and `reason` says why when it is the second,
 or what a covered tool's figures cannot be used for.

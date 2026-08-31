@@ -691,10 +691,13 @@ whatever task that path resolves to.
 arguments named a file under a task folder — the same move `step_start`
 already makes for which skill is running, and it asks nothing of a payload's
 shape. It reaches every host the journal hook dispatches a tool-call event
-for, which today is every declared host except OpenCode: its plugin observes
-only session lifecycle events, never an individual tool call, so there is no
-payload for a declaration to read arguments out of. A declaration is an
-interval, not a whole-session fact — it opens where the tool call happened and
+for, which today is every declared host, OpenCode included as of 2026-08-31:
+a bounded measurement (three further sessions, varying the model) found that
+a completed tool part's own arguments do reach its plugin's `event` hook, and
+`hooks/opencode-plugin.js` joins one the same way every other host's own hook
+already does — see `scripts/__tests__/fixtures/README.md`, "OpenCode's tool
+part," for what was run and what arrived. A declaration is an interval, not
+a whole-session fact — it opens where the tool call happened and
 closes at whichever of a later declaration or a turn boundary comes next, or,
 left open, at the last moment that session's journal actually recorded. Only a
 record whose own moment falls inside that interval belongs to the task by

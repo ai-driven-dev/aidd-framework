@@ -60,7 +60,11 @@ and `codex-task-declared.json` are real, live captures — 2026-08-31, each host
 plugin installed through `aidd setup --ai <host> --plugins aidd-telemetry` in a throwaway
 project, asked to read a file inside a task folder. Captured by temporarily replacing the
 installed `journal.cjs` entry point with a wrapper that tees its raw stdin to a file and
-then execs the real script unchanged — the project, the tool session and the wrapper are
+then execs the real script unchanged. `opencode-task-declared.json` is real too, from the
+same date, captured a different way - OpenCode's plugin surface hands its hook a JS event
+object in-process rather than stdin, so this one is built by `hooks/opencode-plugin.js`
+itself from a genuinely captured event; see "OpenCode's plugin events" below. In every
+case the project, the tool session and the wrapper (where one was used) are
 all thrown away afterward; nothing in this repository or in any global tool config was
 touched to take them.
 
@@ -99,11 +103,23 @@ touched to take them.
   never reads `tool_use_id` at all, so the fixture keeps the sibling-consistent `call_`
   style for this synthesised value rather than introducing a third id shape into the set for
   a field the code under test never touches.
+- **`opencode-task-declared.json`** — the tool-used call `hooks/opencode-plugin.js` builds
+  from a genuinely captured, completed tool part (`opencode-tool-part-completed.json`, see
+  "OpenCode's plugin events" below), the path in `tool_input.filePath`. Whether OpenCode
+  could declare at all was measured, not assumed: a bounded, three-further-session spike
+  (2026-08-31, `opencode 1.14.20`) found that a completed tool part's own arguments do
+  reach the plugin's `event` hook. `telemetryTaskAttributable: true` in
+  `cli/src/domain/tools/ai/opencode.ts` and `registry-conformance.unit.test.ts` both state
+  this now, and `TASK_DECLARED_EXPECTATION` in `scripts/verify-chain.mjs` expects it live.
 
 The negative case — a captured payload whose path names something other than a task folder
-— needs no new capture: `claude-code-post-tool-use-skill.json`, `copilot-post-tool-use-skill.json`,
-`codex-post-tool-use-skill-read.json` and `cursor-post-tool-use-skill-read.json` above each
-name a `SKILL.md` path, and `declaredTaskPath` returns `null` against all four.
+— needs no new capture for four of the five hosts: `claude-code-post-tool-use-skill.json`,
+`copilot-post-tool-use-skill.json`, `codex-post-tool-use-skill-read.json` and
+`cursor-post-tool-use-skill-read.json` above each name a `SKILL.md` path, and
+`declaredTaskPath` returns `null` against all four. OpenCode's own negative,
+`opencode-tool-part-no-task.json`, is a fresh capture from the same live run as its positive
+sibling — a completed `bash` call, `ls -la`, naming no task folder anywhere in its own
+arguments; see "OpenCode's plugin events" below.
 
 **What this set does not re-prove.** `declaredTaskPath` reads `payload.tool_input`, falling
 back to `payload.toolArgs` only when `tool_input` is absent — Copilot's canonical builder's
@@ -115,16 +131,6 @@ payload. It is still tested — `aidd-telemetry-journal.test.js`'s
 tool_input is absent"` asserts it directly — but against a literal, not a capture, because
 it is testing the function's own precedence contract rather than a claim about what a host
 sends. That test predates this set and was kept rather than replaced for that reason.
-
-**OpenCode cannot declare a task, and no fixture stands for that.** Its plugin
-(`hooks/opencode-plugin.js`) is built from exactly two events, `session.created` and
-`session.idle` (see "OpenCode's two plugin events" below) — neither is a tool-call event, so
-there is never arguments text for `declaredTaskPath` to read. `telemetryTaskAttributable:
-false` in `cli/src/domain/tools/ai/opencode.ts` states this as a property of the host, and
-`registry-conformance.unit.test.ts` asserts it stays true only for the one host whose journal
-hook never dispatches a tool-used event — an absent fixture is the right shape of evidence
-for an event that structurally cannot occur, the same reasoning `TASK_DECLARED_EXPECTATION`
-in `scripts/verify-chain.mjs` already applies live.
 
 ## Copilot's second shape
 
@@ -273,12 +279,12 @@ of whether the journal writes for it today:
   `readCwd`/`CWD_READER_BY_HOST` resolves the first entry that actually is one, the same way
   `lib/record.cjs`'s `readSessionId` resolves Cursor's differently-spelled session id.
 
-## OpenCode's two plugin events
+## OpenCode's plugin events
 
-`opencode-session-idle.json` and `opencode-session-created.json` are not hook payloads —
-OpenCode's plugin surface hands `hooks/opencode-plugin.js` a JS event object in-process,
-never a stdin JSON payload the way every other host's hook does. The two carry different
-weight.
+`opencode-session-idle.json`, `opencode-session-created.json` and the two
+`opencode-tool-part-*.json` fixtures are not hook payloads — OpenCode's plugin surface
+hands `hooks/opencode-plugin.js` a JS event object in-process, never a stdin JSON payload
+the way every other host's hook does. They carry different weight.
 
 - **`opencode-session-idle.json`** is a real, live capture: `opencode 1.14.20` running
   `opencode run` (`opencode/big-pickle`), 2026-08-31. `sessionID` is the only field the
@@ -316,3 +322,47 @@ weight.
   declares for creation. Every value in it is synthesised. Treat it as a shape derived from
   a verified type declaration plus a genuine sibling capture, not as a recording of
   `session.created` actually arriving - because it never did.
+
+## OpenCode's tool part
+
+Whether a tool call's own arguments ever reach the plugin's `event` hook was an open
+question this deliverable exists to close, bounded before it started: three further
+sessions, varying the model, then stop - see plan.md's own Decisions row for why. The
+question was settled on the **first** of those three, not the last: `opencode 1.14.20`,
+2026-08-31, model `opencode/ling-3.0-flash-fin-free`, prompted to list this directory's own
+files. The model called its own `read` tool, and the plugin's `event` hook received a
+`message.part.updated` event whose `part.type` was `"tool"` - three times, once per state
+transition (`pending`, `running`, `completed`).
+
+This directly contradicts an earlier reading this deliverable's own spec.md carried in:
+three *prior* sessions, model `opencode/big-pickle`, answered every prompt in text,
+including one that asked for a tool call, and produced no tool part. Read the two together
+and the earlier negative was never a property of
+OpenCode's plugin surface - it was `big-pickle` declining to call a tool. `ling` did, on the
+very same prompt shape, in the very same plugin. **Measured-and-not-observed on one model
+is not evidence a tool part is undeliverable on the host** - the same distinction
+`session.created` above exists to keep honest, now cutting the other way: this earlier
+negative reading undersold what the plugin surface can actually deliver.
+
+Two further attempts, both spent getting the completed part's own full shape rather than
+searching for whether one existed at all (already settled): a second `ling` run, same
+prompt, full-object logging - reproduced the tool part in ~6 seconds, this time with every
+field. A third session was not needed once the second reproduced cleanly, so the count
+stands at two of the three further sessions the bound allowed, one held in reserve.
+
+- **`opencode-tool-part-completed.json`** — the completed `read` call from that second run:
+  `part.type: "tool"`, `part.tool: "read"`, `part.state.input.filePath` an absolute path,
+  `part.state.output` the file's own content. Redirected at a task-folder path for this
+  fixture, the same convention every `*-task-declared.json` capture uses. Every id
+  synthesised; the key set is exactly what arrived.
+- **`opencode-tool-part-no-task.json`** — the negative, from the same run: a completed
+  `bash` call, `part.state.input.command: "ls -la"`, naming no task folder anywhere in its
+  own arguments.
+
+`hooks/opencode-plugin.js`'s `declaredTaskCallFor` reads only a **completed** tool part -
+`pending` carries `state.input: {}`, empty and unsearchable, and reading `running` too would
+call the declaration reader twice for the one real call `completed` already catches. Neither
+fixture stands for `pending`/`running`; `aidd-telemetry-opencode-payloads.test.js` asserts
+those states produce no journal call by mutating the completed fixture's own `state`, since
+a genuine capture of an incomplete call carries nothing this reader would ever act on
+anyway.

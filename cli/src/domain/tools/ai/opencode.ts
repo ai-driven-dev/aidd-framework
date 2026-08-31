@@ -194,12 +194,15 @@ export const opencode: AiTool<
   // itself and spawns hooks/journal.cjs with it, over the same stdin contract every other
   // host's own hook already uses.
   telemetryJournalHost: "opencode",
-  // Unlike the other three, this is not a payload-shape limit: the plugin above never
-  // observes a single tool call at all, only session.created and session.idle. A
-  // declaration needs a tool-used event to read arguments from, and none ever reaches
-  // journal.cjs for this host - so there is no payload for either a declaration or a
-  // written path to be read out of.
-  telemetryTaskAttributable: false,
+  // Measured 2026-08-31, opencode 1.14.20: a completed tool part's own arguments do reach
+  // the plugin's `event` hook, on `message.part.updated` - a bounded, three-further-session
+  // spike settled what an earlier reading (no tool part observed across three sessions) had
+  // not: that absence was a model-selection artifact, not a property of the plugin surface.
+  // hooks/opencode-plugin.js's `declaredTaskCallFor` joins one into a tool-used call the
+  // same shape every other host's own hook already sends. A written path still cannot be
+  // read this way - no captured tool part named one - so `writtenPath` on
+  // hooks/lib/tools/opencode.cjs stays null; only the declared route opened.
+  telemetryTaskAttributable: true,
 
   rewriteContent(content: string, docsDir: string): string {
     return baseRewriteContent(content, DIRECTORY, docsDir).replace(

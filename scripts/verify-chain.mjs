@@ -713,13 +713,15 @@ const TASK_DECLARED_EXPECTATION = {
   codex: { possible: true },
   copilot: { possible: true },
   cursor: { possible: true },
-  opencode: {
-    possible: false,
-    reason:
-      "OpenCode's plugin (hooks/opencode-plugin.js) only observes session.created and " +
-      "session.idle — no tool-call event ever reaches it, so task_declared can never fire " +
-      "for this host (readers.js declares taskAttributable:false for the same reason).",
-  },
+  // Measured 2026-08-31, opencode 1.14.20: a completed tool part's own arguments do reach
+  // the plugin's `event` hook on `message.part.updated`, and hooks/opencode-plugin.js joins
+  // one into a tool-used call the same way every other host's own hook already does. An
+  // earlier reading (no tool part observed across three sessions) was a model-selection
+  // artifact, not a property of the plugin surface - some models this route can pick
+  // (`opencode run`'s own choice varies per machine and per account, see `opencodeRun`
+  // above) answer in text even when asked to use a tool, and this run's own model can still
+  // land on one of those.
+  opencode: { possible: true },
 };
 
 function runVariant(toolId, variant, projectDir, vendorId, blocked = null) {
