@@ -141,7 +141,8 @@ tokens; turning tokens into money is a separate service's job.
   part across three sessions; that was a model choosing not to call a tool, not a limit of
   the plugin surface — see `scripts/__tests__/fixtures/README.md`, "OpenCode's tool part"
   for what changed the answer and "The task-declaration payloads" for one real capture per
-  host, all five taken live 2026-08-31.
+  host, taken live 2026-08-31 for four of the five, and for OpenCode the call the plugin
+  builds from one such captured event.
 - **These are raw counters, not your tool's usage screen.** A vendor's own page weights a
   cached token by what it charges for it; these figures are the counts the tool wrote down.
   The two disagree on cache lines by construction, and neither is wrong.

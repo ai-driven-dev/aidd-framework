@@ -233,15 +233,17 @@ describe("no parallel list references an unregistered tool", () => {
     expect(journalHostToAiToolId("not-a-host")).toBeNull();
   });
 
-  it("declares task attributability exactly where the journal hook ever reaches a tool call", () => {
+  it("declares task attributability exactly where journal attribution is possible at all", () => {
     // A task no longer needs a written-path extractor: it can be declared instead, read off
-    // any tool call's own arguments the way step_start reads which skill is running - so
-    // task_declared reaches every host journal.cjs's tool-used dispatch reaches, not only the
-    // one WRITTEN_PATH_EXTRACTOR_BY_HOST still names. OpenCode dispatches one too, as of
-    // 2026-08-31: its plugin (hooks/opencode-plugin.js) forwards a completed tool part's own
-    // arguments as a tool-used call, measured live rather than assumed from the two events
-    // it was once built from - a fact about that one file this side cannot import and pins
-    // by name.
+    // any tool call's own arguments the way `declaredTaskPath` reads it - free text, scanned
+    // for a task-folder path - with no per-host gate the way `WRITTEN_PATH_EXTRACTOR_BY_HOST`
+    // gates a written path, or `stepStart` gates a step. That is why this assertion collapses
+    // to `telemetryTaskAttributable === (telemetryJournalHost !== undefined)`: once a host's
+    // events reach the journal hook *at all*, `handleTaskDeclared` runs unconditionally on
+    // every one of them, task declaration included. It does not, on its own, pin OpenCode's
+    // own dispatch mechanism (`hooks/opencode-plugin.js`, an ESM file this suite does not
+    // import) - that fact is exercised live in `scripts/__tests__/aidd-telemetry-opencode-
+    // payloads.test.js` instead, against the plugin file itself.
     for (const [toolId, config] of registeredAiTools) {
       const host = config.telemetryJournalHost;
       const hookReachesToolUse = host !== undefined;

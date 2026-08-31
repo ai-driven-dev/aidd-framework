@@ -2,13 +2,14 @@
 // only against hand-written payloads until now (aidd-telemetry-journal.test.js's own
 // readTaskPayload()), which proves the reader agrees with itself, not with anything a host
 // actually sends - the weakest cell the six-questions audit named. This file replaces that
-// with one real, live capture per host that can declare - Codex included, now that
-// codex-cli is runnable in this environment, and OpenCode included, now that a genuine
-// `opencode 1.14.20` capture (2026-08-31) settled the question a bounded measurement was run
-// to answer: a completed tool part's own arguments do reach the plugin's `event` hook, and
-// `hooks/opencode-plugin.js` joins one into a declaration the same way every other host's
-// hook already does. See fixtures/README.md's "The task-declaration payloads" for exactly
-// what each fixture rests on.
+// with one real, live capture per host that can declare, for four of the five - Codex
+// included, now that codex-cli is runnable in this environment - and, for OpenCode, the
+// call `hooks/opencode-plugin.js` builds from a genuinely captured event, now that a
+// genuine `opencode 1.14.20` capture (2026-08-31) settled the question a bounded
+// measurement was run to answer: a completed tool part's own arguments do reach the
+// plugin's `event` hook, and that hook joins one into a declaration the same way every
+// other host's hook already does. See fixtures/README.md's "The task-declaration payloads"
+// for exactly what each fixture rests on.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");

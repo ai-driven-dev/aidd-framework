@@ -126,9 +126,9 @@ to a task" explains why a frozen conclusion is worse than a re-runnable derivati
 | Tool | Captured | Tested | Validated | Normalised |
 | --- | --- | --- | --- | --- |
 | Claude Code | **F, both routes** — `file_written` (the only host with a readable written path: `tools/claude-code.cjs:13-18`) **and** `task_declared` | **F** — journal test asserts the declared path; `cost-report.unit.test.ts` 5 by-value tests under "a task is a filter over a period" and 5 more under "a task can be declared, not just derived" | **P** — the real `claude-code-post-tool-use-{write,edit,notebook-edit}.json` are replayed **status-only**; the value test uses a mirror payload, and `readTaskPayload` is hand-written | **F** — the stated-path route is exact where a declaration is inferred; `statedAsWrittenAlready` (`task-declared.cjs:48-52`) prevents the two firing on one event |
-| Codex | **P** — declared route only; `writtenPath: null` (`tools/codex.cjs:48`), writes go through an `apply_patch` string | **F** — journal test asserts the path | **✗** — hand-written payload | **P** — a declaration is an interval, not a whole-session fact; documented |
+| Codex | **P** — declared route only; `writtenPath: null` (`tools/codex.cjs:48`), writes go through an `apply_patch` string | **F** — journal test asserts the path | **F** — real, live capture (`codex-cli 0.151.0`), 2026-08-31; see `scripts/__tests__/fixtures/README.md`, "The task-declaration payloads" | **P** — a declaration is an interval, not a whole-session fact; documented |
 | Copilot | **P** — declared route only (`writtenPath: null`), reading `toolArgs` as plain text | **F** — journal test asserts the path; plus "declaredTaskPath reads tool_input first and Copilot's toolArgs string only when tool_input is absent" | **✗** — hand-written payload | **P** — same as Codex |
-| OpenCode | **✗** — `telemetryTaskAttributable: false` (`opencode.ts:202`), the only tool so declared. No tool-call event ever reaches the journal. | **F** (of the absence) | **F** — declared with a reason | **F** — documented as a limit of the tool, printed rather than defaulted |
+| OpenCode | **P** — declared route, `telemetryTaskAttributable: true` (`opencode.ts:205`). Settled by measurement, not assumed: a completed tool part's own arguments do reach the plugin's `event` hook, and `hooks/opencode-plugin.js` joins one into a declaration the same way every other host's hook does. | **F** — `aidd-telemetry-opencode-payloads.test.js` asserts the declared path from a genuine captured tool part | **F** — the call the plugin builds from a genuinely captured event (`opencode-tool-part-completed.json`), not a hand-written payload | **P** — same as Codex; documented in `scripts/__tests__/fixtures/README.md`, "OpenCode's plugin events" |
 | Cursor | **P** — declared route, `telemetryTaskAttributable: true` (`cursor.ts:147`) | **F** — journal test asserts the path | **✗** — hand-written payload | **✗ in effect** — nothing to attribute; no Cursor record exists |
 
 ### Dimension 5 — person
@@ -217,11 +217,12 @@ Ranked by what a wrong value costs.
    a real cache hit silently inflates `input_tokens`, and — because Copilot yields one
    whole-session record with no per-request lines — there is no internal cross-check that
    would ever reveal it. **Nothing declares this.** Full detail in finding **N-1**.
-2. **Task, on Codex / Copilot / Cursor.** The extraction logic is exercised only against
-   hand-written payloads (`readTaskPayload`, self-described as such). The three hosts whose
-   payload shapes are *most* likely to drift — Codex's `Bash`-named shell command, Copilot's
-   JSON-string `toolArgs`, Cursor's absolute `file_path` — are the three with no captured
-   payload behind the value assertion. A wrong value here mis-bills a whole task interval.
+2. **Task, on Copilot / Cursor.** The extraction logic is exercised only against
+   hand-written payloads (`readTaskPayload`, self-described as such). Two of the three hosts
+   this once listed have since gained a real capture behind the value assertion — Codex
+   (`codex-cli 0.151.0` is now runnable) and OpenCode (settled by measurement, see the
+   task dimension table above); Copilot's JSON-string `toolArgs` and Cursor's absolute
+   `file_path` remain hand-written. A wrong value here mis-bills a whole task interval.
    Mitigating: real captures for these shapes *do* exist in the same directory and are used
    for the step dimension, so closing this is cheap.
 3. **Project, all five hosts.** Value assertions run on builders; real session-start
