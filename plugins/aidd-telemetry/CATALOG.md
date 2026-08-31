@@ -39,7 +39,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `actions` | [03-verify.md](skills/00-init/actions/03-verify.md) | - |
 | `actions` | [04-identify.md](skills/00-init/actions/04-identify.md) | - |
 | `actions` | [05-forget.md](skills/00-init/actions/05-forget.md) | - |
-| `-` | [SKILL.md](skills/00-init/SKILL.md) | `Turns AIDD measurement on for a project, proves it is recording, and lets a person opt into (or out of) naming themselves on their own records. Use when the user wants to start measuring what their work costs, wants to stop, asks why nothing is being recorded, or wants their own name to appear on (or disappear from) what gets measured. Not for answering what a piece of work consumed.` |
+| `-` | [SKILL.md](skills/00-init/SKILL.md) | `Turns AIDD measurement on for a project, proves it is recording, lets a person opt into (or out of) naming themselves on their own records, and removes what was measured when asked. Use when the user wants to start measuring what their work costs, wants to stop, asks why nothing is being recorded, wants their own name to appear on (or disappear from) what gets measured, or wants their measured data deleted. Not for answering what a piece of work consumed.` |
 
 #### `skills/01-cost`
 

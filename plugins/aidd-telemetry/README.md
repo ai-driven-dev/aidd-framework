@@ -146,8 +146,13 @@ tokens; turning tokens into money is a separate service's job.
   machine that ran an older version's `aidd telemetry endpoint`, that settings file is a
   fact this plugin cannot see or undo any more — `aidd telemetry check` and `aidd telemetry
   off` both detect it and name what to remove by hand.
-- **`off` keeps what you measured.** It stops the recording; delete the two directories to
-  remove the history.
+- **`off` keeps what you measured.** It stops the recording, not the record — nothing
+  already written is deleted. **`aidd telemetry forget` removes it**: this project's run
+  journal, this machine's stored records (spanning every project ever measured on this
+  machine, not only this one), and this machine's identity file. It shows exactly what
+  would go, and what git history keeps regardless, before anything happens, and removes
+  nothing without `--yes`. The telemetry switch itself is never touched — measurement can
+  be turned back on afterwards.
 
 ## Where things live
 
