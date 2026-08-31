@@ -7,7 +7,7 @@ import type {
   TelemetryRemovalPreview,
 } from "../../../domain/models/telemetry-removal.js";
 import type { PersonIdentityStore } from "../../../domain/ports/person-identity-store.js";
-import type { RunJournalReader } from "../../../domain/ports/run-journal-reader.js";
+import type { RunJournalStore } from "../../../domain/ports/run-journal-reader.js";
 import type { TelemetrySink } from "../../../domain/ports/telemetry-sink.js";
 import type { VersionControl } from "../../../domain/ports/version-control.js";
 
@@ -65,7 +65,7 @@ function errorMessage(error: unknown): string {
 export class ForgetTelemetryUseCase {
   constructor(
     private readonly sink: TelemetrySink,
-    private readonly runJournalReader: RunJournalReader,
+    private readonly runJournalReader: RunJournalStore,
     private readonly identity: PersonIdentityStore,
     private readonly git: VersionControl
   ) {}
@@ -73,19 +73,33 @@ export class ForgetTelemetryUseCase {
   /** Resolves every location once, and touches nothing — a person sees exactly this value
    * before anything is asked to go. */
   async preview(options: ForgetTelemetryOptions): Promise<TelemetryRemovalPreview> {
-    const [dayFileNames, runFileNames, tracked, identityState] = await Promise.all([
-      this.sink.listDayFiles(),
-      this.runJournalReader.listRunFiles(),
-      this.git.listTrackedFiles(options.projectRoot, RUNS_ENTRY),
-      this.identityState(),
-    ]);
+    const [dayFileNames, runFileNames, isRepo, tracked, hasHistory, identityState] =
+      await Promise.all([
+        this.sink.listDayFiles(),
+        this.runJournalReader.listRunFiles(),
+        this.git.isRepository(options.projectRoot),
+        this.git.listTrackedFiles(options.projectRoot, RUNS_ENTRY),
+        this.git.hasHistoryFor(options.projectRoot, RUNS_ENTRY),
+        this.identityState(),
+      ]);
     return {
       journal: { scope: "project", path: this.runJournalReader.runsDir, runFileNames },
       sink: { scope: "machine", path: this.sink.rootDir, dayFileNames },
       identity: { scope: "machine", path: this.identity.filePath, ...identityState },
-      history:
-        tracked.length > 0 ? { certainty: "tracked", files: tracked } : { certainty: "possible" },
+      history: this.historyReading(isRepo, tracked, hasHistory),
     };
+  }
+
+  private historyReading(
+    isRepo: boolean,
+    tracked: readonly string[],
+    hasHistory: boolean
+  ): TelemetryHistoryReading {
+    if (!isRepo) return { certainty: "none" };
+    if (tracked.length === 0) return { certainty: "possible" };
+    return hasHistory
+      ? { certainty: "committed", files: tracked }
+      : { certainty: "staged", files: tracked };
   }
 
   /** Removes exactly what `preview` resolved — see the class doc for why this must never
@@ -111,6 +125,9 @@ export class ForgetTelemetryUseCase {
     }
   }
 
+  // `journal.path` — never `this.runJournalReader.runsDir` re-read here — is what makes
+  // this act on the same value a person was shown; see the class doc and
+  // `telemetry-removal.ts`'s own doc for why that must hold by construction.
   private async removeJournal(
     journal: TelemetryProjectJournalRemoval
   ): Promise<TelemetryRemovalOutcome> {
@@ -118,7 +135,7 @@ export class ForgetTelemetryUseCase {
     let removed = 0;
     for (const fileName of journal.runFileNames) {
       try {
-        await this.runJournalReader.deleteRunFile(fileName);
+        await this.runJournalReader.deleteRunFile(journal.path, fileName);
         removed++;
       } catch (error) {
         failed.push({ path: fileName, reason: errorMessage(error) });
@@ -127,12 +144,16 @@ export class ForgetTelemetryUseCase {
     return { removed, failed };
   }
 
+  // `sink.path`, for the same reason `removeJournal` uses `journal.path` rather than
+  // `this.sink.rootDir` — the sink already froze `rootDir` at construction, so the two
+  // happen to agree today, but this removes the second computation rather than trusting
+  // that agreement to hold.
   private async removeSink(sink: TelemetryMachineSinkRemoval): Promise<TelemetryRemovalOutcome> {
     const failed: TelemetryRemovalFailure[] = [];
     let removed = 0;
     for (const fileName of sink.dayFileNames) {
       try {
-        await this.sink.deleteDayFile(fileName);
+        await this.sink.deleteDayFile(sink.path, fileName);
         removed++;
       } catch (error) {
         failed.push({ path: fileName, reason: errorMessage(error) });
@@ -141,11 +162,16 @@ export class ForgetTelemetryUseCase {
     return { removed, failed };
   }
 
+  // Gated on `identity.present`, the preview's own answer — never the filesystem's answer
+  // at removal time. Without this gate, a file that appeared *after* a preview said
+  // "nothing to remove" would still be deleted and counted, which is exactly the removal
+  // reaching past what was shown that this whole design exists to make impossible.
   private async removeIdentity(
     identity: TelemetryMachineIdentityRemoval
   ): Promise<TelemetryRemovalOutcome> {
+    if (!identity.present) return { removed: 0, failed: [] };
     try {
-      const wasThere = await this.identity.forget();
+      const wasThere = await this.identity.forget(identity.path);
       return { removed: wasThere ? 1 : 0, failed: [] };
     } catch (error) {
       return { removed: 0, failed: [{ path: identity.path, reason: errorMessage(error) }] };

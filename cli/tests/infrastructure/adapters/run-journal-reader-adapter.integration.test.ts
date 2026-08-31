@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -255,6 +255,80 @@ describe("RunJournalReaderAdapter, beyond the boundaries", () => {
       SESSION_ID,
     ]);
 
+    await rm(elsewhere, { recursive: true, force: true });
+  });
+});
+
+describe("RunJournalReaderAdapter.deleteRunFile — confined to the directory it is handed", () => {
+  let projectRoot: string;
+  let runsDir: string;
+
+  beforeEach(async () => {
+    projectRoot = await mkdtemp(join(tmpdir(), "aidd-run-journal-delete-"));
+    runsDir = join(projectRoot, "aidd_docs", "runs");
+    await mkdir(runsDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(projectRoot, { recursive: true, force: true });
+  });
+
+  it("removes a run file by name, from the directory it is handed", async () => {
+    await writeFile(join(runsDir, "a.jsonl"), "content\n");
+    const adapter = new RunJournalReaderAdapter(projectRoot);
+
+    await adapter.deleteRunFile(runsDir, "a.jsonl");
+
+    expect(await adapter.listRunFiles()).toEqual([]);
+  });
+
+  it("is a no-op, not a failure, when the name is already gone", async () => {
+    const adapter = new RunJournalReaderAdapter(projectRoot);
+    await expect(adapter.deleteRunFile(runsDir, "never-existed.jsonl")).resolves.toBeUndefined();
+  });
+
+  // Finding 4: `deleteRunFile("../../VICTIM.txt")` used to delete outside the runs
+  // directory — `join` normalises `..` away visually but still deletes wherever the
+  // normalised path lands. Confinement must be a property of this method, not an accident
+  // of `readdir` yielding bare components.
+  it("refuses a relative walk out of the directory it is handed, rather than deleting outside it", async () => {
+    // aidd_docs/runs -> .. -> aidd_docs -> .. -> projectRoot: "../../VICTIM.txt" lands here.
+    const victimPath = join(projectRoot, "VICTIM.txt");
+    await writeFile(victimPath, "do not delete me\n");
+    const adapter = new RunJournalReaderAdapter(projectRoot);
+
+    await expect(adapter.deleteRunFile(runsDir, "../../VICTIM.txt")).rejects.toThrow();
+
+    expect(await readFile(victimPath, "utf8")).toBe("do not delete me\n");
+  });
+
+  it("refuses a bare '..' or '.' rather than acting on the directory itself", async () => {
+    const adapter = new RunJournalReaderAdapter(projectRoot);
+    await expect(adapter.deleteRunFile(runsDir, "..")).rejects.toThrow();
+    await expect(adapter.deleteRunFile(runsDir, ".")).rejects.toThrow();
+  });
+
+  // Finding 1: `AIDD_RUNS_DIR` relocated between the moment a person is shown `runsDir`
+  // (the preview) and the moment `deleteRunFile` runs (the removal) used to reach the
+  // relocated directory instead of the one shown, because the old `deleteRunFile` re-read
+  // `resolveRunsDir()` on every call. `runsDir` is now frozen at construction, and
+  // `deleteRunFile` takes `dir` as an explicit argument — this proves it acts on whatever
+  // `dir` it is handed, never on a live re-resolution of `AIDD_RUNS_DIR`.
+  it("acts on the dir it is handed, immune to AIDD_RUNS_DIR being relocated afterwards", async () => {
+    await writeFile(join(runsDir, "shown.jsonl"), "shown\n");
+    const adapter = new RunJournalReaderAdapter(projectRoot);
+    const shownDir = adapter.runsDir; // what a preview would have shown
+
+    const elsewhere = await mkdtemp(join(tmpdir(), "aidd-runs-relocated-"));
+    await writeFile(join(elsewhere, "shown.jsonl"), "victim\n");
+    process.env.AIDD_RUNS_DIR = elsewhere; // relocated AFTER the dir was shown
+
+    await adapter.deleteRunFile(shownDir, "shown.jsonl");
+
+    await expect(readFile(join(shownDir, "shown.jsonl"), "utf8")).rejects.toThrow();
+    expect(await readFile(join(elsewhere, "shown.jsonl"), "utf8")).toBe("victim\n");
+
+    delete process.env.AIDD_RUNS_DIR;
     await rm(elsewhere, { recursive: true, force: true });
   });
 });

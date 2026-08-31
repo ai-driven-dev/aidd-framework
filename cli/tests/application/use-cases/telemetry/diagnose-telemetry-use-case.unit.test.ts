@@ -38,6 +38,7 @@ function versionControl(isRepository: boolean): VersionControl {
     getRemoteUrl: async () => null,
     listTrackedFiles: async () => [],
     isRepository: async () => isRepository,
+    hasHistoryFor: async () => false,
   };
 }
 

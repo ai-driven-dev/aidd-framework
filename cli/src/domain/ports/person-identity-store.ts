@@ -44,14 +44,20 @@ export interface PersonIdentityStore extends PersonIdentityReader {
   /** Writes `identity` back with `displayName` attached, replacing any previous one. */
   setDisplayName(identity: PersonIdentity, displayName: string): Promise<PersonIdentity>;
 
-  /** Removes the identity file, answering whether one was actually there. A no-op, not a
-   * failure, when there was none.
+  /** Removes the identity file at `path`, answering whether one was actually there. A
+   * no-op, not a failure, when there was none.
+   *
+   * `path` is never resolved inside this method: a caller supplies exactly the value it
+   * already named — `forget-telemetry-use-case.ts` passes `TelemetryRemovalPreview.
+   * identity.path`, the same path a person was already shown, so a removal can never reach
+   * a file the preview never named. `PersonIdentityUseCase.off()` passes `this.store.
+   * filePath` for the same reason, even though it never previewed separately.
    *
    * Answers from the filesystem rather than from a parse, because the two disagree: a file
    * holding an empty `person_id` parses to "nobody chose" while still existing on disk, so
    * a caller inferring removal from `readStrict()` would leave it there forever with no
    * verb able to remove it. Only this store can see the file itself. */
-  forget(): Promise<boolean>;
+  forget(path: string): Promise<boolean>;
 
   /** The path a stale separate declaration file (`person-mapping.json`) would have lived
    * at beside this one, checked for existence alone and never read - that file was

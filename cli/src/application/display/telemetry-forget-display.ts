@@ -19,21 +19,46 @@ function identityPreviewLine(identity: TelemetryMachineIdentityRemoval): string 
   return `  This machine's identity (${identity.path}): 1 file${damaged}`;
 }
 
-function printHistory(output: CLIOutput, history: TelemetryHistoryReading): void {
-  if (history.certainty === "tracked") {
-    output.warn(
-      "Cannot be reached: this project's run journal is tracked by git right now, so " +
-        `history certainly holds it:\n${history.files.map((file) => `  ${file}`).join("\n")}\n` +
-        "Removing it from the working tree does not remove it from history. No command here " +
-        "rewrites git history."
-    );
-    return;
-  }
-  output.warn(
-    "Cannot be reached: this project's run journal is not tracked by git right now, but " +
-      "history may still hold it if it was ever committed before — that cannot be told " +
-      "apart from never having been committed. No command here rewrites git history."
+function fileList(files: readonly string[]): string {
+  return files.map((file) => `  ${file}`).join("\n");
+}
+
+function committedHistoryWarning(files: readonly string[]): string {
+  return (
+    "Cannot be reached: this project's run journal has been committed, so git history " +
+    `certainly holds it. Tracked right now:\n${fileList(files)}\n` +
+    "Removing it from the working tree does not remove it from history. No command here " +
+    "rewrites git history."
   );
+}
+
+function stagedHistoryWarning(files: readonly string[]): string {
+  return (
+    "Cannot be reached, not yet: this project's run journal is staged (tracked by git " +
+    `right now) but has never been committed — history does not hold it yet:\n${fileList(files)}\n` +
+    "The staged copy stays in git's index after this removal deletes the working-tree " +
+    "file, so a later `git commit` with nothing further done would put it back. No " +
+    "command here touches git's index or history."
+  );
+}
+
+const POSSIBLE_HISTORY_WARNING =
+  "Cannot be reached: this project's run journal is not tracked by git right now, but " +
+  "history may still hold it if it was ever committed before — that cannot be told " +
+  "apart from never having been committed. No command here rewrites git history.";
+
+const NO_REPOSITORY_HISTORY_WARNING =
+  "This project is not a git repository, so no history holds this project's run journal.";
+
+function historyWarning(history: TelemetryHistoryReading): string {
+  if (history.certainty === "committed") return committedHistoryWarning(history.files);
+  if (history.certainty === "staged") return stagedHistoryWarning(history.files);
+  if (history.certainty === "possible") return POSSIBLE_HISTORY_WARNING;
+  return NO_REPOSITORY_HISTORY_WARNING;
+}
+
+function printHistory(output: CLIOutput, history: TelemetryHistoryReading): void {
+  output.warn(historyWarning(history));
 }
 
 /** What `aidd telemetry forget` would remove, and what it never can — shown before

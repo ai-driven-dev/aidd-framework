@@ -1,4 +1,4 @@
-import { appendFile, chmod, mkdtemp, readFile, rm } from "node:fs/promises";
+import { appendFile, chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -73,7 +73,7 @@ describe("TelemetrySinkAdapter", () => {
     expect(before).toEqual(["2026-08-15.jsonl", "2026-08-16.jsonl", "2026-08-17.jsonl"]);
 
     const { keep, prune } = decideTelemetrySinkRetention(before, 2);
-    for (const fileName of prune) await adapter.deleteDayFile(fileName);
+    for (const fileName of prune) await adapter.deleteDayFile(adapter.rootDir, fileName);
 
     const after = await adapter.listDayFiles();
     expect(after).toEqual(keep);
@@ -315,5 +315,19 @@ describe("the real sink and its in-memory double place a record on the same day"
     // v-0 is the 17th in UTC; v-1 is 01:00+05:00 on the 18th, which is the 17th in UTC.
     expect(ids(fromAdapter)).toEqual({ records: ["v-0", "v-1"], undated: ["v-2", "v-3"] });
     expect(ids(fromDouble)).toEqual(ids(fromAdapter));
+  });
+
+  // Finding 4's confinement, mirrored for the sink: `deleteDayFile` shares the same
+  // `isBareFileName` check as `RunJournalReaderAdapter.deleteRunFile`.
+  it("refuses a relative walk out of the directory it is handed, rather than deleting outside it", async () => {
+    const adapter = new TelemetrySinkAdapter(userConfigDir);
+    await adapter.ensureWritable();
+    const victimPath = join(userConfigDir, "VICTIM.txt");
+    await writeFile(victimPath, "do not delete me\n");
+
+    // adapter.rootDir -> .. -> userConfigDir: "../VICTIM.txt" lands here.
+    await expect(adapter.deleteDayFile(adapter.rootDir, "../VICTIM.txt")).rejects.toThrow();
+
+    expect(await readFile(victimPath, "utf8")).toBe("do not delete me\n");
   });
 });

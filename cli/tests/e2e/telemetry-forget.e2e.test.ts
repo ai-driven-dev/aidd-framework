@@ -11,10 +11,13 @@ const execFileAsync = promisify(execFile);
 /**
  * `aidd telemetry forget` — the seventh command, and the only one that deletes data.
  * Covers phase-2.md's own Test Scope: preview vs. confirm, counts matching what was
- * shown, a damaged record file, a refused deletion leaving the rest untouched, and a
- * relocated `AIDD_USER_CONFIG_DIR` reaching only the location it named. The structural
- * "removal cannot resolve its own locations" guarantee is proven by mutation at the unit
- * level (`forget-telemetry-use-case.unit.test.ts`) — this file proves the CLI journey a
+ * shown, a damaged record file, a location that refuses removal (a directory named
+ * `*.jsonl`) leaving the rest untouched, a relocated `AIDD_RUNS_DIR` and a relocated
+ * `AIDD_USER_CONFIG_DIR` each reaching only the location named. The structural "removal
+ * cannot resolve its own locations" guarantee is proven by mutation at the unit level, for
+ * all three locations (`forget-telemetry-use-case.unit.test.ts`) and at the adapter level
+ * for the journal and the identity (`run-journal-reader-adapter.integration.test.ts`,
+ * `person-identity-adapter.integration.test.ts`) — this file proves the CLI journey a
  * person actually sees.
  */
 const RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
@@ -160,6 +163,87 @@ describe("aidd telemetry forget — shows, confirms, removes, and names what his
       expect(result.stderr).toMatch(/certainly holds it/u);
       expect(result.stderr).toContain(trackedRelative);
       expect(result.stderr).toMatch(/does not remove it from history/u);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  // Finding 3: `git ls-files` reads the index, not history — a journal `git add`ed and
+  // never committed used to be relayed as "history certainly holds it", which is false in
+  // a repository with zero commits. This reproduces exactly that and asserts the honest
+  // reading instead.
+  it("previews a staged-but-never-committed journal honestly, never as certainly held", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("forget-staged-preview");
+    try {
+      await gitInit(projectDir);
+      await seedJournal(projectDir);
+      const trackedRelative = `aidd_docs/runs/${JOURNAL_FILE}`;
+      await git(["add", trackedRelative], projectDir);
+      // Deliberately no commit — this repository has zero commits at all.
+
+      const result = await runCli(["telemetry", "forget"], projectDir, fakeHome);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stderr).not.toMatch(/certainly holds it/u);
+      expect(result.stderr).toMatch(/has never been committed/u);
+      expect(result.stderr).toContain(trackedRelative);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  // Finding 1's journal leg, at the CLI: a relocated `AIDD_RUNS_DIR` must reach only the
+  // directory it names, the same shape the existing relocated-`AIDD_USER_CONFIG_DIR` test
+  // proves for the sink.
+  it("a relocated AIDD_RUNS_DIR touches only the relocated location, never the project's own runs dir", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("forget-runs-relocated");
+    try {
+      await gitInit(projectDir);
+      const realJournalPath = await seedJournal(projectDir);
+
+      const relocated = join(fakeHome, "relocated-runs");
+      await mkdir(relocated, { recursive: true });
+      await writeFile(join(relocated, JOURNAL_FILE), "relocated content\n");
+
+      const result = await runCli(["telemetry", "forget", "--yes"], projectDir, fakeHome, {
+        env: { AIDD_RUNS_DIR: relocated },
+      });
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toContain(relocated);
+      expect(await entries(relocated)).toEqual([]);
+      // The project's own runs directory is untouched.
+      expect(await readFile(realJournalPath, "utf8")).toContain(VENDOR_ID);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  // Finding 5: the claimed "a refused deletion leaving the rest untouched" case did not
+  // exist. A directory named `*.jsonl` refuses removal portably (`EISDIR` on POSIX,
+  // access-denied-shaped on Windows) with no `chmod` needed, through the real CLI.
+  it("a run file that refuses removal (a directory named *.jsonl) is reported, and the rest is still removed", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("forget-refused-real");
+    try {
+      await gitInit(projectDir);
+      const runsDir = join(projectDir, "aidd_docs", "runs");
+      await mkdir(join(runsDir, "adir.jsonl"), { recursive: true });
+      await seedSinkDayFile(fakeHome, "2026-08-20.jsonl", sinkRecordLine("s-1"));
+      await seedIdentity(fakeHome, "11111111-1111-1111-1111-111111111111");
+
+      const result = await runCli(["telemetry", "forget", "--yes"], projectDir, fakeHome);
+
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toMatch(
+        /This project's run journal: 0 removed, 1 could not be removed/u
+      );
+      expect(result.stderr).toMatch(/Could not remove journal run file adir\.jsonl/u);
+      // The directory itself was never removed, and every other location still emptied.
+      expect(await entries(runsDir)).toEqual(["adir.jsonl"]);
+      expect(result.stdout).toMatch(/This machine's stored records: 1 removed/u);
+      expect(result.stdout).toMatch(/This machine's identity: 1 removed/u);
+      expect(await entries(sinkDirIn(fakeHome))).toEqual([]);
+      await expect(readFile(identityFileIn(fakeHome), "utf8")).rejects.toThrow();
     } finally {
       await cleanup();
     }

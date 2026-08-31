@@ -158,7 +158,7 @@ export class PersonIdentityUseCase {
     // Always asks the store, never decides from the read above: a file holding an empty
     // `person_id` reads as "nobody chose" and would have been left on disk by a caller
     // that skipped the removal whenever the read came back empty.
-    const removed = await this.store.forget();
+    const removed = await this.store.forget(filePath);
     return { filePath, removed, discardedDamaged, addedIdentifiersRemoved };
   }
 

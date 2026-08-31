@@ -14,6 +14,7 @@ import type {
   TelemetrySinkAppendResult,
   TelemetrySinkPeriodRead,
 } from "../../domain/ports/telemetry-sink.js";
+import { isBareFileName } from "../confined-file-name.js";
 import { TelemetrySinkUnwritableError } from "../errors.js";
 import { resolveHomeDir } from "../home-dir.js";
 
@@ -164,8 +165,15 @@ export class TelemetrySinkAdapter implements TelemetrySink {
     }
   }
 
-  async deleteDayFile(fileName: string): Promise<void> {
-    await rm(join(this.rootDir, fileName), { force: true });
+  // `dir` is always a caller-supplied value (never `this.rootDir` re-derived here) — see
+  // the port's own doc. `isBareFileName` is the actual confinement: `join` alone normalises
+  // `..` away visually but still deletes wherever the normalised path lands, so a
+  // `fileName` that is not a bare component of `dir` is refused before it ever reaches `rm`.
+  async deleteDayFile(dir: string, fileName: string): Promise<void> {
+    if (!isBareFileName(fileName)) {
+      throw new Error(`refusing to delete "${fileName}" — not a day file name inside ${dir}`);
+    }
+    await rm(join(dir, fileName), { force: true });
   }
 
   async readRecordsForVendor(vendorId: string): Promise<readonly TelemetrySinkRecord[]> {

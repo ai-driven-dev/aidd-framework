@@ -5,10 +5,11 @@ import type {
   RunJournal,
   RunJournalBoundary,
   RunJournalFileWritten,
-  RunJournalReader,
   RunJournalSessionStart,
+  RunJournalStore,
   RunJournalTaskDeclared,
 } from "../../domain/ports/run-journal-reader.js";
+import { isBareFileName } from "../confined-file-name.js";
 
 const ULID_LENGTH = 26; // encodeTime(10) + encodeRandom(16), matching record.cjs's own ULID_LENGTH.
 const RUN_FILE_EXTENSION = ".jsonl";
@@ -176,25 +177,24 @@ function classifyLine(collector: JournalCollector, parsed: RawJournalLine): void
  * Never throws: no run file for this session, an unreadable runs directory, or a truncated
  * final line all answer `null` or an empty boundary list, since a missing or damaged
  * journal costs attribution, not the read itself. `AIDD_RUNS_DIR` overrides the directory
- * outright, matching the hook that writes it.
+ * outright, matching the hook that writes it — resolved exactly once, in the constructor,
+ * and frozen from then on: a relocation of that variable after construction can never
+ * change what this instance answers.
  */
-export class RunJournalReaderAdapter implements RunJournalReader {
-  constructor(private readonly projectRoot: string) {}
+export class RunJournalReaderAdapter implements RunJournalStore {
+  readonly runsDir: string;
 
-  // A getter over `resolveRunsDir()`, never a separate computation: `forget-telemetry-
-  // use-case.ts` shows this same string to a person before ever asking `listRunFiles()`
-  // what is inside it, and the two must never be able to name different directories.
-  get runsDir(): string {
-    return this.resolveRunsDir();
+  constructor(projectRoot: string) {
+    this.runsDir = process.env.AIDD_RUNS_DIR || join(projectRoot, DOCS_DIR, RUNS_SUBDIR);
   }
 
   async read(sessionId: string): Promise<RunJournal | null> {
-    const filePath = await this.findRunFile(this.resolveRunsDir(), sessionId);
+    const filePath = await this.findRunFile(this.runsDir, sessionId);
     return filePath ? this.readJournal(filePath) : null;
   }
 
   async list(): Promise<readonly RunJournal[]> {
-    const dir = this.resolveRunsDir();
+    const dir = this.runsDir;
     let entries: string[];
     try {
       entries = await readdir(dir);
@@ -212,7 +212,7 @@ export class RunJournalReaderAdapter implements RunJournalReader {
 
   async listRunFiles(): Promise<readonly string[]> {
     try {
-      const entries = await readdir(this.resolveRunsDir());
+      const entries = await readdir(this.runsDir);
       return entries.filter((entry) => entry.endsWith(RUN_FILE_EXTENSION)).sort();
     } catch {
       return [];
@@ -220,15 +220,17 @@ export class RunJournalReaderAdapter implements RunJournalReader {
   }
 
   // `force: true`, exactly like `TelemetrySinkAdapter.deleteDayFile`: a name already gone
-  // is nothing to remove, never a failure. `join` with `resolveRunsDir()` alone - never a
-  // path handed in by the caller - so a name this method deletes always sits inside the
-  // one directory `listRunFiles`/`list` already named.
-  async deleteRunFile(fileName: string): Promise<void> {
-    await rm(join(this.resolveRunsDir(), fileName), { force: true });
-  }
-
-  private resolveRunsDir(): string {
-    return process.env.AIDD_RUNS_DIR || join(this.projectRoot, DOCS_DIR, RUNS_SUBDIR);
+  // is nothing to remove, never a failure. `dir` is never this instance's own `runsDir` —
+  // it is whatever the caller passes, which `forget-telemetry-use-case.ts` always takes
+  // from `TelemetryRemovalPreview.journal.path`, the value a person was already shown.
+  // `isBareFileName` is the actual confinement: `join` alone normalises `..` away visually
+  // but still deletes wherever the normalised path lands, so a `fileName` that is not a
+  // bare component of `dir` is refused before it ever reaches `rm`.
+  async deleteRunFile(dir: string, fileName: string): Promise<void> {
+    if (!isBareFileName(fileName)) {
+      throw new Error(`refusing to delete "${fileName}" — not a run file name inside ${dir}`);
+    }
+    await rm(join(dir, fileName), { force: true });
   }
 
   private async findRunFile(dir: string, sessionId: string): Promise<string | null> {

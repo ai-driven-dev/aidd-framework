@@ -16,11 +16,15 @@ function dayFileName(at: Date): string {
   return `${dayKey(at)}.jsonl`;
 }
 
-/** In-memory double for `TelemetrySink` — day files keyed by name, in append order. */
+/** In-memory double for `TelemetrySink` — day files keyed by name, in append order.
+ * `deletedFromDirs` records every `dir` argument `deleteDayFile` actually received — what a
+ * mutation test checks to prove a caller passed the preview's own path, never this double's
+ * `rootDir`. */
 export class InMemoryTelemetrySink implements TelemetrySink {
   readonly rootDir = "/fake/telemetry";
   readonly files = new Map<string, TelemetrySinkRecord[]>();
   readonly deletedFiles: string[] = [];
+  readonly deletedFromDirs: string[] = [];
   unwritable = false;
   undeletable = new Set<string>();
 
@@ -41,8 +45,9 @@ export class InMemoryTelemetrySink implements TelemetrySink {
     return [...this.files.keys()].sort();
   }
 
-  async deleteDayFile(fileName: string): Promise<void> {
+  async deleteDayFile(dir: string, fileName: string): Promise<void> {
     if (this.undeletable.has(fileName)) throw new Error(`cannot delete ${fileName}`);
+    this.deletedFromDirs.push(dir);
     this.files.delete(fileName);
     this.deletedFiles.push(fileName);
   }

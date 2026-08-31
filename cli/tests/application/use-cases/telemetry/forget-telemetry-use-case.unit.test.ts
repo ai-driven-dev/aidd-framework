@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ForgetTelemetryUseCase } from "../../../../src/application/use-cases/telemetry/forget-telemetry-use-case.js";
 import { telemetryRemovalIsEmpty } from "../../../../src/domain/models/telemetry-removal.js";
 import type { TelemetrySinkRecord } from "../../../../src/domain/models/telemetry-sink-record.js";
+import type { VersionControl } from "../../../../src/domain/ports/version-control.js";
 import { InMemoryPersonIdentityStore } from "../../../helpers/ports/in-memory-person-identity-store.js";
 import { InMemoryRunJournalReader } from "../../../helpers/ports/in-memory-run-journal-reader.js";
 import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetry-sink.js";
@@ -9,6 +10,12 @@ import { noGit } from "../helpers.js";
 
 const PROJECT_ROOT = "/repo";
 const RUNS_ENTRY = "aidd_docs/runs/";
+
+// Most tests here care about the journal/sink/identity, not about git — this stands for
+// "inside a repository, nothing tracked yet", the common case, so `history` reads
+// `"possible"` rather than `"none"` by default. Tests about history itself override
+// `isRepository`/`listTrackedFiles`/`hasHistoryFor` explicitly.
+const insideRepoNoTracking: VersionControl = { ...noGit, isRepository: async () => true };
 
 const RECORD: TelemetrySinkRecord = {
   sink_schema_version: 2,
@@ -21,11 +28,11 @@ const RECORD: TelemetrySinkRecord = {
   step_attribution: "unattributed",
 };
 
-function buildUseCase() {
+function buildUseCase(git: VersionControl = insideRepoNoTracking) {
   const sink = new InMemoryTelemetrySink();
   const runJournalReader = new InMemoryRunJournalReader();
   const identity = new InMemoryPersonIdentityStore();
-  const useCase = new ForgetTelemetryUseCase(sink, runJournalReader, identity, noGit);
+  const useCase = new ForgetTelemetryUseCase(sink, runJournalReader, identity, git);
   return { sink, runJournalReader, identity, useCase };
 }
 
@@ -76,16 +83,34 @@ describe("ForgetTelemetryUseCase.preview() — every location, resolved once, an
     expect(preview.identity.present).toBe(false);
   });
 
-  it("reads history at its true strength: tracked now reads as certain", async () => {
-    const sink = new InMemoryTelemetrySink();
-    const runJournalReader = new InMemoryRunJournalReader();
-    const identity = new InMemoryPersonIdentityStore();
-    const git = { ...noGit, listTrackedFiles: async () => ["aidd_docs/runs/committed.jsonl"] };
-    const useCase = new ForgetTelemetryUseCase(sink, runJournalReader, identity, git);
+  it("reads history at its true strength: committed reads as certain", async () => {
+    const git = {
+      ...insideRepoNoTracking,
+      listTrackedFiles: async () => ["aidd_docs/runs/committed.jsonl"],
+      hasHistoryFor: async () => true,
+    };
+    const { useCase } = buildUseCase(git);
     const preview = await useCase.preview({ projectRoot: PROJECT_ROOT });
     expect(preview.history).toEqual({
-      certainty: "tracked",
+      certainty: "committed",
       files: ["aidd_docs/runs/committed.jsonl"],
+    });
+  });
+
+  it("reads a staged-but-never-committed journal honestly — tracked, not certainly held", async () => {
+    // `git add`ed but never committed: the index (`listTrackedFiles`) says tracked, but
+    // history (`hasHistoryFor`) has nothing for it yet — the exact gap `git ls-files`
+    // alone cannot see (finding: "history certainly holds it" was over-asserted this way).
+    const git = {
+      ...insideRepoNoTracking,
+      listTrackedFiles: async () => ["aidd_docs/runs/staged.jsonl"],
+      hasHistoryFor: async () => false,
+    };
+    const { useCase } = buildUseCase(git);
+    const preview = await useCase.preview({ projectRoot: PROJECT_ROOT });
+    expect(preview.history).toEqual({
+      certainty: "staged",
+      files: ["aidd_docs/runs/staged.jsonl"],
     });
   });
 
@@ -95,21 +120,31 @@ describe("ForgetTelemetryUseCase.preview() — every location, resolved once, an
     expect(preview.history).toEqual({ certainty: "possible" });
   });
 
-  it("asks listTrackedFiles about the journal's own pathspec", async () => {
-    const sink = new InMemoryTelemetrySink();
-    const runJournalReader = new InMemoryRunJournalReader();
-    const identity = new InMemoryPersonIdentityStore();
-    const seen: { repoRoot: string; pathspec: string }[] = [];
-    const git = {
-      ...noGit,
+  it("reads a non-repository as no history at all, never as a possibility", async () => {
+    const git = { ...insideRepoNoTracking, isRepository: async () => false };
+    const { useCase } = buildUseCase(git);
+    const preview = await useCase.preview({ projectRoot: PROJECT_ROOT });
+    expect(preview.history).toEqual({ certainty: "none" });
+  });
+
+  it("asks listTrackedFiles and hasHistoryFor about the journal's own pathspec", async () => {
+    const seenTracked: { repoRoot: string; pathspec: string }[] = [];
+    const seenHistory: { repoRoot: string; pathspec: string }[] = [];
+    const git: VersionControl = {
+      ...insideRepoNoTracking,
       listTrackedFiles: async (repoRoot: string, pathspec: string) => {
-        seen.push({ repoRoot, pathspec });
+        seenTracked.push({ repoRoot, pathspec });
         return [];
       },
+      hasHistoryFor: async (repoRoot: string, pathspec: string) => {
+        seenHistory.push({ repoRoot, pathspec });
+        return false;
+      },
     };
-    const useCase = new ForgetTelemetryUseCase(sink, runJournalReader, identity, git);
+    const { useCase } = buildUseCase(git);
     await useCase.preview({ projectRoot: PROJECT_ROOT });
-    expect(seen).toEqual([{ repoRoot: PROJECT_ROOT, pathspec: RUNS_ENTRY }]);
+    expect(seenTracked).toEqual([{ repoRoot: PROJECT_ROOT, pathspec: RUNS_ENTRY }]);
+    expect(seenHistory).toEqual([{ repoRoot: PROJECT_ROOT, pathspec: RUNS_ENTRY }]);
   });
 
   it("a machine where nothing was ever measured has nothing to remove, and offers nothing", async () => {
@@ -179,6 +214,7 @@ describe("ForgetTelemetryUseCase.remove() — acts on the value preview() produc
     await sink.appendRecord(RECORD, new Date("2026-08-20T00:00:00.000Z"));
     runJournalReader.runFileNames = ["01ARZ3__abc.jsonl"];
     runJournalReader.undeletable.add("01ARZ3__abc.jsonl");
+    await identity.mint();
 
     const preview = await useCase.preview({ projectRoot: PROJECT_ROOT });
     const result = await useCase.remove(preview);
@@ -209,11 +245,12 @@ describe("ForgetTelemetryUseCase.remove() — acts on the value preview() produc
   });
 
   it("repeats history unchanged after removing — history is not made reachable by removing the rest", async () => {
-    const sink = new InMemoryTelemetrySink();
-    const runJournalReader = new InMemoryRunJournalReader();
-    const identity = new InMemoryPersonIdentityStore();
-    const git = { ...noGit, listTrackedFiles: async () => ["aidd_docs/runs/committed.jsonl"] };
-    const useCase = new ForgetTelemetryUseCase(sink, runJournalReader, identity, git);
+    const git = {
+      ...insideRepoNoTracking,
+      listTrackedFiles: async () => ["aidd_docs/runs/committed.jsonl"],
+      hasHistoryFor: async () => true,
+    };
+    const { runJournalReader, useCase } = buildUseCase(git);
     runJournalReader.runFileNames = ["committed.jsonl"];
 
     const preview = await useCase.preview({ projectRoot: PROJECT_ROOT });
@@ -221,7 +258,7 @@ describe("ForgetTelemetryUseCase.remove() — acts on the value preview() produc
 
     expect(result.history).toEqual(preview.history);
     expect(result.history).toEqual({
-      certainty: "tracked",
+      certainty: "committed",
       files: ["aidd_docs/runs/committed.jsonl"],
     });
   });
@@ -248,5 +285,60 @@ describe("ForgetTelemetryUseCase.remove() — acts on the value preview() produc
     // exists to make impossible.
     expect(await sink.listDayFiles()).toEqual(["2026-08-20.jsonl"]);
     expect(sink.deletedFiles).toEqual(["2026-08-19.jsonl"]);
+  });
+
+  it("proves the guarantee by mutation for the journal: removal acts on the preview's own directory, never the reader's own resolution", async () => {
+    const { runJournalReader, useCase } = buildUseCase();
+    runJournalReader.runFileNames = ["01ARZ3__abc.jsonl"];
+    const realPreview = await useCase.preview({ projectRoot: PROJECT_ROOT });
+    expect(realPreview.journal.path).toBe(runJournalReader.runsDir);
+
+    // A relocated `AIDD_RUNS_DIR` between preview and remove would change what
+    // `runJournalReader.runsDir` answers on the next call, but never what was already
+    // shown — standing in for exactly that by handing `remove()` a preview naming a
+    // different directory than the reader's own.
+    const shownElsewhere = {
+      ...realPreview,
+      journal: { ...realPreview.journal, path: "/elsewhere/relocated-runs" },
+    };
+
+    await useCase.remove(shownElsewhere);
+
+    expect(runJournalReader.deletedFromDirs).toEqual(["/elsewhere/relocated-runs"]);
+    expect(runJournalReader.deletedFromDirs).not.toContain(runJournalReader.runsDir);
+  });
+
+  it("proves the guarantee by mutation for the identity: removal acts on the preview's own path, never the store's own resolution", async () => {
+    const { identity, useCase } = buildUseCase();
+    await identity.mint();
+    const realPreview = await useCase.preview({ projectRoot: PROJECT_ROOT });
+    expect(realPreview.identity.path).toBe(identity.filePath);
+
+    // A relocated `HOME` between preview and remove would change what `identity.filePath`
+    // answers on the next call, but never what was already shown.
+    const shownElsewhere = {
+      ...realPreview,
+      identity: { ...realPreview.identity, path: "/elsewhere/relocated-identity.json" },
+    };
+
+    await useCase.remove(shownElsewhere);
+
+    expect(identity.forgetCalledWithPath).toBe("/elsewhere/relocated-identity.json");
+  });
+
+  it("never touches an identity that was not shown in the preview — the gate on preview.identity.present", async () => {
+    const { identity, useCase } = buildUseCase();
+    const preview = await useCase.preview({ projectRoot: PROJECT_ROOT });
+    expect(preview.identity.present).toBe(false);
+
+    // A file appears AFTER the preview was shown and said "nothing to remove" — this must
+    // never be reached, let alone deleted and counted as removed.
+    identity.filePresent = true;
+
+    const result = await useCase.remove(preview);
+
+    expect(result.identity).toEqual({ removed: 0, failed: [] });
+    expect(identity.forgetCount).toBe(0);
+    expect(identity.forgetCalledWithPath).toBeNull();
   });
 });

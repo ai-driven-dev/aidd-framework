@@ -52,15 +52,31 @@ export interface TelemetryMachineIdentityRemoval {
 }
 
 /**
- * What is known about the run journal's history, at its true strength. `listTrackedFiles`
- * only ever answers "tracked right now" — it cannot see a commit that removed the journal
- * from tracking, so "not tracked" and "never committed" read identically to it. Reporting
- * that as an all-clear would assert something this call never measured; `"possible"` is the
- * honest ceiling on what a lack of tracking can mean.
+ * What is known about the run journal's history, at its true strength.
+ *
+ * `listTrackedFiles` (`git ls-files`) only ever answers what the *index* holds right now —
+ * it says nothing about whether any of that was ever actually committed. A file `git
+ * add`ed and never committed is tracked while history holds nothing for it, in a
+ * repository with zero commits or a thousand unrelated ones; `hasHistoryFor` (`git log`)
+ * is the call that tells the two apart.
+ *
+ * - `"committed"`: history holds at least one commit touching this project's run journal.
+ *   `files` is what the index reports as tracked right now — informational, naming what a
+ *   person can check, not a claim that each individual file was itself proven committed.
+ * - `"staged"`: tracked right now (the index holds it) but no commit anywhere touches it
+ *   yet. The blob still sits in the index after this removal deletes the working-tree
+ *   file, so a later `git commit` with nothing further done would put it back — that is
+ *   worth saying, not just "not yet in history".
+ * - `"possible"`: not tracked now. It cannot be told apart from a file never committed at
+ *   all, so this is never reported as an all-clear — only as what it is, a possibility.
+ * - `"none"`: not inside a git repository at all. No history could hold anything, so this
+ *   is the one case allowed to say so without hedging.
  */
 export type TelemetryHistoryReading =
-  | { readonly certainty: "tracked"; readonly files: readonly string[] }
-  | { readonly certainty: "possible" };
+  | { readonly certainty: "committed"; readonly files: readonly string[] }
+  | { readonly certainty: "staged"; readonly files: readonly string[] }
+  | { readonly certainty: "possible" }
+  | { readonly certainty: "none" };
 
 /** Every location a removal would touch, and what no removal can touch, resolved together
  * so a caller cannot render one without the other — see the module doc comment for why

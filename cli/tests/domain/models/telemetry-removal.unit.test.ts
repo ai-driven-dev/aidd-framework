@@ -33,9 +33,9 @@ describe("TelemetryRemovalPreview — a project's journal and a machine's record
 
   it("carries what cannot be reached beside what can, on the same value", () => {
     const result = preview({
-      history: { certainty: "tracked", files: ["aidd_docs/runs/x.jsonl"] },
+      history: { certainty: "committed", files: ["aidd_docs/runs/x.jsonl"] },
     });
-    expect(result.history.certainty).toBe("tracked");
+    expect(result.history.certainty).toBe("committed");
     // Not optional: a caller reading `result.journal` also has `result.history` in hand.
     expect(result).toHaveProperty("history");
   });

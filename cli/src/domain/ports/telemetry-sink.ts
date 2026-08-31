@@ -47,7 +47,15 @@ export interface TelemetrySink {
   ensureWritable(): Promise<void>;
   appendRecord(record: TelemetrySinkRecord, at: Date): Promise<TelemetrySinkAppendResult>;
   listDayFiles(): Promise<readonly string[]>;
-  deleteDayFile(fileName: string): Promise<void>;
+  /** Removes one day file, by the name `listDayFiles()` named it with, from `dir`. `dir`
+   * is never resolved inside this method: `forget-telemetry-use-case.ts` passes
+   * `TelemetryRemovalPreview.sink.path`, and `read-local-cost-use-case.ts`'s own retention
+   * prune passes `this.rootDir` — either way, the caller supplies the exact directory it
+   * already named, this method never re-derives one of its own. `fileName` must name
+   * exactly one entry directly inside `dir`; anything else, including a relative walk out
+   * of it, is refused rather than deleted. A no-op, not a failure, when the name is already
+   * gone. */
+  deleteDayFile(dir: string, fileName: string): Promise<void>;
   /** Every stored record whose `vendor_id` matches, across every day file. A line that
    * cannot be parsed is skipped rather than failing the whole scan — a torn final line
    * from a concurrent write must not block reading an unrelated session. */

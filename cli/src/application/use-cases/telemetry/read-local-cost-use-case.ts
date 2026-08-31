@@ -330,7 +330,7 @@ export class ReadLocalCostUseCase {
     }
     for (const fileName of prune) {
       try {
-        await this.sink.deleteDayFile(fileName);
+        await this.sink.deleteDayFile(this.sink.rootDir, fileName);
       } catch (error) {
         this.logger.warn(`telemetry read: could not delete ${fileName} - ${errorMessage(error)}`);
       }

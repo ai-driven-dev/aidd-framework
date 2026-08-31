@@ -18,6 +18,10 @@ export class InMemoryPersonIdentityStore implements PersonIdentityStore {
   mintCount = 0;
   forgetCount = 0;
   throwOnForget: Error | null = null;
+  /** The `path` argument `forget()` actually received, last call wins — what a mutation
+   * test checks to prove a caller passed the preview's own path, never this double's fixed
+   * `filePath`. */
+  forgetCalledWithPath: string | null = null;
   /** Whether a file would be on disk. Distinct from `identity` on purpose: a real file
    * holding an empty `person_id` parses to `null` while still existing, and that is the
    * case `off` has to keep working for. Seeded from the identity, settable directly. */
@@ -78,7 +82,8 @@ export class InMemoryPersonIdentityStore implements PersonIdentityStore {
     return this.identity;
   }
 
-  async forget(): Promise<boolean> {
+  async forget(path: string): Promise<boolean> {
+    this.forgetCalledWithPath = path;
     if (this.throwOnForget) throw this.throwOnForget;
     this.forgetCount++;
     const wasThere = this.filePresent;

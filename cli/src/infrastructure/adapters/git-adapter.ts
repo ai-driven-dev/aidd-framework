@@ -80,6 +80,24 @@ export class GitAdapter implements VersionControl {
     }
   }
 
+  // `git log` on a pathspec, not `git ls-files`: the index and history are different
+  // questions, and this is the one call that actually asks the second. A zero-commit
+  // repository (`git log` itself fails: "does not have any commits yet") and a normal repo
+  // where `pathspec` was only ever staged both read the same way here — no history — which
+  // is the honest answer for both.
+  async hasHistoryFor(repoRoot: string, pathspec: string): Promise<boolean> {
+    try {
+      const result = spawnSync("git", ["log", "--oneline", "-1", "--", pathspec], {
+        cwd: repoRoot,
+        encoding: "utf8",
+        env: environmentWithoutGitVariables(),
+      });
+      return result.status === 0 && result.stdout.trim() !== "";
+    } catch {
+      return false;
+    }
+  }
+
   private async resolveHooksDir(projectRoot: string): Promise<string | null> {
     const gitEntry = join(projectRoot, ".git");
     if (!(await this.fs.fileExists(gitEntry))) return null;

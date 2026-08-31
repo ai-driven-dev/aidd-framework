@@ -89,13 +89,14 @@ export interface RunJournal {
  * runs directory, telemetry that was never enabled. Never throws: a missing, unreadable or
  * truncated journal costs attribution, not the read itself, so a session with no journal at
  * all yields the same figures it would without this port existing.
+ *
+ * Read-only on purpose: `diagnose-telemetry-use-case.ts`, `report-cost-use-case.ts` and
+ * `read-local-cost-use-case.ts` each need to read a journal and none of them should be
+ * handed something that can delete one. `RunJournalStore` below extends this the same way
+ * `PersonIdentityStore` extends `PersonIdentityReader` — one adapter implements both, but a
+ * caller that only reads is typed so it cannot reach for the verb that removes.
  */
 export interface RunJournalReader {
-  /** Where this project's run journal lives — the same directory `read`/`list` and
-   * `listRunFiles` resolve, exposed so a caller that only needs to name the location
-   * (never open a file in it) has one place to ask, rather than re-deriving the same
-   * `AIDD_RUNS_DIR`-aware resolution itself. */
-  readonly runsDir: string;
   read(sessionId: string): Promise<RunJournal | null>;
   /** Every session the journal holds, for a caller that has no identifier to ask about —
    * a report covers a stretch of time, and the sessions inside it are what it is looking
@@ -110,10 +111,29 @@ export interface RunJournalReader {
    * throws; a missing or unreadable runs directory answers an empty list, the same
    * failure direction as `list()`. */
   listRunFiles(): Promise<readonly string[]>;
-  /** Removes one run file, by the name `listRunFiles()` named it with — mirrors
-   * `TelemetrySink.deleteDayFile`. Never a directory-wide removal: a caller (`forget-
-   * telemetry-use-case.ts`) already has the exact names a person was shown, from
-   * `TelemetryRemovalPreview`, and passes them one at a time rather than this port
-   * re-listing what to remove. A no-op, not a failure, when the name is already gone. */
-  deleteRunFile(fileName: string): Promise<void>;
+}
+
+/**
+ * What `ForgetTelemetryUseCase` needs beyond a plain read — extends `RunJournalReader`
+ * rather than sitting beside it, so the one adapter that resolves the runs directory
+ * implements exactly one port, the same shape `PersonIdentityStore` already uses over
+ * `PersonIdentityReader`.
+ */
+export interface RunJournalStore extends RunJournalReader {
+  /** Where this project's run journal lives — the same directory `read`/`list` and
+   * `listRunFiles` resolve, exposed so a caller that only needs to name the location
+   * (never open a file in it) has one place to ask, rather than re-deriving the same
+   * `AIDD_RUNS_DIR`-aware resolution itself. This is also the value `ForgetTelemetryUseCase`
+   * carries into `TelemetryRemovalPreview.journal.path` — `deleteRunFile` below never
+   * re-derives it, it is handed back exactly what this named. */
+  readonly runsDir: string;
+  /** Removes one run file, by the name `listRunFiles()` named it with, from `dir` —
+   * mirrors `TelemetrySink.deleteDayFile`. `dir` is never resolved inside this method: the
+   * caller (`forget-telemetry-use-case.ts`) passes `TelemetryRemovalPreview.journal.path`,
+   * the exact directory a person was already shown, so a removal can never reach a
+   * directory the preview never named — see that value's own doc for why. `fileName` must
+   * name exactly one entry directly inside `dir` (`isBareFileName`); anything else,
+   * including a relative walk out of it, is refused rather than deleted. A no-op, not a
+   * failure, when the name is already gone. */
+  deleteRunFile(dir: string, fileName: string): Promise<void>;
 }

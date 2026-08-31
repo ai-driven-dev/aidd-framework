@@ -35,10 +35,11 @@ who knows exactly what happened, what stayed, and what no command here can touch
 3. **Remove everything measured.**
    1. Run `aidd telemetry forget` (without `--yes`) and relay exactly what it shows: every
       location it names, roughly how much is in each, and what history keeps. A journal
-      tracked by git right now is relayed as certainly held by history; one not tracked is
-      relayed as possibly held, if it was ever committed before — never as an all-clear.
-      Never say history is removed, or offer to remove it: no command here rewrites git
-      history.
+      already committed is relayed as certainly held by history; one merely staged but
+      never committed is relayed as not yet held — history holds nothing for it until it
+      is actually committed; one not tracked at all is relayed as possibly held, if it was
+      ever committed before — never as an all-clear. Never say history is removed, or offer
+      to remove it: no command here rewrites git history.
    2. Nothing was ever measured: relay that and stop — there is nothing to confirm.
    3. Ask this person to confirm, having seen exactly what would go and what stays out of
       reach.
@@ -58,6 +59,7 @@ who knows exactly what happened, what stayed, and what no command here can touch
 | Remove everything, confirms | the run journal, the sink and the identity file are all gone; the counts relayed match what the preview showed |
 | Remove everything, declines | nothing is removed, and it is said plainly, not as an error |
 | Remove everything, nothing was ever measured | it says so and asks nothing |
-| Remove everything, a tracked journal | history is relayed as certainly held, never as removable |
+| Remove everything, a committed journal | history is relayed as certainly held, never as removable |
+| Remove everything, a staged-but-never-committed journal | history is relayed as not yet held, never as certainly held |
 | Remove everything, an untracked journal | history is relayed as possibly held, never as an all-clear |
 | Remove everything | the telemetry switch is untouched; a later `aidd telemetry on --yes` still works |
