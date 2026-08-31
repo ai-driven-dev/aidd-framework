@@ -46,6 +46,85 @@ fifth host.
 These are recordings, not hand-written examples — a hand-written fixture would encode the
 assumption being tested rather than what a host actually sends.
 
+## The task-declaration payloads
+
+`plugins/aidd-telemetry/hooks/lib/task-declared.cjs`'s reader asks nothing of a host beyond
+what calling a tool already requires: any tool call whose own arguments name a file under an
+`aidd_docs/tasks/<YYYY_MM>/…` folder is read as that session declaring the task, regardless
+of tool name or event. Before this set, that reader was tested only against hand-written
+payloads (see `aidd-telemetry-journal.test.js`'s prior `readTaskPayload()`), which proves the
+reader agrees with itself, not with anything a host actually sends.
+
+`claude-code-task-declared.json`, `copilot-task-declared.json` and
+`cursor-task-declared.json` are real, live captures — 2026-08-31, each host's own current
+plugin installed through `aidd setup --ai <host> --plugins aidd-telemetry` in a throwaway
+project, asked to read a file inside a task folder. Captured by temporarily replacing the
+installed `journal.cjs` entry point with a wrapper that tees its raw stdin to a file and
+then execs the real script unchanged — the project, the tool session and the wrapper are
+all thrown away afterward; nothing in this repository or in any global tool config was
+touched to take them.
+
+- **`claude-code-task-declared.json`** — a `Read` tool call; the path lives in
+  `tool_input.file_path`, the same field `claude-code-post-tool-use-write.json` above
+  carries for a write.
+- **`copilot-task-declared.json`** — this capture landed on Copilot's **compat** shape
+  (`session_id`/`hook_event_name`/`timestamp`, see "Copilot's second shape" below), not the
+  canonical one `copilot-post-tool-use-skill.json` above shows. Expected, not measured as a
+  universal fact: this plugin's own `hooks.json` declares PascalCase event keys, and per
+  "Copilot's second shape" below that is exactly what selects the compat builder — so a
+  capture against the currently-shipped plugin lands here. The path lives in
+  `tool_input.path` — a key neither `copilot-post-tool-use-skill.json` (`toolArgs`, a
+  string) nor `copilot-compat-post-tool-use-skill.json` (`tool_input.skill`) had shown
+  before. The reader finds it regardless of the key name: it scans every string value
+  `tool_input` carries, never one named field. The canonical shape's `toolArgs`-as-string
+  form is not re-proven by this set; see "What this set does not re-prove" below.
+- **`cursor-task-declared.json`** — a `Read` tool call, `tool_input.file_path`, structurally
+  identical to `cursor-post-tool-use-skill-read.json` above but pointed at a task folder
+  instead of a `SKILL.md`.
+
+**`codex-task-declared.json` is not a fresh capture.** Codex is not installed in the
+environment this set was captured in (`which codex` finds nothing), which is a physical
+fact, not a judgement call — the same standard `opencode-session-created.json` was held to.
+It is derived from `codex-post-tool-use-skill-read.json`'s real captured shape. Unchanged:
+the key set and the tool name (`Bash`, not `exec_command` — see plan.md). Changed, each for
+a stated reason, not silently: `tool_input.command`'s path (from
+`.agents/skills/probe-echo/SKILL.md` to a task-folder path, in the same
+`sed -n '1,120p' <path>` form Codex's own hook was captured sending — the value the reader
+is under test for); `tool_response` (the SKILL.md body replaced with the redacted task
+file's own content, for the same reason every other fixture's response text matches its own
+request); `transcript_path` and `cwd` (`-skill`→`-task`, the same probe-naming convention
+`claude-code-post-tool-use-skill.json` and its `-write`/`-edit` siblings already use); and
+`tool_use_id` (a distinct synthetic value — two different tool calls cannot share one, and
+the source capture's id would otherwise appear twice in this directory). This is the one
+fixture in this set that a plausible invention could not be told apart from a genuine one by
+inspection alone; it is named here so that gap is never silently assumed closed.
+
+The negative case — a captured payload whose path names something other than a task folder
+— needs no new capture: `claude-code-post-tool-use-skill.json`, `copilot-post-tool-use-skill.json`,
+`codex-post-tool-use-skill-read.json` and `cursor-post-tool-use-skill-read.json` above each
+name a `SKILL.md` path, and `declaredTaskPath` returns `null` against all four.
+
+**What this set does not re-prove.** `declaredTaskPath` reads `payload.tool_input`, falling
+back to `payload.toolArgs` only when `tool_input` is absent — Copilot's canonical builder's
+own shape, `toolArgs` as a JSON string, with no `tool_input` field at all
+(`copilot-post-tool-use-skill.json` above). Every capture in this set, Copilot's included,
+carries `tool_input`, so none exercises that fallback branch end-to-end through a real
+payload. It is still tested — `aidd-telemetry-journal.test.js`'s
+`"declaredTaskPath reads tool_input first and Copilot's toolArgs string only when
+tool_input is absent"` asserts it directly — but against a literal, not a capture, because
+it is testing the function's own precedence contract rather than a claim about what a host
+sends. That test predates this set and was kept rather than replaced for that reason.
+
+**OpenCode cannot declare a task, and no fixture stands for that.** Its plugin
+(`hooks/opencode-plugin.js`) is built from exactly two events, `session.created` and
+`session.idle` (see "OpenCode's two plugin events" below) — neither is a tool-call event, so
+there is never arguments text for `declaredTaskPath` to read. `telemetryTaskAttributable:
+false` in `cli/src/domain/tools/ai/opencode.ts` states this as a property of the host, and
+`registry-conformance.unit.test.ts` asserts it stays true only for the one host whose journal
+hook never dispatches a tool-used event — an absent fixture is the right shape of evidence
+for an event that structurally cannot occur, the same reasoning `TASK_DECLARED_EXPECTATION`
+in `scripts/verify-chain.mjs` already applies live.
+
 ## Copilot's second shape
 
 `copilot-compat-session-start.json`, `copilot-compat-post-tool-use.json`,

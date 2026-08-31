@@ -1,0 +1,27 @@
+{
+  "session_id": "64148791-6b04-48b9-bac4-19d72bcc5194",
+  "transcript_path": "/home/user/probe/cc-home-task/projects/-home-user-probe-project-cc-task/64148791-6b04-48b9-bac4-19d72bcc5194.jsonl",
+  "cwd": "/home/user/probe/project-cc-task",
+  "prompt_id": "bc42f4c7-7702-436a-b09a-6803b1184b10",
+  "permission_mode": "bypassPermissions",
+  "effort": {
+    "level": "high"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Read",
+  "tool_input": {
+    "file_path": "/home/user/probe/project-cc-task/aidd_docs/tasks/2026_08/2026_08_15_alpha/spec.md"
+  },
+  "tool_response": {
+    "type": "text",
+    "file": {
+      "filePath": "/home/user/probe/project-cc-task/aidd_docs/tasks/2026_08/2026_08_15_alpha/spec.md",
+      "content": "# alpha\n\nSpec body.\n",
+      "numLines": 3,
+      "startLine": 1,
+      "totalLines": 3
+    }
+  },
+  "tool_use_id": "toolu_01BF4Ycq4bESWxda7dq5NE1W",
+  "duration_ms": 1
+}

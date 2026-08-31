@@ -107,11 +107,11 @@ and one whose reader failed are four different answers.
 
 | Tool | Tokens | Step | Task |
 | --- | --- | --- | --- |
-| **Claude Code** | ✅ proven on live sessions | ✅ stated by the tool, and by interval | ✅ |
+| **Claude Code** | ✅ proven on live sessions | ✅ stated by the tool, and by interval | ✅ observed |
 | **Codex** | ✅ on captured rollouts | ✅ by interval | ✅ observed |
 | **OpenCode** | ✅ | ✅ through its own plugin API, not a declarative hook | ❌ |
-| **Copilot** | ⚠️ session total only, no per-request figure — one cumulative total at `session.shutdown`, never a sum of requests | ✅ by interval ([#663](https://github.com/ai-driven-dev/framework/issues/663)) | ❌ |
-| **Cursor** | ❌ no token count in any file it writes | ✅ headless fires `sessionEnd` where interactive fires `stop`; both are mapped | ❌ |
+| **Copilot** | ⚠️ session total only, no per-request figure — one cumulative total at `session.shutdown`, never a sum of requests | ✅ by interval ([#663](https://github.com/ai-driven-dev/framework/issues/663)) | ✅ observed |
+| **Cursor** | ❌ no token count in any file it writes | ✅ headless fires `sessionEnd` where interactive fires `stop`; both are mapped | ✅ observed |
 
 **No amount, anywhere.** No tool read locally writes a figure in currency. Reports give
 tokens; turning tokens into money is a separate service's job.
@@ -130,8 +130,17 @@ tokens; turning tokens into money is a separate service's job.
   `scripts/__tests__/fixtures/README.md`, "OpenCode's two plugin events" for exactly what
   each run shows. `session.idle` (the turn-end signal) is unaffected and reaches every
   session.
-- **Only Claude Code names the ticket.** The others report by period and by step, never by
-  task, because nothing they write carries one.
+- **A task is declared from a tool call's own arguments, on every host but one.** Claude
+  Code, Codex, Copilot and Cursor each hand their hook a tool call whose own arguments can
+  name a file under a task folder — a `Read`, a `Bash` command line, an object keyed
+  `path` — and the journal reads that text rather than asking the host to cooperate; see
+  `scripts/__tests__/fixtures/README.md`, "The task-declaration payloads" for one real
+  capture per host, taken 2026-08-31 (Codex derived, not captured — that host is not
+  installed in the environment this set was taken in; see that same section for what the
+  derivation changes and why). **OpenCode is the one exception**, and not for a
+  payload-shape reason: its plugin (`hooks/opencode-plugin.js`) never observes a tool-call
+  event at all, only `session.created` and `session.idle`, so there is no arguments text
+  for a declaration to read out of.
 - **These are raw counters, not your tool's usage screen.** A vendor's own page weights a
   cached token by what it charges for it; these figures are the counts the tool wrote down.
   The two disagree on cache lines by construction, and neither is wrong.

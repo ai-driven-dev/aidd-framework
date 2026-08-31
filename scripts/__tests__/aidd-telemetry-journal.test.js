@@ -3339,49 +3339,32 @@ function taskLinesIn(repo) {
   return readLines(written[0]).filter((line) => line.type === "task_declared");
 }
 
-// One shape per host, each a plain tool call whose own arguments name a task file - never a
-// Skill call, since a declaration asks nothing of the host's skill-loading mechanism at all.
-function readTaskPayload(host, { cwd, sessionId }) {
-  if (host === "claude-code") {
-    return {
-      ...makePayload({ cwd, sessionId, event: "PostToolUse" }),
-      tool_name: "Read",
-      tool_input: { file_path: `${cwd}/${TASK_RELATIVE_PATH}` },
-    };
-  }
+const TASK_DECLARED_FIXTURE_BY_HOST = {
+  "claude-code": "claude-code-task-declared.json",
+  cursor: "cursor-task-declared.json",
+  codex: "codex-task-declared.json",
+  copilot: "copilot-task-declared.json",
+};
+
+// Each entry is a real captured payload (see fixtures/README.md, "The task-declaration
+// payloads"), edited only where a test needs its own repo or session - never a hand-written
+// shape. declaredTaskPath finds the task path by pattern match, not by cwd, so the captured
+// tool_input/toolArgs value is left exactly as captured; only the fields the run-file lookup
+// and session identity depend on are retargeted, the same way stepPayload/sessionStartPayload
+// above retarget the step-opening captures.
+function taskPayload(host, { cwd, sessionId }) {
+  const payload = loadFixture(TASK_DECLARED_FIXTURE_BY_HOST[host]);
   if (host === "cursor") {
-    return {
-      conversation_id: sessionId,
-      generation_id: sessionId,
-      model: "default",
-      tool_name: "Read",
-      tool_input: { file_path: `${cwd}/${TASK_RELATIVE_PATH}` },
-      session_id: sessionId,
-      hook_event_name: "postToolUse",
-      cursor_version: "2026.08.11-e8db854",
-      workspace_roots: [cwd],
-    };
+    payload.session_id = sessionId;
+    payload.conversation_id = sessionId;
+    payload.generation_id = sessionId;
+    payload.workspace_roots = [cwd];
+    return payload;
   }
-  if (host === "codex") {
-    return {
-      session_id: sessionId,
-      turn_id: "01a01450-e8a4-7fb1-b29d-f67e6cb10fff",
-      transcript_path: `/home/user/probe/codex-home/sessions/2026/08/18/rollout-2026-08-18T12-00-38-${sessionId}.jsonl`,
-      cwd,
-      hook_event_name: "PostToolUse",
-      tool_name: "Bash",
-      tool_input: { command: `sed -n '1,120p' ${TASK_RELATIVE_PATH}` },
-    };
-  }
-  // Copilot's canonical builder: arguments arrive as a JSON string in toolArgs, and no
-  // tool_input field exists at all.
-  return {
-    sessionId,
-    timestamp: 1787047151891,
-    cwd,
-    toolName: "read_file",
-    toolArgs: JSON.stringify({ path: `${cwd}/${TASK_RELATIVE_PATH}` }),
-  };
+  payload.session_id = sessionId;
+  payload.cwd = cwd;
+  if (host === "codex") retargetCodexTranscript(payload, sessionId);
+  return payload;
 }
 
 const DECLARE_SESSION_SUFFIX_BY_HOST = {
@@ -3407,7 +3390,7 @@ for (const host of Object.keys(DECLARE_SESSION_SUFFIX_BY_HOST)) {
     try {
       const sessionId = `00000000-0000-4000-8000-000000000${DECLARE_SESSION_SUFFIX_BY_HOST[host]}`;
       replayIn(sessionStartPayload(host, { cwd: repo, sessionId }), "session-start");
-      const result = replayIn(readTaskPayload(host, { cwd: repo, sessionId }), "tool-used");
+      const result = replayIn(taskPayload(host, { cwd: repo, sessionId }), "tool-used");
       assert.equal(result.status, 0);
 
       const declared = taskLinesIn(repo);
@@ -3453,12 +3436,12 @@ test("reading two different task files across two calls leaves two lines - the w
   try {
     const sessionId = "00000000-0000-4000-8000-00000000dec7";
     replayIn(sessionStartPayload("claude-code", { cwd: repo, sessionId }), "session-start");
-    replayIn(readTaskPayload("claude-code", { cwd: repo, sessionId }), "tool-used");
-    const second = {
-      ...makePayload({ cwd: repo, sessionId, event: "PostToolUse" }),
-      tool_name: "Read",
-      tool_input: { file_path: `${repo}/aidd_docs/tasks/2026_08/2026_08_16_beta/spec.md` },
-    };
+    replayIn(taskPayload("claude-code", { cwd: repo, sessionId }), "tool-used");
+    const second = taskPayload("claude-code", { cwd: repo, sessionId });
+    second.tool_input.file_path = second.tool_input.file_path.replace(
+      TASK_RELATIVE_PATH,
+      "aidd_docs/tasks/2026_08/2026_08_16_beta/spec.md",
+    );
     replayIn(second, "tool-used");
 
     const declared = taskLinesIn(repo);
@@ -3475,7 +3458,7 @@ test("a declaration for a session that was never journaled writes nothing and ex
   const repo = makeTempRepo({ remote: "git@github.com:acme/declare-no-run-file.git" });
   try {
     const result = replayIn(
-      readTaskPayload("claude-code", { cwd: repo, sessionId: "00000000-0000-4000-8000-00000000dec8" }),
+      taskPayload("claude-code", { cwd: repo, sessionId: "00000000-0000-4000-8000-00000000dec8" }),
       "tool-used",
     );
     assert.equal(result.status, 0);

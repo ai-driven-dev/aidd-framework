@@ -207,8 +207,8 @@ test("the plugin README gives every partly-measurable tool its reason, not just 
     assert.ok(readme.includes(reason), `${tool}'s reason, not just its name`);
   }
   assert.ok(
-    readme.includes("Only Claude Code names the ticket"),
-    "which tool's writes name a task"
+    readme.includes("OpenCode is the one exception"),
+    "which tool's writes cannot name a task"
   );
 });
 
