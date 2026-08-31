@@ -18,6 +18,13 @@ import type { AiToolId } from "./tool-ids.js";
  * `sink_schema_version` exists on a stored line. Adding a field a consumer may ignore is
  * not a bump; changing what an existing field means is.
  *
+ * Bumped to 5: `by_task` is a new top-level breakdown - a consumer summing every
+ * breakdown's requests against `totals.requests` to check nothing was dropped now has a
+ * fifth breakdown to include, the same reasoning that bumped `by_project`, `by_day` and
+ * `by_person` in. Grouped from the same closed intervals the pre-existing `--task` filter
+ * already reads, never a second notion of when a task was running; unrelated to
+ * `task_attribution`, which still exists only alongside a `--task` filter.
+ *
  * Bumped to 4: `by_person` is a new top-level breakdown, and `read` gained
  * `identity_unusable` - a consumer summing every breakdown's requests against
  * `totals.requests` to check nothing was dropped now has a fourth breakdown to include,
@@ -31,7 +38,7 @@ import type { AiToolId } from "./tool-ids.js";
  * `by_project`'s `project` to optional back when that row was added.
  *
  * Bumped to 2: `by_project` and `by_day` are new top-level breakdowns. */
-export const COST_REPORT_ENVELOPE_VERSION = 4;
+export const COST_REPORT_ENVELOPE_VERSION = 5;
 
 /** Money as whole micro-dollars, the way the report carries it: an integer, so a consumer
  * summing several reports gets the same answer this one did. Divide by 1,000,000 for
@@ -110,6 +117,15 @@ export interface CostReportEnvelopeProjectRow {
   readonly totals: CostReportEnvelopeTotals;
 }
 
+/** One framework task's figures, keyed on the closed interval a record's own moment falls
+ * in - see `CostReportTaskRow`. `attribution` is present, and always `"declared"`, only
+ * alongside `task`; the row for what fell in no declared interval carries neither. */
+export interface CostReportEnvelopeTaskRow {
+  readonly task?: string;
+  readonly attribution?: TaskAttributionSource;
+  readonly totals: CostReportEnvelopeTotals;
+}
+
 /** One UTC day's figures. Every day the period spans, in order, whether or not a record
  * landed on it — a day with nothing is a row of zeros, never an omitted row. */
 export interface CostReportEnvelopeDayRow {
@@ -177,6 +193,7 @@ export interface CostReportEnvelope {
   readonly by_model: readonly CostReportEnvelopeModelRow[];
   readonly by_tool: readonly CostReportEnvelopeToolRow[];
   readonly by_project: readonly CostReportEnvelopeProjectRow[];
+  readonly by_task: readonly CostReportEnvelopeTaskRow[];
   /** Every day the period spans, always — a long period stays readable by how the text
    * rendering chooses to show it, never by what this envelope omits. */
   readonly by_day: readonly CostReportEnvelopeDayRow[];
@@ -256,6 +273,14 @@ function modelRow(row: CostReport["byModels"][number]): CostReportEnvelopeModelR
   };
 }
 
+function taskRow(row: CostReport["byTasks"][number]): CostReportEnvelopeTaskRow {
+  return {
+    ...(row.task === undefined ? {} : { task: row.task }),
+    ...(row.attribution === undefined ? {} : { attribution: row.attribution }),
+    totals: totals(row.totals),
+  };
+}
+
 function personRow(row: CostReport["byPeople"][number]): CostReportEnvelopePersonRow {
   return {
     resolution: row.resolution,
@@ -320,6 +345,7 @@ export function toCostReportEnvelope(report: CostReport): CostReportEnvelope {
     by_model: report.byModels.map(modelRow),
     by_tool: report.byTools.map(toolRow),
     by_project: report.byProjects.map(projectRow),
+    by_task: report.byTasks.map(taskRow),
     by_day: report.byDays.map((row) => ({ day: row.day, totals: totals(row.totals) })),
     by_person: report.byPeople.map(personRow),
     attribution: report.attributionMix.map(attributionRow),

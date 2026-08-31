@@ -141,6 +141,27 @@ export interface CostReportProjectRow {
   readonly totals: CostTotals;
 }
 
+/** One framework task's figures, keyed on the declared interval a record's own moment
+ * falls in - never on a session's whole-session written-path inference, which is the
+ * `--task` filter's own, separate route and would let one session's records land in more
+ * than one row. `attribution` is always `"declared"` where `task` is present, since a
+ * closed interval is the only route this breakdown reads; it travels anyway so a consumer
+ * never has to assume a strength this object does not state. The row for what fell in no
+ * declared interval carries neither field - named for the record, never for the session:
+ * "no task was declared in this session's journal" would be false for a record that falls
+ * before a session's first declaration, or between two, even though that same session did
+ * declare - so the row is named for what covers this record, not for the session's whole
+ * history. Never for a written file this breakdown does not consult, and never split from
+ * a declaration the journal simply could not read: the journal records a `task_declared`
+ * line or it does not, and those two produce the same absence. Sorted apart from every
+ * other breakdown: largest first among named tasks, with this row last, so a reader sees
+ * tasks before the remainder. */
+export interface CostReportTaskRow {
+  readonly task?: TaskIdentity;
+  readonly attribution?: TaskAttributionSource;
+  readonly totals: CostTotals;
+}
+
 /** One person's figures — a mapped person, one unplaced identity, or the records that
  * carried none at all. `person` is the canonical `personId`, present only when `resolution`
  * is `"mapped"`; the raw identifier that produced an `"unresolved"` row lives in
@@ -280,6 +301,7 @@ export interface CostReport {
   readonly byModels: readonly CostReportModelRow[];
   readonly byTools: readonly CostReportToolRow[];
   readonly byProjects: readonly CostReportProjectRow[];
+  readonly byTasks: readonly CostReportTaskRow[];
   readonly byDays: readonly CostReportDayRow[];
   /** Mapped people first, then every unplaced identity, then the one row for records
    * carrying none at all - a reader sees people before gaps. Within the mapped and the
@@ -477,6 +499,46 @@ type ModelKey = string | typeof NO_KNOWN_MODEL;
 
 function modelKeyOf(record: TelemetrySinkRecord): ModelKey {
   return record.model === undefined ? NO_KNOWN_MODEL : record.model;
+}
+
+// The same idea, for the task a record's own moment fell inside - a record whose session
+// never declared one, or whose moment predates every declaration, is its own group, never
+// dropped. Distinct from `NO_KNOWN_PROJECT` and `NO_KNOWN_MODEL` only in name: same
+// technique, so it can never collide with a real task identity (a string).
+const NO_KNOWN_TASK = Symbol("no known task");
+type TaskRowKey = TaskIdentity | typeof NO_KNOWN_TASK;
+
+/** Every session's own closed intervals, keyed by vendor id - built once from
+ * `buildTaskIntervals`'s own output, never a second notion of when a task was running.
+ * Unlike `declaredIntervalsForTask`, this keeps every task a session ever declared, not
+ * only one: `byTasks` groups by whichever task a record's moment falls in, not by
+ * membership in a single task asked for. */
+function allTaskIntervalsByVendorId(
+  journals: readonly CostReportSessionJournal[]
+): ReadonlyMap<string, readonly TaskInterval[]> {
+  const byVendorId = new Map<string, readonly TaskInterval[]>();
+  for (const journal of journals) {
+    if (journal.taskIntervals.length > 0) byVendorId.set(journal.vendorId, journal.taskIntervals);
+  }
+  return byVendorId;
+}
+
+/** Which task a record's own moment falls inside, among *all* of its session's declared
+ * intervals - `NO_KNOWN_TASK` for a record whose session never declared one, whose moment
+ * predates every declaration, or whose moment falls in none. Intervals within one session
+ * are closed and never overlap (`buildTaskIntervals`), so at most one ever matches - this
+ * never has to choose between two. */
+function declaredTaskKeyOf(
+  record: TelemetrySinkRecord,
+  intervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>
+): TaskRowKey {
+  const intervals = intervalsByVendorId.get(record.vendor_id);
+  if (!intervals) return NO_KNOWN_TASK;
+  const interval = intervals.find((candidate) =>
+    momentFallsWithin([candidate], record.event_timestamp)
+  );
+  if (!interval) return NO_KNOWN_TASK;
+  return taskIdentityFromWrittenPath(interval.path) ?? NO_KNOWN_TASK;
 }
 
 // A record with no identifier is its own row, keyed on a symbol the same way
@@ -785,6 +847,7 @@ interface Groups {
   readonly attributions: Map<StepAttributionSource, TotalsAccumulator>;
   readonly taskAttributions: Map<TaskAttributionSource, TotalsAccumulator>;
   readonly projects: Map<ProjectKey, TotalsAccumulator>;
+  readonly tasks: Map<TaskRowKey, TotalsAccumulator>;
   readonly people: Map<PersonRowKey, PersonGroup>;
   readonly days: Map<string, TotalsAccumulator>;
   activeTimeSeconds?: number;
@@ -802,6 +865,7 @@ function emptyGroups(fromDay: string, toDay: string): Groups {
     attributions: new Map(),
     taskAttributions: new Map(),
     projects: new Map(),
+    tasks: new Map(),
     people: new Map(),
     days,
   };
@@ -832,6 +896,7 @@ function accumulateRequestRecord(
   groups: Groups,
   record: TelemetrySinkRecord,
   membership: TaskMembership | null,
+  taskIntervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>,
   identity: PersonIdentity | null
 ): void {
   groups.totals.add(record);
@@ -840,6 +905,7 @@ function accumulateRequestRecord(
   accumulateInto(groups.tools, record.tool, record);
   accumulateInto(groups.models, modelKeyOf(record), record);
   accumulateInto(groups.projects, projectKeyOf(record), record);
+  accumulateInto(groups.tasks, declaredTaskKeyOf(record, taskIntervalsByVendorId), record);
   addToPersonGroup(groups.people, record, resolvePerson(identity, personRawIdOf(record)));
   const day = telemetrySinkRecordDayKey(record);
   if (day !== undefined && groups.days.has(day)) groups.days.get(day)?.add(record);
@@ -852,15 +918,17 @@ function accumulate(
   fromDay: string,
   toDay: string,
   membership: TaskMembership | null,
+  journals: readonly CostReportSessionJournal[],
   identity: PersonIdentity | null
 ): Groups {
   const groups = emptyGroups(fromDay, toDay);
+  const taskIntervalsByVendorId = allTaskIntervalsByVendorId(journals);
   for (const record of records) {
     if (record.kind === "session") {
       accumulateSessionRecord(groups, record);
       continue;
     }
-    accumulateRequestRecord(groups, record, membership, identity);
+    accumulateRequestRecord(groups, record, membership, taskIntervalsByVendorId, identity);
   }
   return groups;
 }
@@ -918,6 +986,27 @@ function projectRows(
     (row) => row.totals,
     (row) => row.project ?? ""
   );
+}
+
+/** Every task a record's own moment fell inside, largest first, with the row for what
+ * fell in no declared interval placed last regardless of its size - a reader sees tasks
+ * before the remainder, the same convention `personRows` gives its own `none` row. */
+function taskRows(tasks: ReadonlyMap<TaskRowKey, TotalsAccumulator>): readonly CostReportTaskRow[] {
+  const named: CostReportTaskRow[] = [];
+  let noTask: CostReportTaskRow | undefined;
+  for (const [key, accumulator] of tasks) {
+    if (key === NO_KNOWN_TASK) {
+      noTask = { totals: accumulator.build() };
+      continue;
+    }
+    named.push({ task: key, attribution: "declared", totals: accumulator.build() });
+  }
+  const sorted = bySize(
+    named,
+    (row) => row.totals,
+    (row) => row.task ?? ""
+  );
+  return noTask === undefined ? sorted : [...sorted, noTask];
 }
 
 /** Every day in the period, in order — never sorted by size, unlike every other breakdown
@@ -1030,6 +1119,27 @@ function readFields(
   };
 }
 
+/** Every `by*` breakdown together - pulled out on its own for the same reason
+ * `selectionFields` and `readFields` are: the object literal below reads as one shape,
+ * not a wall of field-by-field assignments. */
+function breakdownFields(
+  input: CostReportInput,
+  groups: Groups
+): Pick<
+  CostReport,
+  "bySteps" | "byModels" | "byTools" | "byProjects" | "byTasks" | "byDays" | "byPeople"
+> {
+  return {
+    bySteps: stepRows(groups.steps),
+    byModels: modelRows(groups.models),
+    byTools: toolRowsInScope(input, groups),
+    byProjects: projectRows(groups.projects),
+    byTasks: taskRows(groups.tasks),
+    byDays: dayRows(groups.days),
+    byPeople: personRows(groups.people),
+  };
+}
+
 function assembleCostReport(
   input: CostReportInput,
   inScope: readonly TelemetrySinkRecord[],
@@ -1046,12 +1156,7 @@ function assembleCostReport(
     ...(groups.activeTimeSeconds === undefined
       ? {}
       : { activeTimeSeconds: groups.activeTimeSeconds }),
-    bySteps: stepRows(groups.steps),
-    byModels: modelRows(groups.models),
-    byTools: toolRowsInScope(input, groups),
-    byProjects: projectRows(groups.projects),
-    byDays: dayRows(groups.days),
-    byPeople: personRows(groups.people),
+    ...breakdownFields(input, groups),
     attributionMix: attributionRows(groups.attributions),
     ...(membership === null
       ? {}
@@ -1268,7 +1373,14 @@ export function buildCostReport(input: CostReportInput): CostReport {
   const emptySelection = emptySelectionOf(stages, input, membership);
   const inScope = stages[stages.length - 1]?.records ?? [];
   const identity = input.identity ?? null;
-  const groups = accumulate(inScope, input.fromDay, input.toDay, membership, identity);
+  const groups = accumulate(
+    inScope,
+    input.fromDay,
+    input.toDay,
+    membership,
+    input.journals,
+    identity
+  );
 
   return assembleCostReport(input, inScope, groups, membership, emptySelection);
 }

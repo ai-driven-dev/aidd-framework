@@ -1,6 +1,6 @@
 ---
 name: 01-cost
-description: Answers what a period or one task consumed - a total, a day-by-day series, or a breakdown by step, model, tool, project or person - and hands back the artefact each question deserves. Use when the user asks what a piece of work cost, what changed, where the effort went, for which project, or who spent it. Not for turning measurement on.
+description: Answers what a period or one task consumed - a total, a day-by-day series, or a breakdown by step, model, task, tool, project or person - and hands back the artefact each question deserves. Use when the user asks what a piece of work cost, what changed, where the effort went, which task, for which project, or who spent it. Not for turning measurement on.
 argument-hint: task | period
 ---
 
@@ -35,6 +35,7 @@ menu and ask them to pick.
 | what did this cost, how much did it use | total | one total, in a line |
 | what changed, which day spiked | day | a series, one row per day |
 | where did it go, which step, model, tool or project took it | step, model, tool or project | a breakdown table |
+| which framework task, per ticket | task | one row per task declared in the period, plus the remainder with no task declared |
 | for a report, to paste, to send, to keep | any of the above | the same artefact, written to a file |
 | per person, who spent, which teammate | person | one row per resolved person plus every unresolved identity, each with the raw identities behind it |
 

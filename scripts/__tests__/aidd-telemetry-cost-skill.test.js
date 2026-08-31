@@ -148,8 +148,9 @@ test("every field the cost skill names by name resolves on the object the script
   // make this pass on an empty set of claims.
   // 13 -> 14 when the skill's own step 8 (03-report.md) named `measurement_enabled`, added
   // alongside the CLI envelope gaining that field (review.md, "one route, and every
-  // sentence about it true", findings 2 and 3).
-  assert.equal(claims.size, 14, "expected exactly fourteen field references in the cost skill");
+  // sentence about it true", findings 2 and 3). 14 -> 15 when 03-report.md named `by_task`,
+  // the new top-level breakdown added alongside the six-questions task axis.
+  assert.equal(claims.size, 15, "expected exactly fifteen field references in the cost skill");
 
   // Fields the envelope carries only under some condition, so a fixture cannot show them all
   // at once: the first five appear only under a selection, and `cost_micro_usd` only once a

@@ -8,6 +8,7 @@ import type {
   CostReportProjectRow,
   CostReportStepRow,
   CostReportTaskAttributionRow,
+  CostReportTaskRow,
   CostReportToolRow,
   CostTotals,
 } from "../../domain/models/cost-report.js";
@@ -27,7 +28,7 @@ export const ATTRIBUTION_LABELS: Record<StepAttributionSource, string> = {
   unattributed: "unattributed",
 };
 
-const TASK_ATTRIBUTION_LABELS: Record<TaskAttributionSource, string> = {
+export const TASK_ATTRIBUTION_LABELS: Record<TaskAttributionSource, string> = {
   declared: "declared by the flow",
   inferred: "inferred from a written file",
 };
@@ -51,6 +52,14 @@ const SESSION_TOTAL_LABEL = "session total, not requests";
 const LABEL_WIDTH = 26;
 const NO_KNOWN_PROJECT = "no known project";
 const NO_KNOWN_MODEL = "no known model";
+// Named for the record, never for the session: a session that declared two tasks back to
+// back still has a gap before its first declaration, and a record landing there is not
+// covered by any interval even though its own session's journal is not silent. Naming this
+// row "no task declared in this session's journal" would read as false exactly there - the
+// journal did declare, just not over this moment. A session that never declared anything at
+// all, and one whose declaration could not be read, both fall in here too - the same
+// absence (see `CostReportTaskRow`) - so the wording has to hold for all three at once.
+const NO_TASK_DECLARED = "no declared interval covers this record";
 
 // A year asked for by day is 365 rows - the envelope always carries every one of them, but
 // a terminal is not the place to read that many. Above this, the text rendering names the
@@ -322,6 +331,25 @@ function printProjects(
   }
 }
 
+/** One row per task a record's own moment fell inside, plus the row for what fell in no
+ * declared interval - always last, whatever its size, the same placement `byPeople` gives
+ * its own no-identifier row. Carries the attribution beside a named row for the same
+ * reason `printStepRows` does: a figure that rests on a closed interval says so next to
+ * the number, not only in a document elsewhere. */
+function printTasks(output: CLIOutput, rows: readonly CostReportTaskRow[], basis: Basis): void {
+  if (rows.length === 0) return;
+  output.print("");
+  output.print(`  by task    ${basis.label}`);
+  for (const row of rows) {
+    const name = row.task ?? NO_TASK_DECLARED;
+    const strength =
+      row.attribution === undefined ? "" : `    ${TASK_ATTRIBUTION_LABELS[row.attribution]}`;
+    output.print(
+      `    ${pad(name)}${shareOf(row.totals, basis.of, basis.useCost)}   ${figureFor(row.totals, basis.useCost)}${strength}`
+    );
+  }
+}
+
 /** Chronological, never sorted by size: a series read out of order is not a series. Above
  * `MAX_PRINTED_DAYS`, a person reads a count and where to get the rest - the envelope
  * still carries every day, since suppressing a row there would be the same false
@@ -402,6 +430,7 @@ function printBreakdowns(output: CLIOutput, report: CostReport): void {
   printStepsAndAttribution(output, report, basis);
   printModels(output, report, basis);
   printProjects(output, report.byProjects, basis);
+  printTasks(output, report.byTasks, basis);
   output.print("");
   output.print("  by tool");
   printToolRows(output, report.byTools, report);

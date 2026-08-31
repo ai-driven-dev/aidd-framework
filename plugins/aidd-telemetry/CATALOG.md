@@ -48,7 +48,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `actions` | [01-locate.md](skills/01-cost/actions/01-locate.md) | - |
 | `actions` | [02-collect.md](skills/01-cost/actions/02-collect.md) | - |
 | `actions` | [03-report.md](skills/01-cost/actions/03-report.md) | - |
-| `-` | [SKILL.md](skills/01-cost/SKILL.md) | `Answers what a period or one task consumed - a total, a day-by-day series, or a breakdown by step, model, tool, project or person - and hands back the artefact each question deserves. Use when the user asks what a piece of work cost, what changed, where the effort went, for which project, or who spent it. Not for turning measurement on.` |
+| `-` | [SKILL.md](skills/01-cost/SKILL.md) | `Answers what a period or one task consumed - a total, a day-by-day series, or a breakdown by step, model, task, tool, project or person - and hands back the artefact each question deserves. Use when the user asks what a piece of work cost, what changed, where the effort went, which task, for which project, or who spent it. Not for turning measurement on.` |
 
 #### `skills/02-check`
 

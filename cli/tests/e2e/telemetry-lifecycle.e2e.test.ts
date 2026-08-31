@@ -260,6 +260,6 @@ describe("measurement, from nothing to off and back", () => {
     const { measurement_enabled: _before, ...historicalFigures } = envelope;
     const { measurement_enabled: _after, ...historicalFiguresAfterOff } = afterOff;
     expect(historicalFiguresAfterOff).toEqual(historicalFigures);
-    expect(envelope.cost_report_version).toBe(4);
+    expect(envelope.cost_report_version).toBe(5);
   }, 60_000);
 });

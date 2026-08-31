@@ -51,17 +51,19 @@ error.
 
 **"Axis" above means a breakdown, not a flag.** Every `by_*` array is always present in
 the `--json` object, whatever filters were given — grouping by any of the six dimensions
-needs no separate flag; reading the matching array is the axis. `by_person` is a seventh
-axis with no matching filter flag at all — see **`by_person`** below — grouping by who ran
-the work, never a way to keep only one person's records. `aidd telemetry report` also
-takes `--axis <name>` (`total`, `day`, `step`, `model`, `tool`, `project` or `person`),
+needs no separate flag; reading the matching array is the axis. `by_task` groups by the
+same declared intervals `--task` filters on, never by a session's whole-session
+written-file inference — see **`by_task`** below. `by_person` is a seventh axis with no
+matching filter flag at all — see **`by_person`** below — grouping by who ran the work,
+never a way to keep only one person's records. `aidd telemetry report` also takes
+`--axis <name>` (`total`, `day`, `step`, `model`, `task`, `tool`, `project` or `person`),
 which picks one of those arrays and renders it alone as a small pasteable artefact instead
 of the whole object — a convenience for copying one figure out, not a second way to group.
 Every figure `--axis` can show is already in the plain `--json` object; only the
-one-artefact-at-a-time rendering is what it adds. A name outside the seven is a usage error
+one-artefact-at-a-time rendering is what it adds. A name outside the eight is a usage error
 naming the valid list (`Error: Unknown axis 'bogus'. Expected one of: total, day, step,
-model, tool, project, person.`, exit `1`), not a silently empty artefact. Given both flags
-at once, `--json` wins and `--axis` is ignored, never the reverse.
+model, task, tool, project, person.`, exit `1`), not a silently empty artefact. Given both
+flags at once, `--json` wins and `--axis` is ignored, never the reverse.
 
 **A filter matching nothing names itself**, in `empty_selection`, rather than the object
 quietly reporting the same shape a genuinely idle period would:
@@ -120,7 +122,12 @@ real count is the ordinary case of reporting from a project whose switch never c
 work, never a contradiction (see "Attributing records to a task" for the same scope split
 elsewhere in this object).
 
-Every object carries `cost_report_version`, currently `4` — bumped from `3` when `by_person`
+Every object carries `cost_report_version`, currently `5` — bumped from `4` when `by_task`
+joined the top-level breakdowns (a consumer summing every breakdown's `requests` against
+`totals.requests` now has a fifth breakdown to include). `by_task` groups by the same
+closed, declared intervals the pre-existing `--task` filter already reads — never a
+second notion of when a task was running — and is unrelated to `task_attribution`, which
+still exists only alongside a `--task` filter. Bumped from `3` to `4` when `by_person`
 joined the top-level breakdowns and `read` gained `identity_unusable` (a consumer
 summing every breakdown's `requests` against `totals.requests` now has a fourth breakdown to
 include). `identity_unusable` was reshaped from a boolean into a named cause, and the field
@@ -139,7 +146,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
 
 ```jsonc
 {
-  "cost_report_version": 4,
+  "cost_report_version": 5,
   "period": { "from_day": "2026-07-01", "to_day": "2026-07-31" },
   "measurement_enabled": true,                  // this project's own switch, right now — see Versioning
   "task": "2026_08/2026_08_21_cost-reporter",   // absent unless --task was given
@@ -152,6 +159,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "by_model":   [{ "model": "gpt-5.6-sol", "totals": {} }],  // a row with no "model" names none known
   "by_tool":    [{ "tool": "codex", "coverage": "covered", "reason": "…", "capability": {}, "totals": {}, "session_totals": {} }],  // session_totals absent unless the tool has one (Copilot, today)
   "by_project": [{ "project": "acme/widgets", "totals": {} }],   // a row with no `project` names none known
+  "by_task":    [{ "task": "2026_08/2026_08_21_cost-reporter", "attribution": "declared", "totals": {} }],  // a row with no `task` names no declared interval; `attribution` absent there too
   "by_day":     [{ "day": "2026-07-01", "totals": {} }],         // every day in the period, in order, gaps included
   "by_person":  [{ "resolution": "mapped", "person": "a-person-id", "identities": ["a-person-id", "a-machine-id"], "totals": {} }],  // mapped rows first, then every unplaced identity, then the one row for records carrying none
   "attribution": [{ "attribution": "tool-stated", "totals": {} }],
@@ -184,13 +192,15 @@ them into money live outside this repository.
 
 ### Breakdowns
 
-`by_step`, `by_model`, `by_tool` and `by_project` are ordered largest first, with a stable
-tie-break, so the biggest thing is the first thing you read. Ordered by `cost_micro_usd`
-where a row has one, and by all four token counters summed where it does not — never by
-`input_tokens` and `output_tokens` alone, which every tool here dwarfs with cache. `by_day`
-is the one exception: it is chronological, one row per day the period spans — a series read
-out of order is not a series, and a day nothing ran on is a row of zeros rather than an
-omitted day.
+`by_step`, `by_model`, `by_tool`, `by_project` and `by_task` are ordered largest first, with
+a stable tie-break, so the biggest thing is the first thing you read. Ordered by
+`cost_micro_usd` where a row has one, and by all four token counters summed where it does
+not — never by `input_tokens` and `output_tokens` alone, which every tool here dwarfs with
+cache. `by_task` places its row for what fell in no declared interval last regardless of
+size, the same convention `by_person` gives its own no-identifier row — a reader sees
+tasks before the remainder. `by_day` is the one exception: it is chronological, one row per
+day the period spans — a series read out of order is not a series, and a day nothing ran on
+is a row of zeros rather than an omitted day.
 
 **Every breakdown sums exactly back to `totals`.** That is asserted, on integers, not
 hoped for.
@@ -208,6 +218,38 @@ project at all - never its own row.
 `by_model` carries a row with no `model` the same way: both the Codex and OpenCode readers
 permit a request with no model, and that record gets its own row rather than vanishing from
 the breakdown while staying in `totals`.
+
+### `by_task` — grouped by the closed interval a record falls in, never by a written file
+
+`by_task` groups by exactly the same declared intervals `--task` already filters on (see
+"Attributing records to a task"), and by nothing else: a record's own moment either falls
+inside one session's closed interval, or it does not. It never consults a written path the
+way the `--task` filter's own "inferred" route does, because that route decides for a whole
+session at once and could place one session's records under two task rows at
+once — the opposite of what a breakdown promises. A record's session is closed, sequential
+intervals never overlap (see "Attributing records to a task"), so at most one interval
+ever matches, and a record lands in exactly one row.
+
+`attribution` is present, and always `"declared"`, on every row that carries a `task` —
+travelling with the row rather than assumed, so a consumer never has to know which route a
+breakdown reads. The row for what fell in no declared interval — before the first
+declaration, or in a session that never declared one — carries neither `task` nor
+`attribution`. **It is one row, never two**: the run journal records a `task_declared` line
+or it does not, and a session whose declaration could not be read produces the exact same
+absence a session that never declared one does — there is no signal in the journal that
+would tell those two apart, so this row is never split by a cause it cannot observe. Where
+that possibility matters, `read.unreadable_lines` already carries it, for this row as for
+the whole object.
+
+`by_task` sums to `totals.requests` exactly like every other breakdown.
+
+**Alongside a `--task` filter, the no-declared-interval row can still appear, and is not a
+contradiction of the header naming that task.** `--task` also keeps a session's records
+through its own "inferred" route - the whole-session written-file fallback - for a record
+no declared interval covers. `by_task` does not read that route at all, so that same
+record lands in the row with no `task`. Read the row as it is named: no *declared interval*
+covers this record, not "this session never touched a task." Cross-check against
+`task_attribution`'s own `declared`/`inferred` split when the distinction matters.
 
 ### `by_person` — three outcomes, never a merge
 
