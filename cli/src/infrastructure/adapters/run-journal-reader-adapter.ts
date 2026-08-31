@@ -1,5 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { DOCS_DIR, RUNS_SUBDIR } from "../../domain/models/paths.js";
 import type {
   RunJournal,
   RunJournalBoundary,
@@ -180,13 +181,20 @@ function classifyLine(collector: JournalCollector, parsed: RawJournalLine): void
 export class RunJournalReaderAdapter implements RunJournalReader {
   constructor(private readonly projectRoot: string) {}
 
+  // A getter over `resolveRunsDir()`, never a separate computation: `forget-telemetry-
+  // use-case.ts` shows this same string to a person before ever asking `listRunFiles()`
+  // what is inside it, and the two must never be able to name different directories.
+  get runsDir(): string {
+    return this.resolveRunsDir();
+  }
+
   async read(sessionId: string): Promise<RunJournal | null> {
-    const filePath = await this.findRunFile(this.runsDir(), sessionId);
+    const filePath = await this.findRunFile(this.resolveRunsDir(), sessionId);
     return filePath ? this.readJournal(filePath) : null;
   }
 
   async list(): Promise<readonly RunJournal[]> {
-    const dir = this.runsDir();
+    const dir = this.resolveRunsDir();
     let entries: string[];
     try {
       entries = await readdir(dir);
@@ -202,8 +210,17 @@ export class RunJournalReaderAdapter implements RunJournalReader {
     return journals;
   }
 
-  private runsDir(): string {
-    return process.env.AIDD_RUNS_DIR || join(this.projectRoot, "aidd_docs", "runs");
+  async listRunFiles(): Promise<readonly string[]> {
+    try {
+      const entries = await readdir(this.resolveRunsDir());
+      return entries.filter((entry) => entry.endsWith(RUN_FILE_EXTENSION)).sort();
+    } catch {
+      return [];
+    }
+  }
+
+  private resolveRunsDir(): string {
+    return process.env.AIDD_RUNS_DIR || join(this.projectRoot, DOCS_DIR, RUNS_SUBDIR);
   }
 
   private async findRunFile(dir: string, sessionId: string): Promise<string | null> {

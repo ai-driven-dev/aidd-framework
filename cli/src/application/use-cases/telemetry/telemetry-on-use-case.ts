@@ -1,4 +1,4 @@
-import { DOCS_DIR } from "../../../domain/models/paths.js";
+import { RUNS_ENTRY } from "../../../domain/models/paths.js";
 import {
   buildTelemetrySwitchFile,
   parseTelemetrySwitchFile,
@@ -24,8 +24,6 @@ export interface TelemetryOnResult {
   readonly switchPath: string;
   readonly switchChanged: boolean;
 }
-
-const RUNS_ENTRY = `${DOCS_DIR}/runs/`;
 
 /** Owns the AIDD telemetry switch alone: flips `.aidd/config.json`'s `telemetry.enabled`
  * and git-ignores the run journal. Never touches a tool's own settings file — arming a

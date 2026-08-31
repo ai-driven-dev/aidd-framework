@@ -91,6 +91,11 @@ export interface RunJournal {
  * all yields the same figures it would without this port existing.
  */
 export interface RunJournalReader {
+  /** Where this project's run journal lives — the same directory `read`/`list` and
+   * `listRunFiles` resolve, exposed so a caller that only needs to name the location
+   * (never open a file in it) has one place to ask, rather than re-deriving the same
+   * `AIDD_RUNS_DIR`-aware resolution itself. */
+  readonly runsDir: string;
   read(sessionId: string): Promise<RunJournal | null>;
   /** Every session the journal holds, for a caller that has no identifier to ask about —
    * a report covers a stretch of time, and the sessions inside it are what it is looking
@@ -98,4 +103,11 @@ export interface RunJournalReader {
    * run file's name carries no date. Never throws, for the same reason `read` does not; a
    * missing or unreadable runs directory answers an empty list. */
   list(): Promise<readonly RunJournal[]>;
+  /** Every run file's own name, directly from the directory — never opened, never
+   * parsed. Distinct from `list()`, which reads and can silently drop a file it cannot
+   * parse: a caller counting what removing this journal would touch needs a name a
+   * damaged file still has, not a count that only survives files still readable. Never
+   * throws; a missing or unreadable runs directory answers an empty list, the same
+   * failure direction as `list()`. */
+  listRunFiles(): Promise<readonly string[]>;
 }
