@@ -192,3 +192,47 @@ of whether the journal writes for it today:
   workspace can list several, not all of them git repositories) — `lib/repo.cjs`'s
   `readCwd`/`CWD_READER_BY_HOST` resolves the first entry that actually is one, the same way
   `lib/record.cjs`'s `readSessionId` resolves Cursor's differently-spelled session id.
+
+## OpenCode's two plugin events
+
+`opencode-session-idle.json` and `opencode-session-created.json` are not hook payloads —
+OpenCode's plugin surface hands `hooks/opencode-plugin.js` a JS event object in-process,
+never a stdin JSON payload the way every other host's hook does. The two carry different
+weight.
+
+- **`opencode-session-idle.json`** is a real, live capture: `opencode 1.14.20` running
+  `opencode run` (`opencode/big-pickle`), 2026-08-31. `sessionID` is the only field the
+  event carries, matching `@opencode-ai/sdk`'s own `EventSessionIdle` type exactly — it
+  names the session, and nothing about where it ran. Synthesised: `sessionID`'s value only.
+- **`opencode-session-created.json`** is *not* a delivery capture, and this entry is
+  the only place that gap is stated for it as bluntly as it needs to be: **`session.created`
+  was never observed reaching the plugin's own `event` hook.** One live `opencode 1.14.20`
+  run (`opencode run`, `opencode/big-pickle`, 2026-08-31, started with `--print-logs`) is the
+  measurement this rests on: the plugin's `event` hook demonstrably fired for roughly 38
+  events of other types in that run (`session.updated`, `session.status`, `message.updated`
+  and others, written to a real `captured-events.jsonl`), the run's own log shows
+  `service=plugin path=…capture.js loading` followed later by
+  `service=bus type=session.created publishing`, and `session.created` never appears among
+  the captured events despite that publish line. That is the discriminating run - it is the
+  only one with debug logging turned on, so it is the only one that can distinguish
+  "never published" from "published but not delivered."
+
+  Two further attempts neither confirm nor refute it, and are named here only so the count
+  is not inflated: a second `opencode run` without `--print-logs` also captured no
+  `session.created`, but with no log to show whether one was ever published, so it adds
+  nothing beyond the first; a bare `POST /session` API call captured zero plugin events of
+  any type in that run, so it says nothing about `session.created` specifically. This is not
+  a new defect - the plugin README already named it (`README.md`, "OpenCode misses a server
+  process's first session, and `opencode run` is always a first session") - this capture is
+  the first evidence behind that sentence rather than a doc comment asserting it.
+
+  The fixture's shape rests on two things that *are* verified: `@opencode-ai/sdk@` (the
+  version opencode 1.14.20 ships) declares `EventSessionCreated` as
+  `{ type: "session.created", properties: { info: Session } }` - byte-identical to
+  `EventSessionUpdated`'s own declared shape - and a `session.updated` event *was* captured
+  live in the same run, carrying a real `info` object with this exact key set (`id`, `slug`,
+  `projectID`, `directory`, `title`, `version`, `permission`, `time.created`,
+  `time.updated`). The fixture is that real `info` shape, re-wrapped under the type the SDK
+  declares for creation. Every value in it is synthesised. Treat it as a shape derived from
+  a verified type declaration plus a genuine sibling capture, not as a recording of
+  `session.created` actually arriving - because it never did.

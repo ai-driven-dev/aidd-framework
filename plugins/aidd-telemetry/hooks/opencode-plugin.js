@@ -14,12 +14,13 @@
 // while a genuine ESM sibling imports fine. So this file spawns `journal.js` as the child
 // process every other host's own hook already runs, over the same stdin-JSON contract, naming
 // itself so `detectHost` (lib/host.js) recognises it without guessing at a fifth vendor shape.
-// See measurements.md, phase 5, for both captures.
+// See scripts/__tests__/fixtures/opencode-session-idle.json and its README entry for the
+// captured evidence behind this shape.
 //
-// A third gap, found only by running a real session (phase 7): `node <a file:// URL>` is
-// not a valid invocation - Node's CLI treats the string as a module specifier and resolves
-// it relative to its own cwd, not as an absolute script path, so the spawned process died
-// with MODULE_NOT_FOUND every time and journal.js never ran. fileURLToPath fixes it.
+// A third gap, found only by running a real session: `node <a file:// URL>` is not a valid
+// invocation - Node's CLI treats the string as a module specifier and resolves it relative
+// to its own cwd, not as an absolute script path, so the spawned process died with
+// MODULE_NOT_FOUND every time and journal.js never ran. fileURLToPath fixes it.
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -40,19 +41,42 @@ function runJournal(event, payload) {
 // this plugin instance's own init-time directory, fixed once - is not a safe stand-in: a
 // turn-end written to the wrong project's journal finds no run file and silently no-ops.
 // Cached per session id instead, from the one event that actually carries it.
+//
+// `session.created` was never observed reaching this hook in a live `opencode 1.14.20`
+// measurement (2026-08-31) that discriminates "never published" from "published but not
+// delivered" - see the fixtures' own README entry for that run's log and two further
+// attempts that could not distinguish the two.
+//
+// Every `opencode run` invocation is a first session, so this cache stays empty for it in
+// practice today, and `session.idle` falls back to `input.directory` below - this plugin's
+// own init-time directory, which happens to be correct for the single-directory case
+// `opencode run` is. The plugin README already named this limit
+// ("OpenCode misses a server process's first session"); this comment is the same fact,
+// now anchored to a measurement rather than left as an assertion.
 const directoryBySessionId = new Map();
+
+/** One OpenCode event in, the journal call it produces out - or `null` for an event this
+ * plugin does not act on. Pure but for the one map mutation `session.created` makes on
+ * its way through: kept separate from `runJournal`'s spawn so a captured event can be
+ * asserted against without running node as a child process. */
+export function journalCallFor(event, sessionDirectories, fallbackDirectory) {
+  if (event.type === "session.created") {
+    const sessionId = event.properties.info.id;
+    const cwd = event.properties.info.directory;
+    sessionDirectories.set(sessionId, cwd);
+    return { script: "session-start", payload: { tool: "opencode", session_id: sessionId, cwd } };
+  }
+  if (event.type === "session.idle") {
+    const sessionId = event.properties.sessionID;
+    const cwd = sessionDirectories.get(sessionId) ?? fallbackDirectory;
+    return { script: "turn-end", payload: { tool: "opencode", session_id: sessionId, cwd } };
+  }
+  return null;
+}
 
 export const AiddTelemetry = async (input) => ({
   event: async ({ event }) => {
-    if (event.type === "session.created") {
-      const sessionId = event.properties.info.id;
-      const cwd = event.properties.info.directory;
-      directoryBySessionId.set(sessionId, cwd);
-      runJournal("session-start", { tool: "opencode", session_id: sessionId, cwd });
-    } else if (event.type === "session.idle") {
-      const sessionId = event.properties.sessionID;
-      const cwd = directoryBySessionId.get(sessionId) ?? input.directory;
-      runJournal("turn-end", { tool: "opencode", session_id: sessionId, cwd });
-    }
+    const call = journalCallFor(event, directoryBySessionId, input.directory);
+    if (call) runJournal(call.script, call.payload);
   },
 });

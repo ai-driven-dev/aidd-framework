@@ -122,6 +122,13 @@ tokens; turning tokens into money is a separate service's job.
   never sees the prompt — so a Codex session journals nothing until someone approves once,
   in an interactive session, and says nothing while it does not.
 - **OpenCode misses a server process's first session**, and `opencode run` is always a first
+  session. Measured, not asserted: one live `opencode 1.14.20` run (2026-08-31, started with
+  `--print-logs`) shows the plugin's own event hook firing for roughly 38 events of other
+  types, and its debug log shows `session.created` genuinely published on the bus after the
+  plugin loaded — yet it never reached the hook. Two further runs neither confirm nor refute
+  this: one without debug logging, one that captured no plugin events at all — see
+  `scripts/__tests__/fixtures/README.md`, "OpenCode's two plugin events" for exactly what
+  each run shows. `session.idle` (the turn-end signal) is unaffected and reaches every
   session.
 - **Only Claude Code names the ticket.** The others report by period and by step, never by
   task, because nothing they write carries one.
