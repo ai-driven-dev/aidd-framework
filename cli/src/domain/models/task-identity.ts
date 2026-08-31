@@ -27,11 +27,14 @@ export type TaskIdentity = string;
  * this answers what a path says, not what is on disk.
  *
  * The path must be repository-relative and `/`-separated, which is what the journal writes
- * on every platform. An absolute path, or one that climbs out with `..`, belongs to no
- * task: both would have been rejected before the line was ever written.
+ * on every platform. One that climbs out with a literal `..` *segment* belongs to no task.
+ * That is a segment check, not a substring one: `file-writes.cjs`'s own gate for a written
+ * path, and `task-declared.cjs`'s pattern for a declared one, both allow `..` to appear
+ * inside a folder or file name (`2026_02_10_a..b` is a name, not a climb) — only a path
+ * segment that is exactly `..` climbs anything, and only that shape is rejected here.
  */
 export function taskIdentityFromWrittenPath(writtenPath: string): TaskIdentity | null {
-  if (writtenPath.includes("..")) return null;
+  if (writtenPath.split("/").includes("..")) return null;
   const match = TASK_FOLDER_PATTERN.exec(writtenPath) ?? TASK_FILE_PATTERN.exec(writtenPath);
   if (!match) return null;
   const [, month, name] = match;

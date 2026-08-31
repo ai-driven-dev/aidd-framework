@@ -221,6 +221,6 @@ describe("aidd telemetry report — a task declared while the work is still goin
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("before the next task this session declares");
     expect(result.stdout).toContain("the journal falls silent before this record");
-    expect(result.stdout).toContain("no task was ever declared in this session");
+    expect(result.stdout).toContain("no usable task declaration in this session");
   });
 });

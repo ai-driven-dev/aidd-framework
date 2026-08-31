@@ -75,15 +75,28 @@ function declaredTools(): readonly CostReportToolDeclaration[] {
   });
 }
 
-function toSessionJournal(journal: RunJournal): CostReportSessionJournal | null {
+function toSessionJournal(
+  journal: RunJournal,
+  periodEndMs: number
+): CostReportSessionJournal | null {
   if (!journal.session) return null;
   return {
     vendorId: journal.session.vendor_id,
     tool: journal.session.tool,
     ...(journal.session.project_id === undefined ? {} : { projectId: journal.session.project_id }),
     writtenPaths: journal.filesWritten.map((written) => written.path),
-    taskIntervals: buildTaskIntervals(journal),
+    taskIntervals: buildTaskIntervals(journal, periodEndMs),
   };
+}
+
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/** The first moment no record `readRecordsInPeriod` could ever return can fall on or after -
+ * `toDay` itself runs through 23:59:59.999 UTC, so this is the *start* of the day after.
+ * `buildTaskIntervals` clamps an unclosed interval's end here rather than at `toDay`'s own
+ * start, which would wrongly cut off a record legitimately timestamped later on `toDay`. */
+function periodEndMsOf(toDay: string): number {
+  return Date.parse(`${toDay}T00:00:00Z`) + MILLISECONDS_PER_DAY;
 }
 
 interface PersonIdentityFields {
@@ -143,11 +156,14 @@ function toReportInput(
   measurementEnabled: boolean
 ): CostReportInput {
   const { fromDay, toDay } = options.period;
+  const periodEndMs = periodEndMsOf(toDay);
   return {
     fromDay,
     toDay,
     records: read.records,
-    journals: journals.map(toSessionJournal).filter((journal) => journal !== null),
+    journals: journals
+      .map((journal) => toSessionJournal(journal, periodEndMs))
+      .filter((journal) => journal !== null),
     declaredTools: declaredTools(),
     undatedRecords: read.undated.length,
     unreadableLines: read.skippedLines,

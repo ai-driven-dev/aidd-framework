@@ -40,7 +40,7 @@ export const TASK_ATTRIBUTION_LABELS: Record<TaskAttributionSource, string> = {
  * person reads it - never one label standing in for all three, which is the fault this
  * breakdown exists to avoid (see `CostReportTaskRow`). */
 export const TASK_UNATTRIBUTED_LABELS: Record<TaskUnattributedReason, string> = {
-  "no-declaration": "no task was ever declared in this session",
+  "no-declaration": "no usable task declaration in this session",
   "precedes-declaration": "before the next task this session declares",
   "journal-silent": "the journal falls silent before this record",
 };

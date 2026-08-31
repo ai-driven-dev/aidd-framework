@@ -221,6 +221,41 @@ describe("buildCostReport — by_task groups by the declared interval a record f
     expect(sumOf(built.byTasks).requests).toBe(built.totals.requests);
   });
 
+  it("resolves a declared interval whose path merely contains '..' as text, never misreading live coverage as journal-silent", () => {
+    // The hook's own gate for a declared path (task-declared.cjs) allows "..' inside a
+    // folder name - "2026_02_10_a..b" is a name, not a climb - and used to be rejected by
+    // a blanket substring check here, which then fell through to `journal-silent` for a
+    // record squarely inside the declared, still-open interval. That is a false claim
+    // about the journal's own timing, not about the path.
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-dotted-name",
+        tool: "codex",
+        writtenPaths: [],
+        taskIntervals: [
+          {
+            path: "aidd_docs/tasks/2026_02/2026_02_10_a..b/spec.md",
+            startMs: Date.parse("2026-02-10T09:10:00Z"),
+            endMs: Date.parse("2026-02-10T09:40:00Z"),
+          },
+        ],
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({
+        vendor_id: "s-dotted-name",
+        cost_usd: 2,
+        event_timestamp: "2026-02-10T09:20:00Z",
+      }),
+    ];
+
+    const built = report({ records, journals });
+
+    expect(built.byTasks).toHaveLength(1);
+    expect(built.byTasks[0]?.task).toBe("2026_02/2026_02_10_a..b");
+    expect(built.byTasks[0]?.reason).toBeUndefined();
+  });
+
   it("answers all six questions over one period, each reconciling to the same total", () => {
     const built = report({ records: RECORDS, journals: JOURNALS });
     const expected = { requests: built.totals.requests, costMicroUsd: built.totals.costMicroUsd };

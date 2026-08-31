@@ -65,7 +65,7 @@ else.
 
 | Task | Share | Tokens | Attribution |
 | --- | --- | --- | --- |
-| <task, or the reason it fell in none: "no task was ever declared in this session" \| "before the next task this session declares" \| "the journal falls silent before this record"> | <n>% | <tokens> | <declared by the flow \| —> |
+| <task, or the reason it fell in none: "no usable task declaration in this session" \| "before the next task this session declares" \| "the journal falls silent before this record"> | <n>% | <tokens> | <declared by the flow \| —> |
 
 <one line per limit that applies, or nothing>
 ```

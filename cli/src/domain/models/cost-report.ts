@@ -153,8 +153,8 @@ export interface CostReportProjectRow {
  *
  * A record that fell in no declared interval carries `reason` instead of `task` -
  * `TaskUnattributedReason` names which of three distinct facts applies, never one label
- * standing in for all three: no task was ever declared in that record's session; a task was
- * declared but this record precedes it (whether every declaration, or the gap a `turn_end`
+ * standing in for all three: no usable task declaration exists in that record's session; a
+ * task was declared but this record precedes it (whether every declaration, or the gap a `turn_end`
  * leaves before the next one); or a task was declared and the journal's own declared
  * coverage runs out before this record's moment. Never for a written file this breakdown
  * does not consult, and never split from a declaration the journal simply could not read:
@@ -536,11 +536,18 @@ function allTaskIntervalsByVendorId(
 /** Which task a record's own moment falls inside, among *all* of its session's declared
  * intervals - `taskUnattributedReason` for a record whose moment falls in none. Intervals
  * within one session are closed and never overlap (`buildTaskIntervals`), so at most one
- * ever matches - this never has to choose between two. A `task_declared` line is only ever
- * written for a path the hook already matched against this same folder pattern (see
- * `task-identity.ts`), so `interval.path` failing to parse here is a defensive branch this
- * layer has no evidence ever fires - reading it the same as no interval covering the moment
- * at all keeps the fallback honest rather than inventing a fourth reason for it. */
+ * ever matches - this never has to choose between two.
+ *
+ * `interval.path` failing to resolve here is unreachable for every interval this codebase's
+ * own wiring ever produces, not merely untested: `buildTaskIntervals` already refuses to
+ * emit a `TaskInterval` for a declared path `taskIdentityFromWrittenPath` cannot turn into
+ * an identity (a literal `..` path segment, say). It is not unreachable in the type this
+ * function actually takes - `CostReportSessionJournal.taskIntervals` is a plain input
+ * field, so a caller (a test, most concretely) can still hand this a `TaskInterval` literal
+ * whose `path` resolves to nothing, which is exactly why the fallback stays rather than
+ * being deleted as dead code. Reading such a moment the same as no interval covering it at
+ * all is deliberate, not an invented fourth reason: a path this layer cannot turn into an
+ * identity names no task a person could act on by name either. */
 function declaredTaskKeyOf(
   record: TelemetrySinkRecord,
   intervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>

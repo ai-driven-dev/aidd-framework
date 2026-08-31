@@ -86,6 +86,40 @@ describe("task-attribution — pure: journal lines -> bounded intervals", () => 
     expect(buildTaskIntervals(journalOf([], [TURN_END]))).toEqual([]);
   });
 
+  it("drops a task_declared line whose own `at` this reader cannot parse, the same as one that was never written", () => {
+    // A real line on disk, an `at` `timed()` cannot place in time - this session yields no
+    // usable interval, and `taskUnattributedReason` folds it into "no-declaration" beside a
+    // session that truly never declared, since neither can tell the two apart. The label
+    // that reason prints says "no *usable* declaration", never "none was ever declared",
+    // exactly because this case exists.
+    const unparseable = {
+      type: "task_declared",
+      at: "not-a-real-timestamp",
+      path: WANTED.path,
+    } as const;
+
+    expect(buildTaskIntervals(journalOf([unparseable], [TURN_END]))).toEqual([]);
+  });
+
+  it("emits no interval for a declared path this reader cannot turn into an identity, but still lets it close the interval before it", () => {
+    // `task-declared.cjs`'s own gate is a scan over free-form tool-call text, looser than
+    // `taskIdentityFromWrittenPath` - a literal `..` path segment passes the hook and still
+    // names no task. Dropping the line from `closers` entirely (rather than only from the
+    // intervals it would otherwise produce) would let WANTED's own interval run past the
+    // moment the climbing line was actually declared - silently widening it.
+    const climbing = {
+      type: "task_declared",
+      at: "2026-08-17T10:10:00Z",
+      path: "aidd_docs/tasks/2026_08/../../etc/passwd",
+    } as const;
+
+    const intervals = buildTaskIntervals(journalOf([WANTED, climbing], [TURN_END]));
+
+    expect(intervals).toEqual([
+      { path: WANTED.path, startMs: Date.parse(WANTED.at), endMs: Date.parse(climbing.at) },
+    ]);
+  });
+
   it("reads a moment inside the interval as covered, and one outside as not", () => {
     const intervals = buildTaskIntervals(journalOf([WANTED], [TURN_END]));
 
@@ -153,6 +187,39 @@ describe("task-attribution — pure: journal lines -> bounded intervals", () => 
     // Long after the last thing the journal witnessed - never attributed, whatever silence
     // followed the write.
     expect(momentFallsWithin(intervals, "2026-08-20T00:00:00Z")).toBe(false);
+  });
+
+  it("clamps an unclosed interval's end to the report's own period end, never past it", () => {
+    // A clock-skewed or damaged `file_written` line dated far in the future still parses -
+    // `timed()` only refuses a moment it cannot parse at all - and used to widen an
+    // unclosed interval's end to it unbounded, attributing anything the period could ever
+    // report. No record this reader is ever asked to place can fall past the period's own
+    // end, so capping there costs nothing real and closes the hole entirely.
+    const farFuture = {
+      type: "file_written",
+      at: "9999-12-31T00:00:00Z",
+      path: "x.md",
+    } as const;
+    const periodEndMs = Date.parse("2026-08-18T00:00:00Z");
+
+    const intervals = buildTaskIntervals(journalOf([WANTED], [], [farFuture]), periodEndMs);
+
+    expect(intervals).toEqual([
+      { path: WANTED.path, startMs: Date.parse(WANTED.at), endMs: periodEndMs },
+    ]);
+    expect(momentFallsWithin(intervals, "2040-01-01T00:00:00Z")).toBe(false);
+  });
+
+  it("leaves an unclosed interval's end exactly where a real closer put it, when that is well inside the period", () => {
+    // The clamp must never pull a legitimate end earlier - only a witnessed moment beyond
+    // the period end is capped.
+    const periodEndMs = Date.parse("2026-08-20T00:00:00Z");
+
+    const intervals = buildTaskIntervals(journalOf([WANTED], [TURN_END]), periodEndMs);
+
+    expect(intervals).toEqual([
+      { path: WANTED.path, startMs: Date.parse(WANTED.at), endMs: Date.parse(TURN_END.at) },
+    ]);
   });
 });
 

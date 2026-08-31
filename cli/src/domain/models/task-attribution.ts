@@ -5,6 +5,7 @@ import type {
   RunJournalTaskDeclared,
   RunJournalTurnEnd,
 } from "../ports/run-journal-reader.js";
+import { taskIdentityFromWrittenPath } from "./task-identity.js";
 
 /** How a record's task came to be known. A declaration is a flow telling the journal which
  * ticket it is on; an inference is this layer noticing a written file on its own - the same
@@ -60,15 +61,49 @@ function timed<T extends { readonly at: string }>(
  * witnessed, not at "still running" read as "forever" - no tool exposes when a flow leaves a
  * ticket, so a boundless interval would go on attributing a long-running session's every
  * later record to the first ticket it ever named.
+ *
+ * `timed()` only refuses a moment it cannot parse at all - it does not refuse one that
+ * parses but is absurd, so a `file_written` line dated by clock skew or a damaged clock (say
+ * `9999-12-31`) still counts as a witnessed moment and can widen `lastMs` to it. `periodEndMs`
+ * exists to close that hole without a second, weaker notion of "too far in the future": no
+ * record this reader could ever be asked to place falls past the report's own period end (the
+ * sink itself never returns one), so capping the unclosed end there costs nothing a real
+ * record could have used and removes everything a clock-skewed one could have won.
+ *
+ * A `task_declared` line whose `path` `taskIdentityFromWrittenPath` cannot turn into an
+ * identity - a literal `..` path segment, say - still takes its place among `closers`: it
+ * still closes whatever interval came before it, at its own moment, exactly like any other
+ * declaration. It simply produces no `TaskInterval` of its own. The alternative - dropping
+ * such a line from `closers` entirely - would let the *previous* interval run past the
+ * moment this one was actually declared, silently widening it. This is not a defensive
+ * branch with no evidence it fires: `task-declared.cjs`'s own gate is a scan over free-form
+ * tool-call text, looser than `taskIdentityFromWrittenPath`, so a session really can declare
+ * a path this reader refuses.
  */
-export function buildTaskIntervals(journal: RunJournal): readonly TaskInterval[] {
-  const everyWitnessedMoment = timed<
-    RunJournalBoundary | RunJournalTaskDeclared | RunJournalFileWritten
-  >([...journal.boundaries, ...journal.taskDeclarations, ...journal.filesWritten]);
-  const lastMs =
+// The journal's own last recorded moment, capped at `periodEndMs` when one is given - see
+// `buildTaskIntervals`'s own doc comment for why a clock-skewed future moment must not
+// widen an unclosed interval past what the report could ever place a record in anyway.
+function lastWitnessedMs(
+  everyWitnessedMoment: readonly TimedBoundary<unknown>[],
+  periodEndMs: number | undefined
+): number | undefined {
+  const witnessedLastMs =
     everyWitnessedMoment.length > 0
       ? everyWitnessedMoment[everyWitnessedMoment.length - 1].atMs
       : undefined;
+  return witnessedLastMs === undefined || periodEndMs === undefined
+    ? witnessedLastMs
+    : Math.min(witnessedLastMs, periodEndMs);
+}
+
+export function buildTaskIntervals(
+  journal: RunJournal,
+  periodEndMs?: number
+): readonly TaskInterval[] {
+  const everyWitnessedMoment = timed<
+    RunJournalBoundary | RunJournalTaskDeclared | RunJournalFileWritten
+  >([...journal.boundaries, ...journal.taskDeclarations, ...journal.filesWritten]);
+  const lastMs = lastWitnessedMs(everyWitnessedMoment, periodEndMs);
 
   const closers = everyWitnessedMoment.filter(
     (entry): entry is TimedBoundary<RunJournalTaskDeclared | RunJournalTurnEnd> =>
@@ -79,6 +114,7 @@ export function buildTaskIntervals(journal: RunJournal): readonly TaskInterval[]
     const { atMs: startMs, boundary } = closers[i];
     if (boundary.type !== "task_declared") continue;
     const endMs = closers[i + 1]?.atMs ?? lastMs ?? startMs;
+    if (taskIdentityFromWrittenPath(boundary.path) === null) continue;
     intervals.push({ path: boundary.path, startMs, endMs });
   }
   return intervals;
@@ -102,7 +138,12 @@ export function momentFallsWithin(
  * already reads as covered; that caller already knows which interval and needs no reason for
  * what it found.
  *
- * - `"no-declaration"`: this session's journal never declared a task at all.
+ * - `"no-declaration"`: this session's journal yields no usable declared interval - either it
+ *   never wrote a `task_declared` line at all, or it wrote one this reader cannot place in
+ *   time (an `at` `timed()` cannot parse, dropped before it ever reaches `buildTaskIntervals`).
+ *   The two are indistinguishable from here, which is why this reason is worded "no usable
+ *   declaration" rather than "none was ever declared" - the latter would be false for a
+ *   session whose journal really does hold a line, just not a readable one.
  * - `"precedes-declaration"`: a task was declared, but some declared interval starts *after*
  *   this moment - true both for a record before the session's very first declaration and for
  *   one landing in the gap a `turn_end` leaves between two declarations, which is a real gap

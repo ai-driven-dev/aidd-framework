@@ -54,6 +54,15 @@ describe("taskIdentityFromWrittenPath", () => {
     ).toBeNull();
   });
 
+  it("resolves a task name that merely contains '..' as text, never mistaking it for a climb", () => {
+    // "2026_02_10_a..b" is a name, not a path segment of exactly "..": it climbs nothing, and
+    // both `file-writes.cjs` and `task-declared.cjs` journal it. Rejecting it on a bare
+    // substring check would read a real, journalled declaration as though none existed.
+    expect(taskIdentityFromWrittenPath("aidd_docs/tasks/2026_02/2026_02_10_a..b/spec.md")).toBe(
+      "2026_02/2026_02_10_a..b"
+    );
+  });
+
   it("touches no filesystem — a string in, an identity or nothing out", () => {
     const source = readFileSync(
       fileURLToPath(new URL("../../../src/domain/models/task-identity.ts", import.meta.url)),
@@ -95,6 +104,7 @@ describe("taskIdentitiesFromWrittenPaths", () => {
       "aidd_docs/tasks/2026_08/2026_08_21_cost-reporter/plan.md",
       "aidd_docs/tasks/2026_08/2026_08_21_cost-reporter.md",
       "aidd_docs/tasks/2026_08/2026_08_21_cost-reporter/notes/a/b.md",
+      "aidd_docs/tasks/2026_02/2026_02_10_a..b/spec.md",
       "aidd_docs/tasks/2026_08/plan.md",
       "aidd_docs/tasks/2026_08/2026_08_21_cost-reporter",
       "aidd_docs/tasks/README.md",
