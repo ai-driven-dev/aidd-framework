@@ -97,12 +97,19 @@ touched to take them.
   headless `codex exec` run needs `--dangerously-bypass-hook-trust`, or the hook never fires
   and the run journals nothing; the diagnostic's own untrusted-hook reading
   (`02-diagnose.md`) describes the same failure. One genuine difference the live capture
-  surfaced and the old derivation could not have known: `tool_use_id` on a real `exec_command`
-  call is shaped `exec-<uuid>`, not the `call_<random>` form the pre-existing sibling
-  fixtures above carry — a version-dependent detail with no bearing on the reader, which
-  never reads `tool_use_id` at all, so the fixture keeps the sibling-consistent `call_`
-  style for this synthesised value rather than introducing a third id shape into the set for
-  a field the code under test never touches.
+  surfaced and the old derivation could not have known: `tool_use_id` on a real
+  `exec_command` call is shaped `exec-<uuid>`, not the `call_<random>` form the pre-existing
+  sibling fixtures above carry. The committed value, `exec-4f8b2e6a-…`, carries that shape
+  but is still a synthesised uuid, not the live run's own — every value in this fixture is
+  synthesised, per this set's own rule, the shape included. That leaves a real gap:
+  inspecting this file alone cannot tell a genuine capture that happened to synthesise this
+  shape apart from a careful re-synthesis of the retired derivation that decided to guess it
+  too. What actually distinguishes the two is not in the artefact — it is the commit message
+  of the change that captured it (`ead9a2f3`, "test: codex's task fixture becomes a genuine
+  capture, not a derivation"), which records the live run that produced it: project, host
+  and wrapper thrown away afterward, nothing touched in the real `~/.codex`. Naming that gap
+  here, rather than letting the file's shape alone imply more evidence than it carries, is
+  the same discipline `opencode-session-created.json` is held to below.
 - **`opencode-task-declared.json`** — the tool-used call `hooks/opencode-plugin.js` builds
   from a genuinely captured, completed tool part (`opencode-tool-part-completed.json`, see
   "OpenCode's plugin events" below), the path in `tool_input.filePath`. Whether OpenCode

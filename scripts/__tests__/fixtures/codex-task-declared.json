@@ -11,5 +11,5 @@
     "command": "sed -n '1,120p' aidd_docs/tasks/2026_08/2026_08_15_alpha/spec.md"
   },
   "tool_response": "# alpha\n\nSpec body.\n",
-  "tool_use_id": "call_9k2Ldu3TnpVh0rMbXeg7WYfQ"
+  "tool_use_id": "exec-4f8b2e6a-7c31-4d09-9a52-8e1f0c6b3d47"
 }
