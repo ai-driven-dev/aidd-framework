@@ -1,6 +1,7 @@
 import type {
   CostReport,
   CostReportAttributionRow,
+  CostReportBacklogRow,
   CostReportDayRow,
   CostReportEmptySelection,
   CostReportFilterName,
@@ -43,6 +44,15 @@ export const TASK_UNATTRIBUTED_LABELS: Record<TaskUnattributedReason, string> = 
   "no-declaration": "no usable task declaration in this session",
   "precedes-declaration": "before the next task this session declares",
   "journal-silent": "the journal falls silent before this record",
+};
+
+/** What a known task's own two non-item states are called where a person reads them -
+ * distinct from `TASK_UNATTRIBUTED_LABELS`, which names why a record belongs to no task at
+ * all. Both of these are about a task that *is* known, whose folder either names nothing or
+ * whose declaration could not be parsed. */
+export const BACKLOG_DECLARATION_LABELS: Record<"none" | "unreadable", string> = {
+  none: "this task declares no backlog item",
+  unreadable: "this task's backlog declaration could not be read",
 };
 
 /** Printed where a figure is genuinely not known, never as `$0.00`. A tool whose own files
@@ -355,6 +365,32 @@ function printTasks(output: CLIOutput, rows: readonly CostReportTaskRow[], basis
   }
 }
 
+/** One row per backlog item a task in the period declared, plus the two rows for a known
+ * task that named none or could not be read, plus up to three reason rows for a record in
+ * no task at all - the same tail order `printTasks` gives its own remainder. No attribution
+ * column: unlike a task's closed interval, a backlog row rests on one route only. */
+function printBacklog(
+  output: CLIOutput,
+  rows: readonly CostReportBacklogRow[],
+  basis: Basis
+): void {
+  if (rows.length === 0) return;
+  output.print("");
+  output.print(`  by backlog item    ${basis.label}`);
+  for (const row of rows) {
+    const name =
+      row.backlog ??
+      (row.declaration !== undefined
+        ? BACKLOG_DECLARATION_LABELS[row.declaration]
+        : row.reason !== undefined
+          ? TASK_UNATTRIBUTED_LABELS[row.reason]
+          : "");
+    output.print(
+      `    ${pad(name)}${shareOf(row.totals, basis.of, basis.useCost)}   ${figureFor(row.totals, basis.useCost)}`
+    );
+  }
+}
+
 /** Chronological, never sorted by size: a series read out of order is not a series. Above
  * `MAX_PRINTED_DAYS`, a person reads a count and where to get the rest - the envelope
  * still carries every day, since suppressing a row there would be the same false
@@ -436,6 +472,7 @@ function printBreakdowns(output: CLIOutput, report: CostReport): void {
   printModels(output, report, basis);
   printProjects(output, report.byProjects, basis);
   printTasks(output, report.byTasks, basis);
+  printBacklog(output, report.byBacklog, basis);
   output.print("");
   output.print("  by tool");
   printToolRows(output, report.byTools, report);

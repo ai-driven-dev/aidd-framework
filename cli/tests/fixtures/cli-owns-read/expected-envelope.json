@@ -1,5 +1,5 @@
 {
-  "cost_report_version": 6,
+  "cost_report_version": 7,
   "period": {
     "from_day": "2026-01-01",
     "to_day": "2026-01-31"
@@ -459,5 +459,17 @@
     "undated_records": 0,
     "unreadable_lines": 0,
     "identity_unusable": "absent"
-  }
+  },
+  "by_backlog": [
+    {
+      "reason": "no-declaration",
+      "totals": {
+        "requests": 4,
+        "input_tokens": 935,
+        "output_tokens": 590,
+        "cache_read_tokens": 14100,
+        "cache_creation_tokens": 1000
+      }
+    }
+  ]
 }

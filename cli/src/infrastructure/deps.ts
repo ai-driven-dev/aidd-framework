@@ -145,6 +145,7 @@ import { PluginFetcherAdapter } from "./adapters/plugin-fetcher-adapter.js";
 import { InquirerPrompterAdapter, SilentPrompterAdapter } from "./adapters/prompter-adapter.js";
 import { RunJournalReaderAdapter } from "./adapters/run-journal-reader-adapter.js";
 import { SelfUpdaterAdapter } from "./adapters/self-updater-adapter.js";
+import { TaskBacklogAdapter } from "./adapters/task-backlog-adapter.js";
 import { TelemetryEvidenceAdapter } from "./adapters/telemetry-evidence-adapter.js";
 import { TelemetrySinkAdapter } from "./adapters/telemetry-sink-adapter.js";
 import { TranscriptCostReaderAdapter } from "./adapters/transcript-cost-reader-adapter.js";
@@ -758,7 +759,8 @@ export async function createDeps(
     telemetrySink,
     runJournalReader,
     personIdentityAdapter,
-    telemetryEvidenceAdapter
+    telemetryEvidenceAdapter,
+    new TaskBacklogAdapter(projectRoot)
   );
   const forgetTelemetryUseCase = new ForgetTelemetryUseCase(
     telemetrySink,

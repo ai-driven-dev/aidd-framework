@@ -11,6 +11,7 @@ import {
   type TaskUnattributedReason,
   taskUnattributedReason,
 } from "./task-attribution.js";
+import type { TaskBacklogDeclaration } from "./task-backlog-link.js";
 import {
   type TaskIdentity,
   taskIdentitiesFromWrittenPaths,
@@ -171,6 +172,32 @@ export interface CostReportTaskRow {
   readonly totals: CostTotals;
 }
 
+/** One backlog item's figures — grouped one level above `CostReportTaskRow`: every task
+ * declaring the same item lands in one row, which is the whole point of this axis (`--task`
+ * still answers "this task cost X"; this answers "this backlog item cost X"). Composes on
+ * the same per-record task membership `byTasks` already computes, resolved once per task
+ * folder rather than per record - see `report-cost-use-case.ts`.
+ *
+ * `backlog` is present only for a record whose task declares an item. Where it is absent,
+ * exactly one of `declaration` or `reason` says why, and never both:
+ *
+ * - `declaration: "none"` — the record's task exists and is known, but its folder declares
+ *   no backlog item. A normal state, its own row, distinct from a record belonging to no
+ *   task at all.
+ * - `declaration: "unreadable"` — the record's task folder's declaration exists but could
+ *   not be parsed. Its own row, costing that row's resolution and no figure: the record is
+ *   still counted, here and in every other breakdown, exactly as `by_task` counts a record
+ *   whose declaration could not be read.
+ * - `reason` — the record belongs to no task at all, carrying the same
+ *   `TaskUnattributedReason` `CostReportTaskRow` gives it; up to three such rows, one per
+ *   reason actually present, never collapsed into one. */
+export interface CostReportBacklogRow {
+  readonly backlog?: string;
+  readonly declaration?: "none" | "unreadable";
+  readonly reason?: TaskUnattributedReason;
+  readonly totals: CostTotals;
+}
+
 /** One person's figures — a mapped person, one unplaced identity, or the records that
  * carried none at all. `person` is the canonical `personId`, present only when `resolution`
  * is `"mapped"`; the raw identifier that produced an `"unresolved"` row lives in
@@ -266,6 +293,14 @@ export interface CostReportInput {
   /** Any of `project`, `step`, `model` and `tool`, each optional and composing with `task`
    * and each other by `and`. */
   readonly filters?: CostReportFilters;
+  /** Every distinct task identity this period's records could fall inside, resolved once
+   * each to its own folder's declaration - never read here, and never re-resolved per
+   * record. Gathering this is `ReportCostUseCase`'s job, exactly like `journals` and
+   * `identity`: the domain stays free of the filesystem `TaskBacklogReader` reads from.
+   * Absent from a task this map cannot name reads as `{ kind: "none" }` - see
+   * `backlogKeyOf`'s own doc for why a missing entry must never drop a record rather than
+   * merely being unreachable through this input's one production caller. */
+  readonly taskBacklogDeclarations?: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration>;
   /** Where a generic filter's value has ever been seen - absent when the caller has none
    * to offer, which reads the same as a filter never matching it elsewhere. */
   readonly knownValues?: CostReportKnownValues;
@@ -311,6 +346,9 @@ export interface CostReport {
   readonly byTools: readonly CostReportToolRow[];
   readonly byProjects: readonly CostReportProjectRow[];
   readonly byTasks: readonly CostReportTaskRow[];
+  /** Every task's records regrouped by what its folder declares - see
+   * `CostReportBacklogRow`. Sums to `totals` exactly like every other breakdown. */
+  readonly byBacklog: readonly CostReportBacklogRow[];
   readonly byDays: readonly CostReportDayRow[];
   /** Mapped people first, then every unplaced identity, then the one row for records
    * carrying none at all - a reader sees people before gaps. Within the mapped and the
@@ -518,6 +556,20 @@ function modelKeyOf(record: TelemetrySinkRecord): ModelKey {
 // `${month}/${name}`, which a reason string never is, so the two can never collide.
 type TaskRowKey = TaskIdentity | TaskUnattributedReason;
 
+// The same idea, one level above a task: a task whose folder declares no backlog item, or
+// whose declaration exists but could not be read, is its own group - never folded into
+// each other, and never folded into a named item. Symbols, the same reason `NO_KNOWN_PROJECT`
+// and `NO_KNOWN_MODEL` are: a backlog item is a free-form string on either support (a forge
+// reference or a project-relative path), so nothing here can rule out a real item colliding
+// with a string sentinel the way a plain string could.
+const NO_BACKLOG_DECLARED = Symbol("task declares no backlog item");
+const UNREADABLE_BACKLOG_DECLARATION = Symbol("task's backlog declaration could not be read");
+type BacklogRowKey =
+  | string
+  | typeof NO_BACKLOG_DECLARED
+  | typeof UNREADABLE_BACKLOG_DECLARATION
+  | TaskUnattributedReason;
+
 /** Every session's own closed intervals, keyed by vendor id - built once from
  * `buildTaskIntervals`'s own output, never a second notion of when a task was running.
  * Unlike `declaredIntervalsForTask`, this keeps every task a session ever declared, not
@@ -558,6 +610,30 @@ function declaredTaskKeyOf(
   );
   const identity = interval && taskIdentityFromWrittenPath(interval.path);
   return identity ?? taskUnattributedReason(intervals, record.event_timestamp);
+}
+
+/** Which `byBacklog` row a record's own task-row key belongs in - built from
+ * `declaredTaskKeyOf`'s own output, never a second notion of which task a record fell
+ * inside. A reason (the record belongs to no task at all) passes straight through
+ * unchanged, exactly as `by_task` gives it; a named task looks up its folder's declaration
+ * once, in the map `ReportCostUseCase` already resolved for every distinct task identity
+ * this period's records could name.
+ *
+ * A named task missing from `declarations` is unreachable through this module's one
+ * production caller - `report-cost-use-case.ts` resolves every task identity `byTasks` can
+ * ever key on before this ever runs - but is read as `{ kind: "none" }` rather than
+ * throwing or dropping the record, the same defensive default `declaredTaskKeyOf`'s own
+ * `interval.path` fallback documents: a caller a test can still construct must never lose a
+ * record's figures to a gap in wiring this module cannot see from here. */
+function backlogKeyOf(
+  taskRowKey: TaskRowKey,
+  declarations: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration> | undefined
+): BacklogRowKey {
+  if (isTaskUnattributedReason(taskRowKey)) return taskRowKey;
+  const declaration = declarations?.get(taskRowKey) ?? { kind: "none" as const };
+  if (declaration.kind === "none") return NO_BACKLOG_DECLARED;
+  if (declaration.kind === "unreadable") return UNREADABLE_BACKLOG_DECLARATION;
+  return declaration.link.backlog;
 }
 
 // A record with no identifier is its own row, keyed on a symbol the same way
@@ -867,6 +943,7 @@ interface Groups {
   readonly taskAttributions: Map<TaskAttributionSource, TotalsAccumulator>;
   readonly projects: Map<ProjectKey, TotalsAccumulator>;
   readonly tasks: Map<TaskRowKey, TotalsAccumulator>;
+  readonly backlog: Map<BacklogRowKey, TotalsAccumulator>;
   readonly people: Map<PersonRowKey, PersonGroup>;
   readonly days: Map<string, TotalsAccumulator>;
   activeTimeSeconds?: number;
@@ -885,6 +962,7 @@ function emptyGroups(fromDay: string, toDay: string): Groups {
     taskAttributions: new Map(),
     projects: new Map(),
     tasks: new Map(),
+    backlog: new Map(),
     people: new Map(),
     days,
   };
@@ -916,7 +994,8 @@ function accumulateRequestRecord(
   record: TelemetrySinkRecord,
   membership: TaskMembership | null,
   taskIntervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>,
-  identity: PersonIdentity | null
+  identity: PersonIdentity | null,
+  taskBacklogDeclarations: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration> | undefined
 ): void {
   groups.totals.add(record);
   addToStepGroup(groups.steps, record);
@@ -924,7 +1003,9 @@ function accumulateRequestRecord(
   accumulateInto(groups.tools, record.tool, record);
   accumulateInto(groups.models, modelKeyOf(record), record);
   accumulateInto(groups.projects, projectKeyOf(record), record);
-  accumulateInto(groups.tasks, declaredTaskKeyOf(record, taskIntervalsByVendorId), record);
+  const taskRowKey = declaredTaskKeyOf(record, taskIntervalsByVendorId);
+  accumulateInto(groups.tasks, taskRowKey, record);
+  accumulateInto(groups.backlog, backlogKeyOf(taskRowKey, taskBacklogDeclarations), record);
   addToPersonGroup(groups.people, record, resolvePerson(identity, personRawIdOf(record)));
   const day = telemetrySinkRecordDayKey(record);
   if (day !== undefined && groups.days.has(day)) groups.days.get(day)?.add(record);
@@ -938,7 +1019,8 @@ function accumulate(
   toDay: string,
   membership: TaskMembership | null,
   journals: readonly CostReportSessionJournal[],
-  identity: PersonIdentity | null
+  identity: PersonIdentity | null,
+  taskBacklogDeclarations: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration> | undefined
 ): Groups {
   const groups = emptyGroups(fromDay, toDay);
   const taskIntervalsByVendorId = allTaskIntervalsByVendorId(journals);
@@ -947,7 +1029,14 @@ function accumulate(
       accumulateSessionRecord(groups, record);
       continue;
     }
-    accumulateRequestRecord(groups, record, membership, taskIntervalsByVendorId, identity);
+    accumulateRequestRecord(
+      groups,
+      record,
+      membership,
+      taskIntervalsByVendorId,
+      identity,
+      taskBacklogDeclarations
+    );
   }
   return groups;
 }
@@ -1007,8 +1096,11 @@ function projectRows(
   );
 }
 
-function isTaskUnattributedReason(key: TaskRowKey): key is TaskUnattributedReason {
-  return (TASK_UNATTRIBUTED_REASONS as readonly string[]).includes(key);
+// Typed over `string | symbol`, wider than either `TaskRowKey` or `BacklogRowKey` alone,
+// so `taskRows` and `backlogRows` share one check rather than each carrying its own copy -
+// safe because every reason is a plain string and a symbol key never equals one.
+function isTaskUnattributedReason(key: string | symbol): key is TaskUnattributedReason {
+  return typeof key === "string" && (TASK_UNATTRIBUTED_REASONS as readonly string[]).includes(key);
 }
 
 /** Every task a record's own moment fell inside, largest first, then one row per reason
@@ -1035,6 +1127,58 @@ function taskRows(tasks: ReadonlyMap<TaskRowKey, TotalsAccumulator>): readonly C
     (row): row is CostReportTaskRow => row !== undefined
   );
   return [...sorted, ...reasonRows];
+}
+
+/** Every backlog item a task declared, largest first, then the two rows for a known task
+ * that named none or could not be read, then one row per reason a record fell in no task at
+ * all - `TASK_UNATTRIBUTED_REASONS`' own fixed order, the same tail convention `taskRows`
+ * uses. Two tasks declaring the same item merge here by construction: `backlogKeyOf` keys
+ * both on the identical `backlog` string, so `accumulateInto` folds them into one
+ * accumulator before this ever runs - never a second merge step that could disagree with
+ * how every other axis already reconciles. */
+interface BacklogGroups {
+  readonly named: readonly CostReportBacklogRow[];
+  readonly byReason: ReadonlyMap<TaskUnattributedReason, CostReportBacklogRow>;
+  readonly none: CostReportBacklogRow | undefined;
+  readonly unreadable: CostReportBacklogRow | undefined;
+}
+
+// Split from `backlogRows` purely to stay under this codebase's own line-per-function limit
+// - one pass classifying every key into the four shapes a row can be, nothing sorted yet.
+function classifyBacklogGroups(
+  backlog: ReadonlyMap<BacklogRowKey, TotalsAccumulator>
+): BacklogGroups {
+  const named: CostReportBacklogRow[] = [];
+  const byReason = new Map<TaskUnattributedReason, CostReportBacklogRow>();
+  let none: CostReportBacklogRow | undefined;
+  let unreadable: CostReportBacklogRow | undefined;
+  for (const [key, accumulator] of backlog) {
+    if (isTaskUnattributedReason(key)) {
+      byReason.set(key, { reason: key, totals: accumulator.build() });
+    } else if (key === NO_BACKLOG_DECLARED) {
+      none = { declaration: "none", totals: accumulator.build() };
+    } else if (key === UNREADABLE_BACKLOG_DECLARATION) {
+      unreadable = { declaration: "unreadable", totals: accumulator.build() };
+    } else {
+      named.push({ backlog: key, totals: accumulator.build() });
+    }
+  }
+  return { named, byReason, none, unreadable };
+}
+
+function backlogRows(
+  backlog: ReadonlyMap<BacklogRowKey, TotalsAccumulator>
+): readonly CostReportBacklogRow[] {
+  const { named, byReason, none, unreadable } = classifyBacklogGroups(backlog);
+  const sorted = bySize(
+    named,
+    (row) => row.totals,
+    (row) => row.backlog ?? ""
+  );
+  const reasonRows = TASK_UNATTRIBUTED_REASONS.map((reason) => byReason.get(reason)).filter(
+    (row): row is CostReportBacklogRow => row !== undefined
+  );
+  return [...sorted, ...(none ? [none] : []), ...(unreadable ? [unreadable] : []), ...reasonRows];
 }
 
 /** Every day in the period, in order — never sorted by size, unlike every other breakdown
@@ -1155,7 +1299,14 @@ function breakdownFields(
   groups: Groups
 ): Pick<
   CostReport,
-  "bySteps" | "byModels" | "byTools" | "byProjects" | "byTasks" | "byDays" | "byPeople"
+  | "bySteps"
+  | "byModels"
+  | "byTools"
+  | "byProjects"
+  | "byTasks"
+  | "byBacklog"
+  | "byDays"
+  | "byPeople"
 > {
   return {
     bySteps: stepRows(groups.steps),
@@ -1163,6 +1314,7 @@ function breakdownFields(
     byTools: toolRowsInScope(input, groups),
     byProjects: projectRows(groups.projects),
     byTasks: taskRows(groups.tasks),
+    byBacklog: backlogRows(groups.backlog),
     byDays: dayRows(groups.days),
     byPeople: personRows(groups.people),
   };
@@ -1407,7 +1559,8 @@ export function buildCostReport(input: CostReportInput): CostReport {
     input.toDay,
     membership,
     input.journals,
-    identity
+    identity,
+    input.taskBacklogDeclarations
   );
 
   return assembleCostReport(input, inScope, groups, membership, emptySelection);

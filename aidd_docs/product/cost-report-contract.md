@@ -55,15 +55,18 @@ needs no separate flag; reading the matching array is the axis. `by_task` groups
 same declared intervals `--task` filters on, never by a session's whole-session
 written-file inference — see **`by_task`** below. `by_person` is a seventh axis with no
 matching filter flag at all — see **`by_person`** below — grouping by who ran the work,
-never a way to keep only one person's records. `aidd telemetry report` also takes
-`--axis <name>` (`total`, `day`, `step`, `model`, `task`, `tool`, `project` or `person`),
-which picks one of those arrays and renders it alone as a small pasteable artefact instead
-of the whole object — a convenience for copying one figure out, not a second way to group.
-Every figure `--axis` can show is already in the plain `--json` object; only the
-one-artefact-at-a-time rendering is what it adds. A name outside the eight is a usage error
-naming the valid list (`Error: Unknown axis 'bogus'. Expected one of: total, day, step,
-model, task, tool, project, person.`, exit `1`), not a silently empty artefact. Given both
-flags at once, `--json` wins and `--axis` is ignored, never the reverse.
+never a way to keep only one person's records. `by_backlog` is an eighth, also with no
+filter of its own — see **`by_backlog`** below — regrouping `by_task`'s own rows one level
+up, by what each task's folder declares. `aidd telemetry report` also takes
+`--axis <name>` (`total`, `day`, `step`, `model`, `task`, `backlog`, `tool`, `project` or
+`person`), which picks one of those arrays and renders it alone as a small pasteable
+artefact instead of the whole object — a convenience for copying one figure out, not a
+second way to group. Every figure `--axis` can show is already in the plain `--json`
+object; only the one-artefact-at-a-time rendering is what it adds. A name outside the nine
+is a usage error naming the valid list (`Error: Unknown axis 'bogus'. Expected one of:
+total, day, step, model, task, backlog, tool, project, person.`, exit `1`), not a silently
+empty artefact. Given both flags at once, `--json` wins and `--axis` is ignored, never the
+reverse.
 
 **A filter matching nothing names itself**, in `empty_selection`, rather than the object
 quietly reporting the same shape a genuinely idle period would:
@@ -122,7 +125,13 @@ real count is the ordinary case of reporting from a project whose switch never c
 work, never a contradiction (see "Attributing records to a task" for the same scope split
 elsewhere in this object).
 
-Every object carries `cost_report_version`, currently `6` — bumped from `5` when the row
+Every object carries `cost_report_version`, currently `7` — bumped from `6` when
+`by_backlog` joined the top-level breakdowns (a consumer summing every breakdown's
+`requests` against `totals.requests` now has a sixth breakdown to include). `by_backlog`
+regroups `by_task`'s own per-record membership one level up, by what each task's own
+folder declares (`aidd_docs/tasks/<task>/backlog-link.json`) — never a second notion of
+which task a record belongs to, and resolved once per task rather than once per record.
+Bumped from `5` when the row
 `by_task` gives for a record that fell in no declared interval stopped being a single row
 and became up to three, one per `reason` actually present in the period
 (`"no-declaration"`, `"precedes-declaration"`, `"journal-silent"` — see "Attributing
@@ -153,7 +162,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
 
 ```jsonc
 {
-  "cost_report_version": 6,
+  "cost_report_version": 7,
   "period": { "from_day": "2026-07-01", "to_day": "2026-07-31" },
   "measurement_enabled": true,                  // this project's own switch, right now — see Versioning
   "task": "2026_08/2026_08_21_cost-reporter",   // absent unless --task was given
@@ -167,6 +176,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "by_tool":    [{ "tool": "codex", "coverage": "covered", "reason": "…", "capability": {}, "totals": {}, "session_totals": {} }],  // session_totals absent unless the tool has one (Copilot, today)
   "by_project": [{ "project": "acme/widgets", "totals": {} }],   // a row with no `project` names none known
   "by_task":    [{ "task": "2026_08/2026_08_21_cost-reporter", "attribution": "declared", "totals": {} }, { "reason": "precedes-declaration", "totals": {} }],  // a row with no `task` carries `reason` instead, naming which of three facts applies; up to three such rows
+  "by_backlog": [{ "backlog": "ai-driven-dev/framework#661", "totals": {} }, { "declaration": "none", "totals": {} }, { "declaration": "unreadable", "totals": {} }, { "reason": "precedes-declaration", "totals": {} }],  // a row with no `backlog` carries `declaration` (a known task naming none, or one whose declaration could not be read) or `reason` (a record in no task at all) — never both, never neither
   "by_day":     [{ "day": "2026-07-01", "totals": {} }],         // every day in the period, in order, gaps included
   "by_person":  [{ "resolution": "mapped", "person": "a-person-id", "identities": ["a-person-id", "a-machine-id"], "totals": {} }],  // mapped rows first, then every unplaced identity, then the one row for records carrying none
   "attribution": [{ "attribution": "tool-stated", "totals": {} }],
@@ -199,17 +209,19 @@ them into money live outside this repository.
 
 ### Breakdowns
 
-`by_step`, `by_model`, `by_tool`, `by_project` and `by_task` are ordered largest first, with
-a stable tie-break, so the biggest thing is the first thing you read. Ordered by
-`cost_micro_usd` where a row has one, and by all four token counters summed where it does
-not — never by `input_tokens` and `output_tokens` alone, which every tool here dwarfs with
-cache. `by_task` places every row for what fell in no declared interval last regardless of
-size, in `reason`'s own fixed order (`"no-declaration"`, `"precedes-declaration"`,
-`"journal-silent"`) — the same convention `by_person` gives its own no-identifier row, a
-reader sees tasks before the remainder, and the remainder in the same order every time.
-`by_day` is the one exception: it is chronological, one row per
-day the period spans — a series read out of order is not a series, and a day nothing ran on
-is a row of zeros rather than an omitted day.
+`by_step`, `by_model`, `by_tool`, `by_project`, `by_task` and `by_backlog` are ordered
+largest first, with a stable tie-break, so the biggest thing is the first thing you read.
+Ordered by `cost_micro_usd` where a row has one, and by all four token counters summed
+where it does not — never by `input_tokens` and `output_tokens` alone, which every tool
+here dwarfs with cache. `by_task` places every row for what fell in no declared interval
+last regardless of size, in `reason`'s own fixed order (`"no-declaration"`,
+`"precedes-declaration"`, `"journal-silent"`) — the same convention `by_person` gives its
+own no-identifier row, a reader sees tasks before the remainder, and the remainder in the
+same order every time. `by_backlog` places its own named rows first, then the row for a
+known task declaring none, then the row for one whose declaration could not be read, then
+every `reason` row in that same fixed order. `by_day` is the one exception: it is
+chronological, one row per day the period spans — a series read out of order is not a
+series, and a day nothing ran on is a row of zeros rather than an omitted day.
 
 **Every breakdown sums exactly back to `totals`.** That is asserted, on integers, not
 hoped for.
@@ -268,6 +280,36 @@ no declared interval covers. `by_task` does not read that route at all, so that 
 record lands in whichever `reason` row applies. Read the row as it is named: no *declared
 interval* covers this record, not "this session never touched a task." Cross-check against
 `task_attribution`'s own `declared`/`inferred` split when the distinction matters.
+
+### `by_backlog` — grouped by what each task's own folder declares
+
+`by_backlog` answers a different question than `by_task`: not "which task", but "which
+backlog item" — the move from "this task cost X" to "issue #661 cost X". It regroups
+`by_task`'s own per-record membership one level up: every record that `by_task` already
+places under a named task is looked up once more, against that task's own
+`aidd_docs/tasks/<task>/backlog-link.json`, and re-keyed on the item it declares. A record
+`by_task` places in a `reason` row (no task at all) is untouched — it carries the identical
+`reason` here, since there is no task to ask a question of in the first place.
+
+A row with no `backlog` carries exactly one of `declaration` or `reason`, never both and
+never neither:
+
+| Field | Value | Means |
+| --- | --- | --- |
+| `declaration` | `"none"` | The record's task is known, but its folder declares no backlog item. A normal state, its own row. |
+| `declaration` | `"unreadable"` | The record's task folder's declaration exists but could not be parsed. Its own row, costing that row's resolution and no figure — the record is still counted, here and everywhere else. |
+| `reason` | one of `by_task`'s three | The record belongs to no task at all — see "Attributing records to a task". |
+
+**Two tasks declaring the same item merge into one row — that is the point of this axis.**
+A story delivered across two task folders, each with its own `backlog-link.json` naming the
+same reference or the same path, reads as one row here, with both tasks' records folded
+into it. Two tasks that each declare nothing do **not** merge into each other's figures by
+virtue of both declaring nothing — they both land in the single `declaration: "none"` row,
+which is one row precisely because "declares nothing" is one state, not because the two
+tasks were confused for each other.
+
+`by_backlog` sums to `totals.requests` exactly like every other breakdown — a damaged or
+absent declaration changes how a task's records are grouped, never how many are counted.
 
 ### `by_person` — three outcomes, never a merge
 

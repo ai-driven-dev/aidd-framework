@@ -13,6 +13,7 @@ import type { TelemetrySinkRecord } from "../../../../src/domain/models/telemetr
 import { AI_TOOL_IDS } from "../../../../src/domain/models/tool-ids.js";
 import { InMemoryPersonIdentityStore } from "../../../helpers/ports/in-memory-person-identity-store.js";
 import { InMemoryRunJournalReader } from "../../../helpers/ports/in-memory-run-journal-reader.js";
+import { InMemoryTaskBacklogReader } from "../../../helpers/ports/in-memory-task-backlog-reader.js";
 import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetry-sink.js";
 import { StubTelemetryEvidenceReader } from "../../../helpers/ports/stub-telemetry-evidence-reader.js";
 
@@ -50,7 +51,13 @@ describe("ReportCostUseCase", () => {
     journals = new InMemoryRunJournalReader();
     identity = new InMemoryPersonIdentityStore();
     evidence = new StubTelemetryEvidenceReader();
-    useCase = new ReportCostUseCase(sink, journals, identity, evidence);
+    useCase = new ReportCostUseCase(
+      sink,
+      journals,
+      identity,
+      evidence,
+      new InMemoryTaskBacklogReader()
+    );
   });
 
   async function store(...records: readonly TelemetrySinkRecord[]): Promise<void> {
@@ -156,7 +163,13 @@ describe("ReportCostUseCase", () => {
       origin: "adopted",
       alsoMe: ["machine-1"],
     });
-    useCase = new ReportCostUseCase(sink, journals, identity, evidence);
+    useCase = new ReportCostUseCase(
+      sink,
+      journals,
+      identity,
+      evidence,
+      new InMemoryTaskBacklogReader()
+    );
     await store(record({ vendor_id: "s-1", cost_usd: 1, person_id: "machine-1" }));
 
     const built = await useCase.execute({ ...BASE_OPTIONS, period: PERIOD });

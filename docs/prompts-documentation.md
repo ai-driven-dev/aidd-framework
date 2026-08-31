@@ -40,7 +40,7 @@ Auto-generated framework content: agents, commands, rules, skills, and templates
 
 | File | Description |
 |------|---|
-| [SKILL.md](../plugins/aidd-telemetry/skills/01-cost/SKILL.md) | `Answers what a period or one task consumed - a total, a day-by-day series, or a breakdown by step, model, task, tool, project or person - and hands back the artefact each question deserves. Use when the user asks what a piece of work cost, what changed, where the effort went, which task, for which project, or who spent it. Not for turning measurement on.` |
+| [SKILL.md](../plugins/aidd-telemetry/skills/01-cost/SKILL.md) | `Answers what a period or one task consumed - a total, a day-by-day series, or a breakdown by step, model, task, backlog item, tool, project or person - and hands back the artefact each question deserves. Use when the user asks what a piece of work cost, what changed, where the effort went, which task, which backlog item or ticket, for which project, or who spent it. Not for turning measurement on.` |
 
 #### `skills/02-check`
 

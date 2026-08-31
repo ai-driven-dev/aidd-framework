@@ -18,6 +18,16 @@ import type { AiToolId } from "./tool-ids.js";
  * `sink_schema_version` exists on a stored line. Adding a field a consumer may ignore is
  * not a bump; changing what an existing field means is.
  *
+ * Bumped to 7: `by_backlog` is a new top-level breakdown - a consumer summing every
+ * breakdown's `requests` against `totals.requests` to check nothing was dropped now has a
+ * sixth breakdown to include, the same reasoning that bumped `by_task` in. Groups the same
+ * per-record task membership `by_task` already computes one level higher, by what each
+ * task's own folder declares (`aidd_docs/tasks/<task>/backlog-link.json`) - never a second
+ * notion of which task a record belongs to. A row with no `backlog` carries `declaration`
+ * (`"none"` for a task known to declare nothing, `"unreadable"` for one whose declaration
+ * could not be parsed) or `reason` (the same three values `by_task` gives a record in no
+ * task at all) - never both, and never neither.
+ *
  * Bumped to 6: the row `by_task` gives what fell in no declared interval can now be up to
  * three rows instead of always exactly one - `reason` names which of three distinct facts
  * applies, and a consumer that read "the one row with no `task`" as a single, whole-period
@@ -45,7 +55,7 @@ import type { AiToolId } from "./tool-ids.js";
  * `by_project`'s `project` to optional back when that row was added.
  *
  * Bumped to 2: `by_project` and `by_day` are new top-level breakdowns. */
-export const COST_REPORT_ENVELOPE_VERSION = 6;
+export const COST_REPORT_ENVELOPE_VERSION = 7;
 
 /** Money as whole micro-dollars, the way the report carries it: an integer, so a consumer
  * summing several reports gets the same answer this one did. Divide by 1,000,000 for
@@ -135,6 +145,15 @@ export interface CostReportEnvelopeTaskRow {
   readonly totals: CostReportEnvelopeTotals;
 }
 
+/** One backlog item's figures — see `CostReportBacklogRow`. `declaration` and `reason` are
+ * never both present, and never neither, on a row with no `backlog`. */
+export interface CostReportEnvelopeBacklogRow {
+  readonly backlog?: string;
+  readonly declaration?: "none" | "unreadable";
+  readonly reason?: TaskUnattributedReason;
+  readonly totals: CostReportEnvelopeTotals;
+}
+
 /** One UTC day's figures. Every day the period spans, in order, whether or not a record
  * landed on it — a day with nothing is a row of zeros, never an omitted row. */
 export interface CostReportEnvelopeDayRow {
@@ -203,6 +222,7 @@ export interface CostReportEnvelope {
   readonly by_tool: readonly CostReportEnvelopeToolRow[];
   readonly by_project: readonly CostReportEnvelopeProjectRow[];
   readonly by_task: readonly CostReportEnvelopeTaskRow[];
+  readonly by_backlog: readonly CostReportEnvelopeBacklogRow[];
   /** Every day the period spans, always — a long period stays readable by how the text
    * rendering chooses to show it, never by what this envelope omits. */
   readonly by_day: readonly CostReportEnvelopeDayRow[];
@@ -291,6 +311,15 @@ function taskRow(row: CostReport["byTasks"][number]): CostReportEnvelopeTaskRow 
   };
 }
 
+function backlogRow(row: CostReport["byBacklog"][number]): CostReportEnvelopeBacklogRow {
+  return {
+    ...(row.backlog === undefined ? {} : { backlog: row.backlog }),
+    ...(row.declaration === undefined ? {} : { declaration: row.declaration }),
+    ...(row.reason === undefined ? {} : { reason: row.reason }),
+    totals: totals(row.totals),
+  };
+}
+
 function personRow(row: CostReport["byPeople"][number]): CostReportEnvelopePersonRow {
   return {
     resolution: row.resolution,
@@ -340,6 +369,34 @@ function readSummary(report: CostReport): CostReportEnvelopeRead {
  *
  * Pure — no clock, no filesystem, no printing.
  */
+/** Every `by_*` breakdown together - pulled out on its own so `toCostReportEnvelope` reads
+ * as one shape assembled from its own reads, not a wall of field-by-field assignments (the
+ * same reason `cost-report.ts`'s own `breakdownFields` exists). */
+function breakdownFields(
+  report: CostReport
+): Pick<
+  CostReportEnvelope,
+  | "by_step"
+  | "by_model"
+  | "by_tool"
+  | "by_project"
+  | "by_task"
+  | "by_backlog"
+  | "by_day"
+  | "by_person"
+> {
+  return {
+    by_step: report.bySteps.map(stepRow),
+    by_model: report.byModels.map(modelRow),
+    by_tool: report.byTools.map(toolRow),
+    by_project: report.byProjects.map(projectRow),
+    by_task: report.byTasks.map(taskRow),
+    by_backlog: report.byBacklog.map(backlogRow),
+    by_day: report.byDays.map((row) => ({ day: row.day, totals: totals(row.totals) })),
+    by_person: report.byPeople.map(personRow),
+  };
+}
+
 export function toCostReportEnvelope(report: CostReport): CostReportEnvelope {
   return {
     cost_report_version: COST_REPORT_ENVELOPE_VERSION,
@@ -351,13 +408,7 @@ export function toCostReportEnvelope(report: CostReport): CostReportEnvelope {
     sessions: report.sessions,
     totals: totals(report.totals),
     ...(report.activeTimeSeconds === undefined ? {} : { active_time_s: report.activeTimeSeconds }),
-    by_step: report.bySteps.map(stepRow),
-    by_model: report.byModels.map(modelRow),
-    by_tool: report.byTools.map(toolRow),
-    by_project: report.byProjects.map(projectRow),
-    by_task: report.byTasks.map(taskRow),
-    by_day: report.byDays.map((row) => ({ day: row.day, totals: totals(row.totals) })),
-    by_person: report.byPeople.map(personRow),
+    ...breakdownFields(report),
     attribution: report.attributionMix.map(attributionRow),
     ...taskAttribution(report.taskAttributionMix),
     read: readSummary(report),

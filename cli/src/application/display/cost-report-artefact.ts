@@ -12,6 +12,7 @@ import type {
 import { getAiToolConfig } from "../../domain/tools/registry.js";
 import {
   ATTRIBUTION_LABELS,
+  BACKLOG_DECLARATION_LABELS,
   TASK_ATTRIBUTION_LABELS,
   TASK_UNATTRIBUTED_LABELS,
 } from "./cost-report-display.js";
@@ -34,6 +35,7 @@ export const ARTEFACT_AXES = [
   "step",
   "model",
   "task",
+  "backlog",
   "tool",
   "project",
   "person",
@@ -252,6 +254,23 @@ function taskArtefact(envelope: CostReportEnvelope): string {
   ].join("\n");
 }
 
+/** No third column, unlike `taskArtefact`: a backlog row carries no attribution to show —
+ * every named row rests on the same single route (reading the declaration), so there is no
+ * second strength to distinguish the way a task's closed interval has. */
+function backlogArtefact(envelope: CostReportEnvelope): string {
+  const rows = envelope.by_backlog.map((row) => {
+    const name =
+      row.backlog ??
+      (row.declaration !== undefined
+        ? BACKLOG_DECLARATION_LABELS[row.declaration]
+        : row.reason !== undefined
+          ? TASK_UNATTRIBUTED_LABELS[row.reason]
+          : "");
+    return `| ${name} | ${figure(row.totals, envelope)} |`;
+  });
+  return table(envelope, "by backlog", "Backlog item", rows);
+}
+
 function modelArtefact(envelope: CostReportEnvelope): string {
   return table(
     envelope,
@@ -329,6 +348,7 @@ const BUILDERS: Record<ArtefactAxis, (envelope: CostReportEnvelope) => string> =
   step: stepArtefact,
   model: modelArtefact,
   task: taskArtefact,
+  backlog: backlogArtefact,
   tool: toolArtefact,
   project: projectArtefact,
   person: personArtefact,

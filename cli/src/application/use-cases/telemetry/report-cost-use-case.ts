@@ -11,11 +11,19 @@ import {
 } from "../../../domain/models/cost-report.js";
 import type { ResolvedReportPeriod } from "../../../domain/models/report-period.js";
 import { buildTaskIntervals } from "../../../domain/models/task-attribution.js";
-import type { TaskIdentity } from "../../../domain/models/task-identity.js";
+import {
+  type TaskBacklogDeclaration,
+  taskFolderPathFromIdentity,
+} from "../../../domain/models/task-backlog-link.js";
+import {
+  type TaskIdentity,
+  taskIdentityFromWrittenPath,
+} from "../../../domain/models/task-identity.js";
 import { AI_TOOL_IDS } from "../../../domain/models/tool-ids.js";
 import type { PersonIdentity } from "../../../domain/ports/person-identity-reader.js";
 import type { PersonIdentityStore } from "../../../domain/ports/person-identity-store.js";
 import type { RunJournal, RunJournalReader } from "../../../domain/ports/run-journal-reader.js";
+import type { TaskBacklogReader } from "../../../domain/ports/task-backlog-reader.js";
 import type { TelemetryEvidenceReader } from "../../../domain/ports/telemetry-evidence-reader.js";
 import type { TelemetrySink } from "../../../domain/ports/telemetry-sink.js";
 import { getAiToolConfig } from "../../../domain/tools/registry.js";
@@ -89,6 +97,45 @@ function toSessionJournal(
   };
 }
 
+/** Every distinct task identity this period's journals could ever key `by_task` on - the
+ * same declared intervals `declaredTaskKeyOf` reads from, built once here from the raw
+ * `RunJournal`s rather than the already-mapped session journals, so it needs no restructure
+ * of `toReportInput`'s own mapping. Each identity is resolved to its folder's declaration
+ * exactly once, never once per record. Order is incidental; the report only ever looks this
+ * map up by key. */
+function distinctTaskIdentities(
+  journals: readonly RunJournal[],
+  periodEndMs: number
+): readonly TaskIdentity[] {
+  const seen = new Set<TaskIdentity>();
+  const identities: TaskIdentity[] = [];
+  for (const journal of journals) {
+    for (const interval of buildTaskIntervals(journal, periodEndMs)) {
+      const identity = taskIdentityFromWrittenPath(interval.path);
+      if (identity !== null && !seen.has(identity)) {
+        seen.add(identity);
+        identities.push(identity);
+      }
+    }
+  }
+  return identities;
+}
+
+/** One read per distinct task identity, through the port - never the filesystem directly,
+ * and never re-read per record. A reader that throws is not this function's to catch:
+ * `TaskBacklogReader.read` promises it never does. */
+async function taskBacklogDeclarationsOf(
+  reader: TaskBacklogReader,
+  journals: readonly RunJournal[],
+  periodEndMs: number
+): Promise<ReadonlyMap<TaskIdentity, TaskBacklogDeclaration>> {
+  const declarations = new Map<TaskIdentity, TaskBacklogDeclaration>();
+  for (const identity of distinctTaskIdentities(journals, periodEndMs)) {
+    declarations.set(identity, await reader.read(taskFolderPathFromIdentity(identity)));
+  }
+  return declarations;
+}
+
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** The first moment no record `readRecordsInPeriod` could ever return can fall on or after -
@@ -153,7 +200,8 @@ function toReportInput(
   read: Awaited<ReturnType<TelemetrySink["readRecordsInPeriod"]>>,
   journals: readonly RunJournal[],
   identity: PersonIdentityFields,
-  measurementEnabled: boolean
+  measurementEnabled: boolean,
+  taskBacklogDeclarations: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration>
 ): CostReportInput {
   const { fromDay, toDay } = options.period;
   const periodEndMs = periodEndMsOf(toDay);
@@ -171,6 +219,7 @@ function toReportInput(
     ...(options.filters === undefined ? {} : { filters: options.filters }),
     knownValues: read.knownValues,
     measurementEnabled,
+    taskBacklogDeclarations,
     ...identityInputFields(identity),
   };
 }
@@ -189,7 +238,8 @@ export class ReportCostUseCase {
     private readonly sink: TelemetrySink,
     private readonly runJournalReader: RunJournalReader,
     private readonly personIdentityStore: PersonIdentityStore,
-    private readonly telemetryEvidenceReader: TelemetryEvidenceReader
+    private readonly telemetryEvidenceReader: TelemetryEvidenceReader,
+    private readonly taskBacklogReader: TaskBacklogReader
   ) {}
 
   /** Whether the project switch is on right now - independent of the sink and the journal,
@@ -210,7 +260,14 @@ export class ReportCostUseCase {
     const journals = await this.runJournalReader.list();
     const identity = await personIdentityFields(this.personIdentityStore);
     const measurementEnabled = await this.measurementEnabled(options);
+    const taskBacklogDeclarations = await taskBacklogDeclarationsOf(
+      this.taskBacklogReader,
+      journals,
+      periodEndMsOf(toDay)
+    );
 
-    return buildCostReport(toReportInput(options, read, journals, identity, measurementEnabled));
+    return buildCostReport(
+      toReportInput(options, read, journals, identity, measurementEnabled, taskBacklogDeclarations)
+    );
   }
 }
