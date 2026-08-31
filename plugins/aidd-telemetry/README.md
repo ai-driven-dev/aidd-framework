@@ -109,9 +109,9 @@ and one whose reader failed are four different answers.
 | --- | --- | --- | --- |
 | **Claude Code** | ✅ proven on live sessions | ✅ stated by the tool, and by interval | ✅ |
 | **Codex** | ✅ on captured rollouts | ✅ by interval | ✅ observed |
-| **OpenCode** | ✅ | ❌ no journal entry ([#676](https://github.com/ai-driven-dev/framework/issues/676)) | ❌ |
-| **Copilot** | ⚠️ session total only, no per-request figure ([#697](https://github.com/ai-driven-dev/framework/issues/697)) | ✅ by interval ([#663](https://github.com/ai-driven-dev/framework/issues/663)) | ❌ |
-| **Cursor** | ❌ no token count in any file it writes | ❌ turn-end never fires headless ([#680](https://github.com/ai-driven-dev/framework/issues/680)) | ❌ |
+| **OpenCode** | ✅ | ✅ through its own plugin API, not a declarative hook | ❌ |
+| **Copilot** | ⚠️ session total only, no per-request figure — one cumulative total at `session.shutdown`, never a sum of requests | ✅ by interval ([#663](https://github.com/ai-driven-dev/framework/issues/663)) | ❌ |
+| **Cursor** | ❌ no token count in any file it writes | ✅ headless fires `sessionEnd` where interactive fires `stop`; both are mapped | ❌ |
 
 **No amount, anywhere.** No tool read locally writes a figure in currency. Reports give
 tokens; turning tokens into money is a separate service's job.
