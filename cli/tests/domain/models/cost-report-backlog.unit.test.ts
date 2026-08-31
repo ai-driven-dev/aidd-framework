@@ -173,7 +173,7 @@ describe("buildCostReport — by_backlog regroups tasks by what their folder dec
     expect(reasonRow?.totals.costMicroUsd).toBe(toMicroUsd(1));
   });
 
-  it("reconciles to the same total as the period, and as the task breakdown", () => {
+  it("reconciles to the same total as the task, step, model, person and project axes", () => {
     const built = report({
       records: RECORDS,
       journals: JOURNALS,
@@ -183,6 +183,10 @@ describe("buildCostReport — by_backlog regroups tasks by what their folder dec
 
     expect(sumOf(built.byBacklog)).toEqual(expected);
     expect(sumOf(built.byTasks)).toEqual(expected);
+    expect(sumOf(built.bySteps)).toEqual(expected);
+    expect(sumOf(built.byModels)).toEqual(expected);
+    expect(sumOf(built.byProjects)).toEqual(expected);
+    expect(sumOf(built.byPeople)).toEqual(expected);
   });
 
   it("orders named items largest first, then none, then unreadable, then every reason", () => {

@@ -9,6 +9,7 @@ import "../../../../src/domain/tools/ai/opencode.js";
 import { ReportCostUseCase } from "../../../../src/application/use-cases/telemetry/report-cost-use-case.js";
 import { UnreadableIdentityFileError } from "../../../../src/domain/errors.js";
 import { toMicroUsd } from "../../../../src/domain/models/cost-report.js";
+import { taskFolderPathFromIdentity } from "../../../../src/domain/models/task-backlog-link.js";
 import type { TelemetrySinkRecord } from "../../../../src/domain/models/telemetry-sink-record.js";
 import { AI_TOOL_IDS } from "../../../../src/domain/models/tool-ids.js";
 import { InMemoryPersonIdentityStore } from "../../../helpers/ports/in-memory-person-identity-store.js";
@@ -44,6 +45,7 @@ describe("ReportCostUseCase", () => {
   let journals: InMemoryRunJournalReader;
   let identity: InMemoryPersonIdentityStore;
   let evidence: StubTelemetryEvidenceReader;
+  let taskBacklog: InMemoryTaskBacklogReader;
   let useCase: ReportCostUseCase;
 
   beforeEach(() => {
@@ -51,13 +53,8 @@ describe("ReportCostUseCase", () => {
     journals = new InMemoryRunJournalReader();
     identity = new InMemoryPersonIdentityStore();
     evidence = new StubTelemetryEvidenceReader();
-    useCase = new ReportCostUseCase(
-      sink,
-      journals,
-      identity,
-      evidence,
-      new InMemoryTaskBacklogReader()
-    );
+    taskBacklog = new InMemoryTaskBacklogReader();
+    useCase = new ReportCostUseCase(sink, journals, identity, evidence, taskBacklog);
   });
 
   async function store(...records: readonly TelemetrySinkRecord[]): Promise<void> {
@@ -220,6 +217,56 @@ describe("ReportCostUseCase", () => {
     await expect(useCase.execute({ ...BASE_OPTIONS, period: PERIOD })).rejects.toThrow(
       "some other failure entirely"
     );
+  });
+
+  it("resolves the declaration through TaskBacklogReader, keyed on the folder the task identity resolves to", async () => {
+    // Pins the wiring `distinctTaskIdentities` -> `taskFolderPathFromIdentity` ->
+    // `TaskBacklogReader.read` actually performs: the double is set on the exact folder
+    // path a real adapter would be asked to read, never on the bare task identity string.
+    journals.set("s-task", {
+      boundaries: [],
+      session: {
+        type: "session_start",
+        at: "2026-08-18T09:00:00Z",
+        run_id: "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+        tool: "claude-code",
+        vendor_id: "s-task",
+      },
+      // A witnessed moment after the record's own timestamp - without one, the declared
+      // interval's own end collapses to its start (buildTaskIntervals's own documented
+      // behaviour), and the record below would fall outside it.
+      filesWritten: [
+        {
+          type: "file_written",
+          at: "2026-08-18T09:40:00Z",
+          path: `aidd_docs/tasks/${TASK}/plan.md`,
+        },
+      ],
+      taskDeclarations: [
+        {
+          type: "task_declared",
+          at: "2026-08-18T09:00:00Z",
+          path: `aidd_docs/tasks/${TASK}/spec.md`,
+        },
+      ],
+    });
+    taskBacklog.set(taskFolderPathFromIdentity(TASK), {
+      kind: "declared",
+      link: {
+        backlog: "acme/widgets#661",
+        writtenAt: "2026-08-18T08:00:00Z",
+        writtenBy: "aidd-pm:04-spec",
+      },
+    });
+    await store(
+      record({ vendor_id: "s-task", cost_usd: 4, event_timestamp: "2026-08-18T09:30:00Z" })
+    );
+
+    const built = await useCase.execute({ ...BASE_OPTIONS, period: PERIOD });
+
+    const named = built.byBacklog.find((row) => row.backlog === "acme/widgets#661");
+    expect(named?.totals.requests).toBe(1);
+    expect(named?.totals.costMicroUsd).toBe(toMicroUsd(4));
   });
 
   it("names no tool, by string literal", () => {
