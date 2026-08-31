@@ -200,6 +200,47 @@ nothing stops a reader typing an identifier they never opted into. Linking one f
 spend into the reader's own row from then on: it declares "this identifier is me", and the
 CLI cannot check the claim against anything the colleague wrote.
 
+## The backlog link
+
+**A task folder can say which backlog item it delivers.** `aidd-pm:04-spec` and
+`aidd-dev:01-plan` write `backlog-link.json` at the folder's own level — beside `spec.md`
+and `plan.md`, never inside either — the moment the request they are building from names
+one. A folder with no `backlog-link.json` is a normal state, never an error: most tasks
+never declare one, and the report reads that exactly as it reads any other silence.
+
+The file carries one meaningful field:
+
+```json
+{
+  "backlog": "owner/repo#123",
+  "written_at": "2026-08-21T09:00:00Z",
+  "written_by": "aidd-pm:04-spec"
+}
+```
+
+`backlog` names the item on whatever support it lives — a forge reference
+(`"owner/repo#123"`) where the backlog lives with a ticket provider, or a
+project-relative Markdown path (`"aidd_docs/backlog/tasks/x.md"`) where it lives as a file
+— one field for both, never two, per
+[`persistence.md`](../aidd-pm/skills/10-task/references/persistence.md)'s own rule of
+keeping one authority across supports. `written_at` and `written_by` are provenance, not status: they say when
+the declaration was made and by what, so a wrong one can be traced to the act that
+produced it, not what the task itself is doing.
+
+**It is a plain file, correctable by hand.** Open it, edit `backlog`, save it — the next
+`aidd telemetry report` reads the file as it stands, never a cache, and never something it
+derived and kept. Nothing here re-derives or overwrites a declaration that already exists:
+the skills that write this file leave one already there untouched, exactly as a person's
+own edit would expect.
+
+**What it deliberately does not carry.** No steps, no produced-file list: `step_start` and
+`file_written` already carry both, timestamped, in the run journal, and deriving which step
+produced which file from that is the same interval mechanism task attribution already
+uses — a second, hand-maintained copy here could disagree with the journal, and a copy that
+can disagree is worse than none. No `branch`, no `pull_request`: git and the forge already
+know both. No status: the artefacts' own frontmatter owns that. No second task identity:
+the folder path already is one.
+
 ## Where things are written down
 
 - [`aidd_docs/runs/README.md`](../../aidd_docs/runs/README.md) — what the journal records,
@@ -208,3 +249,5 @@ CLI cannot check the claim against anything the colleague wrote.
   a skill consumes.
 - [`metrics-contract.md`](../../aidd_docs/product/metrics-contract.md) — one stored line,
   for a service that prices them.
+- [The backlog link](#the-backlog-link) above — the one file a task folder writes to say
+  which backlog item it delivers.
