@@ -1,21 +1,26 @@
-# Coding Guidelines
+# Coding Assertions
 
-> Those rules must be minimal because they MUST be checked after EVERY CODE GENERATION.
+The checks that must pass for code to count as done. Minimal, run after every change.
 
-## Requirements to complete a feature
+## Before commit
 
-**A feature is really completed if ALL of the above are satisfied: if not, iterate to fix all until all are green.**
+The fast gate, wired in `lefthook.yml`.
 
-## Commands to run
+| Order | Command | Checks |
+| ----- | ------- | ------ |
+| 1 | `pnpm exec lefthook run pre-commit` | JSON and YAML validity, skill frontmatter and argument hints, context imports, markdown links, `scripts/` tests, then `cli lint` and `cli typecheck` when `cli/` or `kanban/` changed |
+| 2 | `pnpm exec commitlint --edit` | The commit message against `commitlint.config.cjs` |
 
-### Before commit
+The same hook also regenerates each plugin's `CATALOG.md` and the README counts, and stages them.
 
-| Order | Command | Description |
-| ----- | ------- | ----------- |
-| 1 | `pnpm exec commitlint --edit` | Validate commit message against conventional commit spec |
+## Before push
 
-### Before push
+The heavier gate.
 
-| Order | Command | Description |
-| ----- | ------- | ----------- |
-| 1 | `pnpm exec lefthook run pre-push` | Run parent repo hooks (delegates to parent lefthook.yml) |
+| Order | Command | Checks |
+| ----- | ------- | ------ |
+| 1 | `pnpm exec lefthook run pre-push` | `cli knip:production` then the full `cli` suite, when `cli/` changed |
+
+## Behavior
+
+A feature is done only when every gate above is green. If a fix is needed, spawn one agent per failing assertion (typecheck, tests, rules violated on a category) rather than one agent for all of them.

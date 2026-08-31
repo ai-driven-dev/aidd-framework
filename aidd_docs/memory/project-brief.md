@@ -1,61 +1,38 @@
 # Project Brief
 
-## Executive Summary
+What this project is, the problem it solves, and its domain language. The non-derivable "why", not the "how".
 
-- **Project Name**: AIDD Framework (AI-Driven Dev Framework)
-- **Vision**: Universal plugin marketplace for AI coding assistants
-- **Mission**: Provide structured, reusable skill sets that make AI assistants follow repeatable, high-quality development workflows
+## What it is
 
-### Full Description
+- A plugin marketplace that installs structured SDLC workflows into AI coding tools — Claude Code, Cursor, GitHub Copilot, Codex, opencode — plus the `aidd` binary that installs them.
+- For developers who already work with an AI assistant daily and want its output to be repeatable rather than improvised.
 
-AIDD Framework is a plugin system that installs focused skill sets into AI coding tools (Claude Code, Cursor, GitHub Copilot, Codex, OpenCode). Plugins deliver SDLC workflows — from brainstorming to PR creation — as slash-command-driven skills backed by structured markdown actions.
+## Why it exists
 
-## Context
+- An AI assistant rediscovers a project on every session and improvises its process each time. The framework gives it durable project memory and a fixed set of workflows, so the same request produces comparable work twice.
+- The workflows are tool-agnostic markdown. Writing them once and translating them per tool avoids maintaining a separate prompt library for each assistant.
 
-### Core Domain
+## Domain language
 
-AI-assisted software development tooling. The framework ships workflows, not code. Every artifact is a markdown file (skill, agent, rule, memory template) interpreted by an LLM at runtime.
+| Term | Meaning |
+| ---- | ------- |
+| Plugin | An installable package grouping skills around one concern, listed in `marketplace.json` |
+| Skill | A router: a `SKILL.md` that dispatches a user request to its actions |
+| Action | One atomic step inside a skill, with its own inputs, outputs, process and test |
+| Agent | An isolated executor; runs in its own context and returns only a result |
+| Rule | A coding standard injected into the tool's context automatically |
+| Memory | The bank under `aidd_docs/memory/`, loaded at the start of every session |
+| Marketplace | `.claude-plugin/marketplace.json`, the registry listing every plugin and its version |
+| Concern | What a plugin owns; it decides where a capability lives |
+| Promote | Sending `next` to `main`, which opens the release |
 
-### Ubiquitous Language
+## Key features
 
-| Term | Definition | Synonyms |
-| --- | --- | --- |
-| Plugin | Installable package grouping related skills | package |
-| Skill | Router-based workflow triggered by user phrase or slash command | command |
-| Action | Single step inside a skill, containing inputs/outputs/process/test | step |
-| Agent | Specialized AI persona for a focused sub-task | subagent |
-| Rule | Coding standard injected into LLM context automatically | guardrail |
-| Memory | Structured context file loaded at conversation start | context file |
-| SDLC | Software Development Life Cycle — the end-to-end pipeline from idea to deployed PR | |
-| Marketplace | Central registry listing available plugins with version metadata | |
-
-## Features & Use-cases
-
-- Install plugins per AI tool with `aidd plugin add <plugin> --tool <tool>`
-- Execute skills via slash commands (`/sdlc`, `/commit`, `/plan`, etc.)
-- Bootstrap project memory bank and context files with `aidd-context:02-project-memory`
-- Sync memory references across all AI context files automatically
-- Generate plans, assertions, reviews, and PRs through structured action chains
-- Run async development pipelines via `aidd-orchestrator`
-
-## User Journey maps
-
-```mermaid
-journey
-    title Developer using AIDD on a new feature
-    section Setup
-        Install plugin: 5: Developer
-        Run project init: 5: Developer
-    section Feature loop
-        Brainstorm request: 4: Developer
-        Generate plan: 5: AIDD
-        Implement code: 5: AIDD
-        Review code: 4: AIDD
-        Commit and PR: 5: AIDD
-```
-
-### Developer
-
-- Uses an AI coding assistant daily
-- Wants predictable, structured AI workflows
-- Needs memory of project context across sessions
+- Install and update plugins per AI tool (`aidd plugin add`, `aidd ai`, `aidd ide`).
+- Build a target-native distribution of the repository for one tool (`aidd framework build`).
+- Bootstrap and refresh a project's memory bank, and wire it into every AI context file.
+- Generate context artifacts: skills, rules, agents, commands, hooks, Mermaid diagrams.
+- Run the development loop as workflows: plan, implement, assert, audit, review, test, refactor, debug.
+- Manage a typed product backlog — briefs, epics, stories, specs, spikes, defects.
+- Orchestrate a request end to end, from framing to a draft pull request.
+- Render task documents as a board (`aidd kanban`).
