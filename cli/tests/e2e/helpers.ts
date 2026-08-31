@@ -150,12 +150,30 @@ export function sandboxedEnv(
   };
 }
 
+// `realHome: true` leaves `HOME` real so network tools (gh, git, npm) keep their real
+// credentials — `resolveAiddConfigDir` (identity) and `resolveHomeDir` (local cost readers)
+// never honor `AIDD_USER_CONFIG_DIR`, by design, so both resolve to the developer's real
+// profile under this option. `forget --yes` is the one command that deletes what it finds
+// there. No test passes `realHome: true` today, but nothing before this line stopped one
+// from combining it with `forget` — this makes that specific combination throw instead of
+// reaching a real profile's identity file. A deliberate test that genuinely needs both
+// should sandbox identity/local-cost resolution some other way rather than removing this.
+function refuseRealHomeForget(args: readonly string[], options?: { realHome?: boolean }): void {
+  if (options?.realHome && args.includes("forget")) {
+    throw new Error(
+      "runCli refuses to run `forget` under realHome: true — identity resolution ignores " +
+        "AIDD_USER_CONFIG_DIR and would reach the real machine's ~/.config/aidd/identity.json."
+    );
+  }
+}
+
 export async function runCli(
   args: string[],
   cwd: string,
   fakeHome: string,
   options?: { realHome?: boolean; env?: Record<string, string> }
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  refuseRealHomeForget(args, options);
   const env = sandboxedEnv(fakeHome, options?.env, options);
   try {
     const { stdout, stderr } = await execFileAsync("node", [CLI_PATH, ...args], { cwd, env });
