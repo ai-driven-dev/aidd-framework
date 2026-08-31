@@ -82,7 +82,7 @@ export function printTelemetryOffReport(output: CLIOutput, result: TelemetryOffR
   output.info(
     "This stops new recording only — sessions already journalled stay in aidd_docs/runs/ " +
       "and whatever `aidd telemetry read` already stored, and `aidd telemetry report` still " +
-      "reports them."
+      "reports them. Run `aidd telemetry forget` to remove what was already measured."
   );
 }
 
