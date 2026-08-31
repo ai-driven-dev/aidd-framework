@@ -2,6 +2,8 @@
 
 The version-control conventions this project follows: branches, commits, and the platform.
 
+> CLI-specific notes: [`cli/aidd_docs/memory/vcs.md`](../../cli/aidd_docs/memory/vcs.md).
+
 ## Setup
 
 - Production branch: `main`. Integration branch: `next`, the default target for day-to-day work.
