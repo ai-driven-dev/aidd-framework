@@ -188,18 +188,19 @@ test("a tool part still pending or running produces no journal call - only a com
 });
 
 // The negative, captured live in the same run as the positive above: a completed `bash`
-// tool call, `ls -la`, naming no task folder anywhere in its own arguments. Turns into a
-// tool-used call the reader still recognises as opencode, and that call declares nothing -
-// the same reading a call outside a task folder gets on every other host.
-test("a completed tool part naming no task folder converts to a call, but declaredTaskPath finds nothing in it", async () => {
+// tool call, `ls -la`, naming no task folder anywhere in its own arguments. Produces no
+// journal call at all: a pre-filter over the call's own arguments, mirroring
+// `task-declared.cjs`'s own `TASK_PATH_PATTERN`, refuses it before a call is ever built -
+// on OpenCode, `tool-used` does nothing else downstream for a call that names no task (see
+// `opencode-plugin.js`'s own comment on `declaredTaskCallFor`), so nothing is lost by never
+// spawning `journal.cjs` for it.
+test("a completed tool part naming no task folder produces no journal call at all - nothing downstream would have acted on it", async () => {
   const builder = await journalCallFor();
-  const { declaredTaskPath } = require("../../plugins/aidd-telemetry/hooks/lib/task-declared.cjs");
   const event = loadFixture("opencode-tool-part-no-task.json");
 
   const call = builder(event, new Map(), "/home/user/probe/project-opencode-task");
 
-  assert.equal(detectHost(call.payload), "opencode");
-  assert.equal(declaredTaskPath(call.payload), null);
+  assert.equal(call, null);
 });
 
 test("a non-tool part update (text, reasoning, patch) produces no journal call", async () => {

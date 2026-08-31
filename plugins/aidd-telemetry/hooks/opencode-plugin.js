@@ -56,6 +56,32 @@ function runJournal(event, payload) {
 // now anchored to a measurement rather than left as an assertion.
 const directoryBySessionId = new Map();
 
+// Mirrors `lib/task-declared.cjs`'s own `TASK_PATH_PATTERN` and `lib/host.cjs`'s
+// `stringsWithin`, duplicated rather than imported: this file's own top-of-file comment
+// already measured that OpenCode's loader cannot see a local CommonJS file's exports at
+// all, which is the reason this plugin spawns `journal.cjs` as a child process in the
+// first place rather than calling its functions in-process. That constraint applies here
+// too - the same import that never worked for `record.cjs` would not work for
+// `task-declared.cjs` either.
+const TASK_PATH_PATTERN =
+  /aidd_docs\/tasks\/\d{4}_\d{2}\/[^/"'\s]+\/[^"'\s]*|aidd_docs\/tasks\/\d{4}_\d{2}\/[^/"'\s]+\.md/u;
+
+// Every completed tool part reaches this hook - most naming no task at all - and, unlike
+// every other host's own hook runner, this one runs inside OpenCode's own in-process event
+// handler: a `spawnSync` per call here blocks the agent's own event loop, not a
+// short-lived hook process the host expects to pay for anyway. Cheap and conservative:
+// `true` only when a string reachable inside `toolInput` could possibly be a declared
+// path, exactly what `declaredTaskPath` would itself test after the spawn - so this can
+// never skip a call `handleTaskDeclared` would have acted on, only calls it would have
+// read and discarded.
+function mightDeclareATask(toolInput) {
+  if (typeof toolInput === "string") {
+    return TASK_PATH_PATTERN.test(toolInput.replace(/\\/gu, "/"));
+  }
+  if (!toolInput || typeof toolInput !== "object") return false;
+  return Object.values(toolInput).some(mightDeclareATask);
+}
+
 // A tool call's own arguments, once it has any: `pending` carries `input: {}`, empty and
 // unsearchable, before OpenCode has resolved what the call is even for - only `completed`
 // is read, the moment every argument, and the tool's own output, are settled, the same
@@ -71,9 +97,16 @@ const directoryBySessionId = new Map();
 // `state.input.command` (a `bash` call) were both observed carrying an absolute path or a
 // shell command line - the same two shapes Claude Code's `Read` and Codex's `Bash` already
 // give this reader, never a new field this reader has to learn.
+//
+// `mightDeclareATask` is read before this ever produces a call worth spawning for: on
+// OpenCode, `tool-used` does exactly one thing downstream (`journal.cjs`'s own
+// `handleFileWritten` and `handleStepStart` both no-op for a host with no `writtenPath` /
+// `stepStart` extractor - see `lib/tools/opencode.cjs`) - task declaration - so a call this
+// pre-filter refuses would have done nothing after the spawn either.
 function declaredTaskCallFor(event, sessionDirectories, fallbackDirectory) {
   const part = event.properties.part;
   if (part?.type !== "tool" || part.state?.status !== "completed") return null;
+  if (!mightDeclareATask(part.state.input)) return null;
   const sessionId = event.properties.sessionID;
   const cwd = sessionDirectories.get(sessionId) ?? fallbackDirectory;
   return {
