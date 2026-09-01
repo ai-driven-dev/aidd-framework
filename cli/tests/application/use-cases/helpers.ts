@@ -32,7 +32,8 @@ import { BundledAssetProviderAdapter } from "../../../src/infrastructure/assets/
 export const linuxPlatform: Platform = { current: () => "linux" };
 export const win32Platform: Platform = { current: () => "win32" };
 export const noGit: VersionControl = {
-  installPreCommitDelegate: async () => {},
+  installCommitMessageDelegate: async () => false,
+  removeCommitMessageDelegate: async () => false,
   getRemoteUrl: async () => null,
   listTrackedFiles: async () => [],
   isRepository: async () => false,

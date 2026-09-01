@@ -1,4 +1,8 @@
 import {
+  SESSION_TRAILER_DELEGATE_FILE,
+  SESSION_TRAILER_TOKEN,
+} from "../../../domain/formats/commit-session-trailer.js";
+import {
   buildTelemetrySwitchFile,
   parseTelemetrySwitchFile,
   telemetryConfigPath,
@@ -7,6 +11,7 @@ import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { Logger } from "../../../domain/ports/logger.js";
 import type { TelemetryEvidenceReader } from "../../../domain/ports/telemetry-evidence-reader.js";
+import type { VersionControl } from "../../../domain/ports/version-control.js";
 
 export interface TelemetryOffOptions {
   readonly projectRoot: string;
@@ -27,15 +32,36 @@ export class TelemetryOffUseCase {
   constructor(
     private readonly fs: FileReader & FileWriter,
     private readonly logger: Logger,
-    private readonly telemetryEvidenceReader: TelemetryEvidenceReader
+    private readonly telemetryEvidenceReader: TelemetryEvidenceReader,
+    private readonly git: VersionControl
   ) {}
 
   async execute(options: TelemetryOffOptions): Promise<TelemetryOffResult> {
     const switchPath = telemetryConfigPath(options.projectRoot);
     this.logger.info(`AIDD telemetry switch -> ${switchPath}`);
     const switchChanged = await this.turnSwitchOff(switchPath);
+    await this.stopTrailingCommits(options.projectRoot);
     await this.warnLeftoverExportConfig(options.projectRoot);
     return { switchPath, switchChanged };
+  }
+
+  /** Unlike a tool's own settings file, this one *is* ours to undo: `on` wrote the hook
+   * line and the delegate beside it, so `off` takes both back. Runs whatever the switch's
+   * previous state was — a switch already off with the hook still installed is exactly the
+   * state a person running `off` a second time is trying to get out of.
+   *
+   * Commits already written keep the trailer they were written with. Nothing here rewrites
+   * history, the same rule `identity off` follows for records already stored. */
+  private async stopTrailingCommits(projectRoot: string): Promise<void> {
+    const removed = await this.git.removeCommitMessageDelegate(
+      projectRoot,
+      SESSION_TRAILER_DELEGATE_FILE
+    );
+    if (!removed) return;
+    this.logger.info(
+      `New commits will carry no ${SESSION_TRAILER_TOKEN} trailer. Commits already made ` +
+        "keep theirs — nothing here rewrites history."
+    );
   }
 
   /** Names what `off` cannot touch: a tool's own settings file, still carrying a key

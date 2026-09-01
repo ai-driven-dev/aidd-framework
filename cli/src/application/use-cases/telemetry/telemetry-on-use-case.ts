@@ -1,3 +1,8 @@
+import {
+  SESSION_TRAILER_DELEGATE_FILE,
+  SESSION_TRAILER_TOKEN,
+  sessionTrailerDelegateScript,
+} from "../../../domain/formats/commit-session-trailer.js";
 import { RUNS_ENTRY } from "../../../domain/models/paths.js";
 import {
   buildTelemetrySwitchFile,
@@ -44,6 +49,7 @@ export class TelemetryOnUseCase {
     this.logger.info(`AIDD telemetry switch -> ${switchPath}`);
     const switchChanged = await this.writeSwitch(switchPath);
     await this.protectRunsDir(options.projectRoot);
+    await this.makeCommitsJoinable(options.projectRoot);
     return { switchPath, switchChanged };
   }
 
@@ -78,6 +84,30 @@ export class TelemetryOnUseCase {
       "Already tracked by git — the repository, the task folders written into, the skills " +
         `run, and their timings:\n${tracked.map((file) => `  ${file}`).join("\n")}\n` +
         "Nothing removed or rewritten — your call."
+    );
+  }
+
+  /** Re-run on every successful `on`, switch newly written or not, for the same reason
+   * `protectRunsDir` is: a project turned on before this existed has to be caught up
+   * without anyone turning it off and on again.
+   *
+   * What it buys is the one link the chain was missing. A record already names its turn,
+   * its session and the task folder that session declared; nothing named the commit, so
+   * "what did this backlog item cost" could be answered and "what did this commit cost"
+   * could not. Announced rather than done quietly: this writes into commit messages a team
+   * will read, and a person who did not expect it must be able to find the sentence that
+   * told them, and the command that undoes it. */
+  private async makeCommitsJoinable(projectRoot: string): Promise<void> {
+    const installed = await this.git.installCommitMessageDelegate(
+      projectRoot,
+      SESSION_TRAILER_DELEGATE_FILE,
+      sessionTrailerDelegateScript()
+    );
+    if (!installed) return;
+    this.logger.info(
+      `Commits made by an AI session will carry a ${SESSION_TRAILER_TOKEN} trailer, so what ` +
+        "a session cost can be read per commit. A commit no session made carries nothing. " +
+        "`aidd telemetry off` removes it."
     );
   }
 

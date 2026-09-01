@@ -1,33 +1,68 @@
 import { spawnSync } from "node:child_process";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { sessionTrailerHookLine } from "../../domain/formats/commit-session-trailer.js";
 import type { FileReader } from "../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../domain/ports/file-writer.js";
 import type { VersionControl } from "../../domain/ports/version-control.js";
 import { environmentWithoutGitVariables } from "../git-environment.js";
 
-const GITDIR_PREFIX = "gitdir:";
 const HOOK_HEADER = "#!/bin/sh";
-const PRE_COMMIT_HOOK = "pre-commit";
+const PREPARE_COMMIT_MSG_HOOK = "prepare-commit-msg";
 
 export class GitAdapter implements VersionControl {
   constructor(private readonly fs: FileReader & FileWriter) {}
 
-  async installPreCommitDelegate(projectRoot: string, delegatePath: string): Promise<void> {
+  async installCommitMessageDelegate(
+    projectRoot: string,
+    delegateFile: string,
+    script: string
+  ): Promise<boolean> {
     const hooksDir = await this.resolveHooksDir(projectRoot);
-    if (hooksDir === null) return;
+    if (hooksDir === null) return false;
 
-    const marker = `sh ${delegatePath}`;
-    const hookPath = join(hooksDir, PRE_COMMIT_HOOK);
-    const exists = await this.fs.fileExists(hookPath);
-    let content = exists ? await this.fs.readFile(hookPath) : `${HOOK_HEADER}\n`;
+    const delegatePath = join(hooksDir, delegateFile);
+    // Rewritten on every install, never only when absent: this is how a delegate left by an
+    // older version of the CLI is brought up to date, and the file is ours outright — unlike
+    // the hook itself, which may be somebody else's.
+    await this.fs.createDirectory(hooksDir);
+    await this.fs.writeFile(delegatePath, script);
+    await this.fs.chmodExecutable(delegatePath);
 
-    if (content.includes(marker)) return;
+    const line = sessionTrailerHookLine(delegatePath);
+    const hookPath = join(hooksDir, PREPARE_COMMIT_MSG_HOOK);
+    const existing = (await this.fs.fileExists(hookPath))
+      ? await this.fs.readFile(hookPath)
+      : `${HOOK_HEADER}\n`;
+    if (existing.includes(line)) return false;
 
-    if (!content.endsWith("\n")) content += "\n";
-    content += `${marker}\n`;
-
-    await this.fs.writeFile(hookPath, content);
+    const separator = existing.endsWith("\n") ? "" : "\n";
+    await this.fs.writeFile(hookPath, `${existing}${separator}${line}\n`);
     await this.fs.chmodExecutable(hookPath);
+    return true;
+  }
+
+  async removeCommitMessageDelegate(projectRoot: string, delegateFile: string): Promise<boolean> {
+    const hooksDir = await this.resolveHooksDir(projectRoot);
+    if (hooksDir === null) return false;
+
+    const delegatePath = join(hooksDir, delegateFile);
+    const hookPath = join(hooksDir, PREPARE_COMMIT_MSG_HOOK);
+    const line = sessionTrailerHookLine(delegatePath);
+
+    let removed = false;
+    if (await this.fs.fileExists(hookPath)) {
+      const content = await this.fs.readFile(hookPath);
+      if (content.includes(line)) {
+        const kept = content.split("\n").filter((entry) => entry.trim() !== line);
+        await this.fs.writeFile(hookPath, kept.join("\n"));
+        removed = true;
+      }
+    }
+    if (await this.fs.fileExists(delegatePath)) {
+      await this.fs.deleteFile(delegatePath);
+      removed = true;
+    }
+    return removed;
   }
 
   // Mirrors the journal hook's own `getRemoteUrl` (plugins/aidd-telemetry/hooks/lib/repo.cjs)
@@ -99,23 +134,32 @@ export class GitAdapter implements VersionControl {
     }
   }
 
+  /**
+   * Where this repository's hooks actually live, asked of git rather than assembled from
+   * `.git`.
+   *
+   * `git rev-parse --git-path hooks` answers all three cases one expression at a time could
+   * not: it returns `core.hooksPath` when one is set — the configuration under which a hook
+   * written to `.git/hooks` is silently never run — and in a linked worktree it returns the
+   * *common* git dir's hooks, which is where git looks. The path comes back relative in an
+   * ordinary repository and absolute otherwise, so it is resolved against the repository
+   * root either way.
+   *
+   * `null` when there is no repository here, or when git itself cannot be run: installing a
+   * hook is never allowed to be the reason a command fails.
+   */
   private async resolveHooksDir(projectRoot: string): Promise<string | null> {
-    const gitEntry = join(projectRoot, ".git");
-    if (!(await this.fs.fileExists(gitEntry))) return null;
-
-    let gitDir = gitEntry;
     try {
-      const fileContent = await this.fs.readFile(gitEntry);
-      const firstLine = fileContent.trim().split("\n")[0] ?? "";
-      if (firstLine.startsWith(GITDIR_PREFIX)) {
-        const worktreeGitDir = firstLine.slice(GITDIR_PREFIX.length).trim();
-        // common git dir: .git/worktrees/<name> -> two levels up -> .git
-        gitDir = join(worktreeGitDir, "..", "..");
-      }
+      const result = spawnSync("git", ["rev-parse", "--git-path", "hooks"], {
+        cwd: projectRoot,
+        encoding: "utf8",
+        env: environmentWithoutGitVariables(),
+      });
+      if (result.status !== 0) return null;
+      const answer = result.stdout.trim();
+      return answer === "" ? null : resolve(projectRoot, answer);
     } catch {
-      // .git is a directory — gitDir stays as-is
+      return null;
     }
-
-    return join(gitDir, "hooks");
   }
 }

@@ -1,10 +1,13 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { TelemetryOffUseCase } from "../../../../src/application/use-cases/telemetry/telemetry-off-use-case.js";
+import { SESSION_TRAILER_TOKEN } from "../../../../src/domain/formats/commit-session-trailer.js";
+import type { VersionControl } from "../../../../src/domain/ports/version-control.js";
 import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
 import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
 import { StubTelemetryEvidenceReader } from "../../../helpers/ports/stub-telemetry-evidence-reader.js";
+import { noGit } from "../helpers.js";
 
 const PROJECT_ROOT = "/repo";
 const SWITCH_PATH = join(PROJECT_ROOT, ".aidd", "config.json");
@@ -14,7 +17,7 @@ function buildUseCase(seed: Record<string, string> = {}) {
   const fs = new InMemoryFileAdapter(seed, hasher);
   const logger = new CapturingLogger();
   const evidence = new StubTelemetryEvidenceReader();
-  const useCase = new TelemetryOffUseCase(fs, logger, evidence);
+  const useCase = new TelemetryOffUseCase(fs, logger, evidence, noGit);
   return { fs, logger, evidence, useCase };
 }
 
@@ -115,5 +118,48 @@ describe("TelemetryOffUseCase — names a leftover export it cannot clear", () =
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
     expect(logger.warnMessages).toHaveLength(0);
+  });
+});
+
+describe("TelemetryOffUseCase — taking back what on installed", () => {
+  function buildWith(removed: boolean, seed: Record<string, string> = {}) {
+    const fs = new InMemoryFileAdapter(seed, new DeterministicHasher());
+    const logger = new CapturingLogger();
+    const asked: string[] = [];
+    const git: VersionControl = {
+      ...noGit,
+      removeCommitMessageDelegate: async (_root, delegateFile) => {
+        asked.push(delegateFile);
+        return removed;
+      },
+    };
+    const evidence = new StubTelemetryEvidenceReader();
+    return { asked, logger, useCase: new TelemetryOffUseCase(fs, logger, evidence, git) };
+  }
+
+  it("asks git to remove the delegate, whatever the switch's previous state was", async () => {
+    const { asked, useCase } = buildWith(true);
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(asked).toEqual(["aidd-session-trailer.sh"]);
+  });
+
+  it("says new commits carry nothing, and that the old ones keep theirs", async () => {
+    const { logger, useCase } = buildWith(true);
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    const said = logger.allMessages.join("\n");
+    expect(said).toContain(SESSION_TRAILER_TOKEN);
+    expect(said).toContain("nothing here rewrites history");
+  });
+
+  it("says nothing when there was nothing installed to take back", async () => {
+    const { logger, useCase } = buildWith(false);
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(logger.allMessages.join("\n")).not.toContain(SESSION_TRAILER_TOKEN);
   });
 });

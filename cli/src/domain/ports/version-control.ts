@@ -1,6 +1,27 @@
 export interface VersionControl {
-  installPreCommitDelegate(projectRoot: string, delegatePath: string): Promise<void>;
   getRemoteUrl(repoRoot: string): Promise<string | null>;
+
+  /** Installs `delegateFile` beside the repository's hooks and adds one line to
+   * `prepare-commit-msg` calling it, answering whether that line was newly added. An
+   * existing hook is appended to, never replaced: a repository already running lefthook or
+   * husky keeps what it has.
+   *
+   * `false` both when the line is already there and when there is no repository to install
+   * into — neither is a failure, and neither leaves anything to report. Where the hooks
+   * directory actually is comes from git itself, never from `.git/hooks` assumed: a
+   * `core.hooksPath` pointing elsewhere is exactly the configuration under which a hook
+   * written to the assumed path is never run, and never says so. */
+  installCommitMessageDelegate(
+    projectRoot: string,
+    delegateFile: string,
+    script: string
+  ): Promise<boolean>;
+
+  /** Undoes it: drops the line from `prepare-commit-msg` and deletes the delegate,
+   * answering whether anything was there to remove. Leaves a hook file holding other lines
+   * exactly as it found it, minus the one line — the counterpart of never having replaced
+   * it on the way in. */
+  removeCommitMessageDelegate(projectRoot: string, delegateFile: string): Promise<boolean>;
   /** Every tracked path matching `pathspec`, relative to `repoRoot` — empty, never a
    * throw, when there is no repository at all or nothing matches — the rule the plugin's
    * own `warnIfTracked` read by before the CLI took this over: a project outside git still

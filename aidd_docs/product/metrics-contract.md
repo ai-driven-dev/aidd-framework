@@ -300,6 +300,41 @@ exactly the coverage measured while the route ran; no export will ever carry
   a git author, an email, or a hostname, in either direction. See `person_id`
   and `person_display_name` below for what each carries and when.
 
+## Joining a commit to the session that made it
+
+Not a field of a record — it lives in git, and is the one link between what was
+measured and what was produced.
+
+`aidd telemetry on` installs a `prepare-commit-msg` hook. A commit written while
+an AI session was running carries a trailer:
+
+```text
+AIDD-Session-Id: 33333333-3333-4333-8333-333333333333
+```
+
+The value is the same string that session's records carry in `vendor_id` — never
+a second identifier minted for this purpose — so a commit joins to its records on
+an equality, with no resolution step in between.
+
+Rules a consumer can rely on:
+
+- **A commit no AI session made carries no trailer.** The hook reads the running
+  session from the environment and writes nothing when it finds none. An absent
+  trailer means "not attributable", never "attributable to nobody".
+- **A merge or a squash carries none either**, whatever was running. Those commits
+  bring in work that other commits already account for.
+- **At most one per commit**, amend and re-run included.
+- **What a commit already carries is never rewritten.** `aidd telemetry off`
+  removes the hook so new commits carry nothing; the history keeps what it has.
+- **The trailer is not proof the session's records exist.** Turning the switch on
+  installs the hook, and a session whose records were never read, or were removed
+  with `aidd telemetry forget`, still leaves its trailer behind. A join that finds
+  no records on the other side is an ordinary outcome.
+
+The link the trailer closes is `execution → commit`. From there, `commit → pull
+request → ticket` is the forge's own, and belongs to whoever reads it — this
+framework neither writes nor resolves those.
+
 ## Step attribution
 
 Every record states **how**, not just whether, its step is known, via

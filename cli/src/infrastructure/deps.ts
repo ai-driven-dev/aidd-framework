@@ -708,7 +708,7 @@ export async function createDeps(
   const checkUpdateUseCase = new CheckUpdateUseCase(cliUpdater, currentVersionProvider, logger, fs);
   const telemetryEvidenceAdapter = new TelemetryEvidenceAdapter();
   const telemetryOnUseCase = new TelemetryOnUseCase(fs, logger, gitignoreUseCase, git);
-  const telemetryOffUseCase = new TelemetryOffUseCase(fs, logger, telemetryEvidenceAdapter);
+  const telemetryOffUseCase = new TelemetryOffUseCase(fs, logger, telemetryEvidenceAdapter, git);
   const telemetrySink = new TelemetrySinkAdapter();
   // This is the one place allowed to map a tool that declares `telemetryLocalRead: {
   // kind: "declared" }` to the adapter that reads it.
