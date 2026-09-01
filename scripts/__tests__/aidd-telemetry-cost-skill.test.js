@@ -151,8 +151,10 @@ test("every field the cost skill names by name resolves on the object the script
   // sentence about it true", findings 2 and 3). 14 -> 15 when 03-report.md named `by_task`,
   // the new top-level breakdown added alongside the six-questions task axis. 15 -> 16 when
   // 03-report.md named `by_backlog`, the upward link's own top-level breakdown regrouping
-  // `by_task`'s rows by what each task's own folder declares.
-  assert.equal(claims.size, 16, "expected exactly sixteen field references in the cost skill");
+  // `by_task`'s rows by what each task's own folder declares. 16 -> 17 when 03-report.md
+  // named `by_flow`, the flow-and-versions top-level breakdown grouping by the orchestrated
+  // run the journal's own step sequence already names, nothing newly captured for it.
+  assert.equal(claims.size, 17, "expected exactly seventeen field references in the cost skill");
 
   // Fields the envelope carries only under some condition, so a fixture cannot show them all
   // at once: the first five appear only under a selection, and `cost_micro_usd` only once a

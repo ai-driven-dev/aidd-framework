@@ -57,15 +57,17 @@ written-file inference — see **`by_task`** below. `by_person` is a seventh axi
 matching filter flag at all — see **`by_person`** below — grouping by who ran the work,
 never a way to keep only one person's records. `by_backlog` is an eighth, also with no
 filter of its own — see **`by_backlog`** below — regrouping `by_task`'s own rows one level
-up, by what each task's folder declares. `aidd telemetry report` also takes
-`--axis <name>` (`total`, `day`, `step`, `model`, `task`, `backlog`, `tool`, `project` or
-`person`), which picks one of those arrays and renders it alone as a small pasteable
-artefact instead of the whole object — a convenience for copying one figure out, not a
-second way to group. Every figure `--axis` can show is already in the plain `--json`
-object; only the one-artefact-at-a-time rendering is what it adds. A name outside the nine
+up, by what each task's folder declares. `by_flow` is a ninth, also with no filter of its
+own — see **`by_flow`** below — grouping by which orchestrated run the journal's own step
+sequence names, never a second capture. `aidd telemetry report` also takes
+`--axis <name>` (`total`, `day`, `step`, `model`, `task`, `backlog`, `flow`, `tool`,
+`project` or `person`), which picks one of those arrays and renders it alone as a small
+pasteable artefact instead of the whole object — a convenience for copying one figure out,
+not a second way to group. Every figure `--axis` can show is already in the plain `--json`
+object; only the one-artefact-at-a-time rendering is what it adds. A name outside the ten
 is a usage error naming the valid list (`Error: Unknown axis 'bogus'. Expected one of:
-total, day, step, model, task, backlog, tool, project, person.`, exit `1`), not a silently
-empty artefact. Given both flags at once, `--json` wins and `--axis` is ignored, never the
+total, day, step, model, task, backlog, flow, tool, project, person.`, exit `1`), not a
+silently empty artefact. Given both flags at once, `--json` wins and `--axis` is ignored, never the
 reverse.
 
 **A filter matching nothing names itself**, in `empty_selection`, rather than the object
@@ -125,9 +127,16 @@ real count is the ordinary case of reporting from a project whose switch never c
 work, never a contradiction (see "Attributing records to a task" for the same scope split
 elsewhere in this object).
 
-Every object carries `cost_report_version`, currently `7` — bumped from `6` when
-`by_backlog` joined the top-level breakdowns (a consumer summing every breakdown's
-`requests` against `totals.requests` now has a sixth breakdown to include). `by_backlog`
+Every object carries `cost_report_version`, currently `8` — bumped from `7` when `by_flow`
+joined the top-level breakdowns (a consumer summing every breakdown's `requests` against
+`totals.requests` now has a seventh breakdown to include). `by_flow` groups by which
+orchestrated run the journal's own step sequence already names — no skill declares that it
+orchestrates, so which ones do is a fact this object's own reader declares once, never
+matched from a plugin name — and needs no new capture: the same `step_start` lines
+`by_step` already reads are read again, between whichever of them the declared set names.
+Bumped from `6` when `by_backlog` joined the top-level breakdowns (a consumer summing every
+breakdown's `requests` against `totals.requests` now has a sixth breakdown to include).
+`by_backlog`
 regroups `by_task`'s own per-record membership one level up, by what each task's own
 folder declares (`aidd_docs/tasks/<task>/backlog-link.json`) — never a second notion of
 which task a record belongs to, and resolved once per task rather than once per record.
@@ -162,7 +171,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
 
 ```jsonc
 {
-  "cost_report_version": 7,
+  "cost_report_version": 8,
   "period": { "from_day": "2026-07-01", "to_day": "2026-07-31" },
   "measurement_enabled": true,                  // this project's own switch, right now — see Versioning
   "task": "2026_08/2026_08_21_cost-reporter",   // absent unless --task was given
@@ -177,6 +186,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "by_project": [{ "project": "acme/widgets", "totals": {} }],   // a row with no `project` names none known
   "by_task":    [{ "task": "2026_08/2026_08_21_cost-reporter", "attribution": "declared", "totals": {} }, { "reason": "precedes-declaration", "totals": {} }],  // a row with no `task` carries `reason` instead, naming which of three facts applies; up to three such rows
   "by_backlog": [{ "backlog": "ai-driven-dev/framework#661", "totals": {} }, { "declaration": "none", "totals": {} }, { "declaration": "unreadable", "totals": {} }, { "reason": "precedes-declaration", "totals": {} }],  // a row with no `backlog` carries `declaration` (a known task naming none, or one whose declaration could not be read) or `reason` (a record in no task at all) — never both, never neither
+  "by_flow":    [{ "flow": "aidd-orchestrator:01-sdlc", "started_at": "2026-07-01T09:00:00Z", "totals": {} }, { "flow": "aidd-orchestrator:01-sdlc", "started_at": "2026-07-01T11:00:00Z", "totals": {} }, { "totals": {} }],  // two runs of the same skill are two rows, told apart by `started_at`; the last row is work that fell in no flow interval at all
   "by_day":     [{ "day": "2026-07-01", "totals": {} }],         // every day in the period, in order, gaps included
   "by_person":  [{ "resolution": "mapped", "person": "a-person-id", "identities": ["a-person-id", "a-machine-id"], "totals": {} }],  // mapped rows first, then every unplaced identity, then the one row for records carrying none
   "attribution": [{ "attribution": "tool-stated", "totals": {} }],
@@ -209,17 +219,19 @@ them into money live outside this repository.
 
 ### Breakdowns
 
-`by_step`, `by_model`, `by_tool`, `by_project`, `by_task` and `by_backlog` are ordered
-largest first, with a stable tie-break, so the biggest thing is the first thing you read.
-Ordered by `cost_micro_usd` where a row has one, and by all four token counters summed
-where it does not — never by `input_tokens` and `output_tokens` alone, which every tool
-here dwarfs with cache. `by_task` places every row for what fell in no declared interval
-last regardless of size, in `reason`'s own fixed order (`"no-declaration"`,
+`by_step`, `by_model`, `by_tool`, `by_project`, `by_task`, `by_backlog` and `by_flow` are
+ordered largest first, with a stable tie-break, so the biggest thing is the first thing you
+read. Ordered by `cost_micro_usd` where a row has one, and by all four token counters
+summed where it does not — never by `input_tokens` and `output_tokens` alone, which every
+tool here dwarfs with cache. `by_task` places every row for what fell in no declared
+interval last regardless of size, in `reason`'s own fixed order (`"no-declaration"`,
 `"precedes-declaration"`, `"journal-silent"`) — the same convention `by_person` gives its
 own no-identifier row, a reader sees tasks before the remainder, and the remainder in the
 same order every time. `by_backlog` places its own named rows first, then the row for a
 known task declaring none, then the row for one whose declaration could not be read, then
-every `reason` row in that same fixed order. `by_day` is the one exception: it is
+every `reason` row in that same fixed order. `by_flow` carries no such tail: the row for
+what fell in no flow interval sorts by size exactly like every named one, since there is
+only ever one such row, never a reason to place last. `by_day` is the one exception: it is
 chronological, one row per day the period spans — a series read out of order is not a
 series, and a day nothing ran on is a row of zeros rather than an omitted day.
 
@@ -310,6 +322,42 @@ tasks were confused for each other.
 
 `by_backlog` sums to `totals.requests` exactly like every other breakdown — a damaged or
 absent declaration changes how a task's records are grouped, never how many are counted.
+
+### `by_flow` — grouped by the orchestrated run the journal's own sequence names
+
+`by_flow` answers "what did this orchestrated run cost" — a level above a step and
+unrelated to a task: `aidd-orchestrator:01-sdlc` running end to end is one flow, whatever
+tasks or backlog items it touched along the way. Nothing new is captured for it. Skill
+detection already writes a `step_start` line for any skill, orchestrating or not (the same
+lines `by_step` reads), so a flow is *read* from that sequence, never declared by a hook:
+one flow opens at an orchestrating skill's own `step_start` and closes at whichever of the
+next orchestrating `step_start` or a `turn_end` comes first.
+
+**Which skills orchestrate is declared, once, never matched from a plugin string.** No
+skill's own frontmatter says it orchestrates, and more than one skill in this framework's
+`aidd-orchestrator` plugin plausibly does. `flow-attribution.ts`'s `ORCHESTRATING_SKILLS`
+names them explicitly, in both spellings the journal can carry for the same skill (an
+argument-stated name and a bare directory name — see that module's own doc comment for
+why both exist) — extending it for a project's own orchestrator is the one change adding a
+new one to this axis ever needs.
+
+A row's `flow` names the orchestrating skill; `started_at` names the moment it opened. Both
+are needed to tell two rows apart: **two orchestrated runs of the same skill in one session
+are two rows, never merged into one** — `by_flow` groups by the closed interval a record's
+own moment falls inside, not by the skill's name alone, the same distinction `by_step`
+already draws between a step reached by two different routes. A row with neither field is
+every record whose own moment fell in no flow interval at all — work before the first
+orchestrating step, or between one flow's `turn_end` and the next flow's own opening. There
+is no `reason` breakdown the way `by_task`'s remainder has one: a flow is read from the same
+sequence whichever way a record misses it, so there is only ever the one fact to state.
+
+**A skill a person runs by hand while a flow is open counts inside it.** The journal cannot
+tell a hand-run skill from one the orchestrator itself invoked — both write the identical
+`step_start` line — so neither can this breakdown. State the limit rather than guessing past
+it.
+
+`by_flow` sums to `totals.requests` exactly like every other breakdown, and carries no
+filter of its own — grouping only, the same as `by_person`.
 
 ### `by_person` — three outcomes, never a merge
 

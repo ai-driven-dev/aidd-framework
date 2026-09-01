@@ -9,6 +9,7 @@ import {
   type CostReportToolDeclaration,
   type PersonIdentityUnusableCause,
 } from "../../../domain/models/cost-report.js";
+import { buildFlowIntervals } from "../../../domain/models/flow-attribution.js";
 import type { ResolvedReportPeriod } from "../../../domain/models/report-period.js";
 import { buildTaskIntervals } from "../../../domain/models/task-attribution.js";
 import {
@@ -94,6 +95,7 @@ function toSessionJournal(
     ...(journal.session.project_id === undefined ? {} : { projectId: journal.session.project_id }),
     writtenPaths: journal.filesWritten.map((written) => written.path),
     taskIntervals: buildTaskIntervals(journal, periodEndMs),
+    flowIntervals: buildFlowIntervals(journal, periodEndMs),
   };
 }
 

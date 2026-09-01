@@ -3,9 +3,14 @@ import type {
   RunJournalBoundary,
   RunJournalFileWritten,
   RunJournalTaskDeclared,
-  RunJournalTurnEnd,
 } from "../ports/run-journal-reader.js";
+import { buildClosedIntervals, type ClosedInterval } from "./journal-intervals.js";
 import { taskIdentityFromWrittenPath } from "./task-identity.js";
+
+// Re-exported so this module's own callers and tests need not know the shared walk lives
+// in `journal-intervals.ts` at all - `momentFallsWithin` is generic over `ClosedInterval`,
+// which `TaskInterval` already satisfies structurally.
+export { momentFallsWithin } from "./journal-intervals.js";
 
 /** How a record's task came to be known. A declaration is a flow telling the journal which
  * ticket it is on; an inference is this layer noticing a written file on its own - the same
@@ -22,24 +27,8 @@ export const TASK_ATTRIBUTION_SOURCES: readonly TaskAttributionSource[] = ["decl
  * way `StepInterval` is: no tool exposes when a flow leaves a ticket, so a boundless interval
  * would attribute everything a long-running session goes on to do to the first ticket it
  * ever named, for as long as it keeps running - the failure this type exists to refuse. */
-export interface TaskInterval {
+export interface TaskInterval extends ClosedInterval {
   readonly path: string;
-  readonly startMs: number;
-  readonly endMs: number;
-}
-
-interface TimedBoundary<T> {
-  readonly atMs: number;
-  readonly boundary: T;
-}
-
-function timed<T extends { readonly at: string }>(
-  boundaries: readonly T[]
-): readonly TimedBoundary<T>[] {
-  return boundaries
-    .map((boundary) => ({ atMs: Date.parse(boundary.at), boundary }))
-    .filter(({ atMs }) => !Number.isNaN(atMs))
-    .sort((left, right) => left.atMs - right.atMs);
 }
 
 /**
@@ -80,57 +69,24 @@ function timed<T extends { readonly at: string }>(
  * tool-call text, looser than `taskIdentityFromWrittenPath`, so a session really can declare
  * a path this reader refuses.
  */
-// The journal's own last recorded moment, capped at `periodEndMs` when one is given - see
-// `buildTaskIntervals`'s own doc comment for why a clock-skewed future moment must not
-// widen an unclosed interval past what the report could ever place a record in anyway.
-function lastWitnessedMs(
-  everyWitnessedMoment: readonly TimedBoundary<unknown>[],
-  periodEndMs: number | undefined
-): number | undefined {
-  const witnessedLastMs =
-    everyWitnessedMoment.length > 0
-      ? everyWitnessedMoment[everyWitnessedMoment.length - 1].atMs
-      : undefined;
-  return witnessedLastMs === undefined || periodEndMs === undefined
-    ? witnessedLastMs
-    : Math.min(witnessedLastMs, periodEndMs);
-}
-
 export function buildTaskIntervals(
   journal: RunJournal,
   periodEndMs?: number
 ): readonly TaskInterval[] {
-  const everyWitnessedMoment = timed<
-    RunJournalBoundary | RunJournalTaskDeclared | RunJournalFileWritten
-  >([...journal.boundaries, ...journal.taskDeclarations, ...journal.filesWritten]);
-  const lastMs = lastWitnessedMs(everyWitnessedMoment, periodEndMs);
-
-  const closers = everyWitnessedMoment.filter(
-    (entry): entry is TimedBoundary<RunJournalTaskDeclared | RunJournalTurnEnd> =>
-      entry.boundary.type === "task_declared" || entry.boundary.type === "turn_end"
+  return buildClosedIntervals<
+    RunJournalBoundary | RunJournalTaskDeclared | RunJournalFileWritten,
+    RunJournalTaskDeclared,
+    TaskInterval
+  >(
+    [...journal.boundaries, ...journal.taskDeclarations, ...journal.filesWritten],
+    periodEndMs,
+    (boundary): boundary is RunJournalTaskDeclared => boundary.type === "task_declared",
+    (boundary) => boundary.type === "turn_end",
+    (opener, startMs, endMs) =>
+      taskIdentityFromWrittenPath(opener.path) === null
+        ? null
+        : { path: opener.path, startMs, endMs }
   );
-  const intervals: TaskInterval[] = [];
-  for (let i = 0; i < closers.length; i++) {
-    const { atMs: startMs, boundary } = closers[i];
-    if (boundary.type !== "task_declared") continue;
-    const endMs = closers[i + 1]?.atMs ?? lastMs ?? startMs;
-    if (taskIdentityFromWrittenPath(boundary.path) === null) continue;
-    intervals.push({ path: boundary.path, startMs, endMs });
-  }
-  return intervals;
-}
-
-/** Whether a record's own moment falls inside one of `intervals` - never true for a record
- * with no moment, or one earlier than every interval, which is what keeps a declaration from
- * being read backward onto work that happened before it was ever made. */
-export function momentFallsWithin(
-  intervals: readonly TaskInterval[],
-  momentIso: string | undefined
-): boolean {
-  if (momentIso === undefined) return false;
-  const momentMs = Date.parse(momentIso);
-  if (Number.isNaN(momentMs)) return false;
-  return intervals.some((interval) => momentMs >= interval.startMs && momentMs < interval.endMs);
 }
 
 /** Why a record's own moment falls in none of `intervals` - the three, and only three,

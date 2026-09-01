@@ -10,7 +10,7 @@ The path to `aidd telemetry`, and the question the user asked, in their own word
 ## Output
 
 **One axis, asked for by name.** Run
-`aidd telemetry report --axis <total|day|step|model|task|backlog|tool|project|person> --from <day> --to <day>`,
+`aidd telemetry report --axis <total|day|step|model|task|backlog|flow|tool|project|person> --from <day> --to <day>`,
 never alongside `--json` - the axis flag already picks the one rendering that answers the
 question, printed exactly as the script wrote it:
 
@@ -73,6 +73,12 @@ else.
 | --- | --- | --- |
 | <backlog item, or "this task declares no backlog item" \| "this task's backlog declaration could not be read" \| the same reason "By task" gives a record in no task at all> | <n>% | <tokens> |
 
+**By flow**
+
+| Flow | Share | Tokens |
+| --- | --- | --- |
+| <the orchestrating skill and when it opened, or "outside any flow"> | <n>% | <tokens> |
+
 <one line per limit that applies, or nothing>
 ```
 
@@ -87,9 +93,12 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    - One axis: `aidd telemetry report --axis <axis> --from 2026-08-01 --to 2026-08-31`.
    - Everything: `aidd telemetry report --from 2026-08-01 --to 2026-08-31 --json`, reading the shape from [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md).
    - The figure will be kept or compared: give `--from` and `--to`, since `--days` resolves against today and two identical calls on two days cover two different periods.
-3. **Refuse an unknown shape.** `cost_report_version` is `7` today, read from the `--json`
+3. **Refuse an unknown shape.** `cost_report_version` is `8` today, read from the `--json`
    path - the `--axis` path prints text the script already built from that same object, so
-   there is no separate version to check there. The bump from `6` to `7` added `by_backlog`
+   there is no separate version to check there. The bump from `7` to `8` added `by_flow`
+   to the top-level breakdowns: which orchestrated run the journal's own step sequence
+   already names (see [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md)),
+   nothing newly captured for it. The bump from `6` to `7` added `by_backlog`
    to the top-level breakdowns: every task's records regrouped by what its own folder
    declares (see [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md)),
    never a second notion of which task a record belongs to. The bump from `5` to `6` did
@@ -116,6 +125,12 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    - `by_backlog` answers a different question again: not which task, but which backlog
      item - "issue #661 cost X", never "this task cost X". Two tasks declaring the same
      item are already merged into one row; nothing here re-merges anything.
+   - `by_flow` answers "what did this orchestrated run cost" - unrelated to task or
+     backlog, and read from the journal's own step sequence with nothing new captured for
+     it. Two runs of the *same* orchestrating skill in one session are two rows, told apart
+     by when each opened - never merge them by name. A skill a person ran by hand while a
+     flow was open is counted inside it, since the journal cannot tell it from one the
+     orchestrator itself invoked - say so if it changes how a figure reads.
 5. **Read `capability` before explaining an absent figure.** A tool that cannot supply a number and a session that consumed nothing look identical in the numbers.
 
    | False field | Means |
@@ -139,6 +154,8 @@ A breakdown the object leaves empty is a section left out, never a table of zero
 | A question asks per person | the `person` axis is used, one row per resolved person plus every unresolved identity |
 | A question asks per framework task | the `task` axis is used, one row per task declared in the period plus the row for what declared none |
 | A question asks per backlog item, or what a ticket cost | the `backlog` axis is used, one row per declared item, tasks that named none merged into their own row |
+| A question asks per orchestrated run, or what a pipeline cost | the `flow` axis is used, one row per run the journal's sequence names, plus the row for work outside any flow |
+| The same orchestrating skill ran twice in one session | two rows, told apart by when each opened, never merged into one |
 | A tool carries no amount | the answer says unknown and never prints a currency zero |
 | A tool is not covered | the answer gives its declared reason instead of a figure |
 | The read was partial | the answer says so before giving the total |

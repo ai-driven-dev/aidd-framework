@@ -76,6 +76,7 @@ const JOURNALS: readonly CostReportSessionJournal[] = [
         endMs: Date.parse("2026-08-17T12:00:00Z"),
       },
     ],
+    flowIntervals: [],
   },
 ];
 const RECORDS: readonly TelemetrySinkRecord[] = [
@@ -149,7 +150,13 @@ describe("buildCostReport — by_task groups by the declared interval a record f
 
   it("holds everything in the no-task row when nothing was ever declared, and still reconciles", () => {
     const journals: readonly CostReportSessionJournal[] = [
-      { vendorId: "s-silent", tool: "codex", writtenPaths: [], taskIntervals: [] },
+      {
+        vendorId: "s-silent",
+        tool: "codex",
+        writtenPaths: [],
+        taskIntervals: [],
+        flowIntervals: [],
+      },
     ];
     const records: readonly TelemetrySinkRecord[] = [
       request({ vendor_id: "s-silent", cost_usd: 5, event_timestamp: "2026-08-17T10:00:00Z" }),
@@ -173,6 +180,7 @@ describe("buildCostReport — by_task groups by the declared interval a record f
         tool: "claude-code",
         writtenPaths: ["aidd_docs/tasks/2026_08/first-task/plan.md"],
         taskIntervals: [],
+        flowIntervals: [],
       },
     ];
     const records: readonly TelemetrySinkRecord[] = [
@@ -201,6 +209,7 @@ describe("buildCostReport — by_task groups by the declared interval a record f
         tool: "claude-code",
         writtenPaths: ["aidd_docs/tasks/2026_08/first-task/plan.md"],
         taskIntervals: [],
+        flowIntervals: [],
       },
     ];
     const records: readonly TelemetrySinkRecord[] = [
@@ -239,6 +248,7 @@ describe("buildCostReport — by_task groups by the declared interval a record f
             endMs: Date.parse("2026-02-10T09:40:00Z"),
           },
         ],
+        flowIntervals: [],
       },
     ];
     const records: readonly TelemetrySinkRecord[] = [

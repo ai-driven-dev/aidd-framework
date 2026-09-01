@@ -18,6 +18,16 @@ import type { AiToolId } from "./tool-ids.js";
  * `sink_schema_version` exists on a stored line. Adding a field a consumer may ignore is
  * not a bump; changing what an existing field means is.
  *
+ * Bumped to 8: `by_flow` is a new top-level breakdown - a consumer summing every
+ * breakdown's `requests` against `totals.requests` to check nothing was dropped now has a
+ * seventh breakdown to include, the same reasoning that bumped `by_backlog` in. Grouped
+ * from the journal's own step sequence, read between whichever skills the domain declares
+ * as orchestrating (`flow-attribution.ts`'s `ORCHESTRATING_SKILLS`) - never a second
+ * capture, and never a new hook line. A row with no `flow` is the work that fell in no
+ * flow interval at all; unlike `by_task` and `by_backlog`, it carries no `reason` breaking
+ * that remainder down further; a flow is read from the same sequence whichever way a
+ * record misses it, so there is only ever one fact to state.
+ *
  * Bumped to 7: `by_backlog` is a new top-level breakdown - a consumer summing every
  * breakdown's `requests` against `totals.requests` to check nothing was dropped now has a
  * sixth breakdown to include, the same reasoning that bumped `by_task` in. Groups the same
@@ -55,7 +65,7 @@ import type { AiToolId } from "./tool-ids.js";
  * `by_project`'s `project` to optional back when that row was added.
  *
  * Bumped to 2: `by_project` and `by_day` are new top-level breakdowns. */
-export const COST_REPORT_ENVELOPE_VERSION = 7;
+export const COST_REPORT_ENVELOPE_VERSION = 8;
 
 /** Money as whole micro-dollars, the way the report carries it: an integer, so a consumer
  * summing several reports gets the same answer this one did. Divide by 1,000,000 for
@@ -154,6 +164,16 @@ export interface CostReportEnvelopeBacklogRow {
   readonly totals: CostReportEnvelopeTotals;
 }
 
+/** One orchestrated run's figures — see `CostReportFlowRow`. `flow` names the orchestrating
+ * skill and `startedAt` when it opened, together telling apart two rows that share a name:
+ * the same skill run twice in one session is two rows, never merged into one. Both are
+ * absent on the one row for work that fell in no flow interval at all. */
+export interface CostReportEnvelopeFlowRow {
+  readonly flow?: string;
+  readonly started_at?: string;
+  readonly totals: CostReportEnvelopeTotals;
+}
+
 /** One UTC day's figures. Every day the period spans, in order, whether or not a record
  * landed on it — a day with nothing is a row of zeros, never an omitted row. */
 export interface CostReportEnvelopeDayRow {
@@ -223,6 +243,7 @@ export interface CostReportEnvelope {
   readonly by_project: readonly CostReportEnvelopeProjectRow[];
   readonly by_task: readonly CostReportEnvelopeTaskRow[];
   readonly by_backlog: readonly CostReportEnvelopeBacklogRow[];
+  readonly by_flow: readonly CostReportEnvelopeFlowRow[];
   /** Every day the period spans, always — a long period stays readable by how the text
    * rendering chooses to show it, never by what this envelope omits. */
   readonly by_day: readonly CostReportEnvelopeDayRow[];
@@ -320,6 +341,14 @@ function backlogRow(row: CostReport["byBacklog"][number]): CostReportEnvelopeBac
   };
 }
 
+function flowRow(row: CostReport["byFlows"][number]): CostReportEnvelopeFlowRow {
+  return {
+    ...(row.flow === undefined ? {} : { flow: row.flow }),
+    ...(row.startedAt === undefined ? {} : { started_at: row.startedAt }),
+    totals: totals(row.totals),
+  };
+}
+
 function personRow(row: CostReport["byPeople"][number]): CostReportEnvelopePersonRow {
   return {
     resolution: row.resolution,
@@ -382,6 +411,7 @@ function breakdownFields(
   | "by_project"
   | "by_task"
   | "by_backlog"
+  | "by_flow"
   | "by_day"
   | "by_person"
 > {
@@ -392,6 +422,7 @@ function breakdownFields(
     by_project: report.byProjects.map(projectRow),
     by_task: report.byTasks.map(taskRow),
     by_backlog: report.byBacklog.map(backlogRow),
+    by_flow: report.byFlows.map(flowRow),
     by_day: report.byDays.map((row) => ({ day: row.day, totals: totals(row.totals) })),
     by_person: report.byPeople.map(personRow),
   };

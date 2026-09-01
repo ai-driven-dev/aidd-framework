@@ -92,6 +92,7 @@ const JOURNALS: readonly CostReportSessionJournal[] = [
         endMs: Date.parse("2026-08-17T14:00:00Z"),
       },
     ],
+    flowIntervals: [],
   },
 ];
 

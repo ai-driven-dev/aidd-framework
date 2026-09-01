@@ -1,5 +1,6 @@
 import type { TelemetryRouteSupply } from "../capabilities/telemetry-capability.js";
 import type { PersonIdentity } from "../ports/person-identity-reader.js";
+import type { FlowInterval } from "./flow-attribution.js";
 import { type PersonResolution, type ResolvedPerson, resolvePerson } from "./person-resolution.js";
 import { STEP_ATTRIBUTION_SOURCES, type StepAttributionSource } from "./step-attribution.js";
 import {
@@ -198,6 +199,30 @@ export interface CostReportBacklogRow {
   readonly totals: CostTotals;
 }
 
+/** One orchestrated run's figures - keyed on the closed `FlowInterval` a record's own
+ * moment falls inside, never on `flow` (the orchestrating skill's name) alone: a session
+ * running the same orchestrating skill twice must stay two rows, not one row merged by
+ * name (see `flow-attribution.ts`'s own doc on `buildFlowIntervals`). `startedAt` is the
+ * flow's own opening moment, carried beside `flow` so two rows that do share a name are
+ * still told apart - the same reason `CostReportStepRow` carries `attribution` beside
+ * `step`.
+ *
+ * Absent on the one row for every record whose own moment falls in no flow interval at
+ * all - a normal state, its own row, never folded into a named one and never split by a
+ * reason the way `CostReportTaskRow`'s remainder is: nothing about *why* a record sits
+ * outside every flow needs telling apart the way "no declaration" and "the journal falls
+ * silent" do for a task, since a flow is read from the same sequence either way.
+ *
+ * **The limit stated where this figure is read:** a skill a person runs by hand while a
+ * flow is open still counts inside it. The journal cannot tell a hand-run skill from one
+ * the orchestrator itself invoked - both write the identical `step_start` line - so
+ * neither can this breakdown. */
+export interface CostReportFlowRow {
+  readonly flow?: string;
+  readonly startedAt?: string;
+  readonly totals: CostTotals;
+}
+
 /** One person's figures — a mapped person, one unplaced identity, or the records that
  * carried none at all. `person` is the canonical `personId`, present only when `resolution`
  * is `"mapped"`; the raw identifier that produced an `"unresolved"` row lives in
@@ -233,6 +258,9 @@ export interface CostReportSessionJournal {
   readonly projectId?: string;
   readonly writtenPaths: readonly string[];
   readonly taskIntervals: readonly TaskInterval[];
+  /** Straight from `buildFlowIntervals`, the same way `taskIntervals` comes from
+   * `buildTaskIntervals` - built once per session, never re-derived per record. */
+  readonly flowIntervals: readonly FlowInterval[];
 }
 
 /** The four dimensions that narrow on an equal record field - `task` keeps its own route
@@ -349,6 +377,10 @@ export interface CostReport {
   /** Every task's records regrouped by what its folder declares - see
    * `CostReportBacklogRow`. Sums to `totals` exactly like every other breakdown. */
   readonly byBacklog: readonly CostReportBacklogRow[];
+  /** One row per orchestrated run the journal's own sequence names, plus the one row for
+   * work that ran outside every flow - see `CostReportFlowRow`. Sums to `totals` exactly
+   * like every other breakdown. */
+  readonly byFlows: readonly CostReportFlowRow[];
   readonly byDays: readonly CostReportDayRow[];
   /** Mapped people first, then every unplaced identity, then the one row for records
    * carrying none at all - a reader sees people before gaps. Within the mapped and the
@@ -634,6 +666,51 @@ function backlogKeyOf(
   if (declaration.kind === "none") return NO_BACKLOG_DECLARED;
   if (declaration.kind === "unreadable") return UNREADABLE_BACKLOG_DECLARATION;
   return declaration.link.backlog;
+}
+
+// A record falling in no flow interval at all is its own group, keyed on this symbol -
+// never a plain string sentinel: a `FlowInterval` is never itself a valid key value here
+// (see `FlowRowKey` below), so nothing about a real interval could ever collide with it,
+// unlike `NO_BACKLOG_DECLARED`'s own worry about a free-form backlog string.
+const OUTSIDE_EVERY_FLOW = Symbol("record falls outside every flow interval");
+
+// Keyed on the closed `FlowInterval` object itself, by reference, never on `skill` alone:
+// two orchestrated runs of the same skill in one session are two distinct `FlowInterval`
+// objects (`buildFlowIntervals`'s own doc comment), and a `Map` keyed on object identity
+// keeps them two rows without needing a synthesized composite string key. This also gives
+// `byFlows` for free the property `phase-1.md` asks of it: a record outside every flow can
+// never collide with one inside, since `OUTSIDE_EVERY_FLOW` is a symbol no interval object
+// can ever equal.
+type FlowRowKey = FlowInterval | typeof OUTSIDE_EVERY_FLOW;
+
+/** Every session's own closed flow intervals, keyed by vendor id - the same shape
+ * `allTaskIntervalsByVendorId` gives task intervals, one layer wider. */
+function allFlowIntervalsByVendorId(
+  journals: readonly CostReportSessionJournal[]
+): ReadonlyMap<string, readonly FlowInterval[]> {
+  const byVendorId = new Map<string, readonly FlowInterval[]>();
+  for (const journal of journals) {
+    if (journal.flowIntervals.length > 0) byVendorId.set(journal.vendorId, journal.flowIntervals);
+  }
+  return byVendorId;
+}
+
+/** Which flow interval a record's own moment falls inside, among all of its session's
+ * orchestrated runs - `OUTSIDE_EVERY_FLOW` for a record whose moment falls in none, the
+ * same "no reason taxonomy" spec's own hard constraint gives this axis: unlike a task's
+ * three distinct gaps, nothing here needs telling apart *why* a record sits outside every
+ * flow, since a flow is read from the same sequence either way. Intervals within one
+ * session are closed and never overlap (`buildFlowIntervals`), so at most one ever
+ * matches. */
+function flowKeyOf(
+  record: TelemetrySinkRecord,
+  intervalsByVendorId: ReadonlyMap<string, readonly FlowInterval[]>
+): FlowRowKey {
+  const intervals = intervalsByVendorId.get(record.vendor_id) ?? [];
+  const interval = intervals.find((candidate) =>
+    momentFallsWithin([candidate], record.event_timestamp)
+  );
+  return interval ?? OUTSIDE_EVERY_FLOW;
 }
 
 // A record with no identifier is its own row, keyed on a symbol the same way
@@ -944,6 +1021,7 @@ interface Groups {
   readonly projects: Map<ProjectKey, TotalsAccumulator>;
   readonly tasks: Map<TaskRowKey, TotalsAccumulator>;
   readonly backlog: Map<BacklogRowKey, TotalsAccumulator>;
+  readonly flows: Map<FlowRowKey, TotalsAccumulator>;
   readonly people: Map<PersonRowKey, PersonGroup>;
   readonly days: Map<string, TotalsAccumulator>;
   activeTimeSeconds?: number;
@@ -963,6 +1041,7 @@ function emptyGroups(fromDay: string, toDay: string): Groups {
     projects: new Map(),
     tasks: new Map(),
     backlog: new Map(),
+    flows: new Map(),
     people: new Map(),
     days,
   };
@@ -994,6 +1073,7 @@ function accumulateRequestRecord(
   record: TelemetrySinkRecord,
   membership: TaskMembership | null,
   taskIntervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>,
+  flowIntervalsByVendorId: ReadonlyMap<string, readonly FlowInterval[]>,
   identity: PersonIdentity | null,
   taskBacklogDeclarations: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration> | undefined
 ): void {
@@ -1006,6 +1086,7 @@ function accumulateRequestRecord(
   const taskRowKey = declaredTaskKeyOf(record, taskIntervalsByVendorId);
   accumulateInto(groups.tasks, taskRowKey, record);
   accumulateInto(groups.backlog, backlogKeyOf(taskRowKey, taskBacklogDeclarations), record);
+  accumulateInto(groups.flows, flowKeyOf(record, flowIntervalsByVendorId), record);
   addToPersonGroup(groups.people, record, resolvePerson(identity, personRawIdOf(record)));
   const day = telemetrySinkRecordDayKey(record);
   if (day !== undefined && groups.days.has(day)) groups.days.get(day)?.add(record);
@@ -1024,6 +1105,7 @@ function accumulate(
 ): Groups {
   const groups = emptyGroups(fromDay, toDay);
   const taskIntervalsByVendorId = allTaskIntervalsByVendorId(journals);
+  const flowIntervalsByVendorId = allFlowIntervalsByVendorId(journals);
   for (const record of records) {
     if (record.kind === "session") {
       accumulateSessionRecord(groups, record);
@@ -1034,6 +1116,7 @@ function accumulate(
       record,
       membership,
       taskIntervalsByVendorId,
+      flowIntervalsByVendorId,
       identity,
       taskBacklogDeclarations
     );
@@ -1181,6 +1264,36 @@ function backlogRows(
   return [...sorted, ...(none ? [none] : []), ...(unreadable ? [unreadable] : []), ...reasonRows];
 }
 
+// Second precision, no milliseconds - the same spelling `record.cjs`'s own `nowIso` writes
+// to the journal's `at` field. `startMs` here always comes from `Date.parse`-ing one such
+// value, so its own milliseconds are already zero; this only strips the ".000" `toISOString`
+// would otherwise append, so a row's `startedAt` string-matches the journal line it opened
+// on rather than looking like a different moment.
+function isoSecondsFromMs(ms: number): string {
+  return new Date(ms).toISOString().replace(/\.\d{3}Z$/u, "Z");
+}
+
+/** Every orchestrated run the period's journals name, largest first, then the one row for
+ * work that fell in no flow interval at all - see `CostReportFlowRow`. No reason taxonomy
+ * the way `by_task`'s and `by_backlog`'s own remainders carry one: a flow is read from the
+ * same sequence either way, so there is only one fact to state about falling outside every
+ * one of them, never three. */
+function flowRows(flows: ReadonlyMap<FlowRowKey, TotalsAccumulator>): readonly CostReportFlowRow[] {
+  const rows: CostReportFlowRow[] = [];
+  for (const [key, accumulator] of flows) {
+    rows.push(
+      key === OUTSIDE_EVERY_FLOW
+        ? { totals: accumulator.build() }
+        : { flow: key.skill, startedAt: isoSecondsFromMs(key.startMs), totals: accumulator.build() }
+    );
+  }
+  return bySize(
+    rows,
+    (row) => row.totals,
+    (row) => `${row.flow ?? ""}@${row.startedAt ?? ""}`
+  );
+}
+
 /** Every day in the period, in order — never sorted by size, unlike every other breakdown
  * here. A series read out of order is not a series. */
 function dayRows(days: ReadonlyMap<string, TotalsAccumulator>): readonly CostReportDayRow[] {
@@ -1305,6 +1418,7 @@ function breakdownFields(
   | "byProjects"
   | "byTasks"
   | "byBacklog"
+  | "byFlows"
   | "byDays"
   | "byPeople"
 > {
@@ -1315,6 +1429,7 @@ function breakdownFields(
     byProjects: projectRows(groups.projects),
     byTasks: taskRows(groups.tasks),
     byBacklog: backlogRows(groups.backlog),
+    byFlows: flowRows(groups.flows),
     byDays: dayRows(groups.days),
     byPeople: personRows(groups.people),
   };

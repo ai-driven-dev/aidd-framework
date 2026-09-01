@@ -36,6 +36,7 @@ export const ARTEFACT_AXES = [
   "model",
   "task",
   "backlog",
+  "flow",
   "tool",
   "project",
   "person",
@@ -271,6 +272,34 @@ function backlogArtefact(envelope: CostReportEnvelope): string {
   return table(envelope, "by backlog", "Backlog item", rows);
 }
 
+const OUTSIDE_EVERY_FLOW_LABEL = "outside any flow";
+
+/** A third column beside the generic `table()` helper's two, for the same reason
+ * `stepArtefact` carries one: two rows can share a `flow` name - the same orchestrating
+ * skill run twice in one session - and this table must never let the two read as one run
+ * double-counted. `startedAt` is what tells them apart; the row for work outside every
+ * flow carries neither and prints an em dash the same way `taskArtefact` does for a
+ * reason-only row's own missing attribution.
+ *
+ * A skill a person runs by hand while a flow is open is counted inside it: the journal
+ * cannot tell it apart from one the orchestrator itself invoked, since both write the
+ * identical `step_start` line - see `CostReportFlowRow`'s own doc comment. */
+function flowArtefact(envelope: CostReportEnvelope): string {
+  const rows = envelope.by_flow.map((row) => {
+    const flow = row.flow ?? OUTSIDE_EVERY_FLOW_LABEL;
+    const openedAt = row.started_at ?? "—";
+    return `| ${flow} | ${openedAt} | ${figure(row.totals, envelope)} |`;
+  });
+  return [
+    header(envelope, "by flow"),
+    "",
+    "| Flow | Opened at | Total |",
+    "| --- | --- | --- |",
+    ...rows,
+    ...caveats(envelope),
+  ].join("\n");
+}
+
 function modelArtefact(envelope: CostReportEnvelope): string {
   return table(
     envelope,
@@ -349,6 +378,7 @@ const BUILDERS: Record<ArtefactAxis, (envelope: CostReportEnvelope) => string> =
   model: modelArtefact,
   task: taskArtefact,
   backlog: backlogArtefact,
+  flow: flowArtefact,
   tool: toolArtefact,
   project: projectArtefact,
   person: personArtefact,

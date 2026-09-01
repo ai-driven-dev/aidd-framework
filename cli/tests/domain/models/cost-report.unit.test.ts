@@ -769,12 +769,14 @@ describe("buildCostReport — a task is a filter over a period", () => {
       tool: "claude-code",
       writtenPaths: ["aidd_docs/tasks/2026_08/2026_08_21_cost-reporter/plan.md"],
       taskIntervals: [],
+      flowIntervals: [],
     },
     {
       vendorId: "s-other",
       tool: "claude-code",
       writtenPaths: ["cli/src/index.ts"],
       taskIntervals: [],
+      flowIntervals: [],
     },
   ];
   const RECORDS: readonly TelemetrySinkRecord[] = [
@@ -840,6 +842,7 @@ describe("buildCostReport — a task can be declared, not just derived", () => {
         tool: "codex",
         writtenPaths: [],
         taskIntervals: [closedAt("2026-08-17T10:00:00Z", "2026-08-17T11:00:00Z")],
+        flowIntervals: [],
       },
     ];
     const records: readonly TelemetrySinkRecord[] = [
@@ -857,7 +860,13 @@ describe("buildCostReport — a task can be declared, not just derived", () => {
 
   it("a session that never declared and never wrote into the folder belongs to none - never the last one seen", () => {
     const journals: readonly CostReportSessionJournal[] = [
-      { vendorId: "s-silent", tool: "codex", writtenPaths: [], taskIntervals: [] },
+      {
+        vendorId: "s-silent",
+        tool: "codex",
+        writtenPaths: [],
+        taskIntervals: [],
+        flowIntervals: [],
+      },
     ];
     const records: readonly TelemetrySinkRecord[] = [
       request({ vendor_id: "s-silent", cost_usd: 9, event_timestamp: "2026-08-17T10:30:00Z" }),
@@ -874,8 +883,15 @@ describe("buildCostReport — a task can be declared, not just derived", () => {
         tool: "codex",
         writtenPaths: [],
         taskIntervals: [declared("2026-08-17T10:00:00Z")],
+        flowIntervals: [],
       },
-      { vendorId: "s-later", tool: "codex", writtenPaths: [], taskIntervals: [] },
+      {
+        vendorId: "s-later",
+        tool: "codex",
+        writtenPaths: [],
+        taskIntervals: [],
+        flowIntervals: [],
+      },
     ];
     const records: readonly TelemetrySinkRecord[] = [
       request({ vendor_id: "s-later", cost_usd: 5, event_timestamp: "2026-08-20T09:00:00Z" }),
@@ -891,6 +907,7 @@ describe("buildCostReport — a task can be declared, not just derived", () => {
         tool: "codex",
         writtenPaths: [],
         taskIntervals: [declared("2026-08-17T10:00:00Z")],
+        flowIntervals: [],
       },
     ];
     const records: readonly TelemetrySinkRecord[] = [
@@ -908,6 +925,7 @@ describe("buildCostReport — a task can be declared, not just derived", () => {
         tool: "claude",
         writtenPaths: [WANTED_PATH],
         taskIntervals: [closedAt("2026-08-17T10:00:00Z", "2026-08-17T10:15:00Z")],
+        flowIntervals: [],
       },
     ];
     const records: readonly TelemetrySinkRecord[] = [
@@ -922,6 +940,223 @@ describe("buildCostReport — a task can be declared, not just derived", () => {
       (built.taskAttributionMix ?? []).map((row) => [row.attribution, row.totals.requests])
     );
     expect(mix).toEqual({ declared: 1, inferred: 1 });
+  });
+});
+
+describe("buildCostReport — by_flow reads the journal's own sequence, nothing declared", () => {
+  it("gives two orchestrated runs of the same skill in one session two rows, never one merged by name", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-two-sdlc-runs",
+        tool: "claude-code",
+        writtenPaths: [],
+        taskIntervals: [],
+        flowIntervals: [
+          {
+            skill: "aidd-orchestrator:01-sdlc",
+            startMs: Date.parse("2026-08-17T10:00:00Z"),
+            endMs: Date.parse("2026-08-17T11:00:00Z"),
+          },
+          {
+            skill: "aidd-orchestrator:01-sdlc",
+            startMs: Date.parse("2026-08-17T11:00:00Z"),
+            endMs: Date.parse("2026-08-17T12:00:00Z"),
+          },
+        ],
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({
+        vendor_id: "s-two-sdlc-runs",
+        cost_usd: 3,
+        event_timestamp: "2026-08-17T10:30:00Z",
+      }),
+      request({
+        vendor_id: "s-two-sdlc-runs",
+        cost_usd: 7,
+        event_timestamp: "2026-08-17T11:30:00Z",
+      }),
+    ];
+
+    const built = report({ records, journals });
+
+    const named = built.byFlows.filter((row) => row.flow !== undefined);
+    expect(named).toHaveLength(2);
+    expect(named.every((row) => row.flow === "aidd-orchestrator:01-sdlc")).toBe(true);
+    expect(named.map((row) => row.totals.requests).sort()).toEqual([1, 1]);
+  });
+
+  it("puts a hand-run skill's cost inside the flow it ran during - the journal cannot tell it apart from one the orchestrator invoked", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-hand-run",
+        tool: "claude-code",
+        writtenPaths: [],
+        taskIntervals: [],
+        flowIntervals: [
+          {
+            skill: "aidd-orchestrator:01-sdlc",
+            startMs: Date.parse("2026-08-17T10:00:00Z"),
+            endMs: Date.parse("2026-08-17T12:00:00Z"),
+          },
+        ],
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      // A skill a person ran by hand, mid-flow.
+      request({
+        vendor_id: "s-hand-run",
+        cost_usd: 2,
+        step: "aidd-dev:02-implement",
+        event_timestamp: "2026-08-17T10:30:00Z",
+      }),
+    ];
+
+    const built = report({ records, journals });
+
+    const flowRow = built.byFlows.find((row) => row.flow === "aidd-orchestrator:01-sdlc");
+    expect(flowRow?.totals.requests).toBe(1);
+  });
+
+  it("gives work before the first orchestrating step its own row, outside any flow", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-before",
+        tool: "claude-code",
+        writtenPaths: [],
+        taskIntervals: [],
+        flowIntervals: [
+          {
+            skill: "aidd-orchestrator:01-sdlc",
+            startMs: Date.parse("2026-08-17T10:00:00Z"),
+            endMs: Date.parse("2026-08-17T11:00:00Z"),
+          },
+        ],
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({ vendor_id: "s-before", cost_usd: 1, event_timestamp: "2026-08-17T09:00:00Z" }),
+      request({ vendor_id: "s-before", cost_usd: 4, event_timestamp: "2026-08-17T10:30:00Z" }),
+    ];
+
+    const built = report({ records, journals });
+
+    const outside = built.byFlows.find((row) => row.flow === undefined);
+    expect(outside?.totals.requests).toBe(1);
+    expect(outside?.totals.costMicroUsd).toBe(toMicroUsd(1));
+  });
+
+  it("gives a session that never ran an orchestrating skill exactly one row, outside every flow, total intact", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-plain",
+        tool: "claude-code",
+        writtenPaths: [],
+        taskIntervals: [],
+        flowIntervals: [],
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({ vendor_id: "s-plain", cost_usd: 5, event_timestamp: "2026-08-17T10:00:00Z" }),
+    ];
+
+    const built = report({ records, journals });
+
+    expect(built.byFlows).toHaveLength(1);
+    expect(built.byFlows[0]?.flow).toBeUndefined();
+    expect(built.byFlows[0]?.totals.requests).toBe(1);
+  });
+
+  it("holds nothing, and says so rather than swallowing later work, for a flow opened at the journal's very last moment", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-opened-last",
+        tool: "claude-code",
+        writtenPaths: [],
+        taskIntervals: [],
+        // Unclosed - capped at its own start, the journal's own last witnessed moment.
+        flowIntervals: [
+          {
+            skill: "aidd-orchestrator:01-sdlc",
+            startMs: Date.parse("2026-08-17T10:00:00Z"),
+            endMs: Date.parse("2026-08-17T10:00:00Z"),
+          },
+        ],
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      // At the very moment the flow opened - the half-open interval [t, t) holds nothing.
+      request({ vendor_id: "s-opened-last", cost_usd: 9, event_timestamp: "2026-08-17T10:00:00Z" }),
+    ];
+
+    const built = report({ records, journals });
+
+    expect(built.byFlows.some((row) => row.flow === "aidd-orchestrator:01-sdlc")).toBe(false);
+    const outside = built.byFlows.find((row) => row.flow === undefined);
+    expect(outside?.totals.requests).toBe(1);
+  });
+
+  it("reconciles by_flow to the same total as every other breakdown", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-mixed-flows",
+        tool: "claude-code",
+        writtenPaths: [],
+        taskIntervals: [],
+        flowIntervals: [
+          {
+            skill: "aidd-orchestrator:01-sdlc",
+            startMs: Date.parse("2026-08-17T10:00:00Z"),
+            endMs: Date.parse("2026-08-17T11:00:00Z"),
+          },
+          {
+            skill: "aidd-orchestrator:02-backlog",
+            startMs: Date.parse("2026-08-17T11:00:00Z"),
+            endMs: Date.parse("2026-08-17T12:00:00Z"),
+          },
+        ],
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({ vendor_id: "s-mixed-flows", cost_usd: 1, event_timestamp: "2026-08-17T09:00:00Z" }),
+      request({ vendor_id: "s-mixed-flows", cost_usd: 2, event_timestamp: "2026-08-17T10:30:00Z" }),
+      request({ vendor_id: "s-mixed-flows", cost_usd: 3, event_timestamp: "2026-08-17T11:30:00Z" }),
+    ];
+
+    const built = report({ records, journals });
+
+    expect(built.byFlows).toHaveLength(3);
+    expect(sumOf(built.byFlows)).toEqual({
+      requests: built.totals.requests,
+      costMicroUsd: built.totals.costMicroUsd,
+      inputTokens: built.totals.inputTokens ?? 0,
+      outputTokens: built.totals.outputTokens ?? 0,
+    });
+  });
+
+  it("opens no flow for a skill outside the declared set, however plausible its name", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-unrelated",
+        tool: "claude-code",
+        writtenPaths: [],
+        taskIntervals: [],
+        flowIntervals: [],
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({
+        vendor_id: "s-unrelated",
+        cost_usd: 1,
+        step: "aidd-orchestrator:03-does-not-exist",
+        event_timestamp: "2026-08-17T10:00:00Z",
+      }),
+    ];
+
+    const built = report({ records, journals });
+
+    expect(built.byFlows).toHaveLength(1);
+    expect(built.byFlows[0]?.flow).toBeUndefined();
   });
 });
 

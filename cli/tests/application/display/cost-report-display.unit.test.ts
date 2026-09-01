@@ -148,6 +148,7 @@ describe("printCostReport", () => {
           tool: "claude",
           writtenPaths: ["aidd_docs/tasks/2026_08/2026_08_01_x/plan.md"],
           taskIntervals: [],
+          flowIntervals: [],
         },
       ],
       task: "2026_08/2026_08_01_x",
@@ -292,6 +293,7 @@ describe("printCostReport", () => {
           tool: "claude-code",
           writtenPaths: ["aidd_docs/tasks/2026_08/2026_08_21_cost-reporter/plan.md"],
           taskIntervals: [],
+          flowIntervals: [],
         },
       ],
       task: "2026_08/2026_08_21_cost-reporter",
@@ -319,6 +321,7 @@ describe("printCostReport", () => {
           projectId: "acme-widgets",
           writtenPaths: ["aidd_docs/tasks/2026_08/2026_08_21_cost-reporter/plan.md"],
           taskIntervals: [],
+          flowIntervals: [],
         },
       ],
     });
