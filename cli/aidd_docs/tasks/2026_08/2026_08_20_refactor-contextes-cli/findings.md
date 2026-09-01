@@ -342,3 +342,35 @@ de node compris, donc la réponse sûre est aussi la moins chère.
 Effet de bord traité au passage : les diagnostics de construction remontaient dès lors sur chaque
 commande. Ils appartiennent à `aidd framework build`, où l'utilisateur a demandé une construction ;
 la reconstruction de cache les trace désormais en `--verbose`.
+
+## Ce que le découpage doit faire bouger, mesuré (2026-09-01)
+
+245 fichiers, 22 326 lignes. Les six dossiers qui dépassent dix fichiers source directs :
+
+| dossier | fichiers |
+|---|---|
+| `domain/models` | 29 |
+| `domain/ports` | 25 |
+| `infrastructure/adapters` | 23 |
+| `domain/formats` | 21 |
+| `application/commands` | 16 |
+| `use-cases/shared` | 14 |
+
+Et les quatre fichiers qui portent trop :
+
+| fichier | lignes |
+|---|---|
+| `use-cases/framework/strategies/tool-contracts.ts` | 820 |
+| `infrastructure/deps.ts` | 743 |
+| `use-cases/marketplace/marketplace-sync-settings-use-case.ts` | 543 |
+| `domain/models/manifest.ts` | 529 |
+
+`tool-contracts.ts` est aussi dans la base du cliquet « coût d'un outil » : les deux mesures
+désignent le même fichier, ce qui en fait la cible la plus rentable des extractions.
+
+## Le déterminisme des e2e, vérifié (2026-09-01)
+
+Aucun appel réseau, aucune dépendance à l'ordre, aucune horloge dans le golden. Les deux usages de
+`Date.now()` sont légitimes : un nom de fichier temporaire unique, et un `checkedAt` que le test
+fournit lui-même comme donnée d'entrée. Le seul vrai risque était la dépendance aux binaires
+d'outils installés sur la machine, retirée en filtrant le `PATH` des runs bac à sable.

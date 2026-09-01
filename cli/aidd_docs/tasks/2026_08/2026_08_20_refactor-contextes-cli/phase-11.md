@@ -18,7 +18,6 @@ not a service.
 ```txt
 .
 └── cli/src/contexts/translate/      ✅ create
-    ├── index.ts                     ✅ create (the only public entry)
     ├── domain/
     │   ├── capabilities/            ✏️ modify (agents, skills, commands, rules, hooks)
     │   ├── formats/                 ✏️ modify (markdown, command, placeholders, toml, jsonc, paths, merges, rewrites)
@@ -29,6 +28,12 @@ not a service.
     │   └── translate-source.ts      ✏️ modify (from use-cases/framework/, in place or to a distribution tree)
     └── infrastructure/schema-validator.ts  ✏️ modify
 ```
+
+> **Frontière sans baril (tranché en phase 7).** Ce contexte n'a pas d'`index.ts`. La valeur de
+> l'invariant est « rien n'importe l'intérieur d'un contexte », et un fichier de ré-exports n'est
+> qu'un mécanisme — celui-là contredit `noBarrelFile` et le cliquet `no-re-export` à base vide. La
+> frontière est tenue par un cliquet d'architecture qui liste les modules publics du contexte : une
+> importation venue d'un autre contexte ne vise que cette liste. Voir `arborescence.md`, invariant 4.
 
 ## User Journey
 
@@ -78,7 +83,7 @@ journey
 
 ### `4)` Close the context
 
-1. One `index.ts`. Add the biome `override`. Verify it depends on `tools` and the kernel and on
+1. Declare the context's public modules in the boundary ratchet, and add the biome `override`. Verify it depends on `tools` and the kernel and on
    nothing else.
 
 ## Test acceptance criteria

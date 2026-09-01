@@ -18,7 +18,6 @@ order, with nothing checking that they agree.
 ```txt
 .
 └── cli/src/contexts/tools/          ✅ create
-    ├── index.ts                     ✅ create (the only public entry)
     ├── domain/
     │   ├── profiles/                ✅ create (claude, cursor, copilot, codex, opencode, vscode)
     │   ├── registry.ts              ✏️ modify (from domain/tools/)
@@ -34,6 +33,12 @@ cli/src/application/use-cases/framework/strategies/tool-contracts.ts  ❌ delete
 cli/src/domain/models/plugin-format.ts        ✏️ modify (becomes derived)
 cli/src/domain/models/framework-build.ts      ✏️ modify (keeps only the mode type)
 ```
+
+> **Frontière sans baril (tranché en phase 7).** Ce contexte n'a pas d'`index.ts`. La valeur de
+> l'invariant est « rien n'importe l'intérieur d'un contexte », et un fichier de ré-exports n'est
+> qu'un mécanisme — celui-là contredit `noBarrelFile` et le cliquet `no-re-export` à base vide. La
+> frontière est tenue par un cliquet d'architecture qui liste les modules publics du contexte : une
+> importation venue d'un autre contexte ne vise que cette liste. Voir `arborescence.md`, invariant 4.
 
 ## User Journey
 
@@ -86,7 +91,7 @@ journey
 
 ### `4)` Close the context
 
-1. One `index.ts`. Add the biome `override` refusing imports into the interior.
+1. Declare the context's public modules in the boundary ratchet, and add the biome `override` refusing imports into the interior.
 2. Shrink the `tool-addition-cost` baseline to empty, or record what is left and why.
 
 ## Test acceptance criteria

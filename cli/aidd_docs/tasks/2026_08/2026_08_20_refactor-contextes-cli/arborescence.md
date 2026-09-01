@@ -29,7 +29,6 @@ cli/src/
 
   contexts/
     tools/                                        ~2960   ce que le projet cible
-      index.ts
       domain/
         profiles/  claude cursor copilot codex opencode vscode
                    chemins, formats natifs, capacités déclarées
@@ -44,7 +43,6 @@ cli/src/
         abstract-native-plugin-cli  codex-cli  copilot-cli
 
     translate/                                    ~4000   LE CŒUR
-      index.ts
       domain/
         capabilities/  agents  skills  commands  rules  hooks
         formats/       markdown  command  placeholders  toml  jsonc
@@ -61,7 +59,6 @@ cli/src/
         schema-validator
 
     distribution/                                 ~2400   d'où vient le contenu
-      index.ts
       domain/
         marketplace.ts  cache-entry.ts  source-mode.ts
         catalog.ts      catalog-parsers/  (dont copilot natif)
@@ -74,7 +71,6 @@ cli/src/
         registry  catalog-repository  fetcher  cache  trust  raw-fetcher
 
     framework/                                    ~4800   ce qui est posé ici
-      index.ts
       domain/
         manifest.ts     l'enregistrement, proche d'un lockfile
         plugin.ts       enregistrement installé
@@ -111,8 +107,17 @@ cli/src/
 1. `presentation` → contextes → `kernel`. Aucune flèche inverse.
 2. Chaîne unique : `framework` → `translate` → `tools` → `kernel`, plus `framework` → `distribution`. Aucune autre arête entre contextes.
 3. `kernel` n'importe aucun contexte et ne porte aucune logique métier.
-4. Un contexte expose un seul `index.ts` ; rien n'importe son intérieur.
-5. Aucun barrel de ré-export dans un contexte.
+4. Rien n'importe l'intérieur d'un contexte : une importation venue d'ailleurs ne vise qu'un module
+   que ce contexte déclare public.
+
+   > La valeur est la frontière, pas le fichier. Un `index.ts` de contexte a d'abord été écrit ici
+   > comme mécanisme, avant d'être retiré : c'est un baril de ré-exports, donc il contredit
+   > l'invariant 5, la règle Biome `noBarrelFile` et le cliquet `no-re-export` dont la base est vide
+   > et éprouvée par injection. La frontière est donc tenue par un cliquet d'architecture qui liste
+   > les modules publics de chaque contexte — aucun fichier de ré-export n'existe, donc il n'y a rien
+   > à exempter.
+
+5. Aucun barrel de ré-export, nulle part.
 6. Un module n'est partagé que s'il a des appelants dans au moins deux contextes.
 7. Un chapeau ne dépend pas de plus de contextes qu'il n'en traverse.
 8. Deux régimes de propriété, deux traitements :

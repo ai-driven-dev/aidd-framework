@@ -63,23 +63,18 @@ journey
 
 ## Tasks to do
 
-### `0)` Restore, or replace, the mutation net
+### `0)` Mesurer avant de toucher
 
-> `stryker.conf.json` mutates exactly one file: `src/domain/models/manifest.ts`, with a break
-> threshold of 50. It is the strongest available evidence that this aggregate's tests catch a
-> change, which is exactly what this phase needs before redesigning it.
+> `stryker.conf.json` mute exactement un fichier, `src/domain/models/manifest.ts`, avec un seuil de
+> rupture à 50. C'est la meilleure preuve disponible que les tests de cet agrégat attrapent un
+> changement — ce dont cette phase a besoin avant de le redécouper.
 
-1. It does not run today. `stryker run` crashes with
-   `TypeError: ts.parseConfigFileTextToJson is not a function`: Stryker 9.6.1's TSConfig
-   preprocessor calls a TypeScript API that TypeScript 7.0.2, the native port, no longer exposes.
-   No CI job and no hook invokes it, so nobody saw it break.
-2. Attempt the repair: a Stryker release supporting TypeScript 7, or a configuration that bypasses
-   its TSConfig preprocessor.
-3. If neither works, say so here and name what replaces it. The round-trip test in task 4 is the
-   fallback, and it is weaker: it proves the output is stable, not that the tests would notice a
-   behavior change.
-4. Whatever the outcome, run it **before** the split and record the score. A number taken after the
-   redesign proves nothing about the redesign.
+1. La réparation de Stryker appartient à la phase 9, avec le reste du harnais : une mesure prise
+   après le redécoupage ne prouverait rien sur le redécoupage. Ici on l'utilise.
+2. Enregistrer le score **avant** le découpage, puis après. L'écart entre les deux est la revue.
+3. Si la phase 9 a conclu que la réparation est impossible, elle l'a écrit et a nommé ce qui la
+   remplace. Le test d'aller-retour de la tâche 4 est ce remplacement, et il est plus faible : il
+   prouve que la sortie est stable, pas que les tests remarqueraient un changement de comportement.
 
 ### `1)` Separate the members
 

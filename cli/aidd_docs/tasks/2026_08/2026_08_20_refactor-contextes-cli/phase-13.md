@@ -18,7 +18,6 @@ domain redesign in the same pass cannot both be reviewed.
 ```txt
 .
 └── cli/src/contexts/framework/      ✅ create
-    ├── index.ts                     ✅ create (the only public entry)
     ├── domain/
     │   ├── manifest.ts              ✏️ modify (moved as-is, not yet split)
     │   ├── plugin.ts                ✏️ modify (moved as-is, renamed in phase 14)
@@ -33,6 +32,12 @@ domain redesign in the same pass cannot both be reviewed.
     │   └── cases/                   ✏️ modify (install, uninstall, plugin *, materialize, status, doctor, clean, init)
     └── infrastructure/              ✏️ modify (manifest-repository, plugin-distribution-reader, native plugin CLIs)
 ```
+
+> **Frontière sans baril (tranché en phase 7).** Ce contexte n'a pas d'`index.ts`. La valeur de
+> l'invariant est « rien n'importe l'intérieur d'un contexte », et un fichier de ré-exports n'est
+> qu'un mécanisme — celui-là contredit `noBarrelFile` et le cliquet `no-re-export` à base vide. La
+> frontière est tenue par un cliquet d'architecture qui liste les modules publics du contexte : une
+> importation venue d'un autre contexte ne vise que cette liste. Voir `arborescence.md`, invariant 4.
 
 ## User Journey
 
@@ -75,7 +80,8 @@ journey
 
 ### `2)` Close the context
 
-1. One `index.ts`. It is the only context entry allowed to import another context's.
+1. Declare the context's public modules in the boundary ratchet. This context is the only one
+   allowed to import another context's public modules.
 2. Add the biome `override` refusing imports into the interior.
 
 ### `3)` Turn the chain into a test

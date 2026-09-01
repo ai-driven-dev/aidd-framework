@@ -18,7 +18,6 @@ Its state left the manifest a while ago: `manifest.ts:142` records that the regi
 ```txt
 .
 └── cli/src/contexts/distribution/   ✅ create
-    ├── index.ts                     ✅ create (the only public entry)
     ├── domain/
     │   ├── marketplace.ts           ✏️ modify (entry, scope, staleness)
     │   ├── cache-entry.ts           ✏️ modify
@@ -29,6 +28,12 @@ Its state left the manifest a while ago: `manifest.ts:142` records that the regi
     ├── application/                 ✏️ modify (add, list, refresh, register-framework, resolve, fetch-source)
     └── infrastructure/              ✏️ modify (registry, catalog-repository, fetcher, cache, trust, raw-fetcher)
 ```
+
+> **Frontière sans baril (tranché en phase 7).** Ce contexte n'a pas d'`index.ts`. La valeur de
+> l'invariant est « rien n'importe l'intérieur d'un contexte », et un fichier de ré-exports n'est
+> qu'un mécanisme — celui-là contredit `noBarrelFile` et le cliquet `no-re-export` à base vide. La
+> frontière est tenue par un cliquet d'architecture qui liste les modules publics du contexte : une
+> importation venue d'un autre contexte ne vise que cette liste. Voir `arborescence.md`, invariant 4.
 
 ## User Journey
 
@@ -75,7 +80,7 @@ journey
 
 ### `3)` Close the context and prove the leaf
 
-1. One `index.ts`. Add the biome `override`.
+1. Declare the context's public modules in the boundary ratchet, and add the biome `override`.
 2. Verify by import graph, not by reading: nothing under the context imports a tool profile or
    `Manifest`.
 

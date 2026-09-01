@@ -35,6 +35,7 @@ status: in-progress
 | 17  | Turn kanban into a launcher                 | [`phase-17.md`](./phase-17.md) |
 | 18  | Move the command surface, by alias          | [`phase-18.md`](./phase-18.md) |
 | 19  | Rewrite the documentation and the skills    | [`phase-19.md`](./phase-19.md) |
+| 20  | Make the tests prove they test something     | [`phase-20.md`](./phase-20.md) |
 
 ## Resources
 

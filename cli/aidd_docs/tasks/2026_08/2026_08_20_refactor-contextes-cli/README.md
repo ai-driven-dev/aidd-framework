@@ -147,7 +147,7 @@ couches comme le reste. Trois conséquences à ne pas perdre.
 | `enable`/`disable` distinct d'`install`/`remove` | existe chez Claude, à évaluer pour AIDD |
 | Placement d'`errors.ts` (457 loc) | kernel, ou découpé par contexte avec la base en commun |
 | Découpage de `framework/application` entre `flows/` et `cases/` | validable après la phase 3 |
-| Conflit `1-exports.md` vs `index.ts` de contexte | à trancher au moment du déplacement |
+| Conflit `1-exports.md` vs `index.ts` de contexte | **tranché** : pas d'`index.ts`. La frontière est un cliquet listant les modules publics, pas un baril de ré-exports — voir `arborescence.md`, invariant 4 |
 | Gouvernance | définie comme un sas recevant la télémétrie, pas davantage |
 
 ## Corrections faites en cours de route
