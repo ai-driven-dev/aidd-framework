@@ -1,10 +1,10 @@
 import { join } from "node:path";
+import type { ConfigRef } from "../../../contexts/tools/domain/capabilities/config-refs.js";
 import type { FileMerger } from "../../../contexts/tools/domain/ports/file-merger.js";
 import {
-  type ConfigRef,
   FRAMEWORK_CONFIG_PREFIX,
   FrameworkDescriptor,
-} from "../../../domain/models/framework.js";
+} from "../../../contexts/translate/domain/canon.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { Platform } from "../../../domain/ports/platform.js";

@@ -1,8 +1,8 @@
 import { homedir as nodeHomedir } from "node:os";
 import { dirname, join } from "node:path";
+import { unmergeOpencodeMcp } from "../../../contexts/tools/domain/formats/opencode-mcp-merge.js";
 import type { McpCapability } from "../../../contexts/tools/domain/mcp-capability.js";
 import { getToolConfig, isAiTool } from "../../../contexts/tools/domain/registry.js";
-import { unmergeOpencodeMcp } from "../../../domain/formats/opencode-mcp-merge.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Plugin } from "../../../domain/models/plugin.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";

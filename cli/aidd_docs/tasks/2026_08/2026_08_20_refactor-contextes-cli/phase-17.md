@@ -63,6 +63,13 @@ journey
 
 1. `ink`, `react`, `cli-table3` and `gray-matter` leave `cli/package.json`, and their entries leave
    `knip.json`.
+
+   > Knip signale déjà `@types/react` et `ink-testing-library` comme inutilisées : cette tâche est
+   > ce qui les fait disparaître. Il signale aussi `@commitlint/cli`, et c'est un **faux positif** —
+   > `lefthook.yml` l'appelle, fichier que knip ne lit pas. Ne pas la supprimer : lui apprendre où
+   > regarder. La CI masque les trois aujourd'hui derrière `--exclude exports,types`, ce qui rend
+   > l'outil aveugle à ce qu'il devrait garder ; retirer l'exclusion une fois les vraies mortes
+   > parties.
 2. Note the drop in the bundle budget: it is a verifiable gain, not a claim.
 
 ### `3)` Simplify the hook

@@ -1,7 +1,7 @@
+import type { PluginDistribution } from "../../../../contexts/translate/domain/plugin-distribution.js";
+import type { ReadonlySkipList } from "../../../../contexts/translate/domain/plugin-translation-skip.js";
 import type { Manifest } from "../../../../domain/models/manifest.js";
-import type { PluginDistribution } from "../../../../domain/models/plugin-distribution.js";
 import type { PluginTranslationMode } from "../../../../domain/models/plugin-translation-mode.js";
-import type { ReadonlySkipList } from "../../../../domain/models/plugin-translation-skip.js";
 import type { PluginSource } from "../../../../kernel/source.js";
 import type { AiToolId } from "../../../../kernel/tool.js";
 

@@ -1,12 +1,12 @@
-import type { AgentsCapability } from "../../../domain/capabilities/agents-capability.js";
-import type { CommandsCapability } from "../../../domain/capabilities/commands-capability.js";
-import type { HooksCapability } from "../../../domain/capabilities/hooks-capability.js";
 import type { PluginsCapability } from "../../../domain/capabilities/plugins-capability.js";
-import type { RulesCapability } from "../../../domain/capabilities/rules-capability.js";
-import type { SkillsCapability } from "../../../domain/capabilities/skills-capability.js";
-import type { UserFileSectionKey } from "../../../domain/formats/command.js";
 import type { AiToolId, IdeToolId } from "../../../kernel/tool.js";
 import type { ToolBuildContract } from "./build-contract.js";
+import type { AgentsCapability } from "./capabilities/agents-capability.js";
+import type { CommandsCapability } from "./capabilities/commands-capability.js";
+import type { HooksCapability } from "./capabilities/hooks-capability.js";
+import type { RulesCapability } from "./capabilities/rules-capability.js";
+import type { SkillsCapability } from "./capabilities/skills-capability.js";
+import type { UserFileSectionKey } from "./formats/command.js";
 import type { McpCapability } from "./mcp-capability.js";
 import type { SettingsCapability } from "./settings-capability.js";
 

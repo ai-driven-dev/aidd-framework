@@ -1,3 +1,4 @@
+import type { PluginDistribution } from "../../contexts/translate/domain/plugin-distribution.js";
 import { InvalidPluginNameError, InvalidPluginVersionError } from "../../kernel/errors.js";
 import type { InstallationFile } from "../../kernel/file.js";
 import {
@@ -5,7 +6,6 @@ import {
   parsePluginSource,
   serializePluginSource,
 } from "../../kernel/source.js";
-import type { PluginDistribution } from "./plugin-distribution.js";
 import { isSemver } from "./semver.js";
 
 export const PLUGIN_NAME_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/;

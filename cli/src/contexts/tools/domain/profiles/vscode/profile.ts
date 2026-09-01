@@ -2,7 +2,7 @@ import {
   CONFIG_VSCODE_EXTENSIONS,
   CONFIG_VSCODE_KEYBINDINGS,
   CONFIG_VSCODE_SETTINGS,
-} from "../../../../../domain/models/framework.js";
+} from "../../capabilities/config-refs.js";
 import type { HasSettings, IdeToolConfig } from "../../contracts.js";
 import { registerTool } from "../../registry.js";
 import { SettingsCapability } from "../../settings-capability.js";

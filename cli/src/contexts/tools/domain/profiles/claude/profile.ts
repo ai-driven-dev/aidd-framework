@@ -1,21 +1,10 @@
-import { AgentsCapability } from "../../../../../domain/capabilities/agents-capability.js";
-import { CommandsCapability } from "../../../../../domain/capabilities/commands-capability.js";
 import { buildClaudeStyleMarketplaceEntry } from "../../../../../domain/capabilities/marketplace-entry.js";
 import { PluginsCapability } from "../../../../../domain/capabilities/plugins-capability.js";
-import { RulesCapability } from "../../../../../domain/capabilities/rules-capability.js";
-import { SkillsCapability } from "../../../../../domain/capabilities/skills-capability.js";
-import type { UserFileSectionKey } from "../../../../../domain/formats/command.js";
-import {
-  convertCommandFrontmatter,
-  detectSectionKeyFromPrefixes,
-  reverseConvertCommandFrontmatter,
-  stripToolSuffix,
-} from "../../../../../domain/formats/command.js";
-import {
-  baseReverseRewriteContent,
-  baseRewriteContent,
-} from "../../../../../domain/formats/placeholders.js";
-import { CONFIG_MCP } from "../../../../../domain/models/framework.js";
+import { AgentsCapability } from "../../capabilities/agents-capability.js";
+import { CommandsCapability } from "../../capabilities/commands-capability.js";
+import { CONFIG_MCP } from "../../capabilities/config-refs.js";
+import { RulesCapability } from "../../capabilities/rules-capability.js";
+import { SkillsCapability } from "../../capabilities/skills-capability.js";
 import type {
   AiTool,
   HasAgents,
@@ -25,6 +14,14 @@ import type {
   HasRules,
   HasSkills,
 } from "../../contracts.js";
+import type { UserFileSectionKey } from "../../formats/command.js";
+import {
+  convertCommandFrontmatter,
+  detectSectionKeyFromPrefixes,
+  reverseConvertCommandFrontmatter,
+  stripToolSuffix,
+} from "../../formats/command.js";
+import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
 import { McpCapability } from "../../mcp-capability.js";
 import { registerTool } from "../../registry.js";
 import { buildClaudeContract, buildClaudeFlatContract } from "./build.js";

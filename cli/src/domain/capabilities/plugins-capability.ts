@@ -1,5 +1,5 @@
+import type { HooksContentFormat } from "../../contexts/translate/domain/formats/cursor-hooks.js";
 import { CapabilityConfigError } from "../../kernel/errors.js";
-import type { HooksContentFormat } from "../formats/cursor-hooks.js";
 import type { PluginTranslationMode } from "../models/plugin-translation-mode.js";
 import type { MarketplaceSettings } from "./marketplace-settings.js";
 

@@ -1,6 +1,6 @@
+import type { AgentsCapability } from "../../../contexts/tools/domain/capabilities/agents-capability.js";
 import type { AiTool, HasAgents } from "../../../contexts/tools/domain/contracts.js";
-import type { AgentsCapability } from "../../../domain/capabilities/agents-capability.js";
-import type { ContentSection } from "../../../domain/models/framework.js";
+import type { ContentSection } from "../../../contexts/translate/domain/canon.js";
 import type { InstallationFile } from "../../../kernel/file.js";
 import type { Hasher } from "../../../kernel/ports/hasher.js";
 import {

@@ -5,27 +5,28 @@
  * Content transforms, path computations, and merge helpers are pure functions reused
  * from domain/formats/. The contracts themselves are thin wiring.
  */
-import { stripCursorAgentFrontmatter } from "../../../../../domain/formats/agent-frontmatter-strip.js";
-import {
-  OUTPUT_CURSOR_MANIFEST_RELATIVE,
-  OUTPUT_CURSOR_MARKETPLACE_RELATIVE,
-} from "../../../../../domain/formats/cursor-paths.js";
-import { mergeCursorFlatHooks } from "../../../../../domain/formats/flat-hooks-merge.js";
+
 import {
   genericFlatAgentPath,
   genericFlatHooksFile,
   genericFlatHooksScriptPath,
   genericFlatSkillPath,
-} from "../../../../../domain/formats/flat-paths.js";
-import { parseFrontmatter, serializeFrontmatter } from "../../../../../domain/formats/markdown.js";
-import { rewriteRelativeLinks } from "../../../../../domain/formats/relative-link-rewrite.js";
-import { mergeVscodeMcp } from "../../../../../domain/formats/vscode-mcp-merge.js";
+} from "../../../../../kernel/flat-paths.js";
+import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
+import { rewriteRelativeLinks } from "../../../../../kernel/relative-link-rewrite.js";
 import type { ToolBuildContract } from "../../build-contract.js";
+import { stripCursorAgentFrontmatter } from "../../formats/agent-frontmatter-strip.js";
+import { mergeCursorFlatHooks } from "../../formats/flat-hooks-merge.js";
+import { mergeVscodeMcp } from "../../formats/vscode-mcp-merge.js";
 import {
   buildClaudeStyleEntry,
   buildClaudeStyleMarketplace,
   synthesizeClaudeStyleManifest,
 } from "../../marketplace-catalog.js";
+import {
+  OUTPUT_CURSOR_MANIFEST_RELATIVE,
+  OUTPUT_CURSOR_MARKETPLACE_RELATIVE,
+} from "./cursor-paths.js";
 
 function transformCursorAgent(content: string, _plugin: string, outName: string): string {
   const { frontmatter, body } = parseFrontmatter(content);

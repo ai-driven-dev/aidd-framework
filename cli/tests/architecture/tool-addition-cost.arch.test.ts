@@ -21,16 +21,22 @@ const ALLOWED_FILES = new Set(["src/kernel/tool.ts"]);
  * build mode with `toolId === "opencode" ? ... `, and now reads that mode off the profile.
  * `tool-contracts.ts` left it in phase 10: its nine per-tool build contracts moved into
  * each tool's own profile directory, one `build.ts` per tool.
+ *
+ * Phase 11 relocated four of these without touching their content: `cursor-hooks.ts`,
+ * `framework-build.ts` and `plugin-format.ts` moved into `translate` under new names
+ * (`build-target.ts` for the latter); the `CONFIG_OPENCODE` constant that made
+ * `framework.ts` match moved into `tools`' `config-refs.ts`, so `framework.ts` itself
+ * (now `canon.ts`) no longer does.
  */
 const BASELINE = [
   "src/application/use-cases/flows/marketplace-sync-settings-use-case.ts",
   "src/application/use-cases/restore/restore-use-case.ts",
+  "src/contexts/tools/domain/capabilities/config-refs.ts",
+  "src/contexts/translate/domain/build-target.ts",
+  "src/contexts/translate/domain/formats/cursor-hooks.ts",
+  "src/contexts/translate/domain/plugin-format.ts",
   "src/domain/capabilities/plugins-capability.ts",
-  "src/domain/formats/cursor-hooks.ts",
-  "src/domain/models/framework-build.ts",
-  "src/domain/models/framework.ts",
   "src/domain/models/manifest.ts",
-  "src/domain/models/plugin-format.ts",
   "src/domain/models/tool-recommendations.ts",
 ];
 

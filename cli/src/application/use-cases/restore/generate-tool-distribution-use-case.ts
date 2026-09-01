@@ -7,8 +7,11 @@ import type {
   HasSkills,
 } from "../../../contexts/tools/domain/contracts.js";
 import { isAiTool, type ToolConfig } from "../../../contexts/tools/domain/registry.js";
+import type {
+  ContentSection,
+  FrameworkDescriptor,
+} from "../../../contexts/translate/domain/canon.js";
 import { extractConfigCapabilities } from "../../../domain/models/config-capability.js";
-import type { ContentSection, FrameworkDescriptor } from "../../../domain/models/framework.js";
 import type { Platform } from "../../../domain/ports/platform.js";
 import { InstallationFile, removeRedundantGitkeeps } from "../../../kernel/file.js";
 import type { AssetProvider } from "../../../kernel/ports/asset-provider.js";

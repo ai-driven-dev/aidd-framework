@@ -90,7 +90,7 @@
                 "patterns": [
                   {
                     "group": ["**/domain/**", "**/application/**", "**/infrastructure/**"],
-                    "message": "kernel must not import any context — it is the shared vocabulary contexts speak, not a consumer of one"
+                    "message": "kernel must not import any context \u2014 it is the shared vocabulary contexts speak, not a consumer of one"
                   }
                 ]
               }
@@ -113,6 +113,60 @@
       "includes": ["**/package.json"],
       "formatter": {
         "enabled": false
+      }
+    },
+    {
+      "includes": ["src/contexts/translate/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "**/domain/models/**",
+                      "**/application/commands/**",
+                      "**/application/use-cases/**",
+                      "**/application/display/**",
+                      "**/infrastructure/adapters/**",
+                      "**/infrastructure/assets/**",
+                      "**/infrastructure/auth/**",
+                      "**/infrastructure/git/**",
+                      "**/infrastructure/http/**",
+                      "../../../domain/ports/**",
+                      "../../../../domain/ports/**",
+                      "../../../domain/capabilities/**",
+                      "../../../../domain/capabilities/**"
+                    ],
+                    "message": "translate may import only the kernel and contexts/tools \u2014 see phase-11"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/contexts/tools/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/translate/**"],
+                    "message": "tools may not import translate \u2014 translate depends on tools, not the reverse (arborescence.md invariant 2)"
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     }
   ]

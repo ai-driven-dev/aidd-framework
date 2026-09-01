@@ -20,9 +20,6 @@ import { DoctorUseCase } from "../application/use-cases/doctor/doctor-use-case.j
 import { MarketplaceCheckUseCase } from "../application/use-cases/flows/marketplace-check-use-case.js";
 import { MarketplaceRemoveUseCase } from "../application/use-cases/flows/marketplace-remove-use-case.js";
 import { MarketplaceSyncSettingsUseCase } from "../application/use-cases/flows/marketplace-sync-settings-use-case.js";
-import { FrameworkBuildUseCase } from "../application/use-cases/framework/framework-build-use-case.js";
-import { FlatBuildStrategy } from "../application/use-cases/framework/strategies/flat-build-strategy.js";
-import { MarketplaceBuildStrategy } from "../application/use-cases/framework/strategies/marketplace-build-strategy.js";
 import { GitignoreUseCase } from "../application/use-cases/gitignore-use-case.js";
 import { DoctorAllUseCase } from "../application/use-cases/global/doctor-all-use-case.js";
 import { ResolveUpdateDecisionUseCase } from "../application/use-cases/global/resolve-update-decision-use-case.js";
@@ -74,6 +71,10 @@ import type { NativePluginActivator } from "../contexts/tools/domain/ports/nativ
 import { buildCopilotMarketplaceContract } from "../contexts/tools/domain/profiles/copilot/build.js";
 import { buildContractFor, nativeActivationOf } from "../contexts/tools/domain/registry.js";
 import { NativePluginCliAdapter } from "../contexts/tools/infrastructure/native-plugin-cli-adapter.js";
+import { FlatBuildStrategy } from "../contexts/translate/application/strategies/flat-build-strategy.js";
+import { MarketplaceBuildStrategy } from "../contexts/translate/application/strategies/marketplace-build-strategy.js";
+import { FrameworkBuildUseCase } from "../contexts/translate/application/translate-source.js";
+import { AjvSchemaValidatorAdapter } from "../contexts/translate/infrastructure/schema-validator.js";
 import type { CredentialStore } from "../domain/ports/credential-store.js";
 import type { LatestReleaseResolver } from "../domain/ports/latest-release-resolver.js";
 import type { ManifestRepository } from "../domain/ports/manifest-repository.js";
@@ -93,7 +94,6 @@ import type { FileWriter } from "../kernel/ports/file-writer.js";
 import type { Hasher } from "../kernel/ports/hasher.js";
 import type { Logger } from "../kernel/ports/logger.js";
 import { AI_TOOL_IDS } from "../kernel/tool.js";
-import { AjvSchemaValidatorAdapter } from "./adapters/ajv-schema-validator-adapter.js";
 import { AuthProviderAdapter } from "./adapters/auth-provider-adapter.js";
 import { AuthReaderAdapter } from "./adapters/auth-reader-adapter.js";
 import { CurrentVersionAdapter } from "./adapters/current-version-adapter.js";

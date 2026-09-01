@@ -1,6 +1,6 @@
 import type { FileMerger } from "../../../contexts/tools/domain/ports/file-merger.js";
 import { getToolConfig } from "../../../contexts/tools/domain/registry.js";
-import type { FrameworkDescriptor } from "../../../domain/models/framework.js";
+import type { FrameworkDescriptor } from "../../../contexts/translate/domain/canon.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Platform } from "../../../domain/ports/platform.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";

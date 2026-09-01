@@ -5,33 +5,47 @@
  * Content transforms, path computations, and merge helpers are pure functions reused
  * from domain/formats/. The contracts themselves are thin wiring.
  */
-import { stripAgentFrontmatter } from "../../../../../domain/formats/agent-frontmatter-strip.js";
-import { flattenCopilotHooksShape } from "../../../../../domain/formats/flat-hooks-merge.js";
+
 import {
   genericFlatAgentPath,
   genericFlatHooksFile,
   genericFlatHooksScriptPath,
   genericFlatSkillPath,
-} from "../../../../../domain/formats/flat-paths.js";
-import { parseFrontmatter, serializeFrontmatter } from "../../../../../domain/formats/markdown.js";
-import { rewriteRelativeLinks } from "../../../../../domain/formats/relative-link-rewrite.js";
-import { mergeVscodeMcp } from "../../../../../domain/formats/vscode-mcp-merge.js";
-import {
-  FLAT_AGENT_OUTPUT_EXT,
-  FLAT_GITHUB_AGENTS_PREFIX,
-  FLAT_GITHUB_HOOKS_PREFIX,
-  FLAT_GITHUB_SKILLS_PREFIX,
-  FLAT_VSCODE_MCP_PATH,
-  OUTPUT_MARKETPLACE_RELATIVE,
-  OUTPUT_PLUGIN_MANIFEST_RELATIVE,
-} from "../../../../../domain/models/framework-build.js";
+} from "../../../../../kernel/flat-paths.js";
+import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
+import { rewriteRelativeLinks } from "../../../../../kernel/relative-link-rewrite.js";
 import type { ToolBuildContract } from "../../build-contract.js";
+import { stripAgentFrontmatter } from "../../formats/agent-frontmatter-strip.js";
+import { flattenCopilotHooksShape } from "../../formats/flat-hooks-merge.js";
+import { mergeVscodeMcp } from "../../formats/vscode-mcp-merge.js";
 import {
   resolveDescription,
   resolveVersion,
   synthesizeClaudeStyleManifest,
   transformClaudeAgent,
 } from "../../marketplace-catalog.js";
+import { COPILOT_VSCODE_MCP_PATH, COPILOT_WORKSPACE_DIR } from "./copilot-paths.js";
+
+/** Path where the synthesized OpenPlugin-format plugin manifest is written. */
+const OUTPUT_PLUGIN_MANIFEST_RELATIVE = ".plugin/plugin.json";
+
+/** Path where the synthesized OpenPlugin-format marketplace catalog is written. */
+const OUTPUT_MARKETPLACE_RELATIVE = ".plugin/marketplace.json";
+
+/** Output prefix for agents in flat mode: .github/agents/<plugin>/<name>.agent.md */
+const FLAT_GITHUB_AGENTS_PREFIX = `${COPILOT_WORKSPACE_DIR}agents/`;
+
+/** Output prefix for skills in flat mode: .github/skills/<plugin>/<name>/ */
+const FLAT_GITHUB_SKILLS_PREFIX = `${COPILOT_WORKSPACE_DIR}skills/`;
+
+/** Output prefix for hooks in flat mode: .github/hooks/<plugin>.hooks.json */
+const FLAT_GITHUB_HOOKS_PREFIX = `${COPILOT_WORKSPACE_DIR}hooks/`;
+
+/** Path to the VS Code workspace MCP config merged in flat mode. */
+const FLAT_VSCODE_MCP_PATH = COPILOT_VSCODE_MCP_PATH;
+
+/** File extension for agent files in flat output (workspace canonical). */
+const FLAT_AGENT_OUTPUT_EXT = ".agent.md";
 
 export function buildCopilotMarketplaceContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_PLUGIN_MANIFEST_RELATIVE;

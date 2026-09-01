@@ -14,11 +14,11 @@ import {
   isAiTool,
   machineLocalFilesOf,
 } from "../../../../src/contexts/tools/domain/registry.js";
-import { FRAMEWORK_BUILD_TARGET_MODES } from "../../../../src/domain/models/framework-build.js";
+import { FRAMEWORK_BUILD_TARGET_MODES } from "../../../../src/contexts/translate/domain/build-target.js";
 import {
   MARKETPLACE_PROBES,
   PLUGIN_MANIFEST_PROBES,
-} from "../../../../src/domain/models/plugin-format.js";
+} from "../../../../src/contexts/translate/domain/plugin-format.js";
 import { AI_TOOL_IDS } from "../../../../src/kernel/tool.js";
 
 /**

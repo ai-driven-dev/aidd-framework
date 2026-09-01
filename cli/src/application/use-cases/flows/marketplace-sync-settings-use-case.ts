@@ -5,8 +5,8 @@ import {
   isAiTool,
   nativeActivationOf,
 } from "../../../contexts/tools/domain/registry.js";
+import type { FrameworkBuildTarget } from "../../../contexts/translate/domain/build-target.js";
 import type { MarketplaceSettings } from "../../../domain/capabilities/marketplace-settings.js";
-import type { FrameworkBuildTarget } from "../../../domain/models/framework-build.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Marketplace } from "../../../domain/models/marketplace.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";

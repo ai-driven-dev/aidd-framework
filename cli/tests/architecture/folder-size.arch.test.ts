@@ -18,10 +18,9 @@ const MAX_FILES_PER_FOLDER = 10;
  */
 const BASELINE = [
   "src/application/commands", // 17
-  "src/domain/formats", // 19
-  "src/domain/models", // 24
-  "src/domain/ports", // 18
-  "src/infrastructure/adapters", // 21
+  "src/domain/models", // 18
+  "src/domain/ports", // 17
+  "src/infrastructure/adapters", // 20
 ];
 
 /** Direct `.ts` files per parent directory — a subfolder counts toward itself, not its parent. */

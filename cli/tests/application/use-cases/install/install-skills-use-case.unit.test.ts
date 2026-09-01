@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { InstallSkillsUseCase } from "../../../../src/application/use-cases/install/install-skills-use-case.js";
 import { claude } from "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { copilot } from "../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
-import type { ContentSection } from "../../../../src/domain/models/framework.js";
+import type { ContentSection } from "../../../../src/contexts/translate/domain/canon.js";
 import { GITKEEP_FILE } from "../../../../src/kernel/file.js";
 import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
 

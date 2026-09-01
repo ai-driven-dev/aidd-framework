@@ -1,22 +1,11 @@
-import { AgentsCapability } from "../../../../../domain/capabilities/agents-capability.js";
-import { CommandsCapability } from "../../../../../domain/capabilities/commands-capability.js";
 import { buildClaudeStyleMarketplaceEntry } from "../../../../../domain/capabilities/marketplace-entry.js";
 import { PluginsCapability } from "../../../../../domain/capabilities/plugins-capability.js";
-import { RulesCapability } from "../../../../../domain/capabilities/rules-capability.js";
-import { SkillsCapability } from "../../../../../domain/capabilities/skills-capability.js";
-import type { UserFileSectionKey } from "../../../../../domain/formats/command.js";
-import {
-  convertCommandFrontmatter,
-  reverseConvertCommandFrontmatter,
-} from "../../../../../domain/formats/command.js";
-import {
-  AT_DOCS_PLACEHOLDER,
-  AT_TOOLS_PLACEHOLDER,
-  CONFIG_MCP,
-  DOCS_PLACEHOLDER,
-  TOOLS_PLACEHOLDER,
-} from "../../../../../domain/models/framework.js";
 import { GITKEEP_FILE } from "../../../../../kernel/file.js";
+import { AgentsCapability } from "../../capabilities/agents-capability.js";
+import { CommandsCapability } from "../../capabilities/commands-capability.js";
+import { CONFIG_MCP } from "../../capabilities/config-refs.js";
+import { RulesCapability } from "../../capabilities/rules-capability.js";
+import { SkillsCapability } from "../../capabilities/skills-capability.js";
 import type {
   AiTool,
   HasAgents,
@@ -27,6 +16,11 @@ import type {
   HasSettings,
   HasSkills,
 } from "../../contracts.js";
+import type { UserFileSectionKey } from "../../formats/command.js";
+import {
+  convertCommandFrontmatter,
+  reverseConvertCommandFrontmatter,
+} from "../../formats/command.js";
 import { McpCapability } from "../../mcp-capability.js";
 import { registerTool } from "../../registry.js";
 import { SettingsCapability } from "../../settings-capability.js";
@@ -35,6 +29,14 @@ import { COPILOT_WORKSPACE_DIR } from "./copilot-paths.js";
 
 const DIRECTORY = COPILOT_WORKSPACE_DIR;
 const TOOL_SUFFIX = ".copilot.md";
+
+// Canon's framework-doc reference placeholders. Copilot is the only tool that rewrites
+// content between the canonical form and its own workspace-relative paths, so these
+// tokens live here rather than in a shared location nothing else reads.
+const TOOLS_PLACEHOLDER = "{{TOOLS}}/";
+const DOCS_PLACEHOLDER = "{{DOCS}}/";
+const AT_TOOLS_PLACEHOLDER = "@{{TOOLS}}/";
+const AT_DOCS_PLACEHOLDER = "@{{DOCS}}/";
 
 const EXT_AGENT = ".agent.md";
 const EXT_PROMPT = ".prompt.md";

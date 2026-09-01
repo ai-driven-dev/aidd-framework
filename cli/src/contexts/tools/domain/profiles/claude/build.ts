@@ -5,27 +5,28 @@
  * Content transforms, path computations, and merge helpers are pure functions reused
  * from domain/formats/. The contracts themselves are thin wiring.
  */
-import {
-  OUTPUT_CLAUDE_MANIFEST_RELATIVE,
-  OUTPUT_CLAUDE_MARKETPLACE_RELATIVE,
-} from "../../../../../domain/formats/claude-build-paths.js";
-import { mergeClaudeSettingsHooks } from "../../../../../domain/formats/flat-hooks-merge.js";
+
 import {
   genericFlatAgentPath,
   genericFlatHooksFile,
   genericFlatHooksScriptPath,
   genericFlatSkillPath,
-} from "../../../../../domain/formats/flat-paths.js";
-import { parseFrontmatter, serializeFrontmatter } from "../../../../../domain/formats/markdown.js";
-import { rewriteRelativeLinks } from "../../../../../domain/formats/relative-link-rewrite.js";
-import { mergeVscodeMcp } from "../../../../../domain/formats/vscode-mcp-merge.js";
+} from "../../../../../kernel/flat-paths.js";
+import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
+import { rewriteRelativeLinks } from "../../../../../kernel/relative-link-rewrite.js";
 import type { ToolBuildContract } from "../../build-contract.js";
+import { mergeClaudeSettingsHooks } from "../../formats/flat-hooks-merge.js";
+import { mergeVscodeMcp } from "../../formats/vscode-mcp-merge.js";
 import {
   buildClaudeStyleEntry,
   buildClaudeStyleMarketplace,
   synthesizeClaudeStyleManifest,
   transformClaudeAgent,
 } from "../../marketplace-catalog.js";
+import {
+  OUTPUT_CLAUDE_MANIFEST_RELATIVE,
+  OUTPUT_CLAUDE_MARKETPLACE_RELATIVE,
+} from "./claude-build-paths.js";
 
 export function buildClaudeContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_CLAUDE_MANIFEST_RELATIVE;

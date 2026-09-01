@@ -1,13 +1,13 @@
 import { join } from "node:path";
-import { PLUGIN_NAME_REGEX } from "../../domain/models/plugin.js";
 import {
   type PluginComponentFile,
   type PluginComponents,
   PluginDistribution,
   type PluginManifestFields,
-} from "../../domain/models/plugin-distribution.js";
-import type { PluginFormat } from "../../domain/models/plugin-format.js";
-import { PLUGIN_MANIFEST_PROBES } from "../../domain/models/plugin-format.js";
+} from "../../contexts/translate/domain/plugin-distribution.js";
+import type { PluginFormat } from "../../contexts/translate/domain/plugin-format.js";
+import { PLUGIN_MANIFEST_PROBES } from "../../contexts/translate/domain/plugin-format.js";
+import { PLUGIN_NAME_REGEX } from "../../domain/models/plugin.js";
 import { isSemver } from "../../domain/models/semver.js";
 import type { PluginDistributionReader } from "../../domain/ports/plugin-distribution-reader.js";
 import {

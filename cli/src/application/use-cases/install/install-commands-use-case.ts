@@ -1,6 +1,6 @@
+import type { CommandsCapability } from "../../../contexts/tools/domain/capabilities/commands-capability.js";
 import type { AiTool, HasCommands } from "../../../contexts/tools/domain/contracts.js";
-import type { CommandsCapability } from "../../../domain/capabilities/commands-capability.js";
-import type { ContentSection } from "../../../domain/models/framework.js";
+import type { ContentSection } from "../../../contexts/translate/domain/canon.js";
 import type { InstallationFile } from "../../../kernel/file.js";
 import type { Hasher } from "../../../kernel/ports/hasher.js";
 import {

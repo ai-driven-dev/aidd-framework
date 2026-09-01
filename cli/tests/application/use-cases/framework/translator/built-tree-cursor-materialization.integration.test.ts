@@ -1,9 +1,9 @@
 import "../../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 import { describe, expect, it } from "vitest";
 import { BuiltTreeMaterializationTranslator } from "../../../../../src/application/use-cases/framework/translator/built-tree-materialization-translator.js";
+import { PluginDistribution } from "../../../../../src/contexts/translate/domain/plugin-distribution.js";
 import { Manifest } from "../../../../../src/domain/models/manifest.js";
 import { Marketplace } from "../../../../../src/domain/models/marketplace.js";
-import { PluginDistribution } from "../../../../../src/domain/models/plugin-distribution.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
 import { fakeEnsureBuiltMarketplace } from "../../../../helpers/ports/fake-ensure-built-marketplace.js";
 import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";

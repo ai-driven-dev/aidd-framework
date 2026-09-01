@@ -1,6 +1,6 @@
+import type { RulesCapability } from "../../../contexts/tools/domain/capabilities/rules-capability.js";
 import type { AiTool, HasRules } from "../../../contexts/tools/domain/contracts.js";
-import type { RulesCapability } from "../../../domain/capabilities/rules-capability.js";
-import type { ContentSection } from "../../../domain/models/framework.js";
+import type { ContentSection } from "../../../contexts/translate/domain/canon.js";
 import type { InstallationFile } from "../../../kernel/file.js";
 import type { Hasher } from "../../../kernel/ports/hasher.js";
 import {

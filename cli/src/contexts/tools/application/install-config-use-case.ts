@@ -1,6 +1,4 @@
 import type { ConfigCapability } from "../../../domain/models/config-capability.js";
-import type { ConfigRef } from "../../../domain/models/framework.js";
-import { CONFIG_MCP } from "../../../domain/models/framework.js";
 import type { Platform } from "../../../domain/ports/platform.js";
 import { InstallationFile } from "../../../kernel/file.js";
 import type { MergeStrategy } from "../../../kernel/merge.js";
@@ -8,6 +6,7 @@ import type { AssetProvider } from "../../../kernel/ports/asset-provider.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { Hasher } from "../../../kernel/ports/hasher.js";
 import type { AiToolId } from "../../../kernel/tool.js";
+import { CONFIG_MCP, type ConfigRef } from "../domain/capabilities/config-refs.js";
 import { McpCapability } from "../domain/mcp-capability.js";
 import { transformFor as transformMcpForPlatform } from "../domain/mcp-exclusion.js";
 import { SettingsCapability } from "../domain/settings-capability.js";

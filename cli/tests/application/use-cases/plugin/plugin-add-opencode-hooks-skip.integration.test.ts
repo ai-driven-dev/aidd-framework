@@ -6,7 +6,7 @@ import "../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { PluginAddUseCase } from "../../../../src/application/use-cases/plugin/plugin-add-use-case.js";
-import { OPENCODE_HOOKS_SKIP_REASON } from "../../../../src/domain/models/plugin-translation-skip.js";
+import { OPENCODE_HOOKS_SKIP_REASON } from "../../../../src/contexts/translate/domain/plugin-translation-skip.js";
 import { PluginDistributionReaderAdapter } from "../../../../src/infrastructure/adapters/plugin-distribution-reader-adapter.js";
 import { buildUnitDeps, initAndInstall } from "../../../helpers/ports/build-unit-deps.js";
 import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";

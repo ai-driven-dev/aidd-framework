@@ -1,8 +1,8 @@
 import type { AiTool } from "../../../contexts/tools/domain/contracts.js";
-import type { UserFileSection } from "../../../domain/formats/command.js";
-import { parseFrontmatter } from "../../../domain/formats/markdown.js";
-import type { ContentSection } from "../../../domain/models/framework.js";
+import type { UserFileSection } from "../../../contexts/tools/domain/formats/command.js";
+import type { ContentSection } from "../../../contexts/translate/domain/canon.js";
 import { GITKEEP_FILE, InstallationFile } from "../../../kernel/file.js";
+import { parseFrontmatter } from "../../../kernel/markdown.js";
 import type { Hasher } from "../../../kernel/ports/hasher.js";
 import { AI_TOOL_IDS } from "../../../kernel/tool.js";
 

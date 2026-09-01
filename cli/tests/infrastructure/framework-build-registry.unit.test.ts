@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { FrameworkBuildMode } from "../../src/contexts/tools/domain/registry.js";
 import {
   FRAMEWORK_BUILD_TARGET_MODES,
-  type FrameworkBuildMode,
   type FrameworkBuildTarget,
-} from "../../src/domain/models/framework-build.js";
+} from "../../src/contexts/translate/domain/build-target.js";
 import { BundledAssetProviderAdapter } from "../../src/infrastructure/assets/asset-loader.js";
 import { createFrameworkBuildUseCase } from "../../src/infrastructure/deps.js";
 import { CapturingLogger } from "../helpers/ports/capturing-logger.js";

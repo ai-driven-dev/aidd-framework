@@ -89,9 +89,17 @@ journey
 > The invariant that carries the whole plan deserves more than a lint pattern.
 
 1. Add `tests/architecture/context-graph.arch.test.ts`: build the import graph, map each file to its
-   context, and assert the only edges are `framework → translate`, `framework → distribution`, and
-   every context to the kernel.
-2. It replaces the per-context `override` guesswork with one readable list of allowed edges.
+   context, and assert the only edges are those `arborescence.md` invariant 2 allows —
+   `framework → translate`, `translate → tools`, `framework → distribution`, and every context to
+   the kernel.
+
+   > Une première rédaction de cette tâche omettait `translate → tools`, l'arête que la phase 11
+   > établit précisément. Un test écrit sur cette liste-là aurait refusé la structure voulue.
+
+2. Il remplace les `override` biome par une seule liste lisible d'arêtes autorisées. Les deux ne
+   doivent pas coexister en disant des choses différentes : soit le test devient la source unique et
+   les overlays partent, soit ils restent et le test se contente de ce qu'ils ne savent pas exprimer.
+   Trancher ici, et l'écrire.
 
 ## Test acceptance criteria
 

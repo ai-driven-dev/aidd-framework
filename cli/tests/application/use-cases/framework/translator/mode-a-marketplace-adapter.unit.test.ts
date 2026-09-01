@@ -5,8 +5,8 @@
 import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { describe, expect, it } from "vitest";
 import { ModeAMarketplaceTranslator } from "../../../../../src/application/use-cases/framework/translator/mode-a-marketplace-translator.js";
+import { PluginDistribution } from "../../../../../src/contexts/translate/domain/plugin-distribution.js";
 import { Manifest } from "../../../../../src/domain/models/manifest.js";
-import { PluginDistribution } from "../../../../../src/domain/models/plugin-distribution.js";
 import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
 
 function buildDist(name = "test-plugin"): PluginDistribution {

@@ -1,8 +1,8 @@
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { PluginAddUseCase } from "../../../../src/application/use-cases/plugin/plugin-add-use-case.js";
+import { PluginDistribution } from "../../../../src/contexts/translate/domain/plugin-distribution.js";
 import { Marketplace } from "../../../../src/domain/models/marketplace.js";
-import { PluginDistribution } from "../../../../src/domain/models/plugin-distribution.js";
 import type { PluginDistributionReader } from "../../../../src/domain/ports/plugin-distribution-reader.js";
 import { PluginDistributionReaderAdapter } from "../../../../src/infrastructure/adapters/plugin-distribution-reader-adapter.js";
 import { DuplicatePluginError, MissingPluginMetadataError } from "../../../../src/kernel/errors.js";

@@ -1,5 +1,5 @@
-import { mcpJsonToToml, mergeJsonUserPrime } from "../../../domain/formats/mcp-format.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import { mcpJsonToToml, mergeJsonUserPrime } from "./formats/mcp-format.js";
 
 export class McpCapability {
   readonly consumes: readonly string[];

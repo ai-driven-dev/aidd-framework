@@ -7,18 +7,18 @@
  * capability does; the profile imports it back from here.
  */
 
+import { InvalidMcpServerConfigError, McpConfigError } from "../../../../../kernel/errors.js";
 import {
   flatMcpKeyPrefix,
   genericFlatAgentPath,
   genericFlatSkillPath,
-} from "../../../../../domain/formats/flat-paths.js";
-import { parseFrontmatter, serializeFrontmatter } from "../../../../../domain/formats/markdown.js";
-import { buildOpencodeFlatConfig } from "../../../../../domain/formats/opencode-mcp-merge.js";
-import { rewriteRelativeLinks } from "../../../../../domain/formats/relative-link-rewrite.js";
-import { InvalidMcpServerConfigError, McpConfigError } from "../../../../../kernel/errors.js";
+} from "../../../../../kernel/flat-paths.js";
+import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
 import type { FileReader } from "../../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../../kernel/ports/file-writer.js";
+import { rewriteRelativeLinks } from "../../../../../kernel/relative-link-rewrite.js";
 import type { ToolBuildContract } from "../../build-contract.js";
+import { buildOpencodeFlatConfig } from "../../formats/opencode-mcp-merge.js";
 
 type FsType = FileReader & FileWriter;
 

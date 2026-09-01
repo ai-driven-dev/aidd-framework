@@ -1,16 +1,16 @@
 import { join } from "node:path";
+import { mergeOpencodeMcp } from "../../../../contexts/tools/domain/formats/opencode-mcp-merge.js";
 import type { McpCapability } from "../../../../contexts/tools/domain/mcp-capability.js";
 import { getToolConfig, isAiTool } from "../../../../contexts/tools/domain/registry.js";
-import type { PluginsCapability } from "../../../../domain/capabilities/plugins-capability.js";
-import { mergeOpencodeMcp } from "../../../../domain/formats/opencode-mcp-merge.js";
-import type { Manifest } from "../../../../domain/models/manifest.js";
-import { Plugin } from "../../../../domain/models/plugin.js";
-import { PluginContentTranslator } from "../../../../domain/models/plugin-content-translator.js";
-import type { PluginDistribution } from "../../../../domain/models/plugin-distribution.js";
+import { PluginContentTranslator } from "../../../../contexts/translate/domain/content-translator.js";
+import type { PluginDistribution } from "../../../../contexts/translate/domain/plugin-distribution.js";
 import type {
   PluginTranslationSkip,
   ReadonlySkipList,
-} from "../../../../domain/models/plugin-translation-skip.js";
+} from "../../../../contexts/translate/domain/plugin-translation-skip.js";
+import type { PluginsCapability } from "../../../../domain/capabilities/plugins-capability.js";
+import type { Manifest } from "../../../../domain/models/manifest.js";
+import { Plugin } from "../../../../domain/models/plugin.js";
 import { CursorProjectScopeUnsupportedError } from "../../../../kernel/errors.js";
 import type { InstallationFile } from "../../../../kernel/file.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";

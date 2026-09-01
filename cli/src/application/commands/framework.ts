@@ -1,10 +1,10 @@
 import { resolve } from "node:path";
 import type { Command } from "commander";
+import type { FrameworkBuildMode } from "../../contexts/tools/domain/registry.js";
 import {
-  type FrameworkBuildMode,
   type FrameworkBuildTarget,
   SUPPORTED_BUILD_TARGETS,
-} from "../../domain/models/framework-build.js";
+} from "../../contexts/translate/domain/build-target.js";
 import { createDeps, createFrameworkBuildUseCase } from "../../infrastructure/deps.js";
 import { ErrorHandler } from "../error-handler.js";
 import { parseGlobalOptions } from "./global-options.js";

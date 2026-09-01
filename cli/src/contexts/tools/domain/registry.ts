@@ -3,7 +3,6 @@ import type {
   NativeActivation,
   PluginsMode,
 } from "../../../domain/capabilities/plugins-capability.js";
-import type { FrameworkBuildMode } from "../../../domain/models/framework-build.js";
 import {
   CategoryMismatchError,
   UnknownToolCategoryError,
@@ -19,6 +18,13 @@ import {
 } from "../../../kernel/tool.js";
 import type { ToolBuildContract } from "./build-contract.js";
 import type { AiTool, IdeToolConfig } from "./contracts.js";
+
+/**
+ * Output layout discriminant: marketplace dist (Mode A) vs direct workspace inject (Mode B
+ * flat). Declared here, not by translate, because it is read off a tool's own plugins
+ * capability (see `frameworkBuildModeFor` below) — a tool's build mode is tool knowledge.
+ */
+export type FrameworkBuildMode = "marketplace" | "flat";
 
 export type ToolConfig = AiTool<unknown> | IdeToolConfig;
 

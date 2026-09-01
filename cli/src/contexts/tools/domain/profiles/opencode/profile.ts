@@ -1,23 +1,11 @@
 import { join } from "node:path";
-import { AgentsCapability } from "../../../../../domain/capabilities/agents-capability.js";
-import { CommandsCapability } from "../../../../../domain/capabilities/commands-capability.js";
 import { PluginsCapability } from "../../../../../domain/capabilities/plugins-capability.js";
-import { RulesCapability } from "../../../../../domain/capabilities/rules-capability.js";
-import { SkillsCapability } from "../../../../../domain/capabilities/skills-capability.js";
-import type { UserFileSectionKey } from "../../../../../domain/formats/command.js";
-import {
-  buildAiddCommandFilePath,
-  convertCommandFrontmatterNoHint,
-  detectSectionKeyFromPrefixes,
-  reverseConvertCommandFrontmatterNoHint,
-  stripToolSuffix,
-} from "../../../../../domain/formats/command.js";
-import {
-  baseReverseRewriteContent,
-  baseRewriteContent,
-} from "../../../../../domain/formats/placeholders.js";
-import { CONFIG_MCP, CONFIG_OPENCODE } from "../../../../../domain/models/framework.js";
 import { OpencodeDualConfigError } from "../../../../../kernel/errors.js";
+import { AgentsCapability } from "../../capabilities/agents-capability.js";
+import { CommandsCapability } from "../../capabilities/commands-capability.js";
+import { CONFIG_MCP, CONFIG_OPENCODE } from "../../capabilities/config-refs.js";
+import { RulesCapability } from "../../capabilities/rules-capability.js";
+import { SkillsCapability } from "../../capabilities/skills-capability.js";
 import type {
   AiTool,
   HasAgents,
@@ -27,6 +15,15 @@ import type {
   HasRules,
   HasSkills,
 } from "../../contracts.js";
+import type { UserFileSectionKey } from "../../formats/command.js";
+import {
+  buildAiddCommandFilePath,
+  convertCommandFrontmatterNoHint,
+  detectSectionKeyFromPrefixes,
+  reverseConvertCommandFrontmatterNoHint,
+  stripToolSuffix,
+} from "../../formats/command.js";
+import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
 import { McpCapability } from "../../mcp-capability.js";
 import { registerTool } from "../../registry.js";
 import { buildOpencodeFlatContract, transformMcpToOpencode } from "./build.js";

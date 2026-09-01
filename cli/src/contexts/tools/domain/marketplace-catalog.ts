@@ -10,11 +10,11 @@
  * drawing. This file is the place both can reach without either.
  */
 import { join } from "node:path";
-import { parseFrontmatter, serializeFrontmatter } from "../../../domain/formats/markdown.js";
-import { rewriteRelativeLinks } from "../../../domain/formats/relative-link-rewrite.js";
 import { InvalidSourceMarketplaceError } from "../../../kernel/errors.js";
+import { parseFrontmatter, serializeFrontmatter } from "../../../kernel/markdown.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";
+import { rewriteRelativeLinks } from "../../../kernel/relative-link-rewrite.js";
 import type { PluginPresence } from "./build-contract.js";
 
 type SrcEntry =

@@ -8,24 +8,24 @@
  * profile imports them back from here.
  */
 
-import { codexAgentMarkdownToToml } from "../../../../../domain/formats/codex-agent-toml.js";
-import {
-  OUTPUT_CODEX_AGENTS_DIR,
-  OUTPUT_CODEX_MANIFEST_RELATIVE,
-  OUTPUT_CODEX_MARKETPLACE_RELATIVE,
-} from "../../../../../domain/formats/codex-paths.js";
-import { mergeCodexFrameworkHooksJson } from "../../../../../domain/formats/flat-hooks-merge.js";
 import {
   flatMcpKeyPrefix,
   genericFlatHooksScriptPath,
   genericFlatSkillPath,
-} from "../../../../../domain/formats/flat-paths.js";
-import { parseFrontmatter, serializeFrontmatter } from "../../../../../domain/formats/markdown.js";
-import { parseToml, stringifyToml } from "../../../../../domain/formats/toml.js";
+} from "../../../../../kernel/flat-paths.js";
+import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
 import type { FileReader } from "../../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../../kernel/ports/file-writer.js";
 import type { PluginPresence, ToolBuildContract } from "../../build-contract.js";
+import { mergeCodexFrameworkHooksJson } from "../../formats/flat-hooks-merge.js";
 import { buildCodexMarketplace, buildCodexMarketplaceEntry } from "../../marketplace-catalog.js";
+import { codexAgentMarkdownToToml } from "./codex-agent-toml.js";
+import {
+  OUTPUT_CODEX_AGENTS_DIR,
+  OUTPUT_CODEX_MANIFEST_RELATIVE,
+  OUTPUT_CODEX_MARKETPLACE_RELATIVE,
+} from "./codex-paths.js";
+import { parseToml, stringifyToml } from "./toml.js";
 
 type FsType = FileReader & FileWriter;
 
