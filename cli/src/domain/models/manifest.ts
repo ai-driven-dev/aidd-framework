@@ -1,4 +1,8 @@
 import {
+  type McpExclusion,
+  mcpExclusionEquals,
+} from "../../contexts/tools/domain/mcp-exclusion.js";
+import {
   DuplicatePluginError,
   InvalidManifestDataError,
   InvalidManifestToolIdError,
@@ -8,7 +12,6 @@ import {
 import { FileHash, type InstallationFile } from "../../kernel/file.js";
 import type { MergeFileEntry } from "../../kernel/merge.js";
 import { type ToolId, VALID_TOOL_IDS } from "../../kernel/tool.js";
-import { type McpExclusion, mcpExclusionEquals } from "./mcp-exclusion.js";
 import { Plugin, type PluginEntryData } from "./plugin.js";
 
 const MANIFEST_VERSION = 6;

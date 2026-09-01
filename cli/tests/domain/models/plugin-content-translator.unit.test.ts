@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { claude } from "../../../src/contexts/tools/domain/profiles/claude.js";
+import { codex } from "../../../src/contexts/tools/domain/profiles/codex.js";
+import { copilot } from "../../../src/contexts/tools/domain/profiles/copilot.js";
+import { cursor } from "../../../src/contexts/tools/domain/profiles/cursor.js";
+import { opencode } from "../../../src/contexts/tools/domain/profiles/opencode.js";
+import { vscodeToolConfig } from "../../../src/contexts/tools/domain/profiles/vscode.js";
+import type { ToolConfig } from "../../../src/contexts/tools/domain/registry.js";
 import { PluginContentTranslator } from "../../../src/domain/models/plugin-content-translator.js";
 import {
   type PluginComponentFile,
   PluginDistribution,
 } from "../../../src/domain/models/plugin-distribution.js";
-import { claude } from "../../../src/domain/tools/ai/claude.js";
-import { codex } from "../../../src/domain/tools/ai/codex.js";
-import { copilot } from "../../../src/domain/tools/ai/copilot.js";
-import { cursor } from "../../../src/domain/tools/ai/cursor.js";
-import { opencode } from "../../../src/domain/tools/ai/opencode.js";
-import { vscodeToolConfig } from "../../../src/domain/tools/ide/vscode.js";
-import type { ToolConfig } from "../../../src/domain/tools/registry.js";
 import { FileHash } from "../../../src/kernel/file.js";
 
 const stubHasher = { hash: (_content: string) => new FileHash("a".repeat(32)) };

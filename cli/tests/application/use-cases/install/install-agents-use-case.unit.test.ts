@@ -1,11 +1,11 @@
 // Register the claude and copilot tools so their capabilities are accessible
-import "../../../../src/domain/tools/ai/claude.js";
-import "../../../../src/domain/tools/ai/copilot.js";
+import "../../../../src/contexts/tools/domain/profiles/claude.js";
+import "../../../../src/contexts/tools/domain/profiles/copilot.js";
 import { describe, expect, it } from "vitest";
 import { InstallAgentsUseCase } from "../../../../src/application/use-cases/install/install-agents-use-case.js";
+import { claude } from "../../../../src/contexts/tools/domain/profiles/claude.js";
+import { copilot } from "../../../../src/contexts/tools/domain/profiles/copilot.js";
 import type { ContentSection } from "../../../../src/domain/models/framework.js";
-import { claude } from "../../../../src/domain/tools/ai/claude.js";
-import { copilot } from "../../../../src/domain/tools/ai/copilot.js";
 import { GITKEEP_FILE } from "../../../../src/kernel/file.js";
 import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
 

@@ -1,4 +1,4 @@
-import type { NativePluginActivator } from "../../../src/domain/ports/native-plugin-activator.js";
+import type { NativePluginActivator } from "../../../src/contexts/tools/domain/ports/native-plugin-activator.js";
 import { NativePluginCliError } from "../../../src/kernel/errors.js";
 
 /**

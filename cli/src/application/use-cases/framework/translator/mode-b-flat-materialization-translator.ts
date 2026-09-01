@@ -1,5 +1,6 @@
 import { join } from "node:path";
-import type { McpCapability } from "../../../../domain/capabilities/mcp-capability.js";
+import type { McpCapability } from "../../../../contexts/tools/domain/mcp-capability.js";
+import { getToolConfig, isAiTool } from "../../../../contexts/tools/domain/registry.js";
 import type { PluginsCapability } from "../../../../domain/capabilities/plugins-capability.js";
 import { mergeOpencodeMcp } from "../../../../domain/formats/opencode-mcp-merge.js";
 import type { Manifest } from "../../../../domain/models/manifest.js";
@@ -10,7 +11,6 @@ import type {
   PluginTranslationSkip,
   ReadonlySkipList,
 } from "../../../../domain/models/plugin-translation-skip.js";
-import { getToolConfig, isAiTool } from "../../../../domain/tools/registry.js";
 import { CursorProjectScopeUnsupportedError } from "../../../../kernel/errors.js";
 import type { InstallationFile } from "../../../../kernel/file.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";

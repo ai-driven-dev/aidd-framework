@@ -6,7 +6,7 @@
  *   - Both files appear in Plugin.files (tracked for uninstall)
  *   - No skip warnings are emitted
  */
-import "../../../../../src/domain/tools/ai/cursor.js";
+import "../../../../../src/contexts/tools/domain/profiles/cursor.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ModeBFlatMaterializationTranslator } from "../../../../../src/application/use-cases/framework/translator/mode-b-flat-materialization-translator.js";

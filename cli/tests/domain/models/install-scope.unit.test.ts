@@ -1,8 +1,8 @@
-import "../../../src/domain/tools/ai/claude.js";
-import "../../../src/domain/tools/ai/codex.js";
-import "../../../src/domain/tools/ai/copilot.js";
-import "../../../src/domain/tools/ai/cursor.js";
-import "../../../src/domain/tools/ai/opencode.js";
+import "../../../src/contexts/tools/domain/profiles/claude.js";
+import "../../../src/contexts/tools/domain/profiles/codex.js";
+import "../../../src/contexts/tools/domain/profiles/copilot.js";
+import "../../../src/contexts/tools/domain/profiles/cursor.js";
+import "../../../src/contexts/tools/domain/profiles/opencode.js";
 import { describe, expect, it } from "vitest";
 import {
   assertToolSupportsScope,

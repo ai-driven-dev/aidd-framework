@@ -1,6 +1,6 @@
+import type { AiTool, HasRules } from "../../../contexts/tools/domain/contracts.js";
 import type { RulesCapability } from "../../../domain/capabilities/rules-capability.js";
 import type { ContentSection } from "../../../domain/models/framework.js";
-import type { AiTool, HasRules } from "../../../domain/tools/contracts.js";
 import type { InstallationFile } from "../../../kernel/file.js";
 import type { Hasher } from "../../../kernel/ports/hasher.js";
 import {

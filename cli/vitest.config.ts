@@ -23,6 +23,7 @@ export default defineConfig({
         "src/cli.ts",
         "src/application/commands/**",
         "src/domain/ports/**",
+        "src/contexts/*/domain/ports/**",
         "src/infrastructure/deps.ts",
       ],
       thresholds: {

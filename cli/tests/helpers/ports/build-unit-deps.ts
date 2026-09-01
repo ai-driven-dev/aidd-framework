@@ -1,11 +1,11 @@
 import { resolve } from "node:path";
 // Register all tools so use-cases that call getToolConfig / getIdeToolConfig don't throw
-import "../../../src/domain/tools/ai/claude.js";
-import "../../../src/domain/tools/ai/codex.js";
-import "../../../src/domain/tools/ai/copilot.js";
-import "../../../src/domain/tools/ai/cursor.js";
-import "../../../src/domain/tools/ai/opencode.js";
-import "../../../src/domain/tools/ide/vscode.js";
+import "../../../src/contexts/tools/domain/profiles/claude.js";
+import "../../../src/contexts/tools/domain/profiles/codex.js";
+import "../../../src/contexts/tools/domain/profiles/copilot.js";
+import "../../../src/contexts/tools/domain/profiles/cursor.js";
+import "../../../src/contexts/tools/domain/profiles/opencode.js";
+import "../../../src/contexts/tools/domain/profiles/vscode.js";
 import { CLIOutput } from "../../../src/application/output.js";
 import { DoctorLayoutUseCase } from "../../../src/application/use-cases/doctor/doctor-layout-use-case.js";
 import { DoctorMergeFilesUseCase } from "../../../src/application/use-cases/doctor/doctor-merge-files-use-case.js";
@@ -19,13 +19,13 @@ import { GitignoreUseCase } from "../../../src/application/use-cases/gitignore-u
 import { ResolveUpdateDecisionUseCase } from "../../../src/application/use-cases/global/resolve-update-decision-use-case.js";
 import { UpdateOneToolUseCase } from "../../../src/application/use-cases/global/update-one-tool-use-case.js";
 import { InitUseCase } from "../../../src/application/use-cases/init-use-case.js";
-import { InstallIdeConfigUseCase } from "../../../src/application/use-cases/install/install-ide-config-use-case.js";
-import { InstallRuntimeConfigUseCase } from "../../../src/application/use-cases/install/install-runtime-config-use-case.js";
 import { PostInstallPipelineUseCase } from "../../../src/application/use-cases/install/post-install-pipeline-use-case.js";
 import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
 import { SyncConflictResolverUseCase } from "../../../src/application/use-cases/sync/sync-conflict-resolver-use-case.js";
+import { InstallIdeConfigUseCase } from "../../../src/contexts/tools/application/install-ide-config-use-case.js";
+import { InstallRuntimeConfigUseCase } from "../../../src/contexts/tools/application/install-runtime-config-use-case.js";
+import { isIdeToolId } from "../../../src/contexts/tools/domain/registry.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
-import { isIdeToolId } from "../../../src/domain/tools/registry.js";
 import { PluginCatalogRepositoryAdapter } from "../../../src/infrastructure/adapters/plugin-catalog-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "../../../src/infrastructure/adapters/plugin-distribution-reader-adapter.js";
 import { SilentPrompterAdapter } from "../../../src/infrastructure/adapters/prompter-adapter.js";

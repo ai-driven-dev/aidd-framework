@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { FileMerger } from "../../../src/domain/ports/file-merger.js";
+import type { FileMerger } from "../../../src/contexts/tools/domain/ports/file-merger.js";
 import { FileHash } from "../../../src/kernel/file.js";
 import { stripJsonComments } from "../../../src/kernel/jsonc.js";
 import {

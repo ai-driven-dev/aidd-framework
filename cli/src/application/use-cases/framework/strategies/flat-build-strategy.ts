@@ -1,4 +1,8 @@
 import { basename, join, relative } from "node:path";
+import type {
+  ArtifactContract,
+  ToolBuildContract,
+} from "../../../../contexts/tools/domain/build-contract.js";
 import { rewriteClaudeRootInJson } from "../../../../domain/formats/claude-root-path-rewrite.js";
 import { flatMcpKeyPrefix } from "../../../../domain/formats/flat-paths.js";
 import { parseFrontmatter, serializeFrontmatter } from "../../../../domain/formats/markdown.js";
@@ -9,10 +13,6 @@ import {
   PLUGIN_MCP_RELATIVE,
 } from "../../../../domain/models/framework-build.js";
 import type { JsonSchemaValidator } from "../../../../domain/ports/json-schema-validator.js";
-import type {
-  ArtifactContract,
-  ToolBuildContract,
-} from "../../../../domain/tools/build-contract.js";
 import { FlatTargetExistsError, OutDirNotDirectoryError } from "../../../../kernel/errors.js";
 import type { AssetProvider } from "../../../../kernel/ports/asset-provider.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";

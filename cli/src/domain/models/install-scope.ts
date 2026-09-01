@@ -1,6 +1,6 @@
+import { getToolConfig, isAiTool } from "../../contexts/tools/domain/registry.js";
 import { InvalidInstallScopeError, InvalidPluginScopeError } from "../../kernel/errors.js";
 import type { AiToolId } from "../../kernel/tool.js";
-import { getToolConfig, isAiTool } from "../tools/registry.js";
 
 export type InstallScope = "project" | "user";
 

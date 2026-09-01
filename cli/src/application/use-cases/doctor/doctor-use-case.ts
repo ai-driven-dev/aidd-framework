@@ -1,3 +1,4 @@
+import { toolIdsForCategory } from "../../../contexts/tools/domain/registry.js";
 import type {
   DoctorIssue,
   DoctorReport,
@@ -6,7 +7,6 @@ import type {
 } from "../../../domain/models/doctor.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
-import { toolIdsForCategory } from "../../../domain/tools/registry.js";
 import { ManifestValidationError } from "../../../kernel/errors.js";
 import type { ToolCategory } from "../../../kernel/tool.js";
 import { NoManifestError } from "../../errors.js";

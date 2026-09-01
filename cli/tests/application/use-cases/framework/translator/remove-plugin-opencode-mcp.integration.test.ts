@@ -5,7 +5,7 @@
  *   - preserves user-added servers
  *   - removes the plugin from the manifest
  */
-import "../../../../../src/domain/tools/ai/opencode.js";
+import "../../../../../src/contexts/tools/domain/profiles/opencode.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ModeBFlatMaterializationTranslator } from "../../../../../src/application/use-cases/framework/translator/mode-b-flat-materialization-translator.js";

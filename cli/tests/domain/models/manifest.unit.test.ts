@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import type { McpExclusion } from "../../../src/contexts/tools/domain/mcp-exclusion.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
-import type { McpExclusion } from "../../../src/domain/models/mcp-exclusion.js";
 import { FileHash, InstallationFile } from "../../../src/kernel/file.js";
 import type { MergeFileEntry } from "../../../src/kernel/merge.js";
 import type { ToolId } from "../../../src/kernel/tool.js";

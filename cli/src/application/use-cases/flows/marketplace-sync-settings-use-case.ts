@@ -1,13 +1,17 @@
 import { resolve } from "node:path";
+import type { NativePluginActivator } from "../../../contexts/tools/domain/ports/native-plugin-activator.js";
+import {
+  getToolConfig,
+  isAiTool,
+  nativeActivationOf,
+} from "../../../contexts/tools/domain/registry.js";
 import type { MarketplaceSettings } from "../../../domain/capabilities/marketplace-settings.js";
 import type { FrameworkBuildTarget } from "../../../domain/models/framework-build.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Marketplace } from "../../../domain/models/marketplace.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
-import type { NativePluginActivator } from "../../../domain/ports/native-plugin-activator.js";
 import type { PluginCatalogRepository } from "../../../domain/ports/plugin-catalog-repository.js";
-import { getToolConfig, isAiTool, nativeActivationOf } from "../../../domain/tools/registry.js";
 import { NativePluginCliError } from "../../../kernel/errors.js";
 import { marketplaceCacheDir } from "../../../kernel/paths.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";

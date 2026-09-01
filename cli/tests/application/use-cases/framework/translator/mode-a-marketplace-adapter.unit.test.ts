@@ -2,7 +2,7 @@
 // NOT covered here. Those behaviors live on MarketplaceSyncSettingsUseCase, which owns the
 // marketplace registration logic. ModeAMarketplaceTranslator is a thin translator adapter that
 // only registers the plugin reference in the manifest with empty files.
-import "../../../../../src/domain/tools/ai/claude.js";
+import "../../../../../src/contexts/tools/domain/profiles/claude.js";
 import { describe, expect, it } from "vitest";
 import { ModeAMarketplaceTranslator } from "../../../../../src/application/use-cases/framework/translator/mode-a-marketplace-translator.js";
 import { Manifest } from "../../../../../src/domain/models/manifest.js";

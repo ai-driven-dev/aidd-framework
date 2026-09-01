@@ -1,17 +1,17 @@
-import { Manifest } from "../../../domain/models/manifest.js";
-import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
-import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
-import { CategoryMismatchError } from "../../../kernel/errors.js";
-import type { AiToolId, IdeToolId, ToolId } from "../../../kernel/tool.js";
-import { AI_TOOL_IDS } from "../../../kernel/tool.js";
 import type {
   InstallIdeConfigResult,
   InstallIdeConfigUseCase,
-} from "../install/install-ide-config-use-case.js";
+} from "../../../contexts/tools/application/install-ide-config-use-case.js";
 import type {
   InstallRuntimeConfigResult,
   InstallRuntimeConfigUseCase,
-} from "../install/install-runtime-config-use-case.js";
+} from "../../../contexts/tools/application/install-runtime-config-use-case.js";
+import { getToolConfig, isAiTool } from "../../../contexts/tools/domain/registry.js";
+import { Manifest } from "../../../domain/models/manifest.js";
+import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
+import { CategoryMismatchError } from "../../../kernel/errors.js";
+import type { AiToolId, IdeToolId, ToolId } from "../../../kernel/tool.js";
+import { AI_TOOL_IDS } from "../../../kernel/tool.js";
 
 export type ToolInstallResult = InstallRuntimeConfigResult | InstallIdeConfigResult;
 

@@ -60,7 +60,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/domain/**/*.ts"],
+      "includes": ["src/domain/**/*.ts", "src/contexts/*/domain/**/*.ts"],
       "linter": {
         "rules": {
           "style": {

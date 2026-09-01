@@ -1,5 +1,5 @@
+import { isAiTool, type ToolConfig } from "../../../../contexts/tools/domain/registry.js";
 import type { PluginsCapability } from "../../../../domain/capabilities/plugins-capability.js";
-import { isAiTool, type ToolConfig } from "../../../../domain/tools/registry.js";
 import type { PluginTranslator } from "./plugin-translator.js";
 import { resolveTranslator, type TranslatorDeps } from "./plugin-translator-factory.js";
 

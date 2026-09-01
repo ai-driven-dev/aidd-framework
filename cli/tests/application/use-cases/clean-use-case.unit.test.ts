@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import "../../../src/domain/tools/ai/claude.js";
-import "../../../src/domain/tools/ide/vscode.js";
+import "../../../src/contexts/tools/domain/profiles/claude.js";
+import "../../../src/contexts/tools/domain/profiles/vscode.js";
 import { CleanUseCase } from "../../../src/application/use-cases/clean-use-case.js";
 import type { ToolId } from "../../../src/kernel/tool.js";
 import { buildUnitDeps, initAndInstall } from "../../helpers/ports/build-unit-deps.js";

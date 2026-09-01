@@ -1,3 +1,4 @@
+import { UninstallToolsUseCase } from "../../../contexts/tools/application/uninstall-tools-use-case.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
@@ -8,7 +9,6 @@ import { VALID_TOOL_IDS } from "../../../kernel/tool.js";
 import { InputRequiredError, NoManifestError, ToolNotInstalledError } from "../../errors.js";
 import { UninstallMcpExclusionUseCase } from "./uninstall-mcp-exclusion-use-case.js";
 import { UninstallPluginUseCase } from "./uninstall-plugin-use-case.js";
-import { UninstallToolsUseCase } from "./uninstall-tools-use-case.js";
 
 interface UninstallOptions {
   toolIds: ToolId[];

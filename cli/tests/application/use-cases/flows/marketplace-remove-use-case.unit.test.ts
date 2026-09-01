@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import "../../../../src/domain/tools/ai/claude.js";
+import "../../../../src/contexts/tools/domain/profiles/claude.js";
 import { MarketplaceRemoveUseCase } from "../../../../src/application/use-cases/flows/marketplace-remove-use-case.js";
 import { Manifest } from "../../../../src/domain/models/manifest.js";
 import { Marketplace } from "../../../../src/domain/models/marketplace.js";

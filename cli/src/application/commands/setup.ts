@@ -1,8 +1,8 @@
 import { resolve } from "node:path";
 import type { Command } from "commander";
+import { assertToolIdsMatchCategory } from "../../contexts/tools/domain/registry.js";
 import { MarketplaceSourceMode } from "../../domain/models/marketplace-source-mode.js";
 import { SetupFlow } from "../../domain/models/setup-flow.js";
-import { assertToolIdsMatchCategory } from "../../domain/tools/registry.js";
 import { createDeps } from "../../infrastructure/deps.js";
 import type { ToolId } from "../../kernel/tool.js";
 import { AI_TOOL_IDS, IDE_TOOL_IDS } from "../../kernel/tool.js";

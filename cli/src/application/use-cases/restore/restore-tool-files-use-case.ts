@@ -1,9 +1,9 @@
+import type { FileMerger } from "../../../contexts/tools/domain/ports/file-merger.js";
+import { getToolConfig } from "../../../contexts/tools/domain/registry.js";
 import type { FrameworkDescriptor } from "../../../domain/models/framework.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
-import type { FileMerger } from "../../../domain/ports/file-merger.js";
 import type { Platform } from "../../../domain/ports/platform.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
-import { getToolConfig } from "../../../domain/tools/registry.js";
 import { type FileHash, InstallationFile } from "../../../kernel/file.js";
 import type { MergeFileEntry } from "../../../kernel/merge.js";
 import type { AssetProvider } from "../../../kernel/ports/asset-provider.js";

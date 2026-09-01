@@ -1,6 +1,6 @@
+import { getAllRegisteredTools, hasToolSignals } from "../../contexts/tools/domain/registry.js";
 import { Manifest } from "../../domain/models/manifest.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
-import { getAllRegisteredTools, hasToolSignals } from "../../domain/tools/registry.js";
 import { AIDD_DIR } from "../../kernel/paths.js";
 import type { FileReader } from "../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../kernel/ports/file-writer.js";

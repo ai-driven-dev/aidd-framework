@@ -12,8 +12,7 @@ const TOOL_IDS = ["claude", "cursor", "copilot", "codex", "opencode", "vscode"] 
 
 /** The only places a tool identifier is allowed to be written down. */
 const ALLOWED = new Set([
-  ...TOOL_IDS.map((id) => `src/domain/tools/ai/${id}.ts`),
-  ...TOOL_IDS.map((id) => `src/domain/tools/ide/${id}.ts`),
+  ...TOOL_IDS.map((id) => `src/contexts/tools/domain/profiles/${id}.ts`),
   "src/kernel/tool.ts",
 ]);
 
@@ -54,6 +53,8 @@ describe("adding a tool costs one file", () => {
     expect(namesToolOutsideProfile("src/domain/models/framework.ts", 'if (id === "cursor")')).toBe(
       true
     );
-    expect(namesToolOutsideProfile("src/domain/tools/ai/cursor.ts", 'id: "cursor"')).toBe(false);
+    expect(
+      namesToolOutsideProfile("src/contexts/tools/domain/profiles/cursor.ts", 'id: "cursor"')
+    ).toBe(false);
   });
 });

@@ -10,7 +10,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
-import type { FileMerger } from "../../domain/ports/file-merger.js";
+import type { FileMerger } from "../../contexts/tools/domain/ports/file-merger.js";
 import type { FileHash } from "../../kernel/file.js";
 import { stripJsonComments } from "../../kernel/jsonc.js";
 import {

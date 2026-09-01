@@ -1,5 +1,6 @@
 import { homedir as nodeHomedir } from "node:os";
 import { join } from "node:path";
+import { getToolConfig, type ToolConfig } from "../../../contexts/tools/domain/registry.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import { Plugin } from "../../../domain/models/plugin.js";
 import { PluginContentTranslator } from "../../../domain/models/plugin-content-translator.js";
@@ -8,7 +9,6 @@ import { compareSemver } from "../../../domain/models/semver.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { PluginDistributionReader } from "../../../domain/ports/plugin-distribution-reader.js";
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
-import { getToolConfig, type ToolConfig } from "../../../domain/tools/registry.js";
 import { DOCS_DIR, PLUGIN_CACHE_SUBDIR } from "../../../kernel/paths.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";

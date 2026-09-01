@@ -1,11 +1,11 @@
 import { join } from "node:path";
-import { McpCapability } from "../../../domain/capabilities/mcp-capability.js";
+import { McpCapability } from "../../../contexts/tools/domain/mcp-capability.js";
+import { getToolConfig, isAiTool } from "../../../contexts/tools/domain/registry.js";
 import type { PluginsCapability } from "../../../domain/capabilities/plugins-capability.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Plugin } from "../../../domain/models/plugin.js";
 import type { PluginDistribution } from "../../../domain/models/plugin-distribution.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
-import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
 import type { InstallationFile } from "../../../kernel/file.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";

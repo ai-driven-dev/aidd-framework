@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import "../../../../src/domain/tools/ai/claude.js";
+import "../../../../src/contexts/tools/domain/profiles/claude.js";
 import { PluginListUseCase } from "../../../../src/application/use-cases/plugin/plugin-list-use-case.js";
 import { Manifest } from "../../../../src/domain/models/manifest.js";
 import { Plugin } from "../../../../src/domain/models/plugin.js";

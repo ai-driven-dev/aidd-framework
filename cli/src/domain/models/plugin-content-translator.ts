@@ -1,7 +1,3 @@
-import { InstallationFile } from "../../kernel/file.js";
-import type { Hasher } from "../../kernel/ports/hasher.js";
-import { convertHooksFormat } from "../formats/cursor-hooks.js";
-import { parseFrontmatter, serializeFrontmatter } from "../formats/markdown.js";
 import type {
   AiTool,
   HasAgents,
@@ -9,9 +5,13 @@ import type {
   HasPlugins,
   HasRules,
   HasSkills,
-} from "../tools/contracts.js";
-import type { ToolConfig } from "../tools/registry.js";
-import { isAiTool } from "../tools/registry.js";
+} from "../../contexts/tools/domain/contracts.js";
+import type { ToolConfig } from "../../contexts/tools/domain/registry.js";
+import { isAiTool } from "../../contexts/tools/domain/registry.js";
+import { InstallationFile } from "../../kernel/file.js";
+import type { Hasher } from "../../kernel/ports/hasher.js";
+import { convertHooksFormat } from "../formats/cursor-hooks.js";
+import { parseFrontmatter, serializeFrontmatter } from "../formats/markdown.js";
 import type { PluginComponentFile, PluginDistribution } from "./plugin-distribution.js";
 import {
   OPENCODE_HOOKS_SKIP_REASON,

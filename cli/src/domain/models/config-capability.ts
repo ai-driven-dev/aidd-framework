@@ -1,7 +1,7 @@
+import { McpCapability } from "../../contexts/tools/domain/mcp-capability.js";
+import type { ToolConfig } from "../../contexts/tools/domain/registry.js";
+import { SettingsCapability } from "../../contexts/tools/domain/settings-capability.js";
 import { HooksCapability } from "../capabilities/hooks-capability.js";
-import { McpCapability } from "../capabilities/mcp-capability.js";
-import { SettingsCapability } from "../capabilities/settings-capability.js";
-import type { ToolConfig } from "../tools/registry.js";
 
 export type ConfigCapability = McpCapability | HooksCapability | SettingsCapability;
 

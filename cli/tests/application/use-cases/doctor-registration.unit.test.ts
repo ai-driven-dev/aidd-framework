@@ -3,9 +3,9 @@ import { DoctorRegistrationUseCase } from "../../../src/application/use-cases/do
 import { Manifest } from "../../../src/domain/models/manifest.js";
 import { Marketplace } from "../../../src/domain/models/marketplace.js";
 import type { ToolId } from "../../../src/kernel/tool.js";
-import "../../../src/domain/tools/ai/claude.js";
-import "../../../src/domain/tools/ai/copilot.js";
-import "../../../src/domain/tools/ai/cursor.js";
+import "../../../src/contexts/tools/domain/profiles/claude.js";
+import "../../../src/contexts/tools/domain/profiles/copilot.js";
+import "../../../src/contexts/tools/domain/profiles/cursor.js";
 import { FakeNativePluginActivator } from "../../helpers/ports/fake-native-plugin-activator.js";
 import { InMemoryFileAdapter } from "../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryMarketplaceRegistry } from "../../helpers/ports/in-memory-marketplace-registry.js";

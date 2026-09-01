@@ -1,16 +1,16 @@
 import { basename, join, relative } from "node:path";
+import type {
+  PluginPresence,
+  SourceMarketplaceRef,
+  SourcePluginEntryRef,
+  ToolBuildContract,
+} from "../../../../contexts/tools/domain/build-contract.js";
 import { rewritePluginRootToken } from "../../../../domain/formats/plugin-root-token-rewrite.js";
 import {
   PLUGIN_AGENT_INPUT_EXT,
   SOURCE_PLUGIN_MANIFEST_RELATIVE,
 } from "../../../../domain/models/framework-build.js";
 import type { JsonSchemaValidator } from "../../../../domain/ports/json-schema-validator.js";
-import type {
-  PluginPresence,
-  SourceMarketplaceRef,
-  SourcePluginEntryRef,
-  ToolBuildContract,
-} from "../../../../domain/tools/build-contract.js";
 import type { AssetProvider, SchemaName } from "../../../../kernel/ports/asset-provider.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";

@@ -1,7 +1,7 @@
+import { getAllRegisteredTools, hasToolSignals } from "../../../contexts/tools/domain/registry.js";
 import type { DoctorIssue } from "../../../domain/models/doctor.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { TokenProvider } from "../../../domain/ports/token-provider.js";
-import { getAllRegisteredTools, hasToolSignals } from "../../../domain/tools/registry.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 
 export interface DoctorLayoutOptions {

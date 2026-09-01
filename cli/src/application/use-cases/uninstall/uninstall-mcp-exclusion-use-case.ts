@@ -1,6 +1,6 @@
 import { join } from "node:path";
+import type { McpExclusion } from "../../../contexts/tools/domain/mcp-exclusion.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
-import type { McpExclusion } from "../../../domain/models/mcp-exclusion.js";
 import { type MergeFileEntry, removeEntriesFromJson } from "../../../kernel/merge.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";

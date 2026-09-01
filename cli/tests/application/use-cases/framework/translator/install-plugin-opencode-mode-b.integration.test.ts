@@ -1,7 +1,7 @@
 // OpenCode uses Mode B with `mode: "flat"` and project scope. The translator routes through
 // `translateFlat` which writes files at `.opencode/<section>/<plugin>/<file>` under projectRoot
 // (not under a single `.opencode/plugins/<name>/` root — that shape is exclusive to native mode).
-import "../../../../../src/domain/tools/ai/opencode.js";
+import "../../../../../src/contexts/tools/domain/profiles/opencode.js";
 import { describe, expect, it } from "vitest";
 import { ModeBFlatMaterializationTranslator } from "../../../../../src/application/use-cases/framework/translator/mode-b-flat-materialization-translator.js";
 import { Manifest } from "../../../../../src/domain/models/manifest.js";

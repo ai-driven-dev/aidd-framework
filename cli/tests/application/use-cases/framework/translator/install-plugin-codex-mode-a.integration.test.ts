@@ -1,7 +1,7 @@
 // Codex enables plugins through its own CLI (`codex plugin add`), which writes the
 // user-global `~/.codex/config.toml` and plugin cache — a project-local settings file is
 // inert. This test asserts the sync drives the CodexActivator and writes NO `.codex/config.json`.
-import "../../../../../src/domain/tools/ai/codex.js";
+import "../../../../../src/contexts/tools/domain/profiles/codex.js";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MarketplaceSyncSettingsUseCase } from "../../../../../src/application/use-cases/flows/marketplace-sync-settings-use-case.js";

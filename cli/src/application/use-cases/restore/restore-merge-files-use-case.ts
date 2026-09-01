@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { FileMerger } from "../../../domain/ports/file-merger.js";
+import type { FileMerger } from "../../../contexts/tools/domain/ports/file-merger.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
 import type { InstallationFile } from "../../../kernel/file.js";
 import {

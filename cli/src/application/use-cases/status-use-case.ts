@@ -1,11 +1,11 @@
 import { join } from "node:path";
-import type { Manifest } from "../../domain/models/manifest.js";
-import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import {
   getToolConfig,
   machineLocalFilesOf,
   toolIdsForCategory,
-} from "../../domain/tools/registry.js";
+} from "../../contexts/tools/domain/registry.js";
+import type { Manifest } from "../../domain/models/manifest.js";
+import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { FileHash } from "../../kernel/file.js";
 import { extractMergeEntries, type MergeFileEntry } from "../../kernel/merge.js";
 import type { FileReader } from "../../kernel/ports/file-reader.js";

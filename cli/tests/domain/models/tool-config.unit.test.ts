@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { stripToolSuffix } from "../../../src/domain/formats/command.js";
-import type { AiTool } from "../../../src/domain/tools/contracts.js";
+import type { AiTool } from "../../../src/contexts/tools/domain/contracts.js";
 import {
   assertToolIdsMatchCategory,
   getAllRegisteredTools,
   getToolConfig,
   registerTool,
   toolIdsForCategory,
-} from "../../../src/domain/tools/registry.js";
+} from "../../../src/contexts/tools/domain/registry.js";
+import { stripToolSuffix } from "../../../src/domain/formats/command.js";
 import type { AiToolId, ToolId } from "../../../src/kernel/tool.js";
 import { VALID_TOOL_IDS } from "../../../src/kernel/tool.js";
 

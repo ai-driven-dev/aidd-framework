@@ -1,12 +1,12 @@
 import { join } from "node:path";
+import type { InstallIdeConfigUseCase } from "../../../contexts/tools/application/install-ide-config-use-case.js";
+import type { InstallRuntimeConfigUseCase } from "../../../contexts/tools/application/install-runtime-config-use-case.js";
+import { getToolConfig, isAiTool } from "../../../contexts/tools/domain/registry.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
-import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
 import type { FileHash } from "../../../kernel/file.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { AiToolId, IdeToolId, ToolId } from "../../../kernel/tool.js";
 import { InputRequiredError } from "../../errors.js";
-import type { InstallIdeConfigUseCase } from "../install/install-ide-config-use-case.js";
-import type { InstallRuntimeConfigUseCase } from "../install/install-runtime-config-use-case.js";
 import type { SyncConflictResolverUseCase } from "../sync/sync-conflict-resolver-use-case.js";
 import type {
   BulkConflictState,

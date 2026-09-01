@@ -10,6 +10,15 @@
  * functions reused from domain/formats/. The contracts are thin wiring.
  */
 
+import type {
+  PluginPresence,
+  ToolBuildContract,
+} from "../../../../contexts/tools/domain/build-contract.js";
+import {
+  mergeCodexConfigToml,
+  stripCodexSkillFrontmatter,
+} from "../../../../contexts/tools/domain/profiles/codex.js";
+import { transformMcpToOpencode } from "../../../../contexts/tools/domain/profiles/opencode.js";
 import {
   stripAgentFrontmatter,
   stripCursorAgentFrontmatter,
@@ -55,12 +64,6 @@ import {
   OUTPUT_MARKETPLACE_RELATIVE,
   OUTPUT_PLUGIN_MANIFEST_RELATIVE,
 } from "../../../../domain/models/framework-build.js";
-import {
-  mergeCodexConfigToml,
-  stripCodexSkillFrontmatter,
-} from "../../../../domain/tools/ai/codex.js";
-import { transformMcpToOpencode } from "../../../../domain/tools/ai/opencode.js";
-import type { PluginPresence, ToolBuildContract } from "../../../../domain/tools/build-contract.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import {

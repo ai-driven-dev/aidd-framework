@@ -1,10 +1,14 @@
 import { join } from "node:path";
+import type { NativePluginActivator } from "../../../contexts/tools/domain/ports/native-plugin-activator.js";
+import {
+  getToolConfig,
+  isAiTool,
+  nativeActivationOf,
+} from "../../../contexts/tools/domain/registry.js";
 import type { MarketplaceSettings } from "../../../domain/capabilities/marketplace-settings.js";
 import type { DoctorIssue } from "../../../domain/models/doctor.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
-import type { NativePluginActivator } from "../../../domain/ports/native-plugin-activator.js";
-import { getToolConfig, isAiTool, nativeActivationOf } from "../../../domain/tools/registry.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { ToolId } from "../../../kernel/tool.js";
 

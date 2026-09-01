@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import "../../../src/domain/tools/ai/claude.js";
-import "../../../src/domain/tools/ai/codex.js";
-import "../../../src/domain/tools/ai/copilot.js";
-import "../../../src/domain/tools/ai/cursor.js";
-import "../../../src/domain/tools/ai/opencode.js";
-import "../../../src/domain/tools/ide/vscode.js";
+import "../../../src/contexts/tools/domain/profiles/claude.js";
+import "../../../src/contexts/tools/domain/profiles/codex.js";
+import "../../../src/contexts/tools/domain/profiles/copilot.js";
+import "../../../src/contexts/tools/domain/profiles/cursor.js";
+import "../../../src/contexts/tools/domain/profiles/opencode.js";
+import "../../../src/contexts/tools/domain/profiles/vscode.js";
 import { InitUseCase } from "../../../src/application/use-cases/init-use-case.js";
 import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
 import { StatusUseCase } from "../../../src/application/use-cases/status-use-case.js";
+import { machineLocalFilesOf } from "../../../src/contexts/tools/domain/registry.js";
 import { compareSemver } from "../../../src/domain/models/semver.js";
-import { machineLocalFilesOf } from "../../../src/domain/tools/registry.js";
 import { buildUnitDeps } from "../../helpers/ports/build-unit-deps.js";
 
 const PROJECT_ROOT = "/test-project";
