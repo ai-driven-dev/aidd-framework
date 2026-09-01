@@ -1277,21 +1277,34 @@ function isoSecondsFromMs(ms: number): string {
  * work that fell in no flow interval at all - see `CostReportFlowRow`. No reason taxonomy
  * the way `by_task`'s and `by_backlog`'s own remainders carry one: a flow is read from the
  * same sequence either way, so there is only one fact to state about falling outside every
- * one of them, never three. */
+ * one of them, never three.
+ *
+ * The remainder is pinned last rather than sorted with the named rows, the same tail
+ * convention `taskRows` and `backlogRows` already keep. Sorting it by size put it first
+ * whenever work outside every flow outweighed each single run - which is the ordinary case,
+ * not a corner one - so the axis led with its own remainder while the two axes beside it
+ * led with their largest named row. One breakdown that orders itself differently from its
+ * neighbours is read as a different kind of answer, and it is not one. */
 function flowRows(flows: ReadonlyMap<FlowRowKey, TotalsAccumulator>): readonly CostReportFlowRow[] {
-  const rows: CostReportFlowRow[] = [];
+  const named: CostReportFlowRow[] = [];
+  let outsideEveryFlow: CostReportFlowRow | undefined;
   for (const [key, accumulator] of flows) {
-    rows.push(
-      key === OUTSIDE_EVERY_FLOW
-        ? { totals: accumulator.build() }
-        : { flow: key.skill, startedAt: isoSecondsFromMs(key.startMs), totals: accumulator.build() }
-    );
+    if (key === OUTSIDE_EVERY_FLOW) {
+      outsideEveryFlow = { totals: accumulator.build() };
+      continue;
+    }
+    named.push({
+      flow: key.skill,
+      startedAt: isoSecondsFromMs(key.startMs),
+      totals: accumulator.build(),
+    });
   }
-  return bySize(
-    rows,
+  const sorted = bySize(
+    named,
     (row) => row.totals,
     (row) => `${row.flow ?? ""}@${row.startedAt ?? ""}`
   );
+  return outsideEveryFlow === undefined ? sorted : [...sorted, outsideEveryFlow];
 }
 
 /** Every day in the period, in order — never sorted by size, unlike every other breakdown

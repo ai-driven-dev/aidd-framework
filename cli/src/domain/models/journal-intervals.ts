@@ -29,18 +29,16 @@ export function timed<T extends { readonly at: string }>(
  * clock-skewed future moment (`file_written` dated `9999-12-31`, say) never widens an
  * unclosed interval past what a report could ever place a record in anyway. `timed()` only
  * refuses a moment it cannot parse at all; this is what refuses one that parses but is
- * absurd, without a second, weaker notion of "too far in the future". */
-export function lastWitnessedMs(
-  everyWitnessedMoment: readonly TimedBoundary<unknown>[],
-  periodEndMs: number | undefined
-): number | undefined {
-  const witnessedLastMs =
-    everyWitnessedMoment.length > 0
-      ? everyWitnessedMoment[everyWitnessedMoment.length - 1].atMs
-      : undefined;
-  return witnessedLastMs === undefined || periodEndMs === undefined
-    ? witnessedLastMs
-    : Math.min(witnessedLastMs, periodEndMs);
+ * absurd, without a second, weaker notion of "too far in the future".
+ *
+ * Takes the moment itself and returns a moment. It used to take the whole list and answer
+ * `number | undefined` for an empty one, which made the walk below end an unclosed interval
+ * at `?? lastMs ?? startMs` - a second fallback no input could reach, since a walk that
+ * reaches an opener has by definition witnessed one. A default standing in for a case that
+ * cannot arise is where a wrong number hides, so the emptiness is now handled once, where
+ * it is real, and this answers with a moment. */
+function cappedLastMoment(witnessedLastMs: number, periodEndMs: number | undefined): number {
+  return periodEndMs === undefined ? witnessedLastMs : Math.min(witnessedLastMs, periodEndMs);
 }
 
 /** The two facts every closed interval this module builds actually needs — `path`
@@ -75,8 +73,9 @@ export function momentFallsWithin(
  * `isOpener` names which boundary starts an interval; `isCloser` names every *other*
  * boundary that can end one early (a `task_declared` interval also closes on the next
  * `task_declared`, which `isOpener` already covers - `closers` below is `isOpener` union
- * `isCloser`, not `isCloser` alone). An opener the walk reaches with no later opener,
- * closer, or witnessed moment stays capped at its own start, never left open-ended: no
+ * `isCloser`, not `isCloser` alone). An opener the walk reaches with no later opener or
+ * closer ends at the journal's own last witnessed moment - itself at the earliest, since
+ * the opener is one of those moments - never left open-ended: no
  * boundary here exposes when an interval's own work actually finishes, so an unbounded
  * interval would go on attributing everything a long-running session does afterward to the
  * first opener it ever saw.
@@ -100,7 +99,14 @@ export function buildClosedIntervals<
   toInterval: (opener: TOpener, startMs: number, endMs: number) => TInterval | null
 ): readonly TInterval[] {
   const everyWitnessedMoment = timed(boundaryLike);
-  const lastMs = lastWitnessedMs(everyWitnessedMoment, periodEndMs);
+  // Not one readable moment in the whole journal: no interval either, and nothing below
+  // would find an opener to walk. Returning here is also what makes `lastMs` a moment
+  // rather than a maybe-moment for the rest of this function.
+  if (everyWitnessedMoment.length === 0) return [];
+  const lastMs = cappedLastMoment(
+    everyWitnessedMoment[everyWitnessedMoment.length - 1].atMs,
+    periodEndMs
+  );
   const closers = everyWitnessedMoment.filter(
     (entry) => isOpener(entry.boundary) || isCloser(entry.boundary)
   );
@@ -108,7 +114,7 @@ export function buildClosedIntervals<
   for (let i = 0; i < closers.length; i++) {
     const { atMs: startMs, boundary } = closers[i];
     if (!isOpener(boundary)) continue;
-    const endMs = closers[i + 1]?.atMs ?? lastMs ?? startMs;
+    const endMs = closers[i + 1]?.atMs ?? lastMs;
     const interval = toInterval(boundary, startMs, endMs);
     if (interval !== null) intervals.push(interval);
   }

@@ -269,3 +269,57 @@ describe("buildCostReportArtefact — by step, two rows sharing one name", () =>
     // renderer, but recoverable from the two rows a reader is given.
   });
 });
+
+describe("buildCostReportArtefact — the flow axis states its own limits with the figures", () => {
+  const FLOW_JOURNAL = [
+    {
+      vendorId: "s-1",
+      tool: "claude-code" as const,
+      writtenPaths: [],
+      taskIntervals: [],
+      flowIntervals: [
+        {
+          skill: "aidd-orchestrator:01-sdlc",
+          startMs: Date.parse("2026-08-17T10:00:00Z"),
+          endMs: Date.parse("2026-08-17T11:00:00Z"),
+        },
+      ],
+    },
+  ];
+
+  function withOneFlow() {
+    return envelopeOf({
+      records: [request({ event_timestamp: "2026-08-17T10:30:00Z", input_tokens: 10 })],
+      journals: FLOW_JOURNAL,
+    });
+  }
+
+  it("says a hand-run skill counts inside the flow it ran during", () => {
+    expect(buildCostReportArtefact(withOneFlow(), "flow")).toContain(
+      "a skill run by hand while a flow was open is counted inside it"
+    );
+  });
+
+  it("says a same-named skill of the reader's own project opens a flow of its own", () => {
+    const artefact = buildCostReportArtefact(withOneFlow(), "flow");
+    expect(artefact).toContain("00-async-dev, 01-sdlc or 02-backlog");
+    expect(artefact).toContain("opens a flow of its own");
+  });
+
+  it("says neither when the period names no flow at all - a limit that bit nothing is noise", () => {
+    const noFlow = envelopeOf({
+      records: [request({ event_timestamp: "2026-08-17T10:30:00Z", input_tokens: 10 })],
+      journals: [],
+    });
+    const artefact = buildCostReportArtefact(noFlow, "flow");
+    expect(artefact).not.toContain("counted inside it");
+    expect(artefact).not.toContain("opens a flow of its own");
+  });
+
+  it("states them on the flow axis alone, never on every axis", () => {
+    const envelope = withOneFlow();
+    for (const axis of ARTEFACT_AXES.filter((name) => name !== "flow")) {
+      expect(buildCostReportArtefact(envelope, axis)).not.toContain("counted inside it");
+    }
+  });
+});

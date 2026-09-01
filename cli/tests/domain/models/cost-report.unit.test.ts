@@ -1046,6 +1046,43 @@ describe("buildCostReport — by_flow reads the journal's own sequence, nothing 
     expect(outside?.totals.costMicroUsd).toBe(toMicroUsd(1));
   });
 
+  it("puts the outside-every-flow row last even when it is the largest - the tail convention by_task and by_backlog already keep", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-outside-is-biggest",
+        tool: "claude-code",
+        writtenPaths: [],
+        taskIntervals: [],
+        flowIntervals: [
+          {
+            skill: "aidd-orchestrator:01-sdlc",
+            startMs: Date.parse("2026-08-17T10:00:00Z"),
+            endMs: Date.parse("2026-08-17T11:00:00Z"),
+          },
+        ],
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      // Outside the flow, and worth ten times what ran inside it. Sorted by size alone this
+      // row led the table; the named run has to come first all the same.
+      request({
+        vendor_id: "s-outside-is-biggest",
+        cost_usd: 90,
+        event_timestamp: "2026-08-17T09:00:00Z",
+      }),
+      request({
+        vendor_id: "s-outside-is-biggest",
+        cost_usd: 9,
+        event_timestamp: "2026-08-17T10:30:00Z",
+      }),
+    ];
+
+    const built = report({ records, journals });
+
+    expect(built.byFlows.map((row) => row.flow)).toEqual(["aidd-orchestrator:01-sdlc", undefined]);
+    expect(built.byFlows[1]?.totals.costMicroUsd).toBe(toMicroUsd(90));
+  });
+
   it("gives a session that never ran an orchestrating skill exactly one row, outside every flow, total intact", () => {
     const journals: readonly CostReportSessionJournal[] = [
       {

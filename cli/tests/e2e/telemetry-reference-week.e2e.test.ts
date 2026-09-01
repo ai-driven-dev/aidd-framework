@@ -147,6 +147,20 @@ describe("the reference week", () => {
     expect(outside[0]?.totals.requests).toBe(4);
   });
 
+  it("leads with the run it can name, though more of the week fell outside every flow", () => {
+    // The week's own figures make this the case that matters: 4 requests outside every flow
+    // against 3 inside the one run. Ordered by size alone the remainder led the table, while
+    // `by_task` and `by_backlog` beside it led with their largest named row.
+    expect(envelope.by_flow.map((row) => row.flow)).toEqual([built.expected.flow, undefined]);
+  });
+
+  it("prints, beside those figures, the two things this axis cannot tell apart", () => {
+    const rendered = week.reportReferenceWeek(built, ["--axis", "flow"]);
+
+    expect(rendered).toContain("a skill run by hand while a flow was open is counted inside it");
+    expect(rendered).toContain("00-async-dev, 01-sdlc or 02-backlog");
+  });
+
   it("names each step's attribution, all three strengths in one week", () => {
     const strengths = new Set(envelope.by_step.map((row) => row.attribution));
     expect(strengths).toEqual(new Set(["tool-stated", "journal-interval", "unattributed"]));

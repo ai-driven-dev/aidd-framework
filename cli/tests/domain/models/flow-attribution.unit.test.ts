@@ -210,3 +210,56 @@ describe("buildFlowIntervals — pure: journal lines -> bounded flow intervals",
     expect(source).not.toMatch(/from ["']node:fs/u);
   });
 });
+
+describe("buildFlowIntervals — a journal with no readable moment in it", () => {
+  it("builds nothing from a journal with no boundary at all", () => {
+    expect(buildFlowIntervals(journalOf([]))).toEqual([]);
+  });
+
+  it("builds nothing when every moment it holds is unparseable - never an interval bounded by NaN", () => {
+    const unreadable = {
+      type: "step_start",
+      at: "the seventeenth",
+      skill: "aidd-orchestrator:01-sdlc",
+    } as const;
+
+    expect(buildFlowIntervals(journalOf([unreadable]))).toEqual([]);
+  });
+
+  it("ends a flow nothing ever closed at the journal's own last witnessed moment", () => {
+    const wroteLater = {
+      type: "file_written",
+      at: "2026-08-17T10:45:00Z",
+      path: "aidd_docs/tasks/2026_08/2026_08_17_alpha/plan.md",
+      source: "stated",
+    } as const;
+
+    const intervals = buildFlowIntervals(journalOf([SDLC_OPENS], [], [wroteLater]));
+
+    expect(intervals).toEqual([
+      {
+        skill: SDLC_OPENS.skill,
+        startMs: Date.parse(SDLC_OPENS.at),
+        endMs: Date.parse(wroteLater.at),
+      },
+    ]);
+  });
+});
+
+describe("buildFlowIntervals — the limit the flow axis prints beside its figures", () => {
+  // Pinned as behaviour, not left to a doc comment: `cost-report-artefact.ts`'s own
+  // `flowLimits` tells a reader this happens, and a change here that stopped it happening
+  // would leave that sentence describing something the code no longer does.
+  it("opens a flow on a bare 01-sdlc, whichever project's own skills/ directory named it", () => {
+    const projectsOwnSkill = {
+      type: "step_start",
+      at: "2026-08-17T10:00:00Z",
+      skill: "01-sdlc",
+    } as const;
+
+    const intervals = buildFlowIntervals(journalOf([projectsOwnSkill, TURN_END]));
+
+    expect(intervals).toHaveLength(1);
+    expect(intervals[0]?.skill).toBe("01-sdlc");
+  });
+});

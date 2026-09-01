@@ -27,13 +27,29 @@ import { buildClosedIntervals, type ClosedInterval } from "./journal-intervals.j
  * argument to read and falls back to the bare directory name a `SKILL.md` path names,
  * `01-sdlc` - `sanitizeSkillName` keeps `:` on the way to the journal, so neither spelling
  * is altered before it lands there. A set holding only the prefixed form would silently
- * open no flow at all on Cursor or Codex; matching a bare name as a suffix would be the
- * same pattern-matching this set exists to refuse, just moved one level down. Both bare
- * names are verified unique across every plugin's own `skills/` directory in this
- * framework (`00-async-dev`, `01-sdlc`, `02-backlog` name nothing else), so carrying them
- * plainly, with no prefix, never risks opening a flow on an unrelated skill of the same
- * name. OpenCode names no skill at all on any route (`opencode.cjs`'s own `stepStart: null`
- * - the same limit `bySteps` already lives with), so no third spelling exists to add.
+ * open no flow at all on Cursor or Codex.
+ *
+ * The three bare names carry a real cost, stated rather than argued away: a skill of the
+ * reader's own project named `00-async-dev`, `01-sdlc` or `02-backlog` opens a flow here,
+ * and nothing in the journal separates it from the orchestrator's own. The limit is printed
+ * with the figures - see `flowLimits` in `cost-report-artefact.ts` - because it cannot be
+ * removed at an acceptable price. Qualifying the name at capture was measured and does not
+ * work: the plugin directory sits at a different depth on every host, so no fixed offset
+ * names it. Installed 2026-09-01 by `aidd setup`, for the one skill `01-sdlc`:
+ *
+ *   Claude Code  ~/.claude/plugins/cache/aidd-framework/aidd-orchestrator/2.2.1/skills/01-sdlc/
+ *   Codex        ~/.codex/plugins/cache/aidd-framework/aidd-orchestrator/2.2.1/skills/01-sdlc/
+ *   Cursor       ~/.cursor/plugins/local/aidd-orchestrator/skills/01-sdlc/
+ *
+ * Two segments above `skills/` on the first two, one on the third. An earlier version of
+ * this comment claimed the bare names are "verified unique across every plugin's own
+ * `skills/` directory in this framework", and concluded from it that they "never risk"
+ * opening a flow on an unrelated skill. Both halves stand, and the conclusion does not
+ * follow from them: this code runs against a reader's project, which is not the population
+ * that was checked.
+ *
+ * OpenCode names no skill at all on any route (`opencode.cjs`'s own `stepStart: null` - the
+ * same limit `bySteps` already lives with), so no third spelling exists to add.
  */
 export const ORCHESTRATING_SKILLS: ReadonlySet<string> = new Set([
   "aidd-orchestrator:00-async-dev",
