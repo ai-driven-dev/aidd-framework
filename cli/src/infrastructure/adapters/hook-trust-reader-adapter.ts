@@ -4,9 +4,10 @@ import type { TelemetryCodexHookTrust } from "../../domain/models/telemetry-clai
 import type { HookTrustReader } from "../../domain/ports/hook-trust-reader.js";
 import { resolveHomeDir } from "../home-dir.js";
 
-// Mirrors the plugin's own PLUGIN_NAME/HOOKS_FILE/SESSION_START_EVENT constants
-// (`hook-trust.cjs`) — the exact table header Codex writes to `~/.codex/config.toml` once
-// a hook is approved. Only the SessionStart hook decides whether a journal opens at all —
+// The exact table header Codex writes to `~/.codex/config.toml` once a hook is approved.
+// These came from the plugin's own PLUGIN_NAME/HOOKS_FILE/SESSION_START_EVENT constants
+// (`hook-trust.cjs`), deleted when the CLI took the read path; they live here alone now,
+// so there is no second copy to keep them in step with. Only the SessionStart hook decides whether a journal opens at all —
 // the claim this exists for — so that is the one event whose trust state actually explains
 // an empty journal.
 //
@@ -43,7 +44,8 @@ function parseHookTrust(content: string): { trusted: boolean } {
   return { trusted: /^trusted_hash\s*=/.test((lines[at + 1] ?? "").trim()) };
 }
 
-// `hook-trust.cjs`'s own `error.code || error.message`: a filesystem failure's `code`
+// `error.code || error.message`, the rule the deleted `hook-trust.cjs` read by: a
+// filesystem failure's `code`
 // (`ENOENT`, `EACCES`) is the concise, meaningful half - `.message` on the same error
 // restates the path this sentence already names, which is the mismatch phase 5's
 // confrontation caught once already for a sibling adapter's punctuation (measurements.md).

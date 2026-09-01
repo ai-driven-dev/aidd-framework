@@ -10,12 +10,15 @@ import { join } from "node:path";
  * sets under Git Bash/MSYS2, or a test sandboxes a process under, is silently ignored by a
  * bare `homedir()` call there.
  *
- * This is the same rule the plugin's own `skills/01-cost/scripts/lib/readers.cjs` (`homeDir`) and
- * `skills/00-init/scripts/lib/identity.cjs` apply. Every site here that has to agree with the plugin on
- * which directory holds a tool's session files, the telemetry sink, or this machine's
- * identity file must resolve it through this function rather than `node:os`'s `homedir()`
- * directly — otherwise the two sides answer different questions on Windows while looking
- * identical on POSIX (see `telemetry-plugin-matches-cli.e2e.test.ts`).
+ * Every site that has to name the directory holding a tool's session files, the telemetry
+ * sink, or this machine's identity file resolves it through this function rather than
+ * `node:os`'s `homedir()` directly, so one answer serves them all.
+ *
+ * This rule was once a parity obligation: the plugin's own scripts resolved `HOME` the same
+ * way, and an e2e held the two sides to each other. Those scripts are gone, and the hooks
+ * that remain resolve no home directory at all - they write beside the repository. The rule
+ * stands on the paragraph above alone, which is why it is stated there and not borrowed
+ * from a second implementation that no longer exists.
  */
 export function resolveHomeDir(
   env: NodeJS.ProcessEnv = process.env,

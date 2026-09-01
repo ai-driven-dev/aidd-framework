@@ -1,9 +1,12 @@
 /**
  * Which environment variable, if any, names the session actually running this process —
  * `aidd telemetry check`'s "hook fired" claim needs to tell a genuinely dead hook from one
- * that simply predates this check. Mirrors the plugin's own `session-anchor.cjs`, measured
- * live against real Codex and Claude Code sessions (see that file's own doc comment for
- * the measurements this is not free to re-derive).
+ * that simply predates this check.
+ *
+ * Which variables, and the order they are read in, were measured live against real Codex
+ * and Claude Code sessions in the plugin's own `session-anchor.cjs`. That file was deleted
+ * when the CLI took the read path, so what it measured is written out below rather than
+ * deferred to: a pointer is worth nothing once the thing it points at is gone.
  *
  * Codex's variable is checked first: a Codex process nested inside a Claude Code session
  * inherits `CLAUDE_CODE_SESSION_ID` from its parent, a false anchor that would name the

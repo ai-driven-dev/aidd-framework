@@ -1,6 +1,6 @@
 // OpenCode's own extension surface: a JS module it loads in-process through its
 // `{plugin,plugins}/*.{ts,js}` auto-discovery convention - never a hook it spawns per event,
-// which is why every other file in this directory (a command journal.js runs, reading stdin)
+// which is why every other file in this directory (a command journal.cjs runs, reading stdin)
 // has no counterpart here.
 //
 // The export shape below is load-bearing, not style: OpenCode's loader only recognises a
@@ -8,10 +8,10 @@
 // sat in the auto-discovery path, was logged as found, and never ran a single line of its own
 // code - no error, no output. An `export const` file loaded and ran on the very next attempt.
 //
-// A second, separate limit rules out reusing journal.js's own functions in-process: OpenCode's
+// A second, separate limit rules out reusing journal.cjs's own functions in-process: OpenCode's
 // loader cannot see a local CommonJS file's exports at all - `await import("./lib/record.js")`
 // resolves to a namespace with none, even for a trivial one-line `module.exports = {...}` file,
-// while a genuine ESM sibling imports fine. So this file spawns `journal.js` as the child
+// while a genuine ESM sibling imports fine. So this file spawns `journal.cjs` as the child
 // process every other host's own hook already runs, over the same stdin-JSON contract, naming
 // itself so `detectHost` (lib/host.js) recognises it without guessing at a fifth vendor shape.
 // See scripts/__tests__/fixtures/opencode-session-idle.json and its README entry for the
@@ -20,14 +20,14 @@
 // A third gap, found only by running a real session: `node <a file:// URL>` is not a valid
 // invocation - Node's CLI treats the string as a module specifier and resolves it relative
 // to its own cwd, not as an absolute script path, so the spawned process died with
-// MODULE_NOT_FOUND every time and journal.js never ran. fileURLToPath fixes it.
+// MODULE_NOT_FOUND every time and journal.cjs never ran. fileURLToPath fixes it.
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const JOURNAL_SCRIPT = fileURLToPath(new URL("./journal.cjs", import.meta.url));
 
 // Never `process.execPath`: OpenCode ships as its own standalone binary, so that path names
-// `opencode` itself, not a Node runtime that can run journal.js.
+// `opencode` itself, not a Node runtime that can run journal.cjs.
 function runJournal(event, payload) {
   spawnSync("node", [JOURNAL_SCRIPT, event], {
     input: JSON.stringify(payload),

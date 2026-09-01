@@ -59,8 +59,8 @@ export class TelemetryOnUseCase {
     );
   }
 
-  // Every successful `on` re-checks this, switch newly written or not — the same rule
-  // `journal-privacy.cjs` followed from `telemetry-switch.cjs`, and the reason: a project
+  // Every successful `on` re-checks this, switch newly written or not — the rule the
+  // plugin's own switch script followed before the CLI took it over, and the reason: a project
   // turned on before this existed must still get caught up on ignoring the journal and on
   // naming anything git already tracks, without a person having to turn it off and on again.
   private async protectRunsDir(projectRoot: string): Promise<void> {

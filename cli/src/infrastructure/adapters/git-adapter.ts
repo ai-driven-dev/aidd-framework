@@ -63,7 +63,8 @@ export class GitAdapter implements VersionControl {
     }
   }
 
-  // Mirrors the plugin's own `warnIfTracked` (`journal-privacy.cjs`): a non-zero exit —
+  // The rule the plugin's own `warnIfTracked` read by, before the CLI took this over: a
+  // non-zero exit —
   // no repository at all, or git itself missing — reads the same as "nothing tracked",
   // never a throw. Turning telemetry on must not depend on being inside a git repository.
   async listTrackedFiles(repoRoot: string, pathspec: string): Promise<readonly string[]> {

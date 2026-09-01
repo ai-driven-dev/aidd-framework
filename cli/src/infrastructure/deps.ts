@@ -712,8 +712,8 @@ export async function createDeps(
   const telemetrySink = new TelemetrySinkAdapter();
   // This is the one place allowed to map a tool that declares `telemetryLocalRead: {
   // kind: "declared" }` to the adapter that reads it.
-  // `resolveHomeDir()`, not a bare `homedir()`: this must land on the same directory the
-  // plugin's own `readers.cjs` resolves for the same tool, on every platform.
+  // `resolveHomeDir()`, not a bare `homedir()`: on Windows the bare call ignores a `HOME`
+  // a person set or a test sandboxed this process under - see `home-dir.ts`.
   const localCostReaders: ReadonlyMap<AiToolId, SessionCostReader> = new Map<
     AiToolId,
     SessionCostReader

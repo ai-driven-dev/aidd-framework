@@ -52,8 +52,7 @@ function serializeIdentity(identity: PersonIdentity): string {
 }
 
 /** Reads and writes only this machine's own user profile - `resolveHomeDir()` honors `HOME`
- * on every platform, the same way the plugin's `readers.cjs`/`identity.cjs` resolve it, and
- * this adapter never reads `AIDD_USER_CONFIG_DIR`. That variable is documented as a location
+ * on every platform, and this adapter never reads `AIDD_USER_CONFIG_DIR`. That variable is documented as a location
  * a team or a CI can point every figure at; a choice reachable that way would not be this
  * person's own.
  *

@@ -3,9 +3,10 @@ import type { AiToolId } from "./tool-ids.js";
 /**
  * Four independently verifiable claims about the measurement chain, each answered from
  * what was actually read, never inferred from the others. Ported from the plugin's own
- * `diagnose.cjs` — see that file's own doc comment for the one route this set covers: a
- * local route (`hook fired` -> `session journalled` -> `tool files readable` ->
- * `records join`).
+ * `diagnose.cjs`, which the CLI pivot deleted along with the rest of the skills' scripts;
+ * the route it covered is named here rather than left behind a pointer to a file no reader
+ * can open. That route is the local one: `hook fired` -> `session journalled` ->
+ * `tool files readable` -> `records join`.
  *
  * Two more claims — `export-configured` and `identifier-joinable` — graded a second,
  * export route. That route (the OTLP receiver, the export config reader, and the mapper

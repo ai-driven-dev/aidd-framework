@@ -19,8 +19,10 @@ import type {
 
 const LABEL_WIDTH = 22;
 
-// The exact label strings the plugin's own `diagnose.cjs` prints, so a report reads
-// identically whichever side answered it.
+// The label strings a check report prints. They were pinned, word for word, to the
+// plugin's own `diagnose.cjs` so a report read identically whichever side answered it;
+// that script is gone and this is the only side, so these are now simply the names -
+// changing one changes every report, and nothing else has to be changed with it.
 const CLAIM_LABELS: Record<TelemetryClaimId, string> = {
   "hook-fired": "hook fired",
   "session-journalled": "session journalled",

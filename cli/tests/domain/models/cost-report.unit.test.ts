@@ -606,7 +606,7 @@ describe("buildCostReport — every breakdown reconciles", () => {
   // two cache counters orders a costless breakdown by the sliver of its volume nobody reads
   // it for - here, backwards. `heavy-cache` moves far less input/output than `light-cache`,
   // but consumes forty times the total tokens once cache is counted: the honest "largest
-  // first" answer, and the one `render.cjs`'s own `tokensOf` already prints beside the row.
+  // first" answer, and the one the report already prints beside the row.
   it("weighs a costless row by all four counters, cache included - not input and output alone", () => {
     const built = report({
       records: [

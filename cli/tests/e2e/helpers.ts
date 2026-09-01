@@ -96,8 +96,9 @@ export function pathWithoutAidd(): string {
 
 // Where a person's own identity file lands under sandboxedEnv, restated rather than
 // imported from the adapter: a test that asked the code where it wrote the file could not
-// catch the code writing it somewhere the other side never looks. Mirrors both
-// `person-identity-adapter.ts` and the plugin's `skills/00-init/scripts/lib/identity.cjs` (#707).
+// catch the code writing it somewhere else. It was once held to the plugin's own identity
+// script as well (#707); the CLI is the only writer now, so this pins `person-identity-adapter.ts`
+// alone.
 export function identityFileIn(fakeHome: string): string {
   return process.platform === "win32"
     ? join(fakeHome, "AppData", "Roaming", "aidd", "identity.json")
