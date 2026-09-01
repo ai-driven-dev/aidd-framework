@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import type { MarketplaceSyncSettingsUseCase } from "../../../src/application/use-cases/flows/marketplace-sync-settings-use-case.js";
 import { InstallAiToolUseCase } from "../../../src/application/use-cases/install/install-ai-tool-use-case.js";
-import type { MarketplaceSyncSettingsUseCase } from "../../../src/application/use-cases/marketplace/marketplace-sync-settings-use-case.js";
 import type { PluginInstallFromMarketplaceUseCase } from "../../../src/application/use-cases/plugin/plugin-install-from-marketplace-use-case.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
 import { Plugin } from "../../../src/domain/models/plugin.js";

@@ -11,8 +11,8 @@ import type { FileWriter } from "../../../../domain/ports/file-writer.js";
 import type { Hasher } from "../../../../domain/ports/hasher.js";
 import type { MarketplaceRegistry } from "../../../../domain/ports/marketplace-registry.js";
 import { frameworkBuildModeFor } from "../../../../domain/tools/registry.js";
+import { isPluginFileAtDesiredState, resolvePluginBaseDir } from "../../plugin/plugin-helpers.js";
 import type { EnsureBuiltMarketplaceUseCase } from "../../shared/ensure-built-marketplace-use-case.js";
-import { isPluginFileAtDesiredState, resolvePluginBaseDir } from "../plugin-helpers.js";
 import { ModeBFlatMaterializationTranslator } from "./mode-b-flat-materialization-translator.js";
 import type { PluginTranslator } from "./plugin-translator.js";
 

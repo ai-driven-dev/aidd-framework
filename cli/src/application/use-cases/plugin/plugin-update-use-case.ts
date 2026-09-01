@@ -14,6 +14,8 @@ import type { ManifestRepository } from "../../../domain/ports/manifest-reposito
 import type { PluginDistributionReader } from "../../../domain/ports/plugin-distribution-reader.js";
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
 import { getToolConfig, type ToolConfig } from "../../../domain/tools/registry.js";
+import type { PluginTranslator } from "../framework/translator/plugin-translator.js";
+import { resolvePluginTranslator } from "../framework/translator/resolve-plugin-translator.js";
 import type { BuiltMaterializationDeps } from "../shared/apply-plugin-files-use-case.js";
 import {
   deleteOldFiles,
@@ -23,8 +25,6 @@ import {
   resolvePluginToolIds,
   writePluginFiles,
 } from "./plugin-helpers.js";
-import type { PluginTranslator } from "./translator/plugin-translator.js";
-import { resolvePluginTranslator } from "./translator/resolve-plugin-translator.js";
 
 export interface PluginUpdateOptions {
   pluginNames?: string[];

@@ -25,7 +25,7 @@ const ALLOWED = new Set([
  */
 const BASELINE = [
   "src/application/use-cases/framework/strategies/tool-contracts.ts",
-  "src/application/use-cases/marketplace/marketplace-sync-settings-use-case.ts",
+  "src/application/use-cases/flows/marketplace-sync-settings-use-case.ts",
   "src/application/use-cases/restore/restore-use-case.ts",
   "src/domain/capabilities/plugins-capability.ts",
   "src/domain/formats/cursor-hooks.ts",

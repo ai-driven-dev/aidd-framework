@@ -1,6 +1,6 @@
 import { isAbsolute, join, resolve } from "node:path";
 import { MalformedMarketplaceCatalogError } from "../../domain/errors.js";
-import { parseCopilotMarketplaceCatalog } from "../../domain/formats/copilot-marketplace-catalog.js";
+import { parseCopilotMarketplaceCatalog } from "../../domain/models/copilot-marketplace-catalog.js";
 import { MARKETPLACE_CACHE_SUBDIR } from "../../domain/models/paths.js";
 import { type PluginCatalog, parsePluginCatalog } from "../../domain/models/plugin-catalog.js";
 import type { PluginSource } from "../../domain/models/plugin-source.js";

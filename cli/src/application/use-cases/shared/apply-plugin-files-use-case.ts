@@ -12,14 +12,14 @@ import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-regi
 import type { PluginDistributionReader } from "../../../domain/ports/plugin-distribution-reader.js";
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
 import type { ToolConfig } from "../../../domain/tools/registry.js";
+import type { PluginTranslator } from "../framework/translator/plugin-translator.js";
+import { resolvePluginTranslator } from "../framework/translator/resolve-plugin-translator.js";
 import {
   deleteOldFiles,
   isPluginFileAtDesiredState,
   materializeViaTranslator,
   resolvePluginBaseDir,
 } from "../plugin/plugin-helpers.js";
-import type { PluginTranslator } from "../plugin/translator/plugin-translator.js";
-import { resolvePluginTranslator } from "../plugin/translator/resolve-plugin-translator.js";
 import type { EnsureBuiltMarketplaceUseCase } from "./ensure-built-marketplace-use-case.js";
 
 interface ApplyPluginFilesOptions {

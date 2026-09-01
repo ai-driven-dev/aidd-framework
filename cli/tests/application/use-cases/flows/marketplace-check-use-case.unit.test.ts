@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import "../../../../src/domain/tools/ai/claude.js";
-import { MarketplaceCheckUseCase } from "../../../../src/application/use-cases/marketplace/marketplace-check-use-case.js";
+import { MarketplaceCheckUseCase } from "../../../../src/application/use-cases/flows/marketplace-check-use-case.js";
 import { FetchMarketplaceSourceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace/fetch-marketplace-source-use-case.js";
 import { ResolveMarketplaceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
 import { Manifest } from "../../../../src/domain/models/manifest.js";

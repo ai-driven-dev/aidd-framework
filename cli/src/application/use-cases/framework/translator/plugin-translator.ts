@@ -9,7 +9,7 @@ import type { AiToolId } from "../../../../domain/models/tool-ids.js";
  * Contract implemented by both translation strategy adapters.
  *
  * This interface is a translator strategy contract (not a hexagonal port adapter).
- * It lives in `application/use-cases/plugin/translator/` following the capability
+ * It lives in `application/use-cases/framework/translator/` following the capability
  * sub-use-case subdir pattern (see `.claude/skills/use-case/references/capability-sub-use-cases.md`).
  */
 export interface PluginTranslator {

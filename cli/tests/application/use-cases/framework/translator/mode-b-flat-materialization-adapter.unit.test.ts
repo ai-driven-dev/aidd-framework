@@ -2,7 +2,7 @@ import "../../../../../src/domain/tools/ai/claude.js";
 import "../../../../../src/domain/tools/ai/opencode.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ModeBFlatMaterializationTranslator } from "../../../../../src/application/use-cases/plugin/translator/mode-b-flat-materialization-translator.js";
+import { ModeBFlatMaterializationTranslator } from "../../../../../src/application/use-cases/framework/translator/mode-b-flat-materialization-translator.js";
 import { CursorProjectScopeUnsupportedError } from "../../../../../src/domain/errors.js";
 import { Manifest } from "../../../../../src/domain/models/manifest.js";
 import { PluginDistribution } from "../../../../../src/domain/models/plugin-distribution.js";

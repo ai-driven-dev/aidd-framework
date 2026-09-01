@@ -13,8 +13,8 @@ import type { PluginSource } from "../../../domain/models/plugin-source.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
 import type { MarketplaceTrustStore } from "../../../domain/ports/marketplace-trust-store.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
+import type { MarketplaceRemoveUseCase } from "../flows/marketplace-remove-use-case.js";
 import type { ResolveMarketplaceUseCase } from "../shared/resolve-marketplace-use-case.js";
-import type { MarketplaceRemoveUseCase } from "./marketplace-remove-use-case.js";
 
 export interface MarketplaceAddOptions {
   source: PluginSource;

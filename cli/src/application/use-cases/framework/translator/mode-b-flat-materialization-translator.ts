@@ -22,7 +22,7 @@ import {
   qualifiesForOpencodeMcpMerge,
   resolvePluginBaseDirForCapability,
   writePluginFiles,
-} from "../plugin-helpers.js";
+} from "../../plugin/plugin-helpers.js";
 import type { PluginTranslator } from "./plugin-translator.js";
 
 /**

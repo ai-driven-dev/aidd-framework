@@ -13,7 +13,7 @@ import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
 import { NoManifestError } from "../../errors.js";
-import type { PluginTranslator } from "./translator/plugin-translator.js";
+import type { PluginTranslator } from "../framework/translator/plugin-translator.js";
 
 export function resolvePluginToolIds(toolIds: AiToolId[] | "all", manifest: Manifest): AiToolId[] {
   if (toolIds !== "all") return toolIds;

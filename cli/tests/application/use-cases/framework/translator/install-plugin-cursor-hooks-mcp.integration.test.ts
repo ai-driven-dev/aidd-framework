@@ -9,7 +9,7 @@
 import "../../../../../src/domain/tools/ai/cursor.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ModeBFlatMaterializationTranslator } from "../../../../../src/application/use-cases/plugin/translator/mode-b-flat-materialization-translator.js";
+import { ModeBFlatMaterializationTranslator } from "../../../../../src/application/use-cases/framework/translator/mode-b-flat-materialization-translator.js";
 import { Manifest } from "../../../../../src/domain/models/manifest.js";
 import { PluginDistribution } from "../../../../../src/domain/models/plugin-distribution.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";

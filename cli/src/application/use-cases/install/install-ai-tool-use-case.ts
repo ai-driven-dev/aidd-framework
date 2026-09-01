@@ -3,7 +3,7 @@ import type { Plugin } from "../../../domain/models/plugin.js";
 import type { AiToolId } from "../../../domain/models/tool-ids.js";
 import type { Logger } from "../../../domain/ports/logger.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
-import type { MarketplaceSyncSettingsUseCase } from "../marketplace/marketplace-sync-settings-use-case.js";
+import type { MarketplaceSyncSettingsUseCase } from "../flows/marketplace-sync-settings-use-case.js";
 import type { PluginInstallFromMarketplaceUseCase } from "../plugin/plugin-install-from-marketplace-use-case.js";
 import type {
   InstallRuntimeConfigResult,

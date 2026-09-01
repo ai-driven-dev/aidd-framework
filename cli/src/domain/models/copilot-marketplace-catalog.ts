@@ -12,7 +12,7 @@
  */
 
 import { InvalidPluginManifestError } from "../errors.js";
-import type { PluginCatalog, PluginCatalogEntry } from "../models/plugin-catalog.js";
+import type { PluginCatalog, PluginCatalogEntry } from "./plugin-catalog.js";
 
 const COPILOT_SOURCE = "copilot-catalog";
 

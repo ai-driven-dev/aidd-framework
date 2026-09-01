@@ -17,6 +17,9 @@ import { DoctorReferencesUseCase } from "../application/use-cases/doctor/doctor-
 import { DoctorRegistrationUseCase } from "../application/use-cases/doctor/doctor-registration-use-case.js";
 import { DoctorTrackedFilesUseCase } from "../application/use-cases/doctor/doctor-tracked-files-use-case.js";
 import { DoctorUseCase } from "../application/use-cases/doctor/doctor-use-case.js";
+import { MarketplaceCheckUseCase } from "../application/use-cases/flows/marketplace-check-use-case.js";
+import { MarketplaceRemoveUseCase } from "../application/use-cases/flows/marketplace-remove-use-case.js";
+import { MarketplaceSyncSettingsUseCase } from "../application/use-cases/flows/marketplace-sync-settings-use-case.js";
 import { FrameworkBuildUseCase } from "../application/use-cases/framework/framework-build-use-case.js";
 import { FlatBuildStrategy } from "../application/use-cases/framework/strategies/flat-build-strategy.js";
 import { MarketplaceBuildStrategy } from "../application/use-cases/framework/strategies/marketplace-build-strategy.js";
@@ -46,12 +49,9 @@ import { InstallIdeToolUseCase } from "../application/use-cases/install/install-
 import { InstallRuntimeConfigUseCase } from "../application/use-cases/install/install-runtime-config-use-case.js";
 import { PostInstallPipelineUseCase } from "../application/use-cases/install/post-install-pipeline-use-case.js";
 import { MarketplaceAddUseCase } from "../application/use-cases/marketplace/marketplace-add-use-case.js";
-import { MarketplaceCheckUseCase } from "../application/use-cases/marketplace/marketplace-check-use-case.js";
 import { MarketplaceListUseCase } from "../application/use-cases/marketplace/marketplace-list-use-case.js";
 import { MarketplaceRefreshUseCase } from "../application/use-cases/marketplace/marketplace-refresh-use-case.js";
 import { MarketplaceRegisterFrameworkUseCase } from "../application/use-cases/marketplace/marketplace-register-framework-use-case.js";
-import { MarketplaceRemoveUseCase } from "../application/use-cases/marketplace/marketplace-remove-use-case.js";
-import { MarketplaceSyncSettingsUseCase } from "../application/use-cases/marketplace/marketplace-sync-settings-use-case.js";
 import { PluginAddUseCase } from "../application/use-cases/plugin/plugin-add-use-case.js";
 import { PluginInstallFromMarketplaceUseCase } from "../application/use-cases/plugin/plugin-install-from-marketplace-use-case.js";
 import { PluginInstallUseCase } from "../application/use-cases/plugin/plugin-install-use-case.js";

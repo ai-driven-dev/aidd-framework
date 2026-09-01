@@ -3,7 +3,7 @@
 // (not under a single `.opencode/plugins/<name>/` root — that shape is exclusive to native mode).
 import "../../../../../src/domain/tools/ai/opencode.js";
 import { describe, expect, it } from "vitest";
-import { ModeBFlatMaterializationTranslator } from "../../../../../src/application/use-cases/plugin/translator/mode-b-flat-materialization-translator.js";
+import { ModeBFlatMaterializationTranslator } from "../../../../../src/application/use-cases/framework/translator/mode-b-flat-materialization-translator.js";
 import { Manifest } from "../../../../../src/domain/models/manifest.js";
 import { PluginDistribution } from "../../../../../src/domain/models/plugin-distribution.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";

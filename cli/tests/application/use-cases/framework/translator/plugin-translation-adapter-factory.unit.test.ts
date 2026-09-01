@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { BuiltTreeMaterializationTranslator } from "../../../../../src/application/use-cases/plugin/translator/built-tree-materialization-translator.js";
-import { ModeAMarketplaceTranslator } from "../../../../../src/application/use-cases/plugin/translator/mode-a-marketplace-translator.js";
-import { resolveTranslator } from "../../../../../src/application/use-cases/plugin/translator/plugin-translator-factory.js";
+import { BuiltTreeMaterializationTranslator } from "../../../../../src/application/use-cases/framework/translator/built-tree-materialization-translator.js";
+import { ModeAMarketplaceTranslator } from "../../../../../src/application/use-cases/framework/translator/mode-a-marketplace-translator.js";
+import { resolveTranslator } from "../../../../../src/application/use-cases/framework/translator/plugin-translator-factory.js";
 import { PluginsCapability } from "../../../../../src/domain/capabilities/plugins-capability.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
 import { fakeEnsureBuiltMarketplace } from "../../../../helpers/ports/fake-ensure-built-marketplace.js";

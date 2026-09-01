@@ -11,13 +11,14 @@ src/
 │   ├── use-cases/            # Business orchestration
 │   │   ├── auth/             # login / logout / status / require-auth
 │   │   ├── doctor/           # orchestrator + layout / merge-files / plugin / references / tracked-files
+│   │   ├── flows/            # cross-area flows, pending phase 13 placement: marketplace-check / marketplace-remove / marketplace-sync-settings
 │   │   ├── framework/        # author-side build: source → target-native distribution
-│   │   │   └── strategies/   # marketplace and flat build strategies, per-tool build contracts
+│   │   │   ├── strategies/   # marketplace and flat build strategies, per-tool build contracts
+│   │   │   └── translator/   # per-tool materialization strategies (native, flat, built-tree), applied and recorded at install time
 │   │   ├── global/           # cross-tool chains: update-all / status-all / restore-all / doctor-all / update-one-tool / resolve-update-decision
 │   │   ├── install/          # capability sub-use-cases: runtime-config / ide-config / agents / commands / rules / skills / config / post-install-pipeline
-│   │   ├── marketplace/      # marketplace lifecycle: add / list / remove / refresh / check / register-framework / sync-settings
+│   │   ├── marketplace/      # marketplace lifecycle: add / list / refresh / register-framework
 │   │   ├── plugin/           # create / add / install / install-from-marketplace / remove / list / update / search / pick
-│   │   │   └── translator/   # per-tool materialization strategies (native, flat, built-tree)
 │   │   ├── restore/          # orchestrator + tool-files / all-plugins / plugin / generate-tool-distribution / resolve-restore-decision / restore-drift-entries / restore-merge-files / restore-regular-files
 │   │   ├── setup/            # sub-use-cases: marketplace-source / tools / plugins-prompt
 │   │   ├── sync/             # conflict-resolver only — drift/conflict resolution reused by the update flow
@@ -29,7 +30,7 @@ src/
 │   ├── errors.ts             # application typed exceptions
 │   └── output.ts             # stdout/stderr formatting
 ├── domain/
-│   ├── formats/              # pure string transforms — no I/O (command, json, jsonc, markdown, toml, placeholders, cursor-hooks, mcp-format, markdown-references, *-marketplace parsers)
+│   ├── formats/              # pure string transforms — no I/O (command, json, jsonc, markdown, toml, placeholders, cursor-hooks, mcp-format, markdown-references)
 │   ├── models/               # entities, value objects, discriminant types
 │   ├── ports/                # interface contracts (FileSystem, Hasher, Logger, Prompter, LatestReleaseResolver, etc.)
 │   ├── capabilities/         # one capability class per Has* interface (agents, commands, rules, skills, hooks, mcp, settings, plugins, marketplace-entry)
@@ -77,7 +78,7 @@ src/
 tests/
 ├── application/use-cases/    # unit — use-cases with in-memory ports from tests/helpers/ports/
 ├── domain/capabilities/      # unit — capability class tests
-├── domain/formats/           # unit — format parser tests (incl. *-marketplace parsers)
+├── domain/formats/           # unit — format parser tests
 ├── domain/models/            # unit — pure value object tests; manifest.property.unit.test.ts (property-based)
 ├── domain/tools/             # unit — tool config tests
 ├── e2e/                      # full CLI invocation via runCli()

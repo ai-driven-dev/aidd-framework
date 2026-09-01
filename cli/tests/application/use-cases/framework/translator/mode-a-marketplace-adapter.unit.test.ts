@@ -4,7 +4,7 @@
 // only registers the plugin reference in the manifest with empty files.
 import "../../../../../src/domain/tools/ai/claude.js";
 import { describe, expect, it } from "vitest";
-import { ModeAMarketplaceTranslator } from "../../../../../src/application/use-cases/plugin/translator/mode-a-marketplace-translator.js";
+import { ModeAMarketplaceTranslator } from "../../../../../src/application/use-cases/framework/translator/mode-a-marketplace-translator.js";
 import { Manifest } from "../../../../../src/domain/models/manifest.js";
 import { PluginDistribution } from "../../../../../src/domain/models/plugin-distribution.js";
 import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
