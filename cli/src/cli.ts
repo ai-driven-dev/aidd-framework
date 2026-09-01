@@ -59,6 +59,7 @@ const ONLINE_COMMAND_PATHS = new Set([
 ]);
 
 program.hook("preAction", async (_thisCommand, actionCommand) => {
+  if (process.env.AIDD_SKIP_UPDATE_CHECK === "1") return;
   const opts = program.opts<{ verbose?: boolean }>();
   const output = new CLIOutput(opts.verbose ?? false);
   const deps = await createDeps(process.cwd(), { verbose: opts.verbose ?? false }, output).catch(
@@ -74,6 +75,11 @@ program.hook("preAction", async (_thisCommand, actionCommand) => {
 });
 
 program.hook("postAction", async (_thisCommand, actionCommand) => {
+  // The refresh asks GitHub what the latest release is and caches the answer, so any
+  // run that performs it produces output depending on what has been published since.
+  // A test suite that captures output cannot afford that: every release would rewrite
+  // its expectations. Same switch shape as AIDD_SKIP_MARKETPLACE_REFRESH, same reason.
+  if (process.env.AIDD_SKIP_UPDATE_CHECK === "1") return;
   if (!ONLINE_COMMAND_PATHS.has(resolveCommandPath(actionCommand))) return;
   const opts = program.opts<{ verbose?: boolean }>();
   const output = new CLIOutput(opts.verbose ?? false);

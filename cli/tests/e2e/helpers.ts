@@ -97,6 +97,14 @@ function sandboxedEnv(
     ...extra,
     HOME: fakeHome,
     XDG_CONFIG_HOME: join(fakeHome, ".config"),
+    // The user directory holds the update-check cache; pinning it keeps a run out of
+    // the real one.
+    AIDD_USER_CONFIG_DIR: join(fakeHome, ".config", "aidd"),
+    // And the check itself asks GitHub what the latest release is, then prints a notice
+    // from the answer — so a captured stderr would depend on what has been published
+    // since, and every release would rewrite these expectations. Measured: a golden run
+    // fetched 5.2.2 mid-run and failed on the notice a later command then printed.
+    AIDD_SKIP_UPDATE_CHECK: "1",
     PATH: pathWithoutToolBinaries(),
   };
 }
