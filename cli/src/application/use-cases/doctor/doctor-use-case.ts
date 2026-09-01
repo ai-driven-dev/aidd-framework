@@ -1,4 +1,3 @@
-import { ManifestValidationError } from "../../../domain/errors.js";
 import type {
   DoctorIssue,
   DoctorReport,
@@ -6,9 +5,10 @@ import type {
   ToolHealth,
 } from "../../../domain/models/doctor.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
-import type { ToolCategory } from "../../../domain/models/tool-ids.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import { toolIdsForCategory } from "../../../domain/tools/registry.js";
+import { ManifestValidationError } from "../../../kernel/errors.js";
+import type { ToolCategory } from "../../../kernel/tool.js";
 import { NoManifestError } from "../../errors.js";
 import type { DoctorLayoutUseCase } from "./doctor-layout-use-case.js";
 import type { DoctorMergeFilesUseCase } from "./doctor-merge-files-use-case.js";

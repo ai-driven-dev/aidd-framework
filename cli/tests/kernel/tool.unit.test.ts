@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { UnknownAiToolIdError } from "../../../src/domain/errors.js";
-import {
-  assertValidAiToolId,
-  isAiToolId,
-  parseToolOption,
-} from "../../../src/domain/models/tool-ids.js";
+import { UnknownAiToolIdError } from "../../src/kernel/errors.js";
+import { assertValidAiToolId, isAiToolId, parseToolOption } from "../../src/kernel/tool.js";
 
 describe("isAiToolId", () => {
   it("returns true for known AI tool IDs", () => {

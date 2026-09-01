@@ -1,4 +1,4 @@
-import type { FileHash } from "../models/file.js";
+import type { FileHash } from "../file.js";
 
 export interface FileReader {
   readFile(path: string): Promise<string>;

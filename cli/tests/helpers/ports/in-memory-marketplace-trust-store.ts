@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import type { PluginSource } from "../../../src/domain/models/plugin-source.js";
-import { serializePluginSource } from "../../../src/domain/models/plugin-source.js";
 import type { MarketplaceTrustStore } from "../../../src/domain/ports/marketplace-trust-store.js";
+import type { PluginSource } from "../../../src/kernel/source.js";
+import { serializePluginSource } from "../../../src/kernel/source.js";
 
 /**
  * Pure in-memory MarketplaceTrustStore — no disk I/O.

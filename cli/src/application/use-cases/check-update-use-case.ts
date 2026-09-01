@@ -1,11 +1,11 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { compareSemver, isSemver } from "../../domain/models/semver.js";
-import type { FileReader } from "../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../domain/ports/file-writer.js";
-import type { Logger } from "../../domain/ports/logger.js";
 import type { SelfUpdater } from "../../domain/ports/self-updater.js";
 import type { VersionReader } from "../../domain/ports/version-reader.js";
+import type { FileReader } from "../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../kernel/ports/file-writer.js";
+import type { Logger } from "../../kernel/ports/logger.js";
 
 interface CachedCheck {
   checkedAt: number;

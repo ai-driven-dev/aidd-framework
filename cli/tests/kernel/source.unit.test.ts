@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { InvalidPluginSourceError } from "../../../src/domain/errors.js";
+import { InvalidPluginSourceError } from "../../src/kernel/errors.js";
 import {
   parsePluginSource,
   parsePluginSourceShorthand,
   serializePluginSource,
-} from "../../../src/domain/models/plugin-source.js";
+} from "../../src/kernel/source.js";
 
 describe("parsePluginSource", () => {
   describe("github kind", () => {

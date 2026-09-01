@@ -1,4 +1,4 @@
-import { EmptyLocalSourcePathError, MarketplaceSourceKindError } from "../errors.js";
+import { EmptyLocalSourcePathError, MarketplaceSourceKindError } from "../../kernel/errors.js";
 
 export const DEFAULT_FRAMEWORK_REPO = "ai-driven-dev/framework";
 

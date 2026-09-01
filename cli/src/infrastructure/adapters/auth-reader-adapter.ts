@@ -1,7 +1,7 @@
 import type { AuthConfig, AuthLevel, AuthMethod } from "../../domain/models/auth.js";
-import type { Logger } from "../../domain/ports/logger.js";
 import type { TokenResolver } from "../../domain/ports/oauth-provider.js";
 import type { TokenProvider } from "../../domain/ports/token-provider.js";
+import type { Logger } from "../../kernel/ports/logger.js";
 import type { AuthStorage } from "../auth/auth-storage.js";
 
 export interface AuthContext {

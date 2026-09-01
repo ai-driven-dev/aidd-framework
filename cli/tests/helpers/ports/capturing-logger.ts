@@ -1,4 +1,4 @@
-import type { Logger } from "../../../src/domain/ports/logger.js";
+import type { Logger } from "../../../src/kernel/ports/logger.js";
 
 /**
  * In-memory Logger implementation that captures messages to arrays.

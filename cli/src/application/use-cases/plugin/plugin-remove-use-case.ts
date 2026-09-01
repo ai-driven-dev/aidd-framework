@@ -1,15 +1,15 @@
 import { homedir as nodeHomedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { McpCapability } from "../../../domain/capabilities/mcp-capability.js";
-import { PluginNotFoundError } from "../../../domain/errors.js";
 import { unmergeOpencodeMcp } from "../../../domain/formats/opencode-mcp-merge.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Plugin } from "../../../domain/models/plugin.js";
-import type { AiToolId } from "../../../domain/models/tool-ids.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
+import { PluginNotFoundError } from "../../../kernel/errors.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../kernel/ports/file-writer.js";
+import type { AiToolId } from "../../../kernel/tool.js";
 import {
   loadPluginManifest,
   qualifiesForOpencodeMcpMerge,

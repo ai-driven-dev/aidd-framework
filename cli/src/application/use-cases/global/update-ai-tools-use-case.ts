@@ -1,7 +1,7 @@
-import type { AiToolId } from "../../../domain/models/tool-ids.js";
-import { isAiToolId } from "../../../domain/models/tool-ids.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { VersionReader } from "../../../domain/ports/version-reader.js";
+import type { AiToolId } from "../../../kernel/tool.js";
+import { isAiToolId } from "../../../kernel/tool.js";
 import type { UpdateOneToolUseCase } from "./update-one-tool-use-case.js";
 import { UpdateToolsUseCase } from "./update-tools-use-case.js";
 

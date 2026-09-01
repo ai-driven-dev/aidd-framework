@@ -1,8 +1,8 @@
 import { join } from "node:path";
-import { type FileHash, InstallationFile } from "../../../domain/models/file.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
+import { type FileHash, InstallationFile } from "../../../kernel/file.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../kernel/ports/file-writer.js";
 import type { DriftCollection, DriftDescriptor } from "./restore-drift-entries-use-case.js";
 import { RestoreDriftEntriesUseCase } from "./restore-drift-entries-use-case.js";
 

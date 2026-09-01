@@ -4,14 +4,14 @@ import { MarketplaceRemoveUseCase } from "../../../../src/application/use-cases/
 import { MarketplaceAddUseCase } from "../../../../src/application/use-cases/marketplace/marketplace-add-use-case.js";
 import { FetchMarketplaceSourceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace/fetch-marketplace-source-use-case.js";
 import { ResolveMarketplaceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
+import type { Prompter } from "../../../../src/domain/ports/prompter.js";
+import { PluginCatalogRepositoryAdapter } from "../../../../src/infrastructure/adapters/plugin-catalog-repository-adapter.js";
 import {
   InvalidMarketplaceNameError,
   InvalidPluginManifestError,
   MarketplaceAlreadyRegisteredError,
   TrustDeniedError,
-} from "../../../../src/domain/errors.js";
-import type { Prompter } from "../../../../src/domain/ports/prompter.js";
-import { PluginCatalogRepositoryAdapter } from "../../../../src/infrastructure/adapters/plugin-catalog-repository-adapter.js";
+} from "../../../../src/kernel/errors.js";
 import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
 import { FixturePluginFetcher } from "../../../helpers/ports/fixture-plugin-fetcher.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";

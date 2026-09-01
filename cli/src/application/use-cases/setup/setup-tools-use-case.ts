@@ -1,9 +1,9 @@
-import { CategoryMismatchError } from "../../../domain/errors.js";
 import { Manifest } from "../../../domain/models/manifest.js";
-import type { AiToolId, IdeToolId, ToolId } from "../../../domain/models/tool-ids.js";
-import { AI_TOOL_IDS } from "../../../domain/models/tool-ids.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
+import { CategoryMismatchError } from "../../../kernel/errors.js";
+import type { AiToolId, IdeToolId, ToolId } from "../../../kernel/tool.js";
+import { AI_TOOL_IDS } from "../../../kernel/tool.js";
 import type {
   InstallIdeConfigResult,
   InstallIdeConfigUseCase,

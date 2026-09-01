@@ -1,14 +1,14 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import type { RawCatalogFetcher } from "../../domain/ports/raw-catalog-fetcher.js";
+import type { TokenProvider } from "../../domain/ports/token-provider.js";
 import {
   AuthenticationError,
   CatalogFetchAuthError,
   CatalogFetchError,
   CatalogFetchNotFoundError,
-} from "../../domain/errors.js";
-import type { PluginSourceGitHub } from "../../domain/models/plugin-source.js";
-import type { RawCatalogFetcher } from "../../domain/ports/raw-catalog-fetcher.js";
-import type { TokenProvider } from "../../domain/ports/token-provider.js";
+} from "../../kernel/errors.js";
+import type { PluginSourceGitHub } from "../../kernel/source.js";
 import { HttpNotFoundError } from "../errors.js";
 import type { HttpClient } from "../http/http-client.js";
 

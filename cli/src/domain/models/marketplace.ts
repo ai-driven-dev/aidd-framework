@@ -1,5 +1,9 @@
-import { InvalidMarketplaceNameError, InvalidMarketplaceScopeError } from "../errors.js";
-import { type PluginSource, parsePluginSource, serializePluginSource } from "./plugin-source.js";
+import { InvalidMarketplaceNameError, InvalidMarketplaceScopeError } from "../../kernel/errors.js";
+import {
+  type PluginSource,
+  parsePluginSource,
+  serializePluginSource,
+} from "../../kernel/source.js";
 
 export const MARKETPLACE_NAME_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 export const FRAMEWORK_MARKETPLACE_NAME = "aidd-framework";

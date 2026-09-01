@@ -1,4 +1,4 @@
-import { UnknownAiToolIdError } from "../errors.js";
+import { UnknownAiToolIdError } from "./errors.js";
 
 export type AiToolId = "claude" | "cursor" | "copilot" | "opencode" | "codex";
 export type IdeToolId = "vscode";

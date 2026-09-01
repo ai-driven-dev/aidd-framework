@@ -1,10 +1,7 @@
 import type { Command } from "commander";
 import type { MarketplaceScope } from "../../domain/models/marketplace.js";
-import {
-  describePluginSource,
-  parsePluginSourceShorthand,
-} from "../../domain/models/plugin-source.js";
 import { createDeps, createMenuDeps } from "../../infrastructure/deps.js";
+import { describePluginSource, parsePluginSourceShorthand } from "../../kernel/source.js";
 import { ErrorHandler } from "../error-handler.js";
 import { parseGlobalOptions } from "./global-options.js";
 import { spawnCliCommand } from "./spawn-cli-command.js";

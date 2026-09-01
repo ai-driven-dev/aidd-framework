@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import type { AuthCredential, AuthLevel } from "../../domain/models/auth.js";
-import { AIDD_DIR } from "../../domain/models/paths.js";
 import { createDeps } from "../../infrastructure/deps.js";
+import { AIDD_DIR } from "../../kernel/paths.js";
 import { ErrorHandler } from "../error-handler.js";
 import { InputRequiredError } from "../errors.js";
 import { AuthLoginUseCase } from "../use-cases/auth/auth-login-use-case.js";

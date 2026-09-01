@@ -1,15 +1,15 @@
 import { dirname, join } from "node:path";
 import type { Manifest } from "../../../domain/models/manifest.js";
+import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
 import {
   isMergeContentEmpty,
   type MergeFileEntry,
   removeEntriesFromJson,
-} from "../../../domain/models/merge.js";
-import type { ToolId } from "../../../domain/models/tool-ids.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../../domain/ports/file-writer.js";
-import type { Logger } from "../../../domain/ports/logger.js";
-import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
+} from "../../../kernel/merge.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../kernel/ports/file-writer.js";
+import type { Logger } from "../../../kernel/ports/logger.js";
+import type { ToolId } from "../../../kernel/tool.js";
 
 export interface UninstallToolsOptions {
   toolIds: ToolId[];

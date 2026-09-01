@@ -1,27 +1,27 @@
 import { homedir as nodeHomedir } from "node:os";
 import { join } from "node:path";
-import {
-  DuplicatePluginError,
-  MissingPluginMetadataError,
-  VersionMismatchError,
-} from "../../../domain/errors.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
-import { DOCS_DIR, PLUGIN_CACHE_SUBDIR } from "../../../domain/models/paths.js";
 import { Plugin } from "../../../domain/models/plugin.js";
 import { PluginContentTranslator } from "../../../domain/models/plugin-content-translator.js";
 import type { PluginDistribution } from "../../../domain/models/plugin-distribution.js";
-import type { PluginSource } from "../../../domain/models/plugin-source.js";
 import type { ReadonlySkipList } from "../../../domain/models/plugin-translation-skip.js";
-import type { AiToolId } from "../../../domain/models/tool-ids.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../../domain/ports/file-writer.js";
-import type { Hasher } from "../../../domain/ports/hasher.js";
-import type { Logger } from "../../../domain/ports/logger.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
 import type { PluginDistributionReader } from "../../../domain/ports/plugin-distribution-reader.js";
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
+import {
+  DuplicatePluginError,
+  MissingPluginMetadataError,
+  VersionMismatchError,
+} from "../../../kernel/errors.js";
+import { DOCS_DIR, PLUGIN_CACHE_SUBDIR } from "../../../kernel/paths.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../kernel/ports/file-writer.js";
+import type { Hasher } from "../../../kernel/ports/hasher.js";
+import type { Logger } from "../../../kernel/ports/logger.js";
+import type { PluginSource } from "../../../kernel/source.js";
+import type { AiToolId } from "../../../kernel/tool.js";
 import type { PluginTranslator } from "../framework/translator/plugin-translator.js";
 import { resolvePluginTranslator } from "../framework/translator/resolve-plugin-translator.js";
 import type { EnsureBuiltMarketplaceUseCase } from "../shared/ensure-built-marketplace-use-case.js";

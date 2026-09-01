@@ -1,10 +1,5 @@
 import { extractConfigCapabilities } from "../../../domain/models/config-capability.js";
-import { InstallationFile, removeRedundantGitkeeps } from "../../../domain/models/file.js";
 import type { ContentSection, FrameworkDescriptor } from "../../../domain/models/framework.js";
-import type { AiToolId } from "../../../domain/models/tool-ids.js";
-import type { AssetProvider } from "../../../domain/ports/asset-provider.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
-import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { Platform } from "../../../domain/ports/platform.js";
 import type {
   AiTool,
@@ -14,6 +9,11 @@ import type {
   HasSkills,
 } from "../../../domain/tools/contracts.js";
 import { isAiTool, type ToolConfig } from "../../../domain/tools/registry.js";
+import { InstallationFile, removeRedundantGitkeeps } from "../../../kernel/file.js";
+import type { AssetProvider } from "../../../kernel/ports/asset-provider.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import type { Hasher } from "../../../kernel/ports/hasher.js";
+import type { AiToolId } from "../../../kernel/tool.js";
 import { InstallAgentsUseCase } from "../install/install-agents-use-case.js";
 import { InstallCommandsUseCase } from "../install/install-commands-use-case.js";
 import { InstallConfigUseCase } from "../install/install-config-use-case.js";

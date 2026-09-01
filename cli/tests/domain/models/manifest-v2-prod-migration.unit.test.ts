@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Manifest } from "../../../src/domain/models/manifest.js";
-import type { ToolId } from "../../../src/domain/models/tool-ids.js";
+import type { ToolId } from "../../../src/kernel/tool.js";
 
 const CLAUDE = "claude" as ToolId;
 const CURSOR = "cursor" as ToolId;

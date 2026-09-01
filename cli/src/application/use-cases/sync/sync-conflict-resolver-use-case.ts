@@ -1,4 +1,4 @@
-import type { FileReader } from "../../../domain/ports/file-reader.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
 
 /**
  * Determines whether a target file is in conflict (modified since last sync).

@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { parseInstallScope } from "../../domain/models/install-scope.js";
-import { assertValidAiToolId, parseToolOption } from "../../domain/models/tool-ids.js";
 import { createDeps, createMenuDeps } from "../../infrastructure/deps.js";
+import { assertValidAiToolId, parseToolOption } from "../../kernel/tool.js";
 import { ErrorHandler } from "../error-handler.js";
 import { parseGlobalOptions } from "./global-options.js";
 import { spawnCliCommand } from "./spawn-cli-command.js";

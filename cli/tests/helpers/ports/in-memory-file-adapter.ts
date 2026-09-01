@@ -1,15 +1,15 @@
 import { createHash } from "node:crypto";
-import { stripJsonComments } from "../../../src/domain/formats/jsonc.js";
-import { FileHash } from "../../../src/domain/models/file.js";
+import type { FileMerger } from "../../../src/domain/ports/file-merger.js";
+import { FileHash } from "../../../src/kernel/file.js";
+import { stripJsonComments } from "../../../src/kernel/jsonc.js";
 import {
   isPerKeyMergeStrategy,
   type MergeStrategy,
   type PerKeyMergeStrategy,
-} from "../../../src/domain/models/merge.js";
-import type { FileMerger } from "../../../src/domain/ports/file-merger.js";
-import type { FileReader } from "../../../src/domain/ports/file-reader.js";
-import type { FileWriter } from "../../../src/domain/ports/file-writer.js";
-import type { Hasher } from "../../../src/domain/ports/hasher.js";
+} from "../../../src/kernel/merge.js";
+import type { FileReader } from "../../../src/kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../src/kernel/ports/file-writer.js";
+import type { Hasher } from "../../../src/kernel/ports/hasher.js";
 
 /**
  * Pure in-memory implementation of the FileReader, FileWriter, and FileMerger ports.

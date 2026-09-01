@@ -1,4 +1,3 @@
-import { AuthenticationError } from "../../domain/errors.js";
 import type { AuthConfig, AuthCredential, AuthLevel } from "../../domain/models/auth.js";
 import type {
   AuthLoginResult,
@@ -8,6 +7,7 @@ import type {
   CredentialStore,
 } from "../../domain/ports/credential-store.js";
 import type { CliAuthProvider, TokenAuthProvider } from "../../domain/ports/oauth-provider.js";
+import { AuthenticationError } from "../../kernel/errors.js";
 import type { AuthStorage } from "../auth/auth-storage.js";
 
 export class AuthProviderAdapter implements CredentialStore {

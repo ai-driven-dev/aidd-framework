@@ -4,13 +4,13 @@ import "../../../src/domain/tools/ai/copilot.js";
 import "../../../src/domain/tools/ai/cursor.js";
 import "../../../src/domain/tools/ai/opencode.js";
 import { describe, expect, it } from "vitest";
-import { InvalidPluginScopeError } from "../../../src/domain/errors.js";
 import {
   assertToolSupportsScope,
   getToolSupportedScope,
   isInstallScope,
   parseInstallScope,
 } from "../../../src/domain/models/install-scope.js";
+import { InvalidPluginScopeError } from "../../../src/kernel/errors.js";
 
 describe("install-scope value object", () => {
   describe("isInstallScope", () => {

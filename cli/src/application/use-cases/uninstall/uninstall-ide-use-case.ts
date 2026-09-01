@@ -1,5 +1,5 @@
-import type { IdeToolId } from "../../../domain/models/tool-ids.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
+import type { IdeToolId } from "../../../kernel/tool.js";
 import { NoManifestError, ToolNotInstalledError } from "../../errors.js";
 import type { UninstallToolsUseCase } from "./uninstall-tools-use-case.js";
 

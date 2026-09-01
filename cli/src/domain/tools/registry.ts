@@ -1,19 +1,19 @@
 import { join } from "node:path";
-import type { NativeActivation, PluginsMode } from "../capabilities/plugins-capability.js";
 import {
   CategoryMismatchError,
   UnknownToolCategoryError,
   UnregisteredToolError,
-} from "../errors.js";
-import type { FrameworkBuildMode } from "../models/framework-build.js";
+} from "../../kernel/errors.js";
+import type { FileReader } from "../../kernel/ports/file-reader.js";
 import {
   AI_TOOL_IDS,
   IDE_TOOL_IDS,
   type IdeToolId,
   type ToolCategory,
   type ToolId,
-} from "../models/tool-ids.js";
-import type { FileReader } from "../ports/file-reader.js";
+} from "../../kernel/tool.js";
+import type { NativeActivation, PluginsMode } from "../capabilities/plugins-capability.js";
+import type { FrameworkBuildMode } from "../models/framework-build.js";
 import type { AiTool, IdeToolConfig } from "./contracts.js";
 
 export type ToolConfig = AiTool<unknown> | IdeToolConfig;

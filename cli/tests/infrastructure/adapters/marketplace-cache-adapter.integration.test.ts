@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MarketplaceCacheEntry } from "../../../src/domain/models/marketplace-cache-entry.js";
-import { MARKETPLACE_CACHE_SUBDIR } from "../../../src/domain/models/paths.js";
 import { MarketplaceCacheAdapter } from "../../../src/infrastructure/adapters/marketplace-cache-adapter.js";
+import { MARKETPLACE_CACHE_SUBDIR } from "../../../src/kernel/paths.js";
 
 describe("MarketplaceCacheAdapter", () => {
   let projectRoot: string;

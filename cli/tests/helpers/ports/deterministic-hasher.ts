@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { FileHash } from "../../../src/domain/models/file.js";
-import type { Hasher } from "../../../src/domain/ports/hasher.js";
+import { FileHash } from "../../../src/kernel/file.js";
+import type { Hasher } from "../../../src/kernel/ports/hasher.js";
 
 /**
  * Deterministic in-memory hasher using real MD5.

@@ -1,9 +1,9 @@
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { FileHash, InstallationFile } from "../../../src/domain/models/file.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
-import type { ToolId } from "../../../src/domain/models/tool-ids.js";
-import { VALID_TOOL_IDS } from "../../../src/domain/models/tool-ids.js";
+import { FileHash, InstallationFile } from "../../../src/kernel/file.js";
+import type { ToolId } from "../../../src/kernel/tool.js";
+import { VALID_TOOL_IDS } from "../../../src/kernel/tool.js";
 
 // ── Arbitraries ──────────────────────────────────────────────────────────────
 

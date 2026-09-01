@@ -1,5 +1,5 @@
-import type { FileHash } from "../models/file.js";
-import type { MergeStrategy } from "../models/merge.js";
+import type { FileHash } from "../../kernel/file.js";
+import type { MergeStrategy } from "../../kernel/merge.js";
 
 export interface FileMerger {
   mergeJsonFile(path: string, content: string, strategy: MergeStrategy): Promise<void>;

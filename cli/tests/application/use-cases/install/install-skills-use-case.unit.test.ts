@@ -4,9 +4,9 @@ import "../../../../src/domain/tools/ai/copilot.js";
 import { describe, expect, it } from "vitest";
 import { InstallSkillsUseCase } from "../../../../src/application/use-cases/install/install-skills-use-case.js";
 import type { ContentSection } from "../../../../src/domain/models/framework.js";
-import { GITKEEP_FILE } from "../../../../src/domain/models/framework.js";
 import { claude } from "../../../../src/domain/tools/ai/claude.js";
 import { copilot } from "../../../../src/domain/tools/ai/copilot.js";
+import { GITKEEP_FILE } from "../../../../src/kernel/file.js";
 import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
 
 const DOCS_DIR = "aidd_docs";

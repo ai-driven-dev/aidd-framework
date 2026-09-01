@@ -1,6 +1,6 @@
-import { CapabilityConfigError } from "../errors.js";
-import type { MergeStrategy } from "../models/merge.js";
-import type { ToolId } from "../models/tool-ids.js";
+import { CapabilityConfigError } from "../../kernel/errors.js";
+import type { MergeStrategy } from "../../kernel/merge.js";
+import type { ToolId } from "../../kernel/tool.js";
 
 export class SettingsCapability {
   readonly consumes: readonly string[];

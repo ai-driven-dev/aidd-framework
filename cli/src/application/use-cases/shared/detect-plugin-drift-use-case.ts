@@ -2,8 +2,8 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Manifest } from "../../../domain/models/manifest.js";
-import type { AiToolId, ToolId } from "../../../domain/models/tool-ids.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import type { AiToolId, ToolId } from "../../../kernel/tool.js";
 import { resolvePluginBaseDir } from "../plugin/plugin-helpers.js";
 
 export type PluginFileDriftKind = "missing" | "hash-mismatch";

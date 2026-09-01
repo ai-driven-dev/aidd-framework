@@ -1,11 +1,11 @@
 import { join } from "node:path";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { McpExclusion } from "../../../domain/models/mcp-exclusion.js";
-import { type MergeFileEntry, removeEntriesFromJson } from "../../../domain/models/merge.js";
-import type { ToolId } from "../../../domain/models/tool-ids.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../../domain/ports/file-writer.js";
-import type { Logger } from "../../../domain/ports/logger.js";
+import { type MergeFileEntry, removeEntriesFromJson } from "../../../kernel/merge.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../kernel/ports/file-writer.js";
+import type { Logger } from "../../../kernel/ports/logger.js";
+import type { ToolId } from "../../../kernel/tool.js";
 
 export interface UninstallMcpExclusionOptions {
   toolId: ToolId;

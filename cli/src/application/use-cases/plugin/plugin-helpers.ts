@@ -1,17 +1,17 @@
 import { join } from "node:path";
 import { McpCapability } from "../../../domain/capabilities/mcp-capability.js";
 import type { PluginsCapability } from "../../../domain/capabilities/plugins-capability.js";
-import type { InstallationFile } from "../../../domain/models/file.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Plugin } from "../../../domain/models/plugin.js";
 import type { PluginDistribution } from "../../../domain/models/plugin-distribution.js";
-import type { AiToolId } from "../../../domain/models/tool-ids.js";
-import { AI_TOOL_IDS } from "../../../domain/models/tool-ids.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../../domain/ports/file-writer.js";
-import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
+import type { InstallationFile } from "../../../kernel/file.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../kernel/ports/file-writer.js";
+import type { Hasher } from "../../../kernel/ports/hasher.js";
+import type { AiToolId } from "../../../kernel/tool.js";
+import { AI_TOOL_IDS } from "../../../kernel/tool.js";
 import { NoManifestError } from "../../errors.js";
 import type { PluginTranslator } from "../framework/translator/plugin-translator.js";
 

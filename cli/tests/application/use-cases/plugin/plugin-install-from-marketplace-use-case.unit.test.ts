@@ -4,14 +4,14 @@ import { PluginAddUseCase } from "../../../../src/application/use-cases/plugin/p
 import { PluginInstallFromMarketplaceUseCase } from "../../../../src/application/use-cases/plugin/plugin-install-from-marketplace-use-case.js";
 import { FetchMarketplaceSourceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace/fetch-marketplace-source-use-case.js";
 import { ResolveMarketplaceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
+import { Marketplace } from "../../../../src/domain/models/marketplace.js";
+import { PluginCatalogRepositoryAdapter } from "../../../../src/infrastructure/adapters/plugin-catalog-repository-adapter.js";
+import { PluginDistributionReaderAdapter } from "../../../../src/infrastructure/adapters/plugin-distribution-reader-adapter.js";
 import {
   AmbiguousPluginMatchError,
   PluginNotInMarketplaceError,
   VersionMismatchError,
-} from "../../../../src/domain/errors.js";
-import { Marketplace } from "../../../../src/domain/models/marketplace.js";
-import { PluginCatalogRepositoryAdapter } from "../../../../src/infrastructure/adapters/plugin-catalog-repository-adapter.js";
-import { PluginDistributionReaderAdapter } from "../../../../src/infrastructure/adapters/plugin-distribution-reader-adapter.js";
+} from "../../../../src/kernel/errors.js";
 import { buildUnitDeps, initAndInstall } from "../../../helpers/ports/build-unit-deps.js";
 import { fakeEnsureBuiltMarketplace } from "../../../helpers/ports/fake-ensure-built-marketplace.js";
 import type { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";

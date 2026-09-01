@@ -4,9 +4,9 @@ import { MarketplaceRefreshUseCase } from "../../../../src/application/use-cases
 import { FetchMarketplaceSourceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace/fetch-marketplace-source-use-case.js";
 import { ResolveMarketplaceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
 import { Marketplace } from "../../../../src/domain/models/marketplace.js";
-import { MARKETPLACE_CACHE_SUBDIR } from "../../../../src/domain/models/paths.js";
-import { serializePluginSource } from "../../../../src/domain/models/plugin-source.js";
 import { PluginCatalogRepositoryAdapter } from "../../../../src/infrastructure/adapters/plugin-catalog-repository-adapter.js";
+import { MARKETPLACE_CACHE_SUBDIR } from "../../../../src/kernel/paths.js";
+import { serializePluginSource } from "../../../../src/kernel/source.js";
 import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
 import { FixturePluginFetcher } from "../../../helpers/ports/fixture-plugin-fetcher.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";

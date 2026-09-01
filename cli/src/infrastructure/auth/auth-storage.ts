@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { AuthConfig, AuthCredential, AuthLevel } from "../../domain/models/auth.js";
-import { AIDD_DIR } from "../../domain/models/paths.js";
+import { AIDD_DIR } from "../../kernel/paths.js";
 import { AuthStorageError } from "../errors.js";
 import { userConfigDir } from "../user-config-dir.js";
 

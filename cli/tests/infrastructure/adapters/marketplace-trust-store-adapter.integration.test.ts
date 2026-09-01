@@ -2,9 +2,9 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { PluginSource } from "../../../src/domain/models/plugin-source.js";
 import { HasherAdapter } from "../../../src/infrastructure/adapters/hasher-adapter.js";
 import { MarketplaceTrustStoreAdapter } from "../../../src/infrastructure/adapters/marketplace-trust-store-adapter.js";
+import type { PluginSource } from "../../../src/kernel/source.js";
 
 const githubSource: PluginSource = { kind: "github", repo: "owner/repo" };
 const otherSource: PluginSource = { kind: "github", repo: "owner/other" };

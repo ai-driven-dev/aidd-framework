@@ -1,6 +1,9 @@
-import { ManifestValidationError } from "../errors.js";
-import { GITKEEP_FILE } from "./framework.js";
+import { ManifestValidationError } from "./errors.js";
 import type { MergeStrategy } from "./merge.js";
+
+// Where a file's own emptiness is marked; kernel vocabulary because `removeRedundantGitkeeps`
+// below reasons about it independently of any context's directory conventions.
+export const GITKEEP_FILE = ".gitkeep";
 
 // ── FileHash ──────────────────────────────────────────────────────────────────
 

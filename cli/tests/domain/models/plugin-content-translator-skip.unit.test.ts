@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { FileHash } from "../../../src/domain/models/file.js";
 import { PluginContentTranslator } from "../../../src/domain/models/plugin-content-translator.js";
 import { PluginDistribution } from "../../../src/domain/models/plugin-distribution.js";
 import { OPENCODE_HOOKS_SKIP_REASON } from "../../../src/domain/models/plugin-translation-skip.js";
 import { cursor } from "../../../src/domain/tools/ai/cursor.js";
 import { opencode } from "../../../src/domain/tools/ai/opencode.js";
+import { FileHash } from "../../../src/kernel/file.js";
 
 const stubHasher = { hash: (_content: string) => new FileHash("a".repeat(32)) };
 const translator = new PluginContentTranslator(stubHasher);

@@ -1,5 +1,5 @@
-import { NativePluginCliError } from "../../../src/domain/errors.js";
 import type { NativePluginActivator } from "../../../src/domain/ports/native-plugin-activator.js";
+import { NativePluginCliError } from "../../../src/kernel/errors.js";
 
 /**
  * Records native plugin CLI activation calls instead of shelling out.

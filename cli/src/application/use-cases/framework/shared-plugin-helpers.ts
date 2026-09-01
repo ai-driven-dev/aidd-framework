@@ -1,4 +1,4 @@
-import { FrameworkPlaceholderInPluginError } from "../../../domain/errors.js";
+import { FrameworkPlaceholderInPluginError } from "../../../kernel/errors.js";
 
 const TOOLS_PLACEHOLDER = "@{{TOOLS}}/";
 

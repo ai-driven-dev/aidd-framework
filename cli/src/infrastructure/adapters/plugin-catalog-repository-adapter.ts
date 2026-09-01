@@ -1,11 +1,11 @@
 import { isAbsolute, join, resolve } from "node:path";
-import { MalformedMarketplaceCatalogError } from "../../domain/errors.js";
 import { parseCopilotMarketplaceCatalog } from "../../domain/models/copilot-marketplace-catalog.js";
-import { MARKETPLACE_CACHE_SUBDIR } from "../../domain/models/paths.js";
 import { type PluginCatalog, parsePluginCatalog } from "../../domain/models/plugin-catalog.js";
-import type { PluginSource } from "../../domain/models/plugin-source.js";
-import type { FileReader } from "../../domain/ports/file-reader.js";
 import type { PluginCatalogRepository } from "../../domain/ports/plugin-catalog-repository.js";
+import { MalformedMarketplaceCatalogError } from "../../kernel/errors.js";
+import { MARKETPLACE_CACHE_SUBDIR } from "../../kernel/paths.js";
+import type { FileReader } from "../../kernel/ports/file-reader.js";
+import type { PluginSource } from "../../kernel/source.js";
 
 const COPILOT_MARKETPLACE_PATH = ".plugin/marketplace.json";
 const CLAUDE_MARKETPLACE_PATH = ".claude-plugin/marketplace.json";

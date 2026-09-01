@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DoctorRegistrationUseCase } from "../../../src/application/use-cases/doctor/doctor-registration-use-case.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
 import { Marketplace } from "../../../src/domain/models/marketplace.js";
-import type { ToolId } from "../../../src/domain/models/tool-ids.js";
+import type { ToolId } from "../../../src/kernel/tool.js";
 import "../../../src/domain/tools/ai/claude.js";
 import "../../../src/domain/tools/ai/copilot.js";
 import "../../../src/domain/tools/ai/cursor.js";

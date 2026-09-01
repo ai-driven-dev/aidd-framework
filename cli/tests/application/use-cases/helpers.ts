@@ -14,7 +14,6 @@ import { InstallIdeConfigUseCase } from "../../../src/application/use-cases/inst
 import { InstallRuntimeConfigUseCase } from "../../../src/application/use-cases/install/install-runtime-config-use-case.js";
 import { PostInstallPipelineUseCase } from "../../../src/application/use-cases/install/post-install-pipeline-use-case.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
-import type { ToolId } from "../../../src/domain/models/tool-ids.js";
 import type { Platform } from "../../../src/domain/ports/platform.js";
 import type { Prompter } from "../../../src/domain/ports/prompter.js";
 import type { VersionControl } from "../../../src/domain/ports/version-control.js";
@@ -29,6 +28,7 @@ import { PluginDistributionReaderAdapter } from "../../../src/infrastructure/ada
 import { PluginFetcherAdapter } from "../../../src/infrastructure/adapters/plugin-fetcher-adapter.js";
 import { SilentPrompterAdapter } from "../../../src/infrastructure/adapters/prompter-adapter.js";
 import { BundledAssetProviderAdapter } from "../../../src/infrastructure/assets/asset-loader.js";
+import type { ToolId } from "../../../src/kernel/tool.js";
 
 export const linuxPlatform: Platform = { current: () => "linux" };
 export const win32Platform: Platform = { current: () => "win32" };

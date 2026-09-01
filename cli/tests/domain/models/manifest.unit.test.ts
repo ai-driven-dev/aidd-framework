@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { FileHash, InstallationFile } from "../../../src/domain/models/file.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
 import type { McpExclusion } from "../../../src/domain/models/mcp-exclusion.js";
-import type { MergeFileEntry } from "../../../src/domain/models/merge.js";
-import type { ToolId } from "../../../src/domain/models/tool-ids.js";
+import { FileHash, InstallationFile } from "../../../src/kernel/file.js";
+import type { MergeFileEntry } from "../../../src/kernel/merge.js";
+import type { ToolId } from "../../../src/kernel/tool.js";
 
 const makeHash = (hex: string): FileHash => new FileHash(hex.padEnd(32, "0"));
 

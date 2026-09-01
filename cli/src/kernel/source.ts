@@ -1,4 +1,4 @@
-import { InvalidPluginSourceError } from "../errors.js";
+import { InvalidPluginSourceError } from "./errors.js";
 
 export const GITHUB_REPO_REGEX = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
 

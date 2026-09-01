@@ -1,5 +1,5 @@
-import type { Hasher } from "../ports/hasher.js";
-import { stripJsonComments } from "./jsonc.js";
+import { stripJsonComments } from "../../kernel/jsonc.js";
+import type { Hasher } from "../../kernel/ports/hasher.js";
 
 interface OpencodeMcpSection {
   mcp?: Record<string, unknown>;

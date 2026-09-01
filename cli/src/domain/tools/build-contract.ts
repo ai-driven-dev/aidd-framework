@@ -1,6 +1,6 @@
-import type { AssetProvider, SchemaName } from "../ports/asset-provider.js";
-import type { FileReader } from "../ports/file-reader.js";
-import type { FileWriter } from "../ports/file-writer.js";
+import type { AssetProvider, SchemaName } from "../../kernel/ports/asset-provider.js";
+import type { FileReader } from "../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../kernel/ports/file-writer.js";
 import type { JsonSchemaValidator } from "../ports/json-schema-validator.js";
 
 /**

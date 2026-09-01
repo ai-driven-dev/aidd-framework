@@ -80,6 +80,26 @@
       }
     },
     {
+      "includes": ["src/kernel/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/domain/**", "**/application/**", "**/infrastructure/**"],
+                    "message": "kernel must not import any context — it is the shared vocabulary contexts speak, not a consumer of one"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["tests/helpers/**/*.ts"],
       "linter": {
         "rules": {

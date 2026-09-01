@@ -1,10 +1,10 @@
 import type { Manifest } from "../../../domain/models/manifest.js";
-import type { ToolId } from "../../../domain/models/tool-ids.js";
-import { VALID_TOOL_IDS } from "../../../domain/models/tool-ids.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../../domain/ports/file-writer.js";
-import type { Logger } from "../../../domain/ports/logger.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../kernel/ports/file-writer.js";
+import type { Logger } from "../../../kernel/ports/logger.js";
+import type { ToolId } from "../../../kernel/tool.js";
+import { VALID_TOOL_IDS } from "../../../kernel/tool.js";
 import { InputRequiredError, NoManifestError, ToolNotInstalledError } from "../../errors.js";
 import { UninstallMcpExclusionUseCase } from "./uninstall-mcp-exclusion-use-case.js";
 import { UninstallPluginUseCase } from "./uninstall-plugin-use-case.js";

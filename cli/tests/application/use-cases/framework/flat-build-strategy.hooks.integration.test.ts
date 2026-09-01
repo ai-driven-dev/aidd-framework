@@ -13,9 +13,9 @@ import {
   buildCopilotFlatContract,
   buildCursorFlatContract,
 } from "../../../../src/application/use-cases/framework/strategies/tool-contracts.js";
-import type { AssetProvider } from "../../../../src/domain/ports/asset-provider.js";
 import type { JsonSchemaValidator } from "../../../../src/domain/ports/json-schema-validator.js";
 import { AjvSchemaValidatorAdapter } from "../../../../src/infrastructure/adapters/ajv-schema-validator-adapter.js";
+import type { AssetProvider } from "../../../../src/kernel/ports/asset-provider.js";
 import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
 import { seedFromDirectory } from "../../../helpers/ports/seed-from-directory.js";

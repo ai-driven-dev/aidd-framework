@@ -1,16 +1,16 @@
 import { join } from "node:path";
-import type { FileHash } from "../../domain/models/file.js";
 import type { Manifest } from "../../domain/models/manifest.js";
-import { extractMergeEntries, type MergeFileEntry } from "../../domain/models/merge.js";
-import type { AiToolId, ToolCategory, ToolId } from "../../domain/models/tool-ids.js";
-import type { FileReader } from "../../domain/ports/file-reader.js";
-import type { Hasher } from "../../domain/ports/hasher.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import {
   getToolConfig,
   machineLocalFilesOf,
   toolIdsForCategory,
 } from "../../domain/tools/registry.js";
+import type { FileHash } from "../../kernel/file.js";
+import { extractMergeEntries, type MergeFileEntry } from "../../kernel/merge.js";
+import type { FileReader } from "../../kernel/ports/file-reader.js";
+import type { Hasher } from "../../kernel/ports/hasher.js";
+import type { AiToolId, ToolCategory, ToolId } from "../../kernel/tool.js";
 import { NoManifestError, ToolNotInstalledError } from "../errors.js";
 import type { DetectPluginDriftUseCase } from "./shared/detect-plugin-drift-use-case.js";
 

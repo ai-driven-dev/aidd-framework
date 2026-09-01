@@ -4,9 +4,9 @@ import {
   type Marketplace,
   STALE_MAX_DAYS_DEFAULT,
 } from "../../../domain/models/marketplace.js";
-import { AI_TOOL_IDS, type AiToolId } from "../../../domain/models/tool-ids.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
+import { AI_TOOL_IDS, type AiToolId } from "../../../kernel/tool.js";
 import type { ResolveMarketplaceUseCase } from "../shared/resolve-marketplace-use-case.js";
 
 export interface MarketplaceCheckOptions {

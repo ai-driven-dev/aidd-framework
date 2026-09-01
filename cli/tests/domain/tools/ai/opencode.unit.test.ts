@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { OpencodeDualConfigError } from "../../../../src/domain/errors.js";
-import type { FileReader } from "../../../../src/domain/ports/file-reader.js";
 import { opencode } from "../../../../src/domain/tools/ai/opencode.js";
+import { OpencodeDualConfigError } from "../../../../src/kernel/errors.js";
+import type { FileReader } from "../../../../src/kernel/ports/file-reader.js";
 
 function makeFs(existingPaths: string[]): FileReader {
   return {

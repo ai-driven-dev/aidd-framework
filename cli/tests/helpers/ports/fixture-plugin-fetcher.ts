@@ -1,9 +1,9 @@
-import type { PluginSource } from "../../../src/domain/models/plugin-source.js";
-import { serializePluginSource } from "../../../src/domain/models/plugin-source.js";
 import type {
   PluginFetcher,
   PluginFetchOptions,
 } from "../../../src/domain/ports/plugin-fetcher.js";
+import type { PluginSource } from "../../../src/kernel/source.js";
+import { serializePluginSource } from "../../../src/kernel/source.js";
 
 /**
  * In-memory PluginFetcher that returns pre-staged paths from a local fixture map.

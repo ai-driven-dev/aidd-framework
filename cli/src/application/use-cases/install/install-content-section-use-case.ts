@@ -1,11 +1,10 @@
 import type { UserFileSection } from "../../../domain/formats/command.js";
 import { parseFrontmatter } from "../../../domain/formats/markdown.js";
-import { InstallationFile } from "../../../domain/models/file.js";
 import type { ContentSection } from "../../../domain/models/framework.js";
-import { GITKEEP_FILE } from "../../../domain/models/framework.js";
-import { AI_TOOL_IDS } from "../../../domain/models/tool-ids.js";
-import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { AiTool } from "../../../domain/tools/contracts.js";
+import { GITKEEP_FILE, InstallationFile } from "../../../kernel/file.js";
+import type { Hasher } from "../../../kernel/ports/hasher.js";
+import { AI_TOOL_IDS } from "../../../kernel/tool.js";
 
 const ALL_TOOL_SUFFIXES: readonly string[] = AI_TOOL_IDS.map((id) => `.${id}.md`);
 

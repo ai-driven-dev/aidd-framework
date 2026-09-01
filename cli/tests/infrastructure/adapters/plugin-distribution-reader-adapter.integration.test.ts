@@ -1,9 +1,9 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { InvalidPluginManifestError, InvalidPluginNameError } from "../../../src/domain/errors.js";
 import { FileAdapter } from "../../../src/infrastructure/adapters/file-adapter.js";
 import { HasherAdapter } from "../../../src/infrastructure/adapters/hasher-adapter.js";
 import { PluginDistributionReaderAdapter } from "../../../src/infrastructure/adapters/plugin-distribution-reader-adapter.js";
+import { InvalidPluginManifestError, InvalidPluginNameError } from "../../../src/kernel/errors.js";
 
 const FIXTURE_DIR = join(process.cwd(), "tests/fixtures/plugins");
 

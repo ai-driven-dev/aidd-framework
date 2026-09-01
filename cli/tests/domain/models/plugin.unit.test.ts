@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { InvalidPluginNameError, InvalidPluginVersionError } from "../../../src/domain/errors.js";
 import { Plugin, type PluginEntryData } from "../../../src/domain/models/plugin.js";
+import { InvalidPluginNameError, InvalidPluginVersionError } from "../../../src/kernel/errors.js";
 
 const makePluginData = (overrides: Partial<PluginEntryData> = {}): PluginEntryData => ({
   name: "my-plugin",

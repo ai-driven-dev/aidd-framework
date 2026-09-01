@@ -1,4 +1,4 @@
-import type { IdeToolId } from "./tool-ids.js";
+import type { IdeToolId } from "../../kernel/tool.js";
 
 export const TOOLS_PLACEHOLDER = "{{TOOLS}}/";
 export const DOCS_PLACEHOLDER = "{{DOCS}}/";
@@ -11,7 +11,6 @@ export const CONFIG_VSCODE_EXTENSIONS = "vscodeExtensions";
 export const CONFIG_VSCODE_KEYBINDINGS = "vscodeKeybindings";
 export const CONFIG_OPENCODE = "opencode";
 
-export const GITKEEP_FILE = ".gitkeep";
 export const FRAMEWORK_CONFIG_PREFIX = "config/";
 
 export interface ContentSection {

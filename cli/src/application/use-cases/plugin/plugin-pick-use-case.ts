@@ -1,13 +1,13 @@
+import type { Marketplace } from "../../../domain/models/marketplace.js";
+import type { PluginCatalog, PluginCatalogEntry } from "../../../domain/models/plugin-catalog.js";
+import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
+import type { Prompter } from "../../../domain/ports/prompter.js";
 import {
   InteractiveOnlyError,
   InvalidPluginManifestError,
   NoMarketplacesRegisteredError,
-} from "../../../domain/errors.js";
-import type { Marketplace } from "../../../domain/models/marketplace.js";
-import type { PluginCatalog, PluginCatalogEntry } from "../../../domain/models/plugin-catalog.js";
-import type { AiToolId } from "../../../domain/models/tool-ids.js";
-import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
-import type { Prompter } from "../../../domain/ports/prompter.js";
+} from "../../../kernel/errors.js";
+import type { AiToolId } from "../../../kernel/tool.js";
 import type { ResolveMarketplaceUseCase } from "../shared/resolve-marketplace-use-case.js";
 import type { PluginAddUseCase } from "./plugin-add-use-case.js";
 

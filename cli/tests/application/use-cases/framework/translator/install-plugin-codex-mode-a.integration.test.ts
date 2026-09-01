@@ -9,8 +9,8 @@ import { ModeAMarketplaceTranslator } from "../../../../../src/application/use-c
 import { Manifest } from "../../../../../src/domain/models/manifest.js";
 import { Marketplace } from "../../../../../src/domain/models/marketplace.js";
 import { PluginDistribution } from "../../../../../src/domain/models/plugin-distribution.js";
-import type { PluginSource } from "../../../../../src/domain/models/plugin-source.js";
 import { PluginCatalogRepositoryAdapter } from "../../../../../src/infrastructure/adapters/plugin-catalog-repository-adapter.js";
+import type { PluginSource } from "../../../../../src/kernel/source.js";
 import { CapturingLogger } from "../../../../helpers/ports/capturing-logger.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
 import { fakeEnsureBuiltMarketplace } from "../../../../helpers/ports/fake-ensure-built-marketplace.js";

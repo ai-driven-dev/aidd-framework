@@ -1,15 +1,15 @@
 import { join, resolve } from "node:path";
 import type { Marketplace } from "../../../domain/models/marketplace.js";
-import { marketplaceCacheDir } from "../../../domain/models/paths.js";
 import {
   hasRelativePluginSources,
   type PluginCatalog,
   parsePluginCatalog,
 } from "../../../domain/models/plugin-catalog.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
-import type { Logger } from "../../../domain/ports/logger.js";
 import type { MarketplaceCachePort } from "../../../domain/ports/marketplace-cache.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
+import { marketplaceCacheDir } from "../../../kernel/paths.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import type { Logger } from "../../../kernel/ports/logger.js";
 import type { ResolveMarketplaceUseCase } from "../shared/resolve-marketplace-use-case.js";
 
 export interface MarketplaceRefreshOptions {

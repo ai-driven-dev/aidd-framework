@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { InputRequiredError } from "../../../../src/application/errors.js";
 import { RestoreRegularFilesUseCase } from "../../../../src/application/use-cases/restore/restore-regular-files-use-case.js";
-import { InstallationFile } from "../../../../src/domain/models/file.js";
+import { InstallationFile } from "../../../../src/kernel/file.js";
 import { buildUnitDeps } from "../../../helpers/ports/build-unit-deps.js";
 import {
   KeepPrompter,

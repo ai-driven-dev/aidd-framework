@@ -1,5 +1,4 @@
 import { join, resolve } from "node:path";
-import { InvalidBuildPathsError, InvalidSourceMarketplaceError } from "../../../domain/errors.js";
 import {
   type BuildPluginResult,
   type FrameworkBuildOptions,
@@ -8,11 +7,12 @@ import {
   SOURCE_MARKETPLACE_RELATIVE,
   SOURCE_PLUGIN_MANIFEST_RELATIVE,
 } from "../../../domain/models/framework-build.js";
-import type { AssetProvider } from "../../../domain/ports/asset-provider.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { JsonSchemaValidator } from "../../../domain/ports/json-schema-validator.js";
-import type { Logger } from "../../../domain/ports/logger.js";
+import { InvalidBuildPathsError, InvalidSourceMarketplaceError } from "../../../kernel/errors.js";
+import type { AssetProvider } from "../../../kernel/ports/asset-provider.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../kernel/ports/file-writer.js";
+import type { Logger } from "../../../kernel/ports/logger.js";
 import type {
   BuildOutputStrategy,
   SourceMarketplace,

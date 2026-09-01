@@ -1,9 +1,9 @@
 import { join } from "node:path";
 import type { DoctorIssue } from "../../../domain/models/doctor.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
-import { extractMergeEntries, type MergeFileEntry } from "../../../domain/models/merge.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
-import type { Hasher } from "../../../domain/ports/hasher.js";
+import { extractMergeEntries, type MergeFileEntry } from "../../../kernel/merge.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import type { Hasher } from "../../../kernel/ports/hasher.js";
 
 export interface DoctorMergeFilesOptions {
   manifest: Manifest;

@@ -9,7 +9,7 @@ import {
   NotAuthenticatedError,
   ToolNotInstalledError,
 } from "../../src/application/errors.js";
-import { FlatTargetExistsError, OutDirNotDirectoryError } from "../../src/domain/errors.js";
+import { FlatTargetExistsError, OutDirNotDirectoryError } from "../../src/kernel/errors.js";
 
 describe("NoManifestError", () => {
   it("includes aidd setup hint in message", () => {

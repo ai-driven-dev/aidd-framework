@@ -1,5 +1,5 @@
+import type { AiToolId, IdeToolId } from "../../kernel/tool.js";
 import type { ProjectContext } from "./project-context.js";
-import type { AiToolId, IdeToolId } from "./tool-ids.js";
 
 export function recommendAiTools(context?: ProjectContext): readonly AiToolId[] {
   if (context === undefined) return ["claude"];

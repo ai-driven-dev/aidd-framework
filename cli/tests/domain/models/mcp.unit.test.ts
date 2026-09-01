@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { InstallationFile } from "../../../src/domain/models/file.js";
 import { transformFor } from "../../../src/domain/models/mcp-exclusion.js";
-import type { Hasher } from "../../../src/domain/ports/hasher.js";
+import { InstallationFile } from "../../../src/kernel/file.js";
+import type { Hasher } from "../../../src/kernel/ports/hasher.js";
 
 function makeConfig(servers: Record<string, object>): string {
   return JSON.stringify({ mcpServers: servers }, null, 2);

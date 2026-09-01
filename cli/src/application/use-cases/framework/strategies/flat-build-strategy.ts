@@ -1,5 +1,4 @@
 import { basename, join, relative } from "node:path";
-import { FlatTargetExistsError, OutDirNotDirectoryError } from "../../../../domain/errors.js";
 import { rewriteClaudeRootInJson } from "../../../../domain/formats/claude-root-path-rewrite.js";
 import { flatMcpKeyPrefix } from "../../../../domain/formats/flat-paths.js";
 import { parseFrontmatter, serializeFrontmatter } from "../../../../domain/formats/markdown.js";
@@ -9,15 +8,16 @@ import {
   PLUGIN_HOOKS_RELATIVE,
   PLUGIN_MCP_RELATIVE,
 } from "../../../../domain/models/framework-build.js";
-import type { AssetProvider } from "../../../../domain/ports/asset-provider.js";
-import type { FileReader } from "../../../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../../../domain/ports/file-writer.js";
 import type { JsonSchemaValidator } from "../../../../domain/ports/json-schema-validator.js";
-import type { Logger } from "../../../../domain/ports/logger.js";
 import type {
   ArtifactContract,
   ToolBuildContract,
 } from "../../../../domain/tools/build-contract.js";
+import { FlatTargetExistsError, OutDirNotDirectoryError } from "../../../../kernel/errors.js";
+import type { AssetProvider } from "../../../../kernel/ports/asset-provider.js";
+import type { FileReader } from "../../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
+import type { Logger } from "../../../../kernel/ports/logger.js";
 import { assertNoToolsPlaceholder } from "../shared-plugin-helpers.js";
 import type { BuildOutputStrategy, SourceMarketplace } from "./build-output-strategy.js";
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { DuplicatePluginError, PluginNotFoundError } from "../../../src/domain/errors.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
 import { Plugin } from "../../../src/domain/models/plugin.js";
-import type { ToolId } from "../../../src/domain/models/tool-ids.js";
+import { DuplicatePluginError, PluginNotFoundError } from "../../../src/kernel/errors.js";
+import type { ToolId } from "../../../src/kernel/tool.js";
 
 const CLAUDE = "claude" as ToolId;
 const CURSOR = "cursor" as ToolId;

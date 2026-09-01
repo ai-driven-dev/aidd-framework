@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import { GitHubReleaseResolverAdapter } from "../../../src/infrastructure/adapters/github-release-resolver-adapter.js";
+import { HttpNotFoundError } from "../../../src/infrastructure/errors.js";
 import {
   AuthenticationError,
   CatalogFetchAuthError,
   CatalogFetchError,
-} from "../../../src/domain/errors.js";
-import { GitHubReleaseResolverAdapter } from "../../../src/infrastructure/adapters/github-release-resolver-adapter.js";
-import { HttpNotFoundError } from "../../../src/infrastructure/errors.js";
+} from "../../../src/kernel/errors.js";
 
 const REPO = "owner/repo";
 

@@ -2,8 +2,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { InputRequiredError } from "../../../../src/application/errors.js";
 import { RestoreMergeFilesUseCase } from "../../../../src/application/use-cases/restore/restore-merge-files-use-case.js";
-import { InstallationFile } from "../../../../src/domain/models/file.js";
-import type { MergeFileEntry } from "../../../../src/domain/models/merge.js";
+import { InstallationFile } from "../../../../src/kernel/file.js";
+import type { MergeFileEntry } from "../../../../src/kernel/merge.js";
 import { buildUnitDeps } from "../../../helpers/ports/build-unit-deps.js";
 import {
   KeepPrompter,

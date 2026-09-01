@@ -1,14 +1,14 @@
 import { execSync } from "node:child_process";
 import { platform } from "node:os";
+import type { CliRelease, SelfUpdater } from "../../domain/ports/self-updater.js";
+import type { TokenProvider } from "../../domain/ports/token-provider.js";
 import {
   ElevatedPermissionUpdateError,
   FrameworkResolutionError,
   PackageManagerDetectionError,
   UpdateError,
-} from "../../domain/errors.js";
-import type { Logger } from "../../domain/ports/logger.js";
-import type { CliRelease, SelfUpdater } from "../../domain/ports/self-updater.js";
-import type { TokenProvider } from "../../domain/ports/token-provider.js";
+} from "../../kernel/errors.js";
+import type { Logger } from "../../kernel/ports/logger.js";
 import type { HttpClient } from "../http/http-client.js";
 
 const CLI_REPO = "ai-driven-dev/aidd-cli";

@@ -4,12 +4,12 @@ import {
   InvalidManifestToolIdError,
   PluginNotFoundError,
   ToolNotInManifestError,
-} from "../errors.js";
-import { FileHash, type InstallationFile } from "./file.js";
+} from "../../kernel/errors.js";
+import { FileHash, type InstallationFile } from "../../kernel/file.js";
+import type { MergeFileEntry } from "../../kernel/merge.js";
+import { type ToolId, VALID_TOOL_IDS } from "../../kernel/tool.js";
 import { type McpExclusion, mcpExclusionEquals } from "./mcp-exclusion.js";
-import type { MergeFileEntry } from "./merge.js";
 import { Plugin, type PluginEntryData } from "./plugin.js";
-import { type ToolId, VALID_TOOL_IDS } from "./tool-ids.js";
 
 const MANIFEST_VERSION = 6;
 

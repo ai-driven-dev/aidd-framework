@@ -1,9 +1,9 @@
 import type { Manifest } from "../../../../domain/models/manifest.js";
 import type { PluginDistribution } from "../../../../domain/models/plugin-distribution.js";
-import type { PluginSource } from "../../../../domain/models/plugin-source.js";
 import type { PluginTranslationMode } from "../../../../domain/models/plugin-translation-mode.js";
 import type { ReadonlySkipList } from "../../../../domain/models/plugin-translation-skip.js";
-import type { AiToolId } from "../../../../domain/models/tool-ids.js";
+import type { PluginSource } from "../../../../kernel/source.js";
+import type { AiToolId } from "../../../../kernel/tool.js";
 
 /**
  * Contract implemented by both translation strategy adapters.

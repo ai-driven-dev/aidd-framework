@@ -1,16 +1,16 @@
 import { McpCapability } from "../../../domain/capabilities/mcp-capability.js";
 import { SettingsCapability } from "../../../domain/capabilities/settings-capability.js";
 import type { ConfigCapability } from "../../../domain/models/config-capability.js";
-import { InstallationFile } from "../../../domain/models/file.js";
 import type { ConfigRef } from "../../../domain/models/framework.js";
 import { CONFIG_MCP } from "../../../domain/models/framework.js";
 import { transformFor as transformMcpForPlatform } from "../../../domain/models/mcp-exclusion.js";
-import type { MergeStrategy } from "../../../domain/models/merge.js";
-import type { AiToolId } from "../../../domain/models/tool-ids.js";
-import type { AssetProvider } from "../../../domain/ports/asset-provider.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
-import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { Platform } from "../../../domain/ports/platform.js";
+import { InstallationFile } from "../../../kernel/file.js";
+import type { MergeStrategy } from "../../../kernel/merge.js";
+import type { AssetProvider } from "../../../kernel/ports/asset-provider.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import type { Hasher } from "../../../kernel/ports/hasher.js";
+import type { AiToolId } from "../../../kernel/tool.js";
 
 interface InstallConfigOptions {
   capabilities: readonly ConfigCapability[];

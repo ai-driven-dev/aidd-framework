@@ -6,10 +6,10 @@ import type {
   FrameworkBuildTarget,
 } from "../../../domain/models/framework-build.js";
 import type { Marketplace } from "../../../domain/models/marketplace.js";
-import { builtMarketplaceDir, userBuiltMarketplaceDir } from "../../../domain/models/paths.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { VersionReader } from "../../../domain/ports/version-reader.js";
+import { builtMarketplaceDir, userBuiltMarketplaceDir } from "../../../kernel/paths.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../kernel/ports/file-writer.js";
 import type { FrameworkBuildUseCase } from "../framework/framework-build-use-case.js";
 import type { ResolveMarketplaceUseCase } from "./resolve-marketplace-use-case.js";
 

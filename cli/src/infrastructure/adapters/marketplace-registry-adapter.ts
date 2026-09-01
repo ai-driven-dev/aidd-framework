@@ -5,8 +5,8 @@ import {
   type MarketplaceData,
   type MarketplaceScope,
 } from "../../domain/models/marketplace.js";
-import { AIDD_DIR } from "../../domain/models/paths.js";
 import type { MarketplaceRegistry } from "../../domain/ports/marketplace-registry.js";
+import { AIDD_DIR } from "../../kernel/paths.js";
 import { userConfigDir } from "../user-config-dir.js";
 
 const REGISTRY_FILENAME = "marketplaces.json";

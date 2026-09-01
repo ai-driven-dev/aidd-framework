@@ -1,4 +1,4 @@
-import type { ToolId } from "../models/tool-ids.js";
+import type { ToolId } from "../tool.js";
 
 export type ConfigAsset = Record<string, unknown> | readonly unknown[] | string;
 

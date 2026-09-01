@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
-import { JsonSchemaValidationError } from "../../domain/errors.js";
 import type { JsonSchemaValidator } from "../../domain/ports/json-schema-validator.js";
+import { JsonSchemaValidationError } from "../../kernel/errors.js";
 
 // CJS interop: ajv v8 + ajv-formats are CommonJS; NodeNext requires createRequire.
 // require("ajv") returns a module where the constructor is at .default.

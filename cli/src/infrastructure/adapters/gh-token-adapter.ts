@@ -1,5 +1,5 @@
-import { AuthenticationError } from "../../domain/errors.js";
 import type { TokenAuthProvider } from "../../domain/ports/oauth-provider.js";
+import { AuthenticationError } from "../../kernel/errors.js";
 import type { HttpClient } from "../http/http-client.js";
 
 export class GhTokenAdapter implements TokenAuthProvider {

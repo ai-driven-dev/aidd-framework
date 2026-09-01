@@ -5,10 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { PluginFetchError } from "../../../src/domain/errors.js";
 import { FileAdapter } from "../../../src/infrastructure/adapters/file-adapter.js";
 import { HasherAdapter } from "../../../src/infrastructure/adapters/hasher-adapter.js";
 import { PluginFetcherAdapter } from "../../../src/infrastructure/adapters/plugin-fetcher-adapter.js";
+import { PluginFetchError } from "../../../src/kernel/errors.js";
 
 const execFileAsync = promisify(execFile);
 const FIXTURE_DIR = join(process.cwd(), "tests/fixtures/plugins");

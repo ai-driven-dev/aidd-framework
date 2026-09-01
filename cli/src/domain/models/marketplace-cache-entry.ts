@@ -1,4 +1,4 @@
-import { EmptyMarketplaceCacheNameError } from "../errors.js";
+import { EmptyMarketplaceCacheNameError } from "../../kernel/errors.js";
 
 const MIN_NAME_LENGTH = 1;
 

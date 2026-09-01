@@ -6,13 +6,13 @@ import type { PluginAddUseCase } from "../../../../src/application/use-cases/plu
 import type { PluginInstallFromMarketplaceUseCase } from "../../../../src/application/use-cases/plugin/plugin-install-from-marketplace-use-case.js";
 import { PluginInstallUseCase } from "../../../../src/application/use-cases/plugin/plugin-install-use-case.js";
 import type { PluginPickUseCase } from "../../../../src/application/use-cases/plugin/plugin-pick-use-case.js";
+import type { MarketplaceTrustStore } from "../../../../src/domain/ports/marketplace-trust-store.js";
+import type { Prompter } from "../../../../src/domain/ports/prompter.js";
 import {
   InteractiveOnlyError,
   InvalidPluginScopeError,
   TrustDeniedError,
-} from "../../../../src/domain/errors.js";
-import type { MarketplaceTrustStore } from "../../../../src/domain/ports/marketplace-trust-store.js";
-import type { Prompter } from "../../../../src/domain/ports/prompter.js";
+} from "../../../../src/kernel/errors.js";
 import { InMemoryManifestRepository } from "../../../helpers/ports/in-memory-manifest-repository.js";
 
 const PLUGIN_FIXTURE = join(process.cwd(), "tests/fixtures/plugins/claude-format/sample-plugin");

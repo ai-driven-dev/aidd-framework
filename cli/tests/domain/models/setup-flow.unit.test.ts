@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { SetupFlow } from "../../../src/domain/models/setup-flow.js";
 import {
   InvalidPluginModeConfigError,
   InvalidSetupToolIdError,
-} from "../../../src/domain/errors.js";
-import { SetupFlow } from "../../../src/domain/models/setup-flow.js";
+} from "../../../src/kernel/errors.js";
 
 const ROOT = "/project";
 

@@ -14,7 +14,7 @@ const TOOL_IDS = ["claude", "cursor", "copilot", "codex", "opencode", "vscode"] 
 const ALLOWED = new Set([
   ...TOOL_IDS.map((id) => `src/domain/tools/ai/${id}.ts`),
   ...TOOL_IDS.map((id) => `src/domain/tools/ide/${id}.ts`),
-  "src/domain/models/tool-ids.ts",
+  "src/kernel/tool.ts",
 ]);
 
 /**

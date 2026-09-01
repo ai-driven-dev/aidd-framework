@@ -1,9 +1,4 @@
 import { join } from "node:path";
-import {
-  InvalidPluginManifestError,
-  InvalidPluginNameError,
-  InvalidPluginVersionError,
-} from "../../domain/errors.js";
 import { PLUGIN_NAME_REGEX } from "../../domain/models/plugin.js";
 import {
   type PluginComponentFile,
@@ -14,8 +9,13 @@ import {
 import type { PluginFormat } from "../../domain/models/plugin-format.js";
 import { PLUGIN_MANIFEST_PROBES } from "../../domain/models/plugin-format.js";
 import { isSemver } from "../../domain/models/semver.js";
-import type { FileReader } from "../../domain/ports/file-reader.js";
 import type { PluginDistributionReader } from "../../domain/ports/plugin-distribution-reader.js";
+import {
+  InvalidPluginManifestError,
+  InvalidPluginNameError,
+  InvalidPluginVersionError,
+} from "../../kernel/errors.js";
+import type { FileReader } from "../../kernel/ports/file-reader.js";
 
 const README_FILENAME = "README.md";
 

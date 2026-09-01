@@ -1,8 +1,8 @@
 import { readdir, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { MarketplaceCacheEntry } from "../../domain/models/marketplace-cache-entry.js";
-import { MARKETPLACE_CACHE_SUBDIR } from "../../domain/models/paths.js";
 import type { MarketplaceCachePort } from "../../domain/ports/marketplace-cache.js";
+import { MARKETPLACE_CACHE_SUBDIR } from "../../kernel/paths.js";
 
 const FETCH_META_FILE = ".fetch-meta.json";
 

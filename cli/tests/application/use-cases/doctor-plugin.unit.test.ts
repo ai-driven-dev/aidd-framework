@@ -11,12 +11,12 @@ import { DoctorRegistrationUseCase } from "../../../src/application/use-cases/do
 import { DoctorTrackedFilesUseCase } from "../../../src/application/use-cases/doctor/doctor-tracked-files-use-case.js";
 import { DoctorUseCase } from "../../../src/application/use-cases/doctor/doctor-use-case.js";
 import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
-import { FileHash } from "../../../src/domain/models/file.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
 import { Plugin } from "../../../src/domain/models/plugin.js";
-import type { FileReader } from "../../../src/domain/ports/file-reader.js";
-import type { Hasher } from "../../../src/domain/ports/hasher.js";
 import type { ManifestRepository } from "../../../src/domain/ports/manifest-repository.js";
+import { FileHash } from "../../../src/kernel/file.js";
+import type { FileReader } from "../../../src/kernel/ports/file-reader.js";
+import type { Hasher } from "../../../src/kernel/ports/hasher.js";
 import { InMemoryMarketplaceRegistry } from "../../helpers/ports/in-memory-marketplace-registry.js";
 
 const EXPECTED_HASH = "abc123abc123abc123abc123abc123ab";

@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { JsonSchemaValidationError } from "../../../src/domain/errors.js";
 import { AjvSchemaValidatorAdapter } from "../../../src/infrastructure/adapters/ajv-schema-validator-adapter.js";
+import { JsonSchemaValidationError } from "../../../src/kernel/errors.js";
 
 const schemaPath = new URL("../../../assets/schemas/codex-plugin-manifest.json", import.meta.url);
 const schema = JSON.parse(readFileSync(fileURLToPath(schemaPath), "utf8")) as object;

@@ -1,3 +1,4 @@
+import { GITKEEP_FILE } from "../../../kernel/file.js";
 import { AgentsCapability } from "../../capabilities/agents-capability.js";
 import { CommandsCapability } from "../../capabilities/commands-capability.js";
 import { buildClaudeStyleMarketplaceEntry } from "../../capabilities/marketplace-entry.js";
@@ -16,7 +17,6 @@ import {
   AT_TOOLS_PLACEHOLDER,
   CONFIG_MCP,
   DOCS_PLACEHOLDER,
-  GITKEEP_FILE,
   TOOLS_PLACEHOLDER,
 } from "../../models/framework.js";
 import type {

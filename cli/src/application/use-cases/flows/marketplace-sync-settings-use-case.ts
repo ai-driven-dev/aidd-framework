@@ -1,21 +1,21 @@
 import { resolve } from "node:path";
 import type { MarketplaceSettings } from "../../../domain/capabilities/marketplace-settings.js";
-import { NativePluginCliError } from "../../../domain/errors.js";
 import type { FrameworkBuildTarget } from "../../../domain/models/framework-build.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Marketplace } from "../../../domain/models/marketplace.js";
-import { marketplaceCacheDir } from "../../../domain/models/paths.js";
-import type { PluginSource } from "../../../domain/models/plugin-source.js";
-import type { ToolId } from "../../../domain/models/tool-ids.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../../domain/ports/file-writer.js";
-import type { Hasher } from "../../../domain/ports/hasher.js";
-import type { Logger } from "../../../domain/ports/logger.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
 import type { NativePluginActivator } from "../../../domain/ports/native-plugin-activator.js";
 import type { PluginCatalogRepository } from "../../../domain/ports/plugin-catalog-repository.js";
 import { getToolConfig, isAiTool, nativeActivationOf } from "../../../domain/tools/registry.js";
+import { NativePluginCliError } from "../../../kernel/errors.js";
+import { marketplaceCacheDir } from "../../../kernel/paths.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../kernel/ports/file-writer.js";
+import type { Hasher } from "../../../kernel/ports/hasher.js";
+import type { Logger } from "../../../kernel/ports/logger.js";
+import type { PluginSource } from "../../../kernel/source.js";
+import type { ToolId } from "../../../kernel/tool.js";
 import type { EnsureBuiltMarketplaceUseCase } from "../shared/ensure-built-marketplace-use-case.js";
 
 export interface MarketplaceSyncSettingsOptions {

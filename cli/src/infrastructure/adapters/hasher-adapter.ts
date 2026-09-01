@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { FileHash } from "../../domain/models/file.js";
-import type { Hasher } from "../../domain/ports/hasher.js";
+import { FileHash } from "../../kernel/file.js";
+import type { Hasher } from "../../kernel/ports/hasher.js";
 
 export class HasherAdapter implements Hasher {
   hash(content: string): FileHash {

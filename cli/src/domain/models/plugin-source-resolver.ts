@@ -1,6 +1,6 @@
 import { relative } from "node:path";
+import type { PluginSource, PluginSourceGitSubdir } from "../../kernel/source.js";
 import type { Marketplace } from "./marketplace.js";
-import type { PluginSource, PluginSourceGitSubdir } from "./plugin-source.js";
 
 export function resolvePluginSourceFromMarketplace(
   entrySource: PluginSource,

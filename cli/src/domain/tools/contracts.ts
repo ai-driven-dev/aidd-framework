@@ -1,3 +1,4 @@
+import type { AiToolId, IdeToolId } from "../../kernel/tool.js";
 import type { AgentsCapability } from "../capabilities/agents-capability.js";
 import type { CommandsCapability } from "../capabilities/commands-capability.js";
 import type { HooksCapability } from "../capabilities/hooks-capability.js";
@@ -7,7 +8,6 @@ import type { RulesCapability } from "../capabilities/rules-capability.js";
 import type { SettingsCapability } from "../capabilities/settings-capability.js";
 import type { SkillsCapability } from "../capabilities/skills-capability.js";
 import type { UserFileSectionKey } from "../formats/command.js";
-import type { AiToolId, IdeToolId } from "../models/tool-ids.js";
 
 export interface HasAgents {
   readonly agents: AgentsCapability;

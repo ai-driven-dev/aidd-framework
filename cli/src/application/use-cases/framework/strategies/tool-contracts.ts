@@ -55,14 +55,14 @@ import {
   OUTPUT_MARKETPLACE_RELATIVE,
   OUTPUT_PLUGIN_MANIFEST_RELATIVE,
 } from "../../../../domain/models/framework-build.js";
-import type { FileReader } from "../../../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../../../domain/ports/file-writer.js";
 import {
   mergeCodexConfigToml,
   stripCodexSkillFrontmatter,
 } from "../../../../domain/tools/ai/codex.js";
 import { transformMcpToOpencode } from "../../../../domain/tools/ai/opencode.js";
 import type { PluginPresence, ToolBuildContract } from "../../../../domain/tools/build-contract.js";
+import type { FileReader } from "../../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import {
   buildClaudeStyleCatalogEntry,
   buildClaudeStyleMarketplace,

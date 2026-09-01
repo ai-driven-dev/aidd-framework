@@ -1,9 +1,9 @@
 import { spawnSync } from "node:child_process";
 import { accessSync, constants } from "node:fs";
 import { delimiter, join } from "node:path";
-import { NativePluginCliError } from "../../domain/errors.js";
 import type { MarketplaceScope } from "../../domain/models/marketplace.js";
 import type { NativePluginActivator } from "../../domain/ports/native-plugin-activator.js";
+import { NativePluginCliError } from "../../kernel/errors.js";
 
 // `plugin add/install` may fetch and cache a marketplace snapshot from a git remote.
 const COMMAND_TIMEOUT_MS = 120000;

@@ -15,13 +15,13 @@ import vscodeSettings from "../../../assets/configs/vscode/settings.json" with {
 import defaultMarketplaceJson from "../../../assets/marketplaces/default.json" with {
   type: "json",
 };
-import type { ToolId } from "../../domain/models/tool-ids.js";
 import type {
   AssetProvider,
   ConfigAsset,
   DefaultMarketplace,
   SchemaName,
-} from "../../domain/ports/asset-provider.js";
+} from "../../kernel/ports/asset-provider.js";
+import type { ToolId } from "../../kernel/tool.js";
 import { AssetNotFoundError } from "../errors.js";
 
 const SCHEMA_FILE = "claude-code-plugin-manifest.json";

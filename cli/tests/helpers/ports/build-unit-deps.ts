@@ -25,12 +25,12 @@ import { PostInstallPipelineUseCase } from "../../../src/application/use-cases/i
 import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
 import { SyncConflictResolverUseCase } from "../../../src/application/use-cases/sync/sync-conflict-resolver-use-case.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
-import type { ToolId } from "../../../src/domain/models/tool-ids.js";
 import { isIdeToolId } from "../../../src/domain/tools/registry.js";
 import { PluginCatalogRepositoryAdapter } from "../../../src/infrastructure/adapters/plugin-catalog-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "../../../src/infrastructure/adapters/plugin-distribution-reader-adapter.js";
 import { SilentPrompterAdapter } from "../../../src/infrastructure/adapters/prompter-adapter.js";
 import { BundledAssetProviderAdapter } from "../../../src/infrastructure/assets/asset-loader.js";
+import type { ToolId } from "../../../src/kernel/tool.js";
 import { DeterministicHasher } from "./deterministic-hasher.js";
 import { FakeCurrentVersion } from "./fake-current-version.js";
 import { fakeEnsureBuiltMarketplace } from "./fake-ensure-built-marketplace.js";

@@ -1,6 +1,6 @@
-import { DOCS_DIR } from "../../../domain/models/paths.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
+import { DOCS_DIR } from "../../../kernel/paths.js";
 import { NoManifestError } from "../../errors.js";
 import type { RestoreUseCase } from "../restore/restore-use-case.js";
 import type { StatusUseCase } from "../status-use-case.js";

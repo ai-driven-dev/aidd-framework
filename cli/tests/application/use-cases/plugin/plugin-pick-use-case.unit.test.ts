@@ -4,15 +4,15 @@ import { PluginAddUseCase } from "../../../../src/application/use-cases/plugin/p
 import { PluginPickUseCase } from "../../../../src/application/use-cases/plugin/plugin-pick-use-case.js";
 import { FetchMarketplaceSourceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace/fetch-marketplace-source-use-case.js";
 import { ResolveMarketplaceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
-import {
-  InteractiveOnlyError,
-  InvalidPluginManifestError,
-  NoMarketplacesRegisteredError,
-} from "../../../../src/domain/errors.js";
 import { Marketplace } from "../../../../src/domain/models/marketplace.js";
 import type { Prompter } from "../../../../src/domain/ports/prompter.js";
 import { PluginCatalogRepositoryAdapter } from "../../../../src/infrastructure/adapters/plugin-catalog-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "../../../../src/infrastructure/adapters/plugin-distribution-reader-adapter.js";
+import {
+  InteractiveOnlyError,
+  InvalidPluginManifestError,
+  NoMarketplacesRegisteredError,
+} from "../../../../src/kernel/errors.js";
 import { buildUnitDeps, initAndInstall } from "../../../helpers/ports/build-unit-deps.js";
 import { fakeEnsureBuiltMarketplace } from "../../../helpers/ports/fake-ensure-built-marketplace.js";
 import type { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";

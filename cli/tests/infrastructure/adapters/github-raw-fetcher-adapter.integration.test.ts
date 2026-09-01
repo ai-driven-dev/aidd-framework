@@ -2,14 +2,14 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { GitHubRawFetcherAdapter } from "../../../src/infrastructure/adapters/github-raw-fetcher-adapter.js";
+import { HttpNotFoundError } from "../../../src/infrastructure/errors.js";
 import {
   AuthenticationError,
   CatalogFetchAuthError,
   CatalogFetchError,
   CatalogFetchNotFoundError,
-} from "../../../src/domain/errors.js";
-import { GitHubRawFetcherAdapter } from "../../../src/infrastructure/adapters/github-raw-fetcher-adapter.js";
-import { HttpNotFoundError } from "../../../src/infrastructure/errors.js";
+} from "../../../src/kernel/errors.js";
 
 const CATALOG_PATH = ".claude-plugin/marketplace.json";
 const SAMPLE_CATALOG = JSON.stringify({ plugins: [] });

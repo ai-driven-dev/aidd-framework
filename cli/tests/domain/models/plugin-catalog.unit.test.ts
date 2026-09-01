@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  InvalidPluginManifestError,
-  InvalidPluginSourceError,
-} from "../../../src/domain/errors.js";
-import {
   hasRelativePluginSources,
   parsePluginCatalog,
 } from "../../../src/domain/models/plugin-catalog.js";
+import {
+  InvalidPluginManifestError,
+  InvalidPluginSourceError,
+} from "../../../src/kernel/errors.js";
 
 const VALID_RAW = {
   plugins: [

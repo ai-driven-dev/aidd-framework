@@ -1,8 +1,3 @@
-import {
-  AmbiguousPluginMatchError,
-  PluginNotInMarketplaceError,
-  VersionMismatchError,
-} from "../../../domain/errors.js";
 import type { Marketplace } from "../../../domain/models/marketplace.js";
 import type { PluginCatalogEntry } from "../../../domain/models/plugin-catalog.js";
 import { resolvePluginSourceFromMarketplace } from "../../../domain/models/plugin-source-resolver.js";
@@ -10,10 +5,15 @@ import {
   DEFAULT_REQUESTED_VERSION_POLICY,
   type RequestedVersionPolicy,
 } from "../../../domain/models/requested-version-policy.js";
-import type { AiToolId } from "../../../domain/models/tool-ids.js";
-import type { Logger } from "../../../domain/ports/logger.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
+import {
+  AmbiguousPluginMatchError,
+  PluginNotInMarketplaceError,
+  VersionMismatchError,
+} from "../../../kernel/errors.js";
+import type { Logger } from "../../../kernel/ports/logger.js";
+import type { AiToolId } from "../../../kernel/tool.js";
 import type { ResolveMarketplaceUseCase } from "../shared/resolve-marketplace-use-case.js";
 import type { PluginAddUseCase } from "./plugin-add-use-case.js";
 

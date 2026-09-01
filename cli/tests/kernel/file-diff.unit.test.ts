@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FileDiff, FileDiffKind } from "../../../src/domain/models/file.js";
+import type { FileDiff, FileDiffKind } from "../../src/kernel/file.js";
 
 describe("FileDiffKind", () => {
   it("accepts all valid kinds", () => {

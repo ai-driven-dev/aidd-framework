@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FileHash } from "../../../src/domain/models/file.js";
+import { FileHash } from "../../src/kernel/file.js";
 
 describe("FileHash", () => {
   const validHash = "d41d8cd98f00b204e9800998ecf8427e";

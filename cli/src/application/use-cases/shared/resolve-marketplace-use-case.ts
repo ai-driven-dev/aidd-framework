@@ -1,8 +1,8 @@
 // Called from use-cases/marketplace, use-cases/plugin, and use-cases/setup.
 import type { Marketplace } from "../../../domain/models/marketplace.js";
-import { marketplaceCacheDir } from "../../../domain/models/paths.js";
 import type { PluginCatalog } from "../../../domain/models/plugin-catalog.js";
 import type { PluginCatalogRepository } from "../../../domain/ports/plugin-catalog-repository.js";
+import { marketplaceCacheDir } from "../../../kernel/paths.js";
 import type { FetchMarketplaceSourceUseCase } from "./resolve-marketplace/fetch-marketplace-source-use-case.js";
 
 export interface ResolveMarketplaceOptions {

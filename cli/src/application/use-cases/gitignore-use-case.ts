@@ -1,5 +1,5 @@
-import type { FileReader } from "../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../domain/ports/file-writer.js";
+import type { FileReader } from "../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../kernel/ports/file-writer.js";
 
 const GITIGNORE_FILENAME = ".gitignore";
 

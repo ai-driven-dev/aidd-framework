@@ -1,6 +1,6 @@
 import { FRAMEWORK_MARKETPLACE_NAME, Marketplace } from "../../../domain/models/marketplace.js";
-import type { PluginSource } from "../../../domain/models/plugin-source.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
+import type { PluginSource } from "../../../kernel/source.js";
 
 export interface MarketplaceRegisterFrameworkOptions {
   projectRoot: string;

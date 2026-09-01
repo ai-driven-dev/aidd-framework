@@ -1,15 +1,15 @@
 import { join } from "node:path";
+import {
+  InvalidMcpServerConfigError,
+  McpConfigError,
+  OpencodeDualConfigError,
+} from "../../../kernel/errors.js";
 import { AgentsCapability } from "../../capabilities/agents-capability.js";
 import { CommandsCapability } from "../../capabilities/commands-capability.js";
 import { McpCapability } from "../../capabilities/mcp-capability.js";
 import { PluginsCapability } from "../../capabilities/plugins-capability.js";
 import { RulesCapability } from "../../capabilities/rules-capability.js";
 import { SkillsCapability } from "../../capabilities/skills-capability.js";
-import {
-  InvalidMcpServerConfigError,
-  McpConfigError,
-  OpencodeDualConfigError,
-} from "../../errors.js";
 import type { UserFileSectionKey } from "../../formats/command.js";
 import {
   buildAiddCommandFilePath,

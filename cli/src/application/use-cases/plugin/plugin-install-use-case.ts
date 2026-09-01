@@ -1,18 +1,18 @@
-import { InteractiveOnlyError, TrustDeniedError } from "../../../domain/errors.js";
 import {
   assertToolSupportsScope,
   type InstallScope,
 } from "../../../domain/models/install-scope.js";
 import { parsePluginSpec } from "../../../domain/models/plugin.js";
+import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
+import type { MarketplaceTrustStore } from "../../../domain/ports/marketplace-trust-store.js";
+import type { Prompter } from "../../../domain/ports/prompter.js";
+import { InteractiveOnlyError, TrustDeniedError } from "../../../kernel/errors.js";
 import {
   describePluginSource,
   type PluginSource,
   parsePluginSourceShorthand,
-} from "../../../domain/models/plugin-source.js";
-import { AI_TOOL_IDS, type AiToolId } from "../../../domain/models/tool-ids.js";
-import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
-import type { MarketplaceTrustStore } from "../../../domain/ports/marketplace-trust-store.js";
-import type { Prompter } from "../../../domain/ports/prompter.js";
+} from "../../../kernel/source.js";
+import { AI_TOOL_IDS, type AiToolId } from "../../../kernel/tool.js";
 import type { PluginAddUseCase } from "./plugin-add-use-case.js";
 import type { PluginInstallFromMarketplaceUseCase } from "./plugin-install-from-marketplace-use-case.js";
 import type { PluginPickUseCase } from "./plugin-pick-use-case.js";

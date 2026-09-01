@@ -3,8 +3,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { NativePluginCliError } from "../../../src/domain/errors.js";
 import { NativePluginCliAdapter } from "../../../src/infrastructure/adapters/native-plugin-cli-adapter.js";
+import { NativePluginCliError } from "../../../src/kernel/errors.js";
 
 vi.mock("node:child_process", () => ({
   spawnSync: vi.fn(),

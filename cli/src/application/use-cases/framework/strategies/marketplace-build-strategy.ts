@@ -4,9 +4,6 @@ import {
   PLUGIN_AGENT_INPUT_EXT,
   SOURCE_PLUGIN_MANIFEST_RELATIVE,
 } from "../../../../domain/models/framework-build.js";
-import type { AssetProvider, SchemaName } from "../../../../domain/ports/asset-provider.js";
-import type { FileReader } from "../../../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../../../domain/ports/file-writer.js";
 import type { JsonSchemaValidator } from "../../../../domain/ports/json-schema-validator.js";
 import type {
   PluginPresence,
@@ -14,6 +11,9 @@ import type {
   SourcePluginEntryRef,
   ToolBuildContract,
 } from "../../../../domain/tools/build-contract.js";
+import type { AssetProvider, SchemaName } from "../../../../kernel/ports/asset-provider.js";
+import type { FileReader } from "../../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import { assertNoToolsPlaceholder } from "../shared-plugin-helpers.js";
 import type { BuildOutputStrategy, SourceMarketplace } from "./build-output-strategy.js";
 import { detectPluginPresenceFlags, writeSkillTree } from "./marketplace-strategy-helpers.js";

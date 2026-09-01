@@ -1,6 +1,6 @@
-import { InvalidInstallScopeError, InvalidPluginScopeError } from "../errors.js";
+import { InvalidInstallScopeError, InvalidPluginScopeError } from "../../kernel/errors.js";
+import type { AiToolId } from "../../kernel/tool.js";
 import { getToolConfig, isAiTool } from "../tools/registry.js";
-import type { AiToolId } from "./tool-ids.js";
 
 export type InstallScope = "project" | "user";
 

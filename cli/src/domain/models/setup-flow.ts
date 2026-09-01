@@ -1,6 +1,6 @@
-import { InvalidPluginModeConfigError, InvalidSetupToolIdError } from "../errors.js";
+import { InvalidPluginModeConfigError, InvalidSetupToolIdError } from "../../kernel/errors.js";
+import { type ToolId, VALID_TOOL_IDS } from "../../kernel/tool.js";
 import type { MarketplaceSourceMode } from "./marketplace-source-mode.js";
-import { type ToolId, VALID_TOOL_IDS } from "./tool-ids.js";
 
 export type PluginInstallMode = "interactive" | "all" | "recommended" | "named" | "none";
 

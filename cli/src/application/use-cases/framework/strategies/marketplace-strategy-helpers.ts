@@ -1,5 +1,4 @@
 import { basename, join, relative } from "node:path";
-import { InvalidSourceMarketplaceError } from "../../../../domain/errors.js";
 import { rewriteRelativeLinks } from "../../../../domain/formats/relative-link-rewrite.js";
 import {
   PLUGIN_AGENT_INPUT_EXT,
@@ -7,8 +6,9 @@ import {
   PLUGIN_MCP_RELATIVE,
   PLUGIN_SKILL_ENTRY_FILE,
 } from "../../../../domain/models/framework-build.js";
-import type { FileReader } from "../../../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../../../domain/ports/file-writer.js";
+import { InvalidSourceMarketplaceError } from "../../../../kernel/errors.js";
+import type { FileReader } from "../../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import { assertNoToolsPlaceholder } from "../shared-plugin-helpers.js";
 
 type SkillContentTransform = (content: string, plugin: string, basename: string) => string;

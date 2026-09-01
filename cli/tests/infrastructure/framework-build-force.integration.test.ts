@@ -2,12 +2,12 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { FlatTargetExistsError } from "../../src/domain/errors.js";
 import { BundledAssetProviderAdapter } from "../../src/infrastructure/assets/asset-loader.js";
 import {
   createFrameworkBuildUseCase,
   type FrameworkBuildDeps,
 } from "../../src/infrastructure/deps.js";
+import { FlatTargetExistsError } from "../../src/kernel/errors.js";
 import { CapturingLogger } from "../helpers/ports/capturing-logger.js";
 import { InMemoryFileAdapter } from "../helpers/ports/in-memory-file-adapter.js";
 import { seedFromDirectory } from "../helpers/ports/seed-from-directory.js";

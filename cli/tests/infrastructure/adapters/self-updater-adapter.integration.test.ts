@@ -1,10 +1,10 @@
 import { execSync } from "node:child_process";
 import { platform } from "node:os";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FrameworkResolutionError } from "../../../src/domain/errors.js";
 import { SelfUpdaterAdapter } from "../../../src/infrastructure/adapters/self-updater-adapter.js";
 import { HttpNotFoundError } from "../../../src/infrastructure/errors.js";
 import { HttpClient } from "../../../src/infrastructure/http/http-client.js";
+import { FrameworkResolutionError } from "../../../src/kernel/errors.js";
 
 interface HttpResponse {
   body: Buffer | unknown;

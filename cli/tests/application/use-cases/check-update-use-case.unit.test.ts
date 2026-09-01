@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { CheckUpdateUseCase } from "../../../src/application/use-cases/check-update-use-case.js";
-import { FileHash } from "../../../src/domain/models/file.js";
-import type { FileReader } from "../../../src/domain/ports/file-reader.js";
-import type { FileWriter } from "../../../src/domain/ports/file-writer.js";
-import type { Logger } from "../../../src/domain/ports/logger.js";
 import type { SelfUpdater } from "../../../src/domain/ports/self-updater.js";
 import type { VersionReader } from "../../../src/domain/ports/version-reader.js";
+import { FileHash } from "../../../src/kernel/file.js";
+import type { FileReader } from "../../../src/kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../src/kernel/ports/file-writer.js";
+import type { Logger } from "../../../src/kernel/ports/logger.js";
 
 const TTL_24H = 24 * 60 * 60 * 1000;
 

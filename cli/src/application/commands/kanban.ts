@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import { registerInteractiveCommand } from "../../../../kanban/src/presentation/commands/interactive-command.js";
 import { registerListCommand } from "../../../../kanban/src/presentation/commands/list-command.js";
 import type { KanbanCommandDeps } from "../../../../kanban/src/presentation/kanban-deps.js";
-import { DOCS_DIR } from "../../domain/models/paths.js";
+import { DOCS_DIR } from "../../kernel/paths.js";
 import { ErrorHandler } from "../error-handler.js";
 import type { CLIOutput } from "../output.js";
 import { parseGlobalOptions } from "./global-options.js";

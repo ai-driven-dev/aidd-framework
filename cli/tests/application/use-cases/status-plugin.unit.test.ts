@@ -3,12 +3,12 @@ import "../../../src/domain/tools/ai/claude.js";
 import "../../../src/domain/tools/ai/cursor.js";
 import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
 import { StatusUseCase } from "../../../src/application/use-cases/status-use-case.js";
-import { FileHash } from "../../../src/domain/models/file.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
 import { Plugin } from "../../../src/domain/models/plugin.js";
-import type { FileReader } from "../../../src/domain/ports/file-reader.js";
-import type { Hasher } from "../../../src/domain/ports/hasher.js";
 import type { ManifestRepository } from "../../../src/domain/ports/manifest-repository.js";
+import { FileHash } from "../../../src/kernel/file.js";
+import type { FileReader } from "../../../src/kernel/ports/file-reader.js";
+import type { Hasher } from "../../../src/kernel/ports/hasher.js";
 
 const EXPECTED_HASH = "abc123abc123abc123abc123abc123ab";
 const DRIFTED_HASH = "def456def456def456def456def456de";

@@ -11,7 +11,6 @@ import {
   MARKETPLACE_PROBES,
   PLUGIN_MANIFEST_PROBES,
 } from "../../../src/domain/models/plugin-format.js";
-import { AI_TOOL_IDS } from "../../../src/domain/models/tool-ids.js";
 import type { AiTool } from "../../../src/domain/tools/contracts.js";
 import {
   frameworkBuildModeFor,
@@ -20,6 +19,7 @@ import {
   isAiTool,
   machineLocalFilesOf,
 } from "../../../src/domain/tools/registry.js";
+import { AI_TOOL_IDS } from "../../../src/kernel/tool.js";
 
 /**
  * Conformance suite for the AiTool contract.
@@ -81,7 +81,7 @@ describe("AiTool contract conformance", () => {
     it("is declared in AI_TOOL_IDS", () => {
       expect(
         (AI_TOOL_IDS as readonly string[]).includes(toolId),
-        `${toolId} is registered but missing from AI_TOOL_IDS (domain/models/tool-ids.ts)`
+        `${toolId} is registered but missing from AI_TOOL_IDS (kernel/tool.ts)`
       ).toBe(true);
     });
 

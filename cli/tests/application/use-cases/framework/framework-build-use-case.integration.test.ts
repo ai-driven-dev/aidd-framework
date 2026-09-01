@@ -3,14 +3,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { FrameworkBuildUseCase } from "../../../../src/application/use-cases/framework/framework-build-use-case.js";
 import { MarketplaceBuildStrategy } from "../../../../src/application/use-cases/framework/strategies/marketplace-build-strategy.js";
 import { buildCopilotMarketplaceContract } from "../../../../src/application/use-cases/framework/strategies/tool-contracts.js";
+import type { JsonSchemaValidator } from "../../../../src/domain/ports/json-schema-validator.js";
 import {
   FrameworkPlaceholderInPluginError,
   InvalidBuildPathsError,
   InvalidSourceMarketplaceError,
   JsonSchemaValidationError,
-} from "../../../../src/domain/errors.js";
-import type { AssetProvider } from "../../../../src/domain/ports/asset-provider.js";
-import type { JsonSchemaValidator } from "../../../../src/domain/ports/json-schema-validator.js";
+} from "../../../../src/kernel/errors.js";
+import type { AssetProvider } from "../../../../src/kernel/ports/asset-provider.js";
 import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
 import { seedFromDirectory } from "../../../helpers/ports/seed-from-directory.js";

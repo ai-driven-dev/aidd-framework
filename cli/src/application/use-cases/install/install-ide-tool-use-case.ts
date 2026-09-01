@@ -1,16 +1,16 @@
 import { join } from "node:path";
 import { SettingsCapability } from "../../../domain/capabilities/settings-capability.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
-import { extractMergeEntries, type MergeFileEntry } from "../../../domain/models/merge.js";
-import type { AiToolId, IdeToolId } from "../../../domain/models/tool-ids.js";
-import { AI_TOOL_IDS } from "../../../domain/models/tool-ids.js";
-import type { AssetProvider } from "../../../domain/ports/asset-provider.js";
 import type { FileMerger } from "../../../domain/ports/file-merger.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../../domain/ports/file-writer.js";
-import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
+import { extractMergeEntries, type MergeFileEntry } from "../../../kernel/merge.js";
+import type { AssetProvider } from "../../../kernel/ports/asset-provider.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../kernel/ports/file-writer.js";
+import type { Hasher } from "../../../kernel/ports/hasher.js";
+import type { AiToolId, IdeToolId } from "../../../kernel/tool.js";
+import { AI_TOOL_IDS } from "../../../kernel/tool.js";
 import type {
   InstallIdeConfigResult,
   InstallIdeConfigUseCase,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { InvalidPluginManifestError } from "../../../src/domain/errors.js";
 import { parseCopilotMarketplaceCatalog } from "../../../src/domain/models/copilot-marketplace-catalog.js";
+import { InvalidPluginManifestError } from "../../../src/kernel/errors.js";
 
 const SAMPLE_CATALOG = JSON.stringify({
   name: "aidd-framework",

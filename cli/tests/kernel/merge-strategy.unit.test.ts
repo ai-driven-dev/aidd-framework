@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPerKeyMergeStrategy } from "../../../src/domain/models/merge.js";
+import { isPerKeyMergeStrategy } from "../../src/kernel/merge.js";
 
 describe("isPerKeyMergeStrategy", () => {
   it("returns true for PerKeyMergeStrategy objects", () => {

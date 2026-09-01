@@ -5,6 +5,15 @@
 ```
 src/
 ├── cli.ts                    # Entry point — commander setup, global flags, preAction hook
+├── kernel/                   # shared vocabulary — no business logic, imports no context (biome-enforced)
+│   ├── tool.ts                # AiToolId/IdeToolId/ToolId, tool-id parsing and guards
+│   ├── source.ts               # PluginSource union, parsing/serialization
+│   ├── paths.ts                 # project-relative cache/build directory layout
+│   ├── file.ts                   # FileHash, InstallationFile, FileDiff, GITKEEP_FILE
+│   ├── merge.ts                   # MergeStrategy, ConflictDecision, merge-entry extraction
+│   ├── jsonc.ts                    # stripJsonComments — leaf dependency of merge.ts
+│   ├── errors.ts                    # domain typed exceptions
+│   └── ports/                        # ports with callers in ≥2 contexts: file-reader, file-writer, hasher, logger, asset-provider
 ├── application/
 │   ├── commands/             # CLI wiring only (1 file per command)
 │   ├── display/              # result rendering per command group (doctor, restore, setup, status)
@@ -30,9 +39,9 @@ src/
 │   ├── errors.ts             # application typed exceptions
 │   └── output.ts             # stdout/stderr formatting
 ├── domain/
-│   ├── formats/              # pure string transforms — no I/O (command, json, jsonc, markdown, toml, placeholders, cursor-hooks, mcp-format, markdown-references)
+│   ├── formats/              # pure string transforms — no I/O (command, json, markdown, toml, placeholders, cursor-hooks, mcp-format, markdown-references)
 │   ├── models/               # entities, value objects, discriminant types
-│   ├── ports/                # interface contracts (FileSystem, Hasher, Logger, Prompter, LatestReleaseResolver, etc.)
+│   ├── ports/                # interface contracts owned by one context (FileMerger, Prompter, ManifestRepository, LatestReleaseResolver, etc.) — ports shared by ≥2 contexts live in kernel/ports/
 │   ├── capabilities/         # one capability class per Has* interface (agents, commands, rules, skills, hooks, mcp, settings, plugins, marketplace-entry)
 │   └── tools/
 │       ├── contracts.ts      # AiTool<C>, Has* interfaces, IdeToolConfig, UserFileSectionKey
@@ -70,12 +79,15 @@ src/
 | New capability | `Has*` in `contracts.ts` + class in `domain/capabilities/` |
 | New string transform | `domain/formats/` |
 | New domain type | `domain/models/` |
-| New port | `domain/ports/` + adapter in `infrastructure/adapters/` |
+| New port used by one context | `domain/ports/` + adapter in `infrastructure/adapters/` |
+| New port used by ≥2 contexts | `kernel/ports/` + adapter in `infrastructure/adapters/` |
+| New shared vocabulary (no logic, no context import) | `kernel/` |
 
 ## Tests
 
 ```
 tests/
+├── kernel/                   # unit — shared vocabulary tests, mirrors src/kernel/
 ├── application/use-cases/    # unit — use-cases with in-memory ports from tests/helpers/ports/
 ├── domain/capabilities/      # unit — capability class tests
 ├── domain/formats/           # unit — format parser tests

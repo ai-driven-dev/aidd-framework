@@ -1,7 +1,7 @@
 import { join } from "node:path";
-import type { FileReader } from "../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../domain/ports/file-writer.js";
 import type { VersionControl } from "../../domain/ports/version-control.js";
+import type { FileReader } from "../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../kernel/ports/file-writer.js";
 
 const GITDIR_PREFIX = "gitdir:";
 const HOOK_HEADER = "#!/bin/sh";

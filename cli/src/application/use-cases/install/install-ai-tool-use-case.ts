@@ -1,8 +1,8 @@
 import { Manifest } from "../../../domain/models/manifest.js";
 import type { Plugin } from "../../../domain/models/plugin.js";
-import type { AiToolId } from "../../../domain/models/tool-ids.js";
-import type { Logger } from "../../../domain/ports/logger.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
+import type { Logger } from "../../../kernel/ports/logger.js";
+import type { AiToolId } from "../../../kernel/tool.js";
 import type { MarketplaceSyncSettingsUseCase } from "../flows/marketplace-sync-settings-use-case.js";
 import type { PluginInstallFromMarketplaceUseCase } from "../plugin/plugin-install-from-marketplace-use-case.js";
 import type {

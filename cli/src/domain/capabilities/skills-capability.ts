@@ -1,6 +1,6 @@
-import { CapabilityConfigError } from "../errors.js";
+import { CapabilityConfigError } from "../../kernel/errors.js";
+import { AI_TOOL_IDS } from "../../kernel/tool.js";
 import { serializeFrontmatter } from "../formats/markdown.js";
-import { AI_TOOL_IDS } from "../models/tool-ids.js";
 
 const AGENTS_SKILLS_PREFIX = ".agents/skills/";
 const ALL_TOOL_SUFFIXES: readonly string[] = AI_TOOL_IDS.map((id) => `.${id}.md`);

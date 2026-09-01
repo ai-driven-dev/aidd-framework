@@ -10,18 +10,18 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
-import { stripJsonComments } from "../../domain/formats/jsonc.js";
-import type { FileHash } from "../../domain/models/file.js";
+import type { FileMerger } from "../../domain/ports/file-merger.js";
+import type { FileHash } from "../../kernel/file.js";
+import { stripJsonComments } from "../../kernel/jsonc.js";
 import {
   isPerKeyMergeStrategy,
   type MergeStrategy,
   type PerKeyMergeStrategy,
-} from "../../domain/models/merge.js";
-import type { FileMerger } from "../../domain/ports/file-merger.js";
-import type { FileReader } from "../../domain/ports/file-reader.js";
-import type { FileWriter } from "../../domain/ports/file-writer.js";
-import type { Hasher } from "../../domain/ports/hasher.js";
-import type { Logger } from "../../domain/ports/logger.js";
+} from "../../kernel/merge.js";
+import type { FileReader } from "../../kernel/ports/file-reader.js";
+import type { FileWriter } from "../../kernel/ports/file-writer.js";
+import type { Hasher } from "../../kernel/ports/hasher.js";
+import type { Logger } from "../../kernel/ports/logger.js";
 import { JsonParseError } from "../errors.js";
 
 export class FileAdapter implements FileReader, FileWriter, FileMerger {

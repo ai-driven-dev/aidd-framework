@@ -1,7 +1,7 @@
 import type { Manifest } from "../../../domain/models/manifest.js";
-import { AIDD_DIR } from "../../../domain/models/paths.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import { machineLocalFilesOf } from "../../../domain/tools/registry.js";
+import { AIDD_DIR } from "../../../kernel/paths.js";
 import type { GitignoreUseCase } from "../gitignore-use-case.js";
 
 interface PostInstallPipelineOptions {

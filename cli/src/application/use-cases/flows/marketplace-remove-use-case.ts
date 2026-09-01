@@ -1,13 +1,13 @@
 import { dirname, join } from "node:path";
-import { MarketplaceNotFoundError } from "../../../domain/errors.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Marketplace } from "../../../domain/models/marketplace.js";
 import type { Plugin } from "../../../domain/models/plugin.js";
-import { AI_TOOL_IDS, type AiToolId } from "../../../domain/models/tool-ids.js";
-import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
+import { MarketplaceNotFoundError } from "../../../kernel/errors.js";
+import type { FileWriter } from "../../../kernel/ports/file-writer.js";
+import { AI_TOOL_IDS, type AiToolId } from "../../../kernel/tool.js";
 
 export interface MarketplaceRemoveOptions {
   name: string;

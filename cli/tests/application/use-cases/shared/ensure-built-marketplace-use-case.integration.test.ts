@@ -13,10 +13,10 @@ import type {
   ResolveMarketplaceUseCase,
 } from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
 import { Marketplace } from "../../../../src/domain/models/marketplace.js";
-import { BUILT_CACHE_SUBDIR, builtMarketplaceDir } from "../../../../src/domain/models/paths.js";
-import type { AssetProvider } from "../../../../src/domain/ports/asset-provider.js";
 import type { JsonSchemaValidator } from "../../../../src/domain/ports/json-schema-validator.js";
 import type { VersionReader } from "../../../../src/domain/ports/version-reader.js";
+import { BUILT_CACHE_SUBDIR, builtMarketplaceDir } from "../../../../src/kernel/paths.js";
+import type { AssetProvider } from "../../../../src/kernel/ports/asset-provider.js";
 import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
 import { seedFromDirectory } from "../../../helpers/ports/seed-from-directory.js";

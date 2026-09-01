@@ -1,8 +1,8 @@
 import { mkdir, readdir, readFile, rm, rmdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Manifest } from "../../domain/models/manifest.js";
-import { AIDD_DIR } from "../../domain/models/paths.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
+import { AIDD_DIR } from "../../kernel/paths.js";
 
 const MANIFEST_FILENAME = "manifest.json";
 

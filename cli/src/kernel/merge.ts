@@ -1,6 +1,6 @@
-import { stripJsonComments } from "../formats/jsonc.js";
-import type { Hasher } from "../ports/hasher.js";
 import type { FileHash } from "./file.js";
+import { stripJsonComments } from "./jsonc.js";
+import type { Hasher } from "./ports/hasher.js";
 
 // ── MergeStrategy ────────────────────────────────────────────────────────────
 

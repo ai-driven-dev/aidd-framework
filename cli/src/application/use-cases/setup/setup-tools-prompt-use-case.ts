@@ -1,15 +1,10 @@
 import type { ProjectContext } from "../../../domain/models/project-context.js";
 import {
-  AI_TOOL_IDS,
-  type AiToolId,
-  IDE_TOOL_IDS,
-  type IdeToolId,
-} from "../../../domain/models/tool-ids.js";
-import {
   recommendAiTools,
   recommendIdeTools,
 } from "../../../domain/models/tool-recommendations.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
+import { AI_TOOL_IDS, type AiToolId, IDE_TOOL_IDS, type IdeToolId } from "../../../kernel/tool.js";
 
 export interface SetupToolsPromptOptions {
   interactive: boolean;

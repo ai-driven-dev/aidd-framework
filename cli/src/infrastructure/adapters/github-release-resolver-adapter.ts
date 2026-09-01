@@ -1,10 +1,10 @@
+import type { LatestReleaseResolver } from "../../domain/ports/latest-release-resolver.js";
+import type { TokenProvider } from "../../domain/ports/token-provider.js";
 import {
   AuthenticationError,
   CatalogFetchAuthError,
   CatalogFetchError,
-} from "../../domain/errors.js";
-import type { LatestReleaseResolver } from "../../domain/ports/latest-release-resolver.js";
-import type { TokenProvider } from "../../domain/ports/token-provider.js";
+} from "../../kernel/errors.js";
 import { HttpNotFoundError } from "../errors.js";
 import type { HttpClient } from "../http/http-client.js";
 

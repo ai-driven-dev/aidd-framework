@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { ProjectContext, type Stack } from "../../../domain/models/project-context.js";
-import type { FileReader } from "../../../domain/ports/file-reader.js";
+import type { FileReader } from "../../../kernel/ports/file-reader.js";
 
 const TS_SIGNALS = ["tsconfig.json", "package.json"];
 const PYTHON_SIGNALS = ["pyproject.toml", "setup.py", "requirements.txt"];

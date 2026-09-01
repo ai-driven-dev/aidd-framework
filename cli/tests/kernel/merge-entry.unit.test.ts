@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { HasherAdapter } from "../../src/infrastructure/adapters/hasher-adapter.js";
 import {
   extractMergeEntries,
   parseEntryKeys,
   removeEntriesFromJson,
-} from "../../../src/domain/models/merge.js";
-import type { Hasher } from "../../../src/domain/ports/hasher.js";
-import { HasherAdapter } from "../../../src/infrastructure/adapters/hasher-adapter.js";
+} from "../../src/kernel/merge.js";
+import type { Hasher } from "../../src/kernel/ports/hasher.js";
 
 const hasher: Hasher = new HasherAdapter();
 
