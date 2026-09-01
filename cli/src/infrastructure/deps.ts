@@ -1,11 +1,11 @@
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import "../contexts/tools/domain/profiles/claude.js";
-import "../contexts/tools/domain/profiles/codex.js";
-import "../contexts/tools/domain/profiles/copilot.js";
-import "../contexts/tools/domain/profiles/cursor.js";
-import "../contexts/tools/domain/profiles/opencode.js";
-import "../contexts/tools/domain/profiles/vscode.js";
+import "../contexts/tools/domain/profiles/claude/profile.js";
+import "../contexts/tools/domain/profiles/codex/profile.js";
+import "../contexts/tools/domain/profiles/copilot/profile.js";
+import "../contexts/tools/domain/profiles/cursor/profile.js";
+import "../contexts/tools/domain/profiles/opencode/profile.js";
+import "../contexts/tools/domain/profiles/vscode/profile.js";
 import { CLIOutput } from "../application/output.js";
 import { RequireAuthUseCase } from "../application/use-cases/auth/require-auth-use-case.js";
 import { CheckUpdateUseCase } from "../application/use-cases/check-update-use-case.js";
@@ -23,17 +23,6 @@ import { MarketplaceSyncSettingsUseCase } from "../application/use-cases/flows/m
 import { FrameworkBuildUseCase } from "../application/use-cases/framework/framework-build-use-case.js";
 import { FlatBuildStrategy } from "../application/use-cases/framework/strategies/flat-build-strategy.js";
 import { MarketplaceBuildStrategy } from "../application/use-cases/framework/strategies/marketplace-build-strategy.js";
-import {
-  buildClaudeContract,
-  buildClaudeFlatContract,
-  buildCodexContract,
-  buildCodexFlatContract,
-  buildCopilotFlatContract,
-  buildCopilotMarketplaceContract,
-  buildCursorContract,
-  buildCursorFlatContract,
-  buildOpencodeFlatContract,
-} from "../application/use-cases/framework/strategies/tool-contracts.js";
 import { GitignoreUseCase } from "../application/use-cases/gitignore-use-case.js";
 import { DoctorAllUseCase } from "../application/use-cases/global/doctor-all-use-case.js";
 import { ResolveUpdateDecisionUseCase } from "../application/use-cases/global/resolve-update-decision-use-case.js";
@@ -79,9 +68,11 @@ import { InstallIdeConfigUseCase } from "../contexts/tools/application/install-i
 import { InstallIdeToolUseCase } from "../contexts/tools/application/install-ide-tool-use-case.js";
 import { InstallRuntimeConfigUseCase } from "../contexts/tools/application/install-runtime-config-use-case.js";
 import { UninstallToolsUseCase } from "../contexts/tools/application/uninstall-tools-use-case.js";
+import type { ToolBuildContract } from "../contexts/tools/domain/build-contract.js";
 import type { FileMerger } from "../contexts/tools/domain/ports/file-merger.js";
 import type { NativePluginActivator } from "../contexts/tools/domain/ports/native-plugin-activator.js";
-import { nativeActivationOf } from "../contexts/tools/domain/registry.js";
+import { buildCopilotMarketplaceContract } from "../contexts/tools/domain/profiles/copilot/build.js";
+import { buildContractFor, nativeActivationOf } from "../contexts/tools/domain/registry.js";
 import { NativePluginCliAdapter } from "../contexts/tools/infrastructure/native-plugin-cli-adapter.js";
 import type { CredentialStore } from "../domain/ports/credential-store.js";
 import type { LatestReleaseResolver } from "../domain/ports/latest-release-resolver.js";
@@ -240,29 +231,19 @@ function buildFrameworkUseCase(
   );
 }
 
-const FRAMEWORK_BUILD_REGISTRY: Record<string, FrameworkBuildFactory> = {
-  "claude:marketplace": (deps) =>
-    buildFrameworkUseCase(
-      deps,
-      (d, av) => new MarketplaceBuildStrategy(d.fs, av, d.assetProvider, buildClaudeContract())
-    ),
-  "cursor:marketplace": (deps) =>
-    buildFrameworkUseCase(
-      deps,
-      (d, av) => new MarketplaceBuildStrategy(d.fs, av, d.assetProvider, buildCursorContract())
-    ),
-  "copilot:marketplace": (deps) =>
-    buildFrameworkUseCase(
-      deps,
-      (d, av) =>
-        new MarketplaceBuildStrategy(d.fs, av, d.assetProvider, buildCopilotMarketplaceContract())
-    ),
-  "codex:marketplace": (deps) =>
-    buildFrameworkUseCase(
-      deps,
-      (d, av) => new MarketplaceBuildStrategy(d.fs, av, d.assetProvider, buildCodexContract())
-    ),
-  "copilot:flat": (deps, ctx) =>
+/** One registry entry for a tool/mode pair whose profile declares that build contract. */
+function frameworkBuildFactoryFor(
+  buildContract: () => ToolBuildContract,
+  mode: "marketplace" | "flat"
+): FrameworkBuildFactory {
+  if (mode === "marketplace") {
+    return (deps) =>
+      buildFrameworkUseCase(
+        deps,
+        (d, av) => new MarketplaceBuildStrategy(d.fs, av, d.assetProvider, buildContract())
+      );
+  }
+  return (deps, ctx) =>
     buildFrameworkUseCase(
       deps,
       (d, av) =>
@@ -270,74 +251,37 @@ const FRAMEWORK_BUILD_REGISTRY: Record<string, FrameworkBuildFactory> = {
           d.fs,
           av,
           d.assetProvider,
-          buildCopilotFlatContract(),
+          buildContract(),
           ctx.force,
           ctx.outDir,
           isDirectory,
           d.logger
         )
-    ),
-  "claude:flat": (deps, ctx) =>
-    buildFrameworkUseCase(
-      deps,
-      (d, av) =>
-        new FlatBuildStrategy(
-          d.fs,
-          av,
-          d.assetProvider,
-          buildClaudeFlatContract(),
-          ctx.force,
-          ctx.outDir,
-          isDirectory,
-          d.logger
-        )
-    ),
-  "cursor:flat": (deps, ctx) =>
-    buildFrameworkUseCase(
-      deps,
-      (d, av) =>
-        new FlatBuildStrategy(
-          d.fs,
-          av,
-          d.assetProvider,
-          buildCursorFlatContract(),
-          ctx.force,
-          ctx.outDir,
-          isDirectory,
-          d.logger
-        )
-    ),
-  "codex:flat": (deps, ctx) =>
-    buildFrameworkUseCase(
-      deps,
-      (d, av) =>
-        new FlatBuildStrategy(
-          d.fs,
-          av,
-          d.assetProvider,
-          buildCodexFlatContract(),
-          ctx.force,
-          ctx.outDir,
-          isDirectory,
-          d.logger
-        )
-    ),
-  "opencode:flat": (deps, ctx) =>
-    buildFrameworkUseCase(
-      deps,
-      (d, av) =>
-        new FlatBuildStrategy(
-          d.fs,
-          av,
-          d.assetProvider,
-          buildOpencodeFlatContract(),
-          ctx.force,
-          ctx.outDir,
-          isDirectory,
-          d.logger
-        )
-    ),
-};
+    );
+}
+
+/**
+ * Derived from the registered tool profiles rather than listed by hand: a sixth tool
+ * whose profile declares `buildContracts` needs no edit here. Follows the same shape
+ * as `nativeActivationOf` — a declaration read off the profile — and must not diverge
+ * from `FRAMEWORK_BUILD_TARGET_MODES`, the domain's source of truth for which
+ * target/mode pairs exist.
+ */
+function frameworkBuildRegistryEntries(): (readonly [string, FrameworkBuildFactory])[] {
+  const entries: (readonly [string, FrameworkBuildFactory])[] = [];
+  for (const id of AI_TOOL_IDS) {
+    for (const mode of ["marketplace", "flat"] as const) {
+      const buildContract = buildContractFor(id, mode);
+      if (buildContract === undefined) continue;
+      entries.push([`${id}:${mode}`, frameworkBuildFactoryFor(buildContract, mode)]);
+    }
+  }
+  return entries;
+}
+
+const FRAMEWORK_BUILD_REGISTRY: Record<string, FrameworkBuildFactory> = Object.fromEntries(
+  frameworkBuildRegistryEntries()
+);
 
 export function createFrameworkBuildUseCase(
   deps: FrameworkBuildDeps,

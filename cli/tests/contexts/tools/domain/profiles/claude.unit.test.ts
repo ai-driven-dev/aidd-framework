@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { claude } from "../../../../../src/contexts/tools/domain/profiles/claude.js";
+import { claude } from "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 
 describe("claude", () => {
   describe("capabilities.mcp", () => {

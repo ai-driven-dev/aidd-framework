@@ -3,7 +3,6 @@ import { join, resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { FrameworkBuildUseCase } from "../../../../src/application/use-cases/framework/framework-build-use-case.js";
 import { FlatBuildStrategy } from "../../../../src/application/use-cases/framework/strategies/flat-build-strategy.js";
-import { buildCopilotFlatContract } from "../../../../src/application/use-cases/framework/strategies/tool-contracts.js";
 import {
   EnsureBuiltMarketplaceUseCase,
   type FrameworkBuildFor,
@@ -12,6 +11,7 @@ import type {
   ResolveMarketplaceOptions,
   ResolveMarketplaceUseCase,
 } from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
+import { buildCopilotFlatContract } from "../../../../src/contexts/tools/domain/profiles/copilot/build.js";
 import { Marketplace } from "../../../../src/domain/models/marketplace.js";
 import type { JsonSchemaValidator } from "../../../../src/domain/ports/json-schema-validator.js";
 import type { VersionReader } from "../../../../src/domain/ports/version-reader.js";

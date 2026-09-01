@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { PluginPresenceFlags } from "../../../../src/application/use-cases/framework/strategies/marketplace-strategy-helpers.js";
+import type { PluginPresence } from "../../../../src/contexts/tools/domain/build-contract.js";
 import {
   buildClaudeStyleCatalogEntry,
   buildClaudeStyleMarketplace,
   synthesizeClaudeStyleManifest,
-} from "../../../../src/application/use-cases/framework/strategies/marketplace-strategy-helpers.js";
+} from "../../../../src/contexts/tools/domain/marketplace-catalog.js";
 
-const EMPTY_PRESENCE: PluginPresenceFlags = {
+const EMPTY_PRESENCE: PluginPresence = {
   hasAgents: false,
   agentsList: [],
   skillsList: [],
@@ -14,7 +14,7 @@ const EMPTY_PRESENCE: PluginPresenceFlags = {
   hasMcpJson: false,
 };
 
-const FULL_PRESENCE: PluginPresenceFlags = {
+const FULL_PRESENCE: PluginPresence = {
   hasAgents: true,
   agentsList: ["implementer.md", "planner.md", "reviewer.md"],
   skillsList: ["commit", "plan"],

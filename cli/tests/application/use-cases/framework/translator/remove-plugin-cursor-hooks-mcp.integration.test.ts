@@ -7,7 +7,7 @@
  * PluginRemoveUseCase.deletePluginFiles iterates these keys, so if they're correct
  * the files will be removed.
  */
-import "../../../../../src/contexts/tools/domain/profiles/cursor.js";
+import "../../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ModeBFlatMaterializationTranslator } from "../../../../../src/application/use-cases/framework/translator/mode-b-flat-materialization-translator.js";

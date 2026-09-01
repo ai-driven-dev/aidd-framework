@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 // Side-effect imports: registering every shipped tool is what makes this suite meaningful.
 // A tool missing here would silently escape conformance, so the list must stay complete.
-import "../../../../src/contexts/tools/domain/profiles/claude.js";
-import "../../../../src/contexts/tools/domain/profiles/codex.js";
-import "../../../../src/contexts/tools/domain/profiles/copilot.js";
-import "../../../../src/contexts/tools/domain/profiles/cursor.js";
-import "../../../../src/contexts/tools/domain/profiles/opencode.js";
+import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/codex/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
 import type { AiTool } from "../../../../src/contexts/tools/domain/contracts.js";
 import {
   frameworkBuildModeFor,

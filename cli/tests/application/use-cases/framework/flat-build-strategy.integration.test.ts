@@ -2,10 +2,8 @@ import { resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { FrameworkBuildUseCase } from "../../../../src/application/use-cases/framework/framework-build-use-case.js";
 import { FlatBuildStrategy } from "../../../../src/application/use-cases/framework/strategies/flat-build-strategy.js";
-import {
-  buildCopilotFlatContract,
-  buildOpencodeFlatContract,
-} from "../../../../src/application/use-cases/framework/strategies/tool-contracts.js";
+import { buildCopilotFlatContract } from "../../../../src/contexts/tools/domain/profiles/copilot/build.js";
+import { buildOpencodeFlatContract } from "../../../../src/contexts/tools/domain/profiles/opencode/build.js";
 import type { JsonSchemaValidator } from "../../../../src/domain/ports/json-schema-validator.js";
 import { AjvSchemaValidatorAdapter } from "../../../../src/infrastructure/adapters/ajv-schema-validator-adapter.js";
 import {

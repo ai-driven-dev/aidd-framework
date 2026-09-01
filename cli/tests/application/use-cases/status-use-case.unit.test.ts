@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import "../../../src/contexts/tools/domain/profiles/claude.js";
-import "../../../src/contexts/tools/domain/profiles/codex.js";
-import "../../../src/contexts/tools/domain/profiles/copilot.js";
-import "../../../src/contexts/tools/domain/profiles/cursor.js";
-import "../../../src/contexts/tools/domain/profiles/opencode.js";
-import "../../../src/contexts/tools/domain/profiles/vscode.js";
+import "../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../src/contexts/tools/domain/profiles/codex/profile.js";
+import "../../../src/contexts/tools/domain/profiles/copilot/profile.js";
+import "../../../src/contexts/tools/domain/profiles/cursor/profile.js";
+import "../../../src/contexts/tools/domain/profiles/opencode/profile.js";
+import "../../../src/contexts/tools/domain/profiles/vscode/profile.js";
 import { InitUseCase } from "../../../src/application/use-cases/init-use-case.js";
 import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
 import { StatusUseCase } from "../../../src/application/use-cases/status-use-case.js";

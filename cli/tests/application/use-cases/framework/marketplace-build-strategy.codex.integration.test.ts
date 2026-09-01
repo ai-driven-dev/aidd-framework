@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { FrameworkBuildUseCase } from "../../../../src/application/use-cases/framework/framework-build-use-case.js";
 import { MarketplaceBuildStrategy } from "../../../../src/application/use-cases/framework/strategies/marketplace-build-strategy.js";
-import { buildCodexContract } from "../../../../src/application/use-cases/framework/strategies/tool-contracts.js";
+import { buildCodexContract } from "../../../../src/contexts/tools/domain/profiles/codex/build.js";
 import { parseFrontmatter } from "../../../../src/domain/formats/markdown.js";
 import { parseToml } from "../../../../src/domain/formats/toml.js";
 import { AjvSchemaValidatorAdapter } from "../../../../src/infrastructure/adapters/ajv-schema-validator-adapter.js";

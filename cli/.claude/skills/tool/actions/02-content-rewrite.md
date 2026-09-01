@@ -28,7 +28,7 @@ reverseRewriteContent(content: string, docsDir: string): string {
 
 ## Process
 
-1. Open `contexts/tools/domain/profiles/<tool-name>.ts`.
+1. Open `contexts/tools/domain/profiles/<tool-name>/profile.ts`.
 2. Import `baseRewriteContent` and `baseReverseRewriteContent` from `domain/formats/placeholders.js`.
 3. In `rewriteContent`: call `baseRewriteContent(content, docsDir)` first, then apply any tool-specific transforms on the result.
 4. In `reverseRewriteContent`: apply tool-specific reversal transforms first (in reverse order relative to step 3), then call `baseReverseRewriteContent(result, docsDir)`.

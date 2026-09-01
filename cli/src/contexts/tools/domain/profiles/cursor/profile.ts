@@ -1,22 +1,22 @@
 import { join } from "node:path";
-import { AgentsCapability } from "../../../../domain/capabilities/agents-capability.js";
-import { CommandsCapability } from "../../../../domain/capabilities/commands-capability.js";
-import { PluginsCapability } from "../../../../domain/capabilities/plugins-capability.js";
-import { RulesCapability } from "../../../../domain/capabilities/rules-capability.js";
-import { SkillsCapability } from "../../../../domain/capabilities/skills-capability.js";
-import type { UserFileSectionKey } from "../../../../domain/formats/command.js";
+import { AgentsCapability } from "../../../../../domain/capabilities/agents-capability.js";
+import { CommandsCapability } from "../../../../../domain/capabilities/commands-capability.js";
+import { PluginsCapability } from "../../../../../domain/capabilities/plugins-capability.js";
+import { RulesCapability } from "../../../../../domain/capabilities/rules-capability.js";
+import { SkillsCapability } from "../../../../../domain/capabilities/skills-capability.js";
+import type { UserFileSectionKey } from "../../../../../domain/formats/command.js";
 import {
   buildAiddCommandFilePath,
   convertCommandFrontmatter,
   detectSectionKeyFromPrefixes,
   reverseConvertCommandFrontmatter,
   stripToolSuffix,
-} from "../../../../domain/formats/command.js";
+} from "../../../../../domain/formats/command.js";
 import {
   baseReverseRewriteContent,
   baseRewriteContent,
-} from "../../../../domain/formats/placeholders.js";
-import { CONFIG_MCP } from "../../../../domain/models/framework.js";
+} from "../../../../../domain/formats/placeholders.js";
+import { CONFIG_MCP } from "../../../../../domain/models/framework.js";
 import type {
   AiTool,
   HasAgents,
@@ -25,9 +25,10 @@ import type {
   HasPlugins,
   HasRules,
   HasSkills,
-} from "../contracts.js";
-import { McpCapability } from "../mcp-capability.js";
-import { registerTool } from "../registry.js";
+} from "../../contracts.js";
+import { McpCapability } from "../../mcp-capability.js";
+import { registerTool } from "../../registry.js";
+import { buildCursorContract, buildCursorFlatContract } from "./build.js";
 
 const DIRECTORY = ".cursor/";
 const TOOL_SUFFIX = ".cursor.md";
@@ -45,6 +46,7 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
     toolSuffix: TOOL_SUFFIX,
     signalDir: ".cursor/commands",
     configOutputPaths: { "settings.json": ".cursor/settings.json" },
+    buildContracts: { marketplace: buildCursorContract, flat: buildCursorFlatContract },
 
     capabilities: {
       agents: new AgentsCapability({

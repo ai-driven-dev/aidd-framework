@@ -42,7 +42,7 @@ plugins: new PluginsCapability({
 
 ## Process
 
-1. Open `contexts/tools/domain/profiles/<tool-name>.ts`. Locate the `capabilities` object.
+1. Open `contexts/tools/domain/profiles/<tool-name>/profile.ts`. Locate the `capabilities` object.
 2. Import `PluginsCapability` from `domain/capabilities/plugins-capability.js` if not already imported.
 3. For `mode: "native"`:
    - Set `pluginsDir` to the tool's plugin directory path.

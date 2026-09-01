@@ -1,22 +1,22 @@
-import { AgentsCapability } from "../../../../domain/capabilities/agents-capability.js";
-import { CommandsCapability } from "../../../../domain/capabilities/commands-capability.js";
-import { buildClaudeStyleMarketplaceEntry } from "../../../../domain/capabilities/marketplace-entry.js";
-import { PluginsCapability } from "../../../../domain/capabilities/plugins-capability.js";
-import { RulesCapability } from "../../../../domain/capabilities/rules-capability.js";
-import { SkillsCapability } from "../../../../domain/capabilities/skills-capability.js";
-import type { UserFileSectionKey } from "../../../../domain/formats/command.js";
+import { AgentsCapability } from "../../../../../domain/capabilities/agents-capability.js";
+import { CommandsCapability } from "../../../../../domain/capabilities/commands-capability.js";
+import { buildClaudeStyleMarketplaceEntry } from "../../../../../domain/capabilities/marketplace-entry.js";
+import { PluginsCapability } from "../../../../../domain/capabilities/plugins-capability.js";
+import { RulesCapability } from "../../../../../domain/capabilities/rules-capability.js";
+import { SkillsCapability } from "../../../../../domain/capabilities/skills-capability.js";
+import type { UserFileSectionKey } from "../../../../../domain/formats/command.js";
 import {
   convertCommandFrontmatter,
   reverseConvertCommandFrontmatter,
-} from "../../../../domain/formats/command.js";
+} from "../../../../../domain/formats/command.js";
 import {
   AT_DOCS_PLACEHOLDER,
   AT_TOOLS_PLACEHOLDER,
   CONFIG_MCP,
   DOCS_PLACEHOLDER,
   TOOLS_PLACEHOLDER,
-} from "../../../../domain/models/framework.js";
-import { GITKEEP_FILE } from "../../../../kernel/file.js";
+} from "../../../../../domain/models/framework.js";
+import { GITKEEP_FILE } from "../../../../../kernel/file.js";
 import type {
   AiTool,
   HasAgents,
@@ -26,10 +26,11 @@ import type {
   HasRules,
   HasSettings,
   HasSkills,
-} from "../contracts.js";
-import { McpCapability } from "../mcp-capability.js";
-import { registerTool } from "../registry.js";
-import { SettingsCapability } from "../settings-capability.js";
+} from "../../contracts.js";
+import { McpCapability } from "../../mcp-capability.js";
+import { registerTool } from "../../registry.js";
+import { SettingsCapability } from "../../settings-capability.js";
+import { buildCopilotFlatContract, buildCopilotMarketplaceContract } from "./build.js";
 import { COPILOT_WORKSPACE_DIR } from "./copilot-paths.js";
 
 const DIRECTORY = COPILOT_WORKSPACE_DIR;
@@ -260,6 +261,10 @@ export const copilot: AiTool<
   toolSuffix: TOOL_SUFFIX,
   signalDir: ".github/prompts",
   requiredIdeIds: ["vscode"] as const,
+  buildContracts: {
+    marketplace: buildCopilotMarketplaceContract,
+    flat: buildCopilotFlatContract,
+  },
 
   capabilities: {
     agents: new AgentsCapability({

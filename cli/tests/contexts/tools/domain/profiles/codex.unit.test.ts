@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  codex,
-  mergeCodexConfigToml,
-} from "../../../../../src/contexts/tools/domain/profiles/codex.js";
+import { mergeCodexConfigToml } from "../../../../../src/contexts/tools/domain/profiles/codex/build.js";
+import { codex } from "../../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import { getToolConfig } from "../../../../../src/contexts/tools/domain/registry.js";
 
 describe("codex", () => {

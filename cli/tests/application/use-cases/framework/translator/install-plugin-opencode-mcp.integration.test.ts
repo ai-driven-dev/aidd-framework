@@ -8,8 +8,8 @@
  *   - is idempotent: a second add with same version produces byte-equal opencode.json
  *   - replace path: v1→v2 drops orphaned servers, adds new ones
  */
-import "../../../../../src/contexts/tools/domain/profiles/opencode.js";
-import "../../../../../src/contexts/tools/domain/profiles/claude.js";
+import "../../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
+import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ModeBFlatMaterializationTranslator } from "../../../../../src/application/use-cases/framework/translator/mode-b-flat-materialization-translator.js";

@@ -54,10 +54,17 @@ src/
 └── contexts/                 # bounded contexts — nothing imports another context's interior
     └── tools/                # what the project targets, and how each target is configured — no index.ts (no barrels, ever)
         ├── domain/
-        │   ├── profiles/     # one file per tool: claude, cursor, copilot, codex, opencode (AI), vscode (IDE) — paths, formats, capabilities, build contract
-        │   ├── registry.ts   # ToolConfig union, isAiTool(), registerTool(), getToolConfig(), hasToolSignals()
+        │   ├── profiles/     # one directory per tool — profile.ts (AiTool definition) + build.ts (its ToolBuildContract)
+        │   │   ├── claude/
+        │   │   ├── codex/
+        │   │   ├── copilot/    # + copilot-paths.ts, also read by domain/models/framework-build.ts
+        │   │   ├── cursor/
+        │   │   ├── opencode/
+        │   │   └── vscode/      # IDE tool — profile.ts only, no build contract
+        │   ├── registry.ts   # ToolConfig union, isAiTool(), registerTool(), getToolConfig(), hasToolSignals(), buildContractFor()
         │   ├── contracts.ts  # AiTool<C>, Has* interfaces, IdeToolConfig, UserFileSectionKey
         │   ├── build-contract.ts      # ToolBuildContract, ArtifactContract — per-tool build shape
+        │   ├── marketplace-catalog.ts # catalog/manifest shaping shared by ≥2 tools' build contracts (claude, cursor, copilot, codex)
         │   ├── settings-capability.ts # co-owned with the user (settings.json et al.)
         │   ├── mcp-capability.ts      # co-owned with the user (.mcp.json et al.)
         │   ├── mcp-exclusion.ts       # win32 mcp transform
@@ -83,7 +90,7 @@ src/
 | New CLI command | `application/commands/` + top-level use-case |
 | New use-case | `application/use-cases/<subdir>/` or root for top-level |
 | Shared use-case helper | `application/use-cases/shared/` |
-| New AI/IDE tool | one profile file in `contexts/tools/domain/profiles/<toolname>.ts` — see `tool-addition-cost.arch.test.ts` |
+| New AI/IDE tool | one profile directory in `contexts/tools/domain/profiles/<toolname>/` (`profile.ts` + `build.ts`) — see `tool-addition-cost.arch.test.ts` |
 | New content-translation capability (agents/skills/commands/rules/hooks) | `Has*` in `contexts/tools/domain/contracts.ts` (moving to `contexts/translate` in a later phase) + class in `domain/capabilities/` |
 | New string transform | `domain/formats/` |
 | New domain type | `domain/models/` |

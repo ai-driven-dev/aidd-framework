@@ -17,6 +17,7 @@ import {
   type ToolCategory,
   type ToolId,
 } from "../../../kernel/tool.js";
+import type { ToolBuildContract } from "./build-contract.js";
 import type { AiTool, IdeToolConfig } from "./contracts.js";
 
 export type ToolConfig = AiTool<unknown> | IdeToolConfig;
@@ -106,6 +107,21 @@ export function frameworkBuildModeFor(toolId: ToolId): FrameworkBuildMode {
   if (config === undefined || !isAiTool(config)) return "marketplace";
   const caps = config.capabilities as { plugins?: { mode?: PluginsMode } };
   return caps.plugins?.mode === "flat" ? "flat" : "marketplace";
+}
+
+/**
+ * The tool's declared build contract for one framework-build mode, or undefined when
+ * the tool does not support that mode (e.g. opencode has no marketplace mode). Read
+ * from the profile so `deps.ts` can derive its build registry by iterating the
+ * registered tools instead of listing every tool/mode pair by hand.
+ */
+export function buildContractFor(
+  toolId: ToolId,
+  mode: FrameworkBuildMode
+): (() => ToolBuildContract) | undefined {
+  const config = getToolConfig(toolId);
+  if (config === undefined || !isAiTool(config)) return undefined;
+  return config.buildContracts?.[mode];
 }
 
 /**

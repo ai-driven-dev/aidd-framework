@@ -73,11 +73,11 @@ exactly once per tool file, at module bottom. Never call it from use-cases, adap
 ## Agnostic shape example (fictional `acme` tool)
 
 ```typescript
-// contexts/tools/domain/profiles/acme.ts
-import { AgentsCapability } from "../../capabilities/agents-capability.js";
-import { SkillsCapability } from "../../capabilities/skills-capability.js";
-import type { AiTool, HasAgents, HasSkills, UserFileSectionKey } from "../contracts.js";
-import { registerTool } from "../registry.js";
+// contexts/tools/domain/profiles/acme/profile.ts
+import { AgentsCapability } from "../../../../domain/capabilities/agents-capability.js";
+import { SkillsCapability } from "../../../../domain/capabilities/skills-capability.js";
+import type { AiTool, HasAgents, HasSkills, UserFileSectionKey } from "../../contracts.js";
+import { registerTool } from "../../registry.js";
 
 const DIRECTORY = ".acme/";
 const TOOL_SUFFIX = ".acme.md";

@@ -1,11 +1,11 @@
 import { resolve } from "node:path";
 // Register all tools so use-cases that call getToolConfig / getIdeToolConfig don't throw
-import "../../../src/contexts/tools/domain/profiles/claude.js";
-import "../../../src/contexts/tools/domain/profiles/codex.js";
-import "../../../src/contexts/tools/domain/profiles/copilot.js";
-import "../../../src/contexts/tools/domain/profiles/cursor.js";
-import "../../../src/contexts/tools/domain/profiles/opencode.js";
-import "../../../src/contexts/tools/domain/profiles/vscode.js";
+import "../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../src/contexts/tools/domain/profiles/codex/profile.js";
+import "../../../src/contexts/tools/domain/profiles/copilot/profile.js";
+import "../../../src/contexts/tools/domain/profiles/cursor/profile.js";
+import "../../../src/contexts/tools/domain/profiles/opencode/profile.js";
+import "../../../src/contexts/tools/domain/profiles/vscode/profile.js";
 import { CLIOutput } from "../../../src/application/output.js";
 import { DoctorLayoutUseCase } from "../../../src/application/use-cases/doctor/doctor-layout-use-case.js";
 import { DoctorMergeFilesUseCase } from "../../../src/application/use-cases/doctor/doctor-merge-files-use-case.js";

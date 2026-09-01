@@ -24,7 +24,8 @@ Build-contract checklist:
   - [ ] paths reuse the tool's buildInstallPath / generic flat-path primitives (no inline reinvention)
   - [ ] transforms + merges reuse existing helpers (generalize, never reimplement)
   - [ ] flat mcp merge key-prefixes servers by "<plugin>-"
-  - [ ] (target,mode) rows added to the framework-build registry; unsupported pairs absent
+  - [ ] each `build<Tool><Mode>Contract()` lives in the tool's own `build.ts`, declared on
+        `profile.ts` via `buildContracts: { marketplace?, flat? }` — unsupported modes simply absent
   - [ ] tool id in FrameworkBuildTarget union + command SUPPORTED_TARGETS
   - [ ] orchestrators still contain zero per-tool / per-artifact branches
 ```
@@ -44,10 +45,17 @@ Build-contract checklist:
 5. If the tool needs a post-build artifact (a config file that registers skills, a workspace
    config), implement `emitConfigArtifact`; otherwise omit it.
 6. If two tools differ only by dir prefix + a small transform, factor a single parameterised
-   contract factory; isolate a structurally distinct tool in its own builder.
-7. Register: add `"<tool>:<mode>"` rows to the framework-build registry mapping to
-   `MarketplaceBuildStrategy(contract)` / `FlatBuildStrategy(contract)`. Add the tool id to the
-   `FrameworkBuildTarget` union and the command `SUPPORTED_TARGETS`. Leave unsupported pairs absent.
+   contract factory; isolate a structurally distinct tool in its own builder. Content or
+   catalog-shaping logic genuinely shared across tools (not just this one) belongs in
+   `contexts/tools/domain/marketplace-catalog.ts`, never in one tool's own directory imported by
+   another's.
+7. Write the contract(s) in `contexts/tools/domain/profiles/<tool-name>/build.ts`, exporting
+   `build<Tool>Contract()` and/or `build<Tool>FlatContract()`. In `profile.ts`, add
+   `buildContracts: { marketplace: build<Tool>Contract, flat: build<Tool>FlatContract }` (omit
+   whichever mode the tool does not support) to the `AiTool` object. `infrastructure/deps.ts`
+   derives its framework-build registry from every registered profile's `buildContracts` —
+   nothing to add there. Add the tool id to the `FrameworkBuildTarget` union and the command's
+   `SUPPORTED_TARGETS`.
 
 ## Test
 

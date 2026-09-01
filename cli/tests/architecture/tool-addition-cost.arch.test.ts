@@ -10,20 +10,19 @@ import { expectRatchet, read, sourceFiles } from "./helpers.js";
 
 const TOOL_IDS = ["claude", "cursor", "copilot", "codex", "opencode", "vscode"] as const;
 
-/** The only places a tool identifier is allowed to be written down. */
-const ALLOWED = new Set([
-  ...TOOL_IDS.map((id) => `src/contexts/tools/domain/profiles/${id}.ts`),
-  "src/kernel/tool.ts",
-]);
+/** The only place a tool identifier is allowed to be written down: its own profile directory. */
+const ALLOWED_DIRS = TOOL_IDS.map((id) => `src/contexts/tools/domain/profiles/${id}/`);
+const ALLOWED_FILES = new Set(["src/kernel/tool.ts"]);
 
 /**
  * Files naming a tool outside its profile today. This list may only shrink.
  *
  * `built-tree-materialization-translator.ts` left it in phase 6: it chose the framework
  * build mode with `toolId === "opencode" ? ... `, and now reads that mode off the profile.
+ * `tool-contracts.ts` left it in phase 10: its nine per-tool build contracts moved into
+ * each tool's own profile directory, one `build.ts` per tool.
  */
 const BASELINE = [
-  "src/application/use-cases/framework/strategies/tool-contracts.ts",
   "src/application/use-cases/flows/marketplace-sync-settings-use-case.ts",
   "src/application/use-cases/restore/restore-use-case.ts",
   "src/domain/capabilities/plugins-capability.ts",
@@ -37,7 +36,8 @@ const BASELINE = [
 
 /** The rule itself, over an explicit file/source pair instead of the real tree. */
 function namesToolOutsideProfile(file: string, source: string): boolean {
-  return !ALLOWED.has(file) && TOOL_IDS.some((id) => source.includes(`"${id}"`));
+  if (ALLOWED_FILES.has(file) || ALLOWED_DIRS.some((dir) => file.startsWith(dir))) return false;
+  return TOOL_IDS.some((id) => source.includes(`"${id}"`));
 }
 
 describe("adding a tool costs one file", () => {
@@ -54,7 +54,10 @@ describe("adding a tool costs one file", () => {
       true
     );
     expect(
-      namesToolOutsideProfile("src/contexts/tools/domain/profiles/cursor.ts", 'id: "cursor"')
+      namesToolOutsideProfile(
+        "src/contexts/tools/domain/profiles/cursor/profile.ts",
+        'id: "cursor"'
+      )
     ).toBe(false);
   });
 });

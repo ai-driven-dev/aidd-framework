@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { opencode } from "../../../../../src/contexts/tools/domain/profiles/opencode.js";
+import { opencode } from "../../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
 import { OpencodeDualConfigError } from "../../../../../src/kernel/errors.js";
 import type { FileReader } from "../../../../../src/kernel/ports/file-reader.js";
 

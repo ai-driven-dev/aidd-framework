@@ -1,4 +1,4 @@
-import "../../../../../src/contexts/tools/domain/profiles/copilot.js";
+import "../../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MarketplaceSyncSettingsUseCase } from "../../../../../src/application/use-cases/flows/marketplace-sync-settings-use-case.js";

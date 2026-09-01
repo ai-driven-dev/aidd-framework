@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { claude } from "../../../src/contexts/tools/domain/profiles/claude.js";
-import { codex } from "../../../src/contexts/tools/domain/profiles/codex.js";
-import { copilot } from "../../../src/contexts/tools/domain/profiles/copilot.js";
-import { cursor } from "../../../src/contexts/tools/domain/profiles/cursor.js";
-import { opencode } from "../../../src/contexts/tools/domain/profiles/opencode.js";
-import { vscodeToolConfig } from "../../../src/contexts/tools/domain/profiles/vscode.js";
+import { claude } from "../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import { codex } from "../../../src/contexts/tools/domain/profiles/codex/profile.js";
+import { copilot } from "../../../src/contexts/tools/domain/profiles/copilot/profile.js";
+import { cursor } from "../../../src/contexts/tools/domain/profiles/cursor/profile.js";
+import { opencode } from "../../../src/contexts/tools/domain/profiles/opencode/profile.js";
+import { vscodeToolConfig } from "../../../src/contexts/tools/domain/profiles/vscode/profile.js";
 import type { ToolConfig } from "../../../src/contexts/tools/domain/registry.js";
 import { PluginContentTranslator } from "../../../src/domain/models/plugin-content-translator.js";
 import {

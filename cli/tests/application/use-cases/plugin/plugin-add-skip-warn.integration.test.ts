@@ -2,7 +2,7 @@
  * Integration test for Phase 1: PluginAddUseCase emits logger.warn for each skip entry
  * returned by the translation adapter.
  */
-import "../../../../src/contexts/tools/domain/profiles/opencode.js";
+import "../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { PluginAddUseCase } from "../../../../src/application/use-cases/plugin/plugin-add-use-case.js";

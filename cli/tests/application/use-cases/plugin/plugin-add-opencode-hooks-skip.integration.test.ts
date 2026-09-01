@@ -2,7 +2,7 @@
  * Phase 3 — OpenCode hooks skip: installing a plugin with hooks/ against OpenCode
  * must emit no hooks files and exactly one logger.warn with the expected message.
  */
-import "../../../../src/contexts/tools/domain/profiles/opencode.js";
+import "../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { PluginAddUseCase } from "../../../../src/application/use-cases/plugin/plugin-add-use-case.js";

@@ -6,6 +6,7 @@ import type { RulesCapability } from "../../../domain/capabilities/rules-capabil
 import type { SkillsCapability } from "../../../domain/capabilities/skills-capability.js";
 import type { UserFileSectionKey } from "../../../domain/formats/command.js";
 import type { AiToolId, IdeToolId } from "../../../kernel/tool.js";
+import type { ToolBuildContract } from "./build-contract.js";
 import type { McpCapability } from "./mcp-capability.js";
 import type { SettingsCapability } from "./settings-capability.js";
 
@@ -50,6 +51,15 @@ export interface AiTool<C> {
   readonly requiredIdeIds?: readonly IdeToolId[];
   readonly capabilities: C;
   readonly configOutputPaths?: Readonly<Record<string, string>>;
+  /**
+   * The tool's framework-build contracts, one per supported build mode. Read by
+   * `buildContractFor()` so `deps.ts` can derive its build registry from the set of
+   * registered tools instead of listing every tool/mode pair by hand.
+   */
+  readonly buildContracts?: {
+    readonly marketplace?: () => ToolBuildContract;
+    readonly flat?: () => ToolBuildContract;
+  };
   rewriteContent(content: string, docsDir: string): string;
   reverseRewriteContent(content: string, docsDir: string): string;
   detectUserFileSectionKey(relativePath: string): UserFileSectionKey | null;

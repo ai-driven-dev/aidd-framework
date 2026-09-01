@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { copilot } from "../../../../../src/contexts/tools/domain/profiles/copilot.js";
+import { copilot } from "../../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
 
 describe("copilot", () => {
   describe("capabilities.rules.convertFrontmatter()", () => {

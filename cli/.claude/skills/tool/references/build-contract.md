@@ -66,11 +66,21 @@ contract factory** (pass the dir prefix + ext). When a tool's format is structur
 (e.g. TOML agents + a config-file registration, or a JSON-config merge with no marketplace), give it
 its own contract. This mirrors the layer convention: DRY via a shared factory, isolate genuine
 divergence in its own builder — never a base class, never a per-tool branch in the orchestrator.
+A helper reused by more than one tool's contract (e.g. manifest/catalog shaping shared by
+claude+cursor+copilot+codex) does not belong inside any one tool's own directory — that would make
+another tool import across a tool boundary. It lives in
+`contexts/tools/domain/marketplace-catalog.ts` instead, next to `build-contract.ts`.
 
-## Registration
+## Where the contract lives, and how it reaches the build pipeline
 
-Each `(target, mode)` pair is one row in the framework-build registry (`infrastructure/deps.ts`),
-mapping the key `"<target>:<mode>"` to `mode-orchestrator(tool-contract)`. A tool with no native
-marketplace simply has no `<tool>:marketplace` row — the unsupported pair falls through to the
-existing "Unsupported target/mode" error. The tool id must also be in the `FrameworkBuildTarget`
-union and the command's `SUPPORTED_TARGETS`.
+Each tool's contract(s) live in that tool's own `contexts/tools/domain/profiles/<tool>/build.ts`,
+exporting `build<Tool>Contract()` (marketplace) and/or `build<Tool>FlatContract()` (flat). The
+tool's `profile.ts` declares which modes it supports by setting `buildContracts: { marketplace?,
+flat? }` on the `AiTool` object — a tool with no native marketplace simply omits `marketplace`.
+
+`infrastructure/deps.ts` derives its `FRAMEWORK_BUILD_REGISTRY` (the `"<target>:<mode>"` →
+`mode-orchestrator(contract)` map) by iterating every registered tool id and reading
+`buildContractFor(id, mode)` off its profile — there is no per-tool row to hand-add. A tool with no
+`<tool>:marketplace` contract falls through to the existing "Unsupported target/mode" error. The
+tool id must still be added to the `FrameworkBuildTarget` union and the command's
+`SUPPORTED_TARGETS`, since those name which targets exist at all, independent of build contracts.

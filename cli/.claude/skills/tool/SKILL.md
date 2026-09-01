@@ -36,7 +36,7 @@ framework-build target.
 
 ## Transversal rules
 
-- Tool file lives in `contexts/tools/domain/profiles/<tool-name>.ts`; one file per tool.
+- Tool lives in `contexts/tools/domain/profiles/<tool-name>/`: `profile.ts` (the `AiTool<C>`) plus, when the tool is a framework-build target, `build.ts` (its `ToolBuildContract`(s), declared on `profile.ts` via `buildContracts`).
 - `AiTool<C>` where `C` is an intersection of `Has*` interfaces — never a plain object literal without the type annotation.
 - Capability presence guard uses `"agents" in tool.capabilities` (in-check), not `instanceof`.
 - `rewriteContent` and `reverseRewriteContent` must be exact inverses; compose `baseRewriteContent`/`baseReverseRewriteContent` first, then apply tool-specific transforms.

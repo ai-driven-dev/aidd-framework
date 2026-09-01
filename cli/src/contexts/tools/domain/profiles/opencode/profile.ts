@@ -1,27 +1,23 @@
 import { join } from "node:path";
-import { AgentsCapability } from "../../../../domain/capabilities/agents-capability.js";
-import { CommandsCapability } from "../../../../domain/capabilities/commands-capability.js";
-import { PluginsCapability } from "../../../../domain/capabilities/plugins-capability.js";
-import { RulesCapability } from "../../../../domain/capabilities/rules-capability.js";
-import { SkillsCapability } from "../../../../domain/capabilities/skills-capability.js";
-import type { UserFileSectionKey } from "../../../../domain/formats/command.js";
+import { AgentsCapability } from "../../../../../domain/capabilities/agents-capability.js";
+import { CommandsCapability } from "../../../../../domain/capabilities/commands-capability.js";
+import { PluginsCapability } from "../../../../../domain/capabilities/plugins-capability.js";
+import { RulesCapability } from "../../../../../domain/capabilities/rules-capability.js";
+import { SkillsCapability } from "../../../../../domain/capabilities/skills-capability.js";
+import type { UserFileSectionKey } from "../../../../../domain/formats/command.js";
 import {
   buildAiddCommandFilePath,
   convertCommandFrontmatterNoHint,
   detectSectionKeyFromPrefixes,
   reverseConvertCommandFrontmatterNoHint,
   stripToolSuffix,
-} from "../../../../domain/formats/command.js";
+} from "../../../../../domain/formats/command.js";
 import {
   baseReverseRewriteContent,
   baseRewriteContent,
-} from "../../../../domain/formats/placeholders.js";
-import { CONFIG_MCP, CONFIG_OPENCODE } from "../../../../domain/models/framework.js";
-import {
-  InvalidMcpServerConfigError,
-  McpConfigError,
-  OpencodeDualConfigError,
-} from "../../../../kernel/errors.js";
+} from "../../../../../domain/formats/placeholders.js";
+import { CONFIG_MCP, CONFIG_OPENCODE } from "../../../../../domain/models/framework.js";
+import { OpencodeDualConfigError } from "../../../../../kernel/errors.js";
 import type {
   AiTool,
   HasAgents,
@@ -30,64 +26,13 @@ import type {
   HasPlugins,
   HasRules,
   HasSkills,
-} from "../contracts.js";
-import { McpCapability } from "../mcp-capability.js";
-import { registerTool } from "../registry.js";
+} from "../../contracts.js";
+import { McpCapability } from "../../mcp-capability.js";
+import { registerTool } from "../../registry.js";
+import { buildOpencodeFlatContract, transformMcpToOpencode } from "./build.js";
 
 const DIRECTORY = ".opencode/";
 const TOOL_SUFFIX = ".opencode.md";
-
-type RawServer =
-  | { command: string; args?: string[]; env?: Record<string, string>; disabled?: boolean }
-  | { url: string; disabled?: boolean };
-
-interface OpencodeMcpLocalServer {
-  type: "local";
-  command: string[];
-  enabled: boolean;
-  environment?: Record<string, string>;
-}
-
-interface OpencodeMcpRemoteServer {
-  type: "remote";
-  url: string;
-  enabled: boolean;
-}
-
-type OpencodeMcpServer = OpencodeMcpLocalServer | OpencodeMcpRemoteServer;
-
-function convertRawServer(name: string, server: RawServer): OpencodeMcpServer {
-  const enabled = server.disabled !== true;
-  if ("command" in server) {
-    const { command, args = [], env } = server;
-    const local: OpencodeMcpLocalServer = { type: "local", command: [command, ...args], enabled };
-    if (env && Object.keys(env).length > 0) local.environment = env;
-    return local;
-  }
-  if ("url" in server) {
-    return { type: "remote", url: server.url, enabled };
-  }
-  throw new InvalidMcpServerConfigError(name);
-}
-
-export function transformMcpToOpencode(content: string): string {
-  let parsed: { mcpServers?: Record<string, RawServer> };
-  try {
-    parsed = JSON.parse(content) as typeof parsed;
-  } catch (err) {
-    throw new McpConfigError(
-      `Cannot parse MCP config: ${err instanceof Error ? err.message : String(err)}`
-    );
-  }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new McpConfigError("MCP config must be a JSON object");
-  }
-  const mcp: Record<string, OpencodeMcpServer> = {};
-  for (const [name, server] of Object.entries(parsed.mcpServers ?? {})) {
-    mcp[name] = convertRawServer(name, server);
-  }
-  return JSON.stringify({ mcp }, null, 2);
-}
 
 export const opencode: AiTool<
   HasAgents & HasSkills & HasCommands & HasRules & HasMcp & HasPlugins
@@ -98,6 +43,7 @@ export const opencode: AiTool<
   toolSuffix: TOOL_SUFFIX,
   signalDir: ".opencode/commands",
   configOutputPaths: { "opencode.json": "opencode.json" },
+  buildContracts: { flat: buildOpencodeFlatContract },
 
   capabilities: {
     agents: new AgentsCapability({

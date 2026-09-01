@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { cursor } from "../../../src/contexts/tools/domain/profiles/cursor.js";
-import { opencode } from "../../../src/contexts/tools/domain/profiles/opencode.js";
+import { cursor } from "../../../src/contexts/tools/domain/profiles/cursor/profile.js";
+import { opencode } from "../../../src/contexts/tools/domain/profiles/opencode/profile.js";
 import { PluginContentTranslator } from "../../../src/domain/models/plugin-content-translator.js";
 import { PluginDistribution } from "../../../src/domain/models/plugin-distribution.js";
 import { OPENCODE_HOOKS_SKIP_REASON } from "../../../src/domain/models/plugin-translation-skip.js";

@@ -20,7 +20,7 @@ not a service.
 └── cli/src/contexts/translate/      ✅ create
     ├── domain/
     │   ├── capabilities/            ✏️ modify (agents, skills, commands, rules, hooks)
-    │   ├── formats/                 ✏️ modify (markdown, command, placeholders, toml, jsonc, paths, merges, rewrites)
+    │   ├── formats/                 ✏️ modify (markdown, command, placeholders, toml, paths, merges, rewrites)
     │   ├── content-translator.ts    ✏️ modify (from domain/models/plugin-content-translator.ts)
     │   ├── canon.ts                 ✏️ modify (from domain/models/framework.ts)
     │   └── build-target.ts          ✏️ modify (what remains of framework-build.ts)
@@ -28,6 +28,11 @@ not a service.
     │   └── translate-source.ts      ✏️ modify (from use-cases/framework/, in place or to a distribution tree)
     └── infrastructure/schema-validator.ts  ✏️ modify
 ```
+
+> **`jsonc` reste dans le noyau (phase 9).** La projection le listait ici. Il n'y va pas :
+> `kernel/merge.ts` appelle `stripJsonComments`, donc le laisser dans un contexte rendrait
+> insatisfiable la règle « le noyau n'importe aucun contexte », et le dupliquer serait pire que de
+> le déplacer. Trente lignes pures, sans import.
 
 > **Frontière sans baril (tranché en phase 7).** Ce contexte n'a pas d'`index.ts`. La valeur de
 > l'invariant est « rien n'importe l'intérieur d'un contexte », et un fichier de ré-exports n'est
@@ -66,10 +71,34 @@ journey
 
 ## Tasks to do
 
-### `1)` Move the content capabilities
+### `1)` Les capacités de contenu vont dans `tools`, pas ici — et voici pourquoi
 
-1. `agents`, `skills`, `commands`, `rules` and `hooks` describe content. They come here; `settings`
-   and `mcp` stayed in `tools` at phase 10.
+> La projection les envoyait dans `translate`. Mesuré, c'est ce qui créait l'inversion que la
+> tâche 4 interdit.
+
+Une capacité de contenu chevauche la couture entre les deux contextes : `buildOutputPath` dit **où**
+un outil range ses agents, savoir d'outil ; `convertFrontmatter` dit **comment** le contenu change de
+forme, savoir de traduction. La mettre dans `translate` force `tools/domain/contracts.ts`, qui la
+compose, à importer `translate`. La mettre dans `tools` semblait la forcer à importer `formats/`,
+donc `translate`. Les deux placements paraissaient produire la même arête interdite.
+
+Le blocage n'était pas réel. Ce que ces capacités tirent de `formats/`, mesuré symbole par symbole :
+
+| capacité | ce qu'elle importe de `formats/` |
+|---|---|
+| agents | `parseFrontmatter`, `serializeFrontmatter` |
+| skills, commands, rules | `serializeFrontmatter` |
+| hooks | rien |
+
+Deux transformations pures sur du frontmatter, sans connaissance d'outil ni de cible. Et
+`formats/markdown.ts` fait 139 lignes **sans un seul import**. C'est du vocabulaire partagé, pas de
+la traduction — exactement l'argument qui a mis `jsonc.ts` dans le noyau en phase 9, et le précédent
+vient de ce dépôt.
+
+1. `markdown.ts` va dans le noyau. Ses consommateurs sont déjà des deux côtés de la future frontière.
+2. `agents`, `skills`, `commands`, `rules` et `hooks` rejoignent `settings` et `mcp` dans `tools` :
+   un outil déclare ce qu'il accepte et où il le range. `translate` lit ces déclarations.
+3. La chaîne `translate → tools → kernel` tient alors sans découper `AiTool` ni rouvrir la phase 10.
 
 ### `2)` Move the formats and the translator
 
@@ -83,8 +112,12 @@ journey
 
 ### `4)` Close the context
 
-1. Declare the context's public modules in the boundary ratchet, and add the biome `override`. Verify it depends on `tools` and the kernel and on
-   nothing else.
+1. Declare the context's public modules in the boundary ratchet, and add the biome `override`.
+   Verify it depends on `tools` and the kernel and on nothing else.
+2. Ajouter aussi l'override inverse : `src/contexts/tools/**` ne peut pas importer
+   `src/contexts/translate/**`. C'est l'arête que la phase 10 a laissée debout en promettant qu'elle
+   se résoudrait ici ; une promesse que rien ne vérifie n'est pas une garantie. L'éprouver par
+   injection, comme celui du noyau.
 
 ## Test acceptance criteria
 

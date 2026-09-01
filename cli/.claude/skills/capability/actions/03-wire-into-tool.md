@@ -16,9 +16,9 @@ and instantiating the class in the `capabilities` object.
 ## Outputs
 
 ```typescript
-// contexts/tools/domain/profiles/acme.ts — diff
-import { WidgetsCapability } from "../../capabilities/widgets-capability.js";
-import type { ..., HasWidgets } from "../contracts.js";
+// contexts/tools/domain/profiles/acme/profile.ts — diff
+import { WidgetsCapability } from "../../../../domain/capabilities/widgets-capability.js";
+import type { ..., HasWidgets } from "../../contracts.js";
 
 export const acme: AiTool<HasAgents & HasSkills & HasWidgets> = {
   // ...
@@ -32,8 +32,8 @@ export const acme: AiTool<HasAgents & HasSkills & HasWidgets> = {
 
 ## Process
 
-1. Open `contexts/tools/domain/profiles/<tool-name>.ts`.
-2. Add `import { <CapabilityClass> } from "../../capabilities/<kebab-name>-capability.js";` in alphabetical order.
+1. Open `contexts/tools/domain/profiles/<tool-name>/profile.ts`.
+2. Add `import { <CapabilityClass> } from "../../../../domain/capabilities/<kebab-name>-capability.js";` in alphabetical order.
 3. Add `HasWidgets` (or the appropriate `Has*` name) to the `AiTool<C>` type parameter intersection.
 4. Add the new field to the `capabilities` object with `<camelCaseName>: new <CapabilityClass>({ ... })`.
 5. Confirm the capability presence guard in any use-site that inspects capabilities uses the `in` operator: `"widgets" in tool.capabilities`.

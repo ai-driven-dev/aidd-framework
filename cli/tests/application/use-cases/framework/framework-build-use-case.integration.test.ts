@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { FrameworkBuildUseCase } from "../../../../src/application/use-cases/framework/framework-build-use-case.js";
 import { MarketplaceBuildStrategy } from "../../../../src/application/use-cases/framework/strategies/marketplace-build-strategy.js";
-import { buildCopilotMarketplaceContract } from "../../../../src/application/use-cases/framework/strategies/tool-contracts.js";
+import { buildCopilotMarketplaceContract } from "../../../../src/contexts/tools/domain/profiles/copilot/build.js";
 import type { JsonSchemaValidator } from "../../../../src/domain/ports/json-schema-validator.js";
 import {
   FrameworkPlaceholderInPluginError,

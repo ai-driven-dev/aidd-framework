@@ -11,9 +11,9 @@ setting the required base fields.
 ## Outputs
 
 ```typescript
-// contexts/tools/domain/profiles/acme.ts
-import type { AiTool, HasAgents, HasSkills, UserFileSectionKey } from "../contracts.js";
-import { registerTool } from "../registry.js";
+// contexts/tools/domain/profiles/acme/profile.ts
+import type { AiTool, HasAgents, HasSkills, UserFileSectionKey } from "../../contracts.js";
+import { registerTool } from "../../registry.js";
 
 const DIRECTORY = ".acme/";
 const TOOL_SUFFIX = ".acme.md";
@@ -38,7 +38,7 @@ registerTool(acme);
 
 ## Process
 
-1. Create `contexts/tools/domain/profiles/<tool-name>.ts`. Confirm the file does not already exist.
+1. Create `contexts/tools/domain/profiles/<tool-name>/profile.ts`. Confirm the directory does not already exist. Its build contract (if any) will live alongside it in `build.ts`, added in action 05.
 2. Declare module-level constants for `DIRECTORY` and `TOOL_SUFFIX` in `CONSTANT_CASE`.
 3. Declare `export const <toolName>: AiTool<Has* & Has* & ...>` — type parameter is the intersection of all required `Has*` interfaces from `contexts/tools/domain/contracts.ts`.
 4. Set required fields: `kind: "ai"`, `toolId`, `directory`, `toolSuffix`, `signalDir` (the directory the registry scans for aidd signals; `null` if the tool has no skill signals).

@@ -1,12 +1,12 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import "../../../src/contexts/tools/domain/profiles/claude.js";
-import "../../../src/contexts/tools/domain/profiles/codex.js";
-import "../../../src/contexts/tools/domain/profiles/copilot.js";
-import "../../../src/contexts/tools/domain/profiles/cursor.js";
-import "../../../src/contexts/tools/domain/profiles/opencode.js";
-import "../../../src/contexts/tools/domain/profiles/vscode.js";
+import "../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../src/contexts/tools/domain/profiles/codex/profile.js";
+import "../../../src/contexts/tools/domain/profiles/copilot/profile.js";
+import "../../../src/contexts/tools/domain/profiles/cursor/profile.js";
+import "../../../src/contexts/tools/domain/profiles/opencode/profile.js";
+import "../../../src/contexts/tools/domain/profiles/vscode/profile.js";
 import { CLIOutput } from "../../../src/application/output.js";
 import { GitignoreUseCase } from "../../../src/application/use-cases/gitignore-use-case.js";
 import { InitUseCase } from "../../../src/application/use-cases/init-use-case.js";

@@ -1,23 +1,22 @@
-import { AgentsCapability } from "../../../../domain/capabilities/agents-capability.js";
-import { CommandsCapability } from "../../../../domain/capabilities/commands-capability.js";
-import { HooksCapability } from "../../../../domain/capabilities/hooks-capability.js";
-import { PluginsCapability } from "../../../../domain/capabilities/plugins-capability.js";
-import { RulesCapability } from "../../../../domain/capabilities/rules-capability.js";
-import { SkillsCapability } from "../../../../domain/capabilities/skills-capability.js";
-import type { UserFileSectionKey } from "../../../../domain/formats/command.js";
+import { AgentsCapability } from "../../../../../domain/capabilities/agents-capability.js";
+import { CommandsCapability } from "../../../../../domain/capabilities/commands-capability.js";
+import { HooksCapability } from "../../../../../domain/capabilities/hooks-capability.js";
+import { PluginsCapability } from "../../../../../domain/capabilities/plugins-capability.js";
+import { RulesCapability } from "../../../../../domain/capabilities/rules-capability.js";
+import { SkillsCapability } from "../../../../../domain/capabilities/skills-capability.js";
+import type { UserFileSectionKey } from "../../../../../domain/formats/command.js";
 import {
   buildAiddCommandFilePath,
   convertCommandFrontmatter,
   detectSectionKeyFromPrefixes,
   reverseConvertCommandFrontmatter,
   stripToolSuffix,
-} from "../../../../domain/formats/command.js";
+} from "../../../../../domain/formats/command.js";
 import {
   baseReverseRewriteContent,
   baseRewriteContent,
-} from "../../../../domain/formats/placeholders.js";
-import { parseToml, stringifyToml } from "../../../../domain/formats/toml.js";
-import { CONFIG_MCP } from "../../../../domain/models/framework.js";
+} from "../../../../../domain/formats/placeholders.js";
+import { CONFIG_MCP } from "../../../../../domain/models/framework.js";
 import type {
   AiTool,
   HasAgents,
@@ -27,9 +26,15 @@ import type {
   HasPlugins,
   HasRules,
   HasSkills,
-} from "../contracts.js";
-import { McpCapability } from "../mcp-capability.js";
-import { registerTool } from "../registry.js";
+} from "../../contracts.js";
+import { McpCapability } from "../../mcp-capability.js";
+import { registerTool } from "../../registry.js";
+import {
+  buildCodexContract,
+  buildCodexFlatContract,
+  mergeCodexConfigToml,
+  stripCodexSkillFrontmatter,
+} from "./build.js";
 
 const DIRECTORY = ".codex/";
 const TOOL_SUFFIX = ".codex.md";
@@ -63,57 +68,7 @@ export function reverseRewriteCodexContent(content: string, docsDir: string): st
   return baseReverseRewriteContent(step1, DIRECTORY, docsDir);
 }
 
-const MIN_PROJECT_DOC_MAX_BYTES = 262144;
 const CONFIG_CODEX_HOOKS = "codex-hooks";
-
-type TomlRecord = Record<string, unknown>;
-
-function parseSafe(content: string): TomlRecord {
-  if (!content.trim()) return {};
-  try {
-    return parseToml(content);
-  } catch {
-    return {};
-  }
-}
-
-function mergeMcpServers(existing: TomlRecord, incoming: TomlRecord): void {
-  const incomingServers = incoming.mcp_servers as TomlRecord | undefined;
-  if (!incomingServers) return;
-  const existingServers = (existing.mcp_servers ?? {}) as TomlRecord;
-  for (const [name, value] of Object.entries(incomingServers)) {
-    if (!(name in existingServers)) {
-      existingServers[name] = value;
-    }
-  }
-  existing.mcp_servers = existingServers;
-}
-
-function ensureProjectDocMaxBytes(existing: TomlRecord, incoming: TomlRecord): void {
-  const existingVal =
-    typeof existing.project_doc_max_bytes === "number" ? existing.project_doc_max_bytes : 0;
-  const incomingVal =
-    typeof incoming.project_doc_max_bytes === "number"
-      ? incoming.project_doc_max_bytes
-      : MIN_PROJECT_DOC_MAX_BYTES;
-  if (existingVal >= MIN_PROJECT_DOC_MAX_BYTES) return;
-  existing.project_doc_max_bytes = Math.max(existingVal, incomingVal, MIN_PROJECT_DOC_MAX_BYTES);
-}
-
-function ensureCodexHooks(existing: TomlRecord): void {
-  const features = existing.features as TomlRecord | undefined;
-  if (features?.hooks !== undefined || features?.codex_hooks !== undefined) return;
-  existing.features = { ...(features ?? {}), hooks: true };
-}
-
-export function mergeCodexConfigToml(existing: string, aiddPayload: string): string {
-  const result = parseSafe(existing);
-  const payload = parseSafe(aiddPayload);
-  mergeMcpServers(result, payload);
-  ensureProjectDocMaxBytes(result, payload);
-  ensureCodexHooks(result);
-  return stringifyToml(result);
-}
 
 const AIDD_HOOK_COMMAND = "node .aidd/scripts/update_memory.cjs";
 
@@ -176,14 +131,6 @@ function buildCodexSkillFilePath(fileName: string): string {
   return `${AGENTS_SKILLS_PREFIX}aidd-${skillNameFromPath(fileName)}/SKILL.md`;
 }
 
-export function stripCodexSkillFrontmatter(fm: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  if (fm.name !== undefined) result.name = fm.name;
-  if (fm.description !== undefined) result.description = fm.description;
-  if (fm.allowed_tools !== undefined) result.allowed_tools = fm.allowed_tools;
-  return result;
-}
-
 export const codex: AiTool<
   HasAgents & HasSkills & HasCommands & HasRules & HasMcp & HasHooks & HasPlugins
 > = {
@@ -193,6 +140,7 @@ export const codex: AiTool<
   toolSuffix: TOOL_SUFFIX,
   signalDir: `${DIRECTORY}commands`,
   configOutputPaths: { "config.toml": ".codex/config.toml" },
+  buildContracts: { marketplace: buildCodexContract, flat: buildCodexFlatContract },
 
   capabilities: {
     agents: new AgentsCapability({ directory: DIRECTORY, toolSuffix: TOOL_SUFFIX, format: "toml" }),

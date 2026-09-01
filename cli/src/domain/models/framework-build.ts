@@ -1,7 +1,7 @@
 import {
   COPILOT_VSCODE_MCP_PATH,
   COPILOT_WORKSPACE_DIR,
-} from "../../contexts/tools/domain/profiles/copilot-paths.js";
+} from "../../contexts/tools/domain/profiles/copilot/copilot-paths.js";
 
 /** Build target: supported tool identifiers for framework build. */
 export type FrameworkBuildTarget = "claude" | "cursor" | "copilot" | "codex" | "opencode";

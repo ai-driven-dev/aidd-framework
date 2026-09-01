@@ -1,4 +1,4 @@
-import "../../../../../src/contexts/tools/domain/profiles/cursor.js";
+import "../../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 import { describe, expect, it } from "vitest";
 import { BuiltTreeMaterializationTranslator } from "../../../../../src/application/use-cases/framework/translator/built-tree-materialization-translator.js";
 import { Manifest } from "../../../../../src/domain/models/manifest.js";

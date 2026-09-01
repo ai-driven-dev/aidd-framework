@@ -129,39 +129,45 @@ describe("rewritePluginRootToken", () => {
 describe("per-tool pluginRootToken contract values", () => {
   it("claude contract uses the claude native token", async () => {
     const { buildClaudeContract } = await import(
-      "../../../src/application/use-cases/framework/strategies/tool-contracts.js"
+      "../../../src/contexts/tools/domain/profiles/claude/build.js"
     );
     expect(buildClaudeContract().pluginRootToken).toBe(CLAUDE_TOKEN);
   });
 
   it("cursor contract uses the cursor native token", async () => {
     const { buildCursorContract } = await import(
-      "../../../src/application/use-cases/framework/strategies/tool-contracts.js"
+      "../../../src/contexts/tools/domain/profiles/cursor/build.js"
     );
     expect(buildCursorContract().pluginRootToken).toBe(CURSOR_TOKEN);
   });
 
   it("codex contract uses the codex native token", async () => {
     const { buildCodexContract } = await import(
-      "../../../src/application/use-cases/framework/strategies/tool-contracts.js"
+      "../../../src/contexts/tools/domain/profiles/codex/build.js"
     );
     expect(buildCodexContract().pluginRootToken).toBe(CODEX_TOKEN);
   });
 
   it("copilot marketplace contract uses the OpenPlugin native token", async () => {
     const { buildCopilotMarketplaceContract } = await import(
-      "../../../src/application/use-cases/framework/strategies/tool-contracts.js"
+      "../../../src/contexts/tools/domain/profiles/copilot/build.js"
     );
     expect(buildCopilotMarketplaceContract().pluginRootToken).toBe(CODEX_TOKEN);
   });
 
   it("flat contracts do not set pluginRootToken", async () => {
-    const {
-      buildClaudeFlatContract,
-      buildCursorFlatContract,
-      buildCopilotFlatContract,
-      buildCodexFlatContract,
-    } = await import("../../../src/application/use-cases/framework/strategies/tool-contracts.js");
+    const { buildClaudeFlatContract } = await import(
+      "../../../src/contexts/tools/domain/profiles/claude/build.js"
+    );
+    const { buildCursorFlatContract } = await import(
+      "../../../src/contexts/tools/domain/profiles/cursor/build.js"
+    );
+    const { buildCopilotFlatContract } = await import(
+      "../../../src/contexts/tools/domain/profiles/copilot/build.js"
+    );
+    const { buildCodexFlatContract } = await import(
+      "../../../src/contexts/tools/domain/profiles/codex/build.js"
+    );
     expect(buildClaudeFlatContract().pluginRootToken).toBeUndefined();
     expect(buildCursorFlatContract().pluginRootToken).toBeUndefined();
     expect(buildCopilotFlatContract().pluginRootToken).toBeUndefined();

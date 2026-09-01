@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { vscodeToolConfig } from "../../../../../src/contexts/tools/domain/profiles/vscode.js";
+import { vscodeToolConfig } from "../../../../../src/contexts/tools/domain/profiles/vscode/profile.js";
 
 describe("vscodeToolConfig", () => {
   describe("settings capabilities", () => {

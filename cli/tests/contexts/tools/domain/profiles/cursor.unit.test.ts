@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cursor } from "../../../../../src/contexts/tools/domain/profiles/cursor.js";
+import { cursor } from "../../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 
 describe("cursor", () => {
   describe("capabilities.rules.convertFrontmatter()", () => {

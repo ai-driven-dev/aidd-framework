@@ -1,5 +1,5 @@
-import "../../../../src/contexts/tools/domain/profiles/claude.js";
-import "../../../../src/contexts/tools/domain/profiles/cursor.js";
+import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { PluginAddUseCase } from "../../../../src/application/use-cases/plugin/plugin-add-use-case.js";

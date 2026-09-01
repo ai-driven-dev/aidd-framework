@@ -7,12 +7,10 @@ import { resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { FrameworkBuildUseCase } from "../../../../src/application/use-cases/framework/framework-build-use-case.js";
 import { FlatBuildStrategy } from "../../../../src/application/use-cases/framework/strategies/flat-build-strategy.js";
-import {
-  buildClaudeFlatContract,
-  buildCodexFlatContract,
-  buildCopilotFlatContract,
-  buildCursorFlatContract,
-} from "../../../../src/application/use-cases/framework/strategies/tool-contracts.js";
+import { buildClaudeFlatContract } from "../../../../src/contexts/tools/domain/profiles/claude/build.js";
+import { buildCodexFlatContract } from "../../../../src/contexts/tools/domain/profiles/codex/build.js";
+import { buildCopilotFlatContract } from "../../../../src/contexts/tools/domain/profiles/copilot/build.js";
+import { buildCursorFlatContract } from "../../../../src/contexts/tools/domain/profiles/cursor/build.js";
 import type { JsonSchemaValidator } from "../../../../src/domain/ports/json-schema-validator.js";
 import { AjvSchemaValidatorAdapter } from "../../../../src/infrastructure/adapters/ajv-schema-validator-adapter.js";
 import type { AssetProvider } from "../../../../src/kernel/ports/asset-provider.js";

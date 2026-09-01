@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { FrameworkBuildUseCase } from "../../../../src/application/use-cases/framework/framework-build-use-case.js";
 import { MarketplaceBuildStrategy } from "../../../../src/application/use-cases/framework/strategies/marketplace-build-strategy.js";
-import { buildClaudeContract } from "../../../../src/application/use-cases/framework/strategies/tool-contracts.js";
+import { buildClaudeContract } from "../../../../src/contexts/tools/domain/profiles/claude/build.js";
 import { AjvSchemaValidatorAdapter } from "../../../../src/infrastructure/adapters/ajv-schema-validator-adapter.js";
 import { BundledAssetProviderAdapter } from "../../../../src/infrastructure/assets/asset-loader.js";
 import {

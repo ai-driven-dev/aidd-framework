@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { InstallConfigUseCase } from "../../../../src/contexts/tools/application/install-config-use-case.js";
-import { copilot } from "../../../../src/contexts/tools/domain/profiles/copilot.js";
+import { copilot } from "../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
 import { SettingsCapability } from "../../../../src/contexts/tools/domain/settings-capability.js";
 import { extractConfigCapabilities } from "../../../../src/domain/models/config-capability.js";
 import { FrameworkDescriptor } from "../../../../src/domain/models/framework.js";
