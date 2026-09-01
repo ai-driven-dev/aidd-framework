@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   SESSION_TRAILER_DELEGATE_FILE,
@@ -196,5 +197,35 @@ describe("removing it again", () => {
     await expect(
       adapter().removeCommitMessageDelegate(repo, SESSION_TRAILER_DELEGATE_FILE)
     ).resolves.toBe(false);
+  });
+});
+
+/**
+ * The evidence behind a stated limit, pinned so the limit cannot quietly stop being true.
+ *
+ * `commit-session-trailer.ts` and the metrics contract both say the commit-to-session join
+ * is measured on Claude Code and unconfirmed on Codex, and give a concrete reason: a resumed
+ * Codex rollout carries a `session_meta.id` — which is what becomes a record's `vendor_id` —
+ * different from its own `session_meta.session_id`, so "the thread" and "the rollout" are
+ * demonstrably two things there. If the captured rollout were replaced by one where they
+ * agree, that reason would evaporate while both documents went on giving it.
+ */
+describe("the reason the Codex half of this join is only a candidate", () => {
+  it("still holds a resumed rollout whose own id differs from the session it continues", () => {
+    const rollout = fileURLToPath(
+      new URL(
+        "../../fixtures/local-cost/.codex/sessions/2026/07/29/" +
+          "rollout-2026-07-29T17-12-26-019fae6f-2009-7cd3-86b2-b8f83481b160.jsonl",
+        import.meta.url
+      )
+    );
+    const first = readFileSync(rollout, "utf8").split("\n")[0] ?? "";
+    const meta = JSON.parse(first) as {
+      payload?: { id?: string; session_id?: string };
+    };
+
+    expect(meta.payload?.id).toBe("019fae6f-2009-7cd3-86b2-b8f83481b160");
+    expect(meta.payload?.session_id).toBeDefined();
+    expect(meta.payload?.session_id).not.toBe(meta.payload?.id);
   });
 });

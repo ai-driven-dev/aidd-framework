@@ -6,12 +6,33 @@
  * nothing named was the commit — so "this backlog item cost X" could be answered, and "this
  * commit cost X" could not, though the two are one query apart.
  *
- * A commit carries `AIDD-Session-Id: <vendor id>` and the join closes. The value is the same
- * identifier a record's own `vendor_id` carries, never a second one minted for this: on
- * Claude Code `CLAUDE_CODE_SESSION_ID` is the transcript filename the local reader resolves
- * a session by, and `telemetry-claim.ts`'s own `firedForSession` has compared the two as
- * equal since the "hook fired" claim existed. A different identifier here would be a second
- * identity for one thing.
+ * A commit carries `AIDD-Session-Id: <session anchor>` and the join closes. The value is
+ * whatever `session-anchor.ts` resolves — never a second identifier minted for this, which
+ * would be a second identity for one thing.
+ *
+ * **How far that join is measured, by host, because it is not the same distance for both.**
+ *
+ * On Claude Code it is measured: `CLAUDE_CODE_SESSION_ID` is the transcript filename, and
+ * `claude-code-transcript.ts`'s own `matchesMainTranscript` resolves a session by
+ * `<sessionId>.jsonl`, so the variable and the record's `vendor_id` are the same string.
+ *
+ * On Codex it is **unconfirmed**, and there is a specific reason to doubt it rather than a
+ * general one. A record's `vendor_id` there is the rollout's own `session_meta.id` — the
+ * uuid in `rollout-<timestamp>-<uuid>.jsonl`, as `codex.cjs` states and measured across
+ * every rollout on disk "including resumed ones where it differs from
+ * `session_meta.session_id`". `CODEX_THREAD_ID` names a thread, and a resumed thread spans
+ * two rollouts; if it names the first, a commit made in the second joins to nothing. The
+ * captured rollout in `cli/tests/fixtures/local-cost` is exactly such a resumed session and
+ * carries both values, different — but nothing captured so far carries that variable beside
+ * them, so which one it equals has never been read off a real session.
+ *
+ * What would settle it is one Codex session's `CODEX_THREAD_ID` captured beside the rollout
+ * it wrote. Until then a consumer treats a Codex trailer as a link to check, not one to
+ * rely on — see the same shape of stated limit on `opencode.ts`'s own counters.
+ *
+ * `telemetry-claim.ts`'s `firedForSession` compares the anchor to `vendorId` already, but it
+ * settles nothing here: on Codex a mismatch and a hook that never fired produce the same
+ * unproven claim.
  */
 
 /** Git's own trailer token. Capitalised the way `Co-authored-by` and `Signed-off-by` are,

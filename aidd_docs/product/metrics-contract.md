@@ -312,9 +312,11 @@ an AI session was running carries a trailer:
 AIDD-Session-Id: 33333333-3333-4333-8333-333333333333
 ```
 
-The value is the same string that session's records carry in `vendor_id` — never
-a second identifier minted for this purpose — so a commit joins to its records on
-an equality, with no resolution step in between.
+The value is the running session's own identifier, resolved from the environment.
+It is not a second identifier minted for this purpose, so a commit joins to its
+records on an equality with no resolution step in between — **on Claude Code,
+where that equality is measured.** On Codex it is not yet confirmed, and the
+next paragraph says why that matters.
 
 Rules a consumer can rely on:
 
@@ -325,11 +327,33 @@ Rules a consumer can rely on:
   bring in work that other commits already account for.
 - **At most one per commit**, amend and re-run included.
 - **What a commit already carries is never rewritten.** `aidd telemetry off`
-  removes the hook so new commits carry nothing; the history keeps what it has.
+  removes the hook, so commits made after it carry nothing while the history keeps
+  what it has. Note it is that command which removes it, not the switch's value:
+  a project whose `.aidd/config.json` is edited by hand to `enabled: false` still
+  has the hook installed, and still trailers.
 - **The trailer is not proof the session's records exist.** Turning the switch on
   installs the hook, and a session whose records were never read, or were removed
   with `aidd telemetry forget`, still leaves its trailer behind. A join that finds
   no records on the other side is an ordinary outcome.
+
+### How far the join is measured, per host
+
+**Claude Code — measured.** `CLAUDE_CODE_SESSION_ID` is the transcript filename,
+and a session is resolved locally by `<sessionId>.jsonl`, so the trailer's value
+and the record's `vendor_id` are the same string.
+
+**Codex — unconfirmed, with a specific reason to check it.** A record's
+`vendor_id` there is the rollout's own `session_meta.id`, the uuid in
+`rollout-<timestamp>-<uuid>.jsonl`, which on a *resumed* session differs from that
+rollout's `session_meta.session_id`. The trailer carries `CODEX_THREAD_ID`, which
+names a thread, and a resumed thread spans two rollouts. No capture so far holds
+that variable beside the rollout it wrote, so which of the two it equals has never
+been read off a real session. Treat a Codex trailer as a link to verify before
+relying on it.
+
+**Cursor, Copilot, OpenCode — no trailer.** Nothing was measured that names their
+running session in the environment, so the hook finds nothing and writes nothing.
+That is the same rule as everywhere else here: an unknown is never a guess.
 
 The link the trailer closes is `execution → commit`. From there, `commit → pull
 request → ticket` is the forge's own, and belongs to whoever reads it — this
