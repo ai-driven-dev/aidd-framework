@@ -167,6 +167,25 @@ describe("RunJournalReaderAdapter, beyond the boundaries", () => {
     });
   });
 
+  it("reads plugin_version off the header when the hook stamped one", async () => {
+    await writeFile(
+      join(runsDir, `${RUN_ID}__${SESSION_ID}.jsonl`),
+      runFileLines({ ...HEADER, plugin_version: "0.1.0" })
+    );
+    const adapter = new RunJournalReaderAdapter(projectRoot);
+
+    expect((await adapter.read(SESSION_ID))?.session?.plugin_version).toBe("0.1.0");
+  });
+
+  it("reads no plugin_version at all for a line written before this field existed - unknown, never a guessed default", async () => {
+    await writeFile(join(runsDir, `${RUN_ID}__${SESSION_ID}.jsonl`), runFileLines(HEADER));
+    const adapter = new RunJournalReaderAdapter(projectRoot);
+
+    const session = (await adapter.read(SESSION_ID))?.session;
+    expect(session?.plugin_version).toBeUndefined();
+    expect(Object.hasOwn(session ?? {}, "plugin_version")).toBe(false);
+  });
+
   it("reads the written paths as paths, deriving no task from them", async () => {
     await writeFile(
       join(runsDir, `${RUN_ID}__${SESSION_ID}.jsonl`),

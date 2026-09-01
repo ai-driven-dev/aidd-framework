@@ -60,6 +60,11 @@ const { readCwd } = require("../../plugins/aidd-telemetry/hooks/lib/tools/index.
 // One exact key set per line type (see phase-1.md) - the replacement for the
 // old THE_TEN_KEYS whitelist, which guarded a single mutable record that no
 // longer exists.
+//
+// plugin_version is here, not optional in this list, because every test below runs
+// against this repository's own real, readable `.claude-plugin/plugin.json` - the
+// unreadable-manifest case (plugin_version genuinely absent) is asserted on its own,
+// against a temporary copy whose manifest this suite deletes.
 const SESSION_START_KEYS = [
   "type",
   "at",
@@ -70,7 +75,12 @@ const SESSION_START_KEYS = [
   "tool",
   "vendor_id",
   "vendor_field",
+  "plugin_version",
 ].sort();
+
+// Read once, from the same manifest the hook itself reads - never hardcoded, so a real
+// version bump never turns this suite red for a reason unrelated to what it tests.
+const REAL_PLUGIN_VERSION = require("../../plugins/aidd-telemetry/.claude-plugin/plugin.json").version;
 
 const TURN_END_KEYS = ["type", "at"].sort();
 const TURN_END_WITH_PROMPT_KEYS = ["type", "at", "prompt_id"].sort();
@@ -999,6 +1009,7 @@ test("a session writes exactly one file directly under aidd_docs/runs/ when opte
     assert.deepEqual(Object.keys(line).sort(), SESSION_START_KEYS);
     assert.equal(line.type, "session_start");
     assert.equal(line.schema_version, 2);
+    assert.equal(line.plugin_version, REAL_PLUGIN_VERSION);
     assert.equal(line.project_id, "acme/opted-in");
     assert.equal(line.project_remote, "git@github.com:acme/opted-in.git");
     assert.equal(line.tool, "claude-code");

@@ -19,6 +19,7 @@ import type {
 } from "../../../../src/domain/ports/session-cost-reader.js";
 import type { AiTool } from "../../../../src/domain/tools/contracts.js";
 import { getAiToolConfig, registerTool } from "../../../../src/domain/tools/registry.js";
+import { FakeCurrentVersion } from "../../../helpers/ports/fake-current-version.js";
 import {
   InMemoryPersonIdentityReader,
   NULL_PERSON_IDENTITY_READER,
@@ -233,6 +234,41 @@ describe("ReadLocalCostUseCase", () => {
     const [stored] = [...sink.files.values()].flat();
     expect("person_id" in stored).toBe(false);
     expect("person_display_name" in stored).toBe(false);
+  });
+
+  it("stamps the CLI's own version on the record it stores, read through the version port", async () => {
+    declareClaudeReadable();
+    const sink = new InMemoryTelemetrySink();
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER,
+      new FakeCurrentVersion("9.9.9-test")
+    );
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
+
+    const [stored] = [...sink.files.values()].flat();
+    expect(stored.cli_version).toBe("9.9.9-test");
+  });
+
+  it("stamps no cli_version at all when no version reader was given - never a guessed default", async () => {
+    declareClaudeReadable();
+    const sink = new InMemoryTelemetrySink();
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE])]]),
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
+    );
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
+
+    const [stored] = [...sink.files.values()].flat();
+    expect("cli_version" in stored).toBe(false);
   });
 
   it("stamps the identifier a person chose, and a display name only once they set one", async () => {
@@ -1303,6 +1339,7 @@ describe("a failure in a sweep does not disappear behind a success", () => {
       NULL_PERSON_IDENTITY_READER,
       TELEMETRY_EVIDENCE_READER,
       undefined,
+      undefined,
       2
     );
     await useCase.execute({
@@ -1337,6 +1374,7 @@ describe("a failure in a sweep does not disappear behind a success", () => {
       NULL_RUN_JOURNAL_READER,
       NULL_PERSON_IDENTITY_READER,
       TELEMETRY_EVIDENCE_READER,
+      undefined,
       undefined,
       1
     );

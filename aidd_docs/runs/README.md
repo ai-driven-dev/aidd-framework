@@ -12,7 +12,7 @@ Every line carries `at` (ISO 8601, UTC, second precision) and `type`:
 
 | `type` | Carries | Fired by |
 | --- | --- | --- |
-| `session_start` | `schema_version`, `run_id`, `project_id`, `project_remote`, `tool`, `vendor_id`, `vendor_field`, plus `worktree_id` and `worktree_repo_id` when the session ran in a linked git worktree | SessionStart |
+| `session_start` | `schema_version`, `run_id`, `project_id`, `project_remote`, `tool`, `vendor_id`, `vendor_field`, plus `worktree_id` and `worktree_repo_id` when the session ran in a linked git worktree, plus `plugin_version` when the hook could read its own manifest | SessionStart |
 | `turn_end` | `prompt_id` when the host provides one, omitted otherwise | Stop |
 | `file_written` | `path`, repository-relative and `/`-separated, plus `source` (`"tool-stated"` \| `"observed"`) | PostToolUse, for a write that lands inside a task folder |
 | `task_declared` | `path`, repository-relative and `/`-separated | PostToolUse, for a call whose own arguments name a file under a task folder |
@@ -22,6 +22,16 @@ Every line carries `at` (ISO 8601, UTC, second precision) and `type`:
 `step_start` is the line that names which skill was running, and the one this table most
 recently caught up on documenting: complete coverage of what the journal writes is the
 whole reason a report can attribute a token to a step at all.
+
+`plugin_version` is this plugin's own version, from `.claude-plugin/plugin.json` — read
+once per process by `lib/plugin-version.cjs`, never per line, and stamped only on
+`session_start`, the one line that names the session, never repeated on every later line.
+Never the framework's own version, and never the CLI's — the CLI stamps a different field
+on the record it stores instead, `cli_version` (see `aidd_docs/product/metrics-contract.md`)
+— two different producers, two different artefacts, two different values. A manifest this
+hook cannot read costs the version, never the line: `session_start` is written with
+`plugin_version` omitted rather than the hook failing, and a line written before this field
+existed is read the same way, as an unknown version, never as a default.
 
 `file_written`'s `source` says how the path came to be known. `"tool-stated"` is a path the
 host handed over directly — exact, with no false positive. `"observed"` is a file that

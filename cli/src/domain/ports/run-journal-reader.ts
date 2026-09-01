@@ -41,6 +41,13 @@ export interface RunJournalSessionStart {
    * `worktree_id` rather than left to `project_id`, which falls back to the worktree's own
    * directory name when a clone has no remote. Absent whenever `worktree_id` is. */
   readonly worktree_repo_id?: string;
+  /** The plugin's own version, read from its manifest by `record.cjs`'s
+   * `buildSessionStartLine` at the moment this line was written - never the framework's
+   * version, and never the CLI's, which stamps only the record it stores, not the journal
+   * line beside it (see `TelemetrySinkRecord.cli_version`). Absent for a line the hook
+   * could not read its own manifest to stamp, and for any line written before this field
+   * existed - either way reads as an unknown version, never as a default or a guess. */
+  readonly plugin_version?: string;
 }
 
 /** A `file_written` line: a repository-relative, "/"-separated path a session wrote inside

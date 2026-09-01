@@ -68,6 +68,22 @@ describe("parseTelemetrySinkLine()", () => {
     expect(records.some((r) => r.provenance === "export")).toBe(true);
     expect(records.some((r) => r.provenance === "local-read")).toBe(true);
   });
+
+  // This fixture predates cli_version entirely - the hand-written stand-in for a record a
+  // build before this field existed actually wrote. Parsing it must not choke, and every
+  // record on it must still be there to count: an unknown version costs a field, never a
+  // figure.
+  it("parses a line written before cli_version existed, losing no figure to the gap", () => {
+    const url = new URL("../../fixtures/telemetry-sink/expected.jsonl", import.meta.url);
+    const lines = readFileSync(fileURLToPath(url), "utf8").trim().split("\n");
+    expect(lines.some((line) => line.includes("cli_version"))).toBe(false);
+
+    const records = lines.map(parseTelemetrySinkLine);
+    expect(records).toHaveLength(lines.length);
+    for (const record of records) {
+      expect("cli_version" in record).toBe(false);
+    }
+  });
 });
 
 describe("telemetrySinkRecordDayKey()", () => {

@@ -519,6 +519,27 @@ ignores it exactly as it would any other field it does not recognize.
 - **If absent**: either nobody opted in at all, or they opted in without ever
   setting a display name — the ordinary state, not an incomplete one.
 
+#### `cli_version`
+- **Type**: string, semver.
+- **Present**: conditional — present only on a `provenance: "local-read"`
+  record, stamped by `read-local-cost-use-case.ts` at the moment it stores the
+  record, read through the same port `current-version-adapter.ts` already
+  resolves the CLI's own version through. Never on a `provenance: "export"`
+  record: that route's records were never produced by this CLI at all — a
+  different process, a tool's own SDK, gone even earlier (see `provenance`
+  above) — so there is no version of *this tool* to name on one.
+- **Meaning**: which build of the AIDD CLI stored this record — never the
+  framework's own version, which stored nothing, and never the plugin's,
+  which stamps a different field on a different artefact (see
+  `aidd_docs/runs/README.md`'s `plugin_version` on the `session_start` line).
+  Comparing this field across two records is a real answer to "did this
+  figure change when I upgraded" in a way neither of the other two versions
+  can be, since it alone names what actually computed and wrote the line.
+- **If absent**: the record was stored by a build of this CLI before this
+  field existed. Reads as an unknown version, never as the current one or any
+  other guess — inventing a default here would make an upgrade comparison
+  silently wrong in the one place a version exists to serve it.
+
 ### Cost and token counters (conditional)
 
 #### `cost_usd`

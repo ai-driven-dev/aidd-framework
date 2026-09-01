@@ -15,6 +15,7 @@ const {
   PRIVATE_DIR_MODE,
 } = require("./repo.cjs");
 const { TOOLS_BY_HOST, readCwd, readSessionId } = require("./tools/index.cjs");
+const { pluginVersion } = require("./plugin-version.cjs");
 
 // Hand-rolled ULID - 48-bit millisecond timestamp plus 80 bits of randomness, both
 // Crockford base32 - since this plugin ships with no dependencies.
@@ -125,6 +126,15 @@ function appendLine(filePath, line) {
 // same worktree. They are appended after the fields that were already on this line, so a
 // reader keyed on order sees no existing key move. No schema_version bump: an optional
 // field a reader may not know about is exactly what an optional field is for.
+//
+// plugin_version is the same shape, appended after them for the same reason: this plugin's
+// own version, from `plugin-version.cjs`'s own read of `.claude-plugin/plugin.json`, and
+// omitted entirely - never `null`, never a guessed or inherited value - when that manifest
+// could not be read. Stamped once, on the one line that names the session, never repeated
+// on every later line: it is a fact about which build of this plugin observed the whole
+// session, not a per-event fact. Never the framework's own version, and never the CLI's -
+// this hook is the one producer that can honestly say which build of *this plugin* wrote
+// this line.
 function buildSessionStartLine({
   at,
   runId,
@@ -135,6 +145,7 @@ function buildSessionStartLine({
   worktreeId,
   worktreeRepoId,
 }) {
+  const version = pluginVersion();
   return {
     type: "session_start",
     at,
@@ -147,6 +158,7 @@ function buildSessionStartLine({
     vendor_field: VENDOR_FIELD_BY_HOST[host],
     ...(worktreeId === undefined ? {} : { worktree_id: worktreeId }),
     ...(worktreeRepoId === undefined ? {} : { worktree_repo_id: worktreeRepoId }),
+    ...(version === null ? {} : { plugin_version: version }),
   };
 }
 

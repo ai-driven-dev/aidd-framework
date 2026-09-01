@@ -742,6 +742,7 @@ export async function createDeps(
     runJournalReader,
     personIdentityAdapter,
     telemetryEvidenceAdapter,
+    currentVersionProvider,
     logger
   );
   const personIdentityUseCase = new PersonIdentityUseCase(personIdentityAdapter);

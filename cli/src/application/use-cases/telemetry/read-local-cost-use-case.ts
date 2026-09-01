@@ -30,6 +30,7 @@ import type {
 } from "../../../domain/ports/session-cost-reader.js";
 import type { TelemetryEvidenceReader } from "../../../domain/ports/telemetry-evidence-reader.js";
 import type { TelemetrySink } from "../../../domain/ports/telemetry-sink.js";
+import type { VersionReader } from "../../../domain/ports/version-reader.js";
 import { getAiToolConfig } from "../../../domain/tools/registry.js";
 
 /** Five answers, and only one of them may ever be printed as a zero.
@@ -270,6 +271,16 @@ export class ReadLocalCostUseCase {
     private readonly runJournalReader: RunJournalReader,
     private readonly personIdentityReader: PersonIdentityReader,
     private readonly telemetryEvidenceReader: TelemetryEvidenceReader,
+    /** The CLI's own version, stamped on every record this sweep stores
+     * (`stampProvenanceAndTool`) - read through the same port `current-version-adapter.ts`
+     * already resolves it through, never a second way. Production wiring (`deps.ts`)
+     * always supplies the real adapter; that guarantee is not just asserted here, it is
+     * enforced - `telemetry-multi-tool.e2e.test.ts` runs the real built binary through
+     * `deps.ts` and fails if a stored record ever lacks `cli_version`. Optional on this
+     * constructor only so a caller exercising a concern this field is not about (most unit
+     * tests) does not have to invent a version to reach it - absent, this simply omits the
+     * field from what gets stored, never guesses at a value. */
+    private readonly versionReader?: VersionReader,
     /** Only the retention prune below writes here, and only to warn. Optional because a
      * caller that does not care about housekeeping warnings should not have to invent a
      * logger to read its own figures. */
@@ -485,6 +496,7 @@ export class ReadLocalCostUseCase {
         : { project_id: project.projectId, project_field: project.projectField }),
       ...(person === null ? {} : { person_id: person.personId }),
       ...(person?.displayName === undefined ? {} : { person_display_name: person.displayName }),
+      ...(this.versionReader === undefined ? {} : { cli_version: this.versionReader.get() }),
     };
   }
 

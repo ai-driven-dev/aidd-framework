@@ -103,6 +103,18 @@ export interface TelemetrySinkRecord {
   /** A separate, later choice from `person_id` - present only once asked for, and never
    * derived from it or from anything else. */
   readonly person_display_name?: string;
+  /** The CLI's own version, read through the same port `current-version-adapter.ts` already
+   * resolves it through, stamped only on what the CLI itself stored — a `provenance:
+   * "local-read"` record, never a `provenance: "export"` one, the same restriction
+   * `person_id`'s own comment states for the same reason: the export route's records were
+   * never produced by this CLI at all (a different process, a tool's own SDK, gone even
+   * earlier - see `TelemetrySinkRecordProvenance`), so there is no version of *this tool*
+   * to name on one. Never the framework's own version, which stored nothing here, and never
+   * the plugin's, which stamps only the journal line beside this record (see
+   * `RunJournalSessionStart.plugin_version`) — two different fields, two different
+   * producers, two different values. Absent on a record written before this field existed,
+   * which reads as an unknown version, never as a default or a guess. */
+  readonly cli_version?: string;
   readonly cost_usd?: number;
   readonly input_tokens?: number;
   readonly output_tokens?: number;

@@ -3,7 +3,7 @@ import { realpathSync } from "node:fs";
 import { chmod, cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { delimiter, join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createTestEnv, gitInit, runCli } from "./helpers.js";
+import { createTestEnv, gitInit, runCli, sinkDirIn } from "./helpers.js";
 
 /**
  * Three readable tools through one report, from the files each of them actually writes.
@@ -241,6 +241,35 @@ describe("aidd telemetry, across every tool that can be read", () => {
     expect(mix).toContain("from a journal interval");
     // OpenCode has no journal beside it and states nothing.
     expect(mix).toContain("unattributed");
+  });
+
+  it("stamps every stored record with this CLI's own version, read through the real binary - never the framework's", async () => {
+    await journalClaudeSession();
+    await readEveryTool();
+
+    const sinkDir = sinkDirIn(fakeHome);
+    const dayFiles = await readdir(sinkDir);
+    const records = (
+      await Promise.all(
+        dayFiles
+          .filter((name) => name.endsWith(".jsonl"))
+          .map(async (name) => readFile(join(sinkDir, name), "utf8"))
+      )
+    )
+      .join("\n")
+      .split("\n")
+      .filter((line) => line.trim() !== "")
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+
+    expect(records.length).toBeGreaterThan(0);
+    // This CLI's own package.json - never the framework's root one, which sits one
+    // directory further up and carries a different version entirely.
+    const cliPackageJson = JSON.parse(
+      await readFile(join(process.cwd(), "package.json"), "utf8")
+    ) as { version: string };
+    for (const record of records) {
+      expect(record.cli_version).toBe(cliPackageJson.version);
+    }
   });
 
   it("attributes a task from what the journal hook itself recorded", async () => {

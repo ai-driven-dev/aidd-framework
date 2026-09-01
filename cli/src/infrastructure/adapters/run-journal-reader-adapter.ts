@@ -52,6 +52,7 @@ interface RawJournalLine {
   readonly worktree_id?: unknown;
   readonly worktree_repo_id?: unknown;
   readonly path?: unknown;
+  readonly plugin_version?: unknown;
 }
 
 function parseLine(line: string): RawJournalLine | null {
@@ -103,6 +104,7 @@ function parseSessionStart(parsed: RawJournalLine): RunJournalSessionStart | nul
   }
   const projectId = asString(parsed.project_id);
   const projectRemote = asString(parsed.project_remote);
+  const pluginVersion = asString(parsed.plugin_version);
   return {
     type: "session_start",
     at,
@@ -112,6 +114,7 @@ function parseSessionStart(parsed: RawJournalLine): RunJournalSessionStart | nul
     ...(projectId === undefined ? {} : { project_id: projectId }),
     ...(projectRemote === undefined ? {} : { project_remote: projectRemote }),
     ...parseWorktree(parsed),
+    ...(pluginVersion === undefined ? {} : { plugin_version: pluginVersion }),
   };
 }
 
