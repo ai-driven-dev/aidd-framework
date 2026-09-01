@@ -1442,3 +1442,167 @@ describe("a refusal holds on the one writer left", () => {
     expect([...sink.files.values()].flat()).toHaveLength(0);
   });
 });
+
+/**
+ * Which readers a session actually reaches.
+ *
+ * Reading every tool for every session was pure waste the journal could already have
+ * prevented, and one tool charged for it: the OpenCode reader shells out to its binary and
+ * waits, measured at 1.15s for a session it does not have. Nothing guarded the behaviour
+ * either way, so these tests are what make the narrowing a decision rather than a habit.
+ */
+describe("which readers a session reaches", () => {
+  const SPIED_SESSION = "spied-session";
+  const SUPPLIES = { tokenCounters: true, amount: false, toolStatedStep: false } as const;
+
+  let claudeConfig: AiTool<unknown>;
+  let codexConfig: AiTool<unknown>;
+
+  beforeEach(() => {
+    claudeConfig = getAiToolConfig("claude");
+    codexConfig = getAiToolConfig("codex");
+    registerTool({ ...claudeConfig, telemetryLocalRead: { kind: "declared", supplies: SUPPLIES } });
+    registerTool({ ...codexConfig, telemetryLocalRead: { kind: "declared", supplies: SUPPLIES } });
+  });
+
+  afterEach(() => {
+    registerTool(claudeConfig);
+    registerTool(codexConfig);
+  });
+
+  /** Records every session id it was asked about, so a test can assert on a reader that was
+   * never reached rather than only on the answer it would have given. */
+  function spyReader(): SessionCostReader & { readonly asked: string[] } {
+    const asked: string[] = [];
+    return {
+      asked,
+      read: async (sessionId: string) => {
+        asked.push(sessionId);
+        return { records: [], sessionFound: true };
+      },
+    };
+  }
+
+  function journalNaming(host: string): RunJournal {
+    return {
+      boundaries: [],
+      filesWritten: [],
+      taskDeclarations: [],
+      session: {
+        type: "session_start",
+        at: "2026-03-02T08:00:00Z",
+        run_id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        tool: host,
+        vendor_id: SPIED_SESSION,
+      },
+    };
+  }
+
+  function useCaseWith(
+    journalReader: typeof NULL_RUN_JOURNAL_READER,
+    readers: ReadonlyMap<AiToolId, SessionCostReader>
+  ): ReadLocalCostUseCase {
+    return new ReadLocalCostUseCase(
+      new InMemoryTelemetrySink(),
+      readers,
+      journalReader,
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
+    );
+  }
+
+  it("asks only the reader the journal named, and says so about the ones it skipped", async () => {
+    const journals = new InMemoryRunJournalReader();
+    journals.set(SPIED_SESSION, journalNaming("claude-code"));
+    const claude = spyReader();
+    const codex = spyReader();
+    const useCase = useCaseWith(
+      journals,
+      new Map([
+        ["claude", claude],
+        ["codex", codex],
+      ])
+    );
+
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SPIED_SESSION,
+    });
+
+    expect(claude.asked).toEqual([SPIED_SESSION]);
+    expect(codex.asked).toEqual([]);
+    expect(result.toolReports.find((r) => r.tool === "codex")?.status).toBe("not-asked");
+  });
+
+  it("never reports a skipped reader as having found no session", async () => {
+    const journals = new InMemoryRunJournalReader();
+    journals.set(SPIED_SESSION, journalNaming("claude-code"));
+    const useCase = useCaseWith(journals, new Map([["claude", spyReader()]]));
+
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SPIED_SESSION,
+    });
+
+    // "no session found" is an observation: this tool was looked in and held nothing.
+    // Nothing was looked in here, so nothing may claim it was.
+    expect(result.toolReports.find((r) => r.tool === "codex")?.status).not.toBe("not-found");
+  });
+
+  it("still names a tool nothing can read, with its own declared reason, whoever the session belongs to", async () => {
+    const journals = new InMemoryRunJournalReader();
+    journals.set(SPIED_SESSION, journalNaming("claude-code"));
+    const useCase = useCaseWith(journals, new Map([["claude", spyReader()]]));
+
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SPIED_SESSION,
+    });
+
+    // Cursor's declaration says its files carry no counter at all — a fact about the tool,
+    // true of every session. Answering "not this session's tool" would trade the reason a
+    // person needs for one that says less.
+    const cursor = result.toolReports.find((r) => r.tool === "cursor");
+    expect(cursor?.status).toBe("not-covered");
+    expect(cursor?.reason).toBeTruthy();
+  });
+
+  it("asks every reader when no journal names a tool, since then none is ruled out", async () => {
+    const claude = spyReader();
+    const codex = spyReader();
+    const useCase = useCaseWith(
+      NULL_RUN_JOURNAL_READER,
+      new Map([
+        ["claude", claude],
+        ["codex", codex],
+      ])
+    );
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SPIED_SESSION });
+
+    expect(claude.asked).toEqual([SPIED_SESSION]);
+    expect(codex.asked).toEqual([SPIED_SESSION]);
+  });
+
+  it("asks every reader when the journal names a host no tool claims", async () => {
+    const journals = new InMemoryRunJournalReader();
+    journals.set(SPIED_SESSION, journalNaming("a-tool-nobody-registered"));
+    const claude = spyReader();
+    const codex = spyReader();
+    const useCase = useCaseWith(
+      journals,
+      new Map([
+        ["claude", claude],
+        ["codex", codex],
+      ])
+    );
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SPIED_SESSION });
+
+    expect(claude.asked).toEqual([SPIED_SESSION]);
+    expect(codex.asked).toEqual([SPIED_SESSION]);
+  });
+});

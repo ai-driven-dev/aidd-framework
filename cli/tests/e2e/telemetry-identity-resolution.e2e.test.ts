@@ -196,13 +196,13 @@ describe("aidd telemetry report --axis person, and the identity commands that fe
     expect(new Set(unresolved.flatMap((row) => row.identities)).size).toBe(2);
   });
 
-  it("identity status lists every added identifier with no report ever run", async () => {
+  it("identity lists every added identifier with no report ever run", async () => {
     const { projectDir, fakeHome, cleanup: c } = await setUp("person-status-first");
     cleanup = c;
-    await runCli(["telemetry", "identity", "on"], projectDir, fakeHome);
+    await runCli(["telemetry", "identity", "use"], projectDir, fakeHome);
     await runCli(["telemetry", "identity", "link", "machine-b-id"], projectDir, fakeHome);
 
-    const status = await runCli(["telemetry", "identity", "status"], projectDir, fakeHome);
+    const status = await runCli(["telemetry", "identity"], projectDir, fakeHome);
 
     expect(status.exitCode, status.stderr).toBe(0);
     expect(status.stdout).toContain("machine-b-id");

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { UnreadableIdentityFileError } from "../../domain/errors.js";
 import {
@@ -15,13 +15,6 @@ import { asPlainObject, describeError, isErrnoException } from "../json-file.js"
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIR_MODE = 0o700;
-
-// Never read - `person-mapping.json` was introduced and never released, so there is
-// nothing in an existing one to migrate. Named only so `status` can say it is ignored and
-// safe to remove, beside the same directory `PersonIdentityAdapter.filePath` resolves.
-function stalePersonMappingPath(): string {
-  return join(resolveAiddConfigDir(), "person-mapping.json");
-}
 
 // A file with no `origin` at all is read as `"minted"`, never guessed as anything else:
 // every file written before this change - by this adapter's own earlier shape, or by the
@@ -120,15 +113,6 @@ export class PersonIdentityAdapter implements PersonIdentityStore {
     const next: PersonIdentity = { ...identity, displayName };
     await this.write(next);
     return next;
-  }
-
-  async staleMappingFilePath(): Promise<string | null> {
-    try {
-      await access(stalePersonMappingPath());
-      return stalePersonMappingPath();
-    } catch {
-      return null;
-    }
   }
 
   // `recursive: true` is what lets this discard a damaged identity file that turns out to

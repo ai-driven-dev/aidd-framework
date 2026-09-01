@@ -12,8 +12,8 @@ import { createTestEnv, runCli } from "./helpers.js";
  * forget` — the skill's account of the seventh command going stale the same way the
  * other six are already guarded against.
  *
- * `00-init`'s commands are stateful — `identity name` and `identity off` only make sense
- * once `identity on` has run, and `forget --yes` deletes the very journal and identity
+ * `00-init`'s commands are stateful — `identity use --name` and `identity off` only make sense
+ * once `identity use` has run, and `forget --yes` deletes the very journal and identity
  * every other command in this sweep might still need — so they are not run in whatever
  * order the markdown walk happens to find them in; `orderForExecution` puts every `on`
  * first, every `off` after that, and every `forget` last of all: the most destructive
@@ -50,15 +50,24 @@ function commandsNamedBySkill(): string[] {
   return [...found];
 }
 
-/** `on` before everything else, `off` after that, `forget` last of all. `identity name`
- * and `identity status` sit safely in the middle: both are fine whether an identity
- * exists or not, but only once the `on` commands have already run and before `forget`
- * removes it. A stable sort keeps ties in the file walk's own order. */
+/**
+ * The order every one of these commands can succeed in, stated rather than stumbled into.
+ *
+ * `telemetry on` first, `forget` last, `off` just before it. Between them the identity
+ * verbs have an order of their own: `link` refuses with `IdentityRequiredToLinkError` when
+ * nothing stands, so it has to come after `use`. That used to hold by accident — every
+ * identity command shared one rank and `link` merely happened to appear later in the file
+ * walk — and this test asserts exit 0 on all of them, so reordering the markdown would have
+ * turned it red for a reason that has nothing to do with what it guards.
+ *
+ * A stable sort keeps ties in the file walk's own order.
+ */
 function orderForExecution(commands: readonly string[]): string[] {
   const rank = (command: string): number => {
-    if (/\bforget\b/u.test(command)) return 3;
-    if (/\bon\b/u.test(command)) return 0;
-    if (/\boff\b/u.test(command)) return 2;
+    if (/\bforget\b/u.test(command)) return 4;
+    if (/\btelemetry on\b/u.test(command)) return 0;
+    if (/\boff\b/u.test(command)) return 3;
+    if (/\b(?:un)?link\b/u.test(command)) return 2;
     return 1;
   };
   return [...commands].sort((a, b) => rank(a) - rank(b));

@@ -36,8 +36,12 @@ Records are appended as JSON Lines, one JSON object per line, to a UTC-day file:
 ~/.config/aidd/telemetry/YYYY-MM-DD.jsonl
 ```
 
-or under `$AIDD_USER_CONFIG_DIR/telemetry/YYYY-MM-DD.jsonl` when that environment
-variable is set. A day file is append-only for its whole life — lines are never
+or under `$AIDD_TELEMETRY_DIR/YYYY-MM-DD.jsonl` when that environment variable is set —
+it names this directory outright. `$AIDD_USER_CONFIG_DIR/telemetry/YYYY-MM-DD.jsonl` is
+still honoured, for a machine configured before the two were split, and names the
+directory *above* this one; a consumer has to look in both. The split exists because
+`AIDD_USER_CONFIG_DIR` also relocates `auth.json`, so it could never be the variable a
+team shares. A day file is append-only for its whole life — lines are never
 rewritten in place, only added. A session's records can span more than one day
 file if the session crosses midnight.
 

@@ -85,15 +85,15 @@ async function seedIdentity(home: string, personId: string): Promise<void> {
 }
 
 describe("aidd telemetry identity — the journey and its edge cases", () => {
-  it("walks status -> on -> name -> status -> off, each state legible from stdout", async () => {
+  it("walks identity -> use -> use --name -> identity -> off, each state legible from stdout", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-journey");
     try {
-      const off = await runCli(["telemetry", "identity", "status"], projectDir, fakeHome);
+      const off = await runCli(["telemetry", "identity"], projectDir, fakeHome);
       expect(off.exitCode, off.stderr).toBe(0);
       expect(off.stdout).toContain("off");
       expect(off.stdout).not.toContain("on,");
 
-      const on = await runCli(["telemetry", "identity", "on"], projectDir, fakeHome);
+      const on = await runCli(["telemetry", "identity", "use"], projectDir, fakeHome);
       expect(on.exitCode, on.stderr).toBe(0);
       expect(on.stdout).toMatch(/on, [0-9a-f-]{36}/u);
       const mintedId = (await readIdentityFile(fakeHome)) ?? "";
@@ -101,13 +101,13 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
       expect(personId).toMatch(UUID_V4);
 
       const name = await runCli(
-        ["telemetry", "identity", "name", "Baptiste"],
+        ["telemetry", "identity", "use", "--name", "Baptiste"],
         projectDir,
         fakeHome
       );
       expect(name.exitCode, name.stderr).toBe(0);
 
-      const status = await runCli(["telemetry", "identity", "status"], projectDir, fakeHome);
+      const status = await runCli(["telemetry", "identity"], projectDir, fakeHome);
       expect(status.exitCode, status.stderr).toBe(0);
       expect(status.stdout).toContain(personId);
       expect(status.stdout).toContain('"Baptiste"');
@@ -125,10 +125,10 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
   // 05-forget.md require the skill to relay. Nothing held them: all four could be deleted
   // from telemetry-display.ts and the suite stayed green. In a feature whose whole value is
   // that consent is explicit, the consent text is the last thing that should be unguarded.
-  it("on discloses what an identity attaches to, and what it never attaches to", async () => {
+  it("a minted identity discloses what it attaches to, and what it never attaches to", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-disclosure-on");
     try {
-      const result = await runCli(["telemetry", "identity", "on"], projectDir, fakeHome);
+      const result = await runCli(["telemetry", "identity", "use"], projectDir, fakeHome);
 
       expect(result.exitCode, result.stderr).toBe(0);
       expect(result.stdout).toContain("Attaches to: records this machine reads locally");
@@ -144,7 +144,7 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
   it("off says past records keep the identifier they were written with", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-disclosure-off");
     try {
-      await runCli(["telemetry", "identity", "on"], projectDir, fakeHome);
+      await runCli(["telemetry", "identity", "use"], projectDir, fakeHome);
 
       const result = await runCli(["telemetry", "identity", "off"], projectDir, fakeHome);
 
@@ -157,16 +157,16 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
     }
   });
 
-  it("a second on reports the same identifier, never a new one", async () => {
+  it("a second use reports the same identifier, never a new one", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-double-on");
     try {
-      await runCli(["telemetry", "identity", "on"], projectDir, fakeHome);
+      await runCli(["telemetry", "identity", "use"], projectDir, fakeHome);
       const first = (await readIdentityFile(fakeHome)) ?? "";
 
-      const second = await runCli(["telemetry", "identity", "on"], projectDir, fakeHome);
+      const second = await runCli(["telemetry", "identity", "use"], projectDir, fakeHome);
 
       expect(second.exitCode, second.stderr).toBe(0);
-      expect(second.stdout).toContain("already on");
+      expect(second.stdout).toContain("already in effect");
       expect(await readIdentityFile(fakeHome)).toBe(first);
     } finally {
       await cleanup();
@@ -176,7 +176,7 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
   it("off removes the whole declaration, stating how many added identifiers went with it", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-off-removes-alsome");
     try {
-      await runCli(["telemetry", "identity", "on"], projectDir, fakeHome);
+      await runCli(["telemetry", "identity", "use"], projectDir, fakeHome);
       await runCli(["telemetry", "identity", "link", "a-second-machine"], projectDir, fakeHome);
 
       const result = await runCli(["telemetry", "identity", "off"], projectDir, fakeHome);
@@ -184,25 +184,32 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
       expect(result.exitCode, result.stderr).toBe(0);
       expect(result.stdout).toMatch(/1 added identifier removed with it/iu);
 
-      const status = await runCli(["telemetry", "identity", "status"], projectDir, fakeHome);
+      const status = await runCli(["telemetry", "identity"], projectDir, fakeHome);
       expect(status.stdout).not.toContain("a-second-machine");
     } finally {
       await cleanup();
     }
   });
 
-  it("naming before opting in refuses and names on as the missing step", async () => {
+  it("mints for a name given before anything stands, rather than refusing", async () => {
+    // The separate `name` verb refused here and had to: it could only decorate an identity
+    // that already existed. `use` is the verb that opts in, so a name given to it with
+    // nothing standing is a person saying who they are, not asking to rename a thing that
+    // is not there. One command, one intent, no error to route around.
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-name-first");
     try {
       const result = await runCli(
-        ["telemetry", "identity", "name", "Baptiste"],
+        ["telemetry", "identity", "use", "--name", "Baptiste"],
         projectDir,
         fakeHome
       );
 
-      expect(result.exitCode).toBe(1);
-      expect(result.stderr).toMatch(/telemetry identity on/u);
-      expect(await readIdentityFile(fakeHome)).toBeNull();
+      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.stdout).toContain("Display name: Baptiste");
+      const written = await readIdentityFile(fakeHome);
+      expect(written).not.toBeNull();
+      expect(JSON.parse(written ?? "{}").display_name).toBe("Baptiste");
+      expect(JSON.parse(written ?? "{}").origin).toBe("minted");
     } finally {
       await cleanup();
     }
@@ -213,7 +220,7 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
     try {
       await mkdir(identityFileIn(fakeHome), { recursive: true });
 
-      const result = await runCli(["telemetry", "identity", "status"], projectDir, fakeHome);
+      const result = await runCli(["telemetry", "identity"], projectDir, fakeHome);
 
       expect(result.exitCode).toBe(1);
       expect(result.stderr).toMatch(/could not read/iu);
@@ -288,7 +295,7 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
         `${JSON.stringify({ person_id: "should-never-be-read" }, null, 2)}\n`
       );
 
-      const result = await runCli(["telemetry", "identity", "status"], projectDir, fakeHome, {
+      const result = await runCli(["telemetry", "identity"], projectDir, fakeHome, {
         env: { AIDD_USER_CONFIG_DIR: elsewhere },
       });
 
@@ -318,7 +325,7 @@ describe("aidd telemetry identity — the journey and its edge cases", () => {
         `${JSON.stringify({ person_id: "forced-by-the-repo" }, null, 2)}\n`
       );
 
-      const result = await runCli(["telemetry", "identity", "status"], projectDir, fakeHome, {
+      const result = await runCli(["telemetry", "identity"], projectDir, fakeHome, {
         env: { AIDD_USER_CONFIG_DIR: elsewhere },
       });
 
@@ -385,7 +392,7 @@ describe("a choice made today does not reach backwards", () => {
       expect(beforeOptIn.length).toBeGreaterThan(0);
       expect(beforeOptIn.every((line) => !("person_id" in line))).toBe(true);
 
-      const on = await runCli(["telemetry", "identity", "on"], projectDir, fakeHome);
+      const on = await runCli(["telemetry", "identity", "use"], projectDir, fakeHome);
       expect(on.exitCode, on.stderr).toBe(0);
       const personId = (
         JSON.parse((await readIdentityFile(fakeHome)) ?? "{}") as {
@@ -432,7 +439,7 @@ describe("the on-disk format the deleted script produced", () => {
       await seedIdentity(fakeHome, "shared-person-id");
 
       const result = await runCli(
-        ["telemetry", "identity", "name", "Baptiste"],
+        ["telemetry", "identity", "use", "--name", "Baptiste"],
         projectDir,
         fakeHome
       );
@@ -452,10 +459,10 @@ describe("the on-disk format the deleted script produced", () => {
     }
   });
 
-  it("on: from empty, mints a v4 identifier recording how it was obtained", async () => {
+  it("use with no identifier: from empty, mints a v4 identifier recording how it was obtained", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("identity-format-on-empty");
     try {
-      const result = await runCli(["telemetry", "identity", "on"], projectDir, fakeHome);
+      const result = await runCli(["telemetry", "identity", "use"], projectDir, fakeHome);
 
       expect(result.exitCode, result.stderr).toBe(0);
       const file = await readFile(identityFileIn(fakeHome), "utf8");

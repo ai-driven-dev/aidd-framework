@@ -1,10 +1,9 @@
+import type { TelemetrySink } from "../../domain/ports/telemetry-sink.js";
 import { getAiToolConfig } from "../../domain/tools/registry.js";
 import type { CLIOutput } from "../output.js";
 import type {
   PersonIdentityLinkResult,
-  PersonIdentityNameResult,
   PersonIdentityOffResult,
-  PersonIdentityOnResult,
   PersonIdentityStatusResult,
   PersonIdentityUnlinkResult,
   PersonIdentityUseResult,
@@ -26,6 +25,12 @@ const LOCAL_COST_STATUS_LABELS: Record<LocalCostToolStatus, string> = {
   // is wrong. Distinct from "no session found", where nothing is known and nothing is wrong.
   unreadable: "could not be read",
   "not-covered": "not covered",
+  // Never "no session found": the journal named another tool, so this reader was not run.
+  // Nothing was observed about it, and nothing is wrong. Worded to stay true at both
+  // scales — this line is printed per tool for a whole sweep, so a session-shaped label
+  // ("not this session's tool") would be a claim about one session on a line summarising
+  // several.
+  "not-asked": "no session read belongs to it",
 };
 
 export function printTelemetryOnReport(output: CLIOutput, result: TelemetryOnResult): void {
@@ -108,37 +113,40 @@ export function printPersonIdentityStatus(
   if (result.identity !== null && result.identity.alsoMe.length > 0) {
     output.print(`  Identifiers added onto this person: ${result.identity.alsoMe.join(", ")}`);
   }
-  if (result.staleMappingFilePath !== undefined) {
-    output.print(
-      `  A separate declaration file at ${result.staleMappingFilePath} is ignored and can be removed.`
-    );
-  }
 }
 
-export function printPersonIdentityOn(output: CLIOutput, result: PersonIdentityOnResult): void {
-  const prefix = result.minted ? "on" : "already on";
-  output.success(`AIDD identity: ${prefix}, ${result.identity.personId} (${result.filePath})`);
-  if (!result.minted) return;
-  output.print("  Attaches to: records this machine reads locally, from now on.");
-  output.print(
-    "  Never attaches to: the run journal, a session already recorded, or a tool's own export."
-  );
-}
-
+/** One outcome word, three sentences — and the sentence a person needs is different for
+ * each. A minted identifier is a new fact about this machine and gets the disclosure that
+ * used to belong to `on`; an adopted one replaces something and has to say what happened to
+ * what it replaced; an unchanged one must not claim anything was written. */
 export function printPersonIdentityUse(output: CLIOutput, result: PersonIdentityUseResult): void {
-  if (result.alreadyInEffect) {
+  const at = `(${result.filePath})`;
+  if (result.outcome === "unchanged") {
+    // "already in effect" is true of the identifier and false of the file whenever a name
+    // came with the call: something was written, and the line a person reads first must not
+    // say otherwise.
+    const alsoNamed = result.displayNameSet === undefined ? "" : ", display name set";
     output.success(
-      `AIDD identity: ${result.identity.personId} is already in effect (${result.filePath})`
+      `AIDD identity: ${result.identity.personId} already in effect${alsoNamed} ${at}`
     );
-    return;
+  } else if (result.outcome === "minted") {
+    output.success(`AIDD identity: on, ${result.identity.personId} ${at}`);
+    output.print("  Attaches to: records this machine reads locally, from now on.");
+    output.print(
+      "  Never attaches to: the run journal, a session already recorded, or a tool's own export."
+    );
+  } else {
+    const replaced =
+      result.replacedPersonId === undefined ? "" : ` (replacing ${result.replacedPersonId})`;
+    output.success(`AIDD identity: now ${result.identity.personId}${replaced} ${at}`);
+    if (result.replacedPersonId !== undefined) {
+      output.print("  Records already written keep the identifier they were written with.");
+    }
+    output.print(`  ${DECLARATION_DISCLAIMER}`);
   }
-  const replaced =
-    result.replacedPersonId === undefined ? "" : ` (replacing ${result.replacedPersonId})`;
-  output.success(`AIDD identity: now ${result.identity.personId}${replaced} (${result.filePath})`);
-  if (result.replacedPersonId !== undefined) {
-    output.print("  Records already written keep the identifier they were written with.");
+  if (result.displayNameSet !== undefined) {
+    output.print(`  Display name: ${result.displayNameSet}`);
   }
-  output.print(`  ${DECLARATION_DISCLAIMER}`);
 }
 
 export function printPersonIdentityOff(output: CLIOutput, result: PersonIdentityOffResult): void {
@@ -160,10 +168,6 @@ export function printPersonIdentityOff(output: CLIOutput, result: PersonIdentity
   output.print(
     `  ${result.addedIdentifiersRemoved} added identifier${result.addedIdentifiersRemoved === 1 ? "" : "s"} removed with it.`
   );
-}
-
-export function printPersonIdentityName(output: CLIOutput, result: PersonIdentityNameResult): void {
-  output.success(`AIDD identity: display name set (${result.filePath})`);
 }
 
 export function printPersonIdentityLink(output: CLIOutput, result: PersonIdentityLinkResult): void {
@@ -188,4 +192,32 @@ export function printPersonIdentityUnlink(
     return;
   }
   output.success(`AIDD identity: unlinked '${result.identity}' (${result.filePath})`);
+}
+
+/**
+ * Says, once per command that touches the figures, that this machine locates them through a
+ * variable which also moves its GitHub token.
+ *
+ * Not, as a first draft of this claimed, "the people who followed the plugin README when it
+ * said to share `AIDD_USER_CONFIG_DIR`". That README has never been released — the whole
+ * telemetry layer is absent from `main` — so outside this branch that population is empty,
+ * and a warning written for nobody is the `person-mapping.json` mistake again.
+ *
+ * The real audience is larger and outlives the split: anyone who sets
+ * `AIDD_USER_CONFIG_DIR` for the reason it has always existed — relocating a machine's aidd
+ * config, which a CI job or a test harness legitimately does — and thereby moves their
+ * figures into the same directory as their token without ever intending to. They are not
+ * following bad advice; they are using a variable that does two things, and only this line
+ * tells them the second one.
+ *
+ * `warn` writes to stderr, so a `--json` caller's stdout stays one parseable object.
+ */
+export function warnIfFiguresMoveTheTokenToo(output: CLIOutput, sink: TelemetrySink): void {
+  if (sink.locatedBy !== "user-config-dir") return;
+  output.warn(
+    `Figures are kept at ${sink.rootDir}, located through AIDD_USER_CONFIG_DIR — which also ` +
+      "moves auth.json, this machine's GitHub token. If that directory is shared, the token " +
+      "is in it. Set AIDD_TELEMETRY_DIR to the same path instead: it moves the figures and " +
+      "nothing else."
+  );
 }

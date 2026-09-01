@@ -17,7 +17,33 @@ export interface TelemetrySetup {
   readonly identity: TelemetryIdentitySetup;
   readonly recordsLocation: TelemetryRecordsLocationSetup;
   readonly recorderDeclaration: TelemetryRecorderDeclarationSetup;
+  readonly versions: TelemetryVersionsSetup;
 }
+
+/** Which build of which piece produced what a person is reading.
+ *
+ * Two producers, and only one of them can be asked directly. The CLI's own version is here
+ * in this process; the plugin's is a fact about a different program, on a different
+ * schedule, and the only honest source for it is what that program itself wrote — so it is
+ * read back out of the journal rather than re-derived. Re-deriving it would mean a third
+ * copy of `plugin-version.cjs`'s two-route lookup, in a process that never ran the hook,
+ * able to disagree with the lines actually on disk. */
+export interface TelemetryVersionsSetup {
+  readonly cli: string;
+  readonly plugin: TelemetryPluginVersionSetup;
+}
+
+/** Three answers, and only the first is a version.
+ *
+ * `"unrecorded"` and `"nothing-journalled"` are deliberately apart: the first is a hook
+ * that ran and could not name its own build — the plugin's manifest was not beside its
+ * hooks and no `aidd` install recorded one, which is a plugin copied in by hand. The second
+ * is a project where nothing has been measured yet, and says nothing about the plugin at
+ * all. Collapsing them would let "not measured yet" read as "damaged install". */
+export type TelemetryPluginVersionSetup =
+  | { readonly kind: "recorded"; readonly version: string }
+  | { readonly kind: "unrecorded" }
+  | { readonly kind: "nothing-journalled" };
 
 /** Whether AIDD is allowed to measure this project, and whose decision that is. Mirrors
  * `resolveTelemetryEnabled`'s own precedence exactly, so this can never disagree with the

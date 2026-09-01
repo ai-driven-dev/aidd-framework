@@ -12,6 +12,7 @@ import type { TelemetryExportLeftover } from "../../../domain/models/telemetry-e
 import {
   buildTelemetryAllowedSetup,
   type TelemetryIdentitySetup,
+  type TelemetryPluginVersionSetup,
   type TelemetryRecorderDeclarationSetup,
   type TelemetrySetup,
 } from "../../../domain/models/telemetry-setup.js";
@@ -23,6 +24,7 @@ import type { SessionCostReader } from "../../../domain/ports/session-cost-reade
 import type { TelemetryEvidenceReader } from "../../../domain/ports/telemetry-evidence-reader.js";
 import type { TelemetrySink } from "../../../domain/ports/telemetry-sink.js";
 import type { VersionControl } from "../../../domain/ports/version-control.js";
+import type { VersionReader } from "../../../domain/ports/version-reader.js";
 import { getAiToolConfig } from "../../../domain/tools/registry.js";
 
 const DEFAULT_RUNS_DIR_LABEL = "aidd_docs/runs";
@@ -92,6 +94,30 @@ function uncoveredTools(): readonly DiagnoseTelemetryUncoveredTool[] {
  * `ReadLocalCostUseCase`, this never stores a record, since the question is only ever
  * "would a read of this session's figures work", not "read them".
  */
+/** The plugin version the hook itself stamped, taken from the most recently opened session
+ * that carries one.
+ *
+ * The most recent, not the first: a plugin upgraded mid-period leaves older lines naming
+ * the older build, and what a person asking "which version is running" wants is the one
+ * running now. Sessions that carry none are skipped rather than counted as an absence — one
+ * line written before the field existed must not hide a later line that has it.
+ */
+function pluginVersionFrom(journals: readonly RunJournal[]): TelemetryPluginVersionSetup {
+  const sessions = journals.map((journal) => journal.session).filter(isPresent);
+  if (sessions.length === 0) return { kind: "nothing-journalled" };
+  const withVersion = sessions
+    .filter((session) => session.plugin_version !== undefined)
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  const newest = withVersion[0];
+  return newest?.plugin_version === undefined
+    ? { kind: "unrecorded" }
+    : { kind: "recorded", version: newest.plugin_version };
+}
+
+function isPresent<T>(value: T | undefined): value is T {
+  return value !== undefined;
+}
+
 export class DiagnoseTelemetryUseCase {
   constructor(
     private readonly evidence: TelemetryEvidenceReader,
@@ -100,7 +126,8 @@ export class DiagnoseTelemetryUseCase {
     private readonly readers: ReadonlyMap<AiToolId, SessionCostReader>,
     private readonly hookTrustReader: HookTrustReader,
     private readonly personIdentityStore: PersonIdentityStore,
-    private readonly telemetrySink: TelemetrySink
+    private readonly telemetrySink: TelemetrySink,
+    private readonly currentVersion: VersionReader
   ) {}
 
   async execute(options: DiagnoseTelemetryOptions): Promise<DiagnoseTelemetryResult> {
@@ -127,6 +154,10 @@ export class DiagnoseTelemetryUseCase {
       identity: await this.readIdentitySetup(),
       recordsLocation: { path: this.telemetrySink.rootDir },
       recorderDeclaration,
+      versions: {
+        cli: this.currentVersion.get(),
+        plugin: pluginVersionFrom(await this.runJournalReader.list()),
+      },
     };
   }
 

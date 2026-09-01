@@ -7,6 +7,7 @@ import type { TelemetryExportLeftover } from "../../domain/models/telemetry-expo
 import type {
   TelemetryAllowedSetup,
   TelemetryIdentitySetup,
+  TelemetryPluginVersionSetup,
   TelemetryRecorderDeclarationSetup,
   TelemetrySetup,
 } from "../../domain/models/telemetry-setup.js";
@@ -76,19 +77,39 @@ function describeRecorderDeclaration(declaration: TelemetryRecorderDeclarationSe
 // needs this exactly as much as one who is on, and today they get nothing. Visibly
 // distinct from the four claims below: a sentence naming a location, never the claims'
 // own `ok`/`FAIL`/`--` verdict column.
+/** What produced the lines a person is reading, and — when nothing did — why.
+ *
+ * Read back out of the journal rather than re-derived, so this can only ever say what the
+ * hook itself said. `"unrecorded"` names the one case that is a real problem: a hook that
+ * ran, wrote lines, and could not name its own build. That happens when the plugin arrived
+ * by neither install route — copied in by hand — and the sentence says so, because a person
+ * seeing a bare "unknown" has no way to guess what to do about it.
+ */
+function describePluginVersion(plugin: TelemetryPluginVersionSetup): string {
+  if (plugin.kind === "recorded") return `${plugin.version} (as the hook recorded it)`;
+  if (plugin.kind === "nothing-journalled") return "no session journalled yet";
+  return (
+    "unknown — no journalled session names one. The plugin's own manifest was not beside " +
+    "its hooks and no `aidd` install recorded it; `aidd plugin install aidd-telemetry` " +
+    "would make it known."
+  );
+}
+
 function printSetup(output: CLIOutput, setup: TelemetrySetup): void {
   printSetupRow(output, "measurement allowed", describeAllowed(setup.allowed));
   printSetupRow(output, "identity attached", describeIdentity(setup.identity));
   printSetupRow(
     output,
     "records kept at",
-    `${setup.recordsLocation.path} (override with AIDD_USER_CONFIG_DIR)`
+    `${setup.recordsLocation.path} (override with AIDD_TELEMETRY_DIR)`
   );
   printSetupRow(
     output,
     "recorder declared",
     describeRecorderDeclaration(setup.recorderDeclaration)
   );
+  printSetupRow(output, "cli version", setup.versions.cli);
+  printSetupRow(output, "plugin version", describePluginVersion(setup.versions.plugin));
   output.print("");
 }
 

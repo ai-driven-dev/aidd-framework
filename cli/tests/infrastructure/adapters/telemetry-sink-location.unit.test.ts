@@ -1,8 +1,12 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { defaultConfigDir } from "../../../src/infrastructure/adapters/telemetry-sink-adapter.js";
+import {
+  defaultConfigDir,
+  TelemetrySinkAdapter,
+} from "../../../src/infrastructure/adapters/telemetry-sink-adapter.js";
+import { AuthStorage } from "../../../src/infrastructure/auth/auth-storage.js";
 import { sandboxedEnv, sinkDirIn } from "../../e2e/helpers.js";
 
 /**
@@ -80,7 +84,10 @@ describe("where the figures land by default", () => {
     const text = readFileSync(PLUGIN_README, "utf8");
 
     expect(text).toContain(documented);
-    expect(text).toContain("AIDD_USER_CONFIG_DIR");
+    // The variable the *code* reads. Pinning the older one instead passed on the strength of
+    // a mention that only tells a reader not to use it — which could be deleted without this
+    // noticing, leaving the override the adapter honours documented nowhere.
+    expect(text).toContain("AIDD_TELEMETRY_DIR");
   });
 });
 
@@ -113,4 +120,163 @@ describe("a sandboxed run's sink, agreed between the helper and the adapter", ()
       }
     });
   }
+});
+
+/**
+ * The measurement has its own name, and nothing else follows it.
+ *
+ * The figures are the one thing here meant to leave a machine, so a team shares the
+ * directory they land in. Until this, that directory was named by `AIDD_USER_CONFIG_DIR`,
+ * which also names where `auth.json` — a GitHub token — is written. Sharing the figures
+ * shared the token.
+ */
+describe("where the figures land, and what does not follow them there", () => {
+  const previousTelemetryDir = process.env.AIDD_TELEMETRY_DIR;
+  const previousUserConfigDir = process.env.AIDD_USER_CONFIG_DIR;
+
+  afterEach(() => {
+    for (const [key, value] of [
+      ["AIDD_TELEMETRY_DIR", previousTelemetryDir],
+      ["AIDD_USER_CONFIG_DIR", previousUserConfigDir],
+    ] as const) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+
+  it("puts the figures exactly where AIDD_TELEMETRY_DIR names, not in a subdirectory of it", () => {
+    // The two variables mean different things on purpose: this one names the directory the
+    // day files sit in, `AIDD_USER_CONFIG_DIR` names the directory above it. Appending
+    // "telemetry" to both would make a person who set this one wonder where their figures
+    // went.
+    const shared = mkdtempSync(join(tmpdir(), "aidd-shared-figures-"));
+    try {
+      process.env.AIDD_TELEMETRY_DIR = shared;
+      delete process.env.AIDD_USER_CONFIG_DIR;
+
+      expect(new TelemetrySinkAdapter().rootDir).toBe(shared);
+    } finally {
+      rmSync(shared, { recursive: true, force: true });
+    }
+  });
+
+  it("leaves the token where it was when the figures are shared", () => {
+    // The whole point of the split, asserted as the property rather than as the wiring: a
+    // person following the documented way to share their figures must not move their
+    // credential with them.
+    const shared = mkdtempSync(join(tmpdir(), "aidd-shared-figures-"));
+    const home = mkdtempSync(join(tmpdir(), "aidd-home-"));
+    try {
+      delete process.env.AIDD_USER_CONFIG_DIR;
+      const tokenBefore = new AuthStorage().userConfigPath();
+
+      process.env.AIDD_TELEMETRY_DIR = shared;
+
+      expect(new TelemetrySinkAdapter().rootDir).toBe(shared);
+      expect(new AuthStorage().userConfigPath()).toBe(tokenBefore);
+    } finally {
+      rmSync(shared, { recursive: true, force: true });
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("still honours the older variable, so a setup that predates the split keeps working", () => {
+    const older = mkdtempSync(join(tmpdir(), "aidd-legacy-config-"));
+    try {
+      delete process.env.AIDD_TELEMETRY_DIR;
+      process.env.AIDD_USER_CONFIG_DIR = older;
+
+      expect(new TelemetrySinkAdapter().rootDir).toBe(join(older, "telemetry"));
+    } finally {
+      rmSync(older, { recursive: true, force: true });
+    }
+  });
+
+  it("prefers the name given to the figures when both are set", () => {
+    const shared = mkdtempSync(join(tmpdir(), "aidd-shared-figures-"));
+    const older = mkdtempSync(join(tmpdir(), "aidd-legacy-config-"));
+    try {
+      process.env.AIDD_TELEMETRY_DIR = shared;
+      process.env.AIDD_USER_CONFIG_DIR = older;
+
+      expect(new TelemetrySinkAdapter().rootDir).toBe(shared);
+    } finally {
+      rmSync(shared, { recursive: true, force: true });
+      rmSync(older, { recursive: true, force: true });
+    }
+  });
+});
+
+/**
+ * Who may list a person's working days.
+ *
+ * A day file's content was always 0600. What the directory's own mode decides is the
+ * *listing* — which days this person worked, and how many. A default location is theirs
+ * alone and is tightened; a location they named themselves is left as they made it, because
+ * a shared directory is what naming one is for and locking it to one account would break it.
+ *
+ * Both halves were uncovered until now, on a boolean this change rewrote.
+ */
+describe("who may list the days a person worked", () => {
+  const previousTelemetryDir = process.env.AIDD_TELEMETRY_DIR;
+  const previousUserConfigDir = process.env.AIDD_USER_CONFIG_DIR;
+  const previousHome = process.env.HOME;
+
+  afterEach(() => {
+    for (const [key, value] of [
+      ["AIDD_TELEMETRY_DIR", previousTelemetryDir],
+      ["AIDD_USER_CONFIG_DIR", previousUserConfigDir],
+      ["HOME", previousHome],
+    ] as const) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+
+  function modeOf(dir: string): string {
+    return (statSync(dir).mode & 0o777).toString(8);
+  }
+
+  it.skipIf(process.platform === "win32")(
+    "tightens a default location to this person alone",
+    async () => {
+      const home = mkdtempSync(join(tmpdir(), "aidd-tighten-home-"));
+      try {
+        delete process.env.AIDD_TELEMETRY_DIR;
+        delete process.env.AIDD_USER_CONFIG_DIR;
+        process.env.HOME = home;
+
+        const sink = new TelemetrySinkAdapter();
+        await sink.ensureWritable();
+
+        expect(modeOf(sink.rootDir)).toBe("700");
+      } finally {
+        rmSync(home, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "leaves a location a person named themselves exactly as they made it",
+    async () => {
+      const home = mkdtempSync(join(tmpdir(), "aidd-tighten-home-"));
+      const shared = join(mkdtempSync(join(tmpdir(), "aidd-tighten-shared-")), "figures");
+      try {
+        process.env.HOME = home;
+        delete process.env.AIDD_USER_CONFIG_DIR;
+        process.env.AIDD_TELEMETRY_DIR = shared;
+        mkdirSync(shared, { recursive: true });
+        chmodSync(shared, 0o755);
+
+        const sink = new TelemetrySinkAdapter();
+        await sink.ensureWritable();
+
+        // Untouched: a directory a team shares must stay listable by the team.
+        expect(modeOf(shared)).toBe("755");
+      } finally {
+        rmSync(home, { recursive: true, force: true });
+        rmSync(shared, { recursive: true, force: true });
+      }
+    }
+  );
 });

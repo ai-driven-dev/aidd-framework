@@ -44,6 +44,12 @@ export interface TelemetrySinkPeriodRead {
  * double what came before. */
 export interface TelemetrySink {
   readonly rootDir: string;
+  /** How `rootDir` was decided. `"user-config-dir"` is the one a caller has to react to: it
+   * means this person set `AIDD_USER_CONFIG_DIR`, which also relocates `auth.json`, so
+   * sharing this directory shares a GitHub token. Named on the port rather than left inside
+   * the adapter because the warning belongs where a person is looking, and only a command
+   * knows that. */
+  readonly locatedBy: "telemetry-dir" | "user-config-dir" | "default";
   ensureWritable(): Promise<void>;
   appendRecord(record: TelemetrySinkRecord, at: Date): Promise<TelemetrySinkAppendResult>;
   listDayFiles(): Promise<readonly string[]>;

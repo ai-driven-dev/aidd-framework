@@ -3,6 +3,7 @@ import {
   buildFlowIntervals,
   ORCHESTRATING_SKILLS,
 } from "../../../src/domain/models/flow-attribution.js";
+import { momentFallsWithin } from "../../../src/domain/models/journal-intervals.js";
 import type { RunJournal } from "../../../src/domain/ports/run-journal-reader.js";
 
 function journalOf(
@@ -78,6 +79,45 @@ describe("buildFlowIntervals — pure: journal lines -> bounded flow intervals",
         endMs: Date.parse(TURN_END.at),
       },
     ]);
+  });
+
+  it("closes at the turn_end itself, not at whatever the journal witnessed after it", () => {
+    // The separating case, and the one every other fixture here missed: with `turn_end`
+    // last, the moment it closes at and the journal's own last witnessed moment are the
+    // same number, so a build that ignored the closer entirely produced identical intervals
+    // and every test stayed green. Something witnessed *after* the turn end is what tells
+    // the two apart — replacing the closer with `() => false` moves this end from 11:00 to
+    // 11:30 and turns this red.
+    const writtenAfterTheTurnEnded = {
+      type: "file_written",
+      at: "2026-08-17T11:30:00Z",
+      path: "aidd_docs/tasks/x/spec.md",
+    } as const;
+    const earlierTurnEnd = { type: "turn_end", at: "2026-08-17T11:00:00Z" } as const;
+
+    const intervals = buildFlowIntervals(
+      journalOf([SDLC_OPENS, earlierTurnEnd], [], [writtenAfterTheTurnEnded])
+    );
+
+    expect(intervals[0]?.endMs).toBe(Date.parse(earlierTurnEnd.at));
+    expect(intervals[0]?.endMs).not.toBe(Date.parse(writtenAfterTheTurnEnded.at));
+  });
+
+  it("leaves work done after the turn ended outside the flow that turn opened", () => {
+    // The consequence a person actually reads. A flow that failed to close swallows every
+    // record through to the next one — so this asserts the moment, not just the interval.
+    const writtenAfterTheTurnEnded = {
+      type: "file_written",
+      at: "2026-08-17T11:30:00Z",
+      path: "aidd_docs/tasks/x/spec.md",
+    } as const;
+    const earlierTurnEnd = { type: "turn_end", at: "2026-08-17T11:00:00Z" } as const;
+    const intervals = buildFlowIntervals(
+      journalOf([SDLC_OPENS, earlierTurnEnd], [], [writtenAfterTheTurnEnded])
+    );
+
+    expect(momentFallsWithin(intervals, "2026-08-17T10:30:00Z")).toBe(true);
+    expect(momentFallsWithin(intervals, "2026-08-17T11:15:00Z")).toBe(false);
   });
 
   it("never lets a hand-run, non-orchestrating step_start close an open flow", () => {

@@ -117,7 +117,7 @@ touched to take them.
   (2026-08-31, `opencode 1.14.20`) found that a completed tool part's own arguments do
   reach the plugin's `event` hook. `telemetryTaskAttributable: true` in
   `cli/src/domain/tools/ai/opencode.ts` and `registry-conformance.unit.test.ts` both state
-  this now, and `TASK_DECLARED_EXPECTATION` in `scripts/verify-chain.mjs` expects it live.
+  this now.
 
 The negative case — a captured payload whose path names something other than a task folder
 — needs no new capture for four of the five hosts: `claude-code-post-tool-use-skill.json`,

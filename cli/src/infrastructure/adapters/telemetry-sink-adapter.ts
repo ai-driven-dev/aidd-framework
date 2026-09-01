@@ -94,16 +94,35 @@ function restrictToCurrentUser(target: string, options: { recursive?: boolean } 
  * file's content, and only to let a local re-read know what is already stored. */
 export class TelemetrySinkAdapter implements TelemetrySink {
   readonly rootDir: string;
-  // A user who names their own location keeps responsibility for its permissions - the
-  // README documents pointing AIDD_USER_CONFIG_DIR at a directory a team shares, and
-  // locking that down to one account on Windows would break exactly the sharing it exists
-  // for.
+  // A user who names their own location keeps responsibility for its permissions - a shared
+  // directory is what this exists for, and locking it down to one account on Windows would
+  // break exactly that sharing.
   private readonly userNamed: boolean;
 
+  /**
+   * `AIDD_TELEMETRY_DIR` names this directory outright; `AIDD_USER_CONFIG_DIR` names the
+   * directory *above* it and is kept only so a setup that predates the split keeps working.
+   *
+   * They are two variables because they answer to two different needs that used to share
+   * one name: `AIDD_USER_CONFIG_DIR` also relocates `auth.json` (`auth-storage.ts:19`), a
+   * GitHub token, so it could never be the variable a team shares. The full argument, and
+   * what to tell someone still on the older one, live in `plugins/aidd-telemetry/README.md`
+   * under "Share `AIDD_TELEMETRY_DIR`, never `AIDD_USER_CONFIG_DIR`" - one home, since a
+   * copy here would be a second one to keep true.
+   */
+  /** Which of the three answers above this directory came from. Carried because one of
+   * them has a consequence a person has to be told about: `AIDD_USER_CONFIG_DIR` also names
+   * where `auth.json` is written, so anyone who set it on the old advice has a credential in
+   * the directory they were told to share, and nothing else would ever mention it. */
+  readonly locatedBy: "telemetry-dir" | "user-config-dir" | "default";
+
   constructor(userConfigDir?: string) {
-    const override = userConfigDir ?? process.env.AIDD_USER_CONFIG_DIR;
-    this.userNamed = override !== undefined;
-    this.rootDir = join(override ?? defaultConfigDir(), "telemetry");
+    const named = process.env.AIDD_TELEMETRY_DIR;
+    const legacy = userConfigDir ?? process.env.AIDD_USER_CONFIG_DIR;
+    this.userNamed = named !== undefined || legacy !== undefined;
+    this.rootDir = named ?? join(legacy ?? defaultConfigDir(), "telemetry");
+    this.locatedBy =
+      named !== undefined ? "telemetry-dir" : legacy !== undefined ? "user-config-dir" : "default";
   }
 
   private tightenDir(): void {

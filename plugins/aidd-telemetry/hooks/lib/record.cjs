@@ -128,9 +128,10 @@ function appendLine(filePath, line) {
 // field a reader may not know about is exactly what an optional field is for.
 //
 // plugin_version is the same shape, appended after them for the same reason: this plugin's
-// own version, from `plugin-version.cjs`'s own read of `.claude-plugin/plugin.json`, and
-// omitted entirely - never `null`, never a guessed or inherited value - when that manifest
-// could not be read. Stamped once, on the one line that names the session, never repeated
+// own version, from `plugin-version.cjs`'s two routes - the manifest beside these hooks
+// after a tool's own install, or what the `aidd` CLI recorded when it did the install - and
+// omitted entirely, never `null` and never a guessed or inherited value, when neither can
+// name one. Stamped once, on the one line that names the session, never repeated
 // on every later line: it is a fact about which build of this plugin observed the whole
 // session, not a per-event fact. Never the framework's own version, and never the CLI's -
 // this hook is the one producer that can honestly say which build of *this plugin* wrote
@@ -144,8 +145,9 @@ function buildSessionStartLine({
   vendorId,
   worktreeId,
   worktreeRepoId,
+  repoRoot,
 }) {
-  const version = pluginVersion();
+  const version = pluginVersion(repoRoot, host);
   return {
     type: "session_start",
     at,
@@ -215,7 +217,7 @@ function sanitizeSkillName(skill) {
 function handleSessionStart(payload, host, sessionId) {
   const target = resolveWriteTarget(readCwd(host, payload));
   if (!target) return;
-  const { projectId, projectRemote, dir, worktreeId, worktreeRepoId } = target;
+  const { projectId, projectRemote, dir, repoRoot, worktreeId, worktreeRepoId } = target;
 
   // SessionStart is not documented to fire once per session_id - `source` takes values
   // beyond `startup` - so this guard prevents a second file for one vendor_id.
@@ -231,6 +233,7 @@ function handleSessionStart(payload, host, sessionId) {
     vendorId: sessionId,
     worktreeId,
     worktreeRepoId,
+    repoRoot,
   });
 
   fs.mkdirSync(dir, { recursive: true, mode: PRIVATE_DIR_MODE });

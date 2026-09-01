@@ -4,37 +4,34 @@ import type { PersonIdentityStore } from "../../../domain/ports/person-identity-
 import {
   EmptyDisplayNameError,
   EmptyIdentifierError,
-  IdentityNotOptedInError,
   IdentityRequiredToLinkError,
 } from "../../errors.js";
 
 export interface PersonIdentityStatusResult {
   readonly filePath: string;
   readonly identity: PersonIdentity | null;
-  /** Present only when a stale separate declaration file is found beside the identity —
-   * that file was introduced and never released, so there is nothing in it to migrate;
-   * this only names it as ignored and safe to remove. */
-  readonly staleMappingFilePath?: string;
-}
-
-export interface PersonIdentityOnResult {
-  readonly filePath: string;
-  readonly identity: PersonIdentity;
-  /** `false` when an identity already stood and this call reports it back, unminted. */
-  readonly minted: boolean;
 }
 
 export interface PersonIdentityUseResult {
   readonly filePath: string;
   readonly identity: PersonIdentity;
-  /** `true` when `identity.personId` was already this machine's own before this call —
-   * nothing was written. */
-  readonly alreadyInEffect: boolean;
+  /** How this machine came to carry the identifier it now carries.
+   *
+   * Three values rather than two booleans: `on` used to answer `minted: false` and `use`
+   * `alreadyInEffect: true` for the same situation, in two shapes, because they were two
+   * commands. One door needs one word, and the word has to keep `origin`'s own distinction
+   * visible — an identifier this machine created is not the same fact as one a person
+   * carried here from another machine, and no reader of this result may have to guess
+   * which. */
+  readonly outcome: "minted" | "adopted" | "unchanged";
   /** The identifier this replaced — present only when a different one was in effect
    * before, absent both when nothing was declared yet and when the same identifier was
    * already in effect. Records already written keep the identifier they were written
    * with; taking a different one never rewrites them. */
   readonly replacedPersonId?: string;
+  /** The display name this call attached, when one was asked for. Absent when none was —
+   * never `""`, which would read as a name someone chose to be empty. */
+  readonly displayNameSet?: string;
 }
 
 export interface PersonIdentityOffResult {
@@ -50,10 +47,6 @@ export interface PersonIdentityOffResult {
    * both when none were added and when a damaged file meant this call never learned how
    * many there were. */
   readonly addedIdentifiersRemoved: number;
-}
-
-export interface PersonIdentityNameResult {
-  readonly filePath: string;
 }
 
 export interface PersonIdentityLinkResult {
@@ -78,16 +71,17 @@ export interface PersonIdentityUnlinkResult {
  * What `aidd telemetry identity`'s verbs promise, all against the one file that is the
  * whole declaration of who this machine's user is.
  *
- * `status` never changes anything. `on` mints once and reports the same identifier on
- * every call after. `use` takes an identifier minted elsewhere, so the same person reads
- * as one across machines, without a second identity ever being created for them. `link`
- * and `unlink` add or withdraw an identifier this person did not choose here - a tool's
- * own pseudonymous identifier, or one kept from before a withdrawal - onto `alsoMe`. `name`
- * refuses a display name onto nobody, naming `on` as the missing step. `off` withdraws the
- * whole file, added identifiers included.
+ * `status` never changes anything. `use` settles which identifier this machine carries:
+ * without one it mints, reporting the same identifier on every call after; with one it
+ * takes an identifier minted elsewhere, so the same person reads as one across machines
+ * without a second identity ever being created for them. A display name goes on in the
+ * same call, because it is a property of the identifier and not a separate act. `link` and
+ * `unlink` add or withdraw an identifier this person did not choose here - a tool's own
+ * pseudonymous identifier, or one kept from before a withdrawal - onto `alsoMe`. `off`
+ * withdraws the whole file, added identifiers included.
  *
- * Taking or adding an identifier (`on`, `use`, `link`) is a declaration this tool cannot
- * check - it never verifies that the person running it is who they claim.
+ * Taking or adding an identifier (`use`, `link`) is a declaration this tool cannot check -
+ * it never verifies that the person running it is who they claim.
  */
 export class PersonIdentityUseCase {
   constructor(private readonly store: PersonIdentityStore) {}
@@ -95,34 +89,66 @@ export class PersonIdentityUseCase {
   async status(): Promise<PersonIdentityStatusResult> {
     const filePath = this.store.filePath;
     const identity = await this.store.readStrict();
-    const staleMappingFilePath = await this.store.staleMappingFilePath();
     return {
       filePath,
       identity,
-      ...(staleMappingFilePath === null ? {} : { staleMappingFilePath }),
     };
   }
 
-  async on(): Promise<PersonIdentityOnResult> {
-    const existing = await this.store.readStrict();
-    if (existing !== null) {
-      return { filePath: this.store.filePath, identity: existing, minted: false };
+  /**
+   * The one door to "which identifier am I": mint one, take one minted elsewhere, or attach
+   * a name to whichever stands — asked once, in the terms a person actually holds them.
+   *
+   * `identifier` absent mints; present, adopts. That is not a convenience over two verbs, it
+   * is the same question with and without an answer already in hand, and `origin` keeps the
+   * two apart on disk exactly as before.
+   */
+  async use(options: {
+    identifier?: string;
+    displayName?: string;
+  }): Promise<PersonIdentityUseResult> {
+    if (options.identifier !== undefined && options.identifier.trim() === "") {
+      throw new EmptyIdentifierError("use");
     }
-    const identity = await this.store.mint();
-    return { filePath: this.store.filePath, identity, minted: true };
-  }
-
-  async use(personId: string): Promise<PersonIdentityUseResult> {
-    if (personId.trim() === "") throw new EmptyIdentifierError("use");
-    const current = await this.store.readStrict();
-    if (current !== null && current.personId === personId) {
-      return { filePath: this.store.filePath, identity: current, alreadyInEffect: true };
+    if (options.displayName !== undefined && options.displayName.trim() === "") {
+      throw new EmptyDisplayNameError();
     }
-    const identity = await this.store.adopt(personId);
+    const settled = await this.settleIdentifier(options.identifier);
+    const identity =
+      options.displayName === undefined
+        ? settled.identity
+        : await this.store.setDisplayName(settled.identity, options.displayName);
     return {
       filePath: this.store.filePath,
       identity,
-      alreadyInEffect: false,
+      outcome: settled.outcome,
+      ...(settled.replacedPersonId === undefined
+        ? {}
+        : { replacedPersonId: settled.replacedPersonId }),
+      ...(options.displayName === undefined ? {} : { displayNameSet: options.displayName }),
+    };
+  }
+
+  /** Which identifier stands after this call, and how it got there. Split out because the
+   * display name is a second, independent decision — folding both into one body would make
+   * a rename look like a change of identity. */
+  private async settleIdentifier(identifier?: string): Promise<{
+    identity: PersonIdentity;
+    outcome: PersonIdentityUseResult["outcome"];
+    replacedPersonId?: string;
+  }> {
+    const current = await this.store.readStrict();
+    if (identifier === undefined) {
+      if (current !== null) return { identity: current, outcome: "unchanged" };
+      return { identity: await this.store.mint(), outcome: "minted" };
+    }
+    if (current !== null && current.personId === identifier) {
+      return { identity: current, outcome: "unchanged" };
+    }
+    const identity = await this.store.adopt(identifier);
+    return {
+      identity,
+      outcome: "adopted",
       ...(current === null ? {} : { replacedPersonId: current.personId }),
     };
   }
@@ -144,8 +170,8 @@ export class PersonIdentityUseCase {
   }
 
   /**
-   * The one verb allowed to swallow `readStrict()`'s throw. `status`, `on`, `use`, `link`
-   * and `name` are right to error on a damaged file — the contract's own "the identity
+   * The one verb allowed to swallow `readStrict()`'s throw. `status`, `use` and `link` are
+   * right to error on a damaged file — the contract's own "the identity
    * file is unreadable" edge case. `off` is different: it is how a person gets out, and a
    * file too damaged to parse is exactly the moment withdrawing must still work. A damaged
    * file is discarded the same as a readable one, and the result says so rather than
@@ -160,14 +186,6 @@ export class PersonIdentityUseCase {
     // that skipped the removal whenever the read came back empty.
     const removed = await this.store.forget(filePath);
     return { filePath, removed, discardedDamaged, addedIdentifiersRemoved };
-  }
-
-  async name(displayName: string): Promise<PersonIdentityNameResult> {
-    if (displayName.trim() === "") throw new EmptyDisplayNameError();
-    const existing = await this.store.readStrict();
-    if (existing === null) throw new IdentityNotOptedInError();
-    await this.store.setDisplayName(existing, displayName);
-    return { filePath: this.store.filePath };
   }
 
   private async readForWithdrawal(): Promise<{

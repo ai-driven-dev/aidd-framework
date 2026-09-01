@@ -1,8 +1,8 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   EmptyDisplayNameError,
   EmptyIdentifierError,
-  IdentityNotOptedInError,
   IdentityRequiredToLinkError,
 } from "../../../../src/application/errors.js";
 import { PersonIdentityUseCase } from "../../../../src/application/use-cases/telemetry/person-identity-use-case.js";
@@ -69,40 +69,15 @@ describe("PersonIdentityUseCase.status", () => {
     expect(result.identity?.origin).toBe("adopted");
     expect(result.identity?.alsoMe).toEqual(["a-second-machine"]);
   });
-
-  it("names a stale separate declaration file as ignored and safe to remove", async () => {
-    const store = new InMemoryPersonIdentityStore({
-      personId: "person-1",
-      origin: "minted",
-      alsoMe: [],
-    });
-    store.staleMappingPath = "/fake/home/.config/aidd/person-mapping.json";
-
-    const result = await useCase(store).status();
-
-    expect(result.staleMappingFilePath).toBe("/fake/home/.config/aidd/person-mapping.json");
-  });
-
-  it("names no stale file when none is present", async () => {
-    const store = new InMemoryPersonIdentityStore({
-      personId: "person-1",
-      origin: "minted",
-      alsoMe: [],
-    });
-
-    const result = await useCase(store).status();
-
-    expect(result).not.toHaveProperty("staleMappingFilePath");
-  });
 });
 
-describe("PersonIdentityUseCase.on", () => {
+describe("PersonIdentityUseCase.use, settling which identifier stands", () => {
   it("mints an identifier when none exists", async () => {
     const store = new InMemoryPersonIdentityStore(null, "fresh-id");
 
-    const result = await useCase(store).on();
+    const result = await useCase(store).use({});
 
-    expect(result.minted).toBe(true);
+    expect(result.outcome).toBe("minted");
     expect(result.identity).toEqual({ personId: "fresh-id", origin: "minted", alsoMe: [] });
     expect(store.mintCount).toBe(1);
   });
@@ -113,9 +88,9 @@ describe("PersonIdentityUseCase.on", () => {
       "fresh-id"
     );
 
-    const result = await useCase(store).on();
+    const result = await useCase(store).use({});
 
-    expect(result.minted).toBe(false);
+    expect(result.outcome).toBe("unchanged");
     expect(result.identity).toEqual({ personId: "existing-id", origin: "minted", alsoMe: [] });
     expect(store.mintCount).toBe(0);
   });
@@ -125,16 +100,16 @@ describe("PersonIdentityUseCase.use", () => {
   it("refuses an empty or whitespace-only identifier, writing nothing", async () => {
     const store = new InMemoryPersonIdentityStore(null);
 
-    await expect(useCase(store).use("   ")).rejects.toThrow(EmptyIdentifierError);
+    await expect(useCase(store).use({ identifier: "   " })).rejects.toThrow(EmptyIdentifierError);
     expect(await store.read()).toBeNull();
   });
 
   it("takes an identifier minted elsewhere, recording it as adopted", async () => {
     const store = new InMemoryPersonIdentityStore(null);
 
-    const result = await useCase(store).use("machine-1-id");
+    const result = await useCase(store).use({ identifier: "machine-1-id" });
 
-    expect(result.alreadyInEffect).toBe(false);
+    expect(result.outcome).not.toBe("unchanged");
     expect(result.identity).toEqual({ personId: "machine-1-id", origin: "adopted", alsoMe: [] });
     expect(result.replacedPersonId).toBeUndefined();
   });
@@ -146,9 +121,9 @@ describe("PersonIdentityUseCase.use", () => {
       alsoMe: [],
     });
 
-    const result = await useCase(store).use("machine-1-id");
+    const result = await useCase(store).use({ identifier: "machine-1-id" });
 
-    expect(result.alreadyInEffect).toBe(true);
+    expect(result.outcome).toBe("unchanged");
     expect(await store.read()).toEqual({
       personId: "machine-1-id",
       origin: "minted",
@@ -163,9 +138,9 @@ describe("PersonIdentityUseCase.use", () => {
       alsoMe: [],
     });
 
-    const result = await useCase(store).use("new-id");
+    const result = await useCase(store).use({ identifier: "new-id" });
 
-    expect(result.alreadyInEffect).toBe(false);
+    expect(result.outcome).not.toBe("unchanged");
     expect(result.replacedPersonId).toBe("old-id");
     expect(result.identity.personId).toBe("new-id");
     expect(result.identity.origin).toBe("adopted");
@@ -178,7 +153,7 @@ describe("PersonIdentityUseCase.use", () => {
       alsoMe: ["kept-identifier"],
     });
 
-    const result = await useCase(store).use("new-id");
+    const result = await useCase(store).use({ identifier: "new-id" });
 
     expect(result.identity.alsoMe).toEqual(["kept-identifier"]);
   });
@@ -200,7 +175,7 @@ describe("PersonIdentityUseCase.link", () => {
     const uc = useCase(new InMemoryPersonIdentityStore(null));
 
     await expect(uc.link("some-other-machine-id")).rejects.toThrow(IdentityRequiredToLinkError);
-    await expect(uc.link("some-other-machine-id")).rejects.toThrow(/telemetry identity on/u);
+    await expect(uc.link("some-other-machine-id")).rejects.toThrow(/telemetry identity use/u);
   });
 
   it("reports the person's own identifier as already listed, and appends nothing onto alsoMe", async () => {
@@ -288,11 +263,57 @@ describe("PersonIdentityUseCase.unlink", () => {
   });
 });
 
-describe("PersonIdentityUseCase.name", () => {
-  it("refuses when nothing was opted into, naming on as the missing step", async () => {
-    const useCaseInstance = useCase(new InMemoryPersonIdentityStore(null));
+describe("PersonIdentityUseCase.use, minted apart from adopted", () => {
+  /**
+   * The one distinction the merge had to carry across.
+   *
+   * `on` and `use` were two commands, so nothing could confuse them. Behind one door the
+   * difference lives entirely in a word, and the word decides what a person is told: an
+   * identifier this machine created gets the disclosure about what it will attach to, while
+   * one carried here from another machine has to say what it replaced instead. Reporting
+   * either as the other is a sentence about the wrong event.
+   */
+  it("calls a fresh identifier minted, and one carried here adopted", async () => {
+    const minted = await useCase(new InMemoryPersonIdentityStore(null)).use({});
+    const adopted = await useCase(new InMemoryPersonIdentityStore(null)).use({
+      identifier: "from-another-machine",
+    });
 
-    await expect(useCaseInstance.name("Baptiste")).rejects.toThrow(IdentityNotOptedInError);
+    expect(minted.outcome).toBe("minted");
+    expect(adopted.outcome).toBe("adopted");
+    // And on disk, where a later reader looks: the same distinction, independently.
+    expect(minted.identity.origin).toBe("minted");
+    expect(adopted.identity.origin).toBe("adopted");
+  });
+
+  it("calls replacing one identifier with another adopted, never minted", async () => {
+    const store = new InMemoryPersonIdentityStore({
+      personId: "person-1",
+      origin: "minted",
+      alsoMe: [],
+    });
+
+    const result = await useCase(store).use({ identifier: "person-2" });
+
+    expect(result.outcome).toBe("adopted");
+    expect(result.replacedPersonId).toBe("person-1");
+  });
+});
+
+describe("PersonIdentityUseCase.use, attaching a display name", () => {
+  it("mints an identifier for a name given when none stands, rather than refusing", async () => {
+    // The separate `name` verb refused here, and had to: it could only decorate something
+    // that already existed. Under one door the refusal has no reason left — `use` is the
+    // verb that opts in, and `--name` is a property of what it settles on. A person typing
+    // `identity use --name Ada` with nothing standing is saying who they are, not asking to
+    // rename a thing that is not there.
+    const store = new InMemoryPersonIdentityStore(null);
+
+    const result = await useCase(store).use({ displayName: "Ada" });
+
+    expect(result.outcome).toBe("minted");
+    expect(result.displayNameSet).toBe("Ada");
+    expect(result.identity.origin).toBe("minted");
   });
 
   it("refuses an empty or whitespace-only value", async () => {
@@ -302,7 +323,7 @@ describe("PersonIdentityUseCase.name", () => {
       alsoMe: [],
     });
 
-    await expect(useCase(store).name("   ")).rejects.toThrow(EmptyDisplayNameError);
+    await expect(useCase(store).use({ displayName: "   " })).rejects.toThrow(EmptyDisplayNameError);
   });
 
   it("attaches the display name beside the identifier already opted into", async () => {
@@ -312,7 +333,7 @@ describe("PersonIdentityUseCase.name", () => {
       alsoMe: [],
     });
 
-    await useCase(store).name("Baptiste");
+    await useCase(store).use({ displayName: "Baptiste" });
 
     expect(await store.read()).toEqual({
       personId: "person-1",
@@ -367,9 +388,9 @@ describe("PersonIdentityUseCase.off", () => {
     const uc = useCase(store);
 
     await uc.off();
-    const result = await uc.on();
+    const result = await uc.use({});
 
-    expect(result.minted).toBe(true);
+    expect(result.outcome).toBe("minted");
     expect(result.identity.personId).toBe("fresh-id");
     expect(result.identity.personId).not.toBe("withdrawn-id");
   });
@@ -413,5 +434,39 @@ describe("PersonIdentityUseCase.off", () => {
 
     expect(result.addedIdentifiersRemoved).toBe(2);
     expect(await store.read()).toBeNull();
+  });
+});
+
+/**
+ * Every command an error names is a command the CLI still has.
+ *
+ * An error message is the one surface that tells a person what to run next, and it is the
+ * one nothing typechecks. Reducing `identity` from seven verbs to four left
+ * `EmptyDisplayNameError` saying "run `aidd telemetry identity name`" — a verb the same
+ * change had just deleted, reachable from an ordinary typo, and invisible to every gate
+ * because the only test asserted the error's *class* and never its sentence.
+ *
+ * So this reads the sentences instead. It is deliberately a scan of the source rather than
+ * a list of expected strings: a list would have to be updated by the same hand that forgets
+ * to update the message, which is how the first one went stale.
+ */
+describe("what the errors tell a person to run", () => {
+  /** The verbs `registerTelemetryIdentityCommand` actually registers, plus the bare noun. */
+  const IDENTITY_VERBS = new Set(["", "use", "off", "link", "unlink"]);
+
+  it("names no identity verb the command surface does not have", () => {
+    const source = readFileSync(
+      new URL("../../../../src/application/errors.ts", import.meta.url),
+      "utf8"
+    );
+    const named = [...source.matchAll(/aidd telemetry identity ?([a-z-]*)/gu)].map(
+      (match) => match[1] ?? ""
+    );
+
+    // Non-empty: a scan that found nothing would pass forever while saying nothing.
+    expect(named.length).toBeGreaterThan(0);
+    for (const verb of named) {
+      expect(IDENTITY_VERBS, `errors.ts names \`identity ${verb}\``).toContain(verb);
+    }
   });
 });

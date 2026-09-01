@@ -21,6 +21,8 @@ function dayFileName(at: Date): string {
  * mutation test checks to prove a caller passed the preview's own path, never this double's
  * `rootDir`. */
 export class InMemoryTelemetrySink implements TelemetrySink {
+  /** Settable, so a test can stand in for a machine that located its figures either way. */
+  locatedBy: TelemetrySink["locatedBy"] = "default";
   readonly rootDir = "/fake/telemetry";
   readonly files = new Map<string, TelemetrySinkRecord[]>();
   readonly deletedFiles: string[] = [];

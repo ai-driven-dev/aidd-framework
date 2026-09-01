@@ -24,7 +24,7 @@ who knows exactly what happened, what stayed, and what no command here can touch
      machine's stored records (spanning every project ever measured on this machine, not
      only this one), and this machine's identity file are all deleted.
 
-2. **Withdraw naming.** Run `aidd telemetry identity status`.
+2. **Withdraw naming.** Run `aidd telemetry identity`.
    - Already off: relay it and stop.
    - Otherwise, run `aidd telemetry identity off` and relay everything it prints: new
      records carry no person from this moment; records already stored keep the identifier

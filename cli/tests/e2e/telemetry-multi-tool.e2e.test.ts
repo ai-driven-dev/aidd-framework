@@ -78,14 +78,23 @@ describe("aidd telemetry, across every tool that can be read", () => {
     );
   }
 
-  /** Answers `opencode export <id> --sanitize` with the captured payload, and nothing else
-   * with anything. A real binary would make this test depend on the machine it runs on. */
+  /** Answers `opencode export <id> --sanitize` with the captured payload **for its own
+   * session and no other**, and nothing else with anything. A real binary would make this
+   * test depend on the machine it runs on.
+   *
+   * The session check is not decoration. Answering for any id at all is what a tool whose
+   * identifiers collided with another's would look like, and this stand-in used to do
+   * exactly that: every session read against it came back with OpenCode's figures, so one
+   * session's consumption was stored three times under three vendor ids, and this file
+   * asserted the tripled number under a comment claiming each tool's figures stayed its
+   * own. A real `opencode export` answers "session not found" for a foreign id — measured
+   * 2026-09-01, exit 1 — so this now does too. */
   async function installOpencodeStandIn(): Promise<void> {
     await mkdir(binDir, { recursive: true });
     const standIn = join(binDir, "opencode");
     await writeFile(
       standIn,
-      `#!/bin/sh\nif [ "$1" = "export" ]; then cat ${OPENCODE_EXPORT_FIXTURE}; exit 0; fi\nexit 1\n`,
+      `#!/bin/sh\nif [ "$1" = "export" ] && [ "$2" = "${OPENCODE_SESSION}" ]; then cat ${OPENCODE_EXPORT_FIXTURE}; exit 0; fi\necho "session not found" >&2\nexit 1\n`,
       "utf-8"
     );
     await chmod(standIn, 0o755);
@@ -210,8 +219,9 @@ describe("aidd telemetry, across every tool that can be read", () => {
     expect(out).not.toContain("$");
     // Codex's two turns, recomputed by hand from the rollout's own increments.
     expect(out).toContain("183,939");
-    // The three tools' figures stay their own rather than being pooled.
-    expect(out).toMatch(/OpenCode\s+amount unknown\s+435,855 tokens/u);
+    // The three tools' figures stay their own rather than being pooled. One session's
+    // figures, counted once — not once per session that happened to be read.
+    expect(out).toMatch(/OpenCode\s+amount unknown\s+145,285 tokens/u);
     expect(out).toMatch(/Claude Code\s+amount unknown\s+151,826 tokens/u);
   });
 

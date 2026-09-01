@@ -14,7 +14,11 @@ const CLEAN_ENV = Object.fromEntries(
 const {
   pluginVersion,
   readManifestVersion,
-  DEFAULT_MANIFEST_PATH,
+  versionBesideTheHooks,
+  versionFromAiddManifest,
+  MANIFEST_DIRS,
+  PLUGIN_NAME,
+  AIDD_TOOL_ID_BY_HOST,
 } = require("../../plugins/aidd-telemetry/hooks/lib/plugin-version.cjs");
 
 const REAL_MANIFEST_PATH = path.resolve(
@@ -34,8 +38,39 @@ function makeTempDir(prefix) {
   return dir;
 }
 
-test("DEFAULT_MANIFEST_PATH resolves to this plugin's own real manifest, one directory from the hook", () => {
-  assert.equal(DEFAULT_MANIFEST_PATH, REAL_MANIFEST_PATH);
+test("MANIFEST_DIRS names every directory the build renames this plugin's manifest into", () => {
+  // Duplicated from the CLI on purpose - this plugin is copied verbatim into user projects
+  // and can import nothing from `cli/`. Pinned here so the copy cannot drift from the list
+  // that decides where the manifest is actually written. Looking for one name found the
+  // version on Claude and nowhere else, which is the defect this list exists to close.
+  const contracts = fs.readFileSync(
+    path.resolve(__dirname, "../../cli/src/application/use-cases/framework/strategies/tool-contracts.ts"),
+    "utf8",
+  );
+  const declared = [...contracts.matchAll(/manifestDir:\s*"([^"]+)"/gu)].map((m) => m[1]);
+
+  assert.ok(declared.length > 0, "the CLI must still declare manifest directories");
+  assert.deepEqual([...MANIFEST_DIRS].sort(), [...new Set(declared)].sort());
+});
+
+test("PLUGIN_NAME is the name this plugin's own manifest states", () => {
+  assert.equal(PLUGIN_NAME, JSON.parse(fs.readFileSync(REAL_MANIFEST_PATH, "utf8")).name);
+});
+
+test("AIDD_TOOL_ID_BY_HOST maps every journal host the CLI declares, onto that tool's own id", () => {
+  // The journal's host names and `.aidd/manifest.json`'s tool ids are the same set spelled
+  // twice; only Claude Code differs. A host missing here answers `undefined` and silently
+  // costs the version, so the map has to be complete rather than merely correct.
+  const toolsDir = path.resolve(__dirname, "../../cli/src/domain/tools/ai");
+  const declared = {};
+  for (const file of fs.readdirSync(toolsDir).filter((f) => f.endsWith(".ts"))) {
+    const source = fs.readFileSync(path.join(toolsDir, file), "utf8");
+    const host = /telemetryJournalHost:\s*"([^"]+)"/u.exec(source);
+    if (host) declared[host[1]] = path.basename(file, ".ts");
+  }
+
+  assert.ok(Object.keys(declared).length > 0, "the CLI must still declare journal hosts");
+  assert.deepEqual(Object.keys(AIDD_TOOL_ID_BY_HOST).sort(), Object.keys(declared).sort());
 });
 
 test("readManifestVersion reads the real plugin's own declared version", () => {
@@ -70,25 +105,42 @@ test("readManifestVersion reads null for valid JSON that names no usable version
   }
 });
 
-test("pluginVersion reads its own manifest at most once per process, reused on every later call", () => {
-  const realReadFileSync = fs.readFileSync;
-  let callsForDefaultManifest = 0;
-  fs.readFileSync = (target, ...rest) => {
-    if (target === DEFAULT_MANIFEST_PATH) callsForDefaultManifest += 1;
-    return realReadFileSync(target, ...rest);
-  };
-  try {
-    const first = pluginVersion();
-    const second = pluginVersion();
-    assert.equal(first, REAL_PLUGIN_VERSION);
-    assert.equal(second, REAL_PLUGIN_VERSION);
-    assert.ok(
-      callsForDefaultManifest <= 1,
-      `expected the manifest to be read at most once across two calls, read it ${callsForDefaultManifest} times`,
-    );
-  } finally {
-    fs.readFileSync = realReadFileSync;
-  }
+test("pluginVersion answers per repository, never handing one project's version to the next", () => {
+  // There used to be a process-wide memo here, keyed on nothing. It was harmless while the
+  // answer came from one fixed path; it stopped being harmless the moment the second route
+  // made the answer depend on which repository is asking.
+  const repoWithout = makeTempDir("aidd-plugin-version-norepo-");
+  const repoWith = makeTempDir("aidd-plugin-version-withrepo-");
+  fs.mkdirSync(path.join(repoWith, ".aidd"), { recursive: true });
+  fs.writeFileSync(
+    path.join(repoWith, ".aidd", "manifest.json"),
+    JSON.stringify({ tools: { cursor: { plugins: [{ name: PLUGIN_NAME, version: "9.9.9" }] } } }),
+  );
+
+  assert.equal(versionFromAiddManifest(repoWith, "cursor"), "9.9.9");
+  assert.equal(versionFromAiddManifest(repoWithout, "cursor"), null);
+  assert.equal(versionFromAiddManifest(repoWith, "cursor"), "9.9.9");
+});
+
+test("the aidd manifest answers for the host's own tool, never for whichever lists this plugin first", () => {
+  // `aidd plugin update --tool cursor` updates one tool's copy alone, so two entries can
+  // legitimately disagree. Answering with the wrong one would be worse than answering with
+  // nothing.
+  const repo = makeTempDir("aidd-plugin-version-twotools-");
+  fs.mkdirSync(path.join(repo, ".aidd"), { recursive: true });
+  fs.writeFileSync(
+    path.join(repo, ".aidd", "manifest.json"),
+    JSON.stringify({
+      tools: {
+        claude: { plugins: [{ name: PLUGIN_NAME, version: "1.0.0" }] },
+        cursor: { plugins: [{ name: PLUGIN_NAME, version: "2.0.0" }] },
+      },
+    }),
+  );
+
+  assert.equal(versionFromAiddManifest(repo, "claude-code"), "1.0.0");
+  assert.equal(versionFromAiddManifest(repo, "cursor"), "2.0.0");
+  assert.equal(versionFromAiddManifest(repo, "a-host-no-tool-claims"), null);
 });
 
 // The integration half: journal.cjs run from a temporary copy of this plugin's own hooks/
@@ -103,11 +155,11 @@ const REAL_CLAUDE_PLUGIN_DIR = path.resolve(__dirname, "../../plugins/aidd-telem
  * carries them in - `hooks/lib/plugin-version.cjs`'s own `DEFAULT_MANIFEST_PATH` walks up
  * from `__dirname`, so this is what lets the copy's own manifest (present, corrupted, or
  * missing entirely, per `withManifest`) be the one it actually reads. */
-function makePluginCopy(withManifest) {
+function makePluginCopy(withManifest, manifestDir = ".claude-plugin") {
   const pluginRoot = makeTempDir("aidd-plugin-version-copy-");
   fs.cpSync(HOOKS_SRC, path.join(pluginRoot, "hooks"), { recursive: true });
   if (withManifest === "valid") {
-    fs.cpSync(REAL_CLAUDE_PLUGIN_DIR, path.join(pluginRoot, ".claude-plugin"), { recursive: true });
+    fs.cpSync(REAL_CLAUDE_PLUGIN_DIR, path.join(pluginRoot, manifestDir), { recursive: true });
   } else if (withManifest === "corrupt") {
     fs.mkdirSync(path.join(pluginRoot, ".claude-plugin"), { recursive: true });
     fs.writeFileSync(path.join(pluginRoot, ".claude-plugin", "plugin.json"), "{ not json");
@@ -203,4 +255,63 @@ test("a plugin copy whose manifest is present but not valid JSON reads the same 
   assert.equal(result.status, 0);
   const [sessionStart] = readRunFileLines(repo);
   assert.equal(Object.prototype.hasOwnProperty.call(sessionStart, "plugin_version"), false);
+});
+
+test("finds the manifest under every name the build renames it to, not only Claude's", () => {
+  // The defect this closes: the lookup named `.claude-plugin` alone, so a session on
+  // cursor, codex or copilot wrote a journal line with no version at all — indistinguishable
+  // from a line written before the field existed. Driven through the real hook, one built
+  // layout at a time.
+  for (const manifestDir of MANIFEST_DIRS) {
+    const journalScript = makePluginCopy("valid", manifestDir);
+    const repo = makeTempRepo();
+
+    const result = runJournal(journalScript, repo, `00000000-0000-4000-8000-00000000pv${MANIFEST_DIRS.indexOf(manifestDir)}0`);
+
+    assert.equal(result.status, 0, `${manifestDir}: ${result.stderr}`);
+    const [sessionStart] = readRunFileLines(repo);
+    assert.equal(sessionStart.plugin_version, REAL_PLUGIN_VERSION, `under ${manifestDir}`);
+  }
+});
+
+test("falls back to what the aidd CLI recorded when the hooks were installed away from any manifest", () => {
+  // `aidd setup --ai cursor` copies `hooks/` alone into `.cursor/hooks/aidd-telemetry/`,
+  // with no manifest at any offset — measured, not assumed. The CLI writes
+  // `.aidd/manifest.json` in the same act, and that is the only thing left that knows.
+  const journalScript = makePluginCopy("absent");
+  const repo = makeTempRepo();
+  fs.writeFileSync(
+    path.join(repo, ".aidd", "manifest.json"),
+    JSON.stringify({
+      version: 6,
+      tools: { claude: { plugins: [{ name: PLUGIN_NAME, version: "3.1.4" }] } },
+    }),
+  );
+
+  const result = runJournal(journalScript, repo, "00000000-0000-4000-8000-0000000pv90");
+
+  assert.equal(result.status, 0, result.stderr);
+  const [sessionStart] = readRunFileLines(repo);
+  assert.equal(sessionStart.plugin_version, "3.1.4");
+});
+
+test("prefers the plugin's own manifest over what a stale aidd manifest remembers", () => {
+  // The manifest beside the hooks is what this build *is*; the aidd manifest is what some
+  // earlier install recorded. When both answer, the plugin's own is the one that cannot be
+  // out of date with the file being run.
+  const journalScript = makePluginCopy("valid");
+  const repo = makeTempRepo();
+  fs.writeFileSync(
+    path.join(repo, ".aidd", "manifest.json"),
+    JSON.stringify({
+      version: 6,
+      tools: { claude: { plugins: [{ name: PLUGIN_NAME, version: "0.0.1-stale" }] } },
+    }),
+  );
+
+  const result = runJournal(journalScript, repo, "00000000-0000-4000-8000-0000000pv91");
+
+  assert.equal(result.status, 0, result.stderr);
+  const [sessionStart] = readRunFileLines(repo);
+  assert.equal(sessionStart.plugin_version, REAL_PLUGIN_VERSION);
 });

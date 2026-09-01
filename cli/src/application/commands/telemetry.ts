@@ -9,14 +9,13 @@ import { printTelemetryCheckReport } from "../display/telemetry-check-display.js
 import {
   printLocalCostReadReport,
   printPersonIdentityLink,
-  printPersonIdentityName,
   printPersonIdentityOff,
-  printPersonIdentityOn,
   printPersonIdentityStatus,
   printPersonIdentityUnlink,
   printPersonIdentityUse,
   printTelemetryOffReport,
   printTelemetryOnReport,
+  warnIfFiguresMoveTheTokenToo,
 } from "../display/telemetry-display.js";
 import {
   printTelemetryForgetPreview,
@@ -68,6 +67,7 @@ export function registerTelemetryCommand(program: Command): void {
       const errorHandler = new ErrorHandler(output);
       try {
         const deps = await createDeps(projectRoot, { verbose }, output);
+        warnIfFiguresMoveTheTokenToo(output, deps.telemetrySink);
         const result = await deps.readLocalCostUseCase.execute({
           projectRoot,
           env: process.env,
@@ -126,6 +126,7 @@ export function registerTelemetryCommand(program: Command): void {
           // the two absolute days this resolves to, so the same call answers the same twice.
           const period = resolveReportPeriod(cmdOptions, new Date());
           const deps = await createDeps(projectRoot, { verbose }, output);
+          warnIfFiguresMoveTheTokenToo(output, deps.telemetrySink);
           const report = await deps.reportCostUseCase.execute({
             period,
             projectRoot,
@@ -231,45 +232,38 @@ function registerTelemetryIdentityCommand(telemetry: Command, program: Command):
   const identity = telemetry
     .command("identity")
     .description("Whether this person's own identifier is attached to records read locally");
-  identity.action(() => identity.help());
+  // The bare noun answers with state rather than a help screen: `aidd telemetry identity` is
+  // a question, and a command surface that replies to it by describing itself is talking
+  // about the wrong thing. `--help` still prints the help.
+  identity.action(async () => {
+    const { verbose, output, projectRoot } = parseGlobalOptions(program);
+    const errorHandler = new ErrorHandler(output);
+    try {
+      const deps = await createDeps(projectRoot, { verbose }, output);
+      printPersonIdentityStatus(output, await deps.personIdentityUseCase.status());
+    } catch (error) {
+      errorHandler.handle(error);
+    }
+  });
 
   identity
-    .command("status")
-    .description("Show whether this person opted in, and with what identifier")
-    .action(async () => {
+    .command("use [identifier]")
+    .description(
+      "Mint this person's identifier, or take one minted on another machine. --name attaches a display name"
+    )
+    .option("--name <value>", "A display name for whichever identifier this call settles on")
+    .action(async (identifier: string | undefined, cmdOptions: { name?: string }) => {
       const { verbose, output, projectRoot } = parseGlobalOptions(program);
       const errorHandler = new ErrorHandler(output);
       try {
         const deps = await createDeps(projectRoot, { verbose }, output);
-        printPersonIdentityStatus(output, await deps.personIdentityUseCase.status());
-      } catch (error) {
-        errorHandler.handle(error);
-      }
-    });
-
-  identity
-    .command("on")
-    .description("Opt in: mint this person's own identifier, once")
-    .action(async () => {
-      const { verbose, output, projectRoot } = parseGlobalOptions(program);
-      const errorHandler = new ErrorHandler(output);
-      try {
-        const deps = await createDeps(projectRoot, { verbose }, output);
-        printPersonIdentityOn(output, await deps.personIdentityUseCase.on());
-      } catch (error) {
-        errorHandler.handle(error);
-      }
-    });
-
-  identity
-    .command("use <identifier>")
-    .description("Take an identifier minted on another machine, so this person reads as one")
-    .action(async (identifier: string) => {
-      const { verbose, output, projectRoot } = parseGlobalOptions(program);
-      const errorHandler = new ErrorHandler(output);
-      try {
-        const deps = await createDeps(projectRoot, { verbose }, output);
-        printPersonIdentityUse(output, await deps.personIdentityUseCase.use(identifier));
+        printPersonIdentityUse(
+          output,
+          await deps.personIdentityUseCase.use({
+            ...(identifier === undefined ? {} : { identifier }),
+            ...(cmdOptions.name === undefined ? {} : { displayName: cmdOptions.name }),
+          })
+        );
       } catch (error) {
         errorHandler.handle(error);
       }
@@ -284,20 +278,6 @@ function registerTelemetryIdentityCommand(telemetry: Command, program: Command):
       try {
         const deps = await createDeps(projectRoot, { verbose }, output);
         printPersonIdentityOff(output, await deps.personIdentityUseCase.off());
-      } catch (error) {
-        errorHandler.handle(error);
-      }
-    });
-
-  identity
-    .command("name <value>")
-    .description("Attach a display name to the identifier already opted into")
-    .action(async (value: string) => {
-      const { verbose, output, projectRoot } = parseGlobalOptions(program);
-      const errorHandler = new ErrorHandler(output);
-      try {
-        const deps = await createDeps(projectRoot, { verbose }, output);
-        printPersonIdentityName(output, await deps.personIdentityUseCase.name(value));
       } catch (error) {
         errorHandler.handle(error);
       }

@@ -15,7 +15,7 @@ person can withdraw at any time, and a user who knows exactly what it does and d
 
 ## Process
 
-1. **Check first.** Run `aidd telemetry identity status`.
+1. **Check first.** Run `aidd telemetry identity`.
    - Already on: relay it and stop — no consent to ask again for a choice already made.
 2. **Say what it attaches, before asking.** Turning this on attaches one stable, random
    identifier — never an email, a git author, or a hostname — to records this machine reads
@@ -25,10 +25,10 @@ person can withdraw at any time, and a user who knows exactly what it does and d
    separate, later choice; turning this on alone sets none.
 3. **Ask.** Wait for a yes.
    - Declines: stop, and write nothing.
-4. **Turn it on.** Run `aidd telemetry identity on` and relay what it prints.
+4. **Turn it on.** Run `aidd telemetry identity use` and relay what it prints. No identifier means mint one; an identifier taken from another machine goes after it.
 5. **Offer a display name, separately.** Ask whether they also want a display name shown
    beside their figures. Only on a yes, ask for the value and run
-   `aidd telemetry identity name "<value>"`. A no here is not a smaller yes to the
+   `aidd telemetry identity use --name "<value>"`. A no here is not a smaller yes to the
    identifier question — nothing beyond the identifier is set.
 6. **Say it is reversible.** `aidd telemetry identity off` stops new records carrying
    it; what is already stored keeps the identifier it was written with.
@@ -45,7 +45,7 @@ person can withdraw at any time, and a user who knows exactly what it does and d
    into one row in every report from then on, instead of printing as two. `link` is a
    declaration the CLI cannot verify - only offer it for an identifier this person actually
    owns, never one seen on someone else's record. This writes onto the same `identity.json`
-   `use` and `on` write (under this machine's own user profile, never `.aidd/config.json`
+   `use` writes (under this machine's own user profile, never `.aidd/config.json`
    or `AIDD_USER_CONFIG_DIR`) — refused before there is an identity to add onto. Linking one
    already listed reports it as already listed, not as a second write.
    `aidd telemetry identity unlink <identity>` removes one identifier without touching this

@@ -229,6 +229,9 @@ interface Deps {
   personIdentityUseCase: PersonIdentityUseCase;
   diagnoseTelemetryUseCase: DiagnoseTelemetryUseCase;
   reportCostUseCase: ReportCostUseCase;
+  /** Exposed so a command can say how this machine located its figures — see
+   * `warnIfFiguresMoveTheTokenToo`. */
+  telemetrySink: TelemetrySinkAdapter;
   forgetTelemetryUseCase: ForgetTelemetryUseCase;
 }
 
@@ -754,14 +757,17 @@ export async function createDeps(
     localCostReaders,
     hookTrustReaderAdapter,
     personIdentityAdapter,
-    telemetrySink
+    telemetrySink,
+    currentVersionProvider
   );
   const reportCostUseCase = new ReportCostUseCase(
     telemetrySink,
     runJournalReader,
     personIdentityAdapter,
     telemetryEvidenceAdapter,
-    new TaskBacklogAdapter(projectRoot)
+    new TaskBacklogAdapter(projectRoot),
+    readLocalCostUseCase,
+    logger
   );
   const forgetTelemetryUseCase = new ForgetTelemetryUseCase(
     telemetrySink,
@@ -840,6 +846,7 @@ export async function createDeps(
     personIdentityUseCase,
     diagnoseTelemetryUseCase,
     reportCostUseCase,
+    telemetrySink,
     forgetTelemetryUseCase,
   };
   _cache.set(projectRoot, deps);

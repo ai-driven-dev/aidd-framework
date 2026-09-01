@@ -1,4 +1,7 @@
-import type { TelemetryLocalRead } from "../../../domain/capabilities/telemetry-capability.js";
+import type {
+  TelemetryLocalRead,
+  TelemetryLocalReadDeclared,
+} from "../../../domain/capabilities/telemetry-capability.js";
 import {
   resolveSessionProject,
   type SessionProject,
@@ -31,19 +34,28 @@ import type {
 import type { TelemetryEvidenceReader } from "../../../domain/ports/telemetry-evidence-reader.js";
 import type { TelemetrySink } from "../../../domain/ports/telemetry-sink.js";
 import type { VersionReader } from "../../../domain/ports/version-reader.js";
-import { getAiToolConfig } from "../../../domain/tools/registry.js";
+import { getAiToolConfig, journalHostToAiToolId } from "../../../domain/tools/registry.js";
 
-/** Five answers, and only one of them may ever be printed as a zero.
+/** Six answers, and only one of them may ever be printed as a zero.
  *
  * - `found` — this tool held the session and billed for it.
  * - `empty` — it held the session and billed nothing. The zero is the measurement.
  * - `not-found` — it has no trace of the session at all. Nothing is known about it.
  * - `unreadable` — its reader failed. Nothing is known about it, and something is wrong.
  * - `not-covered` — nothing here can read this tool, and its declaration says why.
+ * - `not-asked` — the journal named another tool for this session, so this reader was
+ *   never run. Deliberately not `not-found`: that one is an observation, this one is a
+ *   decision not to look, and only the first is evidence about the tool.
  *
- * The last four look alike in a total and mean four different things. Collapsing any of
+ * The last five look alike in a total and mean five different things. Collapsing any of
  * them into `empty` is exactly how a session that was never measured reads as free. */
-export type LocalCostToolStatus = "found" | "empty" | "not-found" | "unreadable" | "not-covered";
+export type LocalCostToolStatus =
+  | "found"
+  | "empty"
+  | "not-found"
+  | "unreadable"
+  | "not-covered"
+  | "not-asked";
 
 export interface LocalCostToolReport {
   readonly tool: AiToolId;
@@ -185,12 +197,20 @@ const STATUS_RANK: readonly LocalCostToolStatus[] = [
   "empty",
   "not-found",
   "not-covered",
+  // Weakest on purpose: one session where this tool was never asked must never outrank
+  // another where it actually answered.
+  "not-asked",
 ];
 
 function strongestOf(tool: AiToolId, reports: readonly LocalCostToolReport[]): LocalCostToolReport {
+  // The seed for a tool with no report at all. Reached only when `reports` is empty, which
+  // `printLocalCostReadReport` never renders — it returns on an empty sweep before printing
+  // any tool line. So this is the honest value for an unreachable-today case, not a
+  // behaviour change: `not-asked` is what "nothing looked at it" means, where `not-found`
+  // would report an observation never made.
   const nothingKnown: LocalCostToolReport = {
     tool,
-    status: "not-found",
+    status: "not-asked",
     recordsFound: 0,
     recordsStored: 0,
     sessionsFailed: 0,
@@ -233,6 +253,13 @@ function notCovered(tool: AiToolId, localRead: TelemetryLocalRead): LocalCostToo
     sessionsFailed: 0,
     ...(localRead.kind === "unsupported" ? { reason: localRead.reason } : {}),
   };
+}
+
+/** This tool's reader was never run, because the journal named another tool for the
+ * session. Carries no `reason`: there is nothing wrong here and nothing was measured — the
+ * status is the whole fact. */
+function notAsked(tool: AiToolId): LocalCostToolReport {
+  return { tool, status: "not-asked", recordsFound: 0, recordsStored: 0, sessionsFailed: 0 };
 }
 
 /** Its reader failed, so nothing is known about it and something is wrong — distinct from
@@ -312,7 +339,15 @@ export class ReadLocalCostUseCase {
     for (const sessionId of sessionIds) {
       sessions.push({ sessionId, toolReports: await this.readOneSession(sessionId, at, person) });
     }
-    await this.pruneOldDayFiles();
+    // A sweep prunes; a single named session does not. That was already this function's
+    // own stated reason — "once per sweep rather than per new day file, because a sweep is
+    // already the unit a person invokes" — but it ran on every call, which was harmless
+    // while `aidd telemetry read` was the only caller. It stopped being harmless the moment
+    // `report` began catching sessions up one at a time: a command that had never destroyed
+    // anything started deleting stored day files past the retention window, silently, as a
+    // side effect of being asked a question. Housekeeping belongs to the command a person
+    // runs to do housekeeping.
+    if (options.sessionId === undefined) await this.pruneOldDayFiles();
     return { sessions, toolReports: mergeToolReports(sessions) };
   }
 
@@ -372,21 +407,52 @@ export class ReadLocalCostUseCase {
       project: resolveSessionProject(journal),
       person,
     };
+    // Only the tool whose session this is. The journal's `session_start` names the host
+    // that wrote it, and `journalHostToAiToolId` is the one place those names and this
+    // codebase's tool ids are related — so asking the other four is guaranteed-useless
+    // work, and one of them pays for it in process spawns: the OpenCode reader shells out
+    // to its binary and waits, measured at 1.15s for a session it does not have. On a
+    // machine with that binary installed, a sweep over 200 journalled sessions spent about
+    // four minutes proving four times over what the journal already said.
+    //
+    // Fan out only when the journal cannot name a tool — `--session <id>` given by hand
+    // (no journal at all), or a host no registered tool claims. There the tool is genuinely
+    // unknown, and asking every reader is the only way to find out.
+    const host = journal?.session?.tool;
+    const namedTool = host === undefined ? null : journalHostToAiToolId(host);
     const toolReports: LocalCostToolReport[] = [];
     for (const tool of AI_TOOL_IDS) {
-      toolReports.push(await this.readOneTool(tool, sessionId, at, attribution));
+      toolReports.push(await this.answerFor(tool, namedTool, sessionId, at, attribution));
     }
     return toolReports;
   }
 
-  private async readOneTool(
+  /** What this tool has to say about this session, and in which order the three reasons it
+   * might say nothing are considered.
+   *
+   * Coverage first, always: "nothing here can read this tool" is a fact about the tool,
+   * true of every session, and it carries the declaration's own reason. Answering
+   * `not-asked` there would trade that reason for a session-shaped one that says less. */
+  private async answerFor(
     tool: AiToolId,
+    namedTool: AiToolId | null,
     sessionId: string,
     at: Date,
     attribution: LocalReadAttribution
   ): Promise<LocalCostToolReport> {
     const localRead = getAiToolConfig(tool).telemetryLocalRead;
     if (localRead.kind !== "declared") return notCovered(tool, localRead);
+    if (namedTool !== null && tool !== namedTool) return notAsked(tool);
+    return this.readOneTool(tool, localRead, sessionId, at, attribution);
+  }
+
+  private async readOneTool(
+    tool: AiToolId,
+    localRead: TelemetryLocalReadDeclared,
+    sessionId: string,
+    at: Date,
+    attribution: LocalReadAttribution
+  ): Promise<LocalCostToolReport> {
     const attempt = await this.attemptRead(tool, sessionId);
     if ("failure" in attempt) return unreadable(tool, attempt.failure);
     const candidates = attempt.records;

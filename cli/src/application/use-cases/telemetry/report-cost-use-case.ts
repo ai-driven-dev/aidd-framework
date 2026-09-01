@@ -20,14 +20,20 @@ import {
   type TaskIdentity,
   taskIdentityFromWrittenPath,
 } from "../../../domain/models/task-identity.js";
+import type { TelemetrySinkRecord } from "../../../domain/models/telemetry-sink-record.js";
 import { AI_TOOL_IDS } from "../../../domain/models/tool-ids.js";
+import type { Logger } from "../../../domain/ports/logger.js";
 import type { PersonIdentity } from "../../../domain/ports/person-identity-reader.js";
 import type { PersonIdentityStore } from "../../../domain/ports/person-identity-store.js";
 import type { RunJournal, RunJournalReader } from "../../../domain/ports/run-journal-reader.js";
 import type { TaskBacklogReader } from "../../../domain/ports/task-backlog-reader.js";
 import type { TelemetryEvidenceReader } from "../../../domain/ports/telemetry-evidence-reader.js";
-import type { TelemetrySink } from "../../../domain/ports/telemetry-sink.js";
+import type {
+  TelemetrySink,
+  TelemetrySinkPeriodRead,
+} from "../../../domain/ports/telemetry-sink.js";
 import { getAiToolConfig } from "../../../domain/tools/registry.js";
+import type { ReadLocalCostResult, ReadLocalCostUseCase } from "./read-local-cost-use-case.js";
 
 export interface ReportCostOptions {
   /** Already two absolute days. Resolving what a caller asked for is
@@ -235,13 +241,58 @@ function toReportInput(
  * in particular no amount, since the rates live outside this repository and an amount is
  * only ever reported where a tool's own files already carried one.
  */
+/** Sessions the journal knows about that the period's stored records say nothing about,
+ * and whose own session_start falls inside the period.
+ *
+ * Both halves matter. Without the first, a report re-reads sessions already stored, for
+ * nothing. Without the second, a report over one week would re-read every session a
+ * repository has ever journalled, and the cost of catching up would grow with the age of
+ * the project rather than with the length of the period asked about.
+ *
+ * A session that genuinely billed nothing stays in this list, and is re-read on every
+ * report over its own week. That is the honest cost of not keeping a second file recording
+ * which sessions have already been looked at — a file whose only job would be to remember
+ * an answer the sink can already be asked for. */
+function sessionsNotYetRead(
+  stored: readonly TelemetrySinkRecord[],
+  journals: readonly RunJournal[],
+  fromMs: number,
+  periodEndMs: number
+): readonly string[] {
+  const known = new Set(stored.map((record) => record.vendor_id));
+  const missing: string[] = [];
+  for (const journal of journals) {
+    const session = journal.session;
+    if (session === undefined || known.has(session.vendor_id)) continue;
+    const atMs = Date.parse(session.at);
+    // `periodEndMs` is the first instant *after* the period, which is why this is `>=` and
+    // not `>`. Computing an end here rather than taking the one `periodEndMsOf` already
+    // gives is how the first version of this excluded the whole of `toDay`: a report over
+    // the single day work happened on answered "nothing in this period", and `--days N`
+    // sets `toDay` to today, so the default report never caught up anything journalled
+    // today — the one case this exists for.
+    if (Number.isNaN(atMs) || atMs < fromMs || atMs >= periodEndMs) continue;
+    missing.push(session.vendor_id);
+  }
+  return missing;
+}
+
 export class ReportCostUseCase {
   constructor(
     private readonly sink: TelemetrySink,
     private readonly runJournalReader: RunJournalReader,
     private readonly personIdentityStore: PersonIdentityStore,
     private readonly telemetryEvidenceReader: TelemetryEvidenceReader,
-    private readonly taskBacklogReader: TaskBacklogReader
+    private readonly taskBacklogReader: TaskBacklogReader,
+    /** Reads the sessions the sink has not caught up with yet, before the report is built.
+     * Optional so a caller exercising the report's own rules need not wire a reader it is
+     * not asking about; absent, this reports exactly what the sink already holds. Production
+     * wiring always supplies it — that is what lets `report` be the only command a person
+     * runs, with `read` kept for asking on purpose rather than as a step to remember. */
+    private readonly readLocalCost?: ReadLocalCostUseCase,
+    /** Only `warnAboutFailures` writes here. Optional for the same reason `readLocalCost`
+     * is: a caller asking about the report's own rules wires neither. */
+    private readonly logger?: Logger
   ) {}
 
   /** Whether the project switch is on right now - independent of the sink and the journal,
@@ -252,14 +303,19 @@ export class ReportCostUseCase {
 
   async execute(options: ReportCostOptions): Promise<CostReport> {
     const { fromDay, toDay } = options.period;
-    const read = await this.sink.readRecordsInPeriod(
-      new Date(`${fromDay}T00:00:00Z`),
-      new Date(`${toDay}T00:00:00Z`)
-    );
+    const from = new Date(`${fromDay}T00:00:00Z`);
+    const to = new Date(`${toDay}T00:00:00Z`);
+    const periodEndMs = periodEndMsOf(toDay);
     // Every journal, not only the period's: a journal carries no date in its file name, and
     // the records it is joined to were already selected by their own moments. Filtering the
     // journals as well would only be a second, weaker selection over the same thing.
     const journals = await this.runJournalReader.list();
+    const read = await this.catchUp(
+      await this.sink.readRecordsInPeriod(from, to),
+      journals,
+      options,
+      { from, to, periodEndMs }
+    );
     const identity = await personIdentityFields(this.personIdentityStore);
     const measurementEnabled = await this.measurementEnabled(options);
     const taskBacklogDeclarations = await taskBacklogDeclarationsOf(
@@ -271,5 +327,61 @@ export class ReportCostUseCase {
     return buildCostReport(
       toReportInput(options, read, journals, identity, measurementEnabled, taskBacklogDeclarations)
     );
+  }
+
+  /** Reads whatever the sink has not caught up with, then asks it again.
+   *
+   * `ReadLocalCostUseCase` refuses on its own when the project switch is off or the person
+   * refused, so this needs no second gate: a refusal simply stores nothing and the report
+   * describes what was already there. Silent on success by design — the figures are the
+   * announcement, and `read` remains the command for asking what each tool answered. */
+  private async catchUp(
+    read: TelemetrySinkPeriodRead,
+    journals: readonly RunJournal[],
+    options: ReportCostOptions,
+    period: { from: Date; to: Date; periodEndMs: number }
+  ): Promise<TelemetrySinkPeriodRead> {
+    if (this.readLocalCost === undefined) return read;
+    const missing = sessionsNotYetRead(
+      read.records,
+      journals,
+      period.from.getTime(),
+      period.periodEndMs
+    );
+    if (missing.length === 0) return read;
+    for (const sessionId of missing) {
+      this.warnAboutFailures(
+        sessionId,
+        await this.readLocalCost.execute({
+          sessionId,
+          projectRoot: options.projectRoot,
+          env: options.env,
+        })
+      );
+    }
+    return this.sink.readRecordsInPeriod(period.from, period.to);
+  }
+
+  /** Says what a reader could not answer, since behind a report nobody sees the read's own
+   * output any more.
+   *
+   * Silence on success is a choice; silence on failure is the failure this whole layer
+   * exists to refuse. A period where every reader threw would otherwise print exactly what
+   * a period with no spend prints. Warnings go to stderr, so a `--json` caller's stdout
+   * stays one parseable object. */
+  private warnAboutFailures(sessionId: string, result: ReadLocalCostResult): void {
+    // A missing logger cannot be allowed to swallow the failures this exists to surface —
+    // that is the rule this method is named for, applied to itself. Production always wires
+    // one (`deps.ts`); a caller that does not gets the same sentences on stderr rather than
+    // silence, because a report that quietly drops unreadable sessions reads as low spend.
+    const say =
+      this.logger?.warn.bind(this.logger) ?? ((line: string) => process.stderr.write(`${line}\n`));
+    for (const report of result.toolReports) {
+      if (report.status !== "unreadable") continue;
+      say(
+        `telemetry report: ${report.tool} could not be read for session ${sessionId}` +
+          `${report.failureReason === undefined ? "" : ` - ${report.failureReason}`}`
+      );
+    }
   }
 }

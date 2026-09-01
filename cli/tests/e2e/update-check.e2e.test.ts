@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 
@@ -50,6 +50,8 @@ function startFakeRelease(tag: string): Promise<FakeRelease> {
 interface TestEnv {
   projectDir: string;
   cachePath: string;
+  /** Where this cache lived before it moved under `cache/` — still read, never written. */
+  legacyCachePath: string;
   env: Record<string, string>;
   server: FakeRelease;
   cleanup: () => Promise<void>;
@@ -68,7 +70,10 @@ async function setupEnv(prefix: string): Promise<TestEnv> {
   const server = await startFakeRelease(FAKE_TAG);
   return {
     projectDir,
-    cachePath: join(configDir, "update-check.json"),
+    // Under `cache/`, beside the other disposable things, rather than loose among the files
+    // a person chose. The path before the move is `legacyCachePath` below, still read.
+    cachePath: join(configDir, "cache", "update-check.json"),
+    legacyCachePath: join(configDir, "update-check.json"),
     env: {
       HOME: tempDir,
       AIDD_USER_CONFIG_DIR: configDir,
@@ -146,6 +151,29 @@ describe("E2E: update-check piggyback", () => {
       expect(t.server.hits()).toBeGreaterThanOrEqual(1);
       const cached = JSON.parse(readFileSync(t.cachePath, "utf-8")) as { latest: string };
       expect(cached.latest).toBe("999.0.0");
+    } finally {
+      await t.cleanup();
+    }
+  });
+
+  it("still reads a cache written before it moved, rather than refetching every install at once", async () => {
+    // The file moved into `cache/`. Nothing rewrites the old one, but reading it is what
+    // keeps the move from costing every existing install a network call the first time it
+    // runs an online command.
+    const t = await setupEnv("legacy");
+    try {
+      await mkdir(dirname(t.legacyCachePath), { recursive: true });
+      await writeFile(
+        t.legacyCachePath,
+        JSON.stringify({ checkedAt: Date.now(), latest: "99.0.0" }),
+        "utf-8"
+      );
+
+      const { stderr } = await runCli(["status"], t.projectDir, t.env);
+
+      // `status` is offline: the notice can only have come from the file on disk.
+      expect(t.server.hits()).toBe(0);
+      expect(stderr).toContain("99.0.0");
     } finally {
       await t.cleanup();
     }

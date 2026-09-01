@@ -81,23 +81,16 @@ export class TelemetryProjectScopeRequiresYesError extends Error {
   }
 }
 
-export class IdentityNotOptedInError extends Error {
-  constructor() {
-    super("No identity to name yet. Run `aidd telemetry identity on` first.");
-    this.name = "IdentityNotOptedInError";
-  }
-}
-
 export class EmptyDisplayNameError extends Error {
   constructor() {
-    super("`aidd telemetry identity name` needs a non-empty value.");
+    super("`aidd telemetry identity use --name` needs a non-empty value.");
     this.name = "EmptyDisplayNameError";
   }
 }
 
 export class IdentityRequiredToLinkError extends Error {
   constructor() {
-    super("No identity to link onto yet. Run `aidd telemetry identity on` first.");
+    super("No identity to link onto yet. Run `aidd telemetry identity use` first.");
     this.name = "IdentityRequiredToLinkError";
   }
 }

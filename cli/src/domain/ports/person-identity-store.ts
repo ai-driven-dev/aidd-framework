@@ -58,11 +58,4 @@ export interface PersonIdentityStore extends PersonIdentityReader {
    * a caller inferring removal from `readStrict()` would leave it there forever with no
    * verb able to remove it. Only this store can see the file itself. */
   forget(path: string): Promise<boolean>;
-
-  /** The path a stale separate declaration file (`person-mapping.json`) would have lived
-   * at beside this one, checked for existence alone and never read - that file was
-   * introduced and never released, so there is nothing in it to migrate, only a leftover
-   * to name so `status` can say it is ignored and safe to remove. `null` when none is
-   * present. */
-  staleMappingFilePath(): Promise<string | null>;
 }

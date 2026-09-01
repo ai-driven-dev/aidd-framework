@@ -6,12 +6,16 @@ import "../../../../src/domain/tools/ai/codex.js";
 import "../../../../src/domain/tools/ai/copilot.js";
 import "../../../../src/domain/tools/ai/cursor.js";
 import "../../../../src/domain/tools/ai/opencode.js";
+import { ReadLocalCostUseCase } from "../../../../src/application/use-cases/telemetry/read-local-cost-use-case.js";
 import { ReportCostUseCase } from "../../../../src/application/use-cases/telemetry/report-cost-use-case.js";
 import { UnreadableIdentityFileError } from "../../../../src/domain/errors.js";
 import { toMicroUsd } from "../../../../src/domain/models/cost-report.js";
 import { taskFolderPathFromIdentity } from "../../../../src/domain/models/task-backlog-link.js";
 import type { TelemetrySinkRecord } from "../../../../src/domain/models/telemetry-sink-record.js";
 import { AI_TOOL_IDS } from "../../../../src/domain/models/tool-ids.js";
+import type { RunJournal } from "../../../../src/domain/ports/run-journal-reader.js";
+import type { LocalCostCandidateRecord } from "../../../../src/domain/ports/session-cost-reader.js";
+import { NULL_PERSON_IDENTITY_READER } from "../../../helpers/ports/in-memory-person-identity-reader.js";
 import { InMemoryPersonIdentityStore } from "../../../helpers/ports/in-memory-person-identity-store.js";
 import { InMemoryRunJournalReader } from "../../../helpers/ports/in-memory-run-journal-reader.js";
 import { InMemoryTaskBacklogReader } from "../../../helpers/ports/in-memory-task-backlog-reader.js";
@@ -284,5 +288,283 @@ describe("ReportCostUseCase", () => {
       expect(source).not.toContain(`"${toolId}"`);
       expect(source).not.toContain(`'${toolId}'`);
     }
+  });
+});
+
+/**
+ * Catching the sink up, so a report is the only command a person runs.
+ *
+ * `report` reads the sink, and until now nothing filled the sink but `aidd telemetry read`.
+ * A person who forgot that step was told, truthfully, that the period held nothing — the one
+ * answer indistinguishable from a period where nothing was spent.
+ */
+describe("a report that catches the sink up first", () => {
+  const SESSION = "s-catch-up";
+  const AT = "2026-08-18T10:00:00.000Z";
+
+  let sink: InMemoryTelemetrySink;
+  let journals: InMemoryRunJournalReader;
+  let evidence: StubTelemetryEvidenceReader;
+
+  /** A journal for one session, dated inside the period unless told otherwise. */
+  function journalAt(at: string): RunJournal {
+    return {
+      boundaries: [],
+      filesWritten: [],
+      taskDeclarations: [],
+      session: {
+        type: "session_start",
+        at,
+        run_id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        tool: "claude-code",
+        vendor_id: SESSION,
+      },
+    };
+  }
+
+  /** The real local read, over in-memory ports and one stub reader — not a double for it.
+   * What is being asserted is that `report` reaches the read at all, which a stand-in for
+   * the read could be made to show whether or not it were true. */
+  function localRead(records: readonly LocalCostCandidateRecord[]): ReadLocalCostUseCase {
+    return new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", { read: async () => ({ records, sessionFound: true }) }]]),
+      journals,
+      NULL_PERSON_IDENTITY_READER,
+      evidence
+    );
+  }
+
+  function reportWith(read?: ReadLocalCostUseCase): ReportCostUseCase {
+    return new ReportCostUseCase(
+      sink,
+      journals,
+      new InMemoryPersonIdentityStore(),
+      evidence,
+      new InMemoryTaskBacklogReader(),
+      read
+    );
+  }
+
+  const CANDIDATE: LocalCostCandidateRecord = {
+    kind: "request",
+    vendor_id: SESSION,
+    vendor_field: "sessionId",
+    turn_id: "t-1",
+    event_timestamp: AT,
+    input_tokens: 100,
+    output_tokens: 10,
+  };
+
+  beforeEach(() => {
+    sink = new InMemoryTelemetrySink();
+    journals = new InMemoryRunJournalReader();
+    evidence = new StubTelemetryEvidenceReader();
+  });
+
+  it("reports a journalled session nobody ran a read for", async () => {
+    journals.set(SESSION, journalAt(AT));
+
+    const built = await reportWith(localRead([CANDIDATE])).execute({
+      ...BASE_OPTIONS,
+      period: PERIOD,
+    });
+
+    expect(built.totals.requests).toBe(1);
+    expect(built.totals.inputTokens).toBe(100);
+  });
+
+  it("reports only what the sink holds when no read was wired, rather than guessing", async () => {
+    journals.set(SESSION, journalAt(AT));
+
+    const built = await reportWith().execute({ ...BASE_OPTIONS, period: PERIOD });
+
+    expect(built.totals.requests).toBe(0);
+  });
+
+  it("leaves a session already stored alone rather than reading it again", async () => {
+    journals.set(SESSION, journalAt(AT));
+    await sink.appendRecord(record({ vendor_id: SESSION, event_timestamp: AT }), STORED_ON);
+    let reads = 0;
+    const counting = new ReadLocalCostUseCase(
+      sink,
+      new Map([
+        [
+          "claude",
+          {
+            read: async () => {
+              reads += 1;
+              return { records: [CANDIDATE], sessionFound: true };
+            },
+          },
+        ],
+      ]),
+      journals,
+      NULL_PERSON_IDENTITY_READER,
+      evidence
+    );
+
+    await reportWith(counting).execute({ ...BASE_OPTIONS, period: PERIOD });
+
+    expect(reads).toBe(0);
+  });
+
+  it("reaches a session journalled on the last day of the period, which runs to midnight", async () => {
+    // The bound is the first instant after `toDay`, not `toDay` at 00:00. Getting that
+    // wrong excluded a whole day: a report over the single day work happened on answered
+    // "nothing in this period", and `--days N` sets `toDay` to today, so the default report
+    // never caught up anything journalled today.
+    journals.set(SESSION, journalAt(`${PERIOD.toDay}T23:59:59.999Z`));
+
+    const built = await reportWith(
+      localRead([{ ...CANDIDATE, event_timestamp: `${PERIOD.toDay}T23:59:59.999Z` }])
+    ).execute({ ...BASE_OPTIONS, period: PERIOD });
+
+    expect(built.totals.requests).toBe(1);
+  });
+
+  it("reaches a session journalled at the very first instant of the period", async () => {
+    journals.set(SESSION, journalAt(`${PERIOD.fromDay}T00:00:00.000Z`));
+
+    const built = await reportWith(
+      localRead([{ ...CANDIDATE, event_timestamp: `${PERIOD.fromDay}T00:00:00.000Z` }])
+    ).execute({ ...BASE_OPTIONS, period: PERIOD });
+
+    expect(built.totals.requests).toBe(1);
+  });
+
+  it("never reaches for a session journalled the instant the period ends", async () => {
+    // Midnight opening the day *after* `toDay` is the first moment outside, not the last
+    // one inside — the other half of the boundary, and the half a `>` instead of a `>=`
+    // would silently widen.
+    const dayAfter = new Date(Date.parse(`${PERIOD.toDay}T00:00:00Z`) + 86_400_000);
+    journals.set(SESSION, journalAt(dayAfter.toISOString()));
+
+    const built = await reportWith(localRead([CANDIDATE])).execute({
+      ...BASE_OPTIONS,
+      period: PERIOD,
+    });
+
+    expect(built.totals.requests).toBe(0);
+  });
+
+  it("never reaches for a session whose own moment falls outside the period asked about", async () => {
+    // Otherwise the cost of catching up would grow with the age of the repository rather
+    // than with the length of the period, and a one-week report on a two-year project would
+    // re-read every session it ever journalled.
+    journals.set(SESSION, journalAt("2020-01-01T00:00:00.000Z"));
+
+    const built = await reportWith(localRead([CANDIDATE])).execute({
+      ...BASE_OPTIONS,
+      period: PERIOD,
+    });
+
+    expect(built.totals.requests).toBe(0);
+  });
+
+  it("deletes no stored day file, since a question is not housekeeping", async () => {
+    // `read` prunes past its retention window, which is right for the command a person runs
+    // to do housekeeping. Behind a report it meant a command that had never destroyed
+    // anything started deleting measurement as a side effect of being asked a question.
+    journals.set(SESSION, journalAt(AT));
+    for (let day = 1; day <= 120; day += 1) {
+      const stamp = new Date(Date.UTC(2025, 0, day));
+      await sink.appendRecord(record({ vendor_id: `old-${day}` }), stamp);
+    }
+    const before = await sink.listDayFiles();
+
+    await reportWith(localRead([CANDIDATE])).execute({ ...BASE_OPTIONS, period: PERIOD });
+
+    // Asserted as "none of these is gone", not as an unchanged count: the catch-up stores
+    // what it reads, so it adds a day file of its own. What must hold is that it removed
+    // nothing.
+    const after = new Set(await sink.listDayFiles());
+    expect(before.filter((file) => !after.has(file))).toEqual([]);
+  });
+
+  it("says what a reader could not answer, rather than reporting the silence as no spend", async () => {
+    // A period where every reader threw would otherwise print exactly what a period with no
+    // spend prints. The read surface showed those failures; behind a report nobody sees its
+    // output any more, so the report has to carry them itself.
+    journals.set(SESSION, journalAt(AT));
+    const warnings: string[] = [];
+    const throwing = new ReadLocalCostUseCase(
+      sink,
+      new Map([
+        [
+          "claude",
+          {
+            read: async () => {
+              throw new Error("the transcript directory is unreadable");
+            },
+          },
+        ],
+      ]),
+      journals,
+      NULL_PERSON_IDENTITY_READER,
+      evidence
+    );
+    const report = new ReportCostUseCase(
+      sink,
+      journals,
+      new InMemoryPersonIdentityStore(),
+      evidence,
+      new InMemoryTaskBacklogReader(),
+      throwing,
+      { debug: () => {}, info: () => {}, warn: (m: string) => warnings.push(m) }
+    );
+
+    const built = await report.execute({ ...BASE_OPTIONS, period: PERIOD });
+
+    expect(built.totals.requests).toBe(0);
+    expect(warnings.join("\n")).toContain("the transcript directory is unreadable");
+  });
+
+  it("skips a journal whose own moment cannot be read at all, rather than treating it as now", async () => {
+    journals.set(SESSION, journalAt("not a moment"));
+
+    const built = await reportWith(localRead([CANDIDATE])).execute({
+      ...BASE_OPTIONS,
+      period: PERIOD,
+    });
+
+    expect(built.totals.requests).toBe(0);
+  });
+
+  it("opens no tool's files at all when the project switch is off", async () => {
+    // Asserted on whether the reader was reached, not on the total: a refused catch-up and
+    // an absent one both report zero, so a total cannot tell them apart. What has to hold
+    // here is that a report never opens a person's session files against their refusal.
+    journals.set(SESSION, journalAt(AT));
+    let reads = 0;
+    const counting = new ReadLocalCostUseCase(
+      sink,
+      new Map([
+        [
+          "claude",
+          {
+            read: async () => {
+              reads += 1;
+              return { records: [CANDIDATE], sessionFound: true };
+            },
+          },
+        ],
+      ]),
+      journals,
+      NULL_PERSON_IDENTITY_READER,
+      evidence
+    );
+
+    evidence.enabled = true;
+    await reportWith(counting).execute({ ...BASE_OPTIONS, period: PERIOD });
+    const readWhenOn = reads;
+
+    sink = new InMemoryTelemetrySink();
+    reads = 0;
+    evidence.enabled = false;
+    await reportWith(counting).execute({ ...BASE_OPTIONS, period: PERIOD });
+
+    expect(readWhenOn).toBeGreaterThan(0);
+    expect(reads).toBe(0);
   });
 });

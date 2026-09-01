@@ -11,9 +11,7 @@ import type { PersonIdentityStore } from "../../../src/domain/ports/person-ident
  * `setDisplayName`/`forget`. `throwOnRead`, when set, is what `readStrict()` throws instead
  * of answering — standing in for a damaged or unreadable identity file without touching a
  * real one. `throwOnForget`, when set, is what `forget()` throws instead of removing —
- * standing in for a file that refuses deletion. `staleMappingPath`, when set, is what
- * `staleMappingFilePath()` answers — standing in for a leftover separate declaration file
- * found beside the identity. */
+ * standing in for a file that refuses deletion. */
 export class InMemoryPersonIdentityStore implements PersonIdentityStore {
   mintCount = 0;
   forgetCount = 0;
@@ -27,7 +25,6 @@ export class InMemoryPersonIdentityStore implements PersonIdentityStore {
    * case `off` has to keep working for. Seeded from the identity, settable directly. */
   filePresent: boolean;
   throwOnRead: Error | null = null;
-  staleMappingPath: string | null = null;
 
   constructor(
     private identity: PersonIdentity | null = null,
@@ -90,9 +87,5 @@ export class InMemoryPersonIdentityStore implements PersonIdentityStore {
     this.identity = null;
     this.filePresent = false;
     return wasThere;
-  }
-
-  async staleMappingFilePath(): Promise<string | null> {
-    return this.staleMappingPath;
   }
 }

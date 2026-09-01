@@ -15,6 +15,7 @@ import type {
   SessionCostReader,
 } from "../../../../src/domain/ports/session-cost-reader.js";
 import type { VersionControl } from "../../../../src/domain/ports/version-control.js";
+import { FakeCurrentVersion } from "../../../helpers/ports/fake-current-version.js";
 import { InMemoryPersonIdentityStore } from "../../../helpers/ports/in-memory-person-identity-store.js";
 import { InMemoryRunJournalReader } from "../../../helpers/ports/in-memory-run-journal-reader.js";
 import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetry-sink.js";
@@ -94,7 +95,8 @@ function buildUseCase(options: {
     options.readers ?? new Map(),
     hookTrustReader,
     new InMemoryPersonIdentityStore(),
-    new InMemoryTelemetrySink()
+    new InMemoryTelemetrySink(),
+    new FakeCurrentVersion("9.9.9-check")
   );
   return { useCase, evidence, hookTrustReader };
 }
@@ -314,5 +316,84 @@ describe("DiagnoseTelemetryUseCase — the first claim reads the same declaratio
     expect(hookFired?.verdict).toBe("unknown");
     expect(hookFired?.reason).toBe("recorder-declaration-unreadable");
     expect(hookFired?.detail).not.toContain("FAIL");
+  });
+});
+
+/**
+ * Which build produced what a person is reading.
+ *
+ * Neither version reached any output before this: `cli_version` and `plugin_version` were
+ * written onto records and journal lines that only a person opening `~/.config/aidd` by
+ * hand would ever see. `check` is the command whose job is telling someone the state of
+ * their setup, so it is where they belong.
+ */
+describe("the versions check reports", () => {
+  function sessionAt(at: string, pluginVersion?: string): RunJournal {
+    return {
+      boundaries: [],
+      filesWritten: [],
+      taskDeclarations: [],
+      session: {
+        type: "session_start",
+        at,
+        run_id: `run-${at}`,
+        tool: "claude-code",
+        vendor_id: `vendor-${at}`,
+        ...(pluginVersion === undefined ? {} : { plugin_version: pluginVersion }),
+      },
+    };
+  }
+
+  it("names this CLI's own version, which a person always has since nothing reads without it", async () => {
+    const { useCase } = buildUseCase({});
+
+    const result = await useCase.execute(runOptions());
+
+    expect(result.setup.versions.cli).toBe("9.9.9-check");
+  });
+
+  it("reports the plugin version the hook itself stamped, never one re-derived here", async () => {
+    const { useCase } = buildUseCase({ journals: [sessionAt("2026-09-01T10:00:00Z", "0.1.0")] });
+
+    const result = await useCase.execute(runOptions());
+
+    expect(result.setup.versions.plugin).toEqual({ kind: "recorded", version: "0.1.0" });
+  });
+
+  it("reports the newest, so an upgrade mid-period is not hidden by the sessions before it", async () => {
+    const { useCase } = buildUseCase({
+      journals: [
+        sessionAt("2026-09-01T10:00:00Z", "0.1.0"),
+        sessionAt("2026-09-02T10:00:00Z", "0.2.0"),
+      ],
+    });
+
+    const result = await useCase.execute(runOptions());
+
+    expect(result.setup.versions.plugin).toEqual({ kind: "recorded", version: "0.2.0" });
+  });
+
+  it("skips a session carrying no version rather than letting it hide a later one that does", async () => {
+    // A line written before the field existed must not read as "this install is damaged".
+    const { useCase } = buildUseCase({
+      journals: [sessionAt("2026-09-03T10:00:00Z"), sessionAt("2026-09-01T10:00:00Z", "0.1.0")],
+    });
+
+    const result = await useCase.execute(runOptions());
+
+    expect(result.setup.versions.plugin).toEqual({ kind: "recorded", version: "0.1.0" });
+  });
+
+  it("tells a project that measured nothing yet apart from one whose hook could not name itself", async () => {
+    // The two silences mean different things: nothing journalled says nothing about the
+    // plugin, while a journalled session with no version is a plugin that arrived by
+    // neither install route. Collapsing them would let "not measured yet" read as damage.
+    const nothing = await buildUseCase({}).useCase.execute(runOptions());
+    const journalledWithout = await buildUseCase({
+      journals: [sessionAt("2026-09-01T10:00:00Z")],
+    }).useCase.execute(runOptions());
+
+    expect(nothing.setup.versions.plugin).toEqual({ kind: "nothing-journalled" });
+    expect(journalledWithout.setup.versions.plugin).toEqual({ kind: "unrecorded" });
   });
 });

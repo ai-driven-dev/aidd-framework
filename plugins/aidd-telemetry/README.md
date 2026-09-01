@@ -19,8 +19,20 @@ hand.
 
 ## Install and use
 
-Install the plugin through your tool's own mechanism, then ask your AI tool for a skill.
-You never type a command yourself:
+Install it with the CLI:
+
+```bash
+npm install -g @ai-driven-dev/cli
+aidd plugin install aidd-telemetry
+```
+
+Your tool's own plugin mechanism works too, and the plugin records identically either way.
+The CLI is recommended for one reason: **nothing here can be read without it.** Allowing
+measurement and answering what it cost both go through `aidd`, so a person installing the
+other way still ends up needing it — and until they run it, the install has recorded no
+version of this plugin anywhere, which `aidd telemetry check` will tell them.
+
+Then ask your AI tool for a skill. You never type a command yourself:
 
 - **`00-init`** — allows measurement for this project, and verifies the switch took.
 - **`01-cost`** — answers what a period or one task consumed.
@@ -42,10 +54,6 @@ Recording is the act that must never depend on anything: it runs on every tool c
 hook that needs an installed binary records nothing, silently, when that binary is missing.
 Allowing and answering can afford the CLI, and answering in particular belongs there — the
 report is computed once, in one place, so the figure cannot differ depending on who asked.
-
-```bash
-npm install -g @ai-driven-dev/cli
-```
 
 Your sessions are measured from the moment you allow it, whether or not `aidd` is present.
 Without it you cannot ask what they cost — recording keeps going, and the answer waits.
@@ -181,19 +189,30 @@ repository-relative path or a task folder, and moving it out would leave a file 
 repository with no way to say which. It records the repository, the task folders written
 into, the skills run, and their timings — nothing else, and no person's name or identity.
 
-**The figures** stay with the person — `AIDD_USER_CONFIG_DIR`, or `~/.config/aidd/telemetry/`
+**The figures** stay with the person — `AIDD_TELEMETRY_DIR`, or `~/.config/aidd/telemetry/`
 when that variable is unset. A session's consumption belongs to whoever ran it, not to
-whichever checkout was open at the time. Point `AIDD_USER_CONFIG_DIR` at a directory a
-team shares, or a CI's own per repository, and every figure this plugin writes follows it
-— at the cost that anything outside the default is not swept together with the rest of a
+whichever checkout was open at the time. Point `AIDD_TELEMETRY_DIR` at a directory a team
+shares, or a CI's own per repository, and every figure this plugin writes follows it — at
+the cost that anything outside the default is not swept together with the rest of a
 person's figures by a reader that assumes it. The default stays the default. On Windows
 that default is `%APPDATA%\aidd\telemetry\` instead — `.config` is not where a Windows
 application puts this — unless a machine already journalled under the old `.config` path,
 which it keeps using rather than losing access to what was already written there.
 
-**The identity file never follows `AIDD_USER_CONFIG_DIR`.** It is read from the OS
+**Share `AIDD_TELEMETRY_DIR`, never `AIDD_USER_CONFIG_DIR`.** This document used to name
+the second one here, and that was a mistake worth stating plainly: `AIDD_USER_CONFIG_DIR`
+relocates a machine's whole aidd config, `auth.json` included — a GitHub token. Following
+the advice as written put a credential in the directory a team was told to share. `0600`
+holds on a local POSIX filesystem, but a network share or a synced folder is usually what
+"a directory a team shares" means, and neither guarantees it; and whatever the mode, two
+people pointing at one directory overwrite each other's token file. The figures are the one
+thing here meant to leave a machine, so they have a name of their own and nothing else
+follows it. `AIDD_USER_CONFIG_DIR` still moves the figures too, so a setup made before this
+split keeps working — but it moves the token with them, and it should be changed.
+
+**The identity file never follows either variable.** It is read from the OS
 profile only, on every platform, by design — see `aidd telemetry identity` above. So on a
-sink shared through that variable, a colleague's records stay `unresolved` in every
+shared sink, a colleague's records stay `unresolved` in every
 reader's report until that reader deliberately runs `aidd telemetry identity link` on the
 colleague's identifier — nothing about a colleague's own identity arrives on its own, and
 nothing stops a reader typing an identifier they never opted into. Linking one folds that
