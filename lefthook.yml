@@ -43,6 +43,13 @@ pre-commit:
             exit 1
           fi
         done
+    recipe-validity:
+      run: |
+        if ! command -v node >/dev/null 2>&1; then
+          echo "❌ node not available; cannot validate recipes"
+          exit 1
+        fi
+        node plugins/aidd-context/skills/12-cook/scripts/validate-recipe.mjs --all
     check-skill-argument-hints:
       glob: "plugins/*/skills/**"
       run: |
