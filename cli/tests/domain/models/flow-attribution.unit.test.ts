@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bareOrchestratingSkillNames,
   buildFlowIntervals,
   ORCHESTRATING_SKILLS,
 } from "../../../src/domain/models/flow-attribution.js";
@@ -48,6 +49,21 @@ describe("ORCHESTRATING_SKILLS — declared once, both capture spellings", () =>
   it("matches no plugin name in passing - nothing here reads a prefix or a substring", () => {
     expect(ORCHESTRATING_SKILLS.has("aidd-orchestrator")).toBe(false);
     expect(ORCHESTRATING_SKILLS.has("aidd-orchestrator:03-does-not-exist")).toBe(false);
+  });
+
+  it("hands out the unqualified spellings alone, sorted - the ones a project can collide with", () => {
+    expect(bareOrchestratingSkillNames()).toEqual(["00-async-dev", "01-sdlc", "02-backlog"]);
+  });
+
+  it("hands out a project's fourth orchestrator too, without anything else being told about it", () => {
+    const extended = new Set([...ORCHESTRATING_SKILLS, "acme:03-release", "03-release"]);
+
+    expect(bareOrchestratingSkillNames(extended)).toEqual([
+      "00-async-dev",
+      "01-sdlc",
+      "02-backlog",
+      "03-release",
+    ]);
   });
 });
 

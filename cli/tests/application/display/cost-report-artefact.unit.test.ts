@@ -9,6 +9,7 @@ import { printCostReport } from "../../../src/application/display/cost-report-di
 import { CLIOutput } from "../../../src/application/output.js";
 import { buildCostReport, type CostReportInput } from "../../../src/domain/models/cost-report.js";
 import { toCostReportEnvelope } from "../../../src/domain/models/cost-report-envelope.js";
+import { bareOrchestratingSkillNames } from "../../../src/domain/models/flow-attribution.js";
 import type { TelemetrySinkRecord } from "../../../src/domain/models/telemetry-sink-record.js";
 import type { PersonIdentity } from "../../../src/domain/ports/person-identity-reader.js";
 
@@ -301,9 +302,18 @@ describe("buildCostReportArtefact — the flow axis states its own limits with t
   });
 
   it("says a same-named skill of the reader's own project opens a flow of its own", () => {
+    expect(buildCostReportArtefact(withOneFlow(), "flow")).toContain("opens a flow of its own");
+  });
+
+  // The guard against writing the names out beside the set instead of reading them from it:
+  // a project adding a fourth orchestrator is promised it need change nothing here, and a
+  // hardcoded list of three would go on printing three while this turns red.
+  it("names every unqualified orchestrating skill the declared set holds, whatever it holds", () => {
     const artefact = buildCostReportArtefact(withOneFlow(), "flow");
-    expect(artefact).toContain("00-async-dev, 01-sdlc or 02-backlog");
-    expect(artefact).toContain("opens a flow of its own");
+    const bare = bareOrchestratingSkillNames();
+
+    expect(bare.length).toBeGreaterThan(0);
+    for (const name of bare) expect(artefact).toContain(name);
   });
 
   it("says neither when the period names no flow at all - a limit that bit nothing is noise", () => {

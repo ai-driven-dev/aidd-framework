@@ -9,6 +9,7 @@ import type {
   CostReportEnvelopePersonRow,
   CostReportEnvelopeTotals,
 } from "../../domain/models/cost-report-envelope.js";
+import { bareOrchestratingSkillNames } from "../../domain/models/flow-attribution.js";
 import { getAiToolConfig } from "../../domain/tools/registry.js";
 import {
   ATTRIBUTION_LABELS,
@@ -287,10 +288,18 @@ function flowLimits(envelope: CostReportEnvelope): readonly string[] {
   return [
     "a skill run by hand while a flow was open is counted inside it: the orchestrator's own " +
       "call and a person's write the identical step_start line",
-    "a skill of this project named 00-async-dev, 01-sdlc or 02-backlog opens a flow of its " +
-      "own: outside a plugin a host names a skill by its folder alone, and this axis has " +
-      "only that name to go on",
+    `a skill of this project named ${orAny(bareOrchestratingSkillNames())} opens a flow of ` +
+      "its own: outside a plugin a host names a skill by its folder alone, and this axis " +
+      "has only that name to go on",
   ];
+}
+
+/** `a`, `a or b`, `a, b or c` - the names read as a sentence rather than as a list a program
+ * printed. Takes however many `bareOrchestratingSkillNames` holds, so the sentence stays
+ * grammatical when a project adds a fourth orchestrator to the set. */
+function orAny(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
 }
 
 /** A third column beside the generic `table()` helper's two, for the same reason

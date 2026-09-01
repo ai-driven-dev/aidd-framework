@@ -60,6 +60,21 @@ export const ORCHESTRATING_SKILLS: ReadonlySet<string> = new Set([
   "02-backlog",
 ]);
 
+/** The unqualified spellings among them - every entry carrying no `plugin:` prefix. These
+ * are the ones a reader's own project can collide with, so these are the ones the flow axis
+ * names when it states that limit (`flowLimits`, `cost-report-artefact.ts`).
+ *
+ * Derived rather than written out a second time. The set above promises that a project
+ * adding its own orchestrator "adds to this set and nothing else - no hook changes, no
+ * report code changes"; a sentence listing three names by hand would have broken that
+ * promise the moment a fourth was added, and gone on printing three. Sorted so the sentence
+ * reads the same on every run, whatever order the set was written in. */
+export function bareOrchestratingSkillNames(
+  skills: ReadonlySet<string> = ORCHESTRATING_SKILLS
+): readonly string[] {
+  return [...skills].filter((skill) => !skill.includes(":")).sort();
+}
+
 /** One closed flow interval: from an orchestrating skill's own `step_start` to whichever of
  * the next orchestrating `step_start` or a `turn_end` comes first, or - unclosed - the
  * journal's own last witnessed moment. Read from exactly the same journal a declared task
