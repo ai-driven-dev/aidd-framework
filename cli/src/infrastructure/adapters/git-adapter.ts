@@ -21,14 +21,39 @@ export class GitAdapter implements VersionControl {
     if (hooksDir === null) return false;
 
     const delegatePath = join(hooksDir, delegateFile);
-    // Rewritten on every install, never only when absent: this is how a delegate left by an
-    // older version of the CLI is brought up to date, and the file is ours outright — unlike
-    // the hook itself, which may be somebody else's.
+    await this.writeDelegate(hooksDir, delegatePath, script);
+    return this.callDelegateFromHook(hooksDir, sessionTrailerHookLine(delegatePath));
+  }
+
+  async removeCommitMessageDelegate(projectRoot: string, delegateFile: string): Promise<boolean> {
+    const hooksDir = await this.resolveHooksDir(projectRoot);
+    if (hooksDir === null) return false;
+
+    const delegatePath = join(hooksDir, delegateFile);
+    const lineDropped = await this.stopCallingDelegate(
+      hooksDir,
+      sessionTrailerHookLine(delegatePath)
+    );
+    const fileDeleted = await this.deleteDelegate(delegatePath);
+    // Either half on its own still counts as something removed: a hook edited by hand, or a
+    // delegate deleted by one, leaves the other behind, and reporting "nothing to remove"
+    // there would be a lie a person could not act on.
+    return lineDropped || fileDeleted;
+  }
+
+  /** Rewritten on every install, never only when absent: this is how a delegate left by an
+   * older version of the CLI is brought up to date. This file is ours outright — unlike the
+   * hook that calls it, which may be somebody else's. */
+  private async writeDelegate(hooksDir: string, delegatePath: string, script: string) {
     await this.fs.createDirectory(hooksDir);
     await this.fs.writeFile(delegatePath, script);
     await this.fs.chmodExecutable(delegatePath);
+  }
 
-    const line = sessionTrailerHookLine(delegatePath);
+  /** Appends one line to `prepare-commit-msg`, answering whether it was newly added. An
+   * existing hook is kept whole and gains a line at the end; only a repository with no hook
+   * at all gets one written from scratch. */
+  private async callDelegateFromHook(hooksDir: string, line: string): Promise<boolean> {
     const hookPath = join(hooksDir, PREPARE_COMMIT_MSG_HOOK);
     const existing = (await this.fs.fileExists(hookPath))
       ? await this.fs.readFile(hookPath)
@@ -41,28 +66,24 @@ export class GitAdapter implements VersionControl {
     return true;
   }
 
-  async removeCommitMessageDelegate(projectRoot: string, delegateFile: string): Promise<boolean> {
-    const hooksDir = await this.resolveHooksDir(projectRoot);
-    if (hooksDir === null) return false;
-
-    const delegatePath = join(hooksDir, delegateFile);
+  /** Drops that one line and leaves every other byte of the hook alone, answering whether
+   * there was one to drop. */
+  private async stopCallingDelegate(hooksDir: string, line: string): Promise<boolean> {
     const hookPath = join(hooksDir, PREPARE_COMMIT_MSG_HOOK);
-    const line = sessionTrailerHookLine(delegatePath);
+    if (!(await this.fs.fileExists(hookPath))) return false;
 
-    let removed = false;
-    if (await this.fs.fileExists(hookPath)) {
-      const content = await this.fs.readFile(hookPath);
-      if (content.includes(line)) {
-        const kept = content.split("\n").filter((entry) => entry.trim() !== line);
-        await this.fs.writeFile(hookPath, kept.join("\n"));
-        removed = true;
-      }
-    }
-    if (await this.fs.fileExists(delegatePath)) {
-      await this.fs.deleteFile(delegatePath);
-      removed = true;
-    }
-    return removed;
+    const content = await this.fs.readFile(hookPath);
+    if (!content.includes(line)) return false;
+
+    const kept = content.split("\n").filter((entry) => entry.trim() !== line);
+    await this.fs.writeFile(hookPath, kept.join("\n"));
+    return true;
+  }
+
+  private async deleteDelegate(delegatePath: string): Promise<boolean> {
+    if (!(await this.fs.fileExists(delegatePath))) return false;
+    await this.fs.deleteFile(delegatePath);
+    return true;
   }
 
   // Mirrors the journal hook's own `getRemoteUrl` (plugins/aidd-telemetry/hooks/lib/repo.cjs)

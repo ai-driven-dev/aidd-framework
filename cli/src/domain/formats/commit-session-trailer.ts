@@ -76,13 +76,3 @@ git interpret-trailers --in-place --if-exists doNothing \\
 exit 0
 `;
 }
-
-/** The session id a commit message names, or `null` for a message carrying no such trailer.
- * Read with the same case-insensitivity `git interpret-trailers` matches a token by, and
- * anchored to the start of a line so a token quoted in a commit's own body is never mistaken
- * for one. */
-export function sessionIdFromCommitMessage(message: string): string | null {
-  const pattern = new RegExp(`^${SESSION_TRAILER_TOKEN}:[ \\t]*(.+?)[ \\t]*$`, "imu");
-  const match = pattern.exec(message);
-  return match?.[1] ?? null;
-}

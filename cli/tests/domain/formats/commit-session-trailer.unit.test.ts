@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   SESSION_TRAILER_DELEGATE_FILE,
   SESSION_TRAILER_TOKEN,
-  sessionIdFromCommitMessage,
   sessionTrailerDelegateScript,
   sessionTrailerHookLine,
 } from "../../../src/domain/formats/commit-session-trailer.js";
@@ -67,44 +66,6 @@ describe("the delegate a commit's message actually passes through", () => {
   it("names the commands that install and remove it, where a person will look", () => {
     expect(script).toContain("aidd telemetry on");
     expect(script).toContain("aidd telemetry off");
-  });
-});
-
-describe("reading a session back out of a commit message", () => {
-  it("finds the identifier a trailered commit carries", () => {
-    const message = `feat: a thing\n\n${SESSION_TRAILER_TOKEN}: session-abc\n`;
-
-    expect(sessionIdFromCommitMessage(message)).toBe("session-abc");
-  });
-
-  it("finds it beside other trailers, whichever order they were written in", () => {
-    const message = [
-      "fix: another thing",
-      "",
-      "Co-authored-by: Someone <someone@example.com>",
-      `${SESSION_TRAILER_TOKEN}: session-def`,
-      "Signed-off-by: Someone <someone@example.com>",
-      "",
-    ].join("\n");
-
-    expect(sessionIdFromCommitMessage(message)).toBe("session-def");
-  });
-
-  it("matches the token however it is cased, the way git itself matches one", () => {
-    expect(sessionIdFromCommitMessage("x\n\naidd-session-id: session-ghi\n")).toBe("session-ghi");
-  });
-
-  it("answers null for a commit no session made, never an empty string", () => {
-    expect(sessionIdFromCommitMessage("chore: nothing to see\n")).toBeNull();
-  });
-
-  // A body quoting the token is prose about the trailer, not a trailer. Anchoring to the
-  // start of a line is what keeps a commit that documents this feature from claiming a
-  // session id of its own.
-  it("ignores the token quoted mid-sentence in a commit's own body", () => {
-    const message = `docs: explain it\n\nA commit carries ${SESSION_TRAILER_TOKEN}: <id> when a session made it.\n`;
-
-    expect(sessionIdFromCommitMessage(message)).toBeNull();
   });
 });
 
