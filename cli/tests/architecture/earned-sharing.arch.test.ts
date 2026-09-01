@@ -37,20 +37,35 @@ function underSharedDirectory(file: string): boolean {
   return /\/shared\/[^/]+$/.test(file);
 }
 
+/** The rule itself, over an explicit file list and importer map instead of the real tree. */
+function unearned(files: readonly string[], importers: Map<string, Set<string>>): string[] {
+  return files.filter(underSharedDirectory).filter((file) => {
+    const areas = new Set(
+      [...(importers.get(file) ?? [])].map(areaOf).filter((area) => !NON_AREAS.has(area))
+    );
+    return areas.size < 2;
+  });
+}
+
 describe("shared modules are earned", () => {
   it("every shared module has callers in at least two areas", () => {
-    const importers = importersByFile();
-    const violations = sourceFiles()
-      .filter(underSharedDirectory)
-      .filter((file) => {
-        const areas = new Set(
-          [...(importers.get(file) ?? [])].map(areaOf).filter((area) => !NON_AREAS.has(area))
-        );
-        return areas.size < 2;
-      });
+    const violations = unearned(sourceFiles(), importersByFile());
 
     const { added, fixed } = expectRatchet(violations, BASELINE);
     expect(added, "new shared module with fewer than two calling areas").toEqual([]);
     expect(fixed, "fixed — remove these from BASELINE").toEqual([]);
+  });
+
+  it("flags a shared module called from one area and clears one called from two", () => {
+    const files = ["src/domain/shared/lonely.ts", "src/domain/shared/earned.ts"];
+    const importers = new Map([
+      ["src/domain/shared/lonely.ts", new Set(["src/application/commands/init.ts"])],
+      [
+        "src/domain/shared/earned.ts",
+        new Set(["src/application/commands/init.ts", "src/domain/formats/x.ts"]),
+      ],
+    ]);
+
+    expect(unearned(files, importers)).toEqual(["src/domain/shared/lonely.ts"]);
   });
 });

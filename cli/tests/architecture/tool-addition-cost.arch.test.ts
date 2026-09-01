@@ -36,17 +36,24 @@ const BASELINE = [
   "src/domain/models/tool-recommendations.ts",
 ];
 
+/** The rule itself, over an explicit file/source pair instead of the real tree. */
+function namesToolOutsideProfile(file: string, source: string): boolean {
+  return !ALLOWED.has(file) && TOOL_IDS.some((id) => source.includes(`"${id}"`));
+}
+
 describe("adding a tool costs one file", () => {
   it("no tool identifier is written outside its own profile", () => {
-    const violations = sourceFiles()
-      .filter((file) => !ALLOWED.has(file))
-      .filter((file) => {
-        const source = read(file);
-        return TOOL_IDS.some((id) => source.includes(`"${id}"`));
-      });
+    const violations = sourceFiles().filter((file) => namesToolOutsideProfile(file, read(file)));
 
     const { added, fixed } = expectRatchet(violations, BASELINE);
     expect(added, "tool named outside its profile — read it from the profile instead").toEqual([]);
     expect(fixed, "fixed — remove these from BASELINE").toEqual([]);
+  });
+
+  it("flags a tool name outside its profile and clears one inside it", () => {
+    expect(namesToolOutsideProfile("src/domain/models/framework.ts", 'if (id === "cursor")')).toBe(
+      true
+    );
+    expect(namesToolOutsideProfile("src/domain/tools/ai/cursor.ts", 'id: "cursor"')).toBe(false);
   });
 });

@@ -17,5 +17,9 @@
   "jsonReporter": {
     "fileName": "reports/mutation/mutation.json"
   },
-  "tsconfigFile": ""
+  "tsconfigFile": "",
+  "disableTypeChecks": false,
+  "vitest": {
+    "configFile": "vitest.config.ts"
+  }
 }

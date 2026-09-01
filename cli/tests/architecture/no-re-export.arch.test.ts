@@ -20,15 +20,25 @@ const BARE_RE_EXPORT = /^export\s+(?:type\s+)?\{[^}]*\};$/m;
 /** Files re-exporting a symbol they do not define. This list may only shrink. */
 const BASELINE: string[] = [];
 
+/** The rule itself, over a single file's source text. */
+function reExports(source: string): boolean {
+  return INLINE_RE_EXPORT.test(source) || BARE_RE_EXPORT.test(source);
+}
+
 describe("no module re-exports another module's symbol", () => {
   it("every symbol is imported from the module that defines it", () => {
-    const violations = sourceFiles().filter((file) => {
-      const source = read(file);
-      return INLINE_RE_EXPORT.test(source) || BARE_RE_EXPORT.test(source);
-    });
+    const violations = sourceFiles().filter((file) => reExports(read(file)));
 
     const { added, fixed } = expectRatchet(violations, BASELINE);
     expect(added, "re-export — import the symbol from its source instead").toEqual([]);
     expect(fixed, "fixed — remove these from BASELINE").toEqual([]);
+  });
+
+  it("flags both re-export forms and clears a plain import", () => {
+    expect(reExports('export { thing } from "./thing.js";')).toBe(true);
+    expect(reExports('import { thing } from "./thing.js";\nexport { thing };')).toBe(true);
+    expect(
+      reExports('import { thing } from "./thing.js";\nexport function use() { return thing; }')
+    ).toBe(false);
   });
 });

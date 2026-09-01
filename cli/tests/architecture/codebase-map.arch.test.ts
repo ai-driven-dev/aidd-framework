@@ -10,11 +10,15 @@ import { read, sourceFiles } from "./helpers.js";
 
 const MAP = "aidd_docs/memory/codebase-map.md";
 
-/** Directory names the map draws, from its tree block. */
-function mappedDirectories(): Set<string> {
+/** Directory names a tree block draws, from its raw text. */
+function mappedDirectoriesInText(text: string): Set<string> {
   const names = new Set<string>();
-  for (const match of read(MAP).matchAll(/[│├└─\s]([a-z][a-z-]*)\/[\s#]/g)) names.add(match[1]);
+  for (const match of text.matchAll(/[│├└─\s]([a-z][a-z-]*)\/[\s#]/g)) names.add(match[1]);
   return names;
+}
+
+function mappedDirectories(): Set<string> {
+  return mappedDirectoriesInText(read(MAP));
 }
 
 /** Directory names that actually exist under `src/`. */
@@ -26,10 +30,22 @@ function realDirectories(): Set<string> {
   return names;
 }
 
+/** The rule itself: which real directories the map is silent about. */
+function undocumented(real: ReadonlySet<string>, mapped: ReadonlySet<string>): string[] {
+  return [...real].filter((dir) => !mapped.has(dir)).sort();
+}
+
 describe("the codebase map matches the tree", () => {
   it("every directory under src/ appears in the map", () => {
-    const mapped = mappedDirectories();
-    const missing = [...realDirectories()].filter((dir) => !mapped.has(dir)).sort();
+    const missing = undocumented(realDirectories(), mappedDirectories());
     expect(missing, `${MAP} does not mention these directories`).toEqual([]);
+  });
+
+  it("flags a real directory absent from the tree block and clears one drawn in it", () => {
+    const treeText =
+      "├── kernel/           # shared vocabulary\n└── domain/           # business rules\n";
+
+    const mapped = mappedDirectoriesInText(treeText);
+    expect(undocumented(new Set(["kernel", "ghost"]), mapped)).toEqual(["ghost"]);
   });
 });

@@ -30,20 +30,37 @@ function registeredCommands(): Set<string> {
   return names;
 }
 
-function citedAsAvailable(doc: string): string[] {
+/** The rule's citation-gathering half, over raw text instead of a file on disk. */
+function citedAsAvailableInText(text: string): string[] {
   const cited = new Set<string>();
-  for (const line of read(doc).split("\n")) {
+  for (const line of text.split("\n")) {
     if (MARKED_GONE.test(line) || isMigrationRow(line)) continue;
     for (const match of line.matchAll(/\baidd\s+([a-z][a-z-]*)/g)) cited.add(match[1]);
   }
   return [...cited].sort();
 }
 
+/** The rule itself: which cited commands the registered set does not declare. */
+function undeclaredCommands(text: string, registered: ReadonlySet<string>): string[] {
+  return citedAsAvailableInText(text).filter((name) => !registered.has(name));
+}
+
 describe("documented commands exist", () => {
   const registered = registeredCommands();
 
   it.each(DOCS)("%s presents no command the CLI does not declare", (doc) => {
-    const missing = citedAsAvailable(doc).filter((name) => !registered.has(name));
+    const missing = undeclaredCommands(read(doc), registered);
     expect(missing, `${doc} presents commands that do not exist`).toEqual([]);
+  });
+
+  it("flags an undeclared command and clears one marked gone, migrated, or registered", () => {
+    const knownCommands = new Set(["init"]);
+
+    expect(undeclaredCommands("Run `aidd bogus-command` to do it.", knownCommands)).toEqual([
+      "bogus-command",
+    ]);
+    expect(undeclaredCommands("`aidd bogus-command` was removed.", knownCommands)).toEqual([]);
+    expect(undeclaredCommands("| `aidd old-name` | `aidd new-name` |", knownCommands)).toEqual([]);
+    expect(undeclaredCommands("Run `aidd init` to start.", knownCommands)).toEqual([]);
   });
 });
