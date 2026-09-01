@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import { ResolveUpdateDecisionUseCase } from "../../../../src/application/use-cases/global/resolve-update-decision-use-case.js";
 import { UpdateAiToolsUseCase } from "../../../../src/application/use-cases/global/update-ai-tools-use-case.js";
-import { ResolveUpdateDecisionUseCase } from "../../../../src/application/use-cases/shared/resolve-update-decision-use-case.js";
-import { UpdateOneToolUseCase } from "../../../../src/application/use-cases/shared/update-one-tool-use-case.js";
+import { UpdateOneToolUseCase } from "../../../../src/application/use-cases/global/update-one-tool-use-case.js";
 import { SyncConflictResolverUseCase } from "../../../../src/application/use-cases/sync/sync-conflict-resolver-use-case.js";
 import type { Prompter } from "../../../../src/domain/ports/prompter.js";
 import {

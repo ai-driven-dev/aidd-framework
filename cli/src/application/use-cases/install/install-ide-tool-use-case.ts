@@ -11,11 +11,11 @@ import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
-import type { PostInstallPipelineUseCase } from "../shared/post-install-pipeline-use-case.js";
 import type {
   InstallIdeConfigResult,
   InstallIdeConfigUseCase,
 } from "./install-ide-config-use-case.js";
+import type { PostInstallPipelineUseCase } from "./post-install-pipeline-use-case.js";
 
 export interface InstallIdeToolOptions {
   toolId: IdeToolId;

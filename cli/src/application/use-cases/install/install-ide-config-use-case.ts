@@ -11,7 +11,7 @@ import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { Logger } from "../../../domain/ports/logger.js";
 import { getToolConfig } from "../../../domain/tools/registry.js";
-import type { PostInstallPipelineUseCase } from "../shared/post-install-pipeline-use-case.js";
+import type { PostInstallPipelineUseCase } from "./post-install-pipeline-use-case.js";
 
 export interface InstallIdeConfigOptions {
   toolId: IdeToolId;

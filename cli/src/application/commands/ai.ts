@@ -7,7 +7,7 @@ import { printUnrestorable } from "../display/restore-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import { NoManifestError } from "../errors.js";
 import { parseGlobalOptions } from "./global-options.js";
-import { spawnCliCommand } from "./shared/spawn-cli-command.js";
+import { spawnCliCommand } from "./spawn-cli-command.js";
 
 function assertAiToolId(toolId: string): asserts toolId is AiToolId {
   if (!isAiToolId(toolId)) {

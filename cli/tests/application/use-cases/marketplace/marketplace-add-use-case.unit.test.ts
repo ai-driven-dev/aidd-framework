@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MarketplaceAddUseCase } from "../../../../src/application/use-cases/marketplace/marketplace-add-use-case.js";
 import { MarketplaceRemoveUseCase } from "../../../../src/application/use-cases/marketplace/marketplace-remove-use-case.js";
-import { FetchMarketplaceSourceUseCase } from "../../../../src/application/use-cases/shared/fetch-marketplace-source-use-case.js";
+import { FetchMarketplaceSourceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace/fetch-marketplace-source-use-case.js";
 import { ResolveMarketplaceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
 import {
   InvalidMarketplaceNameError,

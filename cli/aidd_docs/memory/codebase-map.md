@@ -13,16 +13,18 @@ src/
 │   │   ├── doctor/           # orchestrator + layout / merge-files / plugin / references / tracked-files
 │   │   ├── framework/        # author-side build: source → target-native distribution
 │   │   │   └── strategies/   # marketplace and flat build strategies, per-tool build contracts
-│   │   ├── global/           # cross-tool chains: update-all / status-all / restore-all / doctor-all
-│   │   ├── install/          # capability sub-use-cases: runtime-config / ide-config / agents / commands / rules / skills / config
+│   │   ├── global/           # cross-tool chains: update-all / status-all / restore-all / doctor-all / update-one-tool / resolve-update-decision
+│   │   ├── install/          # capability sub-use-cases: runtime-config / ide-config / agents / commands / rules / skills / config / post-install-pipeline
 │   │   ├── marketplace/      # marketplace lifecycle: add / list / remove / refresh / check / register-framework / sync-settings
 │   │   ├── plugin/           # create / add / install / install-from-marketplace / remove / list / update / search / pick
 │   │   │   └── translator/   # per-tool materialization strategies (native, flat, built-tree)
-│   │   ├── restore/          # orchestrator + tool-files / all-plugins / plugin
+│   │   ├── restore/          # orchestrator + tool-files / all-plugins / plugin / generate-tool-distribution / resolve-restore-decision / restore-drift-entries / restore-merge-files / restore-regular-files
 │   │   ├── setup/            # sub-use-cases: marketplace-source / tools / plugins-prompt
 │   │   ├── sync/             # conflict-resolver only — drift/conflict resolution reused by the update flow
 │   │   ├── uninstall/        # orchestrator + tools / plugin / mcp-exclusion / ide
-│   │   └── shared/           # helpers called by use-cases only (never by commands)
+│   │   ├── gitignore-use-case.ts  # used by clean / init / install (post-install-pipeline)
+│   │   └── shared/           # earns its place with callers in ≥2 areas — see 0-shared-modules.md
+│   │       └── resolve-marketplace/  # private step of resolve-marketplace-use-case.ts only
 │   ├── error-handler.ts      # central error handling
 │   ├── errors.ts             # application typed exceptions
 │   └── output.ts             # stdout/stderr formatting
@@ -51,7 +53,7 @@ src/
 | Domain | Orchestrator | Sub-use-cases |
 |---|---|---|
 | doctor | `doctor-use-case.ts` | layout, merge-files, plugin, references, tracked-files |
-| restore | `restore-use-case.ts` | tool-files, all-plugins, plugin (shared: restore-merge-files, restore-regular-files) |
+| restore | `restore-use-case.ts` | tool-files, all-plugins, plugin, generate-tool-distribution, resolve-restore-decision, restore-drift-entries, restore-merge-files, restore-regular-files |
 | uninstall | `uninstall-use-case.ts` | tools, plugin, mcp-exclusion, ide |
 | setup | `setup-use-case.ts` | marketplace-source, tools, plugins-prompt |
 | global | — | update-all, status-all, restore-all, doctor-all (4 chain orchestrators) + update-ai-tools / update-ide-tools helpers |
@@ -93,7 +95,7 @@ tests/
 | `infrastructure/assets/asset-loader.ts` | Typed loader for configs/stubs bundled in binary |
 | `domain/tools/contracts.ts` | All tool/capability interfaces |
 | `domain/tools/registry.ts` | Tool lookup, guards, signal detection |
-| `application/use-cases/shared/post-install-pipeline-use-case.ts` | Mandatory post-write sequence |
+| `application/use-cases/install/post-install-pipeline-use-case.ts` | Mandatory post-write sequence |
 | `application/use-cases/shared/ensure-built-marketplace-use-case.ts` | Per-target built-tree cache — install/update materialize tools from it (build/install parity) |
 | `domain/models/manifest.ts` | Aggregate root — all installed file tracking + schema migration (v1→v6) on load |
 | `domain/models/normalized-plugin.ts` | Internal AST for foreign-format plugin ingestion |

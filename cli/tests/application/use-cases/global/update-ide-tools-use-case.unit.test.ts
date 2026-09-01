@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { UpdateIdeToolsUseCase } from "../../../../src/application/use-cases/global/update-ide-tools-use-case.js";
-import type { UpdateOneToolUseCase } from "../../../../src/application/use-cases/shared/update-one-tool-use-case.js";
+import type { UpdateOneToolUseCase } from "../../../../src/application/use-cases/global/update-one-tool-use-case.js";
 import {
   buildUnitDeps,
   buildUpdateOneToolUseCase,

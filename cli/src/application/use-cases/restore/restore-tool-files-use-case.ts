@@ -12,9 +12,9 @@ import type { Logger } from "../../../domain/ports/logger.js";
 import type { Platform } from "../../../domain/ports/platform.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
 import { getToolConfig } from "../../../domain/tools/registry.js";
-import { GenerateToolDistributionUseCase } from "../shared/generate-tool-distribution-use-case.js";
-import { RestoreMergeFilesUseCase } from "../shared/restore-merge-files-use-case.js";
-import { RestoreRegularFilesUseCase } from "../shared/restore-regular-files-use-case.js";
+import { GenerateToolDistributionUseCase } from "./generate-tool-distribution-use-case.js";
+import { RestoreMergeFilesUseCase } from "./restore-merge-files-use-case.js";
+import { RestoreRegularFilesUseCase } from "./restore-regular-files-use-case.js";
 
 export interface RestoreToolFilesOptions {
   toolId: ToolId;

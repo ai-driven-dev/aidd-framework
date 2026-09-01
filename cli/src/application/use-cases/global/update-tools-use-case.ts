@@ -2,11 +2,8 @@ import { Manifest } from "../../../domain/models/manifest.js";
 import type { ToolId } from "../../../domain/models/tool-ids.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { VersionReader } from "../../../domain/ports/version-reader.js";
-import { BulkConflictState } from "../shared/resolve-update-decision-use-case.js";
-import type {
-  GlobalExecutionError,
-  UpdateOneToolUseCase,
-} from "../shared/update-one-tool-use-case.js";
+import { BulkConflictState } from "./resolve-update-decision-use-case.js";
+import type { GlobalExecutionError, UpdateOneToolUseCase } from "./update-one-tool-use-case.js";
 
 export interface UpdateToolsInput<T extends ToolId> {
   toolArg?: T;

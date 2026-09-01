@@ -13,7 +13,7 @@ import type { FileWriter } from "../../domain/ports/file-writer.js";
 import type { Logger } from "../../domain/ports/logger.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { Prompter } from "../../domain/ports/prompter.js";
-import type { GitignoreUseCase } from "./shared/gitignore-use-case.js";
+import type { GitignoreUseCase } from "./gitignore-use-case.js";
 
 interface CleanOptions {
   projectRoot: string;

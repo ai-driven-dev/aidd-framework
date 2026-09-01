@@ -5,11 +5,8 @@ import type { VersionReader } from "../../../domain/ports/version-reader.js";
 import type { MarketplaceRefreshUseCase } from "../marketplace/marketplace-refresh-use-case.js";
 import type { MarketplaceSyncSettingsUseCase } from "../marketplace/marketplace-sync-settings-use-case.js";
 import type { PluginUpdateUseCase } from "../plugin/plugin-update-use-case.js";
-import { BulkConflictState } from "../shared/resolve-update-decision-use-case.js";
-import type {
-  GlobalExecutionError,
-  UpdateOneToolUseCase,
-} from "../shared/update-one-tool-use-case.js";
+import { BulkConflictState } from "./resolve-update-decision-use-case.js";
+import type { GlobalExecutionError, UpdateOneToolUseCase } from "./update-one-tool-use-case.js";
 
 export interface UpdateAllInput {
   projectRoot: string;

@@ -8,18 +8,14 @@ import { describe, expect, it } from "vitest";
 import { expectRatchet, importersByFile, sourceFiles } from "./helpers.js";
 
 /** Files that fail the rule today. This list may only shrink. */
-const BASELINE = [
-  "src/application/commands/shared/spawn-cli-command.ts",
-  "src/application/use-cases/shared/fetch-marketplace-source-use-case.ts",
-  "src/application/use-cases/shared/generate-tool-distribution-use-case.ts",
-  "src/application/use-cases/shared/resolve-restore-decision.ts",
-  "src/application/use-cases/shared/restore-drift-entries-use-case.ts",
-  "src/application/use-cases/shared/restore-merge-files-use-case.ts",
-  "src/application/use-cases/shared/restore-regular-files-use-case.ts",
-];
+const BASELINE: string[] = [];
 
 /** The functional area a file belongs to. Two callers in one area are still one area. */
 function areaOf(file: string): string {
+  // The composition root constructs every use case by definition — counting it as an
+  // area would let any module satisfy the rule by being wired rather than by being
+  // needed in two places. Drop it the same way `use-case:shared` is dropped below.
+  if (file === "src/infrastructure/deps.ts") return "composition-root";
   const useCase = /^src\/application\/use-cases\/([^/]+)\//.exec(file);
   if (useCase) return `use-case:${useCase[1]}`;
   if (file.startsWith("src/application/use-cases/")) return "use-case:root";
@@ -29,8 +25,16 @@ function areaOf(file: string): string {
   return "other";
 }
 
+const NON_AREAS = new Set(["use-case:shared", "composition-root"]);
+
+/**
+ * A file is "offered as shared" only if it sits directly inside a `shared/` directory.
+ * A file nested further under one shared module (e.g. `shared/resolve-marketplace/x.ts`)
+ * is a private step of that module, not something offered to callers — its only caller
+ * is the module it belongs to, so it must not be judged by this rule.
+ */
 function underSharedDirectory(file: string): boolean {
-  return file.includes("/shared/");
+  return /\/shared\/[^/]+$/.test(file);
 }
 
 describe("shared modules are earned", () => {
@@ -40,7 +44,7 @@ describe("shared modules are earned", () => {
       .filter(underSharedDirectory)
       .filter((file) => {
         const areas = new Set(
-          [...(importers.get(file) ?? [])].map(areaOf).filter((area) => area !== "use-case:shared")
+          [...(importers.get(file) ?? [])].map(areaOf).filter((area) => !NON_AREAS.has(area))
         );
         return areas.size < 2;
       });

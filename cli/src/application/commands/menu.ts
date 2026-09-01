@@ -4,7 +4,7 @@ import { resolveProjectRoot } from "../../infrastructure/project-root.js";
 import { ErrorHandler } from "../error-handler.js";
 import { CLIOutput } from "../output.js";
 import { InteractiveMenuUseCase } from "../use-cases/menu-use-case.js";
-import { spawnCliCommand } from "./shared/spawn-cli-command.js";
+import { spawnCliCommand } from "./spawn-cli-command.js";
 
 async function waitForEnter(): Promise<void> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });

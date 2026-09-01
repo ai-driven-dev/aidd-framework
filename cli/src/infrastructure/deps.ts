@@ -31,16 +31,20 @@ import {
   buildCursorFlatContract,
   buildOpencodeFlatContract,
 } from "../application/use-cases/framework/strategies/tool-contracts.js";
+import { GitignoreUseCase } from "../application/use-cases/gitignore-use-case.js";
 import { DoctorAllUseCase } from "../application/use-cases/global/doctor-all-use-case.js";
+import { ResolveUpdateDecisionUseCase } from "../application/use-cases/global/resolve-update-decision-use-case.js";
 import { RestoreAllUseCase } from "../application/use-cases/global/restore-all-use-case.js";
 import { StatusAllUseCase } from "../application/use-cases/global/status-all-use-case.js";
 import { UpdateAiToolsUseCase } from "../application/use-cases/global/update-ai-tools-use-case.js";
 import { UpdateAllUseCase } from "../application/use-cases/global/update-all-use-case.js";
 import { UpdateIdeToolsUseCase } from "../application/use-cases/global/update-ide-tools-use-case.js";
+import { UpdateOneToolUseCase } from "../application/use-cases/global/update-one-tool-use-case.js";
 import { InstallAiToolUseCase } from "../application/use-cases/install/install-ai-tool-use-case.js";
 import { InstallIdeConfigUseCase } from "../application/use-cases/install/install-ide-config-use-case.js";
 import { InstallIdeToolUseCase } from "../application/use-cases/install/install-ide-tool-use-case.js";
 import { InstallRuntimeConfigUseCase } from "../application/use-cases/install/install-runtime-config-use-case.js";
+import { PostInstallPipelineUseCase } from "../application/use-cases/install/post-install-pipeline-use-case.js";
 import { MarketplaceAddUseCase } from "../application/use-cases/marketplace/marketplace-add-use-case.js";
 import { MarketplaceCheckUseCase } from "../application/use-cases/marketplace/marketplace-check-use-case.js";
 import { MarketplaceListUseCase } from "../application/use-cases/marketplace/marketplace-list-use-case.js";
@@ -68,12 +72,8 @@ import {
   EnsureBuiltMarketplaceUseCase,
   type FrameworkBuildFor,
 } from "../application/use-cases/shared/ensure-built-marketplace-use-case.js";
-import { FetchMarketplaceSourceUseCase } from "../application/use-cases/shared/fetch-marketplace-source-use-case.js";
-import { GitignoreUseCase } from "../application/use-cases/shared/gitignore-use-case.js";
-import { PostInstallPipelineUseCase } from "../application/use-cases/shared/post-install-pipeline-use-case.js";
+import { FetchMarketplaceSourceUseCase } from "../application/use-cases/shared/resolve-marketplace/fetch-marketplace-source-use-case.js";
 import { ResolveMarketplaceUseCase } from "../application/use-cases/shared/resolve-marketplace-use-case.js";
-import { ResolveUpdateDecisionUseCase } from "../application/use-cases/shared/resolve-update-decision-use-case.js";
-import { UpdateOneToolUseCase } from "../application/use-cases/shared/update-one-tool-use-case.js";
 import { StatusUseCase } from "../application/use-cases/status-use-case.js";
 import { SyncConflictResolverUseCase } from "../application/use-cases/sync/sync-conflict-resolver-use-case.js";
 import { UninstallIdeUseCase } from "../application/use-cases/uninstall/uninstall-ide-use-case.js";

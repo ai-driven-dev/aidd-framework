@@ -7,7 +7,7 @@ import {
 import { createDeps, createMenuDeps } from "../../infrastructure/deps.js";
 import { ErrorHandler } from "../error-handler.js";
 import { parseGlobalOptions } from "./global-options.js";
-import { spawnCliCommand } from "./shared/spawn-cli-command.js";
+import { spawnCliCommand } from "./spawn-cli-command.js";
 
 export function registerMarketplaceCommand(program: Command): void {
   const marketplace = program.command("marketplace").description("Manage plugin marketplaces");

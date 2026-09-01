@@ -5,7 +5,7 @@ import type { FileWriter } from "../../domain/ports/file-writer.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import { getAllRegisteredTools, hasToolSignals } from "../../domain/tools/registry.js";
 import { AiddFilesDetectedError, AlreadyInitializedError, NoManifestError } from "../errors.js";
-import { GitignoreUseCase } from "./shared/gitignore-use-case.js";
+import { GitignoreUseCase } from "./gitignore-use-case.js";
 
 interface InitOptions {
   projectRoot: string;

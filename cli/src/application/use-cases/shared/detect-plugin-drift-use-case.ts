@@ -1,3 +1,4 @@
+// Called from use-cases/doctor and use-cases root (status-use-case.ts).
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Manifest } from "../../../domain/models/manifest.js";

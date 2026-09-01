@@ -4,7 +4,7 @@ import { assertValidAiToolId, parseToolOption } from "../../domain/models/tool-i
 import { createDeps, createMenuDeps } from "../../infrastructure/deps.js";
 import { ErrorHandler } from "../error-handler.js";
 import { parseGlobalOptions } from "./global-options.js";
-import { spawnCliCommand } from "./shared/spawn-cli-command.js";
+import { spawnCliCommand } from "./spawn-cli-command.js";
 
 export function registerPluginCommand(program: Command): void {
   const plugin = program.command("plugin").description("Manage plugins for AI tools");

@@ -1,3 +1,4 @@
+// Called from use-cases/plugin and use-cases/restore.
 import { join } from "node:path";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Plugin } from "../../../domain/models/plugin.js";
