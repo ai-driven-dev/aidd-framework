@@ -82,6 +82,24 @@ pnpm test             # all tiers
 pnpm test:mutation    # Stryker mutation (slow)
 ```
 
+### Read the suite count, not only the test count
+
+A suite that fails before producing a single test contributes **zero** to the failure
+count. Vitest then reports `numFailedTests: 0` while every test in that file is silently
+absent from the run. Measured: two suites whose relative path to a fixture stopped
+resolving after a move took fifteen tests out of a run that reported itself green.
+
+A run is green only when both hold:
+
+```
+numPassedTests  === numTotalTests
+numPassedTestSuites === numTotalTestSuites
+```
+
+Moving a test file is when this bites, because a path resolved against `import.meta.url`
+or a relative `readFileSync` depends on the file's depth. Check those before trusting a
+count.
+
 ## Naming Rule
 
 Test names must describe user-visible or system-level behaviour:

@@ -82,12 +82,21 @@ journey
 
 1. The chain `framework → translate → tools → kernel` plus `framework → distribution`.
 2. The kernel imports no context and carries no business logic.
-3. One public entry per context; nothing imports an interior.
+3. Rien n'importe l'intérieur d'un contexte : une importation venue d'ailleurs ne vise qu'un module
+   que ce contexte déclare public.
 
-### `4)` Settle the barrel conflict
+### `4)` Rendre compte de la frontière, sans baril
 
-1. `1-exports.md` forbids every `index.ts`. The context entry is a boundary, not a convenience.
-   Distinguish the two, and align the biome `override` with the rule.
+> Le conflit que cette tâche devait trancher l'a été en phase 7, et dans l'autre sens que sa
+> rédaction supposait : il n'y a pas d'`index.ts` de contexte. `1-exports.md` interdisait déjà tout
+> baril, `noBarrelFile` est actif, et le cliquet `no-re-export` a une base vide éprouvée par
+> injection — c'était l'arbre cible qui était l'intrus, pas la règle.
+
+1. Écrire la frontière telle qu'elle est réellement tenue : un cliquet d'architecture liste les
+   modules publics de chaque contexte, et rien ne ré-exporte quoi que ce soit. Vérifier au passage
+   que la surface publique déclarée a bien rétréci à mesure que les consommateurs entraient dans
+   leur contexte — 20 modules publics sur 48 fichiers pour `tools` à l'extraction, c'est un point de
+   départ, pas une cible.
 
 ## Test acceptance criteria
 
