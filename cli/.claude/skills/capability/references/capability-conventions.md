@@ -26,7 +26,7 @@ export class WidgetsCapability {
 - Constructor takes exactly one params object — never positional arguments.
 - All public fields are `readonly`.
 - Optional params provide defaults via `??` or a module-level `CONSTANT_CASE` constant.
-- Throw `CapabilityConfigError` (from `domain/errors.ts`) on any invalid param combination.
+- Throw `CapabilityConfigError` (from `kernel/errors.ts`) on any invalid param combination.
 - No business logic — the class models configuration, not behavior decisions.
 - No imports from `application/` or `infrastructure/`.
 
@@ -59,7 +59,7 @@ widgetOutputPath(widgetName: string): string {
 
 ## CapabilityConfigError
 
-Import from `domain/errors.js`. Throw when constructor params violate a required invariant.
+Import from `kernel/errors.js`. Throw when constructor params violate a required invariant.
 Message format: `"<ClassName>: <reason>"`.
 
 ```typescript

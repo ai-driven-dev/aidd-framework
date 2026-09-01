@@ -21,7 +21,7 @@ None of these belong in ports, use-cases, or domain models.
 
 - `try/catch` is allowed only to convert third-party errors to typed domain exceptions
 - Never let raw errors (Node.js system errors, HTTP errors, git errors) cross the port boundary
-- Import typed exceptions from `src/domain/errors.ts`
+- Import typed exceptions from `src/kernel/errors.ts`
 - Example: `throw new PluginFetchError(\`git clone failed: ${scrubCredentials(msg)}\`)`
 
 ## File naming

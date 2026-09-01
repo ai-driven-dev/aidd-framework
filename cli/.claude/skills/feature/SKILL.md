@@ -35,7 +35,7 @@ before starting the main flow and apply them in parallel with whichever main ste
 
 | Layer        | Trigger condition                                                         | Skill        |
 | ------------ | ------------------------------------------------------------------------- | ------------ |
-| `tool`       | Adding or modifying an AI tool definition in `domain/tools/ai/`           | `tool`       |
+| `tool`       | Adding or modifying an AI tool definition in `contexts/tools/domain/profiles/`           | `tool`       |
 | `format`     | Adding or modifying a pure string-transform function in `domain/formats/` | `format`     |
 | `capability` | Adding or modifying a capability class in `domain/capabilities/`          | `capability` |
 

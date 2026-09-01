@@ -23,7 +23,7 @@ type WidgetMode = "sync" | "push" | "dry-run";
 type WidgetMode = "sync" | "push" | "dry-run"; // duplicated!
 ```
 
-Good — single named export in `src/domain/models/widget-mode.ts`:
+Good — a single named export, in the module named after the concept:
 
 ```typescript
 // src/domain/models/widget-mode.ts

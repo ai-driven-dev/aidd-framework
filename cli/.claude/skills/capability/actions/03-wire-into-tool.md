@@ -16,7 +16,7 @@ and instantiating the class in the `capabilities` object.
 ## Outputs
 
 ```typescript
-// domain/tools/ai/acme.ts — diff
+// contexts/tools/domain/profiles/acme.ts — diff
 import { WidgetsCapability } from "../../capabilities/widgets-capability.js";
 import type { ..., HasWidgets } from "../contracts.js";
 
@@ -32,7 +32,7 @@ export const acme: AiTool<HasAgents & HasSkills & HasWidgets> = {
 
 ## Process
 
-1. Open `domain/tools/ai/<tool-name>.ts`.
+1. Open `contexts/tools/domain/profiles/<tool-name>.ts`.
 2. Add `import { <CapabilityClass> } from "../../capabilities/<kebab-name>-capability.js";` in alphabetical order.
 3. Add `HasWidgets` (or the appropriate `Has*` name) to the `AiTool<C>` type parameter intersection.
 4. Add the new field to the `capabilities` object with `<camelCaseName>: new <CapabilityClass>({ ... })`.

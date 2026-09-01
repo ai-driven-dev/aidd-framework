@@ -10,7 +10,7 @@ Add typed error throws and delegate manifest+file writes to PostInstallPipelineU
 
 ```typescript
 // Error throw example
-import { WidgetNotFoundError } from "../../../domain/errors.js";
+import { WidgetNotFoundError } from "../../../kernel/errors.js";
 
 if (!inventory.isTracked(widgetId)) {
   throw new WidgetNotFoundError(widgetId);
@@ -29,7 +29,7 @@ await new FinalizeWriteUseCase(this.repo, this.indexWriter).execute({
 
 ## Process
 
-1. For every error condition in the use-case, throw a typed domain exception from `src/domain/errors.ts`. Never `throw new Error("user string")` — see `.claude/rules/00-architecture/0-error-handling.md`.
+1. For every error condition in the use-case, throw a typed domain exception from `src/kernel/errors.ts`. Never `throw new Error("user string")` — see `.claude/rules/00-architecture/0-error-handling.md`.
 2. Identify all `manifestRepo.save()` calls. Replace each with a `PostInstallPipelineUseCase` delegation per `references/post-install-pipeline.md`.
 3. Confirm `GitignoreUseCase` is never called directly — it must flow through the pipeline.
 4. Add the `PostInstallPipelineUseCase` import from `../shared/post-install-pipeline-use-case.js`.

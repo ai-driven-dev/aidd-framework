@@ -49,7 +49,7 @@ export class WidgetsCapability {
 3. Export the class with the `Capability` suffix. No default export.
 4. Constructor takes a single params object (never positional arguments).
 5. For each optional param, provide a sensible default via the `??` operator or a module constant.
-6. Validate required invariants in the constructor body; throw `CapabilityConfigError` (imported from `domain/errors.js`) on invalid input.
+6. Validate required invariants in the constructor body; throw `CapabilityConfigError` (imported from `kernel/errors.js`) on invalid input.
 7. All public fields are `readonly`; assign them from the params object in the constructor.
 8. Declare any derived public methods needed by tool files (≤20 lines each).
 9. No imports from `application/` or `infrastructure/`.

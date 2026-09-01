@@ -1,6 +1,6 @@
 # 01 - Define Has Interface
 
-Add the `Has*` interface to `domain/tools/contracts.ts` so that `AiTool<C>` definitions can
+Add the `Has*` interface to `contexts/tools/domain/contracts.ts` so that `AiTool<C>` definitions can
 include the new capability field in their `C` intersection.
 
 ## Inputs
@@ -11,7 +11,7 @@ include the new capability field in their `C` intersection.
 ## Outputs
 
 ```typescript
-// Addition in domain/tools/contracts.ts
+// Addition in contexts/tools/domain/contracts.ts
 import type { WidgetsCapability } from "../capabilities/widgets-capability.js";
 
 export interface HasWidgets {
@@ -21,7 +21,7 @@ export interface HasWidgets {
 
 ## Process
 
-1. Open `domain/tools/contracts.ts`.
+1. Open `contexts/tools/domain/contracts.ts`.
 2. Add `import type { <ClassName> } from "../capabilities/<kebab-name>-capability.js";` in alphabetical order among existing capability imports.
 3. Add `export interface Has<CapabilityName> { readonly <camelCaseName>: <ClassName>; }` in alphabetical order among the existing `Has*` interfaces.
 4. The field name in the interface is the camelCase capability name (e.g. `HasWidgets` → field `widgets: WidgetsCapability`).

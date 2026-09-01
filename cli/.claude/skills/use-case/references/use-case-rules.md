@@ -22,7 +22,7 @@ All dependencies injected as `private readonly`, typed as port interfaces (never
 ## Throws
 
 - Throw on domain errors — no try/catch inside use-cases
-- Typed domain exceptions from `src/domain/errors.ts` — never `new Error("string")`
+- Typed domain exceptions from `src/kernel/errors.ts` — never `new Error("string")`
 - The caller (command layer) catches via `errorHandler.handle()`
 
 ### Legitimate try/catch carve-outs (not violations)

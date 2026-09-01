@@ -2,7 +2,7 @@
 
 ## Location and placement
 
-All `Has*` interfaces live in `domain/tools/contracts.ts`. They are placed in alphabetical order
+All `Has*` interfaces live in `contexts/tools/domain/contracts.ts`. They are placed in alphabetical order
 among the existing interfaces. The `Has*` interfaces make up the `C` type parameter of `AiTool<C>`.
 
 ## Naming rule

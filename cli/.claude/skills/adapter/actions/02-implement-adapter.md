@@ -36,7 +36,7 @@ export class WidgetFetcherAdapter implements WidgetFetcher {
 2. Inject all dependencies via constructor as `private readonly`, typed as port interfaces — never concrete types.
 3. Own all technical constants at module level (`CONSTANT_CASE`): runtime names, OS paths, protocol strings, error-pattern regexes. None of these belong in the port or the use-case.
 4. For each port method: translate I/O — no domain decisions, no business logic.
-5. Wrap third-party errors in `try/catch` only to convert them to typed domain exceptions from `src/domain/errors.ts`. Never let raw errors cross the port boundary.
+5. Wrap third-party errors in `try/catch` only to convert them to typed domain exceptions from `src/kernel/errors.ts`. Never let raw errors cross the port boundary.
 6. All methods (public or private) ≤20 lines — extract private helpers as needed per `.claude/rules/06-design-patterns/6-method-size.md`.
 
 ## Test

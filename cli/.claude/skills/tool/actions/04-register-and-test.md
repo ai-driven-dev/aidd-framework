@@ -19,7 +19,7 @@ the full definition satisfies all type constraints.
 ```
 Validation checklist:
   - [ ] registerTool(acme) present at module bottom
-  - [ ] toolId is declared in domain/models/tool-ids.ts AI_TOOL_IDS
+  - [ ] toolId is declared in kernel/tool.ts AI_TOOL_IDS
   - [ ] pnpm typecheck exits 0
   - [ ] pnpm build exits 0
   - [ ] pnpm lint exits 0
@@ -28,10 +28,10 @@ Validation checklist:
 ## Process
 
 1. Confirm `registerTool(<toolName>)` is the last statement in the module (after the `export const` declaration).
-2. Confirm `toolId` is a valid member of `AI_TOOL_IDS` in `domain/models/tool-ids.ts`. If not, add it to the array in that file first.
-3. Confirm the tool file imports `registerTool` from `domain/tools/registry.js` (not re-exported from elsewhere).
+2. Confirm `toolId` is a valid member of `AI_TOOL_IDS` in `kernel/tool.ts`. If not, add it to the array in that file first.
+3. Confirm the tool file imports `registerTool` from `contexts/tools/domain/registry.js` (not re-exported from elsewhere).
 4. Run the validation checklist in order: typecheck, then build, then lint. Fix any failures before moving on.
-5. Write a unit test in `tests/domain/tools/` that calls `getToolConfig("<tool-id>")` and asserts the returned config is not undefined and `config.kind === "ai"`.
+5. Write a unit test in `tests/contexts/tools/domain/` that calls `getToolConfig("<tool-id>")` and asserts the returned config is not undefined and `config.kind === "ai"`.
 
 ## Test
 

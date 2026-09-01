@@ -9,7 +9,7 @@ Expose the feature in the CLI as a thin-wrapper command.
 
 ## Outputs
 
-New or updated file in `src/application/commands/` and updated `src/application/cli.ts`.
+New or updated file in `src/application/commands/` and updated `src/cli.ts`.
 
 ## Depends on
 

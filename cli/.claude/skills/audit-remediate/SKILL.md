@@ -42,7 +42,7 @@ Apply the correct layer skill in action 03 based on the target directory:
 | ------------------------ | ------------------------- |
 | `domain/formats/`        | `format`                  |
 | `domain/capabilities/`   | `capability`              |
-| `domain/tools/ai/`       | `tool`                    |
+| `contexts/tools/domain/profiles/`       | `tool`                    |
 | `domain/models/`         | `domain-model`            |
 | `application/use-cases/` | `use-case`                |
 | `infrastructure/adapters/` | `adapter`               |
@@ -74,7 +74,7 @@ before proceeding to action 02.
 
 - `.claude/skills/format/SKILL.md` — layer skill for `domain/formats/`
 - `.claude/skills/capability/SKILL.md` — layer skill for `domain/capabilities/`
-- `.claude/skills/tool/SKILL.md` — layer skill for `domain/tools/ai/`
+- `.claude/skills/tool/SKILL.md` — layer skill for `contexts/tools/domain/profiles/`
 - `.claude/skills/domain-model/SKILL.md` — layer skill for `domain/models/`
 - `.claude/skills/use-case/SKILL.md` — layer skill for `application/use-cases/`
 - `.claude/skills/adapter/SKILL.md` — layer skill for `infrastructure/adapters/`

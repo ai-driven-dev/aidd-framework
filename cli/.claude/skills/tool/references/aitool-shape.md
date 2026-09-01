@@ -20,7 +20,7 @@ interface AiTool<C> {
 
 `C` is always an intersection of `Has*` interfaces (e.g. `HasAgents & HasSkills & HasMcp`).
 
-## Has* interfaces (in domain/tools/contracts.ts)
+## Has* interfaces (in contexts/tools/domain/contracts.ts)
 
 | Interface      | Field               | Capability class         |
 | -------------- | ------------------- | ------------------------ |
@@ -73,7 +73,7 @@ exactly once per tool file, at module bottom. Never call it from use-cases, adap
 ## Agnostic shape example (fictional `acme` tool)
 
 ```typescript
-// domain/tools/ai/acme.ts
+// contexts/tools/domain/profiles/acme.ts
 import { AgentsCapability } from "../../capabilities/agents-capability.js";
 import { SkillsCapability } from "../../capabilities/skills-capability.js";
 import type { AiTool, HasAgents, HasSkills, UserFileSectionKey } from "../contracts.js";

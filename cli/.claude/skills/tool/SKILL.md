@@ -1,7 +1,7 @@
 ---
 name: tool
 description: >
-  Adds or modifies an AI tool definition in domain/tools/ai/ and wires its framework-build
+  Adds or modifies an AI tool definition in contexts/tools/domain/profiles/ and wires its framework-build
   target. Use when defining a new AI assistant tool (composing AiTool<C> from Has* capabilities),
   changing an existing tool's capability intersection, adding or updating content-rewrite logic,
   configuring PluginsCapability with marketplaceSettings, or registering the tool in the registry.
@@ -13,7 +13,7 @@ description: >
 # Tool
 
 Builds a complete AI tool definition: a typed object implementing `AiTool<C>` where `C` is an
-intersection of `Has*` interfaces sourced from `domain/tools/contracts.ts`, registered via
+intersection of `Has*` interfaces sourced from `contexts/tools/domain/contracts.ts`, registered via
 `registerTool`, and optionally equipped with `PluginsCapability` and `marketplaceSettings`.
 
 ## Available actions
@@ -36,7 +36,7 @@ framework-build target.
 
 ## Transversal rules
 
-- Tool file lives in `domain/tools/ai/<tool-name>.ts`; one file per tool.
+- Tool file lives in `contexts/tools/domain/profiles/<tool-name>.ts`; one file per tool.
 - `AiTool<C>` where `C` is an intersection of `Has*` interfaces — never a plain object literal without the type annotation.
 - Capability presence guard uses `"agents" in tool.capabilities` (in-check), not `instanceof`.
 - `rewriteContent` and `reverseRewriteContent` must be exact inverses; compose `baseRewriteContent`/`baseReverseRewriteContent` first, then apply tool-specific transforms.

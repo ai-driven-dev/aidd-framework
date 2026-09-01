@@ -11,7 +11,7 @@ setting the required base fields.
 ## Outputs
 
 ```typescript
-// domain/tools/ai/acme.ts
+// contexts/tools/domain/profiles/acme.ts
 import type { AiTool, HasAgents, HasSkills, UserFileSectionKey } from "../contracts.js";
 import { registerTool } from "../registry.js";
 
@@ -38,9 +38,9 @@ registerTool(acme);
 
 ## Process
 
-1. Create `domain/tools/ai/<tool-name>.ts`. Confirm the file does not already exist.
+1. Create `contexts/tools/domain/profiles/<tool-name>.ts`. Confirm the file does not already exist.
 2. Declare module-level constants for `DIRECTORY` and `TOOL_SUFFIX` in `CONSTANT_CASE`.
-3. Declare `export const <toolName>: AiTool<Has* & Has* & ...>` — type parameter is the intersection of all required `Has*` interfaces from `domain/tools/contracts.ts`.
+3. Declare `export const <toolName>: AiTool<Has* & Has* & ...>` — type parameter is the intersection of all required `Has*` interfaces from `contexts/tools/domain/contracts.ts`.
 4. Set required fields: `kind: "ai"`, `toolId`, `directory`, `toolSuffix`, `signalDir` (the directory the registry scans for aidd signals; `null` if the tool has no skill signals).
 5. For each capability in the list, import its class from `domain/capabilities/` and instantiate it in the `capabilities` object.
 6. Add stub implementations for `rewriteContent`, `reverseRewriteContent`, and `detectUserFileSectionKey` — these are completed in 02.

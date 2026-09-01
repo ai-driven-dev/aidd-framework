@@ -1,7 +1,7 @@
 [
   { "prompt": "Audit and clean the domain/formats/ layer using the format skill", "expect_action": "capture-golden-baseline" },
   { "prompt": "Prove the capability skill on the domain/capabilities/ layer", "expect_action": "capture-golden-baseline" },
-  { "prompt": "Run audit-remediate on domain/tools/ai/ to verify tool skill compliance", "expect_action": "capture-golden-baseline" },
+  { "prompt": "Run audit-remediate on contexts/tools/domain/profiles/ to verify tool skill compliance", "expect_action": "capture-golden-baseline" },
   { "prompt": "Apply the use-case skill to application/use-cases/ to fix any violations", "expect_action": "capture-golden-baseline" },
   { "prompt": "The format skill was just updated — re-run it on domain/formats/ to clean up", "expect_action": "capture-golden-baseline" },
   { "prompt": "Write a new pure string transform for CSV in domain/formats/", "expect_action": null },
