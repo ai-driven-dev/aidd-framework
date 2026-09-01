@@ -57,6 +57,41 @@ side of that line:
    are derivable from the model name. The entity that knows what the work actually cost is
    the one holding the contract, which is a destination, never a hook on a laptop.
 
+## The destination already owns this, and says so
+
+Written before checking, then confirmed against Le Gouvernail's own backlog, which is the
+destination this framework is being pointed at first. Two of its notes settle it from the
+other side:
+
+- Its observability spec carries a whole category for pricing (`C8 · Pricing`), whose
+  opening line is "un coût sans référentiel de prix daté n'est pas reproductible". The
+  fields it holds are per model: price by token type, currency **and period of validity**,
+  and the source of the price. A tariff change "n'écrase pas l'historique : il ouvre une
+  nouvelle période de validité." None of that is expressible by a constant compiled into a
+  CLI, which has one value and no validity period at all.
+- Its common-contract note excludes cost outright — "Coût : exclu, sans formule de
+  conversion" — with the reason stated as "ne pas estimer un coût à partir des tokens :
+  tarifs, plans et catégories de tokens ne sont pas un contrat commun."
+
+So a price table here would not merely be the framework overreaching; it would produce a
+figure the destination is on record refusing to accept.
+
+## What this decision guarantees, in the destination's own terms
+
+`C8` distinguishes three origins for a cost — `provider_reported`, `recomputed` and
+`billed` — and requires they never be summed without saying which. This decision hands the
+destination a guarantee on the first of them:
+
+**Every amount this framework emits is `provider_reported`.** It is read from a file a tool
+wrote and is never derived, so a destination can classify `cost_usd` on sight, without a
+field to carry the distinction and without trusting a producer to set it honestly. The
+framework produces no `recomputed` value at all — that is exactly what it is declining to
+do — and `billed` was never within reach of a machine reading local files.
+
+That guarantee is worth more than the amount would have been: an origin that has to be
+declared can be declared wrongly, and one that follows from what a producer is structurally
+incapable of doing cannot.
+
 ## What this costs, stated rather than hidden
 
 The report is a cost report that reports no cost. That is the real price of this decision
