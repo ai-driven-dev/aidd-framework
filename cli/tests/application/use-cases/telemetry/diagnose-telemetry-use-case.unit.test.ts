@@ -8,6 +8,8 @@ import { DiagnoseTelemetryUseCase } from "../../../../src/application/use-cases/
 import type { TelemetryCodexHookTrust } from "../../../../src/domain/models/telemetry-claim.js";
 import type { AiToolId } from "../../../../src/domain/models/tool-ids.js";
 import type { HookTrustReader } from "../../../../src/domain/ports/hook-trust-reader.js";
+import type { HostPluginRegistryReader } from "../../../../src/domain/ports/host-plugin-registry-reader.js";
+import type { ManifestRepository } from "../../../../src/domain/ports/manifest-repository.js";
 import type { RunJournal } from "../../../../src/domain/ports/run-journal-reader.js";
 import type {
   LocalCostCandidateRecord,
@@ -82,6 +84,8 @@ function buildUseCase(options: {
   journals?: readonly RunJournal[];
   readers?: ReadonlyMap<AiToolId, SessionCostReader>;
   hookTrustReader?: StubHookTrustReader;
+  manifestRepo?: ManifestRepository;
+  hostRegistries?: ReadonlyMap<AiToolId, HostPluginRegistryReader>;
 }) {
   const evidence = options.evidence ?? new StubEvidenceReader();
   const journalReader = new InMemoryRunJournalReader();
@@ -97,7 +101,13 @@ function buildUseCase(options: {
     hookTrustReader,
     new InMemoryPersonIdentityStore(),
     new InMemoryTelemetrySink(),
-    new FakeCurrentVersion("9.9.9-check")
+    new FakeCurrentVersion("9.9.9-check"),
+    options.manifestRepo ?? {
+      load: async () => null,
+      save: async () => {},
+      delete: async () => {},
+    },
+    options.hostRegistries ?? new Map()
   );
   return { useCase, evidence, hookTrustReader };
 }

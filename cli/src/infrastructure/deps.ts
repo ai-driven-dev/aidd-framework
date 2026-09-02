@@ -132,6 +132,7 @@ import { GitHubRawFetcherAdapter } from "./adapters/github-raw-fetcher-adapter.j
 import { GitHubReleaseResolverAdapter } from "./adapters/github-release-resolver-adapter.js";
 import { HasherAdapter } from "./adapters/hasher-adapter.js";
 import { HookTrustReaderAdapter } from "./adapters/hook-trust-reader-adapter.js";
+import { hostPluginRegistryReaders } from "./adapters/host-plugin-registry-reader-adapter.js";
 import { ManifestRepositoryAdapter } from "./adapters/manifest-repository-adapter.js";
 import { MarketplaceCacheAdapter } from "./adapters/marketplace-cache-adapter.js";
 import { MarketplaceRegistryAdapter } from "./adapters/marketplace-registry-adapter.js";
@@ -758,7 +759,9 @@ export async function createDeps(
     hookTrustReaderAdapter,
     personIdentityAdapter,
     telemetrySink,
-    currentVersionProvider
+    currentVersionProvider,
+    manifestRepo,
+    hostPluginRegistryReaders()
   );
   const reportCostUseCase = new ReportCostUseCase(
     telemetrySink,

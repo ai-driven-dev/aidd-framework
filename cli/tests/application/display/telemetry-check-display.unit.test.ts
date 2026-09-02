@@ -35,6 +35,7 @@ function setup(overrides: Partial<TelemetrySetup> = {}): TelemetrySetup {
     },
     identity: { attached: false, path: "/home/.config/aidd/identity.json", readable: true },
     recordsLocation: { path: "/home/.config/aidd/telemetry" },
+    hostRegistration: { entries: [], locationsChecked: [] },
     recorderDeclaration: {
       declared: true,
       declaredAt: ["/repo/.aidd/manifest.json"],

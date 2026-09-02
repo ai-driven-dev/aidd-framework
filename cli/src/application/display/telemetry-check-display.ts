@@ -6,6 +6,7 @@ import type {
 import type { TelemetryExportLeftover } from "../../domain/models/telemetry-export-leftover.js";
 import type {
   TelemetryAllowedSetup,
+  TelemetryHostRegistrationSetup,
   TelemetryIdentitySetup,
   TelemetryPluginVersionSetup,
   TelemetryRecorderDeclarationSetup,
@@ -97,6 +98,31 @@ function describePluginVersion(plugin: TelemetryPluginVersionSetup): string {
   );
 }
 
+/** The other half of `recorder declared`: whether the host will act on the declaration.
+ *
+ * One line per plugin rather than a single verdict, because the answer is genuinely per
+ * plugin and a rolled-up "some are not registered" is the kind of sentence a person cannot
+ * act on. Ordered so what a person must fix comes first: anything that will not load, then
+ * what nobody could ask about, then what is fine — a reader who stops after one line has
+ * still read the problem.
+ *
+ * `nothing installed` is a real, healthy answer and says so, rather than printing an empty
+ * block that reads like a failure to look. */
+function describeHostRegistration(registration: TelemetryHostRegistrationSetup): string {
+  const entries = registration.entries;
+  if (entries.length === 0) return "no plugin recorded for any tool";
+  const rank: Record<string, number> = {
+    "not-registered": 0,
+    "registered-disabled": 1,
+    unanswerable: 2,
+    registered: 3,
+  };
+  const ordered = [...entries].sort((a, b) => (rank[a.answer] ?? 9) - (rank[b.answer] ?? 9));
+  return ordered
+    .map((entry) => `\n    ${entry.tool}/${entry.plugin}: ${entry.answer} — ${entry.detail}`)
+    .join("");
+}
+
 function printSetup(output: CLIOutput, setup: TelemetrySetup): void {
   printSetupRow(output, "measurement allowed", describeAllowed(setup.allowed));
   printSetupRow(output, "identity attached", describeIdentity(setup.identity));
@@ -110,6 +136,7 @@ function printSetup(output: CLIOutput, setup: TelemetrySetup): void {
     "recorder declared",
     describeRecorderDeclaration(setup.recorderDeclaration)
   );
+  printSetupRow(output, "plugins registered", describeHostRegistration(setup.hostRegistration));
   printSetupRow(output, "cli version", setup.versions.cli);
   printSetupRow(output, "plugin version", describePluginVersion(setup.versions.plugin));
   output.print("");
