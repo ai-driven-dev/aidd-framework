@@ -20,7 +20,7 @@ How a command obtains its dependencies and how it talks to the user.
 
 ## CLI output channels
 
-`CLIOutput` (lives in `application/output.ts`, the documented hexagonal exception) routes by level:
+`CLIOutput` (lives in `presentation/output.ts`, the documented hexagonal exception) routes by level:
 
 - **stdout** — nominal output: `output.info()`, `output.success()`, `output.print()`
 - **stderr** — signals: `output.warn()`, `output.error()`
@@ -37,7 +37,7 @@ How a command obtains its dependencies and how it talks to the user.
 ## Display helpers
 
 Multi-step display logic (banners, result summaries, progress output) that uses `CLIOutput` must
-not live in the command file itself. Extract to `src/application/display/<command>-display.ts`.
+not live in the command file itself. Extract to `src/presentation/display/<command>-display.ts`.
 Pure domain formatters (no `CLIOutput` dependency) belong in `src/domain/models/`.
 Parser helpers that convert CLI strings into typed domain values belong in
 `src/domain/models/<model>.ts` or remain inlined if ≤5 lines and used only once.

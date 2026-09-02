@@ -4,9 +4,9 @@ import { copyFile, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { CLIOutput } from "../../src/application/output.js";
 import { InitUseCase } from "../../src/contexts/framework/application/init-use-case.js";
-import { createDeps } from "../../src/infrastructure/deps.js";
+import { CLIOutput } from "../../src/presentation/output.js";
+import { createDeps } from "../../src/runtime/wiring/framework.js";
 
 export const execFileAsync = promisify(execFile);
 

@@ -6,9 +6,9 @@ import {
   ResolveUpdateDecisionUseCase,
 } from "../../../../../src/contexts/framework/application/global/resolve-update-decision-use-case.js";
 import { UpdateOneToolUseCase } from "../../../../../src/contexts/framework/application/global/update-one-tool-use-case.js";
-import { SyncConflictResolverUseCase } from "../../../../../src/contexts/framework/application/sync/sync-conflict-resolver-use-case.js";
 import type { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
 import type { Prompter } from "../../../../../src/domain/ports/prompter.js";
+import { SyncConflictResolverUseCase } from "../../../../../src/presentation/prompts/sync-conflict-resolver-use-case.js";
 import {
   buildUnitDeps,
   initAndInstall,

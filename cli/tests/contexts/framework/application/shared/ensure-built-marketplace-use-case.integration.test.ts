@@ -14,9 +14,9 @@ import type { JsonSchemaValidator } from "../../../../../src/contexts/tools/doma
 import { buildCopilotFlatContract } from "../../../../../src/contexts/tools/domain/profiles/copilot/build.js";
 import { FlatBuildStrategy } from "../../../../../src/contexts/translate/application/strategies/flat-build-strategy.js";
 import { FrameworkBuildUseCase } from "../../../../../src/contexts/translate/application/translate-source.js";
-import type { VersionReader } from "../../../../../src/domain/ports/version-reader.js";
 import { BUILT_CACHE_SUBDIR, builtMarketplaceDir } from "../../../../../src/kernel/paths.js";
 import type { AssetProvider } from "../../../../../src/kernel/ports/asset-provider.js";
+import type { VersionReader } from "../../../../../src/runtime/self-update/version-reader.js";
 import { CapturingLogger } from "../../../../helpers/ports/capturing-logger.js";
 import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
 import { seedFromDirectory } from "../../../../helpers/ports/seed-from-directory.js";

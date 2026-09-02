@@ -15,7 +15,9 @@ function areaOf(file: string): string {
   // The composition root constructs every use case by definition — counting it as an
   // area would let any module satisfy the rule by being wired rather than by being
   // needed in two places. Drop it the same way `use-case:shared` is dropped below.
-  if (file === "src/infrastructure/deps.ts") return "composition-root";
+  // Phase 16 split the single `infrastructure/deps.ts` into one wiring module per
+  // context under `runtime/wiring/`, so the exemption follows the whole directory.
+  if (file.startsWith("src/runtime/wiring/")) return "composition-root";
   // A context's application layer is where the areas live now; the flat
   // `use-cases/` tree is what is left of the layout they came from.
   const contextArea = /^src\/contexts\/[^/]+\/application\/([^/]+)\//.exec(file);
@@ -26,8 +28,11 @@ function areaOf(file: string): string {
   if (useCase) return `use-case:${useCase[1]}`;
   if (file.startsWith("src/application/use-cases/")) return "use-case:root";
   if (file.startsWith("src/application/commands/")) return "commands";
+  if (file.startsWith("src/presentation/commands/")) return "commands";
+  if (file.startsWith("src/presentation/prompts/")) return "prompts";
   if (file.startsWith("src/domain/")) return "domain";
   if (file.startsWith("src/infrastructure/")) return "infrastructure";
+  if (file.startsWith("src/runtime/")) return "runtime";
   return "other";
 }
 

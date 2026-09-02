@@ -24,7 +24,7 @@ function isMigrationRow(line: string): boolean {
 
 function registeredCommands(): Set<string> {
   const names = new Set<string>();
-  for (const file of sourceFiles().filter((f) => f.startsWith("src/application/commands/"))) {
+  for (const file of sourceFiles().filter((f) => f.startsWith("src/presentation/commands/"))) {
     for (const match of read(file).matchAll(/\.command\("([a-z][a-z-]*)/g)) names.add(match[1]);
   }
   // An empty set would clear every document at once: nothing can be undeclared when

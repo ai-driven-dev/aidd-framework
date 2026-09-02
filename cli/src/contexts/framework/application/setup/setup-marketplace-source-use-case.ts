@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { InputRequiredError } from "../../../../application/errors.js";
-import type { LatestReleaseResolver } from "../../../../domain/ports/latest-release-resolver.js";
 import type { Prompter } from "../../../../domain/ports/prompter.js";
+import type { LatestReleaseResolver } from "../../../../runtime/self-update/latest-release-resolver.js";
 import { MarketplaceSourceMode } from "../../../distribution/domain/marketplace-source-mode.js";
 
 /** Sentinel select value for "install from main branch tip" — maps to ref undefined. */

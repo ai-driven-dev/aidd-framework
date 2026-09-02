@@ -1,8 +1,8 @@
 ---
 paths:
-  - "src/application/commands/**/*.ts"
+  - "src/presentation/commands/**/*.ts"
   - "src/cli.ts"
-  - "src/infrastructure/deps.ts"
+  - "src/runtime/wiring/**/*.ts"
 ---
 
 # Dependency Wiring

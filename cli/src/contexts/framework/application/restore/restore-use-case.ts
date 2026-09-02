@@ -1,6 +1,5 @@
 import { join } from "node:path";
 import { NoManifestError } from "../../../../application/errors.js";
-import type { Platform } from "../../../../domain/ports/platform.js";
 import type { Prompter } from "../../../../domain/ports/prompter.js";
 import type { AssetProvider } from "../../../../kernel/ports/asset-provider.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
@@ -8,6 +7,7 @@ import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
 import type { Logger } from "../../../../kernel/ports/logger.js";
 import type { ToolId } from "../../../../kernel/tool.js";
+import type { Platform } from "../../../../runtime/platform/platform.js";
 import type { PluginFetcher } from "../../../distribution/domain/ports/plugin-fetcher.js";
 import type { ConfigRef } from "../../../tools/domain/capabilities/config-refs.js";
 import type { FileMerger } from "../../../tools/domain/ports/file-merger.js";

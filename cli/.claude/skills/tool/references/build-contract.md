@@ -78,7 +78,7 @@ exporting `build<Tool>Contract()` (marketplace) and/or `build<Tool>FlatContract(
 tool's `profile.ts` declares which modes it supports by setting `buildContracts: { marketplace?,
 flat? }` on the `AiTool` object — a tool with no native marketplace simply omits `marketplace`.
 
-`infrastructure/deps.ts` derives its `FRAMEWORK_BUILD_REGISTRY` (the `"<target>:<mode>"` →
+`runtime/wiring/translate.ts` derives its `FRAMEWORK_BUILD_REGISTRY` (the `"<target>:<mode>"` →
 `mode-orchestrator(contract)` map) by iterating every registered tool id and reading
 `buildContractFor(id, mode)` off its profile — there is no per-tool row to hand-add. A tool with no
 `<tool>:marketplace` contract falls through to the existing "Unsupported target/mode" error. The

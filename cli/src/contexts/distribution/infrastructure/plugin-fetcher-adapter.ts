@@ -2,8 +2,6 @@ import { execFile as execFileCb } from "node:child_process";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { simpleGit } from "simple-git";
-import type { TokenProvider } from "../../../domain/ports/token-provider.js";
-import { injectTokenIntoUrl } from "../../../infrastructure/git/inject-token.js";
 import { PluginFetchError } from "../../../kernel/errors.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";
@@ -14,6 +12,8 @@ import type {
   PluginSourceNpm,
   PluginSourceUrl,
 } from "../../../kernel/source.js";
+import type { TokenProvider } from "../../../runtime/auth/ports/token-provider.js";
+import { injectTokenIntoUrl } from "../../../runtime/git/inject-token.js";
 import type { PluginFetcher, PluginFetchOptions } from "../domain/ports/plugin-fetcher.js";
 
 const execFile = promisify(execFileCb);

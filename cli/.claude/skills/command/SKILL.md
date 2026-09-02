@@ -1,7 +1,7 @@
 ---
 name: command
 description: >
-  Creates or modifies CLI commands in src/application/commands/. Use when adding a new command
+  Creates or modifies CLI commands in src/presentation/commands/. Use when adding a new command
   or subcommand, changing flags or the action handler, registering a command in cli.ts, or
   reviewing a command for thin-wrapper compliance. Do NOT use for implementing business logic —
   use `use-case` instead. Do NOT use for infrastructure changes — use `adapter` instead.

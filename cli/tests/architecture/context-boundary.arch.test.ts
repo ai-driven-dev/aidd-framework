@@ -91,9 +91,13 @@ function contextOf(file: string): string | null {
  * The composition root wires every context by construction: profiles register
  * themselves through a side-effect import, and a concrete adapter must be named to be
  * instantiated. Exempting it mirrors `earned-sharing.arch.test.ts`'s exemption of the
- * same file for the same reason — it is not a caller this rule is trying to catch.
+ * same directory for the same reason — it is not a caller this rule is trying to catch.
+ * Phase 16 split the single `infrastructure/deps.ts` into one wiring module per
+ * context under `runtime/wiring/`, so the exemption follows the whole directory.
  */
-const COMPOSITION_ROOT = "src/infrastructure/deps.ts";
+function isCompositionRoot(file: string): boolean {
+  return file.startsWith("src/runtime/wiring/");
+}
 
 /** The rule itself, over an explicit file list and importer map instead of the real tree. */
 function reachesIntoInterior(
@@ -107,7 +111,7 @@ function reachesIntoInterior(
     if (owner === null || !(owner in publicModules)) continue;
     if (publicModules[owner].includes(file)) continue;
     for (const importer of importers.get(file) ?? []) {
-      if (importer === COMPOSITION_ROOT) continue;
+      if (isCompositionRoot(importer)) continue;
       if (contextOf(importer) === owner) continue;
       violations.push(`${importer} -> ${file}`);
     }
@@ -169,7 +173,7 @@ describe("nothing imports a context's interior", () => {
     const importers = new Map([
       [
         "src/contexts/acme/domain/internal.ts",
-        new Set(["src/contexts/acme/application/sibling.ts", "src/infrastructure/deps.ts"]),
+        new Set(["src/contexts/acme/application/sibling.ts", "src/runtime/wiring/framework.ts"]),
       ],
     ]);
     const publicModules = { acme: [] };

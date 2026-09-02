@@ -5,7 +5,7 @@ import {
   MarketplaceSourceMode,
 } from "../../../../../src/contexts/distribution/domain/marketplace-source-mode.js";
 import { SetupMarketplaceSourceUseCase } from "../../../../../src/contexts/framework/application/setup/setup-marketplace-source-use-case.js";
-import type { LatestReleaseResolver } from "../../../../../src/domain/ports/latest-release-resolver.js";
+import type { LatestReleaseResolver } from "../../../../../src/runtime/self-update/latest-release-resolver.js";
 import { ScriptedPrompter } from "../../../../helpers/ports/scripted-prompter.js";
 
 function makeResolver(rootReleases: string[]): LatestReleaseResolver {

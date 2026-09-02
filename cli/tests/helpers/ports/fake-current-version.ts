@@ -1,4 +1,4 @@
-import type { VersionReader } from "../../../src/domain/ports/version-reader.js";
+import type { VersionReader } from "../../../src/runtime/self-update/version-reader.js";
 
 /**
  * Returns a constant version string — no disk or package.json I/O.

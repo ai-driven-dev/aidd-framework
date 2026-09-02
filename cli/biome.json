@@ -69,8 +69,13 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["**/application/**", "**/infrastructure/**"],
-                    "message": "domain must not import application or infrastructure"
+                    "group": [
+                      "**/application/**",
+                      "**/infrastructure/**",
+                      "**/presentation/**",
+                      "**/runtime/**"
+                    ],
+                    "message": "domain must not import application, infrastructure, presentation or runtime"
                   }
                 ]
               }
@@ -89,7 +94,13 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["**/domain/**", "**/application/**", "**/infrastructure/**"],
+                    "group": [
+                      "**/domain/**",
+                      "**/application/**",
+                      "**/infrastructure/**",
+                      "**/presentation/**",
+                      "**/runtime/**"
+                    ],
                     "message": "kernel must not import any context \u2014 it is the shared vocabulary contexts speak, not a consumer of one"
                   }
                 ]
@@ -132,9 +143,8 @@
                       "**/application/display/**",
                       "**/infrastructure/adapters/**",
                       "**/infrastructure/assets/**",
-                      "**/infrastructure/auth/**",
-                      "**/infrastructure/git/**",
-                      "**/infrastructure/http/**",
+                      "**/presentation/**",
+                      "**/runtime/**",
                       "../../../domain/ports/**",
                       "../../../../domain/ports/**",
                       "../../../domain/capabilities/**",

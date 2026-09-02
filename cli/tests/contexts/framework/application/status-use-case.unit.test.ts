@@ -8,8 +8,8 @@ import "../../../../src/contexts/tools/domain/profiles/vscode/profile.js";
 import { InitUseCase } from "../../../../src/contexts/framework/application/init-use-case.js";
 import { DetectPluginDriftUseCase } from "../../../../src/contexts/framework/application/shared/detect-plugin-drift-use-case.js";
 import { StatusUseCase } from "../../../../src/contexts/framework/application/status-use-case.js";
+import { compareSemver } from "../../../../src/contexts/framework/domain/semver.js";
 import { machineLocalFilesOf } from "../../../../src/contexts/tools/domain/registry.js";
-import { compareSemver } from "../../../../src/domain/models/semver.js";
 import { buildUnitDeps } from "../../../helpers/ports/build-unit-deps.js";
 
 const PROJECT_ROOT = "/test-project";

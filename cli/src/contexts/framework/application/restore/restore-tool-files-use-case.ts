@@ -1,4 +1,3 @@
-import type { Platform } from "../../../../domain/ports/platform.js";
 import type { Prompter } from "../../../../domain/ports/prompter.js";
 import { type FileHash, InstallationFile } from "../../../../kernel/file.js";
 import type { MergeFileEntry } from "../../../../kernel/merge.js";
@@ -8,6 +7,7 @@ import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
 import type { Logger } from "../../../../kernel/ports/logger.js";
 import type { ToolId } from "../../../../kernel/tool.js";
+import type { Platform } from "../../../../runtime/platform/platform.js";
 import type { FileMerger } from "../../../tools/domain/ports/file-merger.js";
 import { getToolConfig } from "../../../tools/domain/registry.js";
 import type { FrameworkDescriptor } from "../../../translate/domain/canon.js";

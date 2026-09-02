@@ -1,4 +1,4 @@
-import type { Platform } from "../../../src/domain/ports/platform.js";
+import type { Platform } from "../../../src/runtime/platform/platform.js";
 
 /**
  * Static Platform implementation returning a fixed OS string.

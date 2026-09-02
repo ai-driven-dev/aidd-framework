@@ -4,13 +4,13 @@ import type { MarketplaceRefreshUseCase } from "../../../../src/contexts/distrib
 import type { MarketplaceRegisterFrameworkUseCase } from "../../../../src/contexts/distribution/application/marketplace-register-framework-use-case.js";
 import { MarketplaceSourceMode } from "../../../../src/contexts/distribution/domain/marketplace-source-mode.js";
 import { SetupMarketplaceSourceUseCase } from "../../../../src/contexts/framework/application/setup/setup-marketplace-source-use-case.js";
-import { SetupPluginsPromptUseCase } from "../../../../src/contexts/framework/application/setup/setup-plugins-prompt-use-case.js";
-import { SetupToolsPromptUseCase } from "../../../../src/contexts/framework/application/setup/setup-tools-prompt-use-case.js";
 import { SetupToolsUseCase } from "../../../../src/contexts/framework/application/setup/setup-tools-use-case.js";
 import { SetupUseCase } from "../../../../src/contexts/framework/application/setup-use-case.js";
 import { SetupFlow } from "../../../../src/contexts/framework/domain/setup-flow.js";
 import type { ToolId } from "../../../../src/kernel/tool.js";
 import { AI_TOOL_IDS, IDE_TOOL_IDS } from "../../../../src/kernel/tool.js";
+import { SetupPluginsPromptUseCase } from "../../../../src/presentation/prompts/setup-plugins-prompt-use-case.js";
+import { SetupToolsPromptUseCase } from "../../../../src/presentation/prompts/setup-tools-prompt-use-case.js";
 import {
   buildUnitDeps,
   initAndInstall,

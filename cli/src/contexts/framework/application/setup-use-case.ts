@@ -1,11 +1,13 @@
-import type { LatestReleaseResolver } from "../../../domain/ports/latest-release-resolver.js";
-import type { TokenProvider } from "../../../domain/ports/token-provider.js";
-import type { VersionReader } from "../../../domain/ports/version-reader.js";
 import { CatalogFetchAuthError } from "../../../kernel/errors.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";
 import type { PluginSource } from "../../../kernel/source.js";
 import type { AiToolId, IdeToolId } from "../../../kernel/tool.js";
+import type { SetupPluginsPromptUseCase } from "../../../presentation/prompts/setup-plugins-prompt-use-case.js";
+import type { SetupToolsPromptUseCase } from "../../../presentation/prompts/setup-tools-prompt-use-case.js";
+import type { TokenProvider } from "../../../runtime/auth/ports/token-provider.js";
+import type { LatestReleaseResolver } from "../../../runtime/self-update/latest-release-resolver.js";
+import type { VersionReader } from "../../../runtime/self-update/version-reader.js";
 import type { MarketplaceRefreshUseCase } from "../../distribution/application/marketplace-refresh-use-case.js";
 import type {
   MarketplaceRegisterFrameworkOptions,
@@ -19,8 +21,6 @@ import type { MarketplaceSyncSettingsUseCase } from "./flows/marketplace-sync-se
 import { InitUseCase } from "./init-use-case.js";
 import type { ProjectContextDetectorUseCase } from "./setup/project-context-detector-use-case.js";
 import type { SetupMarketplaceSourceUseCase } from "./setup/setup-marketplace-source-use-case.js";
-import type { SetupPluginsPromptUseCase } from "./setup/setup-plugins-prompt-use-case.js";
-import type { SetupToolsPromptUseCase } from "./setup/setup-tools-prompt-use-case.js";
 import type { SetupToolsResult, SetupToolsUseCase } from "./setup/setup-tools-use-case.js";
 
 export type SetupResult =

@@ -1,6 +1,5 @@
 import { homedir as nodeHomedir } from "node:os";
 import { join } from "node:path";
-import { compareSemver } from "../../../../domain/models/semver.js";
 import { DOCS_DIR, PLUGIN_CACHE_SUBDIR } from "../../../../kernel/paths.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
@@ -14,6 +13,7 @@ import type { Manifest } from "../../domain/manifest.js";
 import { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { PluginDistributionReader } from "../../domain/ports/plugin-distribution-reader.js";
+import { compareSemver } from "../../domain/semver.js";
 import type { PluginTranslator } from "../framework/translator/plugin-translator.js";
 import { resolvePluginTranslator } from "../framework/translator/resolve-plugin-translator.js";
 import type { BuiltMaterializationDeps } from "../shared/apply-plugin-files-use-case.js";

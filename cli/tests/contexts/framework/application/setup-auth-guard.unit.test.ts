@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { MarketplaceSourceMode } from "../../../../src/contexts/distribution/domain/marketplace-source-mode.js";
 import { SetupMarketplaceSourceUseCase } from "../../../../src/contexts/framework/application/setup/setup-marketplace-source-use-case.js";
-import { SetupPluginsPromptUseCase } from "../../../../src/contexts/framework/application/setup/setup-plugins-prompt-use-case.js";
 import { SetupToolsUseCase } from "../../../../src/contexts/framework/application/setup/setup-tools-use-case.js";
 import { SetupUseCase } from "../../../../src/contexts/framework/application/setup-use-case.js";
 import { SetupFlow } from "../../../../src/contexts/framework/domain/setup-flow.js";
-import type { TokenProvider } from "../../../../src/domain/ports/token-provider.js";
 import { CatalogFetchAuthError } from "../../../../src/kernel/errors.js";
+import { SetupPluginsPromptUseCase } from "../../../../src/presentation/prompts/setup-plugins-prompt-use-case.js";
+import type { TokenProvider } from "../../../../src/runtime/auth/ports/token-provider.js";
 import { buildUnitDeps } from "../../../helpers/ports/build-unit-deps.js";
 import { OverwritePrompter } from "../../../helpers/ports/scripted-prompter.js";
 

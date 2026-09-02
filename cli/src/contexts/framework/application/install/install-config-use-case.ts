@@ -1,10 +1,10 @@
-import type { Platform } from "../../../../domain/ports/platform.js";
 import { InstallationFile } from "../../../../kernel/file.js";
 import type { MergeStrategy } from "../../../../kernel/merge.js";
 import type { AssetProvider } from "../../../../kernel/ports/asset-provider.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
 import type { AiToolId } from "../../../../kernel/tool.js";
+import type { Platform } from "../../../../runtime/platform/platform.js";
 import { CONFIG_MCP, type ConfigRef } from "../../../tools/domain/capabilities/config-refs.js";
 import { McpCapability } from "../../../tools/domain/mcp-capability.js";
 import { transformFor as transformMcpForPlatform } from "../../../tools/domain/mcp-exclusion.js";

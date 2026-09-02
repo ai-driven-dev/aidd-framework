@@ -1,5 +1,4 @@
 import { join } from "node:path";
-import { isSemver } from "../../../domain/models/semver.js";
 import {
   InvalidPluginManifestError,
   InvalidPluginNameError,
@@ -16,6 +15,7 @@ import type { PluginFormat } from "../../translate/domain/plugin-format.js";
 import { PLUGIN_MANIFEST_PROBES } from "../../translate/domain/plugin-format.js";
 import { PLUGIN_NAME_REGEX } from "../domain/plugins/installed-plugin.js";
 import type { PluginDistributionReader } from "../domain/ports/plugin-distribution-reader.js";
+import { isSemver } from "../domain/semver.js";
 
 const README_FILENAME = "README.md";
 

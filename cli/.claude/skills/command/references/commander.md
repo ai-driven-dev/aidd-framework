@@ -4,7 +4,7 @@ How a command registers itself and declares its surface. Commander.js.
 
 ## Command registration
 
-- One `register*Command(program)` function per file, in `src/application/commands/`
+- One `register*Command(program)` function per file, in `src/presentation/commands/`
 - All commands registered in `cli.ts` — no business logic there
 - Deps created inside the action handler, never in `register*Command`
 - Parent + subcommand pattern: `const parent = program.command("x"); parent.command("sub")...`

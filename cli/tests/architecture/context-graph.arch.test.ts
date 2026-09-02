@@ -10,9 +10,12 @@
  * path it resolves to, and they answer one file at a time — which is how twenty-three
  * forbidden edges survived until the graph was drawn.
  *
- * `outside` is what no context has claimed yet: the command surface, the runtime
- * services, the interactive menu. Its edges are unconstrained here on purpose; phases 16
- * and 18 place it, and constraining it now would freeze a layout still being decided.
+ * Since phase 16 the two non-context layers have names and a direction of their own:
+ * `presentation` speaks to a human and may depend on anything below it, `runtime` wires
+ * and provides technical services. Invariant 1 says the arrows run one way — presentation
+ * to contexts to kernel — so a context reaching back into either is recorded here rather
+ * than left to prose. It was left to prose until now, and three such imports appeared
+ * without a test noticing.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join, normalize, relative, resolve } from "node:path";
@@ -32,13 +35,33 @@ const BASELINE = [
   // installed plugin files — framework work. The orchestration belongs to whoever
   // calls both, not to the context that only knows where content comes from.
   "distribution->framework",
+  // Three framework orchestrators still name the prompt classes they are handed. A
+  // type-only import with an unchanged signature — inverting it into a port is a design
+  // change, not the move phase 16 was. Recorded so it is measured rather than remembered.
+  "framework->presentation",
+  // Fourteen context files import runtime, and what they import is almost entirely
+  // ports: version reader, platform, token provider, latest release resolver. Those are
+  // contracts a context is entitled to depend on, sitting in the wrong place — a port
+  // used by two contexts belongs in the kernel, as phase 9 established. Two are genuine:
+  // the http client and the git token injection are implementations.
+  "framework->runtime",
+  "distribution->runtime",
 ];
 
 function contextOf(file: string): string {
   const inContext = /^src\/contexts\/([^/]+)\//.exec(file);
   if (inContext) return inContext[1];
   if (file.startsWith("src/kernel/")) return "kernel";
+  if (file.startsWith("src/presentation/")) return "presentation";
+  if (file.startsWith("src/runtime/")) return "runtime";
   return "outside";
+}
+
+/** A layer a context may not depend on: the arrows run towards the kernel, never back. */
+const BELOW_NOTHING = new Set(["presentation", "runtime"]);
+
+function isContext(name: string): boolean {
+  return !BELOW_NOTHING.has(name) && name !== "kernel" && name !== "outside";
 }
 
 const RELATIVE_IMPORT = /(?:from|import)\s*\(?\s*["'](\.[^"']+\.js)["']/g;
@@ -55,6 +78,9 @@ function edgesBetweenContexts(files: readonly string[]): string[] {
       );
       const to = contextOf(target);
       if (from === to || to === "kernel" || from === "outside" || to === "outside") continue;
+      // presentation and runtime may reach down; only the reverse is an edge worth naming
+      if (BELOW_NOTHING.has(from)) continue;
+      if (BELOW_NOTHING.has(to) && !isContext(from)) continue;
       found.add(`${from}->${to}`);
     }
   }

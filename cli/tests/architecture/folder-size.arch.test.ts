@@ -17,10 +17,8 @@ const MAX_FILES_PER_FOLDER = 10;
  * This list may only shrink.
  */
 const BASELINE = [
-  "src/application/commands", // 17
-  "src/infrastructure/adapters", // 12
-  // Born of this refactor and to be split by the phases that place what is still
-  // outside a context: the command surface (18), the runtime services (16).
+  "src/presentation/commands", // 17 — moved from application/commands by phase 16, still over the limit; phase 18 splits it
+  // Born of this refactor and to be split by a later phase.
   "src/contexts/tools/domain", // 12
   "src/contexts/framework/application/install", // 12
   "src/kernel", // 11

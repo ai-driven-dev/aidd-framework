@@ -84,8 +84,23 @@ journey
 > for this phase is not the snapshot — it is equivalence, and it only exists while both spellings do.
 
 1. Add `surface-equivalence.e2e.test.ts`: for each pair, run the old spelling and the new one on two
-   freshly created identical projects, and assert the same exit code, the same files written, the
-   same manifest, and the same stdout once the command echo is removed.
+   freshly created identical projects, and assert the same exit code, the same files written and the
+   same manifest.
+
+   > **Deux sortes de paires, deux exigences.** Une rédaction antérieure demandait aussi la même
+   > sortie standard pour toutes. Impossible : la tâche 1 enrichit `doctor` de l'inventaire des
+   > outils, donc sa sortie ne peut pas égaler celle de `status`, et six commandes repliées en une
+   > ne peuvent pas toutes imprimer la même chose.
+   >
+   > - **Renommage pur** (`restore` → `sync`, `self-update` → `update`, `framework build` →
+   >   `translate`) : mêmes effets **et** même sortie, l'écho de la commande retiré. Une sortie qui
+   >   bouge ici est une régression.
+   > - **Repli** (`status`, `ai status`, `ide status`, `ai doctor`, `ide doctor`, `plugin doctor` →
+   >   `doctor`) : mêmes **effets** seulement. La sortie change par construction, et exiger qu'elle
+   >   ne change pas reviendrait à interdire l'enrichissement que la tâche 1 demande.
+   >
+   > Dire lequel des deux régimes s'applique à chaque paire, dans le test. Une paire sans régime
+   > déclaré est une paire que personne n'a examinée.
 2. Cover every pair the phase introduces, including the ones that fold several commands into one:
    `status` and `ai status` against `doctor`, `restore` against `sync`, `ai install <tool>` against
    `framework install --tool <tool>`, `self-update` against `update`, `framework build` against

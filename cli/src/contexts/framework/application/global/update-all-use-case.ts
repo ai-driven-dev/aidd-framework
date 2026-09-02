@@ -1,5 +1,5 @@
-import type { VersionReader } from "../../../../domain/ports/version-reader.js";
 import type { ToolId } from "../../../../kernel/tool.js";
+import type { VersionReader } from "../../../../runtime/self-update/version-reader.js";
 import type { MarketplaceRefreshUseCase } from "../../../distribution/application/marketplace-refresh-use-case.js";
 import { Manifest } from "../../domain/manifest.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";

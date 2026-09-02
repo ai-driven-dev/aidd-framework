@@ -1,9 +1,9 @@
-import type { Platform } from "../../../../domain/ports/platform.js";
 import { InstallationFile, removeRedundantGitkeeps } from "../../../../kernel/file.js";
 import type { AssetProvider } from "../../../../kernel/ports/asset-provider.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
 import type { AiToolId } from "../../../../kernel/tool.js";
+import type { Platform } from "../../../../runtime/platform/platform.js";
 import type {
   AiTool,
   HasAgents,

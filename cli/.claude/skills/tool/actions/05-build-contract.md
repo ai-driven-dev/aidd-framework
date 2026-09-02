@@ -52,7 +52,7 @@ Build-contract checklist:
 7. Write the contract(s) in `contexts/tools/domain/profiles/<tool-name>/build.ts`, exporting
    `build<Tool>Contract()` and/or `build<Tool>FlatContract()`. In `profile.ts`, add
    `buildContracts: { marketplace: build<Tool>Contract, flat: build<Tool>FlatContract }` (omit
-   whichever mode the tool does not support) to the `AiTool` object. `infrastructure/deps.ts`
+   whichever mode the tool does not support) to the `AiTool` object. `runtime/wiring/translate.ts`
    derives its framework-build registry from every registered profile's `buildContracts` —
    nothing to add there. Add the tool id to the `FrameworkBuildTarget` union and the command's
    `SUPPORTED_TARGETS`.

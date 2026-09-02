@@ -1,10 +1,10 @@
 // Called from use-cases/marketplace and use-cases/plugin.
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { VersionReader } from "../../../../domain/ports/version-reader.js";
 import { builtMarketplaceDir, userBuiltMarketplaceDir } from "../../../../kernel/paths.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
+import type { VersionReader } from "../../../../runtime/self-update/version-reader.js";
 import type { ResolveMarketplaceUseCase } from "../../../distribution/application/resolve-marketplace-use-case.js";
 import type { Marketplace } from "../../../distribution/domain/marketplace.js";
 import type { FrameworkBuildMode } from "../../../tools/domain/registry.js";

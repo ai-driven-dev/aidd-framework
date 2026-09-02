@@ -24,7 +24,7 @@ export function registerWidgetCommand(program: Command): void {
 
 ## Process
 
-1. Create `src/application/commands/<kebab-name>.ts`. One file per top-level command; subcommands live in the same file.
+1. Create `src/presentation/commands/<kebab-name>.ts`. One file per top-level command; subcommands live in the same file.
 2. Declare `export function register<PascalName>Command(program: Command): void`.
 3. Chain `.command("name")`, `.description("...")` on `program` (or on a parent command for subcommands) — see `references/commander.md`.
 4. Add `.requiredOption("--<flag> <value>", "desc")` for mandatory inputs.

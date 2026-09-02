@@ -1,8 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { TokenProvider } from "../../../domain/ports/token-provider.js";
 import { HttpNotFoundError } from "../../../infrastructure/errors.js";
-import type { HttpClient } from "../../../infrastructure/http/http-client.js";
 import {
   AuthenticationError,
   CatalogFetchAuthError,
@@ -10,6 +8,8 @@ import {
   CatalogFetchNotFoundError,
 } from "../../../kernel/errors.js";
 import type { PluginSourceGitHub } from "../../../kernel/source.js";
+import type { TokenProvider } from "../../../runtime/auth/ports/token-provider.js";
+import type { HttpClient } from "../../../runtime/http/http-client.js";
 import type { RawCatalogFetcher } from "../domain/ports/raw-catalog-fetcher.js";
 
 const GITHUB_API_BASE = "https://api.github.com";

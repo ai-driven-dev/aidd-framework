@@ -6,13 +6,13 @@ import {
   parsePluginSourceShorthand,
 } from "../../../../kernel/source.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../../kernel/tool.js";
+import type { PluginPickUseCase } from "../../../../presentation/prompts/plugin-pick-use-case.js";
 import type { MarketplaceTrustStore } from "../../../distribution/domain/ports/marketplace-trust-store.js";
 import { assertToolSupportsScope, type InstallScope } from "../../domain/install-scope.js";
 import { parsePluginSpec } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { PluginAddUseCase } from "./plugin-add-use-case.js";
 import type { PluginInstallFromMarketplaceUseCase } from "./plugin-install-from-marketplace-use-case.js";
-import type { PluginPickUseCase } from "./plugin-pick-use-case.js";
 
 export interface PluginInstallOptions {
   pluginArg: string | undefined;
