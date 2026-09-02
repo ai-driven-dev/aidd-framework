@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { ListTaskDocumentsUseCase } from "../../src/application/use-cases/list-task-documents.js";
+import type { Board } from "../../src/domain/models/board.js";
 import type { TaskDocument } from "../../src/domain/models/task-document.js";
+import type { TaskGroup } from "../../src/domain/models/task-group.js";
 import type { TaskDocumentRepository } from "../../src/domain/ports/task-document-repository.js";
+
+function collectTaskGroups(board: Board): TaskGroup[] {
+  return board.columns.flatMap((column) => column.taskGroups);
+}
+
+function collectParents(board: Board): TaskDocument[] {
+  return collectTaskGroups(board).map((taskGroup) => taskGroup.parent);
+}
 
 const PLAN_DOCUMENT: TaskDocument = {
   name: "FID-560",
@@ -58,62 +68,63 @@ const FIXED_TASK_DOCUMENTS: TaskDocument[] = [
 function createFakeRepository(taskDocuments: TaskDocument[]): TaskDocumentRepository {
   return {
     findAll: async () => taskDocuments,
+    projectExists: async () => true,
   };
 }
 
 describe("ListTaskDocumentsUseCase", () => {
-  it("returns one TaskGroup per directory, each carrying its own subDocuments", async () => {
+  it("places one TaskGroup per directory on the board, each carrying its own subDocuments", async () => {
     const useCase = new ListTaskDocumentsUseCase(createFakeRepository(FIXED_TASK_DOCUMENTS));
 
-    const result = await useCase.execute("/project", {});
+    const board = await useCase.execute("/project", {});
 
-    expect(result).toHaveLength(3);
-    const planGroup = result.find((taskGroup) => taskGroup.parent === PLAN_DOCUMENT);
+    expect(collectTaskGroups(board)).toHaveLength(3);
+    const planGroup = collectTaskGroups(board).find(
+      (taskGroup) => taskGroup.parent === PLAN_DOCUMENT
+    );
     expect(planGroup?.subDocuments).toEqual([PLAN_PHASE_DOCUMENT]);
   });
 
-  it("returns only groups whose parent matches the type filter", async () => {
+  it("keeps only groups whose parent matches the type filter", async () => {
     const useCase = new ListTaskDocumentsUseCase(createFakeRepository(FIXED_TASK_DOCUMENTS));
 
-    const result = await useCase.execute("/project", { type: "plan" });
+    const board = await useCase.execute("/project", { type: "plan" });
 
-    expect(result).toEqual([{ parent: PLAN_DOCUMENT, subDocuments: [PLAN_PHASE_DOCUMENT] }]);
+    expect(collectTaskGroups(board)).toEqual([
+      { parent: PLAN_DOCUMENT, subDocuments: [PLAN_PHASE_DOCUMENT] },
+    ]);
   });
 
   it("excludes a group whose parent status does not match, even when a sub-document would", async () => {
     const useCase = new ListTaskDocumentsUseCase(createFakeRepository(FIXED_TASK_DOCUMENTS));
 
-    const result = await useCase.execute("/project", { status: "blocked" });
+    const board = await useCase.execute("/project", { status: "blocked" });
 
-    expect(result).toEqual([{ parent: DECISION_DOCUMENT, subDocuments: [] }]);
+    expect(collectTaskGroups(board)).toEqual([{ parent: DECISION_DOCUMENT, subDocuments: [] }]);
   });
 
-  it("returns every group unchanged when no filters are supplied", async () => {
+  it("keeps every group on the board when no filters are supplied", async () => {
     const useCase = new ListTaskDocumentsUseCase(createFakeRepository(FIXED_TASK_DOCUMENTS));
 
-    const result = await useCase.execute("/project", {});
+    const board = await useCase.execute("/project", {});
 
-    expect(result.map((taskGroup) => taskGroup.parent)).toEqual([
-      PLAN_DOCUMENT,
-      MASTER_PLAN_DOCUMENT,
-      DECISION_DOCUMENT,
-    ]);
+    expect(collectParents(board)).toEqual([PLAN_DOCUMENT, MASTER_PLAN_DOCUMENT, DECISION_DOCUMENT]);
   });
 
   it("still narrows by the parent's normalized progress bucket", async () => {
     const useCase = new ListTaskDocumentsUseCase(createFakeRepository(FIXED_TASK_DOCUMENTS));
 
-    const result = await useCase.execute("/project", { progress: "blocked" });
+    const board = await useCase.execute("/project", { progress: "blocked" });
 
-    expect(result).toEqual([{ parent: DECISION_DOCUMENT, subDocuments: [] }]);
+    expect(collectTaskGroups(board)).toEqual([{ parent: DECISION_DOCUMENT, subDocuments: [] }]);
   });
 
   it("combines the progress filter with the type filter", async () => {
     const useCase = new ListTaskDocumentsUseCase(createFakeRepository(FIXED_TASK_DOCUMENTS));
 
-    const result = await useCase.execute("/project", { progress: "todo", type: "master_plan" });
+    const board = await useCase.execute("/project", { progress: "todo", type: "master_plan" });
 
-    expect(result).toEqual([]);
+    expect(collectTaskGroups(board)).toEqual([]);
   });
 
   it("excludes a group whose parent has no known status by default", async () => {
@@ -121,9 +132,10 @@ describe("ListTaskDocumentsUseCase", () => {
       createFakeRepository([...FIXED_TASK_DOCUMENTS, UNKNOWN_STATUS_DOCUMENT])
     );
 
-    const result = await useCase.execute("/project", {});
+    const board = await useCase.execute("/project", {});
 
-    expect(result.map((taskGroup) => taskGroup.parent)).not.toContain(UNKNOWN_STATUS_DOCUMENT);
+    expect(collectParents(board)).not.toContain(UNKNOWN_STATUS_DOCUMENT);
+    expect(board.columns.some((column) => column.progressStatus === "unknown")).toBe(false);
   });
 
   it("includes a group whose parent has no known status when shouldIncludeUnknownStatus is true", async () => {
@@ -131,9 +143,10 @@ describe("ListTaskDocumentsUseCase", () => {
       createFakeRepository([...FIXED_TASK_DOCUMENTS, UNKNOWN_STATUS_DOCUMENT])
     );
 
-    const result = await useCase.execute("/project", { shouldIncludeUnknownStatus: true });
+    const board = await useCase.execute("/project", { shouldIncludeUnknownStatus: true });
 
-    expect(result.map((taskGroup) => taskGroup.parent)).toContain(UNKNOWN_STATUS_DOCUMENT);
+    expect(collectParents(board)).toContain(UNKNOWN_STATUS_DOCUMENT);
+    expect(board.columns.at(-1)?.progressStatus).toBe("unknown");
   });
 
   it("still applies the type filter alongside shouldIncludeUnknownStatus", async () => {
@@ -141,11 +154,13 @@ describe("ListTaskDocumentsUseCase", () => {
       createFakeRepository([...FIXED_TASK_DOCUMENTS, UNKNOWN_STATUS_DOCUMENT])
     );
 
-    const result = await useCase.execute("/project", {
+    const board = await useCase.execute("/project", {
       shouldIncludeUnknownStatus: true,
       type: "plan",
     });
 
-    expect(result).toEqual([{ parent: PLAN_DOCUMENT, subDocuments: [PLAN_PHASE_DOCUMENT] }]);
+    expect(collectTaskGroups(board)).toEqual([
+      { parent: PLAN_DOCUMENT, subDocuments: [PLAN_PHASE_DOCUMENT] },
+    ]);
   });
 });

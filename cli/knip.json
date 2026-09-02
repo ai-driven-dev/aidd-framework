@@ -1,5 +1,5 @@
 {
-  "entry": ["src/cli.ts", "scripts/check-bundle-size.mjs"],
+  "entry": ["src/cli.ts", "scripts/check-bundle-size.mjs", "scripts/check-kanban-boundary.mjs"],
   "ignore": [
     "tests/**/helpers.ts",
     "tests/helpers/**",

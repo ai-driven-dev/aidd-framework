@@ -29,7 +29,7 @@
 
 Hooks run this repo's own checks directly (no parent-monorepo delegation):
 
-- `pre-commit`: `pnpm lint` (biome) + `pnpm typecheck`
+- `pre-commit`: `pnpm lint` (biome + `scripts/check-kanban-boundary.mjs`, which fails on any `cli/src` import of `kanban/src/` deeper than `index`) + `pnpm typecheck`
 - `pre-push`: `pnpm knip:production` + `pnpm test`
 - `commit-msg`: `commitlint --edit`
 
@@ -45,7 +45,8 @@ Hooks run this repo's own checks directly (no parent-monorepo delegation):
 | `pnpm build` | tsup production build + bundle size check |
 | `pnpm test` | build + vitest run (all tests) |
 | `pnpm typecheck` | tsc --noEmit |
-| `pnpm lint` | biome check |
+| `pnpm lint` | biome check + kanban boundary gate |
+| `pnpm check:kanban-boundary` | fail if `cli/src` imports `kanban/src/` deeper than `index` |
 | `pnpm format` | biome format --write |
 | `pnpm smoke` | build + `scripts/smoke-tools.sh` (full-matrix smoke on the real binary) |
 | `pnpm pack:local` | build + pack to dist/ |

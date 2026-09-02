@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import matter from "gray-matter";
 import { normalizeDocumentStatus } from "../../domain/models/document-status.js";
 import { normalizeDocumentType } from "../../domain/models/document-type.js";
@@ -61,6 +61,10 @@ function toTaskDocument(filePath: string, frontmatter: RawFrontmatter): TaskDocu
 export class FilesystemTaskDocumentRepository implements TaskDocumentRepository {
   constructor(private readonly docsDirectoryName: string) {}
 
+  async projectExists(projectPath: string): Promise<boolean> {
+    return existsSync(join(projectPath, this.docsDirectoryName));
+  }
+
   async findAll(projectPath: string): Promise<TaskDocument[]> {
     const aiddDocsPath = join(projectPath, this.docsDirectoryName);
 
@@ -75,7 +79,7 @@ export class FilesystemTaskDocumentRepository implements TaskDocumentRepository 
         const fileContent = await readFile(filePath, "utf-8");
         const frontmatter = parseFrontmatter(fileContent);
 
-        return toTaskDocument(filePath, frontmatter);
+        return toTaskDocument(relative(projectPath, filePath), frontmatter);
       })
     );
   }

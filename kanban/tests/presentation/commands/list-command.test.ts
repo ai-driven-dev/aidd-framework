@@ -4,11 +4,15 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { registerListCommand } from "../../src/presentation/commands/list-command.js";
-import { DOCS_DIRECTORY_NAME } from "../helpers/docs-directory.js";
-import { createTestKanbanDeps } from "../helpers/test-deps.js";
+import { createKanbanRuntime } from "../../../src/composition/kanban-runtime.js";
+import { registerListCommand } from "../../../src/presentation/commands/list-command.js";
+import { DOCS_DIRECTORY_NAME } from "../../helpers/docs-directory.js";
+import { createTestKanbanDeps } from "../../helpers/test-deps.js";
 
-const FIXTURES_DIRECTORY = join(dirname(fileURLToPath(import.meta.url)), "../fixtures/frontmatter");
+const FIXTURES_DIRECTORY = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../fixtures/frontmatter"
+);
 
 async function writeTaskDocument(
   directoryPath: string,
@@ -24,13 +28,25 @@ async function writeTaskDocument(
 
 function createProgram(): Command {
   const program = new Command();
-  registerListCommand(program, createTestKanbanDeps());
+  const deps = createTestKanbanDeps();
+  const runtime = createKanbanRuntime({ deps, projectPath: process.cwd() });
+  registerListCommand(program, runtime, deps.onError);
   return program;
 }
 
 function printedTable(consoleLogSpy: ReturnType<typeof vi.spyOn>): string {
   const printedCall = consoleLogSpy.mock.calls[0];
   return typeof printedCall?.[0] === "string" ? printedCall[0] : "";
+}
+
+const ESCAPE_CHARACTER_CODE = 27;
+const ANSI_SGR_PATTERN = new RegExp(
+  `${String.fromCharCode(ESCAPE_CHARACTER_CODE)}\\[[0-9;]*m`,
+  "g"
+);
+
+function stripAnsi(value: string): string {
+  return value.replace(ANSI_SGR_PATTERN, "");
 }
 
 describe("list command", () => {
@@ -53,7 +69,7 @@ describe("list command", () => {
     await rm(projectPath, { recursive: true, force: true });
   });
 
-  it("shows one column per distinct parent status, headed by that literal status", async () => {
+  it("renders the fixed board columns, each parent under its normalized bucket", async () => {
     await writeTaskDocument(join(aiddDocsPath, "task-a"), "plan.md", [
       "name: FID-560",
       "type: plan",
@@ -68,8 +84,8 @@ describe("list command", () => {
     await createProgram().parseAsync(["node", "aidd-kanban", "list", projectPath]);
 
     const table = printedTable(consoleLogSpy);
-    expect(table).toContain("pending");
-    expect(table).toContain("completed");
+    expect(table).toContain("TODO");
+    expect(table).toContain("UNKNOWN");
     expect(table).toContain("FID-560");
     expect(table).toContain("SPEC-001");
   });
@@ -106,10 +122,10 @@ describe("list command", () => {
     await createProgram().parseAsync(["node", "aidd-kanban", "list", projectPath]);
 
     const table = printedTable(consoleLogSpy);
-    const linesMentioningDone = table.split("\n").filter((line) => line.includes("done"));
+    const linesMentioningDone = table.split("\n").filter((line) => line.includes(": done"));
     expect(linesMentioningDone).toHaveLength(1);
     expect(linesMentioningDone[0]).toContain("Phase 1");
-    expect(table).toContain("pending");
+    expect(table).toContain("TODO");
   });
 
   it("produces a bounded-width table when process.stdout.columns is unavailable (non-TTY)", async () => {
@@ -128,7 +144,7 @@ describe("list command", () => {
         createProgram().parseAsync(["node", "aidd-kanban", "list", projectPath])
       ).resolves.not.toThrow();
 
-      const table = printedTable(consoleLogSpy);
+      const table = stripAnsi(printedTable(consoleLogSpy));
       const longestLine = Math.max(...table.split("\n").map((line) => line.length));
       expect(longestLine).toBeLessThan(200);
     } finally {
@@ -253,11 +269,38 @@ describe("list command", () => {
     await createProgram().parseAsync(["node", "aidd-kanban", "list", projectPath, "--all"]);
 
     const table = printedTable(consoleLogSpy);
-    expect(table).toContain("unknown");
+    expect(table).toContain("UNKNOWN");
     expect(table).toContain("SPEC-001");
   });
 
-  it("end-to-end: a fixture document's name/type/status reach the printed table unaltered", async () => {
+  it("prints the board as a DTO whose columns carry cards with sub-document counts when --json is given", async () => {
+    await writeTaskDocument(join(aiddDocsPath, "task-a"), "plan.md", [
+      "name: FID-560",
+      "type: plan",
+      "status: pending",
+    ]);
+    await writeTaskDocument(join(aiddDocsPath, "task-a"), "phase-1.md", [
+      "name: Phase 1",
+      "status: done",
+    ]);
+
+    await createProgram().parseAsync(["node", "aidd-kanban", "list", projectPath, "--json"]);
+
+    const payload = JSON.parse(printedTable(consoleLogSpy)) as {
+      columns: {
+        progressStatus: string;
+        label: string;
+        cards: { name: string; doneSubCount: number; totalSubCount: number }[];
+      }[];
+    };
+    const todoColumn = payload.columns.find((column) => column.progressStatus === "todo");
+    expect(todoColumn?.cards[0]?.name).toBe("FID-560");
+    expect(todoColumn?.cards[0]?.totalSubCount).toBe(1);
+    expect(todoColumn?.cards[0]?.doneSubCount).toBe(1);
+    expect(JSON.stringify(payload)).not.toContain("taskGroups");
+  });
+
+  it("end-to-end: a fixture document's name reaches the table, its unmapped status landing under UNKNOWN", async () => {
     const fixtureContent = await readFile(join(FIXTURES_DIRECTORY, "valid-full.md"), "utf-8");
     await mkdir(join(aiddDocsPath, "task-fixture"), { recursive: true });
     await writeFile(join(aiddDocsPath, "task-fixture", "plan.md"), fixtureContent);
@@ -266,6 +309,6 @@ describe("list command", () => {
 
     const table = printedTable(consoleLogSpy);
     expect(table).toContain("Test name");
-    expect(table).toContain("completed");
+    expect(table).toContain("UNKNOWN");
   });
 });

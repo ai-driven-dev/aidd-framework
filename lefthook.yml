@@ -126,4 +126,4 @@ pre-push:
 commit-msg:
   commands:
     commitlint:
-      run: pnpm exec commitlint --edit {1}
+      run: cd cli && pnpm exec commitlint --edit {1}

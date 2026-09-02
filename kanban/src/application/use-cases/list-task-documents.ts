@@ -1,3 +1,4 @@
+import { type Board, deriveBoard } from "../../domain/models/board.js";
 import { UNKNOWN_DOCUMENT_STATUS } from "../../domain/models/document-status.js";
 import type { ProgressStatus } from "../../domain/models/progress-status.js";
 import { groupTaskDocumentsByDirectory, type TaskGroup } from "../../domain/models/task-group.js";
@@ -25,10 +26,11 @@ function matchesFilters(taskGroup: TaskGroup, filters: ListTaskDocumentsFilters)
 export class ListTaskDocumentsUseCase {
   constructor(private readonly taskDocumentRepository: TaskDocumentRepository) {}
 
-  async execute(projectPath: string, filters: ListTaskDocumentsFilters): Promise<TaskGroup[]> {
+  async execute(projectPath: string, filters: ListTaskDocumentsFilters): Promise<Board> {
     const taskDocuments = await this.taskDocumentRepository.findAll(projectPath);
     const taskGroups = groupTaskDocumentsByDirectory(taskDocuments);
+    const matchingTaskGroups = taskGroups.filter((taskGroup) => matchesFilters(taskGroup, filters));
 
-    return taskGroups.filter((taskGroup) => matchesFilters(taskGroup, filters));
+    return deriveBoard(matchingTaskGroups);
   }
 }

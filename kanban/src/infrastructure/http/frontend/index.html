@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>aidd kanban</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header id="header">
+    <div class="header-left">
+      <h1>aidd kanban</h1>
+      <span id="project-path" class="dimmed" hidden></span>
+      <span id="project-path-picker" class="project-path-picker" hidden>
+        <span class="project-path-row">
+          <input
+            id="project-path-input"
+            class="project-path-input"
+            type="text"
+            spellcheck="false"
+            autocomplete="off"
+            aria-label="project path"
+          />
+          <button id="project-path-scan" class="project-path-scan" type="button">Scan</button>
+        </span>
+        <span id="project-path-error" class="project-path-error" hidden></span>
+      </span>
+    </div>
+    <div class="header-right">
+      <span id="connection-dot" class="dot dot-disconnected"></span>
+      <span id="connection-label" class="dimmed">disconnected</span>
+    </div>
+  </header>
+
+  <main id="board"></main>
+
+  <div id="panel-overlay" class="panel-overlay">
+    <aside id="panel" class="panel">
+      <div class="panel-header">
+        <h2 id="panel-title">Task details</h2>
+        <button id="panel-close" class="panel-close" type="button">&times;</button>
+      </div>
+      <div id="panel-body" class="panel-body"></div>
+    </aside>
+  </div>
+
+  <footer id="footer">
+    <span id="task-count" class="dimmed"></span>
+    <span id="last-update" class="dimmed"></span>
+  </footer>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>

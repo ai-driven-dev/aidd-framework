@@ -4,9 +4,10 @@ import { join } from "node:path";
 import { Command } from "commander";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { StatusColumnsView } from "../../src/presentation/components/status-columns-view.js";
-import { DOCS_DIRECTORY_NAME } from "../helpers/docs-directory.js";
-import { createTestKanbanDeps } from "../helpers/test-deps.js";
+import { createKanbanRuntime } from "../../../src/composition/kanban-runtime.js";
+import { StatusColumnsView } from "../../../src/presentation/components/status-columns-view.js";
+import { DOCS_DIRECTORY_NAME } from "../../helpers/docs-directory.js";
+import { createTestKanbanDeps } from "../../helpers/test-deps.js";
 
 const { renderMock } = vi.hoisted(() => ({ renderMock: vi.fn() }));
 
@@ -16,15 +17,16 @@ vi.mock("ink", async (importOriginal) => {
 });
 
 const { registerInteractiveCommand } = await import(
-  "../../src/presentation/commands/interactive-command.js"
+  "../../../src/presentation/commands/interactive-command.js"
 );
-const { registerListCommand } = await import("../../src/presentation/commands/list-command.js");
+const { registerListCommand } = await import("../../../src/presentation/commands/list-command.js");
 
 function createProgram(): Command {
   const program = new Command();
   const deps = createTestKanbanDeps();
-  registerInteractiveCommand(program, deps);
-  registerListCommand(program, deps);
+  const runtime = createKanbanRuntime({ deps, projectPath: process.cwd() });
+  registerInteractiveCommand(program, runtime, deps.onError);
+  registerListCommand(program, runtime, deps.onError);
   return program;
 }
 
@@ -52,6 +54,22 @@ describe("interactive command wiring", () => {
     const [renderedElement] = renderMock.mock.calls[0] as [ReactElement];
     expect(renderedElement.type).toBe(StatusColumnsView);
     expect((renderedElement.props as { projectPath: string }).projectPath).toBe(projectPath);
+  });
+
+  it("hands the interactive view a watcher factory when --live is set", async () => {
+    await createProgram().parseAsync(["node", "aidd-kanban", projectPath, "--live"]);
+
+    const [renderedElement] = renderMock.mock.calls[0] as [ReactElement];
+    expect(typeof (renderedElement.props as { createWatcher?: unknown }).createWatcher).toBe(
+      "function"
+    );
+  });
+
+  it("leaves the interactive view without a watcher factory when --live is absent", async () => {
+    await createProgram().parseAsync(["node", "aidd-kanban", projectPath]);
+
+    const [renderedElement] = renderMock.mock.calls[0] as [ReactElement];
+    expect((renderedElement.props as { createWatcher?: unknown }).createWatcher).toBeUndefined();
   });
 
   it("wires --all into shouldIncludeUnknownStatus for the interactive view", async () => {

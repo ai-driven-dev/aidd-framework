@@ -38,3 +38,5 @@ pnpm test
 From the CLI folder, `pnpm test:kanban` runs the same suite.
 
 Nothing here may import from `../cli`. Everything the commands need from their host arrives through `KanbanCommandDeps` at registration time.
+
+The boundary holds in the other direction too: `kanban/src/index.ts` is the only entrypoint a host may import. `cli/scripts/check-kanban-boundary.mjs` (run by `pnpm --dir cli lint`) fails the build on any `cli/src` import that reaches deeper than `kanban/src/index`.
