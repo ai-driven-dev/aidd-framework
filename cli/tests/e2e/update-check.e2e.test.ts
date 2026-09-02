@@ -62,7 +62,7 @@ async function setupEnv(prefix: string): Promise<TestEnv> {
   await mkdir(join(projectDir, ".aidd"), { recursive: true });
   await writeFile(
     join(projectDir, ".aidd", "manifest.json"),
-    JSON.stringify({ version: 5, tools: {}, marketplaces: {} }),
+    JSON.stringify({ version: 6, tools: {} }),
     "utf-8"
   );
   const server = await startFakeRelease(FAKE_TAG);

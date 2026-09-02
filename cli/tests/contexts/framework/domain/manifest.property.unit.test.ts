@@ -62,85 +62,16 @@ describe("Manifest property tests", () => {
     );
   });
 
-  // ── Property 2: migration chain idempotent on v6 input ──────────────────────
+  // ── Property 2: the version guard is a no-op on its own output ──────────────
 
-  it("migration chain on v6 input is idempotent (fromJSON round-trips cleanly)", () => {
+  it("fromJSON on v6 input round-trips cleanly (guard is a no-op at the supported version)", () => {
     fc.assert(
       fc.property(fc.array(toolEntryArb, { maxLength: 4 }), (tools) => {
         const m = buildManifest(tools);
         const v6 = m.toJSON();
-        // Apply fromJSON twice — the migration branch must be a no-op on version 6.
         const once = Manifest.fromJSON(v6).toJSON();
         const twice = Manifest.fromJSON(once).toJSON();
         expect(twice).toEqual(once);
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  // ── Property 3: v3/v4 raw shapes deserialize to v5 ──────────────────────────
-
-  it("v3 raw shapes migrate to version 6 without throwing", () => {
-    const v3ToolEntryArb = fc.record({
-      toolId: toolIdArb,
-      version: fc
-        .string({ minLength: 1, maxLength: 20 })
-        .filter((s) => !s.includes("\n") && s.trim().length > 0),
-      files: fc.array(fc.record({ relativePath: relativePathArb, hash: md5Arb }), { maxLength: 4 }),
-      mergeFiles: fc.constant([]),
-    });
-
-    fc.assert(
-      fc.property(fc.array(v3ToolEntryArb, { maxLength: 4 }), (rawTools) => {
-        const toolsRecord: Record<string, unknown> = {};
-        const seenIds = new Set<string>();
-        for (const t of rawTools) {
-          if (!seenIds.has(t.toolId)) {
-            seenIds.add(t.toolId);
-            toolsRecord[t.toolId] = { ...t, plugins: [] };
-          }
-        }
-        const rawV3 = {
-          version: 3,
-          mode: "local",
-          docsDir: "aidd_docs",
-          tools: toolsRecord,
-        };
-        const migrated = Manifest.fromJSON(rawV3);
-        expect(migrated.toJSON().version).toBe(6);
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  it("v4 raw shapes migrate to version 6 without throwing", () => {
-    const v4ToolEntryArb = fc.record({
-      toolId: toolIdArb,
-      version: fc
-        .string({ minLength: 1, maxLength: 20 })
-        .filter((s) => !s.includes("\n") && s.trim().length > 0),
-      files: fc.array(fc.record({ relativePath: relativePathArb, hash: md5Arb }), { maxLength: 4 }),
-      mergeFiles: fc.constant([]),
-    });
-
-    fc.assert(
-      fc.property(fc.array(v4ToolEntryArb, { maxLength: 4 }), (rawTools) => {
-        const toolsRecord: Record<string, unknown> = {};
-        const seenIds = new Set<string>();
-        for (const t of rawTools) {
-          if (!seenIds.has(t.toolId)) {
-            seenIds.add(t.toolId);
-            toolsRecord[t.toolId] = { ...t, plugins: [] };
-          }
-        }
-        const rawV4 = {
-          version: 4,
-          mode: "local",
-          docsDir: "aidd_docs",
-          tools: toolsRecord,
-        };
-        const migrated = Manifest.fromJSON(rawV4);
-        expect(migrated.toJSON().version).toBe(6);
       }),
       { numRuns: 100 }
     );

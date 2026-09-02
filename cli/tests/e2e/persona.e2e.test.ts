@@ -233,7 +233,7 @@ exit 0
       await writeFile(
         join(projectDir, AIDD_DIR, "manifest.json"),
         JSON.stringify({
-          version: 5,
+          version: 6,
           tools: {
             claude: {
               toolId: "claude",
@@ -242,7 +242,6 @@ exit 0
               mergeFiles: [],
             },
           },
-          marketplaces: {},
         })
       );
 

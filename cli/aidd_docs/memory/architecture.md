@@ -71,13 +71,15 @@ FrameworkBuildUseCase → BuildOutputStrategy (MarketplaceBuildStrategy | FlatBu
 Author-side, not user-side: translates the Claude-format framework into a tool-native
 marketplace dist (Mode A) or flat workspace materialization (Mode B `--flat`).
 
-**Manifest schema migration** (no command — runs on load):
+**Manifest version guard** (no command — checked on load):
 ```
-Manifest.deserialize → version-to-version migrations in manifest.ts (v1→v2→…→v6)
-→ strips obsolete fields; upgraded shape persisted on next manifest write; idempotent on v6
+Manifest.fromJSON → version guard in manifest.ts: reads v6 only
+→ older manifest refused, naming the last CLI able to migrate it forward; newer manifest refused, naming self-update
 ```
-The brownfield `aidd migrate` command (backup + strip dead files + rewire plugins) was removed;
-older manifests now auto-upgrade when loaded.
+The version-to-version migration chain (v1→v2→…→v6) was removed once no supported CLI could
+still be behind v6 — a domain entity carrying every past shape of its own JSON was a
+persistence concern, not a domain one. The brownfield `aidd migrate` command (backup + strip
+dead files + rewire plugins) was removed earlier for the same reason.
 
 ## Per-Tool Plugin Install Strategy
 
@@ -139,7 +141,7 @@ This distinction is what `doctor` and `restore` should be scoped by — see
 - IDE-conditional distribution: AI tools declare `requiredIdeIds`; filtered at install time
 - IDE tool files (user-prime): never deleted on uninstall
 - Error handling: typed exceptions thrown from use-cases/adapters; caught only at command layer
-- Manifest schema migration: idempotent version-to-version upgrade applied on load (`manifest.ts`), no manual command
+- Manifest version guard: reads v6 only, refuses older/newer with the fix named in the error (`manifest.ts`), no manual command
 
 ## Foreign-Format Adapters (COMPLETE)
 

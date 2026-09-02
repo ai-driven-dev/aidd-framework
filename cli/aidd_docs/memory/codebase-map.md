@@ -98,7 +98,7 @@ src/
     │   └── infrastructure/   # the adapters behind those six ports
     └── framework/            # the installation record and everything done to a project — the context allowed to reach the others
         ├── domain/
-        │   ├── manifest.ts          # aggregate root: identity, consistency, migrations, entry point to its members
+        │   ├── manifest.ts          # aggregate root: identity, consistency, version guard, entry point to its members
         │   ├── manifest-serialization.ts # ManifestData shape, tools map <-> record conversion
         │   ├── manifest/            # the aggregate's members — tool-entry, tracked-files, merge-files, mcp-exclusions
         │   ├── doctor.ts            # the diagnosis shape
@@ -169,6 +169,6 @@ tests/
 | `contexts/tools/domain/registry.ts` | Tool lookup, guards, signal detection |
 | `contexts/framework/application/install/post-install-pipeline-use-case.ts` | Mandatory post-write sequence |
 | `contexts/framework/application/shared/ensure-built-marketplace-use-case.ts` | Per-target built-tree cache — install/update materialize tools from it (build/install parity) |
-| `contexts/framework/domain/manifest.ts` | Aggregate root — identity, consistency, schema migration (v1→v6) on load; delegates tracked files, merge files, mcp exclusions and plugins to `domain/manifest/` |
+| `contexts/framework/domain/manifest.ts` | Aggregate root — identity, consistency, version guard (reads v6 only, refuses older/newer with the fix) on load; delegates tracked files, merge files, mcp exclusions and plugins to `domain/manifest/` |
 | `domain/models/normalized-plugin.ts` | Internal AST for foreign-format plugin ingestion |
 | `contexts/framework/domain/setup-flow.ts` | Aggregate — setup orchestration state |

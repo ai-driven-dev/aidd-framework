@@ -136,8 +136,10 @@ aidd setup --ai all --ide all --yes
 
 ### Brownfield (existing project)
 
-A manifest from an older CLI version is upgraded to the latest schema automatically the
-first time it is loaded — no manual migration command. Just run any `aidd` command:
+This CLI reads manifest schema v6 only. If `aidd status` (or any command) refuses to load
+the manifest, run `npx @ai-driven-dev/cli@5.2.1 update --force` once — the last version able
+to migrate an older manifest forward — then update the CLI again. `--force` matters: a plain
+`update` skips the save when a tracked file was hand-edited.
 
 ```bash
 aidd status
@@ -498,7 +500,7 @@ aidd framework build --source ./framework --target opencode --out ./dist/aidd-fr
 
 ### Manifest schema upgrades
 
-There is no `aidd migrate` command. A manifest written by an older CLI version is upgraded to the current schema (v6) automatically when it is loaded — the version-to-version migrations live in `manifest.ts` and run on `Manifest.deserialize`. The upgraded shape is persisted the next time the manifest is written (e.g. on the next `install` or `update`). The migration chain is idempotent.
+There is no `aidd migrate` command, and no automatic migration: this CLI reads manifest schema v6 only. A manifest below v6 is refused with a message naming the last CLI able to migrate it — `npx @ai-driven-dev/cli@5.2.1 update --force` — run once to upgrade the manifest on disk, then update the CLI again. A manifest above v6 (written by a newer CLI) is refused with a message pointing at `aidd self-update` instead.
 
 ### `aidd clean`
 

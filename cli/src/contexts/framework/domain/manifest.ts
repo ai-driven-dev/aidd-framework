@@ -10,10 +10,9 @@ import {
   isFileTrackedInEntry,
   removePluginFromEntry,
   type ToolEntry,
-  type ToolEntryData,
   updatePluginInEntry,
 } from "./manifest/tool-entry.js";
-import { parseTrackedFiles, type TrackedFile, withUpdatedHash } from "./manifest/tracked-files.js";
+import { withUpdatedHash } from "./manifest/tracked-files.js";
 import {
   MANIFEST_VERSION,
   type ManifestData,
@@ -22,120 +21,29 @@ import {
 } from "./manifest-serialization.js";
 import type { InstalledPlugin } from "./plugins/installed-plugin.js";
 
-// VSCode file paths that were tracked under "copilot" in manifest v1.
-// Used exclusively by migrateV1toV2 to move them to the "vscode" tool entry.
-// It can only be removed when the manifest version is bumped again and v1 support is explicitly dropped.
-const VSCODE_MIGRATION_PATHS = new Set([
-  ".vscode/extensions.json",
-  ".vscode/keybindings.json",
-  ".vscode/settings.json",
-]);
+// The last published CLI whose manifest migrations could still read a pre-v6 document.
+// v6 shipped 2026-05-09 (commit 273573fc) in 4.1.0-beta.25; 5.2.1 is the last version
+// published before this guard replaced the migration chain. Named here so the refusal
+// below can tell a user stuck on an old manifest exactly what to run first: downgrade,
+// run it once to upgrade the manifest on disk, then update the CLI again.
+const LAST_MIGRATING_CLI_VERSION = "5.2.1";
 
-// Retained for legacy manifest round-trip and isFileTracked coverage.
-interface ScriptsEntry {
-  readonly version: string;
-  readonly files: readonly TrackedFile[];
-}
-
-// Retained for legacy manifest round-trip and isFileTracked coverage.
-interface PluginsEntry {
-  readonly version: string;
-  readonly files: readonly TrackedFile[];
-}
-
-// Kept for legacy manifest round-trip: v3/v4 manifests may carry these sections until migrate runs.
-interface ScriptsEntryData {
-  version: string;
-  files: { relativePath: string; hash: string; frameworkPath?: string }[];
-}
-
-interface PluginsSectionData {
-  version: string;
-  files: { relativePath: string; hash: string; frameworkPath?: string }[];
-}
-
-// This migration block must remain until all users have upgraded past v1.
-// Removing it would corrupt manifests that still have VSCode files tracked under "copilot".
-function migrateV1toV2(raw: Record<string, unknown>): void {
-  const tools = raw.tools as Record<string, ToolEntryData> | undefined;
-  if (!tools) return;
-
-  const copilot = tools.copilot;
-  if (!copilot) return;
-
-  const vscodeFiles = copilot.files.filter((f) => VSCODE_MIGRATION_PATHS.has(f.relativePath));
-  if (vscodeFiles.length === 0) return;
-
-  copilot.files = copilot.files.filter((f) => !VSCODE_MIGRATION_PATHS.has(f.relativePath));
-
-  if (!tools.vscode) {
-    tools.vscode = {
-      toolId: "vscode",
-      version: copilot.version,
-      files: [],
-      mergeFiles: [],
-    };
-  }
-  const existingPaths = new Set(tools.vscode.files.map((f) => f.relativePath));
-  const deduped = vscodeFiles.filter((f) => !existingPaths.has(f.relativePath));
-  tools.vscode.files = [...tools.vscode.files, ...deduped];
-}
-
-function migrateV2toV3(raw: Record<string, unknown>): void {
-  const tools = raw.tools as Record<string, ToolEntryData> | undefined;
-  if (!tools) return;
-  for (const entry of Object.values(tools)) {
-    entry.plugins ??= [];
-  }
-}
-
-function migrateV3toV4(raw: Record<string, unknown>): void {
-  if (!("mode" in raw)) raw.mode = "local";
-  if (!("plugins" in raw)) raw.plugins = null;
-}
-
-// Strips dead top-level fields: docs, mode, repo, docsDir, scripts, plugins.
-// The legacy scripts/plugins file lists are parsed separately (parseLegacySections)
-// before this strip, so removing them here during the round-trip is safe.
-function migrateV4toV5(raw: Record<string, unknown>): void {
-  delete raw.docs;
-  delete raw.mode;
-  delete raw.repo;
-  delete raw.docsDir;
-  delete raw.scripts;
-  delete raw.plugins;
-  if (!("marketplaces" in raw)) raw.marketplaces = {};
-}
-
-// Strips the dead marketplaces aggregate. The actual marketplace registry now lives
-// exclusively in .aidd/marketplaces.json (managed by MarketplaceRegistryAdapter).
-function migrateV5toV6(raw: Record<string, unknown>): void {
-  delete raw.marketplaces;
-}
+// `update` alone is not enough: a locally modified tracked file makes it throw
+// InputRequiredError in non-interactive mode before it ever reaches the save that
+// would persist the migrated v6 manifest, leaving the user exactly as stuck as before.
+// `--force` removes that branch — verified empirically against 5.2.1 (plain manifest,
+// modified-tracked-file manifest, and a zero-tool manifest all re-save as v6).
+const RECOVERY_COMMAND = "update --force";
 
 export class Manifest {
   private readonly _tools: Map<ToolId, ToolEntry>;
-  // Legacy _scripts/_plugins file lists retained so isFileTracked still recognises files
-  // written by pre-v6 manifests (the fields themselves are stripped from serialized output).
-  private _scripts: ScriptsEntry | null;
-  private _plugins: PluginsEntry | null;
 
-  private constructor(params: {
-    tools: Map<ToolId, ToolEntry>;
-    scripts: ScriptsEntry | null;
-    plugins: PluginsEntry | null;
-  }) {
+  private constructor(params: { tools: Map<ToolId, ToolEntry> }) {
     this._tools = new Map(params.tools);
-    this._scripts = params.scripts;
-    this._plugins = params.plugins;
   }
 
   static create(): Manifest {
-    return new Manifest({
-      tools: new Map(),
-      scripts: null,
-      plugins: null,
-    });
+    return new Manifest({ tools: new Map() });
   }
 
   addTool(
@@ -157,16 +65,6 @@ export class Manifest {
         existingPlugins: existing?.plugins ?? [],
       })
     );
-  }
-
-  /** Returns true when the loaded JSON carried a legacy scripts section. Used by isFileTracked. */
-  hasScripts(): boolean {
-    return this._scripts !== null;
-  }
-
-  /** Returns true when the loaded JSON carried a legacy top-level plugins section. Used by isFileTracked. */
-  hasPlugins(): boolean {
-    return this._plugins !== null;
   }
 
   getInstalledToolIds(): ToolId[] {
@@ -290,8 +188,6 @@ export class Manifest {
     for (const entry of this._tools.values()) {
       if (isFileTrackedInEntry(entry, relativePath)) return true;
     }
-    if (this._scripts?.files.some((f) => f.relativePath === relativePath)) return true;
-    if (this._plugins?.files.some((f) => f.relativePath === relativePath)) return true;
     return false;
   }
 
@@ -320,54 +216,28 @@ export class Manifest {
       throw new InvalidManifestDataError("expected an object.");
     }
     const raw = data as Record<string, unknown>;
-    Manifest.applyMigrations(raw);
+    Manifest.assertSupportedVersion(raw);
     const tools = parseManifestTools(raw);
-    const { scripts, plugins } = Manifest.parseLegacySections(raw);
-    return new Manifest({ tools, scripts, plugins });
+    return new Manifest({ tools });
   }
 
-  private static applyMigrations(raw: Record<string, unknown>): void {
+  // This CLI reads exactly MANIFEST_VERSION: the migration chain that used to carry older
+  // documents forward was removed once no supported CLI could still be behind v6 (see
+  // LAST_MIGRATING_CLI_VERSION). A refusal alone would strand a user who self-updated before
+  // opening an old project, so the two failure branches each name the fix: too old names the
+  // last CLI able to migrate the manifest forward; too new means this CLI itself is behind.
+  private static assertSupportedVersion(raw: Record<string, unknown>): void {
     const version = raw.version;
-    if (version === 6) return;
-    if (typeof version !== "number" || version < 1 || version > 6) {
+    if (version === MANIFEST_VERSION) return;
+    if (typeof version === "number" && version > MANIFEST_VERSION) {
       throw new InvalidManifestDataError(
-        `Unsupported manifest version: ${String(version)}. Expected ${MANIFEST_VERSION}.`
+        `manifest version ${version} was written by a newer CLI than this one. Run \`aidd self-update\` to update this CLI, then try again.`
       );
     }
-    const migrations: ((r: Record<string, unknown>) => void)[] = [
-      migrateV1toV2,
-      migrateV2toV3,
-      migrateV3toV4,
-      migrateV4toV5,
-      migrateV5toV6,
-    ];
-    for (const migrate of migrations.slice(version - 1)) {
-      migrate(raw);
-    }
-  }
-
-  // Parse legacy scripts/plugins file lists for backward-compatible file tracking of pre-v6 manifests.
-  private static parseLegacySections(raw: Record<string, unknown>): {
-    scripts: ScriptsEntry | null;
-    plugins: PluginsEntry | null;
-  } {
-    let scripts: ScriptsEntry | null = null;
-    if (raw.scripts !== null && raw.scripts !== undefined && typeof raw.scripts === "object") {
-      const scriptsRaw = raw.scripts as ScriptsEntryData;
-      scripts = {
-        version: scriptsRaw.version,
-        files: parseTrackedFiles(scriptsRaw.files),
-      };
-    }
-
-    let plugins: PluginsEntry | null = null;
-    if (raw.plugins !== null && raw.plugins !== undefined && typeof raw.plugins === "object") {
-      const pluginsRaw = raw.plugins as PluginsSectionData;
-      plugins = {
-        version: pluginsRaw.version,
-        files: parseTrackedFiles(pluginsRaw.files),
-      };
-    }
-    return { scripts, plugins };
+    throw new InvalidManifestDataError(
+      `manifest version ${String(version)} predates version ${MANIFEST_VERSION}, the only one this CLI reads. ` +
+        `Run \`npx @ai-driven-dev/cli@${LAST_MIGRATING_CLI_VERSION} ${RECOVERY_COMMAND}\` once in this project ` +
+        `to upgrade the manifest (overwrites locally modified tracked files), then update the CLI again.`
+    );
   }
 }

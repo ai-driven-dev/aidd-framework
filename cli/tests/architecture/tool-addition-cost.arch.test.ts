@@ -35,7 +35,6 @@ const BASELINE = [
   "src/contexts/translate/domain/build-target.ts",
   "src/contexts/translate/domain/plugin-format.ts",
   "src/contexts/tools/domain/plugins-capability.ts",
-  "src/contexts/framework/domain/manifest.ts",
   "src/contexts/framework/domain/tool-recommendations.ts",
 ];
 

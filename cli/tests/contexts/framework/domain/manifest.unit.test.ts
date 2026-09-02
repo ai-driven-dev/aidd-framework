@@ -197,13 +197,6 @@ describe("Manifest", () => {
     });
   });
 
-  describe("version validation", () => {
-    it("rejects unsupported manifest version", () => {
-      const badData = { version: 99, docsDir: "aidd_docs", tools: {}, docs: null, scripts: null };
-      expect(() => Manifest.fromJSON(badData)).toThrow(/version/);
-    });
-  });
-
   describe("MCP exclusion tracking", () => {
     const exclusionA: McpExclusion = { configPath: ".mcp.json", entryKey: "playwright" };
     const exclusionB: McpExclusion = { configPath: ".mcp.json", entryKey: "github" };
@@ -310,99 +303,8 @@ describe("Manifest", () => {
     });
   });
 
-  describe("migration v1 → v2", () => {
-    const HASH_EXT = "abc123".padEnd(32, "0");
-    const HASH_KEY = "def456".padEnd(32, "0");
-    const HASH_SET = "fed789".padEnd(32, "0");
-    const HASH_CPL = "aabbcc".padEnd(32, "0");
-
-    const v1WithVscode = {
-      version: 1,
-      docsDir: "aidd_docs",
-      tools: {
-        copilot: {
-          toolId: "copilot",
-          version: "1.0.0",
-          files: [
-            { relativePath: ".vscode/extensions.json", hash: HASH_EXT },
-            { relativePath: ".vscode/keybindings.json", hash: HASH_KEY },
-            { relativePath: ".vscode/settings.json", hash: HASH_SET },
-            { relativePath: ".github/copilot-instructions.md", hash: HASH_CPL },
-          ],
-          mergeFiles: [],
-        },
-      },
-      docs: null,
-      scripts: null,
-    };
-
-    const v1CopilotOnly = {
-      version: 1,
-      docsDir: "aidd_docs",
-      tools: {
-        copilot: {
-          toolId: "copilot",
-          version: "1.0.0",
-          files: [{ relativePath: ".github/copilot-instructions.md", hash: HASH_CPL }],
-          mergeFiles: [],
-        },
-      },
-      docs: null,
-      scripts: null,
-    };
-
-    const v1NoCopilot = {
-      version: 1,
-      docsDir: "aidd_docs",
-      tools: {},
-      docs: null,
-      scripts: null,
-    };
-
-    const v0 = { version: 0, docsDir: "aidd_docs", tools: {}, docs: null, scripts: null };
-
-    it("moves .vscode/ files from copilot to vscode after migration", () => {
-      const manifest = Manifest.fromJSON(JSON.parse(JSON.stringify(v1WithVscode)));
-      expect(manifest.hasTool("vscode" as ToolId)).toBe(true);
-      const vscodeFiles = manifest.getToolFiles("vscode" as ToolId);
-      expect(vscodeFiles).toHaveLength(3);
-      const paths = vscodeFiles.map((f) => f.relativePath);
-      expect(paths).toContain(".vscode/extensions.json");
-      expect(paths).toContain(".vscode/keybindings.json");
-      expect(paths).toContain(".vscode/settings.json");
-    });
-
-    it("removes .vscode/ files from copilot after migration", () => {
-      const manifest = Manifest.fromJSON(JSON.parse(JSON.stringify(v1WithVscode)));
-      const copilotFiles = manifest.getToolFiles("copilot" as ToolId);
-      expect(copilotFiles).toHaveLength(1);
-      expect(copilotFiles[0].relativePath).toBe(".github/copilot-instructions.md");
-    });
-
-    it("migration is no-op when copilot has no .vscode/ files", () => {
-      const manifest = Manifest.fromJSON(JSON.parse(JSON.stringify(v1CopilotOnly)));
-      expect(manifest.hasTool("vscode" as ToolId)).toBe(false);
-      expect(manifest.getToolFiles("copilot" as ToolId)).toHaveLength(1);
-    });
-
-    it("migration is no-op when no copilot entry exists", () => {
-      const manifest = Manifest.fromJSON(JSON.parse(JSON.stringify(v1NoCopilot)));
-      expect(manifest.hasTool("vscode" as ToolId)).toBe(false);
-      expect(manifest.hasTool("copilot" as ToolId)).toBe(false);
-    });
-
-    it("v3 manifest migrates to v4 without error", () => {
-      const v3Json = {
-        version: 3,
-        docsDir: "aidd_docs",
-        tools: { copilot: { toolId: "copilot", version: "1.0.0", files: [], plugins: [] } },
-        docs: null,
-        scripts: null,
-      };
-      expect(() => Manifest.fromJSON(v3Json)).not.toThrow();
-    });
-
-    it("v6 manifest loads without migration", () => {
+  describe("version guard", () => {
+    it("v6 manifest loads without error", () => {
       const manifest = Manifest.create();
       manifest.addTool("copilot" as ToolId, "1.0.0", []);
       const json = manifest.toJSON();
@@ -410,95 +312,38 @@ describe("Manifest", () => {
       expect(() => Manifest.fromJSON(json)).not.toThrow();
     });
 
-    it("v0 manifest throws ManifestValidationError", () => {
-      expect(() => Manifest.fromJSON(v0)).toThrow(/version/);
-    });
-
-    it("isFileTracked returns true for migrated .vscode/ file", () => {
-      const manifest = Manifest.fromJSON(JSON.parse(JSON.stringify(v1WithVscode)));
-      expect(manifest.isFileTracked(".vscode/extensions.json")).toBe(true);
-    });
-
-    it("getToolVersion returns copilot version for migrated vscode entry", () => {
-      const manifest = Manifest.fromJSON(JSON.parse(JSON.stringify(v1WithVscode)));
-      expect(manifest.getToolVersion("vscode" as ToolId)).toBe("1.0.0");
-    });
-
-    it("does not duplicate files when vscode entry already exists before migration", () => {
-      const v1PartiallyMigrated = {
-        version: 1,
-        docsDir: "aidd_docs",
-        tools: {
-          copilot: {
-            toolId: "copilot",
-            version: "1.0.0",
-            files: [
-              { relativePath: ".vscode/extensions.json", hash: HASH_EXT },
-              { relativePath: ".vscode/keybindings.json", hash: HASH_KEY },
-              { relativePath: ".github/copilot-instructions.md", hash: HASH_CPL },
-            ],
-            mergeFiles: [],
-          },
-          vscode: {
-            toolId: "vscode",
-            version: "1.0.0",
-            files: [{ relativePath: ".vscode/extensions.json", hash: HASH_EXT }],
-            mergeFiles: [],
-          },
-        },
-        docs: null,
-        scripts: null,
-      };
-
-      const manifest = Manifest.fromJSON(JSON.parse(JSON.stringify(v1PartiallyMigrated)));
-      const vscodeFiles = manifest.getToolFiles("vscode" as ToolId);
-      const paths = vscodeFiles.map((f) => f.relativePath);
-
-      expect(paths.filter((p) => p === ".vscode/extensions.json")).toHaveLength(1);
-      expect(paths).toContain(".vscode/keybindings.json");
-    });
-  });
-
-  describe("v4→v6 migration (strips docs and marketplaces)", () => {
-    it("strips a docs field from a v4 manifest on fromJSON", () => {
-      const v4WithDocs = {
-        version: 4,
-        docsDir: "aidd_docs",
-        tools: {},
-        docs: {
-          version: "3.0.0",
-          files: [{ relativePath: "aidd_docs/architecture.md", hash: "abc".padEnd(32, "0") }],
-        },
-        scripts: null,
-        plugins: null,
-        mode: "local",
-      };
-      const restored = Manifest.fromJSON(JSON.parse(JSON.stringify(v4WithDocs)));
-      const json = restored.toJSON();
-      expect(json.version).toBe(6);
-      expect("docs" in json).toBe(false);
-      expect(restored.isFileTracked("aidd_docs/architecture.md")).toBe(false);
-    });
-
-    it("cascades v3 → v4 → v6 and ends without docs", () => {
-      const v3 = {
-        version: 3,
-        docsDir: "aidd_docs",
-        tools: {},
-        docs: { version: "2.0.0", files: [] },
-        scripts: null,
-      };
-      const restored = Manifest.fromJSON(JSON.parse(JSON.stringify(v3)));
-      const json = restored.toJSON();
-      expect(json.version).toBe(6);
-      expect("docs" in json).toBe(false);
-    });
-
     it("v6 round-trip is stable", () => {
       const manifest = Manifest.create();
       manifest.addTool("claude" as ToolId, "3.0.0", claudeFiles);
       const restored = Manifest.fromJSON(manifest.toJSON());
       expect(restored.toJSON().version).toBe(6);
+    });
+
+    // The command matters as much as the version: plain `update` throws InputRequiredError
+    // on a locally modified tracked file in non-interactive mode before it ever saves,
+    // which would leave the user exactly as stuck as the refusal they're trying to fix.
+    // `--force` is the verified-reliable path (see RECOVERY_COMMAND in manifest.ts), so a
+    // bare /update/ match isn't enough — pin the literal invocation.
+    const RECOVERY_INVOCATION = /npx @ai-driven-dev\/cli@5\.2\.1 update --force/;
+
+    it("rejects a version below 6 and names the last CLI able to migrate it", () => {
+      const v5 = { version: 5, tools: {} };
+      expect(() => Manifest.fromJSON(v5)).toThrow(RECOVERY_INVOCATION);
+      // A refusal that never says "come back" is the impasse this guard exists to avoid.
+      expect(() => Manifest.fromJSON(v5)).toThrow(/update the CLI again/);
+    });
+
+    it("v0 manifest throws, naming the recovery invocation", () => {
+      const v0 = { version: 0, tools: {} };
+      expect(() => Manifest.fromJSON(v0)).toThrow(/version/);
+      expect(() => Manifest.fromJSON(v0)).toThrow(RECOVERY_INVOCATION);
+    });
+
+    it("rejects a version above 6 by pointing at self-update, not a downgrade", () => {
+      const v99 = { version: 99, tools: {} };
+      expect(() => Manifest.fromJSON(v99)).toThrow(/version/);
+      expect(() => Manifest.fromJSON(v99)).toThrow(/self-update/);
+      expect(() => Manifest.fromJSON(v99)).not.toThrow(/5\.2\.1/);
     });
   });
 
