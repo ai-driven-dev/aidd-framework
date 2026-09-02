@@ -5,6 +5,7 @@ import "../../../src/domain/tools/ai/claude.js";
 import "../../../src/domain/tools/ai/codex.js";
 import "../../../src/domain/tools/ai/copilot.js";
 import "../../../src/domain/tools/ai/cursor.js";
+import "../../../src/domain/tools/ai/kilo.js";
 import "../../../src/domain/tools/ai/opencode.js";
 import { FRAMEWORK_BUILD_TARGET_MODES } from "../../../src/domain/models/framework-build.js";
 import {

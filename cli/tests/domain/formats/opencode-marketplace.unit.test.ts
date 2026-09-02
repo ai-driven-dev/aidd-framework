@@ -1,11 +1,28 @@
 import { describe, expect, it } from "vitest";
 import { ForeignSchemaValidationError } from "../../../src/domain/errors.js";
-import { parseOpencodeMarketplace } from "../../../src/domain/formats/opencode-marketplace.js";
+import {
+  parseKiloMarketplace,
+  parseOpencodeMarketplace,
+} from "../../../src/domain/formats/opencode-marketplace.js";
 
 const VALID_JSON = JSON.stringify({
   $schema: "https://opencode.ai/config.json",
   provider: {},
   plugin: ["opencode-dev-tools", "@my-org/opencode-testing", ["opencode-minimal", { debug: true }]],
+});
+
+describe("parseKiloMarketplace", () => {
+  it("parses Kilo's OpenCode-compatible plugin array with Kilo provenance", () => {
+    const catalog = parseKiloMarketplace(JSON.stringify({ plugin: ["@example/kilo-plugin"] }));
+    expect(catalog).toEqual({
+      source: "kilo",
+      plugins: [{ name: "@example/kilo-plugin", source: "kilo" }],
+    });
+  });
+
+  it("reports kilo.json for malformed Kilo configuration", () => {
+    expect(() => parseKiloMarketplace("not json")).toThrow(/kilo\.json is not valid JSON/);
+  });
 });
 
 describe("parseOpencodeMarketplace", () => {

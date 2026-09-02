@@ -1,17 +1,27 @@
 import { join } from "node:path";
+import type { McpCapability } from "../../../../domain/capabilities/mcp-capability.js";
+import { mergeOpencodeMcp } from "../../../../domain/formats/opencode-mcp-merge.js";
 import { InstallationFile } from "../../../../domain/models/file.js";
 import type { Manifest } from "../../../../domain/models/manifest.js";
 import { Plugin } from "../../../../domain/models/plugin.js";
 import type { PluginDistribution } from "../../../../domain/models/plugin-distribution.js";
 import type { PluginSource } from "../../../../domain/models/plugin-source.js";
-import type { ReadonlySkipList } from "../../../../domain/models/plugin-translation-skip.js";
+import type {
+  PluginTranslationSkip,
+  ReadonlySkipList,
+} from "../../../../domain/models/plugin-translation-skip.js";
 import type { AiToolId } from "../../../../domain/models/tool-ids.js";
 import type { FileReader } from "../../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../../domain/ports/file-writer.js";
 import type { Hasher } from "../../../../domain/ports/hasher.js";
 import type { MarketplaceRegistry } from "../../../../domain/ports/marketplace-registry.js";
+import { getToolConfig, isAiTool } from "../../../../domain/tools/registry.js";
 import type { EnsureBuiltMarketplaceUseCase } from "../../shared/ensure-built-marketplace-use-case.js";
-import { isPluginFileAtDesiredState, resolvePluginBaseDir } from "../plugin-helpers.js";
+import {
+  isPluginFileAtDesiredState,
+  qualifiesForOpencodeMcpMerge,
+  resolvePluginBaseDir,
+} from "../plugin-helpers.js";
 import { ModeBFlatMaterializationTranslator } from "./mode-b-flat-materialization-translator.js";
 import type { PluginTranslator } from "./plugin-translator.js";
 
@@ -59,7 +69,7 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
         previousMcpEntries
       );
     }
-    const mode = toolId === "opencode" ? "flat" : "marketplace";
+    const mode = toolId === "opencode" || toolId === "kilo" ? "flat" : "marketplace";
     const { builtDir } = await this.ensureBuilt.execute({
       projectRoot,
       marketplace: resolved,
@@ -68,7 +78,7 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     });
     const files =
       mode === "flat"
-        ? await this.readFlatFiles(builtDir, dist.manifest.name)
+        ? await this.readFlatFiles(builtDir, dist.manifest.name, toolId)
         : await this.readBuiltFiles(
             join(builtDir, "plugins", dist.manifest.name),
             dist.manifest.name
@@ -76,11 +86,17 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     const baseDir =
       mode === "flat" ? projectRoot : resolvePluginBaseDir(toolId, projectRoot, this.homedir);
     const written = await this.writeChangedFiles(files, baseDir);
+    const { entries: mcpEntries, skipped: mcpSkipped } = await this.mergeFlatMcp(
+      dist,
+      toolId,
+      projectRoot,
+      previousMcpEntries
+    );
     manifest.addPlugin(
       toolId,
-      Plugin.fromDistribution(dist, source, files, new Map(), marketplace)
+      Plugin.fromDistributionWithMcp(dist, source, files, mcpEntries, new Map(), marketplace)
     );
-    return { skipped: [], written };
+    return { skipped: mcpSkipped, written };
   }
 
   // Verbatim-copies the built subtree, but skips files already matching the built
@@ -117,12 +133,16 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
 
   // Flat build emits the whole marketplace into one workspace, namespaced by
   // .opencode/<section>/<plugin>-<name>/...; install copies only this plugin's files.
-  private async readFlatFiles(builtDir: string, name: string): Promise<InstallationFile[]> {
+  private async readFlatFiles(
+    builtDir: string,
+    name: string,
+    toolId: AiToolId
+  ): Promise<InstallationFile[]> {
     const absPaths = await this.fs.listFilesRecursive(builtDir);
     const files: InstallationFile[] = [];
     for (const abs of absPaths) {
       const rel = abs.slice(builtDir.length + 1);
-      if (!this.belongsToPlugin(rel, name)) continue;
+      if (!this.belongsToPlugin(rel, name, toolId)) continue;
       const content = await this.fs.readFile(abs);
       files.push(
         new InstallationFile({ relativePath: rel, content, hash: this.hasher.hash(content) })
@@ -131,11 +151,57 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     return files;
   }
 
-  private belongsToPlugin(rel: string, name: string): boolean {
+  private belongsToPlugin(rel: string, name: string, toolId: AiToolId): boolean {
     const segments = rel.split("/");
-    return (
-      segments[0] === ".opencode" && segments.length >= 3 && segments[2].startsWith(`${name}-`)
+    const root = toolId === "kilo" ? ".kilo" : ".opencode";
+    return segments[0] === root && segments.length >= 3 && segments[2].startsWith(`${name}-`);
+  }
+
+  private async mergeFlatMcp(
+    dist: PluginDistribution,
+    toolId: AiToolId,
+    projectRoot: string,
+    previousEntries: ReadonlyMap<string, string>
+  ): Promise<{ entries: ReadonlyMap<string, string>; skipped: ReadonlySkipList }> {
+    const toolConfig = getToolConfig(toolId);
+    if (!isAiTool(toolConfig) || dist.components.mcp.length === 0) {
+      return { entries: new Map(), skipped: [] };
+    }
+    const caps = toolConfig.capabilities as Record<string, unknown>;
+    if (!qualifiesForOpencodeMcpMerge(caps)) return { entries: new Map(), skipped: [] };
+    const mcpCap = caps.mcp as McpCapability;
+    const outputPath = join(projectRoot, await mcpCap.resolveOutput(projectRoot, this.fs));
+    const existing = await this.readExistingJson(outputPath);
+    const transformed = mcpCap.transform(dist.components.mcp[0].content);
+    const { mergedContent, contributedEntries, collisions } = mergeOpencodeMcp(
+      existing,
+      transformed,
+      previousEntries,
+      this.hasher
     );
+    if (contributedEntries.size > 0 || previousEntries.size > 0) {
+      await this.fs.writeFile(outputPath, mergedContent);
+    }
+    return {
+      entries: contributedEntries,
+      skipped: collisions.map(
+        (reason): PluginTranslationSkip => ({
+          pluginName: dist.manifest.name,
+          component: "mcp",
+          toolId,
+          reason,
+        })
+      ),
+    };
+  }
+
+  private async readExistingJson(path: string): Promise<string | null> {
+    try {
+      return await this.fs.readFile(path);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw err;
+    }
   }
 
   private async findMarketplace(name: string, projectRoot: string) {

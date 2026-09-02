@@ -212,6 +212,27 @@ describe("opencode", () => {
       });
     });
 
+    it("preserves remote authentication headers and OAuth settings", () => {
+      const input = JSON.stringify({
+        mcpServers: {
+          protected: {
+            url: "https://mcp.example.com",
+            headers: { Authorization: "Bearer $" + "{MCP_TOKEN}" },
+          },
+        },
+      });
+      expect(JSON.parse(transform("mcp", input))).toEqual({
+        mcp: {
+          protected: {
+            type: "remote",
+            url: "https://mcp.example.com",
+            headers: { Authorization: "Bearer $" + "{MCP_TOKEN}" },
+            enabled: true,
+          },
+        },
+      });
+    });
+
     it("handles mixed local and remote servers in the same config", () => {
       const input = JSON.stringify({
         mcpServers: {

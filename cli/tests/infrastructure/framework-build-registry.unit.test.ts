@@ -15,6 +15,7 @@ const ALL_TARGETS: readonly FrameworkBuildTarget[] = [
   "copilot",
   "codex",
   "opencode",
+  "kilo",
 ];
 const ALL_MODES: readonly FrameworkBuildMode[] = ["marketplace", "flat"];
 

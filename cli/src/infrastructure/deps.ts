@@ -4,6 +4,7 @@ import "../domain/tools/ai/claude.js";
 import "../domain/tools/ai/codex.js";
 import "../domain/tools/ai/copilot.js";
 import "../domain/tools/ai/cursor.js";
+import "../domain/tools/ai/kilo.js";
 import "../domain/tools/ai/opencode.js";
 import "../domain/tools/ide/vscode.js";
 import { CLIOutput } from "../application/output.js";
@@ -28,6 +29,7 @@ import {
   buildCopilotMarketplaceContract,
   buildCursorContract,
   buildCursorFlatContract,
+  buildKiloFlatContract,
   buildOpencodeFlatContract,
 } from "../application/use-cases/framework/strategies/tool-contracts.js";
 import { DoctorAllUseCase } from "../application/use-cases/global/doctor-all-use-case.js";
@@ -330,6 +332,21 @@ const FRAMEWORK_BUILD_REGISTRY: Record<string, FrameworkBuildFactory> = {
           av,
           d.assetProvider,
           buildOpencodeFlatContract(),
+          ctx.force,
+          ctx.outDir,
+          isDirectory,
+          d.logger
+        )
+    ),
+  "kilo:flat": (deps, ctx) =>
+    buildFrameworkUseCase(
+      deps,
+      (d, av) =>
+        new FlatBuildStrategy(
+          d.fs,
+          av,
+          d.assetProvider,
+          buildKiloFlatContract(),
           ctx.force,
           ctx.outDir,
           isDirectory,

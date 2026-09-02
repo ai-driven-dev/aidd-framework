@@ -12,6 +12,7 @@ describe("isAiToolId", () => {
     expect(isAiToolId("cursor")).toBe(true);
     expect(isAiToolId("copilot")).toBe(true);
     expect(isAiToolId("opencode")).toBe(true);
+    expect(isAiToolId("kilo")).toBe(true);
     expect(isAiToolId("codex")).toBe(true);
   });
 

@@ -4,7 +4,10 @@ import { parseCodexMarketplace } from "../../domain/formats/codex-marketplace.js
 import { parseCopilotMarketplace } from "../../domain/formats/copilot-marketplace.js";
 import { parseCopilotMarketplaceCatalog } from "../../domain/formats/copilot-marketplace-catalog.js";
 import { parseCursorMarketplace } from "../../domain/formats/cursor-marketplace.js";
-import { parseOpencodeMarketplace } from "../../domain/formats/opencode-marketplace.js";
+import {
+  parseKiloMarketplace,
+  parseOpencodeMarketplace,
+} from "../../domain/formats/opencode-marketplace.js";
 import type { NormalizedPlugin } from "../../domain/models/normalized-plugin.js";
 import { MARKETPLACE_CACHE_SUBDIR } from "../../domain/models/paths.js";
 import { type PluginCatalog, parsePluginCatalog } from "../../domain/models/plugin-catalog.js";
@@ -42,6 +45,7 @@ export class PluginCatalogRepositoryAdapter implements PluginCatalogRepository {
       if (probe.format === "codex") return this.readCodexCatalog(fullPath);
       if (probe.format === "copilot") return this.readCopilotCatalog(fullPath);
       if (probe.format === "opencode") return this.readOpencodeCatalog(fullPath);
+      if (probe.format === "kilo") return this.readKiloCatalog(fullPath);
     }
     return [];
   }
@@ -101,6 +105,11 @@ export class PluginCatalogRepositoryAdapter implements PluginCatalogRepository {
   private async readOpencodeCatalog(fullPath: string): Promise<NormalizedPlugin[]> {
     const raw = await this.fs.readFile(fullPath);
     return [...parseOpencodeMarketplace(raw).plugins];
+  }
+
+  private async readKiloCatalog(fullPath: string): Promise<NormalizedPlugin[]> {
+    const raw = await this.fs.readFile(fullPath);
+    return [...parseKiloMarketplace(raw).plugins];
   }
 
   private resolveLocalPaths(catalog: PluginCatalog, frameworkPath: string): PluginCatalog {
