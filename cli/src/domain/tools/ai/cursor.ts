@@ -137,6 +137,19 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
     // Measured: Cursor writes no token count in any file it produces — there is nothing
     // on disk for a local reader to find. A gap this deliverable names rather than fills;
     // see spec.md non-goals.
+    // Re-measured 2026-09-02 against a real Cursor install, rather than carried forward as
+    // a declaration nobody had checked lately. Its own local stores hold no consumption at
+    // all: 76 chat stores under `~/.cursor/chats/*/store.db` (a `blobs`/`meta` pair of
+    // SQLite tables), and not one mentions `inputTokens`, `outputTokens`, `totalTokens`,
+    // `promptTokens` or `completionTokens`, nor carries a `usage` object.
+    // `~/.cursor/ai-tracking/ai-code-tracking.db` does count things — `linesAdded`,
+    // `composerLinesAdded`, `humanLinesAdded`, an AI percentage per commit — but those
+    // measure how much code came from the assistant, never what it consumed. There is no
+    // token or cost column anywhere in it.
+    //
+    // So this is a fact about Cursor, not a reader nobody has written yet: the number does
+    // not exist locally to be read. `by_tool` prints this sentence where a figure would go,
+    // which is the whole reason the reason travels with the declaration.
     telemetryLocalRead: {
       kind: "unsupported",
       reason: "It writes no token count in any file it produces.",
