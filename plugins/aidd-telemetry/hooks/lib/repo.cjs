@@ -271,7 +271,7 @@ function restrictToCurrentUser(target, { inheritable = false } = {}) {
 // bare `.git`, whose parent is not a checkout. Second, even where a main worktree does
 // exist, writing into it from worktree B would dirty a checkout on a different branch,
 // possibly with uncommitted work of its own, whose `.gitignore` was never asked to carry
-// the entry `telemetry-switch.js on` added when B turned measurement on.
+// the entry `aidd telemetry on` added when B turned measurement on.
 //
 // Cross-worktree joining - so a report can still see every worktree's sessions together -
 // `worktreeFields` above names the worktree on `session_start`, and the write

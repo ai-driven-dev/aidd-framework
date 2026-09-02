@@ -196,7 +196,8 @@ function buildStepStartLine({ at, skill, turnId }) {
 // A start, told rather than inferred, the same way step_start is: a tool call named a task
 // path, so this session is on that task from here. No end on this line either, and for the
 // same reason step_start carries none - closing is the reader's derivation, from whichever
-// turn_end or later task_declared comes next (see report.js's buildTaskIntervals). path is
+// turn_end or later task_declared comes next (see buildTaskIntervals in the CLI's own
+// cli/src/domain/models/task-attribution.ts, which is where that walk lives now). path is
 // repository-relative like file_written's, never a task_id: the derivation belongs to the
 // reader.
 function buildTaskDeclaredLine({ at, path: declaredPath }) {

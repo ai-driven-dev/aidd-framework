@@ -111,13 +111,14 @@ function hookJsFiles(tracked) {
  * Comments in the hooks named journal.js, record.js, host.js, codex.js and index.js;
  * every one of those files is .cjs, and the backtick rule below saw none of
  * them — some sat in parentheses, one in a test's own name. The hooks directory is the one
- * place a narrow rule is safe: it ships exactly one `.js` file, so any other X.js named
+ * place a narrow rule is safe: it ships exactly one `.js` file, so any other such name
  * anywhere in it, or in the tests that describe it, is a `.cjs` written wrong.
  */
 describe("a comment about the hooks names .cjs where the file is .cjs", () => {
   it("names no <name>.js that the hooks do not actually ship", () => {
     const tracked = new Set(trackedFiles());
     const shipped = hookJsFiles(tracked);
+    const basenames = new Set([...tracked].map((file) => path.basename(file)));
     const scanned = [...tracked].filter(
       (file) =>
         file.startsWith("plugins/aidd-telemetry/hooks/") ||
@@ -128,12 +129,24 @@ describe("a comment about the hooks names .cjs where the file is .cjs", () => {
 
     for (const file of scanned) {
       const text = fs.readFileSync(path.join(ROOT, file), "utf8");
-      for (const match of text.matchAll(/\b([\w-]+)\.js\b/gu)) {
+      // `[\w.-]+`, not `[\w-]+`: a filename can carry dots of its own, and capturing only
+      // the last segment read aidd-telemetry-journal.test.js as test.js and flagged a
+      // file that exists.
+      for (const match of text.matchAll(/([\w.-]+)\.js\b/gu)) {
         const named = `${match[1]}.js`;
         // A path inside a fixture or an assertion about somebody else's project file is not
         // a claim about this plugin's own layout.
         if (named === "index.js" && text.includes("/src/index.js")) continue;
         if (shipped.has(named)) continue;
+        if (basenames.has(named)) continue;
+        // Inside the hooks, every module is `.cjs`; `opencode-plugin.js` is the single
+        // exception, and it is in `shipped` above. So any other such name here is a
+        // `.cjs` written wrong — including a placeholder like `<host>.js`, which no lookup
+        // against a real filename could ever have caught.
+        if (file.startsWith("plugins/aidd-telemetry/hooks/")) {
+          wrong.push(`${file} names ${named}, and every module in hooks/ is .cjs`);
+          continue;
+        }
         if (tracked.has(`plugins/aidd-telemetry/hooks/lib/${match[1]}.cjs`)) {
           wrong.push(`${file} names ${named}, but the file it means is ${match[1]}.cjs`);
         }

@@ -34,7 +34,7 @@ function taskFolderRelativePath(repoRoot, rawPath) {
 }
 
 // The written-path field differs per tool, and Codex has no path field at all - it is
-// inside an apply_patch command string. Each host's own hooks/lib/tools/<host>.js states
+// inside an apply_patch command string. Each host's own hooks/lib/tools/<host>.cjs states
 // its extractor, or null; gathered here for a caller that wants every host covered rather
 // than one at a time (see cli/tests/helpers/telemetry-journal-hook.ts).
 const WRITTEN_PATH_EXTRACTOR_BY_HOST = Object.freeze(

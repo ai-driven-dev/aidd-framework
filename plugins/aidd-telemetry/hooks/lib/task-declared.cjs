@@ -42,7 +42,7 @@ function declaredTaskPath(payload) {
 // handleFileWritten's claim, not this one's: that reading is exact (a field the host itself
 // populated), where a declaration is only ever an inference from arguments text, and the two
 // firing on the same event would be two claims about one write. Restricted to hosts and tools
-// whose own hooks/lib/tools/<host>.js names a writtenPath extractor - a Bash write, which no
+// whose own hooks/lib/tools/<host>.cjs names a writtenPath extractor - a Bash write, which no
 // extractor reads on any host, is not excluded here and reaches the declaration below on its
 // own arguments text.
 function statedAsWrittenAlready(payload, host) {
