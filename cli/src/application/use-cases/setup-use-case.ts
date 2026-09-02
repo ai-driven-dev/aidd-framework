@@ -1,4 +1,9 @@
-import type { MarketplaceSourceMode } from "../../domain/models/marketplace-source-mode.js";
+import type { MarketplaceRefreshUseCase } from "../../contexts/distribution/application/marketplace-refresh-use-case.js";
+import type {
+  MarketplaceRegisterFrameworkOptions,
+  MarketplaceRegisterFrameworkUseCase,
+} from "../../contexts/distribution/application/marketplace-register-framework-use-case.js";
+import type { MarketplaceSourceMode } from "../../contexts/distribution/domain/marketplace-source-mode.js";
 import type { ProjectContext } from "../../domain/models/project-context.js";
 import type { SetupFlow } from "../../domain/models/setup-flow.js";
 import type { LatestReleaseResolver } from "../../domain/ports/latest-release-resolver.js";
@@ -12,11 +17,6 @@ import type { PluginSource } from "../../kernel/source.js";
 import type { AiToolId, IdeToolId } from "../../kernel/tool.js";
 import type { MarketplaceSyncSettingsUseCase } from "./flows/marketplace-sync-settings-use-case.js";
 import { InitUseCase } from "./init-use-case.js";
-import type { MarketplaceRefreshUseCase } from "./marketplace/marketplace-refresh-use-case.js";
-import type {
-  MarketplaceRegisterFrameworkOptions,
-  MarketplaceRegisterFrameworkUseCase,
-} from "./marketplace/marketplace-register-framework-use-case.js";
 import type { ProjectContextDetectorUseCase } from "./setup/project-context-detector-use-case.js";
 import type { SetupMarketplaceSourceUseCase } from "./setup/setup-marketplace-source-use-case.js";
 import type { SetupPluginsPromptUseCase } from "./setup/setup-plugins-prompt-use-case.js";

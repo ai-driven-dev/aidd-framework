@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { MarketplaceTrustStore } from "../../../src/domain/ports/marketplace-trust-store.js";
+import type { MarketplaceTrustStore } from "../../../src/contexts/distribution/domain/ports/marketplace-trust-store.js";
 import type { PluginSource } from "../../../src/kernel/source.js";
 import { serializePluginSource } from "../../../src/kernel/source.js";
 

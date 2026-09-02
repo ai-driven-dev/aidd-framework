@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import type { Command } from "commander";
+import { MarketplaceSourceMode } from "../../contexts/distribution/domain/marketplace-source-mode.js";
 import { assertToolIdsMatchCategory } from "../../contexts/tools/domain/registry.js";
-import { MarketplaceSourceMode } from "../../domain/models/marketplace-source-mode.js";
 import { SetupFlow } from "../../domain/models/setup-flow.js";
 import { createDeps } from "../../infrastructure/deps.js";
 import type { ToolId } from "../../kernel/tool.js";

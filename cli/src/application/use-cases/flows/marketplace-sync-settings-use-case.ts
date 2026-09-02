@@ -1,4 +1,7 @@
 import { resolve } from "node:path";
+import type { Marketplace } from "../../../contexts/distribution/domain/marketplace.js";
+import type { MarketplaceRegistry } from "../../../contexts/distribution/domain/ports/marketplace-registry.js";
+import type { PluginCatalogRepository } from "../../../contexts/distribution/domain/ports/plugin-catalog-repository.js";
 import type { NativePluginActivator } from "../../../contexts/tools/domain/ports/native-plugin-activator.js";
 import {
   getToolConfig,
@@ -8,10 +11,7 @@ import {
 import type { FrameworkBuildTarget } from "../../../contexts/translate/domain/build-target.js";
 import type { MarketplaceSettings } from "../../../domain/capabilities/marketplace-settings.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
-import type { Marketplace } from "../../../domain/models/marketplace.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
-import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
-import type { PluginCatalogRepository } from "../../../domain/ports/plugin-catalog-repository.js";
 import { NativePluginCliError } from "../../../kernel/errors.js";
 import { marketplaceCacheDir } from "../../../kernel/paths.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";

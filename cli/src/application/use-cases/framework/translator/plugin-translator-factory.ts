@@ -1,5 +1,5 @@
+import type { MarketplaceRegistry } from "../../../../contexts/distribution/domain/ports/marketplace-registry.js";
 import type { PluginsCapability } from "../../../../domain/capabilities/plugins-capability.js";
-import type { MarketplaceRegistry } from "../../../../domain/ports/marketplace-registry.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";

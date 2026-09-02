@@ -1,11 +1,12 @@
-import type { Marketplace } from "../../../domain/models/marketplace.js";
-import type { PluginCatalogEntry } from "../../../domain/models/plugin-catalog.js";
+import type { ResolveMarketplaceUseCase } from "../../../contexts/distribution/application/resolve-marketplace-use-case.js";
+import type { PluginCatalogEntry } from "../../../contexts/distribution/domain/catalog.js";
+import type { Marketplace } from "../../../contexts/distribution/domain/marketplace.js";
+import type { MarketplaceRegistry } from "../../../contexts/distribution/domain/ports/marketplace-registry.js";
 import { resolvePluginSourceFromMarketplace } from "../../../domain/models/plugin-source-resolver.js";
 import {
   DEFAULT_REQUESTED_VERSION_POLICY,
   type RequestedVersionPolicy,
 } from "../../../domain/models/requested-version-policy.js";
-import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
 import {
   AmbiguousPluginMatchError,
@@ -14,7 +15,6 @@ import {
 } from "../../../kernel/errors.js";
 import type { Logger } from "../../../kernel/ports/logger.js";
 import type { AiToolId } from "../../../kernel/tool.js";
-import type { ResolveMarketplaceUseCase } from "../shared/resolve-marketplace-use-case.js";
 import type { PluginAddUseCase } from "./plugin-add-use-case.js";
 
 export interface PluginInstallFromMarketplaceOptions {

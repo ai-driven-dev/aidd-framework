@@ -1,7 +1,7 @@
 import type {
   PluginFetcher,
   PluginFetchOptions,
-} from "../../../src/domain/ports/plugin-fetcher.js";
+} from "../../../src/contexts/distribution/domain/ports/plugin-fetcher.js";
 import type { PluginSource } from "../../../src/kernel/source.js";
 import { serializePluginSource } from "../../../src/kernel/source.js";
 

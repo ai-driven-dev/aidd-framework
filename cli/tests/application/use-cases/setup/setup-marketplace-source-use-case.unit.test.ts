@@ -4,7 +4,7 @@ import { SetupMarketplaceSourceUseCase } from "../../../../src/application/use-c
 import {
   DEFAULT_FRAMEWORK_REPO,
   MarketplaceSourceMode,
-} from "../../../../src/domain/models/marketplace-source-mode.js";
+} from "../../../../src/contexts/distribution/domain/marketplace-source-mode.js";
 import type { LatestReleaseResolver } from "../../../../src/domain/ports/latest-release-resolver.js";
 import { ScriptedPrompter } from "../../../helpers/ports/scripted-prompter.js";
 

@@ -57,6 +57,24 @@ const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
     // the build use case — `framework build`, one source to N targets
     "src/contexts/translate/application/translate-source.ts",
   ],
+  // Measured with the composition root excluded: ten modules are reached from outside,
+  // and not one of them is an adapter. The adapters are wired by `deps.ts` alone, which
+  // is why they stay internal — a leaf that exposed its own plumbing would not be one.
+  distribution: [
+    // what a marketplace is, and where it can be read from
+    "src/contexts/distribution/domain/marketplace.ts",
+    "src/contexts/distribution/domain/marketplace-source-mode.ts",
+    "src/contexts/distribution/domain/catalog.ts",
+    // the ports its callers hold, so they can be given an implementation
+    "src/contexts/distribution/domain/ports/marketplace-registry.ts",
+    "src/contexts/distribution/domain/ports/marketplace-trust-store.ts",
+    "src/contexts/distribution/domain/ports/plugin-catalog-repository.ts",
+    "src/contexts/distribution/domain/ports/plugin-fetcher.ts",
+    // the three operations other contexts genuinely ask for
+    "src/contexts/distribution/application/resolve-marketplace-use-case.ts",
+    "src/contexts/distribution/application/marketplace-refresh-use-case.ts",
+    "src/contexts/distribution/application/marketplace-register-framework-use-case.ts",
+  ],
 };
 
 /** The context a file belongs to, or `null` when it is not inside any context yet. */

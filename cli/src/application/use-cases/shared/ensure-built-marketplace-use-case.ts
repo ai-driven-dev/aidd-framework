@@ -1,15 +1,15 @@
 // Called from use-cases/marketplace and use-cases/plugin.
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import type { ResolveMarketplaceUseCase } from "../../../contexts/distribution/application/resolve-marketplace-use-case.js";
+import type { Marketplace } from "../../../contexts/distribution/domain/marketplace.js";
 import type { FrameworkBuildMode } from "../../../contexts/tools/domain/registry.js";
 import type { FrameworkBuildUseCase } from "../../../contexts/translate/application/translate-source.js";
 import type { FrameworkBuildTarget } from "../../../contexts/translate/domain/build-target.js";
-import type { Marketplace } from "../../../domain/models/marketplace.js";
 import type { VersionReader } from "../../../domain/ports/version-reader.js";
 import { builtMarketplaceDir, userBuiltMarketplaceDir } from "../../../kernel/paths.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";
-import type { ResolveMarketplaceUseCase } from "./resolve-marketplace-use-case.js";
 
 /** Builds a FrameworkBuildUseCase for a target/mode writing to outDir, or undefined when unsupported. */
 export type FrameworkBuildFor = (

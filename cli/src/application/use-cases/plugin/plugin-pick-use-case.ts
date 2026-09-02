@@ -1,6 +1,10 @@
-import type { Marketplace } from "../../../domain/models/marketplace.js";
-import type { PluginCatalog, PluginCatalogEntry } from "../../../domain/models/plugin-catalog.js";
-import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
+import type { ResolveMarketplaceUseCase } from "../../../contexts/distribution/application/resolve-marketplace-use-case.js";
+import type {
+  PluginCatalog,
+  PluginCatalogEntry,
+} from "../../../contexts/distribution/domain/catalog.js";
+import type { Marketplace } from "../../../contexts/distribution/domain/marketplace.js";
+import type { MarketplaceRegistry } from "../../../contexts/distribution/domain/ports/marketplace-registry.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
 import {
   InteractiveOnlyError,
@@ -8,7 +12,6 @@ import {
   NoMarketplacesRegisteredError,
 } from "../../../kernel/errors.js";
 import type { AiToolId } from "../../../kernel/tool.js";
-import type { ResolveMarketplaceUseCase } from "../shared/resolve-marketplace-use-case.js";
 import type { PluginAddUseCase } from "./plugin-add-use-case.js";
 
 export interface PluginPickOptions {

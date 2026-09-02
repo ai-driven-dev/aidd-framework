@@ -1,10 +1,10 @@
+import type { MarketplaceTrustStore } from "../../../contexts/distribution/domain/ports/marketplace-trust-store.js";
 import {
   assertToolSupportsScope,
   type InstallScope,
 } from "../../../domain/models/install-scope.js";
 import { parsePluginSpec } from "../../../domain/models/plugin.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
-import type { MarketplaceTrustStore } from "../../../domain/ports/marketplace-trust-store.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
 import { InteractiveOnlyError, TrustDeniedError } from "../../../kernel/errors.js";
 import {

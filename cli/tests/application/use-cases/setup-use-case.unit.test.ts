@@ -1,13 +1,13 @@
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import type { MarketplaceRefreshUseCase } from "../../../src/application/use-cases/marketplace/marketplace-refresh-use-case.js";
-import type { MarketplaceRegisterFrameworkUseCase } from "../../../src/application/use-cases/marketplace/marketplace-register-framework-use-case.js";
 import { SetupMarketplaceSourceUseCase } from "../../../src/application/use-cases/setup/setup-marketplace-source-use-case.js";
 import { SetupPluginsPromptUseCase } from "../../../src/application/use-cases/setup/setup-plugins-prompt-use-case.js";
 import { SetupToolsPromptUseCase } from "../../../src/application/use-cases/setup/setup-tools-prompt-use-case.js";
 import { SetupToolsUseCase } from "../../../src/application/use-cases/setup/setup-tools-use-case.js";
 import { SetupUseCase } from "../../../src/application/use-cases/setup-use-case.js";
-import { MarketplaceSourceMode } from "../../../src/domain/models/marketplace-source-mode.js";
+import type { MarketplaceRefreshUseCase } from "../../../src/contexts/distribution/application/marketplace-refresh-use-case.js";
+import type { MarketplaceRegisterFrameworkUseCase } from "../../../src/contexts/distribution/application/marketplace-register-framework-use-case.js";
+import { MarketplaceSourceMode } from "../../../src/contexts/distribution/domain/marketplace-source-mode.js";
 import { SetupFlow } from "../../../src/domain/models/setup-flow.js";
 import type { ToolId } from "../../../src/kernel/tool.js";
 import { AI_TOOL_IDS, IDE_TOOL_IDS } from "../../../src/kernel/tool.js";

@@ -1,10 +1,10 @@
 import { join } from "node:path";
+import type { MarketplaceRegistry } from "../../../../contexts/distribution/domain/ports/marketplace-registry.js";
 import { frameworkBuildModeFor } from "../../../../contexts/tools/domain/registry.js";
 import type { PluginDistribution } from "../../../../contexts/translate/domain/plugin-distribution.js";
 import type { ReadonlySkipList } from "../../../../contexts/translate/domain/plugin-translation-skip.js";
 import type { Manifest } from "../../../../domain/models/manifest.js";
 import { Plugin } from "../../../../domain/models/plugin.js";
-import type { MarketplaceRegistry } from "../../../../domain/ports/marketplace-registry.js";
 import { InstallationFile } from "../../../../kernel/file.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";

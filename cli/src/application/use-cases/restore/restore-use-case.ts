@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import type { PluginFetcher } from "../../../contexts/distribution/domain/ports/plugin-fetcher.js";
 import type { ConfigRef } from "../../../contexts/tools/domain/capabilities/config-refs.js";
 import type { FileMerger } from "../../../contexts/tools/domain/ports/file-merger.js";
 import {
@@ -9,7 +10,6 @@ import type { Manifest } from "../../../domain/models/manifest.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { Platform } from "../../../domain/ports/platform.js";
 import type { PluginDistributionReader } from "../../../domain/ports/plugin-distribution-reader.js";
-import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
 import type { AssetProvider } from "../../../kernel/ports/asset-provider.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";

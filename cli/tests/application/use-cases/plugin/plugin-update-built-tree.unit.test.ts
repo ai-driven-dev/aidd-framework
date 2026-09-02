@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { PluginAddUseCase } from "../../../../src/application/use-cases/plugin/plugin-add-use-case.js";
 import { PluginUpdateUseCase } from "../../../../src/application/use-cases/plugin/plugin-update-use-case.js";
-import { Marketplace } from "../../../../src/domain/models/marketplace.js";
+import { Marketplace } from "../../../../src/contexts/distribution/domain/marketplace.js";
 import { PluginDistributionReaderAdapter } from "../../../../src/infrastructure/adapters/plugin-distribution-reader-adapter.js";
 import { buildUnitDeps, initAndInstall } from "../../../helpers/ports/build-unit-deps.js";
 import { fakeEnsureBuiltMarketplace } from "../../../helpers/ports/fake-ensure-built-marketplace.js";

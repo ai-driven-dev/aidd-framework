@@ -8,12 +8,12 @@ import {
 import type {
   ResolveMarketplaceOptions,
   ResolveMarketplaceUseCase,
-} from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
+} from "../../../../src/contexts/distribution/application/resolve-marketplace-use-case.js";
+import { Marketplace } from "../../../../src/contexts/distribution/domain/marketplace.js";
 import type { JsonSchemaValidator } from "../../../../src/contexts/tools/domain/ports/schema-validator.js";
 import { buildCopilotFlatContract } from "../../../../src/contexts/tools/domain/profiles/copilot/build.js";
 import { FlatBuildStrategy } from "../../../../src/contexts/translate/application/strategies/flat-build-strategy.js";
 import { FrameworkBuildUseCase } from "../../../../src/contexts/translate/application/translate-source.js";
-import { Marketplace } from "../../../../src/domain/models/marketplace.js";
 import type { VersionReader } from "../../../../src/domain/ports/version-reader.js";
 import { BUILT_CACHE_SUBDIR, builtMarketplaceDir } from "../../../../src/kernel/paths.js";
 import type { AssetProvider } from "../../../../src/kernel/ports/asset-provider.js";

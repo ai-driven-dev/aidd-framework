@@ -3,7 +3,7 @@ import { SetupMarketplaceSourceUseCase } from "../../../src/application/use-case
 import { SetupPluginsPromptUseCase } from "../../../src/application/use-cases/setup/setup-plugins-prompt-use-case.js";
 import { SetupToolsUseCase } from "../../../src/application/use-cases/setup/setup-tools-use-case.js";
 import { SetupUseCase } from "../../../src/application/use-cases/setup-use-case.js";
-import { MarketplaceSourceMode } from "../../../src/domain/models/marketplace-source-mode.js";
+import { MarketplaceSourceMode } from "../../../src/contexts/distribution/domain/marketplace-source-mode.js";
 import { SetupFlow } from "../../../src/domain/models/setup-flow.js";
 import type { TokenProvider } from "../../../src/domain/ports/token-provider.js";
 import { CatalogFetchAuthError } from "../../../src/kernel/errors.js";

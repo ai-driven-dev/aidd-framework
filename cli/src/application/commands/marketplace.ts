@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import type { MarketplaceScope } from "../../domain/models/marketplace.js";
+import type { MarketplaceScope } from "../../contexts/distribution/domain/marketplace.js";
 import { createDeps, createMenuDeps } from "../../infrastructure/deps.js";
 import { describePluginSource, parsePluginSourceShorthand } from "../../kernel/source.js";
 import { ErrorHandler } from "../error-handler.js";
@@ -176,7 +176,7 @@ export function registerMarketplaceCommand(program: Command): void {
 
 function printCatalogEntries(
   marketplaceName: string,
-  catalogs: Map<string, import("../../domain/models/plugin-catalog.js").PluginCatalog>,
+  catalogs: Map<string, import("../../contexts/distribution/domain/catalog.js").PluginCatalog>,
   output: ReturnType<typeof parseGlobalOptions>["output"]
 ): void {
   const catalog = catalogs.get(marketplaceName);

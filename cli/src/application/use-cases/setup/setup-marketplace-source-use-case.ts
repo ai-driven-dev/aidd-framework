@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { MarketplaceSourceMode } from "../../../domain/models/marketplace-source-mode.js";
+import { MarketplaceSourceMode } from "../../../contexts/distribution/domain/marketplace-source-mode.js";
 import type { LatestReleaseResolver } from "../../../domain/ports/latest-release-resolver.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
 import { InputRequiredError } from "../../errors.js";

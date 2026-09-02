@@ -1,9 +1,9 @@
+import type { MarketplaceRefreshUseCase } from "../../../contexts/distribution/application/marketplace-refresh-use-case.js";
 import { Manifest } from "../../../domain/models/manifest.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { VersionReader } from "../../../domain/ports/version-reader.js";
 import type { ToolId } from "../../../kernel/tool.js";
 import type { MarketplaceSyncSettingsUseCase } from "../flows/marketplace-sync-settings-use-case.js";
-import type { MarketplaceRefreshUseCase } from "../marketplace/marketplace-refresh-use-case.js";
 import type { PluginUpdateUseCase } from "../plugin/plugin-update-use-case.js";
 import { BulkConflictState } from "./resolve-update-decision-use-case.js";
 import type { GlobalExecutionError, UpdateOneToolUseCase } from "./update-one-tool-use-case.js";

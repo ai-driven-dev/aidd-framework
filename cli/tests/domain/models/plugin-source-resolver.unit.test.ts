@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Marketplace } from "../../../src/domain/models/marketplace.js";
+import { Marketplace } from "../../../src/contexts/distribution/domain/marketplace.js";
 import { resolvePluginSourceFromMarketplace } from "../../../src/domain/models/plugin-source-resolver.js";
 import type { PluginSource } from "../../../src/kernel/source.js";
 

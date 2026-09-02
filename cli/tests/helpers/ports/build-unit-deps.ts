@@ -22,11 +22,11 @@ import { InitUseCase } from "../../../src/application/use-cases/init-use-case.js
 import { PostInstallPipelineUseCase } from "../../../src/application/use-cases/install/post-install-pipeline-use-case.js";
 import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
 import { SyncConflictResolverUseCase } from "../../../src/application/use-cases/sync/sync-conflict-resolver-use-case.js";
+import { PluginCatalogRepositoryAdapter } from "../../../src/contexts/distribution/infrastructure/plugin-catalog-repository-adapter.js";
 import { InstallIdeConfigUseCase } from "../../../src/contexts/tools/application/install-ide-config-use-case.js";
 import { InstallRuntimeConfigUseCase } from "../../../src/contexts/tools/application/install-runtime-config-use-case.js";
 import { isIdeToolId } from "../../../src/contexts/tools/domain/registry.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
-import { PluginCatalogRepositoryAdapter } from "../../../src/infrastructure/adapters/plugin-catalog-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "../../../src/infrastructure/adapters/plugin-distribution-reader-adapter.js";
 import { SilentPrompterAdapter } from "../../../src/infrastructure/adapters/prompter-adapter.js";
 import { BundledAssetProviderAdapter } from "../../../src/infrastructure/assets/asset-loader.js";

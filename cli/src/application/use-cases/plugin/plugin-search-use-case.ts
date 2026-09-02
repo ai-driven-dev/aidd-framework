@@ -1,7 +1,7 @@
-import type { Marketplace } from "../../../domain/models/marketplace.js";
-import type { PluginCatalogEntry } from "../../../domain/models/plugin-catalog.js";
-import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
-import type { ResolveMarketplaceUseCase } from "../shared/resolve-marketplace-use-case.js";
+import type { ResolveMarketplaceUseCase } from "../../../contexts/distribution/application/resolve-marketplace-use-case.js";
+import type { PluginCatalogEntry } from "../../../contexts/distribution/domain/catalog.js";
+import type { Marketplace } from "../../../contexts/distribution/domain/marketplace.js";
+import type { MarketplaceRegistry } from "../../../contexts/distribution/domain/ports/marketplace-registry.js";
 
 export interface PluginSearchOptions {
   query: string;

@@ -1,13 +1,13 @@
 // Called from use-cases/plugin and use-cases/restore.
 import { join } from "node:path";
+import type { MarketplaceRegistry } from "../../../contexts/distribution/domain/ports/marketplace-registry.js";
+import type { PluginFetcher } from "../../../contexts/distribution/domain/ports/plugin-fetcher.js";
 import type { ToolConfig } from "../../../contexts/tools/domain/registry.js";
 import { PluginContentTranslator } from "../../../contexts/translate/domain/content-translator.js";
 import type { PluginDistribution } from "../../../contexts/translate/domain/plugin-distribution.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Plugin } from "../../../domain/models/plugin.js";
-import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
 import type { PluginDistributionReader } from "../../../domain/ports/plugin-distribution-reader.js";
-import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../kernel/ports/hasher.js";

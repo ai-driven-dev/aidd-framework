@@ -1,13 +1,13 @@
-import type { Manifest } from "../../../domain/models/manifest.js";
+import type { ResolveMarketplaceUseCase } from "../../../contexts/distribution/application/resolve-marketplace-use-case.js";
 import {
   isMarketplaceStale,
   type Marketplace,
   STALE_MAX_DAYS_DEFAULT,
-} from "../../../domain/models/marketplace.js";
+} from "../../../contexts/distribution/domain/marketplace.js";
+import type { MarketplaceRegistry } from "../../../contexts/distribution/domain/ports/marketplace-registry.js";
+import type { Manifest } from "../../../domain/models/manifest.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
-import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../kernel/tool.js";
-import type { ResolveMarketplaceUseCase } from "../shared/resolve-marketplace-use-case.js";
 
 export interface MarketplaceCheckOptions {
   projectRoot: string;

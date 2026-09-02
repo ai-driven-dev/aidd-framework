@@ -150,6 +150,26 @@
       }
     },
     {
+      "includes": ["src/contexts/distribution/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/tools/**", "**/translate/**", "**/manifest.js"],
+                    "message": "distribution knows no tool, no translation and no installation record \u2014 it says where content comes from, not what is done with it (arborescence.md invariant 2)"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["src/contexts/tools/**/*.ts"],
       "linter": {
         "rules": {

@@ -25,7 +25,6 @@ src/
 │   │   │   └── translator/   # per-tool materialization strategies (native, flat, built-tree), applied and recorded at install time
 │   │   ├── global/           # cross-tool chains: update-all / status-all / restore-all / doctor-all / update-one-tool / resolve-update-decision
 │   │   ├── install/          # capability sub-use-cases: agents / commands / rules / skills / content-section / post-install-pipeline — tool-specific installs live in contexts/tools/application/
-│   │   ├── marketplace/      # marketplace lifecycle: add / list / refresh / register-framework
 │   │   ├── plugin/           # create / add / install / install-from-marketplace / remove / list / update / search / pick
 │   │   ├── restore/          # orchestrator + tool-files / all-plugins / plugin / generate-tool-distribution / resolve-restore-decision / restore-drift-entries / restore-merge-files / restore-regular-files
 │   │   ├── setup/            # sub-use-cases: marketplace-source / tools / plugins-prompt
@@ -39,7 +38,7 @@ src/
 │   └── output.ts             # stdout/stderr formatting
 ├── domain/
 │   ├── formats/              # what's left after phase 11: markdown-references.ts only — every other transform moved to kernel/, contexts/tools/domain/formats/, or contexts/translate/domain/formats/
-│   ├── models/               # entities, value objects, discriminant types not yet claimed by a context (manifest, plugin, marketplace, semver, ...)
+│   ├── models/               # entities, value objects, discriminant types not yet claimed by a context (manifest, plugin, semver, ...) — the marketplace and catalog models moved to contexts/distribution/domain/
 │   ├── ports/                # interface contracts owned by one context (Prompter, ManifestRepository, LatestReleaseResolver, etc.) — ports shared by ≥2 contexts live in kernel/ports/
 │   └── capabilities/         # marketplace-entry, marketplace-settings, plugins-capability — pending a framework/tools placement; content-translation capabilities (agents, commands, rules, skills, hooks) moved to contexts/tools/domain/capabilities/
 ├── infrastructure/
@@ -72,7 +71,7 @@ src/
     │   │   └── ports/        # native-plugin-activator, file-merger, schema-validator (JsonSchemaValidator — translate reads it, tools declares it)
     │   ├── application/      # install-ai-tool / install-ide-tool / install-config / install-ide-config / install-runtime-config / uninstall-tools
     │   └── infrastructure/   # native-plugin-cli-adapter + its abstract base — drives a tool's own plugin CLI
-    └── translate/            # the core: canonical source → target-native content, at every level — depends on tools + kernel only
+    ├── translate/            # the core: canonical source → target-native content, at every level — depends on tools + kernel only
         ├── domain/
         │   ├── formats/      # target-aware transforms (cursor-hooks, claude-root-path-rewrite, plugin-root-token-rewrite)
         │   ├── content-translator.ts   # PluginContentTranslator — one plugin's files → one tool's installed files
@@ -81,12 +80,22 @@ src/
         │   ├── plugin-format.ts        # PluginFormat + manifest/marketplace probe paths
         │   ├── plugin-translation-skip.ts # PluginTranslationSkip, ReadonlySkipList
         │   └── build-target.ts         # FrameworkBuildTarget, FRAMEWORK_BUILD_TARGET_MODES, build-time path constants
-        ├── application/
-        │   ├── translate-source.ts     # FrameworkBuildUseCase — one source, N targets, `framework build`
-        │   ├── shared-plugin-helpers.ts
-        │   └── strategies/             # marketplace and flat build strategies
-        └── infrastructure/
-            └── schema-validator.ts     # AjvSchemaValidatorAdapter
+    │   ├── application/
+    │   │   ├── translate-source.ts     # FrameworkBuildUseCase — one source, N targets, `framework build`
+    │   │   ├── shared-plugin-helpers.ts
+    │   │   └── strategies/             # marketplace and flat build strategies
+    │   └── infrastructure/
+    │       └── schema-validator.ts     # AjvSchemaValidatorAdapter
+    └── distribution/         # where content comes from and how it is fetched — a leaf: kernel only, knows no tool and no manifest
+        ├── domain/
+        │   ├── marketplace.ts          # Marketplace entry, scope, staleness
+        │   ├── marketplace-cache-entry.ts
+        │   ├── marketplace-source-mode.ts
+        │   ├── catalog.ts              # PluginCatalog, PluginCatalogEntry + the Claude-shaped parser
+        │   ├── catalog-parsers/        # readers for a non-Claude catalog shape (copilot)
+        │   └── ports/                  # marketplace-registry, marketplace-cache, marketplace-trust-store, plugin-catalog-repository, plugin-fetcher, raw-catalog-fetcher
+        ├── application/      # add / list / refresh / register-framework / resolve-marketplace / fetch-marketplace-source
+        └── infrastructure/   # the adapters behind those six ports
 ```
 
 ## Use-Case Structure
