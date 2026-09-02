@@ -16,32 +16,22 @@
  * `claude-code-transcript.ts`'s own `matchesMainTranscript` resolves a session by
  * `<sessionId>.jsonl`, so the variable and the record's `vendor_id` are the same string.
  *
- * On Codex it is **unconfirmed**, and the reason to doubt it is measured rather than
- * theoretical. A record's `vendor_id` there is the uuid in its own
- * `rollout-<timestamp>-<uuid>.jsonl` filename — one rollout, one identifier.
- * `CODEX_THREAD_ID` names a *thread*, and a thread is demonstrably not a rollout: over 418
- * rollouts on the machine this was written on (2026-09-01), 158 carry a
- * `session_meta.session_id` naming a different rollout than their own `session_meta.id`,
- * across `thread_source` values `subagent` (89), `user` (11) and unset (58). So "several
- * rollouts under one thread" is the common case here, not an exotic one — and if
- * `CODEX_THREAD_ID` names the thread's first rollout, every commit made in a later one
- * carries a trailer that joins to nothing.
+ * On Codex it is measured too, on 2026-09-02, against two real sessions:
  *
- * What is already ruled out: the variable being absent altogether. `CODEX_THREAD_ID` appears
- * in the Codex binary itself (checked 2026-09-02 against `@openai/codex-darwin-arm64`'s own
- * native `codex`), so this reads a variable Codex really does set, and `session-anchor.ts`'s
- * Codex branch is live rather than dead. The open question is narrower than it was: not
- * whether a value arrives, but which rollout that value names.
+ *   fresh session    CODEX_THREAD_ID = 01a06041… = session_meta.id = the rollout's filename
+ *   resumed session  CODEX_THREAD_ID = 01a06041… — and no second rollout was written at all
  *
- * What would settle that is one Codex session's `CODEX_THREAD_ID` read beside the rollout
- * that session wrote. That needs a live Codex session, which costs the person running it, so it
- * is named here as the next measurement rather than guessed at. Until then a consumer treats
- * a Codex trailer as a link to verify, not one to rely on — the same shape of stated limit
- * `opencode.ts` carries for its own counters.
+ * The resume is the half that mattered. This module used to warn that "a thread spans
+ * several rollouts, so a commit made in a later one joins to nothing"; `codex exec resume
+ * --last` disproved it, appending to the same rollout file rather than opening a new one.
+ * `CODEX_THREAD_ID` tracks the rollout, and the rollout's uuid is exactly the `vendor_id`
+ * both the hook and the reader join on. So the trailer's value equals the records' own.
  *
- * `telemetry-claim.ts`'s `firedForSession` compares the anchor to `vendorId` already, but it
- * settles nothing here: on Codex a mismatch and a hook that never fired produce the same
- * unproven claim.
+ * What that leaves is narrow and named: 89 of the 418 rollouts on the machine this was
+ * measured on carry `thread_source: "subagent"`, where `session_meta.id` is the subagent's
+ * own and `session_meta.session_id` is the parent's. No capture yet says which of the two a
+ * subagent's `CODEX_THREAD_ID` carries, so a commit authored from inside a Codex subagent is
+ * the one case still to check. Every ordinary session, fresh or resumed, joins exactly.
  */
 
 /** Git's own trailer token. Capitalised the way `Co-authored-by` and `Signed-off-by` are,

@@ -314,9 +314,9 @@ AIDD-Session-Id: 33333333-3333-4333-8333-333333333333
 
 The value is the running session's own identifier, resolved from the environment.
 It is not a second identifier minted for this purpose, so a commit joins to its
-records on an equality with no resolution step in between — **on Claude Code,
-where that equality is measured.** On Codex it is not yet confirmed, and the
-next paragraph says why that matters.
+records on an equality with no resolution step in between. That equality is
+measured on both hosts that write a trailer — see "How far the join is measured"
+below, which also names the one case still open.
 
 Rules a consumer can rely on:
 
@@ -342,15 +342,18 @@ Rules a consumer can rely on:
 and a session is resolved locally by `<sessionId>.jsonl`, so the trailer's value
 and the record's `vendor_id` are the same string.
 
-**Codex — unconfirmed, and the doubt is measured.** A record's `vendor_id` there
-is the uuid in its own `rollout-<timestamp>-<uuid>.jsonl` filename: one rollout,
-one identifier. The trailer carries `CODEX_THREAD_ID`, which names a *thread*, and
-a thread is not a rollout — measured over 418 rollouts on one machine
-(2026-09-01), 158 name a different rollout in `session_meta.session_id` than in
-their own `session_meta.id`. Several rollouts under one thread is therefore the
-common case, and if the variable names the thread's first rollout, every commit
-made in a later one joins to nothing. Treat a Codex trailer as a link to verify
-before relying on it.
+**Codex — measured, on two real sessions.** A fresh session and a resumed one
+were run on 2026-09-02. Both reported the same `CODEX_THREAD_ID`, and the resume
+wrote **no second rollout** — it appended to the first. So the variable tracks the
+rollout, and the rollout's uuid is exactly the `vendor_id` records carry: the
+trailer's value equals theirs. An earlier version of this section warned that a
+thread spans several rollouts; the resume disproved it.
+
+One case is still open, and it is narrow: 89 of 418 rollouts on that machine are
+`thread_source: "subagent"`, where the rollout's own id and its parent session's
+differ. Which of the two a subagent's `CODEX_THREAD_ID` carries has not been
+captured, so a commit authored from inside a Codex subagent is worth verifying.
+Every ordinary session, fresh or resumed, joins exactly.
 
 **Cursor, Copilot, OpenCode — no trailer.** Nothing was measured that names their
 running session in the environment, so the hook finds nothing and writes nothing.
