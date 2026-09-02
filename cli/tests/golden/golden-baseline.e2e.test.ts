@@ -12,11 +12,11 @@
  *
  * NOT covered here, on purpose:
  *   - anything reaching the network: `marketplace add` on a GitHub source,
- *     `self-update`, the update check. The fixture is local so a capture never
- *     depends on a remote repository or a rate limit.
+ *     `update` (the CLI self-update, formerly `self-update`), the update check. The
+ *     fixture is local so a capture never depends on a remote repository or a rate limit.
  *   - anything interactive: the menu and every prompt. Captures run with `--yes`.
- *   - `framework build`, which has its own golden over the nine target/mode cells
- *     in framework-build-golden.e2e.test.ts.
+ *   - `translate` (formerly `framework build`), which has its own golden over the nine
+ *     target/mode cells in framework-build-golden.e2e.test.ts.
  *   - the shape of `--help`, frozen separately in help-surface.e2e.test.ts.
  *
  * USAGE:
@@ -240,24 +240,25 @@ async function captureMatrix(projectDir: string, fakeHome: string): Promise<Comm
   await capture(["plugin", "install", "aidd-test"]);
   await capture(["plugin", "list"]);
 
-  // A second tool, written from bundled assets.
-  await capture(["ai", "install", "cursor", "--force"]);
-  await capture(["status"]);
-
-  // A tracked file edited outside the CLI: the mechanism status and doctor share.
-  await drift(projectDir, join(".claude", "settings.json"));
-  await capture(["status"]);
+  // A second tool, written from bundled assets. `ai install` folded into `framework
+  // install --tool`; `status` folded into `doctor`, which now carries the drift report.
+  await capture(["framework", "install", "--tool", "cursor", "--force"]);
   await capture(["doctor"]);
 
-  // Regeneration, then back in sync.
-  await capture(["restore", "--force"]);
-  await capture(["status"]);
+  // A tracked file edited outside the CLI, read back through the one command that now
+  // reports both drift and structural health.
+  await drift(projectDir, join(".claude", "settings.json"));
+  await capture(["doctor"]);
+
+  // Regeneration (`restore` folded into `sync`), then back in sync.
+  await capture(["sync", "--force"]);
+  await capture(["doctor"]);
 
   await capture(["plugin", "remove", "aidd-test"]);
 
   // Terminal: removes every AIDD file, then a read of the empty project.
   await capture(["clean", "--force"]);
-  await capture(["status"]);
+  await capture(["doctor"]);
 
   return entries;
 }
@@ -275,12 +276,11 @@ async function captureErrors(projectDir: string, fakeHome: string): Promise<Comm
 
   // A directory that was never set up.
   await capture(["doctor"]);
-  await capture(["status"]);
   await capture(["plugin", "list"]);
 
   // Asking for something that cannot be resolved.
   await capture(["plugin", "install", "does-not-exist"]);
-  await capture(["ai", "install", "not-a-tool"]);
+  await capture(["framework", "install", "--tool", "not-a-tool"]);
   await capture(["definitely-not-a-command"]);
 
   // A marketplace whose catalog does not parse.

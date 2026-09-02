@@ -339,10 +339,10 @@ describe("Manifest", () => {
       expect(() => Manifest.fromJSON(v0)).toThrow(RECOVERY_INVOCATION);
     });
 
-    it("rejects a version above 6 by pointing at self-update, not a downgrade", () => {
+    it("rejects a version above 6 by pointing at update, not a downgrade", () => {
       const v99 = { version: 99, tools: {} };
       expect(() => Manifest.fromJSON(v99)).toThrow(/version/);
-      expect(() => Manifest.fromJSON(v99)).toThrow(/self-update/);
+      expect(() => Manifest.fromJSON(v99)).toThrow(/aidd update/);
       expect(() => Manifest.fromJSON(v99)).not.toThrow(/5\.2\.1/);
     });
   });

@@ -45,7 +45,7 @@ export class DoctorTrackedFilesUseCase {
         issues.push({
           severity: "error",
           message: `Missing tracked file: ${file.relativePath}`,
-          fix: `Restore the file or run \`aidd restore\` to reinstall tracked files.`,
+          fix: `Restore the file or run \`aidd sync\` to reinstall tracked files.`,
         });
       }
     }
@@ -68,7 +68,7 @@ export class DoctorTrackedFilesUseCase {
           issues.push({
             severity: "warning",
             message: `Modified tracked file: ${file.relativePath}`,
-            fix: `Run \`aidd restore --force\` to revert to the framework version.`,
+            fix: `Run \`aidd sync --force\` to revert to the framework version.`,
           });
         }
       }

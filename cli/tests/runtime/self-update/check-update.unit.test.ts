@@ -78,7 +78,7 @@ describe("CheckUpdateUseCase", () => {
         makeFsStub(store)
       ).printFromCacheOnly();
       expect(logs.some((l) => l.includes("CLI update available"))).toBe(true);
-      expect(logs.some((l) => l.includes("aidd self-update"))).toBe(true);
+      expect(logs.some((l) => l.includes("aidd update"))).toBe(true);
     });
 
     it("stays silent when CLI version matches latest in cache", async () => {

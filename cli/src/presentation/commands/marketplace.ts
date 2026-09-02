@@ -130,7 +130,9 @@ export function registerMarketplaceCommand(program: Command): void {
 
   marketplace
     .command("refresh [name]")
-    .description("Refresh registered marketplaces")
+    .description(
+      "Refresh registered marketplaces — re-fetches catalogs; see `framework update`, which moves installed tools to a new version instead"
+    )
     .option("--force", "Clear cache before re-fetching")
     .action(async (name: string | undefined, cmdOptions: { force?: boolean }) => {
       const { verbose, output, projectRoot } = parseGlobalOptions(program);

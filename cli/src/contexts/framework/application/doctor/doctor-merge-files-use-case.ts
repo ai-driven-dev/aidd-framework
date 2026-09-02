@@ -39,7 +39,7 @@ export class DoctorMergeFilesUseCase {
         {
           severity: "error",
           message: `Missing merge file: ${mergeFile.relativePath}`,
-          fix: `Run \`aidd restore --force\` to reinstall tracked files.`,
+          fix: `Run \`aidd sync --force\` to reinstall tracked files.`,
         },
       ];
     }
@@ -56,13 +56,13 @@ export class DoctorMergeFilesUseCase {
         issues.push({
           severity: "error",
           message: `Missing key in ${mergeFile.relativePath} > ${key}`,
-          fix: `Run \`aidd restore --force\` to restore managed keys.`,
+          fix: `Run \`aidd sync --force\` to restore managed keys.`,
         });
       } else if (!diskHash.equals(manifestHash)) {
         issues.push({
           severity: "warning",
           message: `Modified key in ${mergeFile.relativePath} > ${key}`,
-          fix: `Run \`aidd restore --force\` to restore the original value.`,
+          fix: `Run \`aidd sync --force\` to restore the original value.`,
         });
       }
     }

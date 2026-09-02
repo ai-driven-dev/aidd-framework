@@ -17,7 +17,7 @@ const MAX_FILES_PER_FOLDER = 10;
  * This list may only shrink.
  */
 const BASELINE = [
-  "src/presentation/commands", // 17 — moved from application/commands by phase 16, still over the limit; phase 18 splits it
+  "src/presentation/commands", // 15 — phase 18 retired ai.ts/ide.ts/status.ts/restore.ts/self-update.ts and added sync.ts/translate.ts/deprecation.ts (17 -> 15); still over the limit, split remains for a later phase
   // Born of this refactor and to be split by a later phase.
   "src/contexts/tools/domain", // 12
   "src/contexts/framework/application/install", // 12

@@ -141,7 +141,7 @@ describe.concurrent("E2E: issue-271 — setup cache resolution and propagation v
 
       // Install cursor — this triggers plugin propagation with prefer-catalog policy
       const { exitCode, stdout, stderr } = await runCli(
-        ["ai", "install", "cursor"],
+        ["framework", "install", "--tool", "cursor"],
         projectDir,
         fakeHome
       );
@@ -168,7 +168,7 @@ describe.concurrent("E2E: issue-271 — setup cache resolution and propagation v
     const { projectDir, fakeHome, cleanup } = await createTestEnv("271-scenario-c");
     try {
       await seedManifest(projectDir);
-      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 
       // Register local marketplace so aidd-dev is resolvable (catalog version 1.0.0)
       await runCli(

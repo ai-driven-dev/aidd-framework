@@ -95,8 +95,7 @@ describe("interactive menu", () => {
 
       const values = (selectMock.mock.calls[0][1] as SelectChoice[]).map((c) => c.value);
       expect(values).toContain("inspect");
-      expect(values).toContain("manage-ai");
-      expect(values).toContain("manage-ide");
+      expect(values).toContain("manage-tools");
       expect(values).toContain("manage-plugins");
       expect(values).toContain("marketplaces");
       expect(values).toContain("maintain");
@@ -113,39 +112,39 @@ describe("interactive menu", () => {
 
       const choices = selectMock.mock.calls[0][1] as Array<{ value: string; description?: string }>;
       const groupsWithDescription = choices.filter((c) => c.value !== "exit" && c.description);
-      expect(groupsWithDescription.length).toBe(7);
+      expect(groupsWithDescription.length).toBe(6);
     });
 
-    it("status is reachable from the inspect group", async () => {
+    it("doctor is reachable from the inspect group", async () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);
       await initProject(deps, PROJECT_ROOT);
-      const { prompter } = makeQueuedPrompter(["inspect", "status"]);
+      const { prompter } = makeQueuedPrompter(["inspect", "doctor"]);
       const result = await new InteractiveMenuUseCase(deps.manifestRepo, prompter).execute();
-      expect(result.command).toEqual(["status"]);
+      expect(result.command).toEqual(["doctor"]);
     });
 
-    it("ai install is reachable from the manage-ai group", async () => {
+    it("framework install is reachable from the manage-tools group", async () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);
       await initProject(deps, PROJECT_ROOT);
-      const { prompter } = makeQueuedPrompter(["manage-ai", "ai-install"], ["claude"]);
+      const { prompter } = makeQueuedPrompter(["manage-tools", "framework-install"], ["claude"]);
       const result = await new InteractiveMenuUseCase(deps.manifestRepo, prompter).execute();
-      expect(result.command).toEqual(["ai", "install", "claude"]);
+      expect(result.command).toEqual(["framework", "install", "--tool", "claude"]);
     });
 
-    it("update-all is reachable from the maintain group", async () => {
+    it("framework update (all) is reachable from the maintain group", async () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);
       await initProject(deps, PROJECT_ROOT);
-      const { prompter } = makeQueuedPrompter(["maintain", "update-all"]);
+      const { prompter } = makeQueuedPrompter(["maintain", "framework-update-maintain"]);
       const result = await new InteractiveMenuUseCase(deps.manifestRepo, prompter).execute();
-      expect(result.command).toEqual(["update"]);
+      expect(result.command).toEqual(["framework", "update"]);
     });
 
-    it("self-update is reachable from the system group", async () => {
+    it("CLI update is reachable from the system group", async () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);
       await initProject(deps, PROJECT_ROOT);
       const { prompter } = makeQueuedPrompter(["system", "self-update"]);
       const result = await new InteractiveMenuUseCase(deps.manifestRepo, prompter).execute();
-      expect(result.command).toEqual(["self-update"]);
+      expect(result.command).toEqual(["update"]);
     });
 
     it("exit is available directly from a group submenu", async () => {
@@ -191,9 +190,9 @@ describe("interactive menu", () => {
     it("always returns to root after a command (no breadcrumb saved)", async () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);
       await initProject(deps, PROJECT_ROOT);
-      const { prompter } = makeQueuedPrompter(["inspect", "status"]);
+      const { prompter } = makeQueuedPrompter(["inspect", "doctor"]);
       const result = await new InteractiveMenuUseCase(deps.manifestRepo, prompter).execute();
-      expect(result.command).toEqual(["status"]);
+      expect(result.command).toEqual(["doctor"]);
       expect("returnTo" in result).toBe(false);
     });
   });

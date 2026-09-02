@@ -1,9 +1,11 @@
 /**
  * Framework build golden — machine-independent output snapshot for all targets and modes.
  *
- * Captures the file tree hash map from `framework build --target <t> [--flat]` against
+ * Captures the file tree hash map from `translate <source> --to <t> [--as flat]`
+ * (phase 18's pure rename of `framework build --target <t> [--flat]`) against
  * tests/fixtures/framework-real and compares byte-for-byte against the stored
- * baseline in snapshots/framework-build/golden.json.
+ * baseline in snapshots/framework-build/golden.json. A pure rename changes no output,
+ * which is exactly what this file must keep proving as the invocation moves.
  *
  * The stored JSON maps key → { relative-path → SHA-256 hex }. Key format:
  *   "<target>" for marketplace mode, "<target>:flat" for flat mode.
@@ -77,22 +79,13 @@ async function captureTarget(
   const key = flat ? `${target}:flat` : target;
   const outDir = join(tempDir, `dist-${key.replace(":", "-")}`);
   await mkdir(outDir, { recursive: true });
-  const args = [
-    "framework",
-    "build",
-    "--source",
-    FRAMEWORK_FIXTURE,
-    "--target",
-    target,
-    "--out",
-    outDir,
-  ];
-  if (flat) args.push("--flat");
+  // `translate` is the pure rename of `framework build` (phase 18): same sourceDir,
+  // outDir and mode, so the captured file tree — and this golden — must not move.
+  const args = ["translate", FRAMEWORK_FIXTURE, "--to", target, "--out", outDir];
+  if (flat) args.push("--as", "flat");
   const result = await runCli(args, projectDir, fakeHome);
   if (result.exitCode !== 0) {
-    throw new Error(
-      `framework build --target ${target}${flat ? " --flat" : ""} failed: ${result.stderr}`
-    );
+    throw new Error(`translate --to ${target}${flat ? " --as flat" : ""} failed: ${result.stderr}`);
   }
   return hashDirectory(outDir);
 }

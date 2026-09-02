@@ -21,16 +21,16 @@ async function hashDirectory(dir: string): Promise<Map<string, string>> {
   return result;
 }
 
-describe.concurrent("E2E: aidd framework build", () => {
+describe.concurrent("E2E: aidd translate", () => {
   it("AC #1 + #4: build → marketplace add → plugin install runs without error", async () => {
     const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fw-build-install");
     try {
       await initProject(projectDir, FRAMEWORK_PATH);
-      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 
       const outDir = join(tempDir, "dist");
       const build = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "copilot", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -71,7 +71,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       const outDir = join(tempDir, "dist");
 
       const run1 = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "copilot", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -80,7 +80,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       const snapshot1 = await hashDirectory(outDir);
 
       const run2 = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "copilot", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -112,7 +112,7 @@ describe.concurrent("E2E: aidd framework build", () => {
 
       const outDir = join(tempDir, "dist");
       const result = await runCli(
-        ["framework", "build", "--source", sourceDir, "--target", "copilot", "--out", outDir],
+        ["translate", sourceDir, "--to", "copilot", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -129,7 +129,7 @@ describe.concurrent("E2E: aidd framework build", () => {
     try {
       const outDir = join(tempDir, "dist");
       const build = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "copilot", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -171,7 +171,7 @@ describe.concurrent("E2E: aidd framework build", () => {
     try {
       const outDir = join(tempDir, "dist");
       const build = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "copilot", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -199,7 +199,7 @@ describe.concurrent("E2E: aidd framework build", () => {
     try {
       const outDir = join(tempDir, "dist");
       const build = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "copilot", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -232,17 +232,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       await mkdir(projRoot, { recursive: true });
 
       const build = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "copilot",
-          "--flat",
-          "--out",
-          projRoot,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--as", "flat", "--out", projRoot],
         projectDir,
         fakeHome
       );
@@ -296,17 +286,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       await mkdir(projRoot, { recursive: true });
 
       const run1 = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "copilot",
-          "--flat",
-          "--out",
-          projRoot,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--as", "flat", "--out", projRoot],
         projectDir,
         fakeHome
       );
@@ -316,13 +296,12 @@ describe.concurrent("E2E: aidd framework build", () => {
 
       const run2 = await runCli(
         [
-          "framework",
-          "build",
-          "--source",
+          "translate",
           FRAMEWORK_PATH,
-          "--target",
+          "--to",
           "copilot",
-          "--flat",
+          "--as",
+          "flat",
           "--force",
           "--out",
           projRoot,
@@ -340,17 +319,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       }
 
       const run3 = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "copilot",
-          "--flat",
-          "--out",
-          projRoot,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--as", "flat", "--out", projRoot],
         projectDir,
         fakeHome
       );
@@ -378,17 +347,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       );
 
       const build = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "copilot",
-          "--flat",
-          "--out",
-          projRoot,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--as", "flat", "--out", projRoot],
         projectDir,
         fakeHome
       );
@@ -431,7 +390,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       const outDir = join(tempDir, "dist-codex");
       await mkdir(outDir, { recursive: true });
       const build = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "codex", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "codex", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -457,7 +416,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       const outDir = join(tempDir, "dist-claude");
       await mkdir(outDir, { recursive: true });
       const build = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "claude", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "claude", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -483,7 +442,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       const outDir = join(tempDir, "dist-cursor");
       await mkdir(outDir, { recursive: true });
       const build = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "cursor", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "cursor", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -510,7 +469,7 @@ describe.concurrent("E2E: aidd framework build", () => {
     try {
       const outDir = join(tempDir, "dist");
       const result = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "opencode", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "opencode", "--out", outDir],
         projectDir,
         fakeHome
       );
@@ -526,22 +485,12 @@ describe.concurrent("E2E: aidd framework build", () => {
     try {
       const outDir = join(tempDir, "dist");
       const result = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "copilot",
-          "--force",
-          "--out",
-          outDir,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--force", "--out", outDir],
         projectDir,
         fakeHome
       );
       expect(result.exitCode).not.toBe(0);
-      expect(result.stderr).toContain("--force requires --flat");
+      expect(result.stderr).toContain("--force requires --as flat");
     } finally {
       await cleanup();
     }
@@ -555,17 +504,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       const projRoot = join(tempDir, "proj");
       await mkdir(projRoot, { recursive: true });
       const result = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "claude",
-          "--flat",
-          "--out",
-          projRoot,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "claude", "--as", "flat", "--out", projRoot],
         projectDir,
         fakeHome
       );
@@ -592,17 +531,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       const projRoot = join(tempDir, "proj");
       await mkdir(projRoot, { recursive: true });
       const result = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "cursor",
-          "--flat",
-          "--out",
-          projRoot,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "cursor", "--as", "flat", "--out", projRoot],
         projectDir,
         fakeHome
       );
@@ -627,17 +556,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       const projRoot = join(tempDir, "proj");
       await mkdir(projRoot, { recursive: true });
       const result = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "codex",
-          "--flat",
-          "--out",
-          projRoot,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "codex", "--as", "flat", "--out", projRoot],
         projectDir,
         fakeHome
       );
@@ -664,17 +583,7 @@ describe.concurrent("E2E: aidd framework build", () => {
       const projRoot = join(tempDir, "proj");
       await mkdir(projRoot, { recursive: true });
       const result = await runCli(
-        [
-          "framework",
-          "build",
-          "--source",
-          FRAMEWORK_PATH,
-          "--target",
-          "opencode",
-          "--flat",
-          "--out",
-          projRoot,
-        ],
+        ["translate", FRAMEWORK_PATH, "--to", "opencode", "--as", "flat", "--out", projRoot],
         projectDir,
         fakeHome
       );
@@ -700,7 +609,7 @@ describe.concurrent("E2E: aidd framework build", () => {
     try {
       const outDir = join(tempDir, "dist");
       const result = await runCli(
-        ["framework", "build", "--source", FRAMEWORK_PATH, "--target", "opencode", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "opencode", "--out", outDir],
         projectDir,
         fakeHome
       );

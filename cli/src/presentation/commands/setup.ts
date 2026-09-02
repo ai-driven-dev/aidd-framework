@@ -86,7 +86,9 @@ function parsePluginsFlag(
 export function registerSetupCommand(program: Command): void {
   program
     .command("setup")
-    .description("Set up or update the project to a correct state")
+    .description(
+      "Set up or update the project to a correct state — bootstraps the whole project (marketplace, framework, tools, plugins); see `framework install`, which acts on the framework alone"
+    )
     .option("--source <mode>", "Framework source: remote or local")
     .option("--path <dir>", "Absolute path to local framework (required with --source local)")
     .option("--release <tag>", "Marketplace release tag to fetch (e.g., v1.2.3)")

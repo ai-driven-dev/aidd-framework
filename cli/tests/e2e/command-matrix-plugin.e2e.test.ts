@@ -6,7 +6,7 @@
  *   plugin-install.e2e.test.ts — marketplace add/list/remove/browse/check/overwrite,
  *                                plugin search/install
  *
- * See also: command-matrix-help.e2e.test.ts, command-matrix-ai.e2e.test.ts
+ * See also: command-matrix-help.e2e.test.ts
  */
 
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
@@ -29,7 +29,7 @@ async function seedManifest(projectDir: string): Promise<void> {
 
 async function seedWithClaude(projectDir: string, fakeHome: string): Promise<void> {
   await seedManifest(projectDir);
-  await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+  await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 }
 
 async function writeMarketplace(
@@ -108,11 +108,11 @@ describe.concurrent("Command Matrix: Plugin lifecycle (local install)", () => {
     }
   });
 
-  it("plugin doctor exits 0 with healthy message when tool is installed", async () => {
+  it("doctor exits 0 with healthy message when tool is installed", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("plugin-doctor");
     try {
       await seedWithClaude(projectDir, fakeHome);
-      const { stdout, exitCode } = await runCli(["plugin", "doctor"], projectDir, fakeHome);
+      const { stdout, exitCode } = await runCli(["doctor"], projectDir, fakeHome);
       expect(exitCode).toBe(0);
       expect(stdout).toContain("healthy");
     } finally {
@@ -120,15 +120,16 @@ describe.concurrent("Command Matrix: Plugin lifecycle (local install)", () => {
     }
   });
 
-  it("plugin doctor stays 0/healthy when non-plugin drift exists (regression: silent exit 1)", async () => {
-    // Regression for a silent exit-1: plugin doctor used to gate on the FULL
-    // doctor health (tracked-file / reference / layout warnings included) while
-    // only rendering pluginIssues — so unrelated drift made it exit 1 printing
-    // nothing. Here a tracked file is mutated (non-plugin drift): global doctor
-    // must flag it (exit 1), plugin doctor must stay scoped (exit 0 + healthy).
+  it("doctor --plugin stays 0/healthy when non-plugin drift exists (regression: silent exit 1)", async () => {
+    // Regression for a silent exit-1: `plugin doctor` (now `doctor --plugin`) used to
+    // gate on the FULL doctor health (tracked-file / reference / layout warnings
+    // included) while only rendering pluginIssues — so unrelated drift made it exit 1
+    // printing nothing. Here a tracked file is mutated (non-plugin drift): unscoped
+    // doctor must flag it (exit 1), `doctor --plugin` must stay scoped (exit 0 + healthy).
     const { projectDir, fakeHome, cleanup } = await createTestEnv("plugin-doctor-scope");
     try {
       await seedWithClaude(projectDir, fakeHome);
+      await runCli(["plugin", "install", PLUGIN_FIXTURE, "--tool", "claude"], projectDir, fakeHome);
       const manifest = JSON.parse(
         await readFile(join(projectDir, AIDD_DIR, "manifest.json"), "utf-8")
       );
@@ -136,10 +137,14 @@ describe.concurrent("Command Matrix: Plugin lifecycle (local install)", () => {
       await appendFile(join(projectDir, tracked), "\n<!-- drift -->\n");
 
       const global = await runCli(["doctor"], projectDir, fakeHome);
-      expect(global.exitCode).toBe(1); // full doctor sees the drift
+      expect(global.exitCode).toBe(1); // unscoped doctor sees the drift
 
-      const { stdout, exitCode } = await runCli(["plugin", "doctor"], projectDir, fakeHome);
-      expect(exitCode).toBe(0); // plugin doctor is plugin-scoped
+      const { stdout, exitCode } = await runCli(
+        ["doctor", "--plugin", "sample-plugin"],
+        projectDir,
+        fakeHome
+      );
+      expect(exitCode).toBe(0); // plugin-scoped doctor stays scoped
       expect(stdout).toContain("healthy");
     } finally {
       await cleanup();
@@ -176,12 +181,12 @@ describe.concurrent("Command Matrix: Plugin lifecycle (local install)", () => {
     }
   });
 
-  it("ai restore exits 0 and restores plugin files when a tracked file is deleted", async () => {
-    const { projectDir, fakeHome, cleanup } = await createTestEnv("ai-restore-plugin");
+  it("sync --tool claude exits 0 and restores plugin files when a tracked file is deleted", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("sync-restore-plugin");
     try {
       await seedWithClaude(projectDir, fakeHome);
       await runCli(["plugin", "install", PLUGIN_FIXTURE, "--tool", "claude"], projectDir, fakeHome);
-      const { stdout, exitCode } = await runCli(["ai", "restore"], projectDir, fakeHome);
+      const { stdout, exitCode } = await runCli(["sync", "--tool", "claude"], projectDir, fakeHome);
       expect(exitCode).toBe(0);
       expect(stdout).toMatch(/[Rr]estor|[Nn]othing to restore/);
     } finally {

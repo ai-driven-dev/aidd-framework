@@ -6,7 +6,9 @@ import { parseGlobalOptions } from "./global-options.js";
 export function registerCleanCommand(program: Command): void {
   program
     .command("clean")
-    .description("Remove all AIDD-managed files from the project")
+    .description(
+      "Remove all AIDD-managed files from the project — retires every part of AIDD; see `framework remove`, which removes the framework only"
+    )
     .option("--force", "Confirm file removal (skip dry-run)", false)
     .action(async (cmdOptions: { force: boolean }) => {
       const { verbose, output, projectRoot } = parseGlobalOptions(program);

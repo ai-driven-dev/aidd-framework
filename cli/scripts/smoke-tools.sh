@@ -13,7 +13,13 @@
 # Hermetic by default: every setup uses the local framework fixture, so a run needs
 # neither the network nor a token. Set SMOKE_REMOTE=1 to add the remote-fetch section.
 #
-# Measured 2026-08-21: hermetic run 92s, 98 checks, 37/37 leaf commands.
+# Phase 18 moved the surface: `ai`/`ide` folded into `--tool`, `status`/`ai doctor`/
+# `ide doctor`/`plugin doctor` folded into `doctor`, `restore` renamed `sync`,
+# `self-update` renamed `update`, `framework build` renamed `translate`. 22 leaf
+# commands today (was 36) — this file's ALL_COMMANDS below is the same count phase 18's
+# plan measured (`aidd_docs/tasks/2026_08/2026_08_20_refactor-contextes-cli/commandes.md`).
+#
+# Measured 2026-08-21 (pre-phase-18): hermetic run 92s, 98 checks, 37/37 leaf commands.
 # The remote-gated version it replaces took 7 min 11 s and covered 11 invocations
 # when no GitHub token happened to be reachable.
 # Without one, the remote sections are SKIPPED (coverage will read low).
@@ -29,13 +35,11 @@ IDE_TOOLS=(vscode)
 
 # Canonical leaf-command surface. Coverage = exercised / total.
 ALL_COMMANDS=(
-  "setup" "status" "restore" "update" "doctor" "clean" "self-update"
-  "ai install" "ai uninstall" "ai list" "ai status" "ai update" "ai restore" "ai doctor"
-  "ide install" "ide uninstall" "ide list" "ide status" "ide update" "ide restore" "ide doctor"
-  "plugin remove" "plugin list" "plugin install" "plugin search" "plugin update" "plugin doctor"
+  "setup" "doctor" "sync" "translate" "update" "clean"
+  "framework install" "framework update" "framework remove"
+  "plugin remove" "plugin list" "plugin install" "plugin search" "plugin update"
   "marketplace add" "marketplace list" "marketplace remove" "marketplace refresh" "marketplace check"
   "auth login" "auth logout" "auth status"
-  "framework build"
 )
 
 PASS=0; FAIL=0; SKIP=0
@@ -49,7 +53,7 @@ bad()  { FAIL=$((FAIL+1)); FAILURES+=("$1"$'\n'"${2:-}"); echo "  ✗ $1"; }
 skip() { SKIP=$((SKIP+1)); echo "  ~ $1"; }
 section() { echo; echo "=== $1 === [$(date +%H:%M:%S)]"; }
 
-PARENTS=" ai ide plugin marketplace auth framework "
+PARENTS=" plugin marketplace auth framework "
 derive_key() {
   local first="$1" second="${2:-}"
   if [[ "$PARENTS" == *" $first "* ]]; then echo "$first $second"; else echo "$first"; fi
@@ -129,16 +133,16 @@ run "--version" 0 "aidd/" "$ROOT" -- --version
 run "unknown command exits non-zero" 1 "" "$ROOT" -- definitely-not-a-command
 # (version/help are not counted leaves)
 
-section "framework build (local fixture)"
+section "translate (local fixture)"
 FW_OUT="$TMPROOT/fw-out"
-if run "framework build --target claude" 0 "" "$ROOT" -- \
-     framework build --source "$FRAMEWORK_FIXTURE" --target claude --out "$FW_OUT"; then :; fi
+if run "translate --to claude" 0 "" "$ROOT" -- \
+     translate "$FRAMEWORK_FIXTURE" --to claude --out "$FW_OUT"; then :; fi
 
-# --flat: the other build mode. Phase 5 removes it for the four native tools, so this
+# --as flat: the other build mode. Phase 5 removes it for the four native tools, so this
 # invocation is the "before" that removal is compared against.
 FW_FLAT=$(mktemp -d "$TMPROOT/fw-flat.XXXXXX")
-run "framework build --flat" 0 "" "$ROOT" -- \
-  framework build --source "$FRAMEWORK_FIXTURE" --target claude --flat --out "$FW_FLAT" --force
+run "translate --as flat" 0 "" "$ROOT" -- \
+  translate "$FRAMEWORK_FIXTURE" --to claude --as flat --out "$FW_FLAT" --force
 
 section "auth (isolated config)"
 AUTH_HOME="$TMPROOT/auth-home"; mkdir -p "$AUTH_HOME"
@@ -153,16 +157,16 @@ run "auth logout" 0 "" "$P_AUTH" -- auth logout
 run "auth login --gh (no credentials)" "0|1" "" "$P_AUTH" -- auth login --gh --level project
 
 
-section "self-update --check"
-out=$(cd "$ROOT" && node "$CLI" self-update --check 2>&1); rc=$?
-if [[ "$rc" -eq 0 || "$rc" -eq 1 ]]; then mark_covered "self-update"; ok "self-update --check (exit $rc)"; else bad "self-update crashed (exit $rc)" "$out"; fi
+section "update --check"
+out=$(cd "$ROOT" && node "$CLI" update --check 2>&1); rc=$?
+if [[ "$rc" -eq 0 || "$rc" -eq 1 ]]; then mark_covered "update"; ok "update --check (exit $rc)"; else bad "update crashed (exit $rc)" "$out"; fi
 
 # --dry-run must not write. Running it in a set-up project and comparing the file
 # list before and after is the only assertion that proves it.
 P_DRY=$(new_project)
 (cd "$P_DRY" && node "$CLI" setup --source local --path "$FRAMEWORK_FIXTURE" --ai claude --plugins none --yes >/dev/null 2>&1)
 before_dry=$(cd "$P_DRY" && find . -type f | sort | md5)
-run "self-update --dry-run" "0|1" "" "$P_DRY" -- self-update --dry-run
+run "update --dry-run" "0|1" "" "$P_DRY" -- update --dry-run
 after_dry=$(cd "$P_DRY" && find . -type f | sort | md5)
 if [[ "$before_dry" == "$after_dry" ]]; then
   ok "--dry-run wrote nothing"
@@ -262,55 +266,47 @@ if true; then
   [[ -d "$BASE/.vscode" ]] && ok "vscode dir present" || bad "vscode dir missing"
 
   section "global read-only commands (no crash)"
-  run "status" 0 "" "$BASE" -- status
-  # doctor exits 1 by design when it finds drift (e.g. framework-shipped broken
+  # doctor exits 1 by design when it finds drift/issues (e.g. framework-shipped broken
   # references on a fresh --ai all install); 0 or 1 are both non-crash here, and
   # the silent-exit guard above still rejects an exit 1 that prints nothing.
   run "doctor" "0|1" "" "$BASE" -- doctor
-  run "update" 0 "" "$BASE" -- update
+  for t in "${AI_TOOLS[@]}" vscode; do
+    run "doctor --tool $t" "0|1" "" "$BASE" -- doctor --tool "$t"
+  done
 
-  section "global restore"
+  section "global sync"
   tgt=$(find "$BASE/.claude" -name "*.md" | head -1)
   if [[ -n "$tgt" ]]; then printf '\nDRIFT\n' >> "$tgt"; fi
-  run "restore --force" 0 "" "$BASE" -- restore --force
+  run "sync --force" 0 "" "$BASE" -- sync --force
 
-  section "ai per-tool commands × all 5 tools"
-  run "ai list" 0 "" "$BASE" -- ai list
-  run "ai status" 0 "" "$BASE" -- ai status
-  run "ai doctor" "0|1" "" "$BASE" -- ai doctor
-  run "ai update (all)" 0 "" "$BASE" -- ai update
+  section "framework install/update/remove --tool × all 5 AI tools + vscode"
+  run "framework update (all)" 0 "" "$BASE" -- framework update
   d=$(find "$BASE/.cursor" -name "*.md" 2>/dev/null | head -1); [[ -n "$d" ]] && printf '\nX\n' >> "$d"
-  run "ai restore --force" 0 "" "$BASE" -- ai restore --force
-  run "ai restore --plugin" 0 "" "$BASE" -- ai restore --force --plugin aidd-test
+  run "sync --tool cursor" 0 "" "$BASE" -- sync --tool cursor --force
+  run "sync --plugin" 0 "" "$BASE" -- sync --force --plugin aidd-test
   for t in "${AI_TOOLS[@]}"; do
-    run "ai update $t" 0 "" "$BASE" -- ai update "$t"
+    run "framework update --tool $t" 0 "" "$BASE" -- framework update --tool "$t"
   done
-  # install/uninstall lifecycle per tool in an isolated project
+  run "framework update --tool vscode" 0 "" "$BASE" -- framework update --tool vscode
+  # install/remove lifecycle per tool in an isolated project
   P_AI=$(new_project)
   (cd "$P_AI" && node "$CLI" setup --source local --path "$FRAMEWORK_FIXTURE" --ai claude --yes >/dev/null 2>&1)
   for t in "${AI_TOOLS[@]}"; do
-    run "ai install $t" 0 "" "$P_AI" -- ai install "$t" --force
-    run "ai install $t --no-plugins" 0 "" "$P_AI" -- ai install "$t" --force --no-plugins
-    run "ai uninstall $t" 0 "" "$P_AI" -- ai uninstall "$t"
+    run "framework install --tool $t" 0 "" "$P_AI" -- framework install --tool "$t" --force
+    run "framework install --tool $t --no-plugins" 0 "" "$P_AI" -- framework install --tool "$t" --force --no-plugins
+    run "framework remove --tool $t" 0 "" "$P_AI" -- framework remove --tool "$t"
   done
-
-  section "ide per-tool commands (vscode)"
-  run "ide list" 0 "" "$BASE" -- ide list
-  run "ide status" 0 "" "$BASE" -- ide status
-  run "ide doctor" 0 "" "$BASE" -- ide doctor
-  run "ide update" 0 "" "$BASE" -- ide update vscode
-  i=$(find "$BASE/.vscode" -type f | head -1); [[ -n "$i" ]] && printf '\n' >> "$i"
-  run "ide restore --force" 0 "" "$BASE" -- ide restore --force
   P_IDE=$(new_project)
   (cd "$P_IDE" && node "$CLI" setup --source local --path "$FRAMEWORK_FIXTURE" --ide vscode --plugins none --yes >/dev/null 2>&1)
-  run "ide uninstall vscode" 0 "" "$P_IDE" -- ide uninstall vscode
-  run "ide install vscode" 0 "" "$P_IDE" -- ide install vscode --force
+  run "framework remove --tool vscode" 0 "" "$P_IDE" -- framework remove --tool vscode
+  run "framework install --tool vscode" 0 "" "$P_IDE" -- framework install --tool vscode --force
 
   section "plugin commands × tools"
   run "plugin list" 0 "" "$BASE" -- plugin list
-  # plugin doctor is plugin-scoped: a fresh install has healthy plugins, so it
-  # must print "healthy" and exit 0. This pins the silent-exit-1 regression fix.
-  run "plugin doctor" 0 "healthy" "$BASE" -- plugin doctor
+  # doctor --plugin is plugin-scoped: a fresh install has healthy plugins, so it
+  # must print "healthy" and exit 0. This pins the silent-exit-1 regression fix
+  # `plugin doctor` used to guard (folded into `doctor --plugin` in phase 18).
+  run "doctor --plugin" 0 "healthy" "$BASE" -- doctor --plugin aidd-test
   run "plugin search aidd" 0 "" "$BASE" -- plugin search aidd
   run "plugin search --recommended" 0 "" "$BASE" -- plugin search aidd --recommended
   run "plugin search --marketplace" 0 "" "$BASE" -- plugin search aidd --marketplace aidd-framework
@@ -330,8 +326,9 @@ if true; then
   # The hermetic e2e proves the guard on a fake tree; this pins it against the
   # REAL remote framework files: a user-modified tracked file must BLOCK update
   # in non-TTY (exit 1, demand --force) and --force must overwrite it (exit 0).
-  # Covers all three fan-outs: top-level `update`, `ai update`, `ide update`.
-  section "update conflict guard (#286) — modified file blocks, --force overwrites"
+  # `update` (bare) is self-update now and never touches project files — the
+  # project-wide sweep this guards lives at `framework update` since phase 18.
+  section "framework update conflict guard (#286) — modified file blocks, --force overwrites"
   # Pick the FIRST manifest-tracked file for a tool (any extension) — deterministic,
   # unlike a `.md` find heuristic which is empty with --plugins none.
   first_tracked() {
@@ -345,19 +342,19 @@ if true; then
     bad "no tracked claude file in manifest (#286 guard)"
   else
     printf '\nUSER EDIT\n' >> "$P_GUARD/$gc"
-    run "update (modified, non-TTY) → exit 1, demands --force" 1 "force" "$P_GUARD" -- update
-    run "update --force overwrites modified file" 0 "" "$P_GUARD" -- update --force
+    run "framework update (all, modified, non-TTY) → exit 1, demands --force" 1 "force" "$P_GUARD" -- framework update
+    run "framework update --force overwrites modified file" 0 "" "$P_GUARD" -- framework update --force
     printf '\nUSER EDIT 2\n' >> "$P_GUARD/$gc"
-    run "ai update (modified, non-TTY) → exit 1, demands --force" 1 "force" "$P_GUARD" -- ai update
-    run "ai update --force overwrites modified file" 0 "" "$P_GUARD" -- ai update --force
+    run "framework update --tool claude (modified, non-TTY) → exit 1, demands --force" 1 "force" "$P_GUARD" -- framework update --tool claude
+    run "framework update --tool claude --force overwrites modified file" 0 "" "$P_GUARD" -- framework update --tool claude --force
   fi
   gv=$(first_tracked "$P_GUARD" vscode)
   if [[ -z "$gv" ]]; then
-    skip "ide update guard (no tracked vscode file in manifest)"
+    skip "framework update --tool vscode guard (no tracked vscode file in manifest)"
   else
     printf '\n; user edit\n' >> "$P_GUARD/$gv"
-    run "ide update (modified, non-TTY) → exit 1, demands --force" 1 "force" "$P_GUARD" -- ide update
-    run "ide update --force overwrites modified file" 0 "" "$P_GUARD" -- ide update --force
+    run "framework update --tool vscode (modified, non-TTY) → exit 1, demands --force" 1 "force" "$P_GUARD" -- framework update --tool vscode
+    run "framework update --tool vscode --force overwrites modified file" 0 "" "$P_GUARD" -- framework update --tool vscode --force
   fi
 
   section "clean"

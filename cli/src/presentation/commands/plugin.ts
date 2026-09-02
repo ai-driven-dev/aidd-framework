@@ -16,13 +16,11 @@ export function registerPluginCommand(program: Command): void {
     }
     const { prompter } = createMenuDeps(process.cwd());
     const choice = await prompter.select("plugin: what do you want to do?", [
-      { name: "Create a plugin", value: "create", description: "scaffold a new plugin" },
       { name: "Install plugin", value: "install" },
       { name: "List installed plugins", value: "list" },
       { name: "Search plugins", value: "search", description: "requires query arg" },
       { name: "Update plugins", value: "update" },
       { name: "Remove a plugin", value: "remove", description: "requires name arg" },
-      { name: "Plugin doctor", value: "doctor" },
     ]);
     await spawnCliCommand(["plugin", choice]);
   });
@@ -179,38 +177,6 @@ export function registerPluginCommand(program: Command): void {
         } else {
           output.success(`Updated: ${updated.join(", ")}.`);
         }
-      } catch (error) {
-        errorHandler.handle(error);
-      }
-    });
-
-  plugin
-    .command("doctor")
-    .description("Check plugin installation health")
-    .option("--plugin <name>", "Filter check to one plugin")
-    .action(async (cmdOptions: { plugin?: string }) => {
-      const { verbose, output, projectRoot } = parseGlobalOptions(program);
-      const errorHandler = new ErrorHandler(output);
-      try {
-        const deps = await createDeps(projectRoot, { verbose }, output);
-        const report = await deps.doctorUseCase.execute({
-          projectRoot,
-          pluginName: cmdOptions.plugin,
-        });
-        // Plugin doctor is plugin-scoped: gate on plugin issues only, never on
-        // unrelated tracked-file / reference / layout warnings the full report
-        // also carries. Otherwise it exits non-zero while printing nothing (it
-        // only renders pluginIssues) — a silent failure.
-        if (report.pluginIssues.length === 0) {
-          output.success("Plugin installation is healthy");
-          return;
-        }
-        for (const pi of report.pluginIssues) {
-          output.error(
-            `Plugin ${pi.pluginName} (${pi.toolId}): ${pi.issue} — ${pi.filePath}\n  Fix: Run \`aidd ai restore\` to restore.`
-          );
-        }
-        process.exit(1);
       } catch (error) {
         errorHandler.handle(error);
       }

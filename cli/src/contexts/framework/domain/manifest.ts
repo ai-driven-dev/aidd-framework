@@ -231,7 +231,7 @@ export class Manifest {
     if (version === MANIFEST_VERSION) return;
     if (typeof version === "number" && version > MANIFEST_VERSION) {
       throw new InvalidManifestDataError(
-        `manifest version ${version} was written by a newer CLI than this one. Run \`aidd self-update\` to update this CLI, then try again.`
+        `manifest version ${version} was written by a newer CLI than this one. Run \`aidd update\` to update this CLI, then try again.`
       );
     }
     throw new InvalidManifestDataError(

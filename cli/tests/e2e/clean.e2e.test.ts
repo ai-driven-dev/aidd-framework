@@ -32,7 +32,7 @@ describe.concurrent("E2E: aidd clean", () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("clean-dry-run");
     try {
       await seedManifest(projectDir);
-      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 
       // runCli runs non-TTY (child process without TTY), so dry-run shows Would remove
       const { stdout, exitCode } = await runCli(["clean"], projectDir, fakeHome);
@@ -49,7 +49,7 @@ describe.concurrent("E2E: aidd clean", () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("clean-force");
     try {
       await seedManifest(projectDir);
-      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 
       const { stdout, exitCode } = await runCli(["clean", "--force"], projectDir, fakeHome);
 
@@ -66,7 +66,7 @@ describe.concurrent("E2E: aidd clean", () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("clean-preview");
     try {
       await seedManifest(projectDir);
-      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 
       const { stdout, exitCode } = await runCli(["clean"], projectDir, fakeHome);
 
@@ -82,8 +82,8 @@ describe.concurrent("E2E: aidd clean", () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("clean-multi");
     try {
       await seedManifest(projectDir);
-      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
-      await runCli(["ai", "install", "cursor"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "cursor"], projectDir, fakeHome);
 
       const { stdout, exitCode } = await runCli(["clean", "--force"], projectDir, fakeHome);
       expect(exitCode).toBe(0);

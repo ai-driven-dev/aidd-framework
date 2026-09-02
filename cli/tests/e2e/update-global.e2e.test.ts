@@ -15,14 +15,18 @@ async function seedProject(projectDir: string): Promise<void> {
   );
 }
 
-describe.concurrent("E2E: aidd update", () => {
+// The project-wide "re-install everything" sweep this file exercises used to live at
+// bare `aidd update`; that name is now self-update (a bare verb with no subject means
+// "the CLI itself", the Claude Code/Codex convention). Its old behavior — fan out across
+// every installed tool with no `--tool` given — is what `framework update` does now.
+describe.concurrent("E2E: aidd framework update", () => {
   it("reports all tools up to date when no tools have drift", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("update-noop");
     try {
       await seedProject(projectDir);
-      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 
-      const { stdout, exitCode } = await runCli(["update"], projectDir, fakeHome);
+      const { stdout, exitCode } = await runCli(["framework", "update"], projectDir, fakeHome);
 
       expect(exitCode).toBe(0);
       expect(stdout.toLowerCase()).toMatch(/up to date|updated/);
@@ -35,9 +39,9 @@ describe.concurrent("E2E: aidd update", () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("update-force");
     try {
       await seedProject(projectDir);
-      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
 
-      const { stdout, exitCode } = await runCli(["update"], projectDir, fakeHome);
+      const { stdout, exitCode } = await runCli(["framework", "update"], projectDir, fakeHome);
 
       expect(exitCode).toBe(0);
       expect(stdout.toLowerCase()).toMatch(/updated|up to date/);
@@ -51,11 +55,11 @@ describe.concurrent("E2E: aidd update", () => {
   it("exits zero when no manifest exists (no tools installed)", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("update-empty");
     try {
-      const { stdout, exitCode } = await runCli(["update"], projectDir, fakeHome);
+      const { stdout, exitCode } = await runCli(["framework", "update"], projectDir, fakeHome);
 
       // update exits 0 and reports no tools
       expect(exitCode).toBe(0);
-      expect(stdout.toLowerCase()).toMatch(/up to date|no manifest|nothing/);
+      expect(stdout.toLowerCase()).toMatch(/up to date|no manifest|no tools|nothing/);
     } finally {
       await cleanup();
     }
@@ -65,10 +69,10 @@ describe.concurrent("E2E: aidd update", () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("update-multi");
     try {
       await seedProject(projectDir);
-      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
-      await runCli(["ai", "install", "cursor"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "claude"], projectDir, fakeHome);
+      await runCli(["framework", "install", "--tool", "cursor"], projectDir, fakeHome);
 
-      const { stdout, exitCode } = await runCli(["update"], projectDir, fakeHome);
+      const { stdout, exitCode } = await runCli(["framework", "update"], projectDir, fakeHome);
 
       expect(exitCode).toBe(0);
       // Both tools should be mentioned

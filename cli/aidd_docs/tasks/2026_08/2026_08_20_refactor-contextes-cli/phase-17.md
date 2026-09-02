@@ -1,5 +1,5 @@
 ---
-status: pending
+status: blocked
 ---
 
 # Instruction: Turn kanban into a launcher
@@ -51,6 +51,52 @@ journey
   section Teardown
     typecheck the CLI without kanban's node_modules => it passes: 5: system
 ```
+
+## Bloquée (2026-09-02) — la prémisse ne tient pas
+
+La tâche 1 dit « remplacer l'import profond par un lanceur qui trouve le binaire et l'exécute ».
+Mesuré : **il n'y a pas de binaire à trouver.**
+
+`kanban/package.json` déclare `@ai-driven-dev/kanban-source`, et c'est tout ce qu'il déclare :
+
+| champ | valeur |
+|---|---|
+| `private` | `true` |
+| `version` | absente |
+| `main` / `exports` / `bin` | aucun |
+| `scripts` | `test`, `test:watch`, `typecheck`, `lint`, `format` — aucun build |
+
+Et `kanban/src/` ne contient aucun fichier d'entrée : seulement `registerInteractiveCommand` et
+`registerListCommand`, des fonctions qui enregistrent des commandes **dans un programme hôte**.
+Kanban n'est pas un programme qu'on lance, c'est une bibliothèque que le CLI compile avec lui — ce
+qui est précisément la raison d'être de l'import profond que cette phase veut retirer.
+
+### Ce que la phase voulait vraiment, et ce qu'il en reste
+
+Le but n'est pas le lanceur, c'est que le CLI cesse de porter les dépendances d'une interface
+texte. Vérifié, les quatre sont déclarées dans `cli/package.json` et **utilisées par zéro fichier**
+du CLI :
+
+| dépendance | `cli/src` | `cli/tests` | `kanban/src` |
+|---|---|---|---|
+| `ink` | 0 | 0 | 3 |
+| `react` | 0 | 0 | 2 |
+| `cli-table3` | 0 | 0 | 1 |
+| `gray-matter` | 0 | 0 | 1 |
+
+Elles ne sont là que parce que le CLI importe le source de kanban. Les retirer exige donc de
+retirer l'import profond, et retirer l'import profond exige que kanban devienne lançable.
+
+### Ce qu'il faudrait décider
+
+Faire de kanban un programme autonome : un fichier d'entrée, un build, un `bin`, une version, et la
+question produit qui va avec — kanban se publie-t-il séparément, ou reste-t-il interne au dépôt ?
+C'est un changement dans un autre paquet et une décision de produit, pas une étape de ce refactor.
+
+Un import dynamique paresseux ne rendrait rien : les quatre dépendances resteraient nécessaires à
+l'exécution, donc déclarées.
+
+**Rien d'autre n'attend cette phase.** La 18 et la 19 ne la traversent pas.
 
 ## Tasks to do
 

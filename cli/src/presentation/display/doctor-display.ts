@@ -26,7 +26,7 @@ export function printPluginIssues(output: CLIOutput, pluginIssues: readonly Plug
   output.print("\nPlugins:");
   for (const pi of pluginIssues) {
     output.error(
-      `  Plugin ${pi.pluginName} (${pi.toolId}): ${pi.issue} — ${pi.filePath}\n    Fix: Run \`aidd ai restore\``
+      `  Plugin ${pi.pluginName} (${pi.toolId}): ${pi.issue} — ${pi.filePath}\n    Fix: Run \`aidd sync\``
     );
   }
 }

@@ -38,7 +38,7 @@ export class CheckUpdateUseCase {
     this.logger.warn(
       `CLI update available: v${current.replace(/^v/, "")} → v${cached.latest.replace(/^v/, "")}`
     );
-    this.logger.warn("Run `aidd self-update`.");
+    this.logger.warn("Run `aidd update`.");
   }
 
   /** Online piggyback path: fetch the latest release and persist the cache. Awaited. */

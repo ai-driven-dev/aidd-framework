@@ -105,9 +105,9 @@ describe("E2E: update-check piggyback", () => {
   it("hot path is read-only and offline: cold offline command makes no request and writes no cache", async () => {
     const t = await setupEnv("cold");
     try {
-      await runCli(["status"], t.projectDir, t.env);
+      await runCli(["doctor"], t.projectDir, t.env);
 
-      // `status` is not an online command → no piggyback refresh.
+      // `doctor` is not an online command → no piggyback refresh.
       expect(t.server.hits()).toBe(0);
       expect(existsSync(t.cachePath)).toBe(false);
     } finally {
@@ -125,7 +125,9 @@ describe("E2E: update-check piggyback", () => {
         "utf-8"
       );
 
-      const { stderr } = await runCli(["status"], t.projectDir, t.env);
+      // `update` is excluded from the preAction nag (it resolves the latest version
+      // itself), so any other command exercises the generic cache-only path.
+      const { stderr } = await runCli(["doctor"], t.projectDir, t.env);
 
       expect(stderr).toContain("CLI update available");
       expect(t.server.hits()).toBe(0); // hot path never touches the network
@@ -137,9 +139,11 @@ describe("E2E: update-check piggyback", () => {
   it("online command refreshes the cache via postAction (the regression guard)", async () => {
     const t = await setupEnv("refresh");
     try {
-      // Cold cache. `update` IS an online command → postAction must fetch + persist
-      // BEFORE the process exits. The old fire-and-forget design left this file absent.
-      const { exitCode } = await runCli(["update"], t.projectDir, t.env);
+      // Cold cache. `marketplace list` IS an online command → postAction must fetch +
+      // persist BEFORE the process exits. `update` is deliberately NOT one of these
+      // (self-update resolves the latest version through its own request, not this
+      // piggyback) — the old fire-and-forget design left this file absent.
+      const { exitCode } = await runCli(["marketplace", "list"], t.projectDir, t.env);
 
       expect(exitCode).toBe(0);
       expect(existsSync(t.cachePath)).toBe(true);

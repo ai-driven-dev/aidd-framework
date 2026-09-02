@@ -2,47 +2,7 @@
   {
     "invocation": "aidd",
     "exitCode": 0,
-    "help": "Usage: aidd [options] [command]\n\nGenerate AI coding assistant configurations from the AIDD framework\n\nOptions:\n  -V, --version          Show version number\n  --verbose              Show detailed diagnostic output (default: false)\n  -h, --help             display help for command\n\nCommands:\n  setup [options]        Set up or update the project to a correct state\n  framework              Framework build and management tools\n  ai                     Manage AI tools (claude, cursor, copilot, codex,\n                         opencode)\n  ide                    Manage IDE integrations (vscode)\n  plugin                 Manage plugins for AI tools\n  marketplace            Manage plugin marketplaces\n  auth                   Manage authentication\n  status                 Show drift across all installed tools and plugins\n  restore [options]      Restore tracked files to their installed version (from\n                         manifest hashes)\n  update [options]       Re-install runtime configs, update plugins, and refresh\n                         marketplaces\n  doctor                 Check installation health and detect issues across all\n                         tools and plugins\n  clean [options]        Remove all AIDD-managed files from the project\n  self-update [options]  Update the aidd CLI to the latest version\n  help [command]         display help for command"
-  },
-  {
-    "invocation": "aidd ai",
-    "exitCode": 0,
-    "help": "Usage: aidd ai [options] [command]\n\nManage AI tools (claude, cursor, copilot, codex, opencode)\n\nOptions:\n  -h, --help                    display help for command\n\nCommands:\n  install [options] <tool>      Install an AI tool runtime configuration from\n                                bundled assets\n  uninstall <tool>              Remove an AI tool's generated configuration\n                                files\n  list                          List installed AI tools\n  status [options]              Show drift for AI tools (optionally filtered by\n                                tool and/or plugin)\n  update [options] [tool]       Re-install AI tool configs from bundled CLI\n                                assets\n  restore [options] [files...]  Restore AI tool tracked files to their installed\n                                version\n  doctor [options]              Check AI tool installation health (optionally\n                                filtered by plugin)"
-  },
-  {
-    "invocation": "aidd ai doctor",
-    "exitCode": 0,
-    "help": "Usage: aidd ai doctor [options]\n\nCheck AI tool installation health (optionally filtered by plugin)\n\nOptions:\n  --plugin <name>  Limit doctor to a specific plugin\n  -h, --help       display help for command"
-  },
-  {
-    "invocation": "aidd ai install",
-    "exitCode": 0,
-    "help": "Usage: aidd ai install [options] <tool>\n\nInstall an AI tool runtime configuration from bundled assets\n\nOptions:\n  -f, --force   Overwrite already-installed tool (default: false)\n  --no-plugins  Skip propagation of already-installed plugins onto the new tool\n  -h, --help    display help for command"
-  },
-  {
-    "invocation": "aidd ai list",
-    "exitCode": 0,
-    "help": "Usage: aidd ai list [options]\n\nList installed AI tools\n\nOptions:\n  -h, --help  display help for command"
-  },
-  {
-    "invocation": "aidd ai restore",
-    "exitCode": 0,
-    "help": "Usage: aidd ai restore [options] [files...]\n\nRestore AI tool tracked files to their installed version\n\nOptions:\n  -f, --force      Restore without prompting (default: false)\n  --tool <tool>    Limit restore to a specific AI tool\n  --plugin <name>  Limit restore to a specific plugin\n  -h, --help       display help for command"
-  },
-  {
-    "invocation": "aidd ai status",
-    "exitCode": 0,
-    "help": "Usage: aidd ai status [options]\n\nShow drift for AI tools (optionally filtered by tool and/or plugin)\n\nOptions:\n  --tool <tool>    Limit status to a specific AI tool\n  --plugin <name>  Limit status to a specific plugin\n  -h, --help       display help for command"
-  },
-  {
-    "invocation": "aidd ai uninstall",
-    "exitCode": 0,
-    "help": "Usage: aidd ai uninstall [options] <tool>\n\nRemove an AI tool's generated configuration files\n\nOptions:\n  -h, --help  display help for command"
-  },
-  {
-    "invocation": "aidd ai update",
-    "exitCode": 0,
-    "help": "Usage: aidd ai update [options] [tool]\n\nRe-install AI tool configs from bundled CLI assets\n\nOptions:\n  -f, --force  Overwrite modified files without prompting (default: false)\n  -h, --help   display help for command"
+    "help": "Usage: aidd [options] [command]\n\nGenerate AI coding assistant configurations from the AIDD framework\n\nOptions:\n  -V, --version                 Show version number\n  --verbose                     Show detailed diagnostic output (default: false)\n  -h, --help                    display help for command\n\nCommands:\n  setup [options]               Set up or update the project to a correct state\n                                — bootstraps the whole project (marketplace,\n                                framework, tools, plugins); see `framework\n                                install`, which acts on the framework alone\n  framework                     Manage the framework's lifecycle on installed\n                                tools: install, update, remove\n  translate [options] <source>  Convert an arbitrary source into a target-native\n                                plugin tree — records nothing (see `sync` for\n                                the manifest-driven, tracked version)\n  plugin                        Manage plugins for AI tools\n  marketplace                   Manage plugin marketplaces\n  auth                          Manage authentication\n  sync [options] [files...]     Rewrite owned files from what is already there —\n                                regenerate tracked files, driven by the manifest\n                                (see `translate`, which converts a source\n                                without recording anything)\n  update|upgrade [options]      Update the aidd CLI itself to the latest version\n  doctor [options]              Detected and equipped tools, plugins, drift, and\n                                problems — across all tools or one\n  clean [options]               Remove all AIDD-managed files from the project —\n                                retires every part of AIDD; see `framework\n                                remove`, which removes the framework only\n  help [command]                display help for command"
   },
   {
     "invocation": "aidd auth",
@@ -67,67 +27,37 @@
   {
     "invocation": "aidd clean",
     "exitCode": 0,
-    "help": "Usage: aidd clean [options]\n\nRemove all AIDD-managed files from the project\n\nOptions:\n  --force     Confirm file removal (skip dry-run) (default: false)\n  -h, --help  display help for command"
+    "help": "Usage: aidd clean [options]\n\nRemove all AIDD-managed files from the project — retires every part of AIDD; see\n`framework remove`, which removes the framework only\n\nOptions:\n  --force     Confirm file removal (skip dry-run) (default: false)\n  -h, --help  display help for command"
   },
   {
     "invocation": "aidd doctor",
     "exitCode": 0,
-    "help": "Usage: aidd doctor [options]\n\nCheck installation health and detect issues across all tools and plugins\n\nOptions:\n  -h, --help  display help for command"
+    "help": "Usage: aidd doctor [options]\n\nDetected and equipped tools, plugins, drift, and problems — across all tools or\none\n\nOptions:\n  --tool <tool>    Limit to a specific AI or IDE tool\n  --plugin <name>  Limit plugin checks to a specific plugin\n  -h, --help       display help for command"
   },
   {
     "invocation": "aidd framework",
     "exitCode": 0,
-    "help": "Usage: aidd framework [options] [command]\n\nFramework build and management tools\n\nOptions:\n  -h, --help       display help for command\n\nCommands:\n  build [options]  Build a Claude-format framework into a target-native plugin\n                   marketplace tree or project workspace\n  help [command]   display help for command"
+    "help": "Usage: aidd framework [options] [command]\n\nManage the framework's lifecycle on installed tools: install, update, remove\n\nOptions:\n  -h, --help         display help for command\n\nCommands:\n  install [options]  Install a tool's runtime configuration from bundled assets\n                     — acts on the framework alone (see `setup`, which\n                     bootstraps the whole project)\n  remove [options]   Remove a tool's generated configuration files — removes the\n                     framework only (see `clean`, which removes all of AIDD)\n  update [options]   Re-install tool configs from bundled CLI assets, moving to\n                     a new version (all installed tools if --tool is omitted;\n                     see `marketplace refresh`, which re-fetches catalogs\n                     instead)\n  help [command]     display help for command"
   },
   {
-    "invocation": "aidd framework build",
+    "invocation": "aidd framework install",
     "exitCode": 0,
-    "help": "Usage: aidd framework build [options]\n\nBuild a Claude-format framework into a target-native plugin marketplace tree or\nproject workspace\n\nOptions:\n  --source <path>    Path to the source framework directory\n  --target <target>  Build target (claude, cursor, copilot, codex, opencode)\n  --out <dir>        Output directory (marketplace dist or project root)\n  --flat             Materialize directly into project workspace, bypass\n                     marketplace\n  --force            Overwrite existing files at canonical paths (flat mode\n                     only)\n  -h, --help         display help for command"
+    "help": "Usage: aidd framework install [options]\n\nInstall a tool's runtime configuration from bundled assets — acts on the\nframework alone (see `setup`, which bootstraps the whole project)\n\nOptions:\n  --tool <tool>  AI or IDE tool ID\n  -f, --force    Overwrite already-installed tool (default: false)\n  --no-plugins   Skip propagation of already-installed plugins onto the new tool\n  -h, --help     display help for command"
   },
   {
-    "invocation": "aidd ide",
+    "invocation": "aidd framework remove",
     "exitCode": 0,
-    "help": "Usage: aidd ide [options] [command]\n\nManage IDE integrations (vscode)\n\nOptions:\n  -h, --help                    display help for command\n\nCommands:\n  install [options] <tool>      Install an IDE integration from bundled assets\n  uninstall <tool>              Remove an IDE tool from the manifest\n  list                          List installed IDE tools\n  status                        Show drift for IDE tools\n  update [options] [tool]       Re-install IDE tool configs from bundled CLI\n                                assets\n  restore [options] [files...]  Restore IDE tool tracked files to their\n                                installed version\n  doctor                        Check IDE tool installation health and detect\n                                issues"
+    "help": "Usage: aidd framework remove [options]\n\nRemove a tool's generated configuration files — removes the framework only (see\n`clean`, which removes all of AIDD)\n\nOptions:\n  --tool <tool>  AI or IDE tool ID\n  -h, --help     display help for command"
   },
   {
-    "invocation": "aidd ide doctor",
+    "invocation": "aidd framework update",
     "exitCode": 0,
-    "help": "Usage: aidd ide doctor [options]\n\nCheck IDE tool installation health and detect issues\n\nOptions:\n  -h, --help  display help for command"
-  },
-  {
-    "invocation": "aidd ide install",
-    "exitCode": 0,
-    "help": "Usage: aidd ide install [options] <tool>\n\nInstall an IDE integration from bundled assets\n\nOptions:\n  -f, --force  Overwrite already-installed tool (default: false)\n  -h, --help   display help for command"
-  },
-  {
-    "invocation": "aidd ide list",
-    "exitCode": 0,
-    "help": "Usage: aidd ide list [options]\n\nList installed IDE tools\n\nOptions:\n  -h, --help  display help for command"
-  },
-  {
-    "invocation": "aidd ide restore",
-    "exitCode": 0,
-    "help": "Usage: aidd ide restore [options] [files...]\n\nRestore IDE tool tracked files to their installed version\n\nOptions:\n  -f, --force    Restore without prompting (default: false)\n  --tool <tool>  Limit restore to a specific IDE tool\n  -h, --help     display help for command"
-  },
-  {
-    "invocation": "aidd ide status",
-    "exitCode": 0,
-    "help": "Usage: aidd ide status [options]\n\nShow drift for IDE tools\n\nOptions:\n  -h, --help  display help for command"
-  },
-  {
-    "invocation": "aidd ide uninstall",
-    "exitCode": 0,
-    "help": "Usage: aidd ide uninstall [options] <tool>\n\nRemove an IDE tool from the manifest\n\nOptions:\n  -h, --help  display help for command"
-  },
-  {
-    "invocation": "aidd ide update",
-    "exitCode": 0,
-    "help": "Usage: aidd ide update [options] [tool]\n\nRe-install IDE tool configs from bundled CLI assets\n\nOptions:\n  -f, --force  Overwrite modified files without prompting (default: false)\n  -h, --help   display help for command"
+    "help": "Usage: aidd framework update [options]\n\nRe-install tool configs from bundled CLI assets, moving to a new version (all\ninstalled tools if --tool is omitted; see `marketplace refresh`, which\nre-fetches catalogs instead)\n\nOptions:\n  --tool <tool>  Limit update to a specific AI or IDE tool\n  -f, --force    Overwrite modified files without prompting (default: false)\n  -h, --help     display help for command"
   },
   {
     "invocation": "aidd marketplace",
     "exitCode": 0,
-    "help": "Usage: aidd marketplace [options] [command]\n\nManage plugin marketplaces\n\nOptions:\n  -h, --help                     display help for command\n\nCommands:\n  add [options] [name] [source]  Register a plugin marketplace\n  list [options]                 List registered plugin marketplaces\n  remove [options] <name>        Remove a registered plugin marketplace\n  refresh [options] [name]       Refresh registered marketplaces\n  check                          Report stale marketplaces and upstream-removed\n                                 plugins"
+    "help": "Usage: aidd marketplace [options] [command]\n\nManage plugin marketplaces\n\nOptions:\n  -h, --help                     display help for command\n\nCommands:\n  add [options] [name] [source]  Register a plugin marketplace\n  list [options]                 List registered plugin marketplaces\n  remove [options] <name>        Remove a registered plugin marketplace\n  refresh [options] [name]       Refresh registered marketplaces — re-fetches\n                                 catalogs; see `framework update`, which moves\n                                 installed tools to a new version instead\n  check                          Report stale marketplaces and upstream-removed\n                                 plugins"
   },
   {
     "invocation": "aidd marketplace add",
@@ -147,7 +77,7 @@
   {
     "invocation": "aidd marketplace refresh",
     "exitCode": 0,
-    "help": "Usage: aidd marketplace refresh [options] [name]\n\nRefresh registered marketplaces\n\nOptions:\n  --force     Clear cache before re-fetching\n  -h, --help  display help for command"
+    "help": "Usage: aidd marketplace refresh [options] [name]\n\nRefresh registered marketplaces — re-fetches catalogs; see `framework update`,\nwhich moves installed tools to a new version instead\n\nOptions:\n  --force     Clear cache before re-fetching\n  -h, --help  display help for command"
   },
   {
     "invocation": "aidd marketplace remove",
@@ -157,12 +87,7 @@
   {
     "invocation": "aidd plugin",
     "exitCode": 0,
-    "help": "Usage: aidd plugin [options] [command]\n\nManage plugins for AI tools\n\nOptions:\n  -h, --help                  display help for command\n\nCommands:\n  remove [options] <name>     Remove a plugin from one or all AI tools\n  list [options]              List installed plugins for one or all AI tools\n  install [options] [plugin]  Install a plugin (marketplace name, local path, or\n                              interactive pick)\n  search [options] <query>    Search registered marketplaces for plugins\n  update [options] [name]     Update one or all plugins for one or all AI tools\n  doctor [options]            Check plugin installation health"
-  },
-  {
-    "invocation": "aidd plugin doctor",
-    "exitCode": 0,
-    "help": "Usage: aidd plugin doctor [options]\n\nCheck plugin installation health\n\nOptions:\n  --plugin <name>  Filter check to one plugin\n  -h, --help       display help for command"
+    "help": "Usage: aidd plugin [options] [command]\n\nManage plugins for AI tools\n\nOptions:\n  -h, --help                  display help for command\n\nCommands:\n  remove [options] <name>     Remove a plugin from one or all AI tools\n  list [options]              List installed plugins for one or all AI tools\n  install [options] [plugin]  Install a plugin (marketplace name, local path, or\n                              interactive pick)\n  search [options] <query>    Search registered marketplaces for plugins\n  update [options] [name]     Update one or all plugins for one or all AI tools"
   },
   {
     "invocation": "aidd plugin install",
@@ -190,28 +115,23 @@
     "help": "Usage: aidd plugin update [options] [name]\n\nUpdate one or all plugins for one or all AI tools\n\nOptions:\n  --tool <toolId>  Target AI tool (default: all installed)\n  -h, --help       display help for command"
   },
   {
-    "invocation": "aidd restore",
-    "exitCode": 0,
-    "help": "Usage: aidd restore [options]\n\nRestore tracked files to their installed version (from manifest hashes)\n\nOptions:\n  -f, --force  Restore without prompting (default: false)\n  -h, --help   display help for command"
-  },
-  {
-    "invocation": "aidd self-update",
-    "exitCode": 0,
-    "help": "Usage: aidd self-update [options]\n\nUpdate the aidd CLI to the latest version\n\nOptions:\n  --check      Check if a newer version is available without installing\n               (default: false)\n  --dry-run    Preview the update without installing (default: false)\n  -f, --force  Reinstall even if already up to date (default: false)\n  -h, --help   display help for command"
-  },
-  {
     "invocation": "aidd setup",
     "exitCode": 0,
-    "help": "Usage: aidd setup [options]\n\nSet up or update the project to a correct state\n\nOptions:\n  --source <mode>           Framework source: remote or local\n  --path <dir>              Absolute path to local framework (required with\n                            --source local)\n  --release <tag>           Marketplace release tag to fetch (e.g., v1.2.3)\n  --ai <ids>                Comma-separated AI tool IDs, or 'all' (e.g.,\n                            claude,cursor or all)\n  --ide <ids>               Comma-separated IDE tool IDs, or 'all' (e.g., vscode\n                            or all)\n  --plugins <mode>          Plugin install mode: none | all | recommended |\n                            comma-separated names\n  --no-default-marketplace  Skip auto-registering aidd-framework (no source\n                            prompt, no plugin install)\n  --yes                     Accept defaults without prompting\n  -h, --help                display help for command"
+    "help": "Usage: aidd setup [options]\n\nSet up or update the project to a correct state — bootstraps the whole project\n(marketplace, framework, tools, plugins); see `framework install`, which acts on\nthe framework alone\n\nOptions:\n  --source <mode>           Framework source: remote or local\n  --path <dir>              Absolute path to local framework (required with\n                            --source local)\n  --release <tag>           Marketplace release tag to fetch (e.g., v1.2.3)\n  --ai <ids>                Comma-separated AI tool IDs, or 'all' (e.g.,\n                            claude,cursor or all)\n  --ide <ids>               Comma-separated IDE tool IDs, or 'all' (e.g., vscode\n                            or all)\n  --plugins <mode>          Plugin install mode: none | all | recommended |\n                            comma-separated names\n  --no-default-marketplace  Skip auto-registering aidd-framework (no source\n                            prompt, no plugin install)\n  --yes                     Accept defaults without prompting\n  -h, --help                display help for command"
   },
   {
-    "invocation": "aidd status",
+    "invocation": "aidd sync",
     "exitCode": 0,
-    "help": "Usage: aidd status [options]\n\nShow drift across all installed tools and plugins\n\nOptions:\n  -h, --help  display help for command"
+    "help": "Usage: aidd sync [options] [files...]\n\nRewrite owned files from what is already there — regenerate tracked files,\ndriven by the manifest (see `translate`, which converts a source without\nrecording anything)\n\nArguments:\n  files            Limit sync to specific tracked files\n\nOptions:\n  -f, --force      Sync without prompting (default: false)\n  --tool <tool>    Limit sync to a specific tool\n  --plugin <name>  Limit sync to a specific plugin\n  -h, --help       display help for command"
+  },
+  {
+    "invocation": "aidd translate",
+    "exitCode": 0,
+    "help": "Usage: aidd translate [options] <source>\n\nConvert an arbitrary source into a target-native plugin tree — records nothing\n(see `sync` for the manifest-driven, tracked version)\n\nArguments:\n  source                   Path to the source framework directory\n\nOptions:\n  --to <target>            Conversion target (claude, cursor, copilot, codex,\n                           opencode)\n  --out <dir>              Output directory (marketplace dist or project root)\n  --as <marketplace|flat>  Output layout (default: \"marketplace\")\n  --force                  Overwrite existing files at canonical paths (--as\n                           flat only)\n  -h, --help               display help for command"
   },
   {
     "invocation": "aidd update",
     "exitCode": 0,
-    "help": "Usage: aidd update [options]\n\nRe-install runtime configs, update plugins, and refresh marketplaces\n\nOptions:\n  -f, --force  Overwrite modified files without prompting (default: false)\n  -h, --help   display help for command"
+    "help": "Usage: aidd update|upgrade [options]\n\nUpdate the aidd CLI itself to the latest version\n\nOptions:\n  --check      Check if a newer version is available without installing\n               (default: false)\n  --dry-run    Preview the update without installing (default: false)\n  -f, --force  Reinstall even if already up to date (default: false)\n  -h, --help   display help for command"
   }
 ]

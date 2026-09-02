@@ -31,7 +31,6 @@ import { ResolveUpdateDecisionUseCase } from "../../contexts/framework/applicati
 import { RestoreAllUseCase } from "../../contexts/framework/application/global/restore-all-use-case.js";
 import { StatusAllUseCase } from "../../contexts/framework/application/global/status-all-use-case.js";
 import { UpdateAiToolsUseCase } from "../../contexts/framework/application/global/update-ai-tools-use-case.js";
-import { UpdateAllUseCase } from "../../contexts/framework/application/global/update-all-use-case.js";
 import { UpdateIdeToolsUseCase } from "../../contexts/framework/application/global/update-ide-tools-use-case.js";
 import { UpdateOneToolUseCase } from "../../contexts/framework/application/global/update-one-tool-use-case.js";
 import { InstallAiToolUseCase } from "../../contexts/framework/application/install/install-ai-tool-use-case.js";
@@ -167,7 +166,6 @@ interface Deps {
   uninstallUseCase: UninstallUseCase;
   statusAllUseCase: StatusAllUseCase;
   restoreAllUseCase: RestoreAllUseCase;
-  updateAllUseCase: UpdateAllUseCase;
   updateAiToolsUseCase: UpdateAiToolsUseCase;
   updateIdeToolsUseCase: UpdateIdeToolsUseCase;
   cleanUseCase: CleanUseCase;
@@ -445,14 +443,6 @@ export async function createDeps(
     resolveUpdateDecisionUseCase,
     fs
   );
-  const updateAllUseCase = new UpdateAllUseCase(
-    manifestRepo,
-    currentVersionProvider,
-    pluginUpdateUseCase,
-    marketplaceRefreshUseCase,
-    updateOneToolUseCase,
-    marketplaceSyncSettingsUseCase
-  );
   const updateAiToolsUseCase = new UpdateAiToolsUseCase(
     manifestRepo,
     currentVersionProvider,
@@ -524,7 +514,6 @@ export async function createDeps(
     uninstallUseCase,
     statusAllUseCase,
     restoreAllUseCase,
-    updateAllUseCase,
     updateAiToolsUseCase,
     updateIdeToolsUseCase,
     cleanUseCase,

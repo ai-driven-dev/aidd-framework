@@ -106,15 +106,15 @@ aidd setup
 # 2. Non-interactive scriptable setup (CI / onboarding scripts)
 aidd setup --source remote --ai claude --ide vscode --plugins recommended --yes
 
-# 3. Install an AI tool or IDE integration (noun-first surface)
-aidd ai install claude
-aidd ide install vscode
+# 3. Install an AI tool or IDE integration
+aidd framework install --tool claude
+aidd framework install --tool vscode
 
 # 4. Install a plugin from the marketplace
 aidd plugin install aidd-context
 
-# 5. Check installation status
-aidd ai status
+# 5. Check installation health, inventory, and drift
+aidd doctor
 ```
 
 ### Setup flags
@@ -136,13 +136,13 @@ aidd setup --ai all --ide all --yes
 
 ### Brownfield (existing project)
 
-This CLI reads manifest schema v6 only. If `aidd status` (or any command) refuses to load
+This CLI reads manifest schema v6 only. If `aidd doctor` (or any command) refuses to load
 the manifest, run `npx @ai-driven-dev/cli@5.2.1 update --force` once — the last version able
 to migrate an older manifest forward — then update the CLI again. `--force` matters: a plain
 `update` skips the save when a tracked file was hand-edited.
 
 ```bash
-aidd status
+aidd doctor
 ```
 
 ---
@@ -152,26 +152,28 @@ aidd status
 ### Updating the framework
 
 ```bash
-aidd status                     # see what changed (drift + available update)
-aidd update                     # re-install all tool configs, update plugins, refresh marketplaces
-aidd update --force             # overwrite modified files without prompting (CI-safe)
+aidd doctor                     # see what changed (drift + inventory + health)
+aidd framework update           # re-install all tool configs (all installed tools)
+aidd framework update --force   # overwrite modified files without prompting (CI-safe)
+aidd plugin update               # keep plugins up to date
+aidd marketplace refresh         # re-fetch marketplace catalogs
 ```
 
-`aidd update` takes no scope flags — it refreshes every installed tool. To re-install a single tool, use `aidd ai update <tool>` / `aidd ide update <tool>`.
+`aidd framework update` with no `--tool` refreshes every installed tool. To re-install a single tool, use `aidd framework update --tool <tool>`. This is distinct from bare `aidd update`, which updates the CLI binary itself (see [`aidd update`](#aidd-update)).
 
-**Conflict behavior**: unmodified files (disk hash matches manifest hash) are always updated silently. Modified files prompt keep / overwrite / overwrite-all / skip-all in an interactive terminal; in non-interactive mode (no TTY, CI), the command exits 1 unless `--force` is passed. `--force` overwrites all modified files without prompting. Plugin and marketplace updates are never gated by this guard.
+**Conflict behavior**: unmodified files (disk hash matches manifest hash) are always updated silently. Modified files prompt keep / overwrite / overwrite-all / skip-all in an interactive terminal; in non-interactive mode (no TTY, CI), the command exits 1 unless `--force` is passed. `--force` overwrites all modified files without prompting.
 
 ### Restoring modified files
 
 ```bash
-aidd status                              # identify modified (~) files
-aidd restore                             # restore all tracked files (all tools), prompts first
-aidd restore --force                     # skip confirmation prompts (CI-safe)
-aidd ai restore --tool claude            # restore a specific AI tool's files
-aidd ai restore rules/naming.md          # restore specific files
+aidd doctor                              # identify modified (~) files, in the Drift section
+aidd sync                                # restore all tracked files (all tools), prompts first
+aidd sync --force                        # skip confirmation prompts (CI-safe)
+aidd sync --tool claude                  # restore a specific tool's files
+aidd sync rules/naming.md                # restore specific files
 ```
 
-Restore uses the version pinned in the manifest. It does not touch untracked files. Top-level `aidd restore` covers all tools; per-tool/per-file restore lives under `aidd ai restore` / `aidd ide restore`.
+Sync (renamed from `restore`) rewrites owned files from what is already there, using the version pinned in the manifest. It does not touch untracked files. Bare `aidd sync` covers all tools; `--tool`/`--plugin` narrow it to one.
 
 ### Managing plugins
 
@@ -193,41 +195,32 @@ aidd marketplace check
 ### Uninstalling a tool
 
 ```bash
-aidd ai uninstall cursor        # remove cursor files and clean up the manifest
-aidd ide uninstall vscode       # remove VS Code integration only
+aidd framework remove --tool cursor        # remove cursor files and clean up the manifest
+aidd framework remove --tool vscode        # remove VS Code integration only
 ```
 
-`aidd ai uninstall` / `aidd ide uninstall` take a tool argument; run once per tool to remove several.
+`aidd framework remove --tool <tool>` takes one tool per invocation; run once per tool to remove several. This removes the framework's files for that tool only — see [`aidd clean`](#aidd-clean) to remove all of AIDD from the project.
 
 ---
 
 ## Commands
 
-| Command                         | Description                                                                          | Key options                                                       |
-| ------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| `aidd auth`                     | Manage authentication (login, logout, status)                                        | `--token`, `--gh`, `--level`                                      |
-| `aidd setup`                    | Bootstrap a project: init manifest + register marketplace + install runtime config   | `--source`, `--path`, `--release`, `--ai`, `--ide`, `--plugins`, `--yes` |
-| `aidd ai install <tool>`        | Install an AI tool runtime configuration from bundled assets                         | `--force`                                                         |
-| `aidd ai uninstall <tool>`      | Remove an AI tool's generated configuration files                                    | —                                                                 |
-| `aidd ai list`                  | List installed AI tools                                                              | —                                                                 |
-| `aidd ai status`                | Show drift for AI tools                                                              | —                                                                 |
-| `aidd ai update [tool]`         | Re-install AI tool configs from bundled CLI assets; prompts on conflicts in TTY, exits 1 in non-TTY | `--force`                                                |
-| `aidd ai restore [files...]`    | Restore AI tool tracked files to their installed version                             | `--force`, `--tool`                                               |
-| `aidd ai doctor`                | Check AI tool installation health and detect issues                                  | —                                                                 |
-| `aidd ide install <tool>`       | Install an IDE integration from bundled assets                                       | `--force`                                                         |
-| `aidd ide uninstall <tool>`     | Remove an IDE integration from the manifest                                          | —                                                                 |
-| `aidd ide list`                 | List installed IDE tools                                                             | —                                                                 |
-| `aidd ide status`               | Show drift for IDE tools                                                             | —                                                                 |
-| `aidd ide update [tool]`        | Re-install IDE tool configs from bundled CLI assets; prompts on conflicts in TTY, exits 1 in non-TTY | `--force`                                                |
-| `aidd ide doctor`               | Check IDE tool installation health and detect issues                                 | —                                                                 |
-| `aidd status`                   | Show drift across all tools (AI + IDE)                                               | —                                                                 |
-| `aidd doctor`                   | Structural integrity check — exits 1 on errors or warnings                           | —                                                                 |
-| `aidd restore [files...]`       | Revert modified/deleted files to the manifest-pinned version                         | `--force`, `--tool`                                               |
-| `aidd plugin`                   | Manage plugins for AI tools                                                          | `create`, `remove`, `list`, `install`, `search`, `update`, `doctor` |
-| `aidd marketplace`              | Manage plugin marketplaces                                                           | `add`, `list`, `remove`, `refresh`, `check`                       |
-| `aidd framework build`          | Build a Claude-format framework into a tool-native plugin marketplace tree or flat workspace | `--source`, `--target`, `--out`, `--flat`, `--force`     |
-| `aidd clean`                    | Remove all AIDD files — dry-run without `--force`                                    | `--force`                                                         |
-| `aidd self-update`              | Update the CLI itself to the latest version                                          | `--check`, `--dry-run`, `--force`                                 |
+| Command                          | Description                                                                          | Key options                                                       |
+| --------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| `aidd auth`                       | Manage authentication (login, logout, status)                                        | `--token`, `--gh`, `--level`                                      |
+| `aidd setup`                      | Bootstrap a project: init manifest + register marketplace + install runtime config   | `--source`, `--path`, `--release`, `--ai`, `--ide`, `--plugins`, `--yes` |
+| `aidd doctor`                     | Detected/equipped tools, plugins, drift, and problems — across all tools or one      | `--tool`, `--plugin`                                              |
+| `aidd sync [files...]`            | Rewrite owned files from what is already there, driven by the manifest               | `--force`, `--tool`, `--plugin`                                   |
+| `aidd translate <source>`         | Convert an arbitrary source into a target-native plugin tree — records nothing       | `--to`, `--out`, `--as`, `--force`                                |
+| `aidd update` (alias `upgrade`)   | Update the CLI itself to the latest version                                          | `--check`, `--dry-run`, `--force`                                 |
+| `aidd clean`                      | Remove all AIDD files — dry-run without `--force`                                    | `--force`                                                         |
+| `aidd framework install`          | Install a tool's runtime configuration from bundled assets                           | `--tool`, `--force`, `--no-plugins`                               |
+| `aidd framework update`           | Re-install tool configs from bundled CLI assets (all installed tools if `--tool` is omitted) | `--tool`, `--force`                                        |
+| `aidd framework remove`           | Remove a tool's generated configuration files                                        | `--tool`                                                          |
+| `aidd plugin`                     | Manage plugins for AI tools                                                          | `remove`, `list`, `install`, `search`, `update`                   |
+| `aidd marketplace`                | Manage plugin marketplaces                                                           | `add`, `list`, `remove`, `refresh`, `check`                       |
+
+`--tool` is the single scope flag across `doctor`, `sync`, and every `framework`/`plugin` subcommand — it takes one AI or IDE tool ID (`claude`, `cursor`, `copilot`, `codex`, `opencode`, `vscode`); omit it to act on every installed tool.
 
 ### `aidd auth`
 
@@ -270,74 +263,58 @@ aidd setup --ai claude,cursor --ide vscode              # mix AI and IDE tools
 
 `--ai`, `--ide`, `--plugins`, or `--source` each disable interactive prompts.
 
-### `aidd ai`
+### `aidd framework`
 
-Manages AI tools (install, uninstall, list, status, update, restore, doctor).
-
-```bash
-aidd ai install claude                      # install Claude Code runtime config
-aidd ai install cursor --force              # overwrite existing files
-aidd ai uninstall claude                    # remove Claude Code files
-aidd ai list                                # list installed AI tools
-aidd ai status                             # show drift for all AI tools
-aidd ai update                             # re-install all AI tool configs (prompts on conflicts)
-aidd ai update claude                      # re-install a specific AI tool
-aidd ai update --force                     # overwrite modified files without prompting
-aidd ai restore --tool claude              # restore modified Claude files
-aidd ai doctor                             # check AI tool installation health
-```
-
-### `aidd ide`
-
-Manages IDE integrations (install, uninstall, list, status, update, doctor).
+Manages the framework's lifecycle on installed tools — install, update, remove — scoped
+by `--tool` to one AI or IDE tool ID. Acts on the framework alone; see [`aidd setup`](#aidd-setup)
+to bootstrap the whole project instead.
 
 ```bash
-aidd ide install vscode                    # install VS Code integration
-aidd ide uninstall vscode                  # remove VS Code integration
-aidd ide list                              # list installed IDE tools
-aidd ide status                            # show drift for IDE tools
-aidd ide update                            # re-install all IDE tool configs (prompts on conflicts)
-aidd ide update --force                    # overwrite modified files without prompting
-aidd ide doctor                            # check IDE tool installation health
+aidd framework install --tool claude              # install Claude Code runtime config
+aidd framework install --tool cursor --force      # overwrite existing files
+aidd framework remove --tool claude               # remove Claude Code files
+aidd framework install --tool vscode              # install VS Code integration
+aidd framework remove --tool vscode               # remove VS Code integration
+aidd framework update                             # re-install all installed tools' configs (prompts on conflicts)
+aidd framework update --tool claude                # re-install a specific tool
+aidd framework update --force                     # overwrite modified files without prompting
 ```
 
-### `aidd status`
-
-Compares files on disk with the manifest. Shows drift and available framework updates.
-
-```bash
-aidd status                     # drift across all tools (AI + IDE)
-aidd ai status                  # AI tools only
-aidd ide status                 # IDE tools only
-```
-
-Legend: `~` modified · `-` deleted · `+` untracked (on disk, not in manifest)
+Per-file conflict guard on `update`: unmodified files are always updated silently. Modified
+files prompt in TTY or exit 1 in non-TTY. Use `--force` to overwrite all modified files
+without prompting. This moves installed tools to a new version — see
+[`aidd marketplace refresh`](#aidd-marketplace) to re-fetch catalogs instead.
 
 ### `aidd doctor`
 
-Checks structural integrity. Exits 1 if errors or warnings are found; exits 0 with a warning message if only the auth credential is missing (non-blocking in CI).
+Detected and equipped tools, plugins, drift, and problems — in one report, across all
+tools or one. Absorbs what used to be split across `status`, `ai status`, `ide status`,
+`ai doctor`, `ide doctor`, and `plugin doctor`. Structural issues (missing/corrupted
+manifest, orphaned tool directories, broken `@path` includes and markdown links) exit 1;
+drift (modified/deleted files, shown in the Drift section) never gates the exit code —
+only real issues do.
 
 ```bash
-aidd doctor                     # check all tools and plugins
-aidd ai doctor                  # AI tools only
-aidd ide doctor                 # IDE tools only
+aidd doctor                     # inventory + drift + health, across every installed tool
+aidd doctor --tool claude       # scoped to one tool
+aidd doctor --plugin my-plugin  # scoped to one plugin (exit code reflects that plugin only)
 ```
 
-Detects: missing or corrupted manifest, orphaned tool directories, broken `@path` includes and markdown links in tracked files.
+Legend for the drift section: `~` modified · `-` deleted · `+` untracked (on disk, not in manifest)
 
-> Drift (modified/deleted files) is not a structural issue — use `aidd status` for that.
+### `aidd sync`
 
-### `aidd update`
+Rewrites owned files from what is already there — regenerates tracked files, driven by
+the manifest. Renamed from `restore`. Uses the version pinned in the manifest; does not
+touch untracked files. See [`aidd translate`](#aidd-translate) for the unrecorded version
+of the same conversion.
 
-Re-applies bundled configs and fetches updated plugin content. See [Updating the framework](#updating-the-framework) for examples.
-
-> `aidd update` refreshes every installed tool. To re-install one tool, use `aidd ai update <tool>` / `aidd ide update <tool>` (these only touch tools already in the manifest). Use `aidd ai install <tool>` to add a new tool.
-
-Per-file conflict guard: unmodified files are always updated silently. Modified files prompt in TTY or exit 1 in non-TTY. Use `--force` to overwrite all modified files without prompting. Plugin and marketplace branches are always ungated.
-
-### `aidd restore`
-
-Reverts modified or deleted files to the version pinned in the manifest. See [Restoring modified files](#restoring-modified-files) for examples.
+```bash
+aidd sync                                # restore all tracked files (all tools), prompts first
+aidd sync --force                        # skip confirmation prompts (CI-safe)
+aidd sync --tool claude                  # restore a specific tool's files
+aidd sync rules/naming.md                # restore specific files
+```
 
 ### `aidd plugin`
 
@@ -356,7 +333,7 @@ aidd plugin search hooks                    # search marketplaces by keyword
 aidd plugin search hooks --recommended      # show only recommended results
 aidd plugin search hooks --marketplace acme # limit search to one marketplace
 aidd plugin install                         # no arg → interactively browse and install from a marketplace
-aidd plugin doctor                          # check plugin installation health
+aidd doctor --plugin my-plugin              # check one plugin's installation health
 aidd plugin update                          # update all installed plugins
 aidd plugin update my-plugin               # update a specific plugin
 aidd plugin remove my-plugin               # remove a plugin from all tools
@@ -410,30 +387,29 @@ Marketplace registration and plugin enable state are written to per-tool setting
 
 > **GitHub Copilot — workspace recommendations only.** Per [VS Code docs](https://code.visualstudio.com/docs/copilot/customization/agent-plugins), `.github/copilot/settings.json` registers marketplaces as **team recommendations**, not auto-activated. On first chat in the workspace VS Code shows a notification — the user must accept it (or filter Extensions by `@agentPlugins @recommended` and enable manually) before plugins load. To skip the per-project click, add the marketplace to the user-level setting `chat.plugins.marketplaces` (application-scoped, not writable from workspace). See [End-to-end: distribute a framework to Copilot](#end-to-end-distribute-a-framework-to-copilot-marketplace) for the full flow.
 
-### `aidd framework build`
+### `aidd translate`
 
-Translates a Claude-format framework source into a **target-native distribution** — one build per tool, in one of two modes. Used by framework authors to produce the dist trees consumers install. Not a CI step; run it manually (or in your own release script) against a framework checkout, typically a tagged framework release.
+Converts an arbitrary source into a **target-native distribution** — one build per tool, in one of two modes — and records nothing (see [`aidd sync`](#aidd-sync) for the manifest-driven, tracked version of the same conversion). Renamed from `framework build`. Used by framework authors to produce the dist trees consumers install. Not a CI step; run it manually (or in your own release script) against a framework checkout, typically a tagged framework release.
 
 ```bash
-aidd framework build \
-  --source <framework-path> \
-  --target <tool> \
+aidd translate <framework-path> \
+  --to <tool> \
   --out <dir> \
-  [--flat] [--force]
+  [--as marketplace|flat] [--force]
 ```
 
 | Flag | Required | Description |
 |---|---|---|
-| `--source` | yes | Path to a framework root with `plugins/<name>/.claude-plugin/plugin.json` entries |
-| `--target` | yes | `claude`, `cursor`, `copilot`, `codex`, or `opencode` |
+| `<source>` | yes | Path to a framework root with `plugins/<name>/.claude-plugin/plugin.json` entries |
+| `--to` | yes | `claude`, `cursor`, `copilot`, `codex`, or `opencode` |
 | `--out` | yes | Output directory. Marketplace mode: dist root (auto-wiped + recreated). Flat mode: the project root to materialize into |
-| `--flat` | no | Materialize directly into a project workspace, bypassing the marketplace layer |
-| `--force` | no | Overwrite existing files at canonical paths. **Flat mode only** (rejected without `--flat`) |
+| `--as marketplace\|flat` | no | Output layout; defaults to `marketplace`. `flat` materializes directly into a project workspace, bypassing the marketplace layer |
+| `--force` | no | Overwrite existing files at canonical paths. **Flat mode only** (rejected without `--as flat`) |
 
 #### Two modes
 
 - **Marketplace** (default) — emits a self-contained marketplace tree (`marketplace.json` + `plugins/<name>/...`). The consumer registers it with `aidd marketplace add` and installs plugins through the tool's native marketplace flow. Paths are rewritten to the tool's plugin-root token; no `${CLAUDE_PLUGIN_ROOT}` survives unless that token is the tool's own.
-- **Flat** (`--flat`) — materializes plugin content directly under the tool's workspace config directory (e.g. `.claude/`, `.cursor/`), with no marketplace indirection. For tools without native marketplace support, or when you want files on disk in the project.
+- **Flat** (`--as flat`) — materializes plugin content directly under the tool's workspace config directory (e.g. `.claude/`, `.cursor/`), with no marketplace indirection. For tools without native marketplace support, or when you want files on disk in the project.
 
 #### Per-tool / per-mode matrix
 
@@ -453,10 +429,10 @@ Copilot uses the [OpenPlugin spec](https://github.com/vercel/open-plugin-spec) (
 
 ```bash
 # 1. (author, per release) — produce the dist tree
-aidd framework build --source ./framework --target copilot --out ./dist/aidd-framework-copilot
+aidd translate ./framework --to copilot --out ./dist/aidd-framework-copilot
 
 # 2. (consumer) — register and install
-aidd ai install copilot
+aidd framework install --tool copilot
 aidd marketplace add aidd-fw ./dist/aidd-framework-copilot --yes
 aidd plugin install aidd-dev --tool copilot --yes
 ```
@@ -482,9 +458,9 @@ The CLI cannot write this setting programmatically (VS Code enforces application
 
 ```bash
 # Materialize the framework straight into a project workspace
-aidd framework build --source ./framework --target opencode --out ./my-project --flat
+aidd translate ./framework --to opencode --out ./my-project --as flat
 # Re-run after source changes, overwriting canonical paths:
-aidd framework build --source ./framework --target opencode --out ./my-project --flat --force
+aidd translate ./framework --to opencode --out ./my-project --as flat --force
 ```
 
 Flat mode writes directly under the project's tool directory — no `aidd marketplace add` / `aidd plugin install` step. opencode hooks are skipped (its runtime is JS modules, not declarative `hooks.json`).
@@ -493,33 +469,38 @@ Flat mode writes directly under the project's tool directory — no `aidd market
 
 ```bash
 for t in claude cursor copilot codex; do
-  aidd framework build --source ./framework --target "$t" --out "./dist/aidd-framework-$t"
+  aidd translate ./framework --to "$t" --out "./dist/aidd-framework-$t"
 done
-aidd framework build --source ./framework --target opencode --out ./dist/aidd-framework-opencode-flat --flat
+aidd translate ./framework --to opencode --out ./dist/aidd-framework-opencode-flat --as flat
 ```
 
 ### Manifest schema upgrades
 
-There is no `aidd migrate` command, and no automatic migration: this CLI reads manifest schema v6 only. A manifest below v6 is refused with a message naming the last CLI able to migrate it — `npx @ai-driven-dev/cli@5.2.1 update --force` — run once to upgrade the manifest on disk, then update the CLI again. A manifest above v6 (written by a newer CLI) is refused with a message pointing at `aidd self-update` instead.
+There is no `aidd migrate` command, and no automatic migration: this CLI reads manifest schema v6 only. A manifest below v6 is refused with a message naming the last CLI able to migrate it — `npx @ai-driven-dev/cli@5.2.1 update --force` — run once to upgrade the manifest on disk, then update the CLI again. A manifest above v6 (written by a newer CLI) is refused with a message pointing at `aidd update` instead.
 
 ### `aidd clean`
 
-Removes all AIDD-generated files and the manifest.
+Removes all AIDD-generated files and the manifest — retires every part of AIDD from the
+project. See [`aidd framework remove`](#aidd-framework) to remove one tool's framework
+files only.
 
 ```bash
 aidd clean                      # dry-run: shows what will be removed
 aidd clean --force              # actual removal
 ```
 
-### `aidd self-update`
+### `aidd update`
 
-Updates the CLI itself to the latest published version.
+A bare verb with no subject means "the CLI itself" — same convention Claude Code and
+Codex use. Updates the CLI binary to the latest published version. Renamed from
+`self-update`; `upgrade` is an alias. Distinct from [`aidd framework update`](#aidd-framework),
+which updates installed tools' configs within a project.
 
 ```bash
-aidd self-update                # install latest version
-aidd self-update --check        # check availability without installing
-aidd self-update --dry-run      # preview without installing
-aidd self-update --force        # reinstall even if already up to date
+aidd update                     # install latest version
+aidd update --check             # check availability without installing
+aidd update --dry-run           # preview without installing
+aidd update --force             # reinstall even if already up to date
 ```
 
 ---
@@ -554,8 +535,8 @@ The following commands and flags were removed in v4.1.0. Do not use them in new 
 | `aidd cache list` | removed — caches are internal; inspect via `aidd marketplace list` |
 | `aidd cache clear` | `aidd marketplace refresh --force` (clears cache before re-fetch) |
 | `aidd config list\|get\|set` | removed — manifest fields `docsDir`/`repo` dropped |
-| `aidd sync` / `aidd ai sync` | removed — install rebuilds each tool from the marketplace; re-install to refresh |
-| `aidd restore <tool> [file]` (tool/file args) | `aidd ai restore [files...] --tool <tool>` (top-level `aidd restore` still exists, force-only, all tools) |
+| `aidd sync` / `aidd ai sync` (v4.0.x meaning) | removed at the time — install rebuilds each tool from the marketplace; re-install to refresh. `aidd sync` returned in a later pass with a different meaning — see the surface-unification table below |
+| `aidd restore <tool> [file]` (tool/file args) | `aidd ai restore [files...] --tool <tool>` (v4.1.0; `ai restore` itself later folded into `aidd sync --tool` — see below) |
 | `--repo` global flag | `aidd marketplace add` |
 | `--mode` on setup/install | `--source local\|remote` on `aidd setup` |
 | `--path` on install | `aidd setup --source local --path <dir>` |
@@ -563,6 +544,22 @@ The following commands and flags were removed in v4.1.0. Do not use them in new 
 | `--docs-dir` on setup | removed — `docsDir` field dropped from manifest v5 |
 
 See [MIGRATION.md](MIGRATION.md) for the full migration guide from v4.0.x to v4.1.0.
+
+## Removed surface (command grammar unification)
+
+A later pass unified the surface around one grammar: a bare verb performs an action now;
+a noun then a verb manages a resource's lifecycle. `ai`/`ide` were not a managed resource —
+they were the scope dimension, folded into `--tool`.
+
+| Removed | Replacement |
+|---|---|
+| `aidd ai <verb>` / `aidd ide <verb>` | `--tool <id>` on `doctor`, `sync`, and `framework install\|update\|remove` |
+| `aidd status`, `aidd ai status`, `aidd ide status` | `aidd doctor` (gained the drift report `status` carried) |
+| `aidd ai doctor`, `aidd ide doctor`, `aidd plugin doctor` | `aidd doctor --tool <id>` / `aidd doctor --plugin <name>` |
+| `aidd restore`, `aidd ai restore`, `aidd ide restore` | `aidd sync` (same command, renamed) |
+| `aidd self-update` | `aidd update` (bare verb, no subject, means the CLI itself) |
+| `aidd framework build` | `aidd translate <source> --to <target>` (same command, renamed) |
+| `aidd plugin create` | removed — never documented, never implemented |
 
 ---
 
