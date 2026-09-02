@@ -1,4 +1,3 @@
-import Table from "cli-table3";
 import { type Command, Option } from "commander";
 import { ListTaskDocumentsUseCase } from "../../application/use-cases/list-task-documents.js";
 import { PROGRESS_STATUSES_IN_COLUMN_ORDER } from "../../domain/models/progress-status.js";
@@ -53,7 +52,15 @@ function formatHiddenColumnsNotice(hiddenColumnCount: number): string {
   return `\n${hiddenColumnCount} status column(s) not shown; widen the terminal to see them.`;
 }
 
-function buildStatusColumnTable(taskGroups: TaskGroup[]): string {
+/**
+ * The table renderer loads when the command runs, not when it registers.
+ *
+ * The CLI that hosts this command needs the subcommand declared at parse time, but not
+ * the drawing library: importing `cli-table3` at the top of this module makes every
+ * invocation of that CLI load it, for a view most runs never reach.
+ */
+async function buildStatusColumnTable(taskGroups: TaskGroup[]): Promise<string> {
+  const { default: Table } = await import("cli-table3");
   const statuses = collectDistinctParentStatuses(taskGroups);
 
   if (statuses.length === 0) {
@@ -109,7 +116,7 @@ async function runListCommand(
     return;
   }
 
-  deps.output.print(buildStatusColumnTable(taskGroups));
+  deps.output.print(await buildStatusColumnTable(taskGroups));
 }
 
 export function registerListCommand(program: Command, deps: KanbanCommandDeps): void {

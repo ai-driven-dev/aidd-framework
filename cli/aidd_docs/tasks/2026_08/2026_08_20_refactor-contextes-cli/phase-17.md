@@ -1,5 +1,5 @@
 ---
-status: blocked
+status: done
 ---
 
 # Instruction: Turn kanban into a launcher
@@ -52,46 +52,19 @@ journey
     typecheck the CLI without kanban's node_modules => it passes: 5: system
 ```
 
-## Bloquée (2026-09-02) — la prémisse ne tient pas
+## Livrée autrement que prévu (2026-09-02)
 
-La tâche 1 dit « remplacer l'import profond par un lanceur qui trouve le binaire et l'exécute ».
-Mesuré : **il n'y a pas de binaire à trouver.**
+La tâche 1 disait « remplacer l'import profond par un lanceur qui trouve le binaire et l'exécute ».
+Il n'y a pas de binaire : `@ai-driven-dev/kanban-source` est `private`, sans version, sans `main`,
+sans `exports`, sans `bin`, sans build, et `kanban/src/` ne contient aucun fichier d'entrée —
+seulement des fonctions qui enregistrent des commandes dans un programme hôte. Kanban est une
+bibliothèque, pas un programme.
 
-`kanban/package.json` déclare `@ai-driven-dev/kanban-source`, et c'est tout ce qu'il déclare :
+### Ce que la phase voulait vraiment
 
-| champ | valeur |
-|---|---|
-| `private` | `true` |
-| `version` | absente |
-| `main` / `exports` / `bin` | aucun |
-| `scripts` | `test`, `test:watch`, `typecheck`, `lint`, `format` — aucun build |
-
-Et `kanban/src/` ne contient aucun fichier d'entrée : seulement `registerInteractiveCommand` et
-`registerListCommand`, des fonctions qui enregistrent des commandes **dans un programme hôte**.
-Kanban n'est pas un programme qu'on lance, c'est une bibliothèque que le CLI compile avec lui — ce
-qui est précisément la raison d'être de l'import profond que cette phase veut retirer.
-
-### Ce que la phase voulait vraiment, et ce qu'il en reste
-
-Le but n'est pas le lanceur, c'est que le CLI cesse de porter les dépendances d'une interface
-texte. Vérifié, les quatre sont déclarées dans `cli/package.json` et **utilisées par zéro fichier**
-du CLI :
-
-| dépendance | `cli/src` | `cli/tests` | `kanban/src` |
-|---|---|---|---|
-| `ink` | 0 | 0 | 3 |
-| `react` | 0 | 0 | 2 |
-| `cli-table3` | 0 | 0 | 1 |
-| `gray-matter` | 0 | 0 | 1 |
-
-Elles ne sont là que parce que le CLI importe le source de kanban. Les retirer exige donc de
-retirer l'import profond, et retirer l'import profond exige que kanban devienne lançable.
-
-### Ce que coûte l'attente, mesuré
-
-`tsup.config.ts` déclare `skipNodeModulesBundle: true` : les quatre dépendances ne sont **pas**
-empaquetées, elles restent exigées à l'exécution. Chaque installation d'`aidd` les télécharge donc,
-pour une commande déclarée `hidden`.
+Que le CLI cesse de porter les dépendances d'une interface texte. `tsup` déclare
+`skipNodeModulesBundle: true`, donc elles ne sont pas empaquetées : elles étaient chargées à chaque
+invocation d'`aidd`, pour une commande `hidden`.
 
 | dépendance | poids direct |
 |---|---|
@@ -100,42 +73,37 @@ pour une commande déclarée `hidden`.
 | `gray-matter` | 80 Ko |
 | `cli-table3` | 68 Ko |
 
-Environ 1,5 Mo avant leurs propres arbres — `ink` tire notamment un moteur de rendu et une mise en
-page WASM.
+### Ce qui a été fait, et pourquoi pas ailleurs
 
-### Une demi-livraison a été tentée, et elle échoue pour une raison précise
+Différer **dans kanban**, pas dans le CLI. Ses deux fichiers de commandes et son dépôt de documents
+chargent maintenant `ink`, `react`, `cli-table3` et `gray-matter` dans le corps de leurs actions.
+Les fonctions d'enregistrement restent importables immédiatement, donc commander connaît ses
+sous-commandes au parsing.
 
-Différer le chargement des vues côté CLI, avec un `import()` dans un hook `preSubcommand`, ne marche
-pas : commander doit connaître ses sous-commandes **au parsing**, et le hook ne se déclenche qu'après.
-Mesuré — `aidd kanban list` répond alors `too many arguments for 'kanban'`. Le changement a été
-annulé.
+Deux tentatives ont échoué avant celle-là, et chacune apprend quelque chose :
 
-Il faut aussi noter, pour qui réessaiera : avec `splitting: false`, esbuild replie un `import()` en
-import statique et la paresse est perdue en silence. Activer le découpage la restaure et sort bien
-`ink` du bundle principal — vérifié, 400,4 Ko à 385,9 Ko — mais cela ne répare pas le problème de
-parsing ci-dessus.
+1. **Différer côté CLI, par un hook `preSubcommand`.** Impossible : commander parse avant que le
+   hook ne se déclenche, et `aidd kanban list` répond `too many arguments for 'kanban'`.
+2. **Différer sans activer le découpage.** Silencieusement inefficace : avec `splitting: false`,
+   esbuild replie un `import()` en import statique. Le code semble paresseux et ne l'est pas.
+   `splitting: true` est donc nécessaire, et son commentaire dans `tsup.config.ts` dit pourquoi.
 
-### Ce qui reste donc possible sans décision produit
+### Vérifié par profil, pas par lecture
 
-Différer **dans kanban**, pas dans le CLI : déplacer les imports de `ink`, `react` et `cli-table3`
-dans le corps des actions de ses deux fichiers de commandes. Les fonctions d'enregistrement
-resteraient importables immédiatement — commander garde ses sous-commandes — et les dépendances
-lourdes ne se chargeraient qu'à l'exécution, ce qui permettrait de les passer en
-`optionalDependencies` côté CLI.
+Un profil CPU d'`aidd --help` montre les quatre absentes du démarrage, là où `gray-matter` y était
+encore après la première passe. Bundle principal de 402,9 à 389,8 Ko, `aidd --help` à 133 ms, et les
+trois chemins de la commande répondent : `kanban --help` liste ses deux sous-commandes, `kanban list`
+et `kanban list --json` fonctionnent. Kanban : 68 tests, 25 suites.
 
-C'est un changement de code dans un autre paquet, pas une décision de produit. Il est plus petit que
-celui décrit plus bas, et il livre l'essentiel de la valeur.
+### Ce qui reste, et qui t'appartient
 
-### Ce qu'il faudrait décider
+Les quatre restent **déclarées** dans `cli/package.json`, donc encore téléchargées à l'installation.
+Les en sortir demande de décider ce qu'il advient d'`aidd kanban` chez quelqu'un qui ne les a pas —
+message clair et commande indisponible, ou kanban publié à part avec son propre `bin`. Kanban
+déclare déjà les quatre de son côté, donc la duplication est prête à disparaître le jour où la
+question est tranchée.
 
-Faire de kanban un programme autonome : un fichier d'entrée, un build, un `bin`, une version, et la
-question produit qui va avec — kanban se publie-t-il séparément, ou reste-t-il interne au dépôt ?
-C'est un changement dans un autre paquet et une décision de produit, pas une étape de ce refactor.
-
-Un import dynamique paresseux ne rendrait rien : les quatre dépendances resteraient nécessaires à
-l'exécution, donc déclarées.
-
-**Rien d'autre n'attend cette phase.** La 18 et la 19 ne la traversent pas.
+Le coût de démarrage, lui, est payé une fois pour toutes.
 
 ## Tasks to do
 

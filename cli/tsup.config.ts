@@ -12,7 +12,11 @@ export default defineConfig({
   },
   sourcemap: false,
   dts: false,
-  splitting: false,
+  // Kept on so a dynamic import stays dynamic. Kanban's two views defer their text
+  // interface — ink, react, cli-table3 — to the moment the command runs; with splitting
+  // off esbuild folds those imports back into static ones and the deferral is lost in
+  // silence, putting a megabyte and a half back on every invocation.
+  splitting: true,
   shims: false,
   skipNodeModulesBundle: true,
   esbuildOptions(options) {

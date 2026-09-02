@@ -1,7 +1,6 @@
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import matter from "gray-matter";
 import { normalizeDocumentStatus } from "../../domain/models/document-status.js";
 import { normalizeDocumentType } from "../../domain/models/document-type.js";
 import { deriveProgressStatus } from "../../domain/models/progress-status.js";
@@ -31,9 +30,20 @@ async function collectMarkdownFilePaths(directoryPath: string): Promise<string[]
   return markdownFilePaths;
 }
 
-function parseFrontmatter(fileContent: string): RawFrontmatter {
+/**
+ * The frontmatter parser loads on the first document read, not when this module does.
+ *
+ * The CLI that hosts kanban imports this repository to declare its commands, and every
+ * invocation of that CLI would otherwise pay for `gray-matter` whether or not anyone
+ * asked for a task view.
+ */
+type FrontmatterParser = (content: string) => { data: RawFrontmatter };
+let loadParser: Promise<FrontmatterParser> | undefined;
+
+async function parseFrontmatter(fileContent: string): Promise<RawFrontmatter> {
+  loadParser ??= import("gray-matter").then((module) => module.default as FrontmatterParser);
   try {
-    return matter(fileContent).data;
+    return (await loadParser)(fileContent).data;
   } catch {
     return {};
   }
@@ -73,7 +83,7 @@ export class FilesystemTaskDocumentRepository implements TaskDocumentRepository 
     return Promise.all(
       markdownFilePaths.map(async (filePath) => {
         const fileContent = await readFile(filePath, "utf-8");
-        const frontmatter = parseFrontmatter(fileContent);
+        const frontmatter = await parseFrontmatter(fileContent);
 
         return toTaskDocument(filePath, frontmatter);
       })
