@@ -70,7 +70,12 @@ find tests -name '*.e2e.test.ts' | wc -l         # e2e files
 pnpm test                                         # total tests passing
 ```
 
-Shape stays pyramid: unit ≫ integration > e2e.
+Shape stays pyramid: unit ≫ integration > e2e. Measured 2026-09-02: 69% unit, 23%
+integration, 6% e2e, 1% architecture.
+
+`vitest run` runs **every** project, e2e included — `--project=e2e` selects a subset of
+that same total, it does not add to it. Reporting "N tests plus the e2e ones" double
+counts.
 
 ## Running Tests
 
