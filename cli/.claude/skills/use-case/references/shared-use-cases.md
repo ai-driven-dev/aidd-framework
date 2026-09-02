@@ -2,7 +2,7 @@
 
 ## Location
 
-`src/application/use-cases/shared/`
+`src/contexts/framework/application/shared/`
 
 ## Rules
 
@@ -17,7 +17,7 @@ Create a shared use-case when the same orchestration logic is needed by ≥2 top
 ## Agnostic shape example
 
 ```typescript
-// src/application/use-cases/shared/finalize-write-use-case.ts
+// src/contexts/framework/application/shared/finalize-write-use-case.ts
 export class FinalizeWriteUseCase {
   constructor(
     private readonly repo: RecordRepository,

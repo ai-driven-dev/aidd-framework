@@ -1,4 +1,4 @@
-import type { MarketplaceScope } from "../../../distribution/domain/marketplace.js";
+import type { MarketplaceScope } from "../../../../kernel/scope.js";
 
 /**
  * Drives a tool's native plugin CLI, so the tool writes its own configuration.

@@ -1,5 +1,4 @@
 import { join } from "node:path";
-import { PluginsCapability } from "../../../../../domain/capabilities/plugins-capability.js";
 import { AgentsCapability } from "../../capabilities/agents-capability.js";
 import { CommandsCapability } from "../../capabilities/commands-capability.js";
 import { CONFIG_MCP } from "../../capabilities/config-refs.js";
@@ -24,6 +23,7 @@ import {
 } from "../../formats/command.js";
 import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
 import { McpCapability } from "../../mcp-capability.js";
+import { PluginsCapability } from "../../plugins-capability.js";
 import { registerTool } from "../../registry.js";
 import { buildCursorContract, buildCursorFlatContract } from "./build.js";
 
@@ -118,7 +118,7 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         // plugin-local: Cursor auto-discovers hooks.json and mcp.json at the plugin root.
         acceptsHooks: true,
         hooksRelativePath: "hooks.json",
-        hooksContentFormat: "cursor",
+        hooksContentFormat: "flat",
         acceptsMcp: true,
         mcpRelativePath: "mcp.json",
         installScope: "user",

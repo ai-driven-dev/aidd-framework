@@ -11,7 +11,7 @@ all public method behaviors.
 ## Outputs
 
 ```
-Test file: tests/domain/capabilities/<kebab-name>-capability.unit.test.ts
+Test file: tests/contexts/framework/domain/<kebab-name>-capability.unit.test.ts
 ```
 
 ## Depends on
@@ -20,7 +20,7 @@ Test file: tests/domain/capabilities/<kebab-name>-capability.unit.test.ts
 
 ## Process
 
-1. Create `tests/domain/capabilities/<kebab-name>-capability.unit.test.ts`. Use `*.unit.test.ts` suffix — no I/O, no mocks, no filesystem.
+1. Create `tests/contexts/framework/domain/<kebab-name>-capability.unit.test.ts`. Use `*.unit.test.ts` suffix — no I/O, no mocks, no filesystem.
 2. Import only the class under test and `CapabilityConfigError` from `kernel/errors.js`.
 3. Cover valid construction:
    - All required params provided → fields are assigned correctly.

@@ -1,8 +1,6 @@
-import type {
-  Marketplace,
-  MarketplaceScope,
-} from "../../../src/contexts/distribution/domain/marketplace.js";
+import type { Marketplace } from "../../../src/contexts/distribution/domain/marketplace.js";
 import type { MarketplaceRegistry } from "../../../src/contexts/distribution/domain/ports/marketplace-registry.js";
+import type { MarketplaceScope } from "../../../src/kernel/scope.js";
 
 /**
  * Pure in-memory MarketplaceRegistry.

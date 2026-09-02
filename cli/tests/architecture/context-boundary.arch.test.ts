@@ -37,13 +37,12 @@ const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
     "src/contexts/tools/domain/ports/file-merger.ts",
     "src/contexts/tools/domain/ports/native-plugin-activator.ts",
     "src/contexts/tools/domain/ports/schema-validator.ts",
-    // the application layer — install/uninstall entry points
-    "src/contexts/tools/application/install-ai-tool-use-case.ts",
-    "src/contexts/tools/application/install-config-use-case.ts",
-    "src/contexts/tools/application/install-ide-config-use-case.ts",
-    "src/contexts/tools/application/install-ide-tool-use-case.ts",
-    "src/contexts/tools/application/install-runtime-config-use-case.ts",
-    "src/contexts/tools/application/uninstall-tools-use-case.ts",
+    // what a tool declares about plugins, read by whoever installs one for it — the
+    // context has no application layer of its own since installing is framework work
+    "src/contexts/tools/domain/plugins-capability.ts",
+    "src/contexts/tools/domain/marketplace-settings.ts",
+    "src/contexts/tools/domain/plugin-translation-mode.ts",
+    "src/contexts/tools/domain/hooks-format.ts",
   ],
   translate: [
     // the canonical shapes framework produces and translate consumes
@@ -56,6 +55,11 @@ const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
     "src/contexts/translate/domain/content-translator.ts",
     // the build use case — `framework build`, one source to N targets
     "src/contexts/translate/application/translate-source.ts",
+    // the plugin vocabulary a tool profile declares, read by whoever installs from it
+    "src/contexts/tools/domain/plugins-capability.ts",
+    "src/contexts/tools/domain/marketplace-settings.ts",
+    "src/contexts/tools/domain/plugin-translation-mode.ts",
+    "src/contexts/tools/domain/hooks-format.ts",
   ],
   // Measured with the composition root excluded: ten modules are reached from outside,
   // and not one of them is an adapter. The adapters are wired by `deps.ts` alone, which
@@ -131,12 +135,11 @@ function reachesIntoInterior(
  * reach until it does.
  */
 const BASELINE = [
-  "src/application/use-cases/install/install-agents-use-case.ts -> src/contexts/tools/domain/capabilities/agents-capability.ts",
-  "src/application/use-cases/install/install-commands-use-case.ts -> src/contexts/tools/domain/capabilities/commands-capability.ts",
-  "src/application/use-cases/install/install-content-section-use-case.ts -> src/contexts/tools/domain/formats/command.ts",
-  "src/application/use-cases/install/install-rules-use-case.ts -> src/contexts/tools/domain/capabilities/rules-capability.ts",
-  "src/application/use-cases/install/install-skills-use-case.ts -> src/contexts/tools/domain/capabilities/skills-capability.ts",
-  "src/domain/capabilities/plugins-capability.ts -> src/contexts/translate/domain/formats/cursor-hooks.ts",
+  "src/contexts/framework/application/install/install-agents-use-case.ts -> src/contexts/tools/domain/capabilities/agents-capability.ts",
+  "src/contexts/framework/application/install/install-commands-use-case.ts -> src/contexts/tools/domain/capabilities/commands-capability.ts",
+  "src/contexts/framework/application/install/install-content-section-use-case.ts -> src/contexts/tools/domain/formats/command.ts",
+  "src/contexts/framework/application/install/install-rules-use-case.ts -> src/contexts/tools/domain/capabilities/rules-capability.ts",
+  "src/contexts/framework/application/install/install-skills-use-case.ts -> src/contexts/tools/domain/capabilities/skills-capability.ts",
 ];
 
 describe("nothing imports a context's interior", () => {

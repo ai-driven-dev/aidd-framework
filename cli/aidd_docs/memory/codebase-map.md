@@ -86,7 +86,7 @@ src/
     │   │   └── strategies/             # marketplace and flat build strategies
     │   └── infrastructure/
     │       └── schema-validator.ts     # AjvSchemaValidatorAdapter
-    └── distribution/         # where content comes from and how it is fetched — a leaf: kernel only, knows no tool and no manifest
+    ├── distribution/         # where content comes from and how it is fetched — a leaf: kernel only, knows no tool and no manifest
         ├── domain/
         │   ├── marketplace.ts          # Marketplace entry, scope, staleness
         │   ├── marketplace-cache-entry.ts
@@ -94,8 +94,21 @@ src/
         │   ├── catalog.ts              # PluginCatalog, PluginCatalogEntry + the Claude-shaped parser
         │   ├── catalog-parsers/        # readers for a non-Claude catalog shape (copilot)
         │   └── ports/                  # marketplace-registry, marketplace-cache, marketplace-trust-store, plugin-catalog-repository, plugin-fetcher, raw-catalog-fetcher
-        ├── application/      # add / list / refresh / register-framework / resolve-marketplace / fetch-marketplace-source
-        └── infrastructure/   # the adapters behind those six ports
+    │   ├── application/      # add / list / refresh / register-framework / resolve-marketplace / fetch-marketplace-source
+    │   └── infrastructure/   # the adapters behind those six ports
+    └── framework/            # the installation record and everything done to a project — the context allowed to reach the others
+        ├── domain/
+        │   ├── manifest.ts          # the installation record: what was written, where, from which marketplace
+        │   ├── doctor.ts            # the diagnosis shape
+        │   ├── install-scope.ts     # project or user, and which a tool supports
+        │   ├── project-context.ts   # what a project is, seen from here
+        │   ├── setup-flow.ts        # the steps a first install goes through
+        │   ├── config-capability.ts # runtime configuration a tool receives
+        │   ├── tool-recommendations.ts
+        │   ├── plugins/             # a plugin, how it is declared, where it came from — plugin, plugins-capability, translation-mode, source-resolver, marketplace-entry, marketplace-settings, requested-version-policy
+        │   └── ports/               # manifest-repository, plugin-distribution-reader
+        ├── application/      # setup / install / plugin / restore / uninstall / doctor / global / sync / status / clean / init, plus the flows crossing two areas
+        └── infrastructure/   # manifest-repository and plugin-distribution-reader adapters
 ```
 
 ## Use-Case Structure
@@ -152,8 +165,8 @@ tests/
 | `infrastructure/assets/asset-loader.ts` | Typed loader for configs/stubs bundled in binary |
 | `contexts/tools/domain/contracts.ts` | All tool/capability interfaces |
 | `contexts/tools/domain/registry.ts` | Tool lookup, guards, signal detection |
-| `application/use-cases/install/post-install-pipeline-use-case.ts` | Mandatory post-write sequence |
-| `application/use-cases/shared/ensure-built-marketplace-use-case.ts` | Per-target built-tree cache — install/update materialize tools from it (build/install parity) |
-| `domain/models/manifest.ts` | Aggregate root — all installed file tracking + schema migration (v1→v6) on load |
+| `contexts/framework/application/install/post-install-pipeline-use-case.ts` | Mandatory post-write sequence |
+| `contexts/framework/application/shared/ensure-built-marketplace-use-case.ts` | Per-target built-tree cache — install/update materialize tools from it (build/install parity) |
+| `contexts/framework/domain/manifest.ts` | Aggregate root — all installed file tracking + schema migration (v1→v6) on load |
 | `domain/models/normalized-plugin.ts` | Internal AST for foreign-format plugin ingestion |
-| `domain/models/setup-flow.ts` | Aggregate — setup orchestration state |
+| `contexts/framework/domain/setup-flow.ts` | Aggregate — setup orchestration state |

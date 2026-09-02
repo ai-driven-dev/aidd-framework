@@ -1,5 +1,5 @@
+import type { ToolInstallResult } from "../../contexts/framework/application/setup/setup-tools-use-case.js";
 import type { CLIOutput } from "../output.js";
-import type { ToolInstallResult } from "../use-cases/setup/setup-tools-use-case.js";
 
 export function displayInstall(
   output: CLIOutput,

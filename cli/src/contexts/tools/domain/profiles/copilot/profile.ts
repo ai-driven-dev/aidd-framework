@@ -1,5 +1,3 @@
-import { buildClaudeStyleMarketplaceEntry } from "../../../../../domain/capabilities/marketplace-entry.js";
-import { PluginsCapability } from "../../../../../domain/capabilities/plugins-capability.js";
 import { GITKEEP_FILE } from "../../../../../kernel/file.js";
 import { AgentsCapability } from "../../capabilities/agents-capability.js";
 import { CommandsCapability } from "../../capabilities/commands-capability.js";
@@ -21,7 +19,9 @@ import {
   convertCommandFrontmatter,
   reverseConvertCommandFrontmatter,
 } from "../../formats/command.js";
+import { buildClaudeStyleMarketplaceEntry } from "../../marketplace-entry.js";
 import { McpCapability } from "../../mcp-capability.js";
+import { PluginsCapability } from "../../plugins-capability.js";
 import { registerTool } from "../../registry.js";
 import { SettingsCapability } from "../../settings-capability.js";
 import { buildCopilotFlatContract, buildCopilotMarketplaceContract } from "./build.js";

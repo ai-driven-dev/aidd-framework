@@ -21,7 +21,7 @@ Test file at the correct path with the correct suffix.
 ## Process
 
 1. Create the test file at:
-   - Unit: `tests/application/use-cases/<kebab-name>.unit.test.ts` or `tests/domain/models/<kebab-name>.unit.test.ts`
+   - Unit: `tests/application/use-cases/<kebab-name>.unit.test.ts` or `tests/contexts/framework/domain/<kebab-name>.unit.test.ts`
    - Integration: `tests/infrastructure/adapters/<kebab-name>-adapter.integration.test.ts` or `tests/application/use-cases/<kebab-name>.integration.test.ts`
    - E2E: `tests/e2e/<kebab-name>.e2e.test.ts`
 

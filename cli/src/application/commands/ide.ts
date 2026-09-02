@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { Manifest } from "../../domain/models/manifest.js";
+import { Manifest } from "../../contexts/framework/domain/manifest.js";
 import { createDeps, createMenuDeps } from "../../infrastructure/deps.js";
 import { DOCS_DIR } from "../../kernel/paths.js";
 import { IDE_TOOL_IDS, type IdeToolId } from "../../kernel/tool.js";

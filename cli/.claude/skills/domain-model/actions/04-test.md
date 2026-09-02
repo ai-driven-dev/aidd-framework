@@ -10,7 +10,7 @@ Write unit tests for the domain type covering invariants, equality, and invalid 
 ## Outputs
 
 ```
-Test file: tests/domain/models/<kebab-name>.unit.test.ts
+Test file: tests/contexts/framework/domain/<kebab-name>.unit.test.ts
 ```
 
 ## Depends on
@@ -19,7 +19,7 @@ Test file: tests/domain/models/<kebab-name>.unit.test.ts
 
 ## Process
 
-1. Create `tests/domain/models/<kebab-name>.unit.test.ts`. Use `*.unit.test.ts` suffix — no I/O, no mocks, no filesystem per `references/test-pyramid.md` in the `test` skill.
+1. Create `tests/contexts/framework/domain/<kebab-name>.unit.test.ts`. Use `*.unit.test.ts` suffix — no I/O, no mocks, no filesystem per `references/test-pyramid.md` in the `test` skill.
 2. Name each `it()` block as a behavior sentence describing the observable outcome, not the method called — see `references/test-pyramid.md` in the `test` skill.
 3. Cover: valid construction succeeds, invalid inputs throw a typed error, `.equals()` returns true for structurally equal instances and false when different (value objects only), mutations return new instances (value objects only).
 4. For discriminant unions: test that the union type exhaustively covers all expected members by writing a switch that TypeScript narrows without a `default` branch.

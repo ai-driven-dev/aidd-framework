@@ -27,6 +27,10 @@ function registeredCommands(): Set<string> {
   for (const file of sourceFiles().filter((f) => f.startsWith("src/application/commands/"))) {
     for (const match of read(file).matchAll(/\.command\("([a-z][a-z-]*)/g)) names.add(match[1]);
   }
+  // An empty set would clear every document at once: nothing can be undeclared when
+  // nothing is declared. A sibling rule failed exactly that way when its directory
+  // moved, so the emptiness is checked rather than assumed.
+  if (names.size === 0) throw new Error("no command found — the scope of this rule is stale");
   return names;
 }
 

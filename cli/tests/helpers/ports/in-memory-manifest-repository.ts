@@ -1,5 +1,5 @@
-import type { Manifest } from "../../../src/domain/models/manifest.js";
-import type { ManifestRepository } from "../../../src/domain/ports/manifest-repository.js";
+import type { Manifest } from "../../../src/contexts/framework/domain/manifest.js";
+import type { ManifestRepository } from "../../../src/contexts/framework/domain/ports/manifest-repository.js";
 
 /**
  * Pure in-memory implementation of the ManifestRepository port.

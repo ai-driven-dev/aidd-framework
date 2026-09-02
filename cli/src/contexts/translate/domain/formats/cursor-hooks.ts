@@ -1,4 +1,4 @@
-export type HooksContentFormat = "claude" | "cursor";
+import type { HooksContentFormat } from "../../../tools/domain/hooks-format.js";
 
 type ClaudeHookMatcher = { hooks: ClaudeHookItem[] };
 type ClaudeHookItem = { type?: string; command?: string; [key: string]: unknown };
@@ -8,7 +8,7 @@ type ClaudeHooksJson = { hooks?: Record<string, ClaudeHookMatcher[]> };
 // schema transformation — the Cursor plugin format drops Claude-specific matcher
 // structure and cannot be reversed to the original Claude hooks JSON.
 export function convertHooksFormat(content: string, format: HooksContentFormat): string {
-  if (format === "cursor") return convertClaudeHooksToCursorPlugin(content);
+  if (format === "flat") return convertClaudeHooksToCursorPlugin(content);
   return content;
 }
 

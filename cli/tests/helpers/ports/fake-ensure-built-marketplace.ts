@@ -1,7 +1,7 @@
 import type {
   EnsureBuiltMarketplaceOptions,
   EnsureBuiltMarketplaceUseCase,
-} from "../../../src/application/use-cases/shared/ensure-built-marketplace-use-case.js";
+} from "../../../src/contexts/framework/application/shared/ensure-built-marketplace-use-case.js";
 
 /**
  * Stand-in for EnsureBuiltMarketplaceUseCase that returns a deterministic per-target

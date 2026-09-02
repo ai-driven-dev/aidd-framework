@@ -1,4 +1,4 @@
-import type { MarketplaceScope } from "../../distribution/domain/marketplace.js";
+import type { MarketplaceScope } from "../../../kernel/scope.js";
 import { AbstractNativePluginCliAdapter } from "./abstract-native-plugin-cli-adapter.js";
 
 /** Everything about a tool's plugin CLI that differs between tools, read off its profile. */

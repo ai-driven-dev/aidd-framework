@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { parseInstallScope } from "../../domain/models/install-scope.js";
+import { parseInstallScope } from "../../contexts/framework/domain/install-scope.js";
 import { createDeps, createMenuDeps } from "../../infrastructure/deps.js";
 import { assertValidAiToolId, parseToolOption } from "../../kernel/tool.js";
 import { ErrorHandler } from "../error-handler.js";

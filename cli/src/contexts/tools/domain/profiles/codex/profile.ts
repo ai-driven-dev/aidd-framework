@@ -1,4 +1,3 @@
-import { PluginsCapability } from "../../../../../domain/capabilities/plugins-capability.js";
 import { AgentsCapability } from "../../capabilities/agents-capability.js";
 import { CommandsCapability } from "../../capabilities/commands-capability.js";
 import { CONFIG_MCP } from "../../capabilities/config-refs.js";
@@ -25,6 +24,7 @@ import {
 } from "../../formats/command.js";
 import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
 import { McpCapability } from "../../mcp-capability.js";
+import { PluginsCapability } from "../../plugins-capability.js";
 import { registerTool } from "../../registry.js";
 import {
   buildCodexContract,

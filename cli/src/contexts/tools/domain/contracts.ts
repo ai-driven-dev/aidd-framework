@@ -1,4 +1,3 @@
-import type { PluginsCapability } from "../../../domain/capabilities/plugins-capability.js";
 import type { AiToolId, IdeToolId } from "../../../kernel/tool.js";
 import type { ToolBuildContract } from "./build-contract.js";
 import type { AgentsCapability } from "./capabilities/agents-capability.js";
@@ -8,6 +7,7 @@ import type { RulesCapability } from "./capabilities/rules-capability.js";
 import type { SkillsCapability } from "./capabilities/skills-capability.js";
 import type { UserFileSectionKey } from "./formats/command.js";
 import type { McpCapability } from "./mcp-capability.js";
+import type { PluginsCapability } from "./plugins-capability.js";
 import type { SettingsCapability } from "./settings-capability.js";
 
 export interface HasAgents {

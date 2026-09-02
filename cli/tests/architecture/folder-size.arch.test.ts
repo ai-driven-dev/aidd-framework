@@ -18,9 +18,12 @@ const MAX_FILES_PER_FOLDER = 10;
  */
 const BASELINE = [
   "src/application/commands", // 17
-  "src/domain/models", // 13
-  "src/domain/ports", // 11
-  "src/infrastructure/adapters", // 14
+  "src/infrastructure/adapters", // 12
+  // Born of this refactor and to be split by the phases that place what is still
+  // outside a context: the command surface (18), the runtime services (16).
+  "src/contexts/tools/domain", // 12
+  "src/contexts/framework/application/install", // 12
+  "src/kernel", // 11
 ];
 
 /** Direct `.ts` files per parent directory — a subfolder counts toward itself, not its parent. */

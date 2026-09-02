@@ -16,6 +16,12 @@ function areaOf(file: string): string {
   // area would let any module satisfy the rule by being wired rather than by being
   // needed in two places. Drop it the same way `use-case:shared` is dropped below.
   if (file === "src/infrastructure/deps.ts") return "composition-root";
+  // A context's application layer is where the areas live now; the flat
+  // `use-cases/` tree is what is left of the layout they came from.
+  const contextArea = /^src\/contexts\/[^/]+\/application\/([^/]+)\//.exec(file);
+  if (contextArea) return `use-case:${contextArea[1]}`;
+  const contextRoot = /^src\/contexts\/([^/]+)\/application\/[^/]+\.ts$/.exec(file);
+  if (contextRoot) return `use-case:${contextRoot[1]}-root`;
   const useCase = /^src\/application\/use-cases\/([^/]+)\//.exec(file);
   if (useCase) return `use-case:${useCase[1]}`;
   if (file.startsWith("src/application/use-cases/")) return "use-case:root";

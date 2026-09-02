@@ -1,15 +1,15 @@
 import { resolve } from "node:path";
 import type { Command } from "commander";
 import { MarketplaceSourceMode } from "../../contexts/distribution/domain/marketplace-source-mode.js";
+import { SetupUseCase } from "../../contexts/framework/application/setup-use-case.js";
+import { SetupFlow } from "../../contexts/framework/domain/setup-flow.js";
 import { assertToolIdsMatchCategory } from "../../contexts/tools/domain/registry.js";
-import { SetupFlow } from "../../domain/models/setup-flow.js";
 import { createDeps } from "../../infrastructure/deps.js";
 import type { ToolId } from "../../kernel/tool.js";
 import { AI_TOOL_IDS, IDE_TOOL_IDS } from "../../kernel/tool.js";
 import { displayInstall, printNextSteps, printWelcomeBanner } from "../display/setup-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import type { CLIOutput } from "../output.js";
-import { SetupUseCase } from "../use-cases/setup-use-case.js";
 import { parseGlobalOptions } from "./global-options.js";
 
 interface SetupCmdOptions {

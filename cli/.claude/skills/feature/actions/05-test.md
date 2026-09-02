@@ -17,7 +17,7 @@ Test files at the appropriate tiers in `tests/`.
 ## Process
 
 1. Invoke the `test` skill starting at its `01-pick-tier` action for each touched layer.
-2. For domain types: unit tests (`tests/domain/models/`).
+2. For domain types: unit tests (`tests/contexts/framework/domain/`).
 3. For use-cases: unit tests (`tests/application/use-cases/`).
 4. For adapters: integration tests (`tests/infrastructure/adapters/`).
 5. For commands: E2E tests (`tests/e2e/`) covering the full user journey — 5–10 scenarios max.

@@ -29,15 +29,14 @@ const ALLOWED_FILES = new Set(["src/kernel/tool.ts"]);
  * (now `canon.ts`) no longer does.
  */
 const BASELINE = [
-  "src/application/use-cases/flows/marketplace-sync-settings-use-case.ts",
-  "src/application/use-cases/restore/restore-use-case.ts",
+  "src/contexts/framework/application/flows/marketplace-sync-settings-use-case.ts",
+  "src/contexts/framework/application/restore/restore-use-case.ts",
   "src/contexts/tools/domain/capabilities/config-refs.ts",
   "src/contexts/translate/domain/build-target.ts",
-  "src/contexts/translate/domain/formats/cursor-hooks.ts",
   "src/contexts/translate/domain/plugin-format.ts",
-  "src/domain/capabilities/plugins-capability.ts",
-  "src/domain/models/manifest.ts",
-  "src/domain/models/tool-recommendations.ts",
+  "src/contexts/tools/domain/plugins-capability.ts",
+  "src/contexts/framework/domain/manifest.ts",
+  "src/contexts/framework/domain/tool-recommendations.ts",
 ];
 
 /** The rule itself, over an explicit file/source pair instead of the real tree. */

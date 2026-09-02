@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { accessSync, constants } from "node:fs";
 import { delimiter, join } from "node:path";
 import { NativePluginCliError } from "../../../kernel/errors.js";
-import type { MarketplaceScope } from "../../distribution/domain/marketplace.js";
+import type { MarketplaceScope } from "../../../kernel/scope.js";
 import type { NativePluginActivator } from "../domain/ports/native-plugin-activator.js";
 
 // `plugin add/install` may fetch and cache a marketplace snapshot from a git remote.

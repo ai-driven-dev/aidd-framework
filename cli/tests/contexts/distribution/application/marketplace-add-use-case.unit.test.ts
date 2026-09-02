@@ -1,10 +1,10 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MarketplaceRemoveUseCase } from "../../../../src/application/use-cases/flows/marketplace-remove-use-case.js";
 import { FetchMarketplaceSourceUseCase } from "../../../../src/contexts/distribution/application/fetch-marketplace-source-use-case.js";
 import { MarketplaceAddUseCase } from "../../../../src/contexts/distribution/application/marketplace-add-use-case.js";
 import { ResolveMarketplaceUseCase } from "../../../../src/contexts/distribution/application/resolve-marketplace-use-case.js";
 import { PluginCatalogRepositoryAdapter } from "../../../../src/contexts/distribution/infrastructure/plugin-catalog-repository-adapter.js";
+import { MarketplaceRemoveUseCase } from "../../../../src/contexts/framework/application/flows/marketplace-remove-use-case.js";
 import type { Prompter } from "../../../../src/domain/ports/prompter.js";
 import {
   InvalidMarketplaceNameError,

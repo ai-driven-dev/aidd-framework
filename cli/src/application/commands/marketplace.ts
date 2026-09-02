@@ -1,6 +1,6 @@
 import type { Command } from "commander";
-import type { MarketplaceScope } from "../../contexts/distribution/domain/marketplace.js";
 import { createDeps, createMenuDeps } from "../../infrastructure/deps.js";
+import type { MarketplaceScope } from "../../kernel/scope.js";
 import { describePluginSource, parsePluginSourceShorthand } from "../../kernel/source.js";
 import { ErrorHandler } from "../error-handler.js";
 import { parseGlobalOptions } from "./global-options.js";

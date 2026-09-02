@@ -1,8 +1,4 @@
 import { join } from "node:path";
-import type {
-  NativeActivation,
-  PluginsMode,
-} from "../../../domain/capabilities/plugins-capability.js";
 import {
   CategoryMismatchError,
   UnknownToolCategoryError,
@@ -18,6 +14,7 @@ import {
 } from "../../../kernel/tool.js";
 import type { ToolBuildContract } from "./build-contract.js";
 import type { AiTool, IdeToolConfig } from "./contracts.js";
+import type { NativeActivation, PluginsMode } from "./plugins-capability.js";
 
 /**
  * Output layout discriminant: marketplace dist (Mode A) vs direct workspace inject (Mode B

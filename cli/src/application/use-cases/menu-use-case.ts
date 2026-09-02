@@ -1,4 +1,4 @@
-import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
+import type { ManifestRepository } from "../../contexts/framework/domain/ports/manifest-repository.js";
 import type { Prompter } from "../../domain/ports/prompter.js";
 
 interface MenuLeaf {

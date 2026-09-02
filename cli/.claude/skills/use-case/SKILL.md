@@ -32,7 +32,7 @@ catches its own errors, and delegates all file-and-manifest writes to `PostInsta
 
 - Class name ends in `UseCase`; single `async execute()` method; never a plain function.
 - Every method (public or private) ≤ 20 lines; extract named private methods before reaching the limit.
-- Shared sub-use-cases live in `src/application/use-cases/shared/` and are never called from commands.
+- Shared sub-use-cases live in `src/contexts/framework/application/shared/` and are never called from commands.
 - Capability sub-use-cases live in subdirectories (`install/`, `update/`) and receive narrowed types.
 - Never call `manifestRepo.save()` in isolation; delegate to `PostInstallPipelineUseCase`.
 - Use constructor injection order: FileSystem → Repository → Loader → Hasher → Logger → Platform → Prompter.

@@ -1,4 +1,3 @@
-import type { MarketplaceRemoveUseCase } from "../../../application/use-cases/flows/marketplace-remove-use-case.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
 import {
   InvalidMarketplaceNameError,
@@ -6,12 +5,10 @@ import {
   MarketplaceAlreadyRegisteredError,
   TrustDeniedError,
 } from "../../../kernel/errors.js";
+import type { MarketplaceScope } from "../../../kernel/scope.js";
 import type { PluginSource } from "../../../kernel/source.js";
-import {
-  FRAMEWORK_MARKETPLACE_NAME,
-  Marketplace,
-  type MarketplaceScope,
-} from "../domain/marketplace.js";
+import type { MarketplaceRemoveUseCase } from "../../framework/application/flows/marketplace-remove-use-case.js";
+import { FRAMEWORK_MARKETPLACE_NAME, Marketplace } from "../domain/marketplace.js";
 import type { MarketplaceRegistry } from "../domain/ports/marketplace-registry.js";
 import type { MarketplaceTrustStore } from "../domain/ports/marketplace-trust-store.js";
 import type { ResolveMarketplaceUseCase } from "./resolve-marketplace-use-case.js";

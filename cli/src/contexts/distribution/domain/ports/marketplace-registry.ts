@@ -1,4 +1,5 @@
-import type { Marketplace, MarketplaceScope } from "../marketplace.js";
+import type { MarketplaceScope } from "../../../../kernel/scope.js";
+import type { Marketplace } from "../marketplace.js";
 
 export interface MarketplaceRegistry {
   list(projectRoot: string): Promise<readonly Marketplace[]>;
