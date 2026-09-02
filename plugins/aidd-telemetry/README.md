@@ -4,7 +4,10 @@
 
 Know what a piece of work cost — tokens, models, and which skill spent them.
 
-> Status: alpha. Proven end to end on Claude Code; see [Coverage](#coverage) for the rest.
+> Status: beta — usable, and being proven. Proven end to end on Claude Code; see
+> [Coverage](#coverage) for what each of the other four answers, and what none of them does.
+> It stays off the curated install path until it has run on other people's machines, not
+> until that table is all green: two of its rows are limits of the tool, not of this plugin.
 
 Providers can tell you a developer burned four million tokens on Tuesday. None can tell you
 that `aidd-dev:02-implement` spent 78,188 of them. The difference is the task, the step and

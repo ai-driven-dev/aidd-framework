@@ -57,7 +57,7 @@ Why not just write your own commands? → [FAQ](docs/FAQ.md#-why-aidd-instead-of
 
 ### Claude Code
 
-Installs the 6 stable plugins (`aidd-ui` and `aidd-telemetry` are 🚧 alpha, install separately — see [Plugins](#-plugins)).
+Installs the 6 stable plugins (`aidd-ui` is 🚧 alpha and `aidd-telemetry` 🧪 beta, install separately — see [Plugins](#-plugins)).
 
 **In the session** (slash commands)
 
@@ -231,7 +231,7 @@ learning only when it is durable enough to improve the next feature.
 
 ## 🧩 Plugins
 
-Eight plugins covering the whole SDLC — **install all of them**; they work together. (`aidd-ui` and `aidd-telemetry` are 🚧 **alpha**, off the curated path.)
+Eight plugins covering the whole SDLC — **install all of them**; they work together. (`aidd-ui` is 🚧 **alpha** and `aidd-telemetry` 🧪 **beta** — both off the curated path.)
 
 <table>
 <tr>
@@ -304,9 +304,9 @@ UI / UX design — smoke-test only, not ready for use.
 </td>
 <td width="33%" valign="top">
 
-### 📈 [aidd-telemetry](plugins/aidd-telemetry/README.md) 🚧
+### 📈 [aidd-telemetry](plugins/aidd-telemetry/README.md) 🧪
 
-`3 skills` · **alpha**
+`3 skills` · **beta**
 
 Answers what a piece of work cost — tokens, models, and which skill spent them. The switch is git-tracked, so it applies to everyone who clones; opt out per person with `AIDD_TELEMETRY=0`. Nothing leaves your machine.
 
