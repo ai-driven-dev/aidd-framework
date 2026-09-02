@@ -180,7 +180,19 @@ export class DiagnoseTelemetryUseCase {
    * that cannot be loaded contributes nothing, the same normal state as a project with no
    * plugins installed. */
   private async readHostRegistration(): Promise<TelemetryHostRegistrationSetup> {
-    const manifest = await this.manifestRepo.load();
+    let manifest: Awaited<ReturnType<ManifestRepository["load"]>>;
+    try {
+      manifest = await this.manifestRepo.load();
+    } catch (error) {
+      // `Manifest`'s parser maps over fields it does not guard, so a damaged manifest throws
+      // rather than returning null. Reported, never swallowed and never fatal: this is the
+      // command a person runs precisely when something is wrong.
+      const shaped = error as { code?: string; message?: string };
+      return {
+        ...buildHostRegistration([]),
+        manifestUnreadable: shaped.code ?? shaped.message ?? String(error),
+      };
+    }
     if (manifest === null) return buildHostRegistration([]);
     const evidence = await Promise.all(
       AI_TOOL_IDS.map(async (tool) => ({

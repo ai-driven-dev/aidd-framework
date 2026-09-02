@@ -176,6 +176,16 @@ export interface TelemetryHostRegistrationSetup {
    * look at the same file this did. The same set regardless of the outcome, mirroring
    * `TelemetryRecorderDeclarationSetup.locationsChecked`. */
   readonly locationsChecked: readonly string[];
+  /** Why AIDD's own manifest could not be read, when it could not.
+   *
+   * Its own field rather than an absent-entries silence, and this is not defensive
+   * programming: `Manifest`'s parser reads `files.map(...)` on each tool without guarding
+   * the field, so a hand-edited or truncated `.aidd/manifest.json` throws a `TypeError`
+   * rather than returning null. Before this fact existed, `aidd telemetry check` never
+   * loaded the manifest at all — measuring it is what put that crash on the diagnostic's
+   * path, so the diagnostic is what has to survive it. A damaged manifest is exactly when a
+   * person runs `check`, and the one thing it must not do then is die. */
+  readonly manifestUnreadable?: string;
 }
 
 /**

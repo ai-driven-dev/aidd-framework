@@ -109,6 +109,9 @@ function describePluginVersion(plugin: TelemetryPluginVersionSetup): string {
  * `nothing installed` is a real, healthy answer and says so, rather than printing an empty
  * block that reads like a failure to look. */
 function describeHostRegistration(registration: TelemetryHostRegistrationSetup): string {
+  if (registration.manifestUnreadable !== undefined) {
+    return `AIDD's own manifest could not be read — ${registration.manifestUnreadable}`;
+  }
   const entries = registration.entries;
   if (entries.length === 0) return "no plugin recorded for any tool";
   const rank: Record<string, number> = {

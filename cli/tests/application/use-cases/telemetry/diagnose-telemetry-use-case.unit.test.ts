@@ -5,6 +5,8 @@ import "../../../../src/domain/tools/ai/copilot.js";
 import "../../../../src/domain/tools/ai/cursor.js";
 import "../../../../src/domain/tools/ai/opencode.js";
 import { DiagnoseTelemetryUseCase } from "../../../../src/application/use-cases/telemetry/diagnose-telemetry-use-case.js";
+import { Manifest } from "../../../../src/domain/models/manifest.js";
+import { Plugin } from "../../../../src/domain/models/plugin.js";
 import type { TelemetryCodexHookTrust } from "../../../../src/domain/models/telemetry-claim.js";
 import type { AiToolId } from "../../../../src/domain/models/tool-ids.js";
 import type { HookTrustReader } from "../../../../src/domain/ports/hook-trust-reader.js";
@@ -18,6 +20,7 @@ import type {
 } from "../../../../src/domain/ports/session-cost-reader.js";
 import type { VersionControl } from "../../../../src/domain/ports/version-control.js";
 import { FakeCurrentVersion } from "../../../helpers/ports/fake-current-version.js";
+import { InMemoryManifestRepository } from "../../../helpers/ports/in-memory-manifest-repository.js";
 import { InMemoryPersonIdentityStore } from "../../../helpers/ports/in-memory-person-identity-store.js";
 import { InMemoryRunJournalReader } from "../../../helpers/ports/in-memory-run-journal-reader.js";
 import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetry-sink.js";
@@ -406,5 +409,101 @@ describe("the versions check reports", () => {
 
     expect(nothing.setup.versions.plugin).toEqual({ kind: "nothing-journalled" });
     expect(journalledWithout.setup.versions.plugin).toEqual({ kind: "unrecorded" });
+  });
+});
+
+/** A repository whose load throws, which is what a hand-edited `.aidd/manifest.json`
+ * actually produces: `Manifest`'s parser maps over fields it does not guard. Written as a
+ * real implementation of the port rather than a cast, so it cannot drift from it. */
+class ThrowingManifestRepository implements ManifestRepository {
+  constructor(private readonly failure: Error) {}
+  async load(): Promise<Manifest | null> {
+    throw this.failure;
+  }
+  async save(): Promise<void> {}
+  async delete(): Promise<void> {}
+}
+
+function manifestWithClaudePlugin(marketplace?: string): InMemoryManifestRepository {
+  const manifest = Manifest.create();
+  manifest.addTool("claude", "test", []);
+  manifest.addPlugin(
+    "claude",
+    Plugin.fromMetadata(
+      "aidd-telemetry",
+      "1.0.0",
+      { kind: "github", repo: "ai-driven-dev/framework" },
+      true,
+      marketplace
+    )
+  );
+  return new InMemoryManifestRepository(manifest);
+}
+
+function registryCarrying(
+  refs: readonly string[]
+): ReadonlyMap<AiToolId, HostPluginRegistryReader> {
+  const reader: HostPluginRegistryReader = {
+    read: async () => ({ location: REGISTRY, refs: new Map(refs.map((ref) => [ref, true])) }),
+  };
+  return new Map<AiToolId, HostPluginRegistryReader>([["claude", reader]]);
+}
+
+const REGISTRY = "/home/dev/.claude/plugins/installed_plugins.json";
+const REF = "aidd-telemetry@aidd-framework";
+
+describe("DiagnoseTelemetryUseCase — what the host will actually load", () => {
+  it("says a plugin the host's registry carries is registered", async () => {
+    const { useCase } = buildUseCase({
+      manifestRepo: manifestWithClaudePlugin("aidd-framework"),
+      hostRegistries: registryCarrying([REF]),
+    });
+
+    const result = await useCase.execute(runOptions());
+
+    expect(result.setup.hostRegistration.entries[0]?.answer).toBe("registered");
+  });
+
+  // #703 itself, through the use-case: the declaration is fine and the host will drop it.
+  it("says a plugin the registry lacks is not registered, and names the file", async () => {
+    const { useCase } = buildUseCase({
+      manifestRepo: manifestWithClaudePlugin("aidd-framework"),
+      hostRegistries: registryCarrying([]),
+    });
+
+    const entry = (await useCase.execute(runOptions())).setup.hostRegistration.entries[0];
+
+    expect(entry?.answer).toBe("not-registered");
+    expect(entry?.detail).toContain(REGISTRY);
+  });
+
+  it("cannot ask any registry about a plugin recorded without a marketplace", async () => {
+    const { useCase } = buildUseCase({
+      manifestRepo: manifestWithClaudePlugin(undefined),
+      hostRegistries: registryCarrying([REF]),
+    });
+
+    expect((await useCase.execute(runOptions())).setup.hostRegistration.entries[0]?.answer).toBe(
+      "unanswerable"
+    );
+  });
+
+  /**
+   * Verified against the built binary before it was fixed: it printed
+   * `Cannot read properties of undefined (reading 'map')` and died. Nothing loaded the
+   * manifest from `check` until this fact existed, so that crash is one the diagnostic put
+   * on its own path — and a damaged manifest is exactly when someone runs `check`.
+   */
+  it("survives a manifest it cannot parse, and says so instead of dying", async () => {
+    const { useCase } = buildUseCase({
+      manifestRepo: new ThrowingManifestRepository(
+        new TypeError("Cannot read properties of undefined (reading 'map')")
+      ),
+    });
+
+    const registration = (await useCase.execute(runOptions())).setup.hostRegistration;
+
+    expect(registration.manifestUnreadable).toContain("map");
+    expect(registration.entries).toEqual([]);
   });
 });
