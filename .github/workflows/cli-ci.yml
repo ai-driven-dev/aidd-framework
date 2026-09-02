@@ -252,6 +252,12 @@ jobs:
           aidd telemetry check
       - run: cd cli && pnpm test:unit
       - run: cd cli && pnpm test:integration
+      # Every e2e but the two named below — and one of them is why this step matters most:
+      # `telemetry-commit-trailer.e2e.test.ts` makes real commits and reads their messages
+      # back, which is the only thing that proves the `prepare-commit-msg` hook this build
+      # installs is reachable by the shell Git for Windows ships. A path written with
+      # backslashes is not, and nothing but this catches it. Exclude it only for a reason as
+      # concrete as the two below.
       - name: cli e2e
         run: |
           cd cli

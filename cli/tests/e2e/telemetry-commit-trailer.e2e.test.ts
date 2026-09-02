@@ -1,5 +1,5 @@
 import { execFile, execFileSync } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -184,7 +184,11 @@ describe.concurrent("a commit names the session that made it", () => {
     await withRepo(async (repo) => {
       const hook = join(repo.dir, ".git", "hooks", "prepare-commit-msg");
       await writeFile(hook, '#!/bin/sh\necho "theirs ran" >> "$(dirname "$1")/theirs.log"\n');
-      execFileSync("chmod", ["+x", hook]);
+      // `fs.chmod`, never a spawned `chmod`: that binary is Git for Windows' own, reached
+      // only if its `usr/bin` happens to be on PATH, and this test has no business depending
+      // on that. Node's own call is a no-op for the execute bit on Windows, which is right —
+      // git runs a hook there through the shell it ships, not through the file's mode.
+      await chmod(hook, 0o755);
       await repo.aidd(["telemetry", "on", "--yes"]);
 
       await repo.commit("both-hooks", { CLAUDE_CODE_SESSION_ID: SESSION });
