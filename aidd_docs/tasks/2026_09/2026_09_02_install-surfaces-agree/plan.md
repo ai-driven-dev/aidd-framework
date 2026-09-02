@@ -47,6 +47,10 @@ holds no tool name.
 | 5 | The row: `plugins registered`, naming the missing side | `application/display/telemetry-check-display.ts` |
 | 6 | The tests, including the seam through `marketplace-sync-settings-use-case.ts` | `cli/tests/**` |
 
+**Four answers, not the five first sketched.** The fifth needed a declared-refs accessor the
+evidence port does not expose; the reason is written where the type is, and the distinction
+it would have drawn separates two flavours of one outcome. See `spec.md`.
+
 ## Test strategy
 
 - **Unit** — the five answers, from evidence shapes. No filesystem.

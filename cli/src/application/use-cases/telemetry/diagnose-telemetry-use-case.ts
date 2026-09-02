@@ -30,6 +30,7 @@ import type { TelemetrySink } from "../../../domain/ports/telemetry-sink.js";
 import type { VersionControl } from "../../../domain/ports/version-control.js";
 import type { VersionReader } from "../../../domain/ports/version-reader.js";
 import { getAiToolConfig } from "../../../domain/tools/registry.js";
+import { resolvePluginsCapability } from "../plugin/translator/project-hooks-materializer.js";
 
 const DEFAULT_RUNS_DIR_LABEL = "aidd_docs/runs";
 
@@ -202,6 +203,7 @@ export class DiagnoseTelemetryUseCase {
           marketplace: plugin.marketplace,
         })),
         reading: await this.hostRegistries.get(tool)?.read(),
+        declaresNativeActivation: resolvePluginsCapability(tool)?.nativeActivation != null,
       }))
     );
     return buildHostRegistration(evidence.filter((entry) => entry.plugins.length > 0));

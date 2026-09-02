@@ -103,20 +103,31 @@ AIDD manifest  ──►  the project's enabledPlugins  ──►  the host's ow
    installed            declares                       actually load
 ```
 
-**Five answers per installed plugin, never fewer:**
+**Four answers per installed plugin, never fewer:**
 
 | Answer | Means |
 | --- | --- |
 | registered | the registry was read and carries the ref |
-| registered, disabled | the registry carries it and records it off — Codex's `enabled = false` |
-| declared, not registered | the registry was read and lacks it, naming which file — the #703 failure |
-| not declared | the manifest has it and `enabledPlugins` does not, so the sync skipped it |
-| unanswerable | the ref cannot be built (no marketplace recorded), or the registry could not be read or parsed |
+| registered-disabled | the registry carries it and records it off — Codex's `enabled = false` |
+| not-registered | the registry was read and lacks it, naming which file — the #703 failure |
+| unanswerable | the ref cannot be built (no marketplace recorded), or no registry could be read |
 
-The last is not a soft version of the third. A file that cannot be parsed and a file that
-says "no" are different facts, and printing them alike is the defect this ticket is about.
-`registered, disabled` earns its own row for the same reason: folding it into `registered`
-would report a plugin that will not load as one that will.
+`unanswerable` is not a soft version of `not-registered`. A file that cannot be parsed and a
+file that says "no" are different facts, and printing them alike is the defect this ticket is
+about. `registered-disabled` earns its own row for the same reason: folding it into
+`registered` would report a plugin that will not load as one that will. And `unanswerable`
+itself carries two distinct sentences, because they send a person to different places: a tool
+that declares no native activation has no registry to look for, while a tool that declares
+one and has no reader here has a registry nobody has measured.
+
+**A fifth answer was designed and is not built.** Telling "the host does not carry it" from
+"it never reached the project's `enabledPlugins` at all" needs the set of declared refs per
+tool, and `TelemetryEvidenceReader` exposes no accessor for it — `readRecorderDeclaration`
+looks for the recorder specifically, not every declared key. That is a port method, an
+adapter method and their tests, for a distinction between two flavours of one outcome: the
+plugin will not load. The comparison starts from the manifest, which is the half that made
+the distinction visible and the half that matters; the second hop is named in #703's thread
+rather than half-built.
 
 ## Acceptance
 
@@ -125,6 +136,8 @@ would report a plugin that will not load as one that will.
 - [ ] A registry that cannot be read reports as unanswerable, distinctly from one read and
       lacking the entry. Asserted with a JSONC fixture — written from the shape recorded above,
       never copied from the real file, which carries hashed experiment keys and machine paths.
+- [ ] A manifest that cannot be parsed is reported, never fatal: `check` is the command a
+      person runs when something is already wrong.
 - [ ] The comparison starts from AIDD's own manifest, so a plugin the sync skipped is visible
       rather than reading as agreement between two absences.
 - [ ] Codex's `config.toml` is line-scanned, not parsed, and the doc comment says why against
