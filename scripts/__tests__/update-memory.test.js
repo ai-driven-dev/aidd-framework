@@ -14,7 +14,16 @@ const OPEN = "<!-- aidd_project_memory:start -->";
 const CLOSE = "<!-- aidd_project_memory:end -->";
 
 /** A throwaway project with a memory bank, a context file, and the hook run in it. */
-function run({ context, bank = ["architecture.md"], onDemand = [], packageJson, hookAt, args, runs = 1 }) {
+function run({
+  context,
+  contextAt = "CLAUDE.md",
+  bank = ["architecture.md"],
+  onDemand = [],
+  packageJson,
+  hookAt,
+  args,
+  runs = 1,
+}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "update-memory-"));
   try {
     fs.mkdirSync(path.join(root, "aidd_docs/memory"), { recursive: true });
@@ -24,7 +33,11 @@ function run({ context, bank = ["architecture.md"], onDemand = [], packageJson, 
       fs.mkdirSync(path.dirname(full), { recursive: true });
       fs.writeFileSync(full, "# x\n");
     }
-    if (context !== undefined) fs.writeFileSync(path.join(root, "CLAUDE.md"), context);
+    if (context !== undefined) {
+      const target = path.join(root, contextAt);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, context);
+    }
     if (packageJson) fs.writeFileSync(path.join(root, "package.json"), packageJson);
 
     // Copying the hook in mirrors how the CLI installs it, so the project's own
@@ -37,7 +50,7 @@ function run({ context, bank = ["architecture.md"], onDemand = [], packageJson, 
     }
 
     const invoke = () => spawnSync(process.execPath, [hook, ...(args ?? ["claude"])], { cwd: root });
-    const read = () => fs.readFileSync(path.join(root, "CLAUDE.md"), "utf8");
+    const read = () => fs.readFileSync(path.join(root, contextAt), "utf8");
 
     const first = invoke();
     const content = read();
@@ -189,4 +202,33 @@ test("an unpaired marker fails the run when the skill named the tools", () => {
 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /unpaired project memory marker/u);
+});
+
+// The @ import form is Claude-only. AGENTS.md is read by codex, cursor and
+// opencode, none of which resolve it, so an @ line there was inert text.
+test("AGENTS.md gets markdown links, resolvable from the repository root", () => {
+  const content = run({
+    context: `${OPEN}\n${CLOSE}\n`,
+    contextAt: "AGENTS.md",
+    args: ["codex"],
+  }).content;
+
+  assert.match(content, /^\[aidd_docs\/memory\/architecture\.md\]\(aidd_docs\/memory\/architecture\.md\)$/mu);
+  assert.doesNotMatch(content, /\(\.\.\//u);
+});
+
+// A link resolves against the file holding it, so a nested context file has to
+// climb back out. Hardcoding one level made every root-level link escape the
+// repository, which the link check catches as a broken local path.
+test("a nested context file prefixes its links with the climb back out", () => {
+  const content = run({
+    context: `${OPEN}\n${CLOSE}\n`,
+    contextAt: ".github/copilot-instructions.md",
+    args: ["copilot"],
+  }).content;
+
+  assert.match(
+    content,
+    /^\[aidd_docs\/memory\/architecture\.md\]\(\.\.\/aidd_docs\/memory\/architecture\.md\)$/mu,
+  );
 });

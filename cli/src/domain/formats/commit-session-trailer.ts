@@ -27,8 +27,14 @@
  * `CODEX_THREAD_ID` names the thread's first rollout, every commit made in a later one
  * carries a trailer that joins to nothing.
  *
- * What would settle it is one Codex session's `CODEX_THREAD_ID` read beside the rollout that
- * session wrote. That needs a live Codex session, which costs the person running it, so it
+ * What is already ruled out: the variable being absent altogether. `CODEX_THREAD_ID` appears
+ * in the Codex binary itself (checked 2026-09-02 against `@openai/codex-darwin-arm64`'s own
+ * native `codex`), so this reads a variable Codex really does set, and `session-anchor.ts`'s
+ * Codex branch is live rather than dead. The open question is narrower than it was: not
+ * whether a value arrives, but which rollout that value names.
+ *
+ * What would settle that is one Codex session's `CODEX_THREAD_ID` read beside the rollout
+ * that session wrote. That needs a live Codex session, which costs the person running it, so it
  * is named here as the next measurement rather than guessed at. Until then a consumer treats
  * a Codex trailer as a link to verify, not one to rely on — the same shape of stated limit
  * `opencode.ts` carries for its own counters.
