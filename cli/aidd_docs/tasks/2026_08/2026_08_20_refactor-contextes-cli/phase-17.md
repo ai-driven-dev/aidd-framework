@@ -87,6 +87,45 @@ du CLI :
 Elles ne sont là que parce que le CLI importe le source de kanban. Les retirer exige donc de
 retirer l'import profond, et retirer l'import profond exige que kanban devienne lançable.
 
+### Ce que coûte l'attente, mesuré
+
+`tsup.config.ts` déclare `skipNodeModulesBundle: true` : les quatre dépendances ne sont **pas**
+empaquetées, elles restent exigées à l'exécution. Chaque installation d'`aidd` les télécharge donc,
+pour une commande déclarée `hidden`.
+
+| dépendance | poids direct |
+|---|---|
+| `ink` | 1,1 Mo |
+| `react` | 252 Ko |
+| `gray-matter` | 80 Ko |
+| `cli-table3` | 68 Ko |
+
+Environ 1,5 Mo avant leurs propres arbres — `ink` tire notamment un moteur de rendu et une mise en
+page WASM.
+
+### Une demi-livraison a été tentée, et elle échoue pour une raison précise
+
+Différer le chargement des vues côté CLI, avec un `import()` dans un hook `preSubcommand`, ne marche
+pas : commander doit connaître ses sous-commandes **au parsing**, et le hook ne se déclenche qu'après.
+Mesuré — `aidd kanban list` répond alors `too many arguments for 'kanban'`. Le changement a été
+annulé.
+
+Il faut aussi noter, pour qui réessaiera : avec `splitting: false`, esbuild replie un `import()` en
+import statique et la paresse est perdue en silence. Activer le découpage la restaure et sort bien
+`ink` du bundle principal — vérifié, 400,4 Ko à 385,9 Ko — mais cela ne répare pas le problème de
+parsing ci-dessus.
+
+### Ce qui reste donc possible sans décision produit
+
+Différer **dans kanban**, pas dans le CLI : déplacer les imports de `ink`, `react` et `cli-table3`
+dans le corps des actions de ses deux fichiers de commandes. Les fonctions d'enregistrement
+resteraient importables immédiatement — commander garde ses sous-commandes — et les dépendances
+lourdes ne se chargeraient qu'à l'exécution, ce qui permettrait de les passer en
+`optionalDependencies` côté CLI.
+
+C'est un changement de code dans un autre paquet, pas une décision de produit. Il est plus petit que
+celui décrit plus bas, et il livre l'essentiel de la valeur.
+
 ### Ce qu'il faudrait décider
 
 Faire de kanban un programme autonome : un fichier d'entrée, un build, un `bin`, une version, et la
