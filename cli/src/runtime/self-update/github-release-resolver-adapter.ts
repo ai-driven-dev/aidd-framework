@@ -1,8 +1,8 @@
-import { HttpNotFoundError } from "../../infrastructure/errors.js";
 import {
   AuthenticationError,
   CatalogFetchAuthError,
   CatalogFetchError,
+  HttpNotFoundError,
 } from "../../kernel/errors.js";
 import type { TokenProvider } from "../auth/ports/token-provider.js";
 import type { HttpClient } from "../http/http-client.js";

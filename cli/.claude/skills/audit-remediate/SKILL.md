@@ -1,21 +1,22 @@
 ---
 name: audit-remediate
 description: >
-  Macro workflow for auditing a single domain layer against its authoritative layer skill,
-  applying fixes, and gating the result. Use when you need to prove a layer skill on real
-  code, clean up an existing layer after a skill update, or verify that a layer is already
-  compliant. Always captures a golden baseline before touching any file and rolls back
-  automatically if any gate fails. Do NOT use for adding new features — use `feature`
-  instead. Do NOT use for changes that touch multiple layers at once — run this macro once
-  per layer.
+  Macro workflow for auditing one context (or one of the non-context areas: kernel,
+  presentation, runtime) against its authoritative skill or rules, applying fixes, and gating
+  the result. Use when you need to prove a context skill on real code, clean up an existing
+  context after a skill or rule update, or verify that a context is already compliant. Always
+  captures a golden baseline before touching any file and rolls back automatically if any gate
+  fails. Do NOT use for adding new features — use `feature` instead. Do NOT use for changes
+  that touch multiple contexts at once — run this macro once per context.
 ---
 
 # Audit-Remediate
 
-Executes the audit → apply-layer-skill → gate → rollback loop for a single target layer.
-Each step delegates entirely to the relevant action or layer skill. The macro never inlines
-layer-specific rules — it routes to the authoritative layer skill for all judgements about
-what is correct or incorrect.
+Executes the audit → apply-context-skill → gate → rollback loop for a single target area.
+Each step delegates entirely to the relevant action or context skill. The macro never inlines
+context-specific rules — it routes to the authoritative context skill (or, for `kernel`,
+`presentation`, and `runtime`, to the relevant `.claude/rules/00-architecture/*.md`) for all
+judgements about what is correct or incorrect.
 
 ## Available actions
 
@@ -34,22 +35,22 @@ what is correct or incorrect.
 Skip 03 when 02 finds zero violations (clean verdict) — document the skip explicitly:
 "03 skipped — layer audited clean by \<layer-skill\>".
 
-## Layer skill routing
+## Skill routing
 
-Apply the correct layer skill in action 03 based on the target directory:
+Apply the correct authority in action 03 based on the target directory:
 
-| Target directory         | Authoritative layer skill |
+| Target directory | Authoritative skill or rule |
 | ------------------------ | ------------------------- |
-| `domain/formats/`        | `format`                  |
-| `domain/capabilities/`   | `capability`              |
-| `contexts/tools/domain/profiles/`       | `tool`                    |
-| `domain/models/`         | `domain-model`            |
-| `application/use-cases/` | `use-case`                |
-| `infrastructure/adapters/` | `adapter`               |
-| `application/commands/`  | `command`                 |
+| `src/contexts/tools/`       | `tools` skill |
+| `src/contexts/translate/`   | `translate` skill |
+| `src/contexts/distribution/` | `distribution` skill |
+| `src/contexts/framework/`   | `framework` skill |
+| `src/kernel/`               | `.claude/rules/00-architecture/0-contexts.md` — kernel imports no context, carries no business logic |
+| `src/presentation/`         | `.claude/rules/00-architecture/0-deps-wiring.md` |
+| `src/runtime/`               | no dedicated skill — follow the port/adapter shape the target context skill describes for the port it implements |
 
-If the target directory does not map to a known layer skill, stop and report the ambiguity
-before proceeding to action 02.
+If the target directory does not map to a known context skill or rule, stop and report the
+ambiguity before proceeding to action 02.
 
 ## Rollback protocol
 
@@ -72,12 +73,10 @@ before proceeding to action 02.
 
 ## External data
 
-- `.claude/skills/format/SKILL.md` — layer skill for `domain/formats/`
-- `.claude/skills/capability/SKILL.md` — layer skill for `domain/capabilities/`
-- `.claude/skills/tool/SKILL.md` — layer skill for `contexts/tools/domain/profiles/`
-- `.claude/skills/domain-model/SKILL.md` — layer skill for `domain/models/`
-- `.claude/skills/use-case/SKILL.md` — layer skill for `application/use-cases/`
-- `.claude/skills/adapter/SKILL.md` — layer skill for `infrastructure/adapters/`
-- `.claude/skills/command/SKILL.md` — layer skill for `application/commands/`
+- `.claude/skills/tools/SKILL.md` — authoritative skill for `src/contexts/tools/`
+- `.claude/skills/translate/SKILL.md` — authoritative skill for `src/contexts/translate/`
+- `.claude/skills/distribution/SKILL.md` — authoritative skill for `src/contexts/distribution/`
+- `.claude/skills/framework/SKILL.md` — authoritative skill for `src/contexts/framework/`
+- `.claude/rules/00-architecture/` — authoritative rules for `src/kernel/`, `src/presentation/`, `src/runtime/`
 - `references/rollback-protocol.md` — rollback commands and safe-restore procedures
 - `references/gate-criteria.md` — what constitutes a passing gate

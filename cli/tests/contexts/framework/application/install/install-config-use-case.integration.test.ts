@@ -4,7 +4,7 @@ import { extractConfigCapabilities } from "../../../../../src/contexts/framework
 import { copilot } from "../../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
 import { SettingsCapability } from "../../../../../src/contexts/tools/domain/settings-capability.js";
 import { FrameworkDescriptor } from "../../../../../src/contexts/translate/domain/canon.js";
-import { BundledAssetProviderAdapter } from "../../../../../src/infrastructure/assets/asset-loader.js";
+import { BundledAssetProviderAdapter } from "../../../../../src/runtime/assets/asset-loader.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
 import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
 import { linuxPlatform } from "../helpers.js";

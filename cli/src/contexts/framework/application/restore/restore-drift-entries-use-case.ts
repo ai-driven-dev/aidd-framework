@@ -1,4 +1,4 @@
-import type { Prompter } from "../../../../domain/ports/prompter.js";
+import type { Prompter } from "../../../../kernel/ports/prompter.js";
 import { ResolveRestoreDecisionUseCase } from "./resolve-restore-decision.js";
 
 export interface DriftDescriptor {

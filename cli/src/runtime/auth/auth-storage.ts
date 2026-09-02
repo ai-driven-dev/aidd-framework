@@ -1,9 +1,9 @@
 import { execSync } from "node:child_process";
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { AuthStorageError } from "../../infrastructure/errors.js";
-import { userConfigDir } from "../../infrastructure/user-config-dir.js";
+import { AuthStorageError } from "../../kernel/errors.js";
 import { AIDD_DIR } from "../../kernel/paths.js";
+import { userConfigDir } from "../user-config-dir.js";
 import type { AuthConfig, AuthCredential, AuthLevel } from "./auth.js";
 
 interface SaveOptions {

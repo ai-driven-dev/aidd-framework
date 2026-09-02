@@ -4,8 +4,8 @@ Record the current passing state as the immutable reference point before any fil
 
 ## Inputs
 
-- `target-layer-path` (required) - the directory being audited (e.g. `domain/formats/`)
-- `layer-skill` (required) - the authoritative layer skill name (e.g. `format`)
+- `target-layer-path` (required) - the directory being audited (e.g. `src/contexts/tools/domain/formats/`)
+- `layer-skill` (required) - the authoritative skill name (e.g. `tools`)
 
 ## Outputs
 

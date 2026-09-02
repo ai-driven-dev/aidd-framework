@@ -12,19 +12,14 @@
   - `smol-toml` — TOML read/write for Codex config round-trips
 - Vitest (tests), Biome (lint/format), Lefthook (git hooks via parent monorepo)
 
-## Layers
+## Structure
 
-3-layer hexagonal architecture — dependencies flow inward only:
-
-```
-Infrastructure → Application → Domain
-```
-
-| Layer | Path | Role |
-|---|---|---|
-| Domain | `src/domain/` | Models, ports, formats, capabilities, tool definitions |
-| Application | `src/application/` | Use-cases, commands (CLI wiring only) |
-| Infrastructure | `src/infrastructure/` | Adapters (filesystem, HTTP, GitHub, auth, cache) |
+The codebase is organised by bounded context, not by hexagonal layer — see
+`aidd_docs/memory/codebase-map.md` for the tree, and `.claude/rules/00-architecture/0-contexts.md`
+for the three invariants that govern it (the allowed edges between contexts, the kernel's
+no-context/no-logic rule, and the no-reach-into-a-context's-interior rule). Both are enforced by
+`tests/architecture/` rather than described here, so this file does not restate the tree: a second
+copy of it would drift the moment either changed without the other.
 
 ## Key Domain Concepts
 
@@ -38,23 +33,17 @@ Infrastructure → Application → Domain
 
 | Model | File | Description |
 |---|---|---|
-| `MarketplaceSourceMode` | `domain/models/marketplace-source-mode.ts` | Marketplace source type with optional `ref` |
-| `SetupFlow` | `domain/models/setup-flow.ts` | Aggregate: setup orchestration state |
-| `MarketplaceEntry` | `domain/capabilities/marketplace-entry.ts` | Per-tool marketplace registration entry |
-| `MarketplaceCacheEntry` | `domain/models/marketplace-cache-entry.ts` | Cached catalog TTL entry |
-| `NormalizedPlugin` | `domain/models/normalized-plugin.ts` | Foreign-format AST (internal; non-versioned) |
-| `LatestReleaseResolver` | `domain/ports/latest-release-resolver.ts` | Port: resolve latest GitHub release tag |
+| `MarketplaceSourceMode` | `contexts/distribution/domain/marketplace-source-mode.ts` | Marketplace source type with optional `ref` |
+| `SetupFlow` | `contexts/framework/domain/setup-flow.ts` | Aggregate: setup orchestration state |
+| `MarketplaceEntry` | `contexts/tools/domain/marketplace-entry.ts` | Per-tool marketplace registration entry |
+| `MarketplaceCacheEntry` | `contexts/distribution/domain/marketplace-cache-entry.ts` | Cached catalog TTL entry |
+| `LatestReleaseResolver` | `runtime/self-update/latest-release-resolver.ts` | Port: resolve latest GitHub release tag |
 
 ## Install Flows (high-level)
 
-**AI tool runtime config** (`aidd ai install <tool>`):
+**Tool runtime config** (`aidd framework install --tool <tool>`):
 ```
-InstallRuntimeConfigUseCase → AssetLoader (bundled in binary) → FileSystem + ManifestRepository
-```
-
-**IDE config** (`aidd ide install <tool>`):
-```
-InstallIdeConfigUseCase → AssetLoader (bundled in binary) → FileSystem + ManifestRepository
+InstallRuntimeConfigUseCase | InstallIdeConfigUseCase → AssetLoader (bundled in binary) → FileSystem + ManifestRepository
 ```
 
 **Plugin** (`aidd plugin install <name>`):
@@ -63,13 +52,14 @@ PluginInstallFromMarketplaceUseCase → MarketplaceRegistry + PluginFetcher (git
 → Distribution (per-tool rewrite) → FileSystem → PostInstallPipeline
 ```
 
-**Framework build** (`aidd framework build --target <tool>`):
+**Translate, author-side** (`aidd translate <source> --to <target> --out <dir>`):
 ```
 FrameworkBuildUseCase → BuildOutputStrategy (MarketplaceBuildStrategy | FlatBuildStrategy, reading per-tool ToolBuildContract)
 → tool-native plugin tree (author-side distribution; all 5 targets shipped — claude/cursor/copilot/codex marketplace+flat, opencode flat-only)
 ```
 Author-side, not user-side: translates the Claude-format framework into a tool-native
-marketplace dist (Mode A) or flat workspace materialization (Mode B `--flat`).
+marketplace dist (`--as marketplace`, the default) or flat workspace materialization
+(`--as flat`). Renamed from `framework build` in phase 18.
 
 **Manifest version guard** (no command — checked on load):
 ```
@@ -108,8 +98,8 @@ Token resolution: `AIDD_TOKEN` env → project `.aidd/auth.json` → user `~/.co
 
 ## Bundled Assets
 
-Runtime configs and IDE configs ship inside the CLI binary (tsup bundles them):
-- `src/infrastructure/assets/asset-loader.ts` — typed loader, esbuild text/json loaders at build time
+Runtime configs, IDE configs, and JSON schemas ship inside the CLI binary (tsup bundles them):
+- `src/runtime/assets/asset-loader.ts` — typed loader, esbuild text/json loaders at build time
 - `.md` files → text loader (string); `.json` → native import (object); `.toml` → text loader (string)
 - No fs reads at runtime — all assets inlined at bundle time
 
@@ -132,7 +122,7 @@ Hash tracking and per-file merge on CLI-owned files is over-engineering: the can
 source can always reproduce them. Blind rewriting of co-owned files destroys the user's
 own edits, which is why merge strategies and MCP exclusions exist.
 
-This distinction is what `doctor` and `restore` should be scoped by — see
+This distinction is what `doctor` and `sync` should be scoped by — see
 `aidd_docs/tasks/2026_08/2026_08_20_refactor-contextes-cli/`.
 
 ## Key Design Decisions
@@ -143,20 +133,12 @@ This distinction is what `doctor` and `restore` should be scoped by — see
 - Error handling: typed exceptions thrown from use-cases/adapters; caught only at command layer
 - Manifest version guard: reads v6 only, refuses older/newer with the fix named in the error (`manifest.ts`), no manual command
 
-## Foreign-Format Adapters (COMPLETE)
+## Foreign-Format Ingestion
 
-Ingests native marketplace/config formats from other AI tools.
-Pipeline: `NativeFormat → Parser → NormalizedPlugin → Emitter[targetTool] → ToolNativeFiles`
-
-| Tool | File | Notes |
-|---|---|---|
-| Cursor | `src/domain/formats/cursor-marketplace.ts` | `parseCursorMarketplace(rawJson)` → `NormalizedCatalog` |
-| Copilot | `src/domain/formats/copilot-marketplace.ts` | Single-entry degenerate catalog from `.github/plugin/plugin.json` |
-| Codex | `src/domain/formats/codex-marketplace.ts` | Multi-entry catalog at `.agents/plugins/marketplace.json` |
-| OpenCode | `src/domain/formats/opencode-marketplace.ts` | npm specifier strings from `opencode.json`; empty catalog when `plugin` field absent |
-
-**ForeignMarketplaceSource union:** `"cursor" | "copilot" | "codex" | "opencode"`
-
-**MARKETPLACE_PROBES:** cursor `.cursor-plugin/marketplace.json`, copilot `.github/plugin/plugin.json`, codex `.agents/plugins/marketplace.json`, opencode `opencode.json`
-
-**Error type:** `ForeignSchemaValidationError` in `src/domain/errors.ts` — thrown on invalid foreign schema
+Most of this pipeline was removed as dead code (no production caller — see the refactor task
+folder's `arborescence.md`, "Suppressions actées"): the `loadForeign()` entry point, the
+cursor/codex/opencode catalog parsers, and `NormalizedPlugin`. What remains is narrower —
+`contexts/distribution/domain/catalog-parsers/copilot-marketplace-catalog.ts` reads Copilot's
+own catalog shape (`.github/plugin/plugin.json`) into the same `PluginCatalog` shape the Claude
+parser produces, so `distribution` can register a Copilot-hosted marketplace without a
+tool-specific branch above it.

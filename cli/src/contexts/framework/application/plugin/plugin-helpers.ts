@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { NoManifestError } from "../../../../application/errors.js";
+import { NoManifestError } from "../../../../kernel/errors.js";
 import type { InstallationFile } from "../../../../kernel/file.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";

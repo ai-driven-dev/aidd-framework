@@ -2,159 +2,190 @@
 
 ## Where Things Live
 
+The codebase is organised by context, not by layer. Each context under `contexts/` owns a
+`domain/`, an `application/`, and (where it talks to the outside world) an `infrastructure/`.
+`kernel/` is shared vocabulary; `presentation/` and `runtime/` are not contexts. The allowed
+edges between contexts, and everything a context must keep private, are enforced by
+`tests/architecture/context-graph.arch.test.ts` and `context-boundary.arch.test.ts` — read those
+before writing about the boundary, not this file.
+
 ```
 src/
-├── cli.ts                    # Entry point — commander setup, global flags, preAction hook
-├── kernel/                   # shared vocabulary — no business logic, imports no context (biome-enforced)
-│   ├── tool.ts                # AiToolId/IdeToolId/ToolId, tool-id parsing and guards
-│   ├── source.ts               # PluginSource union, parsing/serialization
-│   ├── paths.ts                 # project-relative cache/build directory layout
-│   ├── file.ts                   # FileHash, InstallationFile, FileDiff, GITKEEP_FILE
-│   ├── merge.ts                   # MergeStrategy, ConflictDecision, merge-entry extraction
-│   ├── jsonc.ts                    # stripJsonComments — leaf dependency of merge.ts
-│   ├── errors.ts                    # domain typed exceptions
-│   └── ports/                        # ports with callers in ≥2 contexts: file-reader, file-writer, hasher, logger, asset-provider
-├── presentation/              # everything that talks to a human — phase 16
-│   ├── commands/              # CLI wiring only (1 file per command) — moved from application/commands/, still over folder-size (phase 18 splits it)
-│   ├── display/               # result rendering per command group (doctor, restore, setup, status)
-│   ├── prompts/                # the five interactive use-cases: setup-tools-prompt, setup-plugins-prompt, plugin-pick, sync-conflict-resolver, menu — ask the user, decision stays in the context
-│   ├── error-handler.ts        # central error handling
-│   └── output.ts               # stdout/stderr formatting (CLIOutput)
-├── runtime/                   # technical services that are not a context — phase 16
-│   ├── wiring/                 # one module per context (tools.ts, translate.ts, distribution.ts) plus framework.ts, the composition root — replaces infrastructure/deps.ts
-│   ├── auth/                   # credential-store/oauth-provider/token-provider ports + auth-reader/auth-storage/gh-cli/gh-token/auth-provider adapters + login/logout/status/require-auth use-cases
-│   │   └── ports/                # credential-store, oauth-provider, token-provider
-│   ├── prompter/                # the Prompter adapter (inquirer / silent) — the port itself stays at domain/ports/prompter.ts, read by both framework and distribution
-│   ├── http/                    # HTTP client
-│   ├── git/                     # token injection for authenticated git fetches
-│   ├── platform/                # the Platform port + its adapter
-│   ├── project-root/            # project-root resolution
-│   └── self-update/             # self-update-use-case, check-update-use-case, self-updater/latest-release-resolver/version-reader/version-control ports + their adapters
+├── cli.ts                      # commander setup, global flags, preAction/postAction hooks
+├── kernel/                     # shared vocabulary — imports no context, carries no business logic
+│   ├── tool.ts                  # AiToolId/IdeToolId/ToolId, tool-id parsing and guards
+│   ├── source.ts                  # PluginSource union, parsing/serialization
+│   ├── scope.ts                    # MarketplaceScope ("project" | "user") — a plugin CLI names it without importing distribution
+│   ├── paths.ts                     # project-relative cache/build directory layout
+│   ├── file.ts                       # FileHash, InstallationFile, FileDiff, GITKEEP_FILE
+│   ├── merge.ts                       # MergeStrategy, ConflictDecision, merge-entry extraction
+│   ├── jsonc.ts                        # stripJsonComments — leaf dependency of merge.ts
+│   ├── markdown.ts                      # markdown helpers shared by ≥2 contexts
+│   ├── flat-paths.ts                     # flat-build path helpers shared by ≥2 contexts
+│   ├── relative-link-rewrite.ts           # link-rewrite helper shared by ≥2 contexts
+│   ├── errors.ts                           # every typed domain exception — one catalog, not one per layer
+│   └── ports/                               # ports with callers in ≥2 contexts: file-reader, file-writer, hasher, logger, asset-provider, prompter (framework + distribution)
+├── presentation/                # everything that talks to a human — depends on contexts, never the reverse
+│   ├── commands/                 # CLI wiring only, one file per command; kanban.ts is a launcher stub still mid-migration (see "Launchers" below)
+│   ├── display/                   # result rendering per command group (doctor, restore, setup, status)
+│   ├── prompts/                    # interactive use-cases: menu, plugin-pick, setup-tools-prompt, setup-plugins-prompt, sync-conflict-resolver — ask the user, the decision stays in the context
+│   ├── error-handler.ts            # central error handling
+│   └── output.ts                   # stdout/stderr formatting (CLIOutput)
+├── runtime/                     # technical services that are not a context — wired from runtime/wiring/, may depend on contexts, never depended on by one
+│   ├── wiring/                   # one composition module per context (tools.ts, translate.ts, distribution.ts) plus framework.ts, the full composition root (createDeps/createMenuDeps)
+│   ├── auth/                      # credential-store/oauth-provider/token-provider ports + auth-reader/auth-storage/gh-cli/gh-token/auth-provider adapters + login/logout/status/require-auth use-cases
+│   │   └── ports/                  # credential-store, oauth-provider, token-provider
+│   ├── filesystem/                 # FileAdapter (FileReader+FileWriter+FileMerger) and HasherAdapter — the kernel ports' concrete adapters, plus tools' FileMerger port
+│   ├── assets/                      # BundledAssetProviderAdapter (the AssetProvider port's adapter) + text-assets.d.ts (*.md/*.toml module declarations) — configs/schemas bundled in the binary
+│   ├── prompter/                    # the Prompter adapter (inquirer / silent) — the port itself lives at kernel/ports/prompter.ts
+│   ├── http/                        # HTTP client
+│   ├── git/                          # token injection for authenticated git fetches
+│   ├── platform/                      # the Platform port + its adapter
+│   ├── project-root/                   # project-root resolution
+│   ├── self-update/                     # self-update-use-case, check-update-use-case, self-updater/latest-release-resolver/version-reader/version-control ports + their adapters
+│   └── user-config-dir.ts                # where the CLI keeps what belongs to the user rather than a project — read by runtime/auth, runtime/wiring, and distribution's registry adapter
 ├── application/
-│   ├── use-cases/              # top-level landing zone for a use-case not yet claimed by a context — currently empty (.gitkeep)
-│   └── errors.ts               # application typed exceptions (not yet relocated)
+│   └── use-cases/               # top-level landing zone for a use-case not yet claimed by a context — currently empty (.gitkeep); do not invent content to fill it
 ├── domain/
-│   ├── formats/              # what's left after phase 11: markdown-references.ts only — every other transform moved to kernel/, contexts/tools/domain/formats/, or contexts/translate/domain/formats/
-│   ├── models/               # entities, value objects, discriminant types not yet claimed by a context — semver.ts and auth.ts moved to contexts/framework/domain/ and runtime/auth/ in phase 16; the marketplace and catalog models moved to contexts/distribution/domain/
-│   ├── ports/                # Prompter only after phase 16 moved the auth/platform/self-update ports into runtime/ — ports shared by ≥2 contexts live in kernel/ports/
-│   └── capabilities/         # marketplace-entry, marketplace-settings, plugins-capability — pending a framework/tools placement; content-translation capabilities (agents, commands, rules, skills, hooks) moved to contexts/tools/domain/capabilities/
-├── infrastructure/
-│   ├── adapters/             # what's left after phase 16: file-adapter.ts, hasher-adapter.ts only — auth/http/git/platform/self-update/prompter adapters moved to runtime/
-│   ├── assets/               # asset-loader.ts — typed loader for configs/stubs bundled in binary
-│   ├── user-config-dir.ts    # user-level config dir resolution, read by contexts/distribution and runtime/wiring
-│   └── errors.ts             # infrastructure typed exceptions (internal only)
-└── contexts/                 # bounded contexts — nothing imports another context's interior
-    ├── tools/                # what the project targets, and how each target is configured — no index.ts (no barrels, ever)
+│   └── models/                  # landing zone for a domain type not yet claimed by a context — currently empty (.gitkeep)
+└── contexts/                    # bounded contexts — nothing imports another context's interior (context-boundary.arch.test.ts); no index.ts anywhere, barrels are forbidden
+    ├── tools/                    # what the project targets, and how each target is configured
     │   ├── domain/
-    │   │   ├── profiles/     # one directory per tool — profile.ts (AiTool definition) + build.ts (its ToolBuildContract)
-    │   │   │   ├── claude/
-    │   │   │   ├── codex/     # + codex-paths.ts, codex-agent-toml.ts, toml.ts (codex-only TOML wrapper)
-    │   │   │   ├── copilot/    # + copilot-paths.ts (read by this profile's own build.ts only)
-    │   │   │   ├── cursor/      # + cursor-paths.ts
-    │   │   │   ├── opencode/
-    │   │   │   └── vscode/      # IDE tool — profile.ts only, no build contract
-    │   │   ├── formats/      # tool formats shared by ≥2 profiles (command, placeholders, mcp-format, vscode-mcp-merge, opencode-mcp-merge, flat-hooks-merge, agent-frontmatter-strip)
-    │   │   ├── capabilities/ # content-translation capability classes (agents, commands, rules, skills, hooks) + config-refs.ts (CONFIG_* names, ConfigRef)
-    │   │   ├── registry.ts   # ToolConfig union, isAiTool(), registerTool(), getToolConfig(), hasToolSignals(), buildContractFor(), FrameworkBuildMode
-    │   │   ├── contracts.ts  # AiTool<C>, Has* interfaces, IdeToolConfig, UserFileSectionKey
-    │   │   ├── build-contract.ts      # ToolBuildContract, ArtifactContract — per-tool build shape
-    │   │   ├── marketplace-catalog.ts # catalog/manifest shaping shared by ≥2 tools' build contracts (claude, cursor, copilot, codex)
-    │   │   ├── settings-capability.ts # co-owned with the user (settings.json et al.)
-    │   │   ├── mcp-capability.ts      # co-owned with the user (.mcp.json et al.)
-    │   │   ├── mcp-exclusion.ts       # win32 mcp transform
-    │   │   └── ports/        # native-plugin-activator, file-merger, schema-validator (JsonSchemaValidator — translate reads it, tools declares it)
-    │   ├── application/      # install-ai-tool / install-ide-tool / install-config / install-ide-config / install-runtime-config / uninstall-tools
-    │   └── infrastructure/   # native-plugin-cli-adapter + its abstract base — drives a tool's own plugin CLI
-    ├── translate/            # the core: canonical source → target-native content, at every level — depends on tools + kernel only
-        ├── domain/
-        │   ├── formats/      # target-aware transforms (cursor-hooks, claude-root-path-rewrite, plugin-root-token-rewrite)
-        │   ├── content-translator.ts   # PluginContentTranslator — one plugin's files → one tool's installed files
-        │   ├── canon.ts                # FrameworkDescriptor, ContentSection, TemplateRef — the canonical framework-doc shape
-        │   ├── plugin-distribution.ts  # PluginDistribution, PluginComponentFile — the canonical single-plugin shape
-        │   ├── plugin-format.ts        # PluginFormat + manifest/marketplace probe paths
-        │   ├── plugin-translation-skip.ts # PluginTranslationSkip, ReadonlySkipList
-        │   └── build-target.ts         # FrameworkBuildTarget, FRAMEWORK_BUILD_TARGET_MODES, build-time path constants
+    │   │   ├── profiles/          # one directory per tool: profile.ts (the AiTool<C>/IdeToolConfig) + build.ts (its ToolBuildContract) when the tool is a build target
+    │   │   │   ├── claude/          # + claude-build-paths.ts
+    │   │   │   ├── codex/            # + codex-paths.ts, codex-agent-toml.ts, toml.ts (codex-only TOML wrapper)
+    │   │   │   ├── copilot/           # + copilot-paths.ts (read by this profile's own build.ts only)
+    │   │   │   ├── cursor/             # + cursor-paths.ts
+    │   │   │   ├── opencode/            # flat-only build target
+    │   │   │   └── vscode/               # IDE tool — profile.ts only, no build contract
+    │   │   ├── formats/            # tool formats shared by ≥2 profiles: command, placeholders, mcp-format, vscode-mcp-merge, opencode-mcp-merge, flat-hooks-merge, agent-frontmatter-strip
+    │   │   ├── capabilities/        # content-translation capability classes: agents, commands, hooks, rules, skills + config-refs.ts (CONFIG_* names, ConfigRef)
+    │   │   ├── ports/                # native-plugin-activator, file-merger, schema-validator (translate reads it, tools declares it)
+    │   │   ├── contracts.ts          # AiTool<C>, Has* interfaces, IdeToolConfig, ToolConfig, UserFileSectionKey
+    │   │   ├── registry.ts            # ToolConfig union, isAiTool(), registerTool(), getToolConfig(), hasToolSignals(), buildContractFor()
+    │   │   ├── build-contract.ts       # ToolBuildContract, ArtifactContract — per-tool build shape
+    │   │   ├── marketplace-catalog.ts   # catalog/manifest shaping shared by ≥2 tools' build contracts
+    │   │   ├── settings-capability.ts    # co-owned with the user (settings.json et al.)
+    │   │   ├── mcp-capability.ts          # co-owned with the user (.mcp.json et al.)
+    │   │   ├── mcp-exclusion.ts            # win32 mcp transform
+    │   │   ├── hooks-format.ts              # a tool's hooks format, read by whoever installs from it
+    │   │   ├── plugins-capability.ts         # what a tool declares about plugins
+    │   │   ├── marketplace-settings.ts        # per-tool marketplace registration shape
+    │   │   ├── plugin-translation-mode.ts      # how a tool's plugins get translated
+    │   │   └── marketplace-entry.ts             # per-tool marketplace registration entry
+    │   ├── application/            # install-ai-tool / install-ide-tool / install-config / install-ide-config / install-runtime-config / uninstall-tools
+    │   └── infrastructure/         # native-plugin-cli-adapter + its abstract base — drives a tool's own plugin CLI
+    ├── translate/                 # the core: canonical source → target-native content, for every tool at once — depends on tools + kernel only
+    │   ├── domain/
+    │   │   ├── formats/             # target-aware transforms: claude-root-path-rewrite, cursor-hooks, plugin-root-token-rewrite
+    │   │   ├── content-translator.ts # PluginContentTranslator — one plugin's files → one tool's installed files, calling the tool's own rewriteContent
+    │   │   ├── canon.ts               # FrameworkDescriptor, ContentSection, TemplateRef — the canonical framework-doc shape
+    │   │   ├── plugin-distribution.ts  # PluginDistribution, PluginComponentFile — the canonical single-plugin shape
+    │   │   ├── plugin-format.ts         # PluginFormat + manifest/marketplace probe paths
+    │   │   ├── plugin-translation-skip.ts # PluginTranslationSkip, ReadonlySkipList
+    │   │   └── build-target.ts           # FrameworkBuildTarget, FRAMEWORK_BUILD_TARGET_MODES, build-time path constants
     │   ├── application/
-    │   │   ├── translate-source.ts     # FrameworkBuildUseCase — one source, N targets, `framework build`
+    │   │   ├── translate-source.ts    # FrameworkBuildUseCase — one source, N targets, `aidd translate`
     │   │   ├── shared-plugin-helpers.ts
-    │   │   └── strategies/             # marketplace and flat build strategies
+    │   │   └── strategies/             # marketplace-build-strategy, flat-build-strategy, build-output-strategy, marketplace-strategy-helpers
     │   └── infrastructure/
     │       └── schema-validator.ts     # AjvSchemaValidatorAdapter
-    ├── distribution/         # where content comes from and how it is fetched — a leaf: kernel only, knows no tool and no manifest
+    ├── distribution/              # where content comes from and how it is fetched — a leaf: kernel only, knows no tool and no manifest
+    │   ├── domain/
+    │   │   ├── marketplace.ts          # Marketplace entry, scope, staleness
+    │   │   ├── marketplace-cache-entry.ts
+    │   │   ├── marketplace-source-mode.ts
+    │   │   ├── catalog.ts               # PluginCatalog, PluginCatalogEntry + the Claude-shaped parser
+    │   │   ├── catalog-parsers/          # readers for a non-Claude catalog shape (copilot)
+    │   │   └── ports/                     # marketplace-registry, marketplace-cache, marketplace-trust-store, plugin-catalog-repository, plugin-fetcher, raw-catalog-fetcher
+    │   ├── application/             # add / list / refresh / register-framework / resolve-marketplace / fetch-marketplace-source
+    │   └── infrastructure/          # the adapters behind those six ports
+    └── framework/                  # the installation record and everything done to a project — the only context allowed to reach the others
         ├── domain/
-        │   ├── marketplace.ts          # Marketplace entry, scope, staleness
-        │   ├── marketplace-cache-entry.ts
-        │   ├── marketplace-source-mode.ts
-        │   ├── catalog.ts              # PluginCatalog, PluginCatalogEntry + the Claude-shaped parser
-        │   ├── catalog-parsers/        # readers for a non-Claude catalog shape (copilot)
-        │   └── ports/                  # marketplace-registry, marketplace-cache, marketplace-trust-store, plugin-catalog-repository, plugin-fetcher, raw-catalog-fetcher
-    │   ├── application/      # add / list / refresh / register-framework / resolve-marketplace / fetch-marketplace-source
-    │   └── infrastructure/   # the adapters behind those six ports
-    └── framework/            # the installation record and everything done to a project — the context allowed to reach the others
-        ├── domain/
-        │   ├── manifest.ts          # aggregate root: identity, consistency, version guard, entry point to its members
-        │   ├── manifest-serialization.ts # ManifestData shape, tools map <-> record conversion
-        │   ├── manifest/            # the aggregate's members — tool-entry, tracked-files, merge-files, mcp-exclusions
-        │   ├── doctor.ts            # the diagnosis shape
-        │   ├── install-scope.ts     # project or user, and which a tool supports
-        │   ├── project-context.ts   # what a project is, seen from here
-        │   ├── setup-flow.ts        # the steps a first install goes through
-        │   ├── config-capability.ts # runtime configuration a tool receives
+        │   ├── manifest.ts               # aggregate root: identity, consistency, version guard, entry point to its members
+        │   ├── manifest-serialization.ts  # ManifestData shape, tools map <-> record conversion
+        │   ├── manifest/                   # the aggregate's members: tool-entry, tracked-files, merge-files, mcp-exclusions
+        │   ├── plugins/                      # a plugin, how it is declared, where it came from: installed-plugin, plugin-source-resolver, requested-version-policy
+        │   ├── formats/                        # markdown-references.ts — moved in here in phase 19, one caller
+        │   ├── doctor.ts                        # the diagnosis shape
+        │   ├── install-scope.ts                  # project or user, and which a tool supports
+        │   ├── project-context.ts                 # what a project is, seen from here
+        │   ├── setup-flow.ts                       # the steps a first install goes through
+        │   ├── config-capability.ts                 # runtime configuration a tool receives
         │   ├── tool-recommendations.ts
-        │   ├── plugins/             # a plugin, how it is declared, where it came from — installed-plugin, plugins-capability, translation-mode, source-resolver, marketplace-entry, marketplace-settings, requested-version-policy
-        │   └── ports/               # manifest-repository, plugin-distribution-reader
-        ├── application/      # setup/  install/  plugin/  restore/  uninstall/  doctor/  global/  shared/  framework/  translator/  flows/ (two areas), status-use-case.ts, clean-use-case.ts, init-use-case.ts — the interactive prompts (setup-tools-prompt, setup-plugins-prompt, plugin-pick, sync-conflict-resolver) moved to presentation/prompts/ in phase 16
-        └── infrastructure/   # manifest-repository and plugin-distribution-reader adapters
+        │   ├── semver.ts
+        │   └── ports/                                # manifest-repository, plugin-distribution-reader
+        ├── application/                # + clean-use-case.ts, init-use-case.ts, status-use-case.ts, gitignore-use-case.ts, setup-use-case.ts — the interactive prompts moved to presentation/prompts/
+        │   ├── doctor/                  # layout, merge-files, plugin, references, registration, tracked-files, doctor-use-case (orchestrator)
+        │   ├── flows/                    # marketplace-check, marketplace-remove, marketplace-sync-settings
+        │   ├── framework/                 # legacy name for the translator subtree below (pre-dates `aidd translate`)
+        │   │   └── translator/             # built-tree-materialization, mode-a-marketplace, mode-b-flat-materialization, plugin-translator(-factory), resolve-plugin-translator
+        │   ├── global/                    # doctor-all, restore-all, status-all, update-tools, update-ai-tools, update-ide-tools, update-one-tool, resolve-update-decision
+        │   ├── install/                    # install-ai-tool, install-ide-tool, install-config, install-ide-config, install-runtime-config, install-agents, install-commands, install-rules, install-skills, install-content-section, post-install-pipeline, uninstall-tools
+        │   ├── plugin/                      # add, install(-from-marketplace), remove, list, search, update, plugin-helpers
+        │   ├── restore/                      # tool-files, all-plugins, plugin, generate-tool-distribution, resolve-restore-decision, restore-drift-entries, restore-merge-files, restore-regular-files, restore-use-case (orchestrator)
+        │   ├── setup/                          # setup-marketplace-source, setup-tools, project-context-detector
+        │   ├── shared/                          # apply-plugin-files, detect-plugin-drift, ensure-built-marketplace — never called from commands
+        │   └── uninstall/                        # uninstall-use-case (orchestrator), mcp-exclusion, ide, plugin
+        └── infrastructure/             # manifest-repository-adapter and plugin-distribution-reader-adapter
 ```
+
+## Launchers
+
+Arborescence invariant 9: a launcher locates and executes an external binary; it never embeds
+that binary's application code. `presentation/commands/kanban.ts` is the one launcher-shaped
+command today, and it does not yet meet the invariant — it deep-imports
+`../../../../kanban/src/presentation/...` directly rather than spawning the kanban CLI as a
+subprocess. There is no telemetry or governance launcher; those are unbuilt. Until kanban is
+cut over, describe this as the known gap it is rather than as done.
 
 ## Use-Case Structure
 
 | Domain | Orchestrator | Sub-use-cases |
 |---|---|---|
-| doctor | `doctor-use-case.ts` | layout, merge-files, plugin, references, tracked-files |
-| restore | `restore-use-case.ts` | tool-files, all-plugins, plugin, generate-tool-distribution, resolve-restore-decision, restore-drift-entries, restore-merge-files, restore-regular-files |
-| uninstall | `uninstall-use-case.ts` | plugin, mcp-exclusion, ide — drives `contexts/tools/application/uninstall-tools-use-case.ts` |
-| setup | `setup-use-case.ts` | marketplace-source, tools — plugins-prompt and tools-prompt are `presentation/prompts/` classes it still injects by type (phase 16 tension, see phase-16 report) |
-| global | — | update-all, status-all, restore-all, doctor-all (4 chain orchestrators) + update-ai-tools / update-ide-tools helpers |
+| doctor | `contexts/framework/application/doctor/doctor-use-case.ts` | layout, merge-files, plugin, references, registration, tracked-files |
+| restore | `contexts/framework/application/restore/restore-use-case.ts` | tool-files, all-plugins, plugin, generate-tool-distribution, resolve-restore-decision, restore-drift-entries, restore-merge-files, restore-regular-files |
+| uninstall | `contexts/framework/application/uninstall/uninstall-use-case.ts` | plugin, mcp-exclusion, ide — drives `contexts/tools/application/uninstall-tools-use-case.ts` |
+| setup | `contexts/framework/application/setup-use-case.ts` | setup/setup-marketplace-source, setup/setup-tools, setup/project-context-detector — the plugins-prompt and tools-prompt are `presentation/prompts/` classes it injects by type |
+| global | — | update-all, status-all, restore-all, doctor-all (4 chain orchestrators) + update-ai-tools / update-ide-tools / update-one-tool helpers |
+| plugin | `contexts/framework/application/plugin/` | add, install (+ install-from-marketplace), remove, list, search, update, plugin-helpers |
 
 ## Where to Add Things
 
 | What | Where |
 |------|-------|
-| New CLI command | `presentation/commands/` + top-level use-case |
+| New CLI command | `presentation/commands/` + the top-level use-case it calls, in whichever context owns the concept |
 | New interactive prompt (asks the user) | `presentation/prompts/` — the decision it feeds stays in the context |
-| New use-case | `application/use-cases/<subdir>/` or root for top-level |
-| Shared use-case helper | `application/use-cases/shared/` |
-| New runtime service (not a context: auth, http, git, platform, self-update) | `runtime/<service>/`, wired from `runtime/wiring/<context>.ts` |
-| New AI/IDE tool | one profile directory in `contexts/tools/domain/profiles/<toolname>/` (`profile.ts` + `build.ts`) — see `tool-addition-cost.arch.test.ts` |
+| New use-case not yet claimed by a context | `application/use-cases/` at the root — a temporary landing zone, not a home |
+| Shared use-case helper | the owning context's `application/shared/` |
+| New runtime service (not a context: auth, http, git, platform, self-update, filesystem, assets) | `runtime/<service>/`, wired from `runtime/wiring/<context>.ts` |
+| New AI/IDE tool | one profile directory in `contexts/tools/domain/profiles/<toolname>/` (`profile.ts` + `build.ts`) — see `tool-addition-cost.arch.test.ts` and the `tools` skill |
 | New content-translation capability (agents/skills/commands/rules/hooks) | `Has*` in `contexts/tools/domain/contracts.ts` + class in `contexts/tools/domain/capabilities/` |
 | New target-aware transform (a translate concern) | `contexts/translate/domain/formats/` |
 | New string transform shared by ≥2 tool profiles | `contexts/tools/domain/formats/` |
-| New string transform used by exactly one tool profile | that profile's own directory — see `tool-addition-cost.arch.test.ts` |
-| New domain type not yet claimed by a context | `domain/models/` |
-| New port used by one context | that context's `domain/ports/` (or `domain/ports/` for code not yet in a context) + adapter in `infrastructure/adapters/` (or that context's `infrastructure/`) |
-| New port used by ≥2 contexts | `kernel/ports/` + adapter in `infrastructure/adapters/` |
+| New string transform used by exactly one tool profile | that profile's own directory |
+| New domain type not yet claimed by a context | Decide which context owns it before writing it. There is no landing zone: the pre-refactor tree is gone, and a type with no owner is a design question, not a placement one |
+| New port used by one context | that context's own `domain/ports/` + adapter in that context's `infrastructure/` |
+| New port used by ≥2 contexts | `kernel/ports/` + adapter in `runtime/` (see `runtime/filesystem/`, `runtime/assets/`, `runtime/prompter/` for the pattern) |
 | New shared vocabulary (no logic, no context import) | `kernel/` |
 
 ## Tests
 
 ```
 tests/
-├── kernel/                   # unit — shared vocabulary tests, mirrors src/kernel/
-├── presentation/              # unit — commands, display, prompts, output, error-handler — mirrors src/presentation/
-├── runtime/                    # unit/integration — auth, http, git, platform, project-root, self-update, wiring — mirrors src/runtime/
-├── application/use-cases/    # unit — use-cases with in-memory ports from tests/helpers/ports/
-├── domain/capabilities/      # unit — plugins-capability.ts only; the rest moved to contexts/tools/domain/capabilities/
-├── domain/formats/           # unit — markdown-references.ts only; the rest moved with their source
-├── domain/models/            # unit — pure value object tests; manifest.property.unit.test.ts (property-based)
-├── contexts/tools/           # unit — mirrors src/contexts/tools/ (profiles, registry, formats, capabilities, install/uninstall use-cases, native-plugin-cli adapter)
-├── contexts/translate/       # unit/integration — mirrors src/contexts/translate/ (formats, content-translator, canon, build strategies, schema-validator)
-├── e2e/                      # full CLI invocation via runCli()
-├── infrastructure/           # adapter tests with mock servers/fixtures — file-adapter, hasher-adapter, asset-loader; the rest moved to tests/runtime/
-├── architecture/             # ratchets over source text — folder size, tool-addition cost, no-re-export, codebase-map, etc.
+├── kernel/                    # unit — shared vocabulary tests, mirrors src/kernel/ (errors.unit.test.ts covers the whole catalog)
+├── presentation/               # unit — commands, display, prompts, output, error-handler — mirrors src/presentation/
+├── runtime/                     # unit/integration — auth, filesystem, assets, http, git, platform, project-root, prompter, self-update, wiring — mirrors src/runtime/
+├── contexts/tools/             # unit — mirrors src/contexts/tools/ (profiles, registry, formats, capabilities, install/uninstall use-cases, native-plugin-cli adapter)
+├── contexts/translate/          # unit/integration — mirrors src/contexts/translate/ (formats, content-translator, canon, build strategies, schema-validator)
+├── contexts/distribution/        # unit/integration — mirrors src/contexts/distribution/
+├── contexts/framework/            # unit/integration — mirrors src/contexts/framework/, including domain/formats/markdown-references
+├── e2e/                        # full CLI invocation via runCli()
+├── golden/                     # snapshot tests over a real built framework tree — never derive a snapshot from an absolute path
+├── architecture/               # ratchets over source text — folder size, tool-addition cost, no-re-export, codebase-map, context-graph, context-boundary, referenced-paths, docs-do-not-lie, earned-sharing, orchestrator-deps
 └── fixtures/
-    ├── framework/            # minimal synthetic framework fixture
-    └── framework-real/       # pinned real framework tag (plugins: aidd-async-dev, etc.)
+    ├── framework/               # minimal synthetic framework fixture
+    └── framework-real/          # pinned real framework tag (plugins: aidd-async-dev, etc.)
 ```
 
 ## Key Files
@@ -162,11 +193,13 @@ tests/
 | File | Purpose |
 |------|---------|
 | `runtime/wiring/framework.ts` | Full dependency graph (`createDeps`, `createMenuDeps`) — start here when wiring new deps; composes `runtime/wiring/{tools,translate,distribution}.ts` |
-| `infrastructure/assets/asset-loader.ts` | Typed loader for configs/stubs bundled in binary |
-| `contexts/tools/domain/contracts.ts` | All tool/capability interfaces |
+| `runtime/assets/asset-loader.ts` | Typed loader for configs/schemas bundled in binary |
+| `kernel/errors.ts` | Every typed domain exception in the codebase — one catalog, not one per context |
+| `contexts/tools/domain/contracts.ts` | All tool/capability interfaces, including `rewriteContent`/`reverseRewriteContent` — declared by tools, called by translate |
 | `contexts/tools/domain/registry.ts` | Tool lookup, guards, signal detection |
 | `contexts/framework/application/install/post-install-pipeline-use-case.ts` | Mandatory post-write sequence |
 | `contexts/framework/application/shared/ensure-built-marketplace-use-case.ts` | Per-target built-tree cache — install/update materialize tools from it (build/install parity) |
 | `contexts/framework/domain/manifest.ts` | Aggregate root — identity, consistency, version guard (reads v6 only, refuses older/newer with the fix) on load; delegates tracked files, merge files, mcp exclusions and plugins to `domain/manifest/` |
-| `domain/models/normalized-plugin.ts` | Internal AST for foreign-format plugin ingestion |
 | `contexts/framework/domain/setup-flow.ts` | Aggregate — setup orchestration state |
+| `tests/architecture/context-boundary.arch.test.ts` | The list of what each context declares public — the boundary, since there is no barrel file |
+| `tests/architecture/context-graph.arch.test.ts` | The allowed edges between contexts, as code rather than prose |

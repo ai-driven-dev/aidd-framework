@@ -1,11 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { HttpNotFoundError } from "../../../infrastructure/errors.js";
 import {
   AuthenticationError,
   CatalogFetchAuthError,
   CatalogFetchError,
   CatalogFetchNotFoundError,
+  HttpNotFoundError,
 } from "../../../kernel/errors.js";
 import type { PluginSourceGitHub } from "../../../kernel/source.js";
 import type { TokenProvider } from "../../../runtime/auth/ports/token-provider.js";

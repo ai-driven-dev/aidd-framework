@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { NoManifestError, ToolNotInstalledError } from "../../../application/errors.js";
+import { NoManifestError, ToolNotInstalledError } from "../../../kernel/errors.js";
 import type { FileHash } from "../../../kernel/file.js";
 import { extractMergeEntries, type MergeFileEntry } from "../../../kernel/merge.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";

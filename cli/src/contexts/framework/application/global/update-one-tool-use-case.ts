@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { InputRequiredError } from "../../../../application/errors.js";
+import { InputRequiredError } from "../../../../kernel/errors.js";
 import type { FileHash } from "../../../../kernel/file.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { AiToolId, IdeToolId, ToolId } from "../../../../kernel/tool.js";

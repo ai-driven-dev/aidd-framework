@@ -1,8 +1,7 @@
 import { execSync } from "node:child_process";
 import { platform } from "node:os";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { HttpNotFoundError } from "../../../src/infrastructure/errors.js";
-import { FrameworkResolutionError } from "../../../src/kernel/errors.js";
+import { FrameworkResolutionError, HttpNotFoundError } from "../../../src/kernel/errors.js";
 import { HttpClient } from "../../../src/runtime/http/http-client.js";
 import { SelfUpdaterAdapter } from "../../../src/runtime/self-update/self-updater-adapter.js";
 

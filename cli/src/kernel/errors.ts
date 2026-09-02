@@ -441,3 +441,115 @@ export class NativePluginCliError extends Error {
     this.name = "NativePluginCliError";
   }
 }
+
+export class HttpError extends Error {
+  constructor(
+    readonly statusCode: number,
+    readonly url: string
+  ) {
+    super(`Unexpected HTTP ${statusCode} from ${url}`);
+    this.name = "HttpError";
+  }
+}
+
+export class HttpNotFoundError extends Error {
+  constructor(readonly url: string) {
+    super(`Resource not found (HTTP 404): ${url}`);
+    this.name = "HttpNotFoundError";
+  }
+}
+
+export class HttpRedirectError extends Error {
+  constructor(readonly url: string) {
+    super(`HTTP redirect without location header from ${url}`);
+    this.name = "HttpRedirectError";
+  }
+}
+
+export class JsonParseError extends Error {
+  constructor(path: string, cause: string) {
+    super(`Cannot parse existing JSON at ${path}: ${cause}`);
+    this.name = "JsonParseError";
+  }
+}
+
+export class AuthStorageError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AuthStorageError";
+  }
+}
+
+export class GhCliError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GhCliError";
+  }
+}
+
+export class AssetNotFoundError extends Error {
+  constructor(assetName: string) {
+    super(`Bundled asset not found: '${assetName}'`);
+    this.name = "AssetNotFoundError";
+  }
+}
+export class NoManifestError extends Error {
+  constructor() {
+    super("No AIDD manifest found. Run `aidd setup` to initialize your project.");
+    this.name = "NoManifestError";
+  }
+}
+
+export class AiddFilesDetectedError extends Error {
+  constructor() {
+    super(
+      "AIDD files detected but no manifest found.\nRun `aidd setup` to register existing files."
+    );
+    this.name = "AiddFilesDetectedError";
+  }
+}
+
+export class AdoptRequiresVersionError extends Error {
+  constructor(diagnostic = "") {
+    const suffix = diagnostic ? `\n\n${diagnostic}` : "";
+    super(
+      `--from <version|path> is required for adopt.\nExample: aidd setup --ai claude --from 3.6.0${suffix}`
+    );
+    this.name = "AdoptRequiresVersionError";
+  }
+}
+
+export class NotAuthenticatedError extends Error {
+  constructor() {
+    super("Not authenticated. Run `aidd auth login`.");
+    this.name = "NotAuthenticatedError";
+  }
+}
+
+export class AlreadyInitializedError extends Error {
+  constructor(message = "Already initialized. Use `aidd update` to upgrade.") {
+    super(message);
+    this.name = "AlreadyInitializedError";
+  }
+}
+
+export class InputRequiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InputRequiredError";
+  }
+}
+
+export class ToolNotInstalledError extends Error {
+  constructor(toolId: string, context?: string) {
+    super(context ? `${context} '${toolId}' is not installed.` : `${toolId} is not installed`);
+    this.name = "ToolNotInstalledError";
+  }
+}
+
+export class InvalidCategoryError extends Error {
+  constructor(category: string) {
+    super(`Invalid category '${category}'. Use 'ai' or 'ide'.`);
+    this.name = "InvalidCategoryError";
+  }
+}

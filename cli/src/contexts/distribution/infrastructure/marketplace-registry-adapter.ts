@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { userConfigDir } from "../../../infrastructure/user-config-dir.js";
 import { AIDD_DIR } from "../../../kernel/paths.js";
 import type { MarketplaceScope } from "../../../kernel/scope.js";
+import { userConfigDir } from "../../../runtime/user-config-dir.js";
 import { Marketplace, type MarketplaceData } from "../domain/marketplace.js";
 import type { MarketplaceRegistry } from "../domain/ports/marketplace-registry.js";
 

@@ -20,9 +20,9 @@ Test file at the correct path with the correct suffix.
 
 ## Process
 
-1. Create the test file at:
-   - Unit: `tests/application/use-cases/<kebab-name>.unit.test.ts` or `tests/contexts/framework/domain/<kebab-name>.unit.test.ts`
-   - Integration: `tests/infrastructure/adapters/<kebab-name>-adapter.integration.test.ts` or `tests/application/use-cases/<kebab-name>.integration.test.ts`
+1. Create the test file mirroring the source path under `tests/`, at:
+   - Unit: `tests/contexts/<context>/domain/<kebab-name>.unit.test.ts` or `tests/contexts/<context>/application/<kebab-name>.unit.test.ts`
+   - Integration: `tests/contexts/<context>/infrastructure/<kebab-name>-adapter.integration.test.ts` or `tests/runtime/<service>/<kebab-name>-adapter.integration.test.ts`
    - E2E: `tests/e2e/<kebab-name>.e2e.test.ts`
 
 2. **Unit tests** — mock all ports via `tests/helpers/ports/` in-memory implementations. No real I/O. No `describe.concurrent()`.

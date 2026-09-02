@@ -6,12 +6,12 @@ import type {
 import type { Marketplace } from "../../contexts/distribution/domain/marketplace.js";
 import type { MarketplaceRegistry } from "../../contexts/distribution/domain/ports/marketplace-registry.js";
 import type { PluginAddUseCase } from "../../contexts/framework/application/plugin/plugin-add-use-case.js";
-import type { Prompter } from "../../domain/ports/prompter.js";
 import {
   InteractiveOnlyError,
   InvalidPluginManifestError,
   NoMarketplacesRegisteredError,
 } from "../../kernel/errors.js";
+import type { Prompter } from "../../kernel/ports/prompter.js";
 import type { AiToolId } from "../../kernel/tool.js";
 
 export interface PluginPickOptions {

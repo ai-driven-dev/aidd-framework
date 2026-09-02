@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Prompter } from "../../../src/domain/ports/prompter.js";
+import type { Prompter } from "../../../src/kernel/ports/prompter.js";
 import { InteractiveMenuUseCase } from "../../../src/presentation/prompts/menu-use-case.js";
 import { buildUnitDeps, initProject } from "../../helpers/ports/build-unit-deps.js";
 

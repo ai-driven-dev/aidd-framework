@@ -1,6 +1,6 @@
 ---
 paths:
-  - "src/domain/models/**/*.ts"
+  - "src/contexts/*/domain/**/*.ts"
 ---
 
 # Domain Model

@@ -18,12 +18,12 @@ import { Manifest } from "../../../../src/contexts/framework/domain/manifest.js"
 import { ManifestRepositoryAdapter } from "../../../../src/contexts/framework/infrastructure/manifest-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "../../../../src/contexts/framework/infrastructure/plugin-distribution-reader-adapter.js";
 import { isIdeToolId } from "../../../../src/contexts/tools/domain/registry.js";
-import type { Prompter } from "../../../../src/domain/ports/prompter.js";
-import { FileAdapter } from "../../../../src/infrastructure/adapters/file-adapter.js";
-import { HasherAdapter } from "../../../../src/infrastructure/adapters/hasher-adapter.js";
-import { BundledAssetProviderAdapter } from "../../../../src/infrastructure/assets/asset-loader.js";
+import type { Prompter } from "../../../../src/kernel/ports/prompter.js";
 import type { ToolId } from "../../../../src/kernel/tool.js";
 import { CLIOutput } from "../../../../src/presentation/output.js";
+import { BundledAssetProviderAdapter } from "../../../../src/runtime/assets/asset-loader.js";
+import { FileAdapter } from "../../../../src/runtime/filesystem/file-adapter.js";
+import { HasherAdapter } from "../../../../src/runtime/filesystem/hasher-adapter.js";
 import type { Platform } from "../../../../src/runtime/platform/platform.js";
 import { SilentPrompterAdapter } from "../../../../src/runtime/prompter/prompter-adapter.js";
 import { CurrentVersionAdapter } from "../../../../src/runtime/self-update/current-version-adapter.js";

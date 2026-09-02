@@ -6,12 +6,12 @@ import { Marketplace } from "../../../src/contexts/distribution/domain/marketpla
 import { PluginCatalogRepositoryAdapter } from "../../../src/contexts/distribution/infrastructure/plugin-catalog-repository-adapter.js";
 import { PluginAddUseCase } from "../../../src/contexts/framework/application/plugin/plugin-add-use-case.js";
 import { PluginDistributionReaderAdapter } from "../../../src/contexts/framework/infrastructure/plugin-distribution-reader-adapter.js";
-import type { Prompter } from "../../../src/domain/ports/prompter.js";
 import {
   InteractiveOnlyError,
   InvalidPluginManifestError,
   NoMarketplacesRegisteredError,
 } from "../../../src/kernel/errors.js";
+import type { Prompter } from "../../../src/kernel/ports/prompter.js";
 import { PluginPickUseCase } from "../../../src/presentation/prompts/plugin-pick-use-case.js";
 import { buildUnitDeps, initAndInstall } from "../../helpers/ports/build-unit-deps.js";
 import { fakeEnsureBuiltMarketplace } from "../../helpers/ports/fake-ensure-built-marketplace.js";

@@ -6,12 +6,12 @@ import type { MarketplaceTrustStore } from "../../../../../src/contexts/distribu
 import type { PluginAddUseCase } from "../../../../../src/contexts/framework/application/plugin/plugin-add-use-case.js";
 import type { PluginInstallFromMarketplaceUseCase } from "../../../../../src/contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.js";
 import { PluginInstallUseCase } from "../../../../../src/contexts/framework/application/plugin/plugin-install-use-case.js";
-import type { Prompter } from "../../../../../src/domain/ports/prompter.js";
 import {
   InteractiveOnlyError,
   InvalidPluginScopeError,
   TrustDeniedError,
 } from "../../../../../src/kernel/errors.js";
+import type { Prompter } from "../../../../../src/kernel/ports/prompter.js";
 import type { PluginPickUseCase } from "../../../../../src/presentation/prompts/plugin-pick-use-case.js";
 import { InMemoryManifestRepository } from "../../../../helpers/ports/in-memory-manifest-repository.js";
 

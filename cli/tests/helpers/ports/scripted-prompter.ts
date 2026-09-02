@@ -1,4 +1,4 @@
-import type { Prompter } from "../../../src/domain/ports/prompter.js";
+import type { Prompter } from "../../../src/kernel/ports/prompter.js";
 
 type PromptAnswer =
   | { type: "conflict"; value: "keep" | "overwrite" }

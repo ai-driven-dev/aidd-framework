@@ -4,13 +4,13 @@ import { buildCursorContract } from "../../../../../src/contexts/tools/domain/pr
 import { MarketplaceBuildStrategy } from "../../../../../src/contexts/translate/application/strategies/marketplace-build-strategy.js";
 import { FrameworkBuildUseCase } from "../../../../../src/contexts/translate/application/translate-source.js";
 import { AjvSchemaValidatorAdapter } from "../../../../../src/contexts/translate/infrastructure/schema-validator.js";
-import { BundledAssetProviderAdapter } from "../../../../../src/infrastructure/assets/asset-loader.js";
 import {
   FrameworkPlaceholderInPluginError,
   InvalidBuildPathsError,
   JsonSchemaValidationError,
 } from "../../../../../src/kernel/errors.js";
 import type { AssetProvider } from "../../../../../src/kernel/ports/asset-provider.js";
+import { BundledAssetProviderAdapter } from "../../../../../src/runtime/assets/asset-loader.js";
 import { CapturingLogger } from "../../../../helpers/ports/capturing-logger.js";
 import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
 import { seedFromDirectory } from "../../../../helpers/ports/seed-from-directory.js";

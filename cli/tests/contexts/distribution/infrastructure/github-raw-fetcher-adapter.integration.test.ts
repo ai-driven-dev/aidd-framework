@@ -3,12 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GitHubRawFetcherAdapter } from "../../../../src/contexts/distribution/infrastructure/github-raw-fetcher-adapter.js";
-import { HttpNotFoundError } from "../../../../src/infrastructure/errors.js";
 import {
   AuthenticationError,
   CatalogFetchAuthError,
   CatalogFetchError,
   CatalogFetchNotFoundError,
+  HttpNotFoundError,
 } from "../../../../src/kernel/errors.js";
 
 const CATALOG_PATH = ".claude-plugin/marketplace.json";

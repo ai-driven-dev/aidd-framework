@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { InputRequiredError } from "../../../../../src/application/errors.js";
 import {
   BulkConflictState,
   ResolveUpdateDecisionUseCase,
 } from "../../../../../src/contexts/framework/application/global/resolve-update-decision-use-case.js";
-import type { Prompter } from "../../../../../src/domain/ports/prompter.js";
+import { InputRequiredError } from "../../../../../src/kernel/errors.js";
+import type { Prompter } from "../../../../../src/kernel/ports/prompter.js";
 
 function buildFakePrompter(
   resolveConflictBulkReturn: "keep" | "overwrite" | "overwrite-all" | "skip-all"

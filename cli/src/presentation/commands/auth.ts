@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { InputRequiredError } from "../../application/errors.js";
+import { InputRequiredError } from "../../kernel/errors.js";
 import { AIDD_DIR } from "../../kernel/paths.js";
 import type { AuthCredential, AuthLevel } from "../../runtime/auth/auth.js";
 import { AuthLoginUseCase } from "../../runtime/auth/auth-login-use-case.js";

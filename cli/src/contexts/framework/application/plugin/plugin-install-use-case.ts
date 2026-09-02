@@ -1,5 +1,5 @@
-import type { Prompter } from "../../../../domain/ports/prompter.js";
 import { InteractiveOnlyError, TrustDeniedError } from "../../../../kernel/errors.js";
+import type { Prompter } from "../../../../kernel/ports/prompter.js";
 import {
   describePluginSource,
   type PluginSource,

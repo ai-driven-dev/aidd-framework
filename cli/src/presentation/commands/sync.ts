@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { NoManifestError } from "../../application/errors.js";
+import { NoManifestError } from "../../kernel/errors.js";
 import { DOCS_DIR } from "../../kernel/paths.js";
 import type { ToolId } from "../../kernel/tool.js";
 import { createDeps } from "../../runtime/wiring/framework.js";

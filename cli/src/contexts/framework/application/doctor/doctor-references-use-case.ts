@@ -1,12 +1,12 @@
 import { dirname, join, normalize } from "node:path";
+import type { FileReader } from "../../../../kernel/ports/file-reader.js";
+import type { AiToolId, ToolId } from "../../../../kernel/tool.js";
+import type { DoctorIssue } from "../../domain/doctor.js";
 import {
   extractAtReferences,
   extractMarkdownLinkTargets,
   isFileReference,
-} from "../../../../domain/formats/markdown-references.js";
-import type { FileReader } from "../../../../kernel/ports/file-reader.js";
-import type { AiToolId, ToolId } from "../../../../kernel/tool.js";
-import type { DoctorIssue } from "../../domain/doctor.js";
+} from "../../domain/formats/markdown-references.js";
 import type { Manifest } from "../../domain/manifest.js";
 
 export interface DoctorReferencesOptions {

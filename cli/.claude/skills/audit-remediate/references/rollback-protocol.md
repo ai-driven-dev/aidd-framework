@@ -9,7 +9,7 @@ layer path to avoid disturbing unrelated uncommitted work.
 git restore <target-layer-path>
 ```
 
-Example: `git restore src/domain/formats/`
+Example: `git restore src/contexts/tools/domain/formats/`
 
 Reverts all unstaged modifications in the given directory. Does not touch staged changes or
 commits. Run `git status <target-layer-path>` to confirm the directory is clean after.

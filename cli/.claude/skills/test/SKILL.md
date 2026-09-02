@@ -4,8 +4,8 @@ description: >
   Creates or modifies tests in tests/ following the project's three-tier pyramid. Use when
   writing tests for a new or existing use-case, adapter, domain model, or CLI command; when
   reproducing a user-reported bug; or when auditing coverage. Do NOT use for implementing
-  production code — use the layer skills (`use-case`, `adapter`, `domain-model`, `command`)
-  instead.
+  production code — use the context skill that owns the concept (`tools`, `translate`,
+  `distribution`, `framework`) instead.
 ---
 
 # Test

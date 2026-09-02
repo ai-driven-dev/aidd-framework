@@ -1,6 +1,5 @@
 import { dirname, join } from "node:path";
-import { NoManifestError } from "../../../../application/errors.js";
-import { PluginNotFoundError } from "../../../../kernel/errors.js";
+import { NoManifestError, PluginNotFoundError } from "../../../../kernel/errors.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { AiToolId, ToolId } from "../../../../kernel/tool.js";
 import { AI_TOOL_IDS } from "../../../../kernel/tool.js";

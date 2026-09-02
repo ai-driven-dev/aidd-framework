@@ -1,5 +1,4 @@
 import { dirname, join } from "node:path";
-import type { Prompter } from "../../../domain/ports/prompter.js";
 import {
   isMergeContentEmpty,
   type MergeFileEntry,
@@ -9,6 +8,7 @@ import { AIDD_DIR } from "../../../kernel/paths.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";
 import type { Logger } from "../../../kernel/ports/logger.js";
+import type { Prompter } from "../../../kernel/ports/prompter.js";
 import type { ToolId } from "../../../kernel/tool.js";
 import { isAiToolId } from "../../../kernel/tool.js";
 import type { Manifest } from "../domain/manifest.js";

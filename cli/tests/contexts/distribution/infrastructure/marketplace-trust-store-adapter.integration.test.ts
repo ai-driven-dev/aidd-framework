@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MarketplaceTrustStoreAdapter } from "../../../../src/contexts/distribution/infrastructure/marketplace-trust-store-adapter.js";
-import { HasherAdapter } from "../../../../src/infrastructure/adapters/hasher-adapter.js";
 import type { PluginSource } from "../../../../src/kernel/source.js";
+import { HasherAdapter } from "../../../../src/runtime/filesystem/hasher-adapter.js";
 
 const githubSource: PluginSource = { kind: "github", repo: "owner/repo" };
 const otherSource: PluginSource = { kind: "github", repo: "owner/other" };

@@ -1,4 +1,4 @@
-import { NotAuthenticatedError } from "../../application/errors.js";
+import { NotAuthenticatedError } from "../../kernel/errors.js";
 import type { TokenProvider } from "./ports/token-provider.js";
 
 export class RequireAuthUseCase {

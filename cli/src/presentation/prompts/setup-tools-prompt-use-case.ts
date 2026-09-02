@@ -3,7 +3,7 @@ import {
   recommendAiTools,
   recommendIdeTools,
 } from "../../contexts/framework/domain/tool-recommendations.js";
-import type { Prompter } from "../../domain/ports/prompter.js";
+import type { Prompter } from "../../kernel/ports/prompter.js";
 import { AI_TOOL_IDS, type AiToolId, IDE_TOOL_IDS, type IdeToolId } from "../../kernel/tool.js";
 
 export interface SetupToolsPromptOptions {

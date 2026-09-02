@@ -1,6 +1,6 @@
-import { NoManifestError } from "../../../../application/errors.js";
-import type { Prompter } from "../../../../domain/ports/prompter.js";
+import { NoManifestError } from "../../../../kernel/errors.js";
 import { DOCS_DIR } from "../../../../kernel/paths.js";
+import type { Prompter } from "../../../../kernel/ports/prompter.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { RestoreUseCase } from "../restore/restore-use-case.js";
 import type { StatusUseCase } from "../status-use-case.js";

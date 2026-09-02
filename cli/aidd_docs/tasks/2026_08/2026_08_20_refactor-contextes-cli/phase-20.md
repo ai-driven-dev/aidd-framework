@@ -60,6 +60,36 @@ journey
     the score is written down => the next run has something to compare against: 5: system
 ```
 
+## Ce que « large » doit vouloir dire, chiffré (2026-09-02)
+
+Muter tout le code n'a pas de sens : un adaptateur et un câblage ne portent pas de règles, et un
+mutant qui y survit ne dit rien sur la conception. Ce qui mérite d'être muté, c'est le domaine de
+chaque contexte plus le noyau.
+
+| cible | fichiers | lignes |
+|---|---|---|
+| `contexts/tools/domain` | 45 | 4431 |
+| `contexts/framework/domain` | 19 | 1100 |
+| `contexts/translate/domain` | 9 | 653 |
+| `contexts/distribution/domain` | 11 | 423 |
+| `kernel` | 17 | 1449 |
+
+Environ 8000 lignes. À l'échelle du run du manifest — 660 lignes, 386 mutants, trois minutes — cela
+donne un ordre de grandeur de plusieurs milliers de mutants et quelques dizaines de minutes,
+`ignoreStatic` activé pour écarter les quatre mutants statiques qui consommaient 90 % du temps.
+
+### La conséquence sur la tâche 3
+
+« Chaque mutant survivant est tué ou accepté par écrit » tient pour 109 survivants. Pour plusieurs
+centaines, c'est une promesse qu'on ne tiendra pas, et une promesse non tenue est pire qu'une
+absence de promesse. La forme honnête :
+
+1. Un run par contexte, nommé, pour qu'un chiffre désigne un responsable plutôt qu'une moyenne.
+2. Le contexte au plus mauvais score est le seul dont les survivants sont traités un par un.
+3. Le reste devient une base : un score par contexte, écrit, qui ne peut que monter.
+
+Un score global unique serait le plus facile à produire et le moins actionnable.
+
 ## Tasks to do
 
 ### `1)` Bring the runner back to life

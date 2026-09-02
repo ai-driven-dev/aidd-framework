@@ -1,9 +1,0 @@
-[
-  { "prompt": "Create a new use-case for installing runtime config", "expect_action": "define-types" },
-  { "prompt": "Write the execute method for the new SyncPluginUseCase", "expect_action": "write-execute" },
-  { "prompt": "Extract the 30-line buildSectionFiles method in install-use-case.ts", "expect_action": "extract-methods" },
-  { "prompt": "Delegate manifest writes to PostInstallPipeline in the new use-case", "expect_action": "wire-errors-and-pipeline" },
-  { "prompt": "Write unit tests for the new CleanUseCase", "expect_action": "test" },
-  { "prompt": "Add a new CLI command called aidd doctor", "expect_action": null },
-  { "prompt": "Create a new port interface for fetching plugins", "expect_action": null }
-]

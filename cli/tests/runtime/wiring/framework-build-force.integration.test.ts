@@ -2,8 +2,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { BundledAssetProviderAdapter } from "../../../src/infrastructure/assets/asset-loader.js";
 import { FlatTargetExistsError } from "../../../src/kernel/errors.js";
+import { BundledAssetProviderAdapter } from "../../../src/runtime/assets/asset-loader.js";
 import {
   createFrameworkBuildUseCase,
   type FrameworkBuildDeps,

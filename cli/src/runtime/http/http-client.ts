@@ -1,8 +1,12 @@
 import type { IncomingMessage } from "node:http";
 import * as http from "node:http";
 import * as https from "node:https";
-import { HttpError, HttpNotFoundError, HttpRedirectError } from "../../infrastructure/errors.js";
-import { AuthenticationError } from "../../kernel/errors.js";
+import {
+  AuthenticationError,
+  HttpError,
+  HttpNotFoundError,
+  HttpRedirectError,
+} from "../../kernel/errors.js";
 
 interface HttpGetOptions {
   token?: string;

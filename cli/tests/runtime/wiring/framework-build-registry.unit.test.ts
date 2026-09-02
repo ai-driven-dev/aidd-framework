@@ -4,7 +4,7 @@ import {
   FRAMEWORK_BUILD_TARGET_MODES,
   type FrameworkBuildTarget,
 } from "../../../src/contexts/translate/domain/build-target.js";
-import { BundledAssetProviderAdapter } from "../../../src/infrastructure/assets/asset-loader.js";
+import { BundledAssetProviderAdapter } from "../../../src/runtime/assets/asset-loader.js";
 import { createFrameworkBuildUseCase } from "../../../src/runtime/wiring/translate.js";
 import { CapturingLogger } from "../../helpers/ports/capturing-logger.js";
 import { InMemoryFileAdapter } from "../../helpers/ports/in-memory-file-adapter.js";

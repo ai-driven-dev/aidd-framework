@@ -26,10 +26,10 @@ import { DetectPluginDriftUseCase } from "../../../src/contexts/framework/applic
 import { Manifest } from "../../../src/contexts/framework/domain/manifest.js";
 import { PluginDistributionReaderAdapter } from "../../../src/contexts/framework/infrastructure/plugin-distribution-reader-adapter.js";
 import { isIdeToolId } from "../../../src/contexts/tools/domain/registry.js";
-import { BundledAssetProviderAdapter } from "../../../src/infrastructure/assets/asset-loader.js";
 import type { ToolId } from "../../../src/kernel/tool.js";
 import { CLIOutput } from "../../../src/presentation/output.js";
 import { SyncConflictResolverUseCase } from "../../../src/presentation/prompts/sync-conflict-resolver-use-case.js";
+import { BundledAssetProviderAdapter } from "../../../src/runtime/assets/asset-loader.js";
 import { SilentPrompterAdapter } from "../../../src/runtime/prompter/prompter-adapter.js";
 import { DeterministicHasher } from "./deterministic-hasher.js";
 import { FakeCurrentVersion } from "./fake-current-version.js";

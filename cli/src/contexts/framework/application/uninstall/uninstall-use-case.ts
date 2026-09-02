@@ -2,7 +2,7 @@ import {
   InputRequiredError,
   NoManifestError,
   ToolNotInstalledError,
-} from "../../../../application/errors.js";
+} from "../../../../kernel/errors.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Logger } from "../../../../kernel/ports/logger.js";

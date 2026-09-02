@@ -1,6 +1,6 @@
 ---
 paths:
-  - "src/application/use-cases/**/*.ts"
+  - "src/contexts/*/application/**/*.ts"
 ---
 
 # Orchestration

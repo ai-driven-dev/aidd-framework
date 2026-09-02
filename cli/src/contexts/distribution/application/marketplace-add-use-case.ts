@@ -1,10 +1,10 @@
-import type { Prompter } from "../../../domain/ports/prompter.js";
 import {
   InvalidMarketplaceNameError,
   InvalidPluginManifestError,
   MarketplaceAlreadyRegisteredError,
   TrustDeniedError,
 } from "../../../kernel/errors.js";
+import type { Prompter } from "../../../kernel/ports/prompter.js";
 import type { MarketplaceScope } from "../../../kernel/scope.js";
 import type { PluginSource } from "../../../kernel/source.js";
 import type { MarketplaceRemoveUseCase } from "../../framework/application/flows/marketplace-remove-use-case.js";

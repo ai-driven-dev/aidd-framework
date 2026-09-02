@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NotAuthenticatedError } from "../../../src/application/errors.js";
+import { NotAuthenticatedError } from "../../../src/kernel/errors.js";
 import type { TokenProvider } from "../../../src/runtime/auth/ports/token-provider.js";
 import { RequireAuthUseCase } from "../../../src/runtime/auth/require-auth-use-case.js";
 

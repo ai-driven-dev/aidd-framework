@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { InputRequiredError } from "../../src/application/errors.js";
-import { AuthenticationError } from "../../src/kernel/errors.js";
+import { AuthenticationError, InputRequiredError } from "../../src/kernel/errors.js";
 import { ErrorHandler } from "../../src/presentation/error-handler.js";
 import type { CLIOutput } from "../../src/presentation/output.js";
 

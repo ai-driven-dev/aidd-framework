@@ -1,10 +1,10 @@
-import type { Prompter } from "../../../../domain/ports/prompter.js";
 import {
   AmbiguousPluginMatchError,
   PluginNotInMarketplaceError,
   VersionMismatchError,
 } from "../../../../kernel/errors.js";
 import type { Logger } from "../../../../kernel/ports/logger.js";
+import type { Prompter } from "../../../../kernel/ports/prompter.js";
 import type { AiToolId } from "../../../../kernel/tool.js";
 import type { ResolveMarketplaceUseCase } from "../../../distribution/application/resolve-marketplace-use-case.js";
 import type { PluginCatalogEntry } from "../../../distribution/domain/catalog.js";

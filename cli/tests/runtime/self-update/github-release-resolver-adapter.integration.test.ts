@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { HttpNotFoundError } from "../../../src/infrastructure/errors.js";
 import {
   AuthenticationError,
   CatalogFetchAuthError,
   CatalogFetchError,
+  HttpNotFoundError,
 } from "../../../src/kernel/errors.js";
 import { GitHubReleaseResolverAdapter } from "../../../src/runtime/self-update/github-release-resolver-adapter.js";
 

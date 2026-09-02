@@ -1,12 +1,12 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { PluginDistributionReaderAdapter } from "../../../../src/contexts/framework/infrastructure/plugin-distribution-reader-adapter.js";
-import { FileAdapter } from "../../../../src/infrastructure/adapters/file-adapter.js";
-import { HasherAdapter } from "../../../../src/infrastructure/adapters/hasher-adapter.js";
 import {
   InvalidPluginManifestError,
   InvalidPluginNameError,
 } from "../../../../src/kernel/errors.js";
+import { FileAdapter } from "../../../../src/runtime/filesystem/file-adapter.js";
+import { HasherAdapter } from "../../../../src/runtime/filesystem/hasher-adapter.js";
 
 const FIXTURE_DIR = join(process.cwd(), "tests/fixtures/plugins");
 

@@ -1,7 +1,9 @@
 ---
 paths:
-  - "src/domain/ports/**/*.ts"
-  - "src/infrastructure/adapters/**/*.ts"
+  - "src/contexts/*/domain/ports/**/*.ts"
+  - "src/kernel/ports/**/*.ts"
+  - "src/contexts/*/infrastructure/**/*.ts"
+  - "src/runtime/**/*.ts"
 ---
 
 # Ports and Adapters

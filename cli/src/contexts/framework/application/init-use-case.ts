@@ -2,7 +2,7 @@ import {
   AiddFilesDetectedError,
   AlreadyInitializedError,
   NoManifestError,
-} from "../../../application/errors.js";
+} from "../../../kernel/errors.js";
 import { AIDD_DIR } from "../../../kernel/paths.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";

@@ -6,7 +6,7 @@ the sole authority for what constitutes correct code in the target layer.
 ## Inputs
 
 - `violation-list` (required) - numbered list from action 02
-- `layer-skill` (required) - the layer skill to apply (e.g. `format`, `capability`, `tool`)
+- `layer-skill` (required) - the context skill to apply (e.g. `tools`, `translate`, `distribution`, `framework`)
 
 ## Outputs
 

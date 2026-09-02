@@ -1,8 +1,0 @@
-[
-  { "prompt": "Build a new aidd doctor command end to end", "expect_action": "domain-model" },
-  { "prompt": "Add a restore feature that reverts installed files to their framework version", "expect_action": "domain-model" },
-  { "prompt": "I need to add a new full feature with domain model, use-case, and command", "expect_action": "domain-model" },
-  { "prompt": "Write unit tests for the CleanUseCase", "expect_action": null },
-  { "prompt": "Create a port interface for fetching plugins", "expect_action": null },
-  { "prompt": "Add a --dry-run flag to the existing install command", "expect_action": null }
-]

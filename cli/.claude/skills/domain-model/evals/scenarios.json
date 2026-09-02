@@ -1,8 +1,0 @@
-[
-  { "prompt": "Create a value object for plugin source with kind discriminant", "expect_action": "choose-shape" },
-  { "prompt": "Add a readonly field with validation to the FileDiff class", "expect_action": "define-invariants" },
-  { "prompt": "Where should I put the new MergeDecision discriminant union?", "expect_action": "place" },
-  { "prompt": "Write unit tests for the new ToolScope value object", "expect_action": "test" },
-  { "prompt": "Add a new CLI command to the AIDD tool", "expect_action": null },
-  { "prompt": "Implement the install use-case for a new plugin type", "expect_action": null }
-]

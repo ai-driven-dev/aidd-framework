@@ -1,36 +1,31 @@
 # Architecture
 
-## Layer Diagram
+## Contexts, not layers
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  CLI Entry (src/cli.ts)                                     │
-│  Command registration only — no business logic              │
-├─────────────────────────────────────────────────────────────┤
-│  Commands (src/application/commands/)                       │
-│  Thin wiring: parse flags → call use-case → display result  │
-├─────────────────────────────────────────────────────────────┤
-│  Use Cases (src/application/use-cases/)                     │
-│  Orchestration: auth/ global/ install/ marketplace/ plugin/ restore/ setup/ shared/ sync/       │
-│  SetupUseCase (orchestrator), SyncUseCase, UpdateUseCase    │
-├─────────────────────────────────────────────────────────────┤
-│  Domain (src/domain/)                                       │
-│  models/   — entities, value objects, pure functions        │
-│  ports/    — interface contracts (no implementations)       │
-│  formats/  — pure string transforms (TOML, Markdown, JSON)  │
-│  capabilities/ — agents, commands, hooks, mcp, rules, skills│
-│  tools/    — AI + IDE tool definitions and registry         │
-├─────────────────────────────────────────────────────────────┤
-│  Infrastructure (src/infrastructure/)                       │
-│  adapters/ — port implementations, all I/O                  │
-│  assets/   — bundled runtime configs (embedded in binary)   │
-│  auth/     — credential storage and resolution              │
-│  git/      — token injection for authenticated git fetches  │
-│  http/     — HTTP client                                    │
-└─────────────────────────────────────────────────────────────┘
+presentation ──> contexts ──> kernel
+runtime ─────────> (wiring only)
+
+framework ──> translate ──> tools ──> kernel
+framework ──> distribution ─────────> kernel
 ```
 
-Dependencies point inward only: infrastructure → application → domain. Domain never imports from application or infrastructure.
+| where | what lives there |
+|---|---|
+| `src/kernel/` | the vocabulary every context speaks: tool identity, source location, paths, files and fingerprints, merge strategies, errors, and the ports used by two contexts or more. It imports no context and carries no business logic. |
+| `src/contexts/tools/` | what the project targets and how each target is configured. One directory per tool: its profile beside its build contracts. |
+| `src/contexts/translate/` | canonical source into target-native content, at every level. |
+| `src/contexts/distribution/` | where content comes from and how it is fetched. A leaf: it knows no tool and no installation record. |
+| `src/contexts/framework/` | the installation record and everything done to a project. The only context allowed to reach the others. |
+| `src/presentation/` | what speaks to a human: commands, display, prompts, output. |
+| `src/runtime/` | technical services and wiring: auth, http, git, platform, project root, self-update, one wiring module per context. |
+
+Three invariants hold this together, and each is enforced by a test rather than by this
+document. `tests/architecture/context-graph.arch.test.ts` allows exactly the edges drawn
+above. `tests/architecture/context-boundary.arch.test.ts` refuses an import that reaches
+a context's interior: a cross-context import targets a module that context declares
+public, and there is no barrel file anywhere to make that convenient. A biome override
+refuses an import from the kernel into any context.
 
 ## Key Domain Models (manifest v6)
 

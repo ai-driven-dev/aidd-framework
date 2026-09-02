@@ -5,13 +5,13 @@ import { MarketplaceAddUseCase } from "../../../../src/contexts/distribution/app
 import { ResolveMarketplaceUseCase } from "../../../../src/contexts/distribution/application/resolve-marketplace-use-case.js";
 import { PluginCatalogRepositoryAdapter } from "../../../../src/contexts/distribution/infrastructure/plugin-catalog-repository-adapter.js";
 import { MarketplaceRemoveUseCase } from "../../../../src/contexts/framework/application/flows/marketplace-remove-use-case.js";
-import type { Prompter } from "../../../../src/domain/ports/prompter.js";
 import {
   InvalidMarketplaceNameError,
   InvalidPluginManifestError,
   MarketplaceAlreadyRegisteredError,
   TrustDeniedError,
 } from "../../../../src/kernel/errors.js";
+import type { Prompter } from "../../../../src/kernel/ports/prompter.js";
 import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
 import { FixturePluginFetcher } from "../../../helpers/ports/fixture-plugin-fetcher.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";

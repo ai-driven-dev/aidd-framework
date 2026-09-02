@@ -1,5 +1,4 @@
-import { NoManifestError } from "../../../../application/errors.js";
-import { ManifestValidationError } from "../../../../kernel/errors.js";
+import { ManifestValidationError, NoManifestError } from "../../../../kernel/errors.js";
 import type { ToolCategory } from "../../../../kernel/tool.js";
 import { toolIdsForCategory } from "../../../tools/domain/registry.js";
 import type {

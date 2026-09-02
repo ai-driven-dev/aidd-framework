@@ -28,16 +28,20 @@ A violation list. Each entry:
 
 ## Common check categories
 
-Consult the layer skill for the definitive list. Typical checks by layer:
+Consult the target context skill for the definitive list. Typical checks by area:
 
-- `format`: named export only, no `any`, pure function (no I/O/side effects), lossless
-  round-trip inverse present, `.js` ESM imports, `CONSTANT_CASE` for repeated literals.
-- `capability`: `Has*` interface in the tool contracts file, constructor accepts single params object,
-  all public fields `readonly`, throws `CapabilityConfigError` on invalid params, named export
-  only, no `any`, `in` operator for presence guard, `.js` imports.
-- `tool`: `AiTool<C>` type annotation, `signalDir` non-null and pointing to the correct dir,
-  `rewriteContent`/`reverseRewriteContent` are lossless inverses, `registerTool` at file bottom,
-  named export only, no `any`, `.js` imports.
+- `tools` (a format, capability, or profile): named export only, no `any`, `.js` ESM imports; a
+  format is a pure function with a lossless round-trip inverse; a capability class ends in
+  `Capability`, takes one params object, all public fields `readonly`, throws
+  `CapabilityConfigError` on invalid params; a profile carries the `AiTool<C>` type annotation,
+  a non-null `signalDir`, lossless `rewriteContent`/`reverseRewriteContent`, and calls
+  `registerTool` at file bottom.
+- `translate`/`distribution`/`framework` use-cases: class ends in `UseCase`, single
+  `async execute()`, no self-caught errors outside the three documented carve-outs, typed
+  `*Options`/`*Result`, `.js` imports, no `any` — see `.claude/rules/00-architecture/0-use-case.md`.
+- A port/adapter pair in any context's `infrastructure/`: port is an interface only (≤5 methods,
+  no unexplained `null`), adapter owns every technical constant and translates raw errors to
+  `kernel/errors.ts` types — see `.claude/rules/00-architecture/0-ports-adapters.md`.
 
 ## Test
 

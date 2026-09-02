@@ -1,0 +1,61 @@
+# Reference: Post-Install Pipeline, Shared Use-Cases, Capability Sub-Use-Cases
+
+## Post-install pipeline
+
+**Rule**: any use-case writing framework files AND updating the manifest delegates to
+`PostInstallPipelineUseCase`. Never replicate its steps inline.
+
+**Steps, in order**: `manifestRepo.save()` (persist the updated manifest), then
+`GitignoreUseCase.execute()` (update `.gitignore` with tracked framework paths).
+
+```typescript
+import { PostInstallPipelineUseCase } from "../install/post-install-pipeline-use-case.js";
+
+await new PostInstallPipelineUseCase(this.fs, this.manifestRepo).execute({
+  projectRoot: options.projectRoot,
+  manifest: options.manifest,
+});
+```
+
+Forbidden: calling `manifestRepo.save()` in isolation outside the pipeline; calling
+`GitignoreUseCase` directly from a feature use-case. `InitUseCase` calls the pipeline directly
+(no skipped steps) — the only documented exception, noted inline in that file.
+
+## Shared use-cases
+
+Location: `application/shared/`. Rules:
+
+- Never called from commands — only from other use-cases.
+- Same class shape as a top-level use-case: single `execute()`, typed `*Options` in, typed
+  `*Result` out.
+- Create one only when the same orchestration logic is needed by ≥2 top-level use-cases — do not
+  inline equivalent logic in each caller instead. `ensure-built-marketplace-use-case.ts` is the
+  canonical example: both `plugin install` and `framework update` materialize a tool's build from
+  the same per-target cache.
+
+## Capability sub-use-cases
+
+**Pattern**: an orchestrator guards capability presence before dispatching to a sub-use-case that
+receives a narrowed type.
+
+```typescript
+if ("agents" in caps) {
+  const result = await new InstallAgentsUseCase(/* ... */).execute({
+    config: toolConfig as AiTool<HasAgents>,
+  });
+}
+```
+
+- Check `"name" in caps` before dispatching — skip tools that lack the capability.
+- Never access `caps.agents` without first confirming presence via the guard.
+- The sub-use-case receives pre-filtered, pre-typed input — never a raw `ToolConfig` or
+  unnarrowed union — and returns `InstallationFile[]` or a typed result, no side effects beyond
+  what it's explicitly asked to do.
+- Sub-use-cases live in subdirectories of the parent feature: `install/`, and the equivalent
+  update/uninstall directories.
+
+These five files (`install-agents-use-case.ts` and its `commands`/`hooks`/`rules`/`skills`
+siblings) are the one place `framework` reaches directly into a `tools` capability class instead
+of through a module `tools` has declared public. `context-boundary.arch.test.ts` tracks this as a
+shrinking baseline, not a pattern — it resolves once `install/` moves fully under
+`contexts/tools/application/`, which has not happened yet. Do not add a sixth file to that list.

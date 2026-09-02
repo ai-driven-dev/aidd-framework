@@ -87,6 +87,16 @@ pnpm test             # all tiers
 pnpm test:mutation    # Stryker mutation (slow)
 ```
 
+### Run one vitest at a time
+
+The golden suites capture the same command twice and compare the bytes, which is how they
+prove a snapshot is deterministic. Two vitest invocations at once break that: they share
+one `dist/cli.js`, so a rebuild landing between the two captures changes the bytes and the
+determinism test reports a difference that is not there.
+
+Seen twice in this refactor, both times chasing a phantom. If those two tests fail and
+nothing else does, re-run alone before looking for a cause.
+
 ### Read the suite count, not only the test count
 
 A suite that fails before producing a single test contributes **zero** to the failure
