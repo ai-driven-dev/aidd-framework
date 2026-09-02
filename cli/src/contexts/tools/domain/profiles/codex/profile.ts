@@ -133,6 +133,10 @@ export const codex: AiTool<
 > = {
   kind: "ai",
   toolId: "codex",
+  distributionProbes: {
+    manifest: [".codex-plugin/plugin.json"],
+    marketplace: [".agents/plugins/marketplace.json"],
+  },
   directory: DIRECTORY,
   toolSuffix: TOOL_SUFFIX,
   signalDir: `${DIRECTORY}commands`,

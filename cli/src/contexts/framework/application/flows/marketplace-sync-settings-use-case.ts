@@ -35,7 +35,7 @@ export class MarketplaceSyncSettingsUseCase {
     private readonly catalogRepo: PluginCatalogRepository,
     private readonly hasher: Hasher,
     private readonly logger: Logger,
-    /** Native plugin CLI activators keyed by `NativeActivation.binary` (e.g. "codex", "copilot"). */
+    /** Native plugin CLI activators, keyed by the `binary` each profile declares. */
     private readonly activators: ReadonlyMap<string, NativePluginActivator>,
     private readonly ensureBuilt: EnsureBuiltMarketplaceUseCase
   ) {}

@@ -36,6 +36,9 @@ export const opencode: AiTool<
 > = {
   kind: "ai",
   toolId: "opencode",
+  distributionProbes: {
+    marketplace: ["opencode.json"],
+  },
   directory: DIRECTORY,
   toolSuffix: TOOL_SUFFIX,
   signalDir: ".opencode/commands",

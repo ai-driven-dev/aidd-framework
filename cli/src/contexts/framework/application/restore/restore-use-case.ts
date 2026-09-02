@@ -9,7 +9,14 @@ import type { Prompter } from "../../../../kernel/ports/prompter.js";
 import type { ToolId } from "../../../../kernel/tool.js";
 import type { Platform } from "../../../../runtime/platform/platform.js";
 import type { PluginFetcher } from "../../../distribution/domain/ports/plugin-fetcher.js";
-import type { ConfigRef } from "../../../tools/domain/capabilities/config-refs.js";
+import {
+  CONFIG_MCP,
+  CONFIG_OPENCODE,
+  CONFIG_VSCODE_EXTENSIONS,
+  CONFIG_VSCODE_KEYBINDINGS,
+  CONFIG_VSCODE_SETTINGS,
+  type ConfigRef,
+} from "../../../tools/domain/capabilities/config-refs.js";
 import type { FileMerger } from "../../../tools/domain/ports/file-merger.js";
 import { FRAMEWORK_CONFIG_PREFIX, FrameworkDescriptor } from "../../../translate/domain/canon.js";
 import type { Manifest } from "../../domain/manifest.js";
@@ -25,12 +32,18 @@ import {
   RestoreToolFilesUseCase,
 } from "./restore-tool-files-use-case.js";
 
+/**
+ * Where each config artifact sits in the canonical source, keyed by the same names a
+ * tool's capability declares in its `consumes` list. Named through the constants rather
+ * than spelled out, so restoring knows artifacts and not tools: `CONFIG_OPENCODE` is
+ * the name of a file shape, and the tool that accepts it says so in its own profile.
+ */
 const CONFIG_REFS: readonly ConfigRef[] = [
-  { name: "mcp", path: `${FRAMEWORK_CONFIG_PREFIX}mcp.json` },
-  { name: "vscodeExtensions", path: `${FRAMEWORK_CONFIG_PREFIX}vscode/extensions.json` },
-  { name: "vscodeKeybindings", path: `${FRAMEWORK_CONFIG_PREFIX}vscode/keybindings.json` },
-  { name: "vscodeSettings", path: `${FRAMEWORK_CONFIG_PREFIX}vscode/settings.json` },
-  { name: "opencode", path: `${FRAMEWORK_CONFIG_PREFIX}.opencode/opencode.json` },
+  { name: CONFIG_MCP, path: `${FRAMEWORK_CONFIG_PREFIX}mcp.json` },
+  { name: CONFIG_VSCODE_EXTENSIONS, path: `${FRAMEWORK_CONFIG_PREFIX}vscode/extensions.json` },
+  { name: CONFIG_VSCODE_KEYBINDINGS, path: `${FRAMEWORK_CONFIG_PREFIX}vscode/keybindings.json` },
+  { name: CONFIG_VSCODE_SETTINGS, path: `${FRAMEWORK_CONFIG_PREFIX}vscode/settings.json` },
+  { name: CONFIG_OPENCODE, path: `${FRAMEWORK_CONFIG_PREFIX}.opencode/opencode.json` },
 ];
 
 interface RestoreOptions {

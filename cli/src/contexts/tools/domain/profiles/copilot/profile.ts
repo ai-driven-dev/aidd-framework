@@ -259,6 +259,10 @@ export const copilot: AiTool<
 > = {
   kind: "ai",
   toolId: "copilot",
+  distributionProbes: {
+    manifest: [".plugin/plugin.json", ".github/plugin/plugin.json", "plugin.json"],
+    marketplace: [".github/plugin/plugin.json"],
+  },
   directory: DIRECTORY,
   toolSuffix: TOOL_SUFFIX,
   signalDir: ".github/prompts",

@@ -1,21 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { FrameworkBuildMode } from "../../../src/contexts/tools/domain/registry.js";
 import {
-  FRAMEWORK_BUILD_TARGET_MODES,
   type FrameworkBuildTarget,
+  frameworkBuildTargetModes,
 } from "../../../src/contexts/translate/domain/build-target.js";
+import { AI_TOOL_IDS } from "../../../src/kernel/tool.js";
 import { BundledAssetProviderAdapter } from "../../../src/runtime/assets/asset-loader.js";
 import { createFrameworkBuildUseCase } from "../../../src/runtime/wiring/translate.js";
 import { CapturingLogger } from "../../helpers/ports/capturing-logger.js";
 import { InMemoryFileAdapter } from "../../helpers/ports/in-memory-file-adapter.js";
 
-const ALL_TARGETS: readonly FrameworkBuildTarget[] = [
-  "claude",
-  "cursor",
-  "copilot",
-  "codex",
-  "opencode",
-];
+const ALL_TARGETS: readonly FrameworkBuildTarget[] = AI_TOOL_IDS;
 const ALL_MODES: readonly FrameworkBuildMode[] = ["marketplace", "flat"];
 
 function makeDeps() {
@@ -27,10 +22,15 @@ function makeDeps() {
 }
 
 function isSupported(target: FrameworkBuildTarget, mode: FrameworkBuildMode): boolean {
-  return FRAMEWORK_BUILD_TARGET_MODES.some((e) => e.target === target && e.mode === mode);
+  return frameworkBuildTargetModes().some((e) => e.target === target && e.mode === mode);
 }
 
-describe("deps.ts's build registry matches domain's FRAMEWORK_BUILD_TARGET_MODES exactly", () => {
+/**
+ * Both the wiring and the domain read the pairs off the profiles, so they cannot
+ * disagree about which exist. What is still worth running is the other half: that every
+ * pair the domain announces actually resolves to a use case the wiring can construct.
+ */
+describe("every announced build target/mode resolves to a wired use case", () => {
   for (const target of ALL_TARGETS) {
     for (const mode of ALL_MODES) {
       const label = `${target}:${mode}`;

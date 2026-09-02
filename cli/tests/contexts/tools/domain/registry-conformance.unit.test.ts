@@ -14,12 +14,15 @@ import {
   isAiTool,
   machineLocalFilesOf,
 } from "../../../../src/contexts/tools/domain/registry.js";
-import { FRAMEWORK_BUILD_TARGET_MODES } from "../../../../src/contexts/translate/domain/build-target.js";
 import {
-  MARKETPLACE_PROBES,
-  PLUGIN_MANIFEST_PROBES,
+  buildTargetModesOf,
+  frameworkBuildTargetModes,
+} from "../../../../src/contexts/translate/domain/build-target.js";
+import {
+  distributionProbesOf,
+  marketplaceProbes,
 } from "../../../../src/contexts/translate/domain/plugin-format.js";
-import { AI_TOOL_IDS } from "../../../../src/kernel/tool.js";
+import { AI_TOOL_IDS, type ToolId } from "../../../../src/kernel/tool.js";
 
 /**
  * Conformance suite for the AiTool contract.
@@ -28,10 +31,10 @@ import { AI_TOOL_IDS } from "../../../../src/kernel/tool.js";
  * automatically subjects it to all of them: omitting that tool from a parallel list elsewhere
  * fails a test instead of misbehaving at runtime.
  *
- * The probe tables (plugin-format.ts) and the build registry (deps.ts) keep their own literal
- * entries — "a format aidd can read" and "a tool aidd installs into" are distinct concepts
- * that happen to share members. These assertions check the two agree, not that one derives
- * from the other.
+ * Since phase 10 the build targets and the probe tables derive from those same profiles, so
+ * "they agree" is no longer a claim worth asserting — it cannot be false. What replaces it is
+ * a probe of each derivation over synthetic tools, where a profile declaring nothing is a case
+ * the live registry can never present.
  */
 
 const registeredAiTools: [string, AiTool<unknown>][] = [
@@ -87,8 +90,8 @@ describe("AiTool contract conformance", () => {
 
     it("is reachable by at least one framework build target/mode", () => {
       expect(
-        FRAMEWORK_BUILD_TARGET_MODES.some((entry) => entry.target === toolId),
-        `${toolId} is registered but has no entry in FRAMEWORK_BUILD_TARGET_MODES (domain/models/framework-build.ts) — 'aidd framework build --target ${toolId}' would be rejected`
+        frameworkBuildTargetModes().some((entry) => entry.target === toolId),
+        `${toolId} is registered but declares no buildContracts — 'aidd translate --to ${toolId}' would be rejected`
       ).toBe(true);
     });
 
@@ -96,8 +99,8 @@ describe("AiTool contract conformance", () => {
       const declaresPlugins = "plugins" in (tool.capabilities as object);
       if (!declaresPlugins) return;
       expect(
-        MARKETPLACE_PROBES.some((probe) => probe.format === toolId),
-        `${toolId} declares a plugins capability but has no MARKETPLACE_PROBES entry (domain/models/plugin-format.ts) — its native marketplace would never be detected`
+        marketplaceProbes().some((probe) => probe.format === toolId),
+        `${toolId} declares a plugins capability but its profile declares no marketplace probe — its native marketplace would never be detected`
       ).toBe(true);
     });
   });
@@ -112,30 +115,80 @@ describe("no parallel list references an unregistered tool", () => {
       );
     }
   });
+});
 
-  it("every FRAMEWORK_BUILD_TARGET_MODES target is a registered AI tool", () => {
-    const registered = new Set(registeredAiTools.map(([id]) => id));
-    for (const { target } of FRAMEWORK_BUILD_TARGET_MODES) {
-      expect(
-        registered.has(target),
-        `FRAMEWORK_BUILD_TARGET_MODES has an entry for "${target}", which is not a registered AI tool (stale entry?)`
-      ).toBe(true);
-    }
+/** A profile reduced to the two fields each derivation reads. */
+function fakeTool(overrides: Partial<AiTool<unknown>>): AiTool<unknown> {
+  return {
+    kind: "ai",
+    toolId: "claude",
+    directory: ".fake/",
+    toolSuffix: ".md",
+    signalDir: null,
+    capabilities: {},
+    rewriteContent: (content) => content,
+    reverseRewriteContent: (content) => content,
+    detectUserFileSectionKey: () => null,
+    ...overrides,
+  };
+}
+
+function registryOf(...tools: AiTool<unknown>[]): ReadonlyMap<ToolId, AiTool<unknown>> {
+  return new Map(tools.map((tool) => [tool.toolId, tool]));
+}
+
+describe("buildTargetModesOf()", () => {
+  it("gives a tool one pair per contract it declares, and none for what it omits", () => {
+    const contract = () => ({}) as never;
+    const modes = buildTargetModesOf(
+      registryOf(
+        fakeTool({ toolId: "claude", buildContracts: { marketplace: contract, flat: contract } }),
+        fakeTool({ toolId: "opencode", buildContracts: { flat: contract } })
+      )
+    );
+    expect(modes).toEqual([
+      { target: "claude", mode: "marketplace" },
+      { target: "claude", mode: "flat" },
+      { target: "opencode", mode: "flat" },
+    ]);
   });
 
-  it("every probe-table format is a registered AI tool", () => {
-    const registered = new Set(registeredAiTools.map(([id]) => id));
-    for (const [label, probes] of [
-      ["PLUGIN_MANIFEST_PROBES", PLUGIN_MANIFEST_PROBES],
-      ["MARKETPLACE_PROBES", MARKETPLACE_PROBES],
-    ] as const) {
-      for (const probe of probes) {
-        expect(
-          registered.has(probe.format),
-          `${label} has an entry for format "${probe.format}" (${probe.relativePath}), which is not a registered AI tool (stale entry?)`
-        ).toBe(true);
-      }
-    }
+  it("excludes a registered tool that declares no build contract at all", () => {
+    expect(buildTargetModesOf(registryOf(fakeTool({ toolId: "cursor" })))).toEqual([]);
+  });
+});
+
+describe("distributionProbesOf()", () => {
+  // Order is behaviour: the reader takes the first probe that resolves, and a bare
+  // `plugin.json` at the root is satisfied by almost any directory. A specific path must
+  // therefore be tried first, whichever tool declared it.
+  it("puts the deepest path first and a bare filename last", () => {
+    const probes = distributionProbesOf(
+      registryOf(
+        fakeTool({ toolId: "claude", distributionProbes: { manifest: ["plugin.json"] } }),
+        fakeTool({
+          toolId: "copilot",
+          distributionProbes: { manifest: [".plugin/plugin.json", ".a/b/plugin.json"] },
+        })
+      ),
+      "manifest"
+    );
+    expect(probes.map((probe) => probe.relativePath)).toEqual([
+      ".a/b/plugin.json",
+      ".plugin/plugin.json",
+      "plugin.json",
+    ]);
+  });
+
+  it("reads the kind it was asked for, and nothing from a profile that declares none", () => {
+    const tools = registryOf(
+      fakeTool({ toolId: "claude", distributionProbes: { marketplace: ["m.json"] } }),
+      fakeTool({ toolId: "cursor" })
+    );
+    expect(distributionProbesOf(tools, "marketplace")).toEqual([
+      { format: "claude", relativePath: "m.json" },
+    ]);
+    expect(distributionProbesOf(tools, "manifest")).toEqual([]);
   });
 });
 

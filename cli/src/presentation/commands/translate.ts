@@ -3,7 +3,7 @@ import type { Command } from "commander";
 import type { FrameworkBuildMode } from "../../contexts/tools/domain/registry.js";
 import {
   type FrameworkBuildTarget,
-  SUPPORTED_BUILD_TARGETS,
+  supportedBuildTargets,
 } from "../../contexts/translate/domain/build-target.js";
 import { createDeps } from "../../runtime/wiring/framework.js";
 import { createFrameworkBuildUseCase } from "../../runtime/wiring/translate.js";
@@ -80,9 +80,10 @@ export function registerTranslateCommand(program: Command): void {
     .action(async (source: string, cmdOptions: TranslateCmdOptions) => {
       const { verbose, output, projectRoot } = parseGlobalOptions(program);
 
-      if (!(SUPPORTED_BUILD_TARGETS as readonly string[]).includes(cmdOptions.to)) {
+      const targets = supportedBuildTargets();
+      if (!(targets as readonly string[]).includes(cmdOptions.to)) {
         output.error(
-          `Unsupported target '${cmdOptions.to}'. Supported targets: ${SUPPORTED_BUILD_TARGETS.join(", ")}.`
+          `Unsupported target '${cmdOptions.to}'. Supported targets: ${targets.join(", ")}.`
         );
         process.exit(1);
       }

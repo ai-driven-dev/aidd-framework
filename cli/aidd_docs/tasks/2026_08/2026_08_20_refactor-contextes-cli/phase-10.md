@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Extract the tools context
@@ -103,3 +103,56 @@ journey
 | 3    | Installing into a project that already has its own `settings.json` and `.mcp.json` preserves the user's entries |
 | 4    | An import into `contexts/tools/` interior fails the lint; the `tool-addition-cost` baseline is empty or justified line by line |
 | all  | Golden, build golden and e2e pass **unmodified** |
+
+## Livrée (2026-09-02)
+
+Les tâches 1, 3 et 4 étaient faites depuis `c67bcd6a` : les neuf contrats de build sont dans un
+`build.ts` par outil, `tool-contracts.ts` a disparu, `settings`, `mcp` et `mcp-exclusion` sont dans
+`tools`, et la frontière du contexte est déclarée et prouvée par injection.
+
+La tâche 2, elle, ne l'était pas. Les trois unions parallèles existaient toujours, écrites à la
+main, avec un test de conformité qui vérifiait qu'elles s'accordaient — un détecteur, pas une
+dérivation : ajouter un sixième outil demandait encore quatre éditions.
+
+Ce qui a changé :
+
+- `FrameworkBuildTarget` et `PluginFormat` sont des alias de `AiToolId`. Une cible de build est un
+  outil, un format est la mise en page qu'un outil donne à un plugin ; les réécrire créait une
+  deuxième liste à tenir.
+- `FRAMEWORK_BUILD_TARGET_MODES` devient `frameworkBuildTargetModes()`, lue sur les profils : un
+  outil supporte un mode quand son profil déclare un contrat de build pour ce mode. Une fonction et
+  pas une constante, parce que le registre se remplit au câblage — une constante évaluée à l'import
+  aurait capturé un registre vide. Le câblage de `runtime` itère la même liste, donc les deux ne
+  peuvent plus diverger.
+- Les emplacements de manifeste et de catalogue sont déclarés par chaque profil
+  (`distributionProbes`) et collectés par `translate`.
+
+L'ordre des sondes est un comportement, pas une présentation : le lecteur prend la première qui
+résout, et copilot accepte un `plugin.json` nu à la racine, que n'importe quel répertoire peut
+porter. Les sondes sont donc triées du chemin le plus profond au moins profond — la raison pour
+laquelle l'ordre écrit à la main fonctionnait, dite explicitement. Un répertoire codex portant un
+`plugin.json` racine était le cas discriminant : sans le tri il se lit `copilot`, et le test
+d'intégration échoue exactement là.
+
+Deux tests changeaient de nature en devenant tautologiques. « chaque cible est un outil enregistré »
+et « chaque format de sonde est un outil enregistré » ne peuvent plus être faux : ils sont remplacés
+par une éprouvette de chaque dérivation sur des profils synthétiques, dont le cas qu'un registre
+réel ne présentera jamais — un outil enregistré qui ne déclare aucun contrat de build.
+
+## Ce qui reste dans le socle, et pourquoi
+
+Sept fichiers nommaient un outil hors de son profil, il en reste trois, chacun pour une raison
+différente et une seule est une dette :
+
+| Fichier | Pourquoi il reste |
+| ------- | ----------------- |
+| `tool-recommendations.ts` | Recommande des outils à un utilisateur par leur nom. Il n'y a pas de profil où lire « quel outil convient à quelle stack » : ce n'est la propriété d'aucun outil. |
+| `config-refs.ts` | `CONFIG_OPENCODE = "opencode"` nomme un artefact de configuration, pas un outil. Il s'écrit comme un outil parce que l'artefact est son fichier de config ; c'est le profil d'opencode qui déclare le consommer. |
+| `plugins-capability.ts` | `NativeActivation.binary` liste les trois CLI que ce dépôt a mesurées et pour lesquelles il a écrit un activateur. C'est une liste blanche assumée : un quatrième outil pilotant sa CLI devra de toute façon enregistrer un activateur pour ce binaire. |
+
+## Vérifié
+
+- 1987 tests, 982 suites, 0 échec — suites comptées, pas seulement les tests
+- smoke : 98 pass, 0 fail, 22 / 22 commandes feuilles
+- `aidd translate --to nope` répond `claude, cursor, copilot, opencode, codex`, dérivé des profils
+- tsc 0, biome 0, build ok

@@ -12,7 +12,7 @@ import {
   type PluginManifestFields,
 } from "../../translate/domain/plugin-distribution.js";
 import type { PluginFormat } from "../../translate/domain/plugin-format.js";
-import { PLUGIN_MANIFEST_PROBES } from "../../translate/domain/plugin-format.js";
+import { pluginManifestProbes } from "../../translate/domain/plugin-format.js";
 import { PLUGIN_NAME_REGEX } from "../domain/plugins/installed-plugin.js";
 import type { PluginDistributionReader } from "../domain/ports/plugin-distribution-reader.js";
 import { isSemver } from "../domain/semver.js";
@@ -33,7 +33,7 @@ export class PluginDistributionReaderAdapter implements PluginDistributionReader
   private async probeManifest(
     pluginRoot: string
   ): Promise<{ format: PluginFormat; manifestPath: string; manifestRelativePath: string }> {
-    for (const probe of PLUGIN_MANIFEST_PROBES) {
+    for (const probe of pluginManifestProbes()) {
       const fullPath = join(pluginRoot, probe.relativePath);
       if (await this.fs.fileExists(fullPath)) {
         return {

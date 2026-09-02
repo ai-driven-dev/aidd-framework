@@ -39,6 +39,10 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
   {
     kind: "ai",
     toolId: "cursor",
+    distributionProbes: {
+      manifest: [".cursor-plugin/plugin.json"],
+      marketplace: [".cursor-plugin/marketplace.json"],
+    },
     directory: DIRECTORY,
     toolSuffix: TOOL_SUFFIX,
     signalDir: ".cursor/commands",

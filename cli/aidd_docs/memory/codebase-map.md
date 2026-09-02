@@ -81,9 +81,9 @@ src/
     │   │   ├── content-translator.ts # PluginContentTranslator — one plugin's files → one tool's installed files, calling the tool's own rewriteContent
     │   │   ├── canon.ts               # FrameworkDescriptor, ContentSection, TemplateRef — the canonical framework-doc shape
     │   │   ├── plugin-distribution.ts  # PluginDistribution, PluginComponentFile — the canonical single-plugin shape
-    │   │   ├── plugin-format.ts         # PluginFormat + manifest/marketplace probe paths
+    │   │   ├── plugin-format.ts         # PluginFormat, probe paths derived from the profiles
     │   │   ├── plugin-translation-skip.ts # PluginTranslationSkip, ReadonlySkipList
-    │   │   └── build-target.ts           # FrameworkBuildTarget, FRAMEWORK_BUILD_TARGET_MODES, build-time path constants
+    │   │   └── build-target.ts           # FrameworkBuildTarget, target/mode pairs derived from the profiles
     │   ├── application/
     │   │   ├── translate-source.ts    # FrameworkBuildUseCase — one source, N targets, `aidd translate`
     │   │   ├── shared-plugin-helpers.ts

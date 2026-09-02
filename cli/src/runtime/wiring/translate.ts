@@ -15,12 +15,12 @@ import { buildContractFor } from "../../contexts/tools/domain/registry.js";
 import { FlatBuildStrategy } from "../../contexts/translate/application/strategies/flat-build-strategy.js";
 import { MarketplaceBuildStrategy } from "../../contexts/translate/application/strategies/marketplace-build-strategy.js";
 import { FrameworkBuildUseCase } from "../../contexts/translate/application/translate-source.js";
+import { frameworkBuildTargetModes } from "../../contexts/translate/domain/build-target.js";
 import { AjvSchemaValidatorAdapter } from "../../contexts/translate/infrastructure/schema-validator.js";
 import type { AssetProvider } from "../../kernel/ports/asset-provider.js";
 import type { FileReader } from "../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../kernel/ports/file-writer.js";
 import type { Logger } from "../../kernel/ports/logger.js";
-import { AI_TOOL_IDS } from "../../kernel/tool.js";
 
 /** The subset of shared deps the framework build pipeline reads — lets EnsureBuilt build any target. */
 export interface FrameworkBuildDeps {
@@ -96,20 +96,16 @@ function frameworkBuildFactoryFor(
 }
 
 /**
- * Derived from the registered tool profiles rather than listed by hand: a sixth tool
- * whose profile declares `buildContracts` needs no edit here. Follows the same shape
- * as `nativeActivationOf` — a declaration read off the profile — and must not diverge
- * from `FRAMEWORK_BUILD_TARGET_MODES`, the domain's source of truth for which
- * target/mode pairs exist.
+ * One factory per pair `frameworkBuildTargetModes()` reports, so the wiring cannot
+ * offer a target the domain rejects, nor miss one it accepts. Both read the same
+ * profiles; a sixth tool whose profile declares `buildContracts` needs no edit here.
  */
 function frameworkBuildRegistryEntries(): (readonly [string, FrameworkBuildFactory])[] {
   const entries: (readonly [string, FrameworkBuildFactory])[] = [];
-  for (const id of AI_TOOL_IDS) {
-    for (const mode of ["marketplace", "flat"] as const) {
-      const buildContract = buildContractFor(id, mode);
-      if (buildContract === undefined) continue;
-      entries.push([`${id}:${mode}`, frameworkBuildFactoryFor(buildContract, mode)]);
-    }
+  for (const { target, mode } of frameworkBuildTargetModes()) {
+    const buildContract = buildContractFor(target, mode);
+    if (buildContract === undefined) continue;
+    entries.push([`${target}:${mode}`, frameworkBuildFactoryFor(buildContract, mode)]);
   }
   return entries;
 }

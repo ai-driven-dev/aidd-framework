@@ -37,6 +37,10 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
   {
     kind: "ai",
     toolId: "claude",
+    distributionProbes: {
+      manifest: [".claude-plugin/plugin.json"],
+      marketplace: [".claude-plugin/marketplace.json"],
+    },
     directory: DIRECTORY,
     toolSuffix: TOOL_SUFFIX,
     signalDir: ".claude/commands",

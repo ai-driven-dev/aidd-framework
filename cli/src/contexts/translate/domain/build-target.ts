@@ -1,34 +1,58 @@
-import type { FrameworkBuildMode } from "../../tools/domain/registry.js";
+import { AI_TOOL_IDS, type AiToolId, type ToolId } from "../../../kernel/tool.js";
+import type { FrameworkBuildMode, ToolConfig } from "../../tools/domain/registry.js";
+import { getAllRegisteredTools, isAiTool } from "../../tools/domain/registry.js";
 
-/** Build target: supported tool identifiers for framework build. */
-export type FrameworkBuildTarget = "claude" | "cursor" | "copilot" | "codex" | "opencode";
+/**
+ * The tool a framework build produces for.
+ *
+ * An alias rather than its own union: every AI tool is buildable, so a sixth tool is a
+ * sixth target by construction. Writing the members again would only create a second
+ * list to keep in step.
+ */
+export type FrameworkBuildTarget = AiToolId;
 
 export interface FrameworkBuildTargetMode {
   readonly target: FrameworkBuildTarget;
   readonly mode: FrameworkBuildMode;
 }
 
-/**
- * Every target/mode combination the build pipeline supports — the single source of truth
- * for "which target:mode pairs exist". Infrastructure wiring (deps.ts's build registry)
- * must not diverge from this list; commands read it here, not through infrastructure.
- */
-export const FRAMEWORK_BUILD_TARGET_MODES: readonly FrameworkBuildTargetMode[] = [
-  { target: "claude", mode: "marketplace" },
-  { target: "claude", mode: "flat" },
-  { target: "cursor", mode: "marketplace" },
-  { target: "cursor", mode: "flat" },
-  { target: "copilot", mode: "marketplace" },
-  { target: "copilot", mode: "flat" },
-  { target: "codex", mode: "marketplace" },
-  { target: "codex", mode: "flat" },
-  { target: "opencode", mode: "flat" },
-];
+const BUILD_MODES: readonly FrameworkBuildMode[] = ["marketplace", "flat"];
 
-/** Every target with at least one supported build mode, derived from FRAMEWORK_BUILD_TARGET_MODES. */
-export const SUPPORTED_BUILD_TARGETS: readonly FrameworkBuildTarget[] = [
-  ...new Set(FRAMEWORK_BUILD_TARGET_MODES.map((entry) => entry.target)),
-];
+/**
+ * The rule, over an explicit set of profiles: a tool supports a mode when its profile
+ * declares a build contract for it. Exported so it can be probed with synthetic tools —
+ * the version reading the live registry cannot say what it would do with a tool that
+ * declares nothing, and that is the case worth checking.
+ */
+export function buildTargetModesOf(
+  tools: ReadonlyMap<ToolId, ToolConfig>
+): readonly FrameworkBuildTargetMode[] {
+  const pairs: FrameworkBuildTargetMode[] = [];
+  for (const target of AI_TOOL_IDS) {
+    const config = tools.get(target);
+    if (config === undefined || !isAiTool(config)) continue;
+    for (const mode of BUILD_MODES) {
+      if (config.buildContracts?.[mode] !== undefined) pairs.push({ target, mode });
+    }
+  }
+  return pairs;
+}
+
+/**
+ * Every target/mode pair the build pipeline supports, read off the registered profiles.
+ *
+ * A function and not a constant: the registry fills at wiring time, so a constant
+ * evaluated at import would capture an empty one. opencode, flat-only, yields one pair
+ * where the others yield two — because that is what its profile declares.
+ */
+export function frameworkBuildTargetModes(): readonly FrameworkBuildTargetMode[] {
+  return buildTargetModesOf(getAllRegisteredTools());
+}
+
+/** Every target with at least one supported build mode. */
+export function supportedBuildTargets(): readonly FrameworkBuildTarget[] {
+  return [...new Set(frameworkBuildTargetModes().map((entry) => entry.target))];
+}
 
 export interface FrameworkBuildOptions {
   readonly sourceDir: string;

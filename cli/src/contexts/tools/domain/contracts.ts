@@ -60,6 +60,18 @@ export interface AiTool<C> {
     readonly marketplace?: () => ToolBuildContract;
     readonly flat?: () => ToolBuildContract;
   };
+  /**
+   * Where this tool's plugin manifest and marketplace catalog sit inside a distribution
+   * it produced. Read by `translate` to recognise a directory's format, so a sixth tool
+   * declares its own layout instead of being added to two lists it does not own.
+   *
+   * Order does not matter here: the collected probes are sorted deepest-path-first, so
+   * a specific location always wins over a bare `plugin.json` at the root.
+   */
+  readonly distributionProbes?: {
+    readonly manifest?: readonly string[];
+    readonly marketplace?: readonly string[];
+  };
   rewriteContent(content: string, docsDir: string): string;
   reverseRewriteContent(content: string, docsDir: string): string;
   detectUserFileSectionKey(relativePath: string): UserFileSectionKey | null;

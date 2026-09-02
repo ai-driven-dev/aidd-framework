@@ -1,6 +1,15 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { PluginDistributionReaderAdapter } from "../../../../src/contexts/framework/infrastructure/plugin-distribution-reader-adapter.js";
+// Side-effect imports: the adapter reads each tool's declared manifest locations off the
+// registry, so an unregistered profile is a format it cannot recognise.
+import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/codex/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
 import {
   InvalidPluginManifestError,
   InvalidPluginNameError,
@@ -109,6 +118,28 @@ describe("PluginDistributionReaderAdapter", () => {
       await expect(adapter.read(join(FIXTURE_DIR, "broken-plugin"))).rejects.toThrow(
         InvalidPluginNameError
       );
+    });
+  });
+
+  describe("a directory two tools could claim", () => {
+    // copilot accepts a bare `plugin.json` at the root, which any distribution can also
+    // happen to carry, and copilot is declared before codex. The probes are ordered
+    // deepest-path-first precisely so the specific location wins; read in declaration
+    // order, a codex distribution carrying a root `plugin.json` would read as copilot.
+    it("resolves to the tool whose location is the more specific one", async () => {
+      const root = await mkdtemp(join(tmpdir(), "aidd-ambiguous-"));
+      try {
+        const manifest = JSON.stringify({ name: "sample-plugin", version: "1.0.0" });
+        await mkdir(join(root, ".codex-plugin"), { recursive: true });
+        await writeFile(join(root, ".codex-plugin/plugin.json"), manifest);
+        await writeFile(join(root, "plugin.json"), manifest);
+
+        const dist = await makeAdapter().read(root);
+
+        expect(dist.format).toBe("codex");
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
     });
   });
 
