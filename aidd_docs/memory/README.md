@@ -27,6 +27,11 @@ Refreshed automatically by the memory hook. Do not edit by hand.
 - [project-brief.md](project-brief.md)
 - [testing.md](testing.md)
 - [vcs.md](vcs.md)
+
+Read on demand:
+
+- [internal/decisions/a-price-table-is-the-destination-s.md](internal/decisions/a-price-table-is-the-destination-s.md)
+- [internal/decisions/measurement-may-reach-a-hosted-destination.md](internal/decisions/measurement-may-reach-a-hosted-destination.md)
 <!-- files:end -->
 
 ## Maintaining it
