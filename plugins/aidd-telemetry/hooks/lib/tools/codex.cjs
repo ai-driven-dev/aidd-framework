@@ -7,12 +7,19 @@
 const { skillNameFromSkillFileRead } = require("./skill-detection.cjs");
 
 // A Codex rollout is named `rollout-<timestamp>-<uuid>.jsonl`, and that trailing uuid is
-// the rollout's own `session_meta.id` - measured across every rollout on disk, including
-// resumed ones where it differs from `session_meta.session_id`. The reader side resolves a
-// Codex session on exactly this equality; see CODEX_ROLLOUT_LOCATION in
-// cli/src/domain/formats/codex-rollout.ts, whose `matches` this mirrors. The two parses
-// live apart because hooks/ is copied verbatim by the framework build and can import
-// nothing from cli/ - the same reason sanitizePathSegment is duplicated - so
+// the identity both sides of this system join on: the hook writes it as `vendor_id` (see
+// `readSessionId` below) and the reader resolves a session by it (CODEX_ROLLOUT_LOCATION in
+// cli/src/domain/formats/codex-rollout.ts, whose `matches` compares `-<uuid>.jsonl`). The
+// join is filename to filename, and holds by construction.
+//
+// It is NOT read as `session_meta.id`, and an earlier version of this comment said it was -
+// "measured across every rollout on disk". Re-measured 2026-09-01 over 418 rollouts, that
+// claim is false: two of them, both `thread_source: "realtime_voice"`, carry a
+// `session_meta.id` that is not the uuid in their own filename. Nothing broke, because no
+// code here ever reads that field; what broke was the sentence explaining why this works.
+//
+// The two parses live apart because hooks/ is copied verbatim by the framework build and
+// can import nothing from cli/ - the same reason sanitizePathSegment is duplicated - so
 // tests/domain/formats/codex-rollout.unit.test.ts pins them to each other and turns red if
 // either moves.
 const CODEX_ROLLOUT_PREFIX = "rollout-";
@@ -30,10 +37,12 @@ function codexSessionIdFromTranscriptPath(transcriptPath) {
   return UUID_PATTERN.test(candidate) && stem.length > 36 ? candidate : undefined;
 }
 
-// 124 of 330 rollouts on this machine are resumed sessions where `session_meta.session_id`
-// holds the parent's identifier rather than the rollout's own, and a vendor_id written from
-// the wrong one joins to nothing while the journal still looks healthy. `session_id` is the
-// fallback for a payload carrying no transcript path.
+// The filename first, `session_id` only as the fallback for a payload carrying no transcript
+// path - because the two disagree often. Measured 2026-09-01 over 418 rollouts on the
+// machine this was written on: 158 carry a `session_meta.session_id` that is not their own
+// `session_meta.id`, and it is `thread_source` that explains which - 89 `subagent`, 11
+// `user`, 58 with the field unset. A vendor_id written from `session_id` on any of those
+// names another rollout, and joins to nothing while the journal still looks healthy.
 function readSessionId(payload) {
   return codexSessionIdFromTranscriptPath(payload.transcript_path) ?? payload.session_id;
 }

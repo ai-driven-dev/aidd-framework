@@ -125,7 +125,7 @@ function handleFileWritten(payload, host, sessionId) {
   const relativePath = taskFolderRelativePath(target.repoRoot, realPathOf(stated));
   if (!relativePath) return;
 
-  // The session id arrives already read behind the host's own declaration (journal.js), the
+  // The session id arrives already read behind the host's own declaration (journal.cjs), the
   // same one the session_start line was named with. Reading payload.session_id here instead
   // would be one host's spelling promoted to a rule - and on Codex it is the spelling that
   // names the parent of a resumed session, so the lookup would find another session's file.
@@ -175,7 +175,7 @@ function appendFileWritten(filePath, relativePath, source) {
   appendLine(filePath, buildFileWrittenLine({ at: nowIso(), path: relativePath, source }));
 }
 
-// Not a record.js builder: record.js owns session_start/turn_end/file_written/step_start
+// Not a record.cjs builder: record.cjs owns session_start/turn_end/file_written/step_start
 // alone, and readJournalFile there already ignores any type it does not name, so this new
 // one is inert to every existing reader rather than breaking one.
 function buildScanTruncatedLine({ at, cap, scanned }) {

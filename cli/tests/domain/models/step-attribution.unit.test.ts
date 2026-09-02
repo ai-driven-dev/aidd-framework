@@ -123,3 +123,39 @@ describe("step-attribution — pure: journal lines + records -> intervals", () =
     expect(source).not.toMatch(/require\(["']node:fs/);
   });
 });
+
+describe("buildStepIntervals — a step the session never closed", () => {
+  // Pinned because it is a choice, not an accident, and one that differs from how
+  // `journal-intervals.ts` treats an unclosed task or flow. See `StepInterval`'s own doc
+  // comment for why the cap those two apply cannot be applied here — and note that
+  // `aidd telemetry check`'s `records-join` claim depends on this reading, so changing it
+  // is a behaviour change, not a tidy-up.
+  it("leaves the last step open when no turn_end ever closed it", () => {
+    const intervals = buildStepIntervals({
+      boundaries: [{ type: "step_start", at: "2026-08-17T10:00:00Z", skill: "aidd-dev:01-plan" }],
+      filesWritten: [],
+      taskDeclarations: [],
+    });
+
+    expect(intervals).toEqual([
+      {
+        skill: "aidd-dev:01-plan",
+        startMs: Date.parse("2026-08-17T10:00:00Z"),
+        endMs: Number.POSITIVE_INFINITY,
+      },
+    ]);
+  });
+
+  it("attributes a much later moment to it, which is what leaving it open means", () => {
+    const intervals = buildStepIntervals({
+      boundaries: [{ type: "step_start", at: "2026-08-17T10:00:00Z", skill: "aidd-dev:01-plan" }],
+      filesWritten: [],
+      taskDeclarations: [],
+    });
+
+    expect(attributeMoment(intervals, "2026-09-30T23:59:00Z")).toEqual({
+      source: "journal-interval",
+      step: "aidd-dev:01-plan",
+    });
+  });
+});

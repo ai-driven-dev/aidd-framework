@@ -342,14 +342,15 @@ Rules a consumer can rely on:
 and a session is resolved locally by `<sessionId>.jsonl`, so the trailer's value
 and the record's `vendor_id` are the same string.
 
-**Codex — unconfirmed, with a specific reason to check it.** A record's
-`vendor_id` there is the rollout's own `session_meta.id`, the uuid in
-`rollout-<timestamp>-<uuid>.jsonl`, which on a *resumed* session differs from that
-rollout's `session_meta.session_id`. The trailer carries `CODEX_THREAD_ID`, which
-names a thread, and a resumed thread spans two rollouts. No capture so far holds
-that variable beside the rollout it wrote, so which of the two it equals has never
-been read off a real session. Treat a Codex trailer as a link to verify before
-relying on it.
+**Codex — unconfirmed, and the doubt is measured.** A record's `vendor_id` there
+is the uuid in its own `rollout-<timestamp>-<uuid>.jsonl` filename: one rollout,
+one identifier. The trailer carries `CODEX_THREAD_ID`, which names a *thread*, and
+a thread is not a rollout — measured over 418 rollouts on one machine
+(2026-09-01), 158 name a different rollout in `session_meta.session_id` than in
+their own `session_meta.id`. Several rollouts under one thread is therefore the
+common case, and if the variable names the thread's first rollout, every commit
+made in a later one joins to nothing. Treat a Codex trailer as a link to verify
+before relying on it.
 
 **Cursor, Copilot, OpenCode — no trailer.** Nothing was measured that names their
 running session in the environment, so the hook finds nothing and writes nothing.

@@ -16,19 +16,22 @@
  * `claude-code-transcript.ts`'s own `matchesMainTranscript` resolves a session by
  * `<sessionId>.jsonl`, so the variable and the record's `vendor_id` are the same string.
  *
- * On Codex it is **unconfirmed**, and there is a specific reason to doubt it rather than a
- * general one. A record's `vendor_id` there is the rollout's own `session_meta.id` — the
- * uuid in `rollout-<timestamp>-<uuid>.jsonl`, as `codex.cjs` states and measured across
- * every rollout on disk "including resumed ones where it differs from
- * `session_meta.session_id`". `CODEX_THREAD_ID` names a thread, and a resumed thread spans
- * two rollouts; if it names the first, a commit made in the second joins to nothing. The
- * captured rollout in `cli/tests/fixtures/local-cost` is exactly such a resumed session and
- * carries both values, different — but nothing captured so far carries that variable beside
- * them, so which one it equals has never been read off a real session.
+ * On Codex it is **unconfirmed**, and the reason to doubt it is measured rather than
+ * theoretical. A record's `vendor_id` there is the uuid in its own
+ * `rollout-<timestamp>-<uuid>.jsonl` filename — one rollout, one identifier.
+ * `CODEX_THREAD_ID` names a *thread*, and a thread is demonstrably not a rollout: over 418
+ * rollouts on the machine this was written on (2026-09-01), 158 carry a
+ * `session_meta.session_id` naming a different rollout than their own `session_meta.id`,
+ * across `thread_source` values `subagent` (89), `user` (11) and unset (58). So "several
+ * rollouts under one thread" is the common case here, not an exotic one — and if
+ * `CODEX_THREAD_ID` names the thread's first rollout, every commit made in a later one
+ * carries a trailer that joins to nothing.
  *
- * What would settle it is one Codex session's `CODEX_THREAD_ID` captured beside the rollout
- * it wrote. Until then a consumer treats a Codex trailer as a link to check, not one to
- * rely on — see the same shape of stated limit on `opencode.ts`'s own counters.
+ * What would settle it is one Codex session's `CODEX_THREAD_ID` read beside the rollout that
+ * session wrote. That needs a live Codex session, which costs the person running it, so it
+ * is named here as the next measurement rather than guessed at. Until then a consumer treats
+ * a Codex trailer as a link to verify, not one to rely on — the same shape of stated limit
+ * `opencode.ts` carries for its own counters.
  *
  * `telemetry-claim.ts`'s `firedForSession` compares the anchor to `vendorId` already, but it
  * settles nothing here: on Codex a mismatch and a hook that never fired produce the same

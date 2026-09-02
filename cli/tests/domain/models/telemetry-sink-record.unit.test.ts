@@ -122,3 +122,33 @@ describe("telemetrySinkRecordDayKey()", () => {
     ).toBeUndefined();
   });
 });
+
+describe("telemetrySinkRecordDayKey() — a line holds whatever it holds", () => {
+  const BASE: TelemetrySinkRecord = {
+    sink_schema_version: SINK_SCHEMA_VERSION,
+    kind: "request",
+    provenance: "local-read",
+    tool: "claude",
+    vendor_id: "s-1",
+    vendor_field: "sessionId",
+    step_attribution: "unattributed",
+  };
+
+  // `parseTelemetrySinkLine` validates the schema version and casts the rest, so this field
+  // is only a string by convention. A number used to pass the absence check and be read as
+  // epoch milliseconds: the record landed on 1970-01-01, fell outside every real period,
+  // and disappeared without ever counting as undated.
+  /** Built through the real parse, which is the only way a record of the wrong shape ever
+   * reaches this function: it checks `sink_schema_version` and casts the rest. */
+  function recordFromLine(overrides: Record<string, unknown>): TelemetrySinkRecord {
+    return parseTelemetrySinkLine(JSON.stringify({ ...BASE, ...overrides }));
+  }
+
+  it("answers nothing for a moment stored as a number, never 1970", () => {
+    expect(telemetrySinkRecordDayKey(recordFromLine({ event_timestamp: 12_345 }))).toBeUndefined();
+  });
+
+  it("answers nothing for a moment stored as null", () => {
+    expect(telemetrySinkRecordDayKey(recordFromLine({ event_timestamp: null }))).toBeUndefined();
+  });
+});

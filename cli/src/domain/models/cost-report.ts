@@ -555,10 +555,10 @@ function addToStepGroup(groups: Map<string, StepGroup>, record: TelemetrySinkRec
 const NO_KNOWN_PROJECT = Symbol("no known project");
 type ProjectKey = string | typeof NO_KNOWN_PROJECT;
 
-// An empty string is not a name - it is what a tool writes when it has none to give.
-// Treating it as its own project would print a nameless row a person cannot act on.
-// `typeof` guards a field only declared `string` by
-// its type: a record read off disk carries whatever its own line actually held.
+// An empty string is not a name - it is what a tool writes when it has none to give, and
+// treating it as its own project would print a nameless row a person cannot act on. The
+// `typeof` guard is there for a second reason: a record read off disk carries whatever its
+// own line actually held, not what this field's type declares.
 function projectKeyOf(record: TelemetrySinkRecord): ProjectKey {
   return typeof record.project_id === "string" && record.project_id !== ""
     ? record.project_id
@@ -1057,7 +1057,13 @@ function emptyGroups(fromDay: string, toDay: string): Groups {
 // of being summed with a later flush of the same quantity. Kept off `totals`, `bySteps` and
 // `byDays` regardless - the two-kinds rule forbids summing it with request lines.
 function accumulateSessionRecord(groups: Groups, record: TelemetrySinkRecord): void {
-  if (record.active_time_s !== undefined) {
+  // `typeof`, not `!== undefined`, for the same reason `TotalsAccumulator` guards every
+  // counter that way: `parseTelemetrySinkLine` validates `sink_schema_version` and casts
+  // the rest, so a field's declared type is a claim about what this system writes, never
+  // about what a line on disk holds. This one was the exception until it was not — `null`
+  // is `!== undefined` and would have read as an observed zero, and a string would have
+  // concatenated into the running total and reached the terminal as `NaN` minutes.
+  if (typeof record.active_time_s === "number") {
     groups.activeTimeSeconds = (groups.activeTimeSeconds ?? 0) + record.active_time_s;
   }
   if (record.provenance === "local-read") {

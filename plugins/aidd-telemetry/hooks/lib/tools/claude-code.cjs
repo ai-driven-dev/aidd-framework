@@ -34,7 +34,7 @@ module.exports = {
   // Claude Code alone, and that is a coverage fact rather than an oversight: Copilot and
   // Cursor were never captured handing a path to a hook, and Codex writes through an
   // apply_patch command string. A host with no writtenPath here is not blind to tasks -
-  // file-writes.js's observed pass covers it - but a stated path is exact where an
+  // file-writes.cjs's observed pass covers it - but a stated path is exact where an
   // observed one is inferred, so it is preferred wherever it exists.
   writtenPath,
 };

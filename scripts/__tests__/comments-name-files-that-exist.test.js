@@ -95,6 +95,55 @@ function namesSomethingReal(token, file, tracked, basenames) {
   return basenames.has(path.basename(token));
 }
 
+/** Every `.js` file the plugin's hooks actually ship. One, today: everything else there is
+ * `.cjs`, because the hooks run as CommonJS while OpenCode's loader needs an ESM entry. */
+function hookJsFiles(tracked) {
+  return new Set(
+    [...tracked]
+      .filter((file) => file.startsWith("plugins/aidd-telemetry/hooks/") && file.endsWith(".js"))
+      .map((file) => path.basename(file))
+  );
+}
+
+/**
+ * The same rule as below, for a mention that carries no backticks.
+ *
+ * Comments in the hooks named journal.js, record.js, host.js, codex.js and index.js;
+ * every one of those files is .cjs, and the backtick rule below saw none of
+ * them — some sat in parentheses, one in a test's own name. The hooks directory is the one
+ * place a narrow rule is safe: it ships exactly one `.js` file, so any other X.js named
+ * anywhere in it, or in the tests that describe it, is a `.cjs` written wrong.
+ */
+describe("a comment about the hooks names .cjs where the file is .cjs", () => {
+  it("names no <name>.js that the hooks do not actually ship", () => {
+    const tracked = new Set(trackedFiles());
+    const shipped = hookJsFiles(tracked);
+    const scanned = [...tracked].filter(
+      (file) =>
+        file.startsWith("plugins/aidd-telemetry/hooks/") ||
+        file.startsWith("scripts/__tests__/opencode-plugin") ||
+        file.startsWith("scripts/__tests__/aidd-telemetry-journal")
+    );
+    const wrong = [];
+
+    for (const file of scanned) {
+      const text = fs.readFileSync(path.join(ROOT, file), "utf8");
+      for (const match of text.matchAll(/\b([\w-]+)\.js\b/gu)) {
+        const named = `${match[1]}.js`;
+        // A path inside a fixture or an assertion about somebody else's project file is not
+        // a claim about this plugin's own layout.
+        if (named === "index.js" && text.includes("/src/index.js")) continue;
+        if (shipped.has(named)) continue;
+        if (tracked.has(`plugins/aidd-telemetry/hooks/lib/${match[1]}.cjs`)) {
+          wrong.push(`${file} names ${named}, but the file it means is ${match[1]}.cjs`);
+        }
+      }
+    }
+
+    assert.deepEqual(wrong, []);
+  });
+});
+
 describe("a comment that names a source file names one that exists", () => {
   it("names no file the repository does not hold, outside the mentions listed as history", () => {
     const tracked = new Set(trackedFiles());

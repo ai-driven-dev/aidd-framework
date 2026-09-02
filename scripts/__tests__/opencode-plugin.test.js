@@ -76,7 +76,7 @@ function readRunLines(repo) {
   );
 }
 
-test("opencode-plugin.js: runJournal spawns journal.js by an absolute filesystem path, not a file:// URL string", async () => {
+test("opencode-plugin.js: runJournal spawns journal.cjs by an absolute filesystem path, not a file:// URL string", async () => {
   // Regression test for a real bug found only by running a live OpenCode session
   // (see measurements.md, Phase 7): `spawnSync("node", [new URL(...)])` stringifies
   // the URL to "file:///..." - node's CLI does not accept that as a script path, it

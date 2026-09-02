@@ -1470,3 +1470,38 @@ describe("buildCostReport — any dimension filters as well as it groups", () =>
     expect(withProject.activeTimeSeconds).toBe(30);
   });
 });
+
+describe("buildCostReport — a line on disk holds whatever it holds, not what a type declares", () => {
+  // `parseTelemetrySinkLine` checks `sink_schema_version` and casts the rest, which is why
+  // every counter is read through a `typeof` guard rather than an `!== undefined` one.
+  // `active_time_s` was the one field that skipped it.
+  /** A record carrying a field of the wrong type, built the only way one ever reaches this
+   * module: through the real parse, which checks `sink_schema_version` and casts the rest.
+   * Written as JSON rather than hand-cast, so the test exercises the route instead of
+   * asserting against a shape no file could produce. */
+  function recordFromLine(overrides: Record<string, unknown>): TelemetrySinkRecord {
+    return parseTelemetrySinkLine(JSON.stringify({ ...sessionMeasure(), ...overrides }));
+  }
+
+  it("ignores an active time that is not a number, rather than adding it", () => {
+    const built = report({
+      records: [recordFromLine({ active_time_s: "12" }), recordFromLine({ active_time_s: 30 })],
+    });
+
+    expect(built.activeTimeSeconds).toBe(30);
+  });
+
+  it("leaves a null active time unobserved, rather than counting it as a zero", () => {
+    const built = report({ records: [recordFromLine({ active_time_s: null })] });
+
+    expect(built.activeTimeSeconds).toBeUndefined();
+  });
+
+  it("still sums the active times that are numbers", () => {
+    const built = report({
+      records: [recordFromLine({ active_time_s: 12 }), recordFromLine({ active_time_s: 30 })],
+    });
+
+    expect(built.activeTimeSeconds).toBe(42);
+  });
+});

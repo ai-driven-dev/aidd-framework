@@ -145,7 +145,12 @@ const DAY_KEY_LENGTH = "YYYY-MM-DD".length;
  * rather than a sliced fragment. */
 export function telemetrySinkRecordDayKey(record: TelemetrySinkRecord): string | undefined {
   const at = record.event_timestamp;
-  if (at === undefined) return undefined;
+  // `typeof`, not `!== undefined`: `parseTelemetrySinkLine` checks the schema version and
+  // casts the rest, so this field holds whatever its line held. A number passes an
+  // `undefined` check and `new Date(12345)` is a valid moment — epoch milliseconds — so the
+  // record would have been placed on 1970-01-01, fallen outside every real period, and gone
+  // missing from the read without ever being counted as undated.
+  if (typeof at !== "string") return undefined;
   // The parse is checked first, always - the fast slice below is only ever a faster way to
   // read a moment already known to parse, never a substitute for checking it does. Slicing
   // first and parsing only for the rest let a string merely shaped like a moment

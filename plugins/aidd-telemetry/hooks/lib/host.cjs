@@ -23,7 +23,7 @@ function* stringsWithin(value) {
   for (const nested of Object.values(value)) yield* stringsWithin(nested);
 }
 
-// The complete set of hosts journal.js will write for. A fifth host becomes one more
+// The complete set of hosts journal.cjs will write for. A fifth host becomes one more
 // entry here, never a branch in the dispatcher - detectHost above stays the only place
 // that decides which host a payload came from; this only decides whether that host is
 // one the journal acts on yet.

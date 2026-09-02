@@ -1,5 +1,5 @@
 // Everything the journal knows about Copilot: two payload shapes for the same host (its
-// canonical builder and the _vsCodeCompat one, see lib/host.js), so session id and step
+// canonical builder and the _vsCodeCompat one, see lib/host.cjs), so session id and step
 // name each read behind both spellings. cwd is straight off the payload either way. No
 // turn identifier ever arrives on a hook payload, and no written-path extractor - Copilot
 // was never captured handing a path to a hook.

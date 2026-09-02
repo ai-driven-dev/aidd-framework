@@ -9,11 +9,11 @@
 // code - no error, no output. An `export const` file loaded and ran on the very next attempt.
 //
 // A second, separate limit rules out reusing journal.cjs's own functions in-process: OpenCode's
-// loader cannot see a local CommonJS file's exports at all - `await import("./lib/record.js")`
+// loader cannot see a local CommonJS file's exports at all - `await import("./lib/record.cjs")`
 // resolves to a namespace with none, even for a trivial one-line `module.exports = {...}` file,
 // while a genuine ESM sibling imports fine. So this file spawns `journal.cjs` as the child
 // process every other host's own hook already runs, over the same stdin-JSON contract, naming
-// itself so `detectHost` (lib/host.js) recognises it without guessing at a fifth vendor shape.
+// itself so `detectHost` (lib/host.cjs) recognises it without guessing at a fifth vendor shape.
 // See scripts/__tests__/fixtures/opencode-session-idle.json and its README entry for the
 // captured evidence behind this shape.
 //

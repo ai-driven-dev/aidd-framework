@@ -97,7 +97,7 @@ function findRunFileByVendorId(dir, vendorId) {
 const SCHEMA_VERSION = 2;
 
 // Which export-side attribute vendor_id can be joined against, per host - each host's own
-// hooks/lib/tools/<host>.js states it, measured or explicitly null; this is that fact
+// hooks/lib/tools/<host>.cjs states it, measured or explicitly null; this is that fact
 // gathered into the one shape buildSessionStartLine below already expects.
 const VENDOR_FIELD_BY_HOST = Object.freeze(
   Object.fromEntries(
@@ -106,7 +106,7 @@ const VENDOR_FIELD_BY_HOST = Object.freeze(
 );
 
 // codexSessionIdFromTranscriptPath and readSessionId(host, payload) live in
-// hooks/lib/tools/ now (codex.js and tools/index.js respectively) and are re-exported
+// hooks/lib/tools/ now (codex.cjs and tools/index.cjs respectively) and are re-exported
 // below unchanged - CLI tests reach them by exactly these names (see
 // cli/tests/helpers/telemetry-journal-hook.ts).
 const { codexSessionIdFromTranscriptPath } = require("./tools/codex.cjs");
@@ -121,7 +121,7 @@ function appendLine(filePath, line) {
 
 // worktree_id / worktree_repo_id are omitted entirely, never written as null or "", for a
 // session that is not in a linked worktree - the common case, a plain checkout. See
-// `worktreeFields` in hooks/lib/repo.js for why absence is the only honest answer there:
+// `worktreeFields` in hooks/lib/repo.cjs for why absence is the only honest answer there:
 // an empty string would gather every plain checkout into one group as though they were the
 // same worktree. They are appended after the fields that were already on this line, so a
 // reader keyed on order sees no existing key move. No schema_version bump: an optional
@@ -213,7 +213,7 @@ function sanitizeSkillName(skill) {
 // sessionId arrives already read behind the host declaration (see readSessionId above) -
 // this function never assumes payload.session_id is that host's own spelling. The working
 // directory is read the same way, behind readCwd - Cursor names it workspace_roots, never
-// cwd (see hooks/lib/repo.js).
+// cwd (see hooks/lib/repo.cjs).
 function handleSessionStart(payload, host, sessionId) {
   const target = resolveWriteTarget(readCwd(host, payload));
   if (!target) return;
@@ -262,7 +262,7 @@ function handleTurnEnd(payload, host, sessionId) {
 // never collide with `<runId>__<vendorId>.jsonl`.
 const UNRECOGNISED_FILE_NAME = "_unrecognised.jsonl";
 
-// Overwritten, not appended: journal.js already keeps this off the tool-used path (the
+// Overwritten, not appended: journal.cjs already keeps this off the tool-used path (the
 // git-shellout gate), so this only ever runs once per session-start or turn-end - but it
 // still stays at exactly one line however many of those arrive, and `at` is always the
 // most recent one rather than freezing on the first. A marker that never moved forward

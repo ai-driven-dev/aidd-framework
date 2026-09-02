@@ -27,7 +27,24 @@ const UNATTRIBUTED: StepAttribution = { source: "unattributed" };
 
 /** One `step_start`, closed by whichever boundary — another `step_start` or a `turn_end` —
  * comes next in file order, or left open if none does. `endMs` is exclusive, matching the
- * half-open interval the run journal itself defines. */
+ * half-open interval the run journal itself defines.
+ *
+ * **Left open, unlike a task or a flow interval, and the difference is deliberate.**
+ * `journal-intervals.ts` caps an unclosed task or flow at the journal's own last witnessed
+ * moment, because leaving one open "would go on attributing everything a long-running
+ * session does afterward to the first opener it ever saw". The same cap cannot be applied
+ * here: those two walks see `filesWritten` and `taskDeclarations` as well as boundaries, so
+ * there are later moments to cap at, while this one sees boundaries alone. The last
+ * boundary of a session that never wrote `turn_end` *is* the open `step_start`, so capping
+ * would give it a zero-width interval covering nothing — trading "attributes too much" for
+ * "attributes nothing", which is not obviously the better error.
+ *
+ * A session ends without `turn_end` whenever its host fires no stop event; `journal.cjs`'s
+ * own `HOOK_EVENT_NAME_TO_CANONICAL` maps one for Claude Code, Cursor and OpenCode, and
+ * none for Copilot. So this is a live case, not a theoretical one, and
+ * `aidd telemetry check`'s own `records-join` claim currently depends on the open reading —
+ * change it and that claim starts failing for every unclosed session. Pinned by
+ * `buildStepIntervals` tests below so the choice stays visible rather than incidental. */
 export interface StepInterval {
   readonly skill: string;
   readonly startMs: number;

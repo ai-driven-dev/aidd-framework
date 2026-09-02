@@ -1,4 +1,4 @@
-// Which ticket a session is on, told rather than inferred - the same move step-starts.js
+// Which ticket a session is on, told rather than inferred - the same move step-starts.cjs
 // already made for which skill is running. A task is inferred today from a written path, and
 // only Claude Code's payload hands one over in readable form. A declaration asks nothing of
 // the host: any tool call whose own arguments name a file under a task folder is evidence the
@@ -14,7 +14,7 @@ const { findRunFileByVendorId, appendLine, buildTaskDeclaredLine, nowIso } = req
 
 // Unanchored, and tolerant of sitting inside a larger string - a quote or whitespace closes
 // it, the same tolerance SKILL_FILE_PATTERN gives a Codex shell command line. Two shapes,
-// matching file-writes.js's own TASK_SEGMENT_PATTERN exactly: a folder task's path continues
+// matching file-writes.cjs's own TASK_SEGMENT_PATTERN exactly: a folder task's path continues
 // past a "/" into its own file, a single-file task's ends the segment itself in ".md" - a
 // bare segment with neither (a task folder mentioned with no file, a random ".txt") is not a
 // task path either place.
@@ -30,7 +30,7 @@ function firstTaskPathIn(value) {
 }
 
 // tool_input is every declared host's own shape for a tool call's arguments, Copilot's
-// _vsCodeCompat builder included (see step-starts.js). Only Copilot's canonical builder
+// _vsCodeCompat builder included (see step-starts.cjs). Only Copilot's canonical builder
 // carries none, spelling its arguments toolArgs instead - a JSON string, but a plain string
 // scan finds a path inside it exactly as well as a parsed object would, so it is read the
 // same way rather than parsed first.
@@ -51,7 +51,7 @@ function statedAsWrittenAlready(payload, host) {
   return typeof extractWrittenPath === "function" && typeof extractWrittenPath(payload) === "string";
 }
 
-// A declaration must never move the run file's own mtime forward: file-writes.js's observed
+// A declaration must never move the run file's own mtime forward: file-writes.cjs's observed
 // pass reads that mtime as "the moment this session last wrote a line" to know what changed
 // since. A task mention landing between a shell write and the turn end that observes it would
 // push the watermark past that write, silently dropping it - so the append below restores the
