@@ -1,0 +1,222 @@
+import { describe, expect, it } from "vitest";
+import { printTelemetryCheckReport } from "../../../src/application/display/telemetry-check-display.js";
+import { CLIOutput } from "../../../src/application/output.js";
+import type { TelemetrySetup } from "../../../src/domain/models/telemetry-setup.js";
+
+/**
+ * `aidd telemetry check` exists to send a person to the right place when nothing is being
+ * recorded. Everything asserted here is about not sending them to the wrong one: a gated
+ * run must not look like a judged one, an unreadable thing must not look like an absent
+ * one, and the setup a person needs in order to act has to survive the gate.
+ */
+class CapturingOutput extends CLIOutput {
+  readonly lines: string[] = [];
+  readonly warnings: string[] = [];
+
+  override print(message: string): void {
+    this.lines.push(message);
+  }
+  override warn(message: string): void {
+    this.warnings.push(message);
+  }
+
+  get text(): string {
+    return this.lines.join("\n");
+  }
+}
+
+function setup(overrides: Partial<TelemetrySetup> = {}): TelemetrySetup {
+  return {
+    allowed: {
+      allowed: true,
+      readable: true,
+      location: "/repo/.aidd/config.json",
+      decidedBy: "project-switch",
+    },
+    identity: { attached: false, path: "/home/.config/aidd/identity.json", readable: true },
+    recordsLocation: { path: "/home/.config/aidd/telemetry" },
+    recorderDeclaration: {
+      declared: true,
+      declaredAt: ["/repo/.aidd/manifest.json"],
+      locationsChecked: ["/repo/.aidd/manifest.json"],
+      unreadable: [],
+    },
+    versions: { cli: "5.2.2", plugin: { kind: "recorded", version: "1.0.0" } },
+    ...overrides,
+  };
+}
+
+describe("the setup a person reads before any claim", () => {
+  // A gated run judges nothing — but what is in place is exactly what a person switched off
+  // still needs to see, so the setup is printed on both sides of the gate.
+  it("prints the setup even when the run was gated before judging anything", () => {
+    const output = new CapturingOutput();
+
+    printTelemetryCheckReport(output, {
+      gate: "measurement is off — nothing to check until it is turned on",
+      setup: setup(),
+      leftoverExportConfig: [],
+    });
+
+    expect(output.text).toContain("measurement allowed");
+    expect(output.text).toContain("records kept at");
+    expect(output.text).toContain("measurement is off");
+  });
+
+  // The person's own refusal is a different fact from a project that never turned it on,
+  // and only one of them is changed by editing the project's file.
+  it("names a person's own refusal rather than reporting the project as off", () => {
+    const output = new CapturingOutput();
+
+    printTelemetryCheckReport(output, {
+      gate: "measurement is off",
+      setup: setup({
+        allowed: {
+          allowed: false,
+          readable: true,
+          location: "AIDD_TELEMETRY",
+          decidedBy: "person-refusal",
+        },
+      }),
+      leftoverExportConfig: [],
+    });
+
+    expect(output.text).toContain("this person's own refusal");
+  });
+
+  // Nothing declared is a person's cue to go and declare it somewhere, so the row lists
+  // every candidate rather than saying only that none matched.
+  it("lists every location it looked in when nothing declares the recorder", () => {
+    const output = new CapturingOutput();
+
+    printTelemetryCheckReport(output, {
+      setup: setup({
+        recorderDeclaration: {
+          declared: false,
+          declaredAt: [],
+          locationsChecked: ["/repo/.aidd/manifest.json", "/repo/.claude/settings.json"],
+          unreadable: [],
+        },
+      }),
+      claims: [],
+      uncovered: [],
+      leftoverExportConfig: [],
+    });
+
+    expect(output.text).toContain("nowhere this build checks");
+    expect(output.text).toContain("/repo/.claude/settings.json");
+  });
+
+  // A damaged file is something to fix; an absent declaration is an ordinary state. The row
+  // must not print the first as the second.
+  it("reads a damaged declaration location as unreadable, not as undeclared", () => {
+    const output = new CapturingOutput();
+
+    printTelemetryCheckReport(output, {
+      setup: setup({
+        recorderDeclaration: {
+          declared: false,
+          declaredAt: [],
+          locationsChecked: ["/repo/.aidd/manifest.json"],
+          unreadable: ["/repo/.aidd/manifest.json"],
+        },
+      }),
+      claims: [],
+      uncovered: [],
+      leftoverExportConfig: [],
+    });
+
+    expect(output.text).toContain("could not be read");
+    expect(output.text).not.toContain("nowhere this build checks");
+  });
+
+  it("names a plugin version nothing journalled apart from one that was never stamped", () => {
+    const nothing = new CapturingOutput();
+    printTelemetryCheckReport(nothing, {
+      setup: setup({ versions: { cli: "5.2.2", plugin: { kind: "nothing-journalled" } } }),
+      claims: [],
+      uncovered: [],
+      leftoverExportConfig: [],
+    });
+    const unstamped = new CapturingOutput();
+    printTelemetryCheckReport(unstamped, {
+      setup: setup({ versions: { cli: "5.2.2", plugin: { kind: "unrecorded" } } }),
+      claims: [],
+      uncovered: [],
+      leftoverExportConfig: [],
+    });
+
+    const line = (o: CapturingOutput) => o.lines.find((l) => l.includes("plugin version")) ?? "";
+    expect(line(nothing)).not.toBe(line(unstamped));
+  });
+});
+
+describe("the claims, and what is deliberately not one", () => {
+  it("prints a verdict and its detail for every claim judged", () => {
+    const output = new CapturingOutput();
+
+    printTelemetryCheckReport(output, {
+      setup: setup(),
+      claims: [
+        {
+          claim: "hook-fired",
+          verdict: "ok",
+          reason: "session-anchored",
+          detail: "2 run file(s)",
+        },
+        {
+          claim: "records-join",
+          verdict: "fail",
+          reason: "all-unattributed",
+          detail: "nothing joined",
+        },
+      ],
+      uncovered: [],
+      leftoverExportConfig: [],
+    });
+
+    expect(output.text).toContain("2 run file(s)");
+    expect(output.text).toContain("nothing joined");
+  });
+
+  it("names a tool nothing can read with its own reason, never as a failing claim", () => {
+    const output = new CapturingOutput();
+
+    printTelemetryCheckReport(output, {
+      setup: setup(),
+      claims: [],
+      uncovered: [{ tool: "cursor", reason: "It writes no token count in any file it produces." }],
+      leftoverExportConfig: [],
+    });
+
+    expect(output.text).toContain("not covered: cursor");
+    expect(output.text).toContain("no token count");
+  });
+
+  // A stale export lives in a tool's own settings file, which no claim here can see — so it
+  // is a warning on stderr, never one of the judged four.
+  it("warns about a leftover export on stderr, on both sides of the gate", () => {
+    const leftoverExportConfig = [
+      { path: "/repo/.claude/settings.json", keys: ["OTEL_EXPORTER_OTLP_ENDPOINT"] },
+    ];
+
+    const judged = new CapturingOutput();
+    printTelemetryCheckReport(judged, {
+      setup: setup(),
+      claims: [],
+      uncovered: [],
+      leftoverExportConfig,
+    });
+    const gated = new CapturingOutput();
+    printTelemetryCheckReport(gated, {
+      gate: "measurement is off",
+      setup: setup(),
+      leftoverExportConfig,
+    });
+
+    for (const output of [judged, gated]) {
+      expect(output.warnings.join("\n")).toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
+      expect(output.text).not.toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
+    }
+  });
+});
