@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Extract the translate context
@@ -128,3 +128,33 @@ vient de ce dépôt.
 | 3    | `framework build` still works, unchanged, under its current name |
 | 4    | The context imports only `tools` and the kernel; an import into its interior fails the lint |
 | all  | Golden, build golden and e2e pass **unmodified** |
+
+## Livrée (2026-09-02)
+
+Les trois premières tâches étaient faites depuis le commit `77a8c6bf` : `markdown.ts` est dans le
+noyau, les formats et le traducteur sont dans `translate`, `framework.ts` s'appelle `canon.ts`, et
+`translate` n'importe que le noyau et `tools` (vérifié : toutes ses importations relatives pointent
+vers `kernel/`, `tools/domain/` ou son propre domaine).
+
+La tâche 4 demandait d'éprouver les deux règles par injection plutôt que de les lire. C'est ce qui a
+trouvé le défaut. L'override `tools` ne peut pas importer `translate` mordait bien. Celui de
+`translate` ne mordait pas du tout : sa liste nommait `**/domain/models/**`,
+`**/application/use-cases/**`, `**/infrastructure/adapters/**` et trois autres chemins que le
+refactor avait déjà supprimés. La règle se lisait comme une frontière, ne correspondait à rien, et
+laissait `translate` importer `framework`, `distribution`, `presentation` ou `runtime` sans un mot.
+
+Elle nomme désormais les quatre destinations interdites qui existent. Les six overrides sont
+prouvés un par un, en écrivant l'import interdit et en regardant biome refuser :
+
+| Depuis | Import injecté | Message |
+| ------ | -------------- | ------- |
+| `translate/domain` | `../../framework/domain/manifest.js` | translate may import only the kernel and contexts/tools |
+| `translate/domain` | `../../../runtime/wiring/translate.js` | idem |
+| `tools/domain` | `../../translate/domain/plugin-format.js` | tools may not import translate |
+| `distribution/domain` | `../../tools/domain/registry.js` | distribution knows no tool… |
+| `kernel` | `../contexts/tools/domain/registry.js` | kernel must not import any context |
+| `framework/domain` | `../application/restore/restore-use-case.js` | domain must not import application… |
+
+Et `tests/architecture/import-rules-bite.arch.test.ts` empêche la panne de revenir : chaque motif de
+chaque override doit encore désigner un chemin présent sous `src/`. Le bug d'origine réinjecté le
+fait échouer en nommant la ligne fautive.

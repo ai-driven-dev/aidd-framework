@@ -60,7 +60,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/domain/**/*.ts", "src/contexts/*/domain/**/*.ts"],
+      "includes": ["src/contexts/*/domain/**/*.ts"],
       "linter": {
         "rules": {
           "style": {
@@ -137,18 +137,10 @@
                 "patterns": [
                   {
                     "group": [
-                      "**/domain/models/**",
-                      "**/application/commands/**",
-                      "**/application/use-cases/**",
-                      "**/application/display/**",
-                      "**/infrastructure/adapters/**",
-                      "**/infrastructure/assets/**",
+                      "**/framework/**",
+                      "**/distribution/**",
                       "**/presentation/**",
-                      "**/runtime/**",
-                      "../../../domain/ports/**",
-                      "../../../../domain/ports/**",
-                      "../../../domain/capabilities/**",
-                      "../../../../domain/capabilities/**"
+                      "**/runtime/**"
                     ],
                     "message": "translate may import only the kernel and contexts/tools \u2014 see phase-11"
                   }
