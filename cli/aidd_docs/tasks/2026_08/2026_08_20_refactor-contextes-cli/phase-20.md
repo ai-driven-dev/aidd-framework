@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Instruction: Make the tests prove they test something
@@ -110,6 +110,80 @@ Un score global unique serait le plus facile à produire et le moins actionnable
    with the reason. No silent list.
 2. Record the score so the next run compares rather than restarts.
 
+## Les scores, par contexte (2026-09-02)
+
+Seuil de rupture 50 dans tous les cas.
+
+| cible | fichiers | score |
+|---|---|---|
+| `contexts/translate/domain` | 9 | 78,63 % |
+| `contexts/framework/domain` | 19 | 77,97 % |
+| `contexts/distribution/domain` | 11 | 74,07 % |
+| `kernel` | 17 | **61,60 %** |
+| `contexts/tools/domain` | 45 | **61,64 %** |
+
+Le noyau et `tools` sont à égalité au plus bas. Le noyau est le pire des deux endroits où l'être :
+c'est le vocabulaire que les quatre contextes parlent, donc un changement de comportement qui y
+passe inaperçu passe inaperçu partout. C'est lui dont les survivants ont été examinés.
+
+### Ce que 255 survivants du noyau disent réellement
+
+| fichier | survivants / mutants |
+|---|---|
+| `errors.ts` | 101 / 247 |
+| `markdown.ts` | 60 / 236 |
+| `source.ts` | 43 / 266 |
+| `jsonc.ts` | 25 / 116 |
+| `file.ts` | 14 / 42 |
+| `merge.ts` | 10 / 75 |
+| `paths.ts` | 2 / 11 |
+
+**Cent des cent un survivants d'`errors.ts` sont un message remplacé par une chaîne vide.** Aucun
+test ne fige la prose d'une erreur, et l'exiger produirait des tests qui cassent au premier
+reformulage sans rien protéger. C'est une catégorie **acceptée**, écrite ici pour qu'on cesse de la
+recompter comme une dette. L'exception qui confirme la règle vit ailleurs : le message de la garde
+de version du manifest **est** un contrat, et un test épingle son invocation littérale — parce que
+celui-là dit à l'utilisateur quoi taper.
+
+La tentation inverse a été écartée aussi : retirer ce mutateur de la configuration aurait fait
+monter le chiffre sans rien améliorer. Le score reste ce qu'il est ; c'est sa lecture qui était
+fausse.
+
+**Le manque réel est `markdown.ts`**, où chaque profil d'outil rencontre le contenu qu'il réécrit :
+un changement y est un changement partout. Onze tests y ont été ajoutés, écrits sur les branches que
+la mutation désignait — le guillemetage des globs, l'apostrophe doublée, le booléen écrit nu, la
+chaîne JSON laissée brute, le délimiteur avec espaces en fin de ligne, le bloc non refermé traité
+comme du corps, le seul saut de ligne retiré quand il n'y a pas de frontmatter.
+
+`source.ts` et `jsonc.ts` restent la prochaine cible évidente, dans cet ordre.
+
+## Ce que la campagne a coûté avant de mesurer quoi que ce soit
+
+Deux obstacles, tous deux instructifs.
+
+**Les tests d'architecture ne peuvent pas participer.** Ils lisent l'arbre des fichiers comme du
+texte — tailles de dossiers, chemins cités, graphe d'imports. Stryker travaille sur une copie de cet
+arbre avec un mutant injecté : ces tests répondent alors à une question sur le bac à sable, pas sur
+le code, et ils font échouer le run initial avant le premier mutant. Ils mesurent la structure, et
+la mutation ne mesure pas la structure. D'où `vitest.mutation.config.ts`, qui ne garde que les deux
+projets qui mesurent du comportement. L'e2e en est exclu pour la raison inverse : il lance le
+binaire construit, qu'aucun mutant n'atteint, donc tous survivraient et dilueraient le score.
+
+À noter pour qui y reviendra : un simple `test.exclude` ne suffit pas. Le fichier de workspace
+définit les projets et l'emporte sur une config passée par `--config` ; seule une autre déclaration
+de projets le remplace.
+
+**Deux tests unitaires lisaient la machine du développeur.** `MarketplaceListUseCase` attendait un
+marketplace et en voyait trois ; `MarketplaceRegistryAdapter` en attendait zéro et en voyait deux.
+Tous deux truquaient `HOME` — mais le CLI ne retombe sur `homedir()` que si
+`AIDD_USER_CONFIG_DIR` n'est pas défini, et il suffit qu'une valeur traîne pour que le test aille
+lire un vrai registre utilisateur. Ils passaient par chance, et Stryker les a mis à nu en changeant
+le répertoire de travail. Corrigés en épinglant le répertoire de configuration, et vérifiés sous un
+environnement délibérément empoisonné.
+
+C'est le premier bénéfice de cette phase, et il est arrivé avant le premier chiffre : la mutation a
+trouvé du non-déterminisme que 1969 tests verts ne montraient pas.
+
 ## Test acceptance criteria
 
 | Task | Acceptance criteria |
@@ -118,3 +192,16 @@ Un score global unique serait le plus facile à produire et le moins actionnable
 | 2    | The manifest aggregate and the tool profiles are mutated, with a score recorded |
 | 3    | Every surviving mutant is killed or accepted in writing; the score is committed so the next run has a baseline |
 | all  | Mutation is scored, never a gate: it reports on the suite, it does not block a merge |
+
+## Un piège d'outillage, pour qui relancera la campagne
+
+Stryker ne nettoie pas `.stryker-tmp/` quand un run est interrompu ou échoue — c'est écrit dans son
+journal : « Not removing the temp dir because an error occurred ». Le répertoire monte vite à une
+centaine de mégaoctets, et il contient une copie complète du dépôt, `aidd_docs/` inclus.
+
+Il est bien dans le `.gitignore`, ce qui ne suffit pas : le hook de pré-commit qui vérifie les liens
+markdown lit le disque et non l'index, donc il scanne la copie et signale des liens morts pointant
+vers des chemins d'il y a plusieurs phases. Un commit refusé pour des fichiers qui n'existent pas
+vraiment.
+
+`rm -rf .stryker-tmp` après un run interrompu, avant de committer.

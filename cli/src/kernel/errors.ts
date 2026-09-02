@@ -274,7 +274,7 @@ export class AmbiguousPluginMatchError extends Error {
 
 export class NoMarketplacesRegisteredError extends Error {
   constructor() {
-    super("No marketplaces registered. Use `aidd plugin marketplace add <source>` first.");
+    super("No marketplaces registered. Use `aidd marketplace add <name> <source>` first.");
     this.name = "NoMarketplacesRegisteredError";
   }
 }

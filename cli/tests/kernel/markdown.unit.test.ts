@@ -112,3 +112,70 @@ describe("parseFrontmatter() — block scalars", () => {
     expect(frontmatter.tools).toBe("[invalid json}");
   });
 });
+
+/**
+ * The branches mutation found unguarded.
+ *
+ * Frontmatter is where every tool profile meets the content it rewrites, so a change
+ * here is a change everywhere. Sixty of the kernel's surviving mutants were in this
+ * module, and the clusters below are what they pointed at: the quoting decisions, the
+ * delimiter checks, and the shape of an empty document.
+ */
+describe("frontmatter, at the edges", () => {
+  it("keeps a glob quoted so YAML cannot read it as a pattern", () => {
+    const out = serializeFrontmatter({ globs: ["*.ts", "a?b", "{x,y}"] }, "body");
+    expect(out).toContain('  - "*.ts"');
+    expect(out).toContain('  - "a?b"');
+    expect(out).toContain('  - "{x,y}"');
+  });
+
+  it("leaves an ordinary list item unquoted", () => {
+    expect(serializeFrontmatter({ tags: ["plain"] }, "body")).toContain("  - plain");
+  });
+
+  it("emits a JSON-array string raw, so it stays an inline YAML array", () => {
+    expect(serializeFrontmatter({ globs: '["a","b"]' }, "body")).toContain('globs: ["a","b"]');
+  });
+
+  it("doubles an apostrophe rather than ending the quoted string early", () => {
+    expect(serializeFrontmatter({ name: "it's" }, "body")).toContain("name: 'it''s'");
+  });
+
+  it("writes a boolean bare, not quoted", () => {
+    expect(serializeFrontmatter({ enabled: true }, "body")).toContain("enabled: true");
+    expect(serializeFrontmatter({ enabled: false }, "body")).toContain("enabled: false");
+  });
+
+  it("returns the body untouched when there is no frontmatter to write", () => {
+    expect(serializeFrontmatter({}, "just a body")).toBe("just a body");
+  });
+
+  it("drops one leading newline, and only one, when there is no frontmatter", () => {
+    expect(serializeFrontmatter({}, "\n\nbody")).toBe("\nbody");
+  });
+
+  it("treats a document whose first line is not the delimiter as all body", () => {
+    const { frontmatter, body } = parseFrontmatter("no delimiter\n---\nlate");
+    expect(frontmatter).toEqual({});
+    expect(body).toBe("no delimiter\n---\nlate");
+  });
+
+  it("treats an unterminated frontmatter block as all body", () => {
+    const content = "---\nname: x\nstill open";
+    const { frontmatter, body } = parseFrontmatter(content);
+    expect(frontmatter).toEqual({});
+    expect(body).toBe(content);
+  });
+
+  it("accepts a delimiter carrying trailing spaces", () => {
+    const { frontmatter, body } = parseFrontmatter("---  \nname: x\n---  \nbody");
+    expect(frontmatter.name).toBe("x");
+    expect(body).toBe("body");
+  });
+
+  it("reads an empty frontmatter block and keeps the body", () => {
+    const { frontmatter, body } = parseFrontmatter("---\n---\nbody");
+    expect(frontmatter).toEqual({});
+    expect(body).toBe("body");
+  });
+});

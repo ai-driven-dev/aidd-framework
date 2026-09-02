@@ -4,13 +4,23 @@
   "testRunner": "vitest",
   "plugins": ["@stryker-mutator/vitest-runner"],
   "mutate": [
-    "src/contexts/framework/domain/manifest.ts",
-    "src/contexts/framework/domain/manifest-serialization.ts",
-    "src/contexts/framework/domain/manifest/tool-entry.ts",
-    "src/contexts/framework/domain/manifest/tracked-files.ts",
-    "src/contexts/framework/domain/manifest/merge-files.ts",
-    "src/contexts/framework/domain/manifest/mcp-exclusions.ts",
-    "src/contexts/framework/domain/plugins/installed-plugin.ts"
+    "src/kernel/errors.ts",
+    "src/kernel/file.ts",
+    "src/kernel/flat-paths.ts",
+    "src/kernel/jsonc.ts",
+    "src/kernel/markdown.ts",
+    "src/kernel/merge.ts",
+    "src/kernel/paths.ts",
+    "src/kernel/ports/asset-provider.ts",
+    "src/kernel/ports/file-reader.ts",
+    "src/kernel/ports/file-writer.ts",
+    "src/kernel/ports/hasher.ts",
+    "src/kernel/ports/logger.ts",
+    "src/kernel/ports/prompter.ts",
+    "src/kernel/relative-link-rewrite.ts",
+    "src/kernel/scope.ts",
+    "src/kernel/source.ts",
+    "src/kernel/tool.ts"
   ],
   "coverageAnalysis": "perTest",
   "thresholds": {
@@ -28,6 +38,6 @@
   "tsconfigFile": "",
   "disableTypeChecks": false,
   "vitest": {
-    "configFile": "vitest.config.ts"
+    "configFile": "vitest.mutation.config.ts"
   }
 }

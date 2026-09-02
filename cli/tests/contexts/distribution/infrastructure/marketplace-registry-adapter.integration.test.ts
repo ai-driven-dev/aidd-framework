@@ -20,6 +20,7 @@ describe("MarketplaceRegistryAdapter", () => {
   let projectRoot: string;
   let homeDir: string;
   let originalHome: string | undefined;
+  let originalConfigDir: string | undefined;
   let originalUserProfile: string | undefined;
   let adapter: MarketplaceRegistryAdapter;
 
@@ -28,13 +29,21 @@ describe("MarketplaceRegistryAdapter", () => {
     homeDir = await mkdtemp(join(tmpdir(), "marketplace-registry-home-"));
     originalHome = process.env.HOME;
     originalUserProfile = process.env.USERPROFILE;
+    originalConfigDir = process.env.AIDD_USER_CONFIG_DIR;
     process.env.HOME = homeDir;
     process.env.USERPROFILE = homeDir;
+    // Faking the home alone is not enough: the CLI only falls back to `homedir()` when
+    // `AIDD_USER_CONFIG_DIR` is unset, so a value leaking in from elsewhere sends this
+    // test at a real user registry. Measured — it read two marketplaces of the
+    // developer's own and expected none.
+    process.env.AIDD_USER_CONFIG_DIR = join(homeDir, ".config", "aidd");
     adapter = new MarketplaceRegistryAdapter();
   });
 
   afterEach(async () => {
     process.env.HOME = originalHome;
+    if (originalConfigDir === undefined) delete process.env.AIDD_USER_CONFIG_DIR;
+    else process.env.AIDD_USER_CONFIG_DIR = originalConfigDir;
     process.env.USERPROFILE = originalUserProfile;
     await rm(projectRoot, { recursive: true, force: true });
     await rm(homeDir, { recursive: true, force: true });
