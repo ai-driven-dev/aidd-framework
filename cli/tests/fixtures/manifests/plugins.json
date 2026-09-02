@@ -1,0 +1,42 @@
+{
+  "version": 6,
+  "tools": {
+    "claude": {
+      "toolId": "claude",
+      "version": "1.0.0",
+      "files": [],
+      "mergeFiles": [],
+      "plugins": [
+        {
+          "name": "aidd-dev",
+          "source": {
+            "kind": "local",
+            "path": "/fixtures/plugins/aidd-dev"
+          },
+          "version": "1.0.0",
+          "strict": true,
+          "files": {
+            "commands/foo.md": "11111111111111111111111111111111"
+          },
+          "componentPaths": {
+            "commands/foo.md": "commands/foo.md"
+          },
+          "mcpEntries": {
+            "aidd-server": "22222222222222222222222222222222"
+          },
+          "marketplace": "aidd-framework"
+        },
+        {
+          "name": "aidd-vcs",
+          "source": {
+            "kind": "npm",
+            "package": "aidd-vcs-plugin"
+          },
+          "version": "2.0.0",
+          "strict": false,
+          "files": {}
+        }
+      ]
+    }
+  }
+}

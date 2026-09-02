@@ -14,7 +14,7 @@ import {
 } from "../../translate/domain/plugin-distribution.js";
 import type { PluginFormat } from "../../translate/domain/plugin-format.js";
 import { PLUGIN_MANIFEST_PROBES } from "../../translate/domain/plugin-format.js";
-import { PLUGIN_NAME_REGEX } from "../domain/plugins/plugin.js";
+import { PLUGIN_NAME_REGEX } from "../domain/plugins/installed-plugin.js";
 import type { PluginDistributionReader } from "../domain/ports/plugin-distribution-reader.js";
 
 const README_FILENAME = "README.md";

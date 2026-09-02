@@ -3,7 +3,7 @@ import type { MarketplaceSyncSettingsUseCase } from "../../../../../src/contexts
 import { InstallAiToolUseCase } from "../../../../../src/contexts/framework/application/install/install-ai-tool-use-case.js";
 import type { PluginInstallFromMarketplaceUseCase } from "../../../../../src/contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.js";
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
-import { Plugin } from "../../../../../src/contexts/framework/domain/plugins/plugin.js";
+import { InstalledPlugin } from "../../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
 import {
   buildUnitDeps,
   initAndInstall,
@@ -13,8 +13,8 @@ import {
 const PROJECT_ROOT = "/test-project";
 const VERSION = "1.0.0";
 
-function makeMockPlugin(name: string, marketplace = "aidd"): Plugin {
-  return Plugin.fromJSON({
+function makeMockPlugin(name: string, marketplace = "aidd"): InstalledPlugin {
+  return InstalledPlugin.fromJSON({
     name,
     source: { kind: "github", repo: "acme/plugins", ref: "main" },
     version: "1.0.0",
@@ -24,8 +24,8 @@ function makeMockPlugin(name: string, marketplace = "aidd"): Plugin {
   });
 }
 
-function makeMockOrphanPlugin(name: string): Plugin {
-  return Plugin.fromJSON({
+function makeMockOrphanPlugin(name: string): InstalledPlugin {
+  return InstalledPlugin.fromJSON({
     name,
     source: { kind: "github", repo: "acme/plugins", ref: "main" },
     version: "1.0.0",
@@ -63,7 +63,7 @@ function buildUseCase(
 async function addPlugin(
   deps: Awaited<ReturnType<typeof buildUnitDeps>>,
   toolId: string,
-  plugin: Plugin
+  plugin: InstalledPlugin
 ): Promise<void> {
   const manifest = (await deps.manifestRepo.load()) ?? Manifest.create();
   manifest.addPlugin(toolId as Parameters<typeof manifest.addPlugin>[0], plugin);

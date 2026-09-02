@@ -1,17 +1,26 @@
-import {
-  DuplicatePluginError,
-  InvalidManifestDataError,
-  InvalidManifestToolIdError,
-  PluginNotFoundError,
-  ToolNotInManifestError,
-} from "../../../kernel/errors.js";
-import { FileHash, type InstallationFile } from "../../../kernel/file.js";
+import { InvalidManifestDataError, ToolNotInManifestError } from "../../../kernel/errors.js";
+import type { FileHash, InstallationFile } from "../../../kernel/file.js";
 import type { MergeFileEntry } from "../../../kernel/merge.js";
-import { type ToolId, VALID_TOOL_IDS } from "../../../kernel/tool.js";
-import { type McpExclusion, mcpExclusionEquals } from "../../tools/domain/mcp-exclusion.js";
-import { Plugin, type PluginEntryData } from "./plugins/plugin.js";
-
-const MANIFEST_VERSION = 6;
+import type { ToolId } from "../../../kernel/tool.js";
+import type { McpExclusion } from "../../tools/domain/mcp-exclusion.js";
+import { addExclusions, removeExclusions } from "./manifest/mcp-exclusions.js";
+import {
+  addPluginToEntry,
+  createToolEntry,
+  isFileTrackedInEntry,
+  removePluginFromEntry,
+  type ToolEntry,
+  type ToolEntryData,
+  updatePluginInEntry,
+} from "./manifest/tool-entry.js";
+import { parseTrackedFiles, type TrackedFile, withUpdatedHash } from "./manifest/tracked-files.js";
+import {
+  MANIFEST_VERSION,
+  type ManifestData,
+  parseManifestTools,
+  serializeManifestTools,
+} from "./manifest-serialization.js";
+import type { InstalledPlugin } from "./plugins/installed-plugin.js";
 
 // VSCode file paths that were tracked under "copilot" in manifest v1.
 // Used exclusively by migrateV1toV2 to move them to the "vscode" tool entry.
@@ -21,12 +30,6 @@ const VSCODE_MIGRATION_PATHS = new Set([
   ".vscode/keybindings.json",
   ".vscode/settings.json",
 ]);
-
-interface TrackedFile {
-  readonly relativePath: string;
-  readonly hash: FileHash;
-  readonly frameworkPath?: string;
-}
 
 // Retained for legacy manifest round-trip and isFileTracked coverage.
 interface ScriptsEntry {
@@ -40,50 +43,15 @@ interface PluginsEntry {
   readonly files: readonly TrackedFile[];
 }
 
-interface ToolEntry {
-  readonly toolId: ToolId;
-  readonly version: string;
-  readonly files: readonly TrackedFile[];
-  readonly mergeFiles: readonly MergeFileEntry[];
-  readonly excludedMcp: readonly McpExclusion[];
-  readonly plugins: readonly Plugin[];
-}
-
 // Kept for legacy manifest round-trip: v3/v4 manifests may carry these sections until migrate runs.
 interface ScriptsEntryData {
   version: string;
-  files: TrackedFileData[];
+  files: { relativePath: string; hash: string; frameworkPath?: string }[];
 }
 
 interface PluginsSectionData {
   version: string;
-  files: TrackedFileData[];
-}
-
-interface ManifestData {
-  version: 6;
-  tools: Record<string, ToolEntryData>;
-}
-
-interface MergeFileEntryData {
-  relativePath: string;
-  sectionKey: string | null;
-  entries: Record<string, string>;
-}
-
-interface ToolEntryData {
-  toolId: string;
-  version: string;
-  files: TrackedFileData[];
-  mergeFiles?: MergeFileEntryData[];
-  excludedMcp?: Array<{ configPath: string; entryKey: string }>;
-  plugins?: PluginEntryData[];
-}
-
-interface TrackedFileData {
-  relativePath: string;
-  hash: string;
-  frameworkPath?: string;
+  files: { relativePath: string; hash: string; frameworkPath?: string }[];
 }
 
 // This migration block must remain until all users have upgraded past v1.
@@ -178,14 +146,17 @@ export class Manifest {
     excludedMcp: McpExclusion[] = []
   ): void {
     const existing = this._tools.get(toolId);
-    this._tools.set(toolId, {
+    this._tools.set(
       toolId,
-      version,
-      files: this.toTrackedFiles(files),
-      mergeFiles,
-      excludedMcp,
-      plugins: existing?.plugins ?? [],
-    });
+      createToolEntry({
+        toolId,
+        version,
+        files,
+        mergeFiles,
+        excludedMcp,
+        existingPlugins: existing?.plugins ?? [],
+      })
+    );
   }
 
   /** Returns true when the loaded JSON carried a legacy scripts section. Used by isFileTracked. */
@@ -196,14 +167,6 @@ export class Manifest {
   /** Returns true when the loaded JSON carried a legacy top-level plugins section. Used by isFileTracked. */
   hasPlugins(): boolean {
     return this._plugins !== null;
-  }
-
-  private toTrackedFiles(files: InstallationFile[]): TrackedFile[] {
-    return files.map((f) => ({
-      relativePath: f.relativePath,
-      hash: f.hash,
-      ...(f.frameworkPath !== undefined && { frameworkPath: f.frameworkPath }),
-    }));
   }
 
   getInstalledToolIds(): ToolId[] {
@@ -246,22 +209,19 @@ export class Manifest {
   addExcludedMcp(toolId: ToolId, exclusions: McpExclusion[]): void {
     const entry = this._tools.get(toolId);
     if (!entry) throw new ToolNotInManifestError(toolId);
-    const existing = [...entry.excludedMcp];
-    for (const excl of exclusions) {
-      if (!existing.some((e) => mcpExclusionEquals(e, excl))) {
-        existing.push(excl);
-      }
-    }
-    this._tools.set(toolId, { ...entry, excludedMcp: existing });
+    this._tools.set(toolId, {
+      ...entry,
+      excludedMcp: addExclusions(entry.excludedMcp, exclusions),
+    });
   }
 
   removeExcludedMcp(toolId: ToolId, exclusions: McpExclusion[]): void {
     const entry = this._tools.get(toolId);
     if (!entry) throw new ToolNotInManifestError(toolId);
-    const filtered = entry.excludedMcp.filter(
-      (e) => !exclusions.some((r) => mcpExclusionEquals(e, r))
-    );
-    this._tools.set(toolId, { ...entry, excludedMcp: filtered });
+    this._tools.set(toolId, {
+      ...entry,
+      excludedMcp: removeExclusions(entry.excludedMcp, exclusions),
+    });
   }
 
   clearExcludedMcp(toolId: ToolId): void {
@@ -273,11 +233,10 @@ export class Manifest {
   updateTrackedFileHash(toolId: ToolId, relativePath: string, hash: FileHash): void {
     const entry = this._tools.get(toolId);
     if (!entry) return;
-    const existing = entry.files.find((f) => f.relativePath === relativePath);
-    const updatedFiles = existing
-      ? entry.files.map((f) => (f.relativePath === relativePath ? { ...f, hash } : f))
-      : [...entry.files, { relativePath, hash }];
-    this._tools.set(toolId, { ...entry, files: updatedFiles });
+    this._tools.set(toolId, {
+      ...entry,
+      files: withUpdatedHash(entry.files, relativePath, hash),
+    });
   }
 
   updateToolMergeFiles(
@@ -305,55 +264,34 @@ export class Manifest {
     return this._tools.has(toolId);
   }
 
-  getPlugins(toolId: ToolId): readonly Plugin[] {
+  getPlugins(toolId: ToolId): readonly InstalledPlugin[] {
     return this._tools.get(toolId)?.plugins ?? [];
   }
 
-  addPlugin(toolId: ToolId, plugin: Plugin): void {
+  addPlugin(toolId: ToolId, plugin: InstalledPlugin): void {
     const entry = this._tools.get(toolId);
     if (!entry) throw new ToolNotInManifestError(toolId);
-    if (entry.plugins.some((p) => p.name === plugin.name)) {
-      throw new DuplicatePluginError(plugin.name);
-    }
-    this._tools.set(toolId, { ...entry, plugins: [...entry.plugins, plugin] });
+    this._tools.set(toolId, addPluginToEntry(entry, plugin));
   }
 
   removePlugin(toolId: ToolId, name: string): void {
     const entry = this._tools.get(toolId);
     if (!entry) throw new ToolNotInManifestError(toolId);
-    if (!entry.plugins.some((p) => p.name === name)) {
-      throw new PluginNotFoundError(name);
-    }
-    this._tools.set(toolId, { ...entry, plugins: entry.plugins.filter((p) => p.name !== name) });
+    this._tools.set(toolId, removePluginFromEntry(entry, name));
   }
 
-  updatePlugin(toolId: ToolId, plugin: Plugin): void {
+  updatePlugin(toolId: ToolId, plugin: InstalledPlugin): void {
     const entry = this._tools.get(toolId);
     if (!entry) throw new ToolNotInManifestError(toolId);
-    if (!entry.plugins.some((p) => p.name === plugin.name)) {
-      throw new PluginNotFoundError(plugin.name);
-    }
-    this._tools.set(toolId, {
-      ...entry,
-      plugins: entry.plugins.map((p) => (p.name === plugin.name ? plugin : p)),
-    });
+    this._tools.set(toolId, updatePluginInEntry(entry, plugin));
   }
 
   isFileTracked(relativePath: string): boolean {
     for (const entry of this._tools.values()) {
-      if (entry.files.some((f) => f.relativePath === relativePath)) return true;
-      if (entry.mergeFiles.some((m) => m.relativePath === relativePath)) return true;
-      if (this.isFileTrackedInPlugins(entry.plugins, relativePath)) return true;
+      if (isFileTrackedInEntry(entry, relativePath)) return true;
     }
     if (this._scripts?.files.some((f) => f.relativePath === relativePath)) return true;
     if (this._plugins?.files.some((f) => f.relativePath === relativePath)) return true;
-    return false;
-  }
-
-  private isFileTrackedInPlugins(plugins: readonly Plugin[], relativePath: string): boolean {
-    for (const plugin of plugins) {
-      if (plugin.isFileTracked(relativePath)) return true;
-    }
     return false;
   }
 
@@ -374,74 +312,7 @@ export class Manifest {
   // --- Serialization ---
 
   toJSON(): ManifestData {
-    const tools = this.serializeTools();
-    return { version: MANIFEST_VERSION as 6, tools };
-  }
-
-  private serializeTools(): Record<string, ToolEntryData> {
-    const tools: Record<string, ToolEntryData> = {};
-    for (const [toolId, entry] of this._tools.entries()) {
-      tools[toolId] = {
-        toolId: entry.toolId,
-        version: entry.version,
-        files: this.toTrackedFileData(entry.files),
-        mergeFiles: this.toMergeFileEntryData(entry.mergeFiles),
-        ...(entry.excludedMcp.length > 0 && {
-          excludedMcp: entry.excludedMcp.map((e) => ({
-            configPath: e.configPath,
-            entryKey: e.entryKey,
-          })),
-        }),
-        ...(entry.plugins.length > 0 && {
-          plugins: entry.plugins.map((p) => p.toJSON()),
-        }),
-      };
-    }
-    return tools;
-  }
-
-  private toTrackedFileData(files: readonly TrackedFile[]): TrackedFileData[] {
-    return files.map((f) => ({
-      relativePath: f.relativePath,
-      hash: f.hash.value,
-      ...(f.frameworkPath !== undefined && { frameworkPath: f.frameworkPath }),
-    }));
-  }
-
-  private static parseTrackedFiles(files: TrackedFileData[]): TrackedFile[] {
-    return files.map((f) => ({
-      relativePath: f.relativePath,
-      hash: new FileHash(f.hash),
-      ...(f.frameworkPath !== undefined && { frameworkPath: f.frameworkPath }),
-    }));
-  }
-
-  private toMergeFileEntryData(mergeFiles: readonly MergeFileEntry[]): MergeFileEntryData[] {
-    return mergeFiles.map((m) => {
-      const entries: Record<string, string> = {};
-      for (const [key, hash] of Object.entries(m.entries)) {
-        entries[key] = hash.value;
-      }
-      return {
-        relativePath: m.relativePath,
-        sectionKey: m.sectionKey,
-        entries,
-      };
-    });
-  }
-
-  private static parseMergeFileEntries(data: MergeFileEntryData[]): MergeFileEntry[] {
-    return data.map((m) => {
-      const entries: Record<string, FileHash> = {};
-      for (const [key, hash] of Object.entries(m.entries)) {
-        entries[key] = new FileHash(hash);
-      }
-      return {
-        relativePath: m.relativePath,
-        sectionKey: m.sectionKey,
-        entries,
-      };
-    });
+    return { version: MANIFEST_VERSION as 6, tools: serializeManifestTools(this._tools) };
   }
 
   static fromJSON(data: unknown): Manifest {
@@ -450,7 +321,7 @@ export class Manifest {
     }
     const raw = data as Record<string, unknown>;
     Manifest.applyMigrations(raw);
-    const tools = Manifest.parseTools(raw);
+    const tools = parseManifestTools(raw);
     const { scripts, plugins } = Manifest.parseLegacySections(raw);
     return new Manifest({ tools, scripts, plugins });
   }
@@ -475,29 +346,6 @@ export class Manifest {
     }
   }
 
-  private static parseTools(raw: Record<string, unknown>): Map<ToolId, ToolEntry> {
-    const tools = new Map<ToolId, ToolEntry>();
-    if (raw.tools === null || typeof raw.tools !== "object") return tools;
-
-    for (const [key, value] of Object.entries(raw.tools as Record<string, unknown>)) {
-      const toolId = key as ToolId;
-      if (!VALID_TOOL_IDS.includes(toolId)) {
-        throw new InvalidManifestToolIdError(key);
-      }
-      const entry = value as ToolEntryData;
-      tools.set(toolId, {
-        toolId,
-        version: entry.version,
-        files: Manifest.parseTrackedFiles(entry.files),
-        mergeFiles: Manifest.parseMergeFileEntries(entry.mergeFiles ?? []),
-        excludedMcp:
-          entry.excludedMcp?.map((e) => ({ configPath: e.configPath, entryKey: e.entryKey })) ?? [],
-        plugins: Manifest.parsePluginEntries(entry.plugins ?? []),
-      });
-    }
-    return tools;
-  }
-
   // Parse legacy scripts/plugins file lists for backward-compatible file tracking of pre-v6 manifests.
   private static parseLegacySections(raw: Record<string, unknown>): {
     scripts: ScriptsEntry | null;
@@ -508,7 +356,7 @@ export class Manifest {
       const scriptsRaw = raw.scripts as ScriptsEntryData;
       scripts = {
         version: scriptsRaw.version,
-        files: Manifest.parseTrackedFiles(scriptsRaw.files),
+        files: parseTrackedFiles(scriptsRaw.files),
       };
     }
 
@@ -517,13 +365,9 @@ export class Manifest {
       const pluginsRaw = raw.plugins as PluginsSectionData;
       plugins = {
         version: pluginsRaw.version,
-        files: Manifest.parseTrackedFiles(pluginsRaw.files),
+        files: parseTrackedFiles(pluginsRaw.files),
       };
     }
     return { scripts, plugins };
-  }
-
-  private static parsePluginEntries(data: PluginEntryData[]): Plugin[] {
-    return data.map((p) => Plugin.fromJSON(p));
   }
 }

@@ -4,7 +4,7 @@ import "../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 import { DetectPluginDriftUseCase } from "../../../../src/contexts/framework/application/shared/detect-plugin-drift-use-case.js";
 import { StatusUseCase } from "../../../../src/contexts/framework/application/status-use-case.js";
 import { Manifest } from "../../../../src/contexts/framework/domain/manifest.js";
-import { Plugin } from "../../../../src/contexts/framework/domain/plugins/plugin.js";
+import { InstalledPlugin } from "../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../../../src/contexts/framework/domain/ports/manifest-repository.js";
 import { FileHash } from "../../../../src/kernel/file.js";
 import type { FileReader } from "../../../../src/kernel/ports/file-reader.js";
@@ -19,7 +19,7 @@ function makeManifest(pluginFileHash: string): Manifest {
   manifest.addTool("claude", "1.0.0", []);
   manifest.addPlugin(
     "claude",
-    Plugin.fromJSON({
+    InstalledPlugin.fromJSON({
       name: "test-plugin",
       source: { kind: "local", path: "/some/path" },
       version: "1.0.0",

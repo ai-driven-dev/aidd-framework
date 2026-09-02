@@ -11,7 +11,7 @@ import type { PluginsCapability } from "../../../tools/domain/plugins-capability
 import { getToolConfig, isAiTool } from "../../../tools/domain/registry.js";
 import type { PluginDistribution } from "../../../translate/domain/plugin-distribution.js";
 import type { Manifest } from "../../domain/manifest.js";
-import type { Plugin } from "../../domain/plugins/plugin.js";
+import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { PluginTranslator } from "../framework/translator/plugin-translator.js";
 
@@ -108,7 +108,7 @@ export async function materializeViaTranslator(
   translator: PluginTranslator,
   dist: PluginDistribution,
   toolId: AiToolId,
-  plugin: Plugin,
+  plugin: InstalledPlugin,
   projectRoot: string,
   manifest: Manifest,
   docsDir: string

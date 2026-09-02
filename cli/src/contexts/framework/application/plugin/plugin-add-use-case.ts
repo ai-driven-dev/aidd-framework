@@ -19,7 +19,7 @@ import { PluginContentTranslator } from "../../../translate/domain/content-trans
 import type { PluginDistribution } from "../../../translate/domain/plugin-distribution.js";
 import type { ReadonlySkipList } from "../../../translate/domain/plugin-translation-skip.js";
 import type { Manifest } from "../../domain/manifest.js";
-import { Plugin } from "../../domain/plugins/plugin.js";
+import { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { PluginDistributionReader } from "../../domain/ports/plugin-distribution-reader.js";
 import type { PluginTranslator } from "../framework/translator/plugin-translator.js";
@@ -112,7 +112,7 @@ export class PluginAddUseCase {
     for (const toolId of toolIds) {
       manifest.addPlugin(
         toolId,
-        Plugin.fromMetadata(
+        InstalledPlugin.fromMetadata(
           pluginMetadata.name,
           version,
           source,
@@ -281,7 +281,7 @@ export class PluginAddUseCase {
     await writePluginFiles(files, projectRoot, this.fs);
     manifest.addPlugin(
       toolId,
-      Plugin.fromDistribution(dist, source, files, componentPaths, marketplace)
+      InstalledPlugin.fromDistribution(dist, source, files, componentPaths, marketplace)
     );
     return { skipped };
   }

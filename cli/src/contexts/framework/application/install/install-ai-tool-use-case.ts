@@ -1,7 +1,7 @@
 import type { Logger } from "../../../../kernel/ports/logger.js";
 import type { AiToolId } from "../../../../kernel/tool.js";
 import { Manifest } from "../../domain/manifest.js";
-import type { Plugin } from "../../domain/plugins/plugin.js";
+import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { MarketplaceSyncSettingsUseCase } from "../flows/marketplace-sync-settings-use-case.js";
 import type { PluginInstallFromMarketplaceUseCase } from "../plugin/plugin-install-from-marketplace-use-case.js";
@@ -77,10 +77,10 @@ export class InstallAiToolUseCase {
   private collectUniquePlugins(
     allToolIds: AiToolId[],
     excludeToolId: AiToolId,
-    getPlugins: (id: AiToolId) => readonly Plugin[]
-  ): Plugin[] {
+    getPlugins: (id: AiToolId) => readonly InstalledPlugin[]
+  ): InstalledPlugin[] {
     const seen = new Set<string>();
-    const result: Plugin[] = [];
+    const result: InstalledPlugin[] = [];
     for (const id of allToolIds) {
       if (id === excludeToolId) continue;
       for (const plugin of getPlugins(id)) {
@@ -94,7 +94,7 @@ export class InstallAiToolUseCase {
   }
 
   private async propagatePlugin(
-    plugin: Plugin,
+    plugin: InstalledPlugin,
     toolId: AiToolId,
     projectRoot: string,
     propagated: string[],

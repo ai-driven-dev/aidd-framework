@@ -17,7 +17,7 @@ import type {
   ReadonlySkipList,
 } from "../../../../translate/domain/plugin-translation-skip.js";
 import type { Manifest } from "../../../domain/manifest.js";
-import { Plugin } from "../../../domain/plugins/plugin.js";
+import { InstalledPlugin } from "../../../domain/plugins/installed-plugin.js";
 import {
   qualifiesForOpencodeMcpMerge,
   resolvePluginBaseDirForCapability,
@@ -123,7 +123,7 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
     manifest: Manifest
   ): Promise<void> {
     if (files.length > 0) await writePluginFiles(files, baseDir, this.fs);
-    const plugin = Plugin.fromDistributionWithMcp(
+    const plugin = InstalledPlugin.fromDistributionWithMcp(
       dist,
       source,
       files,

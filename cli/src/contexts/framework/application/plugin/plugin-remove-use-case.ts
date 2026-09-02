@@ -8,7 +8,7 @@ import { unmergeOpencodeMcp } from "../../../tools/domain/formats/opencode-mcp-m
 import type { McpCapability } from "../../../tools/domain/mcp-capability.js";
 import { getToolConfig, isAiTool } from "../../../tools/domain/registry.js";
 import type { Manifest } from "../../domain/manifest.js";
-import type { Plugin } from "../../domain/plugins/plugin.js";
+import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import {
   loadPluginManifest,
@@ -59,7 +59,7 @@ export class PluginRemoveUseCase {
   }
 
   private async removeMcpEntries(
-    plugin: Plugin,
+    plugin: InstalledPlugin,
     toolId: AiToolId,
     projectRoot: string
   ): Promise<void> {

@@ -1,0 +1,32 @@
+{
+  "version": 6,
+  "tools": {
+    "claude": {
+      "toolId": "claude",
+      "version": "1.2.3",
+      "files": [
+        {
+          "relativePath": ".claude/CLAUDE.md",
+          "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "frameworkPath": "framework/claude/CLAUDE.md"
+        },
+        {
+          "relativePath": ".claude/settings.json",
+          "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      ],
+      "mergeFiles": []
+    },
+    "cursor": {
+      "toolId": "cursor",
+      "version": "4.5.6",
+      "files": [
+        {
+          "relativePath": ".cursor/rules/naming.mdc",
+          "hash": "cccccccccccccccccccccccccccccccc"
+        }
+      ],
+      "mergeFiles": []
+    }
+  }
+}

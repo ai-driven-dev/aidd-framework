@@ -6,7 +6,7 @@ import { AI_TOOL_IDS, type AiToolId } from "../../../../kernel/tool.js";
 import type { Marketplace } from "../../../distribution/domain/marketplace.js";
 import type { MarketplaceRegistry } from "../../../distribution/domain/ports/marketplace-registry.js";
 import type { Manifest } from "../../domain/manifest.js";
-import type { Plugin } from "../../domain/plugins/plugin.js";
+import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 
 export interface MarketplaceRemoveOptions {
@@ -23,7 +23,7 @@ export interface MarketplaceRemoveResult {
 
 interface OrphanRef {
   toolId: AiToolId;
-  plugin: Plugin;
+  plugin: InstalledPlugin;
 }
 
 export class MarketplaceRemoveUseCase {

@@ -10,7 +10,7 @@ import type { ToolConfig } from "../../../tools/domain/registry.js";
 import { PluginContentTranslator } from "../../../translate/domain/content-translator.js";
 import type { PluginDistribution } from "../../../translate/domain/plugin-distribution.js";
 import type { Manifest } from "../../domain/manifest.js";
-import type { Plugin } from "../../domain/plugins/plugin.js";
+import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { PluginDistributionReader } from "../../domain/ports/plugin-distribution-reader.js";
 import type { PluginTranslator } from "../framework/translator/plugin-translator.js";
 import { resolvePluginTranslator } from "../framework/translator/resolve-plugin-translator.js";
@@ -24,7 +24,7 @@ import type { EnsureBuiltMarketplaceUseCase } from "./ensure-built-marketplace-u
 
 interface ApplyPluginFilesOptions {
   toolId: AiToolId;
-  plugin: Plugin;
+  plugin: InstalledPlugin;
   toolConfig: ToolConfig;
   projectRoot: string;
   cacheDir: string;

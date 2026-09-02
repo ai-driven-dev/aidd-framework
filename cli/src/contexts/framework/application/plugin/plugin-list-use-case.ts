@@ -1,6 +1,6 @@
 import type { AiToolId } from "../../../../kernel/tool.js";
 import type { Manifest } from "../../domain/manifest.js";
-import type { Plugin } from "../../domain/plugins/plugin.js";
+import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import { loadPluginManifest, resolvePluginToolIds } from "./plugin-helpers.js";
 
@@ -8,7 +8,7 @@ export interface PluginListOptions {
   toolIds: AiToolId[] | "all";
 }
 
-export type PluginListResult = Map<AiToolId, readonly Plugin[]>;
+export type PluginListResult = Map<AiToolId, readonly InstalledPlugin[]>;
 
 export class PluginListUseCase {
   constructor(private readonly manifestRepo: ManifestRepository) {}

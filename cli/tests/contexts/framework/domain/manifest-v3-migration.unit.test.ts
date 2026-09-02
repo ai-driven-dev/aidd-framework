@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Manifest } from "../../../../src/contexts/framework/domain/manifest.js";
-import { Plugin } from "../../../../src/contexts/framework/domain/plugins/plugin.js";
+import { InstalledPlugin } from "../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
 import { DuplicatePluginError, PluginNotFoundError } from "../../../../src/kernel/errors.js";
 import type { ToolId } from "../../../../src/kernel/tool.js";
 
@@ -29,7 +29,7 @@ const makeV2Manifest = () => ({
 });
 
 const makePlugin = (name = "my-plugin") =>
-  Plugin.fromJSON({
+  InstalledPlugin.fromJSON({
     name,
     source: { kind: "github", repo: "owner/my-plugin" },
     version: "1.0.0",

@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { PluginListUseCase } from "../../../../../src/contexts/framework/application/plugin/plugin-list-use-case.js";
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
-import { Plugin } from "../../../../../src/contexts/framework/domain/plugins/plugin.js";
+import { InstalledPlugin } from "../../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../../../../src/contexts/framework/domain/ports/manifest-repository.js";
 
 function makeManifestWithPlugin(): Manifest {
   const manifest = Manifest.create();
   manifest.addTool("claude", "1.0.0", []);
-  const plugin = Plugin.fromJSON({
+  const plugin = InstalledPlugin.fromJSON({
     name: "sample-plugin",
     source: { kind: "local", path: "./sample" },
     version: "1.0.0",

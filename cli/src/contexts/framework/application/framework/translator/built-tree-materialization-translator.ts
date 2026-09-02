@@ -10,7 +10,7 @@ import { frameworkBuildModeFor } from "../../../../tools/domain/registry.js";
 import type { PluginDistribution } from "../../../../translate/domain/plugin-distribution.js";
 import type { ReadonlySkipList } from "../../../../translate/domain/plugin-translation-skip.js";
 import type { Manifest } from "../../../domain/manifest.js";
-import { Plugin } from "../../../domain/plugins/plugin.js";
+import { InstalledPlugin } from "../../../domain/plugins/installed-plugin.js";
 import { isPluginFileAtDesiredState, resolvePluginBaseDir } from "../../plugin/plugin-helpers.js";
 import type { EnsureBuiltMarketplaceUseCase } from "../../shared/ensure-built-marketplace-use-case.js";
 import { ModeBFlatMaterializationTranslator } from "./mode-b-flat-materialization-translator.js";
@@ -79,7 +79,7 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     const written = await this.writeChangedFiles(files, baseDir);
     manifest.addPlugin(
       toolId,
-      Plugin.fromDistribution(dist, source, files, new Map(), marketplace)
+      InstalledPlugin.fromDistribution(dist, source, files, new Map(), marketplace)
     );
     return { skipped: [], written };
   }

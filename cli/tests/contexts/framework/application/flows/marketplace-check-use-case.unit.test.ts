@@ -7,7 +7,7 @@ import { Marketplace } from "../../../../../src/contexts/distribution/domain/mar
 import { PluginCatalogRepositoryAdapter } from "../../../../../src/contexts/distribution/infrastructure/plugin-catalog-repository-adapter.js";
 import { MarketplaceCheckUseCase } from "../../../../../src/contexts/framework/application/flows/marketplace-check-use-case.js";
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
-import { Plugin } from "../../../../../src/contexts/framework/domain/plugins/plugin.js";
+import { InstalledPlugin } from "../../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
 import { FixturePluginFetcher } from "../../../../helpers/ports/fixture-plugin-fetcher.js";
 import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
@@ -75,7 +75,7 @@ describe("MarketplaceCheckUseCase", () => {
     manifest.addTool("claude", "1.0.0", []);
     manifest.addPlugin(
       "claude",
-      Plugin.fromJSON({
+      InstalledPlugin.fromJSON({
         name: "ghost-plugin",
         source: { kind: "github", repo: "owner/ghost" },
         version: "1.0.0",

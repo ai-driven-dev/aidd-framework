@@ -3,7 +3,15 @@
   "packageManager": "pnpm",
   "testRunner": "vitest",
   "plugins": ["@stryker-mutator/vitest-runner"],
-  "mutate": ["src/domain/models/manifest.ts"],
+  "mutate": [
+    "src/contexts/framework/domain/manifest.ts",
+    "src/contexts/framework/domain/manifest-serialization.ts",
+    "src/contexts/framework/domain/manifest/tool-entry.ts",
+    "src/contexts/framework/domain/manifest/tracked-files.ts",
+    "src/contexts/framework/domain/manifest/merge-files.ts",
+    "src/contexts/framework/domain/manifest/mcp-exclusions.ts",
+    "src/contexts/framework/domain/plugins/installed-plugin.ts"
+  ],
   "coverageAnalysis": "perTest",
   "thresholds": {
     "high": 80,

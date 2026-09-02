@@ -4,7 +4,7 @@ import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { Marketplace } from "../../../../../src/contexts/distribution/domain/marketplace.js";
 import { MarketplaceRemoveUseCase } from "../../../../../src/contexts/framework/application/flows/marketplace-remove-use-case.js";
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
-import { Plugin } from "../../../../../src/contexts/framework/domain/plugins/plugin.js";
+import { InstalledPlugin } from "../../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
 import { MarketplaceNotFoundError } from "../../../../../src/kernel/errors.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
 import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
@@ -57,7 +57,7 @@ describe("MarketplaceRemoveUseCase", () => {
     const { useCase, registry, manifestRepo, fs } = buildUseCase();
     const manifest = Manifest.create();
     manifest.addTool("claude", "1.0.0", []);
-    const plugin = Plugin.fromJSON({
+    const plugin = InstalledPlugin.fromJSON({
       name: "sample",
       source: { kind: "github", repo: "owner/sample" },
       version: "1.0.0",

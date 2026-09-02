@@ -12,7 +12,7 @@ import { DoctorTrackedFilesUseCase } from "../../../../src/contexts/framework/ap
 import { DoctorUseCase } from "../../../../src/contexts/framework/application/doctor/doctor-use-case.js";
 import { DetectPluginDriftUseCase } from "../../../../src/contexts/framework/application/shared/detect-plugin-drift-use-case.js";
 import { Manifest } from "../../../../src/contexts/framework/domain/manifest.js";
-import { Plugin } from "../../../../src/contexts/framework/domain/plugins/plugin.js";
+import { InstalledPlugin } from "../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../../../src/contexts/framework/domain/ports/manifest-repository.js";
 import { FileHash } from "../../../../src/kernel/file.js";
 import type { FileReader } from "../../../../src/kernel/ports/file-reader.js";
@@ -28,7 +28,7 @@ function makeManifest(pluginFileHash: string): Manifest {
   manifest.addTool("claude", "1.0.0", []);
   manifest.addPlugin(
     "claude",
-    Plugin.fromJSON({
+    InstalledPlugin.fromJSON({
       name: "my-plugin",
       source: { kind: "local", path: "/some/path" },
       version: "1.0.0",
@@ -135,7 +135,7 @@ describe("DoctorUseCase — plugin integrity", () => {
       const userScopeRelPath = "aidd-context/skills/06-discovery/SKILL.md";
       manifest.addPlugin(
         "cursor",
-        Plugin.fromJSON({
+        InstalledPlugin.fromJSON({
           name: "aidd-context",
           source: { kind: "local", path: "/some/path" },
           version: "1.0.0",

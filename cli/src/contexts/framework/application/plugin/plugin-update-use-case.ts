@@ -11,7 +11,7 @@ import { getToolConfig, type ToolConfig } from "../../../tools/domain/registry.j
 import { PluginContentTranslator } from "../../../translate/domain/content-translator.js";
 import type { PluginDistribution } from "../../../translate/domain/plugin-distribution.js";
 import type { Manifest } from "../../domain/manifest.js";
-import { Plugin } from "../../domain/plugins/plugin.js";
+import { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { PluginDistributionReader } from "../../domain/ports/plugin-distribution-reader.js";
 import type { PluginTranslator } from "../framework/translator/plugin-translator.js";
@@ -92,7 +92,7 @@ export class PluginUpdateUseCase {
   }
 
   private async updateOnePlugin(
-    plugin: Plugin,
+    plugin: InstalledPlugin,
     toolId: AiToolId,
     projectRoot: string,
     cacheDir: string,
@@ -109,7 +109,7 @@ export class PluginUpdateUseCase {
   }
 
   private async replacePluginFiles(
-    plugin: Plugin,
+    plugin: InstalledPlugin,
     dist: PluginDistribution,
     toolId: AiToolId,
     projectRoot: string,
@@ -138,7 +138,7 @@ export class PluginUpdateUseCase {
     await writePluginFiles(newFiles, baseDir, this.fs);
     manifest.updatePlugin(
       toolId,
-      Plugin.fromDistribution(dist, plugin.source, newFiles, componentPaths)
+      InstalledPlugin.fromDistribution(dist, plugin.source, newFiles, componentPaths)
     );
   }
 

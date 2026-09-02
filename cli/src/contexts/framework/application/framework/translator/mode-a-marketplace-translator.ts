@@ -3,7 +3,7 @@ import type { AiToolId } from "../../../../../kernel/tool.js";
 import type { PluginDistribution } from "../../../../translate/domain/plugin-distribution.js";
 import type { ReadonlySkipList } from "../../../../translate/domain/plugin-translation-skip.js";
 import type { Manifest } from "../../../domain/manifest.js";
-import { Plugin } from "../../../domain/plugins/plugin.js";
+import { InstalledPlugin } from "../../../domain/plugins/installed-plugin.js";
 import type { PluginTranslator } from "./plugin-translator.js";
 
 /**
@@ -14,7 +14,7 @@ import type { PluginTranslator } from "./plugin-translator.js";
  * (extraKnownMarketplaces / enabledPlugins) using MarketplaceSettings.
  * Used by tools with native marketplace support: Claude, Copilot VSCode, Codex, Cursor.
  *
- * Plugin files are NOT materialized on disk. Instead, a plugin reference is added to
+ * InstalledPlugin files are NOT materialized on disk. Instead, a plugin reference is added to
  * the manifest with an empty files set — the marketplace sync handles the rest.
  */
 export class ModeAMarketplaceTranslator implements PluginTranslator {
@@ -29,7 +29,10 @@ export class ModeAMarketplaceTranslator implements PluginTranslator {
     marketplace: string | undefined,
     _docsDir: string
   ): Promise<{ skipped: ReadonlySkipList }> {
-    manifest.addPlugin(toolId, Plugin.fromDistribution(dist, source, [], new Map(), marketplace));
+    manifest.addPlugin(
+      toolId,
+      InstalledPlugin.fromDistribution(dist, source, [], new Map(), marketplace)
+    );
     return { skipped: [] };
   }
 }
