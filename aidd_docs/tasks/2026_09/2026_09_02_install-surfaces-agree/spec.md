@@ -59,13 +59,20 @@ config.json               // comments, then { firstLaunchAt, installedPlugins: [
    This is the exact failure this layer exists to refuse, waiting in the first file it reads.
 2. **`installed_plugins.json` records a `scope`** — `user`, `project`, `local` observed —
    but its `installPath` always points inside the plugins cache, never at a project. So the
-   registry says *this machine can load this ref*; only the project's own `enabledPlugins`
-   says *this project wants it*. The comparison needs both sides and cannot be done from
-   either alone.
-3. **The architecture already exists.** `HookTrustReader` +
+   registry says *this machine can load this ref*, never *this project wants it*.
+3. **Codex records `enabled`, and it is the only key it records.** 27 plugin tables on the
+   machine measured, every one `enabled = true`, and nothing else under any of them. So
+   `enabled = false` is possible and unobserved — a state where the host knows the plugin and
+   will still not load it, which is not the same fact as an absent entry.
+4. **The architecture already exists.** `HookTrustReader` +
    `hook-trust-reader-adapter.ts` reads `~/.codex/config.toml` to answer one `check` claim,
-   with the three-state error handling this needs. What is built here is its sibling, not a
-   new layer.
+   with the error handling this needs. What is built here is its sibling, not a new layer —
+   and it inherits that adapter's stated choice to **line-scan** `config.toml` rather than
+   parse it: *"carries arbitrary nested tables and multi-line values this adapter has no
+   business understanding"*. Concretely, the file measured is 26 KB and most of it is
+   `[projects."<absolute path>"]` tables; parsing the whole document to read `[plugins.…]`
+   would pull every project path on the machine into a process that then writes diagnostic
+   output. Line-scanning reads the one shape Codex always emits verbatim and nothing else.
 
 ## Design
 
@@ -78,23 +85,50 @@ declaration of where their registry lives and how it is read — the same way
 `marketplaceSettings` already declares where the settings file lives. A tool that declares
 none is reported as *not answerable*, never as agreeing.
 
-**Three answers per declared plugin, never two:**
+**The declaration side is AIDD's own manifest, not `enabledPlugins`.** This is the
+correction that changes what the code compares. `mergeEnabledPlugins`
+(`marketplace-sync-settings-use-case.ts:413-417`) iterates `manifest.getPlugins(toolId)` and
+**skips silently, twice**: once when a plugin records no marketplace, once when its
+marketplace does not resolve. A plugin AIDD installed under either condition never reaches
+`enabledPlugins` at all — so comparing `enabledPlugins` against the registry would find both
+sides absent and call it agreement, while the plugin is installed and will never load. The
+manifest is what that loop reads *from*, and it carries `name` and an optional `marketplace`
+(`domain/models/plugin.ts:36`), which is exactly the `<plugin>@<marketplace>` ref.
+
+So there are **three surfaces, two hops**:
+
+```
+AIDD manifest  ──►  the project's enabledPlugins  ──►  the host's own registry
+   what AIDD           what the project                what the host will
+   installed            declares                       actually load
+```
+
+**Five answers per installed plugin, never fewer:**
 
 | Answer | Means |
 | --- | --- |
 | registered | the registry was read and carries the ref |
-| declared, not registered | the registry was read and does not carry it — the #703 failure, naming which of the two files lacks it |
-| unknown | the registry could not be read or parsed — absent file, permissions, JSONC |
+| registered, disabled | the registry carries it and records it off — Codex's `enabled = false` |
+| declared, not registered | the registry was read and lacks it, naming which file — the #703 failure |
+| not declared | the manifest has it and `enabledPlugins` does not, so the sync skipped it |
+| unanswerable | the ref cannot be built (no marketplace recorded), or the registry could not be read or parsed |
 
-The third is not a soft version of the second. A file that cannot be parsed and a file that
+The last is not a soft version of the third. A file that cannot be parsed and a file that
 says "no" are different facts, and printing them alike is the defect this ticket is about.
+`registered, disabled` earns its own row for the same reason: folding it into `registered`
+would report a plugin that will not load as one that will.
 
 ## Acceptance
 
 - [ ] The host's own registry is read, not only the declaration the CLI wrote.
 - [ ] `check` states whether the two agree and names the missing side — never a bare pass.
-- [ ] A registry that cannot be read reports as unknown, distinctly from one read and lacking
-      the entry. Asserted with a JSONC fixture, because that is a real file, not a hypothetical.
+- [ ] A registry that cannot be read reports as unanswerable, distinctly from one read and
+      lacking the entry. Asserted with a JSONC fixture — written from the shape recorded above,
+      never copied from the real file, which carries hashed experiment keys and machine paths.
+- [ ] The comparison starts from AIDD's own manifest, so a plugin the sync skipped is visible
+      rather than reading as agreement between two absences.
+- [ ] Codex's `config.toml` is line-scanned, not parsed, and the doc comment says why against
+      `hook-trust-reader-adapter.ts`'s own stated reason.
 - [ ] A test fails when the two surfaces disagree, driven **through**
       `marketplace-sync-settings-use-case.ts` — which has no test file today.
 - [ ] The whole comparison runs with no AI session, no network, no money, no binary on PATH.
