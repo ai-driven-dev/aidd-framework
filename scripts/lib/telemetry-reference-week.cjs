@@ -102,8 +102,26 @@ const EXPECTED = Object.freeze({
 // Machinery
 // ---------------------------------------------------------------------------
 
+/** Every `GIT_*` variable removed. Git exports `GIT_DIR`, `GIT_INDEX_FILE` and friends into
+ * every process it spawns, so anything run from inside a git hook — `pre-push` running the
+ * test suite, most concretely — inherits a pointer to the *real* repository. The checkouts
+ * below then `git init` a temp directory and immediately fail on `git remote add origin`,
+ * because the origin it finds is this repository's own, which already has one.
+ *
+ * This suite passed run by hand and failed run from the pre-push hook, which is exactly the
+ * shape that leak takes. Both sides of the system already defend against it — `repo.cjs`'s
+ * own `gitEnv` in the hook, `git-environment.ts` in the CLI, and an integration test named
+ * "neither side follows a leaked GIT_DIR" — and this harness was the one place that did not. */
+function withoutGitVariables(env) {
+  return Object.fromEntries(Object.entries(env).filter(([key]) => !key.startsWith("GIT_")));
+}
+
 function run(command, args, options = {}) {
-  const result = spawnSync(command, args, { encoding: "utf8", ...options });
+  const result = spawnSync(command, args, {
+    encoding: "utf8",
+    ...options,
+    env: withoutGitVariables(options.env ?? process.env),
+  });
   if (result.status !== 0) {
     throw new Error(
       `${command} ${args.join(" ")} exited ${result.status}\n${result.stderr || result.stdout}`

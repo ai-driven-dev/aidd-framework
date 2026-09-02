@@ -266,3 +266,32 @@ describe("a report that needs no read first", () => {
     expect(sumRequests(envelope.by_task)).toBe(4);
   });
 });
+
+/**
+ * Git exports `GIT_DIR` and its siblings into every process it spawns, so a suite run from
+ * inside a hook — `pre-push` running the tests, which is how this was found — inherits a
+ * pointer to the real repository. The builder's own `git init` then lands in a temp
+ * directory while `git remote add origin` operates on this repository, which already has
+ * one, and the whole week fails to build with `exited 3`.
+ *
+ * It passed by hand and failed from the hook, which is precisely the shape of that leak.
+ * Asserted here rather than left to whichever runner happens to be inside git, because a
+ * harness that only works outside one is a harness nobody can trust from CI either.
+ */
+describe("the week builds inside a git hook's own environment", () => {
+  it("ignores a leaked GIT_DIR rather than resolving the real repository", () => {
+    const root = mkdtempSync(join(tmpdir(), "aidd-reference-week-gitdir-"));
+    const saved = process.env.GIT_DIR;
+    process.env.GIT_DIR = join(process.cwd(), "..", ".git");
+    try {
+      const built = week.buildReferenceWeek({ root, cliPath: CLI_PATH });
+      const envelope = JSON.parse(week.reportReferenceWeek(built, ["--json"])) as Envelope;
+
+      expect(envelope.totals.requests).toBe(built.expected.requests);
+    } finally {
+      if (saved === undefined) delete process.env.GIT_DIR;
+      else process.env.GIT_DIR = saved;
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 120_000);
+});
