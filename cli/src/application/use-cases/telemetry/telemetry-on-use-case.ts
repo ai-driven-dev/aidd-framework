@@ -105,7 +105,7 @@ export class TelemetryOnUseCase {
     );
     if (!installed) return;
     this.logger.info(
-      `Commits made by an AI session will carry a ${SESSION_TRAILER_TOKEN} trailer, so what ` +
+      `Commits made by an AI session will carry an ${SESSION_TRAILER_TOKEN} trailer, so what ` +
         "a session cost can be read per commit. A commit no session made carries nothing. " +
         "`aidd telemetry off` removes it."
     );
