@@ -77,44 +77,38 @@ function findGitDirWithoutAidd(): string | undefined {
 }
 
 /**
- * Where Git for Windows keeps the shell it ships, derived from wherever `git.exe` was found.
+ * The directories already on `PATH` that hold a shell, minus any that also hold `aidd`.
  *
- * This is not a convenience. Git runs a hook by reading its shebang and looking the
- * interpreter up **by name on `PATH`** — `#!/bin/sh` sends it looking for `sh.exe`. On POSIX
- * the list below already carries `/bin`, so it is found and nobody notices the dependency.
- * On Windows `sh.exe` lives in `<git>\bin` and `<git>\usr\bin`, never in the `cmd`
- * directory `git.exe` itself is usually found in — so a `PATH` built without these makes
- * every hook fail with `cannot spawn …: No such file or directory`, which reads exactly like
- * a missing hook file and is nothing of the sort.
+ * Git runs a hook by reading its shebang and looking the interpreter up **by name on
+ * `PATH`** — `#!/bin/sh` sends it looking for `sh.exe`. `pathWithoutAidd` hands every
+ * sandboxed run a deliberately narrow `PATH`, and on POSIX that list already carries `/bin`,
+ * so the dependency stayed invisible. On Windows there was no shell on it at all, and every
+ * hook failed with `cannot spawn …: No such file or directory` — a message that reads like a
+ * missing hook file and is nothing of the sort.
  *
- * Measured: six `telemetry-commit-trailer` e2e tests failed that way on the Windows runner
- * while passing everywhere else, and the only one that passed was the one that installs no
- * hook at all.
- *
- * Probed rather than assumed — a directory is added only when it really holds a shell, so a
- * Git install laid out differently contributes nothing instead of a path that does not exist.
+ * Selected by what a directory actually contains, never derived from where `git.exe` lives.
+ * An earlier attempt walked one level up from the git directory and looked for `bin` and
+ * `usr\bin`, which was measured wrong on the runner this exists for: git resolves there to
+ * `C:\Program Files\Git\mingw64\bin`, whose parent holds neither, while the shells sit in
+ * `C:\Program Files\Git\usr\bin` and `C:\Program Files\Git\bin` — two levels away and
+ * on a different branch. Filtering what is already on `PATH` needs no theory of the layout
+ * and cannot be wrong about one.
  */
-export function gitShellDirs(
-  gitDir: string | undefined,
-  holdsShell: (dir: string) => boolean = (dir) => existsSync(join(dir, "sh.exe"))
+export function shellDirsWithoutAidd(
+  pathDirs: readonly string[],
+  holds: (dir: string, name: string) => boolean = hasExecutable
 ): readonly string[] {
-  if (gitDir === undefined) return [];
-  const root = dirname(gitDir);
-  return [join(root, "bin"), join(root, "usr", "bin")].filter(holdsShell);
+  return [...new Set(pathDirs.filter((dir) => holds(dir, "sh") && !holds(dir, "aidd")))];
 }
 
-/** A `PATH` holding only node's own directory, wherever `git` actually lives, and the
- * platform's own essential system directories — never a directory holding `aidd` or this
- * repository's own `node_modules` binaries. `/usr/bin` and `/bin` are POSIX paths; Windows
- * has neither, so a `PATH` built from them alone leaves a spawned process unable to find
- * `git.exe` (hooks/lib/repo.cjs shells out to it) or anything the OS loader itself needs —
- * nor, on that platform, the shell every git hook is spawned through (`gitShellDirs`). */
 export interface PathWithoutAiddInputs {
   readonly platform: NodeJS.Platform;
   readonly nodeDir: string;
   readonly gitDir: string | undefined;
   readonly systemRoot: string;
-  readonly holdsShell: (dir: string) => boolean;
+  /** Every directory the ambient `PATH` names — where the shell is picked from on Windows. */
+  readonly pathDirs: readonly string[];
+  readonly holds: (dir: string, name: string) => boolean;
 }
 
 /** The list itself, from stated inputs. Pure so the Windows shape is asserted from whatever
@@ -126,12 +120,13 @@ export function pathDirsWithoutAidd({
   nodeDir,
   gitDir,
   systemRoot,
-  holdsShell,
+  pathDirs,
+  holds,
 }: PathWithoutAiddInputs): readonly string[] {
   const dirs = [nodeDir];
   if (gitDir) dirs.push(gitDir);
   if (platform === "win32") {
-    dirs.push(...gitShellDirs(gitDir, holdsShell), join(systemRoot, "System32"), systemRoot);
+    dirs.push(...shellDirsWithoutAidd(pathDirs, holds), join(systemRoot, "System32"), systemRoot);
   } else {
     dirs.push("/usr/bin", "/bin");
   }
@@ -144,7 +139,8 @@ export function pathWithoutAidd(): string {
     nodeDir: dirname(process.execPath),
     gitDir: findGitDirWithoutAidd(),
     systemRoot: process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows",
-    holdsShell: (dir) => existsSync(join(dir, "sh.exe")),
+    pathDirs: (process.env.PATH ?? "").split(delimiter).filter(Boolean),
+    holds: hasExecutable,
   }).join(delimiter);
 }
 
