@@ -21,6 +21,14 @@ describe("BundledAssetProviderAdapter.loadConfigAsset", () => {
     });
   });
 
+  describe("kilo", () => {
+    it("returns parsed kilo.json with Kilo's schema and instructions", () => {
+      const asset = provider.loadConfigAsset("kilo", "kilo.json") as Record<string, unknown>;
+      expect(asset).toHaveProperty("$schema", "https://app.kilo.ai/config.json");
+      expect(asset).toHaveProperty("instructions");
+    });
+  });
+
   describe("codex", () => {
     it("returns config.toml as raw string", () => {
       const asset = provider.loadConfigAsset("codex", "config.toml");

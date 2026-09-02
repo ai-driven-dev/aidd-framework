@@ -116,6 +116,24 @@ describe("InstallRuntimeConfigUseCase", () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(".claude/settings.json"));
   });
 
+  it("does not create kilo.json next to an existing kilo.jsonc", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initProject(deps, PROJECT_ROOT);
+    await deps.fs.writeFile(join(PROJECT_ROOT, "kilo.jsonc"), '{ "model": "kilo/default" }');
+
+    const manifest = (await deps.manifestRepo.load()) ?? Manifest.create();
+    await buildUseCase(deps).execute({
+      toolId: "kilo",
+      projectRoot: PROJECT_ROOT,
+      manifest,
+      force: false,
+      version: "1.0.0",
+    });
+
+    expect(deps.fs.has(join(PROJECT_ROOT, "kilo.json"))).toBe(false);
+    expect(deps.fs.getFile(join(PROJECT_ROOT, "kilo.jsonc"))).toContain("kilo/default");
+  });
+
   describe("copilot requiresTool gate", () => {
     it("does not create .vscode/settings.json when vscode is not installed", async () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);

@@ -4,14 +4,14 @@ Most "how do I…" answers live in the README; this page covers what isn't docum
 
 ## 🤔 Why AIDD instead of your own skills?
 
-You can write your own Claude Code skills — nothing stops you. AIDD exists because that setup is work every team repeats and re-debugs alone: the router/action split ([Skill](GLOSSARY.md#-skill) glossary entry), the plan → implement → review gating, the plugin packaging and versioning, the multi-tool support (Cursor, Copilot, Codex, OpenCode). AIDD ships that scaffolding pre-built and maintained, so you start from a working SDLC loop and only author the skill content specific to your project. If your workflow doesn't match the framework's shape, [`CREATE_PLUGIN.md`](CREATE_PLUGIN.md) shows how to build on the same scaffolding instead of replacing it.
+You can write your own Claude Code skills — nothing stops you. AIDD exists because that setup is work every team repeats and re-debugs alone: the router/action split ([Skill](GLOSSARY.md#-skill) glossary entry), the plan → implement → review gating, the plugin packaging and versioning, the multi-tool support (Cursor, Copilot, Codex, OpenCode, Kilo Code). AIDD ships that scaffolding pre-built and maintained, so you start from a working SDLC loop and only author the skill content specific to your project. If your workflow doesn't match the framework's shape, [`CREATE_PLUGIN.md`](CREATE_PLUGIN.md) shows how to build on the same scaffolding instead of replacing it.
 
 ## 📦 Install, update, other tools
 
 - **Install / first run** → [Quick start](../README.md#-quick-start).
 - **Update plugins** → `/plugin marketplace update aidd-framework`, or see [Versioning & updates](MARKETPLACE.md#-versioning--updates).
 - **Private repo?** Yes — `/plugin marketplace add` just needs GitHub read access (via `gh auth login` or a PAT).
-- **Cursor / Copilot / Codex / OpenCode?** Each other tool installs via its own native mechanism (project files, local plugins, or a plugin command) from the [release](https://github.com/ai-driven-dev/framework/releases/latest) archives. Steps per tool → [Other tools](../README.md#other-tools).
+- **Cursor / Copilot / Codex / OpenCode / Kilo Code?** Each other tool installs via its own native mechanism (project files, local plugins, or a plugin command) from the [release](https://github.com/ai-driven-dev/framework/releases/latest) archives. Steps per tool → [Other tools](../README.md#other-tools).
 
 ## 💸 Cost and quotas
 

@@ -818,3 +818,78 @@ export function buildOpencodeFlatContract(): ToolBuildContract {
     },
   };
 }
+
+// ── Kilo flat contract ────────────────────────────────────────────────────────
+
+function kiloFlatAgentPath(plugin: string, rel: string): string {
+  return genericFlatAgentPath(".kilo/agents/", plugin, rel.replace(/^agents\//, ""), ".md");
+}
+
+function kiloFlatSkillPath(plugin: string, rel: string): string {
+  return genericFlatSkillPath(".kilo/skills/", plugin, rel.replace(/^skills\//, ""));
+}
+
+function kiloFlatResolveTarget(plugin: string, rel: string): string {
+  if (rel.startsWith("agents/")) return kiloFlatAgentPath(plugin, rel);
+  if (rel.startsWith("skills/")) return kiloFlatSkillPath(plugin, rel);
+  return rel;
+}
+
+function transformKiloFlatAgent(content: string, plugin: string, outName: string): string {
+  const { frontmatter, body } = parseFrontmatter(content);
+  const flatRelPath = kiloFlatAgentPath(plugin, `agents/${outName}`);
+  const rewrittenBody = rewriteRelativeLinks(body, {
+    currentFilePluginRelative: flatRelPath,
+    resolveTargetPath: (rel) => kiloFlatResolveTarget(plugin, rel),
+  });
+  const prefixedName = `${plugin}-${outName.replace(/\.md$/, "")}`;
+  return serializeFrontmatter(
+    { ...frontmatter, name: prefixedName, mode: "subagent" },
+    rewrittenBody
+  );
+}
+
+async function resolveKiloJsonPath(outDir: string, fs: FsType): Promise<string> {
+  const jsoncExists = await fs.fileExists(`${outDir}/kilo.jsonc`);
+  if (jsoncExists) return `${outDir}/kilo.jsonc`;
+  return `${outDir}/kilo.json`;
+}
+
+export function buildKiloFlatContract(): ToolBuildContract {
+  return {
+    manifestDir: null,
+    marketplaceRelative: null,
+    manifestFileRelative: null,
+    synthesizeManifest: null,
+    manifestSchemaName: null,
+    artifacts: {
+      skills: {
+        supported: true,
+        source: { kind: "fullTree", srcDir: "skills" },
+        path: kiloFlatSkillPath,
+        rewriteSkillName: true,
+      },
+      agents: {
+        supported: true,
+        source: { kind: "filteredTree", srcDir: "agents", inputExt: ".md" },
+        path: kiloFlatAgentPath,
+        transform: transformKiloFlatAgent,
+      },
+      mcp: { supported: false },
+      hooks: { supported: false },
+      rules: { supported: false },
+      commands: { supported: false },
+    },
+    buildMarketplaceCatalog: null,
+    buildMarketplaceEntry: null,
+    emitConfigArtifact: async (builtPlugins, outDir, sourceDir, fs, _validator, assetProvider) => {
+      const configPath = await resolveKiloJsonPath(outDir, fs);
+      const existing = (await fs.fileExists(configPath)) ? await fs.readFile(configPath) : null;
+      const incoming = await collectOpencodeMcp(builtPlugins, sourceDir, fs);
+      const baseAsset = assetProvider.loadConfigAsset("kilo", "kilo.json");
+      const base = typeof baseAsset === "string" ? baseAsset : JSON.stringify(baseAsset);
+      await fs.writeFile(configPath, buildOpencodeFlatConfig(base, existing, incoming));
+      return 1;
+    },
+  };
+}

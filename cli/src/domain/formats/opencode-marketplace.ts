@@ -20,59 +20,83 @@
  */
 
 import { ForeignSchemaValidationError } from "../errors.js";
-import type { NormalizedCatalog, NormalizedPlugin } from "../models/normalized-plugin.js";
+import type {
+  ForeignMarketplaceSource,
+  NormalizedCatalog,
+  NormalizedPlugin,
+} from "../models/normalized-plugin.js";
 
 const SOURCE = "opencode";
 
 export function parseOpencodeMarketplace(rawJson: string): NormalizedCatalog {
-  const parsed = parseJson(rawJson);
-  const plugins = extractPlugins(parsed);
-  return { source: SOURCE, plugins };
+  return parseCompatibleMarketplace(rawJson, SOURCE, "opencode.json");
 }
 
-function parseJson(rawJson: string): unknown {
+export function parseKiloMarketplace(rawJson: string): NormalizedCatalog {
+  return parseCompatibleMarketplace(rawJson, "kilo", "kilo.json");
+}
+
+function parseCompatibleMarketplace(
+  rawJson: string,
+  source: ForeignMarketplaceSource,
+  fileName: string
+): NormalizedCatalog {
+  const parsed = parseJson(rawJson, source, fileName);
+  const plugins = extractPlugins(parsed, source, fileName);
+  return { source, plugins };
+}
+
+function parseJson(rawJson: string, source: ForeignMarketplaceSource, fileName: string): unknown {
   try {
     return JSON.parse(rawJson);
   } catch {
-    throw new ForeignSchemaValidationError(SOURCE, "opencode.json is not valid JSON");
+    throw new ForeignSchemaValidationError(source, `${fileName} is not valid JSON`);
   }
 }
 
-function extractPlugins(parsed: unknown): readonly NormalizedPlugin[] {
+function extractPlugins(
+  parsed: unknown,
+  source: ForeignMarketplaceSource,
+  fileName: string
+): readonly NormalizedPlugin[] {
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new ForeignSchemaValidationError(SOURCE, "opencode.json must be a JSON object");
+    throw new ForeignSchemaValidationError(source, `${fileName} must be a JSON object`);
   }
   const obj = parsed as Record<string, unknown>;
   if (!("plugin" in obj) || obj.plugin === undefined) {
     return [];
   }
   if (!Array.isArray(obj.plugin)) {
-    throw new ForeignSchemaValidationError(SOURCE, '"plugin" must be an array');
+    throw new ForeignSchemaValidationError(source, '"plugin" must be an array');
   }
-  return obj.plugin.map((entry, i) => parseEntry(entry, i));
+  return obj.plugin.map((entry, i) => parseEntry(entry, i, source));
 }
 
-function parseEntry(raw: unknown, index: number): NormalizedPlugin {
-  const spec = extractSpec(raw, index);
+function parseEntry(
+  raw: unknown,
+  index: number,
+  source: ForeignMarketplaceSource
+): NormalizedPlugin {
+  const spec = extractSpec(raw, index, source);
   if (typeof spec !== "string" || spec.length === 0) {
     throw new ForeignSchemaValidationError(
-      SOURCE,
+      source,
       `plugin[${index}] specifier must be a non-empty string`
     );
   }
-  return { name: spec, source: SOURCE };
+  return { name: spec, source };
 }
 
-function extractSpec(raw: unknown, index: number): unknown {
+function extractSpec(raw: unknown, index: number, source: ForeignMarketplaceSource): unknown {
   if (typeof raw === "string") return raw;
   if (Array.isArray(raw)) {
     if (raw.length === 0) {
-      throw new ForeignSchemaValidationError(SOURCE, `plugin[${index}] tuple must not be empty`);
+      throw new ForeignSchemaValidationError(source, `plugin[${index}] tuple must not be empty`);
     }
     return raw[0];
   }
   throw new ForeignSchemaValidationError(
-    SOURCE,
+    source,
     `plugin[${index}] must be a string or [string, options] tuple`
   );
 }

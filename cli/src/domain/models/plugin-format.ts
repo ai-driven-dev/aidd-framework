@@ -1,4 +1,4 @@
-export type PluginFormat = "claude" | "cursor" | "codex" | "copilot" | "opencode";
+export type PluginFormat = "claude" | "cursor" | "codex" | "copilot" | "opencode" | "kilo";
 
 export const PLUGIN_MANIFEST_PROBES: readonly { format: PluginFormat; relativePath: string }[] = [
   { format: "claude", relativePath: ".claude-plugin/plugin.json" },
@@ -15,4 +15,5 @@ export const MARKETPLACE_PROBES: readonly { format: PluginFormat; relativePath: 
   { format: "codex", relativePath: ".agents/plugins/marketplace.json" },
   { format: "copilot", relativePath: ".github/plugin/plugin.json" },
   { format: "opencode", relativePath: "opencode.json" },
+  { format: "kilo", relativePath: "kilo.json" },
 ];

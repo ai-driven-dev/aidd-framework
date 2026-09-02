@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { SettingsCapability } from "../../../domain/capabilities/settings-capability.js";
+import { KiloDualConfigError } from "../../../domain/errors.js";
 import { InstallationFile } from "../../../domain/models/file.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import { extractMergeEntries, type MergeFileEntry } from "../../../domain/models/merge.js";
@@ -77,7 +78,13 @@ export class InstallRuntimeConfigUseCase {
     const toolConfig = getToolConfig(options.toolId);
     if (!isAiTool(toolConfig) || !toolConfig.configOutputPaths) return [];
     const files: InstallationFile[] = [];
-    for (const [fileName, outputPath] of Object.entries(toolConfig.configOutputPaths)) {
+    for (const [fileName, configuredOutputPath] of Object.entries(toolConfig.configOutputPaths)) {
+      const outputPath = await this.resolveConfigOutputPath(
+        options.toolId,
+        fileName,
+        configuredOutputPath,
+        options.projectRoot
+      );
       const asset = this.assets.loadConfigAsset(options.toolId, fileName);
       const content = typeof asset === "string" ? asset : JSON.stringify(asset, null, 2);
       if (await this.isUserOwned(outputPath, options)) continue;
@@ -86,6 +93,21 @@ export class InstallRuntimeConfigUseCase {
       );
     }
     return files;
+  }
+
+  private async resolveConfigOutputPath(
+    toolId: AiToolId,
+    fileName: string,
+    configuredOutputPath: string,
+    projectRoot: string
+  ): Promise<string> {
+    if (toolId !== "kilo" || fileName !== "kilo.json") return configuredOutputPath;
+    const jsonPath = join(projectRoot, "kilo.json");
+    const jsoncPath = join(projectRoot, "kilo.jsonc");
+    const jsonExists = await this.fs.fileExists(jsonPath);
+    const jsoncExists = await this.fs.fileExists(jsoncPath);
+    if (jsonExists && jsoncExists) throw new KiloDualConfigError();
+    return jsoncExists ? "kilo.jsonc" : configuredOutputPath;
   }
 
   private buildStaticSettingsFiles(options: InstallRuntimeConfigOptions): InstallationFile[] {

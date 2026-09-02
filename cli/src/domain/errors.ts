@@ -137,6 +137,13 @@ export class OpencodeDualConfigError extends Error {
   }
 }
 
+export class KiloDualConfigError extends Error {
+  constructor() {
+    super("Both kilo.json and kilo.jsonc exist. Remove one.");
+    this.name = "KiloDualConfigError";
+  }
+}
+
 export class PackageManagerDetectionError extends Error {
   constructor(commands: readonly string[]) {
     super(`Could not detect package manager. Run manually:\n  ${commands.join("\n  ")}`);
