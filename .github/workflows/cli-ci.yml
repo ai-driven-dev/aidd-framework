@@ -26,6 +26,11 @@ on:
       # `**.md`, not `**/*.md`: GitHub's `**` matches any character including a
       # slash, so the second form needs a slash after it and would miss the
       # top-level README.md that this exists for.
+      #
+      # Bounded on purpose: on `pull_request` GitHub matches the whole diff, not
+      # the last push, so a branch that also touches cli/ runs everything however
+      # small its newest commit is. This saves the run on a push to next or main,
+      # and on a pull request whose diff is prose and nothing else.
       - "!plugins/aidd-telemetry/**.md"
   pull_request:
     paths:
@@ -44,6 +49,11 @@ on:
       # `**.md`, not `**/*.md`: GitHub's `**` matches any character including a
       # slash, so the second form needs a slash after it and would miss the
       # top-level README.md that this exists for.
+      #
+      # Bounded on purpose: on `pull_request` GitHub matches the whole diff, not
+      # the last push, so a branch that also touches cli/ runs everything however
+      # small its newest commit is. This saves the run on a push to next or main,
+      # and on a pull request whose diff is prose and nothing else.
       - "!plugins/aidd-telemetry/**.md"
 
 concurrency:
