@@ -36,8 +36,11 @@
  * sharing a destination has to demonstrate the safe way of doing it, or it teaches the
  * thing the README now warns against.
  *
- * No amount appears anywhere: `supplies.amount` is `false` on all five tools, so a produced
- * week has counters and no currency until the price table lands (#654).
+ * No amount appears anywhere, and that is settled rather than pending: `supplies.amount` is
+ * `false` on all five tools, and the framework holds no price table by decision — see
+ * `aidd_docs/memory/internal/decisions/a-price-table-is-the-destination-s.md`. A produced
+ * week therefore has counters and no currency, and will until a tool starts stating an
+ * amount of its own or a destination does the multiplying.
  */
 
 const { spawnSync } = require("node:child_process");

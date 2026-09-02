@@ -65,8 +65,9 @@ function main() {
     out("the hook stamps with is supplied too. What is being proved is the reading — every");
     out("figure below is produced by the shipped CLI opening those files for itself.");
     out();
-    out("No tool in the registry states an amount, so the week has counters and no currency");
-    out("— see #654.");
+    out("No tool in the registry states an amount, and the framework holds no price table");
+    out("by decision, so the week has counters and no currency. That is settled, not pending:");
+    out("see aidd_docs/memory/internal/decisions/a-price-table-is-the-destination-s.md");
     out();
     out(`period      ${week.period.from} to ${week.period.to}`);
     out(`expected    ${EXPECTED.requests} requests, every axis reconciling to it`);

@@ -27,11 +27,26 @@
  * `CODEX_THREAD_ID` tracks the rollout, and the rollout's uuid is exactly the `vendor_id`
  * both the hook and the reader join on. So the trailer's value equals the records' own.
  *
- * What that leaves is narrow and named: 89 of the 418 rollouts on the machine this was
- * measured on carry `thread_source: "subagent"`, where `session_meta.id` is the subagent's
- * own and `session_meta.session_id` is the parent's. No capture yet says which of the two a
- * subagent's `CODEX_THREAD_ID` carries, so a commit authored from inside a Codex subagent is
- * the one case still to check. Every ordinary session, fresh or resumed, joins exactly.
+ * What that leaves is narrow, named, and bounded. 89 of the 418 rollouts on the machine this
+ * was measured on carry `thread_source: "subagent"`, where `session_meta.id` is the
+ * subagent's own and `session_meta.session_id` is the parent's. No capture yet says which of
+ * the two a subagent's `CODEX_THREAD_ID` carries, so a commit authored from inside a Codex
+ * subagent is the one case not measured.
+ *
+ * The bound is what makes it liveable rather than open-ended: those two identifiers are the
+ * subagent and the thread that delegated to it, so the trailer names one or the other and
+ * both are the same piece of work. The failure mode is a commit attributed to the parent
+ * thread instead of the delegated turn inside it — coarser than intended, never somebody
+ * else's session and never a different tree. And where the named rollout has no records
+ * read, the result is the ordinary "a join that finds no records on the other side", which
+ * this contract already calls a normal outcome.
+ *
+ * Settling it takes one Codex session that delegates, with `CODEX_THREAD_ID` read from
+ * inside the subagent and compared against the rollout that subagent wrote. Nothing forces a
+ * delegation from the command line, so it waits for one that happens anyway rather than for
+ * a run bought to provoke it.
+ *
+ * Every ordinary session, fresh or resumed, joins exactly.
  */
 
 /** Git's own trailer token. Capitalised the way `Co-authored-by` and `Signed-off-by` are,

@@ -349,10 +349,19 @@ rollout, and the rollout's uuid is exactly the `vendor_id` records carry: the
 trailer's value equals theirs. An earlier version of this section warned that a
 thread spans several rollouts; the resume disproved it.
 
-One case is still open, and it is narrow: 89 of 418 rollouts on that machine are
-`thread_source: "subagent"`, where the rollout's own id and its parent session's
-differ. Which of the two a subagent's `CODEX_THREAD_ID` carries has not been
-captured, so a commit authored from inside a Codex subagent is worth verifying.
+One case is still open, and it is both narrow and bounded: 89 of 418 rollouts on
+that machine are `thread_source: "subagent"`, where the rollout's own id and its
+parent session's differ. Which of the two a subagent's `CODEX_THREAD_ID` carries
+has not been captured.
+
+What that can cost is worth stating, because it is less than it sounds: those two
+identifiers are the subagent and the thread that delegated to it, so the trailer
+names one or the other and both are the same piece of work. The worst reading is a
+commit attributed to the parent thread rather than the delegated turn inside it —
+coarser than intended, never another person's session and never a different tree.
+Where the named rollout has no records read, the outcome is the ordinary
+"a join that finds no records on the other side" named above.
+
 Every ordinary session, fresh or resumed, joins exactly.
 
 **Cursor, Copilot, OpenCode — no trailer.** Nothing was measured that names their
