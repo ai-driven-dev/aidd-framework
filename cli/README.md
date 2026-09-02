@@ -2,7 +2,7 @@
 
 The **AIDD CLI** (`@ai-driven-dev/cli`) installs AI tool runtime configs, IDE integrations, and plugins from the [AIDD marketplace](https://github.com/ai-driven-dev/framework) across AI coding assistants. Runtime configs are bundled in the CLI binary; memory and context files are provided by the `aidd-context` plugin, not the binary. Plugins are fetched from the marketplace on demand. Every installed file is hash-tracked in a manifest for drift detection.
 
-**Supported tools:** Claude Code · Cursor · GitHub Copilot · OpenCode · Codex · VS Code (IDE integration)
+**Supported tools:** Claude Code · Cursor · GitHub Copilot · OpenCode · Kilo Code · Codex · VS Code (IDE integration)
 
 ---
 
@@ -405,6 +405,7 @@ Marketplace registration and plugin enable state are written to per-tool setting
 | GitHub Copilot | `.github/copilot/settings.json` |
 | Codex | `.codex/config.json` |
 | OpenCode | `opencode.json` (project root) |
+| Kilo Code | `kilo.json` (project root) |
 
 > **GitHub Copilot — workspace recommendations only.** Per [VS Code docs](https://code.visualstudio.com/docs/copilot/customization/agent-plugins), `.github/copilot/settings.json` registers marketplaces as **team recommendations**, not auto-activated. On first chat in the workspace VS Code shows a notification — the user must accept it (or filter Extensions by `@agentPlugins @recommended` and enable manually) before plugins load. To skip the per-project click, add the marketplace to the user-level setting `chat.plugins.marketplaces` (application-scoped, not writable from workspace). See [End-to-end: distribute a framework to Copilot](#end-to-end-distribute-a-framework-to-copilot-marketplace) for the full flow.
 
@@ -423,7 +424,7 @@ aidd framework build \
 | Flag | Required | Description |
 |---|---|---|
 | `--source` | yes | Path to a framework root with `plugins/<name>/.claude-plugin/plugin.json` entries |
-| `--target` | yes | `claude`, `cursor`, `copilot`, `codex`, or `opencode` |
+| `--target` | yes | `claude`, `cursor`, `copilot`, `codex`, `opencode`, or `kilo` |
 | `--out` | yes | Output directory. Marketplace mode: dist root (auto-wiped + recreated). Flat mode: the project root to materialize into |
 | `--flat` | no | Materialize directly into a project workspace, bypassing the marketplace layer |
 | `--force` | no | Overwrite existing files at canonical paths. **Flat mode only** (rejected without `--flat`) |
@@ -435,7 +436,7 @@ aidd framework build \
 
 #### Per-tool / per-mode matrix
 
-`opencode` is **flat-only** (no native marketplace). The other four support both modes.
+`opencode` and `kilo` are **flat-only** (no native marketplace). The other four support both modes.
 
 | Target | Marketplace layout (`<out>/`) | Plugin-root token | Flat layout (`<project>/`) |
 |---|---|---|---|
@@ -444,6 +445,7 @@ aidd framework build \
 | `copilot` | `.plugin/marketplace.json` · `plugins/<n>/.plugin/plugin.json` (OpenPlugin spec) · `agents/*.md` | `${PLUGIN_ROOT}` | `.github/` (+ `.vscode/`) |
 | `codex` | `.claude-plugin/marketplace.json` · `plugins/<n>/.codex-plugin/plugin.json` · `codex-agents/*.toml` | `${PLUGIN_ROOT}` | `.codex/` |
 | `opencode` | — (flat-only) | — | `.opencode/` (+ `opencode.json` for MCP) |
+| `kilo` | — (flat-only) | — | `.kilo/` (+ `kilo.json` for MCP) |
 
 Copilot uses the [OpenPlugin spec](https://github.com/vercel/open-plugin-spec) (`.plugin/plugin.json`, `${PLUGIN_ROOT}`) — the only layout where Copilot's editor + CLI resolve the plugin-root token at runtime. Codex requires the manifest `skills` field as a **string** (`"./skills"`), and project subagents (`.codex/agents/*.toml`) load only when the project is **trusted**.
 
@@ -476,7 +478,7 @@ To skip the per-project notification, add the dist path to the user-level `chat.
 
 The CLI cannot write this setting programmatically (VS Code enforces application scope on it).
 
-#### Flat materialization (e.g. opencode)
+#### Flat materialization (e.g. OpenCode or Kilo Code)
 
 ```bash
 # Materialize the framework straight into a project workspace
@@ -487,6 +489,8 @@ aidd framework build --source ./framework --target opencode --out ./my-project -
 
 Flat mode writes directly under the project's tool directory — no `aidd marketplace add` / `aidd plugin install` step. opencode hooks are skipped (its runtime is JS modules, not declarative `hooks.json`).
 
+For Kilo Code, replace `opencode` with `kilo`; the build writes `.kilo/` and `kilo.json`.
+
 #### Build every target for a release
 
 ```bash
@@ -494,6 +498,7 @@ for t in claude cursor copilot codex; do
   aidd framework build --source ./framework --target "$t" --out "./dist/aidd-framework-$t"
 done
 aidd framework build --source ./framework --target opencode --out ./dist/aidd-framework-opencode-flat --flat
+aidd framework build --source ./framework --target kilo --out ./dist/aidd-framework-kilo-flat --flat
 ```
 
 ### Manifest schema upgrades

@@ -1,6 +1,6 @@
 import { UnknownAiToolIdError } from "../errors.js";
 
-export type AiToolId = "claude" | "cursor" | "copilot" | "opencode" | "codex";
+export type AiToolId = "claude" | "cursor" | "copilot" | "opencode" | "kilo" | "codex";
 export type IdeToolId = "vscode";
 export type ToolId = AiToolId | IdeToolId;
 export type ToolCategory = "ai" | "ide";
@@ -10,6 +10,7 @@ export const AI_TOOL_IDS: readonly AiToolId[] = [
   "cursor",
   "copilot",
   "opencode",
+  "kilo",
   "codex",
 ];
 export const IDE_TOOL_IDS: readonly IdeToolId[] = ["vscode"];

@@ -5,11 +5,7 @@ import { McpCapability } from "../../capabilities/mcp-capability.js";
 import { PluginsCapability } from "../../capabilities/plugins-capability.js";
 import { RulesCapability } from "../../capabilities/rules-capability.js";
 import { SkillsCapability } from "../../capabilities/skills-capability.js";
-import {
-  InvalidMcpServerConfigError,
-  McpConfigError,
-  OpencodeDualConfigError,
-} from "../../errors.js";
+import { KiloDualConfigError } from "../../errors.js";
 import {
   buildAiddCommandFilePath,
   convertCommandFrontmatterNoHint,
@@ -18,7 +14,7 @@ import {
   stripToolSuffix,
 } from "../../formats/command.js";
 import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
-import { CONFIG_MCP, CONFIG_OPENCODE } from "../../models/framework.js";
+import { CONFIG_MCP } from "../../models/framework.js";
 import type {
   AiTool,
   HasAgents,
@@ -30,78 +26,18 @@ import type {
   UserFileSectionKey,
 } from "../contracts.js";
 import { registerTool } from "../registry.js";
+import { transformMcpToOpencode } from "./opencode.js";
 
-const DIRECTORY = ".opencode/";
-const TOOL_SUFFIX = ".opencode.md";
+const DIRECTORY = ".kilo/";
+const TOOL_SUFFIX = ".kilo.md";
 
-type RawServer =
-  | { command: string; args?: string[]; env?: Record<string, string>; disabled?: boolean }
-  | {
-      url: string;
-      headers?: Record<string, string>;
-      disabled?: boolean;
-    };
-
-interface OpencodeMcpLocalServer {
-  type: "local";
-  command: string[];
-  enabled: boolean;
-  environment?: Record<string, string>;
-}
-
-interface OpencodeMcpRemoteServer {
-  type: "remote";
-  url: string;
-  enabled: boolean;
-  headers?: Record<string, string>;
-}
-
-type OpencodeMcpServer = OpencodeMcpLocalServer | OpencodeMcpRemoteServer;
-
-function convertRawServer(name: string, server: RawServer): OpencodeMcpServer {
-  const enabled = server.disabled !== true;
-  if ("command" in server) {
-    const { command, args = [], env } = server;
-    const local: OpencodeMcpLocalServer = { type: "local", command: [command, ...args], enabled };
-    if (env && Object.keys(env).length > 0) local.environment = env;
-    return local;
-  }
-  if ("url" in server) {
-    const remote: OpencodeMcpRemoteServer = { type: "remote", url: server.url, enabled };
-    if (server.headers && Object.keys(server.headers).length > 0) remote.headers = server.headers;
-    return remote;
-  }
-  throw new InvalidMcpServerConfigError(name);
-}
-
-export function transformMcpToOpencode(content: string): string {
-  let parsed: { mcpServers?: Record<string, RawServer> };
-  try {
-    parsed = JSON.parse(content) as typeof parsed;
-  } catch (err) {
-    throw new McpConfigError(
-      `Cannot parse MCP config: ${err instanceof Error ? err.message : String(err)}`
-    );
-  }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new McpConfigError("MCP config must be a JSON object");
-  }
-  const mcp: Record<string, OpencodeMcpServer> = {};
-  for (const [name, server] of Object.entries(parsed.mcpServers ?? {})) {
-    mcp[name] = convertRawServer(name, server);
-  }
-  return JSON.stringify({ mcp }, null, 2);
-}
-
-export const opencode: AiTool<
-  HasAgents & HasSkills & HasCommands & HasRules & HasMcp & HasPlugins
-> = {
+export const kilo: AiTool<HasAgents & HasSkills & HasCommands & HasRules & HasMcp & HasPlugins> = {
   kind: "ai",
-  toolId: "opencode",
+  toolId: "kilo",
   directory: DIRECTORY,
   toolSuffix: TOOL_SUFFIX,
-  signalDir: ".opencode/commands",
-  configOutputPaths: { "opencode.json": "opencode.json" },
+  signalDir: ".kilo/commands",
+  configOutputPaths: { "kilo.json": "kilo.json" },
 
   capabilities: {
     agents: new AgentsCapability({
@@ -140,23 +76,20 @@ export const opencode: AiTool<
       reverseConvertFrontmatter: () => ({}),
     }),
     mcp: new McpCapability({
-      outputPath: "opencode.json",
+      outputPath: "kilo.json",
       format: "json",
       entrySection: "mcp",
       mergeStrategy: "framework-prime",
       transformContent: transformMcpToOpencode,
-      consumes: [CONFIG_MCP, CONFIG_OPENCODE],
+      consumes: [CONFIG_MCP],
       resolveOutputPath: async (projectRoot, fs) => {
-        const jsonExists = await fs.fileExists(join(projectRoot, "opencode.json"));
-        const jsoncExists = await fs.fileExists(join(projectRoot, "opencode.jsonc"));
-        if (jsonExists && jsoncExists) throw new OpencodeDualConfigError();
-        if (jsoncExists) return "opencode.jsonc";
-        return "opencode.json";
+        const jsonExists = await fs.fileExists(join(projectRoot, "kilo.json"));
+        const jsoncExists = await fs.fileExists(join(projectRoot, "kilo.jsonc"));
+        if (jsonExists && jsoncExists) throw new KiloDualConfigError();
+        if (jsoncExists) return "kilo.jsonc";
+        return "kilo.json";
       },
     }),
-    // marketplaceSettings is not available in flat mode (FlatPluginsParams has no such field).
-    // Additionally, opencode's plugin[] array accepts only npm package name strings —
-    // there is no source/version concept that a marketplace entry could express.
     plugins: new PluginsCapability({
       mode: "flat",
       flatNamespacePrefix: "aidd-",
@@ -165,8 +98,8 @@ export const opencode: AiTool<
 
   rewriteContent(content: string, docsDir: string): string {
     return baseRewriteContent(content, DIRECTORY, docsDir).replace(
-      /(@?)\.opencode\/commands\/(\d+)[_-][^/]+\/([^\s]+)/g,
-      "$1.opencode/commands/aidd/$2/$3"
+      /(@?)\.kilo\/commands\/(\d+)[_-][^/]+\/([^\s]+)/g,
+      "$1.kilo/commands/aidd/$2/$3"
     );
   },
 
@@ -184,4 +117,4 @@ export const opencode: AiTool<
   },
 };
 
-registerTool(opencode);
+registerTool(kilo);

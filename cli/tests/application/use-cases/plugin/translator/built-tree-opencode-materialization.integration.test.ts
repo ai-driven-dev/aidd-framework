@@ -1,4 +1,6 @@
 import "../../../../../src/domain/tools/ai/opencode.js";
+import "../../../../../src/domain/tools/ai/kilo.js";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { BuiltTreeMaterializationTranslator } from "../../../../../src/application/use-cases/plugin/translator/built-tree-materialization-translator.js";
 import { Manifest } from "../../../../../src/domain/models/manifest.js";
@@ -12,12 +14,19 @@ import { InMemoryMarketplaceRegistry } from "../../../../helpers/ports/in-memory
 const PROJECT_ROOT = "/proj";
 const BUILT = "/built/opencode";
 
-function dist(): PluginDistribution {
+function dist(mcpContent?: string): PluginDistribution {
   return new PluginDistribution({
     manifest: { name: "aidd-vcs", version: "1.0.0" },
     format: "claude",
     files: [],
-    components: { commands: [], agents: [], rules: [], skills: [], hooks: [], mcp: [] },
+    components: {
+      commands: [],
+      agents: [],
+      rules: [],
+      skills: [],
+      hooks: [],
+      mcp: mcpContent === undefined ? [] : [{ relativePath: ".mcp.json", content: mcpContent }],
+    },
   });
 }
 
@@ -65,12 +74,56 @@ describe("BuiltTreeMaterializationTranslator — opencode (integration)", () => 
       "docs"
     );
 
-    expect(fs.getFile(`${PROJECT_ROOT}/.opencode/skills/aidd-vcs-01-commit/SKILL.md`)).toBe(skill);
-    expect(fs.getFile(`${PROJECT_ROOT}/.opencode/agents/aidd-vcs-helper.md`)).toBe("agent body");
+    expect(fs.getFile(join(PROJECT_ROOT, ".opencode/skills/aidd-vcs-01-commit/SKILL.md"))).toBe(
+      skill
+    );
+    expect(fs.getFile(join(PROJECT_ROOT, ".opencode/agents/aidd-vcs-helper.md"))).toBe(
+      "agent body"
+    );
     // Other plugin's files and the sentinel are NOT installed.
-    expect(fs.has(`${PROJECT_ROOT}/.opencode/skills/aidd-dev-00-sdlc/SKILL.md`)).toBe(false);
-    expect(fs.has(`${PROJECT_ROOT}/.build-version`)).toBe(false);
+    expect(fs.has(join(PROJECT_ROOT, ".opencode/skills/aidd-dev-00-sdlc/SKILL.md"))).toBe(false);
+    expect(fs.has(join(PROJECT_ROOT, ".build-version"))).toBe(false);
     const installed = manifest.getPlugins("opencode").find((p) => p.name === "aidd-vcs");
     expect(installed?.files.size).toBe(2);
+  });
+
+  it("merges Kilo MCP entries and records them for removal", async () => {
+    const fs = new InMemoryFileAdapter();
+    fs.setFile(
+      `${BUILT.replace("opencode", "kilo")}/.kilo/skills/aidd-vcs-01-commit/SKILL.md`,
+      "skill"
+    );
+    const manifest = Manifest.create();
+    manifest.addTool("kilo", "test", []);
+    const translator = new BuiltTreeMaterializationTranslator(
+      fs,
+      new DeterministicHasher(),
+      () => "/home/u",
+      fakeEnsureBuiltMarketplace(),
+      await makeRegistry()
+    );
+    const mcpContent = JSON.stringify({
+      mcpServers: { github: { url: "https://mcp.github.example" } },
+    });
+
+    await translator.addPlugin(
+      dist(mcpContent),
+      "kilo",
+      { kind: "local", path: "/plugin-source" },
+      PROJECT_ROOT,
+      manifest,
+      "aidd-framework",
+      "docs"
+    );
+
+    expect(JSON.parse(fs.getFile(join(PROJECT_ROOT, "kilo.json")) ?? "{}")).toEqual({
+      mcp: { github: { type: "remote", url: "https://mcp.github.example", enabled: true } },
+    });
+    expect(
+      manifest
+        .getPlugins("kilo")
+        .find((p) => p.name === "aidd-vcs")
+        ?.mcpEntries.has("github")
+    ).toBe(true);
   });
 });
