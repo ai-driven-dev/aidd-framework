@@ -17,6 +17,16 @@ on:
       # exists for them in particular - without this, changing any of it runs nothing.
       - "plugins/aidd-telemetry/**"
       - "scripts/__tests__/**"
+      # Except its prose. The plugin's markdown is asserted - the README's coverage
+      # table, where its scripts say they live - but only by `scripts/__tests__`,
+      # which `validate.yml` already runs over the whole tree on every push and
+      # pull request, unfiltered and required. Re-running it here costs a Windows
+      # runner for a paragraph, and proves nothing that job did not.
+      #
+      # `**.md`, not `**/*.md`: GitHub's `**` matches any character including a
+      # slash, so the second form needs a slash after it and would miss the
+      # top-level README.md that this exists for.
+      - "!plugins/aidd-telemetry/**.md"
   pull_request:
     paths:
       - "cli/**"
@@ -25,6 +35,16 @@ on:
       # exists for them in particular - without this, changing any of it runs nothing.
       - "plugins/aidd-telemetry/**"
       - "scripts/__tests__/**"
+      # Except its prose. The plugin's markdown is asserted - the README's coverage
+      # table, where its scripts say they live - but only by `scripts/__tests__`,
+      # which `validate.yml` already runs over the whole tree on every push and
+      # pull request, unfiltered and required. Re-running it here costs a Windows
+      # runner for a paragraph, and proves nothing that job did not.
+      #
+      # `**.md`, not `**/*.md`: GitHub's `**` matches any character including a
+      # slash, so the second form needs a slash after it and would miss the
+      # top-level README.md that this exists for.
+      - "!plugins/aidd-telemetry/**.md"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
