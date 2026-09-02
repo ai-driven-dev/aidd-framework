@@ -3625,3 +3625,92 @@ test("a plain checkout that happens to live in a directory named 'worktrees' is 
     cleanup(parent);
   }
 });
+
+// OpenCode is the one host with no hook payload of its own: `hooks/opencode-plugin.js`
+// builds one and spawns this same journal, so `lib/tools/opencode.cjs` is only ever reached
+// through that synthesized shape. Nothing drove it here — a coverage run over this suite
+// showed `opencode.cjs` at 0% of its own functions while the other four hosts were between
+// 96% and 100% — so the fifth host's write path was the one never exercised in process.
+// The payload below is exactly what `opencode-plugin.js` builds (`{ tool, session_id, cwd }`,
+// and `tool_input` on a tool call); it carries no `hook_event_name`, so the event can only
+// come from argv, which is the second thing this covers.
+function openCodePayload({ cwd, sessionId, toolInput }) {
+  return {
+    tool: "opencode",
+    session_id: sessionId,
+    cwd,
+    ...(toolInput === undefined ? {} : { tool_input: toolInput }),
+  };
+}
+
+test("an OpenCode session journals through the same hook, from the payload its own plugin builds", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/opencode-start.git" });
+  try {
+    const sessionId = "ses_0fedcba98765";
+
+    const result = replayInAt(repo, openCodePayload({ cwd: repo, sessionId }), "session-start");
+
+    assert.equal(result.status, 0);
+    const written = readRunFiles(runsDirOf(repo));
+    assert.equal(written.length, 1);
+    const [line] = readLines(written[0]);
+    assert.equal(line.type, "session_start");
+    assert.equal(line.tool, "opencode");
+    // Its own `readSessionId` reads `session_id`; a change to that field would leave every
+    // OpenCode record joining to nothing while the journal still looked healthy.
+    assert.equal(line.vendor_id, sessionId);
+    assert.equal(line.project_id, "acme/opencode-start");
+  } finally {
+    cleanup(repo);
+  }
+});
+
+test("an OpenCode turn_end appends to the file its session_start opened, never a second one", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/opencode-turn.git" });
+  try {
+    const sessionId = "ses_0abcdef12345";
+    const payload = openCodePayload({ cwd: repo, sessionId });
+    assert.equal(replayInAt(repo, payload, "session-start").status, 0);
+
+    assert.equal(replayInAt(repo, payload, "turn-end").status, 0);
+
+    const written = readRunFiles(runsDirOf(repo));
+    assert.equal(written.length, 1);
+    const lines = readLines(written[0]);
+    assert.deepEqual(
+      lines.map((entry) => entry.type),
+      ["session_start", "turn_end"]
+    );
+  } finally {
+    cleanup(repo);
+  }
+});
+
+// `opencode.cjs` declares `stepStart: null` — OpenCode names no skill on any route — so a
+// tool call must journal nothing beyond what the session already opened. Asserted rather
+// than assumed: the plugin does forward tool calls, and the limit is only real if the hook
+// actually declines them.
+test("an OpenCode tool call opens no step, because that host names no skill", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/opencode-step.git" });
+  try {
+    const sessionId = "ses_0aaaabbbbccc";
+    assert.equal(
+      replayInAt(repo, openCodePayload({ cwd: repo, sessionId }), "session-start").status,
+      0
+    );
+
+    const toolInput = { file_path: `${repo}/plugins/x/skills/01-sdlc/SKILL.md` };
+    assert.equal(
+      replayInAt(repo, openCodePayload({ cwd: repo, sessionId, toolInput }), "tool-used").status,
+      0
+    );
+
+    const lines = readLines(readRunFiles(runsDirOf(repo))[0]);
+    assert.equal(
+      lines.some((entry) => entry.type === "step_start"),
+      false
+    );
+  } finally {
+    cleanup(repo);
+  }
+});
