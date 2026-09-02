@@ -1,0 +1,7 @@
+# Not a workspace. This file exists so pnpm stops searching upward: without it, the
+# repository root's own pnpm-workspace.yaml makes pnpm treat that root as this
+# project's workspace, and `cd cli && pnpm install` resolves the root's dependencies
+# instead of these. Measured, and the reason every CI job failed to find @types/node.
+#
+# Empty on purpose - cli/ has its own lockfile and installs alone.
+packages: []

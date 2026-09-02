@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MarketplaceListUseCase } from "../../../../src/application/use-cases/marketplace/marketplace-list-use-case.js";
-import type { FetchMarketplaceSourceUseCase } from "../../../../src/application/use-cases/shared/fetch-marketplace-source-use-case.js";
+import { FetchMarketplaceSourceUseCase } from "../../../../src/application/use-cases/shared/fetch-marketplace-source-use-case.js";
 import { ResolveMarketplaceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
 import { Marketplace } from "../../../../src/domain/models/marketplace.js";
 import type { PluginCatalog } from "../../../../src/domain/models/plugin-catalog.js";
@@ -71,9 +71,9 @@ describe("MarketplaceListUseCase", () => {
           },
         ],
       };
-      const fakeFetcher = {
-        execute: async () => "/fake/local-path",
-      } as unknown as FetchMarketplaceSourceUseCase;
+      const fakeFetcher = new FetchMarketplaceSourceUseCase({
+        fetch: async () => "/fake/local-path",
+      });
       const fakeCatalogRepo: PluginCatalogRepository = {
         load: async () => fakeCatalog,
         loadForeign: async () => [],
@@ -92,11 +92,11 @@ describe("MarketplaceListUseCase", () => {
       const registry = new MarketplaceRegistryAdapter();
       await registry.save(projectRoot, SAMPLE_MARKETPLACE);
 
-      const failingFetcher = {
-        execute: async () => {
+      const failingFetcher = new FetchMarketplaceSourceUseCase({
+        fetch: async () => {
           throw new Error("network error");
         },
-      } as unknown as FetchMarketplaceSourceUseCase;
+      });
       const fakeCatalogRepo: PluginCatalogRepository = {
         load: async () => null,
         loadForeign: async () => [],
@@ -115,11 +115,11 @@ describe("MarketplaceListUseCase", () => {
       const registry = new MarketplaceRegistryAdapter();
       await registry.save(projectRoot, SAMPLE_MARKETPLACE);
 
-      const failingFetcher = {
-        execute: async () => {
+      const failingFetcher = new FetchMarketplaceSourceUseCase({
+        fetch: async () => {
           throw new Error("network error");
         },
-      } as unknown as FetchMarketplaceSourceUseCase;
+      });
       const fakeCatalogRepo: PluginCatalogRepository = {
         load: async () => null,
         loadForeign: async () => [],

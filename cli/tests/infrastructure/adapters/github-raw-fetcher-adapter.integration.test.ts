@@ -10,11 +10,15 @@ import {
 } from "../../../src/domain/errors.js";
 import { GitHubRawFetcherAdapter } from "../../../src/infrastructure/adapters/github-raw-fetcher-adapter.js";
 import { HttpNotFoundError } from "../../../src/infrastructure/errors.js";
+import type { HttpGet } from "../../../src/infrastructure/http/http-client.js";
+
+/** A real HttpGet whose one method is a spy, so a call can be both made and asserted. */
+type SpyingHttp = HttpGet & { get: ReturnType<typeof vi.fn> };
 
 const CATALOG_PATH = ".claude-plugin/marketplace.json";
 const SAMPLE_CATALOG = JSON.stringify({ plugins: [] });
 
-function makeHttp(override: Partial<{ get: ReturnType<typeof vi.fn> }> = {}) {
+function makeHttp(override: Partial<{ get: ReturnType<typeof vi.fn> }> = {}): SpyingHttp {
   return {
     get:
       override.get ??
@@ -40,7 +44,7 @@ describe("GitHubRawFetcherAdapter", () => {
   describe("fetchCatalog", () => {
     it("returns local cache dir and writes catalog file on HTTP 200", async () => {
       const http = makeHttp();
-      const adapter = new GitHubRawFetcherAdapter(http as never);
+      const adapter = new GitHubRawFetcherAdapter(http);
 
       const result = await adapter.fetchCatalog(
         { kind: "github", repo: "owner/repo" },
@@ -56,7 +60,7 @@ describe("GitHubRawFetcherAdapter", () => {
     it("calls GitHub Contents API with correct URL and auth header", async () => {
       const http = makeHttp();
       const tokenProvider = { resolve: async () => "my-token" as string | null };
-      const adapter = new GitHubRawFetcherAdapter(http as never, tokenProvider);
+      const adapter = new GitHubRawFetcherAdapter(http, tokenProvider);
 
       await adapter.fetchCatalog(
         { kind: "github", repo: "owner/repo", ref: "main" },
@@ -72,7 +76,7 @@ describe("GitHubRawFetcherAdapter", () => {
 
     it("uses HEAD as ref when none specified", async () => {
       const http = makeHttp();
-      const adapter = new GitHubRawFetcherAdapter(http as never);
+      const adapter = new GitHubRawFetcherAdapter(http);
 
       await adapter.fetchCatalog({ kind: "github", repo: "owner/repo" }, CATALOG_PATH, tmpDir);
 
@@ -86,7 +90,7 @@ describe("GitHubRawFetcherAdapter", () => {
       const http = makeHttp({
         get: vi.fn().mockRejectedValue(new HttpNotFoundError("https://api.github.com/...")),
       });
-      const adapter = new GitHubRawFetcherAdapter(http as never);
+      const adapter = new GitHubRawFetcherAdapter(http);
 
       await expect(
         adapter.fetchCatalog({ kind: "github", repo: "owner/repo" }, CATALOG_PATH, tmpDir)
@@ -97,7 +101,7 @@ describe("GitHubRawFetcherAdapter", () => {
       const http = makeHttp({
         get: vi.fn().mockRejectedValue(new AuthenticationError("HTTP 403")),
       });
-      const adapter = new GitHubRawFetcherAdapter(http as never);
+      const adapter = new GitHubRawFetcherAdapter(http);
 
       await expect(
         adapter.fetchCatalog({ kind: "github", repo: "owner/repo" }, CATALOG_PATH, tmpDir)
@@ -108,7 +112,7 @@ describe("GitHubRawFetcherAdapter", () => {
       const http = makeHttp({
         get: vi.fn().mockRejectedValue(new Error("ECONNREFUSED")),
       });
-      const adapter = new GitHubRawFetcherAdapter(http as never);
+      const adapter = new GitHubRawFetcherAdapter(http);
 
       await expect(
         adapter.fetchCatalog({ kind: "github", repo: "owner/repo" }, CATALOG_PATH, tmpDir)

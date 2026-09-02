@@ -22,16 +22,16 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
   constructor(seed: Record<string, string> = {}, hasher?: Hasher) {
     this.hasher = hasher ?? new DefaultHasher();
     for (const [path, content] of Object.entries(seed)) {
-      this.files.set(path, content);
+      this.files.set(norm(path), content);
     }
   }
 
   async writeFile(path: string, content: string): Promise<void> {
-    this.files.set(path, content);
+    this.files.set(norm(path), content);
   }
 
   async deleteFile(path: string): Promise<void> {
-    this.files.delete(path);
+    this.files.delete(norm(path));
   }
 
   async createDirectory(_path: string): Promise<void> {
@@ -43,11 +43,13 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
   }
 
   async readFile(path: string): Promise<string> {
-    const content = this.files.get(path);
+    const normalizedPath = norm(path);
+    const content = this.files.get(normalizedPath);
     if (content === undefined) {
-      const err = Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), {
-        code: "ENOENT",
-      });
+      const err = Object.assign(
+        new Error(`ENOENT: no such file or directory, open '${normalizedPath}'`),
+        { code: "ENOENT" }
+      );
       throw err;
     }
     return content;
@@ -57,7 +59,8 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
    * Returns relative paths of all files under dirPath (recursive), same as FileAdapter.
    */
   async listDirectory(dirPath: string): Promise<string[]> {
-    const prefix = dirPath.endsWith("/") ? dirPath : `${dirPath}/`;
+    const normalizedDir = norm(dirPath);
+    const prefix = normalizedDir.endsWith("/") ? normalizedDir : `${normalizedDir}/`;
     const result: string[] = [];
     for (const key of this.files.keys()) {
       if (key.startsWith(prefix)) {
@@ -68,9 +71,10 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
   }
 
   async fileExists(path: string): Promise<boolean> {
-    if (this.files.has(path)) return true;
+    const normalizedPath = norm(path);
+    if (this.files.has(normalizedPath)) return true;
     // Also return true if the path is a virtual directory (has children)
-    const prefix = path.endsWith("/") ? path : `${path}/`;
+    const prefix = normalizedPath.endsWith("/") ? normalizedPath : `${normalizedPath}/`;
     for (const key of this.files.keys()) {
       if (key.startsWith(prefix)) return true;
     }
@@ -83,9 +87,10 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
   }
 
   async mergeJsonFile(path: string, content: string, strategy: MergeStrategy): Promise<void> {
+    const normalizedPath = norm(path);
     let existing: Record<string, unknown> = {};
 
-    const existingRaw = this.files.get(path);
+    const existingRaw = this.files.get(normalizedPath);
     if (existingRaw !== undefined) {
       try {
         existing = JSON.parse(stripJsonComments(existingRaw)) as Record<string, unknown>;
@@ -97,19 +102,23 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
     const incoming = JSON.parse(stripJsonComments(content)) as Record<string, unknown>;
 
     if (isPerKeyMergeStrategy(strategy)) {
-      this.files.set(path, JSON.stringify(mergePerKey(existing, incoming, strategy), null, 2));
+      this.files.set(
+        normalizedPath,
+        JSON.stringify(mergePerKey(existing, incoming, strategy), null, 2)
+      );
       return;
     }
 
     const merged =
       strategy === "user-prime" ? deepMerge(incoming, existing) : deepMerge(existing, incoming);
-    this.files.set(path, JSON.stringify(merged, null, 2));
+    this.files.set(normalizedPath, JSON.stringify(merged, null, 2));
   }
 
   async deleteDirectory(dirPath: string): Promise<void> {
-    const prefix = dirPath.endsWith("/") ? dirPath : `${dirPath}/`;
+    const normalizedDir = norm(dirPath);
+    const prefix = normalizedDir.endsWith("/") ? normalizedDir : `${normalizedDir}/`;
     for (const key of [...this.files.keys()]) {
-      if (key.startsWith(prefix) || key === dirPath) {
+      if (key.startsWith(prefix) || key === normalizedDir) {
         this.files.delete(key);
       }
     }
@@ -125,7 +134,7 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
       .toISOString()
       .slice(0, 19)
       .replace(/[^0-9T]/g, "");
-    const backupPath = `${absolutePath}.bak.${timestamp}`;
+    const backupPath = `${norm(absolutePath)}.bak.${timestamp}`;
     this.files.set(backupPath, content);
     return backupPath;
   }
@@ -137,7 +146,8 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
   }
 
   async listFilesRecursive(dirPath: string): Promise<string[]> {
-    const prefix = dirPath.endsWith("/") ? dirPath : `${dirPath}/`;
+    const normalizedDir = norm(dirPath);
+    const prefix = normalizedDir.endsWith("/") ? normalizedDir : `${normalizedDir}/`;
     const result: string[] = [];
     for (const key of this.files.keys()) {
       if (key.startsWith(prefix)) {
@@ -150,15 +160,15 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
   // ── Inspection helpers for test assertions ──────────────────────────────────
 
   setFile(path: string, content: string): void {
-    this.files.set(path, content);
+    this.files.set(norm(path), content);
   }
 
   getFile(path: string): string | undefined {
-    return this.files.get(path);
+    return this.files.get(norm(path));
   }
 
   has(path: string): boolean {
-    return this.files.has(path);
+    return this.files.has(norm(path));
   }
 
   listAll(): string[] {
@@ -166,9 +176,16 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
   }
 
   listUnder(dirPath: string): string[] {
-    const prefix = dirPath.endsWith("/") ? dirPath : `${dirPath}/`;
+    const normalizedDir = norm(dirPath);
+    const prefix = normalizedDir.endsWith("/") ? normalizedDir : `${normalizedDir}/`;
     return [...this.files.keys()].filter((k) => k.startsWith(prefix));
   }
+}
+
+// A real Windows filesystem accepts "/" and "\" as equivalent; this Map<path, content>
+// double does not unless every path put through it is normalized to one spelling first.
+function norm(path: string): string {
+  return path.replaceAll("\\", "/");
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────

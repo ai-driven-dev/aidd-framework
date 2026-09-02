@@ -1,5 +1,5 @@
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { FrameworkBuildUseCase } from "../../../../src/application/use-cases/framework/framework-build-use-case.js";
 import { FlatBuildStrategy } from "../../../../src/application/use-cases/framework/strategies/flat-build-strategy.js";
@@ -8,10 +8,8 @@ import {
   EnsureBuiltMarketplaceUseCase,
   type FrameworkBuildFor,
 } from "../../../../src/application/use-cases/shared/ensure-built-marketplace-use-case.js";
-import type {
-  ResolveMarketplaceOptions,
-  ResolveMarketplaceUseCase,
-} from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
+import { FetchMarketplaceSourceUseCase } from "../../../../src/application/use-cases/shared/fetch-marketplace-source-use-case.js";
+import { ResolveMarketplaceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
 import { Marketplace } from "../../../../src/domain/models/marketplace.js";
 import { BUILT_CACHE_SUBDIR, builtMarketplaceDir } from "../../../../src/domain/models/paths.js";
 import type { AssetProvider } from "../../../../src/domain/ports/asset-provider.js";
@@ -50,7 +48,11 @@ function stubAssetProvider(): AssetProvider {
 function makeIsDirectory(memFs: InMemoryFileAdapter): (path: string) => Promise<boolean> {
   return async (path: string): Promise<boolean> => {
     if (memFs.has(path)) return false;
-    const prefix = path.endsWith("/") ? path : `${path}/`;
+    // memFs stores every key "/"-normalised (in-memory-file-adapter.ts's own `norm`) - a
+    // native, backslash-separated `path` on Windows would never prefix-match one of those
+    // keys without the same normalisation here.
+    const normalized = path.replaceAll("\\", "/");
+    const prefix = normalized.endsWith("/") ? normalized : `${normalized}/`;
     return memFs.listAll().some((k) => k.startsWith(prefix));
   };
 }
@@ -65,13 +67,13 @@ function makeMarketplace(): Marketplace {
 }
 
 function fakeResolve(localPath: string, version: string | undefined): ResolveMarketplaceUseCase {
-  return {
-    execute: async ({ marketplace }: ResolveMarketplaceOptions) => ({
-      marketplace,
-      localPath,
-      catalog: version === undefined ? null : { version, plugins: [] },
-    }),
-  } as unknown as ResolveMarketplaceUseCase;
+  return new ResolveMarketplaceUseCase(
+    new FetchMarketplaceSourceUseCase({ fetch: async () => localPath }),
+    {
+      load: async () => (version === undefined ? null : { version, plugins: [] }),
+      loadForeign: async () => [],
+    }
+  );
 }
 
 function fakeVersion(value: string): VersionReader {
@@ -80,7 +82,12 @@ function fakeVersion(value: string): VersionReader {
 
 describe("builtMarketplaceDir", () => {
   it("places the per-target tree under .aidd/cache/built/<mkt>/<target>", () => {
-    expect(builtMarketplaceDir("/p", "aidd", "codex")).toBe("/p/.aidd/cache/built/aidd/codex");
+    expect(builtMarketplaceDir("/p", "aidd", "codex")).toBe(
+      // The layout stays spelled out segment by segment, not taken from the same
+      // constant the implementation uses - that would only assert the code agrees with
+      // itself. join() so the claim is about the layout, not the separator (#707).
+      join("/p", ".aidd", "cache", "built", "aidd", "codex")
+    );
   });
 });
 
@@ -92,14 +99,13 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
   beforeEach(() => {
     fs = new InMemoryFileAdapter();
     builds = 0;
-    buildFor = (_target, _mode, outDir) =>
-      ({
-        execute: async () => {
-          builds += 1;
-          await fs.writeFile(join(outDir, "plugins/aidd-vcs/SKILL.md"), "built content");
-          return { outDir, plugins: [], totalFiles: 1 };
-        },
-      }) as unknown as FrameworkBuildUseCase;
+    buildFor = (_target, _mode, outDir) => ({
+      execute: async () => {
+        builds += 1;
+        await fs.writeFile(join(outDir, "plugins/aidd-vcs/SKILL.md"), "built content");
+        return { outDir, plugins: [], totalFiles: 1 };
+      },
+    });
   });
 
   it("rebuilds and writes a sentinel when none exists", async () => {
@@ -121,7 +127,7 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
   });
 
   it("does not rebuild when the sentinel matches (cliVer:catalogVer)", async () => {
-    const builtDir = builtMarketplaceDir(PROJECT, "aidd-framework", "codex");
+    const builtDir = resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "codex"));
     fs.setFile(join(builtDir, ".build-version"), "5.0.0:1.0.0");
     const uc = new EnsureBuiltMarketplaceUseCase(
       fs,
@@ -140,7 +146,7 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
   });
 
   it("rebuilds when the CLI version changed even if catalog version is the same", async () => {
-    const builtDir = builtMarketplaceDir(PROJECT, "aidd-framework", "codex");
+    const builtDir = resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "codex"));
     fs.setFile(join(builtDir, ".build-version"), "4.0.0:1.0.0");
     const uc = new EnsureBuiltMarketplaceUseCase(
       fs,
@@ -159,7 +165,7 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
   });
 
   it("always rebuilds when catalog version is undefined", async () => {
-    const builtDir = builtMarketplaceDir(PROJECT, "aidd-framework", "codex");
+    const builtDir = resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "codex"));
     fs.setFile(join(builtDir, ".build-version"), "5.0.0:unversioned");
     const uc = new EnsureBuiltMarketplaceUseCase(
       fs,
@@ -191,7 +197,7 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
       target: "codex",
       mode: "marketplace",
     });
-    expect(r.builtDir).toBe(builtMarketplaceDir(PROJECT, "aidd-framework", "codex"));
+    expect(r.builtDir).toBe(resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "codex")));
     expect(fs.getFile(join(r.builtDir, "plugins/aidd-vcs/SKILL.md"))).toBe("built content");
     // temp dir cleaned up
     expect(fs.listUnder(tmpdir()).length).toBe(0);
@@ -225,7 +231,11 @@ describe("force behavior at the cache-rebuild path", () => {
     const memFs = new InMemoryFileAdapter();
     await seedFromDirectory(memFs, FIXTURE_DIR, { useAbsolutePaths: true });
 
-    const builtDir = builtMarketplaceDir(PROJECT, "aidd-framework", "copilot");
+    // EnsureBuiltMarketplaceUseCase.execute() resolves builtDir before handing it to
+    // buildFor(), so FlatBuildStrategy's write target (absOut) is always drive-qualified on
+    // Windows - mirror that resolve() here so this test's drive-less PROJECT seeds the same
+    // path the real write lands on.
+    const builtDir = resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "copilot"));
     const agentPath = `${builtDir}/.github/agents/${PLUGIN}-code-reviewer.agent.md`;
     memFs.setFile(agentPath, "stale cache content from a previous build");
 
@@ -288,7 +298,7 @@ describe("outDir invariant for the cache-rebuild build path", () => {
           await memFs.writeFile(join(outDir, "plugins/aidd-vcs/SKILL.md"), "built content");
           return { outDir, plugins: [], totalFiles: 1 };
         },
-      } as unknown as FrameworkBuildUseCase;
+      };
     };
 
     // Direct path: source lives outside the cache tree → build() writes straight to builtDir.
@@ -321,14 +331,18 @@ describe("outDir invariant for the cache-rebuild build path", () => {
     });
 
     expect(capturedOutDirs).toHaveLength(2);
-    const cacheRoot = join(PROJECT, BUILT_CACHE_SUBDIR);
+    // resolve(): execute() always resolves builtDir before this capture sees it (#707).
+    const cacheRoot = resolve(join(PROJECT, BUILT_CACHE_SUBDIR));
     const tmpRoot = tmpdir();
     for (const outDir of capturedOutDirs) {
-      const underCache = outDir === cacheRoot || outDir.startsWith(`${cacheRoot}/`);
-      const underTmp = outDir === tmpRoot || outDir.startsWith(`${tmpRoot}/`);
+      const underCache = outDir === cacheRoot || outDir.startsWith(`${cacheRoot}${sep}`);
+      const underTmp = outDir === tmpRoot || outDir.startsWith(`${tmpRoot}${sep}`);
       expect(underCache || underTmp).toBe(true);
     }
-    // The dogfood call specifically must have gone through the temp dir, not the cache.
-    expect(capturedOutDirs[1]?.startsWith(`${tmpRoot}/`)).toBe(true);
+    // The dogfood call specifically must have gone through the temp dir, not the cache
+    // (#707): nested() now compares "/"-normalized paths, and both sourceDir and builtDir
+    // are resolve()'d before it sees them, so a drive-less-vs-drive-qualified or
+    // "\"-vs-"/" mismatch can no longer hide real nesting on Windows.
+    expect(capturedOutDirs[1]?.startsWith(`${tmpRoot}${sep}`)).toBe(true);
   });
 });

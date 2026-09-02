@@ -1,0 +1,8 @@
+# pnpm 10+ refuses to run a dependency's install scripts unless it is allowlisted
+# here. lefthook needs its own to place the git hooks, so a fresh `pnpm install`
+# fails with ERR_PNPM_IGNORED_BUILDS without this file.
+#
+# No `packages:` list on purpose: cli/ and kanban/ install independently, and
+# making them workspace members would change how their dependencies resolve.
+allowBuilds:
+  lefthook: true

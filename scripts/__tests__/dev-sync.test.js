@@ -2,7 +2,7 @@ const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
 const { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } = require("node:fs");
 const { tmpdir } = require("node:os");
-const { join, resolve } = require("node:path");
+const { delimiter, join, resolve } = require("node:path");
 const test = require("node:test");
 
 const repo = resolve(__dirname, "../..");
@@ -12,12 +12,28 @@ function executable(path, body) {
   chmodSync(path, 0o755);
 }
 
+/** What the stubs below are put in front of.
+ *
+ * On POSIX this stays the strict pair the isolation depends on: nothing but the stubs and
+ * the platform's own utilities, so a real `opencode` or `claude` installed on the machine
+ * running these tests can never answer in their place.
+ *
+ * Windows has neither directory, and the shell utilities `dev-sync.sh` calls — `find`,
+ * `cp`, `basename` — live wherever Git for Windows put them, which only that runner's own
+ * `PATH` names. So there it keeps the inherited `PATH` and merely puts the stubs first,
+ * which shadows anything real by the same mechanism. */
+const BASE_PATH =
+  process.platform === "win32" ? (process.env.PATH ?? "") : ["/usr/bin", "/bin"].join(delimiter);
+
 function runSync(fakeBin, home, args = ["all"]) {
-  return spawnSync("/bin/bash", [join(repo, "scripts/dev-sync.sh"), ...args], {
+  // `bash`, resolved on PATH, never the literal `/bin/bash`: that path does not exist on
+  // Windows, where bash is the one Git for Windows ships. `spawnSync` resolves a bare name
+  // through the platform's own rules on both.
+  return spawnSync("bash", [join(repo, "scripts/dev-sync.sh"), ...args], {
     cwd: repo,
     env: {
       ...process.env,
-      PATH: `${fakeBin}:/usr/bin:/bin`,
+      PATH: [fakeBin, BASE_PATH].join(delimiter),
       HOME: home,
       BUILD: join(home, "build"),
     },

@@ -74,9 +74,9 @@ describe("Marketplace", () => {
     });
 
     it("throws InvalidMarketplaceScopeError for invalid scope", () => {
-      expect(() =>
-        Marketplace.fromJSON(makeData({ scope: "global" as unknown as "project" }))
-      ).toThrow(InvalidMarketplaceScopeError);
+      expect(() => Marketplace.fromJSON({ ...makeData(), scope: "global" })).toThrow(
+        InvalidMarketplaceScopeError
+      );
     });
 
     it("throws when source is invalid", () => {

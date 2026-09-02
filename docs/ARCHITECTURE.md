@@ -37,9 +37,22 @@ A plugin never contains its own tests: the build copies `hooks/` recursively int
 
 Declared in `plugins/<plugin>/hooks/hooks.json`. They run Node, so users need `node` on their `PATH`:
 
-| Plugin         | Event              | Runs                      | Purpose                                                  |
-| -------------- | ------------------ | ------------------------- | -------------------------------------------------------- |
-| `aidd-context` | `SessionStart`     | `hooks/update_memory.js`  | Refresh the project memory block in the AI context files |
+| Plugin           | Event                                    | Runs                      | Purpose                                                              |
+| ---------------- | ----------------------------------------- | ------------------------- | --------------------------------------------------------------------- |
+| `aidd-context`   | `SessionStart`                            | `hooks/update_memory.cjs`  | Refresh the project memory block in the AI context files              |
+| `aidd-telemetry` | `SessionStart` · `Stop` · `PostToolUse`   | `hooks/journal.cjs`        | Journal every session so a unit of work can be tied to what it cost   |
+
+A hook is authored once, with `${CLAUDE_PLUGIN_ROOT}`, and the installer rewrites it to whatever the target tool expands. Which tools run a bundled hook at all, and what each resolves:
+
+| Tool          | Runs bundled hooks | Resolves the plugin root as | Notes                                                                                  |
+| ------------- | ------------------ | --------------------------- | ---------------------------------------------------------------------------------------- |
+| Claude Code   | yes                | `${CLAUDE_PLUGIN_ROOT}`     | The spelling every plugin is authored in, so nothing is substituted                    |
+| Codex         | yes                | `${PLUGIN_ROOT}`            | Measured: it expands `${CLAUDE_PLUGIN_ROOT}` too, and will not run a hook it has not been asked to trust |
+| GitHub Copilot| yes                | `${PLUGIN_ROOT}`            | Declared, never observed against a running hook                                        |
+| Cursor        | declared            | `./`                        | Its own hook format: the converter rewrites the root to a path relative to the plugin before the declared token is ever substituted. Two headless probes fired no plugin hook at all, and what registers a plugin sitting in Cursor's own plugin directory was not identified |
+| OpenCode      | no, by a second route | —                        | A declarative `hooks.json` means nothing to it — its plugin runtime is JS modules, so it joins through one instead: `plugins/aidd-telemetry/hooks/opencode-plugin.js` maps `session.created` to session-start, `session.idle` to turn-end, and (2026-08-31) a completed tool part on `message.part.updated` to tool-used. The column above is about the declarative axis alone; a tool answering `no` there is not a tool that cannot journal |
+
+A tool that runs no hook says why, and an install that carries one tells whoever ran it what was skipped.
 
 ## 🧠 Plugin concerns and layers
 
@@ -54,8 +67,13 @@ Every capability lives in exactly one plugin, chosen by **concern**. This taxono
 | `aidd-vcs`          | Version control      | External     |
 | `aidd-orchestrator` | Orchestration        | Coordination |
 | `aidd-ui` 🚧        | UI/UX design         | Execution    |
+| `aidd-telemetry` 🧪 | Measurement          | Observation  |
 
 `aidd-ui` is alpha: smoke-test only, off the curated install path.
+
+`aidd-telemetry` is beta, off the curated install path: opt-in only — a repository must commit `.aidd/config.json` with `telemetry.enabled: true`. Each session appends observations, one JSON object per line, to its own `aidd_docs/runs/<run_id>__<vendor_id>.jsonl`, created on demand and git-ignored; that directory's presence is a location, not a permission. A line is never rewritten, only appended — `session_start`, `turn_end`, and `file_written` (a repository-relative path, never a task_id: task identity is a derivation, and belongs to whatever reads the log). Never a measurement; tokens and cost are joined afterwards from the provider's telemetry.
+
+**Observation** writes only *about* the other layers, never the artifact it describes, and nothing may depend on it.
 
 - **Knowledge vs execution is a firewall.** Knowledge plugins produce artifacts you *read* and never write or run application source. `aidd-context`'s bootstrap deliberately creates no `package.json`. Real code belongs to `aidd-dev` or an orchestrator's own setup actions.
 - **Concern decides placement, not existence.** A missing capability goes in the plugin whose concern owns it, then the caller delegates. Never reimplement it in the calling plugin because the right home lacks it today.

@@ -17,7 +17,9 @@ import {
   getAllRegisteredTools,
   getToolConfig,
   isAiTool,
+  journalHostToAiToolId,
 } from "../../../src/domain/tools/registry.js";
+import { journalHost } from "../../helpers/telemetry-journal-hook.js";
 
 /**
  * Conformance suite for the AiTool contract.
@@ -98,6 +100,73 @@ describe("AiTool contract conformance", () => {
         `${toolId} declares a plugins capability but has no MARKETPLACE_PROBES entry (domain/models/plugin-format.ts) — its native marketplace would never be detected`
       ).toBe(true);
     });
+
+    // #703: a tool that declares `marketplaceSettings` writes a project-local
+    // extraKnownMarketplaces/enabledPlugins declaration — that alone was proven, for
+    // Claude, to load nothing under `claude -p` (nor even interactively): the runtime
+    // reads its own user-global registry, not the project file. `nativeActivation`
+    // is what drives that registry via the tool's own CLI. Its absence here is exactly
+    // the two-install-surfaces disagreement #703 measured: settings.json says a plugin
+    // is enabled, the runtime that actually loads plugins was never told.
+    it("drives native CLI activation when its plugins capability declares marketplaceSettings", () => {
+      const caps = tool.capabilities as {
+        plugins?: { marketplaceSettings?: unknown; nativeActivation?: unknown };
+      };
+      if (caps.plugins?.marketplaceSettings == null) return;
+      expect(
+        caps.plugins.nativeActivation,
+        `${toolId} declares marketplaceSettings without nativeActivation — its settings.json declaration is never registered with the runtime that resolves plugins`
+      ).not.toBeNull();
+    });
+
+    // Same shape guard for local-read: the type system requires `telemetryLocalRead` to
+    // exist, but not that its `kind` is one of the three this union defines.
+    it("declares its local-read shape as declared, unmeasured, or explicitly unsupported", () => {
+      expect(
+        ["declared", "unmeasured", "unsupported"],
+        `${toolId} declares an unrecognized telemetryLocalRead kind: ${tool.telemetryLocalRead.kind}`
+      ).toContain(tool.telemetryLocalRead.kind);
+      if (tool.telemetryLocalRead.kind === "unsupported") {
+        expect(
+          tool.telemetryLocalRead.reason.length,
+          `${toolId}: telemetryLocalRead.reason must not be empty`
+        ).toBeGreaterThan(0);
+      }
+    });
+  });
+});
+
+// Cursor's local-read reason is a measured fact (see spec.md non-goals), not a guess.
+// Claude and Codex are declared as of phase 2: read via TranscriptCostReaderAdapter, see
+// claude-code-transcript.ts and codex-rollout.ts for their measurements. OpenCode is
+// declared as of phase 3: read via OpencodeCostReaderAdapter. Copilot is declared as of
+// #697: read via TranscriptCostReaderAdapter and copilot-events.ts, at session rather than
+// request granularity - see copilot-events.unit.test.ts for the measurement.
+describe("telemetryLocalRead — exact declarations, phase 2 of local-cost-read", () => {
+  const EXPECTED: Record<
+    string,
+    { kind: "declared" | "unmeasured" | "unsupported"; reason?: string }
+  > = {
+    claude: { kind: "declared" },
+    codex: { kind: "declared" },
+    opencode: { kind: "declared" },
+    copilot: { kind: "declared" },
+    cursor: { kind: "unsupported", reason: "token count" },
+  };
+
+  it.each(Object.entries(EXPECTED))("%s", (toolId, expected) => {
+    const tool = registeredAiTools.find(([id]) => id === toolId)?.[1];
+    if (!tool) throw new Error(`${toolId} is not registered`);
+
+    const shape = tool.telemetryLocalRead;
+    expect(shape.kind).toBe(expected.kind);
+    if (shape.kind === "unsupported" && expected.reason) {
+      expect(shape.reason).toContain(expected.reason);
+    }
+  });
+
+  it("covers exactly the five registered AI tools — no tool escapes this check", () => {
+    expect(Object.keys(EXPECTED).sort()).toEqual(registeredAiTools.map(([id]) => id).sort());
   });
 });
 
@@ -133,6 +202,67 @@ describe("no parallel list references an unregistered tool", () => {
           `${label} has an entry for format "${probe.format}" (${probe.relativePath}), which is not a registered AI tool (stale entry?)`
         ).toBe(true);
       }
+    }
+  });
+
+  it("every host the journal hook writes for is claimed by exactly one tool declaration", () => {
+    // The hook spells Claude Code "claude-code" while its toolId is "claude", so a report
+    // joining a journal line to a stored record has to relate the two. It relates them by
+    // reading these declarations, which is only safe while every host has one — a fifth
+    // host added to the hook and not declared here would join to nothing, silently.
+    for (const host of journalHost.DECLARED_HOSTS) {
+      expect(
+        journalHostToAiToolId(host),
+        `the journal hook writes for host "${host}", which no registered AI tool declares as its telemetryJournalHost`
+      ).not.toBeNull();
+    }
+  });
+
+  it("declares no journal host the hook does not write for", () => {
+    for (const [toolId, config] of registeredAiTools) {
+      const declared = config.telemetryJournalHost;
+      if (declared === undefined) continue;
+      expect(
+        journalHost.DECLARED_HOSTS.has(declared),
+        `"${toolId}" declares telemetryJournalHost "${declared}", which the journal hook never writes`
+      ).toBe(true);
+    }
+  });
+
+  it("resolves an unknown host to null rather than to a nearby tool", () => {
+    expect(journalHostToAiToolId("not-a-host")).toBeNull();
+  });
+
+  it("declares task attributability exactly where journal attribution is possible at all", () => {
+    // A task no longer needs a written-path extractor: it can be declared instead, read off
+    // any tool call's own arguments the way `declaredTaskPath` reads it - free text, scanned
+    // for a task-folder path - with no per-host gate the way `WRITTEN_PATH_EXTRACTOR_BY_HOST`
+    // gates a written path, or `stepStart` gates a step. That is why this assertion collapses
+    // to `telemetryTaskAttributable === (telemetryJournalHost !== undefined)`: once a host's
+    // events reach the journal hook *at all*, `handleTaskDeclared` runs unconditionally on
+    // every one of them, task declaration included. It does not, on its own, pin OpenCode's
+    // own dispatch mechanism (`hooks/opencode-plugin.js`, an ESM file this suite does not
+    // import) - that fact is exercised live in `scripts/__tests__/aidd-telemetry-opencode-
+    // payloads.test.js` instead, against the plugin file itself.
+    for (const [toolId, config] of registeredAiTools) {
+      const host = config.telemetryJournalHost;
+      const hookReachesToolUse = host !== undefined;
+
+      expect(
+        config.telemetryTaskAttributable,
+        `"${toolId}" declares telemetryTaskAttributable ${config.telemetryTaskAttributable}, but the journal hook ${hookReachesToolUse ? "does" : "never"} dispatch a tool-used event for host "${host}"`
+      ).toBe(hookReachesToolUse);
+    }
+  });
+
+  it("declares what its local-read route supplies, for every tool", () => {
+    for (const [toolId, config] of registeredAiTools) {
+      const declaration = config.telemetryLocalRead;
+      if (declaration.kind !== "declared") continue;
+      expect(
+        declaration.supplies,
+        `"${toolId}" declares a telemetryLocalRead route without saying what it supplies`
+      ).toBeDefined();
     }
   });
 });

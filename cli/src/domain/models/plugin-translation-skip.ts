@@ -8,6 +8,3 @@ export interface PluginTranslationSkip {
 }
 
 export type ReadonlySkipList = readonly PluginTranslationSkip[];
-
-export const OPENCODE_HOOKS_SKIP_REASON =
-  "OpenCode plugin runtime is JS modules; declarative hooks.json is not supported.";

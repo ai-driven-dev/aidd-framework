@@ -1,0 +1,11 @@
+{
+  "sessionId": "b349a8c0-d112-44a6-b329-cc46bdce4865",
+  "timestamp": 1787047151891,
+  "cwd": "/home/user/probe/project-copilot-skill",
+  "toolName": "skill",
+  "toolArgs": "{\"skill\":\"probe-echo\"}",
+  "toolResult": {
+    "resultType": "success",
+    "textResultForLlm": "Skill \"probe-echo\" loaded successfully. Follow the instructions in the skill context."
+  }
+}

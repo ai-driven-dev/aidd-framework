@@ -15,6 +15,15 @@ async function seedManifest(projectDir: string): Promise<void> {
   );
 }
 
+async function seedTelemetryConfig(projectDir: string): Promise<void> {
+  await mkdir(join(projectDir, AIDD_DIR), { recursive: true });
+  await writeFile(
+    join(projectDir, AIDD_DIR, "config.json"),
+    JSON.stringify({ telemetry: { enabled: true, endpoint: "http://127.0.0.1:4318" } }),
+    "utf-8"
+  );
+}
+
 describe.concurrent("E2E: aidd clean", () => {
   it("reports nothing to clean when not initialized", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("clean-empty");
@@ -73,6 +82,25 @@ describe.concurrent("E2E: aidd clean", () => {
       expect(exitCode).toBe(0);
       expect(stdout).toContain("claude");
       expect(stdout).toMatch(/\d+ files?/);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("keeps .aidd/config.json and says so, while removing manifest.json", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("clean-keeps-config");
+    try {
+      await seedManifest(projectDir);
+      await seedTelemetryConfig(projectDir);
+      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+
+      const { stdout, exitCode } = await runCli(["clean", "--force"], projectDir, fakeHome);
+
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain("Kept .aidd/config.json");
+      expect(existsSync(join(projectDir, AIDD_DIR, "config.json"))).toBe(true);
+      expect(existsSync(join(projectDir, AIDD_DIR, "manifest.json"))).toBe(false);
+      expect(existsSync(join(projectDir, AIDD_DIR))).toBe(true);
     } finally {
       await cleanup();
     }

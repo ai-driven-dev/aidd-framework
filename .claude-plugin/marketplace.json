@@ -55,6 +55,13 @@
       "description": "ALPHA, not ready for use. UI and UX concern: design, review, and improve frontend interfaces.",
       "strict": true,
       "recommended": false
+    },
+    {
+      "name": "aidd-telemetry",
+      "source": "./plugins/aidd-telemetry",
+      "description": "Measurement: journals every session so a unit of work can be tied to what it cost. The hooks record on plain node; its three skills reach the `aidd` CLI to turn it on, answer and check.",
+      "strict": true,
+      "recommended": false
     }
   ]
 }

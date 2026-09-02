@@ -52,6 +52,17 @@ const FLAT_TARGETS = ["claude", "cursor", "copilot", "codex", "opencode"] as con
  */
 const FROZEN_CELLS = new Set(["claude"]);
 
+// This repo carries no .gitattributes, so a Windows checkout's core.autocrlf converts
+// every text file's LF to CRLF on write to disk (#707) - hashing those raw bytes would
+// diff on line endings alone against the LF-committed stored baseline. Fold CRLF -> LF
+// before hashing; skip anything that doesn't round-trip through UTF-8 (this tree's
+// outputs are all .md/.json/.yml/.js today) so a future binary asset isn't corrupted.
+function normalizeLineEndings(content: Buffer): Buffer {
+  const text = content.toString("utf-8");
+  if (Buffer.byteLength(text, "utf-8") !== content.length) return content;
+  return Buffer.from(text.replace(/\r\n/g, "\n"), "utf-8");
+}
+
 async function hashDirectory(dir: string): Promise<TargetSnapshot> {
   const result: TargetSnapshot = {};
   const entries = await readdir(dir, { recursive: true });
@@ -59,7 +70,8 @@ async function hashDirectory(dir: string): Promise<TargetSnapshot> {
     const fullPath = join(dir, entry);
     try {
       const content = await readFile(fullPath);
-      result[entry.replace(/\\/g, "/")] = createHash("sha256").update(content).digest("hex");
+      const normalized = normalizeLineEndings(content);
+      result[entry.replace(/\\/g, "/")] = createHash("sha256").update(normalized).digest("hex");
     } catch {
       // skip directories
     }
@@ -113,6 +125,10 @@ async function captureAllCells(
 }
 
 describe.concurrent("Framework build golden — 9-cell matrix", () => {
+  // Two full 9-cell builds, concurrently with the other tests in this file - on a real
+  // windows-latest runner this measured at 60039ms and 60096ms, just over the 60s default,
+  // not a hang (#707 windows-probe, attempt 3, run 32596840364). Raised per-test rather
+  // than the e2e project's global testTimeout so every other e2e file's budget is unchanged.
   it("snapshot is deterministic (two captures of each target are byte-identical)", async () => {
     const env1 = await createTestEnv("fb-golden-det-1");
     const env2 = await createTestEnv("fb-golden-det-2");
@@ -155,8 +171,10 @@ describe.concurrent("Framework build golden — 9-cell matrix", () => {
       await env1.cleanup();
       await env2.cleanup();
     }
-  });
+  }, 120_000);
 
+  // Same reason as above: a full 9-cell build, concurrently with the other tests in this
+  // file, measured at 60096ms on a real windows-latest runner - just over the 60s default.
   it("stored golden baseline covers all 9 cells and the frozen claude cell is byte-identical (AC #1)", async () => {
     const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fb-golden-baseline");
     try {
@@ -190,7 +208,7 @@ describe.concurrent("Framework build golden — 9-cell matrix", () => {
     } finally {
       await cleanup();
     }
-  });
+  }, 120_000);
 
   it("all 9 cells are non-empty", async () => {
     const stored = JSON.parse(await readFile(SNAPSHOT_FILE, "utf-8")) as GoldenSnapshot;

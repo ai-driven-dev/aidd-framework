@@ -1,0 +1,224 @@
+{
+  "info": {
+    "id": "ses_30aea4e57ffeELyWQNJcO9DHET",
+    "slug": "curious-comet",
+    "projectID": "24f278258dfd48bb1176986ff46e47369080c9a1",
+    "directory": "[redacted:session-directory:ses_30aea4e57ffeELyWQNJcO9DHET]",
+    "title": "[redacted:session-title:ses_30aea4e57ffeELyWQNJcO9DHET]",
+    "version": "1.2.24",
+    "summary": {
+      "additions": 0,
+      "deletions": 0,
+      "files": 0
+    },
+    "time": {
+      "created": 1773638365608,
+      "updated": 1773639419671
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1773638365612
+        },
+        "summary": {
+          "diffs": []
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "anthropic",
+          "modelID": "claude-sonnet-4-6"
+        },
+        "id": "msg_cf515b1aa0013pyPAIQe6EtEp1",
+        "sessionID": "ses_30aea4e57ffeELyWQNJcO9DHET"
+      }
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1773638365618,
+          "completed": 1773638370433
+        },
+        "parentID": "msg_cf515b1aa0013pyPAIQe6EtEp1",
+        "modelID": "claude-sonnet-4-6",
+        "providerID": "anthropic",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "[redacted:cwd:msg_cf515b1b20011NzmARPrSpI1lW]",
+          "root": "[redacted:root:msg_cf515b1b20011NzmARPrSpI1lW]"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 46898,
+          "input": 3,
+          "output": 115,
+          "reasoning": 0,
+          "cache": {
+            "read": 43639,
+            "write": 3141
+          }
+        },
+        "finish": "tool-calls",
+        "id": "msg_cf515b1b20011NzmARPrSpI1lW",
+        "sessionID": "ses_30aea4e57ffeELyWQNJcO9DHET"
+      }
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1773638370434,
+          "completed": 1773638375000
+        },
+        "parentID": "msg_cf515b1aa0013pyPAIQe6EtEp1",
+        "modelID": "claude-sonnet-4-6",
+        "providerID": "anthropic",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "[redacted:cwd:msg_cf515c482001XcMRpKRNVBj0v9]",
+          "root": "[redacted:root:msg_cf515c482001XcMRpKRNVBj0v9]"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 47195,
+          "input": 1,
+          "output": 238,
+          "reasoning": 0,
+          "cache": {
+            "read": 46780,
+            "write": 176
+          }
+        },
+        "finish": "tool-calls",
+        "id": "msg_cf515c482001XcMRpKRNVBj0v9",
+        "sessionID": "ses_30aea4e57ffeELyWQNJcO9DHET"
+      }
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1773638375001,
+          "completed": 1773638379047
+        },
+        "parentID": "msg_cf515b1aa0013pyPAIQe6EtEp1",
+        "modelID": "claude-sonnet-4-6",
+        "providerID": "anthropic",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "[redacted:cwd:msg_cf515d659001v8AyNXNm4y69T8]",
+          "root": "[redacted:root:msg_cf515d659001v8AyNXNm4y69T8]"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 51192,
+          "input": 1,
+          "output": 161,
+          "reasoning": 0,
+          "cache": {
+            "read": 46956,
+            "write": 4074
+          }
+        },
+        "finish": "tool-calls",
+        "id": "msg_cf515d659001v8AyNXNm4y69T8",
+        "sessionID": "ses_30aea4e57ffeELyWQNJcO9DHET"
+      }
+    },
+    {
+      "info": {
+        "role": "assistant",
+        "time": {
+          "created": 1773638379047
+        },
+        "parentID": "msg_cf515b1aa0013pyPAIQe6EtEp1",
+        "modelID": "claude-sonnet-4-6",
+        "providerID": "anthropic",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "[redacted:cwd:msg_cf515e6270019kLPJWNgcnoVSu]",
+          "root": "[redacted:root:msg_cf515e6270019kLPJWNgcnoVSu]"
+        },
+        "cost": 0,
+        "tokens": {
+          "input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "id": "msg_cf515e6270019kLPJWNgcnoVSu",
+        "sessionID": "ses_30aea4e57ffeELyWQNJcO9DHET"
+      }
+    },
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1773638396064
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "anthropic",
+          "modelID": "claude-sonnet-4-6"
+        },
+        "id": "msg_cf516289a0010Tfo9ztP07AiEk",
+        "sessionID": "ses_30aea4e57ffeELyWQNJcO9DHET"
+      }
+    },
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1773638416754
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "anthropic",
+          "modelID": "claude-sonnet-4-6"
+        },
+        "id": "msg_cf5167969001dEOWThG2jjVfVF",
+        "sessionID": "ses_30aea4e57ffeELyWQNJcO9DHET"
+      }
+    },
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1773639416370
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "anthropic",
+          "modelID": "claude-sonnet-4-6"
+        },
+        "id": "msg_cf525ba290013xeSu47Hp4a2mf",
+        "sessionID": "ses_30aea4e57ffeELyWQNJcO9DHET"
+      }
+    },
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1773639419670
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "anthropic",
+          "modelID": "claude-sonnet-4-6"
+        },
+        "id": "msg_cf525c70e001xnSjNAacx1ba4K",
+        "sessionID": "ses_30aea4e57ffeELyWQNJcO9DHET"
+      }
+    }
+  ]
+}

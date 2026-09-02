@@ -1,0 +1,14 @@
+{
+  "hook_event_name": "PostToolUse",
+  "session_id": "dc262588-c5be-4dc7-b2c9-91dfb1e9592b",
+  "timestamp": "2026-08-22T05:54:24.887Z",
+  "cwd": "/home/user/probe/project-copilot-compat-skill",
+  "tool_name": "skill",
+  "tool_input": {
+    "skill": "00-init"
+  },
+  "tool_result": {
+    "result_type": "success",
+    "text_result_for_llm": "Skill \"00-init\" loaded successfully. Follow the instructions in the skill context."
+  }
+}

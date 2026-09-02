@@ -35,6 +35,7 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 
 | Command | Scope |
 | --- | --- |
+| `pnpm test:changed` | only the specs a change can break — vitest resolves the CLI's import graph, and the plugin specs are selected by the paths their own text names. What to run while working |
 | `node --test 'scripts/__tests__/*.test.js'` | repository scripts and hooks |
 | `cd cli && pnpm test` | build, then all three CLI tiers |
 | `cd cli && pnpm smoke` | built binary against `scripts/smoke-tools.sh` |

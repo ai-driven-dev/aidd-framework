@@ -1,0 +1,18 @@
+{
+  "conversation_id": "10307932-49df-427b-95dc-a2a85ee02b9a",
+  "generation_id": "10307932-49df-427b-95dc-a2a85ee02b9a",
+  "model": "default",
+  "tool_name": "Read",
+  "tool_input": {
+    "file_path": "/home/user/probe/project-cursor-task/aidd_docs/tasks/2026_08/2026_08_15_alpha/spec.md"
+  },
+  "tool_output": "{\"file_path\":\"/home/user/probe/project-cursor-task/aidd_docs/tasks/2026_08/2026_08_15_alpha/spec.md\",\"content_length\":20}",
+  "duration": 365.266,
+  "tool_use_id": "tool_91afb302-3888-4284-8705-1098d3c2f24",
+  "session_id": "10307932-49df-427b-95dc-a2a85ee02b9a",
+  "hook_event_name": "postToolUse",
+  "cursor_version": "2026.08.11-e8db854",
+  "workspace_roots": ["/home/user/probe/project-cursor-task"],
+  "user_email": "user@example.com",
+  "transcript_path": "/home/user/probe/cursor-home-task/projects/project-cursor-task/agent-transcripts/10307932-49df-427b-95dc-a2a85ee02b9a/10307932-49df-427b-95dc-a2a85ee02b9a.jsonl"
+}

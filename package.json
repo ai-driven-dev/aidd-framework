@@ -28,7 +28,9 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "prepare": "lefthook install || true"
+    "prepare": "lefthook install || true",
+    "test:changed": "node scripts/test-changed.mjs",
+    "telemetry:reference-week": "node scripts/telemetry-reference-week.cjs"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",

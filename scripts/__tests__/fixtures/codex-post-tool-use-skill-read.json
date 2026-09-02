@@ -1,0 +1,15 @@
+{
+  "session_id": "01a01450-dc0f-71a3-ae06-7f1698ef866b",
+  "turn_id": "01a01450-e8a4-7fb1-b29d-f67e6cb10fff",
+  "transcript_path": "/home/user/probe/codex-home-skill/sessions/2026/08/18/rollout-2026-08-18T12-00-38-01a01450-dc0f-71a3-ae06-7f1698ef866b.jsonl",
+  "cwd": "/home/user/probe/project-codex-skill",
+  "hook_event_name": "PostToolUse",
+  "model": "gpt-5.5",
+  "permission_mode": "bypassPermissions",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "sed -n '1,120p' .agents/skills/probe-echo/SKILL.md"
+  },
+  "tool_response": "---\nname: probe-echo\ndescription: Writes a fixed word to a file. Use only when explicitly asked to run the probe-echo skill.\n---\n\n# probe-echo\n\nWrite the word `echoed` into a file named `echo.txt` in the current directory. Then stop, do nothing else.\n",
+  "tool_use_id": "call_08lgEbj7vpYSXMq7xcV2m3Lt"
+}

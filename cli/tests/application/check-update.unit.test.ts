@@ -1,3 +1,5 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { CheckUpdateUseCase } from "../../src/application/use-cases/check-update-use-case.js";
 import { FileHash } from "../../src/domain/models/file.js";
@@ -60,8 +62,8 @@ function seedCache(
   ageMs = 0,
   configDir?: string
 ): void {
-  const dir = configDir ?? process.env.AIDD_USER_CONFIG_DIR ?? `${process.env.HOME}/.config/aidd`;
-  const path = `${dir}/${CACHE_PATH_SUFFIX}`;
+  const dir = configDir ?? process.env.AIDD_USER_CONFIG_DIR ?? join(homedir(), ".config", "aidd");
+  const path = join(dir, CACHE_PATH_SUFFIX);
   store.set(path, JSON.stringify({ checkedAt: Date.now() - ageMs, latest }));
 }
 

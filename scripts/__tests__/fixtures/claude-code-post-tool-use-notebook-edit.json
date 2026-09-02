@@ -1,0 +1,14 @@
+{
+  "session_id": "e5e7c58b-491b-485c-ae02-59c41ac4f934",
+  "transcript_path": "/home/user/probe/cc-home/projects/-home-user-probe-project/e5e7c58b-491b-485c-ae02-59c41ac4f934.jsonl",
+  "cwd": "/home/user/probe/project",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "NotebookEdit",
+  "tool_input": {
+    "notebook_path": "/home/user/probe/project/aidd_docs/tasks/2026_08/2026_08_18_probe-task/scratch.ipynb",
+    "cell_id": "cell-0",
+    "new_source": "# Markdown Cell",
+    "cell_type": "markdown",
+    "edit_mode": "insert"
+  }
+}

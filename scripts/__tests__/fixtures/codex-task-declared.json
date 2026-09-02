@@ -1,0 +1,15 @@
+{
+  "session_id": "01a05850-9a3f-7c12-8e64-2b1d6f0a7c53",
+  "turn_id": "01a05850-a4e2-7d23-9f75-3c2e7a1b8d64",
+  "transcript_path": "/home/user/probe/codex-home-task/sessions/2026/08/31/rollout-2026-08-31T16-51-50-01a05850-9a3f-7c12-8e64-2b1d6f0a7c53.jsonl",
+  "cwd": "/home/user/probe/project-codex-task",
+  "hook_event_name": "PostToolUse",
+  "model": "gpt-5.5",
+  "permission_mode": "bypassPermissions",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "sed -n '1,120p' aidd_docs/tasks/2026_08/2026_08_15_alpha/spec.md"
+  },
+  "tool_response": "# alpha\n\nSpec body.\n",
+  "tool_use_id": "exec-4f8b2e6a-7c31-4d09-9a52-8e1f0c6b3d47"
+}

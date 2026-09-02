@@ -54,7 +54,7 @@ describe("Manifest v2 prod → v6 migration (npm 4.0.0 baseline)", () => {
 
   it("does not contain legacy top-level fields after migration", () => {
     const manifest = Manifest.fromJSON(makeV2ProdManifest());
-    const json = manifest.toJSON() as unknown as Record<string, unknown>;
+    const json = manifest.toJSON();
     for (const field of ["docs", "docsDir", "repo", "mode", "scripts", "plugins", "marketplaces"]) {
       expect(field in json).toBe(false);
     }

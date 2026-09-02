@@ -95,6 +95,17 @@ pre-commit:
             >/dev/null
           git add "${plugin}CATALOG.md" 2>/dev/null || true
         done
+    summarize-telemetry-prompts-doc:
+      run: |
+        if ! command -v node >/dev/null 2>&1; then
+          echo "ℹ️  node not available; skipping summarize-telemetry-prompts-doc"
+          exit 0
+        fi
+        node scripts/summarize-markdown.js plugins/aidd-telemetry docs/prompts-documentation.md \
+          --depth=3 \
+          --fields=description \
+          >/dev/null
+        git add docs/prompts-documentation.md 2>/dev/null || true
     sync-readme-counts:
       run: |
         if ! command -v node >/dev/null 2>&1; then
@@ -103,15 +114,43 @@ pre-commit:
         fi
         node scripts/sync-readme-counts.mjs >/dev/null
         git add README.md 2>/dev/null || true
+    scripts-test:
+      glob: "{scripts,plugins}/**"
+      run: |
+        if ! command -v node >/dev/null 2>&1; then
+          echo "ℹ️  node not available; skipping scripts-test"
+          exit 0
+        fi
+        # `node --test <dir>` treats the directory as a module path and fails, so
+        # the glob is required. A glob that matches nothing exits 0 in silence,
+        # which would make a renamed folder read as a green run — count first.
+        found=$(ls scripts/__tests__/*.test.js 2>/dev/null | wc -l | tr -d ' ')
+        if [ "$found" -eq 0 ]; then
+          echo "❌ no test files under scripts/__tests__/; the runner is not wired"
+          exit 1
+        fi
+        node --test "scripts/__tests__/**/*.test.js"
     cli-biome:
       glob: "cli/**"
       run: cd cli && pnpm lint
+    cli-layering:
+      # The two invariants biome cannot express: dependencies point inward, and no type is
+      # widened through `unknown` or `never`. Measured, not assumed — a noRestrictedImports
+      # rule written against "../../infrastructure" never fired on a violation planted in
+      # src/domain. The glob covers `cli/**`, not `cli/src/**`: the cast half of the check
+      # reads `cli/tests` too, and a test-only commit must not slip past it.
+      glob: "cli/**"
+      run: node scripts/check-cli-layering.mjs
     cli-typecheck:
       # The CLI type-checks `kanban/` too, so that folder's dependencies must be
       # resolvable. Install them only when they are missing, to keep the hook fast.
+      # `--ignore-workspace` because the repository root declares one (for pnpm's
+      # build allowlist); without the flag pnpm resolves kanban to that root, finds
+      # it lists no members, reports "Already up to date" and installs nothing —
+      # leaving this step to fail on a sibling package it was meant to repair.
       glob: "{cli,kanban}/**"
       run: |
-        [ -d kanban/node_modules ] || (cd kanban && pnpm install --frozen-lockfile)
+        [ -d kanban/node_modules ] || (cd kanban && pnpm install --frozen-lockfile --ignore-workspace)
         cd cli && pnpm typecheck
 
 pre-push:

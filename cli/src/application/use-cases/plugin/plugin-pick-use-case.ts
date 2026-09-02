@@ -22,7 +22,12 @@ export interface PluginPickResult {
   installed: readonly string[];
 }
 
-export class PluginPickUseCase {
+/** Picking a plugin interactively, as its callers need it: ask, get a choice back. */
+export interface PluginPick {
+  execute(options: PluginPickOptions): Promise<PluginPickResult>;
+}
+
+export class PluginPickUseCase implements PluginPick {
   constructor(
     private readonly registry: MarketplaceRegistry,
     private readonly resolveMarketplace: ResolveMarketplaceUseCase,

@@ -44,7 +44,7 @@
       "qs": ">=6.15.2"
     }
   },
-  "bundleBudgetKB": 500,
+  "bundleBudgetKB": 590,
   "scripts": {
     "build": "tsup && node scripts/check-bundle-size.mjs",
     "build:check-size": "node scripts/check-bundle-size.mjs",

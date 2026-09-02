@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   flattenCopilotHooksShape,
+  hookCommandsForEvent,
   mergeClaudeSettingsHooks,
   mergeCodexFrameworkHooksJson,
   mergeCursorFlatHooks,
@@ -166,6 +167,25 @@ describe("mergeCursorFlatHooks", () => {
     expect(result.hooks).toHaveProperty("beforeSubmitPrompt");
   });
 
+  // #680: the only reason a Cursor session closes a turn headlessly. Measured 2026-08-22:
+  // an interactive session fires `stop` and a headless one fires `sessionEnd` instead,
+  // never both from one run - so subscribing to `stop` alone journals nothing headless,
+  // in silence. This test fails if either name stops being emitted.
+  it("maps Stop → both stop and sessionEnd, because Cursor fires one or the other", () => {
+    const command = "node ./.cursor/hooks/plugin/turn-end.js";
+    const plugin = JSON.stringify({
+      hooks: { Stop: [{ hooks: [{ type: "command", command }] }] },
+    });
+    const { content } = mergeCursorFlatHooks(null, plugin);
+    const result = JSON.parse(content) as { hooks: Record<string, unknown[]> };
+
+    expect(Object.keys(result.hooks).sort()).toEqual(["sessionEnd", "stop"]);
+    expect(result.hooks).not.toHaveProperty("Stop");
+    // Both must carry the same command: a turn closed either way journals the same line.
+    expect(JSON.stringify(result.hooks.sessionEnd)).toBe(JSON.stringify(result.hooks.stop));
+    expect(JSON.stringify(result.hooks.stop)).toContain(command);
+  });
+
   it("emits version:1 wrapper", () => {
     const plugin = JSON.stringify({ hooks: {} });
     const { content } = mergeCursorFlatHooks(null, plugin);
@@ -248,6 +268,39 @@ describe("mergeCursorFlatHooks", () => {
 // ── mergeCodexFrameworkHooksJson ──────────────────────────────────────────────
 
 describe("mergeCodexFrameworkHooksJson", () => {
+  // #707: Codex has no `Stop` event. Its vocabulary, read out of the 0.149.0 binary and
+  // confirmed by a live `codex exec` run with all four subscribed, is SessionStart /
+  // SessionEnd / PostToolUse / PreToolUse and friends - SessionStart and SessionEnd fired,
+  // Stop never did. Subscribing to Stop alone journals a session_start with nothing after
+  // it, in silence. This test fails if that mapping is dropped.
+  it("maps Stop to SessionEnd, the event Codex actually delivers", () => {
+    // Split literal, the same way claude-root-path-rewrite.ts writes one: biome's
+    // noTemplateCurlyInString cannot tell a plugin-root token from a botched template.
+    const command = `node $${"{PLUGIN_ROOT}"}/hooks/journal.cjs turn-end`;
+    const plugin = JSON.stringify({
+      hooks: { Stop: [{ hooks: [{ type: "command", command }] }] },
+    });
+    const { content } = mergeCodexFrameworkHooksJson(null, plugin);
+    const result = JSON.parse(content) as { hooks: Record<string, unknown[]> };
+
+    expect(Object.keys(result.hooks)).toEqual(["SessionEnd"]);
+    expect(result.hooks).not.toHaveProperty("Stop");
+    expect(JSON.stringify(result.hooks.SessionEnd)).toContain(command);
+  });
+
+  it("leaves the events Codex does share with Claude under their own names", () => {
+    const plugin = JSON.stringify({
+      hooks: {
+        SessionStart: [{ hooks: [{ type: "command", command: "node a.js session-start" }] }],
+        PostToolUse: [{ hooks: [{ type: "command", command: "node a.js tool-used" }] }],
+      },
+    });
+    const { content } = mergeCodexFrameworkHooksJson(null, plugin);
+    const result = JSON.parse(content) as { hooks: Record<string, unknown[]> };
+
+    expect(Object.keys(result.hooks).sort()).toEqual(["PostToolUse", "SessionStart"]);
+  });
+
   it("emits top-level hooks wrapper", () => {
     const plugin = JSON.stringify({
       hooks: {
@@ -321,5 +374,54 @@ describe("mergeCodexFrameworkHooksJson", () => {
       hooks: { SessionStart: Array<{ matcher?: string }> };
     };
     expect(result.hooks.SessionStart[0].matcher).toBe("startup");
+  });
+});
+
+// ── hookCommandsForEvent ────────────────────────────────────────────────────────
+
+describe("hookCommandsForEvent", () => {
+  it("reads a command out of Claude's nested matcher-group shape", () => {
+    const content = JSON.stringify({
+      hooks: { SessionStart: [{ hooks: [{ type: "command", command: "run.js" }] }] },
+    });
+    expect(hookCommandsForEvent(content, "SessionStart")).toEqual(["run.js"]);
+  });
+
+  it("reads a command out of Codex's nested shape without Cursor's event rename", () => {
+    const content = JSON.stringify({
+      hooks: { SessionStart: [{ matcher: "startup", hooks: [{ command: "codex-run.js" }] }] },
+    });
+    expect(hookCommandsForEvent(content, "SessionStart")).toEqual(["codex-run.js"]);
+  });
+
+  it("reads a command out of Copilot's flat shape, event name unchanged", () => {
+    const content = JSON.stringify({
+      version: 1,
+      hooks: { SessionStart: [{ type: "command", command: "copilot-run.js" }] },
+    });
+    expect(hookCommandsForEvent(content, "SessionStart")).toEqual(["copilot-run.js"]);
+  });
+
+  it("reads a command out of Cursor's flat shape via CURSOR_EVENT_MAP's renamed event", () => {
+    const content = JSON.stringify({
+      version: 1,
+      hooks: { sessionStart: [{ command: "cursor-run.js" }] },
+    });
+    expect(hookCommandsForEvent(content, "SessionStart")).toEqual(["cursor-run.js"]);
+  });
+
+  it("returns nothing for an event the file never registered", () => {
+    const content = JSON.stringify({
+      hooks: { PostToolUse: [{ hooks: [{ command: "run.js" }] }] },
+    });
+    expect(hookCommandsForEvent(content, "SessionStart")).toEqual([]);
+  });
+
+  it("returns nothing rather than throwing on content this module never wrote", () => {
+    expect(hookCommandsForEvent("not json", "SessionStart")).toEqual([]);
+    expect(hookCommandsForEvent(JSON.stringify({ enabledPlugins: {} }), "SessionStart")).toEqual(
+      []
+    );
+    expect(hookCommandsForEvent(JSON.stringify({ hooks: [] }), "SessionStart")).toEqual([]);
   });
 });

@@ -1,10 +1,11 @@
 import { AgentsCapability } from "../../capabilities/agents-capability.js";
 import { CommandsCapability } from "../../capabilities/commands-capability.js";
-import { buildClaudeStyleMarketplaceEntry } from "../../capabilities/marketplace-entry.js";
+import { buildDefaultMarketplaceEntry } from "../../capabilities/marketplace-entry.js";
 import { McpCapability } from "../../capabilities/mcp-capability.js";
 import { PluginsCapability } from "../../capabilities/plugins-capability.js";
 import { RulesCapability } from "../../capabilities/rules-capability.js";
 import { SkillsCapability } from "../../capabilities/skills-capability.js";
+import { CLAUDE_CODE_TRANSCRIPT_LOCATION } from "../../formats/claude-code-transcript.js";
 import {
   convertCommandFrontmatter,
   detectSectionKeyFromPrefixes,
@@ -12,6 +13,7 @@ import {
   stripToolSuffix,
 } from "../../formats/command.js";
 import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
+import { CLAUDE_PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token-rewrite.js";
 import { CONFIG_MCP } from "../../models/framework.js";
 import type {
   AiTool,
@@ -36,6 +38,7 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
   {
     kind: "ai",
     toolId: "claude",
+    displayName: "Claude Code",
     directory: DIRECTORY,
     toolSuffix: TOOL_SUFFIX,
     signalDir: ".claude/commands",
@@ -106,16 +109,33 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         pluginsDir: ".claude/plugins/",
         pluginManifestRelativePath: "plugin.json",
         acceptsHooks: true,
+        pluginRootToken: CLAUDE_PLUGIN_ROOT_TOKEN,
         acceptsMcp: true,
         translationMode: "marketplace",
         marketplaceSettings: {
           settingsPath: ".claude/settings.json",
           settingsKey: "extraKnownMarketplaces",
           enabledPluginsKey: "enabledPlugins",
-          toEntry: buildClaudeStyleMarketplaceEntry,
+          toEntry: buildDefaultMarketplaceEntry,
         },
+        // Measured: `claude -p` reads its own user-global plugin registry, not
+        // the project-local settings.json declaration above — see claude-cli-adapter.ts.
+        nativeActivation: { binary: "claude" },
       }),
     },
+
+    // Measured 2026-08-20: an assistant message in ~/.claude/projects/*/*.jsonl carries
+    // `message.usage`'s four counters and `message.model`, keyed on `requestId`. See
+    // claude-code-transcript.ts for the full measurement and its two captured fixtures.
+    telemetryLocalRead: {
+      kind: "declared",
+      transcript: CLAUDE_CODE_TRANSCRIPT_LOCATION,
+      // The mirror image of the export: the transcript names the running skill exactly, on
+      // the same line as the counters, and carries no amount at all.
+      supplies: { tokenCounters: true, amount: false, toolStatedStep: true },
+    },
+    telemetryTaskAttributable: true,
+    telemetryJournalHost: "claude-code",
 
     rewriteContent(content: string, docsDir: string): string {
       return baseRewriteContent(content, DIRECTORY, docsDir).replace(

@@ -1,5 +1,5 @@
 import "../../../../../src/domain/tools/ai/cursor.js";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ModeBFlatMaterializationTranslator } from "../../../../../src/application/use-cases/plugin/translator/mode-b-flat-materialization-translator.js";
 import { Manifest } from "../../../../../src/domain/models/manifest.js";
@@ -48,7 +48,10 @@ describe("install cursor plugin via Mode B (integration)", () => {
       "docs"
     );
 
-    const expectedBase = join(STUB_HOME, ".cursor", "plugins", "local");
+    // fs.listAll() returns the adapter's own "/"-normalised keys (in-memory-file-adapter.ts's
+    // `norm`) - a raw `.startsWith` needs the same convention, unlike `fs.has()` below which
+    // normalises internally.
+    const expectedBase = posix.join(STUB_HOME, ".cursor", "plugins", "local");
     const writtenPaths = fs.listAll();
     expect(writtenPaths.some((p) => p.startsWith(expectedBase))).toBe(true);
   });

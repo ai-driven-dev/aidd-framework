@@ -14,6 +14,7 @@ import { registerRestoreCommand } from "./application/commands/restore.js";
 import { registerSelfUpdateCommand } from "./application/commands/self-update.js";
 import { registerSetupCommand } from "./application/commands/setup.js";
 import { registerStatusCommand } from "./application/commands/status.js";
+import { registerTelemetryCommand } from "./application/commands/telemetry.js";
 import { registerUpdateCommand } from "./application/commands/update.js";
 import { CLIOutput } from "./application/output.js";
 import { CurrentVersionAdapter } from "./infrastructure/adapters/current-version-adapter.js";
@@ -46,6 +47,7 @@ registerRestoreCommand(program);
 registerUpdateCommand(program);
 registerDoctorCommand(program);
 registerCleanCommand(program);
+registerTelemetryCommand(program);
 registerSelfUpdateCommand(program);
 
 // Commands already paying for network I/O: piggyback the update-check refresh on them.

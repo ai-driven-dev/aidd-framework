@@ -1,0 +1,21 @@
+{
+  "session_id": "09195cc1-d8d3-4158-bb62-d0ecb1c04004",
+  "transcript_path": "/home/user/probe/cc-home-skill/projects/-home-user-probe-project-cc-skill/09195cc1-d8d3-4158-bb62-d0ecb1c04004.jsonl",
+  "cwd": "/home/user/probe/project-cc-skill",
+  "prompt_id": "16231051-346b-4bfd-addc-581f911ef878",
+  "permission_mode": "bypassPermissions",
+  "effort": {
+    "level": "high"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Skill",
+  "tool_input": {
+    "skill": "probe-echo"
+  },
+  "tool_response": {
+    "success": true,
+    "commandName": "probe-echo"
+  },
+  "tool_use_id": "toolu_01L2UiKHFgAUckYuv1cSTBJ3",
+  "duration_ms": 62
+}

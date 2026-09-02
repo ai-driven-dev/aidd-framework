@@ -1,6 +1,6 @@
 import { AgentsCapability } from "../../capabilities/agents-capability.js";
 import { CommandsCapability } from "../../capabilities/commands-capability.js";
-import { buildClaudeStyleMarketplaceEntry } from "../../capabilities/marketplace-entry.js";
+import { buildDefaultMarketplaceEntry } from "../../capabilities/marketplace-entry.js";
 import { McpCapability } from "../../capabilities/mcp-capability.js";
 import { PluginsCapability } from "../../capabilities/plugins-capability.js";
 import { RulesCapability } from "../../capabilities/rules-capability.js";
@@ -10,6 +10,7 @@ import {
   convertCommandFrontmatter,
   reverseConvertCommandFrontmatter,
 } from "../../formats/command.js";
+import { PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token-rewrite.js";
 import {
   AT_DOCS_PLACEHOLDER,
   AT_TOOLS_PLACEHOLDER,
@@ -256,6 +257,7 @@ export const copilot: AiTool<
 > = {
   kind: "ai",
   toolId: "copilot",
+  displayName: "GitHub Copilot",
   directory: DIRECTORY,
   toolSuffix: TOOL_SUFFIX,
   signalDir: ".github/prompts",
@@ -321,11 +323,14 @@ export const copilot: AiTool<
       pluginsDir: ".github/plugins/",
       pluginManifestRelativePath: "plugin.json",
       acceptsHooks: true,
+      // Never measured against a running Copilot hook, unlike Codex's. This is what the
+      // build route has been shipping, kept as-is rather than changed on a guess.
+      pluginRootToken: PLUGIN_ROOT_TOKEN,
       acceptsMcp: true,
       translationMode: "marketplace",
       // Copilot treats enabledPlugins in settings.json as a recommendation, not an
       // auto-install (github/copilot-cli#2249); the project marketplace is also not
-      // installable from project scope (#3088). Drive `copilot plugin install` to
+      // installable from project scope. Drive `copilot plugin install` to
       // actually load plugins — the settings file below still surfaces recommendations.
       nativeActivation: { binary: "copilot" },
       // VS Code Copilot: extraKnownMarketplaces in .github/copilot/settings.json.
@@ -336,10 +341,41 @@ export const copilot: AiTool<
         settingsPath: ".github/copilot/settings.json",
         settingsKey: "extraKnownMarketplaces",
         enabledPluginsKey: "enabledPlugins",
-        toEntry: buildClaudeStyleMarketplaceEntry,
+        toEntry: buildDefaultMarketplaceEntry,
       },
     }),
   },
+
+  // Measured, against a real ~/.copilot/session-state/<id>/events.jsonl:
+  // `session.shutdown`'s own `tokenDetails` carries all four counters, but once, for the
+  // whole session — never per request, so no per-step record can be built from it. No
+  // `transcript` location: the session id names the file exactly
+  // (~/.copilot/session-state/<id>/events.jsonl), so `CopilotCostReaderAdapter` opens it
+  // directly rather than walking a directory to find it — see domain/formats/
+  // copilot-events.ts for the reader and the arithmetic that settles it.
+  telemetryLocalRead: {
+    kind: "declared",
+    supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
+    // The exclusivity of `input` against `cache_read` is NOT established. The only capture
+    // this repository holds (tests/fixtures/local-cost/.copilot/.../events.jsonl) reports
+    // `cache_read: 0`, so "input excludes the cached prompt" and "input already includes it"
+    // produce the same number and cannot be told apart from it. Exclusivity against
+    // `cache_write` is measured (10 + 21070), which is what makes only this one open.
+    // It matters because the report adds the four counters as disjoint: if `input` turns out
+    // to include `cache_read`, a Copilot session's total is over-counted by the cached share.
+    // Closing it takes one capture of a session with a non-zero `cache_read` — see #654's
+    // sibling work and plugins/aidd-telemetry/README.md.
+    limitation:
+      "Its own file names outputTokens per turn, but session.shutdown carries all four " +
+      "counters for the whole session — a session total, never a sum of requests. Whether " +
+      "its input count excludes the cached prompt is unconfirmed: the only session captured " +
+      "read back zero cache, which cannot tell the two apart.",
+  },
+  // Copilot's canonical payload carries no tool_input, but a declaration reads its toolArgs
+  // JSON string as plain text instead - the same tolerance that already lets a step be read
+  // off either of Copilot's two shapes.
+  telemetryTaskAttributable: true,
+  telemetryJournalHost: "copilot",
 
   rewriteContent: rewriteCopilotContent,
 

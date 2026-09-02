@@ -1,0 +1,3 @@
+# See cli/pnpm-workspace.yaml. This stops pnpm searching upward and treating the
+# repository root as this project's workspace.
+packages: []

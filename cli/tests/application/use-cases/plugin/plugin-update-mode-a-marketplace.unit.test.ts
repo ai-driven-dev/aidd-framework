@@ -12,7 +12,8 @@ import { seedFromDirectory } from "../../../helpers/ports/seed-from-directory.js
 const PLUGIN_FIXTURE = join(process.cwd(), "tests/fixtures/plugins/claude-format/sample-plugin");
 const PROJECT_ROOT = "/test-project";
 const HOME = "/home/u";
-const BUILT_OPENCODE_SKILL = "/built/opencode/.opencode/skills/sample-plugin-demo/SKILL.md";
+// Skills nest under <plugin>/ in the built tree (agents stay hyphen-namespaced).
+const BUILT_OPENCODE_SKILL = "/built/opencode/.opencode/skills/sample-plugin/demo/SKILL.md";
 
 // A plugin whose catalog entry resolves to a github-hosted source (git-subdir), the shape
 // PluginInstallFromMarketplaceUseCase produces for any plugin catalogued in a github marketplace.
@@ -156,7 +157,7 @@ describe("PluginUpdateUseCase — flat-mode tools are unaffected (regression gua
     expect(plugin?.version).toBe("1.0.0");
     expect(plugin?.files.size).toBeGreaterThan(0);
     expect(
-      deps.fs.getFile(join(PROJECT_ROOT, ".opencode/skills/sample-plugin-demo/SKILL.md"))
+      deps.fs.getFile(join(PROJECT_ROOT, ".opencode/skills/sample-plugin/demo/SKILL.md"))
     ).toBe("# Demo skill v2");
   });
 });
