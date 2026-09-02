@@ -40,6 +40,7 @@ export default defineWorkspace([
       globals: false,
       environment: "node",
       testTimeout: 60000,
+      globalSetup: ["./tests/e2e/global-setup.ts"],
     },
   },
 ]);

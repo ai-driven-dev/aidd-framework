@@ -39,6 +39,7 @@
     "includes": [
       "**",
       "!**/dist",
+      "!**/.e2e-build",
       "!**/node_modules",
       "!**/example",
       "!**/temp",

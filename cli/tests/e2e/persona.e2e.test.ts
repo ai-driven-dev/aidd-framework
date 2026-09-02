@@ -13,12 +13,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { createTestEnv, runCli } from "./helpers.js";
+import { CLI_PATH, createTestEnv, runCli } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
 
 const REAL_FW = resolve(process.cwd(), "tests/fixtures/framework-real");
-const CLI_PATH = resolve(process.cwd(), "dist/cli.js");
 const EXPECT_BIN = "/usr/bin/expect";
 const AIDD_DIR = ".aidd";
 

@@ -3,12 +3,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
+import { CLI_PATH } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
-const CLI_PATH = resolve(process.cwd(), "dist/cli.js");
 const FAKE_TAG = "v999.0.0"; // current CLI is 4.6.x → always outdated against this
 
 interface FakeRelease {

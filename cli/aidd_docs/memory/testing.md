@@ -3,10 +3,10 @@
 ## Tools and Frameworks
 
 - Framework: `vitest` with workspace configuration (`vitest.workspace.ts`)
-- Runner: `pnpm test` (runs `pnpm build` first, then `vitest run`)
+- Runner: `pnpm test` (`vitest run`; the e2e project builds its own binary — see below)
 - Test files: in `tests/` directory (not co-located with `src/`)
 - Watch mode: `pnpm test:watch`
-- Mutation testing: `pnpm test:mutation` (Stryker, scoped to `domain/models/manifest.ts`)
+- Mutation testing: `pnpm test:mutation` (Stryker, scoped to `src/kernel/`)
 
 ## Test Pyramid — 3 Tiers
 
@@ -87,15 +87,28 @@ pnpm test             # all tiers
 pnpm test:mutation    # Stryker mutation (slow)
 ```
 
-### Run one vitest at a time
+### Concurrent vitest runs don't share a binary
 
 The golden suites capture the same command twice and compare the bytes, which is how they
-prove a snapshot is deterministic. Two vitest invocations at once break that: they share
-one `dist/cli.js`, so a rebuild landing between the two captures changes the bytes and the
-determinism test reports a difference that is not there.
+prove a snapshot is deterministic. That used to break under two concurrent vitest
+invocations: `pnpm test` built `dist/cli.js` (`clean: true`) before every run, and every
+e2e file read that same shared path, so a second run's rebuild could delete and rewrite
+the binary the first run's golden suites were still reading mid-capture — the
+determinism test then reported a difference that was not there. Seen twice, both times
+chased as a phantom, before the cause was measured.
 
-Seen twice in this refactor, both times chasing a phantom. If those two tests fail and
-nothing else does, re-run alone before looking for a cause.
+Fixed by removing the sharing rather than serialising the runs: `tests/e2e/global-setup.ts`
+builds a private binary per e2e run, in a gitignored `.e2e-build/` under `cli/`, and
+publishes its path via
+vitest's `provide`/`inject`. The directory sits inside the package on purpose:
+`skipNodeModulesBundle` leaves the dependencies external, and Node resolves those by
+walking up from the built file, so a build outside `cli/` dies on `commander`.
+`tests/e2e/helpers.ts` reads that published path — no fallback
+to `dist/cli.js`, so a run started outside the e2e project throws naming the global setup
+instead of silently reading the shared file. `tests/architecture/no-shared-binary.arch.test.ts`
+holds the boundary: no file under `tests/` may resolve a path into `dist/`. `pnpm test` and
+`pnpm test:e2e` no longer run `pnpm build` — nothing in a test run reads `dist/` any more.
+Two vitest invocations at once are safe.
 
 ### Read the suite count, not only the test count
 

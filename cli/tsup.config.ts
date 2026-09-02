@@ -1,11 +1,24 @@
 import { copyFileSync } from "node:fs";
+import { join } from "node:path";
 import { defineConfig } from "tsup";
+
+/**
+ * Where the build lands. Each e2e run passes its own directory
+ * (`tests/e2e/global-setup.ts`) so two concurrent vitest invocations never share, and
+ * race to rewrite, one `dist/cli.js`.
+ *
+ * It must stay inside this package. `skipNodeModulesBundle` leaves every dependency an
+ * external import that Node resolves by walking up from the built file, so a directory
+ * under `cli/` finds `cli/node_modules` on its own. A directory outside — an OS temp dir
+ * — finds nothing, and the binary fails on `commander` before it prints a word.
+ */
+const outDir = process.env.AIDD_BUILD_OUT_DIR ?? "dist";
 
 export default defineConfig({
   entry: { cli: "src/cli.ts" },
   format: ["esm"],
   target: "node20",
-  outDir: "dist",
+  outDir,
   clean: true,
   banner: {
     js: "#!/usr/bin/env node",
@@ -31,20 +44,23 @@ export default defineConfig({
   async onSuccess() {
     copyFileSync(
       "assets/schemas/claude-code-plugin-manifest.json",
-      "dist/claude-code-plugin-manifest.json"
+      join(outDir, "claude-code-plugin-manifest.json")
     );
     copyFileSync(
       "assets/schemas/copilot-plugin-marketplace.json",
-      "dist/copilot-plugin-marketplace.json"
+      join(outDir, "copilot-plugin-marketplace.json")
     );
     copyFileSync(
       "assets/schemas/claude-marketplace-manifest.json",
-      "dist/claude-marketplace-manifest.json"
+      join(outDir, "claude-marketplace-manifest.json")
     );
-    copyFileSync("assets/schemas/codex-plugin-manifest.json", "dist/codex-plugin-manifest.json");
+    copyFileSync(
+      "assets/schemas/codex-plugin-manifest.json",
+      join(outDir, "codex-plugin-manifest.json")
+    );
     copyFileSync(
       "assets/schemas/codex-marketplace-manifest.json",
-      "dist/codex-marketplace-manifest.json"
+      join(outDir, "codex-marketplace-manifest.json")
     );
   },
 });

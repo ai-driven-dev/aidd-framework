@@ -4,6 +4,7 @@ import { copyFile, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { promisify } from "node:util";
+import { inject } from "vitest";
 import { InitUseCase } from "../../src/contexts/framework/application/init-use-case.js";
 import { CLIOutput } from "../../src/presentation/output.js";
 import { createDeps } from "../../src/runtime/wiring/framework.js";
@@ -24,7 +25,23 @@ export async function gitInit(cwd: string): Promise<void> {
   await execFileAsync("git", ["init"], { cwd, env });
 }
 
-export const CLI_PATH = resolve(process.cwd(), "dist/cli.js");
+/**
+ * The binary this run built for itself (tests/e2e/global-setup.ts), published via
+ * provide/inject. No fallback to dist/cli.js: that path is shared across concurrent
+ * vitest runs, and reading it here is the bug this indirection exists to remove.
+ */
+function resolveCliPath(): string {
+  const cliPath = inject("cliPath");
+  if (!cliPath) {
+    throw new Error(
+      "CLI_PATH is unset: tests/e2e/global-setup.ts did not run. Run e2e tests through " +
+        "the e2e vitest project (`pnpm test:e2e` or `vitest run --project e2e`)."
+    );
+  }
+  return cliPath;
+}
+
+export const CLI_PATH = resolveCliPath();
 export const FRAMEWORK_PATH = resolve(process.cwd(), "tests/fixtures/framework");
 export const FRAMEWORK_V2_PATH = resolve(process.cwd(), "tests/fixtures/framework-v2");
 
