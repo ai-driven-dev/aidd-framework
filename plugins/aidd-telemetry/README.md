@@ -88,7 +88,10 @@ the tokens and knows nothing about AIDD skills.
 
 **`read` joins the two.** It opens the transcript, normalises it into one shape whatever
 tool produced it, matches each record against the journal, and stores the result under
-`~/.config/aidd/telemetry/`. `report` reads only that.
+`~/.config/aidd/telemetry/`. `report` reads that store — and, before it answers, joins
+any session the journal names that the store has not caught up with, so **you never
+have to run `read` to get a figure**. `read` stays the command for asking what each
+tool answered, one line per tool, rather than a total.
 
 The join cannot happen live: when a hook fires, the tokens for that turn are not written
 yet.
