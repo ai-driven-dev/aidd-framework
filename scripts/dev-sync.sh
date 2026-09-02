@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dev-sync.sh - (re)register the marketplace and install every plugin into Claude and Codex
+# dev-sync.sh - (re)install every plugin into Claude, Codex, and OpenCode
 # from THIS checkout. Claude installs from the raw repo (already native Claude format). Codex
 # installs from a native tree built by the aidd CLI (which maps Claude syntax -> Codex,
 # e.g. agents -> TOML), so what you run locally matches what ships at release.
@@ -8,9 +8,10 @@
 #   scripts/dev-sync.sh aidd-refine aidd-pm  # several
 #   scripts/dev-sync.sh all                  # every plugin (default)
 #
-# NOT live: the install copies built files into each tool's plugin cache, so re-run after
-# an edit. Idempotent; each tool is skipped if its CLI is absent. Needs network the first
-# time (npx fetches the CLI). Restart the Claude/Codex session afterwards to load the files.
+# NOT live: the local install copies built files into each tool's cache/config, so re-run
+# after an edit. Idempotent; each tool is skipped if its CLI is absent. Needs network the
+# first time (npx fetches the CLI). A managed OpenCode host may expose the fixed-purpose
+# `aidd-opencode-reload` helper instead; that helper decides which trusted checkout can load.
 #
 # Codex caveat: the CLI emits codex-agents/*.toml but the .codex-plugin manifest does not
 # declare them, and Codex only loads agents from ~/.codex/agents/ - so after install we copy
@@ -26,15 +27,33 @@ BUILD="${BUILD:-$HOME/.cache/aidd-framework-dev}"  # per-tool native trees the m
 CODEX_CACHE="${CODEX_CACHE:-$HOME/.codex/plugins/cache}"
 CLAUDE_CACHE="${CLAUDE_CACHE:-$HOME/.claude/plugins/cache}"
 CODEX_AGENTS="${CODEX_AGENTS:-$HOME/.codex/agents}"
+OPENCODE_SKILLS="${OPENCODE_SKILLS:-$HOME/.config/opencode/skills}"
 
 HAVE_CODEX=0;  command -v codex  >/dev/null 2>&1 && HAVE_CODEX=1
 HAVE_CLAUDE=0; command -v claude >/dev/null 2>&1 && HAVE_CLAUDE=1
+HAVE_OPENCODE=0; command -v opencode >/dev/null 2>&1 && HAVE_OPENCODE=1
+HAVE_MANAGED_OPENCODE=0; command -v aidd-opencode-reload >/dev/null 2>&1 && HAVE_MANAGED_OPENCODE=1
 
 build_tool() { # tool -> $BUILD/$tool ; returns non-zero on build failure
   local tool="$1"
   rm -rf "$BUILD/$tool"; mkdir -p "$BUILD/$tool"
+  local mode=()
+  [ "$tool" != opencode ] || mode=(--flat)
   npx --yes "@ai-driven-dev/cli@${AIDD_CLI_VERSION}" framework build \
-    --source "$FW" --target "$tool" --out "$BUILD/$tool" >/dev/null 2>&1
+    --source "$FW" --target "$tool" --out "$BUILD/$tool" "${mode[@]}" >/dev/null 2>&1
+}
+
+sync_opencode_skills() {
+  local name source skill destination
+  mkdir -p "$OPENCODE_SKILLS"
+  for name in "$@"; do
+    source="$BUILD/opencode/.opencode/skills"
+    find "$OPENCODE_SKILLS" -mindepth 1 -maxdepth 1 -type d -name "$name-*" -exec rm -rf -- {} +
+    for skill in "$source/$name-"*/; do
+      destination="$OPENCODE_SKILLS/$(basename "$skill")"
+      cp -R "$skill" "$destination"
+    done
+  done
 }
 
 register_marketplace() { # tool
@@ -104,8 +123,8 @@ sync_one() {
   echo
 }
 
-if [ "$HAVE_CODEX" = 0 ] && [ "$HAVE_CLAUDE" = 0 ]; then
-  echo "Neither Claude nor Codex CLI found - nothing to install."; exit 0
+if [ "$HAVE_CODEX" = 0 ] && [ "$HAVE_CLAUDE" = 0 ] && [ "$HAVE_OPENCODE" = 0 ] && [ "$HAVE_MANAGED_OPENCODE" = 0 ]; then
+  echo "No Claude, Codex, or OpenCode installation found - nothing to install."; exit 0
 fi
 
 targets=()
@@ -124,7 +143,21 @@ fi
 if [ "$HAVE_CLAUDE" = 1 ]; then
   register_marketplace claude
 fi
+if [ "$HAVE_OPENCODE" = 1 ] && [ "$HAVE_MANAGED_OPENCODE" = 0 ]; then
+  printf '%-22s' "build opencode"
+  build_tool opencode && echo "ok" || { echo "FAIL"; HAVE_OPENCODE=0; }
+fi
 
 for t in "${targets[@]}"; do sync_one "$t"; done
 
-echo "Done. Restart the Claude/Codex session to load the refreshed files."
+if [ "$HAVE_OPENCODE" = 1 ] && [ "$HAVE_MANAGED_OPENCODE" = 0 ]; then
+  printf '%-22s' "install opencode"
+  sync_opencode_skills "${targets[@]}"
+  echo "skills:ok"
+fi
+if [ "$HAVE_MANAGED_OPENCODE" = 1 ]; then
+  printf '%-22s' "reload opencode"
+  aidd-opencode-reload
+fi
+
+echo "Done. Restart Claude/Codex; OpenCode discovers the refreshed skills without a restart."
