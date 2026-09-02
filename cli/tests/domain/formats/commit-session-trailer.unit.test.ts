@@ -18,6 +18,21 @@ describe("the line added to a repository's own prepare-commit-msg", () => {
 
     expect(line).toContain('"/Users/a b/repo/.git/hooks/x.sh"');
   });
+
+  // A hook is shell, run by the `sh` Git for Windows ships, and that shell does not resolve
+  // `C:\Users\…` — inside double quotes a backslash is an ordinary character, so the path
+  // would arrive literally and name nothing. Node's `resolve` hands back backslashes there,
+  // so this is where a filesystem path stops being one.
+  it("writes a Windows path with forward slashes, which is the only form sh resolves", () => {
+    const line = sessionTrailerHookLine("C:\\Users\\a\\repo\\.git\\hooks\\x.sh");
+
+    expect(line).toBe('sh "C:/Users/a/repo/.git/hooks/x.sh" "$@"');
+    expect(line).not.toContain("\\");
+  });
+
+  it("leaves a POSIX path exactly as it was", () => {
+    expect(sessionTrailerHookLine("/repo/.git/hooks/x.sh")).toBe('sh "/repo/.git/hooks/x.sh" "$@"');
+  });
 });
 
 describe("the delegate a commit's message actually passes through", () => {

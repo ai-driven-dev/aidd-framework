@@ -49,9 +49,21 @@ export const SESSION_TRAILER_DELEGATE_FILE = "aidd-session-trailer.sh";
 /** The line appended to `prepare-commit-msg`, and the marker read back to tell an install
  * that already happened from one that has not. `"$@"` forwards git's own three arguments —
  * the message file, where the message came from, and the commit being amended — because the
- * delegate reads the first two and a hook that dropped them would trailer a merge. */
+ * delegate reads the first two and a hook that dropped them would trailer a merge.
+ *
+ * The separators are forced to `/`, which is the whole of what makes this work on Windows.
+ * A hook is shell, run by the `sh` Git for Windows ships, and that shell does not resolve
+ * `C:\Users\…`: inside double quotes a backslash is an ordinary character, so the path
+ * arrives literally and names nothing. `C:/Users/…` it resolves fine. Node's own `resolve`
+ * hands back backslashes there, so this is the seam where a filesystem path becomes shell
+ * text and has to stop being one. On POSIX the replacement matches nothing and the string is
+ * unchanged.
+ *
+ * Both sides go through here — `installCommitMessageDelegate` writes this line and
+ * `removeCommitMessageDelegate` looks for it — so the two can never disagree about the
+ * spelling, whatever the platform. */
 export function sessionTrailerHookLine(delegatePath: string): string {
-  return `sh "${delegatePath}" "$@"`;
+  return `sh "${delegatePath.replace(/\\/gu, "/")}" "$@"`;
 }
 
 /**

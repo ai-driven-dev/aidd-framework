@@ -47,14 +47,22 @@ function makeInstalledRepo() {
     if (entry.name === "hooks.json") continue;
     fs.cpSync(path.join(hooksSrc, entry.name), path.join(pluginDir, entry.name), { recursive: true });
   }
-  // A byte-identical `.mjs` twin, for these tests alone. An install carries the plugin as
-  // `.js` because OpenCode auto-discovers `{plugin,plugins}/*.{ts,js}` and nothing else, and
-  // it loads the file with its own runtime, which does not consult Node's `type` field -
-  // measured: with `hooks/`'s `"type": "commonjs"` marker in place, a real OpenCode session
-  // still journals its session_start. These tests `import()` it with plain Node, which does
-  // consult that marker, and a directory-wide override is not available: `journal.cjs` and
-  // `lib/` are its CommonJS siblings in the same directory. The extension is the only thing
-  // that differs from what ships.
+  // A byte-identical `.mjs` twin, for these tests alone.
+  //
+  // An install carries the plugin as `.js`, and that is forced rather than chosen: OpenCode
+  // auto-discovers `{plugin,plugins}/*.{ts,js}` and nothing else, so an `.mjs` would simply
+  // never be found. It loads the file with its own runtime, which does not consult Node's
+  // `type` field — measured against a real OpenCode session, which journals its
+  // session_start.
+  //
+  // Plain Node does consult that field, and there is none to consult: neither this
+  // repository's root `package.json` nor `hooks/` declares one, so Node reaches the file as
+  // typeless, finds ESM syntax, and reparses — with a warning, and only on a Node new enough
+  // to do it at all. An earlier version of this comment said the measurement was taken "with
+  // `hooks/`'s `\"type\": \"commonjs\"` marker in place"; there is no such file, and every
+  // sibling in that directory is `.cjs`, which needs no marker. Naming the extension
+  // explicitly is what these tests do instead, and the extension is the only thing that
+  // differs from what ships.
   const esmTwin = path.join(pluginDir, "opencode-plugin.mjs");
   fs.copyFileSync(path.join(pluginDir, "opencode-plugin.js"), esmTwin);
   return { repo, pluginDir, esmTwin };
