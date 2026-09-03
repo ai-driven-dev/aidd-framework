@@ -163,6 +163,9 @@ function describeCommitTrailer(trailer: TelemetryCommitTrailerSetup): string {
     parts.push("its script is not executable, so git will not run it");
   }
   if (trailer.callSite === "missing") parts.push("prepare-commit-msg does not call it");
+  if (trailer.hookExecutable === false) {
+    parts.push("prepare-commit-msg is not executable, so git ignores it");
+  }
   if (trailer.callSite === "no-hook-file") parts.push("there is no prepare-commit-msg");
   // Said, never named. Which tool owns the file changes nothing a person does about it, and
   // naming one would be a guess read out of its contents.
@@ -182,7 +185,11 @@ function describeTrailerCount(trailer: TelemetryCommitTrailerSetup): string {
   if (carried === undefined) return "no commit history to read";
   const count = `${carried.carrying} of the last ${carried.examined} commits carry it`;
   const everyPartWorks = trailer.delegate === "executable" && trailer.callSite === "present";
-  if (!everyPartWorks || carried.carrying === carried.examined) return count;
+  // `carrying > 0` and not `>= 0`: zero with every part in place is the finding this whole
+  // row exists to surface, and excusing it as by-design is the one thing that must not
+  // happen. The docstring above says "some", and this is what makes that true.
+  const someCarry = carried.carrying > 0 && carried.carrying < carried.examined;
+  if (!everyPartWorks || !someCarry) return count;
   return `${count} — a commit no session made carries none, by design`;
 }
 

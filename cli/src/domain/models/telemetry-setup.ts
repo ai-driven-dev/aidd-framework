@@ -383,6 +383,11 @@ export interface TelemetryCommitTrailerSetup {
   readonly delegate: "executable" | "not-executable" | "absent";
   /** Whether `prepare-commit-msg` carries the line that calls the delegate. */
   readonly callSite: "present" | "missing" | "no-hook-file";
+  /** Whether that hook is executable, when there is one. Git refuses to run a hook without
+   * the bit and prints a hint on every commit; a regeneration that drops it leaves an
+   * install that looks perfect and writes nothing. Absent when there is no hook to ask
+   * about — a third state, not a `false`. */
+  readonly hookExecutable?: boolean;
   /** Whether that hook holds anything besides our own line — true where lefthook, husky or a
    * hand-written hook owns the file. Said, never named: which tool it is changes nothing a
    * person does, and naming one would be a guess from its contents. */

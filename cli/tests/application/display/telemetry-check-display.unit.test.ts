@@ -356,6 +356,21 @@ describe("the row saying whether commits carry their session", () => {
 
   // Git will not run a hook it cannot execute, so present-but-not-executable is its own
   // sentence rather than a shade of installed.
+  // Zero with every part in place is the finding this row exists to surface. Excusing it as
+  // by-design was the one outcome that had to be impossible, and the guard read `>= 0`.
+  it("never excuses zero, whatever else is in place", () => {
+    const text = report({ ...HEALTHY, recentlyCarrying: { carrying: 0, examined: 20 } });
+
+    expect(text).toContain("0 of the last 20 commits carry it");
+    expect(text).not.toContain("by design");
+  });
+
+  it("says a hook git will not run is not executable", () => {
+    const text = report({ ...HEALTHY, hookExecutable: false });
+
+    expect(text).toContain("prepare-commit-msg is not executable");
+  });
+
   it("says a delegate that is not executable will not be run", () => {
     expect(report({ ...HEALTHY, delegate: "not-executable" })).toContain("not executable");
   });

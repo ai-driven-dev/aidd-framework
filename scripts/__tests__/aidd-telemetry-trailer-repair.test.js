@@ -63,7 +63,12 @@ function installDelegate(hooksDir) {
   const delegatePath = path.join(hooksDir, DELEGATE);
   fs.writeFileSync(delegatePath, "#!/bin/sh\nexit 0\n");
   fs.chmodSync(delegatePath, 0o755);
-  return `sh "${delegatePath.replace(/\\/gu, "/")}" "$@"`;
+  // The physical path, because that is what the repair writes: it builds the line from the
+  // realpath its own containment guard approved, so a line built here from the unresolved
+  // spelling would differ on any machine whose temp directory is reached through a link —
+  // every macOS one, where `/var` is a link to `/private/var`.
+  const resolved = path.join(fs.realpathSync(hooksDir), DELEGATE);
+  return `sh "${resolved.replace(/\\/gu, "/")}" "$@"`;
 }
 
 /** A regeneration, reproduced: the file a person's other tool owns, replaced whole. */
@@ -178,17 +183,117 @@ test("nothing is written when measurement is off for the project", () => {
   });
 });
 
-// The hook must never turn a person's session into an error over a file it could not write.
-test("an unwritable hook file costs the session nothing", () => {
+/**
+ * A file the filesystem says cannot be written is left exactly as it is, and the session
+ * survives. `rename` needs the *directory*, not the file, so without an explicit check a
+ * `0444` hook was silently replaced and left reading `0444` — its content changed while its
+ * permissions said it could not be. The old test asserted only that the session exited 0,
+ * which was true either way.
+ */
+test("an unwritable hook file is left alone, and costs the session nothing", () => {
   withRepo(({ root, hooksDir }) => {
     installDelegate(hooksDir);
     const hookPath = path.join(hooksDir, "prepare-commit-msg");
-    fs.writeFileSync(hookPath, "#!/bin/sh\n");
+    fs.writeFileSync(hookPath, "#!/bin/sh\n# theirs\n");
+    const before = fs.readFileSync(hookPath, "utf8");
     fs.chmodSync(hookPath, 0o444);
     try {
       assert.equal(sessionStart(root).status, 0);
+      assert.equal(fs.readFileSync(hookPath, "utf8"), before);
     } finally {
       fs.chmodSync(hookPath, 0o644);
+    }
+  });
+});
+
+// `open(2)` applies the umask to the mode it is handed, so a staged write narrowed a `0770`
+// hook to `0750`. Narrowing is as much a change to somebody else's file as widening.
+test("a repair does not narrow a hook's group permissions", () => {
+  withRepo(({ root, hooksDir }) => {
+    installDelegate(hooksDir);
+    const hookPath = path.join(hooksDir, "prepare-commit-msg");
+    fs.writeFileSync(hookPath, "#!/bin/sh\n# generated\n");
+    fs.chmodSync(hookPath, 0o770);
+
+    assert.equal(sessionStart(root).status, 0);
+
+    assert.equal(fs.statSync(hookPath).mode & 0o777, 0o770);
+  });
+});
+
+/**
+ * The atomicity criterion, asserted on the one thing only `rename` produces: a different
+ * inode. A direct `writeFileSync` truncates and refills the file it already has, so the
+ * inode survives; staging beside the target and renaming over it replaces it.
+ *
+ * This exists because the criterion had no test that could fail — removing the
+ * stage-and-rename branch entirely left every other case green, and a test asserting only
+ * that no staging file remains is equally true when nothing is ever staged.
+ */
+test("a repair replaces the hook rather than truncating it, so no reader sees it half-written", () => {
+  withRepo(({ root, hooksDir }) => {
+    installDelegate(hooksDir);
+    const hookPath = path.join(hooksDir, "prepare-commit-msg");
+    fs.writeFileSync(hookPath, "#!/bin/sh\n# generated\n");
+    const before = fs.statSync(hookPath).ino;
+
+    assert.equal(sessionStart(root).status, 0);
+
+    assert.notEqual(fs.statSync(hookPath).ino, before);
+  });
+});
+
+test("a hooks directory that is a symlink into the working tree is never written to", () => {
+  withRepo(({ root }) => {
+    const shared = path.join(root, ".githooks");
+    fs.mkdirSync(shared, { recursive: true });
+    fs.writeFileSync(path.join(shared, DELEGATE), "#!/bin/sh\nexit 0\n");
+    fs.chmodSync(path.join(shared, DELEGATE), 0o755);
+    const teamHook = path.join(shared, "prepare-commit-msg");
+    fs.writeFileSync(teamHook, "#!/bin/sh\n# the team's own\nexit 0\n");
+    const before = fs.readFileSync(teamHook, "utf8");
+    fs.rmSync(path.join(root, ".git", "hooks"), { recursive: true, force: true });
+    fs.symlinkSync(path.join("..", ".githooks"), path.join(root, ".git", "hooks"));
+
+    assert.equal(sessionStart(root).status, 0);
+
+    assert.equal(fs.readFileSync(teamHook, "utf8"), before);
+  });
+});
+
+// `rename` replaces the inode, so without carrying the mode across a `0700` hook would come
+// back `0755` — widening a third party's file on a path meant to be conservative.
+test("a repair keeps the hook's own permissions rather than widening them", () => {
+  withRepo(({ root, hooksDir }) => {
+    installDelegate(hooksDir);
+    const hookPath = path.join(hooksDir, "prepare-commit-msg");
+    fs.writeFileSync(hookPath, "#!/bin/sh\n# generated\n");
+    fs.chmodSync(hookPath, 0o700);
+
+    assert.equal(sessionStart(root).status, 0);
+
+    assert.equal(fs.statSync(hookPath).mode & 0o777, 0o700);
+  });
+});
+
+/**
+ * Staging beside the target needs write permission on the *directory*, where a direct write
+ * needs it only on the file. A `0555` hooks directory holding a writable hook was repairable
+ * before the atomic write existed, so the direct write is kept as the fallback rather than
+ * the capability being quietly dropped.
+ */
+test("a read-only hooks directory holding a writable hook is still repaired", () => {
+  withRepo(({ root, hooksDir }) => {
+    const line = installDelegate(hooksDir);
+    const hookPath = path.join(hooksDir, "prepare-commit-msg");
+    fs.writeFileSync(hookPath, "#!/bin/sh\n# generated\n");
+    fs.chmodSync(hookPath, 0o755);
+    fs.chmodSync(hooksDir, 0o555);
+    try {
+      assert.equal(sessionStart(root).status, 0);
+      assert.ok(hookText(hooksDir).includes(line));
+    } finally {
+      fs.chmodSync(hooksDir, 0o755);
     }
   });
 });
@@ -256,81 +361,5 @@ test("a prepare-commit-msg that is a symlink is left alone, target and all", () 
 
     assert.equal(fs.readFileSync(target, "utf8"), before);
     assert.ok(fs.lstatSync(path.join(hooksDir, "prepare-commit-msg")).isSymbolicLink());
-  });
-});
-
-// The repair writes beside the target and renames over it, so a reader can never see a
-// half-written hook. Asserted on what that guarantees: no staging file survives.
-test("no staging file is left behind by a repair", () => {
-  withRepo(({ hooksDir }) => {
-    installDelegate(hooksDir);
-    regenerateHook(hooksDir);
-
-    assert.equal(sessionStart(path.dirname(path.dirname(hooksDir))).status, 0);
-
-    const strays = fs.readdirSync(hooksDir).filter((name) => name.includes(".aidd-"));
-    assert.deepEqual(strays, []);
-  });
-});
-
-/**
- * The configuration an independent check used to defeat both guards at once:
- * `ln -s ../.githooks .git/hooks` makes git answer `<repo>/.git/hooks`, which is inside the
- * git directory *by string* and inside the working tree *on disk*. `path.resolve` never
- * resolves a link, so containment passed, and `lstat` on the hook file — reached through the
- * linked directory — saw a real file rather than a link. A tracked file was modified.
- */
-test("a hooks directory that is a symlink into the working tree is never written to", () => {
-  withRepo(({ root }) => {
-    const shared = path.join(root, ".githooks");
-    fs.mkdirSync(shared, { recursive: true });
-    fs.writeFileSync(path.join(shared, DELEGATE), "#!/bin/sh\nexit 0\n");
-    fs.chmodSync(path.join(shared, DELEGATE), 0o755);
-    const teamHook = path.join(shared, "prepare-commit-msg");
-    fs.writeFileSync(teamHook, "#!/bin/sh\n# the team's own\nexit 0\n");
-    const before = fs.readFileSync(teamHook, "utf8");
-    fs.rmSync(path.join(root, ".git", "hooks"), { recursive: true, force: true });
-    fs.symlinkSync(path.join("..", ".githooks"), path.join(root, ".git", "hooks"));
-
-    assert.equal(sessionStart(root).status, 0);
-
-    assert.equal(fs.readFileSync(teamHook, "utf8"), before);
-  });
-});
-
-// `rename` replaces the inode, so without carrying the mode across a `0700` hook would come
-// back `0755` — widening a third party's file on a path meant to be conservative.
-test("a repair keeps the hook's own permissions rather than widening them", () => {
-  withRepo(({ root, hooksDir }) => {
-    installDelegate(hooksDir);
-    const hookPath = path.join(hooksDir, "prepare-commit-msg");
-    fs.writeFileSync(hookPath, "#!/bin/sh\n# generated\n");
-    fs.chmodSync(hookPath, 0o700);
-
-    assert.equal(sessionStart(root).status, 0);
-
-    assert.equal(fs.statSync(hookPath).mode & 0o777, 0o700);
-  });
-});
-
-/**
- * Staging beside the target needs write permission on the *directory*, where a direct write
- * needs it only on the file. A `0555` hooks directory holding a writable hook was repairable
- * before the atomic write existed, so the direct write is kept as the fallback rather than
- * the capability being quietly dropped.
- */
-test("a read-only hooks directory holding a writable hook is still repaired", () => {
-  withRepo(({ root, hooksDir }) => {
-    const line = installDelegate(hooksDir);
-    const hookPath = path.join(hooksDir, "prepare-commit-msg");
-    fs.writeFileSync(hookPath, "#!/bin/sh\n# generated\n");
-    fs.chmodSync(hookPath, 0o755);
-    fs.chmodSync(hooksDir, 0o555);
-    try {
-      assert.equal(sessionStart(root).status, 0);
-      assert.ok(hookText(hooksDir).includes(line));
-    } finally {
-      fs.chmodSync(hooksDir, 0o755);
-    }
   });
 });

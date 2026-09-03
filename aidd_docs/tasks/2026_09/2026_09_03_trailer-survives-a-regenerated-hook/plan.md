@@ -1,5 +1,5 @@
 ---
-status: planned
+status: delivered
 backlog: ai-driven-dev/framework#746
 spec: ./spec.md
 ---

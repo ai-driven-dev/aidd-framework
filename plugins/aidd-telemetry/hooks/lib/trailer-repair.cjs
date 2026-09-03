@@ -62,14 +62,25 @@ function hookLine(delegatePath) {
  */
 function repairCommitTrailerHook(hooksDir, gitDir) {
   if (typeof hooksDir !== "string" || hooksDir === "") return "no-delegate";
-  const delegatePath = path.join(hooksDir, DELEGATE_FILE);
-  if (!fs.existsSync(delegatePath)) return "no-delegate";
-  if (!isOursToWrite(hooksDir, gitDir)) return "not-ours-to-write";
+  if (!fs.existsSync(path.join(hooksDir, DELEGATE_FILE))) return "no-delegate";
+  // The physical directory, and everything below is built from it: the guard compares
+  // realpaths, so a line built from the unresolved spelling would name a path the guard
+  // never approved. On macOS, where `/tmp` is a link to `/private/tmp`, that put two call
+  // sites in one hook — the delegate ran twice per commit, and `check` then called the file
+  // "somebody else's too" about two lines this project wrote.
+  const resolved = realPath(hooksDir);
+  if (resolved === null || !isOursToWrite(resolved, gitDir)) return "not-ours-to-write";
 
-  const hookPath = path.join(hooksDir, HOOK_FILE);
+  const delegatePath = path.join(resolved, DELEGATE_FILE);
+  const hookPath = path.join(resolved, HOOK_FILE);
   // A symlink is somebody's deliberate indirection, and every write here follows one —
   // which would edit whatever it points at, most usefully a file the team shares.
   if (isSymbolicLink(hookPath)) return "not-ours-to-write";
+
+  // `rename` needs the directory, not the file — so without this a `0444` hook is silently
+  // replaced and left reading `0444`, its content changed while its permissions say it
+  // cannot be. Asked before anything is written, so the answer is "declined", not "done".
+  if (fs.existsSync(hookPath) && !isWritable(hookPath)) return "unwritable";
 
   const line = hookLine(delegatePath);
   try {
@@ -101,6 +112,10 @@ function write(hookPath, content) {
   const staging = `${hookPath}.aidd-${process.pid}`;
   try {
     fs.writeFileSync(staging, content, { mode });
+    // `open(2)` applies the umask to the mode it is given, so a `0770` hook came back
+    // `0750` — narrowed rather than widened, and just as much somebody else's file to have
+    // changed. `chmod` is not filtered.
+    fs.chmodSync(staging, mode);
     fs.renameSync(staging, hookPath);
     return "repaired";
   } catch {
@@ -162,6 +177,15 @@ function realPath(target) {
     return fs.realpathSync(target);
   } catch {
     return null;
+  }
+}
+
+function isWritable(target) {
+  try {
+    fs.accessSync(target, fs.constants.W_OK);
+    return true;
+  } catch {
+    return false;
   }
 }
 

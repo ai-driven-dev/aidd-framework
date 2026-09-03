@@ -138,7 +138,13 @@ describe("what check reads about the commit trailer", () => {
     expect((await read()).recentlyCarrying).toBeUndefined();
   });
 
-  it("reports no history rather than zero outside a repository", async () => {
+  /**
+   * Outside a repository, and said as such. The distinction existed in the type and in two
+   * display fixtures and was produced by nothing — so `check` printed "git could not say
+   * where it runs hooks from" beside its own "not a git repository" line, one of them false.
+   * Asserted through the real adapter, because that is where it was missing.
+   */
+  it("says there is no repository, rather than that git could not answer", async () => {
     const outside = await mkdtemp(join(tmpdir(), "aidd-trailer-nogit-"));
     try {
       const setup = await git.readCommitTrailerSetup(
@@ -148,10 +154,31 @@ describe("what check reads about the commit trailer", () => {
         20
       );
 
+      expect(setup.hooksDirMissing).toBe("no-repository");
       expect(setup.recentlyCarrying).toBeUndefined();
       expect(setup.delegate).toBe("absent");
     } finally {
       await rm(outside, { recursive: true, force: true });
     }
+  });
+
+  // Git refuses to run a hook without the bit and prints a hint on every commit, so an
+  // install that looks perfect can write nothing. The hook's own mode, not the delegate's.
+  it("says whether the hook itself is executable", async () => {
+    const delegatePath = await installDelegate();
+    const hookPath = join(await hooksDir(), "prepare-commit-msg");
+    await writeFile(hookPath, `#!/bin/sh\n${sessionTrailerHookLine(delegatePath)}\n`);
+
+    await chmod(hookPath, 0o644);
+    expect((await read()).hookExecutable).toBe(false);
+
+    await chmod(hookPath, 0o755);
+    expect((await read()).hookExecutable).toBe(true);
+  });
+
+  it("has no opinion on a hook's mode when there is no hook", async () => {
+    await installDelegate();
+
+    expect((await read()).hookExecutable).toBeUndefined();
   });
 });

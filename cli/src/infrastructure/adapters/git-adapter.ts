@@ -173,36 +173,57 @@ export class GitAdapter implements VersionControl {
     const hooksDir = await this.resolveHooksDir(projectRoot);
     const recentlyCarrying = this.countCommitsCarrying(projectRoot, trailerToken, limit);
     const history = recentlyCarrying === null ? {} : { recentlyCarrying };
-    if (hooksDir === null) {
-      return {
-        delegate: "absent",
-        callSite: "no-hook-file",
-        hookHasOtherContent: false,
-        ...history,
-      };
-    }
-    const line = sessionTrailerHookLine(join(hooksDir, delegateFile));
-    const hook = await this.readIfPresent(join(hooksDir, PREPARE_COMMIT_MSG_HOOK));
+    if (hooksDir === null) return { ...(await this.withoutHooksDir(projectRoot)), ...history };
+    return { ...(await this.hookFacts(hooksDir, delegateFile)), hooksDir, ...history };
+  }
+
+  /** Which of the two causes left no hooks directory, asked rather than assumed: only a
+   * project outside git means "no hook to carry anything", and saying that about a git that
+   * merely could not answer prints a falsehood beside the row that says so correctly. */
+  private async withoutHooksDir(
+    projectRoot: string
+  ): Promise<Omit<TelemetryCommitTrailerSetup, "recentlyCarrying">> {
+    const inRepository = await this.isRepository(projectRoot);
     return {
-      hooksDir,
-      delegate: await this.delegateState(join(hooksDir, delegateFile)),
-      callSite: callSiteState(hook, line),
-      hookHasOtherContent: holdsSomebodyElsesLines(hook, line),
-      ...history,
+      delegate: "absent",
+      callSite: "no-hook-file",
+      hookHasOtherContent: false,
+      hooksDirMissing: inRepository ? "unresolved" : "no-repository",
     };
   }
 
-  /** Present, and executable by its owner. Git will not run a hook it cannot execute, so a
-   * file that is there without that bit is a distinct answer from one that is missing. */
+  private async hookFacts(
+    hooksDir: string,
+    delegateFile: string
+  ): Promise<Omit<TelemetryCommitTrailerSetup, "recentlyCarrying" | "hooksDir">> {
+    const hookPath = join(hooksDir, PREPARE_COMMIT_MSG_HOOK);
+    const line = sessionTrailerHookLine(join(hooksDir, delegateFile));
+    const hook = await this.readIfPresent(hookPath);
+    return {
+      delegate: await this.delegateState(join(hooksDir, delegateFile)),
+      // The hook's own bit, not the delegate's. Git refuses to run a `prepare-commit-msg` it
+      // cannot execute and says so on every commit; the repair preserves whatever mode it
+      // finds, so a bit lost to a regeneration stays lost. Reported here rather than fixed
+      // there — quietly widening a file this project did not write is what the repair spends
+      // its whole guard budget avoiding.
+      ...(hook === null ? {} : { hookExecutable: await this.isExecutable(hookPath) }),
+      callSite: callSiteState(hook, line),
+      hookHasOtherContent: holdsSomebodyElsesLines(hook, line),
+    };
+  }
+
+  /** Present, and executable. Git will not run a hook it cannot execute, so a delegate that
+   * is there without that bit is a distinct answer from one that is missing. Any execute
+   * bit, not the owner's alone — git runs the hook as whoever invoked it, who need not own
+   * the file. */
   private async delegateState(path: string): Promise<TelemetryCommitTrailerSetup["delegate"]> {
     if (!(await this.fs.fileExists(path))) return "absent";
-    // Through the same reader that answered `fileExists`, never `node:fs` directly: a
-    // substituted reader saying the file is there while a real `statSync` throws would make
-    // the two halves of this method contradict each other. Any execute bit, not the owner's
-    // alone — git runs the hook as whoever invoked it, who need not own the file.
+    return (await this.isExecutable(path)) ? "executable" : "not-executable";
+  }
+
+  private async isExecutable(path: string): Promise<boolean> {
     const mode = await this.fs.fileMode(path);
-    if (mode === null) return "absent";
-    return (mode & 0o111) === 0 ? "not-executable" : "executable";
+    return mode !== null && (mode & 0o111) !== 0;
   }
 
   private async readIfPresent(path: string): Promise<string | null> {
