@@ -73,6 +73,22 @@ function scriptCalls(files: readonly string[]): { file: string; script: string }
   return calls;
 }
 
+/** Directories outside this package that its own TypeScript program still compiles. */
+function foreignIncludes(): string[] {
+  const raw = readFileSync(join(CLI_ROOT, "tsconfig.json"), "utf8").replace(/\/\/[^\n]*/g, "");
+  const config = JSON.parse(raw) as { include?: string[] };
+  return (config.include ?? []).filter((pattern) => pattern.startsWith("../"));
+}
+
+describe("this package's program stops at this package", () => {
+  it("compiles nothing outside cli/, so a CI job needs no sibling's dependencies", () => {
+    expect(
+      foreignIncludes(),
+      "tsconfig reaches outside the package — every job running tsc must then install that sibling's dependencies, and dropping one breaks CI while every local check stays green"
+    ).toEqual([]);
+  });
+});
+
 describe("the automation calls scripts this package still has", () => {
   it("every pnpm script CI and the hooks run against cli/ exists in its manifest", () => {
     const scripts = manifestScripts();
