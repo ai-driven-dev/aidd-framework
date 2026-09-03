@@ -77,3 +77,18 @@ interface JournalTaskDeclaredModule {
 export const journalTaskDeclared: JournalTaskDeclaredModule = createRequire(import.meta.url)(
   "../../../plugins/aidd-telemetry/hooks/lib/task-declared.cjs"
 );
+
+/** The hook's own trailer repair. Exposed for the one thing a test on this side must prove
+ * and the hook's own suite cannot: that the line this writes is character for character the
+ * line the CLI writes, when neither can import the other. */
+interface JournalTrailerRepairModule {
+  repairCommitTrailerHook(hooksDir: string | undefined, gitDir?: string): string;
+  hookLine(delegatePath: string): string;
+  DELEGATE_FILE: string;
+  HOOK_FILE: string;
+  HOOK_HEADER: string;
+}
+
+export const journalTrailerRepair: JournalTrailerRepairModule = createRequire(import.meta.url)(
+  "../../../plugins/aidd-telemetry/hooks/lib/trailer-repair.cjs"
+);

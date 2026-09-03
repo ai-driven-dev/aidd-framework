@@ -1,3 +1,5 @@
+import type { TelemetryCommitTrailerSetup } from "../models/telemetry-setup.js";
+
 export interface VersionControl {
   getRemoteUrl(repoRoot: string): Promise<string | null>;
 
@@ -43,4 +45,19 @@ export interface VersionControl {
    * over-asserting what history holds: this is the call that separates "tracked now" from
    * "actually committed". */
   hasHistoryFor(repoRoot: string, pathspec: string): Promise<boolean>;
+
+  /** Everything `aidd telemetry check` says about the commit trailer, gathered in one place
+   * because every part of it is a git question: where git runs hooks from, what is in that
+   * directory, and what the last commits actually carry.
+   *
+   * `limit` is how many commits to look back over — a count rather than a date, so the
+   * answer costs the same on a repository of ten commits and one of a million. Never a
+   * throw: no repository, no commits, or no git at all each leave the fields that need one
+   * absent rather than failing the diagnostic that exists to describe them. */
+  readCommitTrailerSetup(
+    projectRoot: string,
+    delegateFile: string,
+    trailerToken: string,
+    limit: number
+  ): Promise<TelemetryCommitTrailerSetup>;
 }

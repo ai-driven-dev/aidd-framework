@@ -1,4 +1,8 @@
 import { describeError } from "../../../domain/describe-error.js";
+import {
+  SESSION_TRAILER_DELEGATE_FILE,
+  SESSION_TRAILER_TOKEN,
+} from "../../../domain/formats/commit-session-trailer.js";
 import { resolveSessionAnchor } from "../../../domain/models/session-anchor.js";
 import { attributeMoment, buildStepIntervals } from "../../../domain/models/step-attribution.js";
 import {
@@ -61,6 +65,11 @@ export type DiagnoseTelemetryResult =
       readonly uncovered: readonly DiagnoseTelemetryUncoveredTool[];
       readonly leftoverExportConfig: readonly TelemetryExportLeftover[];
     };
+
+/** How far back the trailer count looks. Twenty rather than a date: the cost is the same on
+ * any repository, and it is enough that a person measuring for a week sees whether their
+ * commits are being stamped without the answer drowning in history from before they were. */
+const COMMITS_EXAMINED_FOR_TRAILER = 20;
 
 export interface DiagnoseTelemetryOptions {
   readonly projectRoot: string;
@@ -162,6 +171,12 @@ export class DiagnoseTelemetryUseCase {
       recordsLocation: { path: this.telemetrySink.rootDir },
       recorderDeclaration,
       hostRegistration: await this.readHostRegistration(options.projectRoot),
+      commitTrailer: await this.git.readCommitTrailerSetup(
+        options.projectRoot,
+        SESSION_TRAILER_DELEGATE_FILE,
+        SESSION_TRAILER_TOKEN,
+        COMMITS_EXAMINED_FOR_TRAILER
+      ),
       versions: {
         cli: this.currentVersion.get(),
         plugin: pluginVersionFrom(await this.runJournalReader.list()),

@@ -20,6 +20,7 @@ export interface TelemetrySetup {
   readonly recordsLocation: TelemetryRecordsLocationSetup;
   readonly recorderDeclaration: TelemetryRecorderDeclarationSetup;
   readonly hostRegistration: TelemetryHostRegistrationSetup;
+  readonly commitTrailer: TelemetryCommitTrailerSetup;
   readonly versions: TelemetryVersionsSetup;
 }
 
@@ -349,4 +350,51 @@ function whatAnswered(
     };
   }
   return { refs: reading.refs, location: reading.location };
+}
+
+/**
+ * Whether a commit made by a session will carry it, and whether any actually has.
+ *
+ * The trailer is the one link that closes "this commit cost X". It is installed as a single
+ * line in `prepare-commit-msg`, and in a repository where another tool generates that file
+ * the line is erased the next time it regenerates — a loss with no symptom, since commits
+ * keep succeeding and records keep being written. `check` had no claim about any of this;
+ * these are the five facts that make the loss visible, and the hook now repairs the call
+ * site on the next session so this is a report rather than a chore.
+ *
+ * Four of the five describe pieces. `recentlyCarrying` is the only one that describes the
+ * chain: it reads git's own history, so it answers whether commits are actually being
+ * stamped rather than whether the parts that should stamp them are in place.
+ */
+export interface TelemetryCommitTrailerSetup {
+  /** Where git says it runs hooks from — `git rev-parse --git-path hooks`, never
+   * `.git/hooks` assumed, because `core.hooksPath` pointing elsewhere is exactly the
+   * configuration under which everything else here would describe the wrong directory. */
+  readonly hooksDir?: string;
+  /** Why there is no `hooksDir`, when there is none. Two causes, never one sentence: a
+   * project outside git has no hook to carry anything, which is a fact about the project;
+   * a repository whose git could not answer is a reading that failed, and saying "no
+   * repository" about it would be false — measured against a git that rejects `--git-path`,
+   * which reported exactly that inside a repository with commits. */
+  readonly hooksDirMissing?: "no-repository" | "unresolved";
+  /** Whether the delegate script is there and executable. A file present but not executable
+   * is its own state: git will not run it, and saying "installed" would be a lie a person
+   * could not act on. */
+  readonly delegate: "executable" | "not-executable" | "absent";
+  /** Whether `prepare-commit-msg` carries the line that calls the delegate. */
+  readonly callSite: "present" | "missing" | "no-hook-file";
+  /** Whether that hook is executable, when there is one. Git refuses to run a hook without
+   * the bit and prints a hint on every commit; a regeneration that drops it leaves an
+   * install that looks perfect and writes nothing. Absent when there is no hook to ask
+   * about — a third state, not a `false`. */
+  readonly hookExecutable?: boolean;
+  /** Whether that hook holds anything besides our own line — true where lefthook, husky or a
+   * hand-written hook owns the file. Said, never named: which tool it is changes nothing a
+   * person does, and naming one would be a guess from its contents. */
+  readonly hookHasOtherContent: boolean;
+  /** How many of the commits looked at actually carry the trailer, and how many were looked
+   * at. A count, never a pass: "some of your recent commits carry it" is not something a
+   * person can check, and zero out of twenty in a repository that has been measuring for a
+   * week is the whole finding. Absent when history could not be read at all. */
+  readonly recentlyCarrying?: { readonly carrying: number; readonly examined: number };
 }

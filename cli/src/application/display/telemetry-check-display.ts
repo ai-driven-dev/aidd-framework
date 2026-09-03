@@ -6,6 +6,7 @@ import type {
 import type { TelemetryExportLeftover } from "../../domain/models/telemetry-export-leftover.js";
 import type {
   TelemetryAllowedSetup,
+  TelemetryCommitTrailerSetup,
   TelemetryHostRegistrationAnswer,
   TelemetryHostRegistrationSetup,
   TelemetryIdentitySetup,
@@ -139,6 +140,59 @@ function describeHostRegistration(registration: TelemetryHostRegistrationSetup):
   );
 }
 
+/** The trailer, in one sentence that leads with the only fact about the chain rather than
+ * about its parts: how many recent commits actually carry it. A person reading one line has
+ * then read the answer; the pieces below it say why, and only when there is a why. */
+function describeCommitTrailer(trailer: TelemetryCommitTrailerSetup): string {
+  // Outside a repository there is nothing to say about hooks — the same fact the claims
+  // below refuse to read as a failure. Saying "nothing installed" here would describe a
+  // repository this project is not in.
+  if (trailer.hooksDirMissing === "no-repository") {
+    return "no repository here, so no hook to carry it";
+  }
+  // A repository whose git could not name its hooks directory still has a history, and the
+  // count is the fact that matters. Dropping it and saying "no repository" was measured
+  // wrong on a git that rejects `--git-path`: one true fact replaced by one false one.
+  if (trailer.hooksDir === undefined) {
+    return `${describeTrailerCount(trailer)} — git could not say where it runs hooks from`;
+  }
+
+  const parts: string[] = [];
+  if (trailer.delegate === "absent") parts.push("nothing installed to write it");
+  if (trailer.delegate === "not-executable") {
+    parts.push("its script is not executable, so git will not run it");
+  }
+  if (trailer.callSite === "missing") parts.push("prepare-commit-msg does not call it");
+  if (trailer.hookExecutable === false) {
+    parts.push("prepare-commit-msg is not executable, so git ignores it");
+  }
+  if (trailer.callSite === "no-hook-file") parts.push("there is no prepare-commit-msg");
+  // Said, never named. Which tool owns the file changes nothing a person does about it, and
+  // naming one would be a guess read out of its contents.
+  if (trailer.hookHasOtherContent) parts.push("that hook is somebody else's too");
+
+  return `${describeTrailerCount(trailer)}${parts.length === 0 ? "" : ` — ${parts.join("; ")}`}\n    hooks run from ${trailer.hooksDir}`;
+}
+
+/** The count, and what it is not.
+ *
+ * A commit no session made carries no trailer, by design — the delegate writes nothing
+ * without a session variable, and skips merges outright. So a number below the total is not
+ * by itself a fault, and a bare "4 of 20" invites reading it as one. The qualifier is added
+ * exactly when it could mislead: some commits carrying it, and every part in place. */
+function describeTrailerCount(trailer: TelemetryCommitTrailerSetup): string {
+  const carried = trailer.recentlyCarrying;
+  if (carried === undefined) return "no commit history to read";
+  const count = `${carried.carrying} of the last ${carried.examined} commits carry it`;
+  const everyPartWorks = trailer.delegate === "executable" && trailer.callSite === "present";
+  // `carrying > 0` and not `>= 0`: zero with every part in place is the finding this whole
+  // row exists to surface, and excusing it as by-design is the one thing that must not
+  // happen. The docstring above says "some", and this is what makes that true.
+  const someCarry = carried.carrying > 0 && carried.carrying < carried.examined;
+  if (!everyPartWorks || !someCarry) return count;
+  return `${count} — a commit no session made carries none, by design`;
+}
+
 function printSetup(output: CLIOutput, setup: TelemetrySetup): void {
   printSetupRow(output, "measurement allowed", describeAllowed(setup.allowed));
   printSetupRow(output, "identity attached", describeIdentity(setup.identity));
@@ -153,6 +207,7 @@ function printSetup(output: CLIOutput, setup: TelemetrySetup): void {
     describeRecorderDeclaration(setup.recorderDeclaration)
   );
   printSetupRow(output, "plugins registered", describeHostRegistration(setup.hostRegistration));
+  printSetupRow(output, "commit trailer", describeCommitTrailer(setup.commitTrailer));
   printSetupRow(output, "cli version", setup.versions.cli);
   printSetupRow(output, "plugin version", describePluginVersion(setup.versions.plugin));
   output.print("");

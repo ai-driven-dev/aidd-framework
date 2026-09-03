@@ -39,6 +39,13 @@ function setup(overrides: Partial<TelemetrySetup> = {}): TelemetrySetup {
     identity: { attached: false, path: "/home/.config/aidd/identity.json", readable: true },
     recordsLocation: { path: "/home/.config/aidd/telemetry" },
     hostRegistration: { entries: [] },
+    commitTrailer: {
+      delegate: "executable",
+      callSite: "present",
+      hookHasOtherContent: false,
+      hooksDir: "/repo/.git/hooks",
+      recentlyCarrying: { carrying: 3, examined: 5 },
+    },
     recorderDeclaration: {
       declared: true,
       declaredAt: ["/repo/.aidd/manifest.json"],
@@ -295,5 +302,148 @@ describe("the row saying whether the host will load what aidd installed", () => 
 
     expect(text).toContain("AIDD's own manifest could not be read");
     expect(text).not.toContain("no plugin recorded");
+  });
+});
+
+describe("the row saying whether commits carry their session", () => {
+  function report(commitTrailer: TelemetrySetup["commitTrailer"]): string {
+    const output = new CapturingOutput();
+    printTelemetryCheckReport(output, {
+      gate: "measurement is off",
+      setup: setup({ commitTrailer }),
+      leftoverExportConfig: [],
+    });
+    return output.text;
+  }
+
+  const HEALTHY = {
+    delegate: "executable",
+    callSite: "present",
+    hookHasOtherContent: false,
+    hooksDir: "/repo/.git/hooks",
+  } as const;
+
+  // The count leads, because it is the only fact here about the chain rather than its parts.
+  // A person who reads one line has read whether it is working.
+  it("leads with how many recent commits carry it", () => {
+    const text = report({ ...HEALTHY, recentlyCarrying: { carrying: 4, examined: 20 } });
+
+    expect(text).toContain("4 of the last 20 commits carry it");
+  });
+
+  it("says nothing about pieces when every piece is in place", () => {
+    const text = report({ ...HEALTHY, recentlyCarrying: { carrying: 20, examined: 20 } });
+    // Scoped to this row: every other setup row uses a dash of its own, so asserting over
+    // the whole report would only prove the report has dashes in it.
+    const row = text.split("\n").find((line) => line.includes("commit trailer")) ?? "";
+
+    expect(row).not.toContain("—");
+    expect(text).toContain("hooks run from /repo/.git/hooks");
+  });
+
+  it("names each missing piece after the count", () => {
+    const text = report({
+      ...HEALTHY,
+      delegate: "absent",
+      callSite: "missing",
+      recentlyCarrying: { carrying: 0, examined: 20 },
+    });
+
+    expect(text).toContain("0 of the last 20 commits carry it");
+    expect(text).toContain("nothing installed to write it");
+    expect(text).toContain("prepare-commit-msg does not call it");
+  });
+
+  // Git will not run a hook it cannot execute, so present-but-not-executable is its own
+  // sentence rather than a shade of installed.
+  // Zero with every part in place is the finding this row exists to surface. Excusing it as
+  // by-design was the one outcome that had to be impossible, and the guard read `>= 0`.
+  it("never excuses zero, whatever else is in place", () => {
+    const text = report({ ...HEALTHY, recentlyCarrying: { carrying: 0, examined: 20 } });
+
+    expect(text).toContain("0 of the last 20 commits carry it");
+    expect(text).not.toContain("by design");
+  });
+
+  it("says a hook git will not run is not executable", () => {
+    const text = report({ ...HEALTHY, hookExecutable: false });
+
+    expect(text).toContain("prepare-commit-msg is not executable");
+  });
+
+  it("says a delegate that is not executable will not be run", () => {
+    expect(report({ ...HEALTHY, delegate: "not-executable" })).toContain("not executable");
+  });
+
+  // Said, never named. Which tool owns the file changes nothing a person does about it.
+  it("says the hook is somebody else's without naming a tool", () => {
+    const text = report({ ...HEALTHY, hookHasOtherContent: true });
+
+    expect(text).toContain("somebody else's");
+    expect(text).not.toMatch(/lefthook|husky/iu);
+  });
+
+  /**
+   * A commit no session made carries no trailer by design, and merges are skipped outright.
+   * So a number below the total is not a fault, and a bare "4 of 20" reads like one. The
+   * qualifier appears exactly when it could mislead — some carrying, every part in place.
+   */
+  it("says a shortfall is expected when every part is in place", () => {
+    const text = report({ ...HEALTHY, recentlyCarrying: { carrying: 4, examined: 20 } });
+
+    expect(text).toContain("a commit no session made carries none, by design");
+  });
+
+  it("does not excuse a shortfall when a part is broken", () => {
+    const text = report({
+      ...HEALTHY,
+      callSite: "missing",
+      recentlyCarrying: { carrying: 4, examined: 20 },
+    });
+
+    expect(text).not.toContain("by design");
+    expect(text).toContain("prepare-commit-msg does not call it");
+  });
+
+  // Outside a repository there is no hook to carry anything, which the claims below already
+  // refuse to read as a failure. "nothing installed" would describe a repository we are not in.
+  it("says there is no repository rather than listing missing pieces", () => {
+    const text = report({
+      delegate: "absent",
+      callSite: "no-hook-file",
+      hookHasOtherContent: false,
+      hooksDirMissing: "no-repository",
+    });
+
+    expect(text).toContain("no repository here");
+    expect(text).not.toContain("nothing installed");
+  });
+
+  /**
+   * A repository whose git could not name its hooks directory still has a history, and the
+   * count is the fact that matters. An earlier version printed "no repository here" for it —
+   * measured false on a git that rejects `--git-path`, inside a repository with commits, one
+   * of which carried the trailer. One true fact replaced by one false one.
+   */
+  it("keeps the count when git could not name the hooks directory", () => {
+    const text = report({
+      delegate: "absent",
+      callSite: "no-hook-file",
+      hookHasOtherContent: false,
+      hooksDirMissing: "unresolved",
+      recentlyCarrying: { carrying: 1, examined: 4 },
+    });
+
+    expect(text).toContain("1 of the last 4 commits carry it");
+    expect(text).not.toContain("no repository here");
+  });
+
+  // No commits and no commits carrying it are different facts, and only the second is
+  // something to act on.
+  it("says there is no history to read rather than reporting zero", () => {
+    const text = report(HEALTHY);
+
+    expect(text).toContain("no commit history to read");
+    expect(text).not.toContain("0 of the last");
   });
 });

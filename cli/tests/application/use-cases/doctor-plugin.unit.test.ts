@@ -40,6 +40,7 @@ function makeManifest(pluginFileHash: string): Manifest {
 function makeFs(fileExists: boolean, diskHash: string): FileReader {
   return {
     fileExists: async () => fileExists,
+    isExecutable: async () => false,
     readFileHash: async () => new FileHash(diskHash),
     readFile: async () => "",
     listDirectory: async () => [],
@@ -148,6 +149,7 @@ describe("DoctorUseCase — plugin integrity", () => {
           checkedPaths.push(p);
           return true;
         },
+        isExecutable: async () => false,
         readFileHash: async () => new FileHash(EXPECTED_HASH),
         readFile: async () => "",
         listDirectory: async () => [],

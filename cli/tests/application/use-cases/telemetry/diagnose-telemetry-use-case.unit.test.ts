@@ -45,6 +45,11 @@ function versionControl(isRepository: boolean): VersionControl {
     getRemoteUrl: async () => null,
     listTrackedFiles: async () => [],
     isRepository: async () => isRepository,
+    readCommitTrailerSetup: async () => ({
+      delegate: "absent" as const,
+      callSite: "no-hook-file" as const,
+      hookHasOtherContent: false,
+    }),
     hasHistoryFor: async () => false,
   };
 }

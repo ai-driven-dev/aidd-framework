@@ -1,12 +1,15 @@
 import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
-import { sessionTrailerHookLine } from "../../domain/formats/commit-session-trailer.js";
+import {
+  SESSION_TRAILER_HOOK_HEADER,
+  sessionTrailerHookLine,
+} from "../../domain/formats/commit-session-trailer.js";
+import type { TelemetryCommitTrailerSetup } from "../../domain/models/telemetry-setup.js";
 import type { FileReader } from "../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../domain/ports/file-writer.js";
 import type { VersionControl } from "../../domain/ports/version-control.js";
 import { environmentWithoutGitVariables } from "../git-environment.js";
 
-const HOOK_HEADER = "#!/bin/sh";
 const PREPARE_COMMIT_MSG_HOOK = "prepare-commit-msg";
 
 export class GitAdapter implements VersionControl {
@@ -57,7 +60,7 @@ export class GitAdapter implements VersionControl {
     const hookPath = join(hooksDir, PREPARE_COMMIT_MSG_HOOK);
     const existing = (await this.fs.fileExists(hookPath))
       ? await this.fs.readFile(hookPath)
-      : `${HOOK_HEADER}\n`;
+      : `${SESSION_TRAILER_HOOK_HEADER}\n`;
     if (existing.includes(line)) return false;
 
     const separator = existing.endsWith("\n") ? "" : "\n";
@@ -155,6 +158,113 @@ export class GitAdapter implements VersionControl {
     }
   }
 
+  /** Every trailer fact, gathered from one place because every one of them is a git
+   * question. Each field is answered independently: a hooks directory that cannot be
+   * resolved leaves the file facts absent rather than guessed, and history that cannot be
+   * read leaves the count absent rather than reported as zero — which would be the one
+   * reading a person must never be handed, since zero commits carrying it is also what a
+   * genuinely broken install looks like. */
+  async readCommitTrailerSetup(
+    projectRoot: string,
+    delegateFile: string,
+    trailerToken: string,
+    limit: number
+  ): Promise<TelemetryCommitTrailerSetup> {
+    const hooksDir = await this.resolveHooksDir(projectRoot);
+    const recentlyCarrying = this.countCommitsCarrying(projectRoot, trailerToken, limit);
+    const history = recentlyCarrying === null ? {} : { recentlyCarrying };
+    if (hooksDir === null) return { ...(await this.withoutHooksDir(projectRoot)), ...history };
+    return { ...(await this.hookFacts(hooksDir, delegateFile)), hooksDir, ...history };
+  }
+
+  /** Which of the two causes left no hooks directory, asked rather than assumed: only a
+   * project outside git means "no hook to carry anything", and saying that about a git that
+   * merely could not answer prints a falsehood beside the row that says so correctly. */
+  private async withoutHooksDir(
+    projectRoot: string
+  ): Promise<Omit<TelemetryCommitTrailerSetup, "recentlyCarrying">> {
+    const inRepository = await this.isRepository(projectRoot);
+    return {
+      delegate: "absent",
+      callSite: "no-hook-file",
+      hookHasOtherContent: false,
+      hooksDirMissing: inRepository ? "unresolved" : "no-repository",
+    };
+  }
+
+  private async hookFacts(
+    hooksDir: string,
+    delegateFile: string
+  ): Promise<Omit<TelemetryCommitTrailerSetup, "recentlyCarrying" | "hooksDir">> {
+    const hookPath = join(hooksDir, PREPARE_COMMIT_MSG_HOOK);
+    const line = sessionTrailerHookLine(join(hooksDir, delegateFile));
+    const hook = await this.readIfPresent(hookPath);
+    return {
+      delegate: await this.delegateState(join(hooksDir, delegateFile)),
+      // The hook's own bit, not the delegate's. Git refuses to run a `prepare-commit-msg` it
+      // cannot execute and says so on every commit; the repair preserves whatever mode it
+      // finds, so a bit lost to a regeneration stays lost. Reported here rather than fixed
+      // there — quietly widening a file this project did not write is what the repair spends
+      // its whole guard budget avoiding.
+      ...(hook === null ? {} : { hookExecutable: await this.fs.isExecutable(hookPath) }),
+      callSite: callSiteState(hook, line),
+      hookHasOtherContent: holdsSomebodyElsesLines(hook, line),
+    };
+  }
+
+  /** Present, and executable. Git will not run a hook it cannot execute, so a delegate that
+   * is there but unrunnable is a distinct answer from one that is missing. Asked as "can
+   * whoever runs git execute this", not as a permission bit — see `FileReader.isExecutable`
+   * for the platform that made the difference matter. */
+  private async delegateState(path: string): Promise<TelemetryCommitTrailerSetup["delegate"]> {
+    if (!(await this.fs.fileExists(path))) return "absent";
+    return (await this.fs.isExecutable(path)) ? "executable" : "not-executable";
+  }
+
+  private async readIfPresent(path: string): Promise<string | null> {
+    return (await this.fs.fileExists(path)) ? await this.fs.readFile(path) : null;
+  }
+
+  /** How many of the last `limit` non-merge commits carry the trailer. `%(trailers:key=…)` is git's
+   * own reader, so this agrees with what `git log` shows a person by construction rather
+   * than by a regex of ours. `null` — never `0` — when there is no history to read: a
+   * repository with no commits and one whose every commit is unstamped are different facts,
+   * and only the second is a finding. */
+  private countCommitsCarrying(
+    projectRoot: string,
+    trailerToken: string,
+    limit: number
+  ): { carrying: number; examined: number } | null {
+    try {
+      const result = spawnSync(
+        "git",
+        [
+          "log",
+          `-${limit}`,
+          // Merges are excluded because the delegate refuses them by design — a merge commit
+          // carrying one session's id would attribute every commit it brings in to that
+          // session. Counting them would put commits in the denominator that can never be in
+          // the numerator, which is arithmetic that reads as breakage.
+          "--no-merges",
+          `--format=%(trailers:key=${trailerToken},valueonly)%x00`,
+        ],
+        { cwd: projectRoot, encoding: "utf8", env: environmentWithoutGitVariables() }
+      );
+      if (result.status !== 0) return null;
+      // No guard for an empty list: `git log` exits non-zero in a repository with no
+      // commits, so the branch above already answers `null` there, and a repository whose
+      // every commit is a merge cannot exist. A line for a case nothing can reach is a guard
+      // nothing can fail for.
+      const commits = result.stdout.split("\u0000").slice(0, -1);
+      return {
+        carrying: commits.filter((one) => one.trim() !== "").length,
+        examined: commits.length,
+      };
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Where this repository's hooks actually live, asked of git rather than assembled from
    * `.git`.
@@ -163,8 +273,11 @@ export class GitAdapter implements VersionControl {
    * not: it returns `core.hooksPath` when one is set — the configuration under which a hook
    * written to `.git/hooks` is silently never run — and in a linked worktree it returns the
    * *common* git dir's hooks, which is where git looks. The path comes back relative in an
-   * ordinary repository and absolute otherwise, so it is resolved against the repository
-   * root either way.
+   * ordinary repository and absolute otherwise, and git prints a relative one against the
+   * directory it ran in — which here is `projectRoot`, the same value it is resolved
+   * against. The hook side must resolve against its own cwd for that reason, and a version
+   * that resolved against the repository root instead sent a session started in a
+   * subdirectory outside the checkout entirely.
    *
    * `null` when there is no repository here, or when git itself cannot be run: installing a
    * hook is never allowed to be the reason a command fails.
@@ -183,4 +296,19 @@ export class GitAdapter implements VersionControl {
       return null;
     }
   }
+}
+
+function callSiteState(hook: string | null, line: string): TelemetryCommitTrailerSetup["callSite"] {
+  if (hook === null) return "no-hook-file";
+  return hook.includes(line) ? "present" : "missing";
+}
+
+/** Any line that is neither ours nor blank. `#!/bin/sh` alone is the file the CLI writes
+ * when a repository had none, so a hook holding only that is still ours. */
+function holdsSomebodyElsesLines(hook: string | null, line: string): boolean {
+  if (hook === null) return false;
+  return hook
+    .split("\n")
+    .map((entry) => entry.trim())
+    .some((entry) => entry !== "" && entry !== line && entry !== SESSION_TRAILER_HOOK_HEADER);
 }

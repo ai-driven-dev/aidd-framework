@@ -24,8 +24,9 @@ judging anything.
 2. **Relay what is in place first, always.** Before any verdict it states whether
    measurement is allowed and from which file, whose choice that was, whether an identity
    is attached, where records would land, whether the recorder is declared, whether each
-   installed plugin is registered with its host, and which builds produced what is being
-   read — never a count or a figure. This is not a claim and carries no `ok`/`FAIL`/`--`;
+   installed plugin is registered with its host, whether commits carry the session that made
+   them, and which builds produced what is being read — never a count or a figure other than
+   the trailer's own. This is not a claim and carries no `ok`/`FAIL`/`--`;
    present it even when what follows stops immediately.
    - **`plugins registered` is per plugin, and its lines are already ordered.** What will
      not load comes first. Relay them in the order printed and never roll them into one
@@ -87,6 +88,8 @@ judging anything.
 | A plugin whose host registry could not be read | its line is relayed as `unanswerable`, never as `not-registered` |
 | A project with no plugin recorded | the row says so in one sentence, and is never relayed as a failure |
 | The AIDD manifest could not be read | the row names the file and the reason, and no plugin line is relayed — never read as "no plugin recorded" |
+| Commits are being made and none carry the trailer | the count is relayed as `0 of the last N`, with whatever the row names after it — never "the trailer is off" |
+| The repository has no commits yet | the row says there is no history to read, and it is never relayed as zero |
 | Measurement is off | the stated half is relayed, then that single line, and the run stops before checking anything |
 | Not a git repository | the stated half is relayed, then that single line, and the run stops before checking anything — never read as "hook fired FAIL" |
 | A healthy install | all four claims read `ok`, each carrying what it was read from |

@@ -16,6 +16,18 @@ import type { Hasher } from "../../../src/domain/ports/hasher.js";
  * Uses a Map<path, content> — no real I/O.
  */
 export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
+  /** Executable when `chmodExecutable` was called for it, absent otherwise — the two states
+   * `delegateState` tells apart, without a filesystem. */
+  private readonly executable = new Set<string>();
+
+  /** Normalized like every other reader in this class. Skipping `norm` made this the one
+   * method that could answer for a path `fileExists` disagreed with — which is the exact
+   * contradiction `FileReader.isExecutable` sits behind the port to prevent. */
+  async isExecutable(path: string): Promise<boolean> {
+    const key = norm(path);
+    return this.files.has(key) && this.executable.has(key);
+  }
+
   private readonly files = new Map<string, string>();
   private readonly hasher: Hasher;
 
@@ -32,6 +44,8 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
 
   async deleteFile(path: string): Promise<void> {
     this.files.delete(norm(path));
+    // Or a delete-then-rewrite reports the mode the deleted file had.
+    this.executable.delete(norm(path));
   }
 
   async createDirectory(_path: string): Promise<void> {
@@ -124,8 +138,8 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
     }
   }
 
-  async chmodExecutable(_path: string): Promise<void> {
-    // No-op: no permission bits in memory
+  async chmodExecutable(path: string): Promise<void> {
+    this.executable.add(norm(path));
   }
 
   async backup(absolutePath: string): Promise<string> {

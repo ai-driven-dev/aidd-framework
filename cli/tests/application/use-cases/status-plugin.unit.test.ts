@@ -33,6 +33,7 @@ function makeManifest(pluginFileHash: string): Manifest {
 function makeFs(fileExists: boolean, diskHash: string): FileReader {
   return {
     fileExists: async () => fileExists,
+    isExecutable: async () => false,
     readFileHash: async () => new FileHash(diskHash),
     readFile: async () => "",
     listDirectory: async () => [],
