@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { mergeCodexConfigToml } from "../../../../../src/contexts/tools/domain/profiles/codex/build.js";
+import {
+  mergeCodexConfigToml,
+  stripCodexSkillFrontmatter,
+} from "../../../../../src/contexts/tools/domain/profiles/codex/build.js";
 import { codex } from "../../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import { getToolConfig } from "../../../../../src/contexts/tools/domain/registry.js";
+import { serializeFrontmatter } from "../../../../../src/kernel/markdown.js";
 
 describe("codex", () => {
   it("has toolId codex", () => {
@@ -235,5 +239,58 @@ enabled = true
 `;
     const result = mergeCodexConfigToml(existing, MCP_PAYLOAD);
     expect(result).toContain(".agents/skills");
+  });
+});
+
+/**
+ * What a skill's frontmatter becomes on its way to Codex.
+ *
+ * Codex is the only target that re-serialises skill frontmatter instead of passing the
+ * file through, so its output diverges from the source bytes by design. That divergence
+ * went unrecorded for a month: the golden's codex cell still held the source hashes, and
+ * nothing compared it, because only `claude` was frozen. Freezing the nine surfaced it.
+ *
+ * These pin the transform itself, so those thirty golden hashes are not guarded solely by
+ * the snapshot that recorded them.
+ */
+describe("a skill's frontmatter, rewritten for Codex", () => {
+  const rebuild = (fm: Record<string, unknown>) =>
+    serializeFrontmatter(stripCodexSkillFrontmatter(fm), "body\n");
+
+  it("keeps the three fields Codex reads", () => {
+    expect(
+      stripCodexSkillFrontmatter({
+        name: "aidd-dev:01:plan",
+        description: "Plan things",
+        allowed_tools: ["Read"],
+      })
+    ).toEqual({ name: "aidd-dev:01:plan", description: "Plan things", allowed_tools: ["Read"] });
+  });
+
+  it("drops the fields it does not, rather than passing them through", () => {
+    // `model` is the one the framework ships and Codex has no use for.
+    expect(stripCodexSkillFrontmatter({ name: "n", description: "d", model: "opus" })).toEqual({
+      name: "n",
+      description: "d",
+    });
+  });
+
+  it("omits a field the source never set", () => {
+    expect(stripCodexSkillFrontmatter({ description: "d" })).toEqual({ description: "d" });
+  });
+
+  it("quotes a value whose colon would otherwise make the frontmatter unreadable", () => {
+    // This is not cosmetic. Two skills shipped in the pinned release carry a description
+    // containing ": " — `js-yaml` refuses the source outright with "bad indentation of a
+    // mapping entry". Re-serialising with quotes is what makes the installed file parse.
+    expect(rebuild({ name: "aidd-context:03:context-generate", description: "Do a: thing" })).toBe(
+      "---\nname: 'aidd-context:03:context-generate'\ndescription: 'Do a: thing'\n---\nbody\n"
+    );
+  });
+
+  it("escapes a quote in the value rather than closing the string early", () => {
+    expect(rebuild({ description: "it's here" })).toBe(
+      "---\ndescription: 'it''s here'\n---\nbody\n"
+    );
   });
 });

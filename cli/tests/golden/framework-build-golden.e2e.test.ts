@@ -30,14 +30,19 @@
  *   codex, copilot:flat, codex:flat — 2026-09-03, when the other eight cells were frozen
  *     for the first time. All three were stale, and none of the drift came from that day's
  *     work: each was verified against a binary built at this branch's base, which produces
- *     the same output. The stored file has had one write in its life, at the migration
- *     commit, and the eight unfrozen cells were never compared to it again.
+ *     the same output. The stored file has had one write since the CLI was migrated into
+ *     this repository, and the eight unfrozen cells were never compared to it again. (The
+ *     re-baselining passes listed above happened before that migration, on branches whose
+ *     writes were folded into the migration snapshot.)
  *       codex, 30 SKILL.md files — codex is the only target that re-serialises skill
  *         frontmatter (`stripCodexSkillFrontmatter`), and `serializeFrontmatter` quotes
  *         scalars, so its output stopped matching the source bytes the baseline recorded.
  *       copilot:flat, 2 hook files — the hooks format grew a `version` field and a
  *         flattened shape after the baseline was written.
- *       codex:flat, `.codex/config.toml`.
+ *       codex:flat, `.codex/config.toml` — `mergeCodexConfigToml` writes the merged file
+ *         and its invariants moved after the baseline was taken. The current content holds
+ *         them: `project_doc_max_bytes` 262144, `features.hooks` true, three merged
+ *         `mcp_servers`, each pinned by `tests/contexts/tools/domain/profiles/codex.unit.test.ts`.
  *
  * USAGE:
  *   Capture all:   UPDATE_FRAMEWORK_GOLDEN=1 pnpm test:e2e tests/golden/framework-build-golden.e2e.test.ts
@@ -45,10 +50,12 @@
  */
 
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { AI_TOOL_IDS } from "../../src/kernel/tool.js";
 import { createTestEnv, runCli } from "../e2e/helpers.js";
 
 const ROOT = resolve(fileURLToPath(import.meta.url), "../../..");
@@ -190,25 +197,36 @@ describe.concurrent("Framework build golden — 9-cell matrix", () => {
         expect(Object.keys(stored[key]).length, `cell ${key} must have files`).toBeGreaterThan(0);
       }
 
-      // Assert the frozen cell(s) are byte-identical to the stored baseline
+      // Every mismatching cell at once. Asserting inside the loop stops at the first, so a
+      // change landing across several profiles reads as one, and the next is found only
+      // after a fix and a re-run.
+      const drifted = [...FROZEN_CELLS].filter(
+        (key) => JSON.stringify(captured[key]) !== JSON.stringify(stored[key])
+      );
+      expect(drifted, "cells differing from their stored baseline").toEqual([]);
       for (const key of FROZEN_CELLS) {
-        const capturedCell = captured[key];
-        const storedCell = stored[key];
-        expect(
-          capturedCell,
-          `cell ${key}: output differs from stored pre-change baseline`
-        ).toStrictEqual(storedCell);
+        expect(captured[key], `cell ${key}`).toStrictEqual(stored[key]);
       }
     } finally {
       await cleanup();
     }
   });
 
-  it("all 9 cells are non-empty", async () => {
-    const stored = JSON.parse(await readFile(SNAPSHOT_FILE, "utf-8")) as GoldenSnapshot;
+  it("the matrix covers every tool the CLI builds for, and nothing else", () => {
+    // "All nine cells" only means "all of them" while the two hand-written target lists
+    // still cover every tool in the registry, and while the stored file holds those cells
+    // and no others. A sixth tool absent from the lists, or a cell quietly dropped from
+    // one of them, would leave the matrix reading complete and guarding less — the same
+    // "nobody compares this" the frozen set exists to close, one level up.
+    const matrixTools = new Set<string>([...MARKETPLACE_TARGETS, ...FLAT_TARGETS]);
+    for (const id of AI_TOOL_IDS) {
+      expect(matrixTools.has(id), `${id} is a registered AI tool with no golden cell`).toBe(true);
+    }
+
+    const stored = JSON.parse(readFileSync(SNAPSHOT_FILE, "utf-8")) as GoldenSnapshot;
     const expectedCells = [...MARKETPLACE_TARGETS, ...FLAT_TARGETS.map((t) => `${t}:flat`)];
+    expect(Object.keys(stored).sort()).toEqual([...expectedCells].sort());
     for (const key of expectedCells) {
-      expect(stored[key], `missing cell: ${key}`).toBeDefined();
       expect(Object.keys(stored[key]).length, `cell ${key} must have files`).toBeGreaterThan(0);
     }
   });
