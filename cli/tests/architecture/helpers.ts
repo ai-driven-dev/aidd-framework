@@ -28,7 +28,18 @@ export function read(relativePath: string): string {
   return readFileSync(join(CLI_ROOT, relativePath), "utf8");
 }
 
-const RELATIVE_IMPORT = /(?:from\s+|import\s+)["'](\.[^"']+)["']/g;
+/**
+ * Every way one file names another in this codebase.
+ *
+ * `from "./x.js"`, a bare side-effect `import "./x.js"` — that is how tool profiles register
+ * themselves — and `import("./x.js")`, which appears as a type expression. The last form was
+ * missing while `context-graph.arch.test.ts` had it, so two extractors in this directory
+ * disagreed and one real dependency was invisible to every rule built on this one.
+ *
+ * The `@/` alias `tsconfig.json` defines resolves to `src/`. Nothing in `src/` uses it today;
+ * it is handled so that using it does not silently take a file out of every rule's sight.
+ */
+const INTERNAL_IMPORT = /(?:from|import)\s*\(?\s*["'](\.[^"']+|@\/[^"']+)["']/g;
 
 /**
  * Maps every source file to the set of files importing it.
@@ -40,8 +51,13 @@ export function importersByFile(): Map<string, Set<string>> {
   const importers = new Map<string, Set<string>>();
   for (const file of files) {
     const text = read(file);
-    for (const match of text.matchAll(RELATIVE_IMPORT)) {
-      const target = normalize(join(dirname(file), match[1])).replace(/\.js$/, ".ts");
+    for (const match of text.matchAll(INTERNAL_IMPORT)) {
+      const specifier = match[1] as string;
+      const target = (
+        specifier.startsWith("@/")
+          ? `src/${specifier.slice(2)}`
+          : normalize(join(dirname(file), specifier))
+      ).replace(/\.js$/, ".ts");
       if (!known.has(target)) continue;
       const set = importers.get(target) ?? new Set<string>();
       set.add(file);

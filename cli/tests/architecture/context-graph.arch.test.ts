@@ -150,7 +150,7 @@ describe("the context graph has only the edges the plan allows", () => {
   it("names the edge it is given, and stays silent on one it allows", () => {
     expect(contextOf("src/contexts/tools/domain/registry.ts")).toBe("tools");
     expect(contextOf("src/kernel/tool.ts")).toBe("kernel");
-    expect(contextOf("src/application/commands/ai.ts")).toBe("outside");
+    expect(contextOf("src/somewhere-that-is-no-layer/thing.ts")).toBe("outside");
     expect(ALLOWED.has("translate->tools")).toBe(true);
     expect(ALLOWED.has("tools->translate")).toBe(false);
   });

@@ -55,11 +55,10 @@ const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
     "src/contexts/translate/domain/content-translator.ts",
     // the build use case — `framework build`, one source to N targets
     "src/contexts/translate/application/translate-source.ts",
-    // the plugin vocabulary a tool profile declares, read by whoever installs from it
-    "src/contexts/tools/domain/capabilities/plugins-capability.ts",
-    "src/contexts/tools/domain/marketplace-settings.ts",
-    "src/contexts/tools/domain/plugin-translation-mode.ts",
-    "src/contexts/tools/domain/hooks-format.ts",
+    // Four `contexts/tools/...` paths used to sit here, duplicating `tools`' own entries.
+    // They were never consulted: the lookup is keyed by the *imported* file's context, so a
+    // `tools` file is only ever checked against `tools`. A per-consumer allowance is not
+    // something this mechanism can express, and those modules are public to everyone anyway.
   ],
   // Measured with the composition root excluded: ten modules are reached from outside,
   // and not one of them is an adapter. The adapters are wired by `deps.ts` alone, which
