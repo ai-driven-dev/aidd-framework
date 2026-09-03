@@ -21,12 +21,11 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
   private readonly executable = new Set<string>();
 
   /** Normalized like every other reader in this class. Skipping `norm` made this the one
-   * method that could answer `null` for a path `fileExists` answered `true` for — which is
-   * the exact contradiction `FileReader.fileMode` was added to prevent. */
-  async fileMode(path: string): Promise<number | null> {
+   * method that could answer for a path `fileExists` disagreed with — which is the exact
+   * contradiction `FileReader.isExecutable` sits behind the port to prevent. */
+  async isExecutable(path: string): Promise<boolean> {
     const key = norm(path);
-    if (!this.files.has(key)) return null;
-    return this.executable.has(key) ? 0o755 : 0o644;
+    return this.files.has(key) && this.executable.has(key);
   }
 
   private readonly files = new Map<string, string>();

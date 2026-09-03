@@ -25,6 +25,13 @@ import { DeterministicHasher } from "../../helpers/ports/deterministic-hasher.js
 let dir: string;
 let git: GitAdapter;
 
+/** Windows records no execute bit: `chmod` cannot take one away, every readable file reports
+ * `0o666`, and git runs whatever hook it finds through `sh`. "Present but unrunnable" is
+ * therefore a state that exists only where the bit does, and asserting it elsewhere measures
+ * the platform rather than the reader. The states that exist everywhere — absent, and
+ * runnable — are asserted on both. */
+const REMOVING_THE_BIT_MEANS_SOMETHING = process.platform !== "win32";
+
 /** Git exports `GIT_DIR` and friends into everything it spawns, this suite included when it
  * runs from a commit hook. Stripped, or these read the repository being committed. */
 function run(args: readonly string[], env: NodeJS.ProcessEnv = {}): void {
@@ -85,8 +92,10 @@ describe("what check reads about the commit trailer", () => {
   it("tells a delegate that is not executable from one that is absent", async () => {
     expect((await read()).delegate).toBe("absent");
 
-    await installDelegate(0o644);
-    expect((await read()).delegate).toBe("not-executable");
+    if (REMOVING_THE_BIT_MEANS_SOMETHING) {
+      await installDelegate(0o644);
+      expect((await read()).delegate).toBe("not-executable");
+    }
 
     await installDelegate(0o755);
     expect((await read()).delegate).toBe("executable");
@@ -188,8 +197,10 @@ describe("what check reads about the commit trailer", () => {
     const hookPath = join(await hooksDir(), "prepare-commit-msg");
     await writeFile(hookPath, `#!/bin/sh\n${sessionTrailerHookLine(delegatePath)}\n`);
 
-    await chmod(hookPath, 0o644);
-    expect((await read()).hookExecutable).toBe(false);
+    if (REMOVING_THE_BIT_MEANS_SOMETHING) {
+      await chmod(hookPath, 0o644);
+      expect((await read()).hookExecutable).toBe(false);
+    }
 
     await chmod(hookPath, 0o755);
     expect((await read()).hookExecutable).toBe(true);

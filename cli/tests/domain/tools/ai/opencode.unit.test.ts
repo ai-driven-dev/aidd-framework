@@ -7,7 +7,7 @@ import { opencode } from "../../../../src/domain/tools/ai/opencode.js";
 function makeFs(existingPaths: string[]): FileReader {
   return {
     fileExists: async (path: string) => existingPaths.some((p) => path.endsWith(p)),
-    fileMode: async () => 0o644,
+    isExecutable: async () => false,
     readFile: async () => "",
     readFileHash: async () => new FileHash("00000000000000000000000000000000"),
     listDirectory: async () => [],

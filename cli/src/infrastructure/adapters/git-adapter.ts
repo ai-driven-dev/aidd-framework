@@ -206,24 +206,19 @@ export class GitAdapter implements VersionControl {
       // finds, so a bit lost to a regeneration stays lost. Reported here rather than fixed
       // there — quietly widening a file this project did not write is what the repair spends
       // its whole guard budget avoiding.
-      ...(hook === null ? {} : { hookExecutable: await this.isExecutable(hookPath) }),
+      ...(hook === null ? {} : { hookExecutable: await this.fs.isExecutable(hookPath) }),
       callSite: callSiteState(hook, line),
       hookHasOtherContent: holdsSomebodyElsesLines(hook, line),
     };
   }
 
   /** Present, and executable. Git will not run a hook it cannot execute, so a delegate that
-   * is there without that bit is a distinct answer from one that is missing. Any execute
-   * bit, not the owner's alone — git runs the hook as whoever invoked it, who need not own
-   * the file. */
+   * is there but unrunnable is a distinct answer from one that is missing. Asked as "can
+   * whoever runs git execute this", not as a permission bit — see `FileReader.isExecutable`
+   * for the platform that made the difference matter. */
   private async delegateState(path: string): Promise<TelemetryCommitTrailerSetup["delegate"]> {
     if (!(await this.fs.fileExists(path))) return "absent";
-    return (await this.isExecutable(path)) ? "executable" : "not-executable";
-  }
-
-  private async isExecutable(path: string): Promise<boolean> {
-    const mode = await this.fs.fileMode(path);
-    return mode !== null && (mode & 0o111) !== 0;
+    return (await this.fs.isExecutable(path)) ? "executable" : "not-executable";
   }
 
   private async readIfPresent(path: string): Promise<string | null> {

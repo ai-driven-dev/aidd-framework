@@ -35,7 +35,7 @@ function makeManifest(pluginFileHash: string): Manifest {
 function makeFs(fileExists: boolean, diskHash: string): FileReader {
   return {
     fileExists: async () => fileExists,
-    fileMode: async () => 0o644,
+    isExecutable: async () => false,
     readFileHash: async () => new FileHash(diskHash),
     readFile: async () => "",
     listDirectory: async () => [],
@@ -66,7 +66,7 @@ describe("StatusUseCase — cursor plugin drift (user-scope)", () => {
           checkedPaths.push(p);
           return true;
         },
-        fileMode: async () => 0o644,
+        isExecutable: async () => false,
         readFileHash: async () => new FileHash(DRIFTED_HASH),
         readFile: async () => "",
         listDirectory: async () => [],

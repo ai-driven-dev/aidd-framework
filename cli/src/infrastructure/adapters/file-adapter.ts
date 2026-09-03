@@ -1,5 +1,7 @@
 import {
+  access,
   chmod,
+  constants,
   copyFile,
   mkdir,
   readdir,
@@ -25,11 +27,12 @@ import type { Logger } from "../../domain/ports/logger.js";
 import { JsonParseError } from "../errors.js";
 
 export class FileAdapter implements FileReader, FileWriter, FileMerger {
-  async fileMode(path: string): Promise<number | null> {
+  async isExecutable(path: string): Promise<boolean> {
     try {
-      return (await stat(path)).mode;
+      await access(path, constants.X_OK);
+      return true;
     } catch {
-      return null;
+      return false;
     }
   }
 
