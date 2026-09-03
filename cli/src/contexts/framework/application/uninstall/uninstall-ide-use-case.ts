@@ -1,7 +1,7 @@
 import { NoManifestError, ToolNotInstalledError } from "../../../../kernel/errors.js";
 import type { IdeToolId } from "../../../../kernel/tool.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
-import type { UninstallToolsUseCase } from "../uninstall/uninstall-tools-use-case.js";
+import type { UninstallToolsUseCase } from "./uninstall-tools-use-case.js";
 
 export interface UninstallIdeOptions {
   toolId: IdeToolId;

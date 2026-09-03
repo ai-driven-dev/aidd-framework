@@ -8,12 +8,12 @@
  * profile imports them back from here.
  */
 
+import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
 import {
   flatMcpKeyPrefix,
   genericFlatHooksScriptPath,
   genericFlatSkillPath,
-} from "../../../../../kernel/flat-paths.js";
-import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
+} from "../../../../../kernel/materialization/flat-paths.js";
 import type { FileReader } from "../../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../../kernel/ports/file-writer.js";
 import type { PluginPresence, ToolBuildContract } from "../../build-contract.js";

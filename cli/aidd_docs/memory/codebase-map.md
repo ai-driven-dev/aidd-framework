@@ -21,9 +21,8 @@ src/
 │   ├── merge.ts                       # MergeStrategy, ConflictDecision, merge-entry extraction
 │   ├── jsonc.ts                        # stripJsonComments — leaf dependency of merge.ts
 │   ├── markdown.ts                      # markdown helpers shared by ≥2 contexts
-│   ├── flat-paths.ts                     # flat-build path helpers shared by ≥2 contexts
-│   ├── relative-link-rewrite.ts           # link-rewrite helper shared by ≥2 contexts
-│   ├── errors.ts                           # every typed domain exception — one catalog, not one per layer
+│   ├── errors.ts                         # every typed domain exception — one catalog, not one per layer
+│   ├── materialization/                   # where content lands and how its links follow — flat-paths.ts, relative-link-rewrite.ts; called by tools' profile builds and translate's flat/marketplace strategies
 │   └── ports/                               # ports with callers in ≥2 contexts: file-reader, file-writer, hasher, logger, asset-provider, prompter (framework + distribution)
 ├── presentation/                # everything that talks to a human — depends on contexts, never the reverse
 │   ├── commands/                 # CLI wiring only, one file per command; kanban.ts is a launcher stub still mid-migration (see "Launchers" below)

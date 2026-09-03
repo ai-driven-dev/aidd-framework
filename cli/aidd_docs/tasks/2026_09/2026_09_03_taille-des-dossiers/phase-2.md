@@ -8,8 +8,9 @@ status: done
 already there, unstated.
 
 **A use case in the wrong folder.** `uninstall-tools-use-case.ts` lives in `install/`, and
-its only importers are `uninstall/uninstall-use-case.ts` and
-`uninstall/uninstall-ide-use-case.ts` — the folder it should have been in.
+its only importers inside the context are `uninstall/uninstall-use-case.ts` and
+`uninstall/uninstall-ide-use-case.ts` — the folder it should have been in. Four files import
+it in all: those two, `runtime/wiring/framework.ts`, which imports everything, and its test.
 
 **Four descriptors around one engine.** `install-{agents,commands,rules,skills}-use-case.ts`
 are 33 to 35 lines each, every one of them a `ContentSectionDescriptor` handed to the same

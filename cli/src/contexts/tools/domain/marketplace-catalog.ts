@@ -12,9 +12,9 @@
 import { join } from "node:path";
 import { InvalidSourceMarketplaceError } from "../../../kernel/errors.js";
 import { parseFrontmatter, serializeFrontmatter } from "../../../kernel/markdown.js";
+import { rewriteRelativeLinks } from "../../../kernel/materialization/relative-link-rewrite.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";
-import { rewriteRelativeLinks } from "../../../kernel/relative-link-rewrite.js";
 import type { PluginPresence } from "./build-contract.js";
 
 type SrcEntry =

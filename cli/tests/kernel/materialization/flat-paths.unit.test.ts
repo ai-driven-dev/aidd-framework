@@ -5,7 +5,7 @@ import {
   genericFlatHooksFile,
   genericFlatHooksScriptPath,
   genericFlatSkillPath,
-} from "../../src/kernel/flat-paths.js";
+} from "../../../src/kernel/materialization/flat-paths.js";
 
 describe("genericFlatAgentPath", () => {
   it("strips .md suffix, adds outputExt, and prepends plugin prefix", () => {

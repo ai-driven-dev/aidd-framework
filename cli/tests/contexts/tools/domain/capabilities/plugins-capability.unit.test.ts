@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PluginsCapability } from "../../../../src/contexts/tools/domain/capabilities/plugins-capability.js";
+import { PluginsCapability } from "../../../../../src/contexts/tools/domain/capabilities/plugins-capability.js";
 
 const MARKETPLACE_SETTINGS = {
   settingsPath: ".claude/settings.json",

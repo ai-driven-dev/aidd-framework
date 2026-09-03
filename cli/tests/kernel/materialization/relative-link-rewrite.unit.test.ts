@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rewriteRelativeLinks } from "../../src/kernel/relative-link-rewrite.js";
+import { rewriteRelativeLinks } from "../../../src/kernel/materialization/relative-link-rewrite.js";
 
 // Stable test option used for all existing tests (the third branch is not triggered by @./ and @../).
 const STABLE_OPTS = { currentFilePluginRelative: "skills/foo/SKILL.md" };

@@ -36,7 +36,7 @@ journey
   section Setup
     the two paid entries already gone from the baseline: 5: system
   section Happy path
-    the two remaining entries each carry why they stay => the ratchet still passes: 5: system
+    the remaining entry carries why it stays, and the count its reason names => the ratchet still passes: 5: system
   section Edge case - a new offender
     a folder crossing the limit => the ratchet fails, naming it: 5: system
   section Teardown

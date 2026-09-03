@@ -1,13 +1,13 @@
 // Register the claude and copilot tools so their capabilities are accessible
-import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
-import "../../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
+import "../../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
 import { describe, expect, it } from "vitest";
-import { InstallCommandsUseCase } from "../../../../../src/contexts/framework/application/install/content/install-commands-use-case.js";
-import { claude } from "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
-import { copilot } from "../../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
-import type { ContentSection } from "../../../../../src/contexts/translate/domain/canon.js";
-import { GITKEEP_FILE } from "../../../../../src/kernel/file.js";
-import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
+import { InstallCommandsUseCase } from "../../../../../../src/contexts/framework/application/install/content/install-commands-use-case.js";
+import { claude } from "../../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import { copilot } from "../../../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
+import type { ContentSection } from "../../../../../../src/contexts/translate/domain/canon.js";
+import { GITKEEP_FILE } from "../../../../../../src/kernel/file.js";
+import { DeterministicHasher } from "../../../../../helpers/ports/deterministic-hasher.js";
 
 const _DOCS_DIR = "aidd_docs";
 

@@ -6,14 +6,14 @@
  * from domain/formats/. The contracts themselves are thin wiring.
  */
 
+import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
 import {
   genericFlatAgentPath,
   genericFlatHooksFile,
   genericFlatHooksScriptPath,
   genericFlatSkillPath,
-} from "../../../../../kernel/flat-paths.js";
-import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
-import { rewriteRelativeLinks } from "../../../../../kernel/relative-link-rewrite.js";
+} from "../../../../../kernel/materialization/flat-paths.js";
+import { rewriteRelativeLinks } from "../../../../../kernel/materialization/relative-link-rewrite.js";
 import type { ToolBuildContract } from "../../build-contract.js";
 import { mergeClaudeSettingsHooks } from "../../formats/flat-hooks-merge.js";
 import { mergeVscodeMcp } from "../../formats/vscode-mcp-merge.js";

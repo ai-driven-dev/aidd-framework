@@ -1,7 +1,7 @@
 import { basename, join, relative } from "node:path";
+import { rewriteRelativeLinks } from "../../../../kernel/materialization/relative-link-rewrite.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
-import { rewriteRelativeLinks } from "../../../../kernel/relative-link-rewrite.js";
 import {
   PLUGIN_AGENT_INPUT_EXT,
   PLUGIN_HOOKS_RELATIVE,

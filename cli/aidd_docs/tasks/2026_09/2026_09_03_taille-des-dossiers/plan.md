@@ -11,18 +11,33 @@ status: implemented
 `translate`. The question was whether it is one context or three (`install`, `sync`,
 `restore`).
 
-**It is one.** Every one of its ten application subdirectories touches the manifest:
+**It is one.** Not one of its ten application subdirectories is free of the manifest.
 
-| doctor | flows | uninstall | plugin | install | global | restore | setup |
-| ------ | ----- | --------- | ------ | ------- | ------ | ------- | ----- |
-| 7/7 | 3/3 | 3/4 | 5/8 | 6/12 | 2/8 | 3/8 | 1/3 |
+Predicate, so the next reader can re-run it rather than trust it — a file counts when it
+imports a module whose path names the manifest:
 
-36 files of 62. Splitting means duplicating the aggregate, or inventing a fourth context the
-three depend on, or accepting a split that reduces no coupling. The refactor's invariant is
-that a context owns a concept; this one owns the installation record, and the manifest is
-that concept. 88 files is a size observation, not a boundary violation.
+```sh
+grep -rlE 'from "[^"]*[Mm]anifest' src/contexts/framework/application/<subdir> --include='*.ts'
+```
 
-Recorded here so the next person to ask finds the measurement instead of re-deriving it.
+| doctor | flows | uninstall | plugin | install | global | restore | setup | framework | shared |
+| ------ | ----- | --------- | ------ | ------- | ------ | ------- | ----- | --------- | ------ |
+| 7/7 | 3/3 | 5/5 | 6/8 | 5/11 | 5/8 | 3/8 | 1/3 | 4/6 | 2/3 |
+
+41 files of 62, measured after the moves below. The number is what an independent review
+reproduced; the 36/62 first recorded here was not reproducible under any predicate either of
+us tried, and the earlier table omitted two of the ten subdirectories.
+
+But coupling this dense is an argument for a *shared* manifest, not against a split — this
+repo already carries a fourth thing three contexts depend on, and it is called `src/kernel`.
+So the count is not what settles it. What settles it: a context owns a concept, this one owns
+the installation record, and the manifest is that record's lifecycle — created by install,
+read by doctor, rewritten by sync, replayed by restore. Split it three ways and no context
+owns it; the lifecycle fragments and the aggregate has to be duplicated or promoted. 88 files
+is a size observation, not a boundary violation.
+
+Recorded here so the next person to ask finds the measurement and its predicate instead of
+re-deriving both.
 
 ## What is actually owed
 
@@ -33,11 +48,14 @@ two of them promising a split "by a later phase". That promise is the debt.
 | --------- | ----: | -------------------- |
 | `src/contexts/tools/domain` | 12 | Five capability classes live in `capabilities/`, three live beside it. Same suffix, same role, two locations, no stated reason |
 | `src/contexts/framework/application/install` | 12 | `uninstall-tools-use-case.ts` sits here while `uninstall/` exists and holds its only importers. And four 33-line descriptors around one shared engine |
-| `src/kernel` | 11 | A flat vocabulary the four contexts speak |
-| `src/presentation/commands` | 14 | One file per command, plus two helpers |
+| `src/kernel` | 11 | A vocabulary the contexts speak — with one cohesive pair inside it, seen only later |
+| `src/presentation/commands` | 14 | Twelve files carrying the command surface, plus two helpers |
 
-The first two hide a real inconsistency. The last two do not: no grouping there is anything
-but arbitrary, and folders added to satisfy a count lengthen every import for nothing.
+The first two hide a real inconsistency. `src/kernel` was written off here as arbitrary, and
+that was wrong: `flat-paths.ts` and `relative-link-rewrite.ts` are read by the same eight
+files across `tools` and `translate`, and both answer where content lands and how its links
+follow. A follow-up named that `materialization/` and the entry left. Only
+`src/presentation/commands` stays.
 
 ## Phases
 
@@ -83,7 +101,8 @@ Every phase runs all of them, and none is optional:
 Trois tests d'architecture ont échoué pendant le déplacement :
 
 - `codebase-map` — le dossier `content/` absent de la carte
-- `context-boundary` — dix-neuf chemins d'import périmés dans la liste des modules publics
+- `context-boundary` — neuf entrées périmées sur dix-huit lignes : quatre dans la liste des
+  modules publics, cinq dans son socle
 - `tool-addition-cost` — une entrée de socle pointant l'ancien emplacement
 
 Les socles suivent les fichiers. Aucun n'a grossi.
@@ -93,9 +112,9 @@ Les socles suivent les fichiers. Aucun n'a grossi.
 | Gate | Résultat |
 | ---- | -------- |
 | Types | propre |
-| Lint | 485 fichiers, zéro avertissement |
+| Lint | 511 fichiers, zéro avertissement |
 | Code mort | `knip` exit 0 |
-| Suite | 1 001 / 1 001 suites, 2 032 / 2 032 tests |
+| Suite | 205 fichiers de test, 2 032 / 2 032 tests |
 | Architecture | 33 / 33 |
 | Sortie | les neuf builds identiques octet pour octet à la capture d'avant le premier déplacement |
 | Parcours | smoke 98 / 0, 22 commandes feuilles sur 22 |
@@ -103,5 +122,12 @@ Les socles suivent les fichiers. Aucun n'a grossi.
 La sixième est la seule qui vaut pour un déplacement, et elle a été prise avant que le premier
 fichier bouge. Un déplacement qui change la sortie n'est pas un déplacement.
 
-Éprouvé après coup : un dossier synthétique de onze fichiers fait échouer le socle en le
-nommant. La règle mord encore une fois vidée de deux entrées.
+Éprouvé après coup : un dossier synthétique de onze fichiers est bien détecté. Le test
+s'arrêtait là — il prouvait le détecteur, pas le socle, alors que le critère écrit ici
+promettait le second. Corrigé depuis : le dossier synthétique traverse `expectRatchet`, qui
+le nomme.
+
+Les chiffres de gate ci-dessus étaient faux dans la première version de ce document et dans
+les messages de commit `224deafa` et `884501da` : « 485 fichiers », « 1 001 suites ». `pnpm
+lint` en compte 511 — 485 est le compte de `biome check src tests`, une commande plus étroite
+que la gate qu'il nommait. `pnpm test` rapporte 205 fichiers de test. Le 2 032 tenait.

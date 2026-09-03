@@ -1,12 +1,12 @@
 import { basename, join, relative } from "node:path";
 import { FlatTargetExistsError, OutDirNotDirectoryError } from "../../../../kernel/errors.js";
-import { flatMcpKeyPrefix } from "../../../../kernel/flat-paths.js";
 import { parseFrontmatter, serializeFrontmatter } from "../../../../kernel/markdown.js";
+import { flatMcpKeyPrefix } from "../../../../kernel/materialization/flat-paths.js";
+import { rewriteRelativeLinks } from "../../../../kernel/materialization/relative-link-rewrite.js";
 import type { AssetProvider } from "../../../../kernel/ports/asset-provider.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Logger } from "../../../../kernel/ports/logger.js";
-import { rewriteRelativeLinks } from "../../../../kernel/relative-link-rewrite.js";
 import type { ArtifactContract, ToolBuildContract } from "../../../tools/domain/build-contract.js";
 import type { JsonSchemaValidator } from "../../../tools/domain/ports/schema-validator.js";
 import {

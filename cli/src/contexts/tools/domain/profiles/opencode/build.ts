@@ -8,15 +8,15 @@
  */
 
 import { InvalidMcpServerConfigError, McpConfigError } from "../../../../../kernel/errors.js";
+import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
 import {
   flatMcpKeyPrefix,
   genericFlatAgentPath,
   genericFlatSkillPath,
-} from "../../../../../kernel/flat-paths.js";
-import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
+} from "../../../../../kernel/materialization/flat-paths.js";
+import { rewriteRelativeLinks } from "../../../../../kernel/materialization/relative-link-rewrite.js";
 import type { FileReader } from "../../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../../kernel/ports/file-writer.js";
-import { rewriteRelativeLinks } from "../../../../../kernel/relative-link-rewrite.js";
 import type { ToolBuildContract } from "../../build-contract.js";
 import { buildOpencodeFlatConfig } from "../../formats/opencode-mcp-merge.js";
 
