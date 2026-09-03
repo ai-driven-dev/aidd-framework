@@ -125,9 +125,18 @@ function describeHostRegistration(registration: TelemetryHostRegistrationSetup):
     registered: 3,
   };
   const ordered = [...entries].sort((a, b) => rank[a.answer] - rank[b.answer]);
-  return ordered
-    .map((entry) => `\n    ${entry.tool}/${entry.plugin}: ${entry.answer} — ${entry.detail}`)
-    .join("");
+  // A sentence first, then the lines. Every other setup row leads with one, and a label
+  // followed by padding and a newline reads as a value the command failed to produce.
+  const trouble = ordered.filter((entry) => entry.answer !== "registered").length;
+  const headline =
+    trouble === 0
+      ? `all ${ordered.length} will load`
+      : `${trouble} of ${ordered.length} will not load, or could not be answered`;
+  return ordered.reduce(
+    (text, entry) =>
+      `${text}\n    ${entry.tool}/${entry.plugin}: ${entry.answer} — ${entry.detail}`,
+    headline
+  );
 }
 
 function printSetup(output: CLIOutput, setup: TelemetrySetup): void {

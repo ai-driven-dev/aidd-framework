@@ -49,7 +49,7 @@ function makeFs(fileExists: boolean, diskHash: string): FileReader {
 
 function makeManifestRepo(manifest: Manifest): ManifestRepository {
   return {
-    path: "/test-project/.aidd/manifest.json",
+    path: "/proj/.aidd/manifest.json",
     load: async () => manifest,
     save: async () => {},
     delete: async () => {},

@@ -14,9 +14,11 @@
  * this repository's norm is that a duplicate is either justified against its neighbour or
  * removed, and none of the three had a reason the others did not.
  *
- * A different rule lives in `infrastructure/json-file.ts` and returns `.message` alone. That
- * is not a worse copy of this one — it describes a JSON parse error, which carries no `code`
- * worth preferring — and it stays where it is.
+ * `infrastructure/json-file.ts` exported a `describeError` that was in fact this file's
+ * `errorMessage`, byte for byte. Two exported functions of one name with different
+ * behaviour is worse than either duplicate: an import chosen by autocomplete would have
+ * turned a JSON parse message into `ENOENT` with nothing to notice it. That copy is gone and
+ * its one caller imports `errorMessage` from here.
  */
 export function describeError(error: unknown): string {
   if (error instanceof Error && "code" in error && typeof error.code === "string") {

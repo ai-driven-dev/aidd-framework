@@ -161,6 +161,83 @@ class CopilotSettingsPluginsReader implements HostPluginRegistryReader {
   }
 }
 
+const CODEX_PLUGIN_HEADER = /^\[plugins\."(.+?)"\]\s*(?:#.*)?$/u;
+const CODEX_TABLE_HEADER = /^\[/u;
+const CODEX_ENABLED_LINE = /^enabled\s*=\s*(true|false)\s*(?:#.*)?$/u;
+const CODEX_MULTILINE_DELIMITER = /"""|'''/gu;
+
+/**
+ * Reads each plugin table's body, and only outside multi-line strings.
+ *
+ * Two defects were found here by running it rather than reading it, and both produced the
+ * inversion this whole feature exists to remove: a host that will not load a plugin,
+ * reported as one that will.
+ *
+ * The first took `lines[index + 1]` and called that "absent `enabled` reads as enabled". It
+ * meant "not on the immediately following line", so a blank line, a comment, a reordered key
+ * or a trailing comment each turned `enabled = false` into an enabled plugin.
+ *
+ * The second was the fix for the first. Keeping the first occurrence of a ref was justified
+ * by "TOML forbids defining a table twice, so a second line that looks like this header is
+ * necessarily not one" — which proves one of the two is fake and never which one. A header
+ * spelled inside a multi-line string BEFORE the real table therefore won, and a disabled
+ * plugin read as registered again, in the mirror image of what last-wins got wrong.
+ *
+ * Skipping multi-line strings is what makes the ordering rule true rather than asserted: a
+ * fake header is not seen at all, so the only header that can be taken is a real one, and
+ * TOML's own prohibition then guarantees there is exactly one of those.
+ *
+ * Absent `enabled` reads as enabled: Codex writes the key on every table it creates, so a
+ * table without one is a shape it does not produce, and between "the host listed this
+ * plugin" and "the host listed it and said nothing", the listing is the fact.
+ */
+function scanCodexPluginTables(content: string): ReadonlyMap<string, boolean> {
+  const refs = new Map<string, boolean>();
+  const lines = outsideMultilineStrings(content.split("\n"));
+  for (const [index, line] of lines.entries()) {
+    if (line === null) continue;
+    const ref = CODEX_PLUGIN_HEADER.exec(line.trim())?.[1];
+    if (ref === undefined || refs.has(ref)) continue;
+    refs.set(ref, enabledInTableBody(lines, index + 1));
+  }
+  return refs;
+}
+
+/**
+ * The same lines, with every one inside a multi-line string replaced by `null`.
+ *
+ * Positions are preserved rather than filtered out, so a table's body still begins at the
+ * line after its header. A delimiter can open and close on one line, so the number of
+ * delimiters on a line decides the state after it and an odd count is what flips it; the
+ * line carrying the opening delimiter is itself outside, which is right — that line is the
+ * assignment, not the content.
+ */
+function outsideMultilineStrings(lines: readonly string[]): readonly (string | null)[] {
+  let inside = false;
+  return lines.map((line) => {
+    const wasInside = inside;
+    const delimiters = line.match(CODEX_MULTILINE_DELIMITER)?.length ?? 0;
+    if (delimiters % 2 === 1) inside = !inside;
+    return wasInside ? null : line;
+  });
+}
+
+/** The first `enabled` assignment between a table header and the next table, defaulting to
+ * enabled when the table declares none. A line inside a multi-line string is `null` here and
+ * neither ends the table nor answers for it. */
+function enabledInTableBody(lines: readonly (string | null)[], from: number): boolean {
+  for (let at = from; at < lines.length; at += 1) {
+    const line = lines[at];
+    if (line === null || line === undefined) continue;
+    const trimmed = line.trim();
+    if (CODEX_TABLE_HEADER.test(trimmed)) return true;
+    if (trimmed === "" || trimmed.startsWith("#")) continue;
+    const enabled = CODEX_ENABLED_LINE.exec(trimmed);
+    if (enabled !== null) return enabled[1] === "true";
+  }
+  return true;
+}
+
 /** One installed-plugin entry, narrowed to the two fields that decide whether a ref counts
  * for the project being diagnosed. Everything else Claude records there — install path,
  * version, timestamps, commit sha — describes what was installed, never where it applies. */
@@ -204,58 +281,4 @@ async function resolvedPath(path: string): Promise<string> {
   } catch {
     return path;
   }
-}
-
-const CODEX_PLUGIN_HEADER = /^\[plugins\."(.+?)"\]\s*(?:#.*)?$/u;
-const CODEX_TABLE_HEADER = /^\[/u;
-const CODEX_ENABLED_LINE = /^enabled\s*=\s*(true|false)\s*(?:#.*)?$/u;
-
-/**
- * Reads each plugin table's **body**, not the single line after its header.
- *
- * The first version of this took `lines[index + 1]`, and its doc claimed that meant
- * "absent `enabled` reads as enabled". It did not: it meant "not on the immediately
- * following line". Run against six shapes TOML permits, four of them turned
- * `enabled = false` into an enabled plugin — a blank line, a comment line, a reordered key
- * ahead of `enabled`, and a trailing `# comment` on the `enabled` line itself — and a header
- * carrying its own trailing comment dropped the plugin entirely. Every one of those is the
- * exact inversion this feature exists to remove, reached by a file Codex is free to write
- * and a person is free to edit.
- *
- * So: on a header, walk to the next table (`[`), skipping blanks and comments, and take the
- * first `enabled` assignment found. Absent then genuinely means absent, which is what the
- * paragraph below is allowed to claim.
- *
- * Absent reads as enabled: Codex writes the key on every table it creates, so a table
- * without one is a shape it does not produce, and between "the host listed this plugin" and
- * "the host listed it and said nothing", the listing is the fact. Only a literal `false`
- * withholds it.
- */
-function scanCodexPluginTables(content: string): ReadonlyMap<string, boolean> {
-  const refs = new Map<string, boolean>();
-  const lines = content.split("\n");
-  for (const [index, line] of lines.entries()) {
-    const header = CODEX_PLUGIN_HEADER.exec(line.trim());
-    const ref = header?.[1];
-    // First occurrence wins. TOML forbids defining a table twice, so a second line that
-    // looks like this header is necessarily not one — the likeliest source being a header
-    // spelled inside a multi-line string value. Last-write-wins would let that text
-    // override the real table's own `enabled`.
-    if (ref === undefined || refs.has(ref)) continue;
-    refs.set(ref, enabledInTableBody(lines, index + 1));
-  }
-  return refs;
-}
-
-/** The first `enabled` assignment between a table header and the next table, defaulting to
- * enabled when the table declares none. */
-function enabledInTableBody(lines: readonly string[], from: number): boolean {
-  for (let at = from; at < lines.length; at += 1) {
-    const line = (lines[at] ?? "").trim();
-    if (CODEX_TABLE_HEADER.test(line)) return true;
-    if (line === "" || line.startsWith("#")) continue;
-    const enabled = CODEX_ENABLED_LINE.exec(line);
-    if (enabled !== null) return enabled[1] === "true";
-  }
-  return true;
 }

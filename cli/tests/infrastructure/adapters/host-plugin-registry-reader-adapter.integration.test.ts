@@ -235,6 +235,43 @@ describe("Codex's own config.toml", () => {
     ).toBe(true);
   });
 
+  /**
+   * A header spelled inside a multi-line string is not a table, and TOML forbids the real
+   * one being defined twice — so exactly one of the two occurrences is real, and which comes
+   * first decides nothing. Both orders are asserted because each was, at one point, the one
+   * the scanner got wrong: last-write-wins let the fake override the real, and the
+   * first-wins that replaced it let the fake win when it came first.
+   */
+  it.each([
+    [
+      "before the real table",
+      '[projects."/p"]\nnotes = """\n[plugins."aidd-telemetry@aidd-framework"]\nenabled = true\n"""\n\n[plugins."aidd-telemetry@aidd-framework"]\nenabled = false\n',
+    ],
+    [
+      "after the real table",
+      '[plugins."aidd-telemetry@aidd-framework"]\nenabled = false\n\n[projects."/p"]\nnotes = """\n[plugins."aidd-telemetry@aidd-framework"]\nenabled = true\n"""\n',
+    ],
+  ])("ignores a header inside a multi-line string, %s", async (_where, content) => {
+    await write(PATH, content);
+
+    expect(
+      (await readerFor("codex").read(PROJECT)).refs?.get("aidd-telemetry@aidd-framework")
+    ).toBe(false);
+  });
+
+  // A string that opens and closes on one line leaves the scanner outside it, so the tables
+  // after it are still read.
+  it("stays outside a multi-line string that opens and closes on one line", async () => {
+    await write(
+      PATH,
+      '[projects."/p"]\nnotes = """one line"""\n\n[plugins."aidd-telemetry@aidd-framework"]\nenabled = false\n'
+    );
+
+    expect(
+      (await readerFor("codex").read(PROJECT)).refs?.get("aidd-telemetry@aidd-framework")
+    ).toBe(false);
+  });
+
   // `enabled` belongs to the table it sits under, never to the one before it.
   it("does not read the next table's enabled as this table's", async () => {
     await write(PATH, '[plugins."a@m"]\n[plugins."b@m"]\nenabled = false\n');
