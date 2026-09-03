@@ -12,13 +12,32 @@
  * All values are derived from file content only (no absolute paths, no timestamps).
  * This makes the snapshot machine-independent.
  *
- * FROZEN CELLS (marketplace baseline, never regenerate casually):
- *   claude — re-baselined once in the agents-manifest-fix pass (see below), still frozen since.
- * RE-BASELINED CELLS (flat-discovery-fix pass: bare paths, no plugin segment):
- *   claude:flat, cursor:flat, copilot:flat, codex:flat, opencode:flat
- * RE-BASELINED CELLS (agents-manifest-fix pass: `agents` is now a list of
- *   ./agents/*.md file paths instead of the invalid `["./agents"]` dir form):
- *   claude, cursor, copilot (marketplace)
+ * FROZEN CELLS: all nine. Every cell's fresh build is byte-compared to the stored
+ * baseline on every run, so a regression particular to one target fails here.
+ *
+ * It was one cell — claude — until the day a copilot-only regression shipped and this
+ * file could not see it: claude's content rewrite is the identity, so the only guarded
+ * cell was structurally incapable of catching a change in any other profile's. Freezing
+ * the other eight immediately surfaced a stale one (see below), which is the argument for
+ * doing it.
+ *
+ * RE-BASELINED CELLS, and why:
+ *   claude — agents-manifest-fix pass: `agents` became a list of ./agents/*.md paths
+ *     instead of the invalid `["./agents"]` dir form.
+ *   claude:flat, cursor:flat, copilot:flat, codex:flat, opencode:flat — flat-discovery-fix
+ *     pass: bare paths, no plugin segment.
+ *   cursor, copilot — same agents-manifest-fix pass as claude.
+ *   codex, copilot:flat, codex:flat — 2026-09-03, when the other eight cells were frozen
+ *     for the first time. All three were stale, and none of the drift came from that day's
+ *     work: each was verified against a binary built at this branch's base, which produces
+ *     the same output. The stored file has had one write in its life, at the migration
+ *     commit, and the eight unfrozen cells were never compared to it again.
+ *       codex, 30 SKILL.md files — codex is the only target that re-serialises skill
+ *         frontmatter (`stripCodexSkillFrontmatter`), and `serializeFrontmatter` quotes
+ *         scalars, so its output stopped matching the source bytes the baseline recorded.
+ *       copilot:flat, 2 hook files — the hooks format grew a `version` field and a
+ *         flattened shape after the baseline was written.
+ *       codex:flat, `.codex/config.toml`.
  *
  * USAGE:
  *   Capture all:   UPDATE_FRAMEWORK_GOLDEN=1 pnpm test:e2e tests/golden/framework-build-golden.e2e.test.ts
@@ -45,14 +64,14 @@ const MARKETPLACE_TARGETS = ["copilot", "codex", "claude", "cursor"] as const;
 const FLAT_TARGETS = ["claude", "cursor", "copilot", "codex", "opencode"] as const;
 
 /**
- * Frozen marketplace cell: its fresh build is byte-compared to the stored hash on
- * every run. Only claude is frozen — cursor/codex/copilot were re-baselined in the
- * plugin-root-token-rewrite pass (${CLAUDE_PLUGIN_ROOT} → tool-native token), and
- * copilot:flat in the flat-discovery-fix pass. claude itself was re-baselined once
- * in the agents-manifest-fix pass (agents → ./agents/*.md file list) and is frozen
- * at that value since.
+ * Every cell is frozen: each fresh build is byte-compared to its stored hash on every run.
+ * Re-baselining one is a deliberate act with a reason recorded in the header above, never
+ * a reflex when a run goes red.
  */
-const FROZEN_CELLS = new Set(["claude"]);
+const FROZEN_CELLS = new Set<string>([
+  ...MARKETPLACE_TARGETS,
+  ...FLAT_TARGETS.map((target) => `${target}:flat`),
+]);
 
 async function hashDirectory(dir: string): Promise<TargetSnapshot> {
   const result: TargetSnapshot = {};
@@ -150,7 +169,7 @@ describe.concurrent("Framework build golden — 9-cell matrix", () => {
     }
   });
 
-  it("stored golden baseline covers all 9 cells and the frozen claude cell is byte-identical (AC #1)", async () => {
+  it("every one of the 9 cells is byte-identical to its stored baseline", async () => {
     const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fb-golden-baseline");
     try {
       const captured = await captureAllCells(projectDir, fakeHome, tempDir);
