@@ -117,3 +117,27 @@ justesse dépendait de l'ordre interne de tsup. Supprimer sa cause n'en demande 
 | 5 | ligne d'origine réinjectée dans `persona.e2e.test.ts` => échec nommant le fichier |
 | — | **la course elle-même** : deux `vitest run --project e2e` simultanés, `dist/` absent => `A:0 B:0`, 14/14 et 104/104 des deux côtés |
 | all | 1 990 tests / 986 suites, ratios égaux · tsc 0 · biome 487 fichiers 0 · goldens `git diff` vide |
+
+## Revue (2026-09-02)
+
+Trois défauts trouvés en relisant le candidat commité, deux causés par lui.
+
+**`AIDD_BUILD_OUT_DIR` détruisait le répertoire qu'on lui donnait.** `clean: true` vide sa cible
+avant de construire. Un répertoire témoin contenant `notes.txt` a disparu, sortie 0, sans un mot —
+et le binaire produit là ne démarrait pas, faute de `node_modules` au-dessus de lui. La variable
+n'accepte plus que `dist` ou un répertoire sous `.e2e-build/` ; tout le reste lève une erreur qui
+dit pourquoi. Vérifié sur les deux pièges : un répertoire hors du paquet et `src`.
+
+**knip signalait `tests/e2e/global-setup.ts` comme fichier mort.** vitest le charge depuis la
+configuration, ce que knip ne suit pas. `cli-knip` est une étape de `pre-push` : la porte était
+rouge. Déclaré comme point d'entrée, avec `vitest.mutation.config.ts` que Stryker charge de la même
+façon et qui était rouge depuis la phase 20.
+
+**`warnDeprecated` n'a jamais été câblé.** Ajouté à la phase 18, zéro référence dans `src` comme
+dans `tests` — la phase avait conclu qu'un renommage pur garde une sortie identique et le
+message n'a jamais servi. Supprimé plutôt qu'ignoré : knip avait raison.
+
+La preuve de concurrence du premier passage montrait deux runs verts, ce qui n'exclut pas qu'ils se
+soient sérialisés par hasard. Refaite en hostile : un processus crée `dist/cli.js`, le remplit
+d'ordures et le supprime deux cents fois pendant que la suite e2e tourne. 104 / 104 verts. La
+dépendance n'est pas devenue improbable, elle n'existe plus.

@@ -1,5 +1,10 @@
 {
-  "entry": ["src/cli.ts", "scripts/check-bundle-size.mjs"],
+  "entry": [
+    "src/cli.ts",
+    "scripts/check-bundle-size.mjs",
+    "tests/e2e/global-setup.ts",
+    "vitest.mutation.config.ts"
+  ],
   "ignore": ["tests/**/helpers.ts", "tests/helpers/**", "tests/fixtures/**", "tmp/**"],
   "ignoreBinaries": ["gh", "icacls"],
   "ignoreExportsUsedInFile": true,

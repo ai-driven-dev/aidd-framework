@@ -1,18 +1,40 @@
 import { copyFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "tsup";
 
 /**
- * Where the build lands. Each e2e run passes its own directory
- * (`tests/e2e/global-setup.ts`) so two concurrent vitest invocations never share, and
- * race to rewrite, one `dist/cli.js`.
+ * Where the build lands. `dist` normally; each e2e run passes its own directory under
+ * `.e2e-build/` (`tests/e2e/global-setup.ts`) so two concurrent vitest invocations never
+ * share, and race to rewrite, one `dist/cli.js`.
  *
- * It must stay inside this package. `skipNodeModulesBundle` leaves every dependency an
- * external import that Node resolves by walking up from the built file, so a directory
- * under `cli/` finds `cli/node_modules` on its own. A directory outside — an OS temp dir
- * — finds nothing, and the binary fails on `commander` before it prints a word.
+ * Those two are the whole legitimate set, and anything else is refused rather than
+ * trusted. `clean: true` empties the target before building, so an out dir pointed at a
+ * directory holding anything else destroys its contents — silently, exiting 0. And a
+ * directory outside this package could not produce a working binary anyway:
+ * `skipNodeModulesBundle` leaves every dependency an external import that Node resolves
+ * by walking up from the built file, so only somewhere under `cli/` finds
+ * `cli/node_modules`. Refusing here turns both into an error that says so.
  */
-const outDir = process.env.AIDD_BUILD_OUT_DIR ?? "dist";
+const PACKAGE_ROOT = fileURLToPath(new URL(".", import.meta.url));
+const E2E_BUILD_ROOT = resolve(PACKAGE_ROOT, ".e2e-build");
+
+function resolveOutDir(): string {
+  const requested = process.env.AIDD_BUILD_OUT_DIR;
+  if (requested === undefined) return "dist";
+
+  const absolute = resolve(PACKAGE_ROOT, requested);
+  if (absolute === resolve(PACKAGE_ROOT, "dist")) return requested;
+  if (absolute.startsWith(`${E2E_BUILD_ROOT}${sep}`)) return requested;
+
+  throw new Error(
+    `AIDD_BUILD_OUT_DIR must be this package's "dist" or a directory under ".e2e-build/", ` +
+      `and was "${requested}". The build empties its target before writing, and a binary ` +
+      `built outside this package cannot resolve its dependencies.`
+  );
+}
+
+const outDir = resolveOutDir();
 
 export default defineConfig({
   entry: { cli: "src/cli.ts" },

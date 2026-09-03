@@ -110,6 +110,15 @@ holds the boundary: no file under `tests/` may resolve a path into `dist/`. `pnp
 `pnpm test:e2e` no longer run `pnpm build` — nothing in a test run reads `dist/` any more.
 Two vitest invocations at once are safe.
 
+`AIDD_BUILD_OUT_DIR` accepts only `dist` or a directory under `.e2e-build/`; anything else
+is refused with an error. The build empties its target before writing, so an out dir
+pointed anywhere else destroys that directory's contents while exiting 0, and a binary
+built outside the package cannot resolve its externalised dependencies anyway.
+
+`tests/e2e/global-setup.ts` and `vitest.mutation.config.ts` are knip entry points: vitest
+and Stryker load them from configuration, which knip cannot follow, and without the
+declaration it reports them as unused and fails the pre-push gate.
+
 ### Read the suite count, not only the test count
 
 A suite that fails before producing a single test contributes **zero** to the failure
