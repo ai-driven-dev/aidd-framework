@@ -28,7 +28,11 @@ pre-commit:
           echo "ℹ️  node not available; skipping scripts-tests"
           exit 0
         fi
-        node --test 'scripts/__tests__/*.test.js'
+        # Wrapped, because a suite that writes into this repository's own .git/hooks passes
+        # every assertion and destroys an install nothing can restore — `.git` is in no
+        # history. The wrapper passes the suite's own exit code through untouched.
+        node scripts/check-tests-leave-git-alone.js -- \
+          node --test 'scripts/__tests__/*.test.js'
     skill-frontmatter:
       glob: "plugins/*/skills/*/SKILL.md"
       run: |
