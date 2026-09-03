@@ -82,10 +82,11 @@ export const journalTaskDeclared: JournalTaskDeclaredModule = createRequire(impo
  * and the hook's own suite cannot: that the line this writes is character for character the
  * line the CLI writes, when neither can import the other. */
 interface JournalTrailerRepairModule {
-  repairCommitTrailerHook(hooksDir: string | undefined): string;
+  repairCommitTrailerHook(hooksDir: string | undefined, gitDir?: string): string;
   hookLine(delegatePath: string): string;
   DELEGATE_FILE: string;
   HOOK_FILE: string;
+  HOOK_HEADER: string;
 }
 
 export const journalTrailerRepair: JournalTrailerRepairModule = createRequire(import.meta.url)(

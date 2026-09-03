@@ -1,14 +1,16 @@
 import { spawnSync } from "node:child_process";
 import { statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { sessionTrailerHookLine } from "../../domain/formats/commit-session-trailer.js";
+import {
+  SESSION_TRAILER_HOOK_HEADER,
+  sessionTrailerHookLine,
+} from "../../domain/formats/commit-session-trailer.js";
 import type { TelemetryCommitTrailerSetup } from "../../domain/models/telemetry-setup.js";
 import type { FileReader } from "../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../domain/ports/file-writer.js";
 import type { VersionControl } from "../../domain/ports/version-control.js";
 import { environmentWithoutGitVariables } from "../git-environment.js";
 
-const HOOK_HEADER = "#!/bin/sh";
 const PREPARE_COMMIT_MSG_HOOK = "prepare-commit-msg";
 
 export class GitAdapter implements VersionControl {
@@ -59,7 +61,7 @@ export class GitAdapter implements VersionControl {
     const hookPath = join(hooksDir, PREPARE_COMMIT_MSG_HOOK);
     const existing = (await this.fs.fileExists(hookPath))
       ? await this.fs.readFile(hookPath)
-      : `${HOOK_HEADER}\n`;
+      : `${SESSION_TRAILER_HOOK_HEADER}\n`;
     if (existing.includes(line)) return false;
 
     const separator = existing.endsWith("\n") ? "" : "\n";
@@ -157,20 +159,6 @@ export class GitAdapter implements VersionControl {
     }
   }
 
-  /**
-   * Where this repository's hooks actually live, asked of git rather than assembled from
-   * `.git`.
-   *
-   * `git rev-parse --git-path hooks` answers all three cases one expression at a time could
-   * not: it returns `core.hooksPath` when one is set — the configuration under which a hook
-   * written to `.git/hooks` is silently never run — and in a linked worktree it returns the
-   * *common* git dir's hooks, which is where git looks. The path comes back relative in an
-   * ordinary repository and absolute otherwise, so it is resolved against the repository
-   * root either way.
-   *
-   * `null` when there is no repository here, or when git itself cannot be run: installing a
-   * hook is never allowed to be the reason a command fails.
-   */
   /** Every trailer fact, gathered from one place because every one of them is a git
    * question. Each field is answered independently: a hooks directory that cannot be
    * resolved leaves the file facts absent rather than guessed, and history that cannot be
@@ -209,19 +197,20 @@ export class GitAdapter implements VersionControl {
    * file that is there without that bit is a distinct answer from one that is missing. */
   private async delegateState(path: string): Promise<TelemetryCommitTrailerSetup["delegate"]> {
     if (!(await this.fs.fileExists(path))) return "absent";
-    try {
-      // eslint-disable-next-line no-bitwise -- the mode is a bitfield; there is no other read
-      return (statSync(path).mode & 0o100) === 0 ? "not-executable" : "executable";
-    } catch {
-      return "absent";
-    }
+    // Through the same reader that answered `fileExists`, never `node:fs` directly: a
+    // substituted reader saying the file is there while a real `statSync` throws would make
+    // the two halves of this method contradict each other. Any execute bit, not the owner's
+    // alone — git runs the hook as whoever invoked it, who need not own the file.
+    const mode = await this.fs.fileMode(path);
+    if (mode === null) return "absent";
+    return (mode & 0o111) === 0 ? "not-executable" : "executable";
   }
 
   private async readIfPresent(path: string): Promise<string | null> {
     return (await this.fs.fileExists(path)) ? await this.fs.readFile(path) : null;
   }
 
-  /** How many of the last `limit` commits carry the trailer. `%(trailers:key=…)` is git's
+  /** How many of the last `limit` non-merge commits carry the trailer. `%(trailers:key=…)` is git's
    * own reader, so this agrees with what `git log` shows a person by construction rather
    * than by a regex of ours. `null` — never `0` — when there is no history to read: a
    * repository with no commits and one whose every commit is unstamped are different facts,
@@ -234,7 +223,16 @@ export class GitAdapter implements VersionControl {
     try {
       const result = spawnSync(
         "git",
-        ["log", `-${limit}`, `--format=%(trailers:key=${trailerToken},valueonly)%x00`],
+        [
+          "log",
+          `-${limit}`,
+          // Merges are excluded because the delegate refuses them by design — a merge commit
+          // carrying one session's id would attribute every commit it brings in to that
+          // session. Counting them would put commits in the denominator that can never be in
+          // the numerator, which is arithmetic that reads as breakage.
+          "--no-merges",
+          `--format=%(trailers:key=${trailerToken},valueonly)%x00`,
+        ],
         { cwd: projectRoot, encoding: "utf8", env: environmentWithoutGitVariables() }
       );
       if (result.status !== 0) return null;
@@ -249,6 +247,23 @@ export class GitAdapter implements VersionControl {
     }
   }
 
+  /**
+   * Where this repository's hooks actually live, asked of git rather than assembled from
+   * `.git`.
+   *
+   * `git rev-parse --git-path hooks` answers all three cases one expression at a time could
+   * not: it returns `core.hooksPath` when one is set — the configuration under which a hook
+   * written to `.git/hooks` is silently never run — and in a linked worktree it returns the
+   * *common* git dir's hooks, which is where git looks. The path comes back relative in an
+   * ordinary repository and absolute otherwise, and git prints a relative one against the
+   * directory it ran in — which here is `projectRoot`, the same value it is resolved
+   * against. The hook side must resolve against its own cwd for that reason, and a version
+   * that resolved against the repository root instead sent a session started in a
+   * subdirectory outside the checkout entirely.
+   *
+   * `null` when there is no repository here, or when git itself cannot be run: installing a
+   * hook is never allowed to be the reason a command fails.
+   */
   private async resolveHooksDir(projectRoot: string): Promise<string | null> {
     try {
       const result = spawnSync("git", ["rev-parse", "--git-path", "hooks"], {
@@ -277,5 +292,5 @@ function holdsSomebodyElsesLines(hook: string | null, line: string): boolean {
   return hook
     .split("\n")
     .map((entry) => entry.trim())
-    .some((entry) => entry !== "" && entry !== line && entry !== "#!/bin/sh");
+    .some((entry) => entry !== "" && entry !== line && entry !== SESSION_TRAILER_HOOK_HEADER);
 }

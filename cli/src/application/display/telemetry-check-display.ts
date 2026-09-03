@@ -144,10 +144,11 @@ function describeHostRegistration(registration: TelemetryHostRegistrationSetup):
  * about its parts: how many recent commits actually carry it. A person reading one line has
  * then read the answer; the pieces below it say why, and only when there is a why. */
 function describeCommitTrailer(trailer: TelemetryCommitTrailerSetup): string {
-  const carried =
-    trailer.recentlyCarrying === undefined
-      ? "no commit history to read"
-      : `${trailer.recentlyCarrying.carrying} of the last ${trailer.recentlyCarrying.examined} commits carry it`;
+  // Outside a repository there is nothing to say about hooks — the same fact the claims
+  // below refuse to read as a failure. Saying "nothing installed" here would describe a
+  // repository this project is not in.
+  if (trailer.hooksDir === undefined) return "no repository here, so no hook to carry it";
+
   const parts: string[] = [];
   if (trailer.delegate === "absent") parts.push("nothing installed to write it");
   if (trailer.delegate === "not-executable") {
@@ -158,8 +159,23 @@ function describeCommitTrailer(trailer: TelemetryCommitTrailerSetup): string {
   // Said, never named. Which tool owns the file changes nothing a person does about it, and
   // naming one would be a guess read out of its contents.
   if (trailer.hookHasOtherContent) parts.push("that hook is somebody else's too");
-  const where = trailer.hooksDir === undefined ? "" : `\n    hooks run from ${trailer.hooksDir}`;
-  return parts.length === 0 ? `${carried}${where}` : `${carried} — ${parts.join("; ")}${where}`;
+
+  return `${describeTrailerCount(trailer)}${parts.length === 0 ? "" : ` — ${parts.join("; ")}`}\n    hooks run from ${trailer.hooksDir}`;
+}
+
+/** The count, and what it is not.
+ *
+ * A commit no session made carries no trailer, by design — the delegate writes nothing
+ * without a session variable, and skips merges outright. So a number below the total is not
+ * by itself a fault, and a bare "4 of 20" invites reading it as one. The qualifier is added
+ * exactly when it could mislead: some commits carrying it, and every part in place. */
+function describeTrailerCount(trailer: TelemetryCommitTrailerSetup): string {
+  const carried = trailer.recentlyCarrying;
+  if (carried === undefined) return "no commit history to read";
+  const count = `${carried.carrying} of the last ${carried.examined} commits carry it`;
+  const everyPartWorks = trailer.delegate === "executable" && trailer.callSite === "present";
+  if (!everyPartWorks || carried.carrying === carried.examined) return count;
+  return `${count} — a commit no session made carries none, by design`;
 }
 
 function printSetup(output: CLIOutput, setup: TelemetrySetup): void {

@@ -66,13 +66,18 @@ $ git rev-parse --show-toplevel --git-common-dir --git-dir --git-path hooks
 …/.git/hooks
 ```
 
-So the hooks directory costs **no additional process**, and `--git-path hooks` honours
-`core.hooksPath` rather than assuming `.git/hooks`. Two consequences to carry:
+So in the ordinary case the hooks directory costs **no additional process** — but only
+because the four-option form is asked first and the three-option form is the fallback.
+Adding the fourth option to the existing call outright was measured wrong: `rev-parse` fails
+atomically, so a git that rejects `--git-path` refuses all four, `resolveWriteTarget` returns
+null and **the journal records nothing at all**. A git old enough to refuse it pays a second
+call and simply goes without the hooks directory. Two more consequences to carry:
 
-- That file's own comment warns that *"a git too old for one of the later options fails the
-  whole call"*. `--git-path` predates every git this project supports, but the failure mode
-  is shared: a call that fails costs the worktree fields too. The repair must not be able to
-  take the existing facts down with it.
+- **`git rev-parse` prints `--git-path` relative to the directory it ran in**, exactly as
+  `worktreeFields` already says of its own two outputs. Resolving it against the repository
+  root instead sends a session started in `sub/deep` two levels *above* the checkout —
+  measured, `../../.git/hooks` resolved outside the repository entirely, which is where the
+  repair would then have written. It resolves against `cwd`.
 - The command answered the **common** hooks directory from inside a linked worktree, which is
   correct — worktrees share one hooks directory — and means a repair triggered from one
   worktree serves them all.
@@ -109,6 +114,13 @@ its parts:
       the next session start — asserted **without installing lefthook or husky**, by
       reproducing the shape (a hook file replaced) rather than the brand.
 - [ ] The repair never runs when the delegate is absent, so `off` stays final.
+- [ ] A session started in a subdirectory repairs its own repository and writes nowhere above it.
+- [ ] A hooks directory inside the working tree — a checked-in `.githooks/` — is never
+      written to, and neither is a `prepare-commit-msg` that is a symlink. `aidd telemetry on`
+      writing that line once was asked for; this write is not, it recurs, and version-controlled
+      content is not ours to dirty. `check` reports the call site either way.
+- [ ] The repair is atomic: written beside the target and renamed over it, so a hook can
+      never be read half-written by a session starting at the same moment.
 - [ ] It costs no process the session did not already spend, and never runs on `tool-used`.
 - [ ] A `rev-parse` that fails leaves the facts that call already produced intact.
 - [ ] `check` states the five claims above, and the commit count reads as a count — never a
@@ -120,7 +132,14 @@ its parts:
 
 ## The decision this needs, and it is not mine
 
-**The repair writes into `.git/hooks` on a session start, not on a command.** A person ran
+**Settled while building: only inside the git directory.** A `core.hooksPath` pointing into
+the working tree is version-controlled content, and appending there would dirty a tracked
+file on every session with a machine-absolute path nobody can commit. The repair declines it,
+and declines a symlinked hook for the same reason — `writeFileSync` follows one, and would
+edit whatever a team put on the other end.
+
+**What remains, and it is still a decision: the repair writes into `.git/hooks` on a session
+start, not on a command.** A person ran
 `aidd telemetry on` once; from then on, a file under `.git/` is restored by a hook rather
 than by anything they typed. That is defensible — it restores only what they asked for, only
 while the delegate they installed is present — and it is still a write nobody typed.

@@ -61,6 +61,13 @@ export const SESSION_TRAILER_TOKEN = "AIDD-Session-Id";
  * be the kind of silent theft a measurement tool has no business committing. */
 export const SESSION_TRAILER_DELEGATE_FILE = "aidd-session-trailer.sh";
 
+/** What a `prepare-commit-msg` written from scratch starts with — and, read back, the one
+ * line that does not count as somebody else's content. Exported rather than spelled at each
+ * site: `git-adapter.ts` writes it when a repository has no hook and reads it again when
+ * deciding whether a hook holds anything but ours, and a third spelling there would make a
+ * freshly installed hook report as "somebody else's too". */
+export const SESSION_TRAILER_HOOK_HEADER = "#!/bin/sh";
+
 /** The line appended to `prepare-commit-msg`, and the marker read back to tell an install
  * that already happened from one that has not. `"$@"` forwards git's own three arguments —
  * the message file, where the message came from, and the commit being amended — because the

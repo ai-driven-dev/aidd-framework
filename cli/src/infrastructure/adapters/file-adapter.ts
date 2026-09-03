@@ -25,6 +25,14 @@ import type { Logger } from "../../domain/ports/logger.js";
 import { JsonParseError } from "../errors.js";
 
 export class FileAdapter implements FileReader, FileWriter, FileMerger {
+  async fileMode(path: string): Promise<number | null> {
+    try {
+      return (await stat(path)).mode;
+    } catch {
+      return null;
+    }
+  }
+
   constructor(
     private readonly hasher: Hasher,
     private readonly logger?: Logger

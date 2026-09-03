@@ -368,6 +368,41 @@ describe("the row saying whether commits carry their session", () => {
     expect(text).not.toMatch(/lefthook|husky/iu);
   });
 
+  /**
+   * A commit no session made carries no trailer by design, and merges are skipped outright.
+   * So a number below the total is not a fault, and a bare "4 of 20" reads like one. The
+   * qualifier appears exactly when it could mislead — some carrying, every part in place.
+   */
+  it("says a shortfall is expected when every part is in place", () => {
+    const text = report({ ...HEALTHY, recentlyCarrying: { carrying: 4, examined: 20 } });
+
+    expect(text).toContain("a commit no session made carries none, by design");
+  });
+
+  it("does not excuse a shortfall when a part is broken", () => {
+    const text = report({
+      ...HEALTHY,
+      callSite: "missing",
+      recentlyCarrying: { carrying: 4, examined: 20 },
+    });
+
+    expect(text).not.toContain("by design");
+    expect(text).toContain("prepare-commit-msg does not call it");
+  });
+
+  // Outside a repository there is no hook to carry anything, which the claims below already
+  // refuse to read as a failure. "nothing installed" would describe a repository we are not in.
+  it("says there is no repository rather than listing missing pieces", () => {
+    const text = report({
+      delegate: "absent",
+      callSite: "no-hook-file",
+      hookHasOtherContent: false,
+    });
+
+    expect(text).toContain("no repository here");
+    expect(text).not.toContain("nothing installed");
+  });
+
   // No commits and no commits carrying it are different facts, and only the second is
   // something to act on.
   it("says there is no history to read rather than reporting zero", () => {

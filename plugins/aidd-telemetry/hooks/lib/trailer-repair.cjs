@@ -45,9 +45,13 @@ function hookLine(delegatePath) {
 }
 
 /**
- * Answers what it did, in a word, so a caller can log or count without re-deriving it:
+ * Answers what it did, in a word. Nothing in the hook reads it — a session start has no
+ * business reporting on a repair — and it exists for the tests, which are the only reader
+ * that needs to tell "declined" from "nothing to do" without inspecting the filesystem
+ * twice:
  *
  *   `"no-delegate"`   nothing to call, so nothing to repair — the state `off` leaves
+ *   `"not-ours-to-write"` the hook is version-controlled or a symlink; see `isOursToWrite`
  *   `"present"`       the hook already calls it
  *   `"repaired"`      the line was missing and has been put back
  *   `"unwritable"`    the hook could not be read or written; a session is not the place to
@@ -56,12 +60,17 @@ function hookLine(delegatePath) {
  * Never throws. This runs inside a hook, and a hook that throws is a session that reports an
  * error for something no session did.
  */
-function repairCommitTrailerHook(hooksDir) {
+function repairCommitTrailerHook(hooksDir, gitDir) {
   if (typeof hooksDir !== "string" || hooksDir === "") return "no-delegate";
   const delegatePath = path.join(hooksDir, DELEGATE_FILE);
   if (!fs.existsSync(delegatePath)) return "no-delegate";
+  if (!isOursToWrite(hooksDir, gitDir)) return "not-ours-to-write";
 
   const hookPath = path.join(hooksDir, HOOK_FILE);
+  // A symlink is somebody's deliberate indirection, and `writeFileSync` follows it — which
+  // would edit whatever it points at, most usefully a file the team shares. Left alone.
+  if (isSymbolicLink(hookPath)) return "not-ours-to-write";
+
   const line = hookLine(delegatePath);
   try {
     const existing = fs.existsSync(hookPath)
@@ -69,12 +78,44 @@ function repairCommitTrailerHook(hooksDir) {
       : `${HOOK_HEADER}\n`;
     if (existing.includes(line)) return "present";
     const separator = existing.endsWith("\n") ? "" : "\n";
-    fs.writeFileSync(hookPath, `${existing}${separator}${line}\n`);
-    fs.chmodSync(hookPath, 0o755);
+    // Written beside the target and renamed over it, never truncated in place. Two sessions
+    // can start at once, and one reading a half-written file and appending to it would
+    // destroy the content this promises to keep. `rename` within a directory is atomic.
+    const staging = `${hookPath}.aidd-${process.pid}`;
+    fs.writeFileSync(staging, `${existing}${separator}${line}\n`, { mode: 0o755 });
+    fs.renameSync(staging, hookPath);
     return "repaired";
   } catch {
     return "unwritable";
   }
 }
 
-module.exports = { repairCommitTrailerHook, hookLine, DELEGATE_FILE, HOOK_FILE };
+/**
+ * Only a hooks directory inside the repository's own git directory.
+ *
+ * `core.hooksPath` may point at a directory in the working tree — `.githooks/` checked into
+ * the repository is a common way to share hooks with a team. Appending there dirties a
+ * tracked file, on every session start, with a machine-absolute path that cannot be
+ * committed; and a `git checkout` restoring the file brings it straight back.
+ *
+ * `aidd telemetry on` writing that line once was a write a person asked for. This one is
+ * not: nobody typed it, it recurs, and it lands in content under version control. So the
+ * rule is the narrow one — repair only where the CLI's own install would have written, and
+ * leave everything else to `aidd telemetry check`, which reports the call site either way.
+ */
+function isOursToWrite(hooksDir, gitDir) {
+  if (typeof gitDir !== "string" || gitDir === "") return false;
+  const inside = path.resolve(gitDir);
+  const target = path.resolve(hooksDir);
+  return target === inside || target.startsWith(inside + path.sep);
+}
+
+function isSymbolicLink(target) {
+  try {
+    return fs.lstatSync(target).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+module.exports = { repairCommitTrailerHook, hookLine, DELEGATE_FILE, HOOK_FILE, HOOK_HEADER };

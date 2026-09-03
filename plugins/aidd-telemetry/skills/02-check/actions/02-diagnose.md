@@ -24,8 +24,9 @@ judging anything.
 2. **Relay what is in place first, always.** Before any verdict it states whether
    measurement is allowed and from which file, whose choice that was, whether an identity
    is attached, where records would land, whether the recorder is declared, whether each
-   installed plugin is registered with its host, and which builds produced what is being
-   read — never a count or a figure. This is not a claim and carries no `ok`/`FAIL`/`--`;
+   installed plugin is registered with its host, whether commits carry the session that made
+   them, and which builds produced what is being read — never a count or a figure other than
+   the trailer's own. This is not a claim and carries no `ok`/`FAIL`/`--`;
    present it even when what follows stops immediately.
    - **`plugins registered` is per plugin, and its lines are already ordered.** What will
      not load comes first. Relay them in the order printed and never roll them into one

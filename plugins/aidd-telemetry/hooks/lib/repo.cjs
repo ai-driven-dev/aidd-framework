@@ -78,44 +78,59 @@ function repositoryNameFromCommonDir(commonDir) {
   return name === "" || name === "." || name === ".." ? null : sanitizePathSegment(name);
 }
 
-// One `git rev-parse`, never four: a plain checkout pays exactly the shellout it paid
-// before worktrees were named, and reads three more words from the same stdout. `getRepoRoot`
-// above is left alone - it is exported, and asking it for more than the root would change
-// what its name promises.
+// One `git rev-parse` in the ordinary case, and never more than two.
 //
-// `--git-path hooks` is the fourth word, and it is asked here rather than by a second call
-// for two reasons. It costs nothing extra. And it honours `core.hooksPath`, which is the
-// only way to find the directory git will actually run a hook from - joining `.git/hooks`
-// by hand is right until somebody uses lefthook, husky, or any of the tools that move it.
+// The fourth option, `--git-path hooks`, is what finds the directory git will actually run a
+// hook from: it honours `core.hooksPath`, which joining `.git/hooks` by hand does not, and
+// from a linked worktree it answers the common hooks directory, which is where git looks.
 //
-// From a linked worktree it answers the *common* hooks directory, which is correct: git
-// runs one set of hooks for every worktree of a repository.
+// It cannot simply be added to the list, and that is a measured constraint rather than a
+// stylistic one. `rev-parse` fails atomically — a git that does not understand one option
+// answers non-zero for all of them — and this call returning null makes `resolveWriteTarget`
+// return null, which makes the journal write nothing at all. Against a git stubbed to reject
+// `--git-path`, the hook exited 0 and recorded no session. So the four-option form is asked
+// first and the three-option form is the fallback: every git pays one call, and only one too
+// old to answer the fourth pays a second and simply goes without the hooks directory.
 function getRepoLocation(cwd) {
   if (typeof cwd !== "string" || !cwd) return null;
   try {
-    const result = spawnSync(
-      "git",
-      ["rev-parse", "--show-toplevel", "--git-common-dir", "--git-dir", "--git-path", "hooks"],
-      { cwd, encoding: "utf8", env: gitEnv() }
-    );
-    if (result.status !== 0) return null;
-    // A git too old for one of the later options fails the whole call, so this only ever
-    // reads short output when git answered something unexpected - in which case the
-    // worktree fields stay absent rather than being guessed at. `hooksDir` follows the same
-    // rule and for the same reason: absent rather than guessed, and its absence costs the
-    // fields before it nothing.
-    const [root, commonDir, gitDir, hooksDir] = String(result.stdout)
-      .split("\n")
-      .map((part) => part.trim());
+    const withHooks = revParse(cwd, [...LOCATION_OPTIONS, "--git-path", "hooks"]);
+    const parts = withHooks ?? revParse(cwd, LOCATION_OPTIONS);
+    if (!parts) return null;
+    const [root, commonDir, gitDir, hooksDir] = parts;
     if (!root) return null;
     return {
       repoRoot: root,
+      // Carried so the trailer repair can tell a hooks directory inside the git directory
+      // from one `core.hooksPath` points at inside the working tree - the second being
+      // version-controlled content nothing here writes to unasked.
+      ...(commonDir ? { gitDir: path.resolve(cwd, commonDir) } : {}),
       ...worktreeFields(cwd, commonDir, gitDir),
-      ...(hooksDir ? { hooksDir: path.resolve(root, hooksDir) } : {}),
+      // Resolved against `cwd`, never against the repository root: `git rev-parse` prints
+      // this relative to the directory it ran in, exactly as `worktreeFields` above says of
+      // its own two outputs. Resolving against the root instead sent a session started in
+      // `sub/deep` two levels ABOVE the repository - measured, `../../.git/hooks` became a
+      // path outside the checkout entirely, which is where the repair then wrote.
+      ...(hooksDir ? { hooksDir: path.resolve(cwd, hooksDir) } : {}),
     };
   } catch {
     return null;
   }
+}
+
+const LOCATION_OPTIONS = ["--show-toplevel", "--git-common-dir", "--git-dir"];
+
+/** The trimmed words `rev-parse` printed, or `null` when it refused. A git too old for one
+ * of the options refuses all of them, which is why the caller has a shorter form to fall
+ * back to rather than a shorter reading of this one. */
+function revParse(cwd, options) {
+  const result = spawnSync("git", ["rev-parse", ...options], {
+    cwd,
+    encoding: "utf8",
+    env: gitEnv(),
+  });
+  if (result.status !== 0) return null;
+  return String(result.stdout).split("\n").map((part) => part.trim());
 }
 
 // `aidd framework build` copies hooks/ verbatim with no install step, so JSON.parse is

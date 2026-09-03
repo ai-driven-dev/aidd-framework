@@ -16,6 +16,15 @@ import type { Hasher } from "../../../src/domain/ports/hasher.js";
  * Uses a Map<path, content> — no real I/O.
  */
 export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
+  /** Executable when `chmodExecutable` was called for it, absent otherwise — the two states
+   * `delegateState` tells apart, without a filesystem. */
+  private readonly executable = new Set<string>();
+
+  async fileMode(path: string): Promise<number | null> {
+    if (!this.files.has(path)) return null;
+    return this.executable.has(path) ? 0o755 : 0o644;
+  }
+
   private readonly files = new Map<string, string>();
   private readonly hasher: Hasher;
 
@@ -124,7 +133,8 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
     }
   }
 
-  async chmodExecutable(_path: string): Promise<void> {
+  async chmodExecutable(path: string): Promise<void> {
+    this.executable.add(path);
     // No-op: no permission bits in memory
   }
 
