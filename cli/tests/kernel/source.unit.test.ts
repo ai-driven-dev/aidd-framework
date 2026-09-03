@@ -66,6 +66,21 @@ describe("parsePluginSource", () => {
       expect(serializePluginSource(src)).toEqual(raw);
     });
 
+    it("keeps the ref and the sha through a round trip", () => {
+      // `resolvePluginSourceFromMarketplace` builds this shape with the marketplace's own
+      // ref, and `InstalledPlugin.create` serializes then re-parses it in memory — never
+      // through JSON. A guard that stops copying `ref` here unpins the plugin silently:
+      // the default branch is installed where a version was asked for.
+      const raw = {
+        kind: "git-subdir",
+        url: "https://github.com/org/repo.git",
+        path: "plugins/my-plugin",
+        ref: "v1.2.0",
+        sha: "b".repeat(40),
+      };
+      expect(serializePluginSource(parsePluginSource(raw))).toStrictEqual(raw);
+    });
+
     it("throws when url is missing", () => {
       expect(() => parsePluginSource({ kind: "git-subdir", path: "sub" })).toThrow(
         InvalidPluginSourceError
@@ -138,23 +153,6 @@ describe("parsePluginSource", () => {
     });
   });
 
-  describe("URL scheme validation (shorthand)", () => {
-    it("accepts an https URL", () => {
-      const src = parsePluginSourceShorthand("https://github.com/org/repo.git");
-      expect(src.kind).toBe("url");
-    });
-
-    it("accepts an http URL", () => {
-      const src = parsePluginSourceShorthand("http://example.com/repo.git");
-      expect(src.kind).toBe("url");
-    });
-
-    it("accepts a git@ SSH URL", () => {
-      const src = parsePluginSourceShorthand("git@github.com:org/repo.git");
-      expect(src.kind).toBe("url");
-    });
-  });
-
   describe("local kind", () => {
     it("round-trips a local source", () => {
       const raw = { kind: "local", path: "./plugins/my-plugin" };
@@ -177,11 +175,26 @@ describe("parsePluginSource", () => {
       });
     });
 
-    it("reads a path as a local source", () => {
+    it("reads a relative path as a local source", () => {
       expect(parsePluginSource("./plugins/mine")).toEqual({
         kind: "local",
         path: "./plugins/mine",
       });
+    });
+
+    it("reads an absolute path as a local source", () => {
+      expect(parsePluginSource("/opt/plugins/mine")).toEqual({
+        kind: "local",
+        path: "/opt/plugins/mine",
+      });
+    });
+  });
+
+  describe("a field that is present but empty", () => {
+    it("refuses an empty path rather than recording a source pointing nowhere", () => {
+      expect(() => parsePluginSource({ kind: "local", path: "" })).toThrow(
+        /"path" must be a non-empty string/
+      );
     });
   });
 
@@ -331,8 +344,11 @@ describe("the source spellings a user types", () => {
     });
 
     it("reports the JSON's own complaint when the object is a bad source", () => {
+      // Not just the error class: both branches throw InvalidPluginSourceError, so
+      // asserting the class alone would pass even if the parser's own message were
+      // swallowed and replaced by the generic "unrecognized source format".
       expect(() => parsePluginSourceShorthand('{"kind":"github"}')).toThrow(
-        InvalidPluginSourceError
+        /"repo" must be a non-empty string/
       );
     });
 

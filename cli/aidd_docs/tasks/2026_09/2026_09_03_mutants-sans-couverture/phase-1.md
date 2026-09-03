@@ -105,10 +105,11 @@ journey
 ## Livrée (2026-09-03)
 
 `src/kernel/source.ts` : 71 mutants sans couverture, il n'en reste aucun. Le scope `kernel`
-passe de 62,74 % à **71,23 %**, soit huit points. Plus que les sept attendus, parce que couvrir
-les orthographes traverse aussi le reste du fichier : 639 mutants tués avant, 727 après.
+passe de 62,74 % à **72,74 %**, soit dix points. Plus que les sept que le compte laissait
+attendre, parce que couvrir les orthographes traverse aussi le reste du fichier : 639 mutants
+tués avant, 740 après. Deux points de ces dix viennent de la revue, pas du premier jet.
 
-28 tests ajoutés, 60 dans le fichier.
+31 tests ajoutés, 60 dans le fichier après avoir supprimé un bloc que les nouveaux couvraient mieux.
 
 ### Ce qu'une supposition a coûté, et ce qu'elle a appris
 
@@ -126,15 +127,40 @@ genre de branche qu'une lecture ne signale pas et qu'un mutant sans couverture d
 
 ### Ce qui survit, et pourquoi ce n'est pas poursuivi
 
-37 mutants survivent dans `source.ts`.
+**Corrigé après revue.** La première version de cette section déclarait inoffensive une famille
+qui contenait une vraie perte de donnée, silencieuse et sur le chemin principal. Elle affirmait
+que les gardes `if (src.ref !== undefined)` de la sérialisation ne survivaient qu'à cause de
+`toEqual`, qui ignore les clés valant `undefined`, et que `JSON.stringify` les supprimant, rien
+d'observable ne différait. Faux sur les trois points, pour deux des douze mutants :
 
-| Famille | Pourquoi ils restent |
-| ------- | -------------------- |
-| `StringLiteral` dans des messages d'erreur | Les tuer demande d'affirmer le texte exact. Les tests écrits ici affirment déjà le fragment qui porte l'information — le nom du champ, la forme attendue. Figer la phrase entière rendrait chaque reformulation rouge sans qu'un utilisateur y gagne |
-| `if (src.ref !== undefined)` dans la sérialisation | Ils survivent parce que les round-trips utilisent `toEqual`, qui ignore les clés valant `undefined`. `toStrictEqual` les tuerait — mais `JSON.stringify` supprime `undefined` de toute façon, donc le manifeste écrit est identique. Aucune différence observable |
-| `Regex` sur les motifs de dépôt et de paquet | Les cas limites qui les tuent sont des chaînes qu'aucun utilisateur ne tape et qu'aucun format n'autorise |
+- `resolvePluginSourceFromMarketplace` construit une source `git-subdir` portant le `ref` de la
+  marketplace, c'est-à-dire la version épinglée.
+- `InstalledPlugin.create` et `fromDistribution` appellent `serializePluginSource` puis
+  `fromJSON` → `parsePluginSource` **en mémoire**, sans jamais passer par `JSON.stringify`.
+- Une garde cassée en `false` ne pose pas la clé du tout : ni `toEqual` ni `toStrictEqual` ne la
+  rattrapent. Seul un aller-retour `git-subdir` **portant** un `ref` et un `sha` la tue.
+
+Le `ref` disparaissait donc du plugin enregistré, et la branche par défaut s'installait là où une
+version était demandée — mot pour mot le préjudice que le tableau d'ouverture de cette fiche
+donne comme raison d'écrire la phase. Le test manquant existe maintenant, en `toStrictEqual`.
+
+Ce qui reste hors de portée, et pourquoi — 25 survivants, comptés un par un :
+
+| Famille | Nombre | Pourquoi ils restent |
+| ------- | -----: | -------------------- |
+| `StringLiteral` dans des messages d'erreur | 8 | Les tests affirment le fragment qui porte l'information — le nom du champ, la forme attendue. Figer la phrase entière rendrait chaque reformulation rouge sans qu'un utilisateur y gagne |
+| Gardes `!== undefined` mutées en `true` | 7 | La clé est posée avec la valeur `undefined` ; `JSON.stringify` la supprime et l'aller-retour en mémoire la relit comme absente. Aucun manifeste écrit ni aucun plugin enregistré ne diffère. C'est la seule moitié de la famille dont l'argument d'origine tenait |
+| Gardes de position `atIndex` | 4 | Deux formes du même test ; la valeur limite qui les distingue est déjà écartée par le motif du dépôt, testé juste à côté |
+| `Regex` sur les motifs de dépôt et de paquet | 3 | Les cas limites qui les tuent sont des chaînes qu'aucun format n'autorise |
+| Un `case` vidé qui retombe sur le suivant | 1 | `url` et `git-subdir` produisent la même sortie pour les champs communs ; la sortie observable est identique |
+| Divers | 2 | Deux conditions dont les deux branches mènent au même résultat |
 
 Les tuer monterait le chiffre sans protéger quoi que ce soit, ce que la règle du plan interdit.
+La différence avec la version précédente de ce tableau est qu'il compte les survivants un par
+un, au lieu d'en ranger 27 dans trois familles et de laisser les dix autres hors du récit. Trois
+de ces dix étaient des trous d'une ligne, tous couverts depuis : un chemin absolu enregistré
+comme chaîne, un champ présent mais vide, et une erreur dont seule la classe était affirmée
+alors que les deux branches lèvent la même classe.
 
 ### Le noyau, ce qu'il en reste
 
