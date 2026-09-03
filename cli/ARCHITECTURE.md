@@ -20,12 +20,34 @@ framework ──> distribution ─────────> kernel
 | `src/presentation/` | what speaks to a human: commands, display, prompts, output. |
 | `src/runtime/` | technical services and wiring: auth, http, git, platform, project root, self-update, one wiring module per context. |
 
-Three invariants hold this together, and each is enforced by a test rather than by this
-document. `tests/architecture/context-graph.arch.test.ts` allows exactly the edges drawn
-above. `tests/architecture/context-boundary.arch.test.ts` refuses an import that reaches
-a context's interior: a cross-context import targets a module that context declares
-public, and there is no barrel file anywhere to make that convenient. A biome override
-refuses an import from the kernel into any context.
+Four invariants hold this together, and none of them is enforced by this document.
+
+**Which contexts may see each other.** `tests/architecture/context-graph.arch.test.ts`
+allows exactly the edges drawn above; the edges the tree has and the chain forbids are
+listed in that file with what each admits, measured.
+
+**What of a context is visible.** `tests/architecture/context-boundary.arch.test.ts`
+refuses an import that reaches a context's interior: a cross-context import targets a
+module that context declares public, and there is no barrel file anywhere to make that
+convenient. Every context on disk must appear in that list, or it would be skipped rather
+than held.
+
+**Which way the layers point.** Inside a context, `application` may call `domain` and
+`domain` may never call `application`, `infrastructure`, `presentation` or `runtime`;
+`application` may not call `infrastructure` either — it takes a port and the composition
+root supplies the adapter. This one is enforced by biome overrides rather than by a test,
+and it holds against a type-only import, a dynamic import and any depth of `../`.
+`tests/architecture/import-rules-bite.arch.test.ts` checks that each of those overrides
+still names a path that exists, because a pattern matching nothing enforces nothing.
+
+**What the kernel may know.** A biome override refuses an import from the kernel into any
+context. A module belongs there when two areas speak it, which
+`tests/architecture/earned-sharing.arch.test.ts` measures.
+
+The layer rule stops at relative paths on purpose. A domain file may import `node:path` and
+`smol-toml`: both are pure — string manipulation and serialization, no I/O, no lifecycle —
+and forbidding them would mean injecting a TOML serializer through a port to gain nothing.
+The rule exists to keep I/O and human interaction out of the domain, not imports.
 
 ## Key Domain Models (manifest v6)
 

@@ -1,6 +1,6 @@
 ---
 objective: "Aucun garde ne passe au vert sur un périmètre plus étroit que son propre nom."
-status: pending
+status: implemented
 ---
 
 # Plan : que chaque garde mesure ce qu'il annonce

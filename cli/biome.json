@@ -86,6 +86,26 @@
       }
     },
     {
+      "includes": ["src/contexts/*/application/**/*.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/infrastructure/**"],
+                    "message": "application must not import infrastructure \u2014 take a port and let the composition root supply the adapter"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["src/kernel/**/*.ts"],
       "linter": {
         "rules": {
