@@ -63,6 +63,20 @@ pre-commit:
           exit 0
         fi
         node scripts/check-context-imports.js
+    context-reference-form:
+      # The whole repository's answer, not the staged files': the hook rewrites
+      # every target at once, so a partial view could call one file clean while
+      # its sibling drifted in the same session.
+      glob:
+        - "{CLAUDE,AGENTS,copilot-instructions}.md"
+        - "**/{CLAUDE,AGENTS,copilot-instructions}.md"
+        - "plugins/aidd-context/hooks/update_memory.js"
+      run: |
+        if ! command -v node >/dev/null 2>&1; then
+          echo "ℹ️  node not available; skipping context-reference-form"
+          exit 0
+        fi
+        node scripts/check-context-reference-form.js
     markdown-links:
       glob: "**/*.md"
       run: |
