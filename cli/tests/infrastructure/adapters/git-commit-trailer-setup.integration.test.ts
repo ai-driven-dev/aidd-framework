@@ -132,6 +132,25 @@ describe("what check reads about the commit trailer", () => {
     expect((await read()).recentlyCarrying).toEqual({ carrying: 2, examined: 3 });
   });
 
+  /**
+   * A merge carries no trailer by the delegate's own design — one session's id on a merge
+   * would attribute every commit it brings in to that session. Counting them puts commits in
+   * the denominator that can never be in the numerator, which is arithmetic that reads as
+   * breakage on a healthy install.
+   */
+  it("does not count merges, which can never carry it", async () => {
+    commitCarrying("one", "s-1");
+    run(["checkout", "-q", "-b", "side"]);
+    commitCarrying("side", "s-2");
+    run(["checkout", "-q", "-"]);
+    commitCarrying("main", "s-3");
+    run(["merge", "-q", "--no-ff", "-m", "merge", "side"]);
+
+    const counted = (await read()).recentlyCarrying;
+
+    expect(counted).toEqual({ carrying: 3, examined: 3 });
+  });
+
   // Never `0`: a repository with no commits and one whose commits are all unstamped are
   // different facts, and only the second is something to act on.
   it("reports no history rather than zero when there are no commits", async () => {

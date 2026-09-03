@@ -119,8 +119,14 @@ function write(hookPath, content) {
     fs.renameSync(staging, hookPath);
     return "repaired";
   } catch {
-    // Never leave the staging file behind: one per session, each under a different pid,
-    // in a directory a person reads when something is wrong.
+    // Never leave the staging file behind: one per session, each under a different pid, in
+    // the directory a person opens when something is wrong.
+    //
+    // Untested, and said rather than dressed up: no input reachable on POSIX gets past the
+    // write and fails the rename. Both files sit in one directory, so there is no cross-device
+    // case; a target that is a directory throws on the read long before here. The case this
+    // exists for is Windows, where renaming over a file another process holds open fails
+    // EPERM — and no test on this branch runs there.
     try {
       fs.unlinkSync(staging);
     } catch {

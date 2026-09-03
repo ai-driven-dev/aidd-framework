@@ -256,8 +256,11 @@ export class GitAdapter implements VersionControl {
         { cwd: projectRoot, encoding: "utf8", env: environmentWithoutGitVariables() }
       );
       if (result.status !== 0) return null;
+      // No guard for an empty list: `git log` exits non-zero in a repository with no
+      // commits, so the branch above already answers `null` there, and a repository whose
+      // every commit is a merge cannot exist. A line for a case nothing can reach is a guard
+      // nothing can fail for.
       const commits = result.stdout.split("\u0000").slice(0, -1);
-      if (commits.length === 0) return null;
       return {
         carrying: commits.filter((one) => one.trim() !== "").length,
         examined: commits.length,

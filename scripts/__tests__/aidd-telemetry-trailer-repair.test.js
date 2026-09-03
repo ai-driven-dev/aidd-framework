@@ -363,3 +363,49 @@ test("a prepare-commit-msg that is a symlink is left alone, target and all", () 
     assert.ok(fs.lstatSync(path.join(hooksDir, "prepare-commit-msg")).isSymbolicLink());
   });
 });
+
+/**
+ * The fallback that keeps the journal alive on an older git, which a systematic mutation
+ * pass found guarded by nothing — the blocker it fixes could have come straight back.
+ *
+ * `rev-parse` fails atomically, so a git that does not understand `--git-path` answers
+ * non-zero for every option asked with it. Without the three-option retry, the whole
+ * location read returns null and the session records nothing at all.
+ */
+test("a git that rejects --git-path still journals the session", () => {
+  withRepo(({ root }) => {
+    const stub = path.join(root, "stub");
+    fs.mkdirSync(stub, { recursive: true });
+    const real = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+    fs.writeFileSync(
+      path.join(stub, "git"),
+      `#!/bin/sh\nfor a in "$@"; do [ "$a" = "--git-path" ] && exit 129; done\nexec ${real} "$@"\n`
+    );
+    fs.chmodSync(path.join(stub, "git"), 0o755);
+
+    const result = spawnSync(process.execPath, [HOOK, "session-start"], {
+      cwd: root,
+      encoding: "utf8",
+      input: JSON.stringify({
+        session_id: SESSION,
+        cwd: root,
+        transcript_path: `/home/dev/.claude/projects/-repo/${SESSION}.jsonl`,
+        hook_event_name: "SessionStart",
+        source: "startup",
+      }),
+      env: {
+        ...CLEAN_ENV,
+        PATH: `${stub}${path.delimiter}${CLEAN_ENV.PATH}`,
+        HOME: path.join(root, "aidd-home"),
+        AIDD_RUNS_DIR: path.join(root, "aidd-runs"),
+      },
+    });
+
+    assert.equal(result.status, 0);
+    assert.ok(
+      fs.existsSync(path.join(root, "aidd-runs")) &&
+        fs.readdirSync(path.join(root, "aidd-runs")).some((name) => name.endsWith(".jsonl")),
+      "the session is journalled even though git refused --git-path"
+    );
+  });
+});
