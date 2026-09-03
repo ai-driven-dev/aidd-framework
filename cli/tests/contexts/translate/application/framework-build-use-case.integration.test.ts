@@ -54,9 +54,6 @@ function makeAssetProvider(
     loadConfigAsset: () => {
       throw new Error("not used");
     },
-    loadDefaultMarketplace: () => {
-      throw new Error("not used");
-    },
     loadSchema: (name) => {
       if (name === "plugin-manifest") return manifestSchema;
       if (name === "marketplace") return marketplaceSchema;

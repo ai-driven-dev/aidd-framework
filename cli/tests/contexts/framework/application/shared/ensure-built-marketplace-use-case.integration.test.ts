@@ -40,9 +40,6 @@ function stubAssetProvider(): AssetProvider {
     loadConfigAsset: () => {
       throw new Error("not used");
     },
-    loadDefaultMarketplace: () => {
-      throw new Error("not used");
-    },
     loadSchema: (name) => (name === "plugin-manifest" ? MINIMAL_MANIFEST_SCHEMA : {}),
   };
 }

@@ -58,9 +58,6 @@ function makeAssetProvider(): AssetProvider {
       }
       throw new Error("not used");
     },
-    loadDefaultMarketplace: () => {
-      throw new Error("not used");
-    },
     loadSchema: (name) => {
       if (name === "plugin-manifest") return MINIMAL_MANIFEST_SCHEMA;
       if (name === "marketplace") return MINIMAL_MARKETPLACE_SCHEMA;

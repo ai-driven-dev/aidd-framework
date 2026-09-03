@@ -407,13 +407,6 @@ export class UnknownAiToolIdError extends Error {
   }
 }
 
-export class EmptyMarketplaceCacheNameError extends Error {
-  constructor() {
-    super("MarketplaceCacheEntry: name must not be empty");
-    this.name = "EmptyMarketplaceCacheNameError";
-  }
-}
-
 export class NativePluginCliError extends Error {
   constructor(message: string) {
     super(message);

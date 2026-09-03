@@ -132,45 +132,6 @@ describe("FileAdapter", () => {
     });
   });
 
-  describe("backup()", () => {
-    it("creates a copy with .bak.YYYYMMDDTHHMMSS suffix", async () => {
-      const path = join(tempDir, "original.txt");
-      await writeFile(path, "original content", "utf-8");
-
-      const backupPath = await fs.backup(path);
-
-      expect(backupPath).toMatch(/original\.txt\.bak\.\d{8}T\d{6}$/);
-    });
-
-    it("returns the absolute backup path", async () => {
-      const path = join(tempDir, "file.txt");
-      await writeFile(path, "data", "utf-8");
-
-      const backupPath = await fs.backup(path);
-
-      expect(backupPath.startsWith(tempDir)).toBe(true);
-    });
-
-    it("backup file contains original content", async () => {
-      const path = join(tempDir, "source.txt");
-      await writeFile(path, "backup me", "utf-8");
-
-      const backupPath = await fs.backup(path);
-      const backupContent = await readFile(backupPath, "utf-8");
-
-      expect(backupContent).toBe("backup me");
-    });
-
-    it("original file still exists after backup", async () => {
-      const path = join(tempDir, "keep.txt");
-      await writeFile(path, "keep this", "utf-8");
-
-      await fs.backup(path);
-
-      expect(await fs.fileExists(path)).toBe(true);
-    });
-  });
-
   describe("mergeJsonFile()", () => {
     it("creates file if it does not exist", async () => {
       const path = join(tempDir, "new.json");

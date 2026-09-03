@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readdir, readFile, rm, rmdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import type { FileMerger } from "../../contexts/tools/domain/ports/file-merger.js";
 import { JsonParseError } from "../../kernel/errors.js";
@@ -106,22 +106,6 @@ export class FileAdapter implements FileReader, FileWriter, FileMerger {
 
   async deleteDirectory(path: string): Promise<void> {
     await rm(path, { recursive: true, force: true });
-  }
-
-  async hasLocalChanges(path: string, knownHash: FileHash): Promise<boolean> {
-    if (!(await this.fileExists(path))) return false;
-    const diskHash = await this.readFileHash(path);
-    return diskHash.value !== knownHash.value;
-  }
-
-  async backup(absolutePath: string): Promise<string> {
-    const timestamp = new Date()
-      .toISOString()
-      .slice(0, 19)
-      .replace(/[^0-9T]/g, "");
-    const backupPath = `${absolutePath}.bak.${timestamp}`;
-    await copyFile(absolutePath, backupPath);
-    return backupPath;
   }
 
   async listFilesRecursive(dirPath: string): Promise<string[]> {

@@ -33,9 +33,6 @@ function makeAssetProvider(): AssetProvider {
     loadConfigAsset: () => {
       throw new Error("not used");
     },
-    loadDefaultMarketplace: () => {
-      throw new Error("not used");
-    },
     loadSchema: () => ({}),
   };
 }

@@ -115,23 +115,6 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
     }
   }
 
-  async backup(absolutePath: string): Promise<string> {
-    const content = await this.readFile(absolutePath);
-    const timestamp = new Date()
-      .toISOString()
-      .slice(0, 19)
-      .replace(/[^0-9T]/g, "");
-    const backupPath = `${absolutePath}.bak.${timestamp}`;
-    this.files.set(backupPath, content);
-    return backupPath;
-  }
-
-  async hasLocalChanges(path: string, knownHash: FileHash): Promise<boolean> {
-    if (!(await this.fileExists(path))) return false;
-    const diskHash = await this.readFileHash(path);
-    return diskHash.value !== knownHash.value;
-  }
-
   async listFilesRecursive(dirPath: string): Promise<string[]> {
     const prefix = dirPath.endsWith("/") ? dirPath : `${dirPath}/`;
     const result: string[] = [];

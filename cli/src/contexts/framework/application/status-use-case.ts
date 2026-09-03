@@ -122,8 +122,9 @@ export class StatusUseCase {
     directory: string,
     trackedSet: Set<string>,
     projectRoot: string,
-    // Written by this CLI on purpose and never tracked, like the `.backup` files
-    // below — reporting either as something the user added would be a lie.
+    // Written by this CLI on purpose and never tracked — reporting one as something the
+    // user added would be a lie. The `.backup` skip below is not the same thing: nothing in
+    // this codebase writes such a file, so it only spares one an older version left behind.
     machineLocal: readonly string[]
     // User-scope plugin dirs (e.g. ~/.cursor/plugins/local/) are not scanned for added files;
     // only tracked-file drift is detected for user-scope plugins.

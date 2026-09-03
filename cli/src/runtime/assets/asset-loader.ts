@@ -12,16 +12,8 @@ import vscodeKeybindings from "../../../assets/configs/vscode/keybindings.json" 
   type: "json",
 };
 import vscodeSettings from "../../../assets/configs/vscode/settings.json" with { type: "json" };
-import defaultMarketplaceJson from "../../../assets/marketplaces/default.json" with {
-  type: "json",
-};
 import { AssetNotFoundError } from "../../kernel/errors.js";
-import type {
-  AssetProvider,
-  ConfigAsset,
-  DefaultMarketplace,
-  SchemaName,
-} from "../../kernel/ports/asset-provider.js";
+import type { AssetProvider, ConfigAsset, SchemaName } from "../../kernel/ports/asset-provider.js";
 import type { ToolId } from "../../kernel/tool.js";
 
 const SCHEMA_FILE = "claude-code-plugin-manifest.json";
@@ -60,10 +52,6 @@ export class BundledAssetProviderAdapter implements AssetProvider {
       throw new AssetNotFoundError(`${toolId}/${fileName}`);
     }
     return asset;
-  }
-
-  loadDefaultMarketplace(): DefaultMarketplace {
-    return defaultMarketplaceJson as DefaultMarketplace;
   }
 
   loadSchema(name: SchemaName): object {

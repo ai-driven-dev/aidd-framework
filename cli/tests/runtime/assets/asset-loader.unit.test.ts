@@ -70,15 +70,6 @@ describe("BundledAssetProviderAdapter.loadConfigAsset", () => {
   });
 });
 
-describe("BundledAssetProviderAdapter.loadDefaultMarketplace", () => {
-  it("returns the aidd-framework Git source", () => {
-    const marketplace = provider.loadDefaultMarketplace();
-    expect(marketplace.name).toBe("aidd-framework");
-    expect(marketplace.type).toBe("git");
-    expect(marketplace.source).toMatch(/^https:\/\/github\.com\/.+\.git$/);
-  });
-});
-
 describe("BundledAssetProviderAdapter.loadSchema — marketplace", () => {
   it("returns a Copilot-native schema with required fields including metadata", () => {
     const schema = provider.loadSchema("marketplace") as Record<string, unknown>;

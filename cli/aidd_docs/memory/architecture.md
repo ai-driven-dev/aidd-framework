@@ -36,7 +36,6 @@ copy of it would drift the moment either changed without the other.
 | `MarketplaceSourceMode` | `contexts/distribution/domain/marketplace-source-mode.ts` | Marketplace source type with optional `ref` |
 | `SetupFlow` | `contexts/framework/domain/setup-flow.ts` | Aggregate: setup orchestration state |
 | `MarketplaceEntry` | `contexts/tools/domain/marketplace-entry.ts` | Per-tool marketplace registration entry |
-| `MarketplaceCacheEntry` | `contexts/distribution/domain/marketplace-cache-entry.ts` | Cached catalog TTL entry |
 | `LatestReleaseResolver` | `runtime/self-update/latest-release-resolver.ts` | Port: resolve latest GitHub release tag |
 
 ## Install Flows (high-level)
