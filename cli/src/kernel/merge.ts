@@ -16,10 +16,6 @@ export function isPerKeyMergeStrategy(s: MergeStrategy): s is PerKeyMergeStrateg
   return typeof s === "object" && s !== null;
 }
 
-// ── ConflictDecision ─────────────────────────────────────────────────────────
-
-export type ConflictDecision = "overwrite" | "skip" | "backup";
-
 // ── MergeFileEntry ───────────────────────────────────────────────────────────
 
 export interface MergeFileEntry {
@@ -51,17 +47,6 @@ export function extractMergeEntries(
 function resolveContainer(parsed: Record<string, unknown>, sectionKey: string | null): unknown {
   if (sectionKey === null) return parsed;
   return parsed[sectionKey] ?? null;
-}
-
-export function parseEntryKeys(content: string, sectionKey: string): string[] {
-  try {
-    const parsed = JSON.parse(content) as Record<string, unknown>;
-    const section = parsed[sectionKey];
-    if (section === null || typeof section !== "object" || Array.isArray(section)) return [];
-    return Object.keys(section as Record<string, unknown>);
-  } catch {
-    return [];
-  }
 }
 
 export function removeEntriesFromJson(

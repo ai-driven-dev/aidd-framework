@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  AdoptRequiresVersionError,
   AiddFilesDetectedError,
   AlreadyInitializedError,
   AuthStorageError,
   FlatTargetExistsError,
   HttpRedirectError,
   InputRequiredError,
-  InvalidCategoryError,
   JsonParseError,
   NoManifestError,
   NotAuthenticatedError,
@@ -29,20 +27,6 @@ describe("AiddFilesDetectedError", () => {
     expect(error.message).toContain("AIDD files detected but no manifest found");
     expect(error.message).toContain("aidd setup");
     expect(error.name).toBe("AiddFilesDetectedError");
-  });
-});
-
-describe("AdoptRequiresVersionError", () => {
-  it("includes adopt example in message", () => {
-    const error = new AdoptRequiresVersionError();
-    expect(error.message).toContain("--from <version|path> is required for adopt");
-    expect(error.message).toContain("aidd setup --ai claude --from 3.6.0");
-    expect(error.name).toBe("AdoptRequiresVersionError");
-  });
-
-  it("appends diagnostic suffix when provided", () => {
-    const error = new AdoptRequiresVersionError("some diagnostic");
-    expect(error.message).toContain("some diagnostic");
   });
 });
 
@@ -138,16 +122,6 @@ describe("ToolNotInstalledError", () => {
     const error = new ToolNotInstalledError("cursor", "The target tool");
     expect(error.message).toContain("cursor");
     expect(error.message).toContain("The target tool");
-  });
-});
-
-describe("InvalidCategoryError", () => {
-  it("includes the invalid category in the message", () => {
-    const error = new InvalidCategoryError("invalid-cat");
-    expect(error.name).toBe("InvalidCategoryError");
-    expect(error.message).toContain("invalid-cat");
-    expect(error.message).toContain("ai");
-    expect(error.message).toContain("ide");
   });
 });
 

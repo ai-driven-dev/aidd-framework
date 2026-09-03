@@ -30,7 +30,7 @@
 Hooks run this repo's own checks directly (no parent-monorepo delegation):
 
 - `pre-commit`: `pnpm lint` (biome) + `pnpm typecheck`
-- `pre-push`: `pnpm knip:production` + `pnpm test`
+- `pre-push`: `pnpm knip` + `pnpm test`
 - `commit-msg`: `commitlint --edit`
 
 ## CI/CD

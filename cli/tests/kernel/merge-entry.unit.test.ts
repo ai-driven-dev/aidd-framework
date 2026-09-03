@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  extractMergeEntries,
-  parseEntryKeys,
-  removeEntriesFromJson,
-} from "../../src/kernel/merge.js";
+import { extractMergeEntries, removeEntriesFromJson } from "../../src/kernel/merge.js";
 import type { Hasher } from "../../src/kernel/ports/hasher.js";
 import { HasherAdapter } from "../../src/runtime/filesystem/hasher-adapter.js";
 
@@ -103,21 +99,6 @@ describe("extractMergeEntries", () => {
       const entries = extractMergeEntries(json, "mcpServers", hasher);
       expect(entries.a.value).toBe(entries.b.value);
     });
-  });
-});
-
-describe("parseEntryKeys", () => {
-  it("extracts keys from a JSON section", () => {
-    const json = JSON.stringify({ mcpServers: { playwright: {}, github: {} } });
-    expect(parseEntryKeys(json, "mcpServers")).toEqual(["playwright", "github"]);
-  });
-
-  it("returns empty array for missing section", () => {
-    expect(parseEntryKeys(JSON.stringify({}), "mcpServers")).toEqual([]);
-  });
-
-  it("returns empty array for invalid JSON", () => {
-    expect(parseEntryKeys("not json", "mcpServers")).toEqual([]);
   });
 });
 

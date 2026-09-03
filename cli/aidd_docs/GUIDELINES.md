@@ -11,8 +11,8 @@ How this team drives AI coding assistants on the `@ai-driven-dev/cli` repo. Repo
 
 ## Validation depth
 
-- Before commit: `pnpm typecheck` → `pnpm lint` → `pnpm knip:production` → `pnpm jscpd` → `pnpm test` (order in `memory/coding-assertions.md`).
-- Before push (Lefthook): `pnpm knip:production` + `pnpm test`; build must stay under the 500 KB bundle budget.
+- Before commit: `pnpm typecheck` → `pnpm lint` → `pnpm knip` → `pnpm jscpd` → `pnpm test` (order in `memory/coding-assertions.md`).
+- Before push (Lefthook): `pnpm knip` + `pnpm test`; build must stay under the 500 KB bundle budget.
 - Tool-integration claims are empirical: verify against the real tool's CLI/IDE, not source inference (see `memory/testing.md`).
 
 ## When the AI drifts

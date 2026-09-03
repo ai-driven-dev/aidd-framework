@@ -98,7 +98,7 @@ pre-push:
   commands:
     cli-knip:
       glob: "cli/**"
-      run: cd cli && pnpm knip:production
+      run: cd cli && pnpm knip
     cli-test:
       glob: "cli/**"
       run: cd cli && pnpm test

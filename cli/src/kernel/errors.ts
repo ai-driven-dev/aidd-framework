@@ -79,13 +79,6 @@ export class FrameworkResolutionError extends Error {
   }
 }
 
-export class InvalidToolIdError extends Error {
-  constructor(invalid: string[], validToolIds: readonly string[]) {
-    super(`Unknown tool(s): ${invalid.join(", ")}. Valid tools: ${validToolIds.join(", ")}`);
-    this.name = "InvalidToolIdError";
-  }
-}
-
 export class CategoryMismatchError extends Error {
   constructor(wrong: string[], category: ToolCategory, validToolIds: readonly string[]) {
     const label = category === "ai" ? "AI" : "IDE";
@@ -323,20 +316,6 @@ export class JsonSchemaValidationError extends Error {
   }
 }
 
-export class PluginTargetExistsError extends Error {
-  constructor(path: string) {
-    super(`Directory '${path}' already exists. Use '--force' to overwrite.`);
-    this.name = "PluginTargetExistsError";
-  }
-}
-
-export class MarketplaceEntryAlreadyExistsError extends Error {
-  constructor(name: string, index: number, marketplacePath: string) {
-    super(`Plugin '${name}' already in ${marketplacePath} at index ${index}.`);
-    this.name = "MarketplaceEntryAlreadyExistsError";
-  }
-}
-
 export class FrameworkPlaceholderInPluginError extends Error {
   constructor(pluginName: string, relativePath: string) {
     super(
@@ -509,16 +488,6 @@ export class AiddFilesDetectedError extends Error {
   }
 }
 
-export class AdoptRequiresVersionError extends Error {
-  constructor(diagnostic = "") {
-    const suffix = diagnostic ? `\n\n${diagnostic}` : "";
-    super(
-      `--from <version|path> is required for adopt.\nExample: aidd setup --ai claude --from 3.6.0${suffix}`
-    );
-    this.name = "AdoptRequiresVersionError";
-  }
-}
-
 export class NotAuthenticatedError extends Error {
   constructor() {
     super("Not authenticated. Run `aidd auth login`.");
@@ -544,12 +513,5 @@ export class ToolNotInstalledError extends Error {
   constructor(toolId: string, context?: string) {
     super(context ? `${context} '${toolId}' is not installed.` : `${toolId} is not installed`);
     this.name = "ToolNotInstalledError";
-  }
-}
-
-export class InvalidCategoryError extends Error {
-  constructor(category: string) {
-    super(`Invalid category '${category}'. Use 'ai' or 'ide'.`);
-    this.name = "InvalidCategoryError";
   }
 }

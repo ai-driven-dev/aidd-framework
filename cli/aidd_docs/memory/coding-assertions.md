@@ -27,7 +27,7 @@
 | ----- | --------------------- | ---------------------------------- |
 | 1     | `pnpm typecheck`      | Type checking                      |
 | 2     | `pnpm lint`           | Lint + format (biome)              |
-| 3     | `pnpm knip:production`| Dead code / unused exports (knip)  |
+| 3     | `pnpm knip`| Dead code / unused exports (knip)  |
 | 4     | `pnpm jscpd`          | Duplication check (jscpd)          |
 | 5     | `pnpm test`           | Run unit tests                     |
 

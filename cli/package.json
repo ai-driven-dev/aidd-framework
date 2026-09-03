@@ -61,7 +61,6 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "format": "biome format --write .",
-    "knip:production": "knip --production --exclude exports,types",
     "jscpd": "jscpd src/ --threshold 3.3",
     "pack:local": "pnpm build && pnpm pack --pack-destination ./dist",
     "install:local": "pnpm run pack:local && npm install -g ./dist/ai-driven-dev-cli-$(node -p \"require('./package.json').version\").tgz --force",
@@ -73,7 +72,8 @@
     "test:mutation:framework": "node scripts/run-mutation.mjs framework",
     "test:mutation:presentation": "node scripts/run-mutation.mjs presentation",
     "test:mutation:runtime": "node scripts/run-mutation.mjs runtime",
-    "prepare": "lefthook install"
+    "prepare": "lefthook install",
+    "knip": "knip"
   },
   "dependencies": {
     "@inquirer/prompts": "^8.5.2",

@@ -50,16 +50,6 @@ export class InstallationFile {
   }
 }
 
-// ── FileDiff ──────────────────────────────────────────────────────────────────
-
-export type FileDiffKind = "added" | "removed" | "changed" | "unchanged";
-
-export interface FileDiff {
-  readonly relativePath: string;
-  readonly kind: FileDiffKind;
-  readonly conflict?: boolean;
-}
-
 export function removeRedundantGitkeeps(files: InstallationFile[]): InstallationFile[] {
   const nonEmptyDirs = new Set(
     files

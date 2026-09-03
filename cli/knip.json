@@ -1,12 +1,9 @@
 {
-  "entry": [
-    "src/cli.ts",
-    "scripts/check-bundle-size.mjs",
-    "scripts/run-mutation.mjs",
-    "tests/e2e/global-setup.ts",
-    "vitest.mutation.config.ts"
-  ],
-  "ignore": ["tests/**/helpers.ts", "tests/helpers/**", "tests/fixtures/**", "tmp/**"],
-  "ignoreBinaries": ["gh", "icacls"],
-  "ignoreExportsUsedInFile": true
+  "entry": ["tests/**/*.test.ts", "vitest.mutation.config.ts"],
+  "ignore": ["tests/**/helpers.ts", "tests/helpers/**", "tests/fixtures/**"],
+  "ignoreBinaries": ["icacls"],
+  "ignoreExportsUsedInFile": true,
+  "lefthook": {
+    "config": ["../lefthook.yml"]
+  }
 }
