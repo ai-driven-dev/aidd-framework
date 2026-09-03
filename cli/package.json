@@ -54,6 +54,7 @@
     "test:unit": "vitest run --project=unit",
     "test:integration": "vitest run --project=integration",
     "test:e2e": "vitest run --project=e2e",
+    "test:coverage": "vitest run --coverage",
     "test:kanban": "pnpm --dir ../kanban test",
     "test:watch": "vitest",
     "smoke": "pnpm build && bash scripts/smoke-tools.sh",

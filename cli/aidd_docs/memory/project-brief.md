@@ -35,67 +35,57 @@
 
 ## Commands
 
+Twenty-two leaf commands, captured from `--help`. `scripts/smoke-tools.sh` exercises every
+one of them and fails if its own list drifts from the binary's.
+
+The tool is chosen by `--tool <id>`, not by a command group: the per-category `ai`/`ide`
+verbs this document used to list were merged into the unified commands below.
+
 ### Bootstrap
 | Command | Purpose |
 |---|---|
-| `aidd setup --source remote\|local [--path <dir>] [--release <tag>] [--ai <ids>] [--ide <ids>] [--plugins <none\|all\|recommended\|names>] [--no-default-marketplace] [--yes]` | Initialize project: marketplace + tools + plugins (`--ai all` / `--ide all` for everything) |
+| `aidd setup` | Bring the project to a correct state: marketplace, framework, tools, plugins |
+| `aidd clean [--force]` | Remove every AIDD-managed file from the project |
 
-### AI tools (claude, cursor, copilot, codex, opencode)
+### The framework on a tool
 | Command | Purpose |
 |---|---|
-| `aidd ai install <tool> [--force]` | Install AI tool runtime config |
-| `aidd ai uninstall <tool>` | Remove tool config |
-| `aidd ai list / status / update / restore / doctor` | Per-tool ops |
-
-### IDE tools (vscode)
-| Command | Purpose |
-|---|---|
-| `aidd ide install <tool> [--force]` | Install IDE config |
-| `aidd ide uninstall / list / status / update / doctor` | Per-tool ops |
+| `aidd framework install \| update \| remove` | The framework's lifecycle on installed tools |
 
 ### Plugins
 | Command | Purpose |
 |---|---|
-| `aidd plugin install [name\|local-path] [--from <market>] [--tool <id>] [--scope <user\|project>] [--token <v>] [--yes]` | Install from marketplace or local path; no arg → interactive pick |
-| `aidd plugin create [name] / remove / list / update / search / doctor` | Plugin ops |
+| `aidd plugin install [name\|path]` | Install from a marketplace or a local path; no argument opens an interactive pick |
+| `aidd plugin list \| remove \| search \| update` | Plugin operations |
 
 ### Marketplaces
 | Command | Purpose |
 |---|---|
-| `aidd marketplace add [name] [source] [--scope <user\|project>] [--yes] [--overwrite] [--token <v>]` | Register marketplace |
-| `aidd marketplace list [--plugins] / remove / refresh [--force] / check` | Marketplace ops (cache cleared via `refresh --force`) |
+| `aidd marketplace add [name] [source]` | Register a marketplace |
+| `aidd marketplace list \| remove \| refresh \| check` | Marketplace operations |
 
 ### Auth
 | Command | Purpose |
 |---|---|
-| `aidd auth login [--gh] [--token <v>] [--level user\|project]` | GitHub auth |
-| `aidd auth logout / status` | Auth ops |
+| `aidd auth login \| logout \| status` | GitHub authentication |
 
-### Framework (authoring)
+### Across everything
 | Command | Purpose |
 |---|---|
-| `aidd framework build` | Build tool-specific framework distributions (5 targets × 2 modes). Maintainer/authoring command, not part of the consumer install flow |
+| `aidd doctor` | Detected and equipped tools, plugins, drift, and problems |
+| `aidd sync [files...]` | Rewrite owned files from the manifest — the tracked regeneration |
+| `aidd translate <source>` | Convert an arbitrary source into a target-native plugin tree, recording nothing |
+| `aidd update` | Update the CLI itself |
 
-### Globals (chain unitaries)
-| Command | Purpose |
-|---|---|
-| `aidd update / status / restore / doctor` | Run across AI + IDE + plugins (`status --json` for a machine-readable report) |
-| `aidd clean [--force]` | Nuke .aidd + tracked files |
-| `aidd self-update` | Update CLI binary |
+### What went, and where the record is
 
-### Removed (architecture cleanup; current manifest = v6)
-- `aidd sync` / `aidd ai sync` — removed with the build/install parity rework; `update` now re-materializes each tool from the built tree, so a separate sync step is gone (`sync-conflict-resolver` survives, reused by the update flow)
-- `aidd cache list/clear` — removed; cache cleared via `aidd marketplace refresh --force`
-- `aidd config list/get/set` — no remaining writable fields
-- `aidd install [category] [tool]` — replaced by `aidd ai/ide install`
-- `aidd uninstall [category] [tool]` — replaced by `aidd ai/ide uninstall`
-- `aidd migrate [--dry-run] [--non-interactive]` — removed; manifests auto-upgrade to v6 on load (schema migration in `manifest.ts`), no explicit brownfield command
-- Setup flags `--from / --switch-mode / --mode / --path` (path kept only with `--source local`) / `--release`
-- Install flags `--path / --release / --plugins / --mcp / --all-plugins / --recommended-plugins / --no-plugins`
-- Global `--repo` flag; `AIDD_REPO` env var gone from source
-- `FrameworkResolver`, `FrameworkCache`, `ResolveFrameworkUseCase`, `InstallFrameworkPluginsUseCase`, `AdoptUseCase` — removed classes
-- `MemoryCapability` — memory stubs moved to plugin ownership; no `memory-capability.ts` in source
-- Manifest fields: `mode / scripts / repo / docsDir / docs / plugins(top-level)` — all removed
+This document describes the surface as it is. The record of what each retired command became
+is the migration table in
+`aidd_docs/tasks/2026_08/2026_08_20_refactor-contextes-cli/commandes.md`, which carries the
+reason for every merge and deletion.
+
+A list of removals kept here went stale twice over: it named `aidd sync` as removed while the
+command exists, and it described a per-category surface two refactors old as the replacement.
 
 ## User Journey
 
@@ -104,14 +94,14 @@
 ```mermaid
 journey
     section Install
-      Run aidd ai install claude: 5: Multi-Tool Dev
-      Run aidd ai install cursor: 5: Multi-Tool Dev
+      Run aidd framework install --tool claude: 5: Multi-Tool Dev
+      Run aidd framework install --tool cursor: 5: Multi-Tool Dev
       Files generated in .claude/ and .cursor/: 5: CLI
     section Drift
       Modify some files locally: 3: Multi-Tool Dev
-      Run aidd status: 5: Multi-Tool Dev
+      Run aidd doctor: 5: Multi-Tool Dev
       Drift detected per tool: 5: CLI
     section Restore
-      Run aidd ai restore claude --force: 4: Multi-Tool Dev
-      Files reverted to installed version: 5: CLI
+      Run aidd sync --force: 4: Multi-Tool Dev
+      Files rewritten from the manifest: 5: CLI
 ```

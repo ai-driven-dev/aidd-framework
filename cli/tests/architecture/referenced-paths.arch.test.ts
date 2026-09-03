@@ -39,8 +39,32 @@ function resolveCitation(cited: string): string {
 /** Paths cited in prose that no longer exist. This list may only shrink. */
 const BASELINE: string[] = [];
 
-function skillFiles(): string[] {
-  const root = join(CLI_ROOT, ".claude", "skills");
+/**
+ * Where a cited path is an instruction rather than a record.
+ *
+ * The skills were the whole scope for one phase, and that was too narrow: `memory/` is
+ * loaded into every agent conversation and cited four paths that had moved, `ARCHITECTURE.md`
+ * still described a `deps.ts` split into `runtime/wiring/` phases ago, and
+ * `vitest.config.ts` excluded three directories from coverage that do not exist — so the
+ * exclusions did nothing and the numbers they were written to protect were wrong.
+ *
+ * `aidd_docs/tasks/` is deliberately absent: those are archives. A finished plan describing
+ * the tree as it was is a record, and demanding it stay true would forbid ever moving a file.
+ */
+const INSTRUCTING_SOURCES: readonly string[] = [
+  ".claude/skills",
+  "aidd_docs/memory",
+  "aidd_docs/GUIDELINES.md",
+  "ARCHITECTURE.md",
+  "README.md",
+  "vitest.config.ts",
+  "vitest.workspace.ts",
+  "knip.json",
+  "tsup.config.ts",
+  "stryker.conf.json",
+];
+
+function instructingFiles(): string[] {
   const out: string[] = [];
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir)) {
@@ -49,11 +73,15 @@ function skillFiles(): string[] {
       else out.push(full);
     }
   };
-  walk(root);
+  for (const source of INSTRUCTING_SOURCES) {
+    const full = join(CLI_ROOT, source);
+    if (statSync(full).isDirectory()) walk(full);
+    else out.push(full);
+  }
   return out;
 }
 
-function exists(relativePath: string): boolean {
+function statable(relativePath: string): boolean {
   try {
     statSync(join(CLI_ROOT, relativePath));
     return true;
@@ -62,23 +90,42 @@ function exists(relativePath: string): boolean {
   }
 }
 
+/**
+ * Whether a cited path names something on disk.
+ *
+ * A `.js` specifier is how TypeScript's ESM output names a `.ts` file, so a document citing
+ * `tests/helpers/vitest-text-loader.js` is naming a file that exists — the same mapping
+ * `import-rules-bite.arch.test.ts` makes for the same reason.
+ */
+function exists(relativePath: string): boolean {
+  if (statable(relativePath)) return true;
+  return relativePath.endsWith(".js") && statable(relativePath.replace(/\.js$/, ".ts"));
+}
+
 /** Every path a document instructs the reader to open, fenced examples excluded. */
 function citedInProse(text: string): string[] {
   const prose = text.replace(FENCED_BLOCK, "");
-  return [...new Set(prose.match(CITED_PATH) ?? [])].map((cited) => cited.replace(/[/.]+$/, ""));
+  return (
+    [...new Set(prose.match(CITED_PATH) ?? [])]
+      // Trailing punctuation belongs to the sentence, not the path: `src/kernel/.` and
+      // `src/kernel/` both name the directory. Stripping them naively turned a cited `src/`
+      // into `src`, which then resolved as `src/src` and read as dead.
+      .map((cited) => cited.replace(/[./]+$/, ""))
+      .filter((cited) => cited.includes("/"))
+  );
 }
 
-describe("the skills name paths that exist", () => {
-  it("every path the skills instruct a reader to open is still there", () => {
+describe("every document that instructs names paths that exist", () => {
+  it("every path an instructing document names is still there", () => {
     const dead = new Set<string>();
-    for (const file of skillFiles()) {
+    for (const file of instructingFiles()) {
       for (const cited of citedInProse(readFileSync(file, "utf8"))) {
         if (!exists(resolveCitation(cited))) dead.add(cited);
       }
     }
 
     const { added, fixed } = expectRatchet([...dead].sort(), BASELINE);
-    expect(added, "a skill names a path that no longer exists").toEqual([]);
+    expect(added, "an instructing document names a path that no longer exists").toEqual([]);
     expect(fixed, "fixed — remove these from BASELINE").toEqual([]);
   });
 

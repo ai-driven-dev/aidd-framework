@@ -88,6 +88,23 @@ jobs:
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm test
 
+  cli-coverage:
+    name: cli / Coverage thresholds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install expect (TTY persona tests)
+        run: sudo apt-get update && sudo apt-get install -y expect
+      - name: Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+      - run: cd cli && pnpm install --frozen-lockfile
+      - run: cd cli && pnpm test:coverage
+
   cli-smoke:
     name: cli / Smoke
     runs-on: ubuntu-latest

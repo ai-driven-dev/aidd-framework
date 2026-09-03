@@ -9,6 +9,12 @@
  * assertion a rewrite between the two captures breaks. tests/e2e/global-setup.ts now
  * builds a private binary per run and publishes its path through provide/inject; this
  * test holds that boundary so the shared path cannot come back silently.
+ *
+ * The scope is `tests/` on purpose, and a review proposed widening it to `scripts/`. Declined,
+ * measured: the two remaining readers of the shared path are `scripts/smoke-tools.sh` and
+ * `scripts/check-bundle-size.mjs`, and exercising the shipped binary is what both exist for.
+ * Both build before they read. Forbidding them would forbid the only thing that tests what a
+ * user installs.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";

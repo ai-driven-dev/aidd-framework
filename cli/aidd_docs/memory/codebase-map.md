@@ -44,12 +44,8 @@ src/
 │   ├── project-root/                   # project-root resolution
 │   ├── self-update/                     # self-update-use-case, check-update-use-case, self-updater/latest-release-resolver/version-reader/version-control ports + their adapters
 │   └── user-config-dir.ts                # where the CLI keeps what belongs to the user rather than a project — read by runtime/auth, runtime/wiring, and distribution's registry adapter
-├── application/
-│   └── use-cases/               # top-level landing zone for a use-case not yet claimed by a context — currently empty (.gitkeep); do not invent content to fill it
-├── domain/
-│   └── models/                  # landing zone for a domain type not yet claimed by a context — currently empty (.gitkeep)
 └── contexts/                    # bounded contexts — nothing imports another context's interior (context-boundary.arch.test.ts); no index.ts anywhere, barrels are forbidden
-    ├── tools/                    # what the project targets, and how each target is configured
+    ├── tools/                    # what the project targets, and how each target is configured — no application layer of its own: installing for a tool is framework's work, in framework/application/install/
     │   ├── domain/
     │   │   ├── profiles/          # one directory per tool: profile.ts (the AiTool<C>/IdeToolConfig) + build.ts (its ToolBuildContract) when the tool is a build target
     │   │   │   ├── claude/          # + claude-build-paths.ts
@@ -73,7 +69,6 @@ src/
     │   │   ├── marketplace-settings.ts        # per-tool marketplace registration shape
     │   │   ├── plugin-translation-mode.ts      # how a tool's plugins get translated
     │   │   └── marketplace-entry.ts             # per-tool marketplace registration entry
-    │   ├── application/            # install-ai-tool / install-ide-tool / install-config / install-ide-config / install-runtime-config / uninstall-tools
     │   └── infrastructure/         # native-plugin-cli-adapter + its abstract base — drives a tool's own plugin CLI
     ├── translate/                 # the core: canonical source → target-native content, for every tool at once — depends on tools + kernel only
     │   ├── domain/
@@ -136,7 +131,7 @@ Arborescence invariant 9: a launcher locates and executes an external binary; it
 that binary's application code. There is no launcher in the CLI today, and nothing violates the
 invariant.
 
-`presentation/commands/kanban.ts` used to. It deep-imported `../../../../kanban/src/...`, so the
+The kanban command used to. It deep-imported `../../../../kanban/src/...`, so the
 CLI bundled kanban's source and had to declare kanban's four interface packages — 50 packages
 and 24 MB installed by everyone, for a command hidden from `--help` and marked not ready. The
 command was unwired until its product direction is settled; `kanban/` keeps its source and its
@@ -167,7 +162,7 @@ as subprocesses from the start.
 |------|-------|
 | New CLI command | `presentation/commands/` + the top-level use-case it calls, in whichever context owns the concept |
 | New interactive prompt (asks the user) | `presentation/prompts/` — the decision it feeds stays in the context |
-| New use-case not yet claimed by a context | `application/use-cases/` at the root — a temporary landing zone, not a home |
+| New use-case not yet claimed by a context | The context whose concept it serves. There is no root landing zone: `application/use-cases/` and `domain/models/` were drawn here for one and never existed, so a use case that fits no context is a sign the contexts are wrong, not that a lobby is missing |
 | Shared use-case helper | the owning context's `application/shared/` |
 | New runtime service (not a context: auth, http, git, platform, self-update, filesystem, assets) | `runtime/<service>/`, wired from `runtime/wiring/<context>.ts` |
 | New AI/IDE tool | one profile directory in `contexts/tools/domain/profiles/<toolname>/` (`profile.ts` + `build.ts`) — see `tool-addition-cost.arch.test.ts` and the `tools` skill |

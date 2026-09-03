@@ -12,7 +12,19 @@
 import { describe, expect, it } from "vitest";
 import { read, sourceFiles } from "./helpers.js";
 
-const DOCS = ["ARCHITECTURE.md", "README.md"];
+/**
+ * Documents that present the CLI's surface to a reader.
+ *
+ * The memory bank was outside this scope for one phase and it is the document an agent reads
+ * first, in every session. `GUIDELINES.md` names the commands a contributor runs.
+ */
+const DOCS = [
+  "ARCHITECTURE.md",
+  "README.md",
+  "aidd_docs/memory/codebase-map.md",
+  "aidd_docs/memory/project-brief.md",
+  "aidd_docs/GUIDELINES.md",
+];
 
 /** The line itself says the command is gone. */
 const MARKED_GONE = /\b(removed|legacy|no longer|deprecated|replaced by)\b|there is no/i;

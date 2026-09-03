@@ -18,24 +18,29 @@ Tier is identified by **file extension**, not folder:
 | `*.integration.test.ts` | Integration | Use-cases (application) + adapters (infra) |
 | `*.e2e.test.ts`         | E2E         | Full CLI journeys — main happy paths only  |
 
+The test tree mirrors the source tree: a test lives at the same path under `tests/` as the
+file it covers under `src/`. That is asserted nowhere, but it is why this document names layers
+rather than directories — the layers are stable, the directories moved once already and the
+paths written here went stale without anyone noticing, in a file loaded into every session.
+
 ### Tier 1 — Unit (`*.unit.test.ts`)
 
-- Scope: `src/domain/models/`, value objects, pure functions — exhaustive coverage
+- Scope: a context's `domain/` and the `kernel/` — value objects, pure functions, exhaustive
 - No mocks, no I/O, no infrastructure dependencies
 - `describe.concurrent()` forbidden
-- Property tests: `tests/domain/models/manifest.property.unit.test.ts` (fast-check)
+- Property tests use `fast-check`; the manifest's live beside the domain they cover
 
 ### Tier 2 — Integration (`*.integration.test.ts`)
 
 Two sub-scopes:
 
-**Application** (`tests/application/`):
+**Application** (a context's `application/`):
 - Use-cases with real temp filesystem
 - Mock all ports via in-memory implementations from `tests/helpers/ports/`
 - Never mock: `FileSystem`, `ManifestRepository`, `Hasher`
 - Covers specific cases NOT covered by E2E: conflict resolution, non-interactive branches, edge cases
 
-**Infrastructure** (`tests/infrastructure/`):
+**Infrastructure** (a context's `infrastructure/`, and `runtime/`):
 - Adapters tested in isolation with mock server responses or file fixtures
 - One file per adapter
 - Covers technical behaviors not visible in E2E (error parsing, retry logic, format transformation)
