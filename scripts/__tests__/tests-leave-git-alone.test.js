@@ -126,19 +126,22 @@ test("a file that disappeared is reported as removed, never ignored", () => {
 
 // A mode change alone is what turned the leaked hook inert: git silently ignores a
 // `prepare-commit-msg` it cannot execute, so losing the bit is losing the feature.
+//
+// Compared on two snapshots built by hand, never by `chmod`. Windows records no execute bit
+// — every writable file reports `0o666` whatever it was chmod'ed to — so a filesystem round
+// trip there produces no mode change to notice, and the test would be measuring the platform
+// instead of the comparison. The comparison is pure; only *producing* a mode change needs a
+// filesystem that keeps one.
 test("a mode change alone is reported", () => {
-  withDir((dir) => {
-    const at = path.join(dir, "prepare-commit-msg");
-    fs.writeFileSync(at, "#!/bin/sh\n", { mode: 0o755 });
-    fs.chmodSync(at, 0o755);
-    const before = snapshotDirectory(dir);
-    fs.chmodSync(at, 0o644);
+  const same = { size: 10, hash: "deadbeefdeadbeef" };
 
-    const changes = describeChanges(before, snapshotDirectory(dir));
+  const changes = describeChanges(
+    { "prepare-commit-msg": { ...same, mode: 0o755 } },
+    { "prepare-commit-msg": { ...same, mode: 0o644 } }
+  );
 
-    assert.equal(changes.length, 1);
-    assert.match(changes[0], /mode/u);
-  });
+  assert.equal(changes.length, 1);
+  assert.match(changes[0], /mode 0755 -> 0644/u);
 });
 
 test("a directory that was absent and now exists is a change, not a fresh baseline", () => {
@@ -161,7 +164,7 @@ test("a command that leaves the watched directory alone passes the guard through
   withDir((dir) => {
     fs.writeFileSync(path.join(dir, "pre-commit"), "#!/bin/sh\n");
 
-    const run = spawnSync(process.execPath, [GUARD, "--watch", dir, "--", "true"], {
+    const run = spawnSync(process.execPath, [GUARD, "--watch", dir, "--", process.execPath, "-e", ""], {
       encoding: "utf8",
     });
 
