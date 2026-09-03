@@ -1,6 +1,6 @@
 ---
 objective: "La télémétrie de next vit dans la nouvelle architecture, et rien de ce qui marchait des deux côtés ne s'arrête."
-status: pending
+status: in-progress
 ---
 
 # Plan : intégrer la télémétrie sans régression
