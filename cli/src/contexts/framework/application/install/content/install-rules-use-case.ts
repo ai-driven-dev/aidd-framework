@@ -1,8 +1,8 @@
-import type { InstallationFile } from "../../../../kernel/file.js";
-import type { Hasher } from "../../../../kernel/ports/hasher.js";
-import type { RulesCapability } from "../../../tools/domain/capabilities/rules-capability.js";
-import type { AiTool, HasRules } from "../../../tools/domain/contracts.js";
-import type { ContentSection } from "../../../translate/domain/canon.js";
+import type { InstallationFile } from "../../../../../kernel/file.js";
+import type { Hasher } from "../../../../../kernel/ports/hasher.js";
+import type { RulesCapability } from "../../../../tools/domain/capabilities/rules-capability.js";
+import type { AiTool, HasRules } from "../../../../tools/domain/contracts.js";
+import type { ContentSection } from "../../../../translate/domain/canon.js";
 import {
   type ContentSectionDescriptor,
   InstallContentSectionUseCase,

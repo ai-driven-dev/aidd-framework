@@ -1,6 +1,8 @@
 import { AgentsCapability } from "../../capabilities/agents-capability.js";
 import { CommandsCapability } from "../../capabilities/commands-capability.js";
 import { CONFIG_MCP } from "../../capabilities/config-refs.js";
+import { McpCapability } from "../../capabilities/mcp-capability.js";
+import { PluginsCapability } from "../../capabilities/plugins-capability.js";
 import { RulesCapability } from "../../capabilities/rules-capability.js";
 import { SkillsCapability } from "../../capabilities/skills-capability.js";
 import type {
@@ -14,8 +16,6 @@ import type {
 } from "../../contracts.js";
 import { convertCommandFrontmatter, stripToolSuffix } from "../../formats/command.js";
 import { claudeStyleMarketplaceKey } from "../../marketplace-entry.js";
-import { McpCapability } from "../../mcp-capability.js";
-import { PluginsCapability } from "../../plugins-capability.js";
 import { registerTool } from "../../registry.js";
 import { buildClaudeContract, buildClaudeFlatContract } from "./build.js";
 

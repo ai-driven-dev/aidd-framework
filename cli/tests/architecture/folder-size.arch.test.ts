@@ -13,15 +13,29 @@ import { expectRatchet, sourceFiles } from "./helpers.js";
 const MAX_FILES_PER_FOLDER = 10;
 
 /**
- * Directories that exceed the limit today, with the count each was measured at.
- * This list may only shrink.
+ * Directories over the limit, each with the reason it is still here. This list may only
+ * shrink, and an entry leaves when the defect behind it is fixed — not when files are
+ * shuffled to satisfy a count.
+ *
+ * Two entries left that way. `src/contexts/tools/domain` held three capability classes
+ * beside the folder holding the other five; they rejoined their siblings and it dropped to
+ * nine. `src/contexts/framework/application/install` held a use case whose only importers
+ * live in `uninstall/`, plus four thirty-line descriptors around one engine; both groupings
+ * were made explicit and it dropped to six.
+ *
+ * The two below will not leave, and saying so is worth more than promising a later phase
+ * nobody owes.
  */
 const BASELINE = [
-  "src/presentation/commands", // 15 — phase 18 retired ai.ts/ide.ts/status.ts/restore.ts/self-update.ts and added sync.ts/translate.ts/deprecation.ts (17 -> 15); still over the limit, split remains for a later phase
-  // Born of this refactor and to be split by a later phase.
-  "src/contexts/tools/domain", // 12
-  "src/contexts/framework/application/install", // 12
-  "src/kernel", // 11
+  // 14 — thirteen files, one per command, which is the flattest mapping there is from the
+  // CLI's surface to its source. The two helpers could move and would leave twelve, still
+  // over the limit and clearer about nothing.
+  "src/presentation/commands",
+  // 11 — the vocabulary all four contexts speak: errors, file, paths, markdown, jsonc,
+  // merge, scope, source, tool. A folder here would be a category invented for the count;
+  // `text/` and `paths/` are not concepts this repo has, and every import in every context
+  // would grow a segment to express them.
+  "src/kernel",
 ];
 
 /** Direct `.ts` files per parent directory — a subfolder counts toward itself, not its parent. */

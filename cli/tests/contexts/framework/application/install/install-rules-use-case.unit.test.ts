@@ -2,7 +2,7 @@
 import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import "../../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
 import { describe, expect, it } from "vitest";
-import { InstallRulesUseCase } from "../../../../../src/contexts/framework/application/install/install-rules-use-case.js";
+import { InstallRulesUseCase } from "../../../../../src/contexts/framework/application/install/content/install-rules-use-case.js";
 import { claude } from "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { copilot } from "../../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
 import type { ContentSection } from "../../../../../src/contexts/translate/domain/canon.js";

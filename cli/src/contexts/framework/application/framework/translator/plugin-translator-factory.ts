@@ -2,7 +2,7 @@ import type { FileReader } from "../../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../../kernel/ports/hasher.js";
 import type { MarketplaceRegistry } from "../../../../distribution/domain/ports/marketplace-registry.js";
-import type { PluginsCapability } from "../../../../tools/domain/plugins-capability.js";
+import type { PluginsCapability } from "../../../../tools/domain/capabilities/plugins-capability.js";
 import type { EnsureBuiltMarketplaceUseCase } from "../../shared/ensure-built-marketplace-use-case.js";
 import { BuiltTreeMaterializationTranslator } from "./built-tree-materialization-translator.js";
 import { ModeAMarketplaceTranslator } from "./mode-a-marketplace-translator.js";

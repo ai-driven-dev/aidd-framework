@@ -3,9 +3,9 @@ import {
   CONFIG_VSCODE_KEYBINDINGS,
   CONFIG_VSCODE_SETTINGS,
 } from "../../capabilities/config-refs.js";
+import { SettingsCapability } from "../../capabilities/settings-capability.js";
 import type { HasSettings, IdeToolConfig } from "../../contracts.js";
 import { registerTool } from "../../registry.js";
-import { SettingsCapability } from "../../settings-capability.js";
 
 const DIRECTORY = ".vscode/";
 

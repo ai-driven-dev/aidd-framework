@@ -14,11 +14,11 @@ import type {
 import { isAiTool, type ToolConfig } from "../../../tools/domain/registry.js";
 import type { ContentSection, FrameworkDescriptor } from "../../../translate/domain/canon.js";
 import { extractConfigCapabilities } from "../../domain/config-capability.js";
-import { InstallAgentsUseCase } from "../install/install-agents-use-case.js";
-import { InstallCommandsUseCase } from "../install/install-commands-use-case.js";
+import { InstallAgentsUseCase } from "../install/content/install-agents-use-case.js";
+import { InstallCommandsUseCase } from "../install/content/install-commands-use-case.js";
+import { InstallRulesUseCase } from "../install/content/install-rules-use-case.js";
+import { InstallSkillsUseCase } from "../install/content/install-skills-use-case.js";
 import { InstallConfigUseCase } from "../install/install-config-use-case.js";
-import { InstallRulesUseCase } from "../install/install-rules-use-case.js";
-import { InstallSkillsUseCase } from "../install/install-skills-use-case.js";
 
 interface GenerateToolDistributionOptions {
   config: ToolConfig;

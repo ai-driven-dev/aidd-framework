@@ -7,9 +7,9 @@ import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
 import type { Logger } from "../../../../kernel/ports/logger.js";
 import type { IdeToolId } from "../../../../kernel/tool.js";
+import type { SettingsCapability } from "../../../tools/domain/capabilities/settings-capability.js";
 import type { FileMerger } from "../../../tools/domain/ports/file-merger.js";
 import { getToolConfig } from "../../../tools/domain/registry.js";
-import type { SettingsCapability } from "../../../tools/domain/settings-capability.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { PostInstallPipelineUseCase } from "./post-install-pipeline-use-case.js";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { McpCapability } from "../../../../src/contexts/tools/domain/mcp-capability.js";
+import { McpCapability } from "../../../../src/contexts/tools/domain/capabilities/mcp-capability.js";
 
 const sampleMcpJson = JSON.stringify({
   mcpServers: {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BuiltTreeMaterializationTranslator } from "../../../../../../src/contexts/framework/application/framework/translator/built-tree-materialization-translator.js";
 import { ModeAMarketplaceTranslator } from "../../../../../../src/contexts/framework/application/framework/translator/mode-a-marketplace-translator.js";
 import { resolveTranslator } from "../../../../../../src/contexts/framework/application/framework/translator/plugin-translator-factory.js";
-import { PluginsCapability } from "../../../../../../src/contexts/tools/domain/plugins-capability.js";
+import { PluginsCapability } from "../../../../../../src/contexts/tools/domain/capabilities/plugins-capability.js";
 import { DeterministicHasher } from "../../../../../helpers/ports/deterministic-hasher.js";
 import { fakeEnsureBuiltMarketplace } from "../../../../../helpers/ports/fake-ensure-built-marketplace.js";
 import { InMemoryFileAdapter } from "../../../../../helpers/ports/in-memory-file-adapter.js";

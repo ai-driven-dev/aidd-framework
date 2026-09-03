@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { UninstallToolsUseCase } from "../../../../src/contexts/framework/application/install/uninstall-tools-use-case.js";
 import { UninstallIdeUseCase } from "../../../../src/contexts/framework/application/uninstall/uninstall-ide-use-case.js";
+import { UninstallToolsUseCase } from "../../../../src/contexts/framework/application/uninstall/uninstall-tools-use-case.js";
 import { buildUnitDeps, initProject, installTool } from "../../../helpers/ports/build-unit-deps.js";
 
 const PROJECT_ROOT = "/test-project";

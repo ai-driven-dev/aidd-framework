@@ -1,7 +1,7 @@
-import { CapabilityConfigError } from "../../../kernel/errors.js";
-import type { HooksContentFormat } from "./hooks-format.js";
-import type { MarketplaceSettings } from "./marketplace-settings.js";
-import type { PluginTranslationMode } from "./plugin-translation-mode.js";
+import { CapabilityConfigError } from "../../../../kernel/errors.js";
+import type { HooksContentFormat } from "../hooks-format.js";
+import type { MarketplaceSettings } from "../marketplace-settings.js";
+import type { PluginTranslationMode } from "../plugin-translation-mode.js";
 
 export type PluginsMode = "native" | "flat" | "unsupported";
 

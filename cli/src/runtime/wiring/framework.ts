@@ -38,7 +38,6 @@ import { InstallIdeConfigUseCase } from "../../contexts/framework/application/in
 import { InstallIdeToolUseCase } from "../../contexts/framework/application/install/install-ide-tool-use-case.js";
 import { InstallRuntimeConfigUseCase } from "../../contexts/framework/application/install/install-runtime-config-use-case.js";
 import { PostInstallPipelineUseCase } from "../../contexts/framework/application/install/post-install-pipeline-use-case.js";
-import { UninstallToolsUseCase } from "../../contexts/framework/application/install/uninstall-tools-use-case.js";
 import { PluginAddUseCase } from "../../contexts/framework/application/plugin/plugin-add-use-case.js";
 import { PluginInstallFromMarketplaceUseCase } from "../../contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.js";
 import { PluginInstallUseCase } from "../../contexts/framework/application/plugin/plugin-install-use-case.js";
@@ -57,6 +56,7 @@ import {
 } from "../../contexts/framework/application/shared/ensure-built-marketplace-use-case.js";
 import { StatusUseCase } from "../../contexts/framework/application/status-use-case.js";
 import { UninstallIdeUseCase } from "../../contexts/framework/application/uninstall/uninstall-ide-use-case.js";
+import { UninstallToolsUseCase } from "../../contexts/framework/application/uninstall/uninstall-tools-use-case.js";
 import { UninstallUseCase } from "../../contexts/framework/application/uninstall/uninstall-use-case.js";
 import type { ManifestRepository } from "../../contexts/framework/domain/ports/manifest-repository.js";
 import type { PluginDistributionReader } from "../../contexts/framework/domain/ports/plugin-distribution-reader.js";

@@ -1,10 +1,10 @@
-import { GITKEEP_FILE, InstallationFile } from "../../../../kernel/file.js";
-import { parseFrontmatter } from "../../../../kernel/markdown.js";
-import type { Hasher } from "../../../../kernel/ports/hasher.js";
-import { AI_TOOL_IDS } from "../../../../kernel/tool.js";
-import type { AiTool } from "../../../tools/domain/contracts.js";
-import type { UserFileSection } from "../../../tools/domain/formats/command.js";
-import type { ContentSection } from "../../../translate/domain/canon.js";
+import { GITKEEP_FILE, InstallationFile } from "../../../../../kernel/file.js";
+import { parseFrontmatter } from "../../../../../kernel/markdown.js";
+import type { Hasher } from "../../../../../kernel/ports/hasher.js";
+import { AI_TOOL_IDS } from "../../../../../kernel/tool.js";
+import type { AiTool } from "../../../../tools/domain/contracts.js";
+import type { UserFileSection } from "../../../../tools/domain/formats/command.js";
+import type { ContentSection } from "../../../../translate/domain/canon.js";
 
 const ALL_TOOL_SUFFIXES: readonly string[] = AI_TOOL_IDS.map((id) => `.${id}.md`);
 

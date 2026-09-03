@@ -33,7 +33,7 @@ const ALLOWED_FILES = new Set(["src/kernel/tool.ts"]);
  * - `config-refs.ts` declares `CONFIG_OPENCODE = "opencode"`, the name of a config
  *   artifact, not of a tool. It happens to be spelled like one because the artifact is
  *   that tool's config file; opencode's profile is what says it consumes it.
- * - `plugins-capability.ts` types `NativeActivation.binary` as the three CLIs this repo
+ * - `capabilities/plugins-capability.ts` types `NativeActivation.binary` as the three CLIs this repo
  *   has measured and written activators for. It is an allowlist on purpose: a fourth
  *   tool driving its own CLI needs an activator registered against that binary anyway,
  *   so widening the type would move the cost rather than remove it.
@@ -41,7 +41,7 @@ const ALLOWED_FILES = new Set(["src/kernel/tool.ts"]);
 const BASELINE = [
   "src/contexts/framework/domain/tool-recommendations.ts",
   "src/contexts/tools/domain/capabilities/config-refs.ts",
-  "src/contexts/tools/domain/plugins-capability.ts",
+  "src/contexts/tools/domain/capabilities/plugins-capability.ts",
 ];
 
 /** The rule itself, over an explicit file/source pair instead of the real tree. */

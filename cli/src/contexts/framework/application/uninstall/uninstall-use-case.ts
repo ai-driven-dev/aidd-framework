@@ -10,7 +10,7 @@ import type { ToolId } from "../../../../kernel/tool.js";
 import { VALID_TOOL_IDS } from "../../../../kernel/tool.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
-import { UninstallToolsUseCase } from "../install/uninstall-tools-use-case.js";
+import { UninstallToolsUseCase } from "../uninstall/uninstall-tools-use-case.js";
 import { UninstallMcpExclusionUseCase } from "./uninstall-mcp-exclusion-use-case.js";
 import { UninstallPluginUseCase } from "./uninstall-plugin-use-case.js";
 

@@ -6,9 +6,9 @@ import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
 import type { AiToolId, IdeToolId } from "../../../../kernel/tool.js";
 import { AI_TOOL_IDS } from "../../../../kernel/tool.js";
+import { SettingsCapability } from "../../../tools/domain/capabilities/settings-capability.js";
 import type { FileMerger } from "../../../tools/domain/ports/file-merger.js";
 import { getToolConfig, isAiTool } from "../../../tools/domain/registry.js";
-import { SettingsCapability } from "../../../tools/domain/settings-capability.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type {

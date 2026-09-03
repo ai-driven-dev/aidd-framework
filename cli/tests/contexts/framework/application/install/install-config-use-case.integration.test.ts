@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { InstallConfigUseCase } from "../../../../../src/contexts/framework/application/install/install-config-use-case.js";
 import { extractConfigCapabilities } from "../../../../../src/contexts/framework/domain/config-capability.js";
+import { SettingsCapability } from "../../../../../src/contexts/tools/domain/capabilities/settings-capability.js";
 import { copilot } from "../../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
-import { SettingsCapability } from "../../../../../src/contexts/tools/domain/settings-capability.js";
 import { FrameworkDescriptor } from "../../../../../src/contexts/translate/domain/canon.js";
 import { BundledAssetProviderAdapter } from "../../../../../src/runtime/assets/asset-loader.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";

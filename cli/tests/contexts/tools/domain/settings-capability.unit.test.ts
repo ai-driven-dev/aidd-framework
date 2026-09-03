@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SettingsCapability } from "../../../../src/contexts/tools/domain/settings-capability.js";
+import { SettingsCapability } from "../../../../src/contexts/tools/domain/capabilities/settings-capability.js";
 
 describe("SettingsCapability", () => {
   describe("constructor", () => {

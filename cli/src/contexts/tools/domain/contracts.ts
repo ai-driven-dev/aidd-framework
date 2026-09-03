@@ -3,11 +3,11 @@ import type { ToolBuildContract } from "./build-contract.js";
 import type { AgentsCapability } from "./capabilities/agents-capability.js";
 import type { CommandsCapability } from "./capabilities/commands-capability.js";
 import type { HooksCapability } from "./capabilities/hooks-capability.js";
+import type { McpCapability } from "./capabilities/mcp-capability.js";
+import type { PluginsCapability } from "./capabilities/plugins-capability.js";
 import type { RulesCapability } from "./capabilities/rules-capability.js";
+import type { SettingsCapability } from "./capabilities/settings-capability.js";
 import type { SkillsCapability } from "./capabilities/skills-capability.js";
-import type { McpCapability } from "./mcp-capability.js";
-import type { PluginsCapability } from "./plugins-capability.js";
-import type { SettingsCapability } from "./settings-capability.js";
 
 export interface HasAgents {
   readonly agents: AgentsCapability;

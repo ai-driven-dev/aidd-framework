@@ -121,12 +121,13 @@ src/
         │   ├── framework/                 # legacy name for the translator subtree below (pre-dates `aidd translate`)
         │   │   └── translator/             # built-tree-materialization, mode-a-marketplace, mode-b-flat-materialization, plugin-translator(-factory), resolve-plugin-translator
         │   ├── global/                    # doctor-all, restore-all, status-all, update-tools, update-ai-tools, update-ide-tools, update-one-tool, resolve-update-decision
-        │   ├── install/                    # install-ai-tool, install-ide-tool, install-config, install-ide-config, install-runtime-config, install-agents, install-commands, install-rules, install-skills, install-content-section, post-install-pipeline, uninstall-tools
+        │   ├── install/                    # install-ai-tool, install-ide-tool, install-config, install-ide-config, install-runtime-config, post-install-pipeline
+        │   │   └── content/                 # one engine, install-content-section, and the four descriptors it runs: agents, commands, rules, skills
         │   ├── plugin/                      # add, install(-from-marketplace), remove, list, search, update, plugin-helpers
         │   ├── restore/                      # tool-files, all-plugins, plugin, generate-tool-distribution, resolve-restore-decision, restore-drift-entries, restore-merge-files, restore-regular-files, restore-use-case (orchestrator)
         │   ├── setup/                          # setup-marketplace-source, setup-tools, project-context-detector
         │   ├── shared/                          # apply-plugin-files, detect-plugin-drift, ensure-built-marketplace — never called from commands
-        │   └── uninstall/                        # uninstall-use-case (orchestrator), mcp-exclusion, ide, plugin
+        │   └── uninstall/                        # uninstall-use-case (orchestrator), mcp-exclusion, ide, plugin, tools
         └── infrastructure/             # manifest-repository-adapter and plugin-distribution-reader-adapter
 ```
 
@@ -145,7 +146,7 @@ cut over, describe this as the known gap it is rather than as done.
 |---|---|---|
 | doctor | `contexts/framework/application/doctor/doctor-use-case.ts` | layout, merge-files, plugin, references, registration, tracked-files |
 | restore | `contexts/framework/application/restore/restore-use-case.ts` | tool-files, all-plugins, plugin, generate-tool-distribution, resolve-restore-decision, restore-drift-entries, restore-merge-files, restore-regular-files |
-| uninstall | `contexts/framework/application/uninstall/uninstall-use-case.ts` | plugin, mcp-exclusion, ide — drives `contexts/tools/application/uninstall-tools-use-case.ts` |
+| uninstall | `contexts/framework/application/uninstall/uninstall-use-case.ts` | plugin, mcp-exclusion, ide — drives `uninstall-tools-use-case.ts` beside it |
 | setup | `contexts/framework/application/setup-use-case.ts` | setup/setup-marketplace-source, setup/setup-tools, setup/project-context-detector — the plugins-prompt and tools-prompt are `presentation/prompts/` classes it injects by type |
 | global | — | update-all, status-all, restore-all, doctor-all (4 chain orchestrators) + update-ai-tools / update-ide-tools / update-one-tool helpers |
 | plugin | `contexts/framework/application/plugin/` | add, install (+ install-from-marketplace), remove, list, search, update, plugin-helpers |
