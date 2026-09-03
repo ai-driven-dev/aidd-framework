@@ -30,22 +30,40 @@ const ALLOWED = new Set([
 ]);
 
 /** Edges that exist and should not. This list may only shrink. */
-const BASELINE = [
+/**
+ * Edges the chain forbids and the tree still has. The list may only shrink, and each entry
+ * carries what it admits, measured — an edge alone says nothing about its weight, so a
+ * baselined edge could absorb any number of new imports in silence. `folder-size` already
+ * counts its entries; this carries the same shape here.
+ *
+ * That the counts were missing is not theoretical. The single comment below used to cover
+ * two edges at once and got both wrong: it said "fourteen context files import runtime"
+ * where `framework` has eleven, and named "the http client and the git token injection" as
+ * `framework`'s two implementations when they are `distribution`'s, which has three.
+ * `distribution->runtime` sat under that comment with no reason of its own.
+ */
+const BASELINE: readonly {
+  readonly edge: string;
+  readonly imports: number;
+  readonly files: number;
+}[] = [
   // `marketplace add --overwrite` removes before it adds, and removing deletes the
-  // installed plugin files — framework work. The orchestration belongs to whoever
-  // calls both, not to the context that only knows where content comes from.
-  "distribution->framework",
-  // Three framework orchestrators still name the prompt classes they are handed. A
-  // type-only import with an unchanged signature — inverting it into a port is a design
-  // change, not the move phase 16 was. Recorded so it is measured rather than remembered.
-  "framework->presentation",
-  // Fourteen context files import runtime, and what they import is almost entirely
-  // ports: version reader, platform, token provider, latest release resolver. Those are
-  // contracts a context is entitled to depend on, sitting in the wrong place — a port
-  // used by two contexts belongs in the kernel, as phase 9 established. Two are genuine:
-  // the http client and the git token injection are implementations.
-  "framework->runtime",
-  "distribution->runtime",
+  // installed plugin files — framework work. The orchestration belongs to whoever calls
+  // both, not to the context that only knows where content comes from.
+  { edge: "distribution->framework", imports: 1, files: 1 },
+  // Three implementations and one port: the http client, the git token injection and the
+  // user-config directory are concrete, so this edge is a real dependency on runtime and
+  // not a misplaced contract. It resolves by inverting them into ports this context holds.
+  { edge: "distribution->runtime", imports: 5, files: 3 },
+  // Three framework orchestrators still name the prompt classes they are handed. Type-only
+  // imports with unchanged signatures — inverting them into a port is a design change, not
+  // the move phase 16 was. Recorded so it is measured rather than remembered.
+  { edge: "framework->presentation", imports: 4, files: 3 },
+  // Four targets, every one an interface: token provider, platform, latest release
+  // resolver, version reader. Those are contracts a context is entitled to depend on,
+  // sitting in the wrong place — a port used by two contexts belongs in the kernel, as
+  // phase 9 established. Nothing concrete crosses here.
+  { edge: "framework->runtime", imports: 13, files: 11 },
 ];
 
 function contextOf(file: string): string {
@@ -66,9 +84,9 @@ function isContext(name: string): boolean {
 
 const RELATIVE_IMPORT = /(?:from|import)\s*\(?\s*["'](\.[^"']+\.js)["']/g;
 
-/** Every context-to-context edge the import graph actually contains. */
-function edgesBetweenContexts(files: readonly string[]): string[] {
-  const found = new Set<string>();
+/** Every context-to-context edge the import graph contains, with how much crosses each. */
+function weighedEdges(files: readonly string[]): Map<string, { imports: number; files: number }> {
+  const found = new Map<string, { imports: number; files: Set<string> }>();
   for (const file of files) {
     const from = contextOf(file);
     const source = readFileSync(join(CLI_ROOT, file), "utf8");
@@ -81,19 +99,52 @@ function edgesBetweenContexts(files: readonly string[]): string[] {
       // presentation and runtime may reach down; only the reverse is an edge worth naming
       if (BELOW_NOTHING.has(from)) continue;
       if (BELOW_NOTHING.has(to) && !isContext(from)) continue;
-      found.add(`${from}->${to}`);
+      const edge = `${from}->${to}`;
+      const weight = found.get(edge) ?? { imports: 0, files: new Set<string>() };
+      weight.imports += 1;
+      weight.files.add(file);
+      found.set(edge, weight);
     }
   }
-  return [...found].sort();
+  return new Map(
+    [...found].map(([edge, weight]) => [
+      edge,
+      { imports: weight.imports, files: weight.files.size },
+    ])
+  );
+}
+
+/** Every context-to-context edge the import graph actually contains. */
+function edgesBetweenContexts(files: readonly string[]): string[] {
+  return [...weighedEdges(files).keys()].sort();
 }
 
 describe("the context graph has only the edges the plan allows", () => {
   it("no context reaches another the chain does not permit", () => {
     const violations = edgesBetweenContexts(sourceFiles()).filter((edge) => !ALLOWED.has(edge));
 
-    const { added, fixed } = expectRatchet(violations, BASELINE);
+    const { added, fixed } = expectRatchet(
+      violations,
+      BASELINE.map((entry) => entry.edge)
+    );
     expect(added, "an edge the chain forbids — see arborescence.md invariant 2").toEqual([]);
     expect(fixed, "fixed — remove these from BASELINE").toEqual([]);
+  });
+
+  it("holds each admitted edge to the weight its reason was written around", () => {
+    const weighed = weighedEdges(sourceFiles());
+    const recorded = BASELINE.map(
+      ({ edge, imports, files }) => `${edge}: ${imports} imports across ${files} files`
+    );
+    const actual = BASELINE.map(({ edge }) => {
+      const weight = weighed.get(edge) ?? { imports: 0, files: 0 };
+      return `${edge}: ${weight.imports} imports across ${weight.files} files`;
+    });
+
+    expect(
+      actual,
+      "an admitted edge absorbed imports — a baselined edge is not a licence to grow"
+    ).toEqual(recorded);
   });
 
   it("names the edge it is given, and stays silent on one it allows", () => {

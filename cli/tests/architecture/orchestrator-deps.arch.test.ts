@@ -11,10 +11,25 @@ import { expectRatchet, read, sourceFiles } from "./helpers.js";
 /** Above this, an orchestrator is reaching inside the areas it crosses. */
 const MAX_INJECTED_USE_CASES = 4;
 
-/** Orchestrators that exceed the limit today. This list may only shrink. */
-const BASELINE = [
-  "src/contexts/framework/application/doctor/doctor-use-case.ts",
-  "src/contexts/framework/application/setup-use-case.ts",
+/**
+ * Orchestrators over the limit today, each with the count its reason was written around.
+ * The list may only shrink, and a listed file may not absorb another collaborator: an entry
+ * naming only the file would let one grow from five to fifteen in silence.
+ *
+ * Both entries had no reason written at all — just "exceed the limit today" — in a file whose
+ * siblings carry paragraphs. Measured and stated now.
+ */
+const BASELINE: readonly { readonly path: string; readonly injected: number }[] = [
+  // Six checks, one per thing that can drift: tracked files, merged files, plugins,
+  // references, layout, registration. `doctor` reports on every one of them at once, so the
+  // fan-out is the feature. It resolves by giving each check a result type and asking a
+  // single `DriftReport` to collect them, not by removing a check.
+  { path: "src/contexts/framework/application/doctor/doctor-use-case.ts", injected: 6 },
+  // Six steps of one flow: resolve the marketplace source, register the framework, refresh,
+  // sync settings, install tools, prompt for plugins. `setup` is the command that brings a
+  // project from nothing to correct, so it necessarily names each stage. It resolves by
+  // splitting the flow in two — marketplace groundwork, then tools and plugins.
+  { path: "src/contexts/framework/application/setup-use-case.ts", injected: 6 },
 ];
 
 function injectedUseCaseCount(source: string): number {
@@ -24,12 +39,9 @@ function injectedUseCaseCount(source: string): number {
   return params.filter((param) => param[1].includes("UseCase")).length;
 }
 
-/** Where a use case lives: inside a context's application layer, or the flat tree left over. */
+/** Where a use case lives: inside a context's application layer. */
 function isUseCase(file: string): boolean {
-  return (
-    /^src\/contexts\/[^/]+\/application\//.test(file) ||
-    file.startsWith("src/application/use-cases/")
-  );
+  return /^src\/contexts\/[^/]+\/application\//.test(file);
 }
 
 /** The rule itself: does this constructor source cross the limit? */
@@ -46,9 +58,22 @@ describe("orchestrators depend on entry points, not on parts", () => {
     expect(candidates.length, "the rule selects no file — its scope is stale").toBeGreaterThan(20);
     const violations = candidates.filter((file) => overLimit(read(file)));
 
-    const { added, fixed } = expectRatchet(violations, BASELINE);
+    const { added, fixed } = expectRatchet(
+      violations,
+      BASELINE.map((entry) => entry.path)
+    );
     expect(added, "orchestrator reaching inside the areas it crosses").toEqual([]);
     expect(fixed, "fixed — remove these from BASELINE").toEqual([]);
+  });
+
+  it("holds each admitted orchestrator to the count its reason was written around", () => {
+    const recorded = BASELINE.map(({ path, injected }) => `${path}: ${injected}`);
+    const actual = BASELINE.map(({ path }) => `${path}: ${injectedUseCaseCount(read(path))}`);
+
+    expect(
+      actual,
+      "an admitted orchestrator took on another collaborator — fix the count and its reason"
+    ).toEqual(recorded);
   });
 
   it("flags a constructor past the limit and clears one sitting at the limit", () => {
