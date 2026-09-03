@@ -42,7 +42,7 @@ holds no tool name.
 | --- | --- | --- |
 | 1 | The model: `TelemetryHostRegistrationSetup`, four answers, on `TelemetrySetup` | `domain/models/telemetry-setup.ts` |
 | 2 | The port: `HostPluginRegistryReader`, sibling of `HookTrustReader` | `domain/ports/host-plugin-registry-reader.ts` |
-| 3 | The adapter: one reader per host whose registry was measured — Claude's JSON, Codex's line-scanned TOML. Copilot gets none, deliberately | `infrastructure/adapters/host-plugin-registry-reader-adapter.ts` |
+| 3 | The adapter: one reader per host whose registry was measured — Claude's JSON, Codex's line-scanned TOML, Copilot's JSON | `infrastructure/adapters/host-plugin-registry-reader-adapter.ts` |
 | 4 | The comparison: manifest -> `enabledPlugins` -> registry, in the use-case | `use-cases/telemetry/diagnose-telemetry-use-case.ts`, `deps.ts` |
 | 5 | The row: `plugins registered`, naming the missing side | `application/display/telemetry-check-display.ts` |
 | 6 | The tests, including the seam through `marketplace-sync-settings-use-case.ts` | `cli/tests/**` |
@@ -55,10 +55,8 @@ it would have drawn separates two flavours of one outcome. See `spec.md`.
 
 - **Unit** — the four answers, from evidence shapes. No filesystem.
 - **Integration** — each shipped reader against a written fixture: Claude's JSON and Codex's
-  TOML, plus absent, unreadable, `enabled = false`, and a registry that is JSONC where JSON
-  was expected — written from the recorded shape, never copied from the real file. The JSONC
-  case runs through the Claude reader, which is the only way to assert it once Copilot ships
-  no reader of its own.
+  TOML and Copilot's JSON, plus absent, unreadable, disabled, and a registry that is JSONC
+  where JSON was expected — written from the recorded shape, never copied from a real file.
 - **Integration, the seam** — drive `MarketplaceSyncSettingsUseCase` and assert the
   comparison sees what it wrote; this is the file with no test today.
 - **E2E** — `aidd telemetry check` in a sandboxed HOME prints the row and names the missing

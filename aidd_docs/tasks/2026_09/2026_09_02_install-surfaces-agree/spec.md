@@ -40,7 +40,7 @@ Read to learn shape only. No value from any of these files enters a fixture.
 | --- | --- | --- | --- | --- |
 | Claude Code | `~/.claude/plugins/known_marketplaces.json`, `installed_plugins.json` | JSON | object keyed by name | `plugins`, keyed by `<plugin>@<marketplace>` |
 | Codex | `~/.codex/config.toml` | TOML | `[marketplaces.<name>]` | `[plugins."<plugin>@<marketplace>"]`, with `enabled` |
-| Copilot | `~/.copilot/config.json` | **JSONC** | — | `installedPlugins`, an array |
+| Copilot | `~/.copilot/settings.json` | JSON | `extraKnownMarketplaces` | `enabledPlugins`, `<plugin>@<marketplace>` to a boolean |
 
 Shapes, keys only:
 
@@ -53,10 +53,14 @@ config.json               // comments, then { firstLaunchAt, installedPlugins: [
 
 **Three findings that shape the design, not decoration:**
 
-1. **Copilot's file is JSONC.** It opens with two `//` comment lines, so `JSON.parse` throws
-   on it — verified, `SyntaxError: Unexpected token '/'`. A reader that let that throw fall
-   through as "no plugins registered" would print a zero where the honest answer is *unknown*.
-   This is the exact failure this layer exists to refuse, waiting in the first file it reads.
+1. **The file that looks like Copilot's registry is not it.** `~/.copilot/config.json` is
+   JSONC — it opens with two `//` comment lines, so `JSON.parse` throws, verified — and its
+   `installedPlugins` reads empty on a machine that has run installs. Both facts are true and
+   neither matters: driven live on 2026-09-03 against Copilot CLI 1.0.82 under a sandboxed
+   home, `plugin marketplace add` and `plugin install` write `~/.copilot/settings.json`.
+   `uninstall` sets the ref to `false` rather than deleting it, so registered-but-off is an
+   ordinary state there. The JSONC hazard stands on its own: a registry that parses as
+   nothing must read as *unknown*, never as "carries none".
 2. **`installed_plugins.json` binds a ref to a project.** Its `installPath` always points
    inside the plugins cache — but that is not the whole entry. Read across all 115 entries
    rather than the first one, they carry `projectPath` on 100 of them, exactly the 99 at

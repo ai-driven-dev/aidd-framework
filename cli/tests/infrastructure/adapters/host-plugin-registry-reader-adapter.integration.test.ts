@@ -253,12 +253,54 @@ describe("Codex's own config.toml", () => {
   });
 });
 
-// Measured and deliberate: its `installedPlugins` read empty on a machine that had run
-// installs, and its file is JSONC. Nobody has established that this array is the registry a
-// Copilot install writes to, so nothing here claims to read it — and the diagnostic reports
-// Copilot unanswerable rather than confidently wrong.
-describe("a host with no reader", () => {
-  it("declares none for Copilot, rather than guessing at its file", () => {
-    expect(hostPluginRegistryReaders(home).has("copilot")).toBe(false);
+/**
+ * Every shape below was driven live under a sandboxed home on 2026-09-03, against
+ * `GitHub Copilot CLI 1.0.82`: `copilot plugin marketplace add <dir>` then
+ * `copilot plugin install <plugin>@<marketplace>` then `copilot plugin uninstall <plugin>`.
+ * The fixtures are that file's shape, never its contents.
+ */
+describe("Copilot's own settings.json", () => {
+  const PATH = ".copilot/settings.json";
+
+  it("reads the refs its enabledPlugins carries", async () => {
+    await write(
+      PATH,
+      JSON.stringify({
+        extraKnownMarketplaces: { "aidd-framework": { source: { source: "directory" } } },
+        enabledPlugins: { "aidd-telemetry@aidd-framework": true },
+      })
+    );
+
+    expect(
+      (await readerFor("copilot").read(PROJECT)).refs?.get("aidd-telemetry@aidd-framework")
+    ).toBe(true);
+  });
+
+  // `copilot plugin uninstall` writes `false` and keeps the key — measured, and it makes
+  // registered-but-off an ordinary state on this host rather than a Codex peculiarity.
+  it("reads an uninstalled plugin as registered and disabled, not as absent", async () => {
+    await write(
+      PATH,
+      JSON.stringify({ enabledPlugins: { "aidd-telemetry@aidd-framework": false } })
+    );
+
+    expect(
+      (await readerFor("copilot").read(PROJECT)).refs?.get("aidd-telemetry@aidd-framework")
+    ).toBe(false);
+  });
+
+  // A settings file exists from the first `copilot` run and gains `enabledPlugins` only on
+  // the first install, so its absence is "carries none" — a real answer, not a failed read.
+  it("reads a settings file with no enabledPlugins as carrying none", async () => {
+    await write(PATH, JSON.stringify({ extraKnownMarketplaces: {} }));
+
+    const reading = await readerFor("copilot").read(PROJECT);
+
+    expect(reading.refs?.size).toBe(0);
+    expect(reading.unreadable).toBeUndefined();
+  });
+
+  it("says it could not read an absent settings file", async () => {
+    expect((await readerFor("copilot").read(PROJECT)).unreadable).toBe("ENOENT");
   });
 });

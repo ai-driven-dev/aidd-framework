@@ -20,14 +20,17 @@ import { resolveHomeDir } from "../home-dir.js";
  *   Codex        ~/.codex/config.toml                       [plugins."ref"] enabled = true
  *   Copilot      ~/.copilot/config.json                     JSONC, { …, installedPlugins: [] }
  *
- * **Copilot has no reader here, deliberately.** Its file is JSONC — it opens with two `//`
- * comment lines, so `JSON.parse` throws on it outright — and its `installedPlugins` read
- * empty on a machine that had run installs. One of those two facts alone would be a reason
- * to be careful; together they mean nobody has established that this array is the registry
- * a Copilot install writes to. Writing a reader against it would produce a confident
- * "not registered" from a file nobody has shown answers the question, which is the exact
- * defect this whole feature exists to remove. Copilot reads unanswerable until somebody
- * measures what its install actually writes.
+ * **Copilot's registry was measured on 2026-09-03, and it is not the file this once
+ * declined to read.** An earlier version refused Copilot because `~/.copilot/config.json` is
+ * JSONC and its `installedPlugins` read empty on a machine that had run installs. The
+ * instinct was right and the conclusion was wrong: that array is not the registry, and the
+ * registry is `~/.copilot/settings.json`. Driven live under a sandboxed home,
+ * `copilot plugin marketplace add <dir>` writes `extraKnownMarketplaces` and
+ * `copilot plugin install <plugin>@<marketplace>` writes
+ * `enabledPlugins: { "<plugin>@<marketplace>": true }` — plain JSON, no comments, and the
+ * same key every other host uses. `copilot plugin uninstall` sets that value to `false`
+ * rather than deleting the key, so a registered-but-off plugin is an ordinary state here,
+ * not a shape only Codex can produce.
  */
 export function hostPluginRegistryReaders(
   home: string = resolveHomeDir()
@@ -38,6 +41,7 @@ export function hostPluginRegistryReaders(
       new ClaudeInstalledPluginsReader(join(home, ".claude", "plugins", "installed_plugins.json")),
     ],
     ["codex", new CodexConfigPluginsReader(join(home, ".codex", "config.toml"))],
+    ["copilot", new CopilotSettingsPluginsReader(join(home, ".copilot", "settings.json"))],
   ]);
 }
 
@@ -116,6 +120,44 @@ class CodexConfigPluginsReader implements HostPluginRegistryReader {
       return { location: this.path, unreadable: describeError(error) };
     }
     return { location: this.path, refs: scanCodexPluginTables(content) };
+  }
+}
+
+/**
+ * Copilot's own registry: `enabledPlugins` in `~/.copilot/settings.json`, keyed on the same
+ * `<plugin>@<marketplace>` ref as every other host and carrying a boolean.
+ *
+ * The boolean is the whole of the difference from Claude's file. `copilot plugin uninstall`
+ * writes `false` and keeps the key, so a plugin the host knows and declines is a state a
+ * person reaches with one ordinary command — measured, not inferred.
+ *
+ * No project binding: the file records nothing but marketplaces and refs, so like Codex it
+ * answers for the machine and cannot answer for one project.
+ */
+class CopilotSettingsPluginsReader implements HostPluginRegistryReader {
+  constructor(private readonly path: string) {}
+
+  async read(_projectRoot: string): Promise<HostPluginRegistryReading> {
+    let content: string;
+    try {
+      content = await readFile(this.path, "utf8");
+    } catch (error) {
+      return { location: this.path, unreadable: describeError(error) };
+    }
+    try {
+      const parsed = JSON.parse(content) as { enabledPlugins?: Record<string, unknown> };
+      const enabled = parsed.enabledPlugins;
+      // Absent is a real answer here, unlike a file that would not open: Copilot writes the
+      // key on its first install, so a settings file without one belongs to somebody who has
+      // installed no plugin — which is "carries none", not "could not be read".
+      if (enabled === undefined) return { location: this.path, refs: new Map() };
+      return {
+        location: this.path,
+        refs: new Map(Object.entries(enabled).map(([ref, on]) => [ref, on !== false])),
+      };
+    } catch (error) {
+      return { location: this.path, unreadable: describeError(error) };
+    }
   }
 }
 
