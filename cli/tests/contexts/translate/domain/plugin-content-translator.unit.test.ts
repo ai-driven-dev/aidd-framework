@@ -306,3 +306,42 @@ describe("PluginContentTranslator.detectFlatCollisions()", () => {
     expect(translator.detectFlatCollisions([makeDist()], claude)).toEqual([]);
   });
 });
+
+/**
+ * The path a plugin's own content takes on its way to disk.
+ *
+ * This is the chain `aidd plugin install` follows — `translateWithComponentPaths` calls
+ * `tool.rewriteContent`, and the caller writes the result — and it is the one the golden
+ * suite cannot see, because `aidd translate` never calls `rewriteContent` at all. Deleting
+ * copilot's rewriting as dead once shipped `{{TOOLS}}/...` verbatim into an installed file
+ * with every gate green, which is what this covers.
+ */
+describe("a plugin whose content references the framework", () => {
+  const withPlaceholder = () => {
+    const skills = [
+      makeFile(
+        "skills/hello/SKILL.md",
+        `---\nname: hello\ndescription: Hello skill\n---\n\nSee \`{{TOOLS}}/plugins/aidd-pm/x.yml\` and @{{DOCS}}/memory/testing.md\n`
+      ),
+    ];
+    // `files` and `components` both, or the override keeps the default skill content and
+    // the assertion passes on a file that never carried a placeholder.
+    return makeDist({
+      files: skills,
+      components: { skills, commands: [], agents: [], rules: [], hooks: [], mcp: [] },
+    });
+  };
+
+  it("resolves the reference for the tool being installed into", () => {
+    const file = translator
+      .translate(withPlaceholder(), copilot)
+      .find((f) => f.relativePath.endsWith("SKILL.md"));
+
+    expect(file?.content).toContain(".github/plugins/aidd-pm/x.yml");
+    expect(file?.content).toContain(
+      "[aidd_docs/memory/testing.md](../../aidd_docs/memory/testing.md)"
+    );
+    expect(file?.content).not.toContain("{{TOOLS}}");
+    expect(file?.content).not.toContain("{{DOCS}}");
+  });
+});

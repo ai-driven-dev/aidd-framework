@@ -32,7 +32,14 @@ repository. The symmetry was built, the consumer never was.
 
 `UserFileSection` stays — `install-content-section-use-case.ts` uses it.
 
-## The placeholders went too, and the code had already said so
+## Correction (2026-09-03) — la moitié « placeholders » de cette phase était fausse
+
+Ce qui suit décrit la suppression telle qu'elle a été faite. Une relecture indépendante a montré
+qu'une moitié était un défaut, et elle est revenue. La section est gardée telle quelle parce que
+le raisonnement qui a conduit à l'erreur vaut plus que sa correction, mais **la réécriture des
+placeholders de copilot est restaurée** : voir « Ce que la preuve ne pouvait pas voir ».
+
+## La moitié qui tenait, et celle qui ne tenait pas
 
 The first draft of this phase kept the `{{TOOLS}}` / `{{DOCS}}` rewriting on the grounds that
 it is called even if nothing feeds it. That was too cautious, and `placeholders.ts` said so in
@@ -152,3 +159,65 @@ c'est la sortie identique et la suite verte. Les deux tiennent.
 Les dix-huit tests écrits en phase 2 pour épingler la réécriture des placeholders sont partis
 avec elle — ils décrivaient exactement ce qui n'existe plus. Il en reste un, qui dit ce qui est
 vrai maintenant : le contenu passe inchangé.
+
+
+## Ce que la preuve ne pouvait pas voir
+
+`aidd plugin install --tool copilot` écrivait `{{TOOLS}}/...` littéralement dans les fichiers
+installés. Reproduit sur `tests/fixtures/framework-real`, l'instantané figé d'une release que ce
+dépôt embarque :
+
+```
+avant : - validator: `.github/plugins/aidd-pm/skills/05-spec/assets/spec-validator.yml`
+après  : - validator: `{{TOOLS}}/plugins/aidd-pm/skills/05-spec/assets/spec-validator.yml`
+```
+
+Les neuf builds identiques ne pouvaient pas l'attraper, pour trois raisons dont aucune n'était
+écrite ici :
+
+1. `aidd translate` n'appelle jamais `rewriteContent`. La réécriture n'existe que sur le chemin
+   d'installation, que la comparaison de builds ne touche pas.
+2. Le golden ne gèle qu'une cellule — `FROZEN_CELLS = new Set(["claude"])` — et `claude` avait
+   déjà l'identité pour `rewriteContent`. La seule cellule comparée octet à octet était
+   structurellement incapable d'attraper un changement propre à copilot.
+3. Les plugins livrés aujourd'hui ne portent aucun placeholder, donc l'échantillon ne pouvait pas
+   déclencher le défaut. L'exposition est ailleurs : les releases épinglées plus anciennes et les
+   plugins tiers.
+
+L'erreur de raisonnement tient en une phrase : « pas déclenché par mon échantillon » a été écrit
+comme « pas appelé ». La phase 2 avait pourtant fait la distinction, explicitement, et la phase 3
+l'a effacée sans la traiter.
+
+`rewriteCopilotContent`, `resolveInstalledPath` et les quatre constantes sont revenus, avec
+`DOCS_DIR` importé du noyau plutôt que le paramètre `docsDir` déroulé — il valait cette constante
+à chaque site d'appel, ce que le déroulement a confirmé.
+
+### Vérifié sur le bon chemin, cette fois
+
+| Quoi | Preuve |
+| ---- | ------ |
+| L'installation ne bouge pas | `setup` puis `plugin install aidd-dev` pour les cinq outils, binaire d'avant contre binaire d'après : identiques — copilot 246 fichiers, claude 248, codex 48, opencode 46, cursor 5. Seuls les horodatages de `marketplaces.json` diffèrent |
+| La régression est épinglée | Re-supprimée, 13 tests échouent, dont un au niveau du traducteur — la chaîne exacte que suit `plugin install` |
+| La ligne qui a régressé est un cas de test | `validator: \`{{TOOLS}}/plugins/…\`` est écrit tel quel dans `copilot.unit.test.ts` |
+| Les portes | 2 018 tests / 996 suites, tsc 0, biome 0, knip 0 |
+
+## Le score, et son attribution
+
+`tools` passe de **61,04 % à 63,95 %**, mesuré par `pnpm test:mutation:tools`. Deux causes, et
+elles ne se séparent pas proprement parce qu'elles ont atterri ensemble :
+
+- **Le dénominateur a rétréci** : 2 859 mutants avant, 2 613 après. Les 246 disparus étaient dans
+  du code supprimé, donc aucun n'était tué. Retirer des mutants non tués monte le score sans
+  qu'un test gagne un pouce de terrain.
+- **La couverture a gagné** : `copilot/profile.ts` passe de 173 mutants sans couverture à 20,
+  grâce aux tests de réécriture restaurés.
+
+Prétendre à un partage chiffré entre les deux serait une précision inventée. Ce qui est vrai :
+une partie de ces trois points est du code en moins, pas du test en plus.
+
+## Ce que cette phase laisse au dépôt
+
+Le golden ne gèle qu'une cible sur neuf. Les huit autres sont recapturées à chaque re-baseline,
+donc une régression propre à copilot, cursor, codex ou opencode ne fait échouer personne. Ce
+n'est pas corrigé ici — c'est un choix qui appartient à qui décide du coût des re-baselines — mais
+c'est le trou par lequel ce défaut est passé, et il reste ouvert.

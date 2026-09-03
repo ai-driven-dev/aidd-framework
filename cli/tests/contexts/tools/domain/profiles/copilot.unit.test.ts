@@ -250,14 +250,106 @@ describe("copilot", () => {
 });
 
 /**
- * Copilot rewrites paths when it builds a file's install location, never inside the
- * content. It used to rewrite the `{{TOOLS}}` and `{{DOCS}}` placeholders too, a syntax no
- * framework emits any more — measured, zero occurrences in the plugins shipped today — so
- * that rewriting is gone and this is what is left of it.
+ * What a reference to another framework file becomes once installed for Copilot.
+ *
+ * This is not decoration. Deleting this rewriting as "dead" once shipped `{{TOOLS}}/...`
+ * verbatim into installed files on `aidd plugin install --tool copilot`, and every gate
+ * stayed green: `translate` never calls `rewriteContent`, so the golden cannot see it, and
+ * the one golden cell frozen byte-for-byte is claude, whose rewrite is the identity.
+ *
+ * Today's plugins carry no placeholder, so nothing here fires for them. What does carry one
+ * is any pinned older release — this repository ships one as `framework-real` — and any
+ * third-party plugin using the syntax.
+ *
+ * The whole rewritten string is asserted, never a fragment: a mutant that changes the link
+ * target while keeping the label survives a `toContain`.
  */
-describe("content installed for Copilot", () => {
-  it("is written through unchanged", () => {
-    const content = "# A heading\n\nSee `.github/agents/executor.agent.md` and @{{TOOLS}}/x.md\n";
-    expect(copilot.rewriteContent(content)).toBe(content);
+describe("a reference to another framework file, installed for Copilot", () => {
+  const rewrite = (content: string) => copilot.rewriteContent(content);
+
+  describe("an @-reference, which becomes a link", () => {
+    it("points an agent reference at the installed .agent.md file", () => {
+      expect(rewrite("See @{{TOOLS}}/agents/executor.md for details")).toBe(
+        "See [.github/agents/executor.agent.md](../../.github/agents/executor.agent.md) for details"
+      );
+    });
+
+    it("points a command reference at the flattened prompt file", () => {
+      expect(rewrite("Run @{{TOOLS}}/commands/01-plan/02_step.md now")).toBe(
+        "Run [.github/prompts/01-02-step.prompt.md](../../.github/prompts/01-02-step.prompt.md) now"
+      );
+    });
+
+    it("points a rule reference at the instructions file, numeric prefix stripped", () => {
+      expect(rewrite("Read @{{TOOLS}}/rules/1-style.md")).toBe(
+        "Read [.github/instructions/style.instructions.md](../../.github/instructions/style.instructions.md)"
+      );
+    });
+
+    it("keeps a skill reference's directory structure, which Copilot does not flatten", () => {
+      expect(rewrite("Read @{{TOOLS}}/skills/01-plan/SKILL.md")).toBe(
+        "Read [.github/skills/01-plan/SKILL.md](../../.github/skills/01-plan/SKILL.md)"
+      );
+    });
+
+    it("points a docs reference into the project's docs directory", () => {
+      expect(rewrite("Read @{{DOCS}}/memory/testing.md")).toBe(
+        "Read [aidd_docs/memory/testing.md](../../aidd_docs/memory/testing.md)"
+      );
+    });
+
+    it("gives a section nobody declared a prefixed path rather than dropping the link", () => {
+      expect(rewrite("Unknown @{{TOOLS}}/hooks/thing.js")).toBe(
+        "Unknown [.github/hooks/thing.js](../../.github/hooks/thing.js)"
+      );
+    });
+
+    it("resolves a reference to a section directory to that directory", () => {
+      expect(rewrite("Everything under @{{TOOLS}}/agents/ applies")).toBe(
+        "Everything under [.github/agents/](../../.github/agents/) applies"
+      );
+    });
+  });
+
+  describe("a plain path reference, which stays plain text", () => {
+    // Frontmatter cannot hold a markdown link, so the form without the @ replaces the
+    // directory prefix and nothing else.
+    it("replaces the agents prefix and leaves the filename alone", () => {
+      expect(rewrite("Path: {{TOOLS}}/agents/executor.md")).toBe(
+        "Path: .github/agents/executor.md"
+      );
+    });
+
+    it("flattens a command path, because the installed file is flattened", () => {
+      expect(rewrite("Path: {{TOOLS}}/commands/01-plan/02_step.md")).toBe(
+        "Path: .github/prompts/01-02-step.prompt.md"
+      );
+    });
+
+    it("replaces the rules and skills prefixes in one pass", () => {
+      expect(rewrite("At {{TOOLS}}/rules/1-style.md and {{TOOLS}}/skills/x/SKILL.md")).toBe(
+        "At .github/instructions/1-style.md and .github/skills/x/SKILL.md"
+      );
+    });
+
+    it("replaces a bare tools or docs prefix for a section it does not know", () => {
+      expect(rewrite("Bare {{TOOLS}}/other/thing.md and {{DOCS}}/x.md")).toBe(
+        "Bare .github/other/thing.md and aidd_docs/x.md"
+      );
+    });
+
+    it("resolves the plugins path a pinned release still ships", () => {
+      // The exact line that regressed, from framework-real's 00-sdlc skill.
+      expect(rewrite("validator: `{{TOOLS}}/plugins/aidd-pm/skills/05-spec/x.yml`")).toBe(
+        "validator: `.github/plugins/aidd-pm/skills/05-spec/x.yml`"
+      );
+    });
+  });
+
+  describe("content with nothing to rewrite", () => {
+    it("is returned unchanged", () => {
+      const content = "# A heading\n\nProse with a [link](https://example.com) and `code`.\n";
+      expect(rewrite(content)).toBe(content);
+    });
   });
 });
