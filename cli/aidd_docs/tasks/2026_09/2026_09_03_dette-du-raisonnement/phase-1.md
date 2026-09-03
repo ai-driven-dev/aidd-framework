@@ -23,7 +23,9 @@ grep -rln "kernel/relative-link-rewrite.js" src --include='*.ts' | grep -v '^src
 | `flat-paths.ts` | 5 `profiles/*/build.ts` + `translate/…/flat-build-strategy.ts` |
 | `relative-link-rewrite.ts` | les mêmes, plus `tools/domain/marketplace-catalog.ts` et `translate/…/marketplace-strategy-helpers.ts` |
 
-Huit fichiers, deux contextes, un recouvrement quasi total.
+Huit fichiers distincts, deux contextes, cinq d'entre eux lisant les deux modules. C'est le
+recouvrement qui compte, pas un total : « lus par les mêmes huit fichiers » serait faux, et
+cette formulation fausse est passée d'ici dans le commentaire du test et dans le plan.
 
 ## Le nom, qui était le vrai arbitre
 

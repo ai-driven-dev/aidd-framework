@@ -48,4 +48,7 @@ une décision d'agent. Le message de clôture les nomme.
 grep -rnE '\b485\b|\b1001\b|dix-neuf' cli/aidd_docs/tasks/2026_09/
 ```
 
-Une seule occurrence subsiste : la ligne qui enregistre la correction.
+Six lignes, dans trois fichiers — toutes des lignes qui enregistrent la correction, aucun
+chiffre faux ne subsiste. La première version de cette fiche annonçait « une seule
+occurrence » : un résultat de test écrit sans avoir été lancé, dans le document dont le sujet
+est les chiffres écrits sans avoir été mesurés. Corrigé en le lançant.

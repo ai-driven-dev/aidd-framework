@@ -25,11 +25,11 @@ const MAX_FILES_PER_FOLDER = 10;
  * Three entries have left that way. `src/contexts/tools/domain` held three capability
  * classes beside the folder holding the other five; they rejoined their siblings and it
  * dropped to nine. `src/contexts/framework/application/install` held a use case whose only
- * importers live in `uninstall/`, plus four thirty-line descriptors around one engine; both
- * groupings were made explicit and it dropped to six. `src/kernel` held `flat-paths.ts` and
- * `relative-link-rewrite.ts`, read by the same eight files across tools and translate to
- * decide where content lands and how its links follow; `materialization/` names that and it
- * dropped to nine.
+ * importers inside the context live in `uninstall/`, plus four thirty-line descriptors around
+ * one engine; both groupings were made explicit and it dropped to six. `src/kernel` held
+ * `flat-paths.ts` and `relative-link-rewrite.ts`, read by six files and seven across tools and
+ * translate — eight distinct files, five reading both — to decide where content lands and how
+ * its links follow; `materialization/` names that and it dropped to nine.
  *
  * The one below will not leave, and saying so is worth more than promising a later phase
  * nobody owes.

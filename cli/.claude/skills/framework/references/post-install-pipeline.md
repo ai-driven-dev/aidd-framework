@@ -54,8 +54,11 @@ if ("agents" in caps) {
 - Sub-use-cases live in subdirectories of the parent feature: `install/`, and the equivalent
   update/uninstall directories.
 
-These five files (`install-agents-use-case.ts` and its `commands`/`hooks`/`rules`/`skills`
-siblings) are the one place `framework` reaches directly into a `tools` capability class instead
-of through a module `tools` has declared public. `context-boundary.arch.test.ts` tracks this as a
-shrinking baseline, not a pattern — it resolves once `install/` moves fully under
-`contexts/tools/application/`, which has not happened yet. Do not add a sixth file to that list.
+These five files — `install-agents-use-case.ts` with its `commands`/`rules`/`skills`
+siblings, and `install-content-section-use-case.ts`, the engine they hand a descriptor to, all
+under `install/content/` — are the one place `framework` reaches directly into a `tools`
+capability class instead of through a module `tools` has declared public. The exact five pairs
+are listed in that test's baseline; there is no `hooks` sibling. `context-boundary.arch.test.ts` tracks this as a
+shrinking baseline, not a pattern — it resolves once `install/` moves fully under an
+application layer inside the `tools` context, which has not happened yet. Do not add a sixth
+file to that list.

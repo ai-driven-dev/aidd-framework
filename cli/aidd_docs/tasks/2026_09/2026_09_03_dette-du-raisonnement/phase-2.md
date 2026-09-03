@@ -37,9 +37,24 @@ Neuf fichiers de test, en miroir des déplacements de source :
 - `tests/…/install/install-{agents,commands,rules,skills}-use-case.unit.test.ts` → `content/`
 - `tests/kernel/{flat-paths,relative-link-rewrite}.unit.test.ts` → `materialization/`
 
-Aucun des deux dossiers de test n'était au-dessus de la limite (7 et 10). Ce n'est donc pas un
-gain de compte, c'est un gain de lisibilité : le test se trouve là où se trouve ce qu'il teste.
-Le dire ainsi évite de rejouer exactement le défaut qu'on corrige.
+Trois dossiers parents, pas deux, et il faut le dire précisément parce que la version
+précédente de cette phrase disait le contraire de sa propre liste :
+
+| Parent | avant | après |
+| ------ | ----: | ----: |
+| `tests/contexts/tools/domain` | 7 | 7 |
+| `tests/…/application/install` | 10 | 6 |
+| `tests/kernel` | **11** | 9 |
+
+Deux des trois étaient sous la limite : pour ceux-là le gain est de lisibilité, le test se
+trouvant là où se trouve ce qu'il teste. Le troisième, `tests/kernel`, était à onze — il figure
+deux paragraphes plus haut, dans la liste même des sept dossiers au-dessus de la limite. Sous
+l'hypothèse écartée, le déplacer l'aurait sorti du socle : pour ce dossier-là, c'est bien un
+gain de compte.
+
+Rien n'a été truqué, puisque aucun ratchet ne mesure `tests/`. Mais la phrase qui défendait ce
+déplacement contre l'accusation de fausse mesure était elle-même une fausse mesure, et elle
+contredisait un tableau imprimé au-dessus d'elle.
 
 ## Test
 

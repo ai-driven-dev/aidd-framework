@@ -2,86 +2,71 @@
 
 ## Contract
 
-`rewriteContent` and `reverseRewriteContent` must form a lossless round-trip:
-
-```
-reverseRewriteContent(rewriteContent(content, docsDir), docsDir) === content
+```typescript
+rewriteContent(content: string): string;
 ```
 
-for every possible `content` string and every `docsDir` value.
+One direction, one argument. A tool profile declares it in `contexts/tools/domain/contracts.ts`
+and implements it in `contexts/tools/domain/profiles/<tool>/profile.ts`. It is called on the
+install path (`install-content-section-use-case.ts`) and on the translate path
+(`contexts/translate/domain/content-translator.ts`) — every file that reaches a tool's tree
+passes through it.
 
-## Base helpers
+There is no reverse. The round-trip API that used to live here was deleted once nothing
+produced input for it: the CLI writes owned files from the canonical source, it never reads a
+tool's tree back into canonical form. If you find yourself wanting an inverse, the question to
+answer first is what would call it.
 
-Two base helpers in `contexts/tools/domain/formats/placeholders.ts` handle the common case:
+There are no base helpers either, and no `docsDir` parameter. `DOCS_DIR` is a constant in
+`kernel/paths.ts`; a profile that needs it imports it.
 
-- `baseRewriteContent(content, docsDir)` — replaces `docsDir` occurrences with a canonical placeholder.
-- `baseReverseRewriteContent(content, docsDir)` — restores the placeholder back to `docsDir`.
+## What a profile actually does
 
-All tools delegate to these as the foundation layer. Tool-specific transforms are composed on top.
-
-## Composition order
-
-**rewriteContent**: apply `baseRewriteContent` first, then tool-specific transforms.
-
-**reverseRewriteContent**: apply tool-specific reverse transforms first (in the reverse order of
-the forward transforms), then `baseReverseRewriteContent`.
-
-This ordering is mandatory: violating it breaks the lossless identity, because a tool-specific
-substitution assumes the base placeholder is already in its normalized form.
-
-## When no tool-specific transform is needed
-
-Delegate entirely and say so:
+**Nothing, when the tool reads the canonical layout as-is.** `opencode` and `codex` rewrite
+paths for their own directory shapes; `claude` rewrites only its numbered command directories:
 
 ```typescript
-rewriteContent(content: string, docsDir: string): string {
-  // No tool-specific transforms; delegate to base.
-  return baseRewriteContent(content, docsDir);
-},
-reverseRewriteContent(content: string, docsDir: string): string {
-  // No tool-specific transforms; delegate to base.
-  return baseReverseRewriteContent(content, docsDir);
+rewriteContent(content: string): string {
+  return content.replace(
+    /(@?)\.claude\/commands\/(\d+)[_][^/]+\//g,
+    (_, at, phase) => `${at}${commandsDir(phase)}`
+  );
 },
 ```
 
-## Agnostic example (fictional `acme` tool with one extra transform)
+**Placeholder resolution, when the tool's host cannot follow the canonical references.**
+`copilot` is the one real case: it turns `@{{TOOLS}}/…` and `@{{DOCS}}/…` into markdown links
+with a relative href, because Copilot does not resolve `@`-includes. That profile is the
+example to read before writing a new one — `profiles/copilot/profile.ts`,
+`rewriteCopilotContent`.
+
+Note the two spellings it distinguishes, because a new tool will meet the same choice:
+`{{TOOLS}}/` without `@` replaces a directory prefix only (frontmatter, prose); `@{{TOOLS}}/`
+resolves to a full installed path.
+
+## The trap this reference exists to name
+
+A profile whose `rewriteContent` is the identity is indistinguishable from a profile that
+forgot to implement it — until a placeholder reaches a user's file verbatim. That is not
+hypothetical: the rewriting was deleted once on the reasoning that no current plugin emits
+placeholders, and it broke `plugin install --tool copilot` while nine build captures and the
+golden matrix all stayed green. The golden froze `claude`, whose rewrite is the identity, and
+the translate path never calls `rewriteContent` for the marketplace mode.
+
+So: **prove a rewrite on the install path, with a fixture that contains the placeholder.**
+A build comparison cannot see this.
+
+## Test
 
 ```typescript
-import {
-  baseReverseRewriteContent,
-  baseRewriteContent,
-} from "../../formats/placeholders.js";
+const INSTALLED = ".github/agents/checker.md";
 
-const ACME_DOCS_PLACEHOLDER = "[[ACME_DOCS]]";
+it("turns an @{{TOOLS}} reference into a link copilot can follow", () => {
+  const rewritten = copilot.rewriteContent("see @{{TOOLS}}/agents/checker.md");
 
-export const acme: AiTool<...> = {
-  // ...
-  rewriteContent(content: string, docsDir: string): string {
-    const base = baseRewriteContent(content, docsDir);
-    return base.replaceAll(docsDir, ACME_DOCS_PLACEHOLDER);
-  },
-  reverseRewriteContent(content: string, docsDir: string): string {
-    const restored = content.replaceAll(ACME_DOCS_PLACEHOLDER, docsDir);
-    return baseReverseRewriteContent(restored, docsDir);
-  },
-};
-```
-
-## Round-trip verification
-
-Before calling a rewrite pair done, trace it manually with an input that exercises every
-optional field, and add the same assertion as a unit test:
-
-```typescript
-it("round-trips content through rewrite and reverse", () => {
-  const sample = "see [[ACME_DOCS]]/guide.md or /docs/guide.md for details";
-  const after = acme.rewriteContent(sample, "/docs");
-  expect(acme.reverseRewriteContent(after, "/docs")).toBe(sample);
+  // A markdown link whose label is the installed path and whose href reaches it from
+  // two levels down. Asserted in two halves so this file stays link-checkable.
+  expect(rewritten).toContain(`[${INSTALLED}]`);
+  expect(rewritten).toContain(`(../../${INSTALLED})`);
 });
 ```
-
-## When lossless is not achievable
-
-Some transforms are intentionally lossy (hash functions, truncation, schema validation). Do not
-implement an inverse for those; mark the function `// Lossy: no inverse defined — <reason>`
-instead of forcing a fake round-trip.

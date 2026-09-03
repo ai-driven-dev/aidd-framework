@@ -43,7 +43,7 @@ Contract-level: `manifestDir` / `marketplaceRelative` / `synthesizeManifest` (ma
 
 The tool profile already holds the per-tool knowledge — the contract wires it up:
 
-- paths → the capability `buildInstallPath` functions + the generic flat-path primitives in `kernel/flat-paths.ts`.
+- paths → the capability `buildInstallPath` functions + the generic flat-path primitives in `kernel/materialization/flat-paths.ts`.
 - agent format → the tool's existing transform (markdown→TOML formatter, frontmatter-strip helper).
 - mcp / config merges → the existing merge helper for that target format; generalize the helper
   (add a parameter) rather than write a parallel one.

@@ -18,7 +18,23 @@ import { describe, expect, it } from "vitest";
 import { CLI_ROOT, expectRatchet } from "./helpers.js";
 
 const FENCED_BLOCK = /```[\s\S]*?```/g;
-const CITED_PATH = /\b(?:src|tests)\/[A-Za-z0-9_./-]+/g;
+
+/**
+ * A citation is either rooted at the package (`src/…`, `tests/…`) or written the way the
+ * skills mostly write it — relative to `src/`, naming the top-level area directly
+ * (`kernel/…`, `contexts/…`). Both spellings are instructions to open the same file.
+ *
+ * The second form was invisible here until a moved file proved it: `kernel/flat-paths.ts`
+ * went to `kernel/materialization/` and this test stayed green over a dead reference,
+ * because the regex demanded a prefix the document did not write.
+ */
+const CITED_PATH =
+  /\b(?:src|tests)\/[A-Za-z0-9_./-]+|\b(?:kernel|contexts|presentation|runtime)\/[A-Za-z0-9_./-]+/g;
+
+/** `src/`-relative citations resolve under `src/`; rooted ones resolve as written. */
+function resolveCitation(cited: string): string {
+  return cited.startsWith("src/") || cited.startsWith("tests/") ? cited : `src/${cited}`;
+}
 
 /** Paths cited in prose that no longer exist. This list may only shrink. */
 const BASELINE: string[] = [];
@@ -57,7 +73,7 @@ describe("the skills name paths that exist", () => {
     const dead = new Set<string>();
     for (const file of skillFiles()) {
       for (const cited of citedInProse(readFileSync(file, "utf8"))) {
-        if (!exists(cited)) dead.add(cited);
+        if (!exists(resolveCitation(cited))) dead.add(cited);
       }
     }
 
@@ -69,5 +85,14 @@ describe("the skills name paths that exist", () => {
   it("reads instructions and ignores illustrations", () => {
     const text = "Open `src/cli.ts`.\n\n```ts\n// src/domain/models/invented.ts\n```\n";
     expect(citedInProse(text)).toEqual(["src/cli.ts"]);
+  });
+
+  it("catches a dead path written the way the skills write it, without the src/ prefix", () => {
+    const cited = citedInProse("The primitives live in `kernel/gone.ts`.");
+
+    expect(cited, "a bare top-level area is a citation too").toEqual(["kernel/gone.ts"]);
+    expect(resolveCitation("kernel/gone.ts")).toBe("src/kernel/gone.ts");
+    expect(exists(resolveCitation("kernel/gone.ts")), "and it is checked, not skipped").toBe(false);
+    expect(exists(resolveCitation("kernel/errors.ts")), "a live one still passes").toBe(true);
   });
 });

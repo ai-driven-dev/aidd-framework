@@ -52,10 +52,10 @@ two of them promising a split "by a later phase". That promise is the debt.
 | `src/presentation/commands` | 14 | Twelve files carrying the command surface, plus two helpers |
 
 The first two hide a real inconsistency. `src/kernel` was written off here as arbitrary, and
-that was wrong: `flat-paths.ts` and `relative-link-rewrite.ts` are read by the same eight
-files across `tools` and `translate`, and both answer where content lands and how its links
-follow. A follow-up named that `materialization/` and the entry left. Only
-`src/presentation/commands` stays.
+that was wrong: `flat-paths.ts` is read by six files across `tools` and `translate` and
+`relative-link-rewrite.ts` by seven — eight distinct files, five of them reading both — and
+both answer where content lands and how its links follow. A follow-up named that
+`materialization/` and the entry left. Only `src/presentation/commands` stays.
 
 ## Phases
 
