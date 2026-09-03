@@ -12,10 +12,6 @@ type BulkDecision = "overwrite-all" | "skip-all";
 export class BulkConflictState {
   private decision: BulkDecision | null = null;
 
-  isSet(): boolean {
-    return this.decision !== null;
-  }
-
   get(): BulkDecision | null {
     return this.decision;
   }

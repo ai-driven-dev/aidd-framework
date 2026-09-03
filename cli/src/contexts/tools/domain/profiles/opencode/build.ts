@@ -136,8 +136,6 @@ async function collectOpencodeMcp(
 
 export function buildOpencodeFlatContract(): ToolBuildContract {
   return {
-    manifestDir: null,
-    marketplaceRelative: null,
     manifestFileRelative: null,
     synthesizeManifest: null,
     manifestSchemaName: null,

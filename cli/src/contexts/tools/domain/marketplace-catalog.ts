@@ -34,8 +34,6 @@ export function transformClaudeAgent(content: string, _plugin: string, outName: 
 }
 
 export interface SynthesizeClaudeStyleManifestOpts {
-  /** Output manifest subdirectory name (e.g. ".claude-plugin" or ".cursor-plugin"). Reserved for caller/future divergence. */
-  readonly manifestDir: string;
   /** When true, include `agents` as a list of `./agents/*.md` file paths if agents are present. */
   readonly agentsField: boolean;
 }

@@ -64,16 +64,6 @@ export class AgentsCapability {
     return `${this.params.directory}agents/${agentName}${this.params.toolSuffix}`;
   }
 
-  buildUserFilePath(userFileName: string): string {
-    const basename = userFileName.split("/").at(-1) ?? userFileName;
-    const { userFileExt } = this.params;
-    if (userFileExt !== undefined) {
-      const name = basename.endsWith(".md") ? basename.slice(0, -3) : basename;
-      return `${this.params.directory}agents/${name}${userFileExt}`;
-    }
-    return `${this.params.directory}agents/${basename}`;
-  }
-
   buildInstallPath(relativeFileName: string): string | null {
     if (this.params.buildInstallPath) return this.params.buildInstallPath(relativeFileName);
     const basename = relativeFileName.split("/").at(-1) ?? relativeFileName;

@@ -43,13 +43,10 @@ export function buildCursorContract(): ToolBuildContract {
   // Split literal to avoid biome's noTemplateCurlyInString warning.
   const cursorToken = "$" + "{CURSOR_PLUGIN_ROOT}";
   return {
-    manifestDir: ".cursor-plugin",
-    marketplaceRelative,
     pluginRootToken: cursorToken,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: (source, presence) =>
       synthesizeClaudeStyleManifest(source, presence, {
-        manifestDir: ".cursor-plugin",
         agentsField: true,
       }),
     manifestSchemaName: "plugin-manifest",
@@ -127,8 +124,6 @@ function transformCursorFlatAgent(content: string, plugin: string, outName: stri
 
 export function buildCursorFlatContract(): ToolBuildContract {
   return {
-    manifestDir: null,
-    marketplaceRelative: null,
     manifestFileRelative: null,
     synthesizeManifest: null,
     manifestSchemaName: null,

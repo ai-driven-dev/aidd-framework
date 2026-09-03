@@ -81,8 +81,6 @@ export type ArtifactContract =
  * and optional post-build config artifact.
  */
 export interface ToolBuildContract {
-  /** Subdirectory name for the marketplace plugin tree (e.g. ".claude-plugin"). null for opencode. */
-  readonly manifestDir: string | null;
   /**
    * Native plugin-root token for this tool in marketplace mode.
    * Used to rewrite the source ${CLAUDE_PLUGIN_ROOT} placeholder in hooks/mcp content.
@@ -90,8 +88,6 @@ export interface ToolBuildContract {
    * Examples: "${CLAUDE_PLUGIN_ROOT}", "${CURSOR_PLUGIN_ROOT}", "${PLUGIN_ROOT}", "${COPILOT_PLUGIN_ROOT}".
    */
   readonly pluginRootToken?: string;
-  /** Relative path under the output dir where the marketplace catalog is written. null if no marketplace. */
-  readonly marketplaceRelative: string | null;
   /** Plugin-manifest file relative to plugin tree root (e.g. ".claude-plugin/plugin.json"). null if no manifest. */
   readonly manifestFileRelative: string | null;
 

@@ -53,13 +53,10 @@ export function buildCopilotMarketplaceContract(): ToolBuildContract {
   // Split literal to avoid biome's noTemplateCurlyInString warning.
   const copilotToken = "$" + "{PLUGIN_ROOT}";
   return {
-    manifestDir: ".plugin",
-    marketplaceRelative,
     pluginRootToken: copilotToken,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: (source, presence) =>
       synthesizeClaudeStyleManifest(source, presence, {
-        manifestDir: ".plugin",
         agentsField: true,
       }),
     manifestSchemaName: null, // Copilot does not use AJV for the plugin manifest
@@ -153,8 +150,6 @@ function copilotFlatResolveTarget(plugin: string, rel: string): string {
 
 export function buildCopilotFlatContract(): ToolBuildContract {
   return {
-    manifestDir: null,
-    marketplaceRelative: null,
     manifestFileRelative: null,
     synthesizeManifest: null,
     manifestSchemaName: null,

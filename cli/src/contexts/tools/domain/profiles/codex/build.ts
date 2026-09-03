@@ -142,8 +142,6 @@ export function buildCodexContract(): ToolBuildContract {
   // Split literal to avoid biome's noTemplateCurlyInString warning.
   const codexToken = "$" + "{PLUGIN_ROOT}";
   return {
-    manifestDir: ".codex-plugin",
-    marketplaceRelative,
     pluginRootToken: codexToken,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: buildCodexManifest,
@@ -236,8 +234,6 @@ function buildCodexConfigPayload(mcpServers: Record<string, unknown>): string {
 
 export function buildCodexFlatContract(): ToolBuildContract {
   return {
-    manifestDir: null,
-    marketplaceRelative: null,
     manifestFileRelative: null,
     synthesizeManifest: null,
     manifestSchemaName: null,

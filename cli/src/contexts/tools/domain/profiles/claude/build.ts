@@ -34,13 +34,10 @@ export function buildClaudeContract(): ToolBuildContract {
   // Split literal to avoid biome's noTemplateCurlyInString warning.
   const claudeToken = "$" + "{CLAUDE_PLUGIN_ROOT}";
   return {
-    manifestDir: ".claude-plugin",
-    marketplaceRelative,
     pluginRootToken: claudeToken,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: (source, presence) =>
       synthesizeClaudeStyleManifest(source, presence, {
-        manifestDir: ".claude-plugin",
         agentsField: true,
       }),
     manifestSchemaName: "plugin-manifest",
@@ -117,8 +114,6 @@ function transformClaudeFlatAgent(content: string, plugin: string, outName: stri
 
 export function buildClaudeFlatContract(): ToolBuildContract {
   return {
-    manifestDir: null,
-    marketplaceRelative: null,
     manifestFileRelative: null,
     synthesizeManifest: null,
     manifestSchemaName: null,
