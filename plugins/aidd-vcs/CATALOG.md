@@ -78,5 +78,5 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 |-------|------|---|
 | `actions` | [01-resolve.md](skills/05-resolve-conflict/actions/01-resolve.md) | - |
 | `assets` | [resolution-table.md](skills/05-resolve-conflict/assets/resolution-table.md) | - |
-| `-` | [SKILL.md](skills/05-resolve-conflict/SKILL.md) | `Resolves only deterministic Git conflicts and otherwise proposes choices without changing files. Use when the user wants to resolve a merge, rebase, or cherry-pick conflict. Not for deciding between competing implementations or committing changes.` |
+| `-` | [SKILL.md](skills/05-resolve-conflict/SKILL.md) | `Resolves deterministic Git conflicts or approved choices. Use when the user wants to resolve a merge, rebase, or cherry-pick conflict. Not for deciding between competing implementations or committing changes.` |
 

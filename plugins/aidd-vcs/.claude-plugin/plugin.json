@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "aidd-vcs",
   "version": "2.2.1",
-  "description": "VCS workflows: repo init, commit, pull request, release tag, issue creation, and safe conflict resolution",
+  "description": "VCS: init, commit, pull request, release, issues, conflict resolution",
   "author": {
     "name": "AI-Driven Dev",
     "url": "https://github.com/ai-driven-dev"

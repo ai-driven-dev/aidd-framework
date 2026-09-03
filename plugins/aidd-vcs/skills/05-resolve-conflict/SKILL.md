@@ -1,6 +1,6 @@
 ---
 name: resolve-conflict
-description: Resolves only deterministic Git conflicts and otherwise proposes choices without changing files. Use when the user wants to resolve a merge, rebase, or cherry-pick conflict. Not for deciding between competing implementations or committing changes.
+description: Resolves deterministic Git conflicts or approved choices. Use when the user wants to resolve a merge, rebase, or cherry-pick conflict. Not for deciding between competing implementations or committing changes.
 ---
 
 # Resolve Conflict
@@ -9,8 +9,9 @@ description: Resolves only deterministic Git conflicts and otherwise proposes ch
 flowchart LR
   start([active Git conflict]) --> resolve
   resolve -->|no active conflict| none([report no conflict])
-  resolve -->|all decisions deterministic| applied([resolve and report])
-  resolve -->|any decision uncertain| proposal([propose and stop])
+  resolve -->|all rows decided| applied([resolve and report])
+  resolve -->|approval needed| proposal([propose and stop])
+  proposal -->|approved table| resolve
 ```
 
 ## Actions
@@ -19,7 +20,7 @@ Read only the next action file.
 
 | Action | Does |
 | ------ | ---- |
-| resolve | resolve safe conflicts or propose a choice |
+| resolve | resolve conflicts or propose choices |
 
 ## Transversal rules
 

@@ -240,7 +240,7 @@ SDLC loop: plan, implement, assert, audit, review, test, refactor, debug.
 
 `6 skills` · stable
 
-Repo init, commits, pull / merge requests, release tags, issues.
+Repo init, commits, pull / merge requests, release tags, issues, conflict resolution.
 
 </td>
 </tr>
