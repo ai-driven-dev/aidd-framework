@@ -147,7 +147,15 @@ function describeCommitTrailer(trailer: TelemetryCommitTrailerSetup): string {
   // Outside a repository there is nothing to say about hooks — the same fact the claims
   // below refuse to read as a failure. Saying "nothing installed" here would describe a
   // repository this project is not in.
-  if (trailer.hooksDir === undefined) return "no repository here, so no hook to carry it";
+  if (trailer.hooksDirMissing === "no-repository") {
+    return "no repository here, so no hook to carry it";
+  }
+  // A repository whose git could not name its hooks directory still has a history, and the
+  // count is the fact that matters. Dropping it and saying "no repository" was measured
+  // wrong on a git that rejects `--git-path`: one true fact replaced by one false one.
+  if (trailer.hooksDir === undefined) {
+    return `${describeTrailerCount(trailer)} — git could not say where it runs hooks from`;
+  }
 
   const parts: string[] = [];
   if (trailer.delegate === "absent") parts.push("nothing installed to write it");

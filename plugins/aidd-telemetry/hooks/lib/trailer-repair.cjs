@@ -67,8 +67,8 @@ function repairCommitTrailerHook(hooksDir, gitDir) {
   if (!isOursToWrite(hooksDir, gitDir)) return "not-ours-to-write";
 
   const hookPath = path.join(hooksDir, HOOK_FILE);
-  // A symlink is somebody's deliberate indirection, and `writeFileSync` follows it — which
-  // would edit whatever it points at, most usefully a file the team shares. Left alone.
+  // A symlink is somebody's deliberate indirection, and every write here follows one —
+  // which would edit whatever it points at, most usefully a file the team shares.
   if (isSymbolicLink(hookPath)) return "not-ours-to-write";
 
   const line = hookLine(delegatePath);
@@ -77,37 +77,92 @@ function repairCommitTrailerHook(hooksDir, gitDir) {
       ? fs.readFileSync(hookPath, "utf8")
       : `${HOOK_HEADER}\n`;
     if (existing.includes(line)) return "present";
-    const separator = existing.endsWith("\n") ? "" : "\n";
-    // Written beside the target and renamed over it, never truncated in place. Two sessions
-    // can start at once, and one reading a half-written file and appending to it would
-    // destroy the content this promises to keep. `rename` within a directory is atomic.
-    const staging = `${hookPath}.aidd-${process.pid}`;
-    fs.writeFileSync(staging, `${existing}${separator}${line}\n`, { mode: 0o755 });
-    fs.renameSync(staging, hookPath);
-    return "repaired";
+    return write(hookPath, `${existing}${existing.endsWith("\n") ? "" : "\n"}${line}\n`);
   } catch {
     return "unwritable";
   }
 }
 
 /**
- * Only a hooks directory inside the repository's own git directory.
+ * Beside the target and renamed over it where that is possible, directly where it is not.
  *
- * `core.hooksPath` may point at a directory in the working tree — `.githooks/` checked into
- * the repository is a common way to share hooks with a team. Appending there dirties a
- * tracked file, on every session start, with a machine-absolute path that cannot be
- * committed; and a `git checkout` restoring the file brings it straight back.
+ * Renaming is what stops a session starting at the same moment from reading a half-written
+ * hook and appending to the fragment. But staging needs write permission on the *directory*,
+ * where a direct write needs it only on the file — measured, a `0555` hooks directory
+ * holding a writable hook takes the direct write and refuses the staged one. Repairing that
+ * repository mattered before this function existed, so the fallback keeps it.
  *
- * `aidd telemetry on` writing that line once was a write a person asked for. This one is
- * not: nobody typed it, it recurs, and it lands in content under version control. So the
- * rule is the narrow one — repair only where the CLI's own install would have written, and
- * leave everything else to `aidd telemetry check`, which reports the call site either way.
+ * The mode is carried across deliberately: `rename` replaces the inode, so without this a
+ * `0700` hook would come back `0755` and a non-executable one would come back executable —
+ * widening a third party's file on a path meant to be conservative.
+ */
+function write(hookPath, content) {
+  const mode = modeOf(hookPath);
+  const staging = `${hookPath}.aidd-${process.pid}`;
+  try {
+    fs.writeFileSync(staging, content, { mode });
+    fs.renameSync(staging, hookPath);
+    return "repaired";
+  } catch {
+    // Never leave the staging file behind: one per session, each under a different pid,
+    // in a directory a person reads when something is wrong.
+    try {
+      fs.unlinkSync(staging);
+    } catch {
+      // Nothing to clean up, which is the ordinary case when the write itself failed.
+    }
+  }
+  try {
+    fs.writeFileSync(hookPath, content, { mode });
+    return "repaired";
+  } catch {
+    return "unwritable";
+  }
+}
+
+/** The hook's own permission bits, or the mode git needs to run one when there is no hook
+ * yet. Never widened: a file that was not executable stays that way, and `check` reports it
+ * rather than this quietly fixing it. */
+function modeOf(hookPath) {
+  try {
+    return fs.statSync(hookPath).mode & 0o777;
+  } catch {
+    return 0o755;
+  }
+}
+
+/**
+ * Only a hooks directory physically inside the repository's own git directory.
+ *
+ * `core.hooksPath` may point at a directory in the working tree — a checked-in `.githooks/`
+ * is a common way to share hooks with a team. Appending there dirties a tracked file, on
+ * every session start, with a machine-absolute path that cannot be committed; and a
+ * `git checkout` restoring the file brings it straight back.
+ *
+ * **Physically, through `realpath`, not lexically through `resolve`.** An independent check
+ * reproduced the difference: `ln -s ../.githooks .git/hooks` makes git answer
+ * `<repo>/.git/hooks`, which is inside the git directory by string and inside the working
+ * tree on disk. `path.resolve` never resolves a link, so the containment test passed and
+ * `lstat` on the hook file — reached through the linked directory — saw a real file rather
+ * than a link. Both guards were defeated at once, and a tracked file was modified.
+ *
+ * A path that cannot be resolved declines: this is the guard that decides whether to write
+ * into somebody's repository, and the failure direction it takes is "do not".
  */
 function isOursToWrite(hooksDir, gitDir) {
   if (typeof gitDir !== "string" || gitDir === "") return false;
-  const inside = path.resolve(gitDir);
-  const target = path.resolve(hooksDir);
+  const inside = realPath(gitDir);
+  const target = realPath(hooksDir);
+  if (inside === null || target === null) return false;
   return target === inside || target.startsWith(inside + path.sep);
+}
+
+function realPath(target) {
+  try {
+    return fs.realpathSync(target);
+  } catch {
+    return null;
+  }
 }
 
 function isSymbolicLink(target) {

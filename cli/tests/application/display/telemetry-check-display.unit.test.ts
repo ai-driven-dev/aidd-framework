@@ -397,10 +397,30 @@ describe("the row saying whether commits carry their session", () => {
       delegate: "absent",
       callSite: "no-hook-file",
       hookHasOtherContent: false,
+      hooksDirMissing: "no-repository",
     });
 
     expect(text).toContain("no repository here");
     expect(text).not.toContain("nothing installed");
+  });
+
+  /**
+   * A repository whose git could not name its hooks directory still has a history, and the
+   * count is the fact that matters. An earlier version printed "no repository here" for it —
+   * measured false on a git that rejects `--git-path`, inside a repository with commits, one
+   * of which carried the trailer. One true fact replaced by one false one.
+   */
+  it("keeps the count when git could not name the hooks directory", () => {
+    const text = report({
+      delegate: "absent",
+      callSite: "no-hook-file",
+      hookHasOtherContent: false,
+      hooksDirMissing: "unresolved",
+      recentlyCarrying: { carrying: 1, examined: 4 },
+    });
+
+    expect(text).toContain("1 of the last 4 commits carry it");
+    expect(text).not.toContain("no repository here");
   });
 
   // No commits and no commits carrying it are different facts, and only the second is

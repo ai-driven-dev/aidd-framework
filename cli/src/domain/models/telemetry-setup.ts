@@ -369,9 +369,14 @@ function whatAnswered(
 export interface TelemetryCommitTrailerSetup {
   /** Where git says it runs hooks from — `git rev-parse --git-path hooks`, never
    * `.git/hooks` assumed, because `core.hooksPath` pointing elsewhere is exactly the
-   * configuration under which everything else here would describe the wrong directory.
-   * Absent when there is no repository to ask. */
+   * configuration under which everything else here would describe the wrong directory. */
   readonly hooksDir?: string;
+  /** Why there is no `hooksDir`, when there is none. Two causes, never one sentence: a
+   * project outside git has no hook to carry anything, which is a fact about the project;
+   * a repository whose git could not answer is a reading that failed, and saying "no
+   * repository" about it would be false — measured against a git that rejects `--git-path`,
+   * which reported exactly that inside a repository with commits. */
+  readonly hooksDirMissing?: "no-repository" | "unresolved";
   /** Whether the delegate script is there and executable. A file present but not executable
    * is its own state: git will not run it, and saying "installed" would be a lie a person
    * could not act on. */

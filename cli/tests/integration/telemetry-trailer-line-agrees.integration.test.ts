@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   SESSION_TRAILER_DELEGATE_FILE,
   SESSION_TRAILER_HOOK_HEADER,
@@ -57,18 +60,52 @@ describe("the hook and the CLI spell the call site identically", () => {
 });
 
 /**
- * The four words the repair answers with, exercised through the module rather than through
- * a spawned hook: the CLI side is where the distinction matters, since `check` has to tell a
- * hook it declined to touch from one that had nothing to repair.
+ * The words the repair answers with, exercised through the module rather than a spawned
+ * hook: this side is where the distinction matters, since a caller has to tell a directory
+ * the repair declined from one that simply had nothing to do.
+ *
+ * The delegate is really written, because without it every call returns `"no-delegate"` from
+ * the existence check and never reaches the guard the case is named for — which is how an
+ * earlier version of this block passed with that guard deleted.
  */
 describe("what the repair reports about a directory it will not write to", () => {
-  it("declines a hooks directory outside the git directory", () => {
-    expect(journalTrailerRepair.repairCommitTrailerHook("/repo/.githooks", "/repo/.git")).toBe(
-      "no-delegate"
+  let root: string;
+
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), "aidd-trailer-declines-"));
+  });
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  async function hooksAt(relative: string): Promise<string> {
+    const at = join(root, relative);
+    await mkdir(at, { recursive: true });
+    await writeFile(join(at, SESSION_TRAILER_DELEGATE_FILE), "#!/bin/sh\nexit 0\n");
+    return at;
+  }
+
+  it("declines a hooks directory outside the git directory, delegate and all", async () => {
+    const shared = await hooksAt(".githooks");
+    await mkdir(join(root, ".git"), { recursive: true });
+
+    expect(journalTrailerRepair.repairCommitTrailerHook(shared, join(root, ".git"))).toBe(
+      "not-ours-to-write"
+    );
+  });
+
+  it("repairs one inside it", async () => {
+    const inside = await hooksAt(join(".git", "hooks"));
+
+    expect(journalTrailerRepair.repairCommitTrailerHook(inside, join(root, ".git"))).toBe(
+      "repaired"
     );
   });
 
   it("has nothing to do without a hooks directory at all", () => {
-    expect(journalTrailerRepair.repairCommitTrailerHook("", "/repo/.git")).toBe("no-delegate");
+    expect(journalTrailerRepair.repairCommitTrailerHook("", join(root, ".git"))).toBe(
+      "no-delegate"
+    );
   });
 });

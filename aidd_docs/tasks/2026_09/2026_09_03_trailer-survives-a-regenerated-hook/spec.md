@@ -95,10 +95,12 @@ every tool call. The repair takes the same place and inherits the same reasoning
 **Append, never overwrite.** Unchanged from the install: a hook that belongs to somebody else
 keeps everything it had and gains one line at the end.
 
-## `check` states five things about it
+## `check` states five things about it, as one setup row
 
-Each independently verifiable, and the last is the only one that proves the chain rather than
-its parts:
+One row rather than five graded claims, for the rule the display already states: the
+`ok`/`FAIL`/`--` column is reserved for what a run produced, and every fact here is readable
+before any session has been spent. Each is independently verifiable, and the last is the only
+one that proves the chain rather than its parts:
 
 | Claim | Read from |
 | --- | --- |
@@ -123,8 +125,15 @@ its parts:
       never be read half-written by a session starting at the same moment.
 - [ ] It costs no process the session did not already spend, and never runs on `tool-used`.
 - [ ] A `rev-parse` that fails leaves the facts that call already produced intact.
-- [ ] `check` states the five claims above, and the commit count reads as a count — never a
-      bare pass.
+- [ ] `check` states the five facts above, and the commit count reads as a count — never a
+      bare pass, and never a verdict: a commit no session made carries none by design.
+- [ ] A repository whose git cannot name its hooks directory still gets its count. Saying
+      "no repository" about it would be false, and it is a different fact from a project
+      that really is outside git.
+- [ ] A hooks directory that is a *symlink* into the working tree is refused like one that
+      sits there directly — containment is compared physically, never by string.
+- [ ] A repair keeps the hook's own permissions rather than widening them, and a read-only
+      hooks directory holding a writable hook is still repairable.
 - [ ] A commit still succeeds when the delegate is deleted, made non-executable, or made to
       fail.
 - [ ] Every consumer of the check output is updated in the same commit,

@@ -20,9 +20,13 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
    * `delegateState` tells apart, without a filesystem. */
   private readonly executable = new Set<string>();
 
+  /** Normalized like every other reader in this class. Skipping `norm` made this the one
+   * method that could answer `null` for a path `fileExists` answered `true` for — which is
+   * the exact contradiction `FileReader.fileMode` was added to prevent. */
   async fileMode(path: string): Promise<number | null> {
-    if (!this.files.has(path)) return null;
-    return this.executable.has(path) ? 0o755 : 0o644;
+    const key = norm(path);
+    if (!this.files.has(key)) return null;
+    return this.executable.has(key) ? 0o755 : 0o644;
   }
 
   private readonly files = new Map<string, string>();
@@ -41,6 +45,8 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
 
   async deleteFile(path: string): Promise<void> {
     this.files.delete(norm(path));
+    // Or a delete-then-rewrite reports the mode the deleted file had.
+    this.executable.delete(norm(path));
   }
 
   async createDirectory(_path: string): Promise<void> {
@@ -134,8 +140,7 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
   }
 
   async chmodExecutable(path: string): Promise<void> {
-    this.executable.add(path);
-    // No-op: no permission bits in memory
+    this.executable.add(norm(path));
   }
 
   async backup(absolutePath: string): Promise<string> {
