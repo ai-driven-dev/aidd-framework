@@ -4,24 +4,19 @@ Review the working change and stage what belongs in one atomic commit.
 
 ## Input
 
-Optional paths to restrict the commit, the changes made during the current conversation, and the mode (`interactive` default, or `auto`).
+Optional paths to restrict the commit, and the mode (`interactive` default, or `auto`).
 
 ## Output
 
-An ordered commit plan and the staged set for its first concern.
+The staged set for one commit, and the concern it covers.
 
 ## Process
 
-1. **Resolve.** Determine the authorized change set in this order: explicit paths, already staged changes, then changes made during the current conversation.
-   - Never add other unstaged changes merely because they are present.
-   - When conversation ownership or the requested scope is ambiguous, ask in `interactive`; stop with the ambiguity in `auto`.
-2. **Group.** Review the authorized diff and build an ordered plan with one concern per commit.
-3. **Pick.** Stage the first concern only. Keep an existing atomic staged set as-is; otherwise stage exact paths or use `git add -p` when a file contains several concerns.
-4. **Confirm.** In `interactive`, show each proposed split with its scope and reason, then wait for approval. In `auto`, proceed only when every split is unambiguous.
+1. **Read.** Look at the diff and group it by concern.
+2. **Pick.** Stage the files for one concern. With explicit paths, stage exactly those; otherwise keep what is already staged, never adding unstaged files on your own.
+3. **Split.** When several concerns are mixed, stage one at a time with `git add -p`. In `interactive`, propose each split (its scope and why) and wait for approval.
 
 ## Test
 
 - The staged set covers one concern, nothing unrelated.
 - Files the user did not name or stage are left untouched.
-- Ambiguity is surfaced, never resolved by silently staging more files.
-- When all authorized changes are requested, distinct concerns remain distinct commits.
