@@ -110,8 +110,7 @@ export async function materializeViaTranslator(
   toolId: AiToolId,
   plugin: InstalledPlugin,
   projectRoot: string,
-  manifest: Manifest,
-  docsDir: string
+  manifest: Manifest
 ): Promise<number> {
   manifest.removePlugin(toolId, plugin.name);
   const { written } = await translator.addPlugin(
@@ -120,8 +119,7 @@ export async function materializeViaTranslator(
     plugin.source,
     projectRoot,
     manifest,
-    plugin.marketplace,
-    docsDir
+    plugin.marketplace
   );
   return written ?? 0;
 }

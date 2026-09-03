@@ -30,8 +30,7 @@ async function seedCopilotPlugin(
     { kind: "github", repo: "ai-driven-dev/framework" },
     PROJECT_ROOT,
     manifest,
-    MARKETPLACE_NAME,
-    "docs"
+    MARKETPLACE_NAME
   );
   await manifestRepo.save(manifest);
   await registry.save(

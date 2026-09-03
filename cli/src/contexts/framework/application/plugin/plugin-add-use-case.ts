@@ -5,7 +5,7 @@ import {
   MissingPluginMetadataError,
   VersionMismatchError,
 } from "../../../../kernel/errors.js";
-import { DOCS_DIR, PLUGIN_CACHE_SUBDIR } from "../../../../kernel/paths.js";
+import { PLUGIN_CACHE_SUBDIR } from "../../../../kernel/paths.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
@@ -200,7 +200,6 @@ export class PluginAddUseCase {
         projectRoot,
         manifest,
         marketplace,
-        DOCS_DIR,
         prev
       );
       allSkipped.push(skipped);
@@ -253,7 +252,6 @@ export class PluginAddUseCase {
     projectRoot: string,
     manifest: Manifest,
     marketplace: string | undefined,
-    docsDir: string,
     previousMcpEntries: ReadonlyMap<string, string> = new Map()
   ): Promise<{ skipped: ReadonlySkipList }> {
     const toolConfig = getToolConfig(toolId);
@@ -267,16 +265,15 @@ export class PluginAddUseCase {
         projectRoot,
         manifest,
         marketplace,
-        docsDir,
         previousMcpEntries
       );
     }
     const { files, componentPaths, skipped } = new PluginContentTranslator(
       this.hasher
-    ).translateWithComponentPaths(dist, toolConfig, docsDir);
+    ).translateWithComponentPaths(dist, toolConfig);
     if (files.length === 0) return { skipped };
     if (adapter?.mode === "marketplace" && source.kind === "local" && marketplace !== undefined) {
-      return adapter.addPlugin(dist, toolId, source, projectRoot, manifest, marketplace, docsDir);
+      return adapter.addPlugin(dist, toolId, source, projectRoot, manifest, marketplace);
     }
     await writePluginFiles(files, projectRoot, this.fs);
     manifest.addPlugin(

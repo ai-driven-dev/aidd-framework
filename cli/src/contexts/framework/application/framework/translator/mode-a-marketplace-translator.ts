@@ -26,8 +26,7 @@ export class ModeAMarketplaceTranslator implements PluginTranslator {
     source: PluginSource,
     _projectRoot: string,
     manifest: Manifest,
-    marketplace: string | undefined,
-    _docsDir: string
+    marketplace: string | undefined
   ): Promise<{ skipped: ReadonlySkipList }> {
     manifest.addPlugin(
       toolId,

@@ -9,7 +9,7 @@ import type { ContentSection } from "../../../../../src/contexts/translate/domai
 import { GITKEEP_FILE } from "../../../../../src/kernel/file.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
 
-const DOCS_DIR = "aidd_docs";
+const _DOCS_DIR = "aidd_docs";
 
 const commandsSection: ContentSection = {
   name: "commands",
@@ -35,7 +35,6 @@ describe("InstallCommandsUseCase", () => {
         toolConfig: claude,
         section: commandsSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -52,7 +51,6 @@ describe("InstallCommandsUseCase", () => {
         toolConfig: claude,
         section: commandsSection,
         contentFiles: new Map(),
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(0);
@@ -69,7 +67,6 @@ describe("InstallCommandsUseCase", () => {
         toolConfig: claude,
         section: commandsSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(0);
@@ -86,7 +83,6 @@ describe("InstallCommandsUseCase", () => {
         toolConfig: claude,
         section: commandsSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       // Only claude's file passes; cursor's is rejected by acceptsFileName
@@ -103,7 +99,6 @@ describe("InstallCommandsUseCase", () => {
         toolConfig: claude,
         section: commandsSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -122,7 +117,6 @@ describe("InstallCommandsUseCase", () => {
         toolConfig: claude,
         section: commandsSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -145,7 +139,6 @@ describe("InstallCommandsUseCase", () => {
         toolConfig: claude,
         section: sectionWithEntry,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       // Only SKILL.md (matches entryFile) — but SKILL.md has no tool suffix, still accepted
@@ -163,7 +156,6 @@ describe("InstallCommandsUseCase", () => {
         toolConfig: copilot,
         section: commandsSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(0);

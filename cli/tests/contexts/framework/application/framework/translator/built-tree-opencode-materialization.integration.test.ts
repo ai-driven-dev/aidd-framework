@@ -61,8 +61,7 @@ describe("BuiltTreeMaterializationTranslator — opencode (integration)", () => 
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      "aidd-framework",
-      "docs"
+      "aidd-framework"
     );
 
     expect(fs.getFile(`${PROJECT_ROOT}/.opencode/skills/aidd-vcs-01-commit/SKILL.md`)).toBe(skill);

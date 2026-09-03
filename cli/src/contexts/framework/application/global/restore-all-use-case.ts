@@ -1,5 +1,4 @@
 import { NoManifestError } from "../../../../kernel/errors.js";
-import { DOCS_DIR } from "../../../../kernel/paths.js";
 import type { Prompter } from "../../../../kernel/ports/prompter.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { RestoreUseCase } from "../restore/restore-use-case.js";
@@ -95,7 +94,6 @@ export class RestoreAllUseCase {
       if (manifest === null) return empty;
       const result = await this.restoreUseCase.execute({
         version,
-        docsDir: DOCS_DIR,
         projectRoot,
         files,
         force,

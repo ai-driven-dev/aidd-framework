@@ -1,6 +1,5 @@
 import type { Command } from "commander";
 import { NoManifestError } from "../../kernel/errors.js";
-import { DOCS_DIR } from "../../kernel/paths.js";
 import type { ToolId } from "../../kernel/tool.js";
 import { createDeps } from "../../runtime/wiring/framework.js";
 import { printUnrestorable } from "../display/restore-display.js";
@@ -67,7 +66,6 @@ async function runScopedSync(
   const version = manifest.getToolVersion(toolId) ?? deps.currentVersionProvider.get();
   const result = await deps.restoreUseCase.execute({
     version,
-    docsDir: DOCS_DIR,
     projectRoot,
     toolIds: [toolId],
     files: fileArgs.length > 0 ? fileArgs : undefined,

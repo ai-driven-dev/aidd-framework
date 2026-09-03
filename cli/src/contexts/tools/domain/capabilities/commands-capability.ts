@@ -13,7 +13,6 @@ export class CommandsCapability {
         fm: Record<string, unknown>,
         relativeFileName: string
       ) => Record<string, unknown>;
-      reverseConvertFrontmatter: (fm: Record<string, unknown>) => Record<string, unknown>;
     }
   ) {}
 
@@ -30,10 +29,6 @@ export class CommandsCapability {
     relativeFileName: string
   ): Record<string, unknown> {
     return this.params.convertFrontmatter(fm, relativeFileName);
-  }
-
-  reverseConvertFrontmatter(fm: Record<string, unknown>): Record<string, unknown> {
-    return this.params.reverseConvertFrontmatter(fm);
   }
 
   acceptsFileName(fileName: string): boolean {

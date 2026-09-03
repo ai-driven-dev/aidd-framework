@@ -1,10 +1,5 @@
 export type UserFileSection = "agents" | "commands" | "rules" | "skills";
 
-export interface UserFileSectionKey {
-  section: UserFileSection;
-  key: string;
-}
-
 export function stripToolSuffix(suffix: string, fileName: string): string {
   const basename = fileName.split("/").at(-1) ?? fileName;
   if (!basename.endsWith(suffix)) return fileName;
@@ -17,12 +12,6 @@ function buildCommandName(fm: Record<string, unknown>, relativeFileName: string)
   const phase = relativeFileName.split("/")[0]?.match(/^(\d+)/)?.[1];
   const baseName = String(fm.name ?? "");
   return phase ? `aidd:${phase}:${baseName}` : baseName;
-}
-
-function stripCommandNamePrefix(fm: Record<string, unknown>): string {
-  const rawName = String(fm.name ?? "");
-  const match = /^aidd:\d+:(.+)$/.exec(rawName);
-  return match ? match[1] : rawName;
 }
 
 export function convertCommandFrontmatter(
@@ -43,22 +32,6 @@ export function convertCommandFrontmatterNoHint(
   return { name, description: fm.description };
 }
 
-export function reverseConvertCommandFrontmatter(
-  fm: Record<string, unknown>
-): Record<string, unknown> {
-  const name = stripCommandNamePrefix(fm);
-  const result: Record<string, unknown> = { name, description: fm.description };
-  if (fm["argument-hint"] !== undefined) result["argument-hint"] = fm["argument-hint"];
-  return result;
-}
-
-export function reverseConvertCommandFrontmatterNoHint(
-  fm: Record<string, unknown>
-): Record<string, unknown> {
-  const name = stripCommandNamePrefix(fm);
-  return { name, description: fm.description };
-}
-
 export function buildAiddCommandFilePath(dir: string, fileName: string): string {
   const slashIdx = fileName.indexOf("/");
   if (slashIdx !== -1) {
@@ -71,14 +44,4 @@ export function buildAiddCommandFilePath(dir: string, fileName: string): string 
   }
   const baseName = fileName.split("/").at(-1) ?? fileName;
   return `${dir}commands/aidd/${baseName}`;
-}
-
-export function detectSectionKeyFromPrefixes(
-  relativePath: string,
-  prefixes: [string, UserFileSection][]
-): UserFileSectionKey | null {
-  for (const [prefix, section] of prefixes) {
-    if (relativePath.startsWith(prefix)) return { section, key: relativePath.slice(prefix.length) };
-  }
-  return null;
 }

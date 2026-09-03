@@ -28,17 +28,6 @@ describe("opencode", () => {
       const result = opencode.capabilities.agents.convertFrontmatter(fm);
       expect(result).toEqual({ description: "Act like the user", mode: "subagent" });
     });
-
-    it("does not carry OpenCode specific fields back to canonical format", () => {
-      // claude → opencode drops name (filename is the name in OpenCode), adds mode: subagent.
-      // opencode → claude reverse strips mode and cannot recover name from frontmatter alone.
-      const claudeFm = { name: "alexia", description: "Act like the user" };
-      const opencodeFm = opencode.capabilities.agents.convertFrontmatter(claudeFm);
-      const canonical = opencode.capabilities.agents.reverseConvertFrontmatter(opencodeFm);
-      expect(canonical).not.toHaveProperty("name");
-      expect(canonical).not.toHaveProperty("mode");
-      expect(canonical).toEqual({ description: "Act like the user" });
-    });
   });
 
   describe("capabilities.commands.buildInstallPath()", () => {
@@ -63,20 +52,6 @@ describe("opencode", () => {
     it("emits bare name when relativeFileName has no leading-digit phase", () => {
       const fm = { name: "implement", description: "Implement a plan" };
       const result = opencode.capabilities.commands?.convertFrontmatter(fm, "implement.md");
-      expect(result).toEqual({ name: "implement", description: "Implement a plan" });
-    });
-  });
-
-  describe("capabilities.commands.reverseConvertFrontmatter()", () => {
-    it("strips aidd:<phase>: prefix from name", () => {
-      const fm = { name: "aidd:04:implement", description: "Implement a plan" };
-      const result = opencode.capabilities.commands?.reverseConvertFrontmatter(fm);
-      expect(result).toEqual({ name: "implement", description: "Implement a plan" });
-    });
-
-    it("preserves name unchanged when prefix is absent", () => {
-      const fm = { name: "implement", description: "Implement a plan" };
-      const result = opencode.capabilities.commands?.reverseConvertFrontmatter(fm);
       expect(result).toEqual({ name: "implement", description: "Implement a plan" });
     });
   });
@@ -315,33 +290,6 @@ describe("opencode", () => {
 
     it("pluginOutputDir returns null", () => {
       expect(opencode.capabilities.plugins.pluginOutputDir("my-plugin")).toBeNull();
-    });
-  });
-
-  describe("detectUserFileSectionKey()", () => {
-    it("detects agents section", () => {
-      const key = opencode.detectUserFileSectionKey(".opencode/agents/alexia.md");
-      expect(key).toEqual({ section: "agents", key: "alexia.md" });
-    });
-
-    it("detects commands section and strips aidd/ prefix", () => {
-      const key = opencode.detectUserFileSectionKey(".opencode/commands/aidd/04/implement.md");
-      expect(key).toEqual({ section: "commands", key: "04/implement.md" });
-    });
-
-    it("detects rules section", () => {
-      const key = opencode.detectUserFileSectionKey(".opencode/rules/01-standards/naming.md");
-      expect(key).toEqual({ section: "rules", key: "01-standards/naming.md" });
-    });
-
-    it("detects skills section", () => {
-      const key = opencode.detectUserFileSectionKey(".opencode/skills/my-skill/SKILL.md");
-      expect(key).toEqual({ section: "skills", key: "my-skill/SKILL.md" });
-    });
-
-    it("returns null for unrecognised paths", () => {
-      expect(opencode.detectUserFileSectionKey("opencode.json")).toBeNull();
-      expect(opencode.detectUserFileSectionKey("AGENTS.md")).toBeNull();
     });
   });
 });

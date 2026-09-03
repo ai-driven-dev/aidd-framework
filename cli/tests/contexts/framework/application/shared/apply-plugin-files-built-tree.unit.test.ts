@@ -4,7 +4,6 @@ import { Marketplace } from "../../../../../src/contexts/distribution/domain/mar
 import { PluginAddUseCase } from "../../../../../src/contexts/framework/application/plugin/plugin-add-use-case.js";
 import { RestoreAllPluginsUseCase } from "../../../../../src/contexts/framework/application/restore/restore-all-plugins-use-case.js";
 import { PluginDistributionReaderAdapter } from "../../../../../src/contexts/framework/infrastructure/plugin-distribution-reader-adapter.js";
-import { DOCS_DIR } from "../../../../../src/kernel/paths.js";
 import { buildUnitDeps, initAndInstall } from "../../../../helpers/ports/build-unit-deps.js";
 import { fakeEnsureBuiltMarketplace } from "../../../../helpers/ports/fake-ensure-built-marketplace.js";
 import { InMemoryMarketplaceRegistry } from "../../../../helpers/ports/in-memory-marketplace-registry.js";
@@ -111,7 +110,6 @@ describe("RestoreAllPluginsUseCase — built-tree materialization", () => {
     const result = await makeRestoreUseCase(deps, registry).execute({
       projectRoot: PROJECT_ROOT,
       manifest,
-      docsDir: DOCS_DIR,
       fileFilter: null,
     });
 
@@ -154,7 +152,6 @@ describe("RestoreAllPluginsUseCase — built-tree materialization", () => {
     const result = await makeRestoreUseCase(deps, registry).execute({
       projectRoot: PROJECT_ROOT,
       manifest,
-      docsDir: DOCS_DIR,
       fileFilter: null,
     });
 
@@ -175,7 +172,6 @@ describe("RestoreAllPluginsUseCase — built-tree materialization", () => {
     await makeRestoreUseCase(deps, registry).execute({
       projectRoot: PROJECT_ROOT,
       manifest,
-      docsDir: DOCS_DIR,
       fileFilter: null,
     });
 

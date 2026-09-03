@@ -9,7 +9,7 @@ import type { ContentSection } from "../../../../../src/contexts/translate/domai
 import { GITKEEP_FILE } from "../../../../../src/kernel/file.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
 
-const DOCS_DIR = "aidd_docs";
+const _DOCS_DIR = "aidd_docs";
 
 const agentsSection: ContentSection = {
   name: "agents",
@@ -41,7 +41,6 @@ describe("InstallAgentsUseCase", () => {
         toolConfig: claude,
         section: agentsSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -58,7 +57,6 @@ describe("InstallAgentsUseCase", () => {
         toolConfig: claude,
         section: agentsSection,
         contentFiles: new Map(),
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(0);
@@ -75,7 +73,6 @@ describe("InstallAgentsUseCase", () => {
         toolConfig: claude,
         section: agentsSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(0);
@@ -92,7 +89,6 @@ describe("InstallAgentsUseCase", () => {
         toolConfig: claude,
         section: agentsSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -108,7 +104,6 @@ describe("InstallAgentsUseCase", () => {
         toolConfig: claude,
         section: agentsSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -126,7 +121,6 @@ describe("InstallAgentsUseCase", () => {
         toolConfig: claude,
         section: agentsSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -145,7 +139,6 @@ describe("InstallAgentsUseCase", () => {
         toolConfig: claude,
         section: agentsSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(2);
@@ -167,7 +160,6 @@ describe("InstallAgentsUseCase", () => {
         toolConfig: claude,
         section: agentsSectionWithEntry,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -184,7 +176,6 @@ describe("InstallAgentsUseCase", () => {
         toolConfig: claude,
         section: agentsSectionWithEntry,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(0);
@@ -201,7 +192,6 @@ describe("InstallAgentsUseCase", () => {
         toolConfig: copilot,
         section: agentsSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(0);

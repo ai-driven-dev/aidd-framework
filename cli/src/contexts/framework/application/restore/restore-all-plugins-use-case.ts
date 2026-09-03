@@ -17,7 +17,6 @@ import {
 interface RestoreAllPluginsOptions {
   projectRoot: string;
   manifest: Manifest;
-  docsDir: string;
   fileFilter: ((p: string) => boolean) | null;
   pluginName?: string;
   /** Restrict which AI tools' plugins get touched. Undefined means every installed AI tool (unscoped). */
@@ -40,7 +39,7 @@ export class RestoreAllPluginsUseCase {
   ) {}
 
   async execute(options: RestoreAllPluginsOptions): Promise<RestoreAllPluginsResult> {
-    const { projectRoot, manifest, docsDir, fileFilter, pluginName, toolIds } = options;
+    const { projectRoot, manifest, fileFilter, pluginName, toolIds } = options;
     const cacheDir = join(projectRoot, PLUGIN_CACHE_SUBDIR);
     let totalFiles = 0;
     const restoredNames = new Set<string>();
@@ -55,7 +54,6 @@ export class RestoreAllPluginsUseCase {
         toolConfig,
         projectRoot,
         cacheDir,
-        docsDir,
         fileFilter,
         pluginName
       );
@@ -71,7 +69,6 @@ export class RestoreAllPluginsUseCase {
     toolConfig: ToolConfig,
     projectRoot: string,
     cacheDir: string,
-    docsDir: string,
     fileFilter: ((p: string) => boolean) | null,
     pluginName: string | undefined
   ): Promise<RestoreAllPluginsResult> {
@@ -94,7 +91,6 @@ export class RestoreAllPluginsUseCase {
         projectRoot,
         cacheDir,
         manifest,
-        docsDir,
         fileFilter,
       });
       totalFiles += filesWritten;

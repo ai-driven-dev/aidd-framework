@@ -9,7 +9,7 @@ import type { ContentSection } from "../../../../../src/contexts/translate/domai
 import { GITKEEP_FILE } from "../../../../../src/kernel/file.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
 
-const DOCS_DIR = "aidd_docs";
+const _DOCS_DIR = "aidd_docs";
 
 // Skills section without entryFile filter (flat mode)
 const skillsSectionFlat: ContentSection = {
@@ -42,7 +42,6 @@ describe("InstallSkillsUseCase", () => {
         toolConfig: claude,
         section: skillsSectionFlat,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -59,7 +58,6 @@ describe("InstallSkillsUseCase", () => {
         toolConfig: claude,
         section: skillsSectionFlat,
         contentFiles: new Map(),
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(0);
@@ -76,7 +74,6 @@ describe("InstallSkillsUseCase", () => {
         toolConfig: claude,
         section: skillsSectionFlat,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(0);
@@ -93,7 +90,6 @@ describe("InstallSkillsUseCase", () => {
         toolConfig: claude,
         section: skillsSectionFlat,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -109,7 +105,6 @@ describe("InstallSkillsUseCase", () => {
         toolConfig: claude,
         section: skillsSectionFlat,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -128,7 +123,6 @@ describe("InstallSkillsUseCase", () => {
         toolConfig: claude,
         section: skillsSectionFlat,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(2);
@@ -150,7 +144,6 @@ describe("InstallSkillsUseCase", () => {
         toolConfig: claude,
         section: skillsSectionWithEntry,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       // Only SKILL.md passes the entryFile filter
@@ -168,7 +161,6 @@ describe("InstallSkillsUseCase", () => {
         toolConfig: claude,
         section: skillsSectionWithEntry,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(0);
@@ -185,7 +177,6 @@ describe("InstallSkillsUseCase", () => {
         toolConfig: copilot,
         section: skillsSectionFlat,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(0);

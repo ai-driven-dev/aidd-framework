@@ -43,7 +43,6 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     projectRoot: string,
     manifest: Manifest,
     marketplace: string | undefined,
-    docsDir: string,
     previousMcpEntries: ReadonlyMap<string, string> = new Map()
   ): Promise<{ skipped: ReadonlySkipList; written?: number }> {
     const resolved =
@@ -56,7 +55,6 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
         projectRoot,
         manifest,
         marketplace,
-        docsDir,
         previousMcpEntries
       );
     }

@@ -53,8 +53,7 @@ describe("install opencode plugin via Mode B (integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     const written = fs.listAll();
@@ -79,8 +78,7 @@ describe("install opencode plugin via Mode B (integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     expect(fs.listAll().every((p) => !p.startsWith(STUB_HOME))).toBe(true);
@@ -99,8 +97,7 @@ describe("install opencode plugin via Mode B (integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     const installed = manifest.getPlugins("opencode").find((p) => p.name === "aidd-context");

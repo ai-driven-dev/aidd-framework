@@ -62,8 +62,7 @@ describe("remove opencode plugin: unmerge MCP entries (Phase 5)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
     await manifestRepo.save(manifest);
 
@@ -96,8 +95,7 @@ describe("remove opencode plugin: unmerge MCP entries (Phase 5)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
     await manifestRepo.save(manifest);
 
@@ -127,8 +125,7 @@ describe("remove opencode plugin: unmerge MCP entries (Phase 5)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
     // Simulate opencode.json not existing at remove time
     await fs.deleteFile(OPENCODE_JSON);

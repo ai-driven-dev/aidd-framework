@@ -65,8 +65,7 @@ describe("BuiltTreeMaterializationTranslator — cursor (integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      "aidd-framework",
-      "docs"
+      "aidd-framework"
     );
 
     const base = `${HOME}/.cursor/plugins/local/sample-plugin`;
@@ -98,8 +97,7 @@ describe("BuiltTreeMaterializationTranslator — cursor (integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
     expect(result.skipped).toEqual([]);
   });

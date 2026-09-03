@@ -21,7 +21,6 @@ export interface RestoreToolFilesOptions {
   manifest: Manifest;
   descriptor: FrameworkDescriptor;
   contentFiles: Map<string, string>;
-  docsDir: string;
   projectRoot: string;
   version: string;
   force: boolean;
@@ -81,14 +80,14 @@ export class RestoreToolFilesUseCase {
   private async buildDistributionMap(
     options: RestoreToolFilesOptions
   ): Promise<Map<string, InstallationFile>> {
-    const { toolId, descriptor, contentFiles, docsDir, projectRoot } = options;
+    const { toolId, descriptor, contentFiles, projectRoot } = options;
     const config = getToolConfig(toolId);
     const distribution = await new GenerateToolDistributionUseCase(
       this.fs,
       this.hasher,
       this.platform,
       this.assetProvider
-    ).execute({ config, descriptor, contentFiles, docsDir, projectRoot });
+    ).execute({ config, descriptor, contentFiles, projectRoot });
     return new Map(distribution.map((f) => [f.relativePath, f]));
   }
 

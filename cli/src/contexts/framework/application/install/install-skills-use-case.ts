@@ -18,7 +18,6 @@ interface InstallSkillsOptions {
   toolConfig: AiTool<HasSkills>;
   section: ContentSection;
   contentFiles: Map<string, string>;
-  docsDir: string;
 }
 
 export class InstallSkillsUseCase {

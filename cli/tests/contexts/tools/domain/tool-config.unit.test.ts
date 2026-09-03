@@ -19,8 +19,6 @@ const makeStubConfig = (toolId: AiToolId, toolSuffix: string): AiTool<unknown> =
   signalDir: `.${toolId}/commands`,
   capabilities: {},
   rewriteContent: (content: string) => content,
-  reverseRewriteContent: (content: string) => content,
-  detectUserFileSectionKey: () => null,
 });
 
 describe("VALID_TOOL_IDS", () => {

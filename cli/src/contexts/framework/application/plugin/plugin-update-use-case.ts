@@ -1,6 +1,6 @@
 import { homedir as nodeHomedir } from "node:os";
 import { join } from "node:path";
-import { DOCS_DIR, PLUGIN_CACHE_SUBDIR } from "../../../../kernel/paths.js";
+import { PLUGIN_CACHE_SUBDIR } from "../../../../kernel/paths.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
@@ -47,7 +47,6 @@ export class PluginUpdateUseCase {
     const manifest = await loadPluginManifest(this.manifestRepo);
     const resolvedToolIds = resolvePluginToolIds(toolIds, manifest);
     const cacheDir = join(projectRoot, PLUGIN_CACHE_SUBDIR);
-    const docsDir = DOCS_DIR;
     const updated: string[] = [];
     for (const toolId of resolvedToolIds) {
       const names = await this.updatePluginsForTool(
@@ -55,8 +54,7 @@ export class PluginUpdateUseCase {
         pluginNames,
         projectRoot,
         cacheDir,
-        manifest,
-        docsDir
+        manifest
       );
       updated.push(...names);
     }
@@ -69,8 +67,7 @@ export class PluginUpdateUseCase {
     pluginNames: string[] | undefined,
     projectRoot: string,
     cacheDir: string,
-    manifest: Manifest,
-    docsDir: string
+    manifest: Manifest
   ): Promise<string[]> {
     const plugins = manifest.getPlugins(toolId);
     const targets = pluginNames
@@ -78,14 +75,7 @@ export class PluginUpdateUseCase {
       : [...plugins];
     const updated: string[] = [];
     for (const plugin of targets) {
-      const didUpdate = await this.updateOnePlugin(
-        plugin,
-        toolId,
-        projectRoot,
-        cacheDir,
-        manifest,
-        docsDir
-      );
+      const didUpdate = await this.updateOnePlugin(plugin, toolId, projectRoot, cacheDir, manifest);
       if (didUpdate) updated.push(plugin.name);
     }
     return updated;
@@ -96,15 +86,14 @@ export class PluginUpdateUseCase {
     toolId: AiToolId,
     projectRoot: string,
     cacheDir: string,
-    manifest: Manifest,
-    docsDir: string
+    manifest: Manifest
   ): Promise<boolean> {
     const localPath = await this.pluginFetcher.fetch(plugin.source, cacheDir, {
       forceRefresh: true,
     });
     const dist = await this.pluginDistributionReader.read(localPath);
     if (compareSemver(dist.manifest.version, plugin.version) <= 0) return false;
-    await this.replacePluginFiles(plugin, dist, toolId, projectRoot, manifest, docsDir);
+    await this.replacePluginFiles(plugin, dist, toolId, projectRoot, manifest);
     return true;
   }
 
@@ -113,28 +102,19 @@ export class PluginUpdateUseCase {
     dist: PluginDistribution,
     toolId: AiToolId,
     projectRoot: string,
-    manifest: Manifest,
-    docsDir: string
+    manifest: Manifest
   ): Promise<void> {
     const baseDir = resolvePluginBaseDir(toolId, projectRoot, nodeHomedir);
     await deleteOldFiles(plugin.files, baseDir, this.fs);
     const toolConfig = getToolConfig(toolId);
     const translator = this.resolveTranslator(toolConfig);
     if (translator !== null && plugin.marketplace !== undefined) {
-      await materializeViaTranslator(
-        translator,
-        dist,
-        toolId,
-        plugin,
-        projectRoot,
-        manifest,
-        docsDir
-      );
+      await materializeViaTranslator(translator, dist, toolId, plugin, projectRoot, manifest);
       return;
     }
     const { files: newFiles, componentPaths } = new PluginContentTranslator(
       this.hasher
-    ).translateWithComponentPaths(dist, toolConfig, docsDir);
+    ).translateWithComponentPaths(dist, toolConfig);
     await writePluginFiles(newFiles, baseDir, this.fs);
     manifest.updatePlugin(
       toolId,

@@ -12,14 +12,7 @@ import type {
   HasRules,
   HasSkills,
 } from "../../contracts.js";
-import type { UserFileSectionKey } from "../../formats/command.js";
-import {
-  convertCommandFrontmatter,
-  detectSectionKeyFromPrefixes,
-  reverseConvertCommandFrontmatter,
-  stripToolSuffix,
-} from "../../formats/command.js";
-import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
+import { convertCommandFrontmatter, stripToolSuffix } from "../../formats/command.js";
 import { buildClaudeStyleMarketplaceEntry } from "../../marketplace-entry.js";
 import { McpCapability } from "../../mcp-capability.js";
 import { PluginsCapability } from "../../plugins-capability.js";
@@ -59,7 +52,6 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         buildInstallPath: (fileName) =>
           `${DIRECTORY}skills/${stripToolSuffix(TOOL_SUFFIX, fileName)}`,
         convertFrontmatter: (fm) => fm,
-        reverseConvertFrontmatter: (fm) => fm,
       }),
       commands: new CommandsCapability({
         directory: DIRECTORY,
@@ -76,7 +68,6 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         },
         convertFrontmatter: (fm, relativeFileName) =>
           convertCommandFrontmatter(fm, relativeFileName),
-        reverseConvertFrontmatter: (fm) => reverseConvertCommandFrontmatter(fm),
       }),
       rules: new RulesCapability({
         directory: DIRECTORY,
@@ -98,8 +89,6 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
           }
           return {};
         },
-        reverseConvertFrontmatter: (fm) =>
-          Array.isArray(fm.paths) && fm.paths.length > 0 ? { paths: fm.paths } : {},
       }),
       mcp: new McpCapability({
         outputPath: ".mcp.json",
@@ -142,24 +131,11 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
       }),
     },
 
-    rewriteContent(content: string, docsDir: string): string {
-      return baseRewriteContent(content, DIRECTORY, docsDir).replace(
+    rewriteContent(content: string): string {
+      return content.replace(
         /(@?)\.claude\/commands\/(\d+)[_][^/]+\//g,
         (_, at, phase) => `${at}${commandsDir(phase)}`
       );
-    },
-
-    reverseRewriteContent(content: string, docsDir: string): string {
-      return baseReverseRewriteContent(content, DIRECTORY, docsDir);
-    },
-
-    detectUserFileSectionKey(relativePath: string): UserFileSectionKey | null {
-      return detectSectionKeyFromPrefixes(relativePath, [
-        [`${DIRECTORY}agents/`, "agents"],
-        [`${DIRECTORY}commands/aidd/`, "commands"],
-        [`${DIRECTORY}rules/`, "rules"],
-        [`${DIRECTORY}skills/`, "skills"],
-      ]);
     },
   };
 

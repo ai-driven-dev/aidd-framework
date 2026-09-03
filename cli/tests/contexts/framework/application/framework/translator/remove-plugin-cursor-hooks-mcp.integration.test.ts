@@ -73,8 +73,7 @@ describe("Cursor plugin.files tracking enables uninstall of hooks.json and mcp.j
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     const plugins = manifest.getPlugins("cursor");

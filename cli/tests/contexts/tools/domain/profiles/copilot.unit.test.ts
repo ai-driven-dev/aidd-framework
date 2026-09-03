@@ -248,3 +248,16 @@ describe("copilot", () => {
     });
   });
 });
+
+/**
+ * Copilot rewrites paths when it builds a file's install location, never inside the
+ * content. It used to rewrite the `{{TOOLS}}` and `{{DOCS}}` placeholders too, a syntax no
+ * framework emits any more — measured, zero occurrences in the plugins shipped today — so
+ * that rewriting is gone and this is what is left of it.
+ */
+describe("content installed for Copilot", () => {
+  it("is written through unchanged", () => {
+    const content = "# A heading\n\nSee `.github/agents/executor.agent.md` and @{{TOOLS}}/x.md\n";
+    expect(copilot.rewriteContent(content)).toBe(content);
+  });
+});

@@ -53,13 +53,13 @@ describe("PluginContentTranslator skip list", () => {
   describe("flat mode (opencode)", () => {
     it("returns empty skipped list when plugin has no hooks or mcp", () => {
       const dist = buildDistWithNoHooksMcp();
-      const result = translator.translateWithComponentPaths(dist, opencode, "docs");
+      const result = translator.translateWithComponentPaths(dist, opencode);
       expect(result.skipped).toEqual([]);
     });
 
     it("returns one skip entry when plugin has hooks (hooks not accepted by flat mode)", () => {
       const dist = buildDistWithHooks("aidd-pm");
-      const result = translator.translateWithComponentPaths(dist, opencode, "docs");
+      const result = translator.translateWithComponentPaths(dist, opencode);
       expect(result.skipped).toHaveLength(1);
       expect(result.skipped[0]).toMatchObject({
         pluginName: "aidd-pm",
@@ -71,7 +71,7 @@ describe("PluginContentTranslator skip list", () => {
 
     it("emits no skip entry per file — exactly one entry per plugin regardless of hooks file count", () => {
       const dist = buildDistWithHooks("aidd-pm");
-      const result = translator.translateWithComponentPaths(dist, opencode, "docs");
+      const result = translator.translateWithComponentPaths(dist, opencode);
       expect(result.skipped).toHaveLength(1);
     });
   });
@@ -79,13 +79,13 @@ describe("PluginContentTranslator skip list", () => {
   describe("native mode (cursor)", () => {
     it("returns empty skipped list when plugin has no hooks or mcp", () => {
       const dist = buildDistWithNoHooksMcp();
-      const result = translator.translateWithComponentPaths(dist, cursor, "docs");
+      const result = translator.translateWithComponentPaths(dist, cursor);
       expect(result.skipped).toEqual([]);
     });
 
     it("returns empty skipped list when plugin has hooks (cursor acceptsHooks: true)", () => {
       const dist = buildDistWithHooks("test-plugin");
-      const result = translator.translateWithComponentPaths(dist, cursor, "docs");
+      const result = translator.translateWithComponentPaths(dist, cursor);
       expect(result.skipped).toEqual([]);
     });
   });

@@ -112,16 +112,6 @@ describe("codex", () => {
     });
   });
 
-  describe("capabilities.commands.reverseConvertFrontmatter()", () => {
-    it("strips aidd:<phase>: prefix from name", () => {
-      const result = codex.capabilities.commands.reverseConvertFrontmatter({
-        name: "aidd:04:implement",
-        description: "Impl",
-      });
-      expect(result).toEqual({ name: "implement", description: "Impl" });
-    });
-  });
-
   describe("capabilities.rules.buildInstallPath()", () => {
     it("builds path for rules under .codex/rules/", () => {
       const path = codex.capabilities.rules.buildInstallPath("01-standards/naming.md");
@@ -139,33 +129,6 @@ describe("codex", () => {
       const fm = { paths: ["src/**/*.ts"], description: "TS rules" };
       const result = codex.capabilities.rules.convertFrontmatter(fm);
       expect(result).toEqual(fm);
-    });
-  });
-
-  describe("detectUserFileSectionKey()", () => {
-    it("detects agents section for .codex/agents/ paths", () => {
-      const key = codex.detectUserFileSectionKey(".codex/agents/alexia.toml");
-      expect(key).toEqual({ section: "agents", key: "alexia.toml" });
-    });
-
-    it("detects skills section for .agents/skills/aidd- paths", () => {
-      const key = codex.detectUserFileSectionKey(".agents/skills/aidd-my-skill/SKILL.md");
-      expect(key).toEqual({ section: "skills", key: "my-skill/SKILL.md" });
-    });
-
-    it("detects commands section for .codex/commands/aidd/ paths", () => {
-      const key = codex.detectUserFileSectionKey(".codex/commands/aidd/04/implement.md");
-      expect(key).toEqual({ section: "commands", key: "04/implement.md" });
-    });
-
-    it("detects rules section for .codex/rules/ paths", () => {
-      const key = codex.detectUserFileSectionKey(".codex/rules/01-standards/naming.md");
-      expect(key).toEqual({ section: "rules", key: "01-standards/naming.md" });
-    });
-
-    it("returns null for unrecognised paths", () => {
-      expect(codex.detectUserFileSectionKey("AGENTS.md")).toBeNull();
-      expect(codex.detectUserFileSectionKey("unknown.json")).toBeNull();
     });
   });
 

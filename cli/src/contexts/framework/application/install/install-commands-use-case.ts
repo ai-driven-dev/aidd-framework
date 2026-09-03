@@ -19,7 +19,6 @@ interface InstallCommandsOptions {
   toolConfig: AiTool<HasCommands>;
   section: ContentSection;
   contentFiles: Map<string, string>;
-  docsDir: string;
 }
 
 export class InstallCommandsUseCase {

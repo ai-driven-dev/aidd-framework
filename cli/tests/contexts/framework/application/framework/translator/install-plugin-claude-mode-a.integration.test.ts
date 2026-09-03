@@ -52,8 +52,7 @@ describe("install claude plugin via Mode A (integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      MARKETPLACE_NAME,
-      "docs"
+      MARKETPLACE_NAME
     );
     await manifestRepo.save(manifest);
     await registry.save(
@@ -106,8 +105,7 @@ describe("install claude plugin via Mode A (integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      MARKETPLACE_NAME,
-      "docs"
+      MARKETPLACE_NAME
     );
     const pluginFiles = fs.listAll().filter((p) => p.includes(".claude/plugins/"));
     expect(pluginFiles).toEqual([]);
@@ -132,8 +130,7 @@ describe("install claude plugin via Mode A (integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      MARKETPLACE_NAME,
-      "docs"
+      MARKETPLACE_NAME
     );
     await manifestRepo.save(manifest);
     await registry.save(

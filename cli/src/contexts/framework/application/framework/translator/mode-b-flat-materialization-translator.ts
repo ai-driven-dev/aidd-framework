@@ -48,10 +48,9 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
     projectRoot: string,
     manifest: Manifest,
     marketplace: string | undefined,
-    docsDir: string,
     previousMcpEntries: ReadonlyMap<string, string> = new Map()
   ): Promise<{ skipped: ReadonlySkipList }> {
-    const ctx = this.resolveFlatToolContext(toolId, dist, docsDir, projectRoot);
+    const ctx = this.resolveFlatToolContext(toolId, dist, projectRoot);
     if (ctx === null) return { skipped: [] };
     const mcp = await this.resolveMcp(dist, toolId, projectRoot, previousMcpEntries);
     const allSkipped: ReadonlySkipList = [...ctx.skipped, ...mcp.mcpSkips];
@@ -73,7 +72,6 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
   private resolveFlatToolContext(
     toolId: AiToolId,
     dist: PluginDistribution,
-    docsDir: string,
     projectRoot: string
   ): {
     caps: Record<string, unknown>;
@@ -91,7 +89,7 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
     }
     const { files, componentPaths, skipped } = new PluginContentTranslator(
       this.hasher
-    ).translateWithComponentPaths(dist, toolConfig, docsDir);
+    ).translateWithComponentPaths(dist, toolConfig);
     const baseDir = resolvePluginBaseDirForCapability(pluginsCap, projectRoot, this.homedir);
     return { caps, files, componentPaths, skipped, baseDir };
   }

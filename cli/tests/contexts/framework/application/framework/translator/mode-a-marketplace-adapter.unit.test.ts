@@ -43,8 +43,7 @@ describe("ModeAMarketplaceTranslator", () => {
         { kind: "local", path: "/plugin-source" },
         "/project",
         manifest,
-        "aidd-framework",
-        "docs"
+        "aidd-framework"
       );
       const plugins = manifest.getPlugins("claude");
       const installed = plugins.find((p) => p.name === "aidd-context");
@@ -66,8 +65,7 @@ describe("ModeAMarketplaceTranslator", () => {
         { kind: "local", path: "/plugin-source" },
         "/project",
         manifest,
-        undefined,
-        "docs"
+        undefined
       );
       const plugins = manifest.getPlugins("claude");
       const installed = plugins.find((p) => p.name === "test-plugin");
@@ -89,8 +87,7 @@ describe("ModeAMarketplaceTranslator", () => {
         { kind: "local", path: "/plugin-source" },
         "/project",
         manifest,
-        "aidd-framework",
-        "docs"
+        "aidd-framework"
       );
       expect(fs.has("/project/.claude/plugins/test-plugin/commands/hello.md")).toBe(false);
     });

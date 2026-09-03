@@ -13,7 +13,6 @@ export class SkillsCapability {
       prefix?: string;
       buildInstallPath: (fileName: string) => string | null;
       convertFrontmatter: (fm: Record<string, unknown>) => Record<string, unknown>;
-      reverseConvertFrontmatter: (fm: Record<string, unknown>) => Record<string, unknown>;
     }
   ) {
     if (!params.prefix && !params.directory) {
@@ -34,10 +33,6 @@ export class SkillsCapability {
 
   convertFrontmatter(fm: Record<string, unknown>): Record<string, unknown> {
     return this.params.convertFrontmatter(fm);
-  }
-
-  reverseConvertFrontmatter(fm: Record<string, unknown>): Record<string, unknown> {
-    return this.params.reverseConvertFrontmatter(fm);
   }
 
   acceptsFileName(fileName: string): boolean {

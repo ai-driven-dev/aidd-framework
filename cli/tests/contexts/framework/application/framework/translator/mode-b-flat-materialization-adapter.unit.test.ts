@@ -57,8 +57,7 @@ describe("ModeBFlatMaterializationTranslator", () => {
         { kind: "local", path: "/plugin-source" },
         PROJECT_ROOT,
         manifest,
-        undefined,
-        "docs"
+        undefined
       );
       const expectedPath = join(PROJECT_ROOT, ".opencode/commands/test-plugin/hello.md");
       expect(fs.has(expectedPath)).toBe(true);
@@ -75,8 +74,7 @@ describe("ModeBFlatMaterializationTranslator", () => {
         { kind: "local", path: "/plugin-source" },
         PROJECT_ROOT,
         manifest,
-        undefined,
-        "docs"
+        undefined
       );
       const plugins = manifest.getPlugins("opencode");
       const installed = plugins.find((p) => p.name === "test-plugin");
@@ -102,8 +100,7 @@ describe("ModeBFlatMaterializationTranslator", () => {
         { kind: "local", path: "/plugin-source" },
         PROJECT_ROOT,
         manifest,
-        undefined,
-        "docs"
+        undefined
       );
       expect(fs.listAll().length).toBe(0);
       const plugins = manifest.getPlugins("opencode");
@@ -124,8 +121,7 @@ describe("ModeBFlatMaterializationTranslator", () => {
           { kind: "local", path: "/plugin-source" },
           PROJECT_ROOT,
           manifest,
-          undefined,
-          "docs"
+          undefined
         )
       ).rejects.toThrow(CursorProjectScopeUnsupportedError);
     });
@@ -156,8 +152,7 @@ describe("ModeBFlatMaterializationTranslator", () => {
         { kind: "local", path: "/plugin-source" },
         PROJECT_ROOT,
         manifest,
-        undefined,
-        "docs"
+        undefined
       );
       expect(fs.listAll().length).toBe(0);
       const plugins = manifest.getPlugins("opencode");

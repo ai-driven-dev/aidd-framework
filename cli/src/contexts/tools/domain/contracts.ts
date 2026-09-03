@@ -5,7 +5,6 @@ import type { CommandsCapability } from "./capabilities/commands-capability.js";
 import type { HooksCapability } from "./capabilities/hooks-capability.js";
 import type { RulesCapability } from "./capabilities/rules-capability.js";
 import type { SkillsCapability } from "./capabilities/skills-capability.js";
-import type { UserFileSectionKey } from "./formats/command.js";
 import type { McpCapability } from "./mcp-capability.js";
 import type { PluginsCapability } from "./plugins-capability.js";
 import type { SettingsCapability } from "./settings-capability.js";
@@ -72,9 +71,7 @@ export interface AiTool<C> {
     readonly manifest?: readonly string[];
     readonly marketplace?: readonly string[];
   };
-  rewriteContent(content: string, docsDir: string): string;
-  reverseRewriteContent(content: string, docsDir: string): string;
-  detectUserFileSectionKey(relativePath: string): UserFileSectionKey | null;
+  rewriteContent(content: string): string;
 }
 
 export interface IdeToolConfig {

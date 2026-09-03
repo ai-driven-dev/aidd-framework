@@ -13,15 +13,11 @@ import type {
   HasRules,
   HasSkills,
 } from "../../contracts.js";
-import type { UserFileSectionKey } from "../../formats/command.js";
 import {
   buildAiddCommandFilePath,
   convertCommandFrontmatter,
-  detectSectionKeyFromPrefixes,
-  reverseConvertCommandFrontmatter,
   stripToolSuffix,
 } from "../../formats/command.js";
-import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
 import { McpCapability } from "../../mcp-capability.js";
 import { PluginsCapability } from "../../plugins-capability.js";
 import { registerTool } from "../../registry.js";
@@ -61,7 +57,6 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         buildInstallPath: (fileName) =>
           `${DIRECTORY}skills/${stripToolSuffix(TOOL_SUFFIX, fileName)}`,
         convertFrontmatter: (fm) => fm,
-        reverseConvertFrontmatter: (fm) => fm,
       }),
       commands: new CommandsCapability({
         directory: DIRECTORY,
@@ -69,7 +64,6 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         buildInstallPath: (fileName) => buildAiddCommandFilePath(DIRECTORY, fileName),
         convertFrontmatter: (fm, relativeFileName) =>
           convertCommandFrontmatter(fm, relativeFileName),
-        reverseConvertFrontmatter: (fm) => reverseConvertCommandFrontmatter(fm),
       }),
       rules: new RulesCapability({
         directory: DIRECTORY,
@@ -92,19 +86,6 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
             globs: JSON.stringify(patterns).replace(/,/g, ", "),
             alwaysApply: false,
           };
-        },
-        reverseConvertFrontmatter: (fm) => {
-          const { globs } = fm;
-          if (Array.isArray(globs) && globs.length > 0) return { paths: globs };
-          if (typeof globs === "string") {
-            try {
-              const parsed = JSON.parse(globs);
-              if (Array.isArray(parsed) && parsed.length > 0) return { paths: parsed };
-            } catch {
-              /* globs is not valid JSON */
-            }
-          }
-          return {};
         },
       }),
       mcp: new McpCapability({
@@ -130,33 +111,13 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
       }),
     },
 
-    rewriteContent(content: string, docsDir: string): string {
-      return baseRewriteContent(content, DIRECTORY, docsDir)
+    rewriteContent(content: string): string {
+      return content
         .replace(
           /(@?)\.cursor\/commands\/(\d+)[_-][^/]+\/([^\s]+)/g,
           "$1.cursor/commands/aidd/$2/$3"
         )
         .replace(/(@\.cursor\/rules\/[^\s]+)\.md\b/g, "$1.mdc");
-    },
-
-    reverseRewriteContent(content: string, docsDir: string): string {
-      return baseReverseRewriteContent(
-        content.replace(/(@\.cursor\/rules\/[^\s]+)\.mdc\b/g, "$1.md"),
-        DIRECTORY,
-        docsDir
-      );
-    },
-
-    detectUserFileSectionKey(relativePath: string): UserFileSectionKey | null {
-      if (relativePath.startsWith(`${DIRECTORY}rules/`)) {
-        const key = relativePath.slice(`${DIRECTORY}rules/`.length);
-        return { section: "rules", key: key.endsWith(".mdc") ? `${key.slice(0, -4)}.md` : key };
-      }
-      return detectSectionKeyFromPrefixes(relativePath, [
-        [`${DIRECTORY}agents/`, "agents"],
-        [`${DIRECTORY}commands/aidd/`, "commands"],
-        [`${DIRECTORY}skills/`, "skills"],
-      ]);
     },
   };
 

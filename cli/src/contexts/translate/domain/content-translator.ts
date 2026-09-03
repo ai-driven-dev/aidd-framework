@@ -45,14 +45,13 @@ interface SkillCap {
 export class PluginContentTranslator {
   constructor(private readonly hasher: Hasher) {}
 
-  translate(dist: PluginDistribution, toolConfig: ToolConfig, docsDir: string): InstallationFile[] {
-    return this.translateWithComponentPaths(dist, toolConfig, docsDir).files;
+  translate(dist: PluginDistribution, toolConfig: ToolConfig): InstallationFile[] {
+    return this.translateWithComponentPaths(dist, toolConfig).files;
   }
 
   translateWithComponentPaths(
     dist: PluginDistribution,
-    toolConfig: ToolConfig,
-    docsDir: string
+    toolConfig: ToolConfig
   ): {
     files: InstallationFile[];
     componentPaths: ReadonlyMap<string, string>;
@@ -61,9 +60,9 @@ export class PluginContentTranslator {
     const tool = asPluginTool(toolConfig);
     if (tool === null) return { files: [], componentPaths: new Map(), skipped: [] };
     const { mode } = tool.capabilities.plugins;
-    if (mode === "native") return this.translateNativeWithPaths(dist, tool, docsDir);
+    if (mode === "native") return this.translateNativeWithPaths(dist, tool);
     if (mode === "flat") {
-      const { files, skipped } = this.translateFlat(dist, tool, docsDir);
+      const { files, skipped } = this.translateFlat(dist, tool);
       return { files, componentPaths: new Map(), skipped };
     }
     return { files: [], componentPaths: new Map(), skipped: [] };
@@ -79,7 +78,7 @@ export class PluginContentTranslator {
     const seen = new Map<string, string>();
     const collisions: Array<{ plugin: string; path: string }> = [];
     for (const dist of dists) {
-      for (const file of this.translate(dist, toolConfig, "")) {
+      for (const file of this.translate(dist, toolConfig)) {
         if (seen.has(file.relativePath)) {
           collisions.push({ plugin: dist.manifest.name, path: file.relativePath });
         } else {
@@ -92,8 +91,7 @@ export class PluginContentTranslator {
 
   private translateNativeWithPaths(
     dist: PluginDistribution,
-    tool: AiTool<HasPlugins>,
-    docsDir: string
+    tool: AiTool<HasPlugins>
   ): {
     files: InstallationFile[];
     componentPaths: ReadonlyMap<string, string>;
@@ -108,7 +106,7 @@ export class PluginContentTranslator {
       const translated = this.translateFile(file, tool);
       if (translated === null) continue;
       const hooked = this.maybeConvertHooks(file.relativePath, translated.content, tool);
-      const content = tool.rewriteContent(hooked, docsDir);
+      const content = tool.rewriteContent(hooked);
       const installedPath = `${pluginRoot}${translated.relativePath}`;
       result.push(this.makeFile(installedPath, content));
       if (isComponentFile(file.relativePath)) {
@@ -172,20 +170,17 @@ export class PluginContentTranslator {
 
   private translateFlat(
     dist: PluginDistribution,
-    tool: AiTool<HasPlugins>,
-    docsDir: string
+    tool: AiTool<HasPlugins>
   ): { files: InstallationFile[]; skipped: ReadonlySkipList } {
     const { flatNamespacePrefix } = tool.capabilities.plugins;
     if (flatNamespacePrefix === null) return { files: [], skipped: [] };
     const result: InstallationFile[] = [];
     for (const file of dist.components.commands) {
-      result.push(
-        this.flatCommandFile(file, dist.manifest.name, tool, flatNamespacePrefix, docsDir)
-      );
+      result.push(this.flatCommandFile(file, dist.manifest.name, tool, flatNamespacePrefix));
     }
     for (const section of ["agents", "rules", "skills"] as const) {
       for (const file of dist.components[section]) {
-        const f = this.flatSectionFile(file, section, dist.manifest.name, tool, docsDir);
+        const f = this.flatSectionFile(file, section, dist.manifest.name, tool);
         if (f !== null) result.push(f);
       }
     }
@@ -209,12 +204,11 @@ export class PluginContentTranslator {
     file: PluginComponentFile,
     pluginName: string,
     tool: AiTool<HasPlugins>,
-    prefix: string,
-    docsDir: string
+    prefix: string
   ): InstallationFile {
     const filename = basename(file.relativePath);
     const raw = prefixCommandName(file.content, file.relativePath, prefix, pluginName);
-    const content = tool.rewriteContent(raw, docsDir);
+    const content = tool.rewriteContent(raw);
     return this.makeFile(`${tool.directory}commands/${pluginName}/${filename}`, content);
   }
 
@@ -222,13 +216,12 @@ export class PluginContentTranslator {
     file: PluginComponentFile,
     section: "agents" | "rules" | "skills",
     pluginName: string,
-    tool: AiTool<HasPlugins>,
-    docsDir: string
+    tool: AiTool<HasPlugins>
   ): InstallationFile | null {
     if (!sectionPresent(tool, section)) return null;
     const sectionDir = `${section}/`;
     const fileName = file.relativePath.slice(sectionDir.length);
-    const content = tool.rewriteContent(file.content, docsDir);
+    const content = tool.rewriteContent(file.content);
     return this.makeFile(`${tool.directory}${section}/${pluginName}/${fileName}`, content);
   }
 

@@ -58,16 +58,6 @@ describe("cursor", () => {
     });
   });
 
-  describe("capabilities.commands.reverseConvertFrontmatter()", () => {
-    it("strips aidd:<phase>: prefix from name", () => {
-      const result = cursor.capabilities.commands?.reverseConvertFrontmatter({
-        name: "aidd:04:implement",
-        description: "Impl",
-      });
-      expect(result).toEqual({ name: "implement", description: "Impl" });
-    });
-  });
-
   describe("capabilities.rules.buildInstallPath()", () => {
     it("builds path for rules section with .mdc extension", () => {
       const path = cursor.capabilities.rules?.buildInstallPath("01-standards/naming.md");
@@ -91,48 +81,6 @@ describe("cursor", () => {
     it("strips .cursor.md tool suffix from skill name", () => {
       const path = cursor.capabilities.skills.buildInstallPath("commit.cursor.md");
       expect(path).toBe(".cursor/skills/commit.md");
-    });
-  });
-
-  describe("capabilities.rules.reverseConvertFrontmatter()", () => {
-    it("reverses globs string back to paths array", () => {
-      const result = cursor.capabilities.rules?.reverseConvertFrontmatter({
-        globs: '["src/**/*.ts"]',
-        alwaysApply: false,
-      });
-      expect(result).toEqual({ paths: ["src/**/*.ts"] });
-    });
-
-    it("returns empty object when globs is absent (always apply)", () => {
-      const result = cursor.capabilities.rules?.reverseConvertFrontmatter({});
-      expect(result).toEqual({});
-    });
-  });
-
-  describe("detectUserFileSectionKey()", () => {
-    it("detects agents section for .cursor/agents/ paths", () => {
-      const key = cursor.detectUserFileSectionKey(".cursor/agents/alexia.md");
-      expect(key).toEqual({ section: "agents", key: "alexia.md" });
-    });
-
-    it("detects commands section for .cursor/commands/aidd/ paths", () => {
-      const key = cursor.detectUserFileSectionKey(".cursor/commands/aidd/04/implement.md");
-      expect(key).toEqual({ section: "commands", key: "04/implement.md" });
-    });
-
-    it("detects skills section for .cursor/skills/ paths", () => {
-      const key = cursor.detectUserFileSectionKey(".cursor/skills/commit/SKILL.md");
-      expect(key).toEqual({ section: "skills", key: "commit/SKILL.md" });
-    });
-
-    it("detects rules section for .cursor/rules/ paths and normalises .mdc to .md", () => {
-      const key = cursor.detectUserFileSectionKey(".cursor/rules/01-standards/naming.mdc");
-      expect(key).toEqual({ section: "rules", key: "01-standards/naming.md" });
-    });
-
-    it("returns null for unrecognised paths", () => {
-      expect(cursor.detectUserFileSectionKey(".cursor/settings.json")).toBeNull();
-      expect(cursor.detectUserFileSectionKey("unknown.md")).toBeNull();
     });
   });
 

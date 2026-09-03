@@ -9,7 +9,7 @@ import type { ContentSection } from "../../../../../src/contexts/translate/domai
 import { GITKEEP_FILE } from "../../../../../src/kernel/file.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
 
-const DOCS_DIR = "aidd_docs";
+const _DOCS_DIR = "aidd_docs";
 
 const rulesSection: ContentSection = {
   name: "rules",
@@ -40,7 +40,6 @@ describe("InstallRulesUseCase", () => {
         toolConfig: claude,
         section: rulesSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -57,7 +56,6 @@ describe("InstallRulesUseCase", () => {
         toolConfig: claude,
         section: rulesSection,
         contentFiles: new Map(),
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(0);
@@ -74,7 +72,6 @@ describe("InstallRulesUseCase", () => {
         toolConfig: claude,
         section: rulesSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(0);
@@ -91,7 +88,6 @@ describe("InstallRulesUseCase", () => {
         toolConfig: claude,
         section: rulesSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -107,7 +103,6 @@ describe("InstallRulesUseCase", () => {
         toolConfig: claude,
         section: rulesSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -124,7 +119,6 @@ describe("InstallRulesUseCase", () => {
         toolConfig: claude,
         section: rulesSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -142,7 +136,6 @@ describe("InstallRulesUseCase", () => {
         toolConfig: claude,
         section: rulesSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -161,7 +154,6 @@ describe("InstallRulesUseCase", () => {
         toolConfig: claude,
         section: rulesSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(2);
@@ -183,7 +175,6 @@ describe("InstallRulesUseCase", () => {
         toolConfig: claude,
         section: rulesSectionWithEntry,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(1);
@@ -200,7 +191,6 @@ describe("InstallRulesUseCase", () => {
         toolConfig: claude,
         section: rulesSectionWithEntry,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(0);
@@ -217,7 +207,6 @@ describe("InstallRulesUseCase", () => {
         toolConfig: copilot,
         section: rulesSection,
         contentFiles,
-        docsDir: DOCS_DIR,
       });
 
       expect(files).toHaveLength(0);

@@ -14,15 +14,11 @@ import type {
   HasRules,
   HasSkills,
 } from "../../contracts.js";
-import type { UserFileSectionKey } from "../../formats/command.js";
 import {
   buildAiddCommandFilePath,
   convertCommandFrontmatter,
-  detectSectionKeyFromPrefixes,
-  reverseConvertCommandFrontmatter,
   stripToolSuffix,
 } from "../../formats/command.js";
-import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
 import { McpCapability } from "../../mcp-capability.js";
 import { PluginsCapability } from "../../plugins-capability.js";
 import { registerTool } from "../../registry.js";
@@ -38,31 +34,16 @@ const TOOL_SUFFIX = ".codex.md";
 const AGENTS_SKILLS_PREFIX = ".agents/skills/";
 
 const SKILLS_TO_AGENTS_RE = /\.codex\/skills\//g;
-const AGENTS_SKILLS_PLAIN_RE = /\.agents\/skills\/aidd-/g;
 
 function remapSkillPaths(content: string): string {
   return content.replace(SKILLS_TO_AGENTS_RE, ".agents/skills/aidd-");
 }
 
-function reverseSkillPaths(content: string): string {
-  return content.replace(AGENTS_SKILLS_PLAIN_RE, ".codex/skills/");
-}
-
-export function rewriteCodexContent(
-  content: string,
-  context: { directory: string; docsDir: string }
-): string {
-  const step1 = baseRewriteContent(content, context.directory, context.docsDir);
-  const step2 = remapSkillPaths(step1);
-  return step2.replace(
+export function rewriteCodexContent(content: string): string {
+  return remapSkillPaths(content).replace(
     /(@?)\.codex\/commands\/(\d+)[_-][^/]+\/([^\s]+)/g,
     "$1.codex/commands/aidd/$2/$3"
   );
-}
-
-export function reverseRewriteCodexContent(content: string, docsDir: string): string {
-  const step1 = reverseSkillPaths(content);
-  return baseReverseRewriteContent(step1, DIRECTORY, docsDir);
 }
 
 const CONFIG_CODEX_HOOKS = "codex-hooks";
@@ -149,21 +130,18 @@ export const codex: AiTool<
       prefix: "aidd-",
       buildInstallPath: buildCodexSkillFilePath,
       convertFrontmatter: stripCodexSkillFrontmatter,
-      reverseConvertFrontmatter: (fm) => fm,
     }),
     commands: new CommandsCapability({
       directory: DIRECTORY,
       toolSuffix: TOOL_SUFFIX,
       buildInstallPath: (fileName) => buildAiddCommandFilePath(DIRECTORY, fileName),
       convertFrontmatter: (fm, relativeFileName) => convertCommandFrontmatter(fm, relativeFileName),
-      reverseConvertFrontmatter: (fm) => reverseConvertCommandFrontmatter(fm),
     }),
     rules: new RulesCapability({
       directory: DIRECTORY,
       toolSuffix: TOOL_SUFFIX,
       buildInstallPath: (fileName) => `${DIRECTORY}rules/${stripToolSuffix(TOOL_SUFFIX, fileName)}`,
       convertFrontmatter: (fm) => fm,
-      reverseConvertFrontmatter: (fm) => fm,
     }),
     mcp: new McpCapability({
       outputPath: ".codex/config.toml",
@@ -192,21 +170,8 @@ export const codex: AiTool<
     }),
   },
 
-  rewriteContent(content: string, docsDir: string): string {
-    return rewriteCodexContent(content, { directory: DIRECTORY, docsDir });
-  },
-
-  reverseRewriteContent(content: string, docsDir: string): string {
-    return reverseRewriteCodexContent(content, docsDir);
-  },
-
-  detectUserFileSectionKey(relativePath: string): UserFileSectionKey | null {
-    return detectSectionKeyFromPrefixes(relativePath, [
-      [`${AGENTS_SKILLS_PREFIX}aidd-`, "skills"],
-      [`${DIRECTORY}agents/`, "agents"],
-      [`${DIRECTORY}commands/aidd/`, "commands"],
-      [`${DIRECTORY}rules/`, "rules"],
-    ]);
+  rewriteContent(content: string): string {
+    return rewriteCodexContent(content);
   },
 };
 

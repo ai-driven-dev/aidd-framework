@@ -33,7 +33,6 @@ export interface PluginTranslator {
     projectRoot: string,
     manifest: Manifest,
     marketplace: string | undefined,
-    docsDir: string,
     previousMcpEntries?: ReadonlyMap<string, string>
   ): Promise<{ skipped: ReadonlySkipList; written?: number }>;
 }

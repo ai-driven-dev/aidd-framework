@@ -85,7 +85,6 @@ describe("restore", () => {
       useCase.execute({
         frameworkPath: FIXTURE_DIR,
         version: "test",
-        docsDir: "aidd_docs",
         projectRoot: PROJECT_ROOT,
       })
     ).rejects.toThrow("aidd setup");
@@ -98,7 +97,6 @@ describe("restore", () => {
     const result = await makeRestoreUseCase(deps).execute({
       frameworkPath: FIXTURE_DIR,
       version: "test",
-      docsDir: "aidd_docs",
       projectRoot: PROJECT_ROOT,
     });
 
@@ -115,7 +113,6 @@ describe("restore", () => {
     const result = await makeRestoreUseCase(deps).execute({
       frameworkPath: FIXTURE_DIR,
       version: "test",
-      docsDir: "aidd_docs",
       projectRoot: PROJECT_ROOT,
       force: true,
     });
@@ -136,7 +133,6 @@ describe("restore", () => {
     const result = await makeRestoreUseCase(deps).execute({
       frameworkPath: FIXTURE_DIR,
       version: "test",
-      docsDir: "aidd_docs",
       projectRoot: PROJECT_ROOT,
       force: true,
     });
@@ -155,7 +151,6 @@ describe("restore", () => {
     const result = await makeRestoreUseCase(deps, new KeepPrompter()).execute({
       frameworkPath: FIXTURE_DIR,
       version: "test",
-      docsDir: "aidd_docs",
       projectRoot: PROJECT_ROOT,
       interactive: true,
     });
@@ -178,7 +173,6 @@ describe("restore", () => {
     await makeRestoreUseCase(deps).execute({
       frameworkPath: FIXTURE_DIR,
       version: "test",
-      docsDir: "aidd_docs",
       projectRoot: PROJECT_ROOT,
       toolIds: ["vscode"],
       force: true,
@@ -207,7 +201,6 @@ describe("restore", () => {
     await makeRestoreUseCase(deps).execute({
       frameworkPath: FIXTURE_DIR,
       version: "test",
-      docsDir: "aidd_docs",
       projectRoot: PROJECT_ROOT,
       toolIds: ["claude"],
       force: true,
@@ -230,7 +223,6 @@ describe("restore", () => {
     await makeRestoreUseCase(deps).execute({
       frameworkPath: FIXTURE_DIR,
       version: "test",
-      docsDir: "aidd_docs",
       projectRoot: PROJECT_ROOT,
       toolIds: ["vscode"],
       force: true,
@@ -255,7 +247,6 @@ describe("restore", () => {
     await makeRestoreUseCase(deps).execute({
       frameworkPath: FIXTURE_DIR,
       version: "test",
-      docsDir: "aidd_docs",
       projectRoot: PROJECT_ROOT,
       force: true,
     });
@@ -274,7 +265,6 @@ describe("restore", () => {
     await makeRestoreUseCase(deps).execute({
       frameworkPath: FIXTURE_DIR,
       version: "test",
-      docsDir: "aidd_docs",
       projectRoot: PROJECT_ROOT,
       force: true,
     });
@@ -292,7 +282,6 @@ describe("restore", () => {
     const result = await makeRestoreUseCase(deps).execute({
       frameworkPath: FIXTURE_DIR,
       version: "test",
-      docsDir: "aidd_docs",
       projectRoot: PROJECT_ROOT,
       interactive: false,
       force: false,
@@ -313,7 +302,6 @@ describe("restore", () => {
       makeRestoreUseCase(deps).execute({
         frameworkPath: FIXTURE_DIR,
         version: "test",
-        docsDir: "aidd_docs",
         projectRoot: PROJECT_ROOT,
         interactive: false,
         force: false,
@@ -332,7 +320,6 @@ describe("restore", () => {
     await makeRestoreUseCase(deps, prompter).execute({
       frameworkPath: FIXTURE_DIR,
       version: "test",
-      docsDir: "aidd_docs",
       projectRoot: PROJECT_ROOT,
     });
 
@@ -352,7 +339,6 @@ describe("restore", () => {
     await makeRestoreUseCase(deps, prompter).execute({
       frameworkPath: FIXTURE_DIR,
       version: "test",
-      docsDir: "aidd_docs",
       projectRoot: PROJECT_ROOT,
       interactive: true,
     });
@@ -371,7 +357,6 @@ describe("restore", () => {
       const result = await makeRestoreUseCase(deps).execute({
         frameworkPath: FIXTURE_DIR,
         version: "test",
-        docsDir: "aidd_docs",
         projectRoot: PROJECT_ROOT,
       });
 
@@ -393,7 +378,6 @@ describe("restore", () => {
       const result = await makeRestoreUseCase(deps).execute({
         frameworkPath: FIXTURE_DIR,
         version: "test",
-        docsDir: "aidd_docs",
         projectRoot: PROJECT_ROOT,
         force: true,
       });
@@ -413,7 +397,6 @@ describe("restore", () => {
       const result = await makeRestoreUseCase(deps).execute({
         frameworkPath: FIXTURE_DIR,
         version: "test",
-        docsDir: "aidd_docs",
         projectRoot: PROJECT_ROOT,
         force: true,
       });
@@ -437,7 +420,6 @@ describe("restore", () => {
       const result = await makeRestoreUseCase(deps, new KeepPrompter()).execute({
         frameworkPath: FIXTURE_DIR,
         version: "test",
-        docsDir: "aidd_docs",
         projectRoot: PROJECT_ROOT,
         interactive: true,
       });
@@ -464,7 +446,6 @@ describe("restore", () => {
         makeRestoreUseCase(deps).execute({
           frameworkPath: FIXTURE_DIR,
           version: "test",
-          docsDir: "aidd_docs",
           projectRoot: PROJECT_ROOT,
           force: false,
           interactive: false,
@@ -486,7 +467,6 @@ describe("restore", () => {
       const result = await makeRestoreUseCase(deps).execute({
         frameworkPath: FIXTURE_DIR,
         version: "test",
-        docsDir: "aidd_docs",
         projectRoot: PROJECT_ROOT,
         force: true,
         files: ["CLAUDE.md"],

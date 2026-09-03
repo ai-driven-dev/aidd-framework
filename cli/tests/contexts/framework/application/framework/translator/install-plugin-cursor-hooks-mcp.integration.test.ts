@@ -101,8 +101,7 @@ describe("install cursor plugin with hooks and mcp (Phase 2)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     const hooksPath = join(EXPECTED_BASE, PLUGIN_NAME, "hooks.json");
@@ -129,8 +128,7 @@ describe("install cursor plugin with hooks and mcp (Phase 2)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     const hooksPath = join(EXPECTED_BASE, PLUGIN_NAME, "hooks.json");
@@ -153,8 +151,7 @@ describe("install cursor plugin with hooks and mcp (Phase 2)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     const mcpPath = join(EXPECTED_BASE, PLUGIN_NAME, "mcp.json");
@@ -178,8 +175,7 @@ describe("install cursor plugin with hooks and mcp (Phase 2)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     const plugins = manifest.getPlugins("cursor");
@@ -203,8 +199,7 @@ describe("install cursor plugin with hooks and mcp (Phase 2)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     expect(skipped).toHaveLength(0);

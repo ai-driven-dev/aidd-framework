@@ -51,8 +51,7 @@ async function seedCodexPlugin(
     { kind: "local", path: "/plugin-source" },
     PROJECT_ROOT,
     manifest,
-    MARKETPLACE_NAME,
-    "docs"
+    MARKETPLACE_NAME
   );
   await manifestRepo.save(manifest);
   await registry.save(
@@ -80,8 +79,7 @@ async function seedTwoCodexPlugins(
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      MARKETPLACE_NAME,
-      "docs"
+      MARKETPLACE_NAME
     );
   }
   await manifestRepo.save(manifest);

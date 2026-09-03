@@ -14,15 +14,11 @@ import type {
   HasRules,
   HasSkills,
 } from "../../contracts.js";
-import type { UserFileSectionKey } from "../../formats/command.js";
 import {
   buildAiddCommandFilePath,
   convertCommandFrontmatterNoHint,
-  detectSectionKeyFromPrefixes,
-  reverseConvertCommandFrontmatterNoHint,
   stripToolSuffix,
 } from "../../formats/command.js";
-import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
 import { McpCapability } from "../../mcp-capability.js";
 import { PluginsCapability } from "../../plugins-capability.js";
 import { registerTool } from "../../registry.js";
@@ -51,7 +47,6 @@ export const opencode: AiTool<
       toolSuffix: TOOL_SUFFIX,
       format: "markdown",
       convertFrontmatter: (fm) => ({ description: fm.description, mode: "subagent" }),
-      reverseConvertFrontmatter: (fm) => ({ description: fm.description }),
     }),
     skills: new SkillsCapability({
       directory: DIRECTORY,
@@ -59,7 +54,6 @@ export const opencode: AiTool<
       buildInstallPath: (fileName) =>
         `${DIRECTORY}skills/${stripToolSuffix(TOOL_SUFFIX, fileName)}`,
       convertFrontmatter: (fm) => fm,
-      reverseConvertFrontmatter: (fm) => fm,
     }),
     commands: new CommandsCapability({
       directory: DIRECTORY,
@@ -67,7 +61,6 @@ export const opencode: AiTool<
       buildInstallPath: (fileName) => buildAiddCommandFilePath(DIRECTORY, fileName),
       convertFrontmatter: (fm, relativeFileName) =>
         convertCommandFrontmatterNoHint(fm, relativeFileName),
-      reverseConvertFrontmatter: (fm) => reverseConvertCommandFrontmatterNoHint(fm),
     }),
     rules: new RulesCapability({
       directory: DIRECTORY,
@@ -79,7 +72,6 @@ export const opencode: AiTool<
         }
         return {};
       },
-      reverseConvertFrontmatter: () => ({}),
     }),
     mcp: new McpCapability({
       outputPath: "opencode.json",
@@ -105,24 +97,11 @@ export const opencode: AiTool<
     }),
   },
 
-  rewriteContent(content: string, docsDir: string): string {
-    return baseRewriteContent(content, DIRECTORY, docsDir).replace(
+  rewriteContent(content: string): string {
+    return content.replace(
       /(@?)\.opencode\/commands\/(\d+)[_-][^/]+\/([^\s]+)/g,
       "$1.opencode/commands/aidd/$2/$3"
     );
-  },
-
-  reverseRewriteContent(content: string, docsDir: string): string {
-    return baseReverseRewriteContent(content, DIRECTORY, docsDir);
-  },
-
-  detectUserFileSectionKey(relativePath: string): UserFileSectionKey | null {
-    return detectSectionKeyFromPrefixes(relativePath, [
-      [`${DIRECTORY}agents/`, "agents"],
-      [`${DIRECTORY}commands/aidd/`, "commands"],
-      [`${DIRECTORY}rules/`, "rules"],
-      [`${DIRECTORY}skills/`, "skills"],
-    ]);
   },
 };
 

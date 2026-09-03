@@ -72,11 +72,7 @@ describe("AiTool contract conformance", () => {
     });
 
     it("implements every required content method", () => {
-      for (const method of [
-        "rewriteContent",
-        "reverseRewriteContent",
-        "detectUserFileSectionKey",
-      ] as const) {
+      for (const method of ["rewriteContent"] as const) {
         expect(typeof tool[method], `${toolId}: ${method} must be a function`).toBe("function");
       }
     });
@@ -127,8 +123,6 @@ function fakeTool(overrides: Partial<AiTool<unknown>>): AiTool<unknown> {
     signalDir: null,
     capabilities: {},
     rewriteContent: (content) => content,
-    reverseRewriteContent: (content) => content,
-    detectUserFileSectionKey: () => null,
     ...overrides,
   };
 }

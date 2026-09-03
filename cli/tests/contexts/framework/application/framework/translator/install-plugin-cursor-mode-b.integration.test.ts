@@ -44,8 +44,7 @@ describe("install cursor plugin via Mode B (integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     const expectedBase = join(STUB_HOME, ".cursor", "plugins", "local");
@@ -66,8 +65,7 @@ describe("install cursor plugin via Mode B (integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     expect(fs.listAll().every((p) => !p.startsWith(PROJECT_ROOT))).toBe(true);
@@ -86,8 +84,7 @@ describe("install cursor plugin via Mode B (integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     const plugins = manifest.getPlugins("cursor");
@@ -113,8 +110,7 @@ describe("install cursor plugin via Mode B (integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     const plugins = manifest.getPlugins("cursor");

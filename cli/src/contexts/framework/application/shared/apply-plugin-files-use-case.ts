@@ -29,7 +29,6 @@ interface ApplyPluginFilesOptions {
   projectRoot: string;
   cacheDir: string;
   manifest: Manifest;
-  docsDir: string;
   fileFilter?: ((relativePath: string) => boolean) | null;
 }
 
@@ -79,7 +78,7 @@ export class ApplyPluginFilesUseCase {
     dist: PluginDistribution,
     options: ApplyPluginFilesOptions
   ): Promise<number> {
-    const { toolId, plugin, projectRoot, manifest, docsDir } = options;
+    const { toolId, plugin, projectRoot, manifest } = options;
     // Mode A never materializes files, so any manifest-tracked path here is a leftover
     // from a run before that was true (see plugin-update-use-case.ts's unconditional
     // equivalent). Scoped to the manifest's own keys under the plugin's base dir — never
@@ -88,23 +87,15 @@ export class ApplyPluginFilesUseCase {
       const baseDir = resolvePluginBaseDir(toolId, projectRoot, this.builtDeps.homedir);
       await deleteOldFiles(plugin.files, baseDir, this.fs);
     }
-    return materializeViaTranslator(
-      translator,
-      dist,
-      toolId,
-      plugin,
-      projectRoot,
-      manifest,
-      docsDir
-    );
+    return materializeViaTranslator(translator, dist, toolId, plugin, projectRoot, manifest);
   }
 
   private async restoreViaTranslate(
     dist: PluginDistribution,
     options: ApplyPluginFilesOptions
   ): Promise<number> {
-    const { toolId, plugin, toolConfig, projectRoot, manifest, docsDir, fileFilter } = options;
-    const files = new PluginContentTranslator(this.hasher).translate(dist, toolConfig, docsDir);
+    const { toolId, plugin, toolConfig, projectRoot, manifest, fileFilter } = options;
+    const files = new PluginContentTranslator(this.hasher).translate(dist, toolConfig);
     let restored = 0;
     for (const f of files) {
       if (fileFilter !== null && fileFilter !== undefined && !fileFilter(f.relativePath)) continue;

@@ -11,7 +11,6 @@ export class RulesCapability {
       inputSuffix?: string;
       buildInstallPath: (fileName: string) => string | null;
       convertFrontmatter: (fm: Record<string, unknown>) => Record<string, unknown>;
-      reverseConvertFrontmatter: (fm: Record<string, unknown>) => Record<string, unknown>;
     }
   ) {}
 
@@ -25,10 +24,6 @@ export class RulesCapability {
 
   convertFrontmatter(fm: Record<string, unknown>): Record<string, unknown> {
     return this.params.convertFrontmatter(fm);
-  }
-
-  reverseConvertFrontmatter(fm: Record<string, unknown>): Record<string, unknown> {
-    return this.params.reverseConvertFrontmatter(fm);
   }
 
   acceptsFileName(fileName: string): boolean {

@@ -24,7 +24,6 @@ interface GenerateToolDistributionOptions {
   config: ToolConfig;
   descriptor: FrameworkDescriptor;
   contentFiles: Map<string, string>;
-  docsDir: string;
   projectRoot: string;
 }
 
@@ -37,11 +36,11 @@ export class GenerateToolDistributionUseCase {
   ) {}
 
   async execute(options: GenerateToolDistributionOptions): Promise<InstallationFile[]> {
-    const { config, descriptor, contentFiles, docsDir, projectRoot } = options;
+    const { config, descriptor, contentFiles, projectRoot } = options;
     if (!isAiTool(config)) {
       return this.generateIdeToolFiles(config, descriptor, contentFiles, projectRoot);
     }
-    return this.generateAiToolFiles(config, descriptor, contentFiles, docsDir, projectRoot);
+    return this.generateAiToolFiles(config, descriptor, contentFiles, projectRoot);
   }
 
   private async generateIdeToolFiles(
@@ -64,7 +63,6 @@ export class GenerateToolDistributionUseCase {
     config: AiTool<unknown>,
     descriptor: FrameworkDescriptor,
     contentFiles: Map<string, string>,
-    docsDir: string,
     projectRoot: string
   ): Promise<InstallationFile[]> {
     const caps = config.capabilities as Record<string, unknown>;
@@ -72,8 +70,7 @@ export class GenerateToolDistributionUseCase {
       caps,
       config,
       descriptor,
-      contentFiles,
-      docsDir
+      contentFiles
     );
     const configFiles = await new InstallConfigUseCase(this.fs, this.hasher).execute({
       capabilities: extractConfigCapabilities(config),
@@ -111,13 +108,12 @@ export class GenerateToolDistributionUseCase {
     caps: Record<string, unknown>,
     config: AiTool<unknown>,
     descriptor: FrameworkDescriptor,
-    contentFiles: Map<string, string>,
-    docsDir: string
+    contentFiles: Map<string, string>
   ): InstallationFile[] {
     const results: InstallationFile[] = [];
     for (const section of descriptor.contentSections) {
       if (!(section.name in caps)) continue;
-      results.push(...this.generateSectionFiles(config, section, contentFiles, docsDir));
+      results.push(...this.generateSectionFiles(config, section, contentFiles));
     }
     return results;
   }
@@ -125,10 +121,9 @@ export class GenerateToolDistributionUseCase {
   private generateSectionFiles(
     config: AiTool<unknown>,
     section: ContentSection,
-    contentFiles: Map<string, string>,
-    docsDir: string
+    contentFiles: Map<string, string>
   ): InstallationFile[] {
-    const base = { section, contentFiles, docsDir };
+    const base = { section, contentFiles };
     switch (section.name) {
       case "agents":
         return new InstallAgentsUseCase(this.hasher).execute({

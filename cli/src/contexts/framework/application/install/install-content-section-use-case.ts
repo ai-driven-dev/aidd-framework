@@ -45,7 +45,6 @@ export interface InstallContentSectionOptions<
   toolConfig: AiTool<Record<K, Cap>>;
   section: ContentSection;
   contentFiles: Map<string, string>;
-  docsDir: string;
 }
 
 export class InstallContentSectionUseCase<
@@ -58,11 +57,11 @@ export class InstallContentSectionUseCase<
   ) {}
 
   execute(options: InstallContentSectionOptions<K, Cap>): InstallationFile[] {
-    const { toolConfig, section, contentFiles, docsDir } = options;
+    const { toolConfig, section, contentFiles } = options;
     const cap = toolConfig.capabilities[this.descriptor.key];
     const results: InstallationFile[] = [];
     for (const [filePath, rawContent] of contentFiles) {
-      const file = this.processFile(filePath, rawContent, section, cap, toolConfig, docsDir);
+      const file = this.processFile(filePath, rawContent, section, cap, toolConfig);
       if (file !== null) results.push(file);
     }
     return results;
@@ -73,8 +72,7 @@ export class InstallContentSectionUseCase<
     rawContent: string,
     section: ContentSection,
     cap: Cap,
-    toolConfig: AiTool<Record<K, Cap>>,
-    docsDir: string
+    toolConfig: AiTool<Record<K, Cap>>
   ): InstallationFile | null {
     if (!filePath.startsWith(`${section.directory}/`)) return null;
     const relativeFileName = filePath.slice(`${section.directory}/`.length);
@@ -93,15 +91,7 @@ export class InstallContentSectionUseCase<
         frameworkPath: filePath,
       });
     }
-    return this.buildFile(
-      filePath,
-      outputPath,
-      relativeFileName,
-      rawContent,
-      cap,
-      toolConfig,
-      docsDir
-    );
+    return this.buildFile(filePath, outputPath, relativeFileName, rawContent, cap, toolConfig);
   }
 
   private buildFile(
@@ -110,10 +100,9 @@ export class InstallContentSectionUseCase<
     relativeFileName: string,
     rawContent: string,
     cap: Cap,
-    toolConfig: AiTool<Record<K, Cap>>,
-    docsDir: string
+    toolConfig: AiTool<Record<K, Cap>>
   ): InstallationFile {
-    const rewrittenRaw = toolConfig.rewriteContent(rawContent, docsDir);
+    const rewrittenRaw = toolConfig.rewriteContent(rawContent);
     const { frontmatter, body } = parseFrontmatter(rewrittenRaw);
     const convertedFrontmatter = this.descriptor.convertFrontmatter(
       cap,

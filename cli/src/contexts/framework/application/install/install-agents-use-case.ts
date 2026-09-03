@@ -20,7 +20,6 @@ interface InstallAgentsOptions {
   toolConfig: AiTool<HasAgents>;
   section: ContentSection;
   contentFiles: Map<string, string>;
-  docsDir: string;
 }
 
 export class InstallAgentsUseCase {

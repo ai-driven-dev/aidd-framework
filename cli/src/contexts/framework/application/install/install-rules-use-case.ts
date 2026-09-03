@@ -18,7 +18,6 @@ interface InstallRulesOptions {
   toolConfig: AiTool<HasRules>;
   section: ContentSection;
   contentFiles: Map<string, string>;
-  docsDir: string;
 }
 
 export class InstallRulesUseCase {

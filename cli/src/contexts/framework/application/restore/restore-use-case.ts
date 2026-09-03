@@ -49,7 +49,6 @@ const CONFIG_REFS: readonly ConfigRef[] = [
 interface RestoreOptions {
   frameworkPath?: string;
   version?: string;
-  docsDir?: string;
   projectRoot: string;
   toolIds?: ToolId[];
   files?: string[];
@@ -63,7 +62,6 @@ interface RestoreCtx {
   manifest: Manifest;
   descriptor: FrameworkDescriptor;
   contentFiles: Map<string, string>;
-  docsDir: string;
   projectRoot: string;
   version: string;
   force: boolean;
@@ -114,7 +112,6 @@ export class RestoreUseCase {
       contentFiles: options.frameworkPath
         ? await this.buildContentFiles(options.frameworkPath)
         : new Map(),
-      docsDir: options.docsDir ?? "",
       projectRoot: options.projectRoot,
       version: resolvedVersion,
       force: options.force ?? false,
@@ -161,7 +158,6 @@ export class RestoreUseCase {
     ).execute({
       projectRoot: ctx.projectRoot,
       manifest: ctx.manifest,
-      docsDir: ctx.docsDir,
       fileFilter: ctx.fileFilter,
       pluginName: ctx.pluginName,
       toolIds: ctx.toolIds,

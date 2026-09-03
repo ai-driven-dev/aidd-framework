@@ -57,7 +57,6 @@ export class AgentsCapability {
         fm: Record<string, unknown>,
         fileName?: string
       ) => Record<string, unknown>;
-      reverseConvertFrontmatter?: (fm: Record<string, unknown>) => Record<string, unknown>;
     }
   ) {}
 
@@ -103,13 +102,6 @@ export class AgentsCapability {
       return result;
     }
     return { name, description: fm.description };
-  }
-
-  reverseConvertFrontmatter(fm: Record<string, unknown>): Record<string, unknown> {
-    if (this.params.reverseConvertFrontmatter) return this.params.reverseConvertFrontmatter(fm);
-    const result: Record<string, unknown> = { name: fm.name, description: fm.description };
-    if (this.params.format === "toml" && fm.model !== undefined) result.model = fm.model;
-    return result;
   }
 
   serialize(frontmatter: Record<string, unknown>, body: string): string {

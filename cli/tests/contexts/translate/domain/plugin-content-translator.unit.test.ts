@@ -77,7 +77,7 @@ function makeDist(
 }
 
 function pathsFor(tool: ToolConfig, dist = makeDist()): string[] {
-  return translator.translate(dist, tool, "").map((f) => f.relativePath);
+  return translator.translate(dist, tool).map((f) => f.relativePath);
 }
 
 describe("PluginContentTranslator.translate()", () => {
@@ -93,7 +93,7 @@ describe("PluginContentTranslator.translate()", () => {
     });
 
     it("emits native plugin manifest at plugin.json", () => {
-      const files = translator.translate(makeDist(), claude, "");
+      const files = translator.translate(makeDist(), claude);
       const manifest = files.find(
         (f) => f.relativePath === ".claude/plugins/sample-plugin/plugin.json"
       );
@@ -135,13 +135,13 @@ describe("PluginContentTranslator.translate()", () => {
     });
 
     it("emits cursor-format frontmatter on rules (globs key)", () => {
-      const files = translator.translate(makeDist(), cursor, "");
+      const files = translator.translate(makeDist(), cursor);
       const rule = files.find((f) => f.relativePath.endsWith("standards.mdc"));
       expect(rule?.content).toContain("globs:");
     });
 
     it("does not emit plugin.json (pluginManifestRelativePath is null)", () => {
-      const files = translator.translate(makeDist(), cursor, "");
+      const files = translator.translate(makeDist(), cursor);
       const manifest = files.find((f) => f.relativePath.endsWith("plugin.json"));
       expect(manifest).toBeUndefined();
     });
@@ -173,7 +173,7 @@ describe("PluginContentTranslator.translate()", () => {
     });
 
     it("agent content is TOML format", () => {
-      const files = translator.translate(makeDist(), codex, "");
+      const files = translator.translate(makeDist(), codex);
       const agent = files.find((f) => f.relativePath.endsWith("reviewer.toml"));
       expect(agent?.content).toContain("name =");
       expect(agent?.content).toContain("description =");
@@ -181,7 +181,7 @@ describe("PluginContentTranslator.translate()", () => {
     });
 
     it("emits native plugin manifest at plugin.json", () => {
-      const files = translator.translate(makeDist(), codex, "");
+      const files = translator.translate(makeDist(), codex);
       const manifest = files.find(
         (f) => f.relativePath === ".codex/plugins/sample-plugin/plugin.json"
       );
@@ -207,7 +207,7 @@ describe("PluginContentTranslator.translate()", () => {
 
   describe("opencode target (flat mode)", () => {
     it("emits commands under .opencode/commands/sample-plugin/ with name prefix", () => {
-      const files = translator.translate(makeDist(), opencode, "");
+      const files = translator.translate(makeDist(), opencode);
       const greet = files.find(
         (f) => f.relativePath === ".opencode/commands/sample-plugin/greet.md"
       );
@@ -230,7 +230,7 @@ describe("PluginContentTranslator.translate()", () => {
 
   describe("vscode (IDE tool)", () => {
     it("returns empty array", () => {
-      expect(translator.translate(makeDist(), vscodeToolConfig, "")).toEqual([]);
+      expect(translator.translate(makeDist(), vscodeToolConfig)).toEqual([]);
     });
   });
 });
@@ -269,7 +269,7 @@ describe("cross-format matrix (source × target)", () => {
         // Cursor Mode B: pluginManifestRelativePath is null — no manifest file written into plugin dir.
         it(`${source.format} source → ${target.name} target: does not emit manifest (Mode B, null pluginManifestRelativePath)`, () => {
           const dist = makeSourceDist(source);
-          const files = translator.translate(dist, target.tool, "");
+          const files = translator.translate(dist, target.tool);
           expect(files.map((f) => f.relativePath)).not.toContain(
             expect.stringMatching(/plugin\.json$/)
           );
@@ -277,7 +277,7 @@ describe("cross-format matrix (source × target)", () => {
       } else {
         it(`${source.format} source → ${target.name} target: emits manifest at ${target.manifestExpected}`, () => {
           const dist = makeSourceDist(source);
-          const files = translator.translate(dist, target.tool, "");
+          const files = translator.translate(dist, target.tool);
           const expected = `${target.tool.capabilities.plugins.pluginsDir}sample-plugin/${target.manifestExpected}`;
           expect(files.map((f) => f.relativePath)).toContain(expected);
         });

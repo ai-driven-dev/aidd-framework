@@ -69,8 +69,7 @@ describe("install opencode plugin with MCP (Phase 4b integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     expect(fs.has(OPENCODE_JSON)).toBe(true);
@@ -92,8 +91,7 @@ describe("install opencode plugin with MCP (Phase 4b integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     const parsed = JSON.parse(await fs.readFile(OPENCODE_JSON)) as {
@@ -115,8 +113,7 @@ describe("install opencode plugin with MCP (Phase 4b integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     const installed = manifest.getPlugins("opencode").find((p) => p.name === PLUGIN_NAME);
@@ -138,8 +135,7 @@ describe("install opencode plugin with MCP (Phase 4b integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
     const firstContent = await fs.readFile(OPENCODE_JSON);
     const firstPlugin = manifest.getPlugins("opencode").find((p) => p.name === PLUGIN_NAME);
@@ -154,7 +150,6 @@ describe("install opencode plugin with MCP (Phase 4b integration)", () => {
       PROJECT_ROOT,
       manifest,
       undefined,
-      "docs",
       firstMcpEntries
     );
     const secondContent = await fs.readFile(OPENCODE_JSON);
@@ -179,8 +174,7 @@ describe("install opencode plugin with MCP (Phase 4b integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     const v1Plugin = manifest.getPlugins("opencode").find((p) => p.name === PLUGIN_NAME);
@@ -200,7 +194,6 @@ describe("install opencode plugin with MCP (Phase 4b integration)", () => {
       PROJECT_ROOT,
       manifest,
       undefined,
-      "docs",
       v1McpEntries
     );
 
@@ -231,8 +224,7 @@ describe("install opencode plugin with MCP (Phase 4b integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     const parsed = JSON.parse(await fs.readFile(OPENCODE_JSON)) as {
@@ -254,8 +246,7 @@ describe("install opencode plugin with MCP (Phase 4b integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     expect(fs.has(OPENCODE_JSON)).toBe(false);
@@ -279,8 +270,7 @@ describe("install opencode plugin with MCP (Phase 4b integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     const parsed = JSON.parse(await fs.readFile(OPENCODE_JSON)) as {
@@ -305,8 +295,7 @@ describe("install opencode plugin with MCP (Phase 4b integration)", () => {
       { kind: "local", path: "/plugin-source" },
       PROJECT_ROOT,
       manifest,
-      undefined,
-      "docs"
+      undefined
     );
 
     // "local-tool" is user-owned — must be skipped, not overwritten
