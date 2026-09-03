@@ -25,7 +25,7 @@ src/
 │   ├── materialization/                   # where content lands and how its links follow — flat-paths.ts, relative-link-rewrite.ts; called by tools' profile builds and translate's flat/marketplace strategies
 │   └── ports/                               # ports with callers in ≥2 contexts: file-reader, file-writer, hasher, logger, asset-provider, prompter (framework + distribution)
 ├── presentation/                # everything that talks to a human — depends on contexts, never the reverse
-│   ├── commands/                 # CLI wiring only, one file per command; kanban.ts is a launcher stub still mid-migration (see "Launchers" below)
+│   ├── commands/                 # CLI wiring only, one file per command (see "Launchers" below for the rule a future launcher follows)
 │   ├── display/                   # result rendering per command group (doctor, restore, setup, status)
 │   ├── prompts/                    # interactive use-cases: menu, plugin-pick, setup-tools-prompt, setup-plugins-prompt, sync-conflict-resolver — ask the user, the decision stays in the context
 │   ├── error-handler.ts            # central error handling
@@ -133,11 +133,22 @@ src/
 ## Launchers
 
 Arborescence invariant 9: a launcher locates and executes an external binary; it never embeds
-that binary's application code. `presentation/commands/kanban.ts` is the one launcher-shaped
-command today, and it does not yet meet the invariant — it deep-imports
-`../../../../kanban/src/presentation/...` directly rather than spawning the kanban CLI as a
-subprocess. There is no telemetry or governance launcher; those are unbuilt. Until kanban is
-cut over, describe this as the known gap it is rather than as done.
+that binary's application code. There is no launcher in the CLI today, and nothing violates the
+invariant.
+
+`presentation/commands/kanban.ts` used to. It deep-imported `../../../../kanban/src/...`, so the
+CLI bundled kanban's source and had to declare kanban's four interface packages — 50 packages
+and 24 MB installed by everyone, for a command hidden from `--help` and marked not ready. The
+command was unwired until its product direction is settled; `kanban/` keeps its source and its
+own tests, and `pnpm test:kanban` still runs them.
+
+Re-wiring it means meeting the invariant, not repeating the shortcut — and `kanban/src` is
+currently written against it: `kanban-deps.ts` states that the source "is a folder inside the
+framework, not a standalone package", taking its output channel and docs directory from
+whatever host mounts it. A launcher needs the opposite: an entry point that owns those itself.
+
+The same choice arrives with the telemetry and governance CLIs, which are unbuilt. Spawn them
+as subprocesses from the start.
 
 ## Use-Case Structure
 

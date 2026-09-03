@@ -35,12 +35,12 @@ const MAX_FILES_PER_FOLDER = 10;
  * nobody owes.
  */
 const BASELINE: readonly { readonly path: string; readonly count: number }[] = [
-  // Twelve files carry the command surface — eleven register a command on the program,
-  // `menu.ts` runs the interactive loop — plus `global-options.ts` and `spawn-cli-command.ts`,
-  // whose fourteen importers all live in this folder. That is the flattest mapping there is
-  // from the CLI's surface to its source. Moving the two helpers out would leave twelve:
-  // still over the limit, and clearer about nothing.
-  { path: "src/presentation/commands", count: 14 },
+  // Eleven files carry the command surface — ten register a command on the program, `menu.ts`
+  // runs the interactive loop — plus `global-options.ts` and `spawn-cli-command.ts`, whose
+  // importers all live in this folder. That is the flattest mapping there is from the CLI's
+  // surface to its source. Moving the two helpers out would leave eleven: still over the
+  // limit, and clearer about nothing.
+  { path: "src/presentation/commands", count: 13 },
 ];
 
 /** Direct `.ts` files per parent directory — a subfolder counts toward itself, not its parent. */

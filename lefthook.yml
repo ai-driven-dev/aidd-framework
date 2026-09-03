@@ -91,12 +91,8 @@ pre-commit:
       glob: "{cli/src/**,cli/tests/architecture/**,cli/ARCHITECTURE.md,cli/README.md,cli/aidd_docs/memory/codebase-map.md}"
       run: cd cli && pnpm test:arch
     cli-typecheck:
-      # The CLI type-checks `kanban/` too, so that folder's dependencies must be
-      # resolvable. Install them only when they are missing, to keep the hook fast.
-      glob: "{cli,kanban}/**"
-      run: |
-        [ -d kanban/node_modules ] || (cd kanban && pnpm install --frozen-lockfile)
-        cd cli && pnpm typecheck
+      glob: "cli/**"
+      run: cd cli && pnpm typecheck
 
 pre-push:
   commands:

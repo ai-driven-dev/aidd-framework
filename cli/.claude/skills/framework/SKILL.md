@@ -53,10 +53,12 @@ job that needs all three.
   `references/capability-sub-use-cases.md`. These five files reach directly into `tools`'
   capability classes rather than through a declared public module; that reach is a tracked,
   shrinking exception in `context-boundary.arch.test.ts`, not a pattern to add to.
-- **Launchers locate and execute, never embed.** `presentation/commands/kanban.ts` is the one
-  launcher-shaped command; it is not yet compliant — it deep-imports kanban's own source instead
-  of spawning the kanban binary. Any new launcher (a telemetry or governance CLI, say) must spawn
-  the target as a subprocess from the start; do not repeat kanban's shortcut.
+- **Launchers locate and execute, never embed.** There is no launcher in the CLI today.
+  The kanban command was one in shape only — it deep-imported kanban's source, so the CLI
+  carried kanban's four interface packages for every user of a hidden command, and it was
+  unwired. Any new launcher (a telemetry or governance CLI, say) spawns its target as a
+  subprocess from the start, and the binary it spawns owns its own output and configuration.
+  Embedding is what made kanban's command cost 24 MB; do not repeat it.
 
 ## Public surface
 

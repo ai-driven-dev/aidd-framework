@@ -36,7 +36,7 @@ delegates entirely to the context skill that owns the concept at that point.
 
 ## Conditional: adding a launcher
 
-A launcher (kanban-shaped: an external binary the CLI runs but does not embed) is `framework`'s
+A launcher (an external binary the CLI runs but does not embed) is `framework`'s
 concern — see that skill's "Launchers" note. Locate the binary and spawn it; never deep-import
 its source.
 

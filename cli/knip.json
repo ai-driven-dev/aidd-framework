@@ -8,6 +8,5 @@
   ],
   "ignore": ["tests/**/helpers.ts", "tests/helpers/**", "tests/fixtures/**", "tmp/**"],
   "ignoreBinaries": ["gh", "icacls"],
-  "ignoreExportsUsedInFile": true,
-  "ignoreDependencies": ["cli-table3", "gray-matter", "ink", "react"]
+  "ignoreExportsUsedInFile": true
 }
