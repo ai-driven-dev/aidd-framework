@@ -1,5 +1,5 @@
 ---
-status: pending
+status: done
 ---
 
 # Phase 5 — Trois adaptateurs, et l'un d'eux ne devrait pas exister
@@ -99,3 +99,38 @@ Puis le reste du comportement observable :
 `pnpm test:mutation:distribution` et `pnpm test:mutation:runtime` re-mesurés à la fin : les
 mutants vivants des deux adaptateurs conservés doivent baisser, et `git-adapter.ts` doit avoir
 disparu du rapport.
+
+## Ce que la phase a donné
+
+| Cible | Avant | Après | Comment |
+| ----- | ----: | ----: | ------- |
+| `plugin-fetcher-adapter.ts` | 74 | **2** | 33 tests, 123 mutants tués |
+| `auth-provider-adapter.ts` | 32 | **1** | 9 tests, 52 mutants tués |
+| `self-update/git-adapter.ts` | 37 | **0** | supprimé |
+
+143 vivants au départ, 3 à l'arrivée, et les trois sont laissés vivants en connaissance de
+cause :
+
+- deux dans le fetcher, le même mutant équivalent (`startsWith("git@")` mué en `endsWith`),
+  neutralisé par le garde `https://` de `injectTokenIntoUrl` ; le tuer reviendrait à affirmer
+  un détail d'implémentation
+- un dans l'auth, le message `"invalid config"` remplacé par la chaîne vide — un message qui
+  *décrit*, et le dépôt a déjà tranché que la prose ne s'épingle pas
+
+## Ce que la phase a trouvé et qui n'était pas dans le plan
+
+Une fuite de secret, sur deux chemins. Un utilisateur peut écrire son identifiant dans l'URL
+source ; il atterrissait dans le message d'erreur, `displayUrl` étant interpolé brut, et dans
+le **nom du répertoire de cache**, `encodeKey` remplaçant les caractères non alphanumériques
+sans retirer les identifiants. Le secret était donc écrit sur disque et y restait.
+
+Corrigé au point d'étranglement par `withoutCredentials`. Les deux tests correspondants ont
+été lancés contre le code non corrigé avant d'être gardés : ils échouaient.
+
+## Deux observations qui ne sont pas de cette phase
+
+- `"invalid config"` ne dit rien d'actionnable à quelqu'un dont la session est cassée. Le
+  rendre instructif le ferait entrer dans le champ de `errors-that-instruct`.
+- `knip` n'a jamais signalé `GitAdapter` ni `chmodExecutable` : la classe est construite, la
+  méthode est implémentée, donc l'outil les voit utilisées. C'est la même forme d'angle mort
+  que la citation sans préfixe invisible au test `referenced-paths`.

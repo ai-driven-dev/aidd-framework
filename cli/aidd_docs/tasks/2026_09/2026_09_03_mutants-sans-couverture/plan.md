@@ -1,6 +1,6 @@
 ---
 objective: "The behaviour a user types is pinned by a test that names it, not left to a mutant nobody generated."
-status: in-progress
+status: implemented
 ---
 
 # Plan: Cover what no test executes
@@ -54,9 +54,9 @@ Everything else is covered where a regression would be visible to someone using 
 | 4 | What the displays print | 130 | idem |
 | 5 | Three adapters — two tested, one deleted | 143 measured (105 estimated) | [`phase-5.md`](./phase-5.md) |
 
-Only phase 1 is written. The rest are named so the shape is visible, and will be written once
-phase 1 has been re-measured — planning five phases of test-writing before knowing what one
-moves is how a plan becomes a wish.
+Each phase was written only after the one before it was re-measured. That rule paid twice:
+phase 5's estimate of 105 mutants measured 143, and one of its three targets turned out to be
+code no caller reaches, where the right answer was deletion rather than tests.
 
 ## Decisions
 
