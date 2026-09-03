@@ -2,7 +2,6 @@ import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Marketplace } from "../../../../../src/contexts/distribution/domain/marketplace.js";
-import { PluginCatalogRepositoryAdapter } from "../../../../../src/contexts/distribution/infrastructure/plugin-catalog-repository-adapter.js";
 import { MarketplaceSyncSettingsUseCase } from "../../../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
 import { ModeAMarketplaceTranslator } from "../../../../../src/contexts/framework/application/framework/translator/mode-a-marketplace-translator.js";
 import type { EnsureBuiltMarketplaceUseCase } from "../../../../../src/contexts/framework/application/shared/ensure-built-marketplace-use-case.js";
@@ -35,6 +34,8 @@ interface SyncSetup {
   /** Marketplaces to register; the first is the one plugins are attached to. */
   readonly marketplaceNames?: readonly string[];
   readonly ensureBuilt?: EnsureBuiltMarketplaceUseCase;
+  /** Whether the tool's own CLI enables plugins, which decides what it registers. */
+  readonly enablesPlugins?: boolean;
 }
 
 async function sync(setup: SyncSetup = {}) {
@@ -72,11 +73,16 @@ async function sync(setup: SyncSetup = {}) {
     fs,
     manifestRepo,
     registry,
-    new PluginCatalogRepositoryAdapter(fs),
     new DeterministicHasher(),
     logger,
     new Map([
-      ["claude", new FakeNativePluginActivator({ available: true, enablesPlugins: false })],
+      [
+        "claude",
+        new FakeNativePluginActivator({
+          available: true,
+          enablesPlugins: setup.enablesPlugins ?? false,
+        }),
+      ],
     ]),
     setup.ensureBuilt ?? fakeEnsureBuiltMarketplace()
   );
@@ -161,7 +167,7 @@ describe("the settings file a user also edits", () => {
 /**
  * Building the marketplace tree happens for every tool, before the branch that decides who
  * writes the registration down — so a build that fails is on the path of every sync.
- * `builtSourcesForTool` had seven mutants and no test killed one.
+ * `buildAllForTool` — `builtSourcesForTool` when this was written — had seven mutants and no test killed one.
  */
 describe("a marketplace that will not build", () => {
   const failingBuild = (failFor: string): EnsureBuiltMarketplaceUseCase =>
@@ -192,5 +198,37 @@ describe("a marketplace that will not build", () => {
 
     expect(result.updatedTools).toContain("claude");
     expect(written?.enabledPlugins).toEqual({ "aidd-context@aidd-framework": true });
+  });
+});
+
+/**
+ * The build runs before the branch that decides who writes the registration down, and
+ * that position is the whole reason it survived the registration cleanup.
+ *
+ * A tool whose CLI enables plugins registers only the marketplaces a plugin points at
+ * (`toRegister = used`), so a marketplace with no installed plugin is built here and
+ * nowhere else. Deleting the call would have left it unbuilt, and the registration the
+ * tool later writes would point at a directory that does not exist.
+ */
+describe("a marketplace no plugin points at", () => {
+  it("is still built", async () => {
+    const built: string[] = [];
+
+    const recordingBuild = {
+      execute: async (options: { marketplace: { name: string }; target: string }) => {
+        built.push(options.marketplace.name);
+        return { builtDir: `/built/${options.target}`, version: "test", rebuilt: true };
+      },
+    } as unknown as EnsureBuiltMarketplaceUseCase;
+
+    // With the tool's CLI enabling plugins, it registers only the marketplaces a plugin
+    // points at, so "unused" is built here or nowhere.
+    await sync({
+      marketplaceNames: ["aidd-framework", "unused"],
+      ensureBuilt: recordingBuild,
+      enablesPlugins: true,
+    });
+
+    expect(built).toContain("unused");
   });
 });

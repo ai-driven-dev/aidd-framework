@@ -1,22 +1,8 @@
 import type { PluginSource } from "../../../kernel/source.js";
 
-/**
- * One marketplace, as the tool records it: a key in a map of entries.
- *
- * There used to be a second shape — a plain string in an array — for tools whose settings
- * held marketplaces that way. No profile ever produced one, and the code that consumed it
- * was the registration this CLI wrote itself, which every plugin-capable tool now does
- * through its own command instead. Both are gone.
- */
-export interface MarketplaceSettingsEntry {
-  key: string;
-  value: Record<string, unknown>;
-}
-
 export interface MarketplaceSettingsInput {
   name: string;
   source: PluginSource;
-  version?: string;
 }
 
 /**
@@ -29,7 +15,6 @@ export interface MarketplaceSettings {
   settingsPath: string;
   settingsKey: string;
   enabledPluginsKey?: string;
-  enabledPluginsSettingsPath?: string;
   /**
    * Where the tool keeps its registered marketplaces, for the two readers that still
    * need to know: `doctor`, which checks the tool actually wrote one, and the eviction
@@ -46,5 +31,14 @@ export interface MarketplaceSettings {
    * does — the tool's own command does — so the answer had nothing left to mean.
    */
   marketplacesSettingsPath: string | null;
-  toEntry(input: MarketplaceSettingsInput): MarketplaceSettingsEntry | null;
+  /**
+   * The name this marketplace is keyed by in the enabled-plugins map, or `null` when the
+   * tool cannot express its source and no key should be written.
+   *
+   * It used to return the whole entry — key and a value object carrying the source and the
+   * catalog version — for the registration this CLI wrote itself. Every plugin-capable tool
+   * now writes that through its own command, so the value had no reader left, and the
+   * catalog read that filled its version ran once per marketplace per sync for nothing.
+   */
+  toEntryKey(input: MarketplaceSettingsInput): string | null;
 }

@@ -23,7 +23,7 @@ function buildDeps(homedir = "/stub-home") {
 const MARKETPLACE_SETTINGS = {
   settingsPath: ".claude/settings.json",
   settingsKey: "extraKnownMarketplaces",
-  toEntry: () => null,
+  toEntryKey: () => null,
   marketplacesSettingsPath: null,
 };
 

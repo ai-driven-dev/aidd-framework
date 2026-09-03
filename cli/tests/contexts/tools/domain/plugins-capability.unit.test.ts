@@ -4,7 +4,7 @@ import { PluginsCapability } from "../../../../src/contexts/tools/domain/plugins
 const MARKETPLACE_SETTINGS = {
   settingsPath: ".claude/settings.json",
   settingsKey: "extraKnownMarketplaces",
-  toEntry: () => null,
+  toEntryKey: () => null,
   marketplacesSettingsPath: null,
 };
 

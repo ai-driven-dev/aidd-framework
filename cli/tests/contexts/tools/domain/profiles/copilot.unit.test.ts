@@ -192,42 +192,24 @@ describe("copilot", () => {
       expect(ms?.enabledPluginsKey).toBe("enabledPlugins");
     });
 
-    describe("toEntry()", () => {
-      it("returns map entry with github source shape for github source", () => {
-        const result = ms?.toEntry({
-          name: "aidd-framework",
-          source: { kind: "github", repo: "ai-driven-dev/framework" },
-        });
-        expect(result).toEqual({
-          key: "aidd-framework",
-          value: { source: { source: "github", repo: "ai-driven-dev/framework" } },
-        });
+    describe("the key a marketplace is recorded under", () => {
+      it("keys a github marketplace by its name", () => {
+        expect(
+          ms?.toEntryKey({
+            name: "aidd-framework",
+            source: { kind: "github", repo: "ai-driven-dev/framework" },
+          })
+        ).toBe("aidd-framework");
       });
 
-      it("does not include ref in github source (ref dropped per VSCode spec)", () => {
-        const result = ms?.toEntry({
-          name: "aidd-framework",
-          source: { kind: "github", repo: "ai-driven-dev/framework", ref: "v1.0.0" },
-        });
-        expect(result).not.toBeNull();
-        const src = result?.value.source as Record<string, unknown>;
-        expect(src).not.toHaveProperty("ref");
-        expect(src).toEqual({ source: "github", repo: "ai-driven-dev/framework" });
-      });
-
-      it("returns map entry with directory source for local source", () => {
-        const result = ms?.toEntry({
-          name: "my-marketplace",
-          source: { kind: "local", path: "/Users/dev/aidd-framework" },
-        });
-        expect(result).toEqual({
-          key: "my-marketplace",
-          value: { source: { source: "directory", path: "/Users/dev/aidd-framework" } },
-        });
+      it("keys a local marketplace by its name too — the source decides only whether there is a key", () => {
+        expect(
+          ms?.toEntryKey({ name: "my-marketplace", source: { kind: "local", path: "/dev/aidd" } })
+        ).toBe("my-marketplace");
       });
 
       it("returns null for unsupported source kind (npm)", () => {
-        const result = ms?.toEntry({
+        const result = ms?.toEntryKey({
           name: "my-plugin",
           source: { kind: "npm", package: "my-plugin" },
         });
@@ -235,7 +217,7 @@ describe("copilot", () => {
       });
 
       it("returns null for unsupported source kind (url)", () => {
-        const result = ms?.toEntry({
+        const result = ms?.toEntryKey({
           name: "my-plugin",
           source: { kind: "url", url: "https://example.com/plugin.zip" },
         });

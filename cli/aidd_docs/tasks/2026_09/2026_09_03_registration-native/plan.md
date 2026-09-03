@@ -63,3 +63,48 @@ decision, not an oversight, and it is why the contract now says so out loud.
 
 The Windows path normalisation (`replace(/\\/g, "/")`) went with the merge. Nothing is lost,
 its only consumer leaving with it, but it is written here rather than left to be discovered.
+
+## Revue (2026-09-03)
+
+Aucune régression trouvée : ni sur les cinq profils, ni sur `update`, `clean` et
+`framework remove`, les trois chemins que ce dossier signalait comme non éprouvés. Le
+relecteur les a suivis un par un — `aidd update` ne fait plus que la mise à jour du CLI,
+`framework update` ne touche jamais cette classe, `clean` ne mentionne aucune clé de
+réglages, et `MarketplaceRemoveUseCase` n'a jamais écrit d'entrée.
+
+En revanche il a trouvé que le rétrécissement s'était arrêté trop tôt, et l'argument était
+le mien.
+
+**`entry.value` n'avait plus aucun lecteur.** Un seul `grep` le montre : la seule survivante
+de `toEntry` lit `entry.key` et rien d'autre. Derrière, toute une chaîne devenait écriture
+pure — `version` → `versionByName` → `loadAllVersions` → `loadCatalogVersion`, une lecture
+asynchrone du catalogue par marketplace et par synchronisation, dont le résultat était jeté.
+J'avais retiré `valueShape` en écrivant qu'un contrat promettant plus que ce que le code
+tient est du legacy déguisé en généricité, et laissé debout une instance plus grosse.
+
+`toEntry` devient `toEntryKey` : une clé, ou `null`. Le `null` était la partie porteuse — il
+empêche d'écrire une entrée pour une source que l'outil ne sait pas exprimer, et garde les
+plugins qui en viennent hors de la carte des plugins activés. Partent avec : le type
+d'entrée, `version`, les deux chargeurs de catalogue, et le port `PluginCatalogRepository`
+que cette classe n'a plus de raison de recevoir.
+
+Trois autres, tous réels et tous laissés par mon propre rétrécissement : une garde
+`marketplacesSettingsPath === undefined` devenue inatteignable, un commentaire de `doctor`
+décrivant trois cas dont un n'existe plus, et `enabledPluginsSettingsPath`, champ sans
+producteur — la justification exacte qui avait fait retirer `valueShape`.
+
+### Le test qui a failli ne rien prouver
+
+La revue notait que la raison de garder le build n'était épinglée par aucun test. Le premier
+que j'ai écrit passait **aussi avec le build supprimé** : l'activateur factice avait
+`enablesPlugins: false`, donc `toRegister` valait toutes les marketplaces et l'autre chemin
+construisait tout de toute façon.
+
+Le cas non redondant est celui qu'un outil dont la CLI active les plugins présente : il ne
+déclare que les marketplaces qu'un plugin utilise, donc une marketplace sans plugin est
+construite là ou nulle part. Option câblée dans le harnais, et la suppression du build fait
+maintenant tomber le test.
+
+Sans cette correction, j'aurais commité un test qui prouve zéro — la forme même du défaut que
+cette séquence entière a passé son temps à corriger.
+

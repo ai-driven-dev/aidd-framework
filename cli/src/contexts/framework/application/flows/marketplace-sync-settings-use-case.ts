@@ -1,6 +1,5 @@
 import { resolve } from "node:path";
 import { NativePluginCliError } from "../../../../kernel/errors.js";
-import { marketplaceCacheDir } from "../../../../kernel/paths.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
@@ -8,7 +7,6 @@ import type { Logger } from "../../../../kernel/ports/logger.js";
 import type { ToolId } from "../../../../kernel/tool.js";
 import type { Marketplace } from "../../../distribution/domain/marketplace.js";
 import type { MarketplaceRegistry } from "../../../distribution/domain/ports/marketplace-registry.js";
-import type { PluginCatalogRepository } from "../../../distribution/domain/ports/plugin-catalog-repository.js";
 import type { MarketplaceSettings } from "../../../tools/domain/marketplace-settings.js";
 import type { NativePluginActivator } from "../../../tools/domain/ports/native-plugin-activator.js";
 import { getToolConfig, isAiTool } from "../../../tools/domain/registry.js";
@@ -31,7 +29,6 @@ export class MarketplaceSyncSettingsUseCase {
     private readonly fs: FileReader & FileWriter,
     private readonly manifestRepo: ManifestRepository,
     private readonly marketplaceRegistry: MarketplaceRegistry,
-    private readonly catalogRepo: PluginCatalogRepository,
     private readonly hasher: Hasher,
     private readonly logger: Logger,
     /** Native plugin CLI activators, keyed by the `binary` each profile declares. */
@@ -248,7 +245,6 @@ export class MarketplaceSyncSettingsUseCase {
     marketplaces: readonly Marketplace[],
     settings: MarketplaceSettings
   ): Promise<boolean> {
-    const versionByName = await this.loadAllVersions(projectRoot, marketplaces);
     const marketplaceChanged = await this.syncMarketplacesFile(
       toolId,
       projectRoot,
@@ -258,14 +254,7 @@ export class MarketplaceSyncSettingsUseCase {
     );
     const pluginsChanged =
       settings.enabledPluginsKey != null
-        ? await this.syncEnabledPluginsFile(
-            toolId,
-            projectRoot,
-            manifest,
-            marketplaces,
-            settings,
-            versionByName
-          )
+        ? await this.syncEnabledPluginsFile(toolId, projectRoot, manifest, marketplaces, settings)
         : false;
     return marketplaceChanged || pluginsChanged;
   }
@@ -297,7 +286,6 @@ export class MarketplaceSyncSettingsUseCase {
     manifest: Manifest,
     settings: MarketplaceSettings
   ): Promise<boolean> {
-    if (settings.marketplacesSettingsPath === undefined) return false;
     const sharedPath = resolve(projectRoot, settings.settingsPath);
     const shared = await this.loadSettings(sharedPath);
     if (!(settings.settingsKey in shared)) return false;
@@ -313,19 +301,14 @@ export class MarketplaceSyncSettingsUseCase {
     projectRoot: string,
     manifest: Manifest,
     marketplaces: readonly Marketplace[],
-    settings: MarketplaceSettings,
-    versionByName: Map<string, string | undefined>
+    settings: MarketplaceSettings
   ): Promise<boolean> {
-    const pluginsPath =
-      settings.enabledPluginsSettingsPath ?? resolve(projectRoot, settings.settingsPath);
+    const pluginsPath = resolve(projectRoot, settings.settingsPath);
     const json = await this.loadSettings(pluginsPath);
-    if (!this.mergeEnabledPlugins(json, settings, toolId, manifest, marketplaces, versionByName))
-      return false;
+    if (!this.mergeEnabledPlugins(json, settings, toolId, manifest, marketplaces)) return false;
     const content = JSON.stringify(json, null, 2);
     await this.fs.writeFile(pluginsPath, content);
-    if (settings.enabledPluginsSettingsPath == null) {
-      manifest.updateTrackedFileHash(toolId, settings.settingsPath, this.hasher.hash(content));
-    }
+    manifest.updateTrackedFileHash(toolId, settings.settingsPath, this.hasher.hash(content));
     return true;
   }
 
@@ -334,8 +317,7 @@ export class MarketplaceSyncSettingsUseCase {
     settings: MarketplaceSettings,
     toolId: ToolId,
     manifest: Manifest,
-    marketplaces: readonly Marketplace[],
-    versionByName: Map<string, string | undefined>
+    marketplaces: readonly Marketplace[]
   ): boolean {
     const pluginsKey = settings.enabledPluginsKey;
     if (pluginsKey == null) return false;
@@ -346,40 +328,17 @@ export class MarketplaceSyncSettingsUseCase {
       if (plugin.marketplace == null) continue;
       const marketplace = marketplaceByName.get(plugin.marketplace);
       if (marketplace == null) continue;
-      const entry = settings.toEntry({
+      const entryKey = settings.toEntryKey({
         name: marketplace.name,
         source: marketplace.source,
-        version: versionByName.get(marketplace.name),
       });
-      if (entry == null) continue;
-      const key = `${plugin.name}@${entry.key}`;
+      if (entryKey == null) continue;
+      const key = `${plugin.name}@${entryKey}`;
       if (!(key in existing)) toAdd[key] = true;
     }
     if (Object.keys(toAdd).length === 0) return false;
     json[pluginsKey] = { ...existing, ...toAdd };
     return true;
-  }
-
-  private async loadAllVersions(
-    projectRoot: string,
-    marketplaces: readonly Marketplace[]
-  ): Promise<Map<string, string | undefined>> {
-    const entries = await Promise.all(
-      marketplaces.map(async (m) => {
-        const version = await this.loadCatalogVersion(projectRoot, m.name);
-        return [m.name, version] as const;
-      })
-    );
-    return new Map(entries);
-  }
-
-  private async loadCatalogVersion(
-    projectRoot: string,
-    marketplaceName: string
-  ): Promise<string | undefined> {
-    const cacheDir = marketplaceCacheDir(projectRoot, marketplaceName);
-    const catalog = await this.catalogRepo.load(cacheDir).catch(() => null);
-    return catalog?.version;
   }
 
   private existingRecord(

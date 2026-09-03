@@ -13,7 +13,7 @@ import type {
   HasSkills,
 } from "../../contracts.js";
 import { convertCommandFrontmatter, stripToolSuffix } from "../../formats/command.js";
-import { buildClaudeStyleMarketplaceEntry } from "../../marketplace-entry.js";
+import { claudeStyleMarketplaceKey } from "../../marketplace-entry.js";
 import { McpCapability } from "../../mcp-capability.js";
 import { PluginsCapability } from "../../plugins-capability.js";
 import { registerTool } from "../../registry.js";
@@ -126,7 +126,7 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
           // file `claude plugin marketplace add --scope local` writes itself.
           marketplacesSettingsPath: ".claude/settings.local.json",
           enabledPluginsKey: "enabledPlugins",
-          toEntry: buildClaudeStyleMarketplaceEntry,
+          toEntryKey: claudeStyleMarketplaceKey,
         },
       }),
     },

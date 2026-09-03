@@ -66,9 +66,8 @@ export class DoctorRegistrationUseCase {
       plugins?: { marketplaceSettings?: MarketplaceSettings | null };
     };
     const settings = caps.plugins?.marketplaceSettings;
-    // `undefined` keeps the registrations in the tracked file, which reports its own
-    // damage; `null` means the tool writes none at all. Neither leaves anything here
-    // to check — only a declared path does.
+    // `null` means the tool writes no machine-local registration at all, so there is
+    // nothing here to check — only a declared path leaves a file worth looking at.
     if (typeof settings?.marketplacesSettingsPath !== "string") return undefined;
     return settings as MarketplaceSettings & { marketplacesSettingsPath: string };
   }

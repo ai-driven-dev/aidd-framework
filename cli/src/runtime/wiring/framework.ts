@@ -289,7 +289,6 @@ export async function createDeps(
     fs,
     manifestRepo,
     marketplaceRegistry,
-    pluginCatalogRepository,
     hasher,
     logger,
     nativePluginActivators,

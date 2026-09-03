@@ -55,7 +55,7 @@ export async function buildUnitDeps(_projectRoot: string) {
   const assetProvider = new BundledAssetProviderAdapter();
   const pluginFetcher = new FixturePluginFetcher();
   const pluginDistributionReader = new PluginDistributionReaderAdapter(fs);
-  const pluginCatalogRepository = new PluginCatalogRepositoryAdapter(fs);
+  const _pluginCatalogRepository = new PluginCatalogRepositoryAdapter(fs);
   const marketplaceRegistry = new InMemoryMarketplaceRegistry();
   const gitignoreUseCase = new GitignoreUseCase(fs);
   const postInstallPipelineUseCase = new PostInstallPipelineUseCase(manifestRepo, gitignoreUseCase);
@@ -81,7 +81,6 @@ export async function buildUnitDeps(_projectRoot: string) {
     fs,
     manifestRepo,
     marketplaceRegistry,
-    pluginCatalogRepository,
     hasher,
     logger,
     new Map([["codex", new FakeNativePluginActivator()]]),
@@ -99,7 +98,6 @@ export async function buildUnitDeps(_projectRoot: string) {
     assetProvider,
     pluginFetcher,
     pluginDistributionReader,
-    pluginCatalogRepository,
     marketplaceRegistry,
     marketplaceSyncSettings,
     installRuntimeConfigUseCase,

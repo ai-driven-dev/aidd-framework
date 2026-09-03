@@ -5,7 +5,6 @@ import "../../../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Marketplace } from "../../../../../../src/contexts/distribution/domain/marketplace.js";
-import { PluginCatalogRepositoryAdapter } from "../../../../../../src/contexts/distribution/infrastructure/plugin-catalog-repository-adapter.js";
 import { MarketplaceSyncSettingsUseCase } from "../../../../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
 import { ModeAMarketplaceTranslator } from "../../../../../../src/contexts/framework/application/framework/translator/mode-a-marketplace-translator.js";
 import { Manifest } from "../../../../../../src/contexts/framework/domain/manifest.js";
@@ -100,7 +99,6 @@ describe("install codex plugin via Mode A (integration)", () => {
     const hasher = new DeterministicHasher();
     const manifestRepo = new InMemoryManifestRepository();
     const registry = new InMemoryMarketplaceRegistry();
-    const catalog = new PluginCatalogRepositoryAdapter(fs);
     const activator = new FakeNativePluginActivator({ available: true });
     await seedCodexPlugin(manifestRepo, registry);
 
@@ -108,7 +106,6 @@ describe("install codex plugin via Mode A (integration)", () => {
       fs,
       manifestRepo,
       registry,
-      catalog,
       hasher,
       new CapturingLogger(),
       new Map([["codex", activator]]),
@@ -139,7 +136,6 @@ describe("install codex plugin via Mode A (integration)", () => {
       fs,
       manifestRepo,
       registry,
-      new PluginCatalogRepositoryAdapter(fs),
       new DeterministicHasher(),
       new CapturingLogger(),
       new Map([["codex", activator]]),
@@ -166,7 +162,6 @@ describe("install codex plugin via Mode A (integration)", () => {
       fs,
       manifestRepo,
       registry,
-      new PluginCatalogRepositoryAdapter(fs),
       new DeterministicHasher(),
       logger,
       new Map([["codex", activator]]),
@@ -189,7 +184,6 @@ describe("install codex plugin via Mode A (integration)", () => {
       fs,
       manifestRepo,
       registry,
-      new PluginCatalogRepositoryAdapter(fs),
       new DeterministicHasher(),
       new CapturingLogger(),
       new Map([["codex", activator]]),

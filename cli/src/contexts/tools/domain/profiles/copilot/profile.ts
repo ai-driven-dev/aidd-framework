@@ -16,7 +16,7 @@ import type {
   HasSkills,
 } from "../../contracts.js";
 import { convertCommandFrontmatter } from "../../formats/command.js";
-import { buildClaudeStyleMarketplaceEntry } from "../../marketplace-entry.js";
+import { claudeStyleMarketplaceKey } from "../../marketplace-entry.js";
 import { McpCapability } from "../../mcp-capability.js";
 import { PluginsCapability } from "../../plugins-capability.js";
 import { registerTool } from "../../registry.js";
@@ -314,7 +314,7 @@ export const copilot: AiTool<
         settingsKey: "extraKnownMarketplaces",
         marketplacesSettingsPath: null,
         enabledPluginsKey: "enabledPlugins",
-        toEntry: buildClaudeStyleMarketplaceEntry,
+        toEntryKey: claudeStyleMarketplaceKey,
       },
     }),
   },
