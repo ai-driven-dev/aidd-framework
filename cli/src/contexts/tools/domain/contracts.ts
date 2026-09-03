@@ -47,7 +47,6 @@ export interface AiTool<C> {
   readonly directory: string;
   readonly toolSuffix: string;
   readonly signalDir: string | null;
-  readonly requiredIdeIds?: readonly IdeToolId[];
   readonly capabilities: C;
   readonly configOutputPaths?: Readonly<Record<string, string>>;
   /**

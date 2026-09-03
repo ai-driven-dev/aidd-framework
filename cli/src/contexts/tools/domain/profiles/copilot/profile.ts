@@ -216,7 +216,6 @@ export const copilot: AiTool<
   directory: DIRECTORY,
   toolSuffix: TOOL_SUFFIX,
   signalDir: ".github/prompts",
-  requiredIdeIds: ["vscode"] as const,
   buildContracts: {
     marketplace: buildCopilotMarketplaceContract,
     flat: buildCopilotFlatContract,
