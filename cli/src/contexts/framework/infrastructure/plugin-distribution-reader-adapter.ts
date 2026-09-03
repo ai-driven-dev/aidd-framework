@@ -5,6 +5,7 @@ import {
   InvalidPluginVersionError,
 } from "../../../kernel/errors.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
+import { isSemver } from "../../../kernel/semver.js";
 import {
   type PluginComponentFile,
   type PluginComponents,
@@ -15,7 +16,6 @@ import type { PluginFormat } from "../../translate/domain/plugin-format.js";
 import { pluginManifestProbes } from "../../translate/domain/plugin-format.js";
 import { PLUGIN_NAME_REGEX } from "../domain/plugins/installed-plugin.js";
 import type { PluginDistributionReader } from "../domain/ports/plugin-distribution-reader.js";
-import { isSemver } from "../domain/semver.js";
 
 const README_FILENAME = "README.md";
 

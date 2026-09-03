@@ -1,9 +1,9 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { compareSemver, isSemver } from "../../contexts/framework/domain/semver.js";
 import type { FileReader } from "../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../kernel/ports/file-writer.js";
 import type { Logger } from "../../kernel/ports/logger.js";
+import { compareSemver, isSemver } from "../../kernel/semver.js";
 import type { SelfUpdater } from "./self-updater.js";
 import type { VersionReader } from "./version-reader.js";
 

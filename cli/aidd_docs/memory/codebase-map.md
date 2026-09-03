@@ -18,7 +18,8 @@ src/
 │   ├── scope.ts                    # MarketplaceScope ("project" | "user") — a plugin CLI names it without importing distribution
 │   ├── paths.ts                     # project-relative cache/build directory layout
 │   ├── file.ts                       # FileHash, InstallationFile, FileDiff, GITKEEP_FILE
-│   ├── merge.ts                       # MergeStrategy, ConflictDecision, merge-entry extraction
+│   ├── merge.ts                       # MergeStrategy, merge-entry extraction
+│   ├── semver.ts                       # isSemver/compareSemver — spoken by framework and by the self-updater
 │   ├── jsonc.ts                        # stripJsonComments — leaf dependency of merge.ts
 │   ├── markdown.ts                      # markdown helpers shared by ≥2 contexts
 │   ├── errors.ts                         # every typed domain exception — one catalog, not one per layer
@@ -112,7 +113,6 @@ src/
         │   ├── setup-flow.ts                       # the steps a first install goes through
         │   ├── config-capability.ts                 # runtime configuration a tool receives
         │   ├── tool-recommendations.ts
-        │   ├── semver.ts
         │   └── ports/                                # manifest-repository, plugin-distribution-reader
         ├── application/                # + clean-use-case.ts, init-use-case.ts, status-use-case.ts, gitignore-use-case.ts, setup-use-case.ts — the interactive prompts moved to presentation/prompts/
         │   ├── doctor/                  # layout, merge-files, plugin, references, registration, tracked-files, doctor-use-case (orchestrator)

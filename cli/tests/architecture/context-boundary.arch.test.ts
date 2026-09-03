@@ -79,7 +79,40 @@ const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
     "src/contexts/distribution/application/marketplace-refresh-use-case.ts",
     "src/contexts/distribution/application/marketplace-register-framework-use-case.ts",
   ],
+  // The largest context, and the last to be fenced — this file's own header said the list
+  // would grow "as `framework` and `distribution` are extracted", and only `distribution`
+  // ever was. Until this entry existed the mechanism below skipped every framework file, so
+  // fifteen imports reached its interior unchecked. Measured, composition root excluded.
+  framework: [
+    // the installation record, which is what this context owns
+    "src/contexts/framework/domain/manifest.ts",
+    "src/contexts/framework/domain/ports/manifest-repository.ts",
+    "src/contexts/framework/domain/install-scope.ts",
+    "src/contexts/framework/domain/project-context.ts",
+    // the flows a command drives end to end
+    "src/contexts/framework/application/setup-use-case.ts",
+    "src/contexts/framework/application/setup/setup-tools-use-case.ts",
+    "src/contexts/framework/application/plugin/plugin-add-use-case.ts",
+    "src/contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.ts",
+    // what a display or a prompt reads to render a decision it does not make
+    "src/contexts/framework/domain/doctor.ts",
+    "src/contexts/framework/domain/setup-flow.ts",
+    "src/contexts/framework/domain/tool-recommendations.ts",
+    // the one operation another context genuinely asks for: `distribution` removes a
+    // marketplace and this context forgets the plugins that came from it
+    "src/contexts/framework/application/flows/marketplace-remove-use-case.ts",
+  ],
 };
+
+/** Every directory under `src/contexts/`, which is what a context is. */
+function contextsOnDisk(files: readonly string[]): string[] {
+  const names = new Set<string>();
+  for (const file of files) {
+    const match = /^src\/contexts\/([^/]+)\//.exec(file);
+    if (match) names.add(match[1] as string);
+  }
+  return [...names].sort();
+}
 
 /** The context a file belongs to, or `null` when it is not inside any context yet. */
 function contextOf(file: string): string | null {
@@ -153,6 +186,31 @@ describe("nothing imports a context's interior", () => {
     const { added, fixed } = expectRatchet(violations, BASELINE);
     expect(added, "new import reaches a context's undeclared interior").toEqual([]);
     expect(fixed, "fixed — remove these from BASELINE").toEqual([]);
+  });
+
+  it("declares a public surface for every context on disk", () => {
+    const declared = Object.keys(PUBLIC_MODULES).sort();
+
+    expect(
+      contextsOnDisk(sourceFiles()),
+      "a context with no entry above is skipped entirely by the rule, not held by it"
+    ).toEqual(declared);
+  });
+
+  it("skips a context silently when it has no declaration, which is why the check above exists", () => {
+    const files = ["src/contexts/ghost/domain/inner.ts"];
+    const importers = new Map([
+      ["src/contexts/ghost/domain/inner.ts", new Set(["src/presentation/commands/x.ts"])],
+    ]);
+
+    expect(
+      reachesIntoInterior(files, importers, {}),
+      "undeclared means unchecked — the failure mode this rule had for framework"
+    ).toEqual([]);
+    expect(
+      reachesIntoInterior(files, importers, { ghost: [] }),
+      "declared with an empty surface means every reach is a violation"
+    ).toEqual(["src/presentation/commands/x.ts -> src/contexts/ghost/domain/inner.ts"]);
   });
 
   it("flags a reach into a context's interior and clears one that targets its public surface", () => {

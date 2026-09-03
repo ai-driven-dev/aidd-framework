@@ -1,4 +1,4 @@
-import { compareSemver } from "../../contexts/framework/domain/semver.js";
+import { compareSemver } from "../../kernel/semver.js";
 import type { SelfUpdater } from "./self-updater.js";
 import type { VersionReader } from "./version-reader.js";
 
