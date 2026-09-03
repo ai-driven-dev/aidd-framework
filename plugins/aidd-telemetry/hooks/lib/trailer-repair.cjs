@@ -111,10 +111,14 @@ function write(hookPath, content) {
   const mode = modeOf(hookPath);
   const staging = `${hookPath}.aidd-${process.pid}`;
   try {
+    // The mode on this call has no test that can fail for it: `chmod` below sets the same
+    // bits a moment later, so removing it leaves every case green. It stays because it
+    // narrows the window in which the staging file exists wider than the hook it replaces,
+    // and that window is not something a test here can observe.
     fs.writeFileSync(staging, content, { mode });
     // `open(2)` applies the umask to the mode it is given, so a `0770` hook came back
     // `0750` — narrowed rather than widened, and just as much somebody else's file to have
-    // changed. `chmod` is not filtered.
+    // changed. `chmod` is not filtered, and is what actually carries the mode across.
     fs.chmodSync(staging, mode);
     fs.renameSync(staging, hookPath);
     return "repaired";

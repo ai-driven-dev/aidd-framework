@@ -208,16 +208,22 @@ test("an unwritable hook file is left alone, and costs the session nothing", () 
 
 // `open(2)` applies the umask to the mode it is handed, so a staged write narrowed a `0770`
 // hook to `0750`. Narrowing is as much a change to somebody else's file as widening.
+//
+// Asserted as "the mode the repair found is the mode it left", never against a literal:
+// Windows has no POSIX permission bits, and reports `0o666` for every writable file
+// whatever it was chmod'ed to. The literal made this fail there for a reason that was
+// about the platform and not about the repair.
 test("a repair does not narrow a hook's group permissions", () => {
   withRepo(({ root, hooksDir }) => {
     installDelegate(hooksDir);
     const hookPath = path.join(hooksDir, "prepare-commit-msg");
     fs.writeFileSync(hookPath, "#!/bin/sh\n# generated\n");
     fs.chmodSync(hookPath, 0o770);
+    const before = fs.statSync(hookPath).mode & 0o777;
 
     assert.equal(sessionStart(root).status, 0);
 
-    assert.equal(fs.statSync(hookPath).mode & 0o777, 0o770);
+    assert.equal(fs.statSync(hookPath).mode & 0o777, before);
   });
 });
 
@@ -262,17 +268,19 @@ test("a hooks directory that is a symlink into the working tree is never written
 });
 
 // `rename` replaces the inode, so without carrying the mode across a `0700` hook would come
-// back `0755` — widening a third party's file on a path meant to be conservative.
+// back `0755` — widening a third party's file on a path meant to be conservative. Compared
+// against the mode found rather than a literal, for the reason the narrowing case gives.
 test("a repair keeps the hook's own permissions rather than widening them", () => {
   withRepo(({ root, hooksDir }) => {
     installDelegate(hooksDir);
     const hookPath = path.join(hooksDir, "prepare-commit-msg");
     fs.writeFileSync(hookPath, "#!/bin/sh\n# generated\n");
     fs.chmodSync(hookPath, 0o700);
+    const before = fs.statSync(hookPath).mode & 0o777;
 
     assert.equal(sessionStart(root).status, 0);
 
-    assert.equal(fs.statSync(hookPath).mode & 0o777, 0o700);
+    assert.equal(fs.statSync(hookPath).mode & 0o777, before);
   });
 });
 
