@@ -1,0 +1,196 @@
+import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+import { Marketplace } from "../../../../../src/contexts/distribution/domain/marketplace.js";
+import { PluginCatalogRepositoryAdapter } from "../../../../../src/contexts/distribution/infrastructure/plugin-catalog-repository-adapter.js";
+import { MarketplaceSyncSettingsUseCase } from "../../../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
+import { ModeAMarketplaceTranslator } from "../../../../../src/contexts/framework/application/framework/translator/mode-a-marketplace-translator.js";
+import type { EnsureBuiltMarketplaceUseCase } from "../../../../../src/contexts/framework/application/shared/ensure-built-marketplace-use-case.js";
+import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
+import { PluginDistribution } from "../../../../../src/contexts/translate/domain/plugin-distribution.js";
+import { CapturingLogger } from "../../../../helpers/ports/capturing-logger.js";
+import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
+import { fakeEnsureBuiltMarketplace } from "../../../../helpers/ports/fake-ensure-built-marketplace.js";
+import { FakeNativePluginActivator } from "../../../../helpers/ports/fake-native-plugin-activator.js";
+import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
+import { InMemoryManifestRepository } from "../../../../helpers/ports/in-memory-manifest-repository.js";
+import { InMemoryMarketplaceRegistry } from "../../../../helpers/ports/in-memory-marketplace-registry.js";
+
+const PROJECT_ROOT = "/test-project";
+const SHARED_SETTINGS = resolve(PROJECT_ROOT, ".claude/settings.json");
+
+function distribution(name: string): PluginDistribution {
+  const files = [{ relativePath: "commands/hello.md", content: "# Hello" }];
+  return new PluginDistribution({
+    manifest: { name, version: "1.0.0" },
+    format: "claude",
+    files,
+    components: { commands: files, agents: [], rules: [], skills: [], hooks: [], mcp: [] },
+  });
+}
+
+interface SyncSetup {
+  /** Content written to `.claude/settings.json` before the sync, when given. */
+  readonly settings?: string;
+  /** Marketplaces to register; the first is the one plugins are attached to. */
+  readonly marketplaceNames?: readonly string[];
+  readonly ensureBuilt?: EnsureBuiltMarketplaceUseCase;
+}
+
+async function sync(setup: SyncSetup = {}) {
+  const names = setup.marketplaceNames ?? ["aidd-framework"];
+  const fs = new InMemoryFileAdapter();
+  const manifestRepo = new InMemoryManifestRepository();
+  const registry = new InMemoryMarketplaceRegistry();
+  const logger = new CapturingLogger();
+  const manifest = Manifest.create();
+  manifest.addTool("claude", "test", []);
+
+  await new ModeAMarketplaceTranslator().addPlugin(
+    distribution("aidd-context"),
+    "claude",
+    { kind: "local", path: "/plugin-source" },
+    PROJECT_ROOT,
+    manifest,
+    names[0]
+  );
+  await manifestRepo.save(manifest);
+  for (const name of names) {
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name,
+        source: { kind: "local", path: `/source/${name}` },
+        scope: "project",
+        addedAt: "2026-01-01T00:00:00Z",
+      })
+    );
+  }
+  if (setup.settings !== undefined) await fs.writeFile(SHARED_SETTINGS, setup.settings);
+
+  const useCase = new MarketplaceSyncSettingsUseCase(
+    fs,
+    manifestRepo,
+    registry,
+    new PluginCatalogRepositoryAdapter(fs),
+    new DeterministicHasher(),
+    logger,
+    new Map([
+      ["claude", new FakeNativePluginActivator({ available: true, enablesPlugins: false })],
+    ]),
+    setup.ensureBuilt ?? fakeEnsureBuiltMarketplace()
+  );
+  const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+  const written = (await fs.fileExists(SHARED_SETTINGS))
+    ? (JSON.parse(await fs.readFile(SHARED_SETTINGS)) as Record<string, unknown>)
+    : undefined;
+  return { result, written, logger, fs };
+}
+
+/**
+ * The settings file the CLI shares with the tool, and with whoever edits it by hand.
+ *
+ * This flow writes into a file it does not own. Its own comment states the contract — "a
+ * trailing comma must not take the whole sync down with it" — and the mutation report said
+ * three of nineteen mutants in `loadSettings` were killed, so the contract was mostly a
+ * sentence. Every case below names what a user loses if it stops holding.
+ */
+describe("the settings file a user also edits", () => {
+  it("writes the enabled plugin into a file that did not exist", async () => {
+    const { result, written } = await sync();
+
+    expect(result.updatedTools).toContain("claude");
+    expect(written?.enabledPlugins).toEqual({ "aidd-context@aidd-framework": true });
+  });
+
+  it("keeps entries it did not put there", async () => {
+    const { written } = await sync({
+      settings: JSON.stringify({
+        model: "opus",
+        enabledPlugins: { "someone-elses@their-marketplace": true },
+      }),
+    });
+
+    expect(written?.model).toBe("opus");
+    expect(written?.enabledPlugins).toEqual({
+      "someone-elses@their-marketplace": true,
+      "aidd-context@aidd-framework": true,
+    });
+  });
+
+  it("leaves a plugin somebody turned off turned off", async () => {
+    // The sync adds a key only when it is absent. Adding it unconditionally would
+    // silently re-enable a plugin on the next `aidd sync`.
+    const { written } = await sync({
+      settings: JSON.stringify({ enabledPlugins: { "aidd-context@aidd-framework": false } }),
+    });
+
+    expect(written?.enabledPlugins).toEqual({ "aidd-context@aidd-framework": false });
+  });
+
+  it("warns and carries on when the file is not valid JSON", async () => {
+    // A trailing comma in a hand-edited file must not fail `setup`, `sync` and `update`.
+    const { result, written, logger } = await sync({
+      settings: '{ "enabledPlugins": { "a@b": true }, }',
+    });
+
+    expect(result.updatedTools).toContain("claude");
+    expect(logger.warnMessages.some((w) => w.includes("malformed JSON"))).toBe(true);
+    expect(written?.enabledPlugins).toEqual({ "aidd-context@aidd-framework": true });
+  });
+
+  it("treats a file holding an array as empty rather than merging into it", async () => {
+    const { written } = await sync({ settings: JSON.stringify(["not", "an", "object"]) });
+
+    expect(written?.enabledPlugins).toEqual({ "aidd-context@aidd-framework": true });
+  });
+
+  it("treats a file holding null as empty", async () => {
+    const { written } = await sync({ settings: "null" });
+
+    expect(written?.enabledPlugins).toEqual({ "aidd-context@aidd-framework": true });
+  });
+
+  it("treats a non-object under the key as empty rather than spreading it", async () => {
+    const { written } = await sync({ settings: JSON.stringify({ enabledPlugins: ["a", "b"] }) });
+
+    expect(written?.enabledPlugins).toEqual({ "aidd-context@aidd-framework": true });
+  });
+});
+
+/**
+ * Building the marketplace tree happens for every tool, before the branch that decides who
+ * writes the registration down — so a build that fails is on the path of every sync.
+ * `builtSourcesForTool` had seven mutants and no test killed one.
+ */
+describe("a marketplace that will not build", () => {
+  const failingBuild = (failFor: string): EnsureBuiltMarketplaceUseCase =>
+    ({
+      execute: async (options: { marketplace: { name: string }; target: string }) => {
+        if (options.marketplace.name === failFor) throw new Error("no catalog at that source");
+        return { builtDir: `/built/${options.target}`, version: "test", rebuilt: true };
+      },
+    }) as unknown as EnsureBuiltMarketplaceUseCase;
+
+  it("says which marketplace and which tool were skipped", async () => {
+    const { logger } = await sync({
+      marketplaceNames: ["aidd-framework", "broken"],
+      ensureBuilt: failingBuild("broken"),
+    });
+
+    expect(
+      logger.warnMessages.some((w) => w.includes("'broken'") && w.includes("claude")),
+      "the warning must name the marketplace and the tool, or it says nothing actionable"
+    ).toBe(true);
+  });
+
+  it("still syncs the tool, rather than letting one bad source stop the rest", async () => {
+    const { result, written } = await sync({
+      marketplaceNames: ["aidd-framework", "broken"],
+      ensureBuilt: failingBuild("broken"),
+    });
+
+    expect(result.updatedTools).toContain("claude");
+    expect(written?.enabledPlugins).toEqual({ "aidd-context@aidd-framework": true });
+  });
+});
