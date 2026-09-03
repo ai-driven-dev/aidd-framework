@@ -1,3 +1,4 @@
+import { errorMessage } from "../../../domain/describe-error.js";
 import { RUNS_ENTRY } from "../../../domain/models/paths.js";
 import type {
   TelemetryHistoryReading,
@@ -33,12 +34,6 @@ export interface TelemetryRemovalResult {
    * become reachable by having removed the rest, so this is the exact same reading, not a
    * fresh one. */
   readonly history: TelemetryHistoryReading;
-}
-
-// Local rather than `infrastructure/json-file.ts`'s `describeError`: this layer does not
-// import infrastructure, and `scripts/check-cli-layering.mjs` enforces it.
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 /**

@@ -30,8 +30,7 @@ import type { TelemetryEvidenceReader } from "../../../domain/ports/telemetry-ev
 import type { TelemetrySink } from "../../../domain/ports/telemetry-sink.js";
 import type { VersionControl } from "../../../domain/ports/version-control.js";
 import type { VersionReader } from "../../../domain/ports/version-reader.js";
-import { getAiToolConfig } from "../../../domain/tools/registry.js";
-import { resolvePluginsCapability } from "../plugin/translator/project-hooks-materializer.js";
+import { getAiToolConfig, resolvePluginsCapability } from "../../../domain/tools/registry.js";
 
 const DEFAULT_RUNS_DIR_LABEL = "aidd_docs/runs";
 
@@ -189,7 +188,14 @@ export class DiagnoseTelemetryUseCase {
       // `Manifest`'s parser maps over fields it does not guard, so a damaged manifest throws
       // rather than returning null. Reported, never swallowed and never fatal: this is the
       // command a person runs precisely when something is wrong.
-      return { ...buildHostRegistration([]), manifestUnreadable: describeError(error) };
+      // Names the file, because the row directly above says `recorder declared: yes` about
+      // the same one: that row scans the raw JSON for a declaration while this goes through
+      // the manifest's own validation, so a file that parses but fails validation makes the
+      // two rows disagree. Naming it is what tells a person they are one file, read twice.
+      return {
+        ...buildHostRegistration([]),
+        manifestUnreadable: `${this.manifestRepo.path} — ${describeError(error)}`,
+      };
     }
     if (manifest === null) return buildHostRegistration([]);
     const evidence = await Promise.all(

@@ -61,6 +61,25 @@ describe("what a host's own registry says about a plugin AIDD installed", () => 
     expect(only(evidence({ reading: undefined })).answer).toBe("unanswerable");
   });
 
+  /**
+   * Two silences, two different things for a person to do, so never one sentence. A tool
+   * that drives its own CLI keeps a registry somebody could go and measure; a tool that
+   * declares no native activation has none to look for. Getting these the wrong way round
+   * sends someone hunting for a file that does not exist, or tells them nothing is knowable
+   * about a file that is sitting there.
+   */
+  it("says a declared registry is unmeasured, not that none exists", () => {
+    const entry = only(evidence({ reading: undefined, declaresNativeActivation: true }));
+
+    expect(entry.detail).toContain("has established its shape");
+  });
+
+  it("says a host declaring no registry has none to read", () => {
+    const entry = only(evidence({ reading: undefined, declaresNativeActivation: false }));
+
+    expect(entry.detail).toContain("declares no plugin registry");
+  });
+
   // Every measured host keys its registry on `<plugin>@<marketplace>`, so a plugin with no
   // marketplace recorded cannot be looked up anywhere — unanswerable at the source, not a
   // lookup that came back empty.

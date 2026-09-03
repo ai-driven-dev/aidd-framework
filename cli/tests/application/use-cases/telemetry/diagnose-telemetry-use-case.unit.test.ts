@@ -106,6 +106,7 @@ function buildUseCase(options: {
     new InMemoryTelemetrySink(),
     new FakeCurrentVersion("9.9.9-check"),
     options.manifestRepo ?? {
+      path: "/test-project/.aidd/manifest.json",
       load: async () => null,
       save: async () => {},
       delete: async () => {},
@@ -416,6 +417,7 @@ describe("the versions check reports", () => {
  * actually produces: `Manifest`'s parser maps over fields it does not guard. Written as a
  * real implementation of the port rather than a cast, so it cannot drift from it. */
 class ThrowingManifestRepository implements ManifestRepository {
+  readonly path = "/test-project/.aidd/manifest.json";
   constructor(private readonly failure: Error) {}
   async load(): Promise<Manifest | null> {
     throw this.failure;

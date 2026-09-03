@@ -68,9 +68,8 @@ config.json               // comments, then { firstLaunchAt, installedPlugins: [
 3. **Codex records `enabled`, and it is the only key it records.** Every plugin table on the
    machine measured carries `enabled = true` and nothing else. So `enabled = false` is
    possible and unobserved — a state where the host knows the plugin and will still not load
-   it, which is not the same fact as an absent entry. (Counted 27 tables on 2026-09-02 and 23
-   the next day: the count moves with what is installed, so the doc states the invariant and
-   not the number.)
+   it, which is not the same fact as an absent entry. The count is deliberately not stated: it
+   moves with what happens to be installed, so it can carry no argument.
 4. **The architecture already exists.** `HookTrustReader` +
    `hook-trust-reader-adapter.ts` reads `~/.codex/config.toml` to answer one `check` claim,
    with the error handling this needs. What is built here is its sibling, not a new layer —

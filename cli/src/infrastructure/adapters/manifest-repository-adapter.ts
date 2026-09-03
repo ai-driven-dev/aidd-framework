@@ -9,8 +9,12 @@ const MANIFEST_FILENAME = "manifest.json";
 export class ManifestRepositoryAdapter implements ManifestRepository {
   constructor(private readonly projectRoot: string) {}
 
-  private get manifestPath(): string {
+  get path(): string {
     return join(this.projectRoot, AIDD_DIR, MANIFEST_FILENAME);
+  }
+
+  private get manifestPath(): string {
+    return this.path;
   }
 
   private get aiddDir(): string {

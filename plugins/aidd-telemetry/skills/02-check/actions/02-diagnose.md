@@ -86,6 +86,7 @@ judging anything.
 | A plugin the host never registered | its `plugins registered` line is relayed as `not-registered`, naming the registry file, and appears before any plugin that is fine |
 | A plugin whose host registry could not be read | its line is relayed as `unanswerable`, never as `not-registered` |
 | A project with no plugin recorded | the row says so in one sentence, and is never relayed as a failure |
+| The AIDD manifest could not be read | the row names the file and the reason, and no plugin line is relayed — never read as "no plugin recorded" |
 | Measurement is off | the stated half is relayed, then that single line, and the run stops before checking anything |
 | Not a git repository | the stated half is relayed, then that single line, and the run stops before checking anything — never read as "hook fired FAIL" |
 | A healthy install | all four claims read `ok`, each carrying what it was read from |

@@ -47,7 +47,7 @@ function marketplace(): Marketplace {
   });
 }
 
-function manifestWithPlugin(): InMemoryManifestRepository {
+function manifestWithPlugin(marketplace: string = MARKETPLACE): InMemoryManifestRepository {
   const manifest = Manifest.create();
   manifest.addTool("claude", "test", []);
   manifest.addPlugin(
@@ -57,19 +57,19 @@ function manifestWithPlugin(): InMemoryManifestRepository {
       "1.0.0",
       { kind: "github", repo: "ai-driven-dev/framework" },
       true,
-      MARKETPLACE
+      marketplace
     )
   );
   return new InMemoryManifestRepository(manifest);
 }
 
-function buildSync(activator: FakeNativePluginActivator) {
+function buildSync(activator: FakeNativePluginActivator, pluginMarketplace?: string) {
   const registry = new InMemoryMarketplaceRegistry();
   return {
     registry,
     useCase: new MarketplaceSyncSettingsUseCase(
       new InMemoryFileAdapter(),
-      manifestWithPlugin(),
+      manifestWithPlugin(pluginMarketplace),
       registry,
       NO_CATALOG,
       new DeterministicHasher(),
@@ -111,5 +111,35 @@ describe("syncing settings registers the plugin with the host's own CLI", () => 
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
     expect(activator.enabledPlugins).toEqual([]);
+  });
+
+  /**
+   * The half of the disagreement the contract argues hardest for, and the reason the
+   * comparison starts from the manifest rather than from a settings file.
+   *
+   * `mergeEnabledPlugins` skips a plugin whose marketplace does not resolve — silently,
+   * with a bare `continue`. So this plugin reaches no settings file and no host CLI, while
+   * AIDD's own manifest says it is installed. A diagnostic reading settings against a
+   * registry would find both sides absent and call that agreement; reading the manifest
+   * against the registry is what makes it visible.
+   */
+  it("registers nothing for a plugin whose marketplace does not resolve, and says nothing about it", async () => {
+    const activator = new FakeNativePluginActivator({ available: true });
+    const { useCase, registry } = buildSync(activator, "a-marketplace-nobody-added");
+    await registry.save(PROJECT_ROOT, marketplace());
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(activator.enabledPlugins).toEqual([]);
+    // And the manifest still carries it, which is the only place it can now be seen from.
+    const entry = buildHostRegistration([
+      {
+        tool: "claude",
+        plugins: [{ name: PLUGIN, marketplace: "a-marketplace-nobody-added" }],
+        reading: { location: "/registry", refs: new Map() },
+      },
+    ]).entries[0];
+
+    expect(entry?.answer).toBe("not-registered");
   });
 });

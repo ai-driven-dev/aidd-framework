@@ -6,6 +6,7 @@ import type { ManifestRepository } from "../../../src/domain/ports/manifest-repo
  * Holds a single Manifest | null — no disk I/O.
  */
 export class InMemoryManifestRepository implements ManifestRepository {
+  readonly path = "/test-project/.aidd/manifest.json";
   private manifest: Manifest | null;
 
   constructor(seed: Manifest | null = null) {

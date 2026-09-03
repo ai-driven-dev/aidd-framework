@@ -97,7 +97,8 @@ class ClaudeInstalledPluginsReader implements HostPluginRegistryReader {
  * output to a terminal.
  *
  * The one shape it needs is the header Codex writes verbatim, `[plugins."<ref>"]`, and the
- * `enabled` line that follows it. `enabled = false` is carried through as `false` rather
+ * `enabled` key in the table under it. Line-scanning reads that shape wherever it appears,
+ * a string value included, which is why the first occurrence of a ref is the one kept. `enabled = false` is carried through as `false` rather
  * than dropped: a host that knows a plugin and declines it is not a host that never heard
  * of it, and the two must not print alike.
  */
@@ -194,7 +195,11 @@ function scanCodexPluginTables(content: string): ReadonlyMap<string, boolean> {
   for (const [index, line] of lines.entries()) {
     const header = CODEX_PLUGIN_HEADER.exec(line.trim());
     const ref = header?.[1];
-    if (ref === undefined) continue;
+    // First occurrence wins. TOML forbids defining a table twice, so a second line that
+    // looks like this header is necessarily not one — the likeliest source being a header
+    // spelled inside a multi-line string value. Last-write-wins would let that text
+    // override the real table's own `enabled`.
+    if (ref === undefined || refs.has(ref)) continue;
     refs.set(ref, enabledInTableBody(lines, index + 1));
   }
   return refs;

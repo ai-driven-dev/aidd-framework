@@ -9,16 +9,33 @@
  * In the domain rather than beside the adapters that raise these errors: a use case has to
  * describe one too, and a use case may not import infrastructure. Pure, no I/O.
  *
- * Shared rather than copied. Three call sites had grown their own version of this rule and a
- * fourth was inlined; this repository's norm is that a duplicate is either justified against
- * its neighbour or removed, and none of the four had a reason the others did not. The one
- * genuine exception stays where it is: `person-identity-adapter.ts` describes a JSON parse
- * error alone and reads `.message` unconditionally, which is a different rule rather than a
- * worse copy of this one.
+ * Shared rather than copied. `hook-trust-reader-adapter.ts` carried this rule, the host
+ * registry reader grew a second copy of it, and the telemetry diagnostic inlined a third;
+ * this repository's norm is that a duplicate is either justified against its neighbour or
+ * removed, and none of the three had a reason the others did not.
+ *
+ * A different rule lives in `infrastructure/json-file.ts` and returns `.message` alone. That
+ * is not a worse copy of this one — it describes a JSON parse error, which carries no `code`
+ * worth preferring — and it stays where it is.
  */
 export function describeError(error: unknown): string {
   if (error instanceof Error && "code" in error && typeof error.code === "string") {
     return error.code;
   }
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * The message alone, for a failure whose `code` says nothing worth reading — a JSON parse
+ * error being the case that matters here, where the `SyntaxError`'s message is the whole
+ * answer and there is no `code` at all.
+ *
+ * Beside `describeError` rather than in a second module, because the two are one decision
+ * with two answers and a reader choosing between them should see both at once. Two call
+ * sites had each grown a byte-identical private copy, both justified by "this layer does not
+ * import infrastructure" — true when the only shared version lived there, and no longer a
+ * reason now that one lives here.
+ */
+export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }

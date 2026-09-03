@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import type { PluginsCapability } from "../capabilities/plugins-capability.js";
 import {
   CategoryMismatchError,
   UnknownToolCategoryError,
@@ -99,4 +100,20 @@ export async function hasToolSignals(
     if (/^name:\s*['"]?aidd[_:]/m.test(content)) matches.push(join(config.signalDir, filePath));
   }
   return matches;
+}
+
+/**
+ * A tool's plugin capability, or `null` when it declares none.
+ *
+ * Here rather than beside one of its callers: it reads nothing but this registry, and its
+ * callers now span three of them — the plugin translators, plugin removal, and the telemetry
+ * diagnostic. A use case reaching into a hooks materializer to ask what a tool declares is a
+ * placement the layering gate happens to permit and the project's own rule does not.
+ */
+export function resolvePluginsCapability(toolId: AiToolId): PluginsCapability | null {
+  const toolConfig = getToolConfig(toolId);
+  if (!isAiTool(toolConfig)) return null;
+  const caps = toolConfig.capabilities as Record<string, unknown>;
+  if (!("plugins" in caps)) return null;
+  return caps.plugins as PluginsCapability;
 }

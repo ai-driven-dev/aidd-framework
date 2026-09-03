@@ -2,6 +2,7 @@ import type {
   TelemetryLocalRead,
   TelemetryLocalReadDeclared,
 } from "../../../domain/capabilities/telemetry-capability.js";
+import { errorMessage } from "../../../domain/describe-error.js";
 import {
   resolveSessionProject,
   type SessionProject,
@@ -280,12 +281,6 @@ function mergeToolReports(
   sessions: readonly LocalCostSessionReport[]
 ): readonly LocalCostToolReport[] {
   return AI_TOOL_IDS.map((tool) => mergeOneTool(tool, sessions));
-}
-
-// Local rather than `infrastructure/json-file.ts`'s `describeError`: this layer does not
-// import infrastructure, and the check at `scripts/check-cli-layering.mjs` enforces it.
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 const REFUSED_REASON =
