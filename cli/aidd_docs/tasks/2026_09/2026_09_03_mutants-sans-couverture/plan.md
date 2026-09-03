@@ -52,7 +52,7 @@ Everything else is covered where a regression would be visible to someone using 
 | 2 | Copilot's content transforms | 173 | to write after phase 1 is measured |
 | 3 | The marketplace sync flow | 100 | idem |
 | 4 | What the displays print | 130 | idem |
-| 5 | Three adapters, at the integration tier | 105 | idem |
+| 5 | Three adapters — two tested, one deleted | 143 measured (105 estimated) | [`phase-5.md`](./phase-5.md) |
 
 Only phase 1 is written. The rest are named so the shape is visible, and will be written once
 phase 1 has been re-measured — planning five phases of test-writing before knowing what one
