@@ -14,6 +14,7 @@ const {
   tightenOwnedFile,
   PRIVATE_DIR_MODE,
 } = require("./repo.cjs");
+const { repairCommitTrailerHook } = require("./trailer-repair.cjs");
 const { TOOLS_BY_HOST, readCwd, readSessionId } = require("./tools/index.cjs");
 const { pluginVersion } = require("./plugin-version.cjs");
 
@@ -219,6 +220,15 @@ function handleSessionStart(payload, host, sessionId) {
   const target = resolveWriteTarget(readCwd(host, payload));
   if (!target) return;
   const { projectId, projectRemote, dir, repoRoot, worktreeId, worktreeRepoId } = target;
+
+  // Before the run file, and outside the guard below: the commit trailer's call site can go
+  // missing in a repository whose `prepare-commit-msg` another tool regenerates, and a
+  // session that already has a run file is exactly the one whose second SessionStart should
+  // still put it back. Here rather than in `journal.cjs` because this is the only place that
+  // already holds an *enabled* repository's hooks directory - `resolveWriteTarget` gated on
+  // that and paid the `rev-parse` for it - and buying a module boundary with a second
+  // process on every session start is not a trade this hook makes.
+  repairCommitTrailerHook(target.hooksDir);
 
   // SessionStart is not documented to fire once per session_id - `source` takes values
   // beyond `startup` - so this guard prevents a second file for one vendor_id.

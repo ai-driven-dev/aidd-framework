@@ -78,25 +78,41 @@ function repositoryNameFromCommonDir(commonDir) {
   return name === "" || name === "." || name === ".." ? null : sanitizePathSegment(name);
 }
 
-// One `git rev-parse`, never three: a plain checkout pays exactly the shellout it paid
-// before worktrees were named, and reads two more words from the same stdout. `getRepoRoot` above
-// is left alone - it is exported, and asking it for more than the root would change what
-// its name promises.
+// One `git rev-parse`, never four: a plain checkout pays exactly the shellout it paid
+// before worktrees were named, and reads three more words from the same stdout. `getRepoRoot`
+// above is left alone - it is exported, and asking it for more than the root would change
+// what its name promises.
+//
+// `--git-path hooks` is the fourth word, and it is asked here rather than by a second call
+// for two reasons. It costs nothing extra. And it honours `core.hooksPath`, which is the
+// only way to find the directory git will actually run a hook from - joining `.git/hooks`
+// by hand is right until somebody uses lefthook, husky, or any of the tools that move it.
+//
+// From a linked worktree it answers the *common* hooks directory, which is correct: git
+// runs one set of hooks for every worktree of a repository.
 function getRepoLocation(cwd) {
   if (typeof cwd !== "string" || !cwd) return null;
   try {
     const result = spawnSync(
       "git",
-      ["rev-parse", "--show-toplevel", "--git-common-dir", "--git-dir"],
+      ["rev-parse", "--show-toplevel", "--git-common-dir", "--git-dir", "--git-path", "hooks"],
       { cwd, encoding: "utf8", env: gitEnv() }
     );
     if (result.status !== 0) return null;
     // A git too old for one of the later options fails the whole call, so this only ever
     // reads short output when git answered something unexpected - in which case the
-    // worktree fields stay absent rather than being guessed at.
-    const [root, commonDir, gitDir] = String(result.stdout).split("\n").map((part) => part.trim());
+    // worktree fields stay absent rather than being guessed at. `hooksDir` follows the same
+    // rule and for the same reason: absent rather than guessed, and its absence costs the
+    // fields before it nothing.
+    const [root, commonDir, gitDir, hooksDir] = String(result.stdout)
+      .split("\n")
+      .map((part) => part.trim());
     if (!root) return null;
-    return { repoRoot: root, ...worktreeFields(cwd, commonDir, gitDir) };
+    return {
+      repoRoot: root,
+      ...worktreeFields(cwd, commonDir, gitDir),
+      ...(hooksDir ? { hooksDir: path.resolve(root, hooksDir) } : {}),
+    };
   } catch {
     return null;
   }
