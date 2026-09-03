@@ -57,13 +57,20 @@ config.json               // comments, then { firstLaunchAt, installedPlugins: [
    on it — verified, `SyntaxError: Unexpected token '/'`. A reader that let that throw fall
    through as "no plugins registered" would print a zero where the honest answer is *unknown*.
    This is the exact failure this layer exists to refuse, waiting in the first file it reads.
-2. **`installed_plugins.json` records a `scope`** — `user`, `project`, `local` observed —
-   but its `installPath` always points inside the plugins cache, never at a project. So the
-   registry says *this machine can load this ref*, never *this project wants it*.
-3. **Codex records `enabled`, and it is the only key it records.** 27 plugin tables on the
-   machine measured, every one `enabled = true`, and nothing else under any of them. So
-   `enabled = false` is possible and unobserved — a state where the host knows the plugin and
-   will still not load it, which is not the same fact as an absent entry.
+2. **`installed_plugins.json` binds a ref to a project.** Its `installPath` always points
+   inside the plugins cache — but that is not the whole entry. Read across all 115 entries
+   rather than the first one, they carry `projectPath` on 100 of them, exactly the 99 at
+   `scope: "project"` plus the one at `"local"`; the 15 user-scoped entries carry none,
+   because they apply everywhere. So the registry does say which project wants a ref, and
+   `aidd` writes every one at project scope (`claude-cli-adapter.ts`'s `PROJECT_SCOPE_ARGS`).
+   A reader that ignored it would report a plugin installed for another project as one this
+   host will load here.
+3. **Codex records `enabled`, and it is the only key it records.** Every plugin table on the
+   machine measured carries `enabled = true` and nothing else. So `enabled = false` is
+   possible and unobserved — a state where the host knows the plugin and will still not load
+   it, which is not the same fact as an absent entry. (Counted 27 tables on 2026-09-02 and 23
+   the next day: the count moves with what is installed, so the doc states the invariant and
+   not the number.)
 4. **The architecture already exists.** `HookTrustReader` +
    `hook-trust-reader-adapter.ts` reads `~/.codex/config.toml` to answer one `check` claim,
    with the error handling this needs. What is built here is its sibling, not a new layer —

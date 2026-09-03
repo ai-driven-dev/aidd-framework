@@ -1,3 +1,4 @@
+import { describeError } from "../../../domain/describe-error.js";
 import { resolveSessionAnchor } from "../../../domain/models/session-anchor.js";
 import { attributeMoment, buildStepIntervals } from "../../../domain/models/step-attribution.js";
 import {
@@ -161,7 +162,7 @@ export class DiagnoseTelemetryUseCase {
       identity: await this.readIdentitySetup(),
       recordsLocation: { path: this.telemetrySink.rootDir },
       recorderDeclaration,
-      hostRegistration: await this.readHostRegistration(),
+      hostRegistration: await this.readHostRegistration(options.projectRoot),
       versions: {
         cli: this.currentVersion.get(),
         plugin: pluginVersionFrom(await this.runJournalReader.list()),
@@ -180,7 +181,7 @@ export class DiagnoseTelemetryUseCase {
    * `buildHostRegistration` turns into `unanswerable` — never into agreement. A manifest
    * that cannot be loaded contributes nothing, the same normal state as a project with no
    * plugins installed. */
-  private async readHostRegistration(): Promise<TelemetryHostRegistrationSetup> {
+  private async readHostRegistration(projectRoot: string): Promise<TelemetryHostRegistrationSetup> {
     let manifest: Awaited<ReturnType<ManifestRepository["load"]>>;
     try {
       manifest = await this.manifestRepo.load();
@@ -188,25 +189,24 @@ export class DiagnoseTelemetryUseCase {
       // `Manifest`'s parser maps over fields it does not guard, so a damaged manifest throws
       // rather than returning null. Reported, never swallowed and never fatal: this is the
       // command a person runs precisely when something is wrong.
-      const shaped = error as { code?: string; message?: string };
-      return {
-        ...buildHostRegistration([]),
-        manifestUnreadable: shaped.code ?? shaped.message ?? String(error),
-      };
+      return { ...buildHostRegistration([]), manifestUnreadable: describeError(error) };
     }
     if (manifest === null) return buildHostRegistration([]);
     const evidence = await Promise.all(
-      AI_TOOL_IDS.map(async (tool) => ({
+      // Filtered before the read, never after: a tool with no plugin recorded contributes no
+      // entry, so opening its registry would be a home-directory read whose result is thrown
+      // away on every `check`.
+      AI_TOOL_IDS.filter((tool) => manifest.getPlugins(tool).length > 0).map(async (tool) => ({
         tool,
         plugins: manifest.getPlugins(tool).map((plugin) => ({
           name: plugin.name,
           marketplace: plugin.marketplace,
         })),
-        reading: await this.hostRegistries.get(tool)?.read(),
+        reading: await this.hostRegistries.get(tool)?.read(projectRoot),
         declaresNativeActivation: resolvePluginsCapability(tool)?.nativeActivation != null,
       }))
     );
-    return buildHostRegistration(evidence.filter((entry) => entry.plugins.length > 0));
+    return buildHostRegistration(evidence);
   }
 
   // `PersonIdentityStore.readStrict()` promises to throw on a damaged file, unlike the

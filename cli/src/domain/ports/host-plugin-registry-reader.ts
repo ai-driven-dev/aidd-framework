@@ -31,5 +31,9 @@ export interface HostPluginRegistryReading {
 }
 
 export interface HostPluginRegistryReader {
-  read(): Promise<HostPluginRegistryReading>;
+  /** `projectRoot` because a registry may bind a ref to one project rather than to the
+   * machine — Claude's does, on 100 of the 115 entries measured. A reader whose host records
+   * no such binding ignores it and says so in its own doc, rather than silently answering a
+   * narrower question than it was asked. */
+  read(projectRoot: string): Promise<HostPluginRegistryReading>;
 }

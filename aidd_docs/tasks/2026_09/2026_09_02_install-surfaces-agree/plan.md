@@ -8,7 +8,7 @@ spec: ./spec.md
 
 ## The shape, and why it is not a fifth claim
 
-`telemetry-check-display.ts:42` states the rule the report already follows: a setup row is
+`telemetry-check-display.ts` states the rule the report already follows: a setup row is
 *"a sentence, never the claims' `ok`/`FAIL`/`--` verdict column — that vocabulary is reserved
 for a grade, and nothing here is graded yet."*
 
@@ -40,7 +40,7 @@ holds no tool name.
 
 | # | Does | Touches |
 | --- | --- | --- |
-| 1 | The model: `TelemetryHostRegistrationSetup`, five answers, on `TelemetrySetup` | `domain/models/telemetry-setup.ts` |
+| 1 | The model: `TelemetryHostRegistrationSetup`, four answers, on `TelemetrySetup` | `domain/models/telemetry-setup.ts` |
 | 2 | The port: `HostPluginRegistryReader`, sibling of `HookTrustReader` | `domain/ports/host-plugin-registry-reader.ts` |
 | 3 | The adapter: one reader per measured host, JSON / line-scanned TOML / JSONC | `infrastructure/adapters/host-plugin-registry-reader-adapter.ts` |
 | 4 | The comparison: manifest -> `enabledPlugins` -> registry, in the use-case | `use-cases/telemetry/diagnose-telemetry-use-case.ts`, `deps.ts` |
@@ -53,7 +53,7 @@ it would have drawn separates two flavours of one outcome. See `spec.md`.
 
 ## Test strategy
 
-- **Unit** — the five answers, from evidence shapes. No filesystem.
+- **Unit** — the four answers, from evidence shapes. No filesystem.
 - **Integration** — each adapter against a written fixture: Claude's JSON, Codex's TOML,
   Copilot's JSONC (written from the recorded shape, never copied from the real file), plus
   absent, unreadable and `enabled = false`.

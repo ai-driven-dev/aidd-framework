@@ -6,6 +6,7 @@ import type {
 import type { TelemetryExportLeftover } from "../../domain/models/telemetry-export-leftover.js";
 import type {
   TelemetryAllowedSetup,
+  TelemetryHostRegistrationAnswer,
   TelemetryHostRegistrationSetup,
   TelemetryIdentitySetup,
   TelemetryPluginVersionSetup,
@@ -114,13 +115,16 @@ function describeHostRegistration(registration: TelemetryHostRegistrationSetup):
   }
   const entries = registration.entries;
   if (entries.length === 0) return "no plugin recorded for any tool";
-  const rank: Record<string, number> = {
+  // Keyed on the answer type, not on `string`: a fifth answer then fails to compile here
+  // rather than sorting silently last, which is how a new "will not load" state would end up
+  // printed below the ones that are fine.
+  const rank: Record<TelemetryHostRegistrationAnswer, number> = {
     "not-registered": 0,
     "registered-disabled": 1,
     unanswerable: 2,
     registered: 3,
   };
-  const ordered = [...entries].sort((a, b) => (rank[a.answer] ?? 9) - (rank[b.answer] ?? 9));
+  const ordered = [...entries].sort((a, b) => rank[a.answer] - rank[b.answer]);
   return ordered
     .map((entry) => `\n    ${entry.tool}/${entry.plugin}: ${entry.answer} — ${entry.detail}`)
     .join("");

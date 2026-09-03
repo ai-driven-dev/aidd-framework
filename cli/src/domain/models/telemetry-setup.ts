@@ -172,10 +172,6 @@ export interface TelemetryHostRegistrationSetup {
   /** One per plugin AIDD installed for a tool whose registration can be asked about at
    * all. Empty when the manifest records no plugin, which is a normal state, not a fault. */
   readonly entries: readonly TelemetryHostRegistrationEntry[];
-  /** Every registry location consulted, whatever each one answered, so a person can go and
-   * look at the same file this did. The same set regardless of the outcome, mirroring
-   * `TelemetryRecorderDeclarationSetup.locationsChecked`. */
-  readonly locationsChecked: readonly string[];
   /** Why AIDD's own manifest could not be read, when it could not.
    *
    * Its own field rather than an absent-entries silence, and this is not defensive
@@ -260,17 +256,13 @@ export function buildHostRegistration(
   evidence: readonly TelemetryHostRegistrationEvidence[]
 ): TelemetryHostRegistrationSetup {
   const entries: TelemetryHostRegistrationEntry[] = [];
-  const locationsChecked: string[] = [];
   for (const item of evidence) {
     const { tool, plugins, reading } = item;
-    if (reading !== undefined && !locationsChecked.includes(reading.location)) {
-      locationsChecked.push(reading.location);
-    }
     for (const plugin of plugins) {
       entries.push(hostRegistrationEntry(tool, plugin, reading, item.declaresNativeActivation));
     }
   }
-  return { entries, locationsChecked };
+  return { entries };
 }
 
 function hostRegistrationEntry(
@@ -302,9 +294,6 @@ function hostRegistrationEntry(
 /** What one registry says about one ref, given the reading it produced. Split from the
  * entry it becomes so the two absences above — no ref to ask about, and no registry to ask
  * — stay visibly separate from the four answers a registry can give. */
-/** What one registry says about one ref. Split from the entry it becomes so the absences —
- * no ref to ask about, and no registry that answered — stay visibly separate from the three
- * answers a registry that did answer can give. */
 function askRegistry(
   tool: AiToolId,
   ref: string,

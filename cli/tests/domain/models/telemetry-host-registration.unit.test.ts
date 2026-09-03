@@ -71,16 +71,16 @@ describe("what a host's own registry says about a plugin AIDD installed", () => 
     expect(entry.ref).toBeUndefined();
   });
 
-  it("names every registry it consulted once, whatever each answered", () => {
+  it("gives every plugin its own entry, across tools", () => {
     const result = buildHostRegistration([
       evidence(),
       evidence({ plugins: [{ name: "aidd-dev", marketplace: "aidd-framework" }] }),
     ]);
 
-    expect(result.locationsChecked).toEqual([REGISTRY]);
+    expect(result.entries.map((e) => e.plugin)).toEqual(["aidd-telemetry", "aidd-dev"]);
   });
 
-  it("reports no entry, and no location, for a project with nothing installed", () => {
-    expect(buildHostRegistration([])).toEqual({ entries: [], locationsChecked: [] });
+  it("reports no entry for a project with nothing installed", () => {
+    expect(buildHostRegistration([])).toEqual({ entries: [] });
   });
 });
