@@ -13,6 +13,7 @@ import {
   stripToolSuffix,
 } from "../../formats/command.js";
 import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
+import { CURSOR_PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token-rewrite.js";
 import { CONFIG_MCP } from "../../models/framework.js";
 import type {
   AiTool,
@@ -38,6 +39,7 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
   {
     kind: "ai",
     toolId: "cursor",
+    displayName: "Cursor",
     directory: DIRECTORY,
     toolSuffix: TOOL_SUFFIX,
     signalDir: ".cursor/commands",
@@ -113,16 +115,50 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         // (base-relative keys like "aidd-context/commands/foo.md" per D2).
         pluginsDir: "",
         pluginManifestRelativePath: null,
-        // plugin-local: Cursor auto-discovers hooks.json and mcp.json at the plugin root.
+        // plugin-local: Cursor auto-discovers mcp.json at the plugin root, but never a
+        // plugin-scope hooks.json - three probes (headless/interactive, auto-discovered
+        // and explicit --plugin-dir, with and without a manifest) fired zero of seven
+        // events. Only a project-scope .cursor/hooks.json is ever observed firing (see
+        // measurements.md Phase 4/6), so hooksDestination routes hooks there instead of
+        // here; hooksRelativePath/hooksContentFormat stay declared for the shape they
+        // still describe but are no longer read for Cursor's own install.
         acceptsHooks: true,
+        pluginRootToken: CURSOR_PLUGIN_ROOT_TOKEN,
         hooksRelativePath: "hooks.json",
         hooksContentFormat: "cursor",
+        hooksDestination: "project",
         acceptsMcp: true,
         mcpRelativePath: "mcp.json",
         installScope: "user",
         userPluginsDir: (h) => join(h, ".cursor", "plugins", "local"),
       }),
     },
+
+    // Measured: Cursor writes no token count in any file it produces — there is nothing
+    // on disk for a local reader to find. A gap this deliverable names rather than fills;
+    // see spec.md non-goals.
+    // Re-measured 2026-09-02 against a real Cursor install, rather than carried forward as
+    // a declaration nobody had checked lately. Its own local stores hold no consumption at
+    // all: 76 chat stores under `~/.cursor/chats/*/store.db` (a `blobs`/`meta` pair of
+    // SQLite tables), and not one mentions `inputTokens`, `outputTokens`, `totalTokens`,
+    // `promptTokens` or `completionTokens`, nor carries a `usage` object.
+    // `~/.cursor/ai-tracking/ai-code-tracking.db` does count things — `linesAdded`,
+    // `composerLinesAdded`, `humanLinesAdded`, an AI percentage per commit — but those
+    // measure how much code came from the assistant, never what it consumed. There is no
+    // token or cost column anywhere in it.
+    //
+    // So this is a fact about Cursor, not a reader nobody has written yet: the number does
+    // not exist locally to be read. `by_tool` prints this sentence where a figure would go,
+    // which is the whole reason the reason travels with the declaration.
+    telemetryLocalRead: {
+      kind: "unsupported",
+      reason: "It writes no token count in any file it produces.",
+    },
+    // A declared task no longer needs a written path in the payload at all - it reads a
+    // tool call's own arguments the same way a step's skill name is read, and Cursor's
+    // postToolUse payload carries tool_input on every call, exactly like Claude Code's.
+    telemetryTaskAttributable: true,
+    telemetryJournalHost: "cursor",
 
     rewriteContent(content: string, docsDir: string): string {
       return baseRewriteContent(content, DIRECTORY, docsDir)

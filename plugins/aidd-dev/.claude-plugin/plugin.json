@@ -1,14 +1,13 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "aidd-dev",
-  "version": "2.3.1",
-  "description": "Code transformation: Dev SDLC orchestrator (code-shipping pipeline), plan, assert, audit, review, test, refactor, debug, for-sure. Hosts engineering agents.",
+  "version": "2.4.1",
+  "description": "Code transformation: plan, implement, assert, audit, review, test, refactor, debug, for-sure, plus short standalone Browser QA evidence. Hosts engineering agents.",
   "author": {
     "name": "AI-Driven Dev",
     "url": "https://github.com/ai-driven-dev"
   },
   "skills": [
-    "./skills/00-sdlc",
     "./skills/01-plan",
     "./skills/02-implement",
     "./skills/03-assert",
@@ -18,7 +17,8 @@
     "./skills/07-refactor",
     "./skills/08-debug",
     "./skills/09-for-sure",
-    "./skills/10-todo"
+    "./skills/10-todo",
+    "./skills/11-browser-qa"
   ],
   "agents": [
     "./agents/executor.md",

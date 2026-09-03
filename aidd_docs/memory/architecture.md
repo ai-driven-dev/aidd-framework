@@ -1,69 +1,46 @@
 # Architecture
 
-## Language/Framework
+The macro technical shape: the stack, how the pieces fit, and the decisions behind them. Point to the code, do not restate it.
 
-```json
-{
-  "runtime": "Node.js 20",
-  "primary_format": "Markdown (skills, agents, rules, memory)",
-  "package_manager": "pnpm",
-  "devDependencies": ["@commitlint/cli", "@commitlint/config-conventional", "lefthook"]
-}
-```
+> CLI internals (layers, domain models, install flows, adapters) live in [`cli/aidd_docs/memory/architecture.md`](../../cli/aidd_docs/memory/architecture.md).
 
-```mermaid
-flowchart LR
-    Marketplace[".claude-plugin/marketplace.json"] --> Plugins["plugins/"]
-    Plugins --> Context["aidd-context"]
-    Plugins --> Dev["aidd-dev"]
-    Plugins --> VCS["aidd-vcs"]
-    Plugins --> PM["aidd-pm"]
-    Plugins --> Refine["aidd-refine"]
-    Plugins --> Orchestrator["aidd-orchestrator"]
-    CLI["@ai-driven-dev/cli"] -- installs --> Plugins
-```
+## Stack
 
-### Naming Conventions
+| Part | What |
+| --- | --- |
+| Product | markdown — skills, agents, rules, templates. No framework runtime; an LLM interprets them. |
+| Delivery | Node `>=22.12`, pnpm. `cli/` (the `aidd` binary) and `kanban/` (bundled into it from source). |
+| Manifest | `.claude-plugin/marketplace.json`, 7 plugins, versioned per plugin. |
 
-- **Plugins**: `aidd-<domain>` — kebab-case
-- **Skills**: `NN-slug/SKILL.md` — numbered prefix + kebab-case slug
-- **Actions**: `NN-action-name.md` — numbered, kebab-case
-- **Agents**: `name.md` — flat, kebab-case
-- **Rules**: `N-name.md` — numbered, kebab-case
-- **Memory files**: `topic.md` — kebab-case noun
-
-## Plugin Structure
-
-Each plugin follows this layout:
-
-```mermaid
-flowchart TD
-    Plugin["plugins/aidd-X/"] --> ClaudePlugin[".claude-plugin/plugin.json"]
-    Plugin --> Skills["skills/NN-name/"]
-    Plugin --> Agents["agents/"]
-    Skills --> SkillMd["SKILL.md"]
-    Skills --> Actions["actions/NN-action.md"]
-    Skills --> Assets["assets/"]
-```
-
-## Services Communication
-
-### CLI to Marketplace
+## How it fits together
 
 ```mermaid
 flowchart LR
-    User["Developer"] -- "aidd plugin add" --> CLI["@ai-driven-dev/cli"]
-    CLI -- reads --> Marketplace[".claude-plugin/marketplace.json"]
-    CLI -- copies --> TargetRepo["target repo's AI tool dir"]
+    Manifest[".claude-plugin/marketplace.json"] -->|lists| Plugins["plugins/ · 7"]
+    Plugins -->|ships| Surfaces["skills · agents · commands · hooks · rules"]
+    CLI["cli/ · aidd"] -->|reads| Manifest
+    CLI -->|installs| Target["a project's AI tool dir"]
+    Kanban["kanban/"] -->|bundled from source| CLI
+    Editor["AI coding tool"] -->|invokes| Surfaces
 ```
 
-### External Services
+`cli/` and `kanban/` are workspaces of this repo, not outside consumers: type-checked, tested and released here.
 
-#### GitHub Package Registry
+## Key decisions
 
-```mermaid
-flowchart LR
-    CI["GitHub Actions"] -- publishes --> NPM["npm.pkg.github.com/@ai-driven-dev/cli"]
-    CI -- creates --> Release["GitHub Release + assets"]
-    BuildScript["scripts/build-dist.sh"] -- generates --> Dist["plugin dist archives"]
-```
+| Decision | Why |
+| --- | --- |
+| Knowledge and execution separated by a firewall | knowledge plugins produce artifacts you read, never write or run application source |
+| Concern decides placement, not existence | a missing capability goes to the plugin whose concern owns it; the caller delegates |
+| A skill is a router | `SKILL.md` dispatches to actions or protocols; the only place a capability is addressed by name |
+| Recipe skills discover providers at runtime | by description matching. Only agent permission lists and orchestration references name a provider |
+| `kanban/` never imports `cli/` | the host injects through `KanbanCommandDeps` (`kanban/src/presentation/kanban-deps.ts`) |
+
+The concern-to-plugin taxonomy is canonical in [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md).
+
+## Gotchas
+
+- A plugin never contains its own tests — `hooks/` ships recursively into user projects.
+- A skill never links outside itself: the tree ships both flat and as a marketplace, so no relative path survives both.
+- Bundled hooks run Node. No `node` on `PATH`, no memory refresh.
+- `cli/` reaches into `kanban/src/` by relative path, so `kanban/`'s deps must be installed before any `cli` typecheck, test or build.

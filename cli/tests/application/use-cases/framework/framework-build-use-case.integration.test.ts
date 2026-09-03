@@ -17,7 +17,10 @@ import { seedFromDirectory } from "../../../helpers/ports/seed-from-directory.js
 
 const FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework");
 const SOURCE_DIR = FIXTURE_DIR;
-const OUT_DIR = "/tmp/aidd-build-test-out";
+// resolve(), not the bare literal: on Windows path.resolve treats a leading "/" as
+// drive-relative and prepends the current drive, so production's own resolve(outDir)
+// would otherwise write under a different key than this constant's raw string names.
+const OUT_DIR = resolve("/tmp/aidd-build-test-out");
 
 // Minimal plugin manifest JSON schema: only "name" required.
 const MINIMAL_MANIFEST_SCHEMA = {

@@ -1,5 +1,30 @@
 # Changelog
 
+## [2.4.1](https://github.com/ai-driven-dev/framework/compare/aidd-dev-v2.4.0...aidd-dev-v2.4.1) (2026-08-07)
+
+
+### Bug Fixes
+
+* **framework:** leave a fenced block alone when normalising Process steps ([#604](https://github.com/ai-driven-dev/framework/issues/604)) ([019486f](https://github.com/ai-driven-dev/framework/commit/019486f5bc3ab0d91f43a527c05f9a16e322f03a))
+
+
+### Refactoring
+
+* **framework:** one home for the skill contract ([#601](https://github.com/ai-driven-dev/framework/issues/601)) ([415a777](https://github.com/ai-driven-dev/framework/commit/415a77706c84277036dc7470d6dc329f9abde1de))
+
+## [2.4.0](https://github.com/ai-driven-dev/framework/compare/aidd-dev-v2.3.1...aidd-dev-v2.4.0) (2026-08-06)
+
+
+### Features
+
+* **framework:** add QA and communication evaluations ([#512](https://github.com/ai-driven-dev/framework/issues/512)) ([871d192](https://github.com/ai-driven-dev/framework/commit/871d1926e9944af231b15951d54bfe6364234536))
+
+
+### Refactoring
+
+* **orchestrator:** replace SDLC actions with protocols ([#517](https://github.com/ai-driven-dev/framework/issues/517)) ([ed81604](https://github.com/ai-driven-dev/framework/commit/ed816044709b2b7081cc00ad2103a8571bf0ad6c))
+* **plugins:** action citations use markdown links, not @ ([c5da712](https://github.com/ai-driven-dev/framework/commit/c5da7126ef30354e17d4665300bd88481fc7c816))
+
 ## [2.3.1](https://github.com/ai-driven-dev/framework/compare/aidd-dev-v2.3.0...aidd-dev-v2.3.1) (2026-07-10)
 
 

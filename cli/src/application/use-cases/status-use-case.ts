@@ -1,4 +1,3 @@
-import { homedir as nodeHomedir } from "node:os";
 import { join } from "node:path";
 import type { FileHash } from "../../domain/models/file.js";
 import type { Manifest } from "../../domain/models/manifest.js";
@@ -14,6 +13,7 @@ import {
   toolIdsForCategory,
 } from "../../domain/tools/registry.js";
 import { NoManifestError, ToolNotInstalledError } from "../errors.js";
+import type { DetectPluginDriftUseCase } from "./shared/detect-plugin-drift-use-case.js";
 
 type FileStatusKind = "modified" | "deleted" | "added";
 
@@ -34,24 +34,34 @@ interface PluginDriftEntry {
   driftedFiles: string[];
 }
 
-interface StatusReport {
+export interface StatusReport {
   tools: ToolStatus[];
   pluginDrift: PluginDriftEntry[];
   inSync: boolean;
 }
 
-interface StatusOptions {
+export interface StatusOptions {
   projectRoot: string;
   filterToolId?: ToolId;
   category?: ToolCategory;
   pluginName?: string;
 }
 
-export class StatusUseCase {
+/**
+ * The question an orchestrator asks of status: one report per scope. Callers that only
+ * ask depend on this, not on the class that answers it - so a double is a real
+ * implementation rather than a cast.
+ */
+export interface StatusQuery {
+  execute(options: StatusOptions): Promise<StatusReport>;
+}
+
+export class StatusUseCase implements StatusQuery {
   constructor(
     private readonly fs: FileReader,
     private readonly manifestRepo: ManifestRepository,
-    private readonly hasher: Hasher
+    private readonly hasher: Hasher,
+    private readonly detectPluginDrift: DetectPluginDriftUseCase
   ) {}
 
   async execute(options: StatusOptions): Promise<StatusReport> {
@@ -203,67 +213,16 @@ export class StatusUseCase {
     projectRoot: string,
     pluginName?: string
   ): Promise<PluginDriftEntry[]> {
-    const result: PluginDriftEntry[] = [];
-    for (const toolId of toolIds) {
-      const entries = await this.checkPluginsForTool(
-        toolId as AiToolId,
-        manifest,
-        projectRoot,
-        pluginName
-      );
-      result.push(...entries);
-    }
-    return result;
-  }
-
-  private async checkPluginsForTool(
-    toolId: AiToolId,
-    manifest: Manifest,
-    projectRoot: string,
-    pluginName?: string
-  ): Promise<PluginDriftEntry[]> {
-    const plugins = manifest.getPlugins(toolId);
-    const targets = pluginName ? plugins.filter((p) => p.name === pluginName) : plugins;
-    const baseDir = this.resolvePluginBaseDir(toolId, projectRoot);
-    const result: PluginDriftEntry[] = [];
-    for (const plugin of targets) {
-      // baseDir is projectRoot for project-scope, or homedir-resolved path for user-scope plugins (see D3 in 192-cursor-mode-b-plan)
-      const driftedFiles = await this.checkOnePluginDrift(plugin.files, baseDir);
-      if (driftedFiles.length > 0) {
-        result.push({ toolId, pluginName: plugin.name, driftedFiles });
-      }
-    }
-    return result;
-  }
-
-  private resolvePluginBaseDir(toolId: AiToolId, projectRoot: string): string {
-    const toolConfig = getToolConfig(toolId);
-    if (!toolConfig || !("capabilities" in toolConfig)) return projectRoot;
-    const caps = toolConfig.capabilities as Record<string, unknown>;
-    if (!("plugins" in caps)) return projectRoot;
-    const pluginsCap = caps.plugins as {
-      installScope: "project" | "user";
-      resolvePluginsBaseDir: (projectRoot: string, homedir: string) => string;
-    };
-    if (pluginsCap.installScope !== "user") return projectRoot;
-    return pluginsCap.resolvePluginsBaseDir(projectRoot, nodeHomedir());
-  }
-
-  private async checkOnePluginDrift(
-    files: ReadonlyMap<string, string>,
-    // baseDir is projectRoot for project-scope, or homedir-resolved path for user-scope plugins (see D3 in 192-cursor-mode-b-plan)
-    baseDir: string
-  ): Promise<string[]> {
-    const drifted: string[] = [];
-    for (const [relativePath, expectedHashValue] of files.entries()) {
-      const fullPath = join(baseDir, relativePath);
-      if (!(await this.fs.fileExists(fullPath))) {
-        drifted.push(relativePath);
-      } else {
-        const diskHash = await this.fs.readFileHash(fullPath);
-        if (diskHash.value !== expectedHashValue) drifted.push(relativePath);
-      }
-    }
-    return drifted;
+    const drifts = await this.detectPluginDrift.execute({
+      manifest,
+      projectRoot,
+      toolIds,
+      pluginName,
+    });
+    return drifts.map((drift) => ({
+      toolId: drift.toolId,
+      pluginName: drift.pluginName,
+      driftedFiles: drift.files.map((file) => file.relativePath),
+    }));
   }
 }

@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { cursor } from "../../../../src/domain/tools/ai/cursor.js";
 
@@ -171,7 +172,7 @@ describe("cursor", () => {
 
     it("resolvePluginsBaseDir returns ~/.cursor/plugins/local resolved from given homedir", () => {
       const result = cursor.capabilities.plugins.resolvePluginsBaseDir("/proj", "/home/user");
-      expect(result).toBe("/home/user/.cursor/plugins/local");
+      expect(result).toBe(join("/home/user", ".cursor", "plugins", "local"));
     });
   });
 });

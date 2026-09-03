@@ -1,10 +1,26 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.7/schema.json",
-  "assist": { "actions": { "source": { "organizeImports": "on" } } },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "complexity": {
+        "noExcessiveLinesPerFunction": {
+          "level": "error",
+          "options": {
+            "maxLines": 20,
+            "skipBlankLines": true,
+            "skipIifes": true
+          }
+        }
+      }
     }
   },
   "formatter": {
@@ -44,8 +60,58 @@
   },
   "overrides": [
     {
+      "includes": ["tests/**", "scripts/**"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveLinesPerFunction": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["**/package.json"],
-      "formatter": { "enabled": false }
+      "formatter": {
+        "enabled": false
+      }
+    },
+    {
+      "includes": ["src/application/commands/**"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveLinesPerFunction": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "src/application/use-cases/framework/strategies/tool-contracts.ts",
+        "src/application/use-cases/install/install-content-section-use-case.ts",
+        "src/application/use-cases/install/install-ide-config-use-case.ts",
+        "src/application/use-cases/marketplace/marketplace-sync-settings-use-case.ts",
+        "src/application/use-cases/plugin/plugin-add-use-case.ts",
+        "src/application/use-cases/plugin/plugin-install-from-marketplace-use-case.ts",
+        "src/application/use-cases/plugin/plugin-update-use-case.ts",
+        "src/application/use-cases/plugin/translator/built-tree-materialization-translator.ts",
+        "src/application/use-cases/restore/restore-all-plugins-use-case.ts",
+        "src/application/use-cases/shared/restore-regular-files-use-case.ts",
+        "src/domain/capabilities/plugins-capability.ts",
+        "src/domain/formats/copilot-marketplace-catalog.ts",
+        "src/domain/formats/jsonc.ts",
+        "src/domain/models/plugin-source.ts",
+        "src/domain/tools/ai/copilot.ts",
+        "src/infrastructure/adapters/plugin-distribution-reader-adapter.ts",
+        "src/infrastructure/deps.ts"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveLinesPerFunction": "off"
+          }
+        }
+      }
     }
   ]
 }

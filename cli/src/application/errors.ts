@@ -58,3 +58,46 @@ export class InvalidCategoryError extends Error {
     this.name = "InvalidCategoryError";
   }
 }
+
+export class InvalidTelemetryPeriodError extends Error {
+  constructor(value: string, maxDays: number) {
+    super(`Invalid --days '${value}'. Expected an integer between 1 and ${maxDays}.`);
+    this.name = "InvalidTelemetryPeriodError";
+  }
+}
+
+/** One sentence for one consequence: writing a git-tracked file that turns telemetry on for
+ * everyone who clones. `endpoint --scope project` and `telemetry on` both have exactly this
+ * consequence — the parameterised `action` and `trackedPath` are the only two things that
+ * differ between them, so they share the one error rather than each writing its own
+ * sentence for the same fact. */
+export class TelemetryProjectScopeRequiresYesError extends Error {
+  constructor(action: string, trackedPath: string) {
+    super(
+      `${action} writes the git-tracked ${trackedPath}, turning telemetry on for ` +
+        "everyone who clones. Pass --yes to confirm."
+    );
+    this.name = "TelemetryProjectScopeRequiresYesError";
+  }
+}
+
+export class EmptyDisplayNameError extends Error {
+  constructor() {
+    super("`aidd telemetry identity use --name` needs a non-empty value.");
+    this.name = "EmptyDisplayNameError";
+  }
+}
+
+export class IdentityRequiredToLinkError extends Error {
+  constructor() {
+    super("No identity to link onto yet. Run `aidd telemetry identity use` first.");
+    this.name = "IdentityRequiredToLinkError";
+  }
+}
+
+export class EmptyIdentifierError extends Error {
+  constructor(command: "use" | "link") {
+    super(`\`aidd telemetry identity ${command}\` needs a non-empty value.`);
+    this.name = "EmptyIdentifierError";
+  }
+}

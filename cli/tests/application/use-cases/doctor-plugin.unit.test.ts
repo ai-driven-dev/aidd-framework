@@ -9,6 +9,7 @@ import { DoctorPluginUseCase } from "../../../src/application/use-cases/doctor/d
 import { DoctorReferencesUseCase } from "../../../src/application/use-cases/doctor/doctor-references-use-case.js";
 import { DoctorTrackedFilesUseCase } from "../../../src/application/use-cases/doctor/doctor-tracked-files-use-case.js";
 import { DoctorUseCase } from "../../../src/application/use-cases/doctor/doctor-use-case.js";
+import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
 import { FileHash } from "../../../src/domain/models/file.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
 import { Plugin } from "../../../src/domain/models/plugin.js";
@@ -41,12 +42,9 @@ function makeFs(fileExists: boolean, diskHash: string): FileReader {
     fileExists: async () => fileExists,
     readFileHash: async () => new FileHash(diskHash),
     readFile: async () => "",
-    writeFile: async () => {},
-    deleteFile: async () => {},
     listDirectory: async () => [],
-    deleteEmptyDirectories: async () => {},
-    copyFile: async () => {},
-  } as unknown as FileReader;
+    listFilesRecursive: async () => [],
+  };
 }
 
 function makeManifestRepo(manifest: Manifest): ManifestRepository {
@@ -62,7 +60,7 @@ function makeDoctorUseCase(fs: FileReader, manifest: Manifest): DoctorUseCase {
     makeManifestRepo(manifest),
     new DoctorTrackedFilesUseCase(fs),
     new DoctorMergeFilesUseCase(fs, noopHasher),
-    new DoctorPluginUseCase(fs),
+    new DoctorPluginUseCase(new DetectPluginDriftUseCase(fs)),
     new DoctorReferencesUseCase(fs),
     new DoctorLayoutUseCase(fs)
   );
@@ -140,21 +138,17 @@ describe("DoctorUseCase — plugin integrity", () => {
         })
       );
       const checkedPaths: string[] = [];
-      const fs = {
+      const fs: FileReader = {
         fileExists: async (p: string) => {
           checkedPaths.push(p);
           return true;
         },
         readFileHash: async () => new FileHash(EXPECTED_HASH),
         readFile: async () => "",
-        writeFile: async () => {},
-        deleteFile: async () => {},
         listDirectory: async () => [],
         listFilesRecursive: async () => [],
-        deleteEmptyDirectories: async () => {},
-        copyFile: async () => {},
-      } as unknown as FileReader;
-      const pluginUseCase = new DoctorPluginUseCase(fs);
+      };
+      const pluginUseCase = new DoctorPluginUseCase(new DetectPluginDriftUseCase(fs));
 
       await pluginUseCase.execute({
         manifest,

@@ -1,10 +1,12 @@
-// Register the claude tool so its capabilities are accessible
+// Register the claude and copilot tools so their capabilities are accessible
 import "../../../../src/domain/tools/ai/claude.js";
+import "../../../../src/domain/tools/ai/copilot.js";
 import { describe, expect, it } from "vitest";
 import { InstallAgentsUseCase } from "../../../../src/application/use-cases/install/install-agents-use-case.js";
 import type { ContentSection } from "../../../../src/domain/models/framework.js";
 import { GITKEEP_FILE } from "../../../../src/domain/models/framework.js";
 import { claude } from "../../../../src/domain/tools/ai/claude.js";
+import { copilot } from "../../../../src/domain/tools/ai/copilot.js";
 import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
 
 const DOCS_DIR = "aidd_docs";
@@ -13,6 +15,12 @@ const agentsSection: ContentSection = {
   name: "agents",
   directory: "agents",
   entryFile: null,
+};
+
+const agentsSectionWithEntry: ContentSection = {
+  name: "agents",
+  directory: "agents",
+  entryFile: "AGENT.md",
 };
 
 function buildUseCase() {
@@ -144,6 +152,59 @@ describe("InstallAgentsUseCase", () => {
       const paths = files.map((f) => f.relativePath).sort();
       expect(paths).toContain(".claude/agents/agent-a.md");
       expect(paths).toContain(".claude/agents/agent-b.md");
+    });
+  });
+
+  describe("execute — entryFile section", () => {
+    it("accepts only the entryFile-named file and installs it", () => {
+      const { useCase } = buildUseCase();
+      const contentFiles = new Map([
+        ["agents/my-agent/AGENT.md", "---\nname: my-agent\ndescription: My agent\n---\n# Agent\n"],
+        ["agents/my-agent/other.claude.md", "---\nname: other\ndescription: Other\n---\n# Other\n"],
+      ]);
+
+      const files = useCase.execute({
+        toolConfig: claude,
+        section: agentsSectionWithEntry,
+        contentFiles,
+        docsDir: DOCS_DIR,
+      });
+
+      expect(files).toHaveLength(1);
+      expect(files[0].frameworkPath).toBe("agents/my-agent/AGENT.md");
+    });
+
+    it("filters out files whose basename does not match entryFile", () => {
+      const { useCase } = buildUseCase();
+      const contentFiles = new Map([
+        ["agents/reviewer/helper.claude.md", "# helper — not AGENT.md basename"],
+      ]);
+
+      const files = useCase.execute({
+        toolConfig: claude,
+        section: agentsSectionWithEntry,
+        contentFiles,
+        docsDir: DOCS_DIR,
+      });
+
+      expect(files).toHaveLength(0);
+    });
+  });
+
+  describe("execute — tool with a null install path for .gitkeep", () => {
+    it("filters out the .gitkeep file entirely instead of producing an empty InstallationFile", () => {
+      const { useCase } = buildUseCase();
+      const gitkeepPath = `agents/${GITKEEP_FILE}`;
+      const contentFiles = new Map([[gitkeepPath, ""]]);
+
+      const files = useCase.execute({
+        toolConfig: copilot,
+        section: agentsSection,
+        contentFiles,
+        docsDir: DOCS_DIR,
+      });
+
+      expect(files).toHaveLength(0);
     });
   });
 });

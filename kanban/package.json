@@ -1,0 +1,32 @@
+{
+  "name": "@ai-driven-dev/kanban-source",
+  "description": "Source folder mounted by the AIDD CLI as `aidd kanban`. Never published on its own.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "packageManager": "pnpm@10.14.0",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome format --write ."
+  },
+  "dependencies": {
+    "cli-table3": "0.6.5",
+    "commander": "^15.0.0",
+    "gray-matter": "^4.0.3",
+    "ink": "7.1.1",
+    "react": "19.2.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.4",
+    "@types/node": "^26.1.1",
+    "@types/react": "19.2.17",
+    "ink-testing-library": "4.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "^3.2.6"
+  }
+}

@@ -1,28 +1,24 @@
-<p align="right">
-  <a href="https://github.com/ai-driven-dev/framework/stargazers">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/star-cta-dark.svg" />
-      <img src="docs/assets/star-cta-light.svg" alt="Support the community, star us! The button is at the top-right of this page" width="290" />
-    </picture>
-  </a>
-</p>
-
 <div align="center">
 
-<img src="docs/assets/logo.png" alt="AIDD" width="140" />
+<img src="docs/assets/logo.png" alt="AIDD" width="100" />
 
-# AI-Driven Dev Framework 🇫🇷
+# AI-Driven Dev Framework
 
-## Agentic framework for software engineers to produce 100% quality code with IA, agonistically.
+## Enterprise-grade SDLC for high-quality software development.
+
+Unify **engineering teams** around **standardized workflows** and **shared best practices**, across modern stacks and **legacy systems**, while reducing **technical debt**.
+
+🧱 **IDE agnostic** · 🏗️ **Legacy systems** · 🌱 **Token-optimized** · 🇫🇷 **Made in France**
 
 <p>
-  <!--counts:start--><kbd>7 plugins</kbd> · <kbd>41 skills</kbd> · <kbd>2 agents</kbd><!--counts:end--> · <kbd>MIT</kbd>
+  <!--counts:start--><kbd>8 plugins</kbd> · <kbd>51 skills</kbd> · <kbd>2 agents</kbd><!--counts:end-->
 </p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Open Source](https://img.shields.io/badge/Open_Source-Yes-yellow?logo=open-source-initiative&logoColor=white)](https://opensource.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/ai-driven-dev/framework?include_prereleases&sort=semver)](https://github.com/ai-driven-dev/framework/releases)
 [![CI](https://github.com/ai-driven-dev/framework/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ai-driven-dev/framework/actions/workflows/ci.yml)
-[![Made in France](https://img.shields.io/badge/made%20in-France-0055A4?labelColor=EF4135)](https://www.ai-driven-dev.fr/)
+
 
 <p>🗺️ <a href="https://github.com/orgs/ai-driven-dev/projects/8"><b>Live roadmap</b></a></p>
 
@@ -33,8 +29,8 @@
 The **AI-Driven Dev Framework** installs a working SDLC (Software Development Life Cycle) into your AI coding tool — **skills, agents, commands, rules** — that turns a rough idea into a reviewed, shipped pull request:
 
 ```text
-/aidd-dev:00-sdlc "add rate limiting to the /login endpoint"
-→ spec → plan → implement → review → ship (commit + PR opened)
+/aidd-orchestrator:01-sdlc "add rate limiting to the /login endpoint"
+→ frame when needed → plan → implement → validate → review → challenge → ship
 ```
 
 Why not just write your own commands? → [FAQ](docs/FAQ.md#-why-aidd-instead-of-your-own-skills).
@@ -42,7 +38,7 @@ Why not just write your own commands? → [FAQ](docs/FAQ.md#-why-aidd-instead-of
 ## ✅ Prerequisites
 
 - **An AI coding tool** — Claude Code (native), or Cursor / Copilot / Codex / OpenCode (see [Compatibility](#-compatibility)).
-- **[Node](https://nodejs.org)** on your `PATH` — for the plugins that ship hooks ([what they do](docs/ARCHITECTURE.md#-bundled-hooks)).
+- **[Node](https://nodejs.org)** on your `PATH` — for the plugin that ships hooks ([what they do](docs/ARCHITECTURE.md#-bundled-hooks)).
 
 ## 🔌 Compatibility
 
@@ -61,7 +57,7 @@ Why not just write your own commands? → [FAQ](docs/FAQ.md#-why-aidd-instead-of
 
 ### Claude Code
 
-Installs the 6 stable plugins (`aidd-ui` is 🚧 alpha, install separately — see [Plugins](#-plugins)).
+Installs the 6 stable plugins (`aidd-ui` is 🚧 alpha and `aidd-telemetry` 🧪 beta, install separately — see [Plugins](#-plugins)).
 
 **In the session** (slash commands)
 
@@ -100,13 +96,16 @@ Same plugin names as Claude Code.
 
 Download your tool's bundle from the [latest release](https://github.com/ai-driven-dev/framework/releases/latest), then follow its steps:
 
+> [!NOTE]
+> Installing the framework host-wide for several tools can make the same command appear more than once in a tool's list. This happens when one tool reads another tool's settings, and is harmless.
+
 <details>
 <summary><strong>Cursor</strong></summary>
 
 **Marketplace**
 
 1. Unzip the `cursor-marketplace` archive.
-2. Copy the plugins, then reload (**Developer → Reload Window**):
+2. Copy the plugins (Cursor reloads them automatically):
 
 ```bash
 cp -r plugins/aidd-* ~/.cursor/plugins/local/
@@ -117,6 +116,8 @@ cp -r plugins/aidd-* ~/.cursor/plugins/local/
 1. Unzip the `cursor-flat` archive into your project root → `.cursor/`.
 
 _All plans; team marketplaces need Teams/Enterprise. Also reads Claude format (`.claude/skills/`)._
+
+Disable **Include Third-Party Plugins, Skills, and Other Configs** under **Settings → Rules, Skills, Subagents** to hide the duplicate commands.
 
 [Docs](https://cursor.com/docs/plugins)
 
@@ -183,7 +184,7 @@ Three ways in — pick one:
 | --- | --- | --- |
 | 🧭 **Guided onboarding** | `/aidd-context:00-onboard` | First time, or unsure what to run — it inspects the project and routes you. |
 | 🧠 **Project memory** | `/aidd-context:02-project-memory` | Build the project memory bank by hand. |
-| ⚙️ **Feature flow** | `/aidd-dev:00-sdlc` | Ship a feature end to end (plan → implement → review → PR). |
+| ⚙️ **Feature flow** | `/aidd-orchestrator:01-sdlc` | Autonomously ship a feature end to end (frame → deliver → check → PR). |
 
 The full loop, and how onboarding sets it up:
 
@@ -196,23 +197,41 @@ flowchart TD
     end
 
     subgraph loop["② Per feature — repeat"]
-      direction LR
-      B["brainstorm"] --> P["plan"] --> I["implement"] --> R["review"] --> C["commit"] --> PR(["✅ PR"])
+      direction TB
+      subgraph frame["Frame"]
+        direction LR
+        N["functional need<br/>or User Story"] --> T["issue / ticket"] --> P["plan"]
+      end
+      subgraph deliver["Deliver"]
+        direction LR
+        I["implement"] --> V["validate"] --> R["review"]
+      end
+      subgraph ship["Ship"]
+        direction LR
+        PR["PR"] --> S(["✅ production"]) --> L["learn"]
+      end
+      P --> I
+      R --> PR
     end
 
-    Onboard --> Memory --> B
+    Onboard --> Memory --> N
+    L -. next need .-> N
 
     classDef hub fill:#D97757,stroke:#9c4f37,color:#fff;
     classDef done fill:#2ea043,stroke:#1a7f37,color:#fff;
     class Onboard hub;
-    class PR done;
+    class S done;
 ```
+
+Start with a functional need or User Story, then track it as an issue or ticket
+before planning. Shipping follows the project's own delivery process. Capture a
+learning only when it is durable enough to improve the next feature.
 
 > 🍳 **More flows** → bundled recipes: [start a project](plugins/aidd-context/skills/12-cook/assets/recipes/start-a-project.md), [ship a feature](plugins/aidd-context/skills/12-cook/assets/recipes/ship-a-feature.md), and more.
 
 ## 🧩 Plugins
 
-Seven plugins covering the whole SDLC — **install all of them**; they work together. (`aidd-ui` is 🚧 **alpha**, off the curated path.)
+Eight plugins covering the whole SDLC — **install all of them**; they work together. (`aidd-ui` is 🚧 **alpha** and `aidd-telemetry` 🧪 **beta** — both off the curated path.)
 
 <table>
 <tr>
@@ -231,7 +250,7 @@ Project init, memory bank, context-artifact generation, diagrams, learning, expl
 
 `11 skills` · stable
 
-SDLC loop: plan, implement, assert, audit, review, test, refactor, debug.
+Code transformation: plan, implement, assert, audit, review, test, refactor, debug. Standalone Browser QA records short web evidence.
 
 </td>
 <td width="33%" valign="top">
@@ -249,27 +268,27 @@ Repo init, commits, pull / merge requests, release tags, issues, conflict resolu
 
 ### 📋 [aidd-pm](plugins/aidd-pm/README.md)
 
-`4 skills` · stable
+`10 skills` · stable
 
-Ticket info, user stories, PRD, spec drafting.
+Three Amigos refinement, Product Briefs, Epics, User Stories, Tasks, Spikes, Defects, PRD, and specs.
 
 </td>
 <td width="33%" valign="top">
 
 ### 🪞 [aidd-refine](plugins/aidd-refine/README.md)
 
-`5 skills` · stable
+`4 skills` · stable
 
-Brainstorm, challenge, condense, shadow-areas, fact-check.
+Brainstorm, challenge, shadow-areas, fact-check.
 
 </td>
 <td width="33%" valign="top">
 
 ### 🎼 [aidd-orchestrator](plugins/aidd-orchestrator/README.md)
 
-`1 skill` · stable
+`3 skills` · stable
 
-Async dev: label an issue → get a PR.
+Synchronous feature flow, async issue-to-PR automation, and product backlog.
 
 </td>
 </tr>
@@ -283,7 +302,15 @@ Async dev: label an issue → get a PR.
 UI / UX design — smoke-test only, not ready for use.
 
 </td>
-<td width="33%" valign="top"></td>
+<td width="33%" valign="top">
+
+### 📈 [aidd-telemetry](plugins/aidd-telemetry/README.md) 🧪
+
+`3 skills` · **beta**
+
+Answers what a piece of work cost — tokens, models, and which skill spent them. The switch is git-tracked, so it applies to everyone who clones; opt out per person with `AIDD_TELEMETRY=0`. Nothing leaves your machine.
+
+</td>
 <td width="33%" valign="top"></td>
 </tr>
 </table>
@@ -321,11 +348,13 @@ Free and open-source (MIT). If it saves you time, [a ⭐](https://github.com/ai-
 - **Idea or bug?** [Open an issue](https://github.com/ai-driven-dev/framework/issues) or [start a discussion](https://github.com/ai-driven-dev/framework/discussions).
 - **Contribute code** → [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
+[![Contributors](https://contrib.rocks/image?repo=ai-driven-dev/framework)](https://github.com/ai-driven-dev/framework/graphs/contributors)
+
 ---
 
 <div align="center">
 
-<img src="https://api.star-history.com/svg?repos=ai-driven-dev/framework&type=Date" alt="Star History Chart" width="500" />
+<a href="https://github.com/ai-driven-dev/framework/stargazers"><img src="https://raw.githubusercontent.com/ai-driven-dev/framework/star-history/star-history.svg" alt="Star History Chart" width="500" /></a>
 
 Made with care in France 🇫🇷 · ← [AIDD organisation](https://github.com/ai-driven-dev)
 

@@ -30,7 +30,7 @@ export function registerCleanCommand(program: Command): void {
           for (const tool of result.preview.tools) {
             output.print(`  ${tool.toolId}: ${tool.fileCount} files`);
           }
-          output.print("  manifest: .aidd/");
+          output.print("  manifest: .aidd/ (config.json, if present, is kept)");
           const toolCount = result.preview.tools.length;
           if (process.stdout.isTTY) {
             output.print("No files removed.");

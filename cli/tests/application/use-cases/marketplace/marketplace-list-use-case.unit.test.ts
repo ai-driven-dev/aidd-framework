@@ -1,9 +1,10 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MarketplaceListUseCase } from "../../../../src/application/use-cases/marketplace/marketplace-list-use-case.js";
-import type { FetchMarketplaceSourceUseCase } from "../../../../src/application/use-cases/shared/fetch-marketplace-source-use-case.js";
+import { FetchMarketplaceSourceUseCase } from "../../../../src/application/use-cases/shared/fetch-marketplace-source-use-case.js";
+import { ResolveMarketplaceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
 import { Marketplace } from "../../../../src/domain/models/marketplace.js";
 import type { PluginCatalog } from "../../../../src/domain/models/plugin-catalog.js";
 import type { PluginCatalogRepository } from "../../../../src/domain/ports/plugin-catalog-repository.js";
@@ -70,15 +71,16 @@ describe("MarketplaceListUseCase", () => {
           },
         ],
       };
-      const fakeFetcher = {
-        execute: async () => "/fake/local-path",
-      } as unknown as FetchMarketplaceSourceUseCase;
+      const fakeFetcher = new FetchMarketplaceSourceUseCase({
+        fetch: async () => "/fake/local-path",
+      });
       const fakeCatalogRepo: PluginCatalogRepository = {
         load: async () => fakeCatalog,
         loadForeign: async () => [],
       };
+      const resolveMarketplace = new ResolveMarketplaceUseCase(fakeFetcher, fakeCatalogRepo);
 
-      const useCase = new MarketplaceListUseCase(registry, fakeCatalogRepo, fakeFetcher);
+      const useCase = new MarketplaceListUseCase(registry, resolveMarketplace);
       const result = await useCase.execute({ projectRoot, withCatalogs: true });
 
       expect(result.marketplaces).toHaveLength(1);
@@ -90,17 +92,54 @@ describe("MarketplaceListUseCase", () => {
       const registry = new MarketplaceRegistryAdapter();
       await registry.save(projectRoot, SAMPLE_MARKETPLACE);
 
-      const failingFetcher = {
-        execute: async () => {
+      const failingFetcher = new FetchMarketplaceSourceUseCase({
+        fetch: async () => {
           throw new Error("network error");
         },
-      } as unknown as FetchMarketplaceSourceUseCase;
+      });
       const fakeCatalogRepo: PluginCatalogRepository = {
         load: async () => null,
         loadForeign: async () => [],
       };
+      const resolveMarketplace = new ResolveMarketplaceUseCase(failingFetcher, fakeCatalogRepo);
 
-      const useCase = new MarketplaceListUseCase(registry, fakeCatalogRepo, failingFetcher);
+      const useCase = new MarketplaceListUseCase(registry, resolveMarketplace);
+      const result = await useCase.execute({ projectRoot, withCatalogs: true });
+
+      expect(result.marketplaces).toHaveLength(1);
+      expect(result.catalogs).toBeDefined();
+      expect(result.catalogs?.size).toBe(0);
+    });
+
+    it("logs a warning through the logger when the catalog fetch fails", async () => {
+      const registry = new MarketplaceRegistryAdapter();
+      await registry.save(projectRoot, SAMPLE_MARKETPLACE);
+
+      const failingFetcher = new FetchMarketplaceSourceUseCase({
+        fetch: async () => {
+          throw new Error("network error");
+        },
+      });
+      const fakeCatalogRepo: PluginCatalogRepository = {
+        load: async () => null,
+        loadForeign: async () => [],
+      };
+      const resolveMarketplace = new ResolveMarketplaceUseCase(failingFetcher, fakeCatalogRepo);
+      const logger = { info: vi.fn(), debug: vi.fn(), warn: vi.fn() };
+
+      const useCase = new MarketplaceListUseCase(registry, resolveMarketplace, logger);
+      await useCase.execute({ projectRoot, withCatalogs: true });
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Skipping marketplace 'awesome'")
+      );
+    });
+
+    it("skips catalog fetching entirely when resolveMarketplace is not wired", async () => {
+      const registry = new MarketplaceRegistryAdapter();
+      await registry.save(projectRoot, SAMPLE_MARKETPLACE);
+
+      const useCase = new MarketplaceListUseCase(registry);
       const result = await useCase.execute({ projectRoot, withCatalogs: true });
 
       expect(result.marketplaces).toHaveLength(1);

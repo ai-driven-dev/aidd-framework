@@ -38,16 +38,24 @@ Project docs, memory, specs, and plans live in `aidd_docs/`.
 
 ### Project memory
 
-<aidd_project_memory>
-@aidd_docs/memory/architecture.md
-@aidd_docs/memory/browsing.md
-@aidd_docs/memory/codebase-map.md
-@aidd_docs/memory/coding-assertions.md
-@aidd_docs/memory/deployment.md
-@aidd_docs/memory/project-brief.md
-@aidd_docs/memory/testing.md
-@aidd_docs/memory/vcs.md
-</aidd_project_memory>
+<!-- aidd_project_memory:start -->
+
+[aidd_docs/memory/architecture.md](aidd_docs/memory/architecture.md)
+[aidd_docs/memory/backlog.md](aidd_docs/memory/backlog.md)
+[aidd_docs/memory/cli.md](aidd_docs/memory/cli.md)
+[aidd_docs/memory/codebase-map.md](aidd_docs/memory/codebase-map.md)
+[aidd_docs/memory/coding-assertions.md](aidd_docs/memory/coding-assertions.md)
+[aidd_docs/memory/deployment.md](aidd_docs/memory/deployment.md)
+[aidd_docs/memory/ecosystem.md](aidd_docs/memory/ecosystem.md)
+[aidd_docs/memory/project-brief.md](aidd_docs/memory/project-brief.md)
+[aidd_docs/memory/testing.md](aidd_docs/memory/testing.md)
+[aidd_docs/memory/vcs.md](aidd_docs/memory/vcs.md)
+
+<!-- read on demand, not auto-loaded -->
+- aidd_docs/memory/internal/decisions/a-price-table-is-the-destination-s.md
+- aidd_docs/memory/internal/decisions/measurement-may-reach-a-hosted-destination.md
+
+<!-- aidd_project_memory:end -->
 
 - If the block above is empty, run `ls -1tr aidd_docs/memory/` and read each file.
 - Load `aidd_docs/memory/external/*` when the user asks.

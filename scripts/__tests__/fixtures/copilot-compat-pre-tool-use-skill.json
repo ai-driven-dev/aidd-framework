@@ -1,0 +1,10 @@
+{
+  "hook_event_name": "PreToolUse",
+  "session_id": "9f4a20c7-8e13-4d6b-b0a5-3c7e91d42f68",
+  "timestamp": "2026-08-28T03:20:14.425Z",
+  "cwd": "/home/user/probe/project-copilot-compat-skill",
+  "tool_name": "skill",
+  "tool_input": {
+    "skill": "probe-echo"
+  }
+}

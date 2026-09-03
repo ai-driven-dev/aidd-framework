@@ -1,7 +1,7 @@
 ---
 name: 08-debug
 description: Reproduce and fix a known bug, or find an unknown root cause by hypothesis validation. Use when the user wants to fix a bug, find why something breaks, or reopen a stuck investigation. Not for building a feature or reviewing a diff.
-argument-hint: reproduce | debug | reflect-issue
+argument-hint: bug | symptom
 model: opus
 ---
 

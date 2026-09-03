@@ -1,9 +1,8 @@
 import { join } from "node:path";
-import type { PluginsCapability } from "../../../domain/capabilities/plugins-capability.js";
 import type { Manifest } from "../../../domain/models/manifest.js";
 import type { Plugin } from "../../../domain/models/plugin.js";
+import { PluginContentTranslator } from "../../../domain/models/plugin-content-translator.js";
 import type { PluginDistribution } from "../../../domain/models/plugin-distribution.js";
-import { PluginTranslator } from "../../../domain/models/plugin-translator.js";
 import type { AiToolId } from "../../../domain/models/tool-ids.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
@@ -11,10 +10,16 @@ import type { Hasher } from "../../../domain/ports/hasher.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
 import type { PluginDistributionReader } from "../../../domain/ports/plugin-distribution-reader.js";
 import type { PluginFetcher } from "../../../domain/ports/plugin-fetcher.js";
-import { isAiTool, type ToolConfig } from "../../../domain/tools/registry.js";
-import { BuiltTreeMaterializationTranslator } from "../plugin/translator/built-tree-materialization-translator.js";
-import { resolveTranslator } from "../plugin/translator/plugin-translator-factory.js";
-import type { EnsureBuiltMarketplaceUseCase } from "./ensure-built-marketplace-use-case.js";
+import type { ToolConfig } from "../../../domain/tools/registry.js";
+import {
+  deleteOldFiles,
+  isPluginFileAtDesiredState,
+  materializeViaTranslator,
+} from "../plugin/plugin-file-sync.js";
+import { resolvePluginBaseDir } from "../plugin/plugin-target-resolution.js";
+import type { PluginTranslator } from "../plugin/translator/plugin-translator.js";
+import { resolvePluginTranslator } from "../plugin/translator/resolve-plugin-translator.js";
+import type { EnsureBuiltMarketplace } from "./ensure-built-marketplace-use-case.js";
 
 interface ApplyPluginFilesOptions {
   toolId: AiToolId;
@@ -29,7 +34,7 @@ interface ApplyPluginFilesOptions {
 
 /** Optional deps that let restore re-materialize via the build pipeline (parity with install). */
 export interface BuiltMaterializationDeps {
-  ensureBuilt: EnsureBuiltMarketplaceUseCase;
+  ensureBuilt: EnsureBuiltMarketplace;
   marketplaceRegistry: MarketplaceRegistry;
   homedir: () => string;
 }
@@ -46,46 +51,51 @@ export class ApplyPluginFilesUseCase {
   async execute(options: ApplyPluginFilesOptions): Promise<number> {
     const localPath = await this.pluginFetcher.fetch(options.plugin.source, options.cacheDir);
     const dist = await this.pluginDistributionReader.read(localPath);
-    const builtTree = this.builtTreeTranslator(options.toolConfig);
-    if (builtTree !== null && options.plugin.marketplace !== undefined) {
-      return this.restoreViaBuiltTree(builtTree, dist, options);
+    const translator = this.resolveTranslator(options.toolConfig);
+    if (translator !== null && options.plugin.marketplace !== undefined) {
+      return this.restoreViaTranslator(translator, dist, options);
     }
     return this.restoreViaTranslate(dist, options);
   }
 
   // Materializing tools (cursor/opencode) must re-materialize from the BUILT tree so
-  // restored content + hashes match what install wrote — not the raw source transform.
-  private builtTreeTranslator(toolConfig: ToolConfig): BuiltTreeMaterializationTranslator | null {
-    if (this.builtDeps === undefined || !isAiTool(toolConfig)) return null;
-    const caps = toolConfig.capabilities as { plugins?: PluginsCapability };
-    if (caps.plugins === undefined) return null;
-    const translator = resolveTranslator(caps.plugins, {
+  // restored content + hashes match what install wrote, and Mode A marketplace tools
+  // (claude/codex/copilot) must re-register without writing files — not the raw source
+  // transform in either case.
+  private resolveTranslator(toolConfig: ToolConfig): PluginTranslator | null {
+    if (this.builtDeps === undefined) return null;
+    return resolvePluginTranslator(toolConfig, {
       fs: this.fs,
       hasher: this.hasher,
       homedir: this.builtDeps.homedir,
       ensureBuilt: this.builtDeps.ensureBuilt,
       marketplaceRegistry: this.builtDeps.marketplaceRegistry,
     });
-    return translator instanceof BuiltTreeMaterializationTranslator ? translator : null;
   }
 
-  private async restoreViaBuiltTree(
-    translator: BuiltTreeMaterializationTranslator,
+  private async restoreViaTranslator(
+    translator: PluginTranslator,
     dist: PluginDistribution,
     options: ApplyPluginFilesOptions
   ): Promise<number> {
     const { toolId, plugin, projectRoot, manifest, docsDir } = options;
-    manifest.removePlugin(toolId, plugin.name);
-    await translator.addPlugin(
+    // Mode A never materializes files, so any manifest-tracked path here is a leftover
+    // from a run before that was true (see plugin-update-use-case.ts's unconditional
+    // equivalent). Scoped to the manifest's own keys under the plugin's base dir — never
+    // a directory scan — so it cannot touch files the plugin never wrote.
+    if (translator.mode === "marketplace" && this.builtDeps !== undefined) {
+      const baseDir = resolvePluginBaseDir(toolId, projectRoot, this.builtDeps.homedir);
+      await deleteOldFiles(plugin.files, baseDir, this.fs);
+    }
+    return materializeViaTranslator(
+      translator,
       dist,
       toolId,
-      plugin.source,
+      plugin,
       projectRoot,
       manifest,
-      plugin.marketplace,
       docsDir
     );
-    return manifest.getPlugins(toolId).find((p) => p.name === plugin.name)?.files.size ?? 0;
   }
 
   private async restoreViaTranslate(
@@ -93,12 +103,12 @@ export class ApplyPluginFilesUseCase {
     options: ApplyPluginFilesOptions
   ): Promise<number> {
     const { toolId, plugin, toolConfig, projectRoot, manifest, docsDir, fileFilter } = options;
-    const files = new PluginTranslator(this.hasher).translate(dist, toolConfig, docsDir);
+    const files = new PluginContentTranslator(this.hasher).translate(dist, toolConfig, docsDir);
     let restored = 0;
     for (const f of files) {
       if (fileFilter !== null && fileFilter !== undefined && !fileFilter(f.relativePath)) continue;
       const outputPath = join(projectRoot, f.relativePath);
-      if (!(await this.isFileAtDesiredState(outputPath, f.hash.value))) {
+      if (!(await isPluginFileAtDesiredState(this.fs, this.hasher, outputPath, f.hash.value))) {
         await this.fs.writeFile(outputPath, f.content);
         restored++;
       }
@@ -108,14 +118,5 @@ export class ApplyPluginFilesUseCase {
       plugin.withFiles(new Map(files.map((f) => [f.relativePath, f.hash.value])))
     );
     return restored;
-  }
-
-  private async isFileAtDesiredState(
-    outputPath: string,
-    expectedHashValue: string
-  ): Promise<boolean> {
-    if (!(await this.fs.fileExists(outputPath))) return false;
-    const content = await this.fs.readFile(outputPath);
-    return this.hasher.hash(content).value === expectedHashValue;
   }
 }

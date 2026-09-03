@@ -33,13 +33,16 @@ import {
   mergeClaudeSettingsHooks,
   mergeCodexFrameworkHooksJson,
   mergeCursorFlatHooks,
+  renameCodexHookEvents,
 } from "../../../../domain/formats/flat-hooks-merge.js";
 import {
+  flatHooksSharedDirPath,
   flatMcpKeyPrefix,
   genericFlatAgentPath,
   genericFlatHooksFile,
   genericFlatHooksScriptPath,
   genericFlatSkillPath,
+  genericFlatSkillTreePath,
 } from "../../../../domain/formats/flat-paths.js";
 import { parseFrontmatter, serializeFrontmatter } from "../../../../domain/formats/markdown.js";
 import { buildOpencodeFlatConfig } from "../../../../domain/formats/opencode-mcp-merge.js";
@@ -57,18 +60,27 @@ import {
 } from "../../../../domain/models/framework-build.js";
 import type { FileReader } from "../../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../../domain/ports/file-writer.js";
-import { mergeCodexConfigToml } from "../../../../domain/tools/ai/codex.js";
-import { transformMcpToOpencode } from "../../../../domain/tools/ai/opencode.js";
-import type { PluginPresence, ToolBuildContract } from "../../../../domain/tools/build-contract.js";
+import { claude } from "../../../../domain/tools/ai/claude.js";
 import {
-  buildClaudeStyleMarketplace,
-  buildClaudeStyleMarketplaceEntry,
-  buildCodexMarketplace,
-  buildCodexMarketplaceEntry,
-  resolveDescription,
-  resolveVersion,
-  synthesizeClaudeStyleManifest,
-} from "./marketplace-strategy-helpers.js";
+  codex,
+  mergeCodexConfigToml,
+  stripCodexSkillFrontmatter,
+} from "../../../../domain/tools/ai/codex.js";
+import { copilot } from "../../../../domain/tools/ai/copilot.js";
+import { cursor } from "../../../../domain/tools/ai/cursor.js";
+import { opencode, transformMcpToOpencode } from "../../../../domain/tools/ai/opencode.js";
+import type {
+  ArtifactContract,
+  PluginPresence,
+  ToolBuildContract,
+} from "../../../../domain/tools/build-contract.js";
+import { buildCodexMarketplace, buildCodexMarketplaceEntry } from "./codex-marketplace-catalog.js";
+import {
+  buildDefaultCatalogEntry,
+  buildDefaultMarketplace,
+  synthesizeDefaultPluginManifest,
+} from "./default-plugin-catalog.js";
+import { resolveDescription, resolveVersion } from "./plugin-source-tree-reader.js";
 
 type FsType = FileReader & FileWriter;
 type SrcEntry =
@@ -96,7 +108,7 @@ function transformCursorAgent(content: string, _plugin: string, outName: string)
 
 // ── Shared catalog builders ────────────────────────────────────────────────────
 
-async function buildClaudeStyleEntry(
+async function buildDefaultEntry(
   name: string,
   outDir: string,
   srcEntry: SrcEntry,
@@ -106,7 +118,7 @@ async function buildClaudeStyleEntry(
   const args = [fs, name, srcEntry, outDir, manifestRelative] as const;
   const version = await resolveVersion(...args);
   const description = await resolveDescription(...args);
-  return buildClaudeStyleMarketplaceEntry(
+  return buildDefaultCatalogEntry(
     name,
     description,
     version,
@@ -119,17 +131,15 @@ async function buildClaudeStyleEntry(
 export function buildClaudeContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_CLAUDE_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_CLAUDE_MARKETPLACE_RELATIVE;
-  // Split literal to avoid biome's noTemplateCurlyInString warning.
-  const claudeToken = "$" + "{CLAUDE_PLUGIN_ROOT}";
   return {
     manifestDir: ".claude-plugin",
     marketplaceRelative,
-    pluginRootToken: claudeToken,
+    pluginRootToken: claude.capabilities.plugins.pluginRootToken,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: (source, presence) =>
-      synthesizeClaudeStyleManifest(source, presence, {
-        manifestDir: ".claude-plugin",
+      synthesizeDefaultPluginManifest(source, presence, {
         agentsField: true,
+        hooksField: false,
       }),
     manifestSchemaName: "plugin-manifest",
     artifacts: {
@@ -158,15 +168,15 @@ export function buildClaudeContract(): ToolBuildContract {
       commands: { supported: false },
     },
     buildMarketplaceCatalog: async (source, entries, _fs) => ({
-      catalog: buildClaudeStyleMarketplace(
-        source as Parameters<typeof buildClaudeStyleMarketplace>[0],
+      catalog: buildDefaultMarketplace(
+        source as Parameters<typeof buildDefaultMarketplace>[0],
         entries
       ),
       schemaName: "claude-marketplace",
       destRelPath: marketplaceRelative,
     }),
     buildMarketplaceEntry: async (name, _src, outDir, srcEntry, fs) =>
-      buildClaudeStyleEntry(name, outDir, srcEntry, manifestRelative, fs),
+      buildDefaultEntry(name, outDir, srcEntry, manifestRelative, fs),
   };
 }
 
@@ -175,17 +185,15 @@ export function buildClaudeContract(): ToolBuildContract {
 export function buildCursorContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_CURSOR_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_CURSOR_MARKETPLACE_RELATIVE;
-  // Split literal to avoid biome's noTemplateCurlyInString warning.
-  const cursorToken = "$" + "{CURSOR_PLUGIN_ROOT}";
   return {
     manifestDir: ".cursor-plugin",
     marketplaceRelative,
-    pluginRootToken: cursorToken,
+    pluginRootToken: cursor.capabilities.plugins.pluginRootToken,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: (source, presence) =>
-      synthesizeClaudeStyleManifest(source, presence, {
-        manifestDir: ".cursor-plugin",
+      synthesizeDefaultPluginManifest(source, presence, {
         agentsField: true,
+        hooksField: true,
       }),
     manifestSchemaName: "plugin-manifest",
     artifacts: {
@@ -214,15 +222,15 @@ export function buildCursorContract(): ToolBuildContract {
       commands: { supported: false },
     },
     buildMarketplaceCatalog: async (source, entries, _fs) => ({
-      catalog: buildClaudeStyleMarketplace(
-        source as Parameters<typeof buildClaudeStyleMarketplace>[0],
+      catalog: buildDefaultMarketplace(
+        source as Parameters<typeof buildDefaultMarketplace>[0],
         entries
       ),
       schemaName: "claude-marketplace",
       destRelPath: marketplaceRelative,
     }),
     buildMarketplaceEntry: async (name, _src, outDir, srcEntry, fs) =>
-      buildClaudeStyleEntry(name, outDir, srcEntry, manifestRelative, fs),
+      buildDefaultEntry(name, outDir, srcEntry, manifestRelative, fs),
   };
 }
 
@@ -231,17 +239,15 @@ export function buildCursorContract(): ToolBuildContract {
 export function buildCopilotMarketplaceContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_PLUGIN_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_MARKETPLACE_RELATIVE;
-  // Split literal to avoid biome's noTemplateCurlyInString warning.
-  const copilotToken = "$" + "{PLUGIN_ROOT}";
   return {
     manifestDir: ".plugin",
     marketplaceRelative,
-    pluginRootToken: copilotToken,
+    pluginRootToken: copilot.capabilities.plugins.pluginRootToken,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: (source, presence) =>
-      synthesizeClaudeStyleManifest(source, presence, {
-        manifestDir: ".plugin",
+      synthesizeDefaultPluginManifest(source, presence, {
         agentsField: true,
+        hooksField: true,
       }),
     manifestSchemaName: null, // Copilot does not use AJV for the plugin manifest
     artifacts: {
@@ -331,15 +337,18 @@ function buildCodexManifest(
   return manifest;
 }
 
+function transformCodexSkill(content: string): string {
+  const { frontmatter, body } = parseFrontmatter(content);
+  return serializeFrontmatter(stripCodexSkillFrontmatter(frontmatter), body);
+}
+
 export function buildCodexContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_CODEX_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_CODEX_MARKETPLACE_RELATIVE;
-  // Split literal to avoid biome's noTemplateCurlyInString warning.
-  const codexToken = "$" + "{PLUGIN_ROOT}";
   return {
     manifestDir: ".codex-plugin",
     marketplaceRelative,
-    pluginRootToken: codexToken,
+    pluginRootToken: codex.capabilities.plugins.pluginRootToken,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: buildCodexManifest,
     manifestSchemaName: "codex-plugin-manifest",
@@ -348,6 +357,7 @@ export function buildCodexContract(): ToolBuildContract {
         supported: true,
         source: { kind: "fullTree", srcDir: "skills" },
         path: (_p, rel) => rel,
+        transform: transformCodexSkill,
       },
       agents: {
         supported: true,
@@ -365,6 +375,11 @@ export function buildCodexContract(): ToolBuildContract {
         supported: true,
         source: { kind: "hooksBundle", jsonPath: "hooks/hooks.json", scriptDir: "hooks" },
         path: (_p, rel) => rel,
+        // The same rename the merged install route applies. Codex has no `Stop`, so without
+        // this the built tree subscribes the turn-end hook to an event that never arrives
+        // and the turn is never closed, in silence.
+        transform: (content, _plugin, base) =>
+          base === "hooks.json" ? renameCodexHookEvents(content) : content,
       },
       rules: { supported: false },
       commands: { supported: false },
@@ -719,14 +734,28 @@ function opencodeFlatAgentPath(plugin: string, rel: string): string {
   return genericFlatAgentPath(".opencode/agents/", plugin, rel.replace(/^agents\//, ""), ".md");
 }
 
+// Nested, not hyphen-flat like the other four tools' skill paths — see
+// genericFlatSkillTreePath's doc comment. This is the shape already installed for OpenCode,
+// so it stays; nothing under skills/ depends on it any more. Must produce the same relative paths as
+// `aidd plugin install --tool opencode`'s route (PluginContentTranslator.translateFlat,
+// mode-b-flat-materialization-translator.ts), pinned equal by
+// built-tree-vs-modeb-skills-agree.unit.test.ts.
 function opencodeFlatSkillPath(plugin: string, rel: string): string {
-  return genericFlatSkillPath(".opencode/skills/", plugin, rel.replace(/^skills\//, ""));
+  return genericFlatSkillTreePath(".opencode/skills/", plugin, rel.replace(/^skills\//, ""));
 }
 
 function opencodeFlatResolveTarget(plugin: string, rel: string): string {
   if (rel.startsWith("agents/")) return opencodeFlatAgentPath(plugin, rel);
   if (rel.startsWith("skills/")) return opencodeFlatSkillPath(plugin, rel);
   return rel;
+}
+
+// OpenCode's loader scans one directory non-recursively (flatHooksDir), so a hook script
+// lands there directly — no plugin-name segment, the same shape `translateFlat` delivers
+// for the install route (plugin-content-translator.ts's flatHooksFiles, via the same
+// flatHooksSharedDirPath).
+function makeOpencodeFlatHooksPath(flatHooksDir: string): (plugin: string, rel: string) => string {
+  return (_plugin, rel) => flatHooksSharedDirPath(flatHooksDir, rel);
 }
 
 function transformOpencodeFlatAgent(content: string, plugin: string, outName: string): string {
@@ -771,6 +800,20 @@ async function collectOpencodeMcp(
   return incoming;
 }
 
+// Delivers what `aidd plugin install --tool opencode` delivers: `flatHooksDir` is the
+// tool's own declaration (opencode.ts), read here rather than restated, so the two
+// routes cannot fall out of sync the way they did before this fix.
+function buildOpencodeFlatHooksArtifact(): ArtifactContract {
+  const { flatHooksDir } = opencode.capabilities.plugins;
+  if (flatHooksDir === null) return { supported: false };
+  return {
+    supported: true,
+    source: { kind: "hooksBundle", jsonPath: "hooks/hooks.json", scriptDir: "hooks" },
+    path: makeOpencodeFlatHooksPath(flatHooksDir),
+    skipHooksJson: true,
+  };
+}
+
 export function buildOpencodeFlatContract(): ToolBuildContract {
   return {
     manifestDir: null,
@@ -792,7 +835,7 @@ export function buildOpencodeFlatContract(): ToolBuildContract {
         transform: transformOpencodeFlatAgent,
       },
       mcp: { supported: false }, // handled by emitConfigArtifact (opencode.json mcp)
-      hooks: { supported: false }, // opencode has no HasHooks capability
+      hooks: buildOpencodeFlatHooksArtifact(),
       rules: { supported: false },
       commands: { supported: false },
     },

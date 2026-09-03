@@ -63,18 +63,38 @@ import { SetupMarketplaceSourceUseCase } from "../application/use-cases/setup/se
 import { SetupPluginsPromptUseCase } from "../application/use-cases/setup/setup-plugins-prompt-use-case.js";
 import { SetupToolsPromptUseCase } from "../application/use-cases/setup/setup-tools-prompt-use-case.js";
 import { SetupToolsUseCase } from "../application/use-cases/setup/setup-tools-use-case.js";
+import { DetectPluginDriftUseCase } from "../application/use-cases/shared/detect-plugin-drift-use-case.js";
 import {
   EnsureBuiltMarketplaceUseCase,
   type FrameworkBuildFor,
 } from "../application/use-cases/shared/ensure-built-marketplace-use-case.js";
 import { FetchMarketplaceSourceUseCase } from "../application/use-cases/shared/fetch-marketplace-source-use-case.js";
+import { GitignoreUseCase } from "../application/use-cases/shared/gitignore-use-case.js";
+import { PostInstallPipelineUseCase } from "../application/use-cases/shared/post-install-pipeline-use-case.js";
 import { ResolveMarketplaceUseCase } from "../application/use-cases/shared/resolve-marketplace-use-case.js";
 import { ResolveUpdateDecisionUseCase } from "../application/use-cases/shared/resolve-update-decision-use-case.js";
 import { UpdateOneToolUseCase } from "../application/use-cases/shared/update-one-tool-use-case.js";
 import { StatusUseCase } from "../application/use-cases/status-use-case.js";
 import { SyncConflictResolverUseCase } from "../application/use-cases/sync/sync-conflict-resolver-use-case.js";
+import { DiagnoseTelemetryUseCase } from "../application/use-cases/telemetry/diagnose-telemetry-use-case.js";
+import { ForgetTelemetryUseCase } from "../application/use-cases/telemetry/forget-telemetry-use-case.js";
+import { PersonIdentityUseCase } from "../application/use-cases/telemetry/person-identity-use-case.js";
+import { ReadLocalCostUseCase } from "../application/use-cases/telemetry/read-local-cost-use-case.js";
+import { ReportCostUseCase } from "../application/use-cases/telemetry/report-cost-use-case.js";
+import { TelemetryOffUseCase } from "../application/use-cases/telemetry/telemetry-off-use-case.js";
+import { TelemetryOnUseCase } from "../application/use-cases/telemetry/telemetry-on-use-case.js";
 import { UninstallIdeUseCase } from "../application/use-cases/uninstall/uninstall-ide-use-case.js";
+import { UninstallToolsUseCase } from "../application/use-cases/uninstall/uninstall-tools-use-case.js";
 import { UninstallUseCase } from "../application/use-cases/uninstall/uninstall-use-case.js";
+import {
+  CLAUDE_CODE_TRANSCRIPT_LOCATION,
+  createClaudeCodeTranscriptAccumulator,
+} from "../domain/formats/claude-code-transcript.js";
+import {
+  CODEX_ROLLOUT_LOCATION,
+  createCodexRolloutAccumulator,
+} from "../domain/formats/codex-rollout.js";
+import type { AiToolId } from "../domain/models/tool-ids.js";
 import type { AssetProvider } from "../domain/ports/asset-provider.js";
 import type { CredentialStore } from "../domain/ports/credential-store.js";
 import type { FileMerger } from "../domain/ports/file-merger.js";
@@ -84,7 +104,6 @@ import type { Hasher } from "../domain/ports/hasher.js";
 import type { LatestReleaseResolver } from "../domain/ports/latest-release-resolver.js";
 import type { Logger } from "../domain/ports/logger.js";
 import type { ManifestRepository } from "../domain/ports/manifest-repository.js";
-import type { MarketplaceCachePort } from "../domain/ports/marketplace-cache.js";
 import type { MarketplaceRegistry } from "../domain/ports/marketplace-registry.js";
 import type { MarketplaceTrustStore } from "../domain/ports/marketplace-trust-store.js";
 import type { NativePluginActivator } from "../domain/ports/native-plugin-activator.js";
@@ -94,13 +113,16 @@ import type { PluginDistributionReader } from "../domain/ports/plugin-distributi
 import type { PluginFetcher } from "../domain/ports/plugin-fetcher.js";
 import type { Prompter } from "../domain/ports/prompter.js";
 import type { SelfUpdater } from "../domain/ports/self-updater.js";
+import type { SessionCostReader } from "../domain/ports/session-cost-reader.js";
 import type { VersionControl } from "../domain/ports/version-control.js";
 import type { VersionReader } from "../domain/ports/version-reader.js";
 import { AjvSchemaValidatorAdapter } from "./adapters/ajv-schema-validator-adapter.js";
 import { AuthProviderAdapter } from "./adapters/auth-provider-adapter.js";
 import { AuthReaderAdapter } from "./adapters/auth-reader-adapter.js";
+import { ClaudeCliAdapter } from "./adapters/claude-cli-adapter.js";
 import { CodexCliAdapter } from "./adapters/codex-cli-adapter.js";
 import { CopilotCliAdapter } from "./adapters/copilot-cli-adapter.js";
+import { CopilotCostReaderAdapter } from "./adapters/copilot-cost-reader-adapter.js";
 import { CurrentVersionAdapter } from "./adapters/current-version-adapter.js";
 import { FileAdapter } from "./adapters/file-adapter.js";
 import { GhCliAdapter } from "./adapters/gh-cli-adapter.js";
@@ -109,18 +131,27 @@ import { GitAdapter } from "./adapters/git-adapter.js";
 import { GitHubRawFetcherAdapter } from "./adapters/github-raw-fetcher-adapter.js";
 import { GitHubReleaseResolverAdapter } from "./adapters/github-release-resolver-adapter.js";
 import { HasherAdapter } from "./adapters/hasher-adapter.js";
+import { HookTrustReaderAdapter } from "./adapters/hook-trust-reader-adapter.js";
 import { ManifestRepositoryAdapter } from "./adapters/manifest-repository-adapter.js";
 import { MarketplaceCacheAdapter } from "./adapters/marketplace-cache-adapter.js";
 import { MarketplaceRegistryAdapter } from "./adapters/marketplace-registry-adapter.js";
 import { MarketplaceTrustStoreAdapter } from "./adapters/marketplace-trust-store-adapter.js";
+import { OpencodeCostReaderAdapter } from "./adapters/opencode-cost-reader-adapter.js";
+import { PersonIdentityAdapter } from "./adapters/person-identity-adapter.js";
 import { PlatformAdapter } from "./adapters/platform-adapter.js";
 import { PluginCatalogRepositoryAdapter } from "./adapters/plugin-catalog-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "./adapters/plugin-distribution-reader-adapter.js";
 import { PluginFetcherAdapter } from "./adapters/plugin-fetcher-adapter.js";
 import { InquirerPrompterAdapter, SilentPrompterAdapter } from "./adapters/prompter-adapter.js";
+import { RunJournalReaderAdapter } from "./adapters/run-journal-reader-adapter.js";
 import { SelfUpdaterAdapter } from "./adapters/self-updater-adapter.js";
+import { TaskBacklogAdapter } from "./adapters/task-backlog-adapter.js";
+import { TelemetryEvidenceAdapter } from "./adapters/telemetry-evidence-adapter.js";
+import { TelemetrySinkAdapter } from "./adapters/telemetry-sink-adapter.js";
+import { TranscriptCostReaderAdapter } from "./adapters/transcript-cost-reader-adapter.js";
 import { BundledAssetProviderAdapter } from "./assets/asset-loader.js";
 import { AuthStorage } from "./auth/auth-storage.js";
+import { resolveHomeDir } from "./home-dir.js";
 import { HttpClient } from "./http/http-client.js";
 
 interface GlobalOptions {
@@ -144,7 +175,6 @@ interface Deps {
   pluginCatalogRepository: PluginCatalogRepository;
   pluginFetcher: PluginFetcher;
   pluginDistributionReader: PluginDistributionReader;
-  marketplaceCache: MarketplaceCachePort;
   marketplaceRegistry: MarketplaceRegistry;
   marketplaceTrustStore: MarketplaceTrustStore;
   pluginAddUseCase: PluginAddUseCase;
@@ -193,6 +223,16 @@ interface Deps {
   cleanUseCase: CleanUseCase;
   doctorAllUseCase: DoctorAllUseCase;
   checkUpdateUseCase: CheckUpdateUseCase;
+  telemetryOnUseCase: TelemetryOnUseCase;
+  telemetryOffUseCase: TelemetryOffUseCase;
+  readLocalCostUseCase: ReadLocalCostUseCase;
+  personIdentityUseCase: PersonIdentityUseCase;
+  diagnoseTelemetryUseCase: DiagnoseTelemetryUseCase;
+  reportCostUseCase: ReportCostUseCase;
+  /** Exposed so a command can say how this machine located its figures — see
+   * `warnIfFiguresMoveTheTokenToo`. */
+  telemetrySink: TelemetrySinkAdapter;
+  forgetTelemetryUseCase: ForgetTelemetryUseCase;
 }
 
 const _cache = new Map<string, Deps>();
@@ -398,10 +438,16 @@ export async function createDeps(
     ? new InquirerPrompterAdapter()
     : new SilentPrompterAdapter();
   const nativePluginActivators = new Map<string, NativePluginActivator>([
+    ["claude", new ClaudeCliAdapter()],
     ["codex", new CodexCliAdapter()],
     ["copilot", new CopilotCliAdapter()],
   ]);
-  const pluginRemoveUseCase = new PluginRemoveUseCase(fs, manifestRepo);
+  const pluginRemoveUseCase = new PluginRemoveUseCase(
+    fs,
+    manifestRepo,
+    logger,
+    nativePluginActivators
+  );
   const pluginListUseCase = new PluginListUseCase(manifestRepo);
   const fetchMarketplaceSource = new FetchMarketplaceSourceUseCase(
     pluginFetcher,
@@ -409,10 +455,13 @@ export async function createDeps(
     fs,
     logger
   );
+  const resolveMarketplaceUseCase = new ResolveMarketplaceUseCase(
+    fetchMarketplaceSource,
+    pluginCatalogRepository
+  );
   const marketplaceListUseCase = new MarketplaceListUseCase(
     marketplaceRegistry,
-    pluginCatalogRepository,
-    fetchMarketplaceSource,
+    resolveMarketplaceUseCase,
     logger
   );
   const marketplaceRemoveUseCase = new MarketplaceRemoveUseCase(
@@ -422,32 +471,31 @@ export async function createDeps(
     prompter
   );
   const marketplaceAddUseCase = new MarketplaceAddUseCase(
-    pluginCatalogRepository,
     marketplaceRegistry,
     marketplaceTrustStore,
-    fetchMarketplaceSource,
+    resolveMarketplaceUseCase,
     prompter,
     marketplaceRemoveUseCase
   );
   const marketplaceRefreshUseCase = new MarketplaceRefreshUseCase(
-    pluginCatalogRepository,
     marketplaceRegistry,
-    fetchMarketplaceSource,
+    resolveMarketplaceUseCase,
+    marketplaceCache,
     logger,
     fs
   );
   const marketplaceCheckUseCase = new MarketplaceCheckUseCase(
     manifestRepo,
-    pluginCatalogRepository,
     marketplaceRegistry,
-    fetchMarketplaceSource
-  );
-  const resolveMarketplaceUseCase = new ResolveMarketplaceUseCase(
-    fetchMarketplaceSource,
-    pluginCatalogRepository
+    resolveMarketplaceUseCase
   );
   const assetProvider = new BundledAssetProviderAdapter();
   const jsonSchemaValidator = new AjvSchemaValidatorAdapter();
+  // force:true is safe here: outDir is always builtMarketplaceDir(), an aidd-owned
+  // disposable cache under .aidd/cache/built/, never a user-owned directory. A
+  // collision only means "the cache from a previous build already exists" — the
+  // whole point of a rebuild. The real user --force (framework.ts) is unrelated
+  // and already threaded correctly for the direct `framework build --flat` path.
   const frameworkBuildFor: FrameworkBuildFor = (target, mode, outDir) =>
     createFrameworkBuildUseCase(
       { fs, assetProvider, logger },
@@ -498,28 +546,34 @@ export async function createDeps(
     assetProvider,
     logger
   );
+  const gitignoreUseCase = new GitignoreUseCase(fs);
+  const postInstallPipelineUseCase = new PostInstallPipelineUseCase(manifestRepo, gitignoreUseCase);
   const installRuntimeConfigUseCase = new InstallRuntimeConfigUseCase(
     fs,
-    manifestRepo,
     hasher,
     logger,
-    assetProvider
+    assetProvider,
+    postInstallPipelineUseCase
   );
   const installIdeConfigUseCase = new InstallIdeConfigUseCase(
     fs,
-    manifestRepo,
     hasher,
     logger,
-    assetProvider
+    assetProvider,
+    postInstallPipelineUseCase
   );
   const installIdeToolUseCase = new InstallIdeToolUseCase(
     installIdeConfigUseCase,
     manifestRepo,
     fs,
     hasher,
+    postInstallPipelineUseCase,
     assetProvider
   );
-  const uninstallIdeUseCase = new UninstallIdeUseCase(fs, manifestRepo);
+  const uninstallIdeUseCase = new UninstallIdeUseCase(
+    manifestRepo,
+    new UninstallToolsUseCase(fs, logger)
+  );
   const pluginInstallFromMarketplaceUseCase = new PluginInstallFromMarketplaceUseCase(
     resolveMarketplaceUseCase,
     marketplaceRegistry,
@@ -528,17 +582,15 @@ export async function createDeps(
     logger
   );
   const pluginSearchUseCase = new PluginSearchUseCase(
-    pluginCatalogRepository,
     marketplaceRegistry,
-    fetchMarketplaceSource
+    resolveMarketplaceUseCase
   );
   const marketplaceRegisterFrameworkUseCase = new MarketplaceRegisterFrameworkUseCase(
     marketplaceRegistry
   );
   const pluginPickUseCase = new PluginPickUseCase(
-    pluginCatalogRepository,
     marketplaceRegistry,
-    fetchMarketplaceSource,
+    resolveMarketplaceUseCase,
     pluginAddUseCase,
     prompter
   );
@@ -560,7 +612,8 @@ export async function createDeps(
   const syncConflictResolverUseCase = new SyncConflictResolverUseCase(fs);
   const doctorTrackedFilesUseCase = new DoctorTrackedFilesUseCase(fs);
   const doctorMergeFilesUseCase = new DoctorMergeFilesUseCase(fs, hasher);
-  const doctorPluginUseCase = new DoctorPluginUseCase(fs);
+  const detectPluginDriftUseCase = new DetectPluginDriftUseCase(fs);
+  const doctorPluginUseCase = new DoctorPluginUseCase(detectPluginDriftUseCase);
   const doctorReferencesUseCase = new DoctorReferencesUseCase(fs);
   const doctorLayoutUseCase = new DoctorLayoutUseCase(fs, authReader);
   const doctorUseCase = new DoctorUseCase(
@@ -589,7 +642,7 @@ export async function createDeps(
   );
   const setupToolsPromptUseCase = new SetupToolsPromptUseCase(prompter);
   const projectContextDetector = new ProjectContextDetectorUseCase(fs);
-  const statusUseCase = new StatusUseCase(fs, manifestRepo, hasher);
+  const statusUseCase = new StatusUseCase(fs, manifestRepo, hasher, detectPluginDriftUseCase);
   // Lets restore re-materialize cursor/opencode plugins via the build pipeline,
   // matching what install wrote (otherwise restore rewrites raw content → drift).
   const builtMaterializationDeps = {
@@ -618,18 +671,12 @@ export async function createDeps(
     builtMaterializationDeps
   );
   const uninstallUseCase = new UninstallUseCase(fs, manifestRepo, logger);
-  const statusAllUseCase = new StatusAllUseCase(fs, manifestRepo, hasher);
+  const statusAllUseCase = new StatusAllUseCase(statusUseCase);
   const restoreAllUseCase = new RestoreAllUseCase(
-    fs,
     manifestRepo,
-    hasher,
-    logger,
-    platform,
     prompter,
-    pluginFetcher,
-    pluginDistributionReader,
-    assetProvider,
-    builtMaterializationDeps
+    statusUseCase,
+    restoreUseCase
   );
   const resolveUpdateDecisionUseCase = new ResolveUpdateDecisionUseCase(prompter);
   const updateOneToolUseCase = new UpdateOneToolUseCase(
@@ -642,13 +689,9 @@ export async function createDeps(
   const updateAllUseCase = new UpdateAllUseCase(
     manifestRepo,
     currentVersionProvider,
-    installRuntimeConfigUseCase,
-    installIdeConfigUseCase,
     pluginUpdateUseCase,
     marketplaceRefreshUseCase,
-    syncConflictResolverUseCase,
-    resolveUpdateDecisionUseCase,
-    fs
+    updateOneToolUseCase
   );
   const updateAiToolsUseCase = new UpdateAiToolsUseCase(
     manifestRepo,
@@ -660,9 +703,78 @@ export async function createDeps(
     currentVersionProvider,
     updateOneToolUseCase
   );
-  const cleanUseCase = new CleanUseCase(fs, manifestRepo, logger, prompter);
+  const cleanUseCase = new CleanUseCase(fs, manifestRepo, logger, gitignoreUseCase, prompter);
   const doctorAllUseCase = new DoctorAllUseCase(doctorUseCase);
   const checkUpdateUseCase = new CheckUpdateUseCase(cliUpdater, currentVersionProvider, logger, fs);
+  const telemetryEvidenceAdapter = new TelemetryEvidenceAdapter();
+  const telemetryOnUseCase = new TelemetryOnUseCase(fs, logger, gitignoreUseCase, git);
+  const telemetryOffUseCase = new TelemetryOffUseCase(fs, logger, telemetryEvidenceAdapter, git);
+  const telemetrySink = new TelemetrySinkAdapter();
+  // This is the one place allowed to map a tool that declares `telemetryLocalRead: {
+  // kind: "declared" }` to the adapter that reads it.
+  // `resolveHomeDir()`, not a bare `homedir()`: on Windows the bare call ignores a `HOME`
+  // a person set or a test sandboxed this process under - see `home-dir.ts`.
+  const localCostReaders: ReadonlyMap<AiToolId, SessionCostReader> = new Map<
+    AiToolId,
+    SessionCostReader
+  >([
+    ["opencode", new OpencodeCostReaderAdapter()],
+    [
+      "claude",
+      new TranscriptCostReaderAdapter(
+        resolveHomeDir(),
+        CLAUDE_CODE_TRANSCRIPT_LOCATION,
+        createClaudeCodeTranscriptAccumulator
+      ),
+    ],
+    [
+      "codex",
+      new TranscriptCostReaderAdapter(
+        resolveHomeDir(),
+        CODEX_ROLLOUT_LOCATION,
+        createCodexRolloutAccumulator
+      ),
+    ],
+    ["copilot", new CopilotCostReaderAdapter(resolveHomeDir())],
+  ]);
+  const runJournalReader = new RunJournalReaderAdapter(projectRoot);
+  const personIdentityAdapter = new PersonIdentityAdapter();
+  const readLocalCostUseCase = new ReadLocalCostUseCase(
+    telemetrySink,
+    localCostReaders,
+    runJournalReader,
+    personIdentityAdapter,
+    telemetryEvidenceAdapter,
+    currentVersionProvider,
+    logger
+  );
+  const personIdentityUseCase = new PersonIdentityUseCase(personIdentityAdapter);
+  const hookTrustReaderAdapter = new HookTrustReaderAdapter();
+  const diagnoseTelemetryUseCase = new DiagnoseTelemetryUseCase(
+    telemetryEvidenceAdapter,
+    git,
+    runJournalReader,
+    localCostReaders,
+    hookTrustReaderAdapter,
+    personIdentityAdapter,
+    telemetrySink,
+    currentVersionProvider
+  );
+  const reportCostUseCase = new ReportCostUseCase(
+    telemetrySink,
+    runJournalReader,
+    personIdentityAdapter,
+    telemetryEvidenceAdapter,
+    new TaskBacklogAdapter(projectRoot),
+    readLocalCostUseCase,
+    logger
+  );
+  const forgetTelemetryUseCase = new ForgetTelemetryUseCase(
+    telemetrySink,
+    runJournalReader,
+    personIdentityAdapter,
+    git
+  );
   const deps: Deps = {
     fs,
     manifestRepo,
@@ -680,7 +792,6 @@ export async function createDeps(
     pluginCatalogRepository,
     pluginFetcher,
     pluginDistributionReader,
-    marketplaceCache,
     marketplaceRegistry,
     marketplaceTrustStore,
     pluginAddUseCase,
@@ -729,6 +840,14 @@ export async function createDeps(
     cleanUseCase,
     doctorAllUseCase,
     checkUpdateUseCase,
+    telemetryOnUseCase,
+    telemetryOffUseCase,
+    readLocalCostUseCase,
+    personIdentityUseCase,
+    diagnoseTelemetryUseCase,
+    reportCostUseCase,
+    telemetrySink,
+    forgetTelemetryUseCase,
   };
   _cache.set(projectRoot, deps);
   return deps;

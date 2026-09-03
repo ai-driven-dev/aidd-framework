@@ -1,0 +1,57 @@
+name: 🌱 Quick Contribution
+description: Propose a change or new content for the framework, minimal form
+title: "feat(<scope>): "
+type: Feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Issue-first: a maintainer validates this before any PR is opened (see [CONTRIBUTING.md](https://github.com/ai-driven-dev/framework/blob/main/CONTRIBUTING.md)).
+        Want to discuss an idea first? Post it in [Discussions](https://github.com/ai-driven-dev/framework/discussions).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What problem does this solve? e.g. "There is no rule for..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe the content you want. Which file? Which format?
+    validations:
+      required: true
+  - type: checkboxes
+    id: content-type
+    attributes:
+      label: Content type
+      options:
+        - label: Rule
+        - label: Skill
+        - label: Command
+        - label: Agent
+        - label: Plugin
+        - label: Other
+  - type: checkboxes
+    id: tools
+    attributes:
+      label: Target tool(s)
+      options:
+        - label: Claude Code
+        - label: Cursor
+        - label: Windsurf
+        - label: Gemini CLI
+        - label: Other
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Links, examples, use cases.
+  - type: checkboxes
+    id: coc
+    attributes:
+      label: Code of Conduct
+      options:
+        - label: I agree to follow this project's [Code of Conduct](https://github.com/ai-driven-dev/framework/blob/main/CODE_OF_CONDUCT.md).
+          required: true

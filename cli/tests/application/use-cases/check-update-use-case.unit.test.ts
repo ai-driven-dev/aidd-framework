@@ -1,3 +1,5 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { CheckUpdateUseCase } from "../../../src/application/use-cases/check-update-use-case.js";
 import { FileHash } from "../../../src/domain/models/file.js";
@@ -56,8 +58,11 @@ function makeFsStub(store: Map<string, string> = new Map()): FileReader & FileWr
 }
 
 function seedCache(store: Map<string, string>, latest: string, ageMs = 0): void {
-  const dir = process.env.AIDD_USER_CONFIG_DIR ?? `${process.env.HOME ?? "/tmp"}/.config/aidd`;
-  store.set(`${dir}/update-check.json`, JSON.stringify({ checkedAt: Date.now() - ageMs, latest }));
+  const dir = process.env.AIDD_USER_CONFIG_DIR ?? join(homedir(), ".config", "aidd");
+  store.set(
+    join(dir, "update-check.json"),
+    JSON.stringify({ checkedAt: Date.now() - ageMs, latest })
+  );
 }
 
 // ---- SWR matrix ----

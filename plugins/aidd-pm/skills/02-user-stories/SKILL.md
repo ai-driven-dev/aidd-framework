@@ -1,40 +1,41 @@
 ---
 name: 02-user-stories
-description: Turn a feature or epic into a prioritized, estimated, INVEST-compliant user-story backlog in the tracker. Use when the user wants to create, split, estimate, or prioritize user stories. Not for source code or a PRD.
-argument-hint: clarify-scope | split-epic | draft-stories | estimate-impact | prioritize | sync-tracker
+description: Produces or refines ordered User Stories from an Epic, Product Brief, PRD, or bounded request. Use when the user wants to slice, write, assess, order, or persist Stories. Not for Epics or implementation.
+argument-hint: request | epic
 ---
 
 # User Stories
 
-Produces a prioritized backlog of INVEST-compliant user stories, each estimated for effort and impact and carrying a pragmatic functional Definition of Done, then saved to the project's configured tracker.
+```mermaid
+flowchart LR
+  source([request, Product Brief, PRD, Epic, or Stories]) --> frame --> slice --> write --> assess
+  source -->|"already persisted"| finalize
+  assess -->|"reshape"| slice
+  assess --> estimation --> order --> finalize
+  order -->|"reslice"| slice
+  finalize -->|"revise"| write
+  finalize -->|"authorized"| done([User Stories])
+```
 
 ## Actions
 
-| #   | Action            | Role                                                                 | Input                                  |
-| --- | ----------------- | -------------------------------------------------------------------- | -------------------------------------- |
-| 01  | `clarify-scope`   | Clarify the request through Product Owner questioning; decide epic vs single story | feature or epic description            |
-| 02  | `split-epic`      | Decompose the confirmed scope into candidate vertical-slice stories  | confirmed scope from 01                |
-| 03  | `draft-stories`   | Write each candidate as an INVEST story with acceptance criteria and a functional DoD | candidate stories from 02              |
-| 04  | `estimate-impact` | Rate each story for effort (points) and impact on the existing system | drafted stories from 03                |
-| 05  | `prioritize`      | Rank the backlog by value against effort and impact                  | estimated stories from 04              |
-| 06  | `sync-tracker`    | Gate on Definition of Ready, get explicit approval, save to the tracker | ranked backlog from 05                 |
+Run the flow above. Read only the next action file.
 
-Run `01 → 02 → 03 → 04 → 05 → 06`, passing each `## Test` first. A single story skips the epic split.
-Before running an action, read its file in `actions/`, not only the table or assets.
+| Action     | Does                                      |
+| ---------- | ----------------------------------------- |
+| frame      | resolve the source and Story scope        |
+| slice      | find vertical deliverable slices          |
+| write      | write Stories and acceptance              |
+| assess     | determine readiness and blockers          |
+| estimation | estimate only when applicable             |
+| order      | order only when useful                    |
+| finalize   | approve, persist, or transition           |
 
 ## Transversal rules
 
-- **INVEST**: each story is Independent, Negotiable, Valuable, Estimable, Small, Testable.
-- **Definition of Ready**: acceptance criteria, dependencies, story points, and an impact rating are set, with zero blocking questions, before save.
-- **Definition of Done**: each story carries a pragmatic, functional DoD, observable user-facing conditions that mean the goal is met. Functional only, never technical delivery steps.
-- **Lean clarification**: at most 3 questions per iteration; focus on user needs, not technical aspects.
-- Always wait for explicit user validation before saving to the tracker.
-- The save target is the configured ticketing tool from project memory; never assume a specific tool.
-
-## References
-
-- `references/rating.md`: INVEST, the Definition of Ready and functional Definition of Done, the minor/major/critic impact scale, and the prioritization method.
-
-## Assets
-
-- `assets/user-story-template.md`: user story body template.
+- Keep product and lifecycle decisions with the user.
+- Separate evidence, decisions, and assumptions.
+- Preserve source links and existing edits.
+- Ask natural questions; never expose actions, references, or unchanged state.
+- Require explicit approval or caller-provided bounded authority before any write.
+- Draft only after actor, need, and outcome are explicit in the source or confirmed.

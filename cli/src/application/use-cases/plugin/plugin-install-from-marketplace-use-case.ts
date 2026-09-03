@@ -41,7 +41,14 @@ interface MatchEntry {
   localPath: string;
 }
 
-export class PluginInstallFromMarketplaceUseCase {
+/** Installing a plugin named in a marketplace catalog, as its callers need it. */
+export interface PluginInstallFromMarketplace {
+  execute(
+    options: PluginInstallFromMarketplaceOptions
+  ): Promise<PluginInstallFromMarketplaceResult>;
+}
+
+export class PluginInstallFromMarketplaceUseCase implements PluginInstallFromMarketplace {
   constructor(
     private readonly resolveMarketplace: ResolveMarketplaceUseCase,
     private readonly registry: MarketplaceRegistry,

@@ -1,0 +1,47 @@
+name: 📋 Detailed Contribution
+description: "Propose a scoped change: a skill, a refactor, a rule to enforce"
+title: "<type>(<scope>): "
+type: Task
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Issue-first: a maintainer validates this before any PR is opened (see [CONTRIBUTING.md](https://github.com/ai-driven-dev/framework/blob/main/CONTRIBUTING.md)).
+        Reporting a bug? Use the **Bug Report** form instead.
+
+        The title carries its own scope, matching `commitlint.config.cjs`: `feat(aidd-pm):`, `fix(framework):`, `refactor(aidd-context):`.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is wrong or missing today. State the current behaviour, not the fix.
+      placeholder: The router of `10-learn` is 40 lines of its 153, denser than the four actions it routes to.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What this change does. One bullet per deliverable.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Checkboxes a reviewer can verify without asking the author. Each one observable.
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: prior-art
+    attributes:
+      label: Prior art in this repo
+      description: What already exists that this builds on or duplicates. Cite the file and line. Leave empty if you checked and found none.
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What a reader would expect here and will not find, with where it lives instead.

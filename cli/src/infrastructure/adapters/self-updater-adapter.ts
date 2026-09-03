@@ -9,7 +9,7 @@ import {
 import type { Logger } from "../../domain/ports/logger.js";
 import type { CliRelease, SelfUpdater } from "../../domain/ports/self-updater.js";
 import type { TokenProvider } from "../../domain/ports/token-provider.js";
-import type { HttpClient } from "../http/http-client.js";
+import type { HttpGet } from "../http/http-client.js";
 
 const CLI_REPO = "ai-driven-dev/aidd-cli";
 const CLI_PACKAGE = "@ai-driven-dev/cli";
@@ -68,7 +68,7 @@ export class SelfUpdaterAdapter implements SelfUpdater {
   private readonly logger: Logger | undefined;
 
   constructor(
-    private readonly http: HttpClient,
+    private readonly http: HttpGet,
     config: SelfUpdaterAdapterConfig = {}
   ) {
     this.tokenProvider = config.tokenProvider;

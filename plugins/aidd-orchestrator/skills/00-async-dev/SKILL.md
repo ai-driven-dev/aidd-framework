@@ -1,7 +1,7 @@
 ---
 name: 00-async-dev
 description: Drive the async-dev pipeline from one entry point, whether setup, run, or review. Use when the user wants to install async dev, run a ready issue, or address PR review comments, or on a webhook trigger. Not for plain status checks.
-argument-hint: collect-comments | detect-stop | fix-iteration | finalize | poll-ready | resolve-deps | acquire-lock | check-sdlc | delegate-sdlc | write-audit | detect-context | ask-config | generate-workflow | generate-local-script | write-config | bootstrap-labels | install-user-scope-plugins | configure-remote-secrets | bootstrap-scheduling | commit-and-push | smoke-test
+argument-hint: setup | run | review
 ---
 
 # Async-dev
@@ -78,7 +78,7 @@ Executes one orchestration cycle on a fresh issue. Reads ready issues, resolves 
 | 01  | `poll-ready`      | Find the next issue with `to-implement`, no `claude/working`, no open closing PR               |
 | 02  | `resolve-deps`    | Check linked issues / dependencies; abort if blocked                                           |
 | 03  | `acquire-lock`    | Apply `claude/working` label; refuse if already held                                           |
-| 04  | `check-sdlc`      | Verify an SDLC orchestrator is loaded (`aidd-dev:00-sdlc` or equivalent)                       |
+| 04  | `check-sdlc`      | Verify an SDLC orchestration capability is loaded                                              |
 | 05  | `delegate-sdlc`   | Hand the issue to the SDLC capability; observe outcome                                         |
 | 06  | `write-audit`     | Emit `run-result.json` for the workflow's post-job                                             |
 

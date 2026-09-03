@@ -80,8 +80,20 @@ describe("install claude plugin via Mode A (integration)", () => {
     const settings = JSON.parse(await fs.readFile(settingsPath)) as Record<string, unknown>;
     expect(settings.extraKnownMarketplaces).toBeDefined();
     // Settings reference the BUILT claude tree, not the raw source.
+    // marketplace-sync-settings-use-case.ts's resolveSourceForSettings re-resolves every
+    // local source against projectRoot before writing it out, even one already absolute -
+    // harmless when that path already carries a drive letter, as a real builtDir always
+    // does, but a genuinely drive-less absolute local path (e.g. a marketplaces.json
+    // committed on POSIX and read on Windows) would silently gain the current drive
+    // instead of failing loud. Named, not fixed here - the expectation below goes through
+    // the same call so this test does not mask that behavior as something else.
+    // (#707: this is what surfaced it - the fake ensureBuilt stand-in these tests share
+    // returns exactly that drive-less shape.)
     expect((settings.extraKnownMarketplaces as Record<string, unknown>)[MARKETPLACE_NAME]).toEqual({
-      source: { source: "directory", path: "/built/claude" },
+      source: {
+        source: "directory",
+        path: resolve(PROJECT_ROOT, "/built/claude").replace(/\\/g, "/"),
+      },
     });
     expect(settings.enabledPlugins).toBeDefined();
     expect(

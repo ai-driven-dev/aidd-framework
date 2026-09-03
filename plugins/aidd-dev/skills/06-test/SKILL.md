@@ -1,7 +1,7 @@
 ---
 name: 06-test
 description: Write and iterate tests until they pass, or validate a user journey end to end in the browser. Use when the user wants to add coverage, find what's untested, or walk a flow. Not for auditing test health or debugging a failure.
-argument-hint: test | test-journey
+argument-hint: scope | journey
 model: sonnet
 ---
 

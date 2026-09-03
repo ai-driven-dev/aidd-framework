@@ -26,7 +26,7 @@ function buildFakePrompter(answer: "keep" | "overwrite" | "overwrite-all" | "ski
     input: vi.fn(),
     select: vi.fn(),
     checkbox: vi.fn(),
-  } as unknown as Prompter;
+  };
 }
 
 function buildUseCase(
@@ -133,6 +133,52 @@ describe("UpdateOneToolUseCase integration", () => {
       ).rejects.toThrow(InputRequiredError);
 
       expect(errors).toHaveLength(0);
+    });
+  });
+
+  describe("install failure", () => {
+    it("reports the failure and returns null instead of throwing", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      vi.spyOn(deps.installRuntimeConfigUseCase, "execute").mockRejectedValue(
+        new Error("disk full")
+      );
+
+      const useCase = buildUseCase(deps, buildFakePrompter("keep"));
+      const errors: Parameters<typeof useCase.execute>[4] = [];
+
+      const result = await useCase.execute(
+        "claude",
+        await loadManifest(deps),
+        PROJECT_ROOT,
+        "test",
+        errors,
+        { userForce: false, interactive: false, bulkState: new BulkConflictState() }
+      );
+
+      expect(result).toBeNull();
+      expect(errors).toEqual([{ scope: "claude", message: "disk full" }]);
+    });
+
+    it("reports a non-Error rejection as a string", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      vi.spyOn(deps.installRuntimeConfigUseCase, "execute").mockRejectedValue("plain string");
+
+      const useCase = buildUseCase(deps, buildFakePrompter("keep"));
+      const errors: Parameters<typeof useCase.execute>[4] = [];
+
+      const result = await useCase.execute(
+        "claude",
+        await loadManifest(deps),
+        PROJECT_ROOT,
+        "test",
+        errors,
+        { userForce: false, interactive: false, bulkState: new BulkConflictState() }
+      );
+
+      expect(result).toBeNull();
+      expect(errors).toEqual([{ scope: "claude", message: "plain string" }]);
     });
   });
 

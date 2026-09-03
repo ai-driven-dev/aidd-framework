@@ -1,9 +1,15 @@
 /**
- * Phase 2 — Cursor flat (native user-scope) hooks + mcp parity.
- * Asserts that with acceptsHooks:true and acceptsMcp:true in cursor.ts:
- *   - hooks/hooks.json is converted to Cursor format (camelCase events, ${CLAUDE_PLUGIN_ROOT}/ → ./)
- *   - .mcp.json is passed through as mcp.json
- *   - Both files appear in Plugin.files (tracked for uninstall)
+ * Phase 6 — Cursor flat (native user-scope) hooks + mcp parity.
+ * Plugin-scope hooks were measured to never fire (three probes, see
+ * aidd_docs/tasks/2026_08/2026_08_22_telemetry-every-tool/measurements.md, Phase 4),
+ * so hooksDestination:"project" in cursor.ts now routes hooks/hooks.json to the
+ * project's own .cursor/hooks.json instead — the destination measured to fire.
+ * Asserts that:
+ *   - hooks/hooks.json is merged into the project's .cursor/hooks.json (camelCase
+ *     events, ${CLAUDE_PLUGIN_ROOT}/ → ./.cursor/hooks/<plugin>/)
+ *   - .mcp.json is still passed through as mcp.json at the plugin root, unchanged
+ *   - hooks.json is NOT tracked in Plugin.files (it isn't under the plugin's own
+ *     baseDir, so `plugin remove`'s baseDir-relative deletePluginFiles must not try)
  *   - No skip warnings are emitted
  */
 import "../../../../../src/domain/tools/ai/cursor.js";
@@ -87,8 +93,8 @@ function buildDist(): PluginDistribution {
   });
 }
 
-describe("install cursor plugin with hooks and mcp (Phase 2)", () => {
-  it("writes converted hooks.json at plugin root with camelCase events", async () => {
+describe("install cursor plugin with hooks and mcp (Phase 6)", () => {
+  it("merges converted hooks.json into the project's .cursor/hooks.json with camelCase events", async () => {
     const fs = new InMemoryFileAdapter();
     const hasher = new DeterministicHasher();
     const adapter = new ModeBFlatMaterializationTranslator(fs, hasher, () => STUB_HOME);
@@ -105,8 +111,9 @@ describe("install cursor plugin with hooks and mcp (Phase 2)", () => {
       "docs"
     );
 
-    const hooksPath = join(EXPECTED_BASE, PLUGIN_NAME, "hooks.json");
+    const hooksPath = join(PROJECT_ROOT, ".cursor", "hooks.json");
     expect(fs.has(hooksPath)).toBe(true);
+    expect(fs.has(join(EXPECTED_BASE, PLUGIN_NAME, "hooks.json"))).toBe(false);
     const parsed = JSON.parse(await fs.readFile(hooksPath)) as { hooks: Record<string, unknown> };
     expect(parsed.hooks).toHaveProperty("preToolUse");
     expect(parsed.hooks).toHaveProperty("postToolUse");
@@ -116,7 +123,7 @@ describe("install cursor plugin with hooks and mcp (Phase 2)", () => {
   });
 
   // biome-ignore lint/suspicious/noTemplateCurlyInString: describes the Claude hook placeholder
-  it("rewrites ${CLAUDE_PLUGIN_ROOT}/ to ./ in hook commands", async () => {
+  it("rewrites ${CLAUDE_PLUGIN_ROOT}/ to the project's own .cursor/hooks/<plugin>/ in hook commands", async () => {
     const fs = new InMemoryFileAdapter();
     const hasher = new DeterministicHasher();
     const adapter = new ModeBFlatMaterializationTranslator(fs, hasher, () => STUB_HOME);
@@ -133,11 +140,11 @@ describe("install cursor plugin with hooks and mcp (Phase 2)", () => {
       "docs"
     );
 
-    const hooksPath = join(EXPECTED_BASE, PLUGIN_NAME, "hooks.json");
+    const hooksPath = join(PROJECT_ROOT, ".cursor", "hooks.json");
     const content = await fs.readFile(hooksPath);
     expect(content).not.toContain("CLAUDE_PLUGIN_ROOT");
-    expect(content).toContain("./hooks/pre.js");
-    expect(content).toContain("./hooks/post.js");
+    expect(content).toContain(`./.cursor/hooks/${PLUGIN_NAME}/pre.js`);
+    expect(content).toContain(`./.cursor/hooks/${PLUGIN_NAME}/post.js`);
   });
 
   it("writes mcp.json at plugin root with the source content unchanged", async () => {
@@ -165,7 +172,7 @@ describe("install cursor plugin with hooks and mcp (Phase 2)", () => {
     expect(written).toEqual(source);
   });
 
-  it("tracks hooks.json and mcp.json in Plugin.files for uninstall", async () => {
+  it("tracks mcp.json in Plugin.files for uninstall; hooks.json is not (it isn't under the plugin's own baseDir)", async () => {
     const fs = new InMemoryFileAdapter();
     const hasher = new DeterministicHasher();
     const adapter = new ModeBFlatMaterializationTranslator(fs, hasher, () => STUB_HOME);
@@ -186,7 +193,7 @@ describe("install cursor plugin with hooks and mcp (Phase 2)", () => {
     const installed = plugins.find((p) => p.name === PLUGIN_NAME);
     expect(installed).toBeDefined();
     const keys = [...(installed?.files.keys() ?? [])];
-    expect(keys.some((k) => k.endsWith("hooks.json"))).toBe(true);
+    expect(keys.some((k) => k.endsWith("hooks.json"))).toBe(false);
     expect(keys.some((k) => k.endsWith("mcp.json"))).toBe(true);
   });
 

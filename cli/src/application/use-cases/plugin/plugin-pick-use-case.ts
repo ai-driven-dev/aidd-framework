@@ -4,13 +4,11 @@ import {
   NoMarketplacesRegisteredError,
 } from "../../../domain/errors.js";
 import type { Marketplace } from "../../../domain/models/marketplace.js";
-import { marketplaceCacheDir } from "../../../domain/models/paths.js";
 import type { PluginCatalog, PluginCatalogEntry } from "../../../domain/models/plugin-catalog.js";
 import type { AiToolId } from "../../../domain/models/tool-ids.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
-import type { PluginCatalogRepository } from "../../../domain/ports/plugin-catalog-repository.js";
 import type { Prompter } from "../../../domain/ports/prompter.js";
-import type { FetchMarketplaceSourceUseCase } from "../shared/fetch-marketplace-source-use-case.js";
+import type { ResolveMarketplaceUseCase } from "../shared/resolve-marketplace-use-case.js";
 import type { PluginAddUseCase } from "./plugin-add-use-case.js";
 
 export interface PluginPickOptions {
@@ -24,11 +22,15 @@ export interface PluginPickResult {
   installed: readonly string[];
 }
 
-export class PluginPickUseCase {
+/** Picking a plugin interactively, as its callers need it: ask, get a choice back. */
+export interface PluginPick {
+  execute(options: PluginPickOptions): Promise<PluginPickResult>;
+}
+
+export class PluginPickUseCase implements PluginPick {
   constructor(
-    private readonly catalogRepo: PluginCatalogRepository,
     private readonly registry: MarketplaceRegistry,
-    private readonly fetchMarketplaceSource: FetchMarketplaceSourceUseCase,
+    private readonly resolveMarketplace: ResolveMarketplaceUseCase,
     private readonly pluginAddUseCase: PluginAddUseCase,
     private readonly prompter: Prompter
   ) {}
@@ -53,9 +55,10 @@ export class PluginPickUseCase {
   }
 
   private async loadCatalog(marketplace: Marketplace, projectRoot: string): Promise<PluginCatalog> {
-    const cacheDir = marketplaceCacheDir(projectRoot, marketplace.name);
-    const localPath = await this.fetchMarketplaceSource.execute({ marketplace, cacheDir });
-    const catalog = await this.catalogRepo.load(localPath);
+    const { catalog, localPath } = await this.resolveMarketplace.execute({
+      marketplace,
+      projectRoot,
+    });
     if (catalog === null) {
       throw new InvalidPluginManifestError(`marketplace.json not found at "${localPath}"`);
     }

@@ -18,8 +18,8 @@ The `architecture` findings, written to `architecture.md` in the run's audit fol
    - **Coupling**: identify modules that import from layers they should not depend on, a wrong dependency direction or a circular reference across bounded contexts.
    - **God-modules**: detect modules with an abnormally large surface area, too many exports or responsibilities, that signal architectural erosion.
    - When ADRs or C4 diagrams are absent, note "no architecture docs found, conformance check skipped" in `Coverage > Skipped` and limit the scan to observable coupling heuristics.
-3. **Rate.** Give each finding a severity and an effort per the `@../assets/audit-template.md` legend, with a concrete `file:line`. The category is always `architecture`.
-4. **Write.** Fill `@../assets/audit-template.md` into the pillar file: the Findings table (one row per issue, severity-first), the ranked Top actions, and the Coverage section. In a full run, also add the rows to the merged `report.md` in the same folder. Emit the report and stop.
+3. **Rate.** Give each finding a severity and an effort per the [audit-template.md](../assets/audit-template.md) legend, with a concrete `file:line`. The category is always `architecture`.
+4. **Write.** Fill [audit-template.md](../assets/audit-template.md) into the pillar file: the Findings table (one row per issue, severity-first), the ranked Top actions, and the Coverage section. In a full run, also add the rows to the merged `report.md` in the same folder. Emit the report and stop.
 
 ## Test
 

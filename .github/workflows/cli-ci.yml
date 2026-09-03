@@ -1,16 +1,60 @@
 name: cli CI
 
 # Native path-filtered isolation: this whole workflow is skipped when nothing
-# under cli/ changed — no third-party paths-filter action needed.
+# under cli/ or kanban/ changed — no third-party paths-filter action needed.
+#
+# kanban/ is a source folder the CLI type-checks and bundles, not a published
+# package. Any job that runs a TypeScript-aware tool over the CLI's program must
+# install kanban's dependencies too, or module resolution fails from its sources.
 
 on:
   push:
     branches: [main, next]
     paths:
       - "cli/**"
+      - "kanban/**"
+      # The plugin ships the hooks and skills these jobs exercise, and the Windows job
+      # exists for them in particular - without this, changing any of it runs nothing.
+      - "plugins/aidd-telemetry/**"
+      - "scripts/__tests__/**"
+      # Except its prose. The plugin's markdown is asserted - the README's coverage
+      # table, where its scripts say they live - but only by `scripts/__tests__`,
+      # which `validate.yml` already runs over the whole tree on every push and
+      # pull request, unfiltered and required. Re-running it here costs a Windows
+      # runner for a paragraph, and proves nothing that job did not.
+      #
+      # `**.md`, not `**/*.md`: GitHub's `**` matches any character including a
+      # slash, so the second form needs a slash after it and would miss the
+      # top-level README.md that this exists for.
+      #
+      # Bounded on purpose: on `pull_request` GitHub matches the whole diff, not
+      # the last push, so a branch that also touches cli/ runs everything however
+      # small its newest commit is. This saves the run on a push to next or main,
+      # and on a pull request whose diff is prose and nothing else.
+      - "!plugins/aidd-telemetry/**.md"
   pull_request:
     paths:
       - "cli/**"
+      - "kanban/**"
+      # The plugin ships the hooks and skills these jobs exercise, and the Windows job
+      # exists for them in particular - without this, changing any of it runs nothing.
+      - "plugins/aidd-telemetry/**"
+      - "scripts/__tests__/**"
+      # Except its prose. The plugin's markdown is asserted - the README's coverage
+      # table, where its scripts say they live - but only by `scripts/__tests__`,
+      # which `validate.yml` already runs over the whole tree on every push and
+      # pull request, unfiltered and required. Re-running it here costs a Windows
+      # runner for a paragraph, and proves nothing that job did not.
+      #
+      # `**.md`, not `**/*.md`: GitHub's `**` matches any character including a
+      # slash, so the second form needs a slash after it and would miss the
+      # top-level README.md that this exists for.
+      #
+      # Bounded on purpose: on `pull_request` GitHub matches the whole diff, not
+      # the last push, so a branch that also touches cli/ runs everything however
+      # small its newest commit is. This saves the run on a push to next or main,
+      # and on a pull request whose diff is prose and nothing else.
+      - "!plugins/aidd-telemetry/**.md"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,14 +68,15 @@ jobs:
     name: cli / Typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pnpm
         run: |
           corepack enable
           corepack prepare pnpm@latest --activate
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - run: cd kanban && pnpm install --frozen-lockfile
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm typecheck
 
@@ -39,12 +84,12 @@ jobs:
     name: cli / Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pnpm
         run: |
           corepack enable
           corepack prepare pnpm@latest --activate
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
       - run: cd cli && pnpm install --frozen-lockfile
@@ -54,16 +99,17 @@ jobs:
     name: cli / Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install expect (TTY persona tests)
         run: sudo apt-get update && sudo apt-get install -y expect
       - name: Install pnpm
         run: |
           corepack enable
           corepack prepare pnpm@latest --activate
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - run: cd kanban && pnpm install --frozen-lockfile
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm test
 
@@ -71,14 +117,15 @@ jobs:
     name: cli / Build & Bundle Budget
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pnpm
         run: |
           corepack enable
           corepack prepare pnpm@latest --activate
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - run: cd kanban && pnpm install --frozen-lockfile
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm build
 
@@ -87,29 +134,166 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pnpm
         run: |
           corepack enable
           corepack prepare pnpm@latest --activate
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+      - run: cd kanban && pnpm install --frozen-lockfile
+      - run: cd cli && pnpm install --frozen-lockfile
+      - run: cd cli && pnpm knip:production
+
+  identifier-join:
+    name: cli / Identifier join (Claude Code)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
       - run: cd cli && pnpm install --frozen-lockfile
-      - run: cd cli && pnpm knip:production
+      - run: cd cli && pnpm build
+      # The probe drives the real tool, so the real tool has to be here. No credentials are
+      # configured and none are needed: it points Claude Code at a dead address with a fake
+      # key, and the session id is minted before any of that matters.
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+      # Re-checks what #632 measured once, by running a session: that the identifier a hook
+      # receives is the one the export carries. Everything in this layer joins on that, and a
+      # tool update can break it with nothing else turning red. Exit 2 means the probe could
+      # not form an opinion and says so rather than blaming the tool.
+      - name: Probe the identifier join
+        run: node scripts/probe-identifier-join.cjs
 
   cli-jscpd:
     name: cli / JSCPD (duplication)
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pnpm
         run: |
           corepack enable
           corepack prepare pnpm@latest --activate
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm jscpd
+
+  kanban-checks:
+    name: kanban / Typecheck, Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+      - run: cd kanban && pnpm install --frozen-lockfile
+      - run: cd kanban && pnpm typecheck
+      - run: cd kanban && pnpm lint
+      - run: cd kanban && pnpm test
+
+  windows:
+    # Runs under bash (Git Bash, bundled on windows-latest) so every command is the one the
+    # Linux jobs run, not a PowerShell rewrite of it.
+    name: cli / Windows
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+
+      # The WRITE path, on the platform where a home directory, a line ending and an absolute
+      # path all resolve differently than they do on the Linux jobs above. It runs before the
+      # CLI is built, on purpose: recording is supposed to need nothing installed, and this is
+      # where that claim is exercised. Reading is the CLI's now, and the e2e project below
+      # covers it on this same runner.
+      - name: Chain - allow measurement, with nothing installed
+        run: |
+          # Written directly rather than through a command: the switch is a file, the hooks
+          # read it fresh at every write, and no binary has to exist for that to work.
+          mkdir -p .aidd
+          node -e "require('fs').writeFileSync('.aidd/config.json', JSON.stringify({ telemetry: { enabled: true } }, null, 2) + '\n');"
+      - name: Chain - journal a captured payload
+        run: |
+          # The fixture's own cwd is a path from whatever machine captured it - rewritten to
+          # this checkout's real path so getRepoRoot resolves a repository that exists here.
+          node -e "const p=require('./scripts/__tests__/fixtures/claude-code-session-start.json'); p.cwd=process.cwd(); require('fs').writeFileSync('payload.json', JSON.stringify(p));"
+          node plugins/aidd-telemetry/hooks/journal.cjs session-start < payload.json
+          node plugins/aidd-telemetry/hooks/journal.cjs turn-end < payload.json
+      - name: Chain - the journal stays private and git add -A still works
+        run: |
+          git add -A
+          git status --porcelain >/dev/null
+
+      - name: Plugin suite
+        run: node --test "scripts/__tests__/*.test.js"
+
+      - run: cd kanban && pnpm install --frozen-lockfile
+      - run: cd cli && pnpm install --frozen-lockfile
+      # A real global install, not `node dist/cli.js` by path: build, pack, and
+      # `npm install -g` the tarball — the same shim generation a person's own
+      # `npm install -g @ai-driven-dev/cli` produces. Every suite below invokes the built
+      # file directly and proves nothing about whether `aidd` actually resolves on this
+      # platform's PATH — Windows is where that kind of assumption has broken silently
+      # before (`os.homedir()` never reading `$HOME` here). Built here, ahead of the
+      # unit/integration/e2e suites below, so this is the only build this job needs.
+      #
+      # Inlined rather than `pnpm run install:local` (the equivalent script this package
+      # already ships): a package.json script runs through pnpm's own configured shell,
+      # `cmd.exe` on Windows unless `script-shell` says otherwise, which this repository
+      # never sets — its `$(node -p ...)` command substitution is bash syntax and would
+      # not survive that. This step's own `run:` block is guaranteed bash by the job's
+      # `defaults.run.shell` above, so the same two commands run here directly instead,
+      # with a glob standing in for the version substitution.
+      - name: Install the built CLI globally, the way a person actually would
+        run: |
+          cd cli
+          pnpm build
+          pnpm pack --pack-destination ./dist
+          npm install -g ./dist/ai-driven-dev-cli-*.tgz --force
+      # `02-check` diagnoses the chain above through this exact command, lifted from its
+      # own markdown — not a script beside it, the same move `00-init`'s own chain step
+      # made for the switch. `aidd --version` is the same command every skill's own locate
+      # step runs first; failing here means the CLI could not be resolved on the PATH.
+      - name: Chain - diagnose, through the command every skill's own markdown names
+        run: |
+          aidd --version
+          aidd telemetry check
+      - run: cd cli && pnpm test:unit
+      - run: cd cli && pnpm test:integration
+      # Every e2e but the two named below — and one of them is why this step matters most:
+      # `telemetry-commit-trailer.e2e.test.ts` makes real commits and reads their messages
+      # back, which is the only thing that proves the `prepare-commit-msg` hook this build
+      # installs is reachable by the shell Git for Windows ships. A path written with
+      # backslashes is not, and nothing but this catches it. Exclude it only for a reason as
+      # concrete as the two below.
+      - name: cli e2e
+        run: |
+          cd cli
+          pnpm exec vitest run --project=e2e \
+            --exclude "tests/e2e/persona.e2e.test.ts" \
+            --exclude "tests/e2e/telemetry-multi-tool.e2e.test.ts"
+        # persona.e2e.test.ts hardcodes /usr/bin/expect for TTY emulation, which windows-latest
+        # does not carry. telemetry-multi-tool.e2e.test.ts puts a `#!/bin/sh` stand-in binary
+        # with no extension on PATH; Windows resolves an executable by PATHEXT, never a shebang.

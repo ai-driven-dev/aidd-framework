@@ -5,6 +5,7 @@ import { McpCapability } from "../../capabilities/mcp-capability.js";
 import { PluginsCapability } from "../../capabilities/plugins-capability.js";
 import { RulesCapability } from "../../capabilities/rules-capability.js";
 import { SkillsCapability } from "../../capabilities/skills-capability.js";
+import { CODEX_ROLLOUT_LOCATION } from "../../formats/codex-rollout.js";
 import {
   buildAiddCommandFilePath,
   convertCommandFrontmatter,
@@ -13,6 +14,7 @@ import {
   stripToolSuffix,
 } from "../../formats/command.js";
 import { baseReverseRewriteContent, baseRewriteContent } from "../../formats/placeholders.js";
+import { PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token-rewrite.js";
 import { parseToml, stringifyToml } from "../../formats/toml.js";
 import { CONFIG_MCP } from "../../models/framework.js";
 import type {
@@ -99,8 +101,8 @@ function ensureProjectDocMaxBytes(existing: TomlRecord, incoming: TomlRecord): v
 
 function ensureCodexHooks(existing: TomlRecord): void {
   const features = existing.features as TomlRecord | undefined;
-  if (features?.codex_hooks !== undefined) return;
-  existing.features = { ...(features ?? {}), codex_hooks: true };
+  if (features?.hooks !== undefined || features?.codex_hooks !== undefined) return;
+  existing.features = { ...(features ?? {}), hooks: true };
 }
 
 export function mergeCodexConfigToml(existing: string, aiddPayload: string): string {
@@ -111,6 +113,17 @@ export function mergeCodexConfigToml(existing: string, aiddPayload: string): str
   ensureCodexHooks(result);
   return stringifyToml(result);
 }
+
+// Measured: four consecutive `codex exec` sessions installed a plugin's
+// hooks, ran clean, and journaled nothing — no warning, no line in the output — until
+// `--dangerously-bypass-hook-trust` made the same install produce all three hooks and its
+// journal. Codex writes one `trusted_hash` per hook under `[hooks.state]` in
+// `~/.codex/config.toml` when a person approves it; a hook with no entry is skipped in
+// silence, and nothing prompts for it outside a terminal.
+const CODEX_HOOKS_TRUST_NOTICE =
+  "Codex will not run this plugin's hooks until each one is trusted — approve the prompt " +
+  "once in an interactive session, or pass --dangerously-bypass-hook-trust to codex exec " +
+  "for a headless run. Until then, a session leaves no run journal and nothing says why.";
 
 const AIDD_HOOK_COMMAND = "node .aidd/scripts/update_memory.cjs";
 
@@ -173,7 +186,7 @@ function buildCodexSkillFilePath(fileName: string): string {
   return `${AGENTS_SKILLS_PREFIX}aidd-${skillNameFromPath(fileName)}/SKILL.md`;
 }
 
-function stripCodexSkillFrontmatter(fm: Record<string, unknown>): Record<string, unknown> {
+export function stripCodexSkillFrontmatter(fm: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   if (fm.name !== undefined) result.name = fm.name;
   if (fm.description !== undefined) result.description = fm.description;
@@ -186,6 +199,7 @@ export const codex: AiTool<
 > = {
   kind: "ai",
   toolId: "codex",
+  displayName: "Codex",
   directory: DIRECTORY,
   toolSuffix: TOOL_SUFFIX,
   signalDir: `${DIRECTORY}commands`,
@@ -231,7 +245,14 @@ export const codex: AiTool<
       mode: "native",
       pluginsDir: ".codex/plugins/",
       pluginManifestRelativePath: "plugin.json",
+      acceptsHooks: true,
+      hooksTrustNotice: CODEX_HOOKS_TRUST_NOTICE,
       acceptsMcp: true,
+      // Measured, not read off the docs: a headless session ran five SessionStart hooks
+      // to completion, one written ${PLUGIN_ROOT} and three written ${CLAUDE_PLUGIN_ROOT}.
+      // Codex expands both, and reports a non-zero hook as failed — so completion is the
+      // proof. Either spelling works; this is the one its own plugins are built with.
+      pluginRootToken: PLUGIN_ROOT_TOKEN,
       translationMode: "marketplace",
       // Codex only enables plugins from its user-global config (~/.codex/config.toml)
       // plus its plugin cache (~/.codex/plugins/cache/). A project-local settings file
@@ -239,6 +260,24 @@ export const codex: AiTool<
       nativeActivation: { binary: "codex" },
     }),
   },
+
+  // Measured 2026-08-20: a rollout's `token_count` events carry counters but no model and
+  // no request id — those come from the preceding `turn_context` event, keyed on `turn_id`.
+  // Resolved by `session_meta.id`, not `session_id`, which a resumed session's rollout can
+  // disagree with. See codex-rollout.ts for the full measurement and its two captured
+  // fixtures.
+  telemetryLocalRead: {
+    kind: "declared",
+    transcript: CODEX_ROLLOUT_LOCATION,
+    // Complete counters per turn, no currency anywhere in a rollout, and no field naming a
+    // running skill - so a step here can only ever come from a run journal interval.
+    supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
+  },
+  // Codex's payload carries no write-path field for any tool (writes go through
+  // apply_patch), but a declaration never needed one - it reads the same Bash command text
+  // its step detection already reads a SKILL.md path out of.
+  telemetryTaskAttributable: true,
+  telemetryJournalHost: "codex",
 
   rewriteContent(content: string, docsDir: string): string {
     return rewriteCodexContent(content, { directory: DIRECTORY, docsDir });

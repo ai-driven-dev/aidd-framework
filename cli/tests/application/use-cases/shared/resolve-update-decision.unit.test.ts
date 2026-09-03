@@ -16,7 +16,7 @@ function buildFakePrompter(
     input: vi.fn(),
     select: vi.fn(),
     checkbox: vi.fn(),
-  } as unknown as Prompter;
+  };
 }
 
 describe("ResolveUpdateDecisionUseCase", () => {

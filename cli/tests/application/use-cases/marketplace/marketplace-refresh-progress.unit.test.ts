@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MarketplaceRefreshUseCase } from "../../../../src/application/use-cases/marketplace/marketplace-refresh-use-case.js";
 import { FetchMarketplaceSourceUseCase } from "../../../../src/application/use-cases/shared/fetch-marketplace-source-use-case.js";
+import { ResolveMarketplaceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
 import { Marketplace } from "../../../../src/domain/models/marketplace.js";
 import { serializePluginSource } from "../../../../src/domain/models/plugin-source.js";
 import { PluginCatalogRepositoryAdapter } from "../../../../src/infrastructure/adapters/plugin-catalog-repository-adapter.js";
@@ -9,6 +10,7 @@ import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
 import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
 import { FixturePluginFetcher } from "../../../helpers/ports/fixture-plugin-fetcher.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
+import { InMemoryMarketplaceCache } from "../../../helpers/ports/in-memory-marketplace-cache.js";
 import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-marketplace-registry.js";
 import { seedFromDirectory } from "../../../helpers/ports/seed-from-directory.js";
 
@@ -24,11 +26,15 @@ async function buildUseCase() {
     [JSON.stringify(serializePluginSource({ kind: "local", path: VALID_FIXTURE }))]: VALID_FIXTURE,
   });
   const fetchMarketplaceSource = new FetchMarketplaceSourceUseCase(pluginFetcher);
+  const resolveMarketplace = new ResolveMarketplaceUseCase(
+    fetchMarketplaceSource,
+    new PluginCatalogRepositoryAdapter(fs)
+  );
   const logger = new CapturingLogger();
   const useCase = new MarketplaceRefreshUseCase(
-    new PluginCatalogRepositoryAdapter(fs),
     registry,
-    fetchMarketplaceSource,
+    resolveMarketplace,
+    new InMemoryMarketplaceCache(),
     logger
   );
   return { useCase, registry, logger };

@@ -11,6 +11,8 @@ import { CLIOutput } from "../../../src/application/output.js";
 import { InitUseCase } from "../../../src/application/use-cases/init-use-case.js";
 import { InstallIdeConfigUseCase } from "../../../src/application/use-cases/install/install-ide-config-use-case.js";
 import { InstallRuntimeConfigUseCase } from "../../../src/application/use-cases/install/install-runtime-config-use-case.js";
+import { GitignoreUseCase } from "../../../src/application/use-cases/shared/gitignore-use-case.js";
+import { PostInstallPipelineUseCase } from "../../../src/application/use-cases/shared/post-install-pipeline-use-case.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
 import type { Platform } from "../../../src/domain/ports/platform.js";
 import type { Prompter } from "../../../src/domain/ports/prompter.js";
@@ -29,7 +31,14 @@ import { BundledAssetProviderAdapter } from "../../../src/infrastructure/assets/
 
 export const linuxPlatform: Platform = { current: () => "linux" };
 export const win32Platform: Platform = { current: () => "win32" };
-export const noGit: VersionControl = { installPreCommitDelegate: async () => {} };
+export const noGit: VersionControl = {
+  installCommitMessageDelegate: async () => false,
+  removeCommitMessageDelegate: async () => false,
+  getRemoteUrl: async () => null,
+  listTrackedFiles: async () => [],
+  isRepository: async () => false,
+  hasHistoryFor: async () => false,
+};
 
 export { SilentPrompterAdapter as OverwritePrompter };
 
@@ -212,19 +221,21 @@ export function buildDeps(projectRoot: string) {
   const pluginFetcher = new PluginFetcherAdapter(fs);
   const pluginDistributionReader = new PluginDistributionReaderAdapter(fs);
   const pluginCatalogRepository = new PluginCatalogRepositoryAdapter(fs);
+  const gitignoreUseCase = new GitignoreUseCase(fs);
+  const postInstallPipelineUseCase = new PostInstallPipelineUseCase(manifestRepo, gitignoreUseCase);
   const installRuntimeConfigUseCase = new InstallRuntimeConfigUseCase(
     fs,
-    manifestRepo,
     hasher,
     logger,
-    assetProvider
+    assetProvider,
+    postInstallPipelineUseCase
   );
   const installIdeConfigUseCase = new InstallIdeConfigUseCase(
     fs,
-    manifestRepo,
     hasher,
     logger,
-    assetProvider
+    assetProvider,
+    postInstallPipelineUseCase
   );
   const currentVersionProvider: VersionReader = new CurrentVersionAdapter();
   return {

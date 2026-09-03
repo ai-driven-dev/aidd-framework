@@ -20,6 +20,8 @@ A plan table, one row per action: slug, input to output, test, and any dependenc
 
 ## Test
 
-- Every row is one job with a checkable test.
-- No row's input comes from a later row.
-- Modify: only changed jobs get a row.
+| Case | Pass |
+| --- | --- |
+| The table is presented | every row is one job carrying a checkable test |
+| A row consumes an output | that output comes from an earlier row, never a later one |
+| The run is a modify | only the jobs the user named have a row |

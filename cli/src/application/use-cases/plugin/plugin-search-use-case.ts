@@ -1,9 +1,7 @@
 import type { Marketplace } from "../../../domain/models/marketplace.js";
-import { marketplaceCacheDir } from "../../../domain/models/paths.js";
 import type { PluginCatalogEntry } from "../../../domain/models/plugin-catalog.js";
 import type { MarketplaceRegistry } from "../../../domain/ports/marketplace-registry.js";
-import type { PluginCatalogRepository } from "../../../domain/ports/plugin-catalog-repository.js";
-import type { FetchMarketplaceSourceUseCase } from "../shared/fetch-marketplace-source-use-case.js";
+import type { ResolveMarketplaceUseCase } from "../shared/resolve-marketplace-use-case.js";
 
 export interface PluginSearchOptions {
   query: string;
@@ -23,9 +21,8 @@ export interface PluginSearchResult {
 
 export class PluginSearchUseCase {
   constructor(
-    private readonly catalogRepo: PluginCatalogRepository,
     private readonly registry: MarketplaceRegistry,
-    private readonly fetchMarketplaceSource: FetchMarketplaceSourceUseCase
+    private readonly resolveMarketplace: ResolveMarketplaceUseCase
   ) {}
 
   async execute(options: PluginSearchOptions): Promise<PluginSearchResult> {
@@ -39,9 +36,10 @@ export class PluginSearchUseCase {
   }
 
   private async searchOne(m: Marketplace, options: PluginSearchOptions): Promise<SearchHit[]> {
-    const cacheDir = marketplaceCacheDir(options.projectRoot, m.name);
-    const localPath = await this.fetchMarketplaceSource.execute({ marketplace: m, cacheDir });
-    const catalog = await this.catalogRepo.load(localPath);
+    const { catalog } = await this.resolveMarketplace.execute({
+      marketplace: m,
+      projectRoot: options.projectRoot,
+    });
     if (!catalog) return [];
     return catalog.plugins
       .filter((entry) => this.matches(entry, options))

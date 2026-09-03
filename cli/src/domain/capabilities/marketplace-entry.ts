@@ -1,12 +1,8 @@
 import type { MarketplaceSettingsEntry, MarketplaceSettingsInput } from "./plugins-capability.js";
 
-/**
- * Shared toEntry implementation for tools that use the Claude Code marketplace schema:
- *   { source: { source: "github"|"directory", repo/path: "..." }, version? }
- *
- * Used by: claude, cursor, codex
- */
-export function buildClaudeStyleMarketplaceEntry(
+/** `{ source: { source: "github"|"directory", repo/path: "..." }, version? }` — the entry
+ * shape every tool accepts unless it declares its own. */
+export function buildDefaultMarketplaceEntry(
   input: MarketplaceSettingsInput
 ): MarketplaceSettingsEntry | null {
   const { name, source, version } = input;

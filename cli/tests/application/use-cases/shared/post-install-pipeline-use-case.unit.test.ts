@@ -13,7 +13,7 @@ describe("post-install pipeline", () => {
     const manifest = await deps.manifestRepo.load();
     if (manifest === null) throw new Error("manifest not found");
 
-    await new PostInstallPipelineUseCase(deps.fs, deps.manifestRepo).execute({
+    await new PostInstallPipelineUseCase(deps.manifestRepo, deps.gitignoreUseCase).execute({
       projectRoot: PROJECT_ROOT,
       manifest,
     });
@@ -27,5 +27,22 @@ describe("post-install pipeline", () => {
     expect(deps.fs.has(gitignorePath)).toBe(true);
     const gitignoreContent = deps.fs.getFile(gitignorePath) ?? "";
     expect(gitignoreContent).toContain(".aidd/cache/");
+  });
+
+  it("ignores the run journal, and nothing wider", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "claude");
+    const manifest = await deps.manifestRepo.load();
+    if (manifest === null) throw new Error("manifest not found");
+
+    await new PostInstallPipelineUseCase(deps.manifestRepo, deps.gitignoreUseCase).execute({
+      projectRoot: PROJECT_ROOT,
+      manifest,
+    });
+
+    const gitignoreContent = deps.fs.getFile(join(PROJECT_ROOT, ".gitignore")) ?? "";
+    expect(gitignoreContent).toContain("aidd_docs/runs/");
+    expect(gitignoreContent).not.toContain("aidd_docs/*");
+    expect(gitignoreContent).not.toMatch(/^aidd_docs\/$/mu);
   });
 });

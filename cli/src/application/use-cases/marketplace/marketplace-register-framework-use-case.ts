@@ -14,7 +14,14 @@ export interface MarketplaceRegisterFrameworkResult {
   registered: boolean;
 }
 
-export class MarketplaceRegisterFrameworkUseCase {
+/** Registering the bundled framework marketplace, as its callers need it. */
+export interface MarketplaceRegisterFramework {
+  execute(
+    options: MarketplaceRegisterFrameworkOptions
+  ): Promise<MarketplaceRegisterFrameworkResult>;
+}
+
+export class MarketplaceRegisterFrameworkUseCase implements MarketplaceRegisterFramework {
   constructor(private readonly registry: MarketplaceRegistry) {}
 
   async execute(

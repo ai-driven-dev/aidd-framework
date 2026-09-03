@@ -5,11 +5,11 @@ import type {
   FrameworkBuildTarget,
 } from "../../../domain/models/framework-build.js";
 import type { Marketplace } from "../../../domain/models/marketplace.js";
-import { builtMarketplaceDir } from "../../../domain/models/paths.js";
+import { builtMarketplaceDir, pathsOverlap } from "../../../domain/models/paths.js";
 import type { FileReader } from "../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { VersionReader } from "../../../domain/ports/version-reader.js";
-import type { FrameworkBuildUseCase } from "../framework/framework-build-use-case.js";
+import type { FrameworkBuild } from "../framework/framework-build-use-case.js";
 import type { ResolveMarketplaceUseCase } from "./resolve-marketplace-use-case.js";
 
 /** Builds a FrameworkBuildUseCase for a target/mode writing to outDir, or undefined when unsupported. */
@@ -17,7 +17,7 @@ export type FrameworkBuildFor = (
   target: FrameworkBuildTarget,
   mode: FrameworkBuildMode,
   outDir: string
-) => FrameworkBuildUseCase | undefined;
+) => FrameworkBuild | undefined;
 
 export interface EnsureBuiltMarketplaceOptions {
   readonly projectRoot: string;
@@ -42,7 +42,12 @@ const UNVERSIONED = "unversioned";
  * the single source of truth; this owns source resolution, staleness, and the
  * guard-safe outDir (build to temp then copy when the cache nests under the source).
  */
-export class EnsureBuiltMarketplaceUseCase {
+/** Getting a built tree for a target, as its callers need it. */
+export interface EnsureBuiltMarketplace {
+  execute(options: EnsureBuiltMarketplaceOptions): Promise<EnsureBuiltMarketplaceResult>;
+}
+
+export class EnsureBuiltMarketplaceUseCase implements EnsureBuiltMarketplace {
   private readonly memo = new Map<string, EnsureBuiltMarketplaceResult>();
 
   constructor(
@@ -53,10 +58,13 @@ export class EnsureBuiltMarketplaceUseCase {
   ) {}
 
   async execute(options: EnsureBuiltMarketplaceOptions): Promise<EnsureBuiltMarketplaceResult> {
-    const builtDir = builtMarketplaceDir(
-      options.projectRoot,
-      options.marketplace.name,
-      options.target
+    // resolve(), matching sourceDir below: builtMarketplaceDir() joins with the platform
+    // separator, and on Windows a drive-less projectRoot yields a drive-less builtDir here
+    // while FrameworkBuildUseCase.execute() resolves its own outDir copy for validation only
+    // - leaving FlatBuildStrategy's write target (captured unresolved at construction) to
+    // diverge from the path that gets checked.
+    const builtDir = resolve(
+      builtMarketplaceDir(options.projectRoot, options.marketplace.name, options.target)
     );
     const resolved = await this.resolveMarketplace.execute({
       marketplace: options.marketplace,
@@ -113,11 +121,7 @@ export class EnsureBuiltMarketplaceUseCase {
   }
 
   private nested(sourceDir: string, builtDir: string): boolean {
-    return (
-      sourceDir === builtDir ||
-      builtDir.startsWith(`${sourceDir}/`) ||
-      sourceDir.startsWith(`${builtDir}/`)
-    );
+    return pathsOverlap(sourceDir, builtDir);
   }
 
   private async buildViaTemp(
@@ -134,6 +138,9 @@ export class EnsureBuiltMarketplaceUseCase {
     await this.fs.deleteDirectory(temp);
   }
 
+  // Every outDir reaching this method (see build() and buildViaTemp() above) is either
+  // builtMarketplaceDir() or a temp dir this class just deleteDirectory'd — an aidd-owned
+  // cache, never a user directory — so a collision here is stale-cache reuse, not data loss.
   private async runBuild(
     target: FrameworkBuildTarget,
     mode: FrameworkBuildMode,
@@ -145,7 +152,7 @@ export class EnsureBuiltMarketplaceUseCase {
     if (build === undefined) {
       throw new Error(`No framework build for target '${target}' mode '${mode}'.`);
     }
-    await build.execute({ sourceDir, outDir, target, mode, force: true });
+    await build.execute({ sourceDir, outDir, target, mode });
   }
 
   private async copyDir(from: string, to: string): Promise<void> {

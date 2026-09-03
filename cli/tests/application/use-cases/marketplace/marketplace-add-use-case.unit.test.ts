@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import { MarketplaceAddUseCase } from "../../../../src/application/use-cases/marketplace/marketplace-add-use-case.js";
 import { MarketplaceRemoveUseCase } from "../../../../src/application/use-cases/marketplace/marketplace-remove-use-case.js";
 import { FetchMarketplaceSourceUseCase } from "../../../../src/application/use-cases/shared/fetch-marketplace-source-use-case.js";
+import { ResolveMarketplaceUseCase } from "../../../../src/application/use-cases/shared/resolve-marketplace-use-case.js";
 import {
   InvalidMarketplaceNameError,
+  InvalidPluginManifestError,
   MarketplaceAlreadyRegisteredError,
   TrustDeniedError,
 } from "../../../../src/domain/errors.js";
@@ -36,12 +38,15 @@ async function buildUseCase(prompter: Prompter = new KeepPrompter()) {
   const trustStore = new InMemoryMarketplaceTrustStore();
   const manifestRepo = new InMemoryManifestRepository();
   const fetchMarketplaceSource = new FetchMarketplaceSourceUseCase(new FixturePluginFetcher());
+  const resolveMarketplace = new ResolveMarketplaceUseCase(
+    fetchMarketplaceSource,
+    new PluginCatalogRepositoryAdapter(fs)
+  );
   const removeUseCase = new MarketplaceRemoveUseCase(fs, manifestRepo, registry, prompter);
   const useCase = new MarketplaceAddUseCase(
-    new PluginCatalogRepositoryAdapter(fs),
     registry,
     trustStore,
-    fetchMarketplaceSource,
+    resolveMarketplace,
     prompter,
     removeUseCase
   );
@@ -144,6 +149,21 @@ describe("MarketplaceAddUseCase", () => {
       const list = await registry.list(PROJECT_ROOT);
       expect(list).toHaveLength(1);
       expect(list[0]?.name).toBe("awesome");
+    });
+
+    it("throws InvalidPluginManifestError when marketplace.json is missing at the source", async () => {
+      const { useCase } = await buildUseCase();
+      const source = { kind: "local" as const, path: "/empty-marketplace-dir" };
+
+      await expect(
+        useCase.execute({
+          source,
+          name: "empty",
+          scope: "project",
+          projectRoot: PROJECT_ROOT,
+          autoTrust: true,
+        })
+      ).rejects.toThrow(InvalidPluginManifestError);
     });
 
     it("throws TrustDeniedError when the user denies trust", async () => {

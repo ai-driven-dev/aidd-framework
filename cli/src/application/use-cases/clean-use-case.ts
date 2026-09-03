@@ -5,7 +5,7 @@ import {
   type MergeFileEntry,
   removeEntriesFromJson,
 } from "../../domain/models/merge.js";
-import { AIDD_DIR } from "../../domain/models/paths.js";
+import { AIDD_CONFIG_FILENAME, AIDD_DIR, PLUGIN_CACHE_SUBDIR } from "../../domain/models/paths.js";
 import { isAiToolId } from "../../domain/models/tool-ids.js";
 import type { FileReader } from "../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../domain/ports/file-writer.js";
@@ -13,7 +13,7 @@ import type { Logger } from "../../domain/ports/logger.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { Prompter } from "../../domain/ports/prompter.js";
 import type { ToolId } from "../../domain/tools/registry.js";
-import { GitignoreUseCase } from "./shared/gitignore-use-case.js";
+import type { GitignoreUseCase } from "./shared/gitignore-use-case.js";
 
 interface CleanOptions {
   projectRoot: string;
@@ -38,6 +38,7 @@ export class CleanUseCase {
     private readonly fs: FileReader & FileWriter,
     private readonly manifestRepo: ManifestRepository,
     private readonly logger: Logger,
+    private readonly gitignoreUseCase: GitignoreUseCase,
     private readonly prompter?: Prompter
   ) {}
 
@@ -51,9 +52,30 @@ export class CleanUseCase {
     const dryRunResult = await this.confirmOrDryRun(options, preview);
     if (dryRunResult !== null) return dryRunResult;
     const deleted = await this.deleteAllToolFiles(manifest, options.projectRoot);
-    await this.fs.deleteDirectory(join(options.projectRoot, AIDD_DIR));
-    await new GitignoreUseCase(this.fs).remove(options.projectRoot, [`${AIDD_DIR}/cache/`]);
+    await this.removeAiddState(options.projectRoot);
+    await this.gitignoreUseCase.remove(options.projectRoot, [`${AIDD_DIR}/cache/`]);
     return { dryRun: false, manifestFound: true, preview, fileCount: deleted };
+  }
+
+  // config.json is the committed telemetry switch: a file clean did not write,
+  // so clean never removes it. Every directory clean did write must go before
+  // the emptiness check, or its own presence blocks a removal that should
+  // happen.
+  private async removeAiddState(projectRoot: string): Promise<void> {
+    const aiddDir = join(projectRoot, AIDD_DIR);
+    const configKept = await this.fs.fileExists(join(aiddDir, AIDD_CONFIG_FILENAME));
+
+    await this.fs.deleteDirectory(join(aiddDir, "cache"));
+    await this.fs.deleteDirectory(join(projectRoot, PLUGIN_CACHE_SUBDIR));
+    await this.manifestRepo.delete();
+
+    if (!(await this.fs.fileExists(aiddDir))) return;
+    const remaining = await this.fs.listDirectory(aiddDir);
+    if (remaining.length === 0) {
+      await this.fs.deleteDirectory(aiddDir);
+      return;
+    }
+    if (configKept) this.logger.info(`Kept ${AIDD_DIR}/${AIDD_CONFIG_FILENAME}`);
   }
 
   private buildPreview(manifest: Manifest): CleanPreview {

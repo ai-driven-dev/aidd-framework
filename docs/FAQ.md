@@ -41,7 +41,34 @@ You can write your own Claude Code skills — nothing stops you. AIDD exists bec
 - **Not autonomous by default.** Skills run under human supervision; you drive each step.
 - **Authored for Claude Code.** Other tools install via their native mechanism from the release archives ([Other tools](../README.md#other-tools)); public-marketplace publishing is on the way, native parity is a roadmap item.
 - **Plugins assume their own context.** A skill that expects a git repo, a `package.json`, or a ticketing tool won't work without it — check the plugin's README.
-- **No hosted service.** AIDD is prompt content you install into your own tool; there is no AIDD server, account, or telemetry.
+- **No hosted service.** AIDD is prompt content you install into your own tool; there is no AIDD server and no account.
+- **Measurement is off unless you turn it on.** It records nothing until you do, and nothing leaves your machine → [Measurement](#-measurement).
+
+## 📊 Measurement
+
+**The switch is git-tracked, so it applies to everyone who clones; opt out per person with `AIDD_TELEMETRY=0`. Nothing leaves your machine.**
+
+The `aidd-telemetry` plugin is not part of the curated install, and even installed it records
+nothing until you allow it. Ask your AI tool for the plugin's `00-init` skill: it turns
+measurement on for the current project and tells you what is now recorded.
+
+Then work as usual, and ask `01-cost` what a period or a task consumed. No account, no
+server — but turning it on and asking both need the `aidd` CLI
+(`npm install -g @ai-driven-dev/cli`); recording itself, in between, needs nothing
+installed.
+
+| Where | What |
+| --- | --- |
+| `aidd_docs/runs/` in your repository, git-ignored | which session served which task, which skill was running when, and which files inside a task folder changed |
+| `~/.config/aidd/telemetry/` | token counts and model names, read out of the transcript your AI tool already wrote |
+
+**No prompt, no code, no diff** — the stored shape is an allowlist, field by field, in
+[`metrics-contract.md`](../aidd_docs/product/metrics-contract.md).
+
+Turning it off stops the recording and keeps what you already measured; both directories are
+ordinary files you can delete. Coverage differs per AI tool, and a tool that cannot be
+measured is named rather than shown as a zero →
+[the plugin's README](../plugins/aidd-telemetry/README.md).
 
 ## 🆘 Still stuck?
 

@@ -1,7 +1,7 @@
 ---
 name: 00-onboard
 description: Guide a project's journey through AIDD, from first setup to shipping a feature. Use when the user says onboard me, where do I start, or what to do next. Not for listing every installed surface.
-argument-hint: scan | assess | present | run
+argument-hint: project
 ---
 
 # Onboard

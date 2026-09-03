@@ -1,21 +1,24 @@
-# Coding Guidelines
+# Coding Assertions
 
-> Those rules must be minimal because they MUST be checked after EVERY CODE GENERATION.
+The checks that must pass for code to count as done. Minimal, run after every change.
 
-## Requirements to complete a feature
+> CLI-specific completion criteria: [`cli/aidd_docs/memory/coding-assertions.md`](../../cli/aidd_docs/memory/coding-assertions.md).
 
-**A feature is really completed if ALL of the above are satisfied: if not, iterate to fix all until all are green.**
+## Before commit
 
-## Commands to run
+| Order | Command | Checks |
+| ----- | ------- | ------ |
+| 1 | `pnpm exec lefthook run pre-commit` | JSON and YAML validity, skill frontmatter and argument hints, context imports, markdown links, `scripts/` tests; `cli lint` and `cli typecheck` when `cli/` or `kanban/` changed |
+| 2 | `pnpm exec commitlint --edit` | the message against `commitlint.config.cjs` |
 
-### Before commit
+Same hook regenerates each plugin's `CATALOG.md` and the README counts, and stages them.
 
-| Order | Command | Description |
-| ----- | ------- | ----------- |
-| 1 | `pnpm exec commitlint --edit` | Validate commit message against conventional commit spec |
+## Before push
 
-### Before push
+| Order | Command | Checks |
+| ----- | ------- | ------ |
+| 1 | `pnpm exec lefthook run pre-push` | `cli knip:production`, then the full `cli` suite, when `cli/` changed |
 
-| Order | Command | Description |
-| ----- | ------- | ----------- |
-| 1 | `pnpm exec lefthook run pre-push` | Run parent repo hooks (delegates to parent lefthook.yml) |
+## Behavior
+
+Done means every gate green. On failure, one agent per failing assertion — typecheck, tests, rules — not one agent for all.

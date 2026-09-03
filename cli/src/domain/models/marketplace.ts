@@ -17,6 +17,17 @@ export interface MarketplaceData {
   version?: string;
 }
 
+/**
+ * A marketplace record as it comes off disk: `scope` is whatever the file said, which is
+ * exactly why fromJSON checks it. Saying so lets a caller hand over an unchecked value
+ * without pretending it is already one of the two the domain accepts.
+ */
+export type StoredMarketplaceData = Omit<MarketplaceData, "scope"> & { scope: string };
+
+function isMarketplaceScope(value: string): value is MarketplaceScope {
+  return value === "project" || value === "user";
+}
+
 export class Marketplace {
   readonly name: string;
   readonly source: PluginSource;
@@ -55,11 +66,11 @@ export class Marketplace {
     });
   }
 
-  static fromJSON(data: MarketplaceData): Marketplace {
+  static fromJSON(data: StoredMarketplaceData): Marketplace {
     if (!MARKETPLACE_NAME_REGEX.test(data.name)) {
       throw new InvalidMarketplaceNameError(data.name);
     }
-    if (data.scope !== "project" && data.scope !== "user") {
+    if (!isMarketplaceScope(data.scope)) {
       throw new InvalidMarketplaceScopeError(String(data.scope));
     }
     const source = parsePluginSource(data.source);

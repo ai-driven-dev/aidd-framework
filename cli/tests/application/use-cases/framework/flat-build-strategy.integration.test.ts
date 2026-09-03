@@ -19,7 +19,13 @@ import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapt
 import { seedFromDirectory } from "../../../helpers/ports/seed-from-directory.js";
 
 const FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework");
-const ABS_OUT = "/tmp/aidd-flat-test";
+// resolve(), not the bare literal: on Windows path.resolve treats a leading "/" as
+// drive-relative and prepends the current drive, so production's own resolve(outDir)
+// would otherwise write under a different key than this constant's raw string names.
+const ABS_OUT = resolve("/tmp/aidd-flat-test");
+// FlatBuildStrategy embeds this into written JSON content ("/"-joined, forward-slash - see
+// resolveClaudeRootAbsolute), never ABS_OUT's own native separators.
+const ABS_OUT_IN_CONTENT = ABS_OUT.replace(/\\/g, "/");
 const PLUGIN = "aidd-test";
 // Avoid biome noTemplateCurlyInString: split literal for the placeholder.
 const CLAUDE_ROOT_VAR = "$" + "{CLAUDE_PLUGIN_ROOT}";
@@ -76,10 +82,12 @@ function makeAssetProvider(): AssetProvider {
  * A path is a "directory" if it has no exact file entry but has child paths.
  */
 function makeIsDirectory(fs: InMemoryFileAdapter): (path: string) => Promise<boolean> {
+  // listUnder() normalizes path before comparing; a hand-rolled prefix scan here would
+  // compare a native-separator outDir against the adapter's "/"-only keys and never match
+  // on Windows, where production's resolve(outDir) is backslash-joined.
   return async (path: string): Promise<boolean> => {
     if (fs.has(path)) return false;
-    const prefix = path.endsWith("/") ? path : `${path}/`;
-    return fs.listAll().some((k) => k.startsWith(prefix));
+    return fs.listUnder(path).length > 0;
   };
 }
 
@@ -191,7 +199,7 @@ describe("FlatOutputStrategy integration", () => {
       await useCase.execute({ sourceDir: FIXTURE_DIR, outDir: ABS_OUT, target: "copilot" });
       const content = memFs.getFile(`${ABS_OUT}/.vscode/mcp.json`) ?? "";
       expect(content).not.toContain("CLAUDE_PLUGIN_ROOT");
-      expect(content).toContain(ABS_OUT);
+      expect(content).toContain(ABS_OUT_IN_CONTENT);
     });
 
     it("does NOT write a marketplace.json", async () => {
@@ -303,7 +311,7 @@ describe("FlatOutputStrategy integration", () => {
       const useCase = makeUseCase(memFs);
       await useCase.execute({ sourceDir: FIXTURE_DIR, outDir: ABS_OUT, target: "copilot" });
       const content = memFs.getFile(`${ABS_OUT}/.vscode/mcp.json`) ?? "";
-      expect(content).toContain(ABS_OUT);
+      expect(content).toContain(ABS_OUT_IN_CONTENT);
     });
   });
 
@@ -373,14 +381,18 @@ describe("FlatOutputStrategy integration", () => {
     });
   });
 
-  describe("AC #11: unsupported hooks warn-and-skip (opencode contract)", () => {
+  describe("AC #11: unsupported hooks warn-and-skip", () => {
     it("warns and skips hooks for a hooks-bearing plugin when hooks is unsupported", async () => {
       const captLogger = new CapturingLogger();
+      // No shipped flat contract declares hooks unsupported any more (every tool's
+      // acceptsHooks is true) — this exercises writeHooks's own unsupported branch
+      // directly, on a contract built for that case rather than on any real tool's.
+      const base = buildOpencodeFlatContract();
       const strategy = new FlatBuildStrategy(
         memFs,
         new AjvSchemaValidatorAdapter(),
         makeAssetProvider(),
-        buildOpencodeFlatContract(),
+        { ...base, artifacts: { ...base.artifacts, hooks: { supported: false } } },
         false,
         ABS_OUT,
         makeIsDirectory(memFs),

@@ -1,27 +1,21 @@
 import type { BuildPluginResult } from "../../../../domain/models/framework-build.js";
+import type {
+  SourceMarketplaceRef,
+  SourcePluginEntryRef,
+} from "../../../../domain/tools/build-contract.js";
 
 /**
  * Source marketplace catalog entry from the framework's .claude-plugin/marketplace.json.
- * Shared by orchestrator and marketplace strategy.
+ * Shared by orchestrator and marketplace strategy. The build contract already describes
+ * this shape for tool authors, so the orchestrator speaks the same type rather than a
+ * near-identical twin that only a cast could bridge.
  */
-export interface SourcePluginEntry {
-  readonly name: string;
-  readonly version?: string;
-  readonly description?: string;
-  readonly [key: string]: unknown;
-}
+export type SourcePluginEntry = SourcePluginEntryRef;
 
 /**
  * Parsed source marketplace catalog from the framework root.
  */
-export interface SourceMarketplace {
-  readonly name: string;
-  readonly version?: string;
-  readonly description?: string;
-  readonly owner: unknown;
-  readonly plugins: readonly SourcePluginEntry[];
-  readonly [key: string]: unknown;
-}
+export type SourceMarketplace = SourceMarketplaceRef;
 
 /**
  * Port-style interface for the output layout strategy used by FrameworkBuildUseCase.

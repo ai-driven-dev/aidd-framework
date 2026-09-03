@@ -1,6 +1,7 @@
 import "../../../src/domain/tools/ai/cursor.js";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { DetectPluginDriftUseCase } from "../../../src/application/use-cases/shared/detect-plugin-drift-use-case.js";
 import { StatusUseCase } from "../../../src/application/use-cases/status-use-case.js";
 import { FileHash } from "../../../src/domain/models/file.js";
 import { Manifest } from "../../../src/domain/models/manifest.js";
@@ -36,12 +37,9 @@ function makeFs(fileExists: boolean, diskHash: string): FileReader {
     fileExists: async () => fileExists,
     readFileHash: async () => new FileHash(diskHash),
     readFile: async () => "",
-    writeFile: async () => {},
-    deleteFile: async () => {},
     listDirectory: async () => [],
-    deleteEmptyDirectories: async () => {},
-    copyFile: async () => {},
-  } as unknown as FileReader;
+    listFilesRecursive: async () => [],
+  };
 }
 
 function makeManifestRepo(manifest: Manifest): ManifestRepository {
@@ -57,32 +55,39 @@ describe("StatusUseCase — cursor plugin drift (user-scope)", () => {
     it("resolves absolute path from homedir via resolvePluginsBaseDir before checking disk", async () => {
       const manifest = makeManifest(EXPECTED_HASH);
       const checkedPaths: string[] = [];
-      const fs = {
+      const fs: FileReader = {
         fileExists: async (p: string) => {
           checkedPaths.push(p);
           return true;
         },
         readFileHash: async () => new FileHash(DRIFTED_HASH),
         readFile: async () => "",
-        writeFile: async () => {},
-        deleteFile: async () => {},
         listDirectory: async () => [],
-        deleteEmptyDirectories: async () => {},
-        copyFile: async () => {},
-      } as unknown as FileReader;
+        listFilesRecursive: async () => [],
+      };
 
-      const useCase = new StatusUseCase(fs, makeManifestRepo(manifest), noopHasher);
+      const useCase = new StatusUseCase(
+        fs,
+        makeManifestRepo(manifest),
+        noopHasher,
+        new DetectPluginDriftUseCase(fs)
+      );
       await useCase.execute({ projectRoot: "/proj" });
 
       // All checked paths must be absolute (resolved from user home, not from projectRoot)
-      expect(checkedPaths.some((p) => p.includes(".cursor/plugins/local"))).toBe(true);
+      expect(checkedPaths.some((p) => p.includes(join(".cursor", "plugins", "local")))).toBe(true);
       expect(checkedPaths.every((p) => !p.includes(join("/proj", PLUGIN_KEY)))).toBe(true);
     });
 
     it("returns plugin drift entry with the relative key", async () => {
       const manifest = makeManifest(EXPECTED_HASH);
       const fs = makeFs(true, DRIFTED_HASH);
-      const useCase = new StatusUseCase(fs, makeManifestRepo(manifest), noopHasher);
+      const useCase = new StatusUseCase(
+        fs,
+        makeManifestRepo(manifest),
+        noopHasher,
+        new DetectPluginDriftUseCase(fs)
+      );
 
       const report = await useCase.execute({ projectRoot: "/proj" });
 
@@ -97,7 +102,12 @@ describe("StatusUseCase — cursor plugin drift (user-scope)", () => {
     it("returns empty pluginDrift", async () => {
       const manifest = makeManifest(EXPECTED_HASH);
       const fs = makeFs(true, EXPECTED_HASH);
-      const useCase = new StatusUseCase(fs, makeManifestRepo(manifest), noopHasher);
+      const useCase = new StatusUseCase(
+        fs,
+        makeManifestRepo(manifest),
+        noopHasher,
+        new DetectPluginDriftUseCase(fs)
+      );
 
       const report = await useCase.execute({ projectRoot: "/proj" });
 

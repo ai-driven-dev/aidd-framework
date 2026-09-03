@@ -6,6 +6,7 @@ import { registerCleanCommand } from "./application/commands/clean.js";
 import { registerDoctorCommand } from "./application/commands/doctor.js";
 import { registerFrameworkCommand } from "./application/commands/framework.js";
 import { registerIdeCommand } from "./application/commands/ide.js";
+import { registerKanbanCommand } from "./application/commands/kanban.js";
 import { registerMarketplaceCommand } from "./application/commands/marketplace.js";
 import { runMenuLoop } from "./application/commands/menu.js";
 import { registerPluginCommand } from "./application/commands/plugin.js";
@@ -13,6 +14,7 @@ import { registerRestoreCommand } from "./application/commands/restore.js";
 import { registerSelfUpdateCommand } from "./application/commands/self-update.js";
 import { registerSetupCommand } from "./application/commands/setup.js";
 import { registerStatusCommand } from "./application/commands/status.js";
+import { registerTelemetryCommand } from "./application/commands/telemetry.js";
 import { registerUpdateCommand } from "./application/commands/update.js";
 import { CLIOutput } from "./application/output.js";
 import { CurrentVersionAdapter } from "./infrastructure/adapters/current-version-adapter.js";
@@ -40,10 +42,12 @@ registerPluginCommand(program);
 registerMarketplaceCommand(program);
 registerAuthCommand(program);
 registerStatusCommand(program);
+registerKanbanCommand(program);
 registerRestoreCommand(program);
 registerUpdateCommand(program);
 registerDoctorCommand(program);
 registerCleanCommand(program);
+registerTelemetryCommand(program);
 registerSelfUpdateCommand(program);
 
 // Commands already paying for network I/O: piggyback the update-check refresh on them.

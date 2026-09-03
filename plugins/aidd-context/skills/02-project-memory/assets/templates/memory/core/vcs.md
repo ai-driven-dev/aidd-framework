@@ -6,7 +6,6 @@ The version-control conventions this project follows: branches, commits, and the
 
 - Main branch: `<main, master, trunk>`
 - Platform: `<github, gitlab, bitbucket>`
-- Ticketing: `<jira, linear, none>`
 
 ## Branches
 

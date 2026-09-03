@@ -1,25 +1,30 @@
 import { join } from "node:path";
-import { McpCapability } from "../../../../domain/capabilities/mcp-capability.js";
+import type { McpCapability } from "../../../../domain/capabilities/mcp-capability.js";
 import type { PluginsCapability } from "../../../../domain/capabilities/plugins-capability.js";
 import { CursorProjectScopeUnsupportedError } from "../../../../domain/errors.js";
 import { mergeOpencodeMcp } from "../../../../domain/formats/opencode-mcp-merge.js";
 import type { InstallationFile } from "../../../../domain/models/file.js";
 import type { Manifest } from "../../../../domain/models/manifest.js";
 import { Plugin } from "../../../../domain/models/plugin.js";
+import { PluginContentTranslator } from "../../../../domain/models/plugin-content-translator.js";
 import type { PluginDistribution } from "../../../../domain/models/plugin-distribution.js";
 import type { PluginSource } from "../../../../domain/models/plugin-source.js";
 import type {
   PluginTranslationSkip,
   ReadonlySkipList,
 } from "../../../../domain/models/plugin-translation-skip.js";
-import { PluginTranslator as PluginTranslatorHelper } from "../../../../domain/models/plugin-translator.js";
 import type { AiToolId } from "../../../../domain/models/tool-ids.js";
 import type { FileReader } from "../../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../../domain/ports/file-writer.js";
 import type { Hasher } from "../../../../domain/ports/hasher.js";
 import { getToolConfig, isAiTool } from "../../../../domain/tools/registry.js";
-import { writePluginFiles } from "../plugin-helpers.js";
+import { writePluginFiles } from "../plugin-file-sync.js";
+import {
+  isFrameworkPrimeFlatMcp,
+  resolvePluginBaseDirForCapability,
+} from "../plugin-target-resolution.js";
 import type { PluginTranslator } from "./plugin-translator.js";
+import { ProjectHooksMaterializer, withoutHooks } from "./project-hooks-materializer.js";
 
 /**
  * Mode B — Flat materialization.
@@ -30,12 +35,15 @@ import type { PluginTranslator } from "./plugin-translator.js";
  */
 export class ModeBFlatMaterializationTranslator implements PluginTranslator {
   readonly mode = "flat" as const;
+  private readonly projectHooks: ProjectHooksMaterializer;
 
   constructor(
     private readonly fs: FileWriter & FileReader,
     private readonly hasher: Hasher,
     private readonly homedir: () => string
-  ) {}
+  ) {
+    this.projectHooks = new ProjectHooksMaterializer(fs);
+  }
 
   async addPlugin(
     dist: PluginDistribution,
@@ -50,7 +58,8 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
     const ctx = this.resolveFlatToolContext(toolId, dist, docsDir, projectRoot);
     if (ctx === null) return { skipped: [] };
     const mcp = await this.resolveMcp(dist, toolId, projectRoot, previousMcpEntries);
-    const allSkipped: ReadonlySkipList = [...ctx.skipped, ...mcp.mcpSkips];
+    const hooksSkips = await this.projectHooks.materialize(dist, toolId, projectRoot);
+    const allSkipped: ReadonlySkipList = [...ctx.skipped, ...mcp.mcpSkips, ...hooksSkips];
     if (ctx.files.length === 0 && mcp.mcpEntries.size === 0) return { skipped: allSkipped };
     await this.writeAndRegisterPlugin(
       dist,
@@ -85,10 +94,11 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
     if (pluginsCap.mode === "native" && pluginsCap.installScope !== "user") {
       throw new CursorProjectScopeUnsupportedError();
     }
-    const { files, componentPaths, skipped } = new PluginTranslatorHelper(
+    const distForNative = pluginsCap.hooksDestination === "project" ? withoutHooks(dist) : dist;
+    const { files, componentPaths, skipped } = new PluginContentTranslator(
       this.hasher
-    ).translateWithComponentPaths(dist, toolConfig, docsDir);
-    const baseDir = this.resolveBaseDir(pluginsCap, projectRoot);
+    ).translateWithComponentPaths(distForNative, toolConfig, docsDir);
+    const baseDir = resolvePluginBaseDirForCapability(pluginsCap, projectRoot, this.homedir);
     return { caps, files, componentPaths, skipped, baseDir };
   }
 
@@ -101,7 +111,7 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
     const toolConfig = getToolConfig(toolId);
     if (!isAiTool(toolConfig)) return { mcpEntries: new Map(), mcpSkips: [] };
     const caps = toolConfig.capabilities as Record<string, unknown>;
-    if (!this.qualifiesForOpencodeMcpMerge(caps) || dist.components.mcp.length === 0) {
+    if (!isFrameworkPrimeFlatMcp(caps) || dist.components.mcp.length === 0) {
       return { mcpEntries: new Map(), mcpSkips: [] };
     }
     return this.mergeOpencodeMcpEntries(dist, caps, projectRoot, previousMcpEntries, toolId);
@@ -128,15 +138,6 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
       marketplace
     );
     manifest.addPlugin(toolId, plugin);
-  }
-
-  private qualifiesForOpencodeMcpMerge(caps: Record<string, unknown>): boolean {
-    if (!("mcp" in caps)) return false;
-    const mcp = caps.mcp;
-    if (!(mcp instanceof McpCapability)) return false;
-    if (mcp.params.mergeStrategy !== "framework-prime") return false;
-    const plugins = caps.plugins as PluginsCapability;
-    return plugins.mode === "flat";
   }
 
   private async mergeOpencodeMcpEntries(
@@ -187,12 +188,5 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
       throw err;
     }
-  }
-
-  private resolveBaseDir(
-    plugins: { resolvePluginsBaseDir: (projectRoot: string, homedir: string) => string },
-    projectRoot: string
-  ): string {
-    return plugins.resolvePluginsBaseDir(projectRoot, this.homedir());
   }
 }

@@ -17,5 +17,5 @@ doctor: ## Check the local toolchain
 check: ## Run the pre-commit checks
 	pnpm exec lefthook run pre-commit
 
-reload: ## Dev: CLI-build this checkout into Claude+Codex native trees and reinstall (PLUGIN="aidd-refine aidd-pm", default all)
+reload: ## Dev: reload this checkout into Claude, Codex, and OpenCode (PLUGIN="aidd-refine aidd-pm", default all)
 	scripts/dev-sync.sh $(PLUGIN)

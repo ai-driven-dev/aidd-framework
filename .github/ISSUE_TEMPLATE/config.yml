@@ -6,9 +6,3 @@ contact_links:
   - name: Discord community
     url: https://discord.gg/EWySJSpjWs
     about: Ask questions, get help, or chat with the AI-Driven Dev community in real time.
-  - name: Website
-    url: https://www.ai-driven-dev.fr/
-    about: Read the AI-Driven Dev methodology, guides, and announcements.
-  - name: Report a security vulnerability
-    url: https://github.com/ai-driven-dev/framework/security/advisories/new
-    about: Disclose a vulnerability privately via GitHub Security Advisories. Do not open a public issue.

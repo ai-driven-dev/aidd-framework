@@ -21,7 +21,13 @@ const files = (p) =>
   existsSync(p) ? readdirSync(p, { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name) : [];
 
 const plugins = dirs(PLUGINS).sort();
-const skillsOf = (name) => dirs(`${PLUGINS}/${name}/skills`).length;
+// A directory under skills/ is a skill only once it carries a SKILL.md - the same test
+// the CLI's own plugin-source-tree-reader.ts uses. Without it, a plugin-wide directory
+// that carries no SKILL.md would count as a skill.
+const skillsOf = (name) =>
+  dirs(`${PLUGINS}/${name}/skills`).filter((skill) =>
+    existsSync(`${PLUGINS}/${name}/skills/${skill}/SKILL.md`)
+  ).length;
 const agentsOf = (name) => files(`${PLUGINS}/${name}/agents`).filter((f) => f.endsWith(".md")).length;
 
 const totalPlugins = plugins.length;

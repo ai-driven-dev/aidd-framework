@@ -1,3 +1,4 @@
+import { isAbsolute, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { InputRequiredError } from "../../../../src/application/errors.js";
 import { SetupMarketplaceSourceUseCase } from "../../../../src/application/use-cases/setup/setup-marketplace-source-use-case.js";
@@ -148,7 +149,11 @@ describe("SetupMarketplaceSourceUseCase", () => {
       const result = await uc.execute({ projectRoot: PROJECT_ROOT, interactive: true });
 
       expect(result.kind).toBe("local");
-      expect(result.path).toBe("/abs/framework");
+      // The use-case runs the prompted path through resolve(), which — on Windows — fills in
+      // the current drive letter for a rootless absolute path like "/abs/framework". Resolve
+      // it the same way here so the expectation is the same location, spelled how the platform
+      // spells it.
+      expect(result.path).toBe(resolve("/abs/framework"));
     });
 
     it("resolves relative path to absolute when user enters a relative local path", async () => {
@@ -162,7 +167,10 @@ describe("SetupMarketplaceSourceUseCase", () => {
       const result = await uc.execute({ projectRoot: PROJECT_ROOT, interactive: true });
 
       expect(result.kind).toBe("local");
-      expect(result.path).toMatch(/^[/\\]/);
+      // A leading-slash regex assumes an absolute path always starts with a separator, which
+      // misses a Windows drive letter (e.g. "D:\..."). isAbsolute() is the platform-correct
+      // check for "resolved to absolute" on every OS.
+      expect(isAbsolute(result.path)).toBe(true);
     });
   });
 

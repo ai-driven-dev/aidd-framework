@@ -3,6 +3,7 @@ import { InstallationFile } from "../../../src/domain/models/file.js";
 import {
   buildMergeFileEntries,
   extractMergeEntries,
+  hashJsonEntries,
   parseEntryKeys,
   removeEntriesFromJson,
 } from "../../../src/domain/models/merge.js";
@@ -250,5 +251,42 @@ describe("removeEntriesFromJson", () => {
     const json = JSON.stringify({ playwright: { cmd: "npx" }, github: { cmd: "gh" } });
     const result = JSON.parse(removeEntriesFromJson(json, null, ["playwright"]));
     expect(result).toEqual({ github: { cmd: "gh" } });
+  });
+
+  it("drops a section entirely once emptied, even alongside unrelated top-level keys", () => {
+    const json = JSON.stringify({
+      permissions: { allow: ["Bash(ls:*)"] },
+      env: { CLAUDE_CODE_ENABLE_TELEMETRY: "1" },
+    });
+    const result = JSON.parse(removeEntriesFromJson(json, "env", ["CLAUDE_CODE_ENABLE_TELEMETRY"]));
+    expect(result).toEqual({ permissions: { allow: ["Bash(ls:*)"] } });
+    expect("env" in result).toBe(false);
+  });
+
+  it("keeps a section that still has entries after removal, alongside unrelated keys", () => {
+    const json = JSON.stringify({
+      permissions: { allow: ["Bash(ls:*)"] },
+      env: { CLAUDE_CODE_ENABLE_TELEMETRY: "1", MY_OWN_VAR: "keep-me" },
+    });
+    const result = JSON.parse(removeEntriesFromJson(json, "env", ["CLAUDE_CODE_ENABLE_TELEMETRY"]));
+    expect(result).toEqual({
+      permissions: { allow: ["Bash(ls:*)"] },
+      env: { MY_OWN_VAR: "keep-me" },
+    });
+  });
+});
+
+describe("hashJsonEntries", () => {
+  it("hashes each top-level value, one entry per key", () => {
+    const entries = hashJsonEntries({ a: 1, b: "two" }, hasher);
+    expect(entries.a.value).toBe(hasher.hash(JSON.stringify(1)).value);
+    expect(entries.b.value).toBe(hasher.hash(JSON.stringify("two")).value);
+  });
+
+  it("backs extractMergeEntries with the same hashing logic", () => {
+    const json = JSON.stringify({ env: { FOO: "bar" } });
+    const viaExtract = extractMergeEntries(json, "env", hasher);
+    const viaHash = hashJsonEntries({ FOO: "bar" }, hasher);
+    expect(viaExtract.FOO.value).toBe(viaHash.FOO.value);
   });
 });

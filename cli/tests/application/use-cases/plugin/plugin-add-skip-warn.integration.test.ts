@@ -1,6 +1,14 @@
 /**
  * Integration test for Phase 1: PluginAddUseCase emits logger.warn for each skip entry
  * returned by the translation adapter.
+ *
+ * The live example this originally used — sample-plugin's hooks/ against OpenCode —
+ * stopped producing a skip once OpenCode's flat mode started accepting hooks (Phase 7,
+ * see the telemetry plan's measurements.md): every registered tool now runs what a
+ * plugin's hooks/ ships, so no live fixture currently exercises collectHooksSkips's
+ * non-empty branch. The first two tests below assert that absence directly rather than
+ * keep asserting a skip that no longer happens; the warn-format contract itself is still
+ * covered, tool-agnostically, by the last test in this file.
  */
 import "../../../../src/domain/tools/ai/opencode.js";
 import { join } from "node:path";
@@ -18,8 +26,8 @@ const PLUGIN_FIXTURE = join(process.cwd(), "tests/fixtures/plugins/claude-format
 const PROJECT_ROOT = "/test-project";
 
 describe("PluginAddUseCase skip warnings", () => {
-  describe("when adapter returns skip entries", () => {
-    it("emits one logger.warn per skip entry with the expected format", async () => {
+  describe("when a plugin's hooks are now accepted (no skip entry)", () => {
+    it("emits no logger.warn — OpenCode delivers sample-plugin's hooks instead of skipping them", async () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);
       await initAndInstall(deps, PROJECT_ROOT, "opencode");
       await seedFromDirectory(deps.fs, PLUGIN_FIXTURE, { useAbsolutePaths: true });
@@ -41,33 +49,7 @@ describe("PluginAddUseCase skip warnings", () => {
         projectRoot: PROJECT_ROOT,
         interactive: false,
       });
-      // sample-plugin ships hooks/ — Phase 3: OpenCode emits one skip warn for hooks.
-      expect(capturingLogger.warnMessages).toHaveLength(1);
-    });
-
-    it("emits one warning for hooks skip when plugin ships hooks against opencode", async () => {
-      const deps = await buildUnitDeps(PROJECT_ROOT);
-      await initAndInstall(deps, PROJECT_ROOT, "opencode");
-      await seedFromDirectory(deps.fs, PLUGIN_FIXTURE, { useAbsolutePaths: true });
-      const capturingLogger = new CapturingLogger();
-      const registry = new InMemoryMarketplaceRegistry();
-      const useCase = new PluginAddUseCase(
-        deps.fs,
-        deps.manifestRepo,
-        deps.pluginFetcher,
-        new PluginDistributionReaderAdapter(deps.fs),
-        deps.hasher,
-        capturingLogger,
-        registry,
-        fakeEnsureBuiltMarketplace()
-      );
-      await useCase.execute({
-        source: { kind: "local", path: PLUGIN_FIXTURE },
-        toolIds: ["opencode"],
-        projectRoot: PROJECT_ROOT,
-        interactive: false,
-      });
-      expect(capturingLogger.warnMessages).toHaveLength(1);
+      expect(capturingLogger.warnMessages).toEqual([]);
     });
   });
 

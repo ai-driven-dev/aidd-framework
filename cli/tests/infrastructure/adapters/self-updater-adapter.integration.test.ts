@@ -4,24 +4,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FrameworkResolutionError } from "../../../src/domain/errors.js";
 import { SelfUpdaterAdapter } from "../../../src/infrastructure/adapters/self-updater-adapter.js";
 import { HttpNotFoundError } from "../../../src/infrastructure/errors.js";
-import { HttpClient } from "../../../src/infrastructure/http/http-client.js";
-
-interface HttpResponse {
-  body: Buffer | unknown;
-  statusCode: number;
-  contentType: string;
-}
+import {
+  HttpClient,
+  type HttpGet,
+  type HttpResponse,
+} from "../../../src/infrastructure/http/http-client.js";
 
 interface GetCall {
   url: string;
   accept?: string;
 }
 
-/** Fake HttpClient routing GET by URL so fetchLatestRelease can be exercised offline. */
+/** Fake HTTP GET routing by URL so fetchLatestRelease can be exercised offline. */
 function fakeHttp(
   routes: Record<string, () => HttpResponse | Promise<HttpResponse>>,
   calls: GetCall[] = []
-): HttpClient {
+): HttpGet {
   return {
     get: async (url: string, options?: { accept?: string }) => {
       calls.push({ url, accept: options?.accept });
@@ -29,7 +27,7 @@ function fakeHttp(
       if (!route) throw new HttpNotFoundError(url);
       return route();
     },
-  } as unknown as HttpClient;
+  };
 }
 
 function jsonResponse(body: unknown): HttpResponse {
@@ -51,9 +49,9 @@ function makeAdapter(): SelfUpdaterAdapter {
 
 function mockInstall(whichOutput: string, os: "win32" | "linux" | "darwin" = "linux"): void {
   mockPlatform.mockReturnValue(os);
-  mockExecSync
-    .mockReturnValueOnce(whichOutput as unknown as ReturnType<typeof execSync>)
-    .mockReturnValue(undefined as unknown as ReturnType<typeof execSync>);
+  // which/where is read with `encoding: "utf8"` (a string); the install call runs with
+  // piped stdio and yields a Buffer. Both are what execSync really returns.
+  mockExecSync.mockReturnValueOnce(whichOutput).mockReturnValue(Buffer.alloc(0));
 }
 
 describe("self-updater-adapter — fetchLatestRelease", () => {
@@ -86,6 +84,23 @@ describe("self-updater-adapter — fetchLatestRelease", () => {
     });
     const release = await new SelfUpdaterAdapter(http).fetchLatestRelease();
     expect(release).toEqual({ version: "5.1.2", changelog: null });
+  });
+
+  it("resolves the latest version for an unauthenticated user (token provider yields null)", async () => {
+    const calls: GetCall[] = [];
+    const http = fakeHttp(
+      {
+        [NPM_DIST_TAGS_URL]: () => jsonResponse({ latest: "5.1.2" }),
+        [GH_TAG_URL]: () => jsonResponse({ body: "Release notes" }),
+      },
+      calls
+    );
+    const tokenProvider = { resolve: async () => null };
+
+    const release = await new SelfUpdaterAdapter(http, { tokenProvider }).fetchLatestRelease();
+
+    expect(release.version).toBe("5.1.2");
+    expect(calls.some((c) => c.url === NPM_DIST_TAGS_URL)).toBe(true);
   });
 
   it("traces the reason on the debug channel when the changelog fetch fails", async () => {
@@ -229,20 +244,16 @@ describe("self-updater-adapter — install", () => {
 
   it("surfaces a read:packages hint when the install command fails", () => {
     mockPlatform.mockReturnValue("linux");
-    mockExecSync
-      .mockReturnValueOnce("/usr/local/bin/aidd" as unknown as ReturnType<typeof execSync>)
-      .mockImplementationOnce(() => {
-        throw new Error("npm error 403");
-      });
+    mockExecSync.mockReturnValueOnce("/usr/local/bin/aidd").mockImplementationOnce(() => {
+      throw new Error("npm error 403");
+    });
     expect(() => makeAdapter().install()).toThrow("read:packages");
   });
 
   it("surfaces an elevation hint when the install fails with EPERM", () => {
     mockPlatform.mockReturnValue("win32");
     mockExecSync
-      .mockReturnValueOnce(
-        "C:\\Program Files\\nodejs\\aidd.cmd" as unknown as ReturnType<typeof execSync>
-      )
+      .mockReturnValueOnce("C:\\Program Files\\nodejs\\aidd.cmd")
       .mockImplementationOnce(() => {
         const err = new Error("Command failed") as Error & { stderr: Buffer };
         err.stderr = Buffer.from("npm error code EPERM\nnpm error syscall mkdir");
@@ -253,13 +264,11 @@ describe("self-updater-adapter — install", () => {
 
   it("classifies EACCES failures as elevation errors too", () => {
     mockPlatform.mockReturnValue("linux");
-    mockExecSync
-      .mockReturnValueOnce("/usr/local/bin/aidd" as unknown as ReturnType<typeof execSync>)
-      .mockImplementationOnce(() => {
-        const err = new Error("Command failed") as Error & { stderr: string };
-        err.stderr = "npm error code EACCES";
-        throw err;
-      });
+    mockExecSync.mockReturnValueOnce("/usr/local/bin/aidd").mockImplementationOnce(() => {
+      const err = new Error("Command failed") as Error & { stderr: string };
+      err.stderr = "npm error code EACCES";
+      throw err;
+    });
     expect(() => makeAdapter().install()).toThrow(/npm config set prefix/);
   });
 });

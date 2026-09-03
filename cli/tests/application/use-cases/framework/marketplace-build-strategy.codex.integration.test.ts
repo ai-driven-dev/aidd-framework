@@ -9,6 +9,7 @@ import {
   InvalidBuildPathsError,
   JsonSchemaValidationError,
 } from "../../../../src/domain/errors.js";
+import { parseFrontmatter } from "../../../../src/domain/formats/markdown.js";
 import { parseToml } from "../../../../src/domain/formats/toml.js";
 import type { AssetProvider } from "../../../../src/domain/ports/asset-provider.js";
 import { AjvSchemaValidatorAdapter } from "../../../../src/infrastructure/adapters/ajv-schema-validator-adapter.js";
@@ -19,7 +20,10 @@ import { seedFromDirectory } from "../../../helpers/ports/seed-from-directory.js
 
 const REAL_FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework-real");
 const CODEX_FIXTURE_DIR = resolve(process.cwd(), "tests/fixtures/framework-codex");
-const OUT_DIR = "/tmp/aidd-codex-test-out";
+// resolve(), not the bare literal: on Windows path.resolve treats a leading "/" as
+// drive-relative and prepends the current drive, so production's own resolve(outDir)
+// would otherwise write under a different key than this constant's raw string names.
+const OUT_DIR = resolve("/tmp/aidd-codex-test-out");
 
 // Avoid biome noTemplateCurlyInString: split literal
 const CLAUDE_ROOT_VAR = "$" + "{CLAUDE_PLUGIN_ROOT}";
@@ -223,6 +227,44 @@ describe("CodexOutputStrategy", () => {
   });
 
   describe("skill rewrite (AC #6)", () => {
+    it("uses the skill frontmatter allowlist without changing the source", async () => {
+      const fs = await makeSeededFsFromCodex();
+      const sourcePath = `${CODEX_FIXTURE_DIR}/plugins/aidd-codex-fixture/skills/sample/SKILL.md`;
+      const sourceBefore = await fs.readFile(sourcePath);
+      const uc = makeUseCase(fs);
+
+      await uc.execute({ sourceDir: CODEX_FIXTURE_DIR, outDir: OUT_DIR, target: "codex" });
+
+      const output =
+        fs.getFile(`${OUT_DIR}/plugins/aidd-codex-fixture/skills/sample/SKILL.md`) ?? "";
+      expect(parseFrontmatter(output).frontmatter).toEqual({
+        name: "sample",
+        description: "Sample skill for testing reference rewriting.",
+        allowed_tools: ["Read"],
+      });
+      expect(output).not.toMatch(/^model:/m);
+      expect(await fs.readFile(sourcePath)).toBe(sourceBefore);
+    });
+
+    it("preserves auxiliary Markdown frontmatter", async () => {
+      const fs = await makeSeededFsFromCodex();
+      const sourcePath = `${CODEX_FIXTURE_DIR}/plugins/aidd-codex-fixture/skills/sample/assets/template.md`;
+      const source = await fs.readFile(sourcePath);
+      const uc = makeUseCase(fs);
+
+      await uc.execute({ sourceDir: CODEX_FIXTURE_DIR, outDir: OUT_DIR, target: "codex" });
+
+      const output = fs.getFile(
+        `${OUT_DIR}/plugins/aidd-codex-fixture/skills/sample/assets/template.md`
+      );
+      expect(output).toBe(source);
+      expect(parseFrontmatter(output ?? "").frontmatter).toEqual({
+        name: "template",
+        model: "opus",
+        custom: "keep-this",
+      });
+    });
+
     it("rewrites @./ references in skill SKILL.md to markdown links", async () => {
       const fs = await makeSeededFsFromCodex();
       const uc = makeUseCase(fs);
@@ -270,6 +312,46 @@ describe("CodexOutputStrategy", () => {
       await uc.execute({ sourceDir: REAL_FIXTURE_DIR, outDir: OUT_DIR, target: "codex" });
       const destHooks = fs.getFile(`${OUT_DIR}/plugins/aidd-context/hooks/hooks.json`) ?? "";
       expect(destHooks).toContain(`${CODEX_ROOT_VAR}/hooks/`);
+    });
+  });
+
+  // #707: Codex is installed two ways - this built tree and a merged project config - and
+  // they have drifted three times. The rename lives in one place, renameCodexHookEvents,
+  // and this is the half that proves the *build* route spends it. Codex has no `Stop`, so a
+  // built tree that keeps it subscribes the turn-end hook to an event that never arrives
+  // and the turn is never closed, in silence.
+  describe("hook events Codex actually delivers (#707)", () => {
+    it("renames Stop to SessionEnd in a built plugin's hooks.json", async () => {
+      const fs = await makeSeededFsFromReal();
+      // No fixture plugin declares Stop today, so the source is seeded with one rather than
+      // asserted against a tree that cannot exercise the rename.
+      fs.setFile(
+        `${REAL_FIXTURE_DIR}/plugins/aidd-context/hooks/hooks.json`,
+        JSON.stringify({
+          hooks: {
+            SessionStart: [{ hooks: [{ type: "command", command: "node a.js session-start" }] }],
+            Stop: [{ hooks: [{ type: "command", command: "node a.js turn-end" }] }],
+          },
+        })
+      );
+      const uc = makeUseCase(fs);
+      await uc.execute({ sourceDir: REAL_FIXTURE_DIR, outDir: OUT_DIR, target: "codex" });
+      const destHooks = fs.getFile(`${OUT_DIR}/plugins/aidd-context/hooks/hooks.json`) ?? "";
+      const events = Object.keys((JSON.parse(destHooks) as { hooks: object }).hooks);
+
+      expect(events).toContain("SessionEnd");
+      expect(events).not.toContain("Stop");
+      expect(destHooks).toContain("turn-end");
+    });
+
+    it("leaves the events Codex does share with Claude under their own names", async () => {
+      const fs = await makeSeededFsFromReal();
+      const uc = makeUseCase(fs);
+      await uc.execute({ sourceDir: REAL_FIXTURE_DIR, outDir: OUT_DIR, target: "codex" });
+      const destHooks = fs.getFile(`${OUT_DIR}/plugins/aidd-context/hooks/hooks.json`) ?? "";
+      const events = Object.keys((JSON.parse(destHooks) as { hooks: object }).hooks);
+
+      expect(events).toContain("SessionStart");
     });
   });
 

@@ -1,0 +1,28 @@
+{
+  "type": "message.part.updated",
+  "properties": {
+    "sessionID": "ses_aaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "part": {
+      "id": "prt_bbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "messageID": "msg_bbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sessionID": "ses_aaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "type": "tool",
+      "tool": "read",
+      "callID": "call_bbbbbbbbbbbbbbbbbbbbbbbb",
+      "state": {
+        "status": "completed",
+        "input": {
+          "filePath": "/home/user/probe/project-opencode-task/aidd_docs/tasks/2026_08/2026_08_15_alpha/spec.md"
+        },
+        "output": "<path>/home/user/probe/project-opencode-task/aidd_docs/tasks/2026_08/2026_08_15_alpha/spec.md</path>\n<type>file</type>\n<content>\n# alpha\n\nSpec body.\n</content>",
+        "metadata": {
+          "preview": "# alpha\n\nSpec body.",
+          "truncated": false
+        },
+        "title": "",
+        "time": { "start": 1788189156445, "end": 1788189156452 }
+      }
+    },
+    "time": 1788189156452
+  }
+}

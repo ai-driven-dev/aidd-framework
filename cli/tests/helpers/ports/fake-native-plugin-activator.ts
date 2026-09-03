@@ -10,16 +10,20 @@ import type { NativePluginActivator } from "../../../src/domain/ports/native-plu
  * once (simulates the CLI rejecting `add` when the name exists from a different source).
  * `throwOnRemove` makes `removeMarketplace` throw (simulates removing an absent name,
  * i.e. an `add` that failed for a reason other than a different-source conflict).
+ * `failOnUninstall` makes `uninstallPlugin` throw for the listed refs (simulates the
+ * plugin already being absent from the tool's own registry).
  */
 export class FakeNativePluginActivator implements NativePluginActivator {
   available: boolean;
   readonly addedMarketplaces: string[] = [];
   readonly removedMarketplaces: string[] = [];
   readonly enabledPlugins: string[] = [];
+  readonly uninstalledPlugins: string[] = [];
   upgradeCount = 0;
   private readonly failOnPlugins: ReadonlySet<string>;
   private readonly conflictOnAdd: boolean;
   private readonly throwOnRemove: boolean;
+  private readonly failOnUninstall: ReadonlySet<string>;
 
   constructor(
     options: {
@@ -27,12 +31,14 @@ export class FakeNativePluginActivator implements NativePluginActivator {
       failOnPlugins?: readonly string[];
       conflictOnAdd?: boolean;
       throwOnRemove?: boolean;
+      failOnUninstall?: readonly string[];
     } = {}
   ) {
     this.available = options.available ?? false;
     this.failOnPlugins = new Set(options.failOnPlugins ?? []);
     this.conflictOnAdd = options.conflictOnAdd ?? false;
     this.throwOnRemove = options.throwOnRemove ?? false;
+    this.failOnUninstall = new Set(options.failOnUninstall ?? []);
   }
 
   isAvailable(): boolean {
@@ -66,5 +72,12 @@ export class FakeNativePluginActivator implements NativePluginActivator {
       throw new NativePluginCliError(`plugin \`${pluginRef}\` was not found in marketplace`);
     }
     this.enabledPlugins.push(pluginRef);
+  }
+
+  uninstallPlugin(pluginRef: string): void {
+    if (this.failOnUninstall.has(pluginRef)) {
+      throw new NativePluginCliError(`plugin \`${pluginRef}\` is not installed`);
+    }
+    this.uninstalledPlugins.push(pluginRef);
   }
 }

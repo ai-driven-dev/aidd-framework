@@ -14,7 +14,7 @@ Rows in the `Findings` table of the feature folder's `review.md`, kind `code`, e
 
 1. **Resolve.** Take the diff from the arguments, otherwise the diff against the repository default branch.
 2. **Review.** Read every changed line for clean-code: naming, structure, complexity, smells, error handling. No runtime checks. Rule conformance is the relevancy lens, not this one.
-3. **Rate.** One row per issue, rated per `@../references/review-rubric.md`, citing a `file:line`.
+3. **Rate.** One row per issue, rated per [review-rubric.md](../references/review-rubric.md), citing a `file:line`.
 4. **Record.** Append one row per finding to the `Findings` table: kind `code`, Phase the plan phase the file falls in or `-`. Write "None." when the run found nothing.
 
 ## Test

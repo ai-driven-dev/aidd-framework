@@ -1,6 +1,7 @@
 ---
 paths:
   - "src/**/*.ts"
+  - "tests/**/*.ts"
 ---
 
 # Hexagonal Architecture
@@ -35,6 +36,12 @@ paths:
 
 - `cli.ts` wires commands only — no business logic
 - `deps.ts` assembles the dependency graph
+
+## Type honesty
+
+- No type is widened through `as unknown as`, `as any`, `as never`, `@ts-expect-error` or
+  `@ts-ignore`, in `tests/` as much as in `src/` — `scripts/check-cli-layering.mjs` enforces
+  it over both trees, and lists in `CASTS_ALLOWED` the ones the type system cannot express
 
 ## Exceptions
 

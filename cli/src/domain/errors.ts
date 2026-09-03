@@ -455,3 +455,51 @@ export class NativePluginCliError extends Error {
     this.name = "NativePluginCliError";
   }
 }
+
+export class UnknownTelemetrySinkSchemaVersionError extends Error {
+  constructor(version: unknown) {
+    super(
+      `Unknown telemetry sink schema version '${String(version)}' — refusing to guess its shape.`
+    );
+    this.name = "UnknownTelemetrySinkSchemaVersionError";
+  }
+}
+
+/** A genuine `opencode export` failure — a non-zero exit not explained by "no such
+ * session", or the command exceeding its timeout. An absent binary or an unknown session
+ * are not this: those mean the machine simply holds no OpenCode data, and the reader
+ * resolves to an empty array for them instead of throwing. */
+export class OpencodeExportError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OpencodeExportError";
+  }
+}
+
+export class InvalidReportDayError extends Error {
+  constructor(flag: string, value: string) {
+    super(`Invalid ${flag} '${value}'. Expected a UTC day, as YYYY-MM-DD.`);
+    this.name = "InvalidReportDayError";
+  }
+}
+
+export class InvalidReportSpanError extends Error {
+  constructor(value: string, maxDays: number) {
+    super(`Invalid --days '${value}'. Expected an integer between 1 and ${maxDays}.`);
+    this.name = "InvalidReportSpanError";
+  }
+}
+
+/** The identity file exists but could not be read back — a read failure (e.g. it is a
+ * directory) or content that does not parse. Distinct from no file at all, which is a
+ * person never having opted in and answers `null` rather than throwing.
+ *
+ * Also what a damaged separate declaration file would have thrown, back when one existed
+ * as its own file (`UnreadablePersonMappingFileError`, deleted alongside it): one file,
+ * one error for a read that could not come back. */
+export class UnreadableIdentityFileError extends Error {
+  constructor(filePath: string, cause: string) {
+    super(`Could not read the identity file at ${filePath} (${cause}).`);
+    this.name = "UnreadableIdentityFileError";
+  }
+}

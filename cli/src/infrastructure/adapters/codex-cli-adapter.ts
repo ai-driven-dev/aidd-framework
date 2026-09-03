@@ -15,4 +15,10 @@ export class CodexCliAdapter extends AbstractNativePluginCliAdapter {
   enablePlugin(pluginRef: string): void {
     this.run(["plugin", "add", pluginRef], `plugin add ${pluginRef}`);
   }
+
+  // The removal counterpart of `plugin add` above: drops the plugin from
+  // `~/.codex/config.toml` and its cache (`~/.codex/plugins/cache/`).
+  uninstallPlugin(pluginRef: string): void {
+    this.run(["plugin", "remove", pluginRef], `plugin remove ${pluginRef}`);
+  }
 }

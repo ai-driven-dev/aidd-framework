@@ -28,14 +28,16 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "prepare": "lefthook install || true"
+    "prepare": "lefthook install || true",
+    "test:changed": "node scripts/test-changed.mjs",
+    "telemetry:reference-week": "node scripts/telemetry-reference-week.cjs"
   },
   "devDependencies": {
-    "@commitlint/cli": "^21.2.1",
-    "@commitlint/config-conventional": "^21.2.0",
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
-    "js-yaml": "5.2.1",
-    "lefthook": "^2.1.10"
+    "js-yaml": "5.4.1",
+    "lefthook": "^2.1.12"
   }
 }

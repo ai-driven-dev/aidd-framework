@@ -74,6 +74,12 @@ export type ArtifactContract =
        * Used to reshape the Claude nested format to a tool-specific flat format.
        */
       readonly hooksTransform?: (rewrittenJson: string) => string;
+      /**
+       * When true, `writeHooks` delivers everything under hooks/ except hooks.json —
+       * for a tool whose hook is a runtime module a loader scans for, not a manifest a
+       * merge reads (opencode's flat plugin directory).
+       */
+      readonly skipHooksJson?: boolean;
     };
 
 /**
@@ -89,7 +95,7 @@ export interface ToolBuildContract {
    * Absent for flat-only contracts (no substitution needed).
    * Examples: "${CLAUDE_PLUGIN_ROOT}", "${CURSOR_PLUGIN_ROOT}", "${PLUGIN_ROOT}", "${COPILOT_PLUGIN_ROOT}".
    */
-  readonly pluginRootToken?: string;
+  readonly pluginRootToken?: string | null;
   /** Relative path under the output dir where the marketplace catalog is written. null if no marketplace. */
   readonly marketplaceRelative: string | null;
   /** Plugin-manifest file relative to plugin tree root (e.g. ".claude-plugin/plugin.json"). null if no manifest. */

@@ -1,0 +1,11 @@
+{
+  "session_id": "195fff46-dc16-4296-ab58-d625563d7f78",
+  "transcript_path": "/home/user/probe/cc-home/projects/-home-user-probe-project/195fff46-dc16-4296-ab58-d625563d7f78.jsonl",
+  "cwd": "/home/user/probe/project",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Write",
+  "tool_input": {
+    "file_path": "/home/user/probe/project/aidd_docs/tasks/2026_08/2026_08_18_probe-task/notes.md",
+    "content": "probe"
+  }
+}

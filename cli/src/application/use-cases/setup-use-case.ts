@@ -11,12 +11,12 @@ import type { ManifestRepository } from "../../domain/ports/manifest-repository.
 import type { TokenProvider } from "../../domain/ports/token-provider.js";
 import type { VersionReader } from "../../domain/ports/version-reader.js";
 import { InitUseCase } from "./init-use-case.js";
-import type { MarketplaceRefreshUseCase } from "./marketplace/marketplace-refresh-use-case.js";
+import type { MarketplaceRefresh } from "./marketplace/marketplace-refresh-use-case.js";
 import type {
+  MarketplaceRegisterFramework,
   MarketplaceRegisterFrameworkOptions,
-  MarketplaceRegisterFrameworkUseCase,
 } from "./marketplace/marketplace-register-framework-use-case.js";
-import type { MarketplaceSyncSettingsUseCase } from "./marketplace/marketplace-sync-settings-use-case.js";
+import type { MarketplaceSyncSettings } from "./marketplace/marketplace-sync-settings-use-case.js";
 import type { ProjectContextDetectorUseCase } from "./setup/project-context-detector-use-case.js";
 import type { SetupMarketplaceSourceUseCase } from "./setup/setup-marketplace-source-use-case.js";
 import type { SetupPluginsPromptUseCase } from "./setup/setup-plugins-prompt-use-case.js";
@@ -35,9 +35,9 @@ export class SetupUseCase {
     private readonly fs: FileReader & FileWriter,
     private readonly manifestRepo: ManifestRepository,
     private readonly setupMarketplaceSourceUseCase: SetupMarketplaceSourceUseCase,
-    private readonly marketplaceRegisterFrameworkUseCase: MarketplaceRegisterFrameworkUseCase,
-    private readonly marketplaceRefreshUseCase: MarketplaceRefreshUseCase,
-    private readonly marketplaceSyncSettingsUseCase: MarketplaceSyncSettingsUseCase,
+    private readonly marketplaceRegisterFrameworkUseCase: MarketplaceRegisterFramework,
+    private readonly marketplaceRefreshUseCase: MarketplaceRefresh,
+    private readonly marketplaceSyncSettingsUseCase: MarketplaceSyncSettings,
     private readonly setupToolsUseCase: SetupToolsUseCase,
     private readonly setupPluginsPromptUseCase: SetupPluginsPromptUseCase,
     private readonly currentVersionProvider: VersionReader,

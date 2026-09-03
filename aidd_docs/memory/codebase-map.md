@@ -1,23 +1,45 @@
-# Codebase Structure
+# Codebase Map
+
+The macro layout: the top-level areas and what each holds. A map to navigate, not the full tree.
+
+> Where things live inside the CLI is in [`cli/aidd_docs/memory/codebase-map.md`](../../cli/aidd_docs/memory/codebase-map.md).
 
 ```mermaid
 flowchart TD
-    Root["framework/"] --> ClaudePlugin[".claude-plugin/ (marketplace manifest)"]
-    Root --> Plugins["plugins/ (6 plugin packages)"]
-    Root --> Scripts["scripts/ (build & distribution)"]
-    Root --> GH[".github/ (CI workflows, issue templates)"]
-    Root --> AiddDocs["aidd_docs/ (memory bank, guidelines)"]
-    Root --> DotClaude[".claude/ (rules, settings, tasks)"]
-
-    Plugins --> AiddContext["aidd-context"]
-    Plugins --> AiddDev["aidd-dev"]
-    Plugins --> AiddVCS["aidd-vcs"]
-    Plugins --> AiddPM["aidd-pm"]
-    Plugins --> AiddRefine["aidd-refine"]
-    Plugins --> AiddOrchestrator["aidd-orchestrator"]
-
-    AiddContext --> CtxSkills["skills/ (onboard, bootstrap, project-memory, context-generate, mermaid, learn, discovery)"]
-    AiddContext --> CtxHooks["hooks/update_memory.js"]
-    AiddDev --> DevSkills["skills/ (00-sdlc, 01-plan, 02-implement, 03-assert, 04-audit, 05-review, 06-test, 07-refactor, 08-debug, 09-for-sure)"]
-    AiddDev --> DevAgents["agents/ (planner, implementer, reviewer)"]
+    Root["framework/"] --> Plugins["plugins/"]
+    Root --> Cli["cli/"]
+    Root --> Kanban["kanban/"]
+    Root --> Scripts["scripts/"]
+    Root --> Docs["docs/"]
+    Root --> AiddDocs["aidd_docs/"]
+    Root --> Manifest[".claude-plugin/"]
+    Root --> GH[".github/"]
 ```
+
+## Areas
+
+| Path | Holds |
+| --- | --- |
+| `plugins/` | the product — one dir per plugin, each with `skills/`, optionally `agents/`, `commands/`, `hooks/`, `rules/` |
+| `cli/` | the `aidd` binary. Has its own memory bank and `CLAUDE.md` |
+| `kanban/` | the task board, bundled into the CLI, never published alone |
+| `scripts/` | repository checks and generators, run by lefthook and CI. Tests in `scripts/__tests__/` |
+| `docs/` | durable docs — architecture, plugin authoring, glossary, maintainer runbook |
+| `aidd_docs/` | this memory bank, plus task documents read by `aidd kanban` |
+| `.claude-plugin/` | `marketplace.json`, the version manifest |
+| `.github/` | workflows, issue templates, rulesets |
+
+## Entry points
+
+| Entry | Path |
+| --- | --- |
+| Binary | `cli/src/cli.ts` → `dist/cli.js`, bin name `aidd` |
+| Workflow | `plugins/<plugin>/skills/<NN>-<name>/SKILL.md` |
+| Memory refresh | `plugins/aidd-context/hooks/update_memory.js`, on `SessionStart` |
+
+## Packages
+
+| Package | Released |
+| --- | --- |
+| `cli` (`@ai-driven-dev/cli`) | npm, the only published package |
+| `kanban` | private, compiled into the CLI. Depends on npm packages only, never on `cli/` |

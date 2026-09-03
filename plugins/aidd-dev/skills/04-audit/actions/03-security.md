@@ -21,8 +21,8 @@ The `security` findings, written to `security.md` in the run's audit folder.
    - **Unsafe deserialization**: flag `eval`, unsafe YAML/pickle/JSON reviver patterns, or object deserialization from untrusted sources.
    - **Insecure defaults**: missing TLS enforcement, overly permissive CORS, disabled security headers, debug flags left on in non-dev code.
    - Use a static-analysis tool when available. Flag only findings supported by code evidence, never inferred from naming alone.
-3. **Rate.** Give each finding a severity and an effort per the `@../assets/audit-template.md` legend, with a concrete `file:line`. The category is always `security`.
-4. **Write.** Fill `@../assets/audit-template.md` into the pillar file: the Findings table (one row per issue, severity-first), the ranked Top actions, and the Coverage section. In a full run, also add the rows to the merged `report.md` in the same folder. Emit the report and stop.
+3. **Rate.** Give each finding a severity and an effort per the [audit-template.md](../assets/audit-template.md) legend, with a concrete `file:line`. The category is always `security`.
+4. **Write.** Fill [audit-template.md](../assets/audit-template.md) into the pillar file: the Findings table (one row per issue, severity-first), the ranked Top actions, and the Coverage section. In a full run, also add the rows to the merged `report.md` in the same folder. Emit the report and stop.
 
 ## Test
 

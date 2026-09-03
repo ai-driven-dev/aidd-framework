@@ -1,5 +1,64 @@
 # Changelog
 
+## [2.7.0](https://github.com/ai-driven-dev/framework/compare/aidd-context-v2.6.2...aidd-context-v2.7.0) (2026-08-28)
+
+
+### Features
+
+* **aidd-context:** add retrospective lens to learn ([#712](https://github.com/ai-driven-dev/framework/issues/712)) ([5449b39](https://github.com/ai-driven-dev/framework/commit/5449b39b4eb1d6c9414aaff6c1de52fb1ae6b494))
+
+
+### Bug Fixes
+
+* **aidd-context:** load the project memory block in Claude Code ([#721](https://github.com/ai-driven-dev/framework/issues/721)) ([87304fb](https://github.com/ai-driven-dev/framework/commit/87304fbca9ce478131320e7e13d093917a05b8dd))
+
+## [2.6.2](https://github.com/ai-driven-dev/framework/compare/aidd-context-v2.6.1...aidd-context-v2.6.2) (2026-08-14)
+
+
+### Bug Fixes
+
+* **aidd-context:** make 10-learn's recommendation step consistent ([#622](https://github.com/ai-driven-dev/framework/issues/622)) ([56bbb6e](https://github.com/ai-driven-dev/framework/commit/56bbb6e2d88e9d00e8bad304f59049709174389d))
+* **aidd-context:** make 10-learn's recommendation step consistent and enforce scope ([56bbb6e](https://github.com/ai-driven-dev/framework/commit/56bbb6e2d88e9d00e8bad304f59049709174389d)), closes [#561](https://github.com/ai-driven-dev/framework/issues/561)
+
+
+### Refactoring
+
+* **aidd-context:** project memory shows what it would change before writing ([#633](https://github.com/ai-driven-dev/framework/issues/633)) ([a9d5b0b](https://github.com/ai-driven-dev/framework/commit/a9d5b0b20a4812857cff2e15c9f3dfe97456003b))
+
+## [2.6.1](https://github.com/ai-driven-dev/framework/compare/aidd-context-v2.6.0...aidd-context-v2.6.1) (2026-08-07)
+
+
+### Bug Fixes
+
+* **framework:** leave a fenced block alone when normalising Process steps ([#604](https://github.com/ai-driven-dev/framework/issues/604)) ([019486f](https://github.com/ai-driven-dev/framework/commit/019486f5bc3ab0d91f43a527c05f9a16e322f03a))
+
+
+### Refactoring
+
+* **framework:** one home for the skill contract ([#601](https://github.com/ai-driven-dev/framework/issues/601)) ([415a777](https://github.com/ai-driven-dev/framework/commit/415a77706c84277036dc7470d6dc329f9abde1de))
+
+## [2.6.0](https://github.com/ai-driven-dev/framework/compare/aidd-context-v2.5.0...aidd-context-v2.6.0) (2026-08-06)
+
+
+### Features
+
+* **aidd-pm:** keep a typed product backlog coherent whoever writes to it ([#582](https://github.com/ai-driven-dev/framework/issues/582)) ([fe0eebc](https://github.com/ai-driven-dev/framework/commit/fe0eebc5cf142e6668859f83dfe7ae4a38097435))
+* **framework:** add QA and communication evaluations ([#512](https://github.com/ai-driven-dev/framework/issues/512)) ([871d192](https://github.com/ai-driven-dev/framework/commit/871d1926e9944af231b15951d54bfe6364234536))
+
+
+### Refactoring
+
+* **aidd-context:** citations are links at their point of use ([dc85562](https://github.com/ai-driven-dev/framework/commit/dc855624736645325ae49b2df9e9768bbf82320f))
+* **orchestrator:** replace SDLC actions with protocols ([#517](https://github.com/ai-driven-dev/framework/issues/517)) ([ed81604](https://github.com/ai-driven-dev/framework/commit/ed816044709b2b7081cc00ad2103a8571bf0ad6c))
+* **plugins:** action citations use markdown links, not @ ([c5da712](https://github.com/ai-driven-dev/framework/commit/c5da7126ef30354e17d4665300bd88481fc7c816))
+
+## [2.5.0](https://github.com/ai-driven-dev/framework/compare/aidd-context-v2.4.1...aidd-context-v2.5.0) (2026-07-31)
+
+
+### Features
+
+* **aidd-pm:** add Product Brief discovery skill ([#551](https://github.com/ai-driven-dev/framework/issues/551)) ([d5e7224](https://github.com/ai-driven-dev/framework/commit/d5e72243f683bc57ea439f2571b410df8b332d69)), closes [#349](https://github.com/ai-driven-dev/framework/issues/349)
+
 ## [2.4.1](https://github.com/ai-driven-dev/framework/compare/aidd-context-v2.4.0...aidd-context-v2.4.1) (2026-07-22)
 
 

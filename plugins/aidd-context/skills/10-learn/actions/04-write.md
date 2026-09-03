@@ -12,15 +12,18 @@ The created or updated files, and a summary table.
 
 ## Process
 
-1. Start from the approved learning packet.
-2. Apply only the destination path in [destinations](../references/destinations.md).
-3. Load only the destination asset when one is required, fill it from the packet, and strip its guidance comment.
-4. Apply [review protocol](../references/review-protocol.md) to touched files or handoffs.
-5. Report packet, destination, action, file or handoff, and review verdict.
+1. **Start.** Start from each approved learning packet.
+2. **Route.** Apply the destination and reconciliation rules in [destinations](../references/destinations.md).
+3. **Fill.** Load the destination asset when one is required and follow its instructions.
+   - For a retraction, remove the entry instead of filling one.
+4. **Review.** Apply [review protocol](../references/review-protocol.md) to every touched file or handoff.
+5. **Report.** Fill [write report](../assets/write-report.md) grouped by destination.
 
 ## Test
 
-- Every approved lesson appears in the table.
-- No packet without user approval is written or handed off.
-- Each packet uses the destination chosen by the user.
-- The report includes a review verdict for touched files or handoffs.
+| Case | Pass |
+| --- | --- |
+| A lesson is approved | it appears in the table, at the destination the user chose |
+| A packet has no user approval | it is neither written nor handed off |
+| The report is delivered | it carries a review verdict for every touched file and handoff |
+| A candidate retracts existing content | the entry is removed, not left in place with a note |
