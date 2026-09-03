@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { describeError } from "../../domain/describe-error.js";
 import type { TelemetryCodexHookTrust } from "../../domain/models/telemetry-claim.js";
 import type { HookTrustReader } from "../../domain/ports/hook-trust-reader.js";
 import { resolveHomeDir } from "../home-dir.js";
@@ -42,21 +43,6 @@ function parseHookTrust(content: string): { trusted: boolean } {
   const at = lines.findIndex((line) => line.startsWith(prefix) && line.endsWith(suffix));
   if (at === -1) return { trusted: false };
   return { trusted: /^trusted_hash\s*=/.test((lines[at + 1] ?? "").trim()) };
-}
-
-// `error.code || error.message`, the rule the deleted `hook-trust.cjs` read by: a
-// filesystem failure's `code`
-// (`ENOENT`, `EACCES`) is the concise, meaningful half - `.message` on the same error
-// restates the path this sentence already names, which is the mismatch phase 5's
-// confrontation caught once already for a sibling adapter's punctuation (measurements.md).
-// Not `person-identity-adapter.ts`'s own `describeError`: that one describes a JSON parse
-// error, which carries no `code` worth preferring, so it reads `.message` alone - a
-// different error kind, not a duplicate of this one.
-function describeError(error: unknown): string {
-  if (error instanceof Error && "code" in error && typeof error.code === "string") {
-    return error.code;
-  }
-  return error instanceof Error ? error.message : String(error);
 }
 
 export class HookTrustReaderAdapter implements HookTrustReader {

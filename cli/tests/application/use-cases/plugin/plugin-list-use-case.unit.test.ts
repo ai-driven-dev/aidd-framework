@@ -21,6 +21,7 @@ function makeManifestWithPlugin(): Manifest {
 
 function makeManifestRepository(manifest: Manifest): ManifestRepository {
   return {
+    path: "/test-project/.aidd/manifest.json",
     load: async () => manifest,
     save: async () => {},
     delete: async () => {},

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { printTelemetryCheckReport } from "../../../src/application/display/telemetry-check-display.js";
 import { CLIOutput } from "../../../src/application/output.js";
-import type { TelemetrySetup } from "../../../src/domain/models/telemetry-setup.js";
+import type {
+  TelemetryHostRegistrationEntry,
+  TelemetrySetup,
+} from "../../../src/domain/models/telemetry-setup.js";
 
 /**
  * `aidd telemetry check` exists to send a person to the right place when nothing is being
@@ -35,6 +38,7 @@ function setup(overrides: Partial<TelemetrySetup> = {}): TelemetrySetup {
     },
     identity: { attached: false, path: "/home/.config/aidd/identity.json", readable: true },
     recordsLocation: { path: "/home/.config/aidd/telemetry" },
+    hostRegistration: { entries: [] },
     recorderDeclaration: {
       declared: true,
       declaredAt: ["/repo/.aidd/manifest.json"],
@@ -117,7 +121,7 @@ describe("the setup a person reads before any claim", () => {
         recorderDeclaration: {
           declared: false,
           declaredAt: [],
-          locationsChecked: ["/repo/.aidd/manifest.json"],
+          locationsChecked: [],
           unreadable: ["/repo/.aidd/manifest.json"],
         },
       }),
@@ -218,5 +222,78 @@ describe("the claims, and what is deliberately not one", () => {
       expect(output.warnings.join("\n")).toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
       expect(output.text).not.toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
     }
+  });
+});
+
+describe("the row saying whether the host will load what aidd installed", () => {
+  function report(hostRegistration: TelemetrySetup["hostRegistration"]): string {
+    const output = new CapturingOutput();
+    printTelemetryCheckReport(output, {
+      gate: "measurement is off",
+      setup: setup({ hostRegistration }),
+      leftoverExportConfig: [],
+    });
+    return output.text;
+  }
+
+  const REGISTRY = "/home/dev/.claude/plugins/installed_plugins.json";
+
+  function entry(
+    answer: TelemetryHostRegistrationEntry["answer"],
+    plugin: string
+  ): TelemetryHostRegistrationEntry {
+    return { tool: "claude", plugin, answer, detail: REGISTRY };
+  }
+
+  // The one thing a person must not miss is what will not load. A reader who stops after the
+  // first line has still read the problem.
+  it("puts what will not load above what is fine", () => {
+    const text = report({
+      entries: [entry("registered", "fine"), entry("not-registered", "broken")],
+    });
+
+    expect(text.indexOf("broken")).toBeLessThan(text.indexOf("fine"));
+  });
+
+  it("orders a disabled registration and an unanswerable one between the two", () => {
+    const text = report({
+      entries: [
+        entry("registered", "fine"),
+        entry("unanswerable", "unknown"),
+        entry("registered-disabled", "off"),
+        entry("not-registered", "broken"),
+      ],
+    });
+    const at = (plugin: string) => text.indexOf(plugin);
+
+    expect(at("broken")).toBeLessThan(at("off"));
+    expect(at("off")).toBeLessThan(at("unknown"));
+    expect(at("unknown")).toBeLessThan(at("fine"));
+  });
+
+  it("names the answer and the detail on each line, never a bare pass", () => {
+    const text = report({
+      entries: [{ ...entry("not-registered", "aidd-telemetry"), detail: "does not carry it" }],
+    });
+
+    expect(text).toContain("claude/aidd-telemetry: not-registered — does not carry it");
+  });
+
+  // A project with nothing installed is healthy, and an empty block would read as a failure
+  // to look rather than as an answer.
+  it("says a project has no plugin recorded rather than printing nothing", () => {
+    expect(report({ entries: [] })).toContain("no plugin recorded for any tool");
+  });
+
+  // The crash guard, made visible: a manifest that cannot be parsed is its own sentence, and
+  // must never print as the empty case above — one is damage, the other is a normal state.
+  it("says the manifest could not be read, distinctly from having nothing installed", () => {
+    const text = report({
+      entries: [],
+      manifestUnreadable: "Cannot read properties of undefined (reading 'map')",
+    });
+
+    expect(text).toContain("AIDD's own manifest could not be read");
+    expect(text).not.toContain("no plugin recorded");
   });
 });

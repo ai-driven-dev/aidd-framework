@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { errorMessage } from "../../domain/describe-error.js";
 import { UnreadableIdentityFileError } from "../../domain/errors.js";
 import {
   withAlsoMeAdded,
@@ -11,7 +12,7 @@ import type { PersonIdentity } from "../../domain/ports/person-identity-reader.j
 import type { PersonIdentityStore } from "../../domain/ports/person-identity-store.js";
 import { IdentityWriteError } from "../errors.js";
 import { resolveAiddConfigDir } from "../home-dir.js";
-import { asPlainObject, describeError, isErrnoException } from "../json-file.js";
+import { asPlainObject, isErrnoException } from "../json-file.js";
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIR_MODE = 0o700;
@@ -80,7 +81,7 @@ export class PersonIdentityAdapter implements PersonIdentityStore {
     try {
       return parseIdentity(raw);
     } catch (error) {
-      throw new UnreadableIdentityFileError(this.filePath, describeError(error));
+      throw new UnreadableIdentityFileError(this.filePath, errorMessage(error));
     }
   }
 
@@ -150,7 +151,7 @@ export class PersonIdentityAdapter implements PersonIdentityStore {
       return await readFile(this.filePath, "utf8");
     } catch (error) {
       if (isErrnoException(error) && error.code === "ENOENT") return null;
-      throw new UnreadableIdentityFileError(this.filePath, describeError(error));
+      throw new UnreadableIdentityFileError(this.filePath, errorMessage(error));
     }
   }
 

@@ -6,6 +6,8 @@ import type {
 import type { TelemetryExportLeftover } from "../../domain/models/telemetry-export-leftover.js";
 import type {
   TelemetryAllowedSetup,
+  TelemetryHostRegistrationAnswer,
+  TelemetryHostRegistrationSetup,
   TelemetryIdentitySetup,
   TelemetryPluginVersionSetup,
   TelemetryRecorderDeclarationSetup,
@@ -97,6 +99,46 @@ function describePluginVersion(plugin: TelemetryPluginVersionSetup): string {
   );
 }
 
+/** The other half of `recorder declared`: whether the host will act on the declaration.
+ *
+ * One line per plugin rather than a single verdict, because the answer is genuinely per
+ * plugin and a rolled-up "some are not registered" is the kind of sentence a person cannot
+ * act on. Ordered so what a person must fix comes first: anything that will not load, then
+ * what nobody could ask about, then what is fine — a reader who stops after one line has
+ * still read the problem.
+ *
+ * `nothing installed` is a real, healthy answer and says so, rather than printing an empty
+ * block that reads like a failure to look. */
+function describeHostRegistration(registration: TelemetryHostRegistrationSetup): string {
+  if (registration.manifestUnreadable !== undefined) {
+    return `AIDD's own manifest could not be read — ${registration.manifestUnreadable}`;
+  }
+  const entries = registration.entries;
+  if (entries.length === 0) return "no plugin recorded for any tool";
+  // Keyed on the answer type, not on `string`: a fifth answer then fails to compile here
+  // rather than sorting silently last, which is how a new "will not load" state would end up
+  // printed below the ones that are fine.
+  const rank: Record<TelemetryHostRegistrationAnswer, number> = {
+    "not-registered": 0,
+    "registered-disabled": 1,
+    unanswerable: 2,
+    registered: 3,
+  };
+  const ordered = [...entries].sort((a, b) => rank[a.answer] - rank[b.answer]);
+  // A sentence first, then the lines. Every other setup row leads with one, and a label
+  // followed by padding and a newline reads as a value the command failed to produce.
+  const trouble = ordered.filter((entry) => entry.answer !== "registered").length;
+  const headline =
+    trouble === 0
+      ? `all ${ordered.length} will load`
+      : `${trouble} of ${ordered.length} will not load, or could not be answered`;
+  return ordered.reduce(
+    (text, entry) =>
+      `${text}\n    ${entry.tool}/${entry.plugin}: ${entry.answer} — ${entry.detail}`,
+    headline
+  );
+}
+
 function printSetup(output: CLIOutput, setup: TelemetrySetup): void {
   printSetupRow(output, "measurement allowed", describeAllowed(setup.allowed));
   printSetupRow(output, "identity attached", describeIdentity(setup.identity));
@@ -110,6 +152,7 @@ function printSetup(output: CLIOutput, setup: TelemetrySetup): void {
     "recorder declared",
     describeRecorderDeclaration(setup.recorderDeclaration)
   );
+  printSetupRow(output, "plugins registered", describeHostRegistration(setup.hostRegistration));
   printSetupRow(output, "cli version", setup.versions.cli);
   printSetupRow(output, "plugin version", describePluginVersion(setup.versions.plugin));
   output.print("");

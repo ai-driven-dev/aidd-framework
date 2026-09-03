@@ -15,14 +15,17 @@ import type { FileWriter } from "../../../domain/ports/file-writer.js";
 import type { Logger } from "../../../domain/ports/logger.js";
 import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { NativePluginActivator } from "../../../domain/ports/native-plugin-activator.js";
-import { getToolConfig, isAiTool } from "../../../domain/tools/registry.js";
+import {
+  getToolConfig,
+  isAiTool,
+  resolvePluginsCapability,
+} from "../../../domain/tools/registry.js";
 import { loadPluginManifest } from "./plugin-file-sync.js";
 import {
   isFrameworkPrimeFlatMcp,
   resolvePluginBaseDir,
   resolvePluginToolIds,
 } from "./plugin-target-resolution.js";
-import { resolvePluginsCapability } from "./translator/project-hooks-materializer.js";
 
 export interface PluginRemoveOptions {
   pluginName: string;

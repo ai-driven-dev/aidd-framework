@@ -1,4 +1,6 @@
+import type { HostPluginRegistryReading } from "../ports/host-plugin-registry-reader.js";
 import { personRefusesTelemetry, TELEMETRY_REFUSAL_VARIABLE } from "./telemetry-switch.js";
+import type { AiToolId } from "./tool-ids.js";
 
 /**
  * What is already in place before `aidd telemetry check` grades whether anything
@@ -17,6 +19,7 @@ export interface TelemetrySetup {
   readonly identity: TelemetryIdentitySetup;
   readonly recordsLocation: TelemetryRecordsLocationSetup;
   readonly recorderDeclaration: TelemetryRecorderDeclarationSetup;
+  readonly hostRegistration: TelemetryHostRegistrationSetup;
   readonly versions: TelemetryVersionsSetup;
 }
 
@@ -122,9 +125,10 @@ export interface TelemetryRecordsLocationSetup {
  * enabled plugins, or a hooks block that invokes the recorder's own entry point directly
  * (Claude's nested `hooks` key, or Cursor's project-scope flat file — the marketplace
  * route is not the only one this build can see). A declaration is not proof the hook will
- * fire — see `claude-cli-adapter.ts`'s own measured case, where a declared entry is
- * silently dropped as orphaned when a headless run never registers the plugin — this fact
- * states only that a declaration was found, never that it works. */
+ * fire: a declared entry is silently dropped as orphaned when a host never registers the
+ * plugin in its own registry (`claude-cli-adapter.ts`'s measured case). This fact states
+ * only that a declaration was found; whether the host will act on it is
+ * `TelemetryHostRegistrationSetup`, directly below. */
 export interface TelemetryRecorderDeclarationSetup {
   readonly declared: boolean;
   /** Where it was found declared — non-empty exactly when `declared` is `true`. */
@@ -140,4 +144,209 @@ export interface TelemetryRecorderDeclarationSetup {
    * at one readable location is real regardless of what else could not be read, so a
    * consumer should only look at this when `declared` is `false`. */
   readonly unreadable: readonly string[];
+}
+
+/**
+ * Whether the host will actually load what AIDD installed — the other half of
+ * `TelemetryRecorderDeclarationSetup`, which answers only whether a declaration exists.
+ *
+ * Two facts, two different files, and #703 is the gap between them: a project's own
+ * settings can carry a perfectly good `enabledPlugins` entry while the host's registry
+ * knows nothing about it, at which point the host drops the entry as orphaned and every
+ * visible signal still says healthy. `claude --debug-file` says it in one line nobody
+ * passes the flag to see: `Skipping orphaned enabledPlugins entry …: marketplace not
+ * registered`.
+ *
+ * **Read from AIDD's own manifest, never from `enabledPlugins`.** That is not a
+ * preference: `mergeEnabledPlugins` iterates the manifest and skips silently twice — once
+ * for a plugin recording no marketplace, once for a marketplace that does not resolve
+ * (`marketplace-sync-settings-use-case.ts`). A plugin installed under either condition
+ * reaches no settings file at all, so comparing settings against a registry would find
+ * both sides absent and read it as agreement while the plugin never loads. The manifest is
+ * what that loop reads from, so it is what this reads from too.
+ *
+ * Costs no session, no network and no money: every fact here comes from files already on
+ * disk, which is what makes it answerable before a person has spent anything.
+ */
+export interface TelemetryHostRegistrationSetup {
+  /** One per plugin AIDD installed for a tool whose registration can be asked about at
+   * all. Empty when the manifest records no plugin, which is a normal state, not a fault. */
+  readonly entries: readonly TelemetryHostRegistrationEntry[];
+  /** Why AIDD's own manifest could not be read, when it could not.
+   *
+   * Its own field rather than an absent-entries silence, and this is not defensive
+   * programming: `Manifest`'s parser reads `files.map(...)` on each tool without guarding
+   * the field, so a hand-edited or truncated `.aidd/manifest.json` throws a `TypeError`
+   * rather than returning null. Before this fact existed, `aidd telemetry check` never
+   * loaded the manifest at all — measuring it is what put that crash on the diagnostic's
+   * path, so the diagnostic is what has to survive it. A damaged manifest is exactly when a
+   * person runs `check`, and the one thing it must not do then is die. */
+  readonly manifestUnreadable?: string;
+}
+
+/**
+ * Four answers, and none of them collapses into another.
+ *
+ * `registered-disabled` is its own answer rather than a shade of `registered` because
+ * folding it in would report a plugin that will not load as one that will — Codex records
+ * `enabled` per plugin table and nothing else, so `enabled = false` is a host that knows
+ * the plugin and still declines it.
+ *
+ * `unanswerable` is its own answer rather than a shade of `not-registered` for the rule
+ * this whole layer is built on: an unknown is never a zero. A registry that cannot be read
+ * — absent, unreadable, or JSONC where JSON was expected — has said nothing, and printing
+ * that as "not registered" would invent a fact. Copilot's own `~/.copilot/config.json`
+ * opens with two `//` comment lines, so this is not hypothetical: a naive parse throws on
+ * the first registry a reader meets.
+ *
+ * **A fifth answer was designed and is not built here.** The plan distinguished a plugin
+ * the host does not carry from one that never reached the project's own `enabledPlugins`
+ * at all, which happens because `mergeEnabledPlugins` skips silently twice. Telling those
+ * apart needs the set of declared refs per tool, and `TelemetryEvidenceReader` exposes no
+ * accessor for it — `readRecorderDeclaration` looks for the recorder specifically, not for
+ * every declared key. Adding one is a port method, an adapter method and their tests, for a
+ * distinction between two flavours of the same outcome: the plugin will not load. The
+ * comparison here starts from the manifest, which is what made that distinction visible in
+ * the first place and is the half that matters; the second hop is named in #703's own
+ * thread rather than half-built. */
+export type TelemetryHostRegistrationAnswer =
+  | "registered"
+  | "registered-disabled"
+  | "not-registered"
+  | "unanswerable";
+
+export interface TelemetryHostRegistrationEntry {
+  readonly tool: AiToolId;
+  readonly plugin: string;
+  /** `<plugin>@<marketplace>`, the one string all three measured hosts key their registry
+   * on and the same string `enabledPlugins` uses. Absent exactly when the manifest records
+   * no marketplace for the plugin, which is the case no registry can be asked about. */
+  readonly ref?: string;
+  readonly answer: TelemetryHostRegistrationAnswer;
+  /** One sentence naming what was read and what it said, so the answer can be acted on
+   * rather than merely believed. */
+  readonly detail: string;
+}
+
+/** What one tool contributes to the comparison: the plugins AIDD's own manifest records for
+ * it, and what its registry answered — `undefined` when nothing here knows how to ask that
+ * host, which is a different fact from asking and getting nothing back. */
+export interface TelemetryHostRegistrationEvidence {
+  readonly tool: AiToolId;
+  readonly plugins: readonly { readonly name: string; readonly marketplace?: string }[];
+  readonly reading?: HostPluginRegistryReading;
+  /** Whether the tool declares a native activation at all — it drives its own CLI to
+   * register a plugin, so a registry exists to be found. Carried because the two silences
+   * are different problems: a tool that declares none has no registry to read, while one
+   * that declares an activation and has no reader here has a registry nobody has measured.
+   * Telling a person the first when the second is true would send them looking for a file
+   * that does not exist. */
+  readonly declaresNativeActivation?: boolean;
+}
+
+/**
+ * The comparison itself: for every plugin AIDD installed, what the host's own registry says
+ * about it.
+ *
+ * Pure, and driven from the manifest rather than from any settings file, for the reason
+ * `TelemetryHostRegistrationSetup` states — a plugin the settings sync skipped would
+ * otherwise be absent from both sides and read as agreement.
+ */
+export function buildHostRegistration(
+  evidence: readonly TelemetryHostRegistrationEvidence[]
+): TelemetryHostRegistrationSetup {
+  const entries: TelemetryHostRegistrationEntry[] = [];
+  for (const item of evidence) {
+    const { tool, plugins, reading } = item;
+    for (const plugin of plugins) {
+      entries.push(hostRegistrationEntry(tool, plugin, reading, item.declaresNativeActivation));
+    }
+  }
+  return { entries };
+}
+
+function hostRegistrationEntry(
+  tool: AiToolId,
+  plugin: { readonly name: string; readonly marketplace?: string },
+  reading: HostPluginRegistryReading | undefined,
+  declaresNativeActivation: boolean | undefined
+): TelemetryHostRegistrationEntry {
+  // No marketplace recorded means no ref exists to look up — every measured host keys its
+  // registry on `<plugin>@<marketplace>`, so this is unanswerable at the source rather than
+  // a lookup that failed.
+  if (plugin.marketplace === undefined || plugin.marketplace === "") {
+    return {
+      tool,
+      plugin: plugin.name,
+      answer: "unanswerable",
+      detail: "AIDD records no marketplace for it, so no host registry can be asked",
+    };
+  }
+  const ref = `${plugin.name}@${plugin.marketplace}`;
+  return {
+    tool,
+    plugin: plugin.name,
+    ref,
+    ...askRegistry(tool, ref, reading, declaresNativeActivation),
+  };
+}
+
+/** What one registry says about one ref, given the reading it produced. Split from the
+ * entry it becomes so the two absences above — no ref to ask about, and no registry to ask
+ * — stay visibly separate from the four answers a registry can give. */
+function askRegistry(
+  tool: AiToolId,
+  ref: string,
+  reading: HostPluginRegistryReading | undefined,
+  declaresNativeActivation: boolean | undefined
+): { answer: TelemetryHostRegistrationAnswer; detail: string } {
+  const answered = whatAnswered(tool, reading, declaresNativeActivation);
+  if ("detail" in answered) return answered;
+  const enabled = answered.refs.get(ref);
+  if (enabled === undefined) {
+    return {
+      answer: "not-registered",
+      detail: `${answered.location} does not carry ${ref} — ${tool} will drop the declaration as orphaned`,
+    };
+  }
+  if (!enabled) {
+    return {
+      answer: "registered-disabled",
+      detail: `${answered.location} carries ${ref} and records it disabled`,
+    };
+  }
+  return { answer: "registered", detail: answered.location };
+}
+
+/** Either the refs a registry actually produced, or the reason nothing did — returned as
+ * one value so the caller never has to re-narrow, and so no branch can reach a lookup
+ * against a registry that never opened.
+ *
+ * Three reasons, not one, because they send a person somewhere different: a tool that drives
+ * its own CLI keeps a registry somebody could go and measure, a tool that declares no native
+ * activation has none to look for at all, and a registry that was found and could not be
+ * read names the file and the failure. */
+function whatAnswered(
+  tool: AiToolId,
+  reading: HostPluginRegistryReading | undefined,
+  declaresNativeActivation: boolean | undefined
+):
+  | { readonly refs: ReadonlyMap<string, boolean>; readonly location: string }
+  | { readonly answer: TelemetryHostRegistrationAnswer; readonly detail: string } {
+  if (reading === undefined) {
+    return {
+      answer: "unanswerable",
+      detail:
+        declaresNativeActivation === true
+          ? `${tool} keeps a plugin registry, and nothing here has established its shape`
+          : `${tool} declares no plugin registry to read`,
+    };
+  }
+  if (reading.refs === undefined) {
+    return {
+      answer: "unanswerable",
+      detail: `${reading.location} could not be read — ${reading.unreadable ?? "no reason given"}`,
+    };
+  }
+  return { refs: reading.refs, location: reading.location };
 }

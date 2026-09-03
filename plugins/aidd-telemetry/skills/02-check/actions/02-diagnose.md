@@ -23,9 +23,17 @@ judging anything.
    It takes no arguments and reads the current project.
 2. **Relay what is in place first, always.** Before any verdict it states whether
    measurement is allowed and from which file, whose choice that was, whether an identity
-   is attached, where records would land, and whether the recorder is declared — never a
-   count or a figure. This is not a claim and carries no `ok`/`FAIL`/`--`; present it even
-   when what follows stops immediately.
+   is attached, where records would land, whether the recorder is declared, whether each
+   installed plugin is registered with its host, and which builds produced what is being
+   read — never a count or a figure. This is not a claim and carries no `ok`/`FAIL`/`--`;
+   present it even when what follows stops immediately.
+   - **`plugins registered` is per plugin, and its lines are already ordered.** What will
+     not load comes first. Relay them in the order printed and never roll them into one
+     sentence: "some plugins are not registered" is not something a person can act on.
+     `not-registered` means the host was asked and does not carry it — it will drop the
+     declaration as orphaned. `registered-disabled` means the host carries it and declines
+     it. `unanswerable` means nothing was established, and it is never relayed as
+     "not registered".
 3. **Measurement off stops here.** After the stated half, if the next line says measurement
    is off, relay that line and stop — there is nothing to check until it is turned on, and
    no failure to report. The output is never only that one line: what is in place still
@@ -41,8 +49,10 @@ judging anything.
    "no run file" at all.** Which of four readings applies is decided by reading, never
    guessed from the absence itself:
    - The recorder is declared (the stated half already named where), and no run file has
-     appeared anywhere: reads `--`, nothing to evaluate — a declaration is not proof the
-     hook will fire, only that it was asked for.
+     appeared anywhere: reads `--`, nothing to evaluate. A declaration is not proof the hook
+     will fire, and the stated half's own `plugins registered` row is where that is
+     answered — a plugin the host never registered is dropped as orphaned however well it is
+     declared. Read that row before treating this one as a mystery.
    - The recorder is declared nowhere this build checks, and no run file has appeared
      anywhere: reads `FAIL`, naming the recorder itself as declared nowhere.
    - The stated half's own `recorder declared` row itself said "could not be read": reads
@@ -73,6 +83,10 @@ judging anything.
 | Case | Pass |
 | --- | --- |
 | Any run | what is in place is relayed first, and is never itself `ok`/`FAIL`/`--` |
+| A plugin the host never registered | its `plugins registered` line is relayed as `not-registered`, naming the registry file, and appears before any plugin that is fine |
+| A plugin whose host registry could not be read | its line is relayed as `unanswerable`, never as `not-registered` |
+| A project with no plugin recorded | the row says so in one sentence, and is never relayed as a failure |
+| The AIDD manifest could not be read | the row names the file and the reason, and no plugin line is relayed — never read as "no plugin recorded" |
 | Measurement is off | the stated half is relayed, then that single line, and the run stops before checking anything |
 | Not a git repository | the stated half is relayed, then that single line, and the run stops before checking anything — never read as "hook fired FAIL" |
 | A healthy install | all four claims read `ok`, each carrying what it was read from |

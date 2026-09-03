@@ -48,7 +48,12 @@ function makeFs(fileExists: boolean, diskHash: string): FileReader {
 }
 
 function makeManifestRepo(manifest: Manifest): ManifestRepository {
-  return { load: async () => manifest, save: async () => {}, delete: async () => {} };
+  return {
+    path: "/proj/.aidd/manifest.json",
+    load: async () => manifest,
+    save: async () => {},
+    delete: async () => {},
+  };
 }
 
 const noopHasher: Hasher = {

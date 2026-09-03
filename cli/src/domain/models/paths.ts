@@ -42,3 +42,12 @@ export function pathContainsOrEquals(outer: string, inner: string): boolean {
 export function pathsOverlap(a: string, b: string): boolean {
   return pathContainsOrEquals(a, b) || pathContainsOrEquals(b, a);
 }
+
+/** The manifest's filename, in the domain because two adapters name that file and a
+ * diagnostic prints both. `telemetry-evidence-adapter.ts` scans it for a declaration while
+ * `manifest-repository-adapter.ts` loads and validates it, and `aidd telemetry check` prints
+ * a row from each — so a person reads two sentences about one file. They agreed by two
+ * matching literals until this existed, which is agreement by coincidence: renaming the file
+ * at one site would have made the rows contradict each other again, which is the defect that
+ * pairing was introduced to close. */
+export const MANIFEST_FILENAME = "manifest.json";

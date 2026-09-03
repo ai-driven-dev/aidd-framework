@@ -1,3 +1,4 @@
+import { describeError } from "../../../domain/describe-error.js";
 import { resolveSessionAnchor } from "../../../domain/models/session-anchor.js";
 import { attributeMoment, buildStepIntervals } from "../../../domain/models/step-attribution.js";
 import {
@@ -10,7 +11,9 @@ import {
 } from "../../../domain/models/telemetry-claim.js";
 import type { TelemetryExportLeftover } from "../../../domain/models/telemetry-export-leftover.js";
 import {
+  buildHostRegistration,
   buildTelemetryAllowedSetup,
+  type TelemetryHostRegistrationSetup,
   type TelemetryIdentitySetup,
   type TelemetryPluginVersionSetup,
   type TelemetryRecorderDeclarationSetup,
@@ -18,6 +21,8 @@ import {
 } from "../../../domain/models/telemetry-setup.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../domain/models/tool-ids.js";
 import type { HookTrustReader } from "../../../domain/ports/hook-trust-reader.js";
+import type { HostPluginRegistryReader } from "../../../domain/ports/host-plugin-registry-reader.js";
+import type { ManifestRepository } from "../../../domain/ports/manifest-repository.js";
 import type { PersonIdentityStore } from "../../../domain/ports/person-identity-store.js";
 import type { RunJournal, RunJournalReader } from "../../../domain/ports/run-journal-reader.js";
 import type { SessionCostReader } from "../../../domain/ports/session-cost-reader.js";
@@ -25,7 +30,7 @@ import type { TelemetryEvidenceReader } from "../../../domain/ports/telemetry-ev
 import type { TelemetrySink } from "../../../domain/ports/telemetry-sink.js";
 import type { VersionControl } from "../../../domain/ports/version-control.js";
 import type { VersionReader } from "../../../domain/ports/version-reader.js";
-import { getAiToolConfig } from "../../../domain/tools/registry.js";
+import { getAiToolConfig, resolvePluginsCapability } from "../../../domain/tools/registry.js";
 
 const DEFAULT_RUNS_DIR_LABEL = "aidd_docs/runs";
 
@@ -127,7 +132,9 @@ export class DiagnoseTelemetryUseCase {
     private readonly hookTrustReader: HookTrustReader,
     private readonly personIdentityStore: PersonIdentityStore,
     private readonly telemetrySink: TelemetrySink,
-    private readonly currentVersion: VersionReader
+    private readonly currentVersion: VersionReader,
+    private readonly manifestRepo: ManifestRepository,
+    private readonly hostRegistries: ReadonlyMap<AiToolId, HostPluginRegistryReader>
   ) {}
 
   async execute(options: DiagnoseTelemetryOptions): Promise<DiagnoseTelemetryResult> {
@@ -154,11 +161,58 @@ export class DiagnoseTelemetryUseCase {
       identity: await this.readIdentitySetup(),
       recordsLocation: { path: this.telemetrySink.rootDir },
       recorderDeclaration,
+      hostRegistration: await this.readHostRegistration(options.projectRoot),
       versions: {
         cli: this.currentVersion.get(),
         plugin: pluginVersionFrom(await this.runJournalReader.list()),
       },
     };
+  }
+
+  /** Every plugin AIDD's own manifest records, against what each host's registry says.
+   *
+   * Driven from the manifest and never from a settings file: `mergeEnabledPlugins` skips a
+   * plugin silently when it records no marketplace or when that marketplace does not
+   * resolve, so a settings-first comparison would find both sides absent and read it as
+   * agreement while the plugin never loads.
+   *
+   * A tool with no reader in the map contributes its plugins with no reading at all, which
+   * `buildHostRegistration` turns into `unanswerable` — never into agreement. A manifest
+   * that cannot be loaded contributes nothing, the same normal state as a project with no
+   * plugins installed. */
+  private async readHostRegistration(projectRoot: string): Promise<TelemetryHostRegistrationSetup> {
+    let manifest: Awaited<ReturnType<ManifestRepository["load"]>>;
+    try {
+      manifest = await this.manifestRepo.load();
+    } catch (error) {
+      // `Manifest`'s parser maps over fields it does not guard, so a damaged manifest throws
+      // rather than returning null. Reported, never swallowed and never fatal: this is the
+      // command a person runs precisely when something is wrong.
+      // Names the file, because the row directly above says `recorder declared: yes` about
+      // the same one: that row scans the raw JSON for a declaration while this goes through
+      // the manifest's own validation, so a file that parses but fails validation makes the
+      // two rows disagree. Naming it is what tells a person they are one file, read twice.
+      return {
+        ...buildHostRegistration([]),
+        manifestUnreadable: `${this.manifestRepo.path} — ${describeError(error)}`,
+      };
+    }
+    if (manifest === null) return buildHostRegistration([]);
+    const evidence = await Promise.all(
+      // Filtered before the read, never after: a tool with no plugin recorded contributes no
+      // entry, so opening its registry would be a home-directory read whose result is thrown
+      // away on every `check`.
+      AI_TOOL_IDS.filter((tool) => manifest.getPlugins(tool).length > 0).map(async (tool) => ({
+        tool,
+        plugins: manifest.getPlugins(tool).map((plugin) => ({
+          name: plugin.name,
+          marketplace: plugin.marketplace,
+        })),
+        reading: await this.hostRegistries.get(tool)?.read(projectRoot),
+        declaresNativeActivation: resolvePluginsCapability(tool)?.nativeActivation != null,
+      }))
+    );
+    return buildHostRegistration(evidence);
   }
 
   // `PersonIdentityStore.readStrict()` promises to throw on a damaged file, unlike the

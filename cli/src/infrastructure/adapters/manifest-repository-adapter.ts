@@ -1,15 +1,13 @@
 import { mkdir, readdir, readFile, rm, rmdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Manifest } from "../../domain/models/manifest.js";
-import { AIDD_DIR } from "../../domain/models/paths.js";
+import { AIDD_DIR, MANIFEST_FILENAME } from "../../domain/models/paths.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
-
-const MANIFEST_FILENAME = "manifest.json";
 
 export class ManifestRepositoryAdapter implements ManifestRepository {
   constructor(private readonly projectRoot: string) {}
 
-  private get manifestPath(): string {
+  get path(): string {
     return join(this.projectRoot, AIDD_DIR, MANIFEST_FILENAME);
   }
 
@@ -20,7 +18,7 @@ export class ManifestRepositoryAdapter implements ManifestRepository {
   async load(): Promise<Manifest | null> {
     let raw: string;
     try {
-      raw = await readFile(this.manifestPath, "utf-8");
+      raw = await readFile(this.path, "utf-8");
     } catch {
       return null;
     }
@@ -31,12 +29,12 @@ export class ManifestRepositoryAdapter implements ManifestRepository {
   async save(manifest: Manifest): Promise<void> {
     await mkdir(this.aiddDir, { recursive: true });
     const json = JSON.stringify(manifest.toJSON(), null, 2);
-    await writeFile(this.manifestPath, json, "utf-8");
+    await writeFile(this.path, json, "utf-8");
   }
 
   async delete(): Promise<void> {
     try {
-      await rm(this.manifestPath, { force: true });
+      await rm(this.path, { force: true });
     } catch {
       // No error if missing
     }

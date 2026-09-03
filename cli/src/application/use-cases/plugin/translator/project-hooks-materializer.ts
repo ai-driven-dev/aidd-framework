@@ -1,5 +1,4 @@
 import { join } from "node:path";
-import type { PluginsCapability } from "../../../../domain/capabilities/plugins-capability.js";
 import {
   cursorProjectHooksScriptPath,
   mergeCursorProjectHooksJson,
@@ -15,7 +14,7 @@ import type {
 import type { AiToolId } from "../../../../domain/models/tool-ids.js";
 import type { FileReader } from "../../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../../domain/ports/file-writer.js";
-import { getToolConfig, isAiTool } from "../../../../domain/tools/registry.js";
+import { resolvePluginsCapability } from "../../../../domain/tools/registry.js";
 
 const HOOKS_MANIFEST_PATH = "hooks/hooks.json";
 
@@ -99,12 +98,4 @@ export function withoutHooks(dist: PluginDistribution): PluginDistribution {
     files: dist.files.filter((f) => f.relativePath.split("/")[0] !== "hooks"),
     components: { ...dist.components, hooks: [] },
   });
-}
-
-export function resolvePluginsCapability(toolId: AiToolId): PluginsCapability | null {
-  const toolConfig = getToolConfig(toolId);
-  if (!isAiTool(toolConfig)) return null;
-  const caps = toolConfig.capabilities as Record<string, unknown>;
-  if (!("plugins" in caps)) return null;
-  return caps.plugins as PluginsCapability;
 }

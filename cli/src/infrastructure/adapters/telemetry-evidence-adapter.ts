@@ -6,7 +6,7 @@ import { hookCommandsForEvent } from "../../domain/formats/flat-hooks-merge.js";
 import { genericFlatHooksScriptPath } from "../../domain/formats/flat-paths.js";
 import { asPlainObject } from "../../domain/formats/plain-object.js";
 import { CLAUDE_PLUGIN_ROOT_TOKEN } from "../../domain/formats/plugin-root-token-rewrite.js";
-import { AIDD_DIR } from "../../domain/models/paths.js";
+import { AIDD_DIR, MANIFEST_FILENAME } from "../../domain/models/paths.js";
 import {
   findLeftoverExportKeys,
   type TelemetryExportLeftover,
@@ -31,7 +31,6 @@ import {
 } from "./hook-trust-reader-adapter.js";
 
 const UNRECOGNISED_FILE_NAME = "_unrecognised.jsonl";
-const MANIFEST_FILENAME = "manifest.json";
 
 function runsDir(projectRoot: string): string {
   return process.env.AIDD_RUNS_DIR || join(projectRoot, "aidd_docs", "runs");
