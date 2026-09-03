@@ -3,9 +3,9 @@ name: cli CI
 # Native path-filtered isolation: this whole workflow is skipped when nothing
 # under cli/ or kanban/ changed — no third-party paths-filter action needed.
 #
-# kanban/ is a source folder the CLI type-checks and bundles, not a published
-# package. Any job that runs a TypeScript-aware tool over the CLI's program must
-# install kanban's dependencies too, or module resolution fails from its sources.
+# kanban/ has its own job and its own dependencies. The CLI no longer type-checks
+# or bundles it: the `aidd kanban` command was unwired, so no CLI job needs
+# kanban's node_modules to resolve modules.
 
 on:
   push:
@@ -38,7 +38,6 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
-      - run: cd kanban && pnpm install --frozen-lockfile
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm typecheck
 
@@ -86,7 +85,6 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
-      - run: cd kanban && pnpm install --frozen-lockfile
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm test
 
@@ -119,7 +117,6 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
-      - run: cd kanban && pnpm install --frozen-lockfile
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm build
 
@@ -135,9 +132,8 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
-      - run: cd kanban && pnpm install --frozen-lockfile
       - run: cd cli && pnpm install --frozen-lockfile
-      - run: cd cli && pnpm knip:production
+      - run: cd cli && pnpm knip
 
   cli-jscpd:
     name: cli / JSCPD (duplication)
