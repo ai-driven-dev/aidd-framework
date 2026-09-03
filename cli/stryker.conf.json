@@ -3,11 +3,12 @@
   "packageManager": "pnpm",
   "testRunner": "vitest",
   "plugins": ["@stryker-mutator/vitest-runner"],
+  "ignorePatterns": ["reports"],
   "coverageAnalysis": "perTest",
   "thresholds": {
     "high": 80,
     "low": 60,
-    "break": 50
+    "break": null
   },
   "reporters": ["html", "json", "progress"],
   "htmlReporter": {

@@ -71,6 +71,8 @@
     "test:mutation:translate": "node scripts/run-mutation.mjs translate",
     "test:mutation:distribution": "node scripts/run-mutation.mjs distribution",
     "test:mutation:framework": "node scripts/run-mutation.mjs framework",
+    "test:mutation:presentation": "node scripts/run-mutation.mjs presentation",
+    "test:mutation:runtime": "node scripts/run-mutation.mjs runtime",
     "prepare": "lefthook install"
   },
   "dependencies": {

@@ -79,6 +79,18 @@ describe("mutation covers every source file", () => {
     }
   });
 
+  it("package.json runs every scope, and nothing it does not", () => {
+    // The globs are declared once; the scope names were not, and a name copied into a
+    // script is a second list. Adding a scope with no way to run it, or leaving a script
+    // behind for a scope that is gone, both fail here.
+    const { scripts } = JSON.parse(read("package.json")) as { scripts: Record<string, string> };
+    const scripted = Object.keys(scripts)
+      .filter((name) => name.startsWith("test:mutation:"))
+      .map((name) => name.slice("test:mutation:".length));
+
+    expect(scripted.sort()).toEqual(Object.keys(declaration().scopes).sort());
+  });
+
   it("no other file lists what mutation covers", () => {
     // The declaration is the single source; stryker.conf.json carrying its own `mutate`
     // is exactly the drift this replaces.

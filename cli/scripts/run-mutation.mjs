@@ -30,7 +30,7 @@ function usage(problem) {
 
 const scope = process.argv[2];
 if (scope === undefined) usage("No scope given.");
-if (!(scope in SCOPES)) usage(`Unknown scope "${scope}".`);
+if (!Object.hasOwn(SCOPES, scope)) usage(`Unknown scope "${scope}".`);
 
 const result = spawnSync(
   join(CLI_ROOT, "node_modules", ".bin", "stryker"),

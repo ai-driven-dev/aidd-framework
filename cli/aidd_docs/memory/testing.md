@@ -85,7 +85,7 @@ pnpm test:integration # use-cases + adapters
 pnpm test:e2e         # functional journeys
 pnpm test             # all tiers
 pnpm test:mutation:kernel        # Stryker, one context at a time (minutes each)
-pnpm test:mutation:framework     # scopes: kernel translate distribution tools framework
+pnpm test:mutation:framework     # scopes: see mutation-scopes.json
 ```
 
 ### Concurrent vitest runs don't share a binary
@@ -130,7 +130,8 @@ crash. `stryker run` on its own is not the entry point and mutates whatever it l
 
 `tests/architecture/mutation-covers-source.arch.test.ts` holds the declaration honest: every
 `.ts` under `src/` matches a scope or a declared exclusion, every exclusion carries a reason,
-every scope matches something, and `stryker.conf.json` may not grow its own `mutate` again.
+every scope matches something, `package.json` runs every scope and nothing more, and
+`stryker.conf.json` may not grow its own `mutate` again.
 That last rule exists because it used to name seventeen kernel files one by one, and a file
 added to the kernel escaped mutation in silence — the score did not drop, because the mutants
 that would have died were never generated.

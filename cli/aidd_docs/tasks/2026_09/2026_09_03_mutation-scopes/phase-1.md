@@ -104,3 +104,44 @@ hors de toute exclusion.
 | 3 | `mutate` remis dans `stryker.conf.json` => `stryker.conf.json declares its own mutate again` |
 | 4 | Les cinq chiffres du dossier sont corrigés avec leur périmètre, et chacun est reproductible par `pnpm test:mutation:<scope>` |
 | all | 1 994 tests / 988 suites · tsc 0 · biome 0 · knip exit 0 |
+
+
+## Revue (2026-09-03)
+
+Sept défauts trouvés par une relecture indépendante, dont un qui vidait la phase de son sens.
+
+**L'exclusion de `presentation` et `runtime` reposait sur une raison fausse.** Elle affirmait que
+leur preuve était e2e et la smoke, qu'aucun mutant n'atteint. Mesuré : 31 tests unitaires et
+d'intégration visent ces deux répertoires, zéro test e2e n'y est écrit, et
+`runtime/self-update/check-update-use-case.ts` est 66 lignes de branchement avec son propre test
+unitaire. La garde n'exigeait d'une exclusion qu'une raison de plus de quarante caractères, pas
+qu'elle soit vraie. Les deux sont devenus des scopes ; seule `src/cli.ts` reste exclue.
+
+**Les rapports étaient copiés dans le bac à sable.** Les déplacer sous `reports/mutation/<scope>/`
+les a sortis du chemin que `stryker.conf.json` déclarait, donc chaque run recopiait les rapports
+des précédents. Mesuré : 1 091 fichiers projet avec les rapports présents, 1 081 sans.
+`ignorePatterns: ["reports"]` ramène à 1 081 rapports présents.
+
+**Les noms de scopes étaient une deuxième liste.** Déclarés dans `mutation-scopes.json`, recopiés
+à la main dans sept scripts `package.json`. Le test compare désormais les deux ensembles :
+supprimer un script fait échouer en le nommant.
+
+**`"constructor" in SCOPES` était vrai.** `node scripts/run-mutation.mjs constructor` prenait le
+chemin heureux et lançait Stryker avec `--mutate 'function Object() { [native code] }'`.
+`Object.hasOwn`.
+
+**Trois formulations trop fortes, corrigées :** « code qu'aucun test n'exécute » devient « aucun
+test unitaire ou d'intégration » — la mesure écarte e2e et architecture ; le message de commit dit
+cinq cibles `domain/` là où les documents disent quatre, et quatre est juste, `kernel` ayant
+toujours été mesuré en entier ; et le seuil `break: 50` contredisait « jamais bloquante » en
+faisant sortir `presentation` en erreur, il est retiré.
+
+## Vérifié après revue
+
+| Quoi | Preuve |
+| ---- | ------ |
+| Rapports hors du bac à sable | `Found 23 of 1081` avec `reports/` peuplé, contre 1 091 avant |
+| Garde des scripts | script `test:mutation:runtime` retiré => échec nommant `runtime` |
+| Lookup durci | `run-mutation.mjs constructor` => `Unknown scope "constructor"` |
+| Jamais bloquante | `presentation` à 14,08 % sort en 0 |
+| Traducteur de glob | comparé au `minimatch` embarqué de Stryker sur 255 fichiers × 8 globs : zéro désaccord |

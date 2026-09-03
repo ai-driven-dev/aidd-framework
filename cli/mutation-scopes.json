@@ -1,15 +1,15 @@
 {
-  "$comment": "The one declaration of what mutation testing covers. scripts/run-mutation.mjs runs a scope by name; tests/architecture/mutation-covers-source.arch.test.ts checks no source file falls outside both maps. Globs, never file lists: a list goes stale the day a file is added, and the score does not drop, because the mutants that would have died were never generated.",
+  "$comment": "The one declaration of what mutation testing covers. scripts/run-mutation.mjs runs a scope by name; tests/architecture/mutation-covers-source.arch.test.ts checks no source file falls outside both maps and that package.json has a script per scope. Globs, never file lists: a list goes stale the day a file is added, and the score does not drop, because the mutants that would have died were never generated.",
   "scopes": {
     "kernel": "src/kernel/**/*.ts",
     "tools": "src/contexts/tools/**/*.ts",
     "translate": "src/contexts/translate/**/*.ts",
     "distribution": "src/contexts/distribution/**/*.ts",
-    "framework": "src/contexts/framework/**/*.ts"
+    "framework": "src/contexts/framework/**/*.ts",
+    "presentation": "src/presentation/**/*.ts",
+    "runtime": "src/runtime/**/*.ts"
   },
   "excluded": {
-    "src/presentation/**/*.ts": "Command wiring and human-facing output. Its behaviour is proven by the e2e suite and scripts/smoke-tools.sh, both of which spawn the built binary — which no mutant reaches, which is why vitest.mutation.config.ts leaves e2e out. Mutating it would score the absence of that net, not the code.",
-    "src/runtime/**/*.ts": "Composition root: adapters and wiring. Same reason — what proves it is the binary running, and a mutant never reaches the binary.",
-    "src/cli.ts": "The entry point. Registers commands and returns; there is no branch here for a mutant to change that a unit test could see."
+    "src/cli.ts": "The entry point. It registers commands and returns: no branch a mutant could change that a unit or integration test would see, and what proves it runs is the e2e suite, which mutation excludes because it spawns a built binary no mutant reaches."
   }
 }
