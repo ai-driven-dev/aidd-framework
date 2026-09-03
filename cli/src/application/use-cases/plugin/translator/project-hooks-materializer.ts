@@ -1,5 +1,4 @@
 import { join } from "node:path";
-import type { PluginsCapability } from "../../../../domain/capabilities/plugins-capability.js";
 import {
   cursorProjectHooksScriptPath,
   mergeCursorProjectHooksJson,
@@ -15,11 +14,7 @@ import type {
 import type { AiToolId } from "../../../../domain/models/tool-ids.js";
 import type { FileReader } from "../../../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../../../domain/ports/file-writer.js";
-import {
-  getToolConfig,
-  isAiTool,
-  resolvePluginsCapability,
-} from "../../../../domain/tools/registry.js";
+import { resolvePluginsCapability } from "../../../../domain/tools/registry.js";
 
 const HOOKS_MANIFEST_PATH = "hooks/hooks.json";
 
