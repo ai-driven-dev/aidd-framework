@@ -39,6 +39,13 @@ function setup(overrides: Partial<TelemetrySetup> = {}): TelemetrySetup {
     identity: { attached: false, path: "/home/.config/aidd/identity.json", readable: true },
     recordsLocation: { path: "/home/.config/aidd/telemetry" },
     hostRegistration: { entries: [] },
+    commitTrailer: {
+      delegate: "executable",
+      callSite: "present",
+      hookHasOtherContent: false,
+      hooksDir: "/repo/.git/hooks",
+      recentlyCarrying: { carrying: 3, examined: 5 },
+    },
     recorderDeclaration: {
       declared: true,
       declaredAt: ["/repo/.aidd/manifest.json"],
@@ -295,5 +302,78 @@ describe("the row saying whether the host will load what aidd installed", () => 
 
     expect(text).toContain("AIDD's own manifest could not be read");
     expect(text).not.toContain("no plugin recorded");
+  });
+});
+
+describe("the row saying whether commits carry their session", () => {
+  function report(commitTrailer: TelemetrySetup["commitTrailer"]): string {
+    const output = new CapturingOutput();
+    printTelemetryCheckReport(output, {
+      gate: "measurement is off",
+      setup: setup({ commitTrailer }),
+      leftoverExportConfig: [],
+    });
+    return output.text;
+  }
+
+  const HEALTHY = {
+    delegate: "executable",
+    callSite: "present",
+    hookHasOtherContent: false,
+    hooksDir: "/repo/.git/hooks",
+  } as const;
+
+  // The count leads, because it is the only fact here about the chain rather than its parts.
+  // A person who reads one line has read whether it is working.
+  it("leads with how many recent commits carry it", () => {
+    const text = report({ ...HEALTHY, recentlyCarrying: { carrying: 4, examined: 20 } });
+
+    expect(text).toContain("4 of the last 20 commits carry it");
+  });
+
+  it("says nothing about pieces when every piece is in place", () => {
+    const text = report({ ...HEALTHY, recentlyCarrying: { carrying: 20, examined: 20 } });
+    // Scoped to this row: every other setup row uses a dash of its own, so asserting over
+    // the whole report would only prove the report has dashes in it.
+    const row = text.split("\n").find((line) => line.includes("commit trailer")) ?? "";
+
+    expect(row).not.toContain("—");
+    expect(text).toContain("hooks run from /repo/.git/hooks");
+  });
+
+  it("names each missing piece after the count", () => {
+    const text = report({
+      ...HEALTHY,
+      delegate: "absent",
+      callSite: "missing",
+      recentlyCarrying: { carrying: 0, examined: 20 },
+    });
+
+    expect(text).toContain("0 of the last 20 commits carry it");
+    expect(text).toContain("nothing installed to write it");
+    expect(text).toContain("prepare-commit-msg does not call it");
+  });
+
+  // Git will not run a hook it cannot execute, so present-but-not-executable is its own
+  // sentence rather than a shade of installed.
+  it("says a delegate that is not executable will not be run", () => {
+    expect(report({ ...HEALTHY, delegate: "not-executable" })).toContain("not executable");
+  });
+
+  // Said, never named. Which tool owns the file changes nothing a person does about it.
+  it("says the hook is somebody else's without naming a tool", () => {
+    const text = report({ ...HEALTHY, hookHasOtherContent: true });
+
+    expect(text).toContain("somebody else's");
+    expect(text).not.toMatch(/lefthook|husky/iu);
+  });
+
+  // No commits and no commits carrying it are different facts, and only the second is
+  // something to act on.
+  it("says there is no history to read rather than reporting zero", () => {
+    const text = report(HEALTHY);
+
+    expect(text).toContain("no commit history to read");
+    expect(text).not.toContain("0 of the last");
   });
 });

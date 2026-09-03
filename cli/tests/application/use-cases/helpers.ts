@@ -38,6 +38,11 @@ export const noGit: VersionControl = {
   listTrackedFiles: async () => [],
   isRepository: async () => false,
   hasHistoryFor: async () => false,
+  readCommitTrailerSetup: async () => ({
+    delegate: "absent",
+    callSite: "no-hook-file",
+    hookHasOtherContent: false,
+  }),
 };
 
 export { SilentPrompterAdapter as OverwritePrompter };

@@ -87,6 +87,8 @@ judging anything.
 | A plugin whose host registry could not be read | its line is relayed as `unanswerable`, never as `not-registered` |
 | A project with no plugin recorded | the row says so in one sentence, and is never relayed as a failure |
 | The AIDD manifest could not be read | the row names the file and the reason, and no plugin line is relayed — never read as "no plugin recorded" |
+| Commits are being made and none carry the trailer | the count is relayed as `0 of the last N`, with whatever the row names after it — never "the trailer is off" |
+| The repository has no commits yet | the row says there is no history to read, and it is never relayed as zero |
 | Measurement is off | the stated half is relayed, then that single line, and the run stops before checking anything |
 | Not a git repository | the stated half is relayed, then that single line, and the run stops before checking anything — never read as "hook fired FAIL" |
 | A healthy install | all four claims read `ok`, each carrying what it was read from |

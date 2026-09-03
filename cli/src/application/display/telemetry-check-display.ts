@@ -6,6 +6,7 @@ import type {
 import type { TelemetryExportLeftover } from "../../domain/models/telemetry-export-leftover.js";
 import type {
   TelemetryAllowedSetup,
+  TelemetryCommitTrailerSetup,
   TelemetryHostRegistrationAnswer,
   TelemetryHostRegistrationSetup,
   TelemetryIdentitySetup,
@@ -139,6 +140,28 @@ function describeHostRegistration(registration: TelemetryHostRegistrationSetup):
   );
 }
 
+/** The trailer, in one sentence that leads with the only fact about the chain rather than
+ * about its parts: how many recent commits actually carry it. A person reading one line has
+ * then read the answer; the pieces below it say why, and only when there is a why. */
+function describeCommitTrailer(trailer: TelemetryCommitTrailerSetup): string {
+  const carried =
+    trailer.recentlyCarrying === undefined
+      ? "no commit history to read"
+      : `${trailer.recentlyCarrying.carrying} of the last ${trailer.recentlyCarrying.examined} commits carry it`;
+  const parts: string[] = [];
+  if (trailer.delegate === "absent") parts.push("nothing installed to write it");
+  if (trailer.delegate === "not-executable") {
+    parts.push("its script is not executable, so git will not run it");
+  }
+  if (trailer.callSite === "missing") parts.push("prepare-commit-msg does not call it");
+  if (trailer.callSite === "no-hook-file") parts.push("there is no prepare-commit-msg");
+  // Said, never named. Which tool owns the file changes nothing a person does about it, and
+  // naming one would be a guess read out of its contents.
+  if (trailer.hookHasOtherContent) parts.push("that hook is somebody else's too");
+  const where = trailer.hooksDir === undefined ? "" : `\n    hooks run from ${trailer.hooksDir}`;
+  return parts.length === 0 ? `${carried}${where}` : `${carried} — ${parts.join("; ")}${where}`;
+}
+
 function printSetup(output: CLIOutput, setup: TelemetrySetup): void {
   printSetupRow(output, "measurement allowed", describeAllowed(setup.allowed));
   printSetupRow(output, "identity attached", describeIdentity(setup.identity));
@@ -153,6 +176,7 @@ function printSetup(output: CLIOutput, setup: TelemetrySetup): void {
     describeRecorderDeclaration(setup.recorderDeclaration)
   );
   printSetupRow(output, "plugins registered", describeHostRegistration(setup.hostRegistration));
+  printSetupRow(output, "commit trailer", describeCommitTrailer(setup.commitTrailer));
   printSetupRow(output, "cli version", setup.versions.cli);
   printSetupRow(output, "plugin version", describePluginVersion(setup.versions.plugin));
   output.print("");
