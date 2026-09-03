@@ -18,3 +18,16 @@ export function injectTokenIntoUrl(url: string, token: string | undefined): stri
   }
   return url.replace("https://", `https://${matcher.authPrefix}${token}@`);
 }
+
+/**
+ * The same URL with any userinfo removed.
+ *
+ * A user may type their own credential into a source URL
+ * (`https://user:token@host/repo.git`). That string then travels two ways it should not: into
+ * the error a failed clone prints, and into the cache directory's name, where the secret is
+ * written to disk and stays there. Strip it before either use; the clone still receives the
+ * URL with its credential.
+ */
+export function withoutCredentials(url: string): string {
+  return url.replace(/^(https?:\/\/)[^/@]*@/, "$1");
+}

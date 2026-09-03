@@ -13,7 +13,7 @@ import type {
   PluginSourceUrl,
 } from "../../../kernel/source.js";
 import type { TokenProvider } from "../../../runtime/auth/ports/token-provider.js";
-import { injectTokenIntoUrl } from "../../../runtime/git/inject-token.js";
+import { injectTokenIntoUrl, withoutCredentials } from "../../../runtime/git/inject-token.js";
 import type { PluginFetcher, PluginFetchOptions } from "../domain/ports/plugin-fetcher.js";
 
 const execFile = promisify(execFileCb);
@@ -76,7 +76,7 @@ export class PluginFetcherAdapter implements PluginFetcher {
     cacheDir: string,
     forceRefresh: boolean
   ): Promise<string> {
-    const key = `${encodeKey(source.url)}${source.ref ? `-${source.ref}` : "-HEAD"}`;
+    const key = `${encodeKey(withoutCredentials(source.url))}${source.ref ? `-${source.ref}` : "-HEAD"}`;
     const targetDir = join(cacheDir, key);
     await this.bustCacheIfNeeded(targetDir, forceRefresh);
     if (!(await this.fs.fileExists(targetDir))) {
@@ -95,7 +95,7 @@ export class PluginFetcherAdapter implements PluginFetcher {
     forceRefresh: boolean
   ): Promise<string> {
     const { url, path: subpath, ref } = source;
-    const key = `${encodeKey(url)}-subdir-${subpath.replace(/\//g, "_")}-${ref ?? "HEAD"}`;
+    const key = `${encodeKey(withoutCredentials(url))}-subdir-${subpath.replace(/\//g, "_")}-${ref ?? "HEAD"}`;
     const targetDir = join(cacheDir, key);
     await this.bustCacheIfNeeded(targetDir, forceRefresh);
     if (!(await this.fs.fileExists(targetDir))) {
@@ -171,12 +171,14 @@ export class PluginFetcherAdapter implements PluginFetcher {
 
   private classifyAndThrow(err: unknown, displayUrl: string): never {
     const msg = err instanceof Error ? err.message : String(err);
+    // The URL the user typed may carry their own credential; the message must not.
+    const safeUrl = withoutCredentials(displayUrl);
     if (AUTH_ERROR_PATTERN.test(msg)) {
       throw new PluginFetchError(
-        `Authentication failed for "${displayUrl}". ${this.authHint(displayUrl)}`
+        `Authentication failed for "${safeUrl}". ${this.authHint(safeUrl)}`
       );
     }
-    throw new PluginFetchError(`git clone failed for "${displayUrl}": ${scrubCredentials(msg)}`);
+    throw new PluginFetchError(`git clone failed for "${safeUrl}": ${scrubCredentials(msg)}`);
   }
 
   private authHint(url: string): string {
