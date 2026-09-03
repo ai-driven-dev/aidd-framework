@@ -27,12 +27,10 @@ import { HasherAdapter } from "../../../../src/runtime/filesystem/hasher-adapter
 import type { Platform } from "../../../../src/runtime/platform/platform.js";
 import { SilentPrompterAdapter } from "../../../../src/runtime/prompter/prompter-adapter.js";
 import { CurrentVersionAdapter } from "../../../../src/runtime/self-update/current-version-adapter.js";
-import type { VersionControl } from "../../../../src/runtime/self-update/version-control.js";
 import type { VersionReader } from "../../../../src/runtime/self-update/version-reader.js";
 
 export const linuxPlatform: Platform = { current: () => "linux" };
 export const win32Platform: Platform = { current: () => "win32" };
-export const noGit: VersionControl = { installPreCommitDelegate: async () => {} };
 
 export { SilentPrompterAdapter as OverwritePrompter };
 

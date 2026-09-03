@@ -115,10 +115,6 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
     }
   }
 
-  async chmodExecutable(_path: string): Promise<void> {
-    // No-op: no permission bits in memory
-  }
-
   async backup(absolutePath: string): Promise<string> {
     const content = await this.readFile(absolutePath);
     const timestamp = new Date()

@@ -91,13 +91,11 @@ import { PlatformAdapter } from "../platform/platform-adapter.js";
 import { InquirerPrompterAdapter, SilentPrompterAdapter } from "../prompter/prompter-adapter.js";
 import { CheckUpdateUseCase } from "../self-update/check-update-use-case.js";
 import { CurrentVersionAdapter } from "../self-update/current-version-adapter.js";
-import { GitAdapter } from "../self-update/git-adapter.js";
 import { GitHubReleaseResolverAdapter } from "../self-update/github-release-resolver-adapter.js";
 import type { LatestReleaseResolver } from "../self-update/latest-release-resolver.js";
 import { SelfUpdateUseCase } from "../self-update/self-update-use-case.js";
 import type { SelfUpdater } from "../self-update/self-updater.js";
 import { SelfUpdaterAdapter } from "../self-update/self-updater-adapter.js";
-import type { VersionControl } from "../self-update/version-control.js";
 import type { VersionReader } from "../self-update/version-reader.js";
 import { userConfigDir } from "../user-config-dir.js";
 import { wireDistribution } from "./distribution.js";
@@ -115,7 +113,6 @@ interface Deps {
   logger: Logger;
   cliUpdater: SelfUpdater;
   currentVersionProvider: VersionReader;
-  git: VersionControl;
   platform: Platform;
   prompter: Prompter;
   authReader: AuthReaderAdapter;
@@ -216,7 +213,6 @@ export async function createDeps(
   const currentVersionProvider = new CurrentVersionAdapter();
   const requireAuthUseCase = new RequireAuthUseCase(authReader);
   const selfUpdateUseCase = new SelfUpdateUseCase(cliUpdater, currentVersionProvider);
-  const git = new GitAdapter(fs);
   const platform = new PlatformAdapter();
   const prompter = process.stdout.isTTY
     ? new InquirerPrompterAdapter()
@@ -462,7 +458,6 @@ export async function createDeps(
     logger,
     cliUpdater,
     currentVersionProvider,
-    git,
     platform,
     prompter,
     authReader,
