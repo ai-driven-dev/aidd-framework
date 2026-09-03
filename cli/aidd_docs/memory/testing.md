@@ -6,7 +6,7 @@
 - Runner: `pnpm test` (`vitest run`; the e2e project builds its own binary — see below)
 - Test files: in `tests/` directory (not co-located with `src/`)
 - Watch mode: `pnpm test:watch`
-- Mutation testing: `pnpm test:mutation` (Stryker, scoped to `src/kernel/`)
+- Mutation testing: `pnpm test:mutation:<scope>` (Stryker, one scope per context)
 
 ## Test Pyramid — 3 Tiers
 
@@ -84,7 +84,8 @@ pnpm test:unit        # domain models only
 pnpm test:integration # use-cases + adapters
 pnpm test:e2e         # functional journeys
 pnpm test             # all tiers
-pnpm test:mutation    # Stryker mutation (slow)
+pnpm test:mutation:kernel        # Stryker, one context at a time (minutes each)
+pnpm test:mutation:framework     # scopes: kernel translate distribution tools framework
 ```
 
 ### Concurrent vitest runs don't share a binary
@@ -118,6 +119,23 @@ built outside the package cannot resolve its externalised dependencies anyway.
 `tests/e2e/global-setup.ts` and `vitest.mutation.config.ts` are knip entry points: vitest
 and Stryker load them from configuration, which knip cannot follow, and without the
 declaration it reports them as unused and fails the pre-push gate.
+
+### Mutation runs one scope at a time
+
+`mutation-scopes.json` is the single declaration: a glob per context, plus what is left out
+and the reason. `scripts/run-mutation.mjs <scope>` runs one, files its html and json report
+under `reports/mutation/<scope>/` — Stryker writes to one path, so five scopes in sequence
+would otherwise leave only the last score — and removes `.stryker-tmp` afterwards, run or
+crash. `stryker run` on its own is not the entry point and mutates whatever it likes.
+
+`tests/architecture/mutation-covers-source.arch.test.ts` holds the declaration honest: every
+`.ts` under `src/` matches a scope or a declared exclusion, every exclusion carries a reason,
+every scope matches something, and `stryker.conf.json` may not grow its own `mutate` again.
+That last rule exists because it used to name seventeen kernel files one by one, and a file
+added to the kernel escaped mutation in silence — the score did not drop, because the mutants
+that would have died were never generated.
+
+Never a gate. The score is read; what is enforced is that it exists and covers everything.
 
 ### Read the suite count, not only the test count
 

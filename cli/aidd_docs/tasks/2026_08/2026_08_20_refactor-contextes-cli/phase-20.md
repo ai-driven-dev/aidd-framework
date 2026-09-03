@@ -122,6 +122,13 @@ Seuil de rupture 50 dans tous les cas.
 | `kernel` | 17 | **61,60 %** |
 | `contexts/tools/domain` | 45 | **61,64 %** |
 
+> **Périmètre, et correction (2026-09-03).** Quatre de ces cibles ne mutaient que la couche
+> `domain/` de leur contexte. Aucune commande gardée ne les reproduisait, et lues sans leur
+> colonne « cible » elles se laissaient prendre pour le score du contexte entier. Les scopes
+> déclarés dans `mutation-scopes.json` couvrent désormais chaque contexte en entier, ce que
+> `application/` et `infrastructure/` font au chiffre compris — voir
+> `aidd_docs/tasks/2026_09/2026_09_03_mutation-scopes/`.
+
 Le noyau et `tools` sont à égalité au plus bas. Le noyau est le pire des deux endroits où l'être :
 c'est le vocabulaire que les quatre contextes parlent, donc un changement de comportement qui y
 passe inaperçu passe inaperçu partout. C'est lui dont les survivants ont été examinés.

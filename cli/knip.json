@@ -2,6 +2,7 @@
   "entry": [
     "src/cli.ts",
     "scripts/check-bundle-size.mjs",
+    "scripts/run-mutation.mjs",
     "tests/e2e/global-setup.ts",
     "vitest.mutation.config.ts"
   ],

@@ -91,8 +91,10 @@ qui s'écrit comme son outil, et une liste blanche assumée des trois CLI pilot�
 - 1 987 tests sur 982 suites, unitaires majoritaires, intégration et e2e déterministes
 - 26 tests d'architecture, chaque règle éprouvée par injection d'une violation de synthèse
 - smoke : 98 assertions, 22 / 22 commandes feuilles
-- mutation par contexte : translate 78,63 %, framework 77,97 %, distribution 74,07 %,
-  tools 61,64 %, kernel 61,60 % — mesurée, jamais bloquante
+- mutation par contexte, couche `domain/` seule : translate 78,63 %, framework 77,97 %,
+  distribution 74,07 %, tools 61,64 %, kernel 61,60 % — mesurée, jamais bloquante. Ces runs
+  n'étaient reproductibles par aucune commande gardée ; les scopes commités de
+  `2026_09_03_mutation-scopes` couvrent chaque contexte en entier et donnent d'autres chiffres
 
 ### Ce qui a été trouvé en chemin, et qui n'était pas au plan
 

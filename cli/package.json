@@ -65,7 +65,12 @@
     "jscpd": "jscpd src/ --threshold 3.3",
     "pack:local": "pnpm build && pnpm pack --pack-destination ./dist",
     "install:local": "pnpm run pack:local && npm install -g ./dist/ai-driven-dev-cli-$(node -p \"require('./package.json').version\").tgz --force",
-    "test:mutation": "stryker run",
+    "test:mutation": "node scripts/run-mutation.mjs",
+    "test:mutation:kernel": "node scripts/run-mutation.mjs kernel",
+    "test:mutation:tools": "node scripts/run-mutation.mjs tools",
+    "test:mutation:translate": "node scripts/run-mutation.mjs translate",
+    "test:mutation:distribution": "node scripts/run-mutation.mjs distribution",
+    "test:mutation:framework": "node scripts/run-mutation.mjs framework",
     "prepare": "lefthook install"
   },
   "dependencies": {
