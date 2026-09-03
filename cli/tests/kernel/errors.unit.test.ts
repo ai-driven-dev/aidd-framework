@@ -8,7 +8,6 @@ import {
   InputRequiredError,
   JsonParseError,
   NoManifestError,
-  NotAuthenticatedError,
   OutDirNotDirectoryError,
   ToolNotInstalledError,
 } from "../../src/kernel/errors.js";
@@ -79,14 +78,6 @@ describe("OutDirNotDirectoryError", () => {
     const error = new OutDirNotDirectoryError("/tmp/some-out");
     expect(error.message).not.toContain("--source");
     expect(error.message).toContain("not a directory");
-  });
-});
-
-describe("NotAuthenticatedError", () => {
-  it("has correct error name and auth hint in message", () => {
-    const error = new NotAuthenticatedError();
-    expect(error.name).toBe("NotAuthenticatedError");
-    expect(error.message).toContain("aidd auth login");
   });
 });
 

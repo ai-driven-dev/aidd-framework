@@ -10,7 +10,6 @@ import "../../contexts/tools/domain/profiles/opencode/profile.js";
 import "../../contexts/tools/domain/profiles/vscode/profile.js";
 import type { ToolBuildContract } from "../../contexts/tools/domain/build-contract.js";
 import type { FileMerger } from "../../contexts/tools/domain/ports/file-merger.js";
-import { buildCopilotMarketplaceContract } from "../../contexts/tools/domain/profiles/copilot/build.js";
 import { buildContractFor } from "../../contexts/tools/domain/registry.js";
 import { FlatBuildStrategy } from "../../contexts/translate/application/strategies/flat-build-strategy.js";
 import { MarketplaceBuildStrategy } from "../../contexts/translate/application/strategies/marketplace-build-strategy.js";
@@ -121,24 +120,4 @@ export function createFrameworkBuildUseCase(
   const key = `${ctx.target}:${ctx.mode}`;
   const factory = FRAMEWORK_BUILD_REGISTRY[key];
   return factory?.(deps, ctx);
-}
-
-/** `framework build`'s own use case — the copilot marketplace contract, wired directly. */
-export function wireTranslate(shared: FrameworkBuildDeps): {
-  frameworkBuildUseCase: FrameworkBuildUseCase;
-} {
-  const jsonSchemaValidator = new AjvSchemaValidatorAdapter();
-  const frameworkBuildUseCase = new FrameworkBuildUseCase(
-    shared.fs,
-    jsonSchemaValidator,
-    shared.assetProvider,
-    shared.logger,
-    new MarketplaceBuildStrategy(
-      shared.fs,
-      jsonSchemaValidator,
-      shared.assetProvider,
-      buildCopilotMarketplaceContract()
-    )
-  );
-  return { frameworkBuildUseCase };
 }

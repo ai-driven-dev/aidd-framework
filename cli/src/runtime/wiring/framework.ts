@@ -9,11 +9,6 @@ import { MarketplaceAddUseCase } from "../../contexts/distribution/application/m
 import type { MarketplaceListUseCase } from "../../contexts/distribution/application/marketplace-list-use-case.js";
 import type { MarketplaceRefreshUseCase } from "../../contexts/distribution/application/marketplace-refresh-use-case.js";
 import type { MarketplaceRegisterFrameworkUseCase } from "../../contexts/distribution/application/marketplace-register-framework-use-case.js";
-import type { ResolveMarketplaceUseCase } from "../../contexts/distribution/application/resolve-marketplace-use-case.js";
-import type { MarketplaceRegistry } from "../../contexts/distribution/domain/ports/marketplace-registry.js";
-import type { MarketplaceTrustStore } from "../../contexts/distribution/domain/ports/marketplace-trust-store.js";
-import type { PluginCatalogRepository } from "../../contexts/distribution/domain/ports/plugin-catalog-repository.js";
-import type { PluginFetcher } from "../../contexts/distribution/domain/ports/plugin-fetcher.js";
 import { CleanUseCase } from "../../contexts/framework/application/clean-use-case.js";
 import { DoctorLayoutUseCase } from "../../contexts/framework/application/doctor/doctor-layout-use-case.js";
 import { DoctorMergeFilesUseCase } from "../../contexts/framework/application/doctor/doctor-merge-files-use-case.js";
@@ -59,15 +54,12 @@ import { UninstallIdeUseCase } from "../../contexts/framework/application/uninst
 import { UninstallToolsUseCase } from "../../contexts/framework/application/uninstall/uninstall-tools-use-case.js";
 import { UninstallUseCase } from "../../contexts/framework/application/uninstall/uninstall-use-case.js";
 import type { ManifestRepository } from "../../contexts/framework/domain/ports/manifest-repository.js";
-import type { PluginDistributionReader } from "../../contexts/framework/domain/ports/plugin-distribution-reader.js";
 import { ManifestRepositoryAdapter } from "../../contexts/framework/infrastructure/manifest-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "../../contexts/framework/infrastructure/plugin-distribution-reader-adapter.js";
 import type { FileMerger } from "../../contexts/tools/domain/ports/file-merger.js";
-import type { FrameworkBuildUseCase } from "../../contexts/translate/application/translate-source.js";
 import type { AssetProvider } from "../../kernel/ports/asset-provider.js";
 import type { FileReader } from "../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../kernel/ports/file-writer.js";
-import type { Hasher } from "../../kernel/ports/hasher.js";
 import type { Logger } from "../../kernel/ports/logger.js";
 import type { Prompter } from "../../kernel/ports/prompter.js";
 import { CLIOutput } from "../../presentation/output.js";
@@ -82,11 +74,9 @@ import { AuthStorage } from "../auth/auth-storage.js";
 import { GhCliAdapter } from "../auth/gh-cli-adapter.js";
 import { GhTokenAdapter } from "../auth/gh-token-adapter.js";
 import type { CredentialStore } from "../auth/ports/credential-store.js";
-import { RequireAuthUseCase } from "../auth/require-auth-use-case.js";
 import { FileAdapter } from "../filesystem/file-adapter.js";
 import { HasherAdapter } from "../filesystem/hasher-adapter.js";
 import { HttpClient } from "../http/http-client.js";
-import type { Platform } from "../platform/platform.js";
 import { PlatformAdapter } from "../platform/platform-adapter.js";
 import { InquirerPrompterAdapter, SilentPrompterAdapter } from "../prompter/prompter-adapter.js";
 import { CheckUpdateUseCase } from "../self-update/check-update-use-case.js";
@@ -94,13 +84,12 @@ import { CurrentVersionAdapter } from "../self-update/current-version-adapter.js
 import { GitHubReleaseResolverAdapter } from "../self-update/github-release-resolver-adapter.js";
 import type { LatestReleaseResolver } from "../self-update/latest-release-resolver.js";
 import { SelfUpdateUseCase } from "../self-update/self-update-use-case.js";
-import type { SelfUpdater } from "../self-update/self-updater.js";
 import { SelfUpdaterAdapter } from "../self-update/self-updater-adapter.js";
 import type { VersionReader } from "../self-update/version-reader.js";
 import { userConfigDir } from "../user-config-dir.js";
 import { wireDistribution } from "./distribution.js";
 import { wireTools } from "./tools.js";
-import { createFrameworkBuildUseCase, wireTranslate } from "./translate.js";
+import { createFrameworkBuildUseCase } from "./translate.js";
 
 interface GlobalOptions {
   verbose: boolean;
@@ -109,23 +98,11 @@ interface GlobalOptions {
 interface Deps {
   fs: FileReader & FileWriter & FileMerger;
   manifestRepo: ManifestRepository;
-  hasher: Hasher;
   logger: Logger;
-  cliUpdater: SelfUpdater;
   currentVersionProvider: VersionReader;
-  platform: Platform;
   prompter: Prompter;
   authReader: AuthReaderAdapter;
-  authStorage: AuthStorage;
   credentialStore: CredentialStore;
-  http: HttpClient;
-  pluginCatalogRepository: PluginCatalogRepository;
-  pluginFetcher: PluginFetcher;
-  pluginDistributionReader: PluginDistributionReader;
-  marketplaceRegistry: MarketplaceRegistry;
-  marketplaceTrustStore: MarketplaceTrustStore;
-  pluginAddUseCase: PluginAddUseCase;
-  frameworkBuildUseCase: FrameworkBuildUseCase;
   pluginRemoveUseCase: PluginRemoveUseCase;
   pluginListUseCase: PluginListUseCase;
   pluginUpdateUseCase: PluginUpdateUseCase;
@@ -134,21 +111,14 @@ interface Deps {
   marketplaceRemoveUseCase: MarketplaceRemoveUseCase;
   marketplaceRefreshUseCase: MarketplaceRefreshUseCase;
   marketplaceCheckUseCase: MarketplaceCheckUseCase;
-  pluginInstallFromMarketplaceUseCase: PluginInstallFromMarketplaceUseCase;
-  resolveMarketplaceUseCase: ResolveMarketplaceUseCase;
-  ensureBuiltMarketplaceUseCase: EnsureBuiltMarketplaceUseCase;
-  installRuntimeConfigUseCase: InstallRuntimeConfigUseCase;
   installAiToolUseCase: InstallAiToolUseCase;
-  installIdeConfigUseCase: InstallIdeConfigUseCase;
   installIdeToolUseCase: InstallIdeToolUseCase;
   uninstallIdeUseCase: UninstallIdeUseCase;
   assetProvider: AssetProvider;
   pluginSearchUseCase: PluginSearchUseCase;
   marketplaceRegisterFrameworkUseCase: MarketplaceRegisterFrameworkUseCase;
-  pluginPickUseCase: PluginPickUseCase;
   pluginInstallUseCase: PluginInstallUseCase;
   marketplaceSyncSettingsUseCase: MarketplaceSyncSettingsUseCase;
-  syncConflictResolverUseCase: SyncConflictResolverUseCase;
   doctorUseCase: DoctorUseCase;
   releaseResolver: LatestReleaseResolver;
   setupMarketplaceSourceUseCase: SetupMarketplaceSourceUseCase;
@@ -156,7 +126,6 @@ interface Deps {
   setupPluginsPromptUseCase: SetupPluginsPromptUseCase;
   setupToolsPromptUseCase: SetupToolsPromptUseCase;
   projectContextDetector: ProjectContextDetectorUseCase;
-  requireAuthUseCase: RequireAuthUseCase;
   selfUpdateUseCase: SelfUpdateUseCase;
   statusUseCase: StatusUseCase;
   restoreUseCase: RestoreUseCase;
@@ -211,7 +180,6 @@ export async function createDeps(
     logger,
   });
   const currentVersionProvider = new CurrentVersionAdapter();
-  const requireAuthUseCase = new RequireAuthUseCase(authReader);
   const selfUpdateUseCase = new SelfUpdateUseCase(cliUpdater, currentVersionProvider);
   const platform = new PlatformAdapter();
   const prompter = process.stdout.isTTY
@@ -219,7 +187,6 @@ export async function createDeps(
     : new SilentPrompterAdapter();
   const { nativePluginActivators } = wireTools();
   const {
-    pluginCatalogRepository,
     pluginFetcher,
     marketplaceRegistry,
     marketplaceTrustStore,
@@ -253,7 +220,6 @@ export async function createDeps(
     resolveMarketplaceUseCase
   );
   const assetProvider = new BundledAssetProviderAdapter();
-  const { frameworkBuildUseCase } = wireTranslate({ fs, assetProvider, logger });
   // force:true is safe here: outDir is always builtMarketplaceDir(), an aidd-owned
   // disposable cache under .aidd/cache/built/, never a user-owned directory. A
   // collision only means "the cache from a previous build already exists" — the
@@ -454,23 +420,11 @@ export async function createDeps(
   const deps: Deps = {
     fs,
     manifestRepo,
-    hasher,
     logger,
-    cliUpdater,
     currentVersionProvider,
-    platform,
     prompter,
     authReader,
-    authStorage,
     credentialStore,
-    http,
-    pluginCatalogRepository,
-    pluginFetcher,
-    pluginDistributionReader,
-    marketplaceRegistry,
-    marketplaceTrustStore,
-    pluginAddUseCase,
-    frameworkBuildUseCase,
     pluginRemoveUseCase,
     pluginListUseCase,
     pluginUpdateUseCase,
@@ -479,21 +433,14 @@ export async function createDeps(
     marketplaceRemoveUseCase,
     marketplaceRefreshUseCase,
     marketplaceCheckUseCase,
-    pluginInstallFromMarketplaceUseCase,
-    resolveMarketplaceUseCase,
-    ensureBuiltMarketplaceUseCase,
-    installRuntimeConfigUseCase,
     installAiToolUseCase,
-    installIdeConfigUseCase,
     installIdeToolUseCase,
     uninstallIdeUseCase,
     assetProvider,
     pluginSearchUseCase,
     marketplaceRegisterFrameworkUseCase,
-    pluginPickUseCase,
     pluginInstallUseCase,
     marketplaceSyncSettingsUseCase,
-    syncConflictResolverUseCase,
     doctorUseCase,
     releaseResolver,
     setupMarketplaceSourceUseCase,
@@ -501,7 +448,6 @@ export async function createDeps(
     setupPluginsPromptUseCase,
     setupToolsPromptUseCase,
     projectContextDetector,
-    requireAuthUseCase,
     selfUpdateUseCase,
     statusUseCase,
     restoreUseCase,

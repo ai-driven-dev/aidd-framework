@@ -488,13 +488,6 @@ export class AiddFilesDetectedError extends Error {
   }
 }
 
-export class NotAuthenticatedError extends Error {
-  constructor() {
-    super("Not authenticated. Run `aidd auth login`.");
-    this.name = "NotAuthenticatedError";
-  }
-}
-
 export class AlreadyInitializedError extends Error {
   constructor(message = "Already initialized. Use `aidd update` to upgrade.") {
     super(message);
