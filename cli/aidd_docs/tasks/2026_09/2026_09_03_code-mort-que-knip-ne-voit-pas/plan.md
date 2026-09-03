@@ -1,6 +1,6 @@
 ---
 objective: "Rien ne subsiste qui soit construit, implémenté ou produit sans que personne ne le lise."
-status: pending
+status: implemented
 ---
 
 # Plan : le code mort que `knip` ne peut pas voir
