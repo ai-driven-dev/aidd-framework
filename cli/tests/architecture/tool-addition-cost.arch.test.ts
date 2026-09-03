@@ -1,73 +1,187 @@
 /**
- * Adding a tool must cost one file.
+ * What adding a tool actually costs, measured rather than claimed.
  *
  * A tool identifier may only appear in that tool's own profile and in the shared
- * vocabulary. Everywhere else, the behaviour must be read from the profile rather
- * than branched on the name — otherwise a sixth tool means editing N files again.
+ * vocabulary. Everywhere else, the behaviour must be read from the profile rather than
+ * branched on the name — otherwise a sixth tool means editing N files again.
+ *
+ * The first version of this rule was inert, and its title said "adding a tool costs one
+ * file" while the real cost was ten. Two reasons, both worth naming because they are the
+ * shape a guard fails in:
+ *
+ * 1. It matched `source.includes('"${id}"')`, so it saw only a double-quoted literal. A
+ *    bare object key (`codex: { … }`), a profile's import path, and a name inside a longer
+ *    string were all invisible — and the decisive one is the third: `presentation/commands/
+ *    translate.ts` lists all five tools in its help text and `grep -c '"claude"'` on it
+ *    returns zero.
+ * 2. Its tool list was written by hand, so a *new* tool was not matched at all. A review
+ *    added a real sixth profile, wrote its name into a file the rule forbids, and the whole
+ *    architecture suite stayed green. The rule that bounds the cost of the next tool could
+ *    not see the next tool.
+ *
+ * Now the tools come from the profile directories, so a new profile is subject to the rule
+ * the moment it exists, and the forms below are the ones a new tool really forces an edit
+ * in. Comments are stripped first: prose explaining that claude's layout differs is
+ * documentation, not coupling.
+ *
+ * Scope is `src/`. The measured cost also includes three files under `tests/` — the
+ * conformance suite's registration list, `tool-config`'s hardcoded ids, and the unit deps
+ * helper — plus the golden matrix's target lists. Those are not scoped here because a test
+ * naming the tool it tests is not coupling; the number is recorded so the ten below is not
+ * mistaken for the whole bill.
  */
 import { describe, expect, it } from "vitest";
 import { expectRatchet, read, sourceFiles } from "./helpers.js";
 
-const TOOL_IDS = ["claude", "cursor", "copilot", "codex", "opencode", "vscode"] as const;
-
-/** The only place a tool identifier is allowed to be written down: its own profile directory. */
-const ALLOWED_DIRS = TOOL_IDS.map((id) => `src/contexts/tools/domain/profiles/${id}/`);
-const ALLOWED_FILES = new Set(["src/kernel/tool.ts"]);
-
 /**
- * Files naming a tool outside its profile today. This list may only shrink.
- *
- * Phase 10 brought it from seven entries to three by moving what was tool data into the
- * profiles: the nine per-tool build contracts became one `build.ts` per tool, the
- * target/mode pairs and the plugin-manifest locations are now read off the profiles
- * instead of being listed twice, `FrameworkBuildTarget` and `PluginFormat` are aliases
- * of `AiToolId` rather than three unions with the same members, and restore names its
- * config artifacts through their constants.
- *
- * What is left is named tool by tool, because each is a different reason and only one of
- * them is debt:
- *
- * - `tool-recommendations.ts` recommends tools to a user by name. There is no profile to
- *   read this off: the knowledge is which tool suits which stack, which belongs to
- *   nobody's profile. A sixth tool is welcome to appear in no recommendation at all.
- * - `config-refs.ts` declares `CONFIG_OPENCODE = "opencode"`, the name of a config
- *   artifact, not of a tool. It happens to be spelled like one because the artifact is
- *   that tool's config file; opencode's profile is what says it consumes it.
- * - `capabilities/plugins-capability.ts` types `NativeActivation.binary` as the three CLIs this repo
- *   has measured and written activators for. It is an allowlist on purpose: a fourth
- *   tool driving its own CLI needs an activator registered against that binary anyway,
- *   so widening the type would move the cost rather than remove it.
+ * The tools, from the tree. A hand-written list is what made this rule blind to the tool it
+ * exists to measure.
  */
-const BASELINE = [
-  "src/contexts/framework/domain/tool-recommendations.ts",
-  "src/contexts/tools/domain/capabilities/config-refs.ts",
-  "src/contexts/tools/domain/capabilities/plugins-capability.ts",
-];
-
-/** The rule itself, over an explicit file/source pair instead of the real tree. */
-function namesToolOutsideProfile(file: string, source: string): boolean {
-  if (ALLOWED_FILES.has(file) || ALLOWED_DIRS.some((dir) => file.startsWith(dir))) return false;
-  return TOOL_IDS.some((id) => source.includes(`"${id}"`));
+function toolIds(files: readonly string[]): string[] {
+  const ids = new Set<string>();
+  for (const file of files) {
+    const match = /^src\/contexts\/tools\/domain\/profiles\/([^/]+)\//.exec(file);
+    if (match) ids.add(match[1] as string);
+  }
+  return [...ids].sort();
 }
 
-describe("adding a tool costs one file", () => {
-  it("no tool identifier is written outside its own profile", () => {
-    const violations = sourceFiles().filter((file) => namesToolOutsideProfile(file, read(file)));
+/** The only places a tool identifier is allowed: its own profile, and the vocabulary. */
+function isAllowed(file: string, ids: readonly string[]): boolean {
+  if (file === "src/kernel/tool.ts") return true;
+  return ids.some((id) => file.startsWith(`src/contexts/tools/domain/profiles/${id}/`));
+}
 
-    const { added, fixed } = expectRatchet(violations, BASELINE);
+const BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g;
+const LINE_COMMENT = /\/\/[^\n]*/g;
+
+function code(source: string): string {
+  return source.replace(BLOCK_COMMENT, "").replace(LINE_COMMENT, "");
+}
+
+/**
+ * Tool identifiers a file names in a way a new tool would force an edit to.
+ *
+ * Four forms: a quoted literal, an object key, a profile's import path, and a string that
+ * enumerates two or more tools — a help line listing five targets is a list a sixth must
+ * join. A string naming one tool is left alone: a message about the tool that exists is not
+ * a list waiting to be extended.
+ */
+function toolsNamedIn(source: string, ids: readonly string[]): string[] {
+  const alternation = ids.join("|");
+  const named = new Set<string>();
+  const body = code(source);
+  const forms = [
+    new RegExp(`["'\`](${alternation})["'\`]`, "g"),
+    new RegExp(`(?:^|[\\s{,(])(${alternation})\\s*:`, "gm"),
+    new RegExp(`["'][^"']*/(${alternation})/[^"']*["']`, "g"),
+  ];
+  for (const form of forms) {
+    for (const match of body.matchAll(form)) named.add(match[1] as string);
+  }
+  for (const literal of body.matchAll(/(["'`])((?:(?!\1).)*)\1/gs)) {
+    const inside = literal[2] as string;
+    const listed = ids.filter((id) => new RegExp(`\\b${id}\\b`).test(inside));
+    if (listed.length >= 2) for (const id of listed) named.add(id);
+  }
+  return [...named].sort();
+}
+
+/**
+ * Files naming a tool outside its profile today, with how many they name. The list may only
+ * shrink, and a listed file may not take on another tool.
+ *
+ * Three carry a reason that is not debt:
+ *
+ * - `tool-recommendations.ts` recommends tools to a user by name. There is no profile to
+ *   read this off: the knowledge is which tool suits which stack, which belongs to nobody's
+ *   profile. A sixth tool is welcome to appear in no recommendation at all.
+ * - `config-refs.ts` declares `CONFIG_OPENCODE`, the name of a config artifact rather than
+ *   of a tool. It is spelled like one because the artifact is that tool's config file.
+ * - `plugins-capability.ts` types `NativeActivation.binary` as the CLIs this repo has
+ *   measured and written activators for. An allowlist on purpose: a fourth tool driving its
+ *   own CLI needs an activator registered anyway, so widening the type moves the cost.
+ *
+ * The other seven are the real bill, and they divide in two:
+ *
+ * - **Registration**, four files. `wiring/{tools,framework,translate}.ts` each repeat the
+ *   same side-effect imports, and `assets/asset-loader.ts` keys a record by tool. A profile
+ *   that registers itself would remove all four; nothing does that today.
+ * - **Words shown to a user**, three files. `translate.ts` lists its targets in help text,
+ *   `setup.ts` gives examples, `menu-use-case.ts` labels its entries. Deriving those from
+ *   the registry is possible and is a presentation change, not a move.
+ */
+const BASELINE: readonly { readonly path: string; readonly named: number }[] = [
+  { path: "src/contexts/framework/domain/tool-recommendations.ts", named: 4 },
+  { path: "src/contexts/tools/domain/capabilities/config-refs.ts", named: 1 },
+  { path: "src/contexts/tools/domain/capabilities/plugins-capability.ts", named: 3 },
+  { path: "src/presentation/commands/setup.ts", named: 2 },
+  { path: "src/presentation/commands/translate.ts", named: 5 },
+  { path: "src/presentation/prompts/menu-use-case.ts", named: 6 },
+  { path: "src/runtime/assets/asset-loader.ts", named: 6 },
+  { path: "src/runtime/wiring/framework.ts", named: 6 },
+  { path: "src/runtime/wiring/tools.ts", named: 6 },
+  { path: "src/runtime/wiring/translate.ts", named: 6 },
+];
+
+describe("a tool identifier stays inside its own profile", () => {
+  it("no file outside a profile names a tool in a form a new tool would have to join", () => {
+    const files = sourceFiles();
+    const ids = toolIds(files);
+    expect(
+      ids.length,
+      "no profile directory found — the scope of this rule is stale"
+    ).toBeGreaterThan(1);
+
+    const violations = files
+      .filter((file) => !isAllowed(file, ids))
+      .filter((file) => toolsNamedIn(read(file), ids).length > 0);
+
+    const { added, fixed } = expectRatchet(
+      violations,
+      BASELINE.map((entry) => entry.path)
+    );
     expect(added, "tool named outside its profile — read it from the profile instead").toEqual([]);
     expect(fixed, "fixed — remove these from BASELINE").toEqual([]);
   });
 
-  it("flags a tool name outside its profile and clears one inside it", () => {
-    expect(namesToolOutsideProfile("src/domain/models/framework.ts", 'if (id === "cursor")')).toBe(
-      true
+  it("holds each admitted file to the number of tools its reason was written around", () => {
+    const ids = toolIds(sourceFiles());
+    const recorded = BASELINE.map(({ path, named }) => `${path}: ${named}`);
+    const actual = BASELINE.map(({ path }) => `${path}: ${toolsNamedIn(read(path), ids).length}`);
+
+    expect(actual, "an admitted file took on another tool — fix the count and its reason").toEqual(
+      recorded
     );
+  });
+
+  it("derives the tools from the profiles, so a new one is subject to the rule at once", () => {
+    const ids = toolIds(["src/contexts/tools/domain/profiles/frobnicator/profile.ts"]);
+
+    expect(ids, "a directory under profiles/ is a tool").toEqual(["frobnicator"]);
     expect(
-      namesToolOutsideProfile(
-        "src/contexts/tools/domain/profiles/cursor/profile.ts",
-        'id: "cursor"'
-      )
-    ).toBe(false);
+      toolsNamedIn('const target = "frobnicator";', ids),
+      "and the rule matches it without anyone editing a list"
+    ).toEqual(["frobnicator"]);
+  });
+
+  it("sees the three forms a quoted-literal match missed, and ignores prose", () => {
+    const ids = ["claude", "codex"];
+
+    expect(toolsNamedIn('codex: { "config.toml": x }', ids), "a bare object key").toEqual([
+      "codex",
+    ]);
+    expect(toolsNamedIn('import "../profiles/codex/build.js";', ids), "an import path").toEqual([
+      "codex",
+    ]);
+    expect(
+      toolsNamedIn('"Conversion target (claude, codex)"', ids),
+      "an enumeration inside one string"
+    ).toEqual(["claude", "codex"]);
+    expect(toolsNamedIn("// claude lays its files out differently", ids), "a comment").toEqual([]);
+    expect(
+      toolsNamedIn('throw new Error("claude is not installed")', ids),
+      "one tool named"
+    ).toEqual([]);
   });
 });
