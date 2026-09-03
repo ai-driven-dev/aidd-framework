@@ -5,6 +5,7 @@ const MARKETPLACE_SETTINGS = {
   settingsPath: ".claude/settings.json",
   settingsKey: "extraKnownMarketplaces",
   toEntry: () => null,
+  marketplacesSettingsPath: null,
 };
 
 describe("PluginsCapability", () => {

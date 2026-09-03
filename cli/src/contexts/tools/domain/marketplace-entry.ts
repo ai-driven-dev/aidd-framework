@@ -21,5 +21,5 @@ export function buildClaudeStyleMarketplaceEntry(
   }
 
   if (version != null) value.version = version;
-  return { valueShape: "map", key: name, value };
+  return { key: name, value };
 }

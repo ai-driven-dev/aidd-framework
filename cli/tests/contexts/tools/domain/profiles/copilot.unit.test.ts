@@ -199,7 +199,6 @@ describe("copilot", () => {
           source: { kind: "github", repo: "ai-driven-dev/framework" },
         });
         expect(result).toEqual({
-          valueShape: "map",
           key: "aidd-framework",
           value: { source: { source: "github", repo: "ai-driven-dev/framework" } },
         });
@@ -211,11 +210,9 @@ describe("copilot", () => {
           source: { kind: "github", repo: "ai-driven-dev/framework", ref: "v1.0.0" },
         });
         expect(result).not.toBeNull();
-        if (result?.valueShape === "map") {
-          const src = result.value.source as Record<string, unknown>;
-          expect(src).not.toHaveProperty("ref");
-          expect(src).toEqual({ source: "github", repo: "ai-driven-dev/framework" });
-        }
+        const src = result?.value.source as Record<string, unknown>;
+        expect(src).not.toHaveProperty("ref");
+        expect(src).toEqual({ source: "github", repo: "ai-driven-dev/framework" });
       });
 
       it("returns map entry with directory source for local source", () => {
@@ -224,7 +221,6 @@ describe("copilot", () => {
           source: { kind: "local", path: "/Users/dev/aidd-framework" },
         });
         expect(result).toEqual({
-          valueShape: "map",
           key: "my-marketplace",
           value: { source: { source: "directory", path: "/Users/dev/aidd-framework" } },
         });

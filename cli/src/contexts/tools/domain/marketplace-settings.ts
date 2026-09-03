@@ -1,17 +1,17 @@
 import type { PluginSource } from "../../../kernel/source.js";
 
-export interface MarketplaceSettingsEntryMap {
-  valueShape: "map";
+/**
+ * One marketplace, as the tool records it: a key in a map of entries.
+ *
+ * There used to be a second shape — a plain string in an array — for tools whose settings
+ * held marketplaces that way. No profile ever produced one, and the code that consumed it
+ * was the registration this CLI wrote itself, which every plugin-capable tool now does
+ * through its own command instead. Both are gone.
+ */
+export interface MarketplaceSettingsEntry {
   key: string;
   value: Record<string, unknown>;
 }
-
-export interface MarketplaceSettingsEntryArray {
-  valueShape: "array";
-  value: string;
-}
-
-export type MarketplaceSettingsEntry = MarketplaceSettingsEntryMap | MarketplaceSettingsEntryArray;
 
 export interface MarketplaceSettingsInput {
   name: string;
@@ -28,23 +28,23 @@ export interface MarketplaceSettingsInput {
 export interface MarketplaceSettings {
   settingsPath: string;
   settingsKey: string;
-  valueShape?: "map" | "array";
   enabledPluginsKey?: string;
   enabledPluginsSettingsPath?: string;
   /**
-   * Where the registered marketplaces go. They name a built marketplace by absolute
-   * path, so they describe one machine and one operating system, which decides the
-   * three answers a tool can give:
+   * Where the tool keeps its registered marketplaces, for the two readers that still
+   * need to know: `doctor`, which checks the tool actually wrote one, and the eviction
+   * that takes a stale entry out of the shared file.
    *
-   * - `undefined` — into `settingsPath`, alongside the rest. Only sound for a tool
-   *   whose settings file is not meant to be shared.
-   * - a path — into a file of its own, which the tool reads but this CLI neither
-   *   commits nor hashes. The sibling keys hold names rather than paths, so they stay
-   *   in `settingsPath` where a team can share them.
-   * - `null` — nowhere. The tool offers no machine-local project file, and its shared
-   *   one is explicitly for recommending plugins to teammates, where a path belonging
-   *   to whoever ran the install is worse than nothing.
+   * - a path — a file of its own, which the tool writes and this CLI neither commits nor
+   *   hashes: the entries name built trees by absolute path, so they describe one machine.
+   * - `null` — nowhere. The tool offers no machine-local project file, and its shared one
+   *   is for recommending plugins to teammates, where a path belonging to whoever ran the
+   *   install is worse than nothing.
+   *
+   * There was a third answer, `undefined`, meaning "into `settingsPath` alongside the
+   * rest". It described the era when this CLI wrote the registration itself. It no longer
+   * does — the tool's own command does — so the answer had nothing left to mean.
    */
-  marketplacesSettingsPath?: string | null;
+  marketplacesSettingsPath: string | null;
   toEntry(input: MarketplaceSettingsInput): MarketplaceSettingsEntry | null;
 }

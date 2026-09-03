@@ -5,14 +5,13 @@ import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
 import type { Logger } from "../../../../kernel/ports/logger.js";
-import type { PluginSource } from "../../../../kernel/source.js";
 import type { ToolId } from "../../../../kernel/tool.js";
 import type { Marketplace } from "../../../distribution/domain/marketplace.js";
 import type { MarketplaceRegistry } from "../../../distribution/domain/ports/marketplace-registry.js";
 import type { PluginCatalogRepository } from "../../../distribution/domain/ports/plugin-catalog-repository.js";
 import type { MarketplaceSettings } from "../../../tools/domain/marketplace-settings.js";
 import type { NativePluginActivator } from "../../../tools/domain/ports/native-plugin-activator.js";
-import { getToolConfig, isAiTool, nativeActivationOf } from "../../../tools/domain/registry.js";
+import { getToolConfig, isAiTool } from "../../../tools/domain/registry.js";
 import type { FrameworkBuildTarget } from "../../../translate/domain/build-target.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
@@ -207,17 +206,18 @@ export class MarketplaceSyncSettingsUseCase {
 
   // Settings entries must reference the BUILT tree (claude reads plugins from it;
   // copilot surfaces them as recommendations) so settings match the native CLI install.
-  private async builtSourcesForTool(
+  /**
+   * Builds every known marketplace for this tool. The registration that points at those
+   * trees is written by the tool's own CLI, so nothing here needs the built paths back —
+   * but the build has to happen either way, including on a machine where that CLI is
+   * absent and activation stops short.
+   */
+  private async buildAllForTool(
     toolId: ToolId,
     marketplaces: readonly Marketplace[],
     projectRoot: string
-  ): Promise<ReadonlyMap<string, PluginSource>> {
-    const result = new Map<string, PluginSource>();
-    for (const m of marketplaces) {
-      const builtDir = await this.buildForTool(toolId, m, projectRoot);
-      if (builtDir !== null) result.set(m.name, { kind: "local", path: builtDir });
-    }
-    return result;
+  ): Promise<void> {
+    for (const m of marketplaces) await this.buildForTool(toolId, m, projectRoot);
   }
 
   private async syncTool(
@@ -254,8 +254,7 @@ export class MarketplaceSyncSettingsUseCase {
       projectRoot,
       manifest,
       settings,
-      marketplaces,
-      versionByName
+      marketplaces
     );
     const pluginsChanged =
       settings.enabledPluginsKey != null
@@ -280,45 +279,13 @@ export class MarketplaceSyncSettingsUseCase {
     projectRoot: string,
     manifest: Manifest,
     settings: MarketplaceSettings,
-    marketplaces: readonly Marketplace[],
-    versionByName: Map<string, string | undefined>
+    marketplaces: readonly Marketplace[]
   ): Promise<boolean> {
     // Building the tree is this CLI's job whoever registers it: a tool that is not
-    // installed today may be tomorrow, and the tree is what any registration points
-    // at. So build first, and only then decide who writes the registration down.
-    const builtSources = await this.builtSourcesForTool(toolId, marketplaces, projectRoot);
-
-    // Where the profile declares a native CLI, the tool writes its own registrations —
-    // in its own format and at its own scope. Writing them here too would be a second
-    // copy of something this CLI does not own. `marketplacesSettingsPath` still says
-    // where that file is, so the gitignore and `status` keep knowing about it.
-    if (settings.marketplacesSettingsPath === null || nativeActivationOf(toolId) !== undefined) {
-      return this.evictMarketplacesFromSharedFile(toolId, projectRoot, manifest, settings);
-    }
-    const relativePath = settings.marketplacesSettingsPath ?? settings.settingsPath;
-    const absPath = resolve(projectRoot, relativePath);
-    const json = await this.loadSettings(absPath);
-    const merged = this.mergeMarketplaces(
-      json,
-      settings,
-      marketplaces,
-      versionByName,
-      projectRoot,
-      builtSources
-    );
-    const evicted = await this.evictMarketplacesFromSharedFile(
-      toolId,
-      projectRoot,
-      manifest,
-      settings
-    );
-    if (!merged) return evicted;
-    const content = JSON.stringify(json, null, 2);
-    await this.fs.writeFile(absPath, content);
-    if (settings.marketplacesSettingsPath === undefined) {
-      manifest.updateTrackedFileHash(toolId, settings.settingsPath, this.hasher.hash(content));
-    }
-    return true;
+    // installed today may be tomorrow, and the tree is what any registration points at.
+    // So build first, unconditionally, and leave the registration itself to the tool.
+    await this.buildAllForTool(toolId, marketplaces, projectRoot);
+    return this.evictMarketplacesFromSharedFile(toolId, projectRoot, manifest, settings);
   }
 
   // An install made before the key moved left it in the shared, committed file, where
@@ -362,90 +329,6 @@ export class MarketplaceSyncSettingsUseCase {
     return true;
   }
 
-  private mergeMarketplaces(
-    json: Record<string, unknown>,
-    settings: MarketplaceSettings,
-    marketplaces: readonly Marketplace[],
-    versionByName: Map<string, string | undefined>,
-    projectRoot: string,
-    builtSources: ReadonlyMap<string, PluginSource>
-  ): boolean {
-    if (settings.valueShape === "array") {
-      return this.mergeMarketplacesArray(
-        json,
-        settings,
-        marketplaces,
-        versionByName,
-        projectRoot,
-        builtSources
-      );
-    }
-    return this.mergeMarketplacesMap(
-      json,
-      settings,
-      marketplaces,
-      versionByName,
-      projectRoot,
-      builtSources
-    );
-  }
-
-  private mergeMarketplacesArray(
-    json: Record<string, unknown>,
-    settings: MarketplaceSettings,
-    marketplaces: readonly Marketplace[],
-    versionByName: Map<string, string | undefined>,
-    projectRoot: string,
-    builtSources: ReadonlyMap<string, PluginSource>
-  ): boolean {
-    const existing = this.existingArray(json, settings.settingsKey);
-    const toAdd: string[] = [];
-    for (const m of marketplaces) {
-      const source = this.resolveSourceForSettings(
-        builtSources.get(m.name) ?? m.source,
-        projectRoot
-      );
-      const entry = settings.toEntry({ name: m.name, source, version: versionByName.get(m.name) });
-      if (entry === null || entry.valueShape !== "array") continue;
-      if (!existing.includes(entry.value) && !toAdd.includes(entry.value)) {
-        toAdd.push(entry.value);
-      }
-    }
-    if (toAdd.length === 0) return false;
-    json[settings.settingsKey] = [...existing, ...toAdd];
-    return true;
-  }
-
-  private mergeMarketplacesMap(
-    json: Record<string, unknown>,
-    settings: MarketplaceSettings,
-    marketplaces: readonly Marketplace[],
-    versionByName: Map<string, string | undefined>,
-    projectRoot: string,
-    builtSources: ReadonlyMap<string, PluginSource>
-  ): boolean {
-    const existing = this.existingRecord(json, settings.settingsKey);
-    const toMerge: Record<string, Record<string, unknown>> = {};
-    for (const m of marketplaces) {
-      const source = this.resolveSourceForSettings(
-        builtSources.get(m.name) ?? m.source,
-        projectRoot
-      );
-      const entry = settings.toEntry({ name: m.name, source, version: versionByName.get(m.name) });
-      if (entry === null || entry.valueShape !== "map" || entry.key in toMerge) continue;
-      if (
-        entry.key in existing &&
-        JSON.stringify(existing[entry.key]) === JSON.stringify(entry.value)
-      ) {
-        continue;
-      }
-      toMerge[entry.key] = entry.value;
-    }
-    if (Object.keys(toMerge).length === 0) return false;
-    json[settings.settingsKey] = { ...existing, ...toMerge };
-    return true;
-  }
-
   private mergeEnabledPlugins(
     json: Record<string, unknown>,
     settings: MarketplaceSettings,
@@ -468,7 +351,7 @@ export class MarketplaceSyncSettingsUseCase {
         source: marketplace.source,
         version: versionByName.get(marketplace.name),
       });
-      if (entry == null || entry.valueShape !== "map") continue;
+      if (entry == null) continue;
       const key = `${plugin.name}@${entry.key}`;
       if (!(key in existing)) toAdd[key] = true;
     }
@@ -508,17 +391,6 @@ export class MarketplaceSyncSettingsUseCase {
       return raw as Record<string, unknown>;
     }
     return {};
-  }
-
-  private existingArray(json: Record<string, unknown>, settingsKey: string): string[] {
-    const raw = json[settingsKey];
-    if (Array.isArray(raw)) return raw.filter((v): v is string => typeof v === "string");
-    return [];
-  }
-
-  private resolveSourceForSettings(source: PluginSource, projectRoot: string): PluginSource {
-    if (source.kind !== "local") return source;
-    return { kind: "local", path: resolve(projectRoot, source.path).replace(/\\/g, "/") };
   }
 
   // These files are co-owned: the tool writes them too, and the machine-local one is
