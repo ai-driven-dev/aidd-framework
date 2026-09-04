@@ -10,7 +10,7 @@ The path to `aidd telemetry`, and the question the user asked, in their own word
 ## Output
 
 **One axis, asked for by name.** Run
-`aidd telemetry report --axis <total|day|step|model|task|backlog|flow|tool|project|person> --from <day> --to <day>`,
+`aidd telemetry report --axis <total|day|step|model|agent|prompt|task|backlog|flow|tool|project|person> --from <day> --to <day>`,
 never alongside `--json` - the axis flag already picks the one rendering that answers the
 question, printed exactly as the script wrote it:
 
@@ -93,9 +93,12 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    - One axis: `aidd telemetry report --axis <axis> --from 2026-08-01 --to 2026-08-31`.
    - Everything: `aidd telemetry report --from 2026-08-01 --to 2026-08-31 --json`, reading the shape from [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md).
    - The figure will be kept or compared: give `--from` and `--to`, since `--days` resolves against today and two identical calls on two days cover two different periods.
-3. **Refuse an unknown shape.** `cost_report_version` is `12` today, read from the `--json`
+3. **Refuse an unknown shape.** `cost_report_version` is `13` today, read from the `--json`
    path - the `--axis` path prints text the script already built from that same object, so
-   there is no separate version to check there. The bump from `11` to `12` did not add a
+   there is no separate version to check there. The bump from `12` to `13` added `by_prompt`
+   to the top-level breakdowns: the prompt that caused the work, the one breakdown no host
+   limit can leave empty, since every record the reader stores already carries the turn it
+   came from. The bump from `11` to `12` did not add a
    breakdown either: `by_task`'s `attribution` stopped being always `declared`, so one task
    can now hold two rows - one for what a declaration covered, one for what only a written
    file names. The bump from `10` to `11` did not add a

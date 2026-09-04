@@ -38,6 +38,8 @@ menu and ask them to pick.
 | which framework task | task | one row per task declared in the period, plus the remainder with no task declared |
 | per backlog item, per ticket, what did issue X cost | backlog | one row per backlog item a task declared, plus tasks that named none, plus the remainder with no task at all |
 | per orchestrated run, per flow, what did that pipeline cost | flow | one row per orchestrated run the journal's own sequence names, plus the remainder that ran outside any flow |
+| which subagent, what did delegation cost | agent | one row per agent that ran, plus the main thread's own row |
+| which prompt, which turn, what did one request cost | prompt | one row per prompt that caused work, dated, plus the row for records naming none |
 | for a report, to paste, to send, to keep | any of the above | the same artefact, written to a file |
 | per person, who spent, which teammate | person | one row per resolved person plus every unresolved identity, each with the raw identities behind it |
 

@@ -356,6 +356,46 @@ describe("printCostReport", () => {
     expect(out).not.toContain("2026-01-15");
   });
 
+  it("prints the prompt that caused the work, dated, largest first", () => {
+    const out = printed({
+      records: [
+        record({
+          turn_id: "a",
+          prompt_id: "p-1",
+          cost_usd: 2,
+          event_timestamp: "2026-08-18T09:00:00Z",
+        }),
+        record({
+          turn_id: "b",
+          prompt_id: "p-2",
+          cost_usd: 1,
+          event_timestamp: "2026-08-18T10:00:00Z",
+        }),
+      ],
+    });
+
+    expect(out).toContain("by prompt");
+    const prompts = out.split("\n").filter((line) => line.includes("p-1") || line.includes("p-2"));
+    expect(prompts[0]).toContain("p-1");
+    expect(prompts[0]).toContain("2026-08-18T09:00:00Z");
+  });
+
+  // The first axis whose cardinality is unbounded: one row per turn, 12 on a session and
+  // 31,435 over the measured history. Unlike `by day` this truncates rather than suppressing
+  // every row - a partial series is a lie about continuity, a top N of a ranking is not, and
+  // it says how many it withheld.
+  it("names how many prompts a long period carries beyond the ones it prints", () => {
+    const records = Array.from({ length: 30 }, (_, i) =>
+      record({ turn_id: `t-${i}`, prompt_id: `p-${i}`, cost_usd: 30 - i })
+    );
+    const out = printed({ records });
+
+    expect(out).toContain("p-0");
+    expect(out).not.toContain("p-29");
+    expect(out).toContain("20 more prompts");
+    expect(out).toContain("--json");
+  });
+
   it("gives a record with no project its own row, named as unknown", () => {
     const out = printed({
       records: [

@@ -46,10 +46,13 @@ function commandsNamedBySkill(): string[] {
 }
 
 /** `<axis>` and friends stand for a choice the agent makes; a placeholder is expanded to its
- * first alternative so the command can actually be run, rather than skipped. */
+ * first alternative so the command can actually be run, rather than skipped. Any `<a|b|c>`
+ * is expanded by its own shape rather than by a copy of one skill's list: pinning the list
+ * here meant the skill could not name a new axis without this regex being edited in the same
+ * breath, and the failure it produced named the placeholder, not the drift. */
 function runnable(command: string): string[] {
   return command
-    .replace(/<total\|day\|step\|model\|task\|backlog\|flow\|tool\|project\|person>/gu, "step")
+    .replace(/<([^<>|]+)(?:\|[^<>]+)>/gu, "$1")
     .replace(/<axis>/gu, "step")
     .replace(/<day>/gu, "2026-01-01")
     .split(/\s+/u)

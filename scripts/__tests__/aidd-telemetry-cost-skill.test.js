@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
@@ -7,12 +8,17 @@ const pluginDir = path.resolve(__dirname, "../../plugins/aidd-telemetry");
 const skillDir = path.join(pluginDir, "skills/01-cost");
 // Real source, not a re-description of it: closure tests below check the skill's own text
 // against what these two modules actually accept and actually emit.
-const skill = fs.readFileSync(path.join(skillDir, "SKILL.md"), "utf8");
+// Normalized, because these tests match multi-line shapes against the file's own text and
+// git hands a Windows checkout the same content with CRLF endings - where `\n\n` matches
+// nothing. Measured: the axis table regex below returns true on the POSIX checkout and false
+// on the identical file with CRLF, which is how a green suite failed on Windows alone.
+const read = (file) => fs.readFileSync(file, "utf8").replace(/\r\n/gu, "\n");
+const skill = read(path.join(skillDir, "SKILL.md"));
 // A router skill's rules live in its actions; reading only the router would test a
 // table of contents.
 const actions = fs
   .readdirSync(path.join(skillDir, "actions"))
-  .map((name) => fs.readFileSync(path.join(skillDir, "actions", name), "utf8"))
+  .map((name) => read(path.join(skillDir, "actions", name)))
   .join("\n");
 const everything = `${skill}\n${actions}`;
 
@@ -157,8 +163,10 @@ test("every field the cost skill names by name resolves on the object the script
   // 17 -> 18 when 03-report.md named `by_agent`, the breakdown by the agent that ran, added
   // while bringing the skill's own version paragraph up from `8` to `11` - it had gone three
   // bumps stale, so the paragraph named neither `by_agent` nor `prompt-matched` nor the
-  // fourth no-task reason a row can now carry.
-  assert.equal(claims.size, 18, "expected exactly eighteen field references in the cost skill");
+  // fourth no-task reason a row can now carry. 18 -> 19 when 03-report.md named `by_prompt`,
+  // the breakdown by the prompt that caused the work - the one axis complete by construction,
+  // since every record the reader stores already carries the turn it came from.
+  assert.equal(claims.size, 19, "expected exactly nineteen field references in the cost skill");
 
   // Fields the envelope carries only under some condition, so a fixture cannot show them all
   // at once: the first five appear only under a selection, and `cost_micro_usd` only once a
@@ -320,6 +328,53 @@ test("the cost skill offers its axes in the language of a question", () => {
     assert.ok(everything.includes(question), `must speak in the language of "${question}"`);
   }
   assert.ok(everything.includes("--axis"), "must derive the flag itself, from the question");
+});
+
+// The skill's own axis list drifted twice while the CLI grew one: `agent` shipped and was
+// named in neither the `--axis` enumeration nor the question table, so a person asking "which
+// subagent spent this" was told the question had no axis while the binary had answered it for
+// two releases. Read the axes the binary actually accepts, rather than restating them here,
+// so the next one cannot ship unoffered.
+test("the cost skill offers every axis the binary accepts, in both places it names them", () => {
+  const artefactSource = read(
+    path.resolve(__dirname, "../../cli/src/application/display/cost-report-artefact.ts"),
+  );
+  const declared = /export const ARTEFACT_AXES = \[([^\]]+)\]/u.exec(artefactSource)?.[1] ?? "";
+  const axes = [...declared.matchAll(/"([a-z]+)"/gu)].map((match) => match[1]);
+  assert.ok(axes.length > 1, "must have read the axis list from the artefact module itself");
+
+  const axisFlagEnum = /--axis <([^>]+)>/u.exec(everything)?.[1].split("|") ?? [];
+  const questionTable = /\| The question sounds like \| Axis \| Artefact \|[\s\S]*?\n\n/u.exec(skill)?.[0] ?? "";
+  // Both directions: an axis the binary accepts must be offered, and one the skill offers
+  // must exist - the second is not covered elsewhere, since the e2e that runs every command
+  // the skill names expands this enumeration to its first alternative alone.
+  assert.deepEqual(axisFlagEnum, axes, "the --axis choices must be exactly the axes that exist");
+  for (const axis of axes) {
+    assert.ok(axisFlagEnum.includes(axis), `must list "${axis}" among the --axis choices`);
+    assert.ok(
+      new RegExp(`\\|[^|\\n]*\\b${axis}\\b[^|\\n]*\\|`, "u").test(questionTable),
+      `must map a question to the "${axis}" axis in SKILL.md's own table`,
+    );
+  }
+});
+
+// The reader itself, against a file on disk with the endings git hands a Windows checkout -
+// not a string normalized inside the assertion, which would pass however the reader behaves.
+test("reads a Windows checkout the same way it reads a POSIX one", () => {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "aidd-crlf-"));
+  const file = path.join(scratch, "SKILL.md");
+  fs.writeFileSync(file, skill.replace(/\n/gu, "\r\n"));
+  try {
+    const asRead = read(file);
+
+    assert.equal(asRead, skill, "must hand back the same text a POSIX checkout would");
+    assert.ok(
+      /\| The question sounds like \| Axis \| Artefact \|[\s\S]*?\n\n/u.test(asRead),
+      "the axis table must still be found in a file checked out with CRLF endings",
+    );
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
 });
 
 // Per person used to be the one axis nothing could answer, back when no record carried an

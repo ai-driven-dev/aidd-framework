@@ -88,6 +88,25 @@ export interface CostReportAgentRow {
   readonly totals: CostTotals;
 }
 
+/** One prompt's own share of a period, `prompt` absent on the row for records that named
+ * none.
+ *
+ * The one breakdown that is complete by construction. Every other depends on a capture that
+ * may not have happened — a journal, an identity file, a declaration, a host that names a
+ * skill. This one depends on a field the transcript reader already resolves for every usage
+ * line by walking `parentUuid`: measured 2026-09-04 on the built binary, 1073 of 1073
+ * records of one real session carried a `prompt_id`, its 972 subagent records included,
+ * across 12 distinct prompts.
+ *
+ * `startedAt` is the earliest moment in the group, and only a named prompt gets one: the
+ * row for records that named no prompt is a bucket drawn from many turns, so a start moment
+ * there would assert a unit that never existed. */
+export interface CostReportPromptRow {
+  readonly prompt?: string;
+  readonly startedAt?: string;
+  readonly totals: CostTotals;
+}
+
 /** Why a tool contributes nothing, when it contributes nothing. `covered` with no records
  * is a tool that could have been read and did nothing in this period; `not-covered` is a
  * tool nothing here can read at all. A consumer prints the second as its reason, never as
@@ -397,6 +416,9 @@ export interface CostReport {
   readonly bySteps: readonly CostReportStepRow[];
   readonly byModels: readonly CostReportModelRow[];
   readonly byAgents: readonly CostReportAgentRow[];
+  /** One row per prompt that caused work, largest first, plus the row for records that
+   * named none — see `CostReportPromptRow`. */
+  readonly byPrompts: readonly CostReportPromptRow[];
   readonly byTools: readonly CostReportToolRow[];
   readonly byProjects: readonly CostReportProjectRow[];
   readonly byTasks: readonly CostReportTaskRow[];
@@ -608,6 +630,15 @@ type AgentKey = string | typeof NO_AGENT;
 
 function agentKeyOf(record: TelemetrySinkRecord): AgentKey {
   return record.agent_name === undefined ? NO_AGENT : record.agent_name;
+}
+
+// The row for what named no prompt. A symbol for the same reason `NO_AGENT` is one: a prompt
+// id is opaque and host-assigned, so no string is safe to reserve against it.
+const NO_PROMPT = Symbol("no prompt named");
+type PromptKey = string | typeof NO_PROMPT;
+
+function promptKeyOf(record: TelemetrySinkRecord): PromptKey {
+  return record.prompt_id === undefined ? NO_PROMPT : record.prompt_id;
 }
 
 function modelKeyOf(record: TelemetrySinkRecord): ModelKey {
@@ -896,6 +927,26 @@ function addToPersonGroup(
   groups.set(key, created);
 }
 
+/** A prompt's running totals plus the earliest moment seen in it. The moment is tracked
+ * here rather than read back off the records because the pass over them happens once, and
+ * because a sink is append-ordered by when it was read, never by when a turn began. */
+interface PromptGroup {
+  readonly totals: TotalsAccumulator;
+  earliestMs?: number;
+}
+
+function addToPromptGroup(groups: Map<PromptKey, PromptGroup>, record: TelemetrySinkRecord): void {
+  const key = promptKeyOf(record);
+  const group = groups.get(key) ?? { totals: new TotalsAccumulator() };
+  group.totals.add(record);
+  const atMs =
+    record.event_timestamp === undefined ? Number.NaN : Date.parse(record.event_timestamp);
+  if (!Number.isNaN(atMs) && (group.earliestMs === undefined || atMs < group.earliestMs)) {
+    group.earliestMs = atMs;
+  }
+  groups.set(key, group);
+}
+
 /** Every UTC day from `fromDay` to `toDay`, inclusive — the full period, whether or not a
  * record ever lands on a given day. A day with nothing is still a row: a gap in a series
  * reads as continuity, so the row has to exist to be a zero. */
@@ -1147,6 +1198,7 @@ interface Groups {
   readonly steps: Map<string, StepGroup>;
   readonly models: Map<ModelKey, TotalsAccumulator>;
   readonly agents: Map<AgentKey, TotalsAccumulator>;
+  readonly prompts: Map<PromptKey, PromptGroup>;
   readonly tools: Map<AiToolId, TotalsAccumulator>;
   readonly toolSessionTotals: Map<AiToolId, TotalsAccumulator>;
   readonly attributions: Map<StepAttributionSource, TotalsAccumulator>;
@@ -1168,6 +1220,7 @@ function emptyGroups(fromDay: string, toDay: string): Groups {
     steps: new Map(),
     models: new Map(),
     agents: new Map(),
+    prompts: new Map(),
     tools: new Map(),
     toolSessionTotals: new Map(),
     attributions: new Map(),
@@ -1224,6 +1277,7 @@ function accumulateRequestRecord(
   accumulateInto(groups.tools, record.tool, record);
   accumulateInto(groups.models, modelKeyOf(record), record);
   accumulateInto(groups.agents, agentKeyOf(record), record);
+  addToPromptGroup(groups.prompts, record);
   accumulateInto(groups.projects, projectKeyOf(record), record);
   const taskRow = taskRowOf(record, taskIntervalsByVendorId, journalsByVendorId);
   addToTaskGroup(groups.tasks, taskRow, record);
@@ -1477,6 +1531,34 @@ function agentRows(
   );
 }
 
+/** Every prompt that caused work, largest first, plus one row for what named none.
+ * Largest first and not chronological: unlike `by_day` this is a ranking, and a ranking has
+ * no continuity to break by reordering. The row for what named none is placed last rather
+ * than ranked among them - it is a remainder drawn from many turns, not a turn, so its size
+ * is not comparable to theirs. `by_flow` places its own remainder the same way. */
+function promptRows(prompts: ReadonlyMap<PromptKey, PromptGroup>): readonly CostReportPromptRow[] {
+  const named: CostReportPromptRow[] = [];
+  let namedNone: CostReportPromptRow | undefined;
+  for (const [key, group] of prompts) {
+    const totals = group.totals.build();
+    if (key === NO_PROMPT) {
+      namedNone = { totals };
+      continue;
+    }
+    named.push({
+      prompt: key,
+      ...(group.earliestMs === undefined ? {} : { startedAt: isoSecondsFromMs(group.earliestMs) }),
+      totals,
+    });
+  }
+  const sorted = bySize(
+    named,
+    (row) => row.totals,
+    (row) => row.prompt ?? ""
+  );
+  return namedNone === undefined ? sorted : [...sorted, namedNone];
+}
+
 /** Every model a record named, largest first, plus one row for what named none. */
 function modelRows(
   models: ReadonlyMap<ModelKey, TotalsAccumulator>
@@ -1592,6 +1674,7 @@ function breakdownFields(
   | "bySteps"
   | "byModels"
   | "byAgents"
+  | "byPrompts"
   | "byTools"
   | "byProjects"
   | "byTasks"
@@ -1604,6 +1687,7 @@ function breakdownFields(
     bySteps: stepRows(groups.steps),
     byModels: modelRows(groups.models),
     byAgents: agentRows(groups.agents),
+    byPrompts: promptRows(groups.prompts),
     byTools: toolRowsInScope(input, groups),
     byProjects: projectRows(groups.projects),
     byTasks: taskRows(groups.tasks),

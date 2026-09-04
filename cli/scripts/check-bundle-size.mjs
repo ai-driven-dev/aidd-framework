@@ -11,6 +11,8 @@ const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 // 590 was set when resolving one person across tools and machines (#661) took
 // the bundle to 567.7 KB - tighter headroom than the 560 raise left, on
 // purpose, rather than padding past what was actually measured.
+// 593 was set when `by_prompt` joined the breakdowns: measured 588.4 -> 590.6 KB,
+// +2.2 KB for the axis that is complete by construction. Same tight headroom.
 const budgetKB = pkg.bundleBudgetKB ?? 500;
 const budgetBytes = budgetKB * 1024;
 
