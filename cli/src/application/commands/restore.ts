@@ -16,9 +16,17 @@ export function registerRestoreCommand(program: Command): void {
       try {
         const deps = await createDeps(projectRoot, { verbose }, output);
         const interactive = !cmdOptions.force && process.stdout.isTTY;
-        const result = await deps.restoreAllUseCase.execute(projectRoot, interactive);
+        const result = await deps.restoreAllUseCase.execute(
+          projectRoot,
+          interactive,
+          cmdOptions.force
+        );
 
         for (const e of result.errors) output.warn(`[${e.scope}] ${e.message}`);
+
+        // A run that errored restored nothing, and saying "nothing to restore" would
+        // report that as the healthy state. Nothing was restored *because* it failed.
+        if (result.errors.length > 0) process.exit(1);
 
         if (
           result.totalRestored === 0 &&
