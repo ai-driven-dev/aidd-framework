@@ -106,6 +106,19 @@ trap 'rm -rf "$TMPROOT"' EXIT
 TOKEN="${AIDD_TOKEN:-$(gh auth token 2>/dev/null || true)}"
 export AIDD_TOKEN="$TOKEN"
 
+# Only now, never earlier: `gh auth token` above reads the REAL home, and moving it first
+# makes every authenticated case silently unauthenticated.
+#
+# Three of the tools this harness loops over activate plugins through their own CLI, and
+# those write into the USER's home, not the project directory - a fresh /tmp project
+# isolates nothing there. Until this existed the harness sandboxed AIDD_USER_CONFIG_DIR for
+# every case and HOME for exactly one, so `plugin install --tool codex|copilot|claude` ran
+# against the real ~/.claude, ~/.codex and ~/.copilot of whoever typed `pnpm smoke`.
+# CODEX_HOME is separate because HOME does not move Codex: it reads that variable, and falls
+# back to the real ~/.codex when it is unset.
+export HOME="$TMPROOT/home"; mkdir -p "$HOME"
+export CODEX_HOME="$TMPROOT/codex-home"; mkdir -p "$CODEX_HOME"
+
 # ════════════════════════════════════════════════════════════════
 # OFFLINE / LOCAL — runs without a token
 # ════════════════════════════════════════════════════════════════
