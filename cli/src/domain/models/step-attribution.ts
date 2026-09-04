@@ -1,4 +1,5 @@
 import type { RunJournal, RunJournalBoundary } from "../ports/run-journal-reader.js";
+import { namesTheSameSkill } from "./skill-name.js";
 
 /** How a record's step came to be known. Never collapsed into one field with the step
  * name itself: a name the tool stated and one taken from an interval answer differently
@@ -88,11 +89,14 @@ function parseableBoundaries(boundaries: readonly RunJournalBoundary[]): readonl
  * With no such line, the rule is the one this reader always had - the next `step_start` or
  * `turn_end`, or nothing. A `step_end` naming a *different* skill is never a closer here: it
  * would truncate a step it has no claim on, which is the fault naming the skill exists to
- * prevent. */
+ * prevent. Same or different is `namesTheSameSkill`'s answer, not `===`: the host that
+ * opened the step may have written the skill's bare directory name while the end the skill
+ * echoes carries its plugin. */
 function stepEndsAt(timed: readonly TimedBoundary[], from: number, skill: string): number {
   for (let i = from + 1; i < timed.length; i++) {
     const { boundary } = timed[i];
-    if (boundary.type === "step_end" && boundary.skill === skill) return timed[i].atMs;
+    if (boundary.type === "step_end" && namesTheSameSkill(boundary.skill, skill))
+      return timed[i].atMs;
   }
   for (let i = from + 1; i < timed.length; i++) {
     if (timed[i].boundary.type !== "step_end") return timed[i].atMs;

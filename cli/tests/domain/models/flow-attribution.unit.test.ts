@@ -117,6 +117,31 @@ describe("buildFlowIntervals — pure: journal lines -> bounded flow intervals",
     ]);
   });
 
+  it("closes a flow opened by its bare name with the end the orchestrator declares in full", () => {
+    // Cursor and Codex write `01-sdlc` into step_start - the plugin never reaches the
+    // journal - while the end the skill echoes always carries it. Compared exactly, the
+    // declaration those hosts capture closed nothing at all.
+    const bareOpener = {
+      type: "step_start",
+      at: "2026-08-17T10:00:00Z",
+      skill: "01-sdlc",
+    } as const;
+    const intervals = buildFlowIntervals(journalOf([bareOpener, SDLC_ENDS], [], [WRITTEN_LATE]));
+
+    expect(intervals[0]?.endMs).toBe(Date.parse(SDLC_ENDS.at));
+  });
+
+  it("still refuses an end whose plugin disagrees with the one that opened the flow", () => {
+    const otherPlugin = {
+      type: "step_end",
+      at: "2026-08-17T11:00:00Z",
+      skill: "acme:01-sdlc",
+    } as const;
+    const intervals = buildFlowIntervals(journalOf([SDLC_OPENS, otherPlugin], [], [WRITTEN_LATE]));
+
+    expect(intervals[0]?.endMs).toBe(Date.parse(WRITTEN_LATE.at));
+  });
+
   it("never closes a flow on a step_end naming some other skill", () => {
     // A step run inside the orchestration ends; the orchestration does not. Distinguishing:
     // something is witnessed after that end, so closing there and not closing there are two
