@@ -92,7 +92,26 @@ run() {
 new_project() { local p; p=$(mktemp -d "$TMPROOT/proj.XXXXXX"); (cd "$p" && git init -q); echo "$p"; }
 # Only the marketplaces catalog — NOT the per-target built-marketplace cache
 # (.aidd/cache/built/.../marketplace.json), which also matches a bare *marketplace.json glob.
-cache_catalog() { find "$1/.aidd/cache/marketplaces" -path "*marketplace.json" 2>/dev/null | head -1; }
+# `find` answers in directory order, which is neither sorted nor the same on two machines.
+# Every case below damages the file this returns, so an unsorted pick runs a different case
+# on every run - and a case nobody can name is a case nobody can debug.
+first_file() { LC_ALL=C sort | head -1; }
+
+cache_catalog() { find "$1/.aidd/cache/marketplaces" -path "*marketplace.json" 2>/dev/null | first_file; }
+
+# The drift every restore case writes, and the string its check looks for again afterwards.
+# A marker rather than a bare newline: a blank line is invisible to `grep`, so a case that
+# appended one could only ever assert an exit code.
+DRIFT_MARK="SMOKE_DRIFT"
+
+# A restore that exits 0 having restored nothing is the exact failure #762 fixed in the
+# command. The exit code is checked by `run`; this is what checks the repair.
+repaired() {
+  local name="$1" file="$2"
+  if [[ -z "$file" ]]; then bad "$name (nothing was drifted to repair)"; return 1; fi
+  if grep -qF -- "$DRIFT_MARK" "$file"; then bad "$name (drift still in $file)"; return 1; fi
+  ok "$name repaired the file it drifted"
+}
 
 # ── build ───────────────────────────────────────────────────────
 echo "Building dist…"
@@ -188,17 +207,20 @@ else
   run "update" 0 "" "$BASE" -- update
 
   section "global restore"
-  tgt=$(find "$BASE/.claude" -name "*.md" | head -1)
-  if [[ -n "$tgt" ]]; then printf '\nDRIFT\n' >> "$tgt"; fi
+  tgt=$(find "$BASE/.claude" -name "*.md" | first_file)
+  if [[ -n "$tgt" ]]; then printf '\n%s\n' "$DRIFT_MARK" >> "$tgt"; fi
   run "restore --force" 0 "" "$BASE" -- restore --force
+  repaired "restore --force" "$tgt"
 
   section "ai per-tool commands × all 5 tools"
   run "ai list" 0 "" "$BASE" -- ai list
   run "ai status" 0 "" "$BASE" -- ai status
   run "ai doctor" "0|1" "" "$BASE" -- ai doctor
   run "ai update (all)" 0 "" "$BASE" -- ai update
-  d=$(find "$BASE/.cursor" -name "*.md" 2>/dev/null | head -1); [[ -n "$d" ]] && printf '\nX\n' >> "$d"
+  d=$(find "$BASE/.cursor" -name "*.md" 2>/dev/null | first_file)
+  [[ -n "$d" ]] && printf '\n%s\n' "$DRIFT_MARK" >> "$d"
   run "ai restore --force" 0 "" "$BASE" -- ai restore --force
+  repaired "ai restore --force" "$d"
   for t in "${AI_TOOLS[@]}"; do
     run "ai update $t" 0 "" "$BASE" -- ai update "$t"
   done
@@ -215,8 +237,12 @@ else
   run "ide status" 0 "" "$BASE" -- ide status
   run "ide doctor" 0 "" "$BASE" -- ide doctor
   run "ide update" 0 "" "$BASE" -- ide update vscode
-  i=$(find "$BASE/.vscode" -type f | head -1); [[ -n "$i" ]] && printf '\n' >> "$i"
+  # A blank line was the drift here, and `grep` cannot see one - so this case could only ever
+  # assert an exit code. The same mark as the other two, for the same reason.
+  i=$(find "$BASE/.vscode" -type f | first_file)
+  [[ -n "$i" ]] && printf '\n%s\n' "$DRIFT_MARK" >> "$i"
   run "ide restore --force" 0 "" "$BASE" -- ide restore --force
+  repaired "ide restore --force" "$i"
   P_IDE=$(new_project)
   (cd "$P_IDE" && node "$CLI" setup --source remote --ide vscode --plugins none --yes >/dev/null 2>&1)
   run "ide uninstall vscode" 0 "" "$P_IDE" -- ide uninstall vscode

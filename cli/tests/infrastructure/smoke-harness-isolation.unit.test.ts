@@ -27,6 +27,17 @@ describe("the smoke harness never runs against the real user home", () => {
     expect(harness).toMatch(/export CODEX_HOME="\$TMPROOT\/[^"]+"/u);
   });
 
+  // A case that damages a file it picked at random, then asserts only an exit code, proves
+  // nothing twice over: it does not know which file it broke, and it never looks at whether
+  // the command repaired it. `find` returns directory order, which is neither sorted nor
+  // stable across filesystems, so `find … | head -1` on a tree of several files runs a
+  // different case on every machine.
+  it("picks the file a case damages in a fixed order, never whatever find returns first", () => {
+    const unsorted = [...harness.matchAll(/find [^\n|]*\|[ \t]*head\b/gu)].map((m) => m[0]);
+
+    expect(unsorted).toEqual([]);
+  });
+
   // Ordering is the whole guard: the token is resolved through `gh`, which reads the real
   // home. Exporting the sandbox before that line makes every authenticated case silently
   // unauthenticated, so the sandbox must come after it and before the first case that runs.
@@ -38,5 +49,24 @@ describe("the smoke harness never runs against the real user home", () => {
     expect(token).toBeGreaterThan(-1);
     expect(home).toBeGreaterThan(token);
     expect(home).toBeLessThan(firstCase);
+  });
+});
+
+/** A `restore --force` that returns 0 having restored nothing is exactly the failure #762
+ * fixed in the command itself, and the smoke case that was supposed to cover it asserted the
+ * exit code alone. An exit code is not a repair. */
+describe("a smoke case that damages a file checks the damage was undone", () => {
+  it("marks the drift it writes, so the check can name what it is looking for", () => {
+    expect(harness).toContain("SMOKE_DRIFT");
+  });
+
+  it("looks for that mark again after every restore it runs", () => {
+    const restores = [...harness.matchAll(/run "((?:ai |ide )?restore --force)"/gu)].map(
+      (match) => match[1]
+    );
+    const checks = [...harness.matchAll(/repaired "([^"]+)"/gu)].map((match) => match[1]);
+
+    expect(restores.length).toBeGreaterThan(0);
+    expect(checks.sort()).toEqual(restores.sort());
   });
 });
