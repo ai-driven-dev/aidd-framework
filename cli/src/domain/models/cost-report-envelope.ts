@@ -18,6 +18,23 @@ import type { AiToolId } from "./tool-ids.js";
  * `sink_schema_version` exists on a stored line. Adding a field a consumer may ignore is
  * not a bump; changing what an existing field means is.
  *
+ * Bumped to 12: `by_task`'s `attribution` stops being always `"declared"`. A record no
+ * declaration covers, in a session whose journal witnessed it and that wrote into exactly
+ * one task folder, is now named after that folder and marked `"inferred"` - so one task can
+ * hold two rows, one per route, the same `(name x attribution)` shape `by_step` already has.
+ * A consumer that read `attribution` as constant, or `by_task` as one row per task,
+ * misreads this version. Measured: on the one session with a complete journal, 1045 of 1073
+ * records fell inside a declared interval and the remaining 27 sat between `session_start`
+ * and the first declaration, 38 minutes of work before the flow named its ticket.
+ *
+ * Bumped to 11: a `by_task` or `by_backlog` row with no task gains a fourth possible
+ * `reason`, `no-journal`. A consumer that switched exhaustively on the three before it meets
+ * a value it has no case for, which is a misread rather than a field it may ignore. It
+ * separates a fact about the read from a fact about the work: a session with no journal read
+ * for it used to be given `no-declaration`, which asserts the session declared no task.
+ * Measured 2026-09-04 - a report run from a subdirectory put 100% of a period into that row
+ * while every journal sat one directory up, unread.
+ *
  * Bumped to 10: `by_agent` is a new top-level breakdown, and a consumer summing every
  * breakdown's `requests` against `totals.requests` to check nothing was dropped now has one
  * more to include. It exists because that is where the spend is: on a live session, ten
@@ -77,7 +94,7 @@ import type { AiToolId } from "./tool-ids.js";
  * `by_project`'s `project` to optional back when that row was added.
  *
  * Bumped to 2: `by_project` and `by_day` are new top-level breakdowns. */
-export const COST_REPORT_ENVELOPE_VERSION = 10;
+export const COST_REPORT_ENVELOPE_VERSION = 12;
 
 /** Money as whole micro-dollars, the way the report carries it: an integer, so a consumer
  * summing several reports gets the same answer this one did. Divide by 1,000,000 for
@@ -157,9 +174,11 @@ export interface CostReportEnvelopeProjectRow {
 }
 
 /** One framework task's figures, keyed on the closed interval a record's own moment falls
- * in - see `CostReportTaskRow`. `attribution` is present, and always `"declared"`, only
- * alongside `task`; a row for what fell in no declared interval carries `reason` instead,
- * naming which of three distinct facts applies - never both, and never neither. */
+ * in - see `CostReportTaskRow`. `attribution` is present only alongside `task`, and says
+ * which route named it: `"declared"` where a `task_declared` interval covers the record,
+ * `"inferred"` where the session wrote into exactly one task folder and no declaration
+ * covered it. One task can therefore carry two rows, one per route; a row for what fell in no declared interval carries `reason` instead,
+ * naming which distinct fact applies - never both, and never neither. */
 export interface CostReportEnvelopeTaskRow {
   readonly task?: string;
   readonly attribution?: TaskAttributionSource;

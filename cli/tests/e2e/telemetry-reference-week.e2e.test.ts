@@ -167,13 +167,20 @@ describe("the reference week", () => {
   });
 
   it("breaks the week down by task, and by the backlog item a task declared", () => {
-    const tasks = envelope.by_task.map((row) => row.task).filter(Boolean);
+    // Distinct, because one task can hold two rows since `cost_report_version` 12 - one for
+    // what a declaration covered, one for what only a written file names, the same
+    // `(name x attribution)` shape `by_step` has always had. What this asserts is which
+    // tasks the week names, never how many routes named each.
+    const tasks = [...new Set(envelope.by_task.map((row) => row.task).filter(Boolean))];
     expect(tasks.sort()).toEqual([...built.expected.tasks].sort());
 
     const declared = envelope.by_backlog.filter((row) => row.backlog !== undefined);
     expect(declared.map((row) => row.backlog)).toEqual([built.expected.backlogItem]);
-    // The task with a backlog link and the task without must not merge into one row.
-    expect(declared[0]?.totals.requests).toBe(2);
+    // The task with a backlog link and the task without must not merge into one row. Three
+    // requests since version 12, not two: that session's 08:07 record precedes its own
+    // declaration at 08:12 by five minutes, its journal witnessed it, and it wrote into that
+    // one task folder and no other - so the written-file route names it too.
+    expect(declared[0]?.totals.requests).toBe(3);
     expect(sumRequests(envelope.by_backlog)).toBe(envelope.totals.requests);
   });
 

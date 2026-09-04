@@ -121,6 +121,51 @@ describe("ReportCostUseCase", () => {
     expect(built.totals.costMicroUsd).toBe(toMicroUsd(1));
   });
 
+  // The written-file route only fires inside the span the journal itself witnessed, and that
+  // span reaches the report from the journal's own lines - nowhere else. A record inside it
+  // that no declaration covers is named after the one task folder the session wrote into; a
+  // record from before the journal was ever open is not, however many files that session
+  // went on to write.
+  it("names a record inside the journal's span after the only task folder that session wrote into", async () => {
+    journals.set("s-inferred", {
+      boundaries: [],
+      session: {
+        type: "session_start",
+        at: "2026-08-18T09:00:00Z",
+        run_id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        tool: "claude-code",
+        vendor_id: "s-inferred",
+      },
+      filesWritten: [
+        {
+          type: "file_written",
+          at: "2026-08-18T09:30:00Z",
+          path: `aidd_docs/tasks/${TASK}/plan.md`,
+        },
+      ],
+      taskDeclarations: [],
+    });
+    await store(
+      record({
+        vendor_id: "s-inferred",
+        cost_usd: 1,
+        event_timestamp: "2026-08-18T09:15:00Z",
+      }),
+      record({
+        vendor_id: "s-inferred",
+        cost_usd: 2,
+        event_timestamp: "2026-08-17T09:15:00Z",
+      })
+    );
+
+    const built = await useCase.execute({ ...BASE_OPTIONS, period: PERIOD });
+
+    const inferred = built.byTasks.find((row) => row.attribution === "inferred");
+    expect(inferred?.task).toBe(TASK);
+    expect(inferred?.totals.costMicroUsd).toBe(toMicroUsd(1));
+    expect(built.byTasks.some((row) => row.reason !== undefined)).toBe(true);
+  });
+
   it("gives every declared tool a row, with the reason an unreadable one cannot be read", async () => {
     await store(record({ cost_usd: 1 }));
 
@@ -221,6 +266,83 @@ describe("ReportCostUseCase", () => {
     await expect(useCase.execute({ ...BASE_OPTIONS, period: PERIOD })).rejects.toThrow(
       "some other failure entirely"
     );
+  });
+
+  // A task reached only by the written-file route still has a folder, and that folder can
+  // declare a backlog item. Resolving declarations from declared intervals alone would send
+  // every inferred record to the "this task declares no backlog item" row - a claim about
+  // the task, produced by a lookup that never happened.
+  // A journal moment is a second: `nowIso()` in the writing hook strips the milliseconds
+  // (`plugins/aidd-telemetry/hooks/lib/record.cjs`). A record carries them. Comparing the
+  // two as instants refuses a record that landed in the very second the journal last wrote,
+  // which is a rounding artefact of the source, not a fact about the work - measured, it
+  // cost one record of 1073 on a real session.
+  it("counts a record inside the last second its journal wrote as witnessed", async () => {
+    journals.set("s-same-second", {
+      boundaries: [],
+      session: {
+        type: "session_start",
+        at: "2026-08-18T09:00:00Z",
+        run_id: "01ARZ3NDEKTSV4RRFFQ69G5FB0",
+        tool: "claude-code",
+        vendor_id: "s-same-second",
+      },
+      filesWritten: [
+        {
+          type: "file_written",
+          at: "2026-08-18T09:30:00Z",
+          path: `aidd_docs/tasks/${TASK}/plan.md`,
+        },
+      ],
+      taskDeclarations: [],
+    });
+    await store(
+      record({
+        vendor_id: "s-same-second",
+        cost_usd: 5,
+        event_timestamp: "2026-08-18T09:30:00.351Z",
+      })
+    );
+
+    const built = await useCase.execute({ ...BASE_OPTIONS, period: PERIOD });
+
+    expect(built.byTasks.find((row) => row.attribution === "inferred")?.task).toBe(TASK);
+  });
+
+  it("resolves the backlog declaration of a task no interval ever declared", async () => {
+    journals.set("s-written-only", {
+      boundaries: [],
+      session: {
+        type: "session_start",
+        at: "2026-08-18T09:00:00Z",
+        run_id: "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+        tool: "claude-code",
+        vendor_id: "s-written-only",
+      },
+      filesWritten: [
+        {
+          type: "file_written",
+          at: "2026-08-18T09:40:00Z",
+          path: `aidd_docs/tasks/${TASK}/plan.md`,
+        },
+      ],
+      taskDeclarations: [],
+    });
+    taskBacklog.set(taskFolderPathFromIdentity(TASK), {
+      kind: "declared",
+      link: { backlog: "acme/widgets#742", writtenAt: "2026-08-18T09:00:00Z", writtenBy: "x" },
+    });
+    await store(
+      record({
+        vendor_id: "s-written-only",
+        cost_usd: 3,
+        event_timestamp: "2026-08-18T09:20:00Z",
+      })
+    );
+
+    const built = await useCase.execute({ ...BASE_OPTIONS, period: PERIOD });
+
+    expect(built.byBacklog.map((row) => row.backlog)).toContain("acme/widgets#742");
   });
 
   it("resolves the declaration through TaskBacklogReader, keyed on the folder the task identity resolves to", async () => {

@@ -95,6 +95,31 @@ describe("TaskBacklogAdapter — reads a declaration without ever writing one", 
     );
   });
 
+  // The task folder path this reader is handed is repository-relative, because the journal
+  // line it came from was written relative to the repository root. Joining it to the
+  // process working directory instead finds nothing from a subdirectory - and "nothing" is
+  // spelled `{ kind: "none" }`, "this task declares no backlog item", which is a claim about
+  // the task rather than about the read. Introduced the moment the journal reader started
+  // anchoring at the root: `by_task` names the task, `by_backlog` says it declares nothing.
+  it("anchors at the repository root, so a subdirectory reads the same declaration", async () => {
+    const root = await freshProject();
+    await mkdir(join(root, ".git"), { recursive: true });
+    await writeLink(
+      root,
+      JSON.stringify({
+        backlog: "acme/widgets#661",
+        written_at: "2026-08-21T10:00:00Z",
+        written_by: "aidd-vcs:01-commit",
+      })
+    );
+    const subdirectory = join(root, "cli", "nested");
+    await mkdir(subdirectory, { recursive: true });
+
+    const declaration = await new TaskBacklogAdapter(subdirectory).read(TASK_FOLDER);
+
+    expect(declaration.kind).toBe("declared");
+  });
+
   it("answers none for a folder that declares nothing — a normal state, not an error", async () => {
     const root = await freshProject();
     await mkdir(join(root, TASK_FOLDER), { recursive: true });

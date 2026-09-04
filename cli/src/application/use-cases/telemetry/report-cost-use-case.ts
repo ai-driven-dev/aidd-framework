@@ -95,11 +95,42 @@ function declaredTools(): readonly CostReportToolDeclaration[] {
   });
 }
 
+/** The first and last moment a journal's own lines carry, or nothing when not one of them
+ * carries a moment this reader can parse. Every line kind counts, not only the kinds an
+ * interval opens or closes on: the question this answers is "was this journal open then",
+ * and a written file witnesses that as surely as a boundary does.
+ *
+ * Not capped at the period's end, unlike an unclosed interval. This span is only ever asked
+ * whether it contains a record's moment, and the sink never returns a record past the
+ * period end, so a clock-skewed line can widen the span past a moment no record can reach -
+ * it cannot pull one in. */
+const LAST_MILLISECOND_OF_A_SECOND = 999;
+
+function witnessedSpan(journal: RunJournal): { fromMs: number; toMs: number } | undefined {
+  const moments = [
+    ...journal.boundaries,
+    ...journal.taskDeclarations,
+    ...journal.filesWritten,
+    ...(journal.session ? [journal.session] : []),
+  ]
+    .map((line) => Date.parse(line.at))
+    .filter((atMs) => !Number.isNaN(atMs));
+  if (moments.length === 0) return undefined;
+  // The end is the end of the second the last line names, not that second's first instant.
+  // A journal moment IS a second - `nowIso()` in the writing hook strips the milliseconds
+  // - while a record carries them, so comparing the two as instants refuses a record that
+  // landed inside the very second the journal last wrote. Measured, that rounding cost one
+  // record of 1073 on a real session. The start needs no such widening: a truncated moment
+  // already sits at the first instant of its own second.
+  return { fromMs: Math.min(...moments), toMs: Math.max(...moments) + LAST_MILLISECOND_OF_A_SECOND };
+}
+
 function toSessionJournal(
   journal: RunJournal,
   periodEndMs: number
 ): CostReportSessionJournal | null {
   if (!journal.session) return null;
+  const span = witnessedSpan(journal);
   return {
     vendorId: journal.session.vendor_id,
     tool: journal.session.tool,
@@ -107,6 +138,7 @@ function toSessionJournal(
     writtenPaths: journal.filesWritten.map((written) => written.path),
     taskIntervals: buildTaskIntervals(journal, periodEndMs),
     flowIntervals: buildFlowIntervals(journal, periodEndMs),
+    ...(span === undefined ? {} : { witnessed: span }),
   };
 }
 
@@ -122,13 +154,21 @@ function distinctTaskIdentities(
 ): readonly TaskIdentity[] {
   const seen = new Set<TaskIdentity>();
   const identities: TaskIdentity[] = [];
+  const remember = (identity: TaskIdentity | null): void => {
+    if (identity === null || seen.has(identity)) return;
+    seen.add(identity);
+    identities.push(identity);
+  };
   for (const journal of journals) {
     for (const interval of buildTaskIntervals(journal, periodEndMs)) {
-      const identity = taskIdentityFromWrittenPath(interval.path);
-      if (identity !== null && !seen.has(identity)) {
-        seen.add(identity);
-        identities.push(identity);
-      }
+      remember(taskIdentityFromWrittenPath(interval.path));
+    }
+    // Written paths too, not declared intervals alone: a task the written-file route names
+    // has a folder like any other, and that folder can declare a backlog item. Resolving
+    // from declarations alone would send every inferred record to "this task declares no
+    // backlog item" - a claim about the task, produced by a lookup that never ran.
+    for (const written of journal.filesWritten) {
+      remember(taskIdentityFromWrittenPath(written.path));
     }
   }
   return identities;

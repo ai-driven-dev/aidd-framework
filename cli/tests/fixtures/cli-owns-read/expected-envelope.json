@@ -1,5 +1,5 @@
 {
-  "cost_report_version": 10,
+  "cost_report_version": 12,
   "period": {
     "from_day": "2026-01-01",
     "to_day": "2026-01-31"
@@ -226,7 +226,7 @@
   ],
   "by_task": [
     {
-      "reason": "no-declaration",
+      "reason": "no-journal",
       "totals": {
         "requests": 4,
         "input_tokens": 935,
@@ -490,7 +490,7 @@
   },
   "by_backlog": [
     {
-      "reason": "no-declaration",
+      "reason": "no-journal",
       "totals": {
         "requests": 4,
         "input_tokens": 935,

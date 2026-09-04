@@ -10,6 +10,7 @@ import type {
   RunJournalTaskDeclared,
 } from "../../domain/ports/run-journal-reader.js";
 import { isBareFileName } from "../confined-file-name.js";
+import { repositoryRootAbove } from "../repository-root.js";
 
 const ULID_LENGTH = 26; // encodeTime(10) + encodeRandom(16), matching record.cjs's own ULID_LENGTH.
 const RUN_FILE_EXTENSION = ".jsonl";
@@ -191,7 +192,8 @@ export class RunJournalReaderAdapter implements RunJournalStore {
   readonly runsDir: string;
 
   constructor(projectRoot: string) {
-    this.runsDir = process.env.AIDD_RUNS_DIR || join(projectRoot, DOCS_DIR, RUNS_SUBDIR);
+    this.runsDir =
+      process.env.AIDD_RUNS_DIR || join(repositoryRootAbove(projectRoot), DOCS_DIR, RUNS_SUBDIR);
   }
 
   async read(sessionId: string): Promise<RunJournal | null> {

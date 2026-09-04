@@ -89,6 +89,66 @@ describe("RunJournalReaderAdapter", () => {
     ]);
   });
 
+  // The hook that writes a journal anchors at `git rev-parse --show-toplevel`
+  // (plugins/aidd-telemetry/hooks/lib/repo.cjs), so a session started anywhere inside a
+  // checkout writes into ONE directory at its root. A reader anchored at the process
+  // working directory instead finds that directory only when the command happens to be run
+  // from the root - and answers "this session declared no task" when it is not, which is a
+  // claim about the work rather than about the read.
+  it("anchors at the repository root, so a subdirectory finds the journal the hook wrote", async () => {
+    await mkdir(join(projectRoot, ".git"), { recursive: true });
+    await writeFile(
+      join(runsDir, `${RUN_ID}__${SESSION_ID}.jsonl`),
+      runFileLines({ type: "step_start", at: "2026-08-20T10:00:00Z", skill: "from-the-root" })
+    );
+    const subdirectory = join(projectRoot, "cli", "nested");
+    await mkdir(subdirectory, { recursive: true });
+
+    const journal = await new RunJournalReaderAdapter(subdirectory).read(SESSION_ID);
+
+    expect(journal?.boundaries).toEqual([
+      { type: "step_start", at: "2026-08-20T10:00:00Z", skill: "from-the-root" },
+    ]);
+  });
+
+  // A linked worktree's `.git` is a FILE holding `gitdir: …`, not a directory. Accepting
+  // only a directory would leave every worktree anchored at the process working directory -
+  // and this repository is developed in worktrees, so the case is the common one, not a
+  // corner.
+  it("accepts a linked worktree, whose .git is a file rather than a directory", async () => {
+    await writeFile(join(projectRoot, ".git"), "gitdir: /elsewhere/.git/worktrees/w\n");
+    await writeFile(
+      join(runsDir, `${RUN_ID}__${SESSION_ID}.jsonl`),
+      runFileLines({ type: "step_start", at: "2026-08-20T10:00:00Z", skill: "from-the-worktree" })
+    );
+    const subdirectory = join(projectRoot, "cli");
+    await mkdir(subdirectory, { recursive: true });
+
+    const journal = await new RunJournalReaderAdapter(subdirectory).read(SESSION_ID);
+
+    expect(journal?.boundaries).toEqual([
+      { type: "step_start", at: "2026-08-20T10:00:00Z", skill: "from-the-worktree" },
+    ]);
+  });
+
+  // Outside any checkout there is no root to walk up to. The reader keeps the directory it
+  // was handed rather than climbing to the filesystem root and reading a stranger's journal.
+  it("keeps the directory it was given when no repository root is above it", async () => {
+    const outside = await mkdtemp(join(tmpdir(), "aidd-run-journal-outside-"));
+    await mkdir(join(outside, "aidd_docs", "runs"), { recursive: true });
+    await writeFile(
+      join(outside, "aidd_docs", "runs", `${RUN_ID}__${SESSION_ID}.jsonl`),
+      runFileLines({ type: "step_start", at: "2026-08-20T10:00:00Z", skill: "from-outside" })
+    );
+
+    const journal = await new RunJournalReaderAdapter(outside).read(SESSION_ID);
+
+    expect(journal?.boundaries).toEqual([
+      { type: "step_start", at: "2026-08-20T10:00:00Z", skill: "from-outside" },
+    ]);
+    await rm(outside, { recursive: true, force: true });
+  });
+
   it("honors AIDD_RUNS_DIR over <projectRoot>/aidd_docs/runs, matching the writing hook", async () => {
     const overrideDir = await mkdtemp(join(tmpdir(), "aidd-run-journal-override-"));
     process.env.AIDD_RUNS_DIR = overrideDir;

@@ -101,11 +101,30 @@ export function buildTaskIntervals(
   );
 }
 
-/** Why a record's own moment falls in none of `intervals` - the three, and only three,
- * distinct facts a person acts on differently. Never called for a moment `momentFallsWithin`
+/** Why a record belongs to no task - the distinct facts a person acts on differently, and
+ * no more than those. This function itself answers only the three that are facts about the
+ * work; `"no-journal"`, the fact about the read, is decided by `declaredTaskKeyOf` before
+ * this is ever called. Never called for a moment `momentFallsWithin`
  * already reads as covered; that caller already knows which interval and needs no reason for
  * what it found.
  *
+ * - `"no-journal"`: no *usable* journal reached this record's session. Either none was read
+ *   for it at all, or one was read and could not be used - `report-cost-use-case.ts` drops
+ *   a journal whose `session_start` header is torn, since nothing then says which session
+ *   its lines belong to, and that shape is real (the adapter's own "keeps a session's
+ *   boundaries when its header line is torn" test produces it). "Usable" is the word this
+ *   reason turns on: saying "no journal existed" would be false for the second case, which
+ *   is the fault this reason exists to stop repeating one level down. Never produced by this
+ *   function, which is only ever asked about a session whose journal was usable -
+ *   `declaredTaskKeyOf` answers it before calling here, from the absence of an entry in its
+ *   own per-session map. It belongs in
+ *   this type all the same: it is one of the reasons a `by_task` row carries, and keeping it
+ *   in the same closed set is what makes `Record<TaskUnattributedReason, string>` force
+ *   every consumer to name it. The three below are facts about the work; this one is a fact
+ *   about the read, and merging it into `"no-declaration"` asserted that a session declared
+ *   nothing when the truth was that its journal was never found - measured on 2026-09-04,
+ *   where running the report from a subdirectory reported 100% "no usable task declaration"
+ *   for a period whose journals were all present one directory up.
  * - `"no-declaration"`: this session's journal yields no usable declared interval - either it
  *   never wrote a `task_declared` line at all, or it wrote one this reader cannot place in
  *   time (an `at` `timed()` cannot parse, dropped before it ever reaches `buildTaskIntervals`).
@@ -124,12 +143,17 @@ export function buildTaskIntervals(
  *   it is as unplaceable as one that arrived after that coverage lapsed. In practice a
  *   report never hands this function such a record - `report-cost-use-case.ts` splits an
  *   undated record off before any of this runs - but the function stays correct standalone. */
-export type TaskUnattributedReason = "no-declaration" | "precedes-declaration" | "journal-silent";
+export type TaskUnattributedReason =
+  | "no-journal"
+  | "no-declaration"
+  | "precedes-declaration"
+  | "journal-silent";
 
 /** Fixed and always in this order, the same reason `TASK_ATTRIBUTION_SOURCES` is: a reader
  * comparing two periods must find the reasons present listed the same way every time, never
  * ordered by how much of a period each accounted for. */
 export const TASK_UNATTRIBUTED_REASONS: readonly TaskUnattributedReason[] = [
+  "no-journal",
   "no-declaration",
   "precedes-declaration",
   "journal-silent",

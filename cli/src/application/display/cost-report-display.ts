@@ -38,10 +38,16 @@ export const TASK_ATTRIBUTION_LABELS: Record<TaskAttributionSource, string> = {
   inferred: "inferred from a written file",
 };
 
-/** What each of the three reasons a record fell in no declared interval is called where a
- * person reads it - never one label standing in for all three, which is the fault this
- * breakdown exists to avoid (see `CostReportTaskRow`). */
+/** What each reason a record fell in no declared interval is called where a person reads
+ * it - never one label standing in for all of them, which is the fault this breakdown
+ * exists to avoid (see `CostReportTaskRow`).
+ *
+ * The first names a fact about the read, the rest facts about the work, and the wording
+ * keeps them apart: "no usable run journal" says this layer never had a journal it could
+ * attach to this session - none read, or one read whose header was torn - where "no usable
+ * task declaration" says it had one and found no declaration in it. */
 export const TASK_UNATTRIBUTED_LABELS: Record<TaskUnattributedReason, string> = {
+  "no-journal": "no usable run journal for this session",
   "no-declaration": "no usable task declaration in this session",
   "precedes-declaration": "before the next task this session declares",
   "journal-silent": "the journal falls silent before this record",
@@ -406,7 +412,7 @@ function printProjects(
   }
 }
 
-/** One row per task a record's own moment fell inside, plus up to three rows for what fell
+/** One row per task a record's own moment fell inside, plus up to four rows for what fell
  * in none - one per reason present, always after every named task and in
  * `TASK_UNATTRIBUTED_REASONS`' own fixed order, the same placement `byPeople` gives its own
  * no-identifier row. Carries the attribution beside a named row for the same reason
@@ -427,7 +433,7 @@ function printTasks(output: CLIOutput, rows: readonly CostReportTaskRow[], basis
 }
 
 /** One row per backlog item a task in the period declared, plus the two rows for a known
- * task that named none or could not be read, plus up to three reason rows for a record in
+ * task that named none or could not be read, plus up to four reason rows for a record in
  * no task at all - the same tail order `printTasks` gives its own remainder. No attribution
  * column: unlike a task's closed interval, a backlog row rests on one route only. */
 function printBacklog(
