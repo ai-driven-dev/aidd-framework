@@ -198,9 +198,10 @@ describe("toCostReportEnvelope", () => {
     expect(cursor?.reason).toBe("It writes no token count in any file it produces.");
   });
 
-  it("carries all three attribution strengths, strongest first, zeros included", () => {
+  it("carries all four attribution strengths, strongest first, zeros included", () => {
     expect(envelopeOf().attribution.map((row) => row.attribution)).toEqual([
       "tool-stated",
+      "prompt-matched",
       "journal-interval",
       "unattributed",
     ]);

@@ -154,7 +154,11 @@ test("every field the cost skill names by name resolves on the object the script
   // `by_task`'s rows by what each task's own folder declares. 16 -> 17 when 03-report.md
   // named `by_flow`, the flow-and-versions top-level breakdown grouping by the orchestrated
   // run the journal's own step sequence already names, nothing newly captured for it.
-  assert.equal(claims.size, 17, "expected exactly seventeen field references in the cost skill");
+  // 17 -> 18 when 03-report.md named `by_agent`, the breakdown by the agent that ran, added
+  // while bringing the skill's own version paragraph up from `8` to `11` - it had gone three
+  // bumps stale, so the paragraph named neither `by_agent` nor `prompt-matched` nor the
+  // fourth no-task reason a row can now carry.
+  assert.equal(claims.size, 18, "expected exactly eighteen field references in the cost skill");
 
   // Fields the envelope carries only under some condition, so a fixture cannot show them all
   // at once: the first five appear only under a selection, and `cost_micro_usd` only once a

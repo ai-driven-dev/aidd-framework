@@ -333,10 +333,11 @@ function seedAdaFlow({ projectDir, home, runsDir }) {
   });
   // Not redundant with the write, and the difference is why both are here: a write is
   // recorded as `file_written` and `task-declared.cjs` stands down for it, but
-  // `buildTaskIntervals` opens intervals on `task_declared` alone. A session that only
-  // writes into a task folder gets no `--axis task` row, while `--task <folder>` still
-  // finds it through the inferred route. The axis and the filter disagree; this session
-  // carries both lines so the week shows each.
+  // `buildTaskIntervals` opens intervals on `task_declared` alone. Since
+  // `cost_report_version` 12 the axis reads written files too, bounded to a session that
+  // wrote into exactly one task folder and to the span its journal witnessed - so a record
+  // before this session's own declaration lands on the task, marked `inferred` rather than
+  // `declared`. This session carries both lines so the week shows each route on one task.
   toolUsed("2026-03-02T08:12:00Z", {
     tool_name: "Read",
     tool_input: { file_path: `aidd_docs/tasks/${TASK_WITH_BACKLOG}/plan.md` },

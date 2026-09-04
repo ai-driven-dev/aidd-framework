@@ -10,6 +10,7 @@ import type {
   RunJournalTaskDeclared,
 } from "../../domain/ports/run-journal-reader.js";
 import { isBareFileName } from "../confined-file-name.js";
+import { repositoryRootAbove } from "../repository-root.js";
 
 const ULID_LENGTH = 26; // encodeTime(10) + encodeRandom(16), matching record.cjs's own ULID_LENGTH.
 const RUN_FILE_EXTENSION = ".jsonl";
@@ -44,6 +45,7 @@ interface RawJournalLine {
   readonly type?: unknown;
   readonly at?: unknown;
   readonly skill?: unknown;
+  readonly turn_id?: unknown;
   readonly run_id?: unknown;
   readonly tool?: unknown;
   readonly vendor_id?: unknown;
@@ -73,7 +75,9 @@ function parseBoundary(parsed: RawJournalLine): RunJournalBoundary | null {
   if (at === undefined) return null;
   if (parsed.type === "turn_end") return { type: "turn_end", at };
   const skill = parsed.type === "step_start" ? asString(parsed.skill) : undefined;
-  return skill !== undefined ? { type: "step_start", at, skill } : null;
+  if (skill === undefined) return null;
+  const turnId = asString(parsed.turn_id);
+  return { type: "step_start", at, skill, ...(turnId === undefined ? {} : { turn_id: turnId }) };
 }
 
 /** The worktree a session ran in, where the line names one. A plain checkout writes
@@ -188,7 +192,8 @@ export class RunJournalReaderAdapter implements RunJournalStore {
   readonly runsDir: string;
 
   constructor(projectRoot: string) {
-    this.runsDir = process.env.AIDD_RUNS_DIR || join(projectRoot, DOCS_DIR, RUNS_SUBDIR);
+    this.runsDir =
+      process.env.AIDD_RUNS_DIR || join(repositoryRootAbove(projectRoot), DOCS_DIR, RUNS_SUBDIR);
   }
 
   async read(sessionId: string): Promise<RunJournal | null> {

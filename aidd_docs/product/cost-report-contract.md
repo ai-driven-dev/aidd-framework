@@ -59,9 +59,11 @@ never a way to keep only one person's records. `by_backlog` is an eighth, also w
 filter of its own — see **`by_backlog`** below — regrouping `by_task`'s own rows one level
 up, by what each task's folder declares. `by_flow` is a ninth, also with no filter of its
 own — see **`by_flow`** below — grouping by which orchestrated run the journal's own step
-sequence names, never a second capture. `aidd telemetry report` also takes
-`--axis <name>` (`total`, `day`, `step`, `model`, `task`, `backlog`, `flow`, `tool`,
-`project` or `person`), which picks one of those arrays and renders it alone as a small
+sequence names, never a second capture. `by_agent` is a tenth, also with no filter of its
+own — see **`by_agent`** below — grouping by which agent ran, the main thread carrying its
+own row rather than an absence. `aidd telemetry report` also takes
+`--axis <name>` (`total`, `day`, `step`, `model`, `agent`, `task`, `backlog`, `flow`,
+`tool`, `project` or `person`), which picks one of those arrays and renders it alone as a small
 pasteable artefact instead of the whole object — a convenience for copying one figure out,
 not a second way to group. Every figure `--axis` can show is already in the plain `--json`
 object; only the one-artefact-at-a-time rendering is what it adds. A name outside the ten
@@ -127,7 +129,47 @@ real count is the ordinary case of reporting from a project whose switch never c
 work, never a contradiction (see "Attributing records to a task" for the same scope split
 elsewhere in this object).
 
-Every object carries `cost_report_version`, currently `8` — bumped from `7` when `by_flow`
+Every object carries `cost_report_version`, currently `12`.
+
+Bumped from `11` when **`by_task`'s `attribution` stopped being always `"declared"`**. A
+record no declaration covers is now named after the one task folder its session wrote into,
+marked `"inferred"`, so one task can hold two rows — one per route — the same
+`(name × attribution)` shape `by_task`'s neighbour `by_step` has always had. A consumer that
+read `attribution` as a constant, or `by_task` as one row per task, misreads this version;
+summing every row's `totals` still reconciles to the period total. Two bounds make the route
+sound and both are load-bearing: a session that wrote into **two** task folders infers
+nothing, since there is no reason to choose between them; and a record outside the span its
+own journal witnessed infers nothing either — measured, a session whose journal was lost and
+recreated witnessed four minutes while the sink held its records from seven days back, and
+without that bound all seven days would have been attributed to a folder it touched today.
+Nothing new is captured for this: `file_written` was already written by the hook at turn end.
+
+Bumped from `10` when the reasons a `by_task` or `by_backlog` row can carry gained a
+fourth, **`"no-journal"`**. It separates a fact about the read from a fact about the work:
+until then, a record whose session had no usable run journal was given `"no-declaration"`,
+which asserts that the session declared no task. Measured on
+2026-09-04, running the report from a subdirectory of the repository put 100% of a period
+into `"no usable task declaration in this session"` while every journal sat one directory
+up, unread — the reader anchored at the process working directory and the hook that writes
+a journal anchors at the repository root. The reader now anchors where the writer does, and
+this reason covers what the anchor cannot reach: a project whose journals are on another
+machine, a period read outside any checkout, a session whose journal was removed. A
+consumer that switched exhaustively on the three previous reasons must add this one; every
+row's `totals` still reconciles to the period total exactly as before.
+
+Bumped from `9` when **`by_agent`** joined the top-level breakdowns. It exists because that
+is where the spend is: measured on a live session, ten subagent transcripts held 432M of its
+466M tokens, and every one of their lines names its agent (`attributionAgent`, 100% of
+subagent tokens) where almost none names a skill (2.7%). That is why `by_step` can read a
+few percent while a session's real cost sits elsewhere — the host names a skill on the main
+thread alone, and no reader can invent one. `by_agent` needs no new capture: `agent_name` was
+already on the record. A row with no `agent` is the main thread's own, never "no agent" — a
+session starts there. On every tool but Claude Code the field is never set at all, so that
+one row carries the whole period, which is the truth for a route that names no subagents.
+
+Bumped from `8` to `9` when `attribution` gained a fourth value, `prompt-matched`.
+
+Bumped from `7` to `8` when `by_flow`
 joined the top-level breakdowns (a consumer summing every breakdown's `requests` against
 `totals.requests` now has a seventh breakdown to include). `by_flow` groups by which
 orchestrated run the journal's own step sequence already names — no skill declares that it
@@ -143,9 +185,10 @@ which task a record belongs to, and resolved once per task rather than once per 
 Bumped from `5` when the row
 `by_task` gives for a record that fell in no declared interval stopped being a single row
 and became up to three, one per `reason` actually present in the period
-(`"no-declaration"`, `"precedes-declaration"`, `"journal-silent"` — see "Attributing
-records to a task" and the `by_task` section below). A consumer that read "the one row
-with no `task`" as a single, whole-period fact would misread this version; summing every
+(`"no-declaration"`, `"precedes-declaration"`, `"journal-silent"`, joined at version `11`
+by `"no-journal"` — see "Attributing records to a task" and the `by_task` section
+below). A consumer that read "the one row with no `task`" as a single, whole-period fact
+would misread this version; summing every
 row's `totals` still reconciles to the period total exactly as before, only the count and
 identity of rows with no `task` changes. Bumped from `4` when `by_task`
 joined the top-level breakdowns (a consumer summing every breakdown's `requests` against
@@ -171,7 +214,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
 
 ```jsonc
 {
-  "cost_report_version": 8,
+  "cost_report_version": 12,
   "period": { "from_day": "2026-07-01", "to_day": "2026-07-31" },
   "measurement_enabled": true,                  // this project's own switch, right now — see Versioning
   "task": "2026_08/2026_08_21_cost-reporter",   // absent unless --task was given
@@ -184,7 +227,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "by_model":   [{ "model": "gpt-5.6-sol", "totals": {} }],  // a row with no "model" names none known
   "by_tool":    [{ "tool": "codex", "coverage": "covered", "reason": "…", "capability": {}, "totals": {}, "session_totals": {} }],  // session_totals absent unless the tool has one (Copilot, today)
   "by_project": [{ "project": "acme/widgets", "totals": {} }],   // a row with no `project` names none known
-  "by_task":    [{ "task": "2026_08/2026_08_21_cost-reporter", "attribution": "declared", "totals": {} }, { "reason": "precedes-declaration", "totals": {} }],  // a row with no `task` carries `reason` instead, naming which of three facts applies; up to three such rows
+  "by_task":    [{ "task": "2026_08/2026_08_21_cost-reporter", "attribution": "declared", "totals": {} }, { "reason": "precedes-declaration", "totals": {} }],  // a row with no `task` carries `reason` instead, naming which of four facts applies; up to four such rows
   "by_backlog": [{ "backlog": "ai-driven-dev/framework#661", "totals": {} }, { "declaration": "none", "totals": {} }, { "declaration": "unreadable", "totals": {} }, { "reason": "precedes-declaration", "totals": {} }],  // a row with no `backlog` carries `declaration` (a known task naming none, or one whose declaration could not be read) or `reason` (a record in no task at all) — never both, never neither
   "by_flow":    [{ "flow": "aidd-orchestrator:01-sdlc", "started_at": "2026-07-01T09:00:00Z", "totals": {} }, { "flow": "aidd-orchestrator:01-sdlc", "started_at": "2026-07-01T11:00:00Z", "totals": {} }, { "totals": {} }],  // two runs of the same skill are two rows, told apart by `started_at`; the last row is work that fell in no flow interval at all
   "by_day":     [{ "day": "2026-07-01", "totals": {} }],         // every day in the period, in order, gaps included
@@ -224,9 +267,10 @@ ordered largest first, with a stable tie-break, so the biggest thing is the firs
 read. Ordered by `cost_micro_usd` where a row has one, and by all four token counters
 summed where it does not — never by `input_tokens` and `output_tokens` alone, which every
 tool here dwarfs with cache. `by_task` places every row for what fell in no declared
-interval last regardless of size, in `reason`'s own fixed order (`"no-declaration"`,
-`"precedes-declaration"`, `"journal-silent"`) — the same convention `by_person` gives its
-own no-identifier row, a reader sees tasks before the remainder, and the remainder in the
+interval last regardless of size, in `reason`'s own fixed order (`"no-journal"`,
+`"no-declaration"`, `"precedes-declaration"`, `"journal-silent"`) — the same convention
+`by_person` gives its own no-identifier row, a reader sees tasks before the remainder, and
+the remainder in the
 same order every time. `by_backlog` places its own named rows first, then the row for a
 known task declaring none, then the row for one whose declaration could not be read, then
 every `reason` row in that same fixed order. `by_flow` carries no such tail: the row for
@@ -266,16 +310,25 @@ ever matches, and a record lands in exactly one row.
 `attribution` is present, and always `"declared"`, on every row that carries a `task` —
 travelling with the row rather than assumed, so a consumer never has to know which route a
 breakdown reads. A row for what fell in no declared interval carries `reason` instead of
-`task` and `attribution`, naming which of three distinct facts applies — never one label
-standing in for all three, and never more than one row per reason:
+`task` and `attribution`, naming which distinct fact applies — never one label standing in
+for all of them, and never more than one row per reason. The first names a fact about the
+read, the rest facts about the work:
+
+`attribution` says which route named the task, and is present only on a row that names one:
+
+| `attribution` | What it means |
+| --- | --- |
+| `"declared"` | A `task_declared` interval in that record's session covers the record's own moment. |
+| `"inferred"` | No declared interval covers it, its session wrote into exactly one task folder, and its own journal witnessed the moment. Weaker on purpose: the journal never said this record was that task's, only that the session touched that task and nothing else. |
 
 | `reason` | What it means |
 | --- | --- |
+| `"no-journal"` | No usable run journal reached this record's session. Either none was read for it at all — the journals are on another machine, the period was read from outside any checkout, the session's own journal was removed — or one was read and could not be used, its `session_start` header torn, so nothing here knows which session its lines belong to. Never says the work declared nothing. |
 | `"no-declaration"` | This record's session never declared a task at all. |
 | `"precedes-declaration"` | A task was declared, but some declared interval in this session starts *after* this record's own moment — true both for a record before the session's very first declaration and for one landing in the gap a `turn_end` leaves between two declarations. That gap is real, but it is the journal still going, never the journal falling silent. |
 | `"journal-silent"` | A task was declared, every declared interval starts at or before this record's moment, and none of them reaches it — the journal's own declared coverage ran out before this record's moment did. |
 
-Up to three such rows can appear in one period — one per reason actually present, never
+Up to four such rows can appear in one period — one per reason actually present, never
 fewer, and never two different gaps collapsed into one row the way a single, undifferentiated
 "no declared interval" row used to read before `cost_report_version` `6`. A session whose
 declaration could not be read produces the same `"no-declaration"` row a session that never

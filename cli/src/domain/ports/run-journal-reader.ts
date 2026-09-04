@@ -7,6 +7,15 @@ export interface RunJournalStepStart {
   readonly type: "step_start";
   readonly at: string;
   readonly skill: string;
+  /** The host's own identifier for the prompt this step opened under, where it hands one to
+   * a hook — Claude Code's `prompt_id`. Named `turn_id` on the line because that is what
+   * `buildStepStartLine` has always written; it is a prompt, not a turn, and three steps
+   * opened under one prompt share it.
+   *
+   * Matched against a record's `prompt_id`, it attributes a step **exactly** rather than by
+   * asking which interval a moment fell in — the only reading that survives two tasks
+   * advancing at once. Absent for every host that hands its hooks no such identifier. */
+  readonly turn_id?: string;
 }
 
 /** One `turn_end` line: closes whatever step was open, even where no further step opens

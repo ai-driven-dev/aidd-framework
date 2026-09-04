@@ -6,6 +6,7 @@ import type {
 } from "../../domain/models/task-backlog-link.js";
 import type { TaskBacklogReader } from "../../domain/ports/task-backlog-reader.js";
 import { asPlainObject, isErrnoException } from "../json-file.js";
+import { repositoryRootAbove } from "../repository-root.js";
 
 /** The one file a task folder writes to declare its backlog item — see
  * `domain/models/task-backlog-link.ts` for why this is not `metadata.json`. */
@@ -39,10 +40,18 @@ function parseLink(raw: string): TaskBacklogLink | null {
  * checkout someone else owns without ever risking the work it is describing.
  */
 export class TaskBacklogAdapter implements TaskBacklogReader {
-  constructor(private readonly projectRoot: string) {}
+  private readonly repositoryRoot: string;
+
+  // Resolved once, at construction, for the same reason `RunJournalReaderAdapter` freezes
+  // its own directory there: a relocation after construction can never change what this
+  // instance answers. A task folder path arrives repository-relative, because the journal
+  // line it came from was written that way.
+  constructor(projectRoot: string) {
+    this.repositoryRoot = repositoryRootAbove(projectRoot);
+  }
 
   async read(taskFolderPath: string): Promise<TaskBacklogDeclaration> {
-    const filePath = join(this.projectRoot, taskFolderPath, TASK_BACKLOG_LINK_FILENAME);
+    const filePath = join(this.repositoryRoot, taskFolderPath, TASK_BACKLOG_LINK_FILENAME);
     let raw: string;
     try {
       raw = await readFile(filePath, "utf8");

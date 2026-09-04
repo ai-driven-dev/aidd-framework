@@ -22,8 +22,18 @@ export type TaskAttributionSource = "declared" | "inferred";
 
 export const TASK_ATTRIBUTION_SOURCES: readonly TaskAttributionSource[] = ["declared", "inferred"];
 
-/** One declared interval, closed by whichever of a later declaration or a `turn_end` comes
- * next - or, unclosed, by the journal's own last recorded moment. Never left open-ended the
+/** One declared interval, closed by a later declaration - or, unclosed, by the journal's
+ * own last recorded moment.
+ *
+ * **A `turn_end` stopped closing one on 2026-09-04.** It is a pause, not a change of
+ * subject: a session declared a task at 05:59, paused at 06:02, and worked on that same
+ * task for three more hours. Closed at the pause, 78% of that session read "before the next
+ * task this session declares" while only 1.8% of its tokens truly preceded any declaration.
+ * Measured again after: 20% attributed became 96%, and the residue matched a hand count of
+ * the records before the first declaration, to the token.
+ *
+ * `turn_end` remains a *witness*, so an interval with nothing after it still ends at the
+ * same moment it used to - the same number, for the honest reason. Never left open-ended the
  * way `StepInterval` is: no tool exposes when a flow leaves a ticket, so a boundless interval
  * would attribute everything a long-running session goes on to do to the first ticket it
  * ever named, for as long as it keeps running - the failure this type exists to refuse. */
@@ -34,15 +44,14 @@ export interface TaskInterval extends ClosedInterval {
 /**
  * Journal lines in, bounded intervals out. `boundaries`, `taskDeclarations` and
  * `filesWritten` are merged and sorted by their own moment into one list, then walked once:
- * each `task_declared` closes at whichever of a later declaration or a `turn_end` comes
- * next. Unclosed, it is capped at that merged list's own last moment - a written file
+ * each `task_declared` closes at the next declaration. Unclosed, it is capped at that
+ * merged list's own last moment - a written file
  * included, never only the kinds an interval actually closes on - so a session that is
  * still running when a report is asked for, with a file written after its declaration and
  * no `turn_end` yet, is bounded by that write rather than collapsing to `[t, t)` and losing
  * everything after it. `RunJournalBoundary` itself carries no `file_written`: pairing one in
  * there would let it close a running *step* early (see `run-journal-reader.ts`), a risk this
- * merge never runs into because `closers` below is filtered to `task_declared` and
- * `turn_end` regardless of what else this list holds. A session that crashes and produces no
+ * merge never runs into because nothing below is treated as a closer at all. A session that crashes and produces no
  * further line at all still leaves nothing after the declaration itself to misattribute.
  *
  * Still never open-ended: widening the last-witnessed moment moves an unclosed interval's
@@ -81,7 +90,10 @@ export function buildTaskIntervals(
     [...journal.boundaries, ...journal.taskDeclarations, ...journal.filesWritten],
     periodEndMs,
     (boundary): boundary is RunJournalTaskDeclared => boundary.type === "task_declared",
-    (boundary) => boundary.type === "turn_end",
+    // Only a later declaration closes one. A `turn_end` is a pause, not a change of
+    // subject — it stays a *witness*, so an interval with nothing after it still ends at
+    // the same moment, for the honest reason. See this module's own doc comment.
+    () => false,
     (opener, startMs, endMs) =>
       taskIdentityFromWrittenPath(opener.path) === null
         ? null
@@ -89,11 +101,30 @@ export function buildTaskIntervals(
   );
 }
 
-/** Why a record's own moment falls in none of `intervals` - the three, and only three,
- * distinct facts a person acts on differently. Never called for a moment `momentFallsWithin`
+/** Why a record belongs to no task - the distinct facts a person acts on differently, and
+ * no more than those. This function itself answers only the three that are facts about the
+ * work; `"no-journal"`, the fact about the read, is decided by `declaredTaskKeyOf` before
+ * this is ever called. Never called for a moment `momentFallsWithin`
  * already reads as covered; that caller already knows which interval and needs no reason for
  * what it found.
  *
+ * - `"no-journal"`: no *usable* journal reached this record's session. Either none was read
+ *   for it at all, or one was read and could not be used - `report-cost-use-case.ts` drops
+ *   a journal whose `session_start` header is torn, since nothing then says which session
+ *   its lines belong to, and that shape is real (the adapter's own "keeps a session's
+ *   boundaries when its header line is torn" test produces it). "Usable" is the word this
+ *   reason turns on: saying "no journal existed" would be false for the second case, which
+ *   is the fault this reason exists to stop repeating one level down. Never produced by this
+ *   function, which is only ever asked about a session whose journal was usable -
+ *   `declaredTaskKeyOf` answers it before calling here, from the absence of an entry in its
+ *   own per-session map. It belongs in
+ *   this type all the same: it is one of the reasons a `by_task` row carries, and keeping it
+ *   in the same closed set is what makes `Record<TaskUnattributedReason, string>` force
+ *   every consumer to name it. The three below are facts about the work; this one is a fact
+ *   about the read, and merging it into `"no-declaration"` asserted that a session declared
+ *   nothing when the truth was that its journal was never found - measured on 2026-09-04,
+ *   where running the report from a subdirectory reported 100% "no usable task declaration"
+ *   for a period whose journals were all present one directory up.
  * - `"no-declaration"`: this session's journal yields no usable declared interval - either it
  *   never wrote a `task_declared` line at all, or it wrote one this reader cannot place in
  *   time (an `at` `timed()` cannot parse, dropped before it ever reaches `buildTaskIntervals`).
@@ -101,9 +132,10 @@ export function buildTaskIntervals(
  *   declaration" rather than "none was ever declared" - the latter would be false for a
  *   session whose journal really does hold a line, just not a readable one.
  * - `"precedes-declaration"`: a task was declared, but some declared interval starts *after*
- *   this moment - true both for a record before the session's very first declaration and for
- *   one landing in the gap a `turn_end` leaves between two declarations, which is a real gap
- *   in coverage, never the journal falling silent (the journal keeps going right through it).
+ *   this moment. Since 2026-09-04 that means one thing only — a record before the session's
+ *   very first declaration. Intervals now run contiguously from each declaration to the
+ *   next, so the gap a `turn_end` used to leave between two of them no longer exists, and
+ *   the test that described it was deleted rather than reworded.
  * - `"journal-silent"`: a task was declared, every declared interval starts at or before this
  *   moment, and still none of them reaches it - the journal's own declared coverage ran out
  *   before this record's moment did. A record with no moment at all, or an unparseable one,
@@ -111,12 +143,17 @@ export function buildTaskIntervals(
  *   it is as unplaceable as one that arrived after that coverage lapsed. In practice a
  *   report never hands this function such a record - `report-cost-use-case.ts` splits an
  *   undated record off before any of this runs - but the function stays correct standalone. */
-export type TaskUnattributedReason = "no-declaration" | "precedes-declaration" | "journal-silent";
+export type TaskUnattributedReason =
+  | "no-journal"
+  | "no-declaration"
+  | "precedes-declaration"
+  | "journal-silent";
 
 /** Fixed and always in this order, the same reason `TASK_ATTRIBUTION_SOURCES` is: a reader
  * comparing two periods must find the reasons present listed the same way every time, never
  * ordered by how much of a period each accounted for. */
 export const TASK_UNATTRIBUTED_REASONS: readonly TaskUnattributedReason[] = [
+  "no-journal",
   "no-declaration",
   "precedes-declaration",
   "journal-silent",
