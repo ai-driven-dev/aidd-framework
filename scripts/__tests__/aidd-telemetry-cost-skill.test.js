@@ -164,8 +164,8 @@ test("every field the cost skill names by name resolves on the object the script
   // while bringing the skill's own version paragraph up from `8` to `11` - it had gone three
   // bumps stale, so the paragraph named neither `by_agent` nor `prompt-matched` nor the
   // fourth no-task reason a row can now carry. 18 -> 19 when 03-report.md named `by_prompt`,
-  // the breakdown by the prompt that caused the work - the one axis complete by construction,
-  // since every record the reader stores already carries the turn it came from.
+  // the breakdown by the prompt that caused the work - the one axis no host limit can empty,
+  // since the reader resolves the turn for itself rather than waiting on a capture.
   assert.equal(claims.size, 19, "expected exactly nineteen field references in the cost skill");
 
   // Fields the envelope carries only under some condition, so a fixture cannot show them all

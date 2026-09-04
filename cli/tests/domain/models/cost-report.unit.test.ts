@@ -589,11 +589,11 @@ describe("buildCostReport — every breakdown reconciles", () => {
     expect(summed).toBe(built.totals.inputTokens);
   });
 
-  // The one axis that is complete by construction. Measured 2026-09-04 on the built binary
-  // against a sandboxed copy of one real session: 1073 of 1073 records carried a
-  // `prompt_id`, its 972 subagent records included, across 12 distinct prompts. Every other
-  // breakdown depends on a capture that may not have happened; this one depends on a field
-  // the reader already resolves for every usage line by walking `parentUuid`.
+  // The one axis no host limit can empty — which is not the same as complete, and the
+  // difference is measured on `CostReportPromptRow`. Every other breakdown depends on a
+  // capture that may not have happened; this one depends on a field the reader resolves for
+  // itself by walking `parentUuid`, so what it cannot name is a chain it cannot walk or a
+  // record an older reader already stored without one.
   it("breaks the period down by the prompt that caused the work, largest first", () => {
     const built = report({
       records: [

@@ -92,12 +92,26 @@ export interface CostReportAgentRow {
 /** One prompt's own share of a period, `prompt` absent on the row for records that named
  * none.
  *
- * The one breakdown that is complete by construction. Every other depends on a capture that
- * may not have happened — a journal, an identity file, a declaration, a host that names a
- * skill. This one depends on a field the transcript reader already resolves for every usage
- * line by walking `parentUuid`: measured 2026-09-04 on the built binary, 1073 of 1073
- * records of one real session carried a `prompt_id`, its 972 subagent records included,
- * across 12 distinct prompts.
+ * The one breakdown no host limit can empty — never one that is complete. Every other
+ * depends on a capture that may not have happened — a journal, an identity file, a
+ * declaration, a host that names a skill. This one depends on a field the transcript reader
+ * resolves for itself, by walking `parentUuid` back to the line that named the prompt.
+ *
+ * The reader is very nearly complete and the sink it fills is not, and the difference is
+ * worth stating where the figure is read. Measured 2026-09-05 on this machine's own sink:
+ * 845 of 30,714 records carry no `prompt_id`, 2.75%. Exactly one of them was written by the
+ * current reader — an assistant line whose `parentUuid` chain reaches no line naming a
+ * prompt, out of 29,607 in that session. The other 844 were stored by earlier readers: 34
+ * before the CLI stamped a version at all, and 810 in one session before this resolution
+ * shipped.
+ *
+ * **Those 844 stay unnamed however often the sink is read again.** `storeNewCandidates`
+ * fixes a record's field set the first time it sees the turn, so a re-read that would now
+ * resolve the prompt stores nothing — the turn is already stored and its counters have not
+ * grown. Re-reading is not the repair either: of the 811 whose sessions were measured, 720
+ * name a request no transcript on disk still holds, so roughly 90 records in 30,714 are all
+ * a retroactive pass could ever recover. Which is why this states a limit rather than
+ * carrying machinery to close it.
  *
  * `startedAt` is the earliest moment in the group, and only a named prompt gets one: the
  * row for records that named no prompt is a bucket drawn from many turns, so a start moment

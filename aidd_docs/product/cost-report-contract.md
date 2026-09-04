@@ -195,12 +195,13 @@ consumer that switched exhaustively on the three previous reasons must add this 
 row's `totals` still reconciles to the period total exactly as before.
 
 Bumped from `12` when **`by_prompt`** joined the top-level breakdowns. It is the only
-breakdown complete by construction: every other one depends on a capture that may not have
+breakdown no host limit can empty: every other one depends on a capture that may not have
 happened — a run journal, an identity file, a task declaration, a host that names the skill
-it is running — while this one depends on a field the transcript reader already resolves for
-every usage line by walking `parentUuid` back to the turn that caused it. Measured 2026-09-04
-on the built binary against one real session: 1073 of 1073 records carried a `prompt_id`, its
-972 subagent records included, across 12 distinct prompts. Nothing new is captured for it.
+it is running — while this one depends on a field the transcript reader resolves for itself,
+by walking `parentUuid` back to the turn that caused the work. That is not the same as
+complete: measured 2026-09-05 on one machine's sink, 845 of 30,714 records carry no
+`prompt_id`, and all but one of them were stored by a reader that predates the resolution —
+see **`by_prompt`** below. Nothing new is captured for it.
 A row carries `started_at`, the earliest moment in that prompt, because a prompt id alone is
 opaque — it is what a person greps for in their own transcript. The row for records that
 named no prompt carries neither `prompt` nor `started_at`, is placed last rather than ranked
@@ -498,7 +499,16 @@ turn that caused the work.
 | Row | Means |
 | --- | --- |
 | `prompt` and `started_at` | one prompt, and the earliest moment measured inside it |
-| neither field | every record whose tool cannot say which prompt caused it |
+| neither field | every record no prompt could be resolved for |
+
+**Read the second row as a real quantity, not a rounding error.** A sink accumulates across
+reader versions, and a record's fields are fixed the first time its turn is stored: a record
+written before this resolution shipped never gains a `prompt_id`, however often the sink is
+read again. Measured 2026-09-05 on one machine's sink of 30,714 records: 845 carry none —
+34 written before the CLI stamped a version, 810 by one session's reader before the
+resolution shipped, and exactly one by the current reader, an assistant line whose
+`parentUuid` chain reaches no line naming a prompt. Re-reading recovers little of it: 720 of
+those requests name no line any transcript on disk still holds.
 
 Ordered largest first, like every breakdown but `by_day`; the remainder row is placed last
 rather than ranked, because a bucket drawn from many turns has no size comparable to a single

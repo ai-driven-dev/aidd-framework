@@ -21,11 +21,11 @@ import type { AiToolId } from "./tool-ids.js";
  *
  * Bumped to 13: `by_prompt` is a new top-level breakdown, and a consumer summing every
  * breakdown's `requests` against `totals.requests` to check nothing was dropped now has one
- * more to include. It is the only breakdown complete by construction: every other depends on
- * a capture that may not have happened, this one on a field the transcript reader already
- * resolves for every usage line. Measured 2026-09-04 on the built binary - 1073 of 1073
- * records of one real session carried a `prompt_id`, its 972 subagent records included,
- * across 12 distinct prompts.
+ * more to include. It is the only breakdown no host limit can empty: every other depends on
+ * a capture that may not have happened, this one on a field the transcript reader resolves
+ * for itself. That is not the same as complete, and `CostReportPromptRow` carries the
+ * measurement — 845 of 30,714 records of this machine's own sink carry no `prompt_id`, all
+ * but one of them stored by a reader that predates the resolution.
  *
  * Bumped to 12: `by_task`'s `attribution` stops being always `"declared"`. A record no
  * declaration covers, in a session whose journal witnessed it and that wrote into exactly

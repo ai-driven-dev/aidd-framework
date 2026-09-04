@@ -106,8 +106,9 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    which a resumed transcript carries - never as the flow declaring its task late. The bump
    from `12` to `13` added `by_prompt`
    to the top-level breakdowns: the prompt that caused the work, the one breakdown no host
-   limit can leave empty, since every record the reader stores already carries the turn it
-   came from. The bump from `11` to `12` did not add a
+   limit can leave empty, since the reader resolves the turn for itself rather than waiting
+   on a capture. Not the same as complete - a record stored before that resolution shipped
+   never gains one, so the row naming no prompt is a real quantity to read, never noise. The bump from `11` to `12` did not add a
    breakdown either: `by_task`'s `attribution` stopped being always `declared`, so one task
    can now hold two rows - one for what a declaration covered, one for what only a written
    file names. The bump from `10` to `11` did not add a
