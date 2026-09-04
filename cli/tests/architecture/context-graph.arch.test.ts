@@ -27,6 +27,11 @@ const ALLOWED = new Set([
   "framework->tools",
   "framework->distribution",
   "translate->tools",
+  // Measurement asks a tool what it declares — its registry entry, where its transcripts
+  // live, the shape of its hooks file — and a tool declares nothing about measurement in
+  // return. The vocabulary both speak (`kernel/measurement.ts`) sits in the kernel, which
+  // is what makes the reverse edge structurally impossible rather than merely absent.
+  "telemetry->tools",
 ]);
 
 /** Edges that exist and should not. This list may only shrink. */
@@ -59,11 +64,12 @@ const BASELINE: readonly {
   // imports with unchanged signatures — inverting them into a port is a design change, not
   // the move phase 16 was. Recorded so it is measured rather than remembered.
   { edge: "framework->presentation", imports: 4, files: 3 },
-  // Four targets, every one an interface: token provider, platform, latest release
-  // resolver, version reader. Those are contracts a context is entitled to depend on,
-  // sitting in the wrong place — a port used by two contexts belongs in the kernel, as
-  // phase 9 established. Nothing concrete crosses here.
-  { edge: "framework->runtime", imports: 13, files: 11 },
+  // Three targets, every one an interface: token provider, platform, latest release
+  // resolver. Those are contracts a context is entitled to depend on, sitting in the wrong
+  // place — a port used by two contexts belongs in the kernel, as phase 9 established.
+  // Nothing concrete crosses here. `version-reader` was the fourth and has since moved to
+  // `kernel/ports/`, which is what this count dropping from thirteen records.
+  { edge: "framework->runtime", imports: 8, files: 7 },
 ];
 
 function contextOf(file: string): string {

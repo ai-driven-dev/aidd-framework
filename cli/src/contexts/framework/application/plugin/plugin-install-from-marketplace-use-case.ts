@@ -15,7 +15,7 @@ import {
   DEFAULT_REQUESTED_VERSION_POLICY,
   type RequestedVersionPolicy,
 } from "../../domain/plugins/requested-version-policy.js";
-import type { PluginAddUseCase } from "./plugin-add-use-case.js";
+import type { PluginAdd } from "./plugin-add-use-case.js";
 
 export interface PluginInstallFromMarketplaceOptions {
   pluginName: string;
@@ -41,11 +41,18 @@ interface MatchEntry {
   localPath: string;
 }
 
-export class PluginInstallFromMarketplaceUseCase {
+/** Installing a plugin named in a marketplace catalog, as its callers need it. */
+export interface PluginInstallFromMarketplace {
+  execute(
+    options: PluginInstallFromMarketplaceOptions
+  ): Promise<PluginInstallFromMarketplaceResult>;
+}
+
+export class PluginInstallFromMarketplaceUseCase implements PluginInstallFromMarketplace {
   constructor(
     private readonly resolveMarketplace: ResolveMarketplaceUseCase,
     private readonly registry: MarketplaceRegistry,
-    private readonly pluginAddUseCase: PluginAddUseCase,
+    private readonly pluginAddUseCase: PluginAdd,
     private readonly prompter: Prompter,
     private readonly logger?: Logger
   ) {}

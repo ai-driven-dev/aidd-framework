@@ -35,18 +35,21 @@ function makeManifest(pluginFileHash: string): Manifest {
 function makeFs(fileExists: boolean, diskHash: string): FileReader {
   return {
     fileExists: async () => fileExists,
+    isExecutable: async () => false,
     readFileHash: async () => new FileHash(diskHash),
     readFile: async () => "",
-    writeFile: async () => {},
-    deleteFile: async () => {},
     listDirectory: async () => [],
-    deleteEmptyDirectories: async () => {},
-    copyFile: async () => {},
-  } as unknown as FileReader;
+    listFilesRecursive: async () => [],
+  };
 }
 
 function makeManifestRepo(manifest: Manifest): ManifestRepository {
-  return { load: async () => manifest, save: async () => {}, delete: async () => {} };
+  return {
+    path: "/proj/.aidd/manifest.json",
+    load: async () => manifest,
+    save: async () => {},
+    delete: async () => {},
+  };
 }
 
 const noopHasher: Hasher = {
@@ -58,19 +61,17 @@ describe("StatusUseCase — cursor plugin drift (user-scope)", () => {
     it("resolves absolute path from homedir via resolvePluginsBaseDir before checking disk", async () => {
       const manifest = makeManifest(EXPECTED_HASH);
       const checkedPaths: string[] = [];
-      const fs = {
+      const fs: FileReader = {
         fileExists: async (p: string) => {
           checkedPaths.push(p);
           return true;
         },
+        isExecutable: async () => false,
         readFileHash: async () => new FileHash(DRIFTED_HASH),
         readFile: async () => "",
-        writeFile: async () => {},
-        deleteFile: async () => {},
         listDirectory: async () => [],
-        deleteEmptyDirectories: async () => {},
-        copyFile: async () => {},
-      } as unknown as FileReader;
+        listFilesRecursive: async () => [],
+      };
 
       const useCase = new StatusUseCase(
         fs,
@@ -81,7 +82,7 @@ describe("StatusUseCase — cursor plugin drift (user-scope)", () => {
       await useCase.execute({ projectRoot: "/proj" });
 
       // All checked paths must be absolute (resolved from user home, not from projectRoot)
-      expect(checkedPaths.some((p) => p.includes(".cursor/plugins/local"))).toBe(true);
+      expect(checkedPaths.some((p) => p.includes(join(".cursor", "plugins", "local")))).toBe(true);
       expect(checkedPaths.every((p) => !p.includes(join("/proj", PLUGIN_KEY)))).toBe(true);
     });
 

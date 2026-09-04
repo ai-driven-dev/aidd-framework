@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Marketplace } from "../../../../../src/contexts/distribution/domain/marketplace.js";
 import { resolvePluginSourceFromMarketplace } from "../../../../../src/contexts/framework/domain/plugins/plugin-source-resolver.js";
@@ -116,7 +117,9 @@ describe("resolvePluginSourceFromMarketplace", () => {
       expect(result).toEqual({
         kind: "git-subdir",
         url: "https://github.com/ai-driven-dev/framework.git",
-        path: "plugins/aidd-context",
+        // relative() (used by the resolver for a pre-resolved absolute path) returns the
+        // platform's native separator, unlike the raw string handling for a ./-relative path.
+        path: join("plugins", "aidd-context"),
         ref: "v4.1.0-beta.14",
       });
     });

@@ -40,6 +40,8 @@ ALL_COMMANDS=(
   "plugin remove" "plugin list" "plugin install" "plugin search" "plugin update"
   "marketplace add" "marketplace list" "marketplace remove" "marketplace refresh" "marketplace check"
   "auth login" "auth logout" "auth status"
+  "telemetry on" "telemetry off" "telemetry read" "telemetry report" "telemetry check"
+  "telemetry forget" "telemetry identity"
 )
 
 PASS=0; FAIL=0; SKIP=0
@@ -53,7 +55,7 @@ bad()  { FAIL=$((FAIL+1)); FAILURES+=("$1"$'\n'"${2:-}"); echo "  ✗ $1"; }
 skip() { SKIP=$((SKIP+1)); echo "  ~ $1"; }
 section() { echo; echo "=== $1 === [$(date +%H:%M:%S)]"; }
 
-PARENTS=" plugin marketplace auth framework "
+PARENTS=" plugin marketplace auth framework telemetry "
 derive_key() {
   local first="$1" second="${2:-}"
   if [[ "$PARENTS" == *" $first "* ]]; then echo "$first $second"; else echo "$first"; fi
@@ -363,6 +365,21 @@ if true; then
   run "clean --force" 0 "" "$P_CLEAN" -- clean --force
   [[ ! -d "$P_CLEAN/.aidd" ]] && ok ".aidd removed after clean" || bad ".aidd survived clean"
 
+  # ── telemetry ────────────────────────────────────────────────
+  # The switch and everything it gates, against the real binary. HOME and
+  # AIDD_USER_CONFIG_DIR are both under TMPROOT, so `forget` deletes a sandbox and
+  # never a person's own profile.
+  section "telemetry"
+  P_TEL=$(new_project)
+  run "telemetry check (before anything)" "0|1" "" "$P_TEL" -- telemetry check
+  run "telemetry on --yes" 0 "" "$P_TEL" -- telemetry on --yes
+  [[ -f "$P_TEL/.aidd/config.json" ]] && ok "telemetry on writes the switch" || bad "no .aidd/config.json after telemetry on"
+  run "telemetry identity use" 0 "" "$P_TEL" -- telemetry identity use
+  run "telemetry read" 0 "" "$P_TEL" -- telemetry read
+  run "telemetry report" 0 "" "$P_TEL" -- telemetry report
+  run "telemetry off" 0 "" "$P_TEL" -- telemetry off
+  run "telemetry forget --yes" 0 "" "$P_TEL" -- telemetry forget --yes
+
 fi
 
 # ════════════════════════════════════════════════════════════════
@@ -431,6 +448,35 @@ else
 fi
 
 # ── coverage report ─────────────────────────────────────────────
+# The list above is written by hand; the binary is what a person actually gets. A command
+# added to the CLI and not to that list reads as 100% covered while nothing ever ran it —
+# which is exactly what twelve telemetry commands did through a whole merge, with this
+# report saying 22/22 the entire time.
+derived_leaves() {
+  local top sub
+  # `cut -d'|'`: commander prints an alias as `update|upgrade`, one command with two names.
+  for top in $(node "$CLI" --help 2>/dev/null | awk '/^Commands:/{f=1;next} f && /^  [a-z]/{print $1}' | cut -d'|' -f1); do
+    [[ "$top" == "help" ]] && continue
+    if [[ "$PARENTS" == *" $top "* ]]; then
+      for sub in $(node "$CLI" "$top" --help 2>/dev/null | awk '/^Commands:/{f=1;next} f && /^  [a-z]/{print $1}' | cut -d'|' -f1); do
+        [[ "$sub" == "help" ]] && continue
+        echo "$top $sub"
+      done
+    else
+      echo "$top"
+    fi
+  done
+}
+
+section "command list"
+declared=$(printf '%s\n' "${ALL_COMMANDS[@]}" | sort)
+actual=$(derived_leaves | sort)
+if [[ "$declared" == "$actual" ]]; then
+  ok "the list this suite exercises is the list the binary offers"
+else
+  bad "ALL_COMMANDS has drifted from the binary" "$(diff <(echo "$declared") <(echo "$actual") || true)"
+fi
+
 section "command coverage"
 covered=0; total=${#ALL_COMMANDS[@]}; missing=()
 for c in "${ALL_COMMANDS[@]}"; do

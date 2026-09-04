@@ -21,10 +21,9 @@ import {
   deleteOldFiles,
   loadPluginManifest,
   materializeViaTranslator,
-  resolvePluginBaseDir,
-  resolvePluginToolIds,
   writePluginFiles,
 } from "./plugin-helpers.js";
+import { resolvePluginBaseDir, resolvePluginToolIds } from "./plugin-target-resolution.js";
 
 export interface PluginUpdateOptions {
   pluginNames?: string[];

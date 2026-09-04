@@ -8,15 +8,20 @@ import {
   HttpRedirectError,
 } from "../../kernel/errors.js";
 
-interface HttpGetOptions {
+export interface HttpGetOptions {
   token?: string;
   accept?: string;
 }
 
-interface HttpResponse {
+export interface HttpResponse {
   body: Buffer | unknown;
   statusCode: number;
   contentType: string;
+}
+
+/** One GET over HTTP, as the adapters that fetch releases and catalogs need it. */
+export interface HttpGet {
+  get(url: string, options?: HttpGetOptions): Promise<HttpResponse>;
 }
 
 function collectBuffer(response: IncomingMessage): Promise<Buffer> {
@@ -58,7 +63,7 @@ function doGet(url: string, token?: string, accept?: string): Promise<IncomingMe
   });
 }
 
-export class HttpClient {
+export class HttpClient implements HttpGet {
   async get(url: string, options?: HttpGetOptions): Promise<HttpResponse> {
     const response = await doGet(url, options?.token, options?.accept);
     const statusCode = response.statusCode ?? 0;

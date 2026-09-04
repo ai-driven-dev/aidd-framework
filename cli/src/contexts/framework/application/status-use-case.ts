@@ -33,20 +33,29 @@ interface PluginDriftEntry {
   driftedFiles: string[];
 }
 
-interface StatusReport {
+export interface StatusReport {
   tools: ToolStatus[];
   pluginDrift: PluginDriftEntry[];
   inSync: boolean;
 }
 
-interface StatusOptions {
+export interface StatusOptions {
   projectRoot: string;
   filterToolId?: ToolId;
   category?: ToolCategory;
   pluginName?: string;
 }
 
-export class StatusUseCase {
+/**
+ * The question an orchestrator asks of status: one report per scope. Callers that only
+ * ask depend on this, not on the class that answers it - so a double is a real
+ * implementation rather than a cast.
+ */
+export interface StatusQuery {
+  execute(options: StatusOptions): Promise<StatusReport>;
+}
+
+export class StatusUseCase implements StatusQuery {
   constructor(
     private readonly fs: FileReader,
     private readonly manifestRepo: ManifestRepository,

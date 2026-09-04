@@ -7,13 +7,18 @@ import {
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import {
   AI_TOOL_IDS,
+  type AiToolId,
   IDE_TOOL_IDS,
   type IdeToolId,
   type ToolCategory,
   type ToolId,
 } from "../../../kernel/tool.js";
 import type { ToolBuildContract } from "./build-contract.js";
-import type { NativeActivation, PluginsMode } from "./capabilities/plugins-capability.js";
+import type {
+  NativeActivation,
+  PluginsCapability,
+  PluginsMode,
+} from "./capabilities/plugins-capability.js";
 import type { AiTool, IdeToolConfig } from "./contracts.js";
 
 /**
@@ -63,6 +68,23 @@ export function getToolConfig(toolId: ToolId): ToolConfig {
   const config = TOOL_REGISTRY.get(toolId);
   if (!config) throw new UnregisteredToolError(toolId);
   return config;
+}
+
+export function getAiToolConfig(toolId: AiToolId): AiTool<unknown> {
+  const config = getToolConfig(toolId);
+  if (!isAiTool(config)) throw new UnregisteredToolError(toolId);
+  return config;
+}
+
+/** The `AiToolId` whose declaration claims a journal host, or `null` for a host no
+ * registered tool claims. The only place the journal hook's host names and this codebase's
+ * tool ids are related, and it relates them by reading declarations rather than by holding
+ * a table that a fifth host would have to be remembered into. */
+export function journalHostToAiToolId(journalHost: string): AiToolId | null {
+  for (const toolId of AI_TOOL_IDS) {
+    if (getAiToolConfig(toolId).telemetryJournalHost === journalHost) return toolId;
+  }
+  return null;
 }
 
 export function getAllRegisteredTools(): Map<ToolId, ToolConfig> {
@@ -115,7 +137,7 @@ export function frameworkBuildModeFor(toolId: ToolId): FrameworkBuildMode {
 /**
  * The tool's declared build contract for one framework-build mode, or undefined when
  * the tool does not support that mode (e.g. opencode has no marketplace mode). Read
- * from the profile so `deps.ts` can derive its build registry by iterating the
+ * from the profile so `runtime/wiring/framework.ts` can derive its build registry by iterating the
  * registered tools instead of listing every tool/mode pair by hand.
  */
 export function buildContractFor(
@@ -145,4 +167,20 @@ export function machineLocalFilesOf(toolId: ToolId): readonly string[] {
   // `null` means the tool has nowhere machine-local to write, so there is no such file
   // to keep out of `status` or the gitignore either.
   return typeof path === "string" ? [path] : [];
+}
+
+/**
+ * A tool's plugin capability, or `null` when it declares none.
+ *
+ * Here rather than beside one of its callers: it reads nothing but this registry, and its
+ * callers now span three of them — the plugin translators, plugin removal, and the telemetry
+ * diagnostic. A use case reaching into a hooks materializer to ask what a tool declares is a
+ * placement the layering gate happens to permit and the project's own rule does not.
+ */
+export function resolvePluginsCapability(toolId: AiToolId): PluginsCapability | null {
+  const toolConfig = getToolConfig(toolId);
+  if (!isAiTool(toolConfig)) return null;
+  const caps = toolConfig.capabilities as Record<string, unknown>;
+  if (!("plugins" in caps)) return null;
+  return caps.plugins as PluginsCapability;
 }

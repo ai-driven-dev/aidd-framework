@@ -17,6 +17,7 @@ import { rewriteRelativeLinks } from "../../../../../kernel/materialization/rela
 import type { ToolBuildContract } from "../../build-contract.js";
 import { stripAgentFrontmatter } from "../../formats/agent-frontmatter-strip.js";
 import { flattenCopilotHooksShape } from "../../formats/flat-hooks-merge.js";
+import { PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token.js";
 import { mergeVscodeMcp } from "../../formats/vscode-mcp-merge.js";
 import {
   resolveDescription,
@@ -51,13 +52,13 @@ export function buildCopilotMarketplaceContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_PLUGIN_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_MARKETPLACE_RELATIVE;
   // Split literal to avoid biome's noTemplateCurlyInString warning.
-  const copilotToken = "$" + "{PLUGIN_ROOT}";
   return {
-    pluginRootToken: copilotToken,
+    pluginRootToken: PLUGIN_ROOT_TOKEN,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: (source, presence) =>
       synthesizeClaudeStyleManifest(source, presence, {
         agentsField: true,
+        hooksField: true,
       }),
     manifestSchemaName: null, // Copilot does not use AJV for the plugin manifest
     artifacts: {

@@ -1,61 +1,40 @@
 # Project Brief
 
-## Executive Summary
+What this project is, the problem it solves, and its domain language. The non-derivable "why", not the "how".
 
-- **Project Name**: AIDD Framework (AI-Driven Dev Framework)
-- **Vision**: Universal plugin marketplace for AI coding assistants
-- **Mission**: Provide structured, reusable skill sets that make AI assistants follow repeatable, high-quality development workflows
+## What it is
 
-### Full Description
+- A plugin marketplace that installs structured SDLC workflows into AI coding tools — Claude Code, Cursor, GitHub Copilot, Codex, opencode — plus the `aidd` binary that installs them.
+- For developers already working with an AI assistant daily, who want its output repeatable rather than improvised.
 
-AIDD Framework is a plugin system that installs focused skill sets into AI coding tools (Claude Code, Cursor, GitHub Copilot, Codex, OpenCode). Plugins deliver SDLC workflows — from brainstorming to PR creation — as slash-command-driven skills backed by structured markdown actions.
+## Why it exists
 
-## Context
+- An assistant rediscovers the project every session and improvises its process. Durable memory plus fixed workflows make the same request produce comparable work twice.
+- Workflows are tool-agnostic markdown: written once, translated per tool, instead of one prompt library per assistant.
 
-### Core Domain
+## Domain language
 
-AI-assisted software development tooling. The framework ships workflows, not code. Every artifact is a markdown file (skill, agent, rule, memory template) interpreted by an LLM at runtime.
+| Term | Meaning |
+| ---- | ------- |
+| Plugin | installable package grouping skills around one concern, listed in `marketplace.json` |
+| Skill | a router: `SKILL.md` dispatching a request to its actions |
+| Action | one atomic step, with its own inputs, outputs, process and test |
+| Agent | isolated executor; own context, returns only a result |
+| Rule | coding standard injected into the tool's context automatically |
+| Memory | the bank under `aidd_docs/memory/`, loaded every session |
+| Marketplace | `.claude-plugin/marketplace.json`, the plugin and version registry |
+| Concern | what a plugin owns; decides where a capability lives |
+| Promote | sending `next` to `main`, which opens the release |
 
-### Ubiquitous Language
+## Key features
 
-| Term | Definition | Synonyms |
-| --- | --- | --- |
-| Plugin | Installable package grouping related skills | package |
-| Skill | Router-based workflow triggered by user phrase or slash command | command |
-| Action | Single step inside a skill, containing inputs/outputs/process/test | step |
-| Agent | Specialized AI persona for a focused sub-task | subagent |
-| Rule | Coding standard injected into LLM context automatically | guardrail |
-| Memory | Structured context file loaded at conversation start | context file |
-| SDLC | Software Development Life Cycle — the end-to-end pipeline from idea to deployed PR | |
-| Marketplace | Central registry listing available plugins with version metadata | |
-
-## Features & Use-cases
-
-- Install plugins per AI tool with `aidd plugin add <plugin> --tool <tool>`
-- Execute skills via slash commands (`/sdlc`, `/commit`, `/plan`, etc.)
-- Bootstrap project memory bank and context files with `aidd-context:02-project-memory`
-- Sync memory references across all AI context files automatically
-- Generate plans, assertions, reviews, and PRs through structured action chains
-- Run async development pipelines via `aidd-orchestrator`
-
-## User Journey maps
-
-```mermaid
-journey
-    title Developer using AIDD on a new feature
-    section Setup
-        Install plugin: 5: Developer
-        Run project init: 5: Developer
-    section Feature loop
-        Brainstorm request: 4: Developer
-        Generate plan: 5: AIDD
-        Implement code: 5: AIDD
-        Review code: 4: AIDD
-        Commit and PR: 5: AIDD
-```
-
-### Developer
-
-- Uses an AI coding assistant daily
-- Wants predictable, structured AI workflows
-- Needs memory of project context across sessions
+| Capability | Entry |
+| --- | --- |
+| Install and update plugins per tool | `aidd plugin add`, `aidd ai`, `aidd ide` |
+| Build a target-native distribution | `aidd framework build` |
+| Bootstrap and refresh project memory | `aidd-context:02-project-memory` |
+| Generate context artifacts | `aidd-context:03-context-generate` and its per-kind generators |
+| Development loop | `aidd-dev` — plan, implement, assert, audit, review, test, refactor, debug |
+| Typed product backlog | `aidd-pm` — brief, epic, story, spec, spike, defect |
+| End-to-end orchestration | `aidd-orchestrator:01-sdlc` |
+| Task board | `aidd kanban` |

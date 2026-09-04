@@ -2,7 +2,8 @@ import type { AiToolId } from "../../../../kernel/tool.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
-import { loadPluginManifest, resolvePluginToolIds } from "./plugin-helpers.js";
+import { loadPluginManifest } from "./plugin-helpers.js";
+import { resolvePluginToolIds } from "./plugin-target-resolution.js";
 
 export interface PluginListOptions {
   toolIds: AiToolId[] | "all";

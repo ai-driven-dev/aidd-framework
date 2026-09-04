@@ -74,6 +74,12 @@ export type ArtifactContract =
        * Used to reshape the Claude nested format to a tool-specific flat format.
        */
       readonly hooksTransform?: (rewrittenJson: string) => string;
+      /**
+       * When true, `writeHooks` delivers everything under hooks/ except hooks.json —
+       * for a tool whose hook is a runtime module a loader scans for, not a manifest a
+       * merge reads (opencode's flat plugin directory).
+       */
+      readonly skipHooksJson?: boolean;
     };
 
 /**

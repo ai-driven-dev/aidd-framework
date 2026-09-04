@@ -36,6 +36,15 @@ export function transformClaudeAgent(content: string, _plugin: string, outName: 
 export interface SynthesizeClaudeStyleManifestOpts {
   /** When true, include `agents` as a list of `./agents/*.md` file paths if agents are present. */
   readonly agentsField: boolean;
+  /**
+   * When true, point `hooks` at `./hooks/hooks.json` if the plugin ships one.
+   *
+   * Declared per tool because the answer is not the same for all of them: Claude Code loads
+   * that path by its own convention and, since 2.1.240, rejects a plugin whose manifest names
+   * it too — "Duplicate hooks file detected". The hooks fired anyway, so the plugin read as
+   * failed while working. Codex and the others still need the pointer.
+   */
+  readonly hooksField: boolean;
 }
 
 /**
@@ -62,7 +71,7 @@ export function synthesizeClaudeStyleManifest(
     manifest.agents = presence.agentsList.map((n) => `./agents/${n}`);
   if (presence.skillsList.length > 0)
     manifest.skills = presence.skillsList.map((n) => `./skills/${n}`);
-  if (presence.hasHooksJson) manifest.hooks = "./hooks/hooks.json";
+  if (opts.hooksField && presence.hasHooksJson) manifest.hooks = "./hooks/hooks.json";
   if (presence.hasMcpJson) manifest.mcpServers = "./.mcp.json";
   return manifest;
 }

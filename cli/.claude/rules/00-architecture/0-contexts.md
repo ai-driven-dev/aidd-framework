@@ -15,12 +15,16 @@ flowchart LR
   framework --> translate --> tools --> kernel
   framework --> tools
   framework --> distribution --> kernel
+  telemetry --> tools
   presentation --> contexts
   contexts --> kernel
 ```
 
 The only edges between contexts are `framework → translate`, `translate → tools`,
-`framework → tools`, and `framework → distribution`. No other context-to-context edge exists.
+`framework → tools`, `framework → distribution`, and `telemetry → tools`. No other
+context-to-context edge exists. Measurement reads what a tool declares and a tool declares
+nothing about measurement: the vocabulary both speak lives in `kernel/measurement.ts`, which
+is what makes the reverse edge impossible rather than merely absent.
 `presentation` and `runtime` may depend on any context; no context may depend on `presentation`
 or `runtime` — the arrows run one way, down toward the kernel, never back up.
 `tests/architecture/context-graph.arch.test.ts` holds this as a ratchet: an edge the chain does

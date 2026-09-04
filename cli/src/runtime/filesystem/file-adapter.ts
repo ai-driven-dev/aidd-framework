@@ -1,9 +1,19 @@
-import { mkdir, readdir, readFile, rm, rmdir, stat, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import {
+  access,
+  chmod,
+  mkdir,
+  readdir,
+  readFile,
+  rm,
+  rmdir,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import type { FileMerger } from "../../contexts/tools/domain/ports/file-merger.js";
 import { JsonParseError } from "../../kernel/errors.js";
 import type { FileHash } from "../../kernel/file.js";
-import { stripJsonComments } from "../../kernel/jsonc.js";
 import {
   isPerKeyMergeStrategy,
   type MergeStrategy,
@@ -13,8 +23,18 @@ import type { FileReader } from "../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../kernel/ports/hasher.js";
 import type { Logger } from "../../kernel/ports/logger.js";
+import { stripJsonComments } from "../../kernel/reading/jsonc.js";
 
 export class FileAdapter implements FileReader, FileWriter, FileMerger {
+  async isExecutable(path: string): Promise<boolean> {
+    try {
+      await access(path, constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   constructor(
     private readonly hasher: Hasher,
     private readonly logger?: Logger
@@ -106,6 +126,10 @@ export class FileAdapter implements FileReader, FileWriter, FileMerger {
 
   async deleteDirectory(path: string): Promise<void> {
     await rm(path, { recursive: true, force: true });
+  }
+
+  async chmodExecutable(path: string): Promise<void> {
+    await chmod(path, 0o755);
   }
 
   async listFilesRecursive(dirPath: string): Promise<string[]> {

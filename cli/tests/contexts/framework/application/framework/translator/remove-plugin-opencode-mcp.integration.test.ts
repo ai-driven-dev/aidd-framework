@@ -12,6 +12,7 @@ import { ModeBFlatMaterializationTranslator } from "../../../../../../src/contex
 import { PluginRemoveUseCase } from "../../../../../../src/contexts/framework/application/plugin/plugin-remove-use-case.js";
 import { Manifest } from "../../../../../../src/contexts/framework/domain/manifest.js";
 import { PluginDistribution } from "../../../../../../src/contexts/translate/domain/plugin-distribution.js";
+import { CLIOutput } from "../../../../../../src/presentation/output.js";
 import { DeterministicHasher } from "../../../../../helpers/ports/deterministic-hasher.js";
 import { InMemoryFileAdapter } from "../../../../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryManifestRepository } from "../../../../../helpers/ports/in-memory-manifest-repository.js";
@@ -66,7 +67,12 @@ describe("remove opencode plugin: unmerge MCP entries (Phase 5)", () => {
     );
     await manifestRepo.save(manifest);
 
-    const removeUseCase = new PluginRemoveUseCase(fs, manifestRepo);
+    const removeUseCase = new PluginRemoveUseCase(
+      fs,
+      manifestRepo,
+      new CLIOutput(false),
+      new Map()
+    );
     await removeUseCase.execute({
       pluginName: PLUGIN_NAME,
       toolIds: ["opencode"],
@@ -99,7 +105,12 @@ describe("remove opencode plugin: unmerge MCP entries (Phase 5)", () => {
     );
     await manifestRepo.save(manifest);
 
-    const removeUseCase = new PluginRemoveUseCase(fs, manifestRepo);
+    const removeUseCase = new PluginRemoveUseCase(
+      fs,
+      manifestRepo,
+      new CLIOutput(false),
+      new Map()
+    );
     await removeUseCase.execute({
       pluginName: PLUGIN_NAME,
       toolIds: ["opencode"],
@@ -131,7 +142,12 @@ describe("remove opencode plugin: unmerge MCP entries (Phase 5)", () => {
     await fs.deleteFile(OPENCODE_JSON);
     await manifestRepo.save(manifest);
 
-    const removeUseCase = new PluginRemoveUseCase(fs, manifestRepo);
+    const removeUseCase = new PluginRemoveUseCase(
+      fs,
+      manifestRepo,
+      new CLIOutput(false),
+      new Map()
+    );
     await expect(
       removeUseCase.execute({
         pluginName: PLUGIN_NAME,

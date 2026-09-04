@@ -1,3 +1,4 @@
+import { isAbsolute } from "node:path";
 import { InteractiveOnlyError, TrustDeniedError } from "../../../../kernel/errors.js";
 import type { Prompter } from "../../../../kernel/ports/prompter.js";
 import {
@@ -6,13 +7,13 @@ import {
   parsePluginSourceShorthand,
 } from "../../../../kernel/source.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../../kernel/tool.js";
-import type { PluginPickUseCase } from "../../../../presentation/prompts/plugin-pick-use-case.js";
+import type { PluginPick } from "../../../../presentation/prompts/plugin-pick-use-case.js";
 import type { MarketplaceTrustStore } from "../../../distribution/domain/ports/marketplace-trust-store.js";
 import { assertToolSupportsScope, type InstallScope } from "../../domain/install-scope.js";
 import { parsePluginSpec } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
-import type { PluginAddUseCase } from "./plugin-add-use-case.js";
-import type { PluginInstallFromMarketplaceUseCase } from "./plugin-install-from-marketplace-use-case.js";
+import type { PluginAdd } from "./plugin-add-use-case.js";
+import type { PluginInstallFromMarketplace } from "./plugin-install-from-marketplace-use-case.js";
 
 export interface PluginInstallOptions {
   pluginArg: string | undefined;
@@ -32,9 +33,9 @@ export interface PluginInstallResult {
 
 export class PluginInstallUseCase {
   constructor(
-    private readonly pluginPickUseCase: PluginPickUseCase,
-    private readonly pluginAddUseCase: PluginAddUseCase,
-    private readonly pluginInstallFromMarketplaceUseCase: PluginInstallFromMarketplaceUseCase,
+    private readonly pluginPickUseCase: PluginPick,
+    private readonly pluginAddUseCase: PluginAdd,
+    private readonly pluginInstallFromMarketplaceUseCase: PluginInstallFromMarketplace,
     private readonly manifestRepo: ManifestRepository,
     private readonly trustStore: MarketplaceTrustStore,
     private readonly prompter: Prompter
@@ -61,7 +62,10 @@ export class PluginInstallUseCase {
   }
 
   private isSourceArg(arg: string): boolean {
-    return arg.includes("://") || arg.startsWith("/") || arg.startsWith("./");
+    // `isAbsolute` also catches a Windows-rooted path (`C:\...`, `\\server\share`), which
+    // `startsWith("/")` never does - without it, a local Windows source falls through to
+    // the marketplace branch below and is looked up as a package name instead.
+    return arg.includes("://") || arg.startsWith("./") || isAbsolute(arg);
   }
 
   private async executeNoArg(options: PluginInstallOptions): Promise<PluginInstallResult> {

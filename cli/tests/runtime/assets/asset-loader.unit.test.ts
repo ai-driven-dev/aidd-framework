@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseToml } from "../../../src/contexts/tools/domain/profiles/codex/toml.js";
 import { BundledAssetProviderAdapter } from "../../../src/runtime/assets/asset-loader.js";
 
 const provider = new BundledAssetProviderAdapter();
@@ -25,7 +26,14 @@ describe("BundledAssetProviderAdapter.loadConfigAsset", () => {
     it("returns config.toml as raw string", () => {
       const asset = provider.loadConfigAsset("codex", "config.toml");
       expect(typeof asset).toBe("string");
-      expect(asset as string).toContain("model");
+    });
+
+    // #700: a pinned "gpt-5" was rejected by ChatGPT-account Codex sessions.
+    // Model choice is owned by the account, not this repo — Codex's own default applies.
+    it("writes no model — the account decides which one it can use", () => {
+      const asset = provider.loadConfigAsset("codex", "config.toml") as string;
+      const parsed = parseToml(asset);
+      expect(parsed).not.toHaveProperty("model");
     });
   });
 

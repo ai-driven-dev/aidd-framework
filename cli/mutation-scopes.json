@@ -3,6 +3,7 @@
   "scopes": {
     "kernel": "src/kernel/**/*.ts",
     "tools": "src/contexts/tools/**/*.ts",
+    "telemetry": "src/contexts/telemetry/**/*.ts",
     "translate": "src/contexts/translate/**/*.ts",
     "distribution": "src/contexts/distribution/**/*.ts",
     "framework": "src/contexts/framework/**/*.ts",

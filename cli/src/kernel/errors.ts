@@ -501,3 +501,112 @@ export class ToolNotInstalledError extends Error {
     this.name = "ToolNotInstalledError";
   }
 }
+
+export class UnknownTelemetrySinkSchemaVersionError extends Error {
+  constructor(version: unknown) {
+    super(
+      `Unknown telemetry sink schema version '${String(version)}' — refusing to guess its shape.`
+    );
+    this.name = "UnknownTelemetrySinkSchemaVersionError";
+  }
+}
+
+/** A genuine `opencode export` failure — a non-zero exit not explained by "no such
+ * session", or the command exceeding its timeout. An absent binary or an unknown session
+ * are not this: those mean the machine simply holds no OpenCode data, and the reader
+ * resolves to an empty array for them instead of throwing. */
+export class OpencodeExportError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OpencodeExportError";
+  }
+}
+
+export class InvalidReportDayError extends Error {
+  constructor(flag: string, value: string) {
+    super(`Invalid ${flag} '${value}'. Expected a UTC day, as YYYY-MM-DD.`);
+    this.name = "InvalidReportDayError";
+  }
+}
+
+export class InvalidReportSpanError extends Error {
+  constructor(value: string, maxDays: number) {
+    super(`Invalid --days '${value}'. Expected an integer between 1 and ${maxDays}.`);
+    this.name = "InvalidReportSpanError";
+  }
+}
+
+/** The identity file exists but could not be read back — a read failure (e.g. it is a
+ * directory) or content that does not parse. Distinct from no file at all, which is a
+ * person never having opted in and answers `null` rather than throwing.
+ *
+ * Also what a damaged separate declaration file would have thrown, back when one existed
+ * as its own file (`UnreadablePersonMappingFileError`, deleted alongside it): one file,
+ * one error for a read that could not come back. */
+export class UnreadableIdentityFileError extends Error {
+  constructor(filePath: string, cause: string) {
+    super(`Could not read the identity file at ${filePath} (${cause}).`);
+    this.name = "UnreadableIdentityFileError";
+  }
+}
+
+/** One sentence for one consequence: writing a git-tracked file that turns telemetry on for
+ * everyone who clones. `endpoint --scope project` and `telemetry on` both have exactly this
+ * consequence — the parameterised `action` and `trackedPath` are the only two things that
+ * differ between them, so they share the one error rather than each writing its own
+ * sentence for the same fact. */
+export class TelemetryProjectScopeRequiresYesError extends Error {
+  constructor(action: string, trackedPath: string) {
+    super(
+      `${action} writes the git-tracked ${trackedPath}, turning telemetry on for ` +
+        "everyone who clones. Pass --yes to confirm."
+    );
+    this.name = "TelemetryProjectScopeRequiresYesError";
+  }
+}
+
+export class EmptyDisplayNameError extends Error {
+  constructor() {
+    super("`aidd telemetry identity use --name` needs a non-empty value.");
+    this.name = "EmptyDisplayNameError";
+  }
+}
+
+export class IdentityRequiredToLinkError extends Error {
+  constructor() {
+    super("No identity to link onto yet. Run `aidd telemetry identity use` first.");
+    this.name = "IdentityRequiredToLinkError";
+  }
+}
+
+export class EmptyIdentifierError extends Error {
+  constructor(command: "use" | "link") {
+    super(`\`aidd telemetry identity ${command}\` needs a non-empty value.`);
+    this.name = "EmptyIdentifierError";
+  }
+}
+export class TelemetrySinkUnwritableError extends Error {
+  constructor(path: string, cause: unknown) {
+    super(
+      `Telemetry sink directory is not writable: ${path} ` +
+        `(${cause instanceof Error ? cause.message : String(cause)})`
+    );
+    this.name = "TelemetrySinkUnwritableError";
+  }
+}
+
+/** A write or a delete against the identity file failed for a reason other than the file
+ * simply not being there — permission denied, a full disk, and the like. Distinct from
+ * `UnreadableIdentityFileError` (domain/errors.ts): that one names a read that could not
+ * come back, this one a write or a forget that could not go out. */
+export class IdentityWriteError extends Error {
+  /** `action` names what the person was doing, because the sentence reaches them: someone
+   * withdrawing should not be told a write failed. */
+  constructor(filePath: string, cause: unknown, action: "write" | "remove" = "write") {
+    super(
+      `Could not ${action} the identity file at ${filePath} ` +
+        `(${cause instanceof Error ? cause.message : String(cause)}).`
+    );
+    this.name = "IdentityWriteError";
+  }
+}

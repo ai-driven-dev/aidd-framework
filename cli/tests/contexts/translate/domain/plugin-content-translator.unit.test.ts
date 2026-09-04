@@ -127,6 +127,29 @@ describe("PluginContentTranslator.translate()", () => {
       expect(paths).toContain(".claude/plugins/sample-plugin/hooks/hooks.json");
       expect(paths).toContain(".claude/plugins/sample-plugin/hooks/update_memory.js");
     });
+
+    it("keeps a hook script's own directories, which its requires resolve against", () => {
+      const hooksFiles = [
+        makeFile("hooks/hooks.json", hooksJsonContent),
+        makeFile("hooks/journal.cjs", 'require("./lib/repo.js");'),
+        makeFile("hooks/lib/repo.cjs", "module.exports = {};"),
+      ];
+      const dist = makeDist({
+        files: [...hooksFiles, makeFile(".claude-plugin/plugin.json", claudeManifestContent)],
+        components: {
+          skills: [],
+          commands: [],
+          agents: [],
+          rules: [],
+          hooks: hooksFiles,
+          mcp: [],
+        },
+      });
+      const paths = pathsFor(claude, dist);
+      expect(paths).toContain(".claude/plugins/sample-plugin/hooks/journal.cjs");
+      expect(paths).toContain(".claude/plugins/sample-plugin/hooks/lib/repo.cjs");
+      expect(paths).not.toContain(".claude/plugins/sample-plugin/hooks/repo.cjs");
+    });
   });
 
   describe("cursor target (Mode B — user-scope flat materialization)", () => {

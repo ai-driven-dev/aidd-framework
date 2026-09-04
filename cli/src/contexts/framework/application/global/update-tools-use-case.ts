@@ -1,5 +1,5 @@
+import type { VersionReader } from "../../../../kernel/ports/version-reader.js";
 import type { ToolId } from "../../../../kernel/tool.js";
-import type { VersionReader } from "../../../../runtime/self-update/version-reader.js";
 import { Manifest } from "../../domain/manifest.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import { BulkConflictState } from "./resolve-update-decision-use-case.js";

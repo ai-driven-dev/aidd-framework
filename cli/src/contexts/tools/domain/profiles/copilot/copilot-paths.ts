@@ -1,7 +1,7 @@
 /**
  * Canonical path constants for the GitHub Copilot workspace layout.
  *
- * Exported from a dedicated file so both `copilot.ts` (tool definition) and
+ * Exported from a dedicated file so both `profile.ts` (tool definition) and
  * flat-mode build helpers can import from a single source of truth, without
  * introducing a cross-layer dependency.
  */

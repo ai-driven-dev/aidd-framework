@@ -20,6 +20,7 @@ import {
   convertCommandFrontmatter,
   stripToolSuffix,
 } from "../../formats/command.js";
+import { CURSOR_PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token.js";
 import { registerTool } from "../../registry.js";
 import { buildCursorContract, buildCursorFlatContract } from "./build.js";
 
@@ -41,6 +42,13 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
     },
     directory: DIRECTORY,
     toolSuffix: TOOL_SUFFIX,
+    displayName: "Cursor",
+    telemetryLocalRead: {
+      kind: "unsupported",
+      reason: "It writes no token count in any file it produces.",
+    },
+    telemetryTaskAttributable: true,
+    telemetryJournalHost: "cursor",
     signalDir: ".cursor/commands",
     configOutputPaths: { "settings.json": ".cursor/settings.json" },
     buildContracts: { marketplace: buildCursorContract, flat: buildCursorFlatContract },
@@ -100,10 +108,18 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         // (base-relative keys like "aidd-context/commands/foo.md" per D2).
         pluginsDir: "",
         pluginManifestRelativePath: null,
-        // plugin-local: Cursor auto-discovers hooks.json and mcp.json at the plugin root.
+        // plugin-local: Cursor auto-discovers mcp.json at the plugin root, but never a
+        // plugin-scope hooks.json — three probes (headless/interactive, auto-discovered
+        // and explicit --plugin-dir, with and without a manifest) fired zero of seven
+        // events. Only a project-scope .cursor/hooks.json is ever observed firing, so
+        // hooksDestination routes hooks there instead of here; hooksRelativePath and
+        // hooksContentFormat stay declared for the shape they still describe but are no
+        // longer read for Cursor's own install.
         acceptsHooks: true,
+        pluginRootToken: CURSOR_PLUGIN_ROOT_TOKEN,
         hooksRelativePath: "hooks.json",
         hooksContentFormat: "flat",
+        hooksDestination: "project",
         acceptsMcp: true,
         mcpRelativePath: "mcp.json",
         installScope: "user",

@@ -17,6 +17,7 @@ import { rewriteRelativeLinks } from "../../../../../kernel/materialization/rela
 import type { ToolBuildContract } from "../../build-contract.js";
 import { stripCursorAgentFrontmatter } from "../../formats/agent-frontmatter-strip.js";
 import { mergeCursorFlatHooks } from "../../formats/flat-hooks-merge.js";
+import { CURSOR_PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token.js";
 import { mergeVscodeMcp } from "../../formats/vscode-mcp-merge.js";
 import {
   buildClaudeStyleEntry,
@@ -41,13 +42,13 @@ export function buildCursorContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_CURSOR_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_CURSOR_MARKETPLACE_RELATIVE;
   // Split literal to avoid biome's noTemplateCurlyInString warning.
-  const cursorToken = "$" + "{CURSOR_PLUGIN_ROOT}";
   return {
-    pluginRootToken: cursorToken,
+    pluginRootToken: CURSOR_PLUGIN_ROOT_TOKEN,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: (source, presence) =>
       synthesizeClaudeStyleManifest(source, presence, {
         agentsField: true,
+        hooksField: true,
       }),
     manifestSchemaName: "plugin-manifest",
     artifacts: {

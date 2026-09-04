@@ -1,11 +1,13 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { FileHash } from "../../../src/kernel/file.js";
 import type { FileReader } from "../../../src/kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../src/kernel/ports/file-writer.js";
 import type { Logger } from "../../../src/kernel/ports/logger.js";
+import type { VersionReader } from "../../../src/kernel/ports/version-reader.js";
 import { CheckUpdateUseCase } from "../../../src/runtime/self-update/check-update-use-case.js";
 import type { SelfUpdater } from "../../../src/runtime/self-update/self-updater.js";
-import type { VersionReader } from "../../../src/runtime/self-update/version-reader.js";
 
 const TTL_24H = 24 * 60 * 60 * 1000;
 
@@ -51,12 +53,17 @@ function makeFsStub(store: Map<string, string> = new Map()): FileReader & FileWr
     createDirectory: async () => {},
     deleteEmptyDirectories: async () => {},
     deleteDirectory: async () => {},
+    isExecutable: async () => false,
+    chmodExecutable: async () => {},
   };
 }
 
 function seedCache(store: Map<string, string>, latest: string, ageMs = 0): void {
-  const dir = process.env.AIDD_USER_CONFIG_DIR ?? `${process.env.HOME ?? "/tmp"}/.config/aidd`;
-  store.set(`${dir}/update-check.json`, JSON.stringify({ checkedAt: Date.now() - ageMs, latest }));
+  const dir = process.env.AIDD_USER_CONFIG_DIR ?? join(homedir(), ".config", "aidd");
+  store.set(
+    join(dir, "update-check.json"),
+    JSON.stringify({ checkedAt: Date.now() - ageMs, latest })
+  );
 }
 
 // ---- SWR matrix ----

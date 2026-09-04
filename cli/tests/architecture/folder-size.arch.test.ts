@@ -35,12 +35,30 @@ const MAX_FILES_PER_FOLDER = 10;
  * nobody owes.
  */
 const BASELINE: readonly { readonly path: string; readonly count: number }[] = [
-  // Eleven files carry the command surface — ten register a command on the program, `menu.ts`
-  // runs the interactive loop — plus `global-options.ts` and `spawn-cli-command.ts`, whose
-  // importers all live in this folder. That is the flattest mapping there is from the CLI's
-  // surface to its source. Moving the two helpers out would leave eleven: still over the
-  // limit, and clearer about nothing.
-  { path: "src/presentation/commands", count: 13 },
+  // Twelve files carry the command surface — eleven register a command on the program,
+  // `menu.ts` runs the interactive loop — plus `global-options.ts` and `spawn-cli-command.ts`,
+  // whose importers all live in this folder. That is the flattest mapping there is from the
+  // CLI's surface to its source. Moving the two helpers out would leave twelve: still over
+  // the limit, and clearer about nothing. `telemetry.ts` is the eleventh command.
+  { path: "src/presentation/commands", count: 14 },
+  // Eleven, and staying there. The kernel gained `measurement.ts` — what a tool declares
+  // about being measured, declared by tools and read by telemetry — and the five file
+  // helpers that came with it are already grouped under `reading/`. What is left is eleven
+  // separate vocabularies with no pair among them: errors (126 importers), tool (111), file
+  // (52), source (33), paths (27), merge (22), markdown (17), measurement (10), scope (9),
+  // semver (6), describe-error (6). Reaching ten means moving one of those, and the cheapest
+  // is `describe-error` at six — into a folder holding it and nothing else. A grouping
+  // invented to satisfy a count is worse than the count.
+  { path: "src/kernel", count: 11 },
+  // Telemetry's own vocabulary: what a record is, how a report is shaped, and the five
+  // attribution rules that decide whose a figure is. They are one subject, and splitting
+  // them by shape would file `cost-report.ts` away from the envelope it fills.
+  { path: "src/contexts/telemetry/domain", count: 19 },
+  // Twelve ports because measurement reads twelve different things it does not own — a
+  // sink, a journal, an identity, a backlog, per-tool cost, a host registry, hook trust,
+  // this project's installed plugins, its ignore file, its version control. One port per
+  // question asked; collapsing any two would be a port that answers two.
+  { path: "src/contexts/telemetry/domain/ports", count: 12 },
 ];
 
 /** Direct `.ts` files per parent directory — a subfolder counts toward itself, not its parent. */

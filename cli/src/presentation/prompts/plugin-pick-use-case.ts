@@ -5,7 +5,7 @@ import type {
 } from "../../contexts/distribution/domain/catalog.js";
 import type { Marketplace } from "../../contexts/distribution/domain/marketplace.js";
 import type { MarketplaceRegistry } from "../../contexts/distribution/domain/ports/marketplace-registry.js";
-import type { PluginAddUseCase } from "../../contexts/framework/application/plugin/plugin-add-use-case.js";
+import type { PluginAdd } from "../../contexts/framework/application/plugin/plugin-add-use-case.js";
 import {
   InteractiveOnlyError,
   InvalidPluginManifestError,
@@ -25,11 +25,16 @@ export interface PluginPickResult {
   installed: readonly string[];
 }
 
-export class PluginPickUseCase {
+/** Picking a plugin interactively, as its callers need it: ask, get a choice back. */
+export interface PluginPick {
+  execute(options: PluginPickOptions): Promise<PluginPickResult>;
+}
+
+export class PluginPickUseCase implements PluginPick {
   constructor(
     private readonly registry: MarketplaceRegistry,
     private readonly resolveMarketplace: ResolveMarketplaceUseCase,
-    private readonly pluginAddUseCase: PluginAddUseCase,
+    private readonly pluginAddUseCase: PluginAdd,
     private readonly prompter: Prompter
   ) {}
 

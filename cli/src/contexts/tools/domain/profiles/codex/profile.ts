@@ -1,3 +1,4 @@
+import { CODEX_ROLLOUT_LOCATION } from "../../../../../contexts/tools/domain/profiles/codex/codex-transcript-location.js";
 import { AgentsCapability } from "../../capabilities/agents-capability.js";
 import { CommandsCapability } from "../../capabilities/commands-capability.js";
 import { CONFIG_MCP } from "../../capabilities/config-refs.js";
@@ -21,6 +22,7 @@ import {
   convertCommandFrontmatter,
   stripToolSuffix,
 } from "../../formats/command.js";
+import { PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token.js";
 import { registerTool } from "../../registry.js";
 import {
   buildCodexContract,
@@ -47,6 +49,17 @@ export function rewriteCodexContent(content: string): string {
 }
 
 const CONFIG_CODEX_HOOKS = "codex-hooks";
+
+// Measured: four consecutive `codex exec` sessions installed a plugin's
+// hooks, ran clean, and journaled nothing — no warning, no line in the output — until
+// `--dangerously-bypass-hook-trust` made the same install produce all three hooks and its
+// journal. Codex writes one `trusted_hash` per hook under `[hooks.state]` in
+// `~/.codex/config.toml` when a person approves it; a hook with no entry is skipped in
+// silence, and nothing prompts for it outside a terminal.
+const CODEX_HOOKS_TRUST_NOTICE =
+  "Codex will not run this plugin's hooks until each one is trusted — approve the prompt " +
+  "once in an interactive session, or pass --dangerously-bypass-hook-trust to codex exec " +
+  "for a headless run. Until then, a session leaves no run journal and nothing says why.";
 
 const AIDD_HOOK_COMMAND = "node .aidd/scripts/update_memory.cjs";
 
@@ -120,6 +133,16 @@ export const codex: AiTool<
   },
   directory: DIRECTORY,
   toolSuffix: TOOL_SUFFIX,
+  displayName: "Codex",
+  telemetryLocalRead: {
+    kind: "declared",
+    transcript: CODEX_ROLLOUT_LOCATION,
+    // Complete counters per turn, no currency anywhere in a rollout, and no field naming a
+    // running skill - so a step here can only ever come from a run journal interval.
+    supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
+  },
+  telemetryTaskAttributable: true,
+  telemetryJournalHost: "codex",
   signalDir: `${DIRECTORY}commands`,
   configOutputPaths: { "config.toml": ".codex/config.toml" },
   buildContracts: { marketplace: buildCodexContract, flat: buildCodexFlatContract },
@@ -166,7 +189,15 @@ export const codex: AiTool<
       // Codex only enables plugins from its user-global config (~/.codex/config.toml)
       // plus its plugin cache (~/.codex/plugins/cache/). A project-local settings file
       // is inert, so we drive the `codex` CLI directly during marketplace sync instead.
-      nativeActivation: { binary: "codex", upgradeVerb: "upgrade", enableVerb: "add" },
+      acceptsHooks: true,
+      hooksTrustNotice: CODEX_HOOKS_TRUST_NOTICE,
+      pluginRootToken: PLUGIN_ROOT_TOKEN,
+      nativeActivation: {
+        binary: "codex",
+        upgradeVerb: "upgrade",
+        enableVerb: "add",
+        disableVerb: "remove",
+      },
     }),
   },
 

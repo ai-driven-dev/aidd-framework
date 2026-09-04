@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import type { VersionReader } from "../../../src/kernel/ports/version-reader.js";
 import { SelfUpdateUseCase } from "../../../src/runtime/self-update/self-update-use-case.js";
 import type { SelfUpdater } from "../../../src/runtime/self-update/self-updater.js";
-import type { VersionReader } from "../../../src/runtime/self-update/version-reader.js";
 
 function makeUseCase(
   currentVersion: string,

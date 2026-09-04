@@ -2,13 +2,9 @@
  * Pure helper that substitutes the native marketplace plugin-root token.
  *
  * In a marketplace plugin bundle, hook/mcp path strings are authored with
- * ${CLAUDE_PLUGIN_ROOT} as the canonical source token. Each tool has its own
- * native expansion token:
- *
- *   claude    → ${CLAUDE_PLUGIN_ROOT}   (no-op)
- *   cursor    → ${CURSOR_PLUGIN_ROOT}
- *   codex     → ${PLUGIN_ROOT}
- *   copilot   → ${COPILOT_PLUGIN_ROOT}
+ * ${CLAUDE_PLUGIN_ROOT} as the canonical source token. Which token a tool
+ * expands is declared on that tool, as `plugins.pluginRootToken`, out of the
+ * vocabulary `tools/domain/formats/plugin-root-token.ts` holds.
  *
  * This helper replaces ALL occurrences of the source token in the content
  * string with the provided target token. For claude the target equals the
@@ -20,8 +16,7 @@
  * No I/O, no JSON parsing — pure string substitution.
  */
 
-// Split literal to avoid biome's noTemplateCurlyInString warning.
-export const CLAUDE_PLUGIN_ROOT_TOKEN = "$" + "{CLAUDE_PLUGIN_ROOT}";
+import { CLAUDE_PLUGIN_ROOT_TOKEN } from "../../../tools/domain/formats/plugin-root-token.js";
 
 /**
  * Replace every occurrence of ${CLAUDE_PLUGIN_ROOT} in `content` with

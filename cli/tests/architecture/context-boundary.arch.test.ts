@@ -43,6 +43,48 @@ const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
     "src/contexts/tools/domain/marketplace-settings.ts",
     "src/contexts/tools/domain/plugin-translation-mode.ts",
     "src/contexts/tools/domain/hooks-format.ts",
+    "src/contexts/tools/domain/models/plugin-install-notice.ts",
+    // The shape of the file a tool's hooks land in, read by whoever writes one for it —
+    // the installer that merges a plugin's hooks in, and the diagnostic that reads them
+    // back out to answer whether the tool will actually run them.
+    "src/contexts/tools/domain/formats/flat-hooks-merge.ts",
+    "src/contexts/tools/domain/formats/cursor-hooks-project-merge.ts",
+    // The variable each tool expands to an installed plugin's own directory. A tool
+    // declares which one it speaks; translate substitutes it, and the diagnostic looks for
+    // it in what was installed — three readers of one vocabulary, none of them a twin.
+    "src/contexts/tools/domain/formats/plugin-root-token.ts",
+  ],
+  // Telemetry answers questions and something has to ask them: every entry here is reached
+  // by `presentation` (which renders an answer) or by the composition root (which wires an
+  // adapter into a port). Nothing here is an adapter, and no other context appears — what
+  // telemetry needs from elsewhere it declares as its own ports
+  // (`domain/ports/installed-plugins-reader.ts`, `ignore-entries.ts`), satisfied at the
+  // composition root, so measurement reaches into no context and no context reaches into it.
+  telemetry: [
+    // the six use cases the `telemetry` command drives
+    "src/contexts/telemetry/application/telemetry-on-use-case.ts",
+    "src/contexts/telemetry/application/telemetry-off-use-case.ts",
+    "src/contexts/telemetry/application/read-local-cost-use-case.ts",
+    "src/contexts/telemetry/application/report-cost-use-case.ts",
+    "src/contexts/telemetry/application/diagnose-telemetry-use-case.ts",
+    "src/contexts/telemetry/application/forget-telemetry-use-case.ts",
+    "src/contexts/telemetry/application/person-identity-use-case.ts",
+    // the shapes a rendered answer is made of
+    "src/contexts/telemetry/domain/cost-report.ts",
+    "src/contexts/telemetry/domain/cost-report-envelope.ts",
+    "src/contexts/telemetry/domain/report-period.ts",
+    "src/contexts/telemetry/domain/telemetry-removal.ts",
+    "src/contexts/telemetry/domain/telemetry-claim.ts",
+    "src/contexts/telemetry/domain/telemetry-setup.ts",
+    "src/contexts/telemetry/domain/telemetry-export-leftover.ts",
+    "src/contexts/telemetry/domain/flow-attribution.ts",
+    "src/contexts/telemetry/domain/step-attribution.ts",
+    "src/contexts/telemetry/domain/task-attribution.ts",
+    // the trailer a commit carries, written by the git adapter that installs the hook
+    "src/contexts/telemetry/domain/formats/commit-session-trailer.ts",
+    // ports a caller wires a concrete adapter into
+    "src/contexts/telemetry/domain/ports/telemetry-sink.ts",
+    "src/contexts/telemetry/domain/ports/version-control.ts",
   ],
   translate: [
     // the canonical shapes framework produces and translate consumes
@@ -61,7 +103,7 @@ const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
     // something this mechanism can express, and those modules are public to everyone anyway.
   ],
   // Measured with the composition root excluded: ten modules are reached from outside,
-  // and not one of them is an adapter. The adapters are wired by `deps.ts` alone, which
+  // and not one of them is an adapter. The adapters are wired by `runtime/wiring/framework.ts` alone, which
   // is why they stay internal — a leaf that exposed its own plumbing would not be one.
   distribution: [
     // what a marketplace is, and where it can be read from
@@ -124,7 +166,7 @@ function contextOf(file: string): string | null {
  * themselves through a side-effect import, and a concrete adapter must be named to be
  * instantiated. Exempting it mirrors `earned-sharing.arch.test.ts`'s exemption of the
  * same directory for the same reason — it is not a caller this rule is trying to catch.
- * Phase 16 split the single `infrastructure/deps.ts` into one wiring module per
+ * Phase 16 split the single `runtime/wiring/framework.ts` into one wiring module per
  * context under `runtime/wiring/`, so the exemption follows the whole directory.
  */
 function isCompositionRoot(file: string): boolean {

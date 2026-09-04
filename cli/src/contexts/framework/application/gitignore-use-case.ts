@@ -6,7 +6,11 @@ const GITIGNORE_FILENAME = ".gitignore";
 export class GitignoreUseCase {
   constructor(private readonly fs: FileReader & FileWriter) {}
 
-  async execute(projectRoot: string, entries: string[]): Promise<void> {
+  /** `true` when at least one of `entries` was newly appended — `false` when every one
+   * was already there and nothing was written. Callers that only care about the file
+   * ending up correct can discard the return value; one does care (`aidd telemetry on`
+   * only announces the journal being ignored the run it actually adds the line). */
+  async execute(projectRoot: string, entries: string[]): Promise<boolean> {
     const gitignorePath = `${projectRoot}/${GITIGNORE_FILENAME}`;
 
     const existing = (await this.fs.fileExists(gitignorePath))
@@ -16,10 +20,11 @@ export class GitignoreUseCase {
     const lines = existing.split("\n");
     const missing = entries.filter((entry) => !lines.some((line) => line.trim() === entry));
 
-    if (missing.length === 0) return;
+    if (missing.length === 0) return false;
 
     const toAppend = existing.endsWith("\n") || existing === "" ? "" : "\n";
     await this.fs.writeFile(gitignorePath, `${existing}${toAppend}${missing.join("\n")}\n`);
+    return true;
   }
 
   async remove(projectRoot: string, entries: string[]): Promise<void> {

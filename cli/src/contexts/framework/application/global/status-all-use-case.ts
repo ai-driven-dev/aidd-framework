@@ -1,8 +1,5 @@
-import type { StatusUseCase } from "../status-use-case.js";
+import type { StatusQuery, StatusReport, StatusUseCase } from "../status-use-case.js";
 import type { GlobalExecutionError } from "./update-one-tool-use-case.js";
-
-type StatusReport = Awaited<ReturnType<StatusUseCase["execute"]>>;
-
 export interface StatusAllResult {
   aiTools: StatusReport;
   ideTools: StatusReport;
@@ -12,7 +9,7 @@ export interface StatusAllResult {
 }
 
 export class StatusAllUseCase {
-  constructor(private readonly statusUseCase: StatusUseCase) {}
+  constructor(private readonly statusUseCase: StatusQuery) {}
 
   async execute(projectRoot: string): Promise<StatusAllResult> {
     const errors: GlobalExecutionError[] = [];
@@ -30,7 +27,7 @@ export class StatusAllUseCase {
   }
 
   private async collectCategoryReports(
-    useCase: StatusUseCase,
+    useCase: StatusQuery,
     projectRoot: string,
     errors: GlobalExecutionError[]
   ): Promise<[StatusReport | null, StatusReport | null]> {

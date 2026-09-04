@@ -1,6 +1,6 @@
 import { AuthenticationError } from "../../kernel/errors.js";
 import type { AuthConfig, AuthCredential, AuthLevel } from "./auth.js";
-import type { AuthStorage } from "./auth-storage.js";
+import type { CredentialFileStore } from "./ports/credential-file-store.js";
 import type {
   AuthLoginResult,
   AuthLogoutHint,
@@ -12,7 +12,7 @@ import type { CliAuthProvider, TokenAuthProvider } from "./ports/oauth-provider.
 
 export class AuthProviderAdapter implements CredentialStore {
   constructor(
-    private readonly storage: AuthStorage,
+    private readonly storage: CredentialFileStore,
     private readonly externalProviders: Map<string, CliAuthProvider>,
     private readonly tokenVerifier: TokenAuthProvider,
     private readonly projectRoot: string

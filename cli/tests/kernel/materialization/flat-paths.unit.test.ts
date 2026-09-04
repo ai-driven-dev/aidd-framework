@@ -5,6 +5,7 @@ import {
   genericFlatHooksFile,
   genericFlatHooksScriptPath,
   genericFlatSkillPath,
+  genericFlatSkillTreePath,
 } from "../../../src/kernel/materialization/flat-paths.js";
 
 describe("genericFlatAgentPath", () => {
@@ -49,6 +50,29 @@ describe("genericFlatSkillPath", () => {
   it("works with different prefixes", () => {
     expect(genericFlatSkillPath(".claude/skills/", "aidd-context", "00-onboard/SKILL.md")).toBe(
       ".claude/skills/aidd-context-00-onboard/SKILL.md"
+    );
+  });
+});
+
+describe("genericFlatSkillTreePath", () => {
+  it("nests the whole plugin skills subtree under one plugin/ segment", () => {
+    expect(genericFlatSkillTreePath(".opencode/skills/", "aidd-dev", "commit/SKILL.md")).toBe(
+      ".opencode/skills/aidd-dev/commit/SKILL.md"
+    );
+  });
+
+  it("keeps a non-skill top-level child's own name intact", () => {
+    expect(
+      genericFlatSkillTreePath(".opencode/skills/", "aidd-telemetry", "shared/attribution.cjs")
+    ).toBe(".opencode/skills/aidd-telemetry/shared/attribution.cjs");
+    expect(genericFlatSkillTreePath(".opencode/skills/", "aidd-telemetry", "package.json")).toBe(
+      ".opencode/skills/aidd-telemetry/package.json"
+    );
+  });
+
+  it("works with different prefixes", () => {
+    expect(genericFlatSkillTreePath(".claude/skills/", "aidd-context", "00-onboard/SKILL.md")).toBe(
+      ".claude/skills/aidd-context/00-onboard/SKILL.md"
     );
   });
 });

@@ -142,6 +142,7 @@ describe("codex", () => {
         binary: "codex",
         upgradeVerb: "upgrade",
         enableVerb: "add",
+        disableVerb: "remove",
       });
     });
 

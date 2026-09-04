@@ -20,11 +20,12 @@ src/
 │   ├── file.ts                       # FileHash, InstallationFile, FileDiff, GITKEEP_FILE
 │   ├── merge.ts                       # MergeStrategy, merge-entry extraction
 │   ├── semver.ts                       # isSemver/compareSemver — spoken by framework and by the self-updater
-│   ├── jsonc.ts                        # stripJsonComments — leaf dependency of merge.ts
 │   ├── markdown.ts                      # markdown helpers shared by ≥2 contexts
 │   ├── errors.ts                         # every typed domain exception — one catalog, not one per layer
-│   ├── materialization/                   # where content lands and how its links follow — flat-paths.ts, relative-link-rewrite.ts; called by tools' profile builds and translate's flat/marketplace strategies
-│   └── ports/                               # ports with callers in ≥2 contexts: file-reader, file-writer, hasher, logger, asset-provider, prompter (framework + distribution)
+│   ├── measurement.ts                    # what a tool declares about being measured — declared by tools, read by telemetry; the vocabulary that keeps the two from importing each other
+│   ├── reading/                           # getting at a file's location and its content safely — home-dir, json-file, plain-object, jsonc, confined-file-name
+│   ├── materialization/                    # where content lands and how its links follow — flat-paths, relative-link-rewrite, claude-root-path-rewrite; called by tools' profile builds and translate's flat/marketplace strategies
+│   └── ports/                               # ports with callers in ≥2 contexts: file-reader, file-writer, hasher, logger, asset-provider, prompter, version-reader
 ├── presentation/                # everything that talks to a human — depends on contexts, never the reverse
 │   ├── commands/                 # CLI wiring only, one file per command (see "Launchers" below for the rule a future launcher follows)
 │   ├── display/                   # result rendering per command group (doctor, restore, setup, status)
@@ -54,7 +55,8 @@ src/
     │   │   │   ├── cursor/             # + cursor-paths.ts
     │   │   │   ├── opencode/            # flat-only build target
     │   │   │   └── vscode/               # IDE tool — profile.ts only, no build contract
-    │   │   ├── formats/            # tool formats shared by ≥2 profiles: command, placeholders, mcp-format, vscode-mcp-merge, opencode-mcp-merge, flat-hooks-merge, agent-frontmatter-strip
+    │   │   ├── formats/            # tool formats shared by ≥2 profiles: command, placeholders, mcp-format, vscode-mcp-merge, opencode-mcp-merge, flat-hooks-merge, cursor-hooks-project-merge, plugin-root-token, agent-frontmatter-strip
+    │   │   ├── models/              # plugin-install-notice — what a tool still requires of a person once a plugin is installed
     │   │   ├── capabilities/        # content-translation capability classes: agents, commands, hooks, rules, skills + config-refs.ts (CONFIG_* names, ConfigRef)
     │   │   ├── ports/                # native-plugin-activator, file-merger, schema-validator (translate reads it, tools declares it)
     │   │   ├── contracts.ts          # AiTool<C>, Has* interfaces, IdeToolConfig, ToolConfig, UserFileSectionKey
@@ -95,6 +97,12 @@ src/
     │   │   └── ports/                     # marketplace-registry, marketplace-cache, marketplace-trust-store, plugin-catalog-repository, plugin-fetcher, raw-catalog-fetcher
     │   ├── application/             # add / list / refresh / register-framework / resolve-marketplace / fetch-marketplace-source
     │   └── infrastructure/          # the adapters behind those six ports
+    ├── telemetry/                 # what a session cost and who it was for — reads what a tool declares, reaches no other context
+    │   ├── domain/                 # the record, the report, and the five attribution rules that decide whose a figure is
+    │   │   ├── formats/             # a tool's own transcript, read into cost records: claude-code-transcript, codex-rollout, copilot-events, opencode-export, commit-session-trailer
+    │   │   └── ports/                # twelve, one per thing measurement reads and does not own — sink, run journal, identity, task backlog, per-tool cost, host registry, hook trust, installed plugins, ignore entries, version control
+    │   ├── application/            # on, off, read, report, check, forget, identity
+    │   └── infrastructure/         # the adapters behind those ports
     └── framework/                  # the installation record and everything done to a project — the only context allowed to reach the others
         ├── domain/
         │   ├── manifest.ts               # aggregate root: identity, consistency, version guard, entry point to its members

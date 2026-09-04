@@ -1,15 +1,21 @@
 #!/usr/bin/env node
 /**
- * update_memory.js - Syncs the <aidd_project_memory> block in AI context files.
+ * update_memory.js - Syncs the project memory block in AI context files.
  *
- * Scans aidd_docs/memory/ and updates the <aidd_project_memory> block in each
+ * Scans aidd_docs/memory/ and updates the block delimited by
+ * <!-- aidd_project_memory:start --> / <!-- aidd_project_memory:end --> in each
  * context file with two tiers:
  *   - Root memory files       -> always loaded, via a tool-appropriate reference.
  *   - internal/ and external/ -> listed (plain paths, no @), read on demand.
  *
  * Reference syntax for the always-loaded tier:
- *   CLAUDE.md / AGENTS.md        -> @aidd_docs/memory/file.md
+ *   CLAUDE.md                    -> @aidd_docs/memory/file.md
+ *   AGENTS.md                    -> [aidd_docs/memory/file.md](aidd_docs/memory/file.md)
  *   .github/copilot-instructions -> [aidd_docs/memory/file.md](../aidd_docs/memory/file.md)
+ *
+ * Only Claude Code resolves the @ import form. The tools reading AGENTS.md
+ * (codex, cursor, opencode) do not, so an @ line there was inert text; a link
+ * is at least navigable.
  *
  * Usage:
  *   node update_memory.js                  every context file already present
@@ -28,8 +34,18 @@
 const DOCS_DIR = "aidd_docs";
 const MEMORY_SUBDIR = "memory";
 const ON_DEMAND_DIRS = ["internal", "external"];
-const BLOCK_OPEN = "<aidd_project_memory>";
-const BLOCK_CLOSE = "</aidd_project_memory>";
+// HTML comment markers, not a bare <aidd_project_memory> tag. A line opening a
+// bare tag starts an HTML block that runs to the next blank line, and an @import
+// inside one is skipped by the context loader exactly like a fenced code block,
+// so the memory silently never loads. A comment closes on its own line.
+const BLOCK_OPEN = "<!-- aidd_project_memory:start -->";
+const BLOCK_CLOSE = "<!-- aidd_project_memory:end -->";
+
+// The shape written before the markers above. Blocks already in a user's context
+// file are rewritten to the new markers on the next run; without that they stop
+// matching, the file is skipped with no output, and the memory stays unloaded.
+const LEGACY_BLOCK_OPEN = "<aidd_project_memory>";
+const LEGACY_BLOCK_CLOSE = "</aidd_project_memory>";
 const ON_DEMAND_NOTE = "<!-- read on demand, not auto-loaded -->";
 const EXCLUDED_FILES = new Set([".gitkeep", "README.md"]);
 
@@ -41,7 +57,7 @@ const TOC_CLOSE = "<!-- files:end -->";
 
 const TARGET_FILES = [
   { path: "CLAUDE.md", syntax: "at" },
-  { path: "AGENTS.md", syntax: "at" },
+  { path: "AGENTS.md", syntax: "link" },
   { path: ".github/copilot-instructions.md", syntax: "link" },
 ];
 
@@ -105,32 +121,100 @@ function scanSubdir(fs, path, sub) {
   return out.sort();
 }
 
-function buildReference(syntax, filePath) {
-  const rel = filePath.replace(/\\/g, "/");
-  return syntax === "link" ? `[${rel}](../${rel})` : `@${rel}`;
+// A markdown link resolves against the file holding it, so it has to climb back
+// out of whatever directory that file sits in. Derived from the target's own
+// depth rather than hardcoded: a root-level AGENTS.md needs no prefix, while
+// .github/copilot-instructions.md needs one "../". Hardcoding one level made
+// every root-level link point outside the repository.
+function relativePrefix(targetPath) {
+  return "../".repeat(targetPath.split("/").length - 1);
 }
 
-function buildBlockContent(rootFiles, onDemandFiles, syntax) {
+function buildReference(syntax, filePath, prefix) {
+  const rel = filePath.replace(/\\/g, "/");
+  return syntax === "link" ? `[${rel}](${prefix}${rel})` : `@${rel}`;
+}
+
+function buildBlockContent(rootFiles, onDemandFiles, syntax, prefix = "") {
   const lines = [];
-  for (const f of rootFiles) lines.push(buildReference(syntax, f));
+  for (const f of rootFiles) lines.push(buildReference(syntax, f, prefix));
   if (onDemandFiles.length > 0) {
     lines.push("", ON_DEMAND_NOTE);
     for (const f of onDemandFiles) lines.push(`- ${f.replace(/\\/g, "/")}`);
   }
-  if (lines.length === 0) return "";
-  return `\n${lines.join("\n")}\n`;
+  if (lines.length === 0) return "\n";
+  // Blank line on each side of the content. The markers are comments, which
+  // close on their own line, but a context loader that treats any line opening
+  // with `<` as an HTML block running to the next blank line would otherwise
+  // swallow the imports. The blank lines hold under either reading.
+  return `\n\n${lines.join("\n")}\n\n`;
+}
+
+// The real block is the one whose markers each own their line, outside any code
+// fence. Substring search is not enough: these markers are the strings every
+// upgrade note and migration doc quotes, and cutting on a quoted one would
+// mangle that prose while leaving the real block untouched and unloaded.
+function findBlockLines(lines, open, close) {
+  let fence = null;
+  let openLine = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    const opener = /^(`{3,}|~{3,})/u.exec(trimmed);
+
+    if (fence !== null) {
+      // A fence closes only on the same character, repeated at least as often,
+      // so a ``` inside a ```` example does not end it early.
+      if (opener && opener[1][0] === fence[0] && opener[1].length >= fence.length) fence = null;
+      continue;
+    }
+    if (opener) {
+      fence = opener[1];
+      continue;
+    }
+    if (trimmed === open) openLine = i;
+    else if (trimmed === close && openLine !== -1) return { openLine, closeLine: i };
+  }
+
+  return null;
 }
 
 // Replace the text between an open and close marker, leaving the rest intact.
-// Anchor on the close, then take the nearest open before it: a bare marker
-// quoted in hand-written prose above the real block must not become the cut
-// point and splice out everything between it and the block.
 function updateMarkers(content, open, close, innerContent) {
-  const closeIdx = content.indexOf(close);
-  if (closeIdx === -1) return null;
-  const openIdx = content.lastIndexOf(open, closeIdx);
-  if (openIdx === -1) return null;
-  return content.slice(0, openIdx + open.length) + innerContent + content.slice(closeIdx);
+  const lines = content.split("\n");
+  const found = findBlockLines(lines, open, close);
+  if (found === null) return null;
+
+  return (
+    lines.slice(0, found.openLine + 1).join("\n") +
+    innerContent +
+    lines.slice(found.closeLine).join("\n")
+  );
+}
+
+// Rewrite a legacy <aidd_project_memory> block to the comment markers.
+function migrateLegacyMarkers(content) {
+  const lines = content.split("\n");
+  const found = findBlockLines(lines, LEGACY_BLOCK_OPEN, LEGACY_BLOCK_CLOSE);
+  if (found === null) return content;
+
+  lines[found.openLine] = lines[found.openLine].replace(LEGACY_BLOCK_OPEN, BLOCK_OPEN);
+  lines[found.closeLine] = lines[found.closeLine].replace(LEGACY_BLOCK_CLOSE, BLOCK_CLOSE);
+  return lines.join("\n");
+}
+
+// A file carrying one marker without its pair can never be filled again. Say so:
+// silence about a block that does not sync is what kept the memory unloaded.
+function reportUnpairedMarkers(filePath, content) {
+  const has = (marker) => content.includes(marker);
+  const unpaired =
+    has(BLOCK_OPEN) !== has(BLOCK_CLOSE) ||
+    has(LEGACY_BLOCK_OPEN) !== has(LEGACY_BLOCK_CLOSE);
+
+  if (unpaired) {
+    console.error(`update_memory: ${filePath} has an unpaired project memory marker, not synced`);
+  }
+  return unpaired;
 }
 
 function updateBlock(content, innerContent) {
@@ -185,6 +269,10 @@ function gitAdd(childProcess, files) {
 
 // ── Main ──────────────────────────────────────────────────────────
 
+// Runs as a script, never imported: no require, no module.exports, and every
+// dependency pulled in with dynamic import(). The file is copied into the user's
+// project by the CLI, so a project declaring "type": "module" decides how it is
+// parsed. CommonJS syntax here would crash the hook on load in any such project.
 (async () => {
   const fs = await import("node:fs");
   const path = await import("node:path");
@@ -204,15 +292,28 @@ function gitAdd(childProcess, files) {
   const rootFiles = scanRootFiles(fs, path);
   const onDemandFiles = ON_DEMAND_DIRS.flatMap((sub) => scanSubdir(fs, path, sub));
   const changed = [];
+  let unpaired = false;
 
   for (const target of targets) {
     const original = readTextOrNull(fs, target.path);
     if (original === null) continue;
 
-    const innerContent = buildBlockContent(rootFiles, onDemandFiles, target.syntax);
-    const updated = updateBlock(original, innerContent);
+    const innerContent = buildBlockContent(
+      rootFiles,
+      onDemandFiles,
+      target.syntax,
+      relativePrefix(target.path),
+    );
+    // Compare against what is on disk, not against the migrated text: a file
+    // whose memory list is unchanged would otherwise look identical and skip
+    // the write, leaving the legacy markers in place forever.
+    const updated = updateBlock(migrateLegacyMarkers(original), innerContent);
 
-    if (updated === null || updated === original) continue;
+    if (updated === null) {
+      if (reportUnpairedMarkers(target.path, original)) unpaired = true;
+      continue;
+    }
+    if (updated === original) continue;
 
     fs.writeFileSync(target.path, updated, "utf8");
     changed.push(target.path);
@@ -235,4 +336,9 @@ function gitAdd(childProcess, files) {
   // so staging its own two would leave a partial index that reads like the whole
   // change. The skill reports instead, and the user stages what they mean to commit.
   if (changed.length > 0 && tools.length === 0) gitAdd(childProcess, changed);
+
+  // Only when tools were named, which means the skill called us and its sync
+  // action stops on a non-zero exit. The auto hook must never fail a session
+  // start over a file the user has yet to repair.
+  if (unpaired && tools.length > 0) process.exit(1);
 })();

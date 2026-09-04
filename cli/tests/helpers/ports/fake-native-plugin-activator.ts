@@ -10,6 +10,8 @@ import { NativePluginCliError } from "../../../src/kernel/errors.js";
  * once (simulates the CLI rejecting `add` when the name exists from a different source).
  * `throwOnRemove` makes `removeMarketplace` throw (simulates removing an absent name,
  * i.e. an `add` that failed for a reason other than a different-source conflict).
+ * `failOnUninstall` makes `uninstallPlugin` throw for the listed refs (simulates the
+ * plugin already being absent from the tool's own registry).
  */
 export class FakeNativePluginActivator implements NativePluginActivator {
   available: boolean;
@@ -17,12 +19,14 @@ export class FakeNativePluginActivator implements NativePluginActivator {
   readonly removedMarketplaces: string[] = [];
   readonly forcedRemovals: boolean[] = [];
   readonly enabledPlugins: string[] = [];
+  readonly uninstalledPlugins: string[] = [];
   upgradeCount = 0;
   private readonly failOnPlugins: ReadonlySet<string>;
   private readonly conflictOnAdd: boolean;
   private readonly throwOnRemove: boolean;
   private readonly pluginsEnabledHere: boolean;
   private readonly state: "live" | "dead" | "unknown";
+  private readonly failOnUninstall: ReadonlySet<string>;
 
   constructor(
     options: {
@@ -34,6 +38,7 @@ export class FakeNativePluginActivator implements NativePluginActivator {
       enablesPlugins?: boolean;
       /** What the tool answers about a name already registered. */
       registrationState?: "live" | "dead" | "unknown";
+      failOnUninstall?: readonly string[];
     } = {}
   ) {
     this.available = options.available ?? false;
@@ -42,6 +47,7 @@ export class FakeNativePluginActivator implements NativePluginActivator {
     this.throwOnRemove = options.throwOnRemove ?? false;
     this.pluginsEnabledHere = options.enablesPlugins ?? true;
     this.state = options.registrationState ?? "unknown";
+    this.failOnUninstall = new Set(options.failOnUninstall ?? []);
   }
 
   registrationState(): "live" | "dead" | "unknown" {
@@ -84,5 +90,12 @@ export class FakeNativePluginActivator implements NativePluginActivator {
       throw new NativePluginCliError(`plugin \`${pluginRef}\` was not found in marketplace`);
     }
     this.enabledPlugins.push(pluginRef);
+  }
+
+  uninstallPlugin(pluginRef: string): void {
+    if (this.failOnUninstall.has(pluginRef)) {
+      throw new NativePluginCliError(`plugin \`${pluginRef}\` is not installed`);
+    }
+    this.uninstalledPlugins.push(pluginRef);
   }
 }

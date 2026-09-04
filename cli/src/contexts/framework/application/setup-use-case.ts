@@ -1,15 +1,19 @@
 import { CatalogFetchAuthError } from "../../../kernel/errors.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";
+import type { VersionReader } from "../../../kernel/ports/version-reader.js";
 import type { PluginSource } from "../../../kernel/source.js";
 import type { AiToolId, IdeToolId } from "../../../kernel/tool.js";
 import type { SetupPluginsPromptUseCase } from "../../../presentation/prompts/setup-plugins-prompt-use-case.js";
 import type { SetupToolsPromptUseCase } from "../../../presentation/prompts/setup-tools-prompt-use-case.js";
 import type { TokenProvider } from "../../../runtime/auth/ports/token-provider.js";
 import type { LatestReleaseResolver } from "../../../runtime/self-update/latest-release-resolver.js";
-import type { VersionReader } from "../../../runtime/self-update/version-reader.js";
-import type { MarketplaceRefreshUseCase } from "../../distribution/application/marketplace-refresh-use-case.js";
 import type {
+  MarketplaceRefresh,
+  MarketplaceRefreshUseCase,
+} from "../../distribution/application/marketplace-refresh-use-case.js";
+import type {
+  MarketplaceRegisterFramework,
   MarketplaceRegisterFrameworkOptions,
   MarketplaceRegisterFrameworkUseCase,
 } from "../../distribution/application/marketplace-register-framework-use-case.js";
@@ -17,7 +21,7 @@ import type { MarketplaceSourceMode } from "../../distribution/domain/marketplac
 import type { ManifestRepository } from "../domain/ports/manifest-repository.js";
 import type { ProjectContext } from "../domain/project-context.js";
 import type { SetupFlow } from "../domain/setup-flow.js";
-import type { MarketplaceSyncSettingsUseCase } from "./flows/marketplace-sync-settings-use-case.js";
+import type { MarketplaceSyncSettings } from "./flows/marketplace-sync-settings-use-case.js";
 import { InitUseCase } from "./init-use-case.js";
 import type { ProjectContextDetectorUseCase } from "./setup/project-context-detector-use-case.js";
 import type { SetupMarketplaceSourceUseCase } from "./setup/setup-marketplace-source-use-case.js";
@@ -32,9 +36,9 @@ export class SetupUseCase {
     private readonly fs: FileReader & FileWriter,
     private readonly manifestRepo: ManifestRepository,
     private readonly setupMarketplaceSourceUseCase: SetupMarketplaceSourceUseCase,
-    private readonly marketplaceRegisterFrameworkUseCase: MarketplaceRegisterFrameworkUseCase,
-    private readonly marketplaceRefreshUseCase: MarketplaceRefreshUseCase,
-    private readonly marketplaceSyncSettingsUseCase: MarketplaceSyncSettingsUseCase,
+    private readonly marketplaceRegisterFrameworkUseCase: MarketplaceRegisterFramework,
+    private readonly marketplaceRefreshUseCase: MarketplaceRefresh,
+    private readonly marketplaceSyncSettingsUseCase: MarketplaceSyncSettings,
     private readonly setupToolsUseCase: SetupToolsUseCase,
     private readonly setupPluginsPromptUseCase: SetupPluginsPromptUseCase,
     private readonly currentVersionProvider: VersionReader,

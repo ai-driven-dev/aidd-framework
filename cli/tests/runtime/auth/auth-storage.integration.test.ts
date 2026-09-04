@@ -89,7 +89,7 @@ describe("AuthStorage", () => {
   describe("paths", () => {
     it("projectConfigPath returns .aidd/auth.json under projectRoot", () => {
       const path = storage.projectConfigPath("/my/project");
-      expect(path).toBe("/my/project/.aidd/auth.json");
+      expect(path).toBe(join("/my/project", ".aidd", "auth.json"));
     });
 
     it("userConfigPath respects AIDD_USER_CONFIG_DIR env override", () => {
@@ -97,7 +97,7 @@ describe("AuthStorage", () => {
       try {
         process.env.AIDD_USER_CONFIG_DIR = "/custom/config/dir";
         const path = storage.userConfigPath();
-        expect(path).toBe("/custom/config/dir/auth.json");
+        expect(path).toBe(join("/custom/config/dir", "auth.json"));
       } finally {
         if (original === undefined) {
           delete process.env.AIDD_USER_CONFIG_DIR;

@@ -13,7 +13,7 @@ import { getToolConfig, isAiTool } from "../../../tools/domain/registry.js";
 import type { FrameworkBuildTarget } from "../../../translate/domain/build-target.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
-import type { EnsureBuiltMarketplaceUseCase } from "../shared/ensure-built-marketplace-use-case.js";
+import type { EnsureBuiltMarketplace } from "../shared/ensure-built-marketplace-use-case.js";
 
 export interface MarketplaceSyncSettingsOptions {
   projectRoot: string;
@@ -24,7 +24,12 @@ export interface MarketplaceSyncSettingsResult {
 }
 
 // Upserts local marketplace entries (absolute path may change); never removes entries; skips non-local if already present.
-export class MarketplaceSyncSettingsUseCase {
+/** Syncing marketplace settings into the tools that read them, as its callers need it. */
+export interface MarketplaceSyncSettings {
+  execute(options: MarketplaceSyncSettingsOptions): Promise<MarketplaceSyncSettingsResult>;
+}
+
+export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
   constructor(
     private readonly fs: FileReader & FileWriter,
     private readonly manifestRepo: ManifestRepository,
@@ -33,7 +38,7 @@ export class MarketplaceSyncSettingsUseCase {
     private readonly logger: Logger,
     /** Native plugin CLI activators, keyed by the `binary` each profile declares. */
     private readonly activators: ReadonlyMap<string, NativePluginActivator>,
-    private readonly ensureBuilt: EnsureBuiltMarketplaceUseCase
+    private readonly ensureBuilt: EnsureBuiltMarketplace
   ) {}
 
   async execute(options: MarketplaceSyncSettingsOptions): Promise<MarketplaceSyncSettingsResult> {
@@ -83,19 +88,21 @@ export class MarketplaceSyncSettingsUseCase {
     manifest: Manifest,
     marketplaces: readonly Marketplace[]
   ): Promise<void> {
-    const { refs, marketplaces: used } = this.pluginActivation(toolId, manifest, marketplaces);
-    // A tool that enables its plugins elsewhere still needs its marketplaces declared,
-    // and a project can have marketplaces before it has plugins — so registration is
-    // driven for every known marketplace, not only for the ones a plugin points at.
-    const toRegister = activator.enablesPlugins() ? used : marketplaces;
-    if (toRegister.length === 0 && refs.length === 0) return;
+    const refs = this.pluginRefsToEnable(toolId, manifest, marketplaces);
+    // Every known marketplace, never only the ones a plugin points at — declaring a
+    // marketplace and installing a plugin from it are two acts, and a person does the first
+    // alone all the time. This used to narrow to the plugins' own marketplaces for a tool
+    // that enables plugins through its CLI, on the reasoning that enabling teaches it the
+    // marketplace; a smoke run against the real `claude` binary measured the consequence —
+    // a project with two registered marketplaces and no plugin told it about neither.
+    if (marketplaces.length === 0 && refs.length === 0) return;
     if (!activator.isAvailable()) {
       this.logger.warn(`${binary} CLI not found on PATH — skipping native plugin activation.`);
       return;
     }
     // Each step is independently best-effort: one failing plugin or marketplace
     // must warn and let the others through, never abort the whole activation.
-    for (const marketplace of toRegister)
+    for (const marketplace of marketplaces)
       await this.registerMarketplace(activator, toolId, marketplace, projectRoot);
     if (!activator.enablesPlugins()) return;
     this.bestEffort(() => activator.upgradeMarketplaces(), "upgrade marketplaces");
@@ -113,21 +120,22 @@ export class MarketplaceSyncSettingsUseCase {
     }
   }
 
-  private pluginActivation(
+  /** The `<plugin>@<marketplace>` refs this tool's own CLI is asked to enable — every
+   * recorded plugin whose marketplace this project still knows, and nothing else. Which
+   * marketplaces get registered is a separate question, answered by the registry itself. */
+  private pluginRefsToEnable(
     toolId: ToolId,
     manifest: Manifest,
     marketplaces: readonly Marketplace[]
-  ): { refs: string[]; marketplaces: Marketplace[] } {
+  ): string[] {
     const byName = new Map(marketplaces.map((m) => [m.name, m]));
     const refs: string[] = [];
-    const used = new Map<string, Marketplace>();
     for (const plugin of manifest.getPlugins(toolId)) {
       const marketplace = plugin.marketplace == null ? undefined : byName.get(plugin.marketplace);
       if (marketplace === undefined) continue;
       refs.push(`${plugin.name}@${marketplace.name}`);
-      used.set(marketplace.name, marketplace);
     }
-    return { refs, marketplaces: [...used.values()] };
+    return refs;
   }
 
   // Native tools must read the BUILT (transformed) tree, not the raw Claude-format

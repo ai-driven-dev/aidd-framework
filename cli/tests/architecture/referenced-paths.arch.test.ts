@@ -44,7 +44,7 @@ const BASELINE: string[] = [];
  *
  * The skills were the whole scope for one phase, and that was too narrow: `memory/` is
  * loaded into every agent conversation and cited four paths that had moved, `ARCHITECTURE.md`
- * still described a `deps.ts` split into `runtime/wiring/` phases ago, and
+ * still described a `runtime/wiring/framework.ts` split into `runtime/wiring/` phases ago, and
  * `vitest.config.ts` excluded three directories from coverage that do not exist — so the
  * exclusions did nothing and the numbers they were written to protect were wrong.
  *

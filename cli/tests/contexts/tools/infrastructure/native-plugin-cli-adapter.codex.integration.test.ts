@@ -139,6 +139,28 @@ describe("CodexCliAdapter", () => {
     ).toThrow("plugin `ghost` was not found");
   });
 
+  it("uninstalls a plugin via `codex plugin remove <ref>`", () => {
+    mockSpawnSync.mockReturnValue(makeResult({}));
+
+    new NativePluginCliAdapter("codex", { disableVerb: "remove" }).uninstallPlugin(
+      "aidd-telemetry@aidd-framework"
+    );
+
+    expect(mockSpawnSync).toHaveBeenCalledWith(
+      "codex",
+      ["plugin", "remove", "aidd-telemetry@aidd-framework"],
+      expect.anything()
+    );
+  });
+
+  it("throws NativePluginCliError when uninstalling an already-absent plugin", () => {
+    mockSpawnSync.mockReturnValue(makeResult({ status: 1, stderr: "plugin `ghost` not found" }));
+
+    expect(() =>
+      new NativePluginCliAdapter("codex", { disableVerb: "remove" }).uninstallPlugin("ghost@m1")
+    ).toThrow(NativePluginCliError);
+  });
+
   it("throws NativePluginCliError when the process fails to spawn", () => {
     mockSpawnSync.mockReturnValue(makeResult({ error: new Error("spawn EACCES"), status: null }));
 

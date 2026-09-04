@@ -1,11 +1,13 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { FileHash } from "../../../src/kernel/file.js";
 import type { FileReader } from "../../../src/kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../src/kernel/ports/file-writer.js";
 import type { Logger } from "../../../src/kernel/ports/logger.js";
+import type { VersionReader } from "../../../src/kernel/ports/version-reader.js";
 import { CheckUpdateUseCase } from "../../../src/runtime/self-update/check-update-use-case.js";
 import type { SelfUpdater } from "../../../src/runtime/self-update/self-updater.js";
-import type { VersionReader } from "../../../src/runtime/self-update/version-reader.js";
 
 const CACHE_PATH_SUFFIX = "update-check.json";
 
@@ -50,6 +52,8 @@ function makeFsStub(store: Map<string, string> = new Map()): FileReader & FileWr
     createDirectory: async () => {},
     deleteEmptyDirectories: async () => {},
     deleteDirectory: async () => {},
+    isExecutable: async () => false,
+    chmodExecutable: async () => {},
   };
 }
 
@@ -59,8 +63,8 @@ function seedCache(
   ageMs = 0,
   configDir?: string
 ): void {
-  const dir = configDir ?? process.env.AIDD_USER_CONFIG_DIR ?? `${process.env.HOME}/.config/aidd`;
-  const path = `${dir}/${CACHE_PATH_SUFFIX}`;
+  const dir = configDir ?? process.env.AIDD_USER_CONFIG_DIR ?? join(homedir(), ".config", "aidd");
+  const path = join(dir, CACHE_PATH_SUFFIX);
   store.set(path, JSON.stringify({ checkedAt: Date.now() - ageMs, latest }));
 }
 

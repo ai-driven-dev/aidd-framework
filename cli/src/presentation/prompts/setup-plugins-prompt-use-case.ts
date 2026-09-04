@@ -1,10 +1,12 @@
-import type { ResolveMarketplaceUseCase } from "../../contexts/distribution/application/resolve-marketplace-use-case.js";
+import type {
+  ResolveMarketplace,
+  ResolveMarketplaceUseCase,
+} from "../../contexts/distribution/application/resolve-marketplace-use-case.js";
 import type { PluginCatalogEntry } from "../../contexts/distribution/domain/catalog.js";
 import type { MarketplaceRegistry } from "../../contexts/distribution/domain/ports/marketplace-registry.js";
-import type { PluginInstallFromMarketplaceUseCase } from "../../contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.js";
+import type { PluginInstallFromMarketplace } from "../../contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.js";
 import type { PluginInstallMode } from "../../contexts/framework/domain/setup-flow.js";
-import type { PluginPickUseCase } from "./plugin-pick-use-case.js";
-
+import type { PluginPick, PluginPickUseCase } from "./plugin-pick-use-case.js";
 export interface SetupPluginsPromptOptions {
   projectRoot: string;
   mode: PluginInstallMode;
@@ -18,10 +20,10 @@ export interface SetupPluginsPromptResult {
 
 export class SetupPluginsPromptUseCase {
   constructor(
-    private readonly pluginPickUseCase: PluginPickUseCase,
-    private readonly pluginInstallFromMarketplaceUseCase: PluginInstallFromMarketplaceUseCase,
+    private readonly pluginPickUseCase: PluginPick,
+    private readonly pluginInstallFromMarketplaceUseCase: PluginInstallFromMarketplace,
     private readonly registry: MarketplaceRegistry,
-    private readonly resolveMarketplaceUseCase: ResolveMarketplaceUseCase
+    private readonly resolveMarketplaceUseCase: ResolveMarketplace
   ) {}
 
   async execute(options: SetupPluginsPromptOptions): Promise<SetupPluginsPromptResult> {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import type { MarketplaceSyncSettingsUseCase } from "../../../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
+import type { MarketplaceSyncSettings } from "../../../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
 import { InstallAiToolUseCase } from "../../../../../src/contexts/framework/application/install/install-ai-tool-use-case.js";
-import type { PluginInstallFromMarketplaceUseCase } from "../../../../../src/contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.js";
+import type { PluginInstallFromMarketplace } from "../../../../../src/contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.js";
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
 import { InstalledPlugin } from "../../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
 import {
@@ -36,17 +36,17 @@ function makeMockOrphanPlugin(name: string): InstalledPlugin {
 
 function buildUseCase(
   deps: Awaited<ReturnType<typeof buildUnitDeps>>,
-  pluginInstall: Partial<PluginInstallFromMarketplaceUseCase> = {},
-  syncSettings: Partial<MarketplaceSyncSettingsUseCase> = {}
+  pluginInstall: Partial<PluginInstallFromMarketplace> = {},
+  syncSettings: Partial<MarketplaceSyncSettings> = {}
 ) {
-  const pluginInstallMock = {
+  const pluginInstallMock: PluginInstallFromMarketplace = {
     execute: vi.fn().mockResolvedValue({ marketplace: {}, entry: {} }),
     ...pluginInstall,
-  } as unknown as PluginInstallFromMarketplaceUseCase;
-  const syncSettingsMock = {
+  };
+  const syncSettingsMock: MarketplaceSyncSettings = {
     execute: vi.fn().mockResolvedValue({ updatedTools: [] }),
     ...syncSettings,
-  } as unknown as MarketplaceSyncSettingsUseCase;
+  };
   return {
     useCase: new InstallAiToolUseCase(
       deps.installRuntimeConfigUseCase,

@@ -1,5 +1,6 @@
 import { join, resolve } from "node:path";
 import { InvalidBuildPathsError, InvalidSourceMarketplaceError } from "../../../kernel/errors.js";
+import { pathsOverlap } from "../../../kernel/paths.js";
 import type { AssetProvider } from "../../../kernel/ports/asset-provider.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";
@@ -19,7 +20,12 @@ import type {
   SourcePluginEntry,
 } from "./strategies/build-output-strategy.js";
 
-export class FrameworkBuildUseCase {
+/** Running one framework build, as its callers need it. */
+export interface FrameworkBuild {
+  execute(options: FrameworkBuildOptions): Promise<FrameworkBuildResult>;
+}
+
+export class FrameworkBuildUseCase implements FrameworkBuild {
   constructor(
     private readonly fs: FileReader & FileWriter,
     private readonly jsonSchemaValidator: JsonSchemaValidator,
@@ -45,10 +51,7 @@ export class FrameworkBuildUseCase {
   }
 
   private guardPaths(sourceDir: string, outDir: string): void {
-    if (sourceDir === outDir) throw new InvalidBuildPathsError(sourceDir, outDir);
-    if (outDir.startsWith(`${sourceDir}/`) || sourceDir.startsWith(`${outDir}/`)) {
-      throw new InvalidBuildPathsError(sourceDir, outDir);
-    }
+    if (pathsOverlap(sourceDir, outDir)) throw new InvalidBuildPathsError(sourceDir, outDir);
   }
 
   private async readSourceMarketplace(sourceDir: string): Promise<SourceMarketplace> {

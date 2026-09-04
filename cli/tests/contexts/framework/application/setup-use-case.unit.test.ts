@@ -1,69 +1,101 @@
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import type { MarketplaceRefreshUseCase } from "../../../../src/contexts/distribution/application/marketplace-refresh-use-case.js";
-import type { MarketplaceRegisterFrameworkUseCase } from "../../../../src/contexts/distribution/application/marketplace-register-framework-use-case.js";
+import type {
+  MarketplaceRefresh,
+  MarketplaceRefreshUseCase,
+} from "../../../../src/contexts/distribution/application/marketplace-refresh-use-case.js";
+import type { MarketplaceRegisterFramework } from "../../../../src/contexts/distribution/application/marketplace-register-framework-use-case.js";
+import type { ResolveMarketplace } from "../../../../src/contexts/distribution/application/resolve-marketplace-use-case.js";
+import type { PluginCatalogEntry } from "../../../../src/contexts/distribution/domain/catalog.js";
+import {
+  FRAMEWORK_MARKETPLACE_NAME,
+  Marketplace,
+} from "../../../../src/contexts/distribution/domain/marketplace.js";
 import { MarketplaceSourceMode } from "../../../../src/contexts/distribution/domain/marketplace-source-mode.js";
+import type { MarketplaceSyncSettings } from "../../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
+import type { PluginInstallFromMarketplace } from "../../../../src/contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.js";
 import { SetupMarketplaceSourceUseCase } from "../../../../src/contexts/framework/application/setup/setup-marketplace-source-use-case.js";
 import { SetupToolsUseCase } from "../../../../src/contexts/framework/application/setup/setup-tools-use-case.js";
 import { SetupUseCase } from "../../../../src/contexts/framework/application/setup-use-case.js";
 import { SetupFlow } from "../../../../src/contexts/framework/domain/setup-flow.js";
 import type { ToolId } from "../../../../src/kernel/tool.js";
 import { AI_TOOL_IDS, IDE_TOOL_IDS } from "../../../../src/kernel/tool.js";
+import type { PluginPick } from "../../../../src/presentation/prompts/plugin-pick-use-case.js";
 import { SetupPluginsPromptUseCase } from "../../../../src/presentation/prompts/setup-plugins-prompt-use-case.js";
 import { SetupToolsPromptUseCase } from "../../../../src/presentation/prompts/setup-tools-prompt-use-case.js";
+import type { LatestReleaseResolver } from "../../../../src/runtime/self-update/latest-release-resolver.js";
 import {
   buildUnitDeps,
   initAndInstall,
   initProject,
 } from "../../../helpers/ports/build-unit-deps.js";
+import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-marketplace-registry.js";
 import { OverwritePrompter, ScriptedPrompter } from "../../../helpers/ports/scripted-prompter.js";
 
-function makeNoOpLatestResolver() {
+function makeNoOpLatestResolver(): LatestReleaseResolver {
   return {
     resolveLatest: vi.fn().mockResolvedValue(null),
     listRootReleases: vi.fn().mockResolvedValue([]),
     isRepoPublic: vi.fn().mockResolvedValue(true),
-  } as never;
+  };
 }
 
-type RegisterFrameworkMock = MarketplaceRegisterFrameworkUseCase & {
-  execute: ReturnType<typeof vi.fn>;
-};
-type RefreshMock = MarketplaceRefreshUseCase & { execute: ReturnType<typeof vi.fn> };
+type RegisterFrameworkMock = MarketplaceRegisterFramework & { execute: ReturnType<typeof vi.fn> };
+type RefreshMock = MarketplaceRefresh & { execute: ReturnType<typeof vi.fn> };
 
 function makeNoOpMarketplaceRegisterFramework(): RegisterFrameworkMock {
   const execute = vi.fn().mockResolvedValue({ registered: false });
-  return { execute } as unknown as RegisterFrameworkMock;
+  return { execute };
 }
 
 function makeNoOpMarketplaceRefresh(): RefreshMock {
   const execute = vi.fn().mockResolvedValue({ results: [], failedCount: 0 });
-  return { execute } as unknown as RefreshMock;
+  return { execute };
 }
 
-function makeNoOpMarketplaceSyncSettings() {
-  return { execute: vi.fn().mockResolvedValue(undefined) } as never;
+function makeNoOpMarketplaceSyncSettings(): MarketplaceSyncSettings {
+  return { execute: vi.fn().mockResolvedValue({ updatedTools: [] }) };
 }
 
-function makeNoOpPluginPick() {
-  return { execute: vi.fn().mockResolvedValue({ marketplace: {}, installed: [] }) } as never;
-}
-
-function makeNoOpPluginInstallFromMarketplace() {
-  return { execute: vi.fn().mockResolvedValue({ marketplace: {}, entry: {} }) } as never;
-}
-
-function makeNoOpMarketplaceRegistry() {
-  return { list: vi.fn().mockResolvedValue([]) } as never;
-}
-
-function makeNoOpResolveMarketplace() {
+function makeNoOpPluginPick(): PluginPick {
   return {
-    execute: vi.fn().mockResolvedValue({ marketplace: {}, localPath: "", catalog: null }),
-  } as never;
+    execute: vi.fn().mockResolvedValue({ marketplace: FRAMEWORK_MARKETPLACE, installed: [] }),
+  };
+}
+
+function makeNoOpPluginInstallFromMarketplace(): PluginInstallFromMarketplace {
+  return {
+    execute: vi
+      .fn()
+      .mockResolvedValue({ marketplace: FRAMEWORK_MARKETPLACE, entry: CATALOG_ENTRY }),
+  };
+}
+
+function makeNoOpResolveMarketplace(): ResolveMarketplace {
+  return {
+    execute: vi
+      .fn()
+      .mockResolvedValue({ marketplace: FRAMEWORK_MARKETPLACE, localPath: "", catalog: null }),
+  };
 }
 
 const PROJECT_ROOT = "/test-project";
+
+// Real values, not empty objects: a no-op double still has to answer with what its
+// contract promises, so a caller that starts reading the answer breaks here first.
+const FRAMEWORK_MARKETPLACE = Marketplace.create({
+  name: FRAMEWORK_MARKETPLACE_NAME,
+  source: { kind: "local", path: "/framework" },
+  scope: "project",
+  addedAt: "2026-08-20T00:00:00.000Z",
+});
+
+const CATALOG_ENTRY: PluginCatalogEntry = {
+  name: "aidd-context",
+  source: { kind: "local", path: "/framework/plugins/aidd-context" },
+  recommended: false,
+  strict: false,
+};
 
 async function buildUseCase(setupToolsPromptUseCase?: SetupToolsPromptUseCase) {
   const deps = await buildUnitDeps(PROJECT_ROOT);
@@ -80,7 +112,7 @@ async function buildUseCase(setupToolsPromptUseCase?: SetupToolsPromptUseCase) {
   const setupPluginsPromptUseCase = new SetupPluginsPromptUseCase(
     makeNoOpPluginPick(),
     makeNoOpPluginInstallFromMarketplace(),
-    makeNoOpMarketplaceRegistry(),
+    new InMemoryMarketplaceRegistry(),
     makeNoOpResolveMarketplace()
   );
   const marketplaceRegisterFramework = makeNoOpMarketplaceRegisterFramework();

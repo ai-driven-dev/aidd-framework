@@ -42,18 +42,21 @@ function makeManifest(pluginFileHash: string): Manifest {
 function makeFs(fileExists: boolean, diskHash: string): FileReader {
   return {
     fileExists: async () => fileExists,
+    isExecutable: async () => false,
     readFileHash: async () => new FileHash(diskHash),
     readFile: async () => "",
-    writeFile: async () => {},
-    deleteFile: async () => {},
     listDirectory: async () => [],
-    deleteEmptyDirectories: async () => {},
-    copyFile: async () => {},
-  } as unknown as FileReader;
+    listFilesRecursive: async () => [],
+  };
 }
 
 function makeManifestRepo(manifest: Manifest): ManifestRepository {
-  return { load: async () => manifest, save: async () => {}, delete: async () => {} };
+  return {
+    path: "/proj/.aidd/manifest.json",
+    load: async () => manifest,
+    save: async () => {},
+    delete: async () => {},
+  };
 }
 
 const noopHasher: Hasher = {
@@ -144,20 +147,17 @@ describe("DoctorUseCase — plugin integrity", () => {
         })
       );
       const checkedPaths: string[] = [];
-      const fs = {
+      const fs: FileReader = {
         fileExists: async (p: string) => {
           checkedPaths.push(p);
           return true;
         },
+        isExecutable: async () => false,
         readFileHash: async () => new FileHash(EXPECTED_HASH),
         readFile: async () => "",
-        writeFile: async () => {},
-        deleteFile: async () => {},
         listDirectory: async () => [],
         listFilesRecursive: async () => [],
-        deleteEmptyDirectories: async () => {},
-        copyFile: async () => {},
-      } as unknown as FileReader;
+      };
       const pluginUseCase = new DoctorPluginUseCase(new DetectPluginDriftUseCase(fs));
 
       await pluginUseCase.execute({

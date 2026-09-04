@@ -16,6 +16,7 @@ import {
 import { rewriteRelativeLinks } from "../../../../../kernel/materialization/relative-link-rewrite.js";
 import type { ToolBuildContract } from "../../build-contract.js";
 import { mergeClaudeSettingsHooks } from "../../formats/flat-hooks-merge.js";
+import { CLAUDE_PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token.js";
 import { mergeVscodeMcp } from "../../formats/vscode-mcp-merge.js";
 import {
   buildClaudeStyleEntry,
@@ -32,13 +33,16 @@ export function buildClaudeContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_CLAUDE_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_CLAUDE_MARKETPLACE_RELATIVE;
   // Split literal to avoid biome's noTemplateCurlyInString warning.
-  const claudeToken = "$" + "{CLAUDE_PLUGIN_ROOT}";
   return {
-    pluginRootToken: claudeToken,
+    pluginRootToken: CLAUDE_PLUGIN_ROOT_TOKEN,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: (source, presence) =>
       synthesizeClaudeStyleManifest(source, presence, {
         agentsField: true,
+        // Claude Code loads ./hooks/hooks.json by its own convention and, since 2.1.240,
+        // rejects the plugin outright when a manifest names it too — "Duplicate hooks file
+        // detected". The hooks fired anyway, so the plugin read as failed while working.
+        hooksField: false,
       }),
     manifestSchemaName: "plugin-manifest",
     artifacts: {

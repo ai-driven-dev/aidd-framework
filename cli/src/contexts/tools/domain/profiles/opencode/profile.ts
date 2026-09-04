@@ -23,8 +23,10 @@ import {
 } from "../../formats/command.js";
 import { registerTool } from "../../registry.js";
 import { buildOpencodeFlatContract, transformMcpToOpencode } from "./build.js";
+import { OPENCODE_DIRECTORY, OPENCODE_FLAT_HOOKS_DIR } from "./opencode-paths.js";
 
-const DIRECTORY = ".opencode/";
+const DIRECTORY = OPENCODE_DIRECTORY;
+const FLAT_HOOKS_DIR = OPENCODE_FLAT_HOOKS_DIR;
 const TOOL_SUFFIX = ".opencode.md";
 
 export const opencode: AiTool<
@@ -37,6 +39,26 @@ export const opencode: AiTool<
   },
   directory: DIRECTORY,
   toolSuffix: TOOL_SUFFIX,
+  displayName: "OpenCode",
+  telemetryLocalRead: {
+    kind: "declared",
+    // Counters per message, and no amount: `info.cost` is `0` in every message captured
+    // and its denomination was never established, so it is deliberately never read. No
+    // field names a running skill either.
+    supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
+    // Measured 2026-08-20: `input` is exclusive of `cache.read` for providerID "anthropic",
+    // matching that API's own documented behaviour. A second provider was probed 2026-08-24
+    // (providerID "opencode") and reconciled the same way, but never exercised its cache
+    // across two turns of one session — no capture puts a large `cache.read` beside `input`
+    // for a non-Anthropic provider, so that probe corroborates without confirming. A
+    // provider that reports prompt tokens inclusive of the cached ones, the way native
+    // OpenAI's usage does, has never been captured here. See plugins/aidd-telemetry/README.md.
+    limitation:
+      "Its four counters are measured correct for the anthropic provider — not " +
+      "independently confirmed for any other provider OpenCode can route to.",
+  },
+  telemetryTaskAttributable: true,
+  telemetryJournalHost: "opencode",
   signalDir: ".opencode/commands",
   configOutputPaths: { "opencode.json": "opencode.json" },
   buildContracts: { flat: buildOpencodeFlatContract },
@@ -94,6 +116,8 @@ export const opencode: AiTool<
     plugins: new PluginsCapability({
       mode: "flat",
       flatNamespacePrefix: "aidd-",
+      acceptsHooks: true,
+      flatHooksDir: FLAT_HOOKS_DIR,
     }),
   },
 

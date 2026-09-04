@@ -130,6 +130,30 @@ describe("CopilotCliAdapter", () => {
     ).toThrow("Marketplace");
   });
 
+  it("uninstalls a plugin via `copilot plugin uninstall <ref>`", () => {
+    mockSpawnSync.mockReturnValue(makeResult({}));
+
+    new NativePluginCliAdapter("copilot", { disableVerb: "uninstall" }).uninstallPlugin(
+      "aidd-telemetry@aidd-framework"
+    );
+
+    expect(mockSpawnSync).toHaveBeenCalledWith(
+      "copilot",
+      ["plugin", "uninstall", "aidd-telemetry@aidd-framework"],
+      expect.anything()
+    );
+  });
+
+  it("throws NativePluginCliError when uninstalling an already-absent plugin", () => {
+    mockSpawnSync.mockReturnValue(makeResult({ status: 1, stderr: "Plugin not found" }));
+
+    expect(() =>
+      new NativePluginCliAdapter("copilot", { disableVerb: "uninstall" }).uninstallPlugin(
+        "ghost@m1"
+      )
+    ).toThrow(NativePluginCliError);
+  });
+
   it("throws NativePluginCliError when the process fails to spawn", () => {
     mockSpawnSync.mockReturnValue(makeResult({ error: new Error("spawn EACCES"), status: null }));
 

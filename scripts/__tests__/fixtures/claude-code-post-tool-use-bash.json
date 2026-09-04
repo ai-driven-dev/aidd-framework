@@ -1,0 +1,11 @@
+{
+  "session_id": "e5e7c58b-491b-485c-ae02-59c41ac4f934",
+  "transcript_path": "/home/user/probe/cc-home/projects/-home-user-probe-project/e5e7c58b-491b-485c-ae02-59c41ac4f934.jsonl",
+  "cwd": "/home/user/probe/project",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "echo hi",
+    "description": "Echo hi to stdout"
+  }
+}

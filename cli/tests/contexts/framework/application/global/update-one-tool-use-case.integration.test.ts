@@ -26,7 +26,7 @@ function buildFakePrompter(answer: "keep" | "overwrite" | "overwrite-all" | "ski
     input: vi.fn(),
     select: vi.fn(),
     checkbox: vi.fn(),
-  } as unknown as Prompter;
+  };
 }
 
 function buildUseCase(

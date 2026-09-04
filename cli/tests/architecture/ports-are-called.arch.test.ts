@@ -54,6 +54,11 @@ function declaredMethods(file: string, source: string): string[] {
   return declared;
 }
 
+/** Empty, and it stays empty: a port that declares a method nothing calls is either a
+ * caller that was never written or a declaration that outlived its reason, and both are
+ * closed by fixing the code rather than by recording it here. */
+const BASELINE: readonly string[] = [];
+
 describe("a port declares nothing nobody calls", () => {
   it("every method a port declares is spelled as a call somewhere in src", () => {
     const bodies = new Map(
@@ -71,12 +76,12 @@ describe("a port declares nothing nobody calls", () => {
       }
     }
 
-    const { added, fixed } = expectRatchet(uncalled.sort(), []);
+    const { added, fixed } = expectRatchet(uncalled.sort(), BASELINE);
     expect(
       added,
       "a port declares a method nothing calls — an adapter implementing it is not a caller"
     ).toEqual([]);
-    expect(fixed, "fixed — this baseline is empty and must stay so").toEqual([]);
+    expect(fixed, "fixed — remove these from BASELINE").toEqual([]);
   });
 
   it("reads a method off an interface block and ignores a property", () => {

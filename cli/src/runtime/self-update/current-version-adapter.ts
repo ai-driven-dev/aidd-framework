@@ -1,5 +1,5 @@
 import pkg from "../../../package.json" with { type: "json" };
-import type { VersionReader } from "./version-reader.js";
+import type { VersionReader } from "../../kernel/ports/version-reader.js";
 
 export class CurrentVersionAdapter implements VersionReader {
   get(): string {

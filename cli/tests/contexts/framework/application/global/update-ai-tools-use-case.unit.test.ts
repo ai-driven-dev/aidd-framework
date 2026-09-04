@@ -103,7 +103,7 @@ describe("UpdateAiToolsUseCase", () => {
         input: vi.fn(),
         select: vi.fn(),
         checkbox: vi.fn(),
-      } as unknown as Prompter;
+      };
 
       const conflictResolver = new SyncConflictResolverUseCase(deps.fs);
       const decisionUseCase = new ResolveUpdateDecisionUseCase(fakePrompter);

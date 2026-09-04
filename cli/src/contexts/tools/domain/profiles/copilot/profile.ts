@@ -19,6 +19,7 @@ import type {
   HasSkills,
 } from "../../contracts.js";
 import { convertCommandFrontmatter } from "../../formats/command.js";
+import { PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token.js";
 import { claudeStyleMarketplaceKey } from "../../marketplace-entry.js";
 import { registerTool } from "../../registry.js";
 import { buildCopilotFlatContract, buildCopilotMarketplaceContract } from "./build.js";
@@ -215,6 +216,27 @@ export const copilot: AiTool<
   },
   directory: DIRECTORY,
   toolSuffix: TOOL_SUFFIX,
+  displayName: "GitHub Copilot",
+  telemetryLocalRead: {
+    kind: "declared",
+    supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
+    // The exclusivity of `input` against `cache_read` is NOT established. The only capture
+    // this repository holds (tests/fixtures/local-cost/.copilot/.../events.jsonl) reports
+    // `cache_read: 0`, so "input excludes the cached prompt" and "input already includes it"
+    // produce the same number and cannot be told apart from it. Exclusivity against
+    // `cache_write` is measured (10 + 21070), which is what makes only this one open.
+    // It matters because the report adds the four counters as disjoint: if `input` turns out
+    // to include `cache_read`, a Copilot session's total is over-counted by the cached share.
+    // Closing it takes one capture of a session with a non-zero `cache_read` — see #654's
+    // sibling work and plugins/aidd-telemetry/README.md.
+    limitation:
+      "Its own file names outputTokens per turn, but session.shutdown carries all four " +
+      "counters for the whole session — a session total, never a sum of requests. Whether " +
+      "its input count excludes the cached prompt is unconfirmed: the only session captured " +
+      "read back zero cache, which cannot tell the two apart.",
+  },
+  telemetryTaskAttributable: true,
+  telemetryJournalHost: "copilot",
   signalDir: ".github/prompts",
   buildContracts: {
     marketplace: buildCopilotMarketplaceContract,
@@ -277,6 +299,7 @@ export const copilot: AiTool<
       pluginsDir: ".github/plugins/",
       pluginManifestRelativePath: "plugin.json",
       acceptsHooks: true,
+      pluginRootToken: PLUGIN_ROOT_TOKEN,
       acceptsMcp: true,
       translationMode: "marketplace",
       // Copilot treats enabledPlugins in settings.json as a recommendation, not an
@@ -292,6 +315,7 @@ export const copilot: AiTool<
         binary: "copilot",
         upgradeVerb: "update",
         enableVerb: "install",
+        disableVerb: "uninstall",
         sourceCheckVerb: "update",
         forceRemoveArgs: ["--force"],
       },

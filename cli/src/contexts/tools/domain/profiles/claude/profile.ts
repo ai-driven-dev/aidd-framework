@@ -1,3 +1,4 @@
+import { CLAUDE_CODE_TRANSCRIPT_LOCATION } from "../../../../../contexts/tools/domain/profiles/claude/claude-transcript-location.js";
 import { AgentsCapability } from "../../capabilities/agents-capability.js";
 import { CommandsCapability } from "../../capabilities/commands-capability.js";
 import { CONFIG_MCP } from "../../capabilities/config-refs.js";
@@ -15,6 +16,7 @@ import type {
   HasSkills,
 } from "../../contracts.js";
 import { convertCommandFrontmatter, stripToolSuffix } from "../../formats/command.js";
+import { CLAUDE_PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token.js";
 import { claudeStyleMarketplaceKey } from "../../marketplace-entry.js";
 import { registerTool } from "../../registry.js";
 import { buildClaudeContract, buildClaudeFlatContract } from "./build.js";
@@ -36,6 +38,16 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
     },
     directory: DIRECTORY,
     toolSuffix: TOOL_SUFFIX,
+    displayName: "Claude Code",
+    telemetryLocalRead: {
+      kind: "declared",
+      transcript: CLAUDE_CODE_TRANSCRIPT_LOCATION,
+      // The mirror image of the export: the transcript names the running skill exactly, on
+      // the same line as the counters, and carries no amount at all.
+      supplies: { tokenCounters: true, amount: false, toolStatedStep: true },
+    },
+    telemetryTaskAttributable: true,
+    telemetryJournalHost: "claude-code",
     signalDir: ".claude/commands",
     configOutputPaths: { "settings.json": ".claude/settings.json" },
     buildContracts: { marketplace: buildClaudeContract, flat: buildClaudeFlatContract },
@@ -101,6 +113,7 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         pluginsDir: ".claude/plugins/",
         pluginManifestRelativePath: "plugin.json",
         acceptsHooks: true,
+        pluginRootToken: CLAUDE_PLUGIN_ROOT_TOKEN,
         acceptsMcp: true,
         translationMode: "marketplace",
         // Claude registers its own marketplaces. An earlier attempt drove the command
@@ -116,6 +129,12 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         nativeActivation: {
           binary: "claude",
           scopeArgs: { project: ["--scope", "local"], user: ["--scope", "user"] },
+          enableVerb: "install",
+          disableVerb: "uninstall",
+          upgradeVerb: "update",
+          // `--yes` gates a prune confirmation these calls never request, but a headless
+          // stdin has no terminal to answer any prompt at all.
+          pluginArgs: ["--yes"],
         },
         marketplaceSettings: {
           settingsPath: ".claude/settings.json",

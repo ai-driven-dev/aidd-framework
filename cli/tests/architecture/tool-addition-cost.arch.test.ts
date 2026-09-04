@@ -122,6 +122,25 @@ const BASELINE: readonly { readonly path: string; readonly named: number }[] = [
   { path: "src/runtime/wiring/framework.ts", named: 6 },
   { path: "src/runtime/wiring/tools.ts", named: 6 },
   { path: "src/runtime/wiring/translate.ts", named: 6 },
+  // Registration is the composition root's job. A profile cannot name the adapter that
+  // reads its transcripts without putting infrastructure in the domain, which the layer
+  // rule refuses — so the tool-to-reader map lives here, and gains one line per tool that
+  // declares `telemetryLocalRead: { kind: "declared" }`.
+  { path: "src/runtime/wiring/telemetry.ts", named: 4 },
+  // The same shape one layer along: which file each host keeps its plugin registry in.
+  // Called from the composition root and nowhere else; the three reader classes beside it
+  // name no tool at all.
+  {
+    path: "src/contexts/telemetry/infrastructure/host-plugin-registry-reader-adapter.ts",
+    named: 3,
+  },
+  // An adapter for exactly one tool, naming the binary it shells out to. A tool named in
+  // its own adapter is not a list a new tool joins — a new tool brings its own adapter.
+  { path: "src/contexts/telemetry/infrastructure/opencode-cost-reader-adapter.ts", named: 1 },
+  // Cursor's project hooks file, named after the tool whose file it is — the same shape
+  // `opencode-mcp-merge.ts` and `vscode-mcp-merge.ts` already have here. The directory it
+  // writes into is Cursor's own, not a list a sixth tool joins.
+  { path: "src/contexts/tools/domain/formats/cursor-hooks-project-merge.ts", named: 1 },
 ];
 
 describe("a tool identifier stays inside its own profile", () => {
@@ -171,9 +190,10 @@ describe("a tool identifier stays inside its own profile", () => {
     expect(toolsNamedIn('codex: { "config.toml": x }', ids), "a bare object key").toEqual([
       "codex",
     ]);
-    expect(toolsNamedIn('import "../profiles/codex/build.js";', ids), "an import path").toEqual([
-      "codex",
-    ]);
+    expect(
+      toolsNamedIn('import "../../src/contexts/tools/domain/profiles/codex/build.js";', ids),
+      "an import path"
+    ).toEqual(["codex"]);
     expect(
       toolsNamedIn('"Conversion target (claude, codex)"', ids),
       "an enumeration inside one string"

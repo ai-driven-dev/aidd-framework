@@ -2,8 +2,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import type {
+  ResolveMarketplace,
   ResolveMarketplaceOptions,
-  ResolveMarketplaceUseCase,
 } from "../../../../../src/contexts/distribution/application/resolve-marketplace-use-case.js";
 import { Marketplace } from "../../../../../src/contexts/distribution/domain/marketplace.js";
 import {
@@ -13,10 +13,13 @@ import {
 import type { JsonSchemaValidator } from "../../../../../src/contexts/tools/domain/ports/schema-validator.js";
 import { buildCopilotFlatContract } from "../../../../../src/contexts/tools/domain/profiles/copilot/build.js";
 import { FlatBuildStrategy } from "../../../../../src/contexts/translate/application/strategies/flat-build-strategy.js";
-import { FrameworkBuildUseCase } from "../../../../../src/contexts/translate/application/translate-source.js";
+import {
+  type FrameworkBuild,
+  FrameworkBuildUseCase,
+} from "../../../../../src/contexts/translate/application/translate-source.js";
 import { BUILT_CACHE_SUBDIR, builtMarketplaceDir } from "../../../../../src/kernel/paths.js";
 import type { AssetProvider } from "../../../../../src/kernel/ports/asset-provider.js";
-import type { VersionReader } from "../../../../../src/runtime/self-update/version-reader.js";
+import type { VersionReader } from "../../../../../src/kernel/ports/version-reader.js";
 import { CapturingLogger } from "../../../../helpers/ports/capturing-logger.js";
 import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
 import { seedFromDirectory } from "../../../../helpers/ports/seed-from-directory.js";
@@ -80,14 +83,14 @@ function makeUserMarketplace(): Marketplace {
   });
 }
 
-function fakeResolve(localPath: string, version: string | undefined): ResolveMarketplaceUseCase {
+function fakeResolve(localPath: string, version: string | undefined): ResolveMarketplace {
   return {
     execute: async ({ marketplace }: ResolveMarketplaceOptions) => ({
       marketplace,
       localPath,
       catalog: version === undefined ? null : { version, plugins: [] },
     }),
-  } as unknown as ResolveMarketplaceUseCase;
+  } satisfies ResolveMarketplace;
 }
 
 function fakeVersion(value: string): VersionReader {
@@ -115,7 +118,7 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
           await fs.writeFile(join(outDir, "plugins/aidd-vcs/SKILL.md"), "built content");
           return { outDir, plugins: [], totalFiles: 1 };
         },
-      }) as unknown as FrameworkBuildUseCase;
+      }) satisfies FrameworkBuild;
   });
 
   it("rebuilds and writes a sentinel when none exists", async () => {
@@ -355,7 +358,7 @@ describe("outDir invariant for the cache-rebuild build path", () => {
           await memFs.writeFile(join(outDir, "plugins/aidd-vcs/SKILL.md"), "built content");
           return { outDir, plugins: [], totalFiles: 1 };
         },
-      } as unknown as FrameworkBuildUseCase;
+      } satisfies FrameworkBuild;
     };
 
     // Direct path: source lives outside the cache tree → build() writes straight to builtDir.
@@ -414,7 +417,7 @@ describe("outDir invariant for the cache-rebuild build path", () => {
           await memFs.writeFile(join(outDir, ".claude-plugin/marketplace.json"), "{}");
           return { outDir, plugins: [], totalFiles: 1 };
         },
-      }) as unknown as FrameworkBuildUseCase;
+      }) satisfies FrameworkBuild;
 
     const uc = new EnsureBuiltMarketplaceUseCase(
       memFs,

@@ -1,7 +1,7 @@
 /**
  * No file under tests/ resolves a path into the shared dist/ build output.
  *
- * tests/e2e/helpers.ts used to define CLI_PATH by resolving process.cwd() into the
+ * tests/e2e/helpers.ts used to define cliPath() by resolving process.cwd() into the
  * shared dist/cli.js, and two more e2e files repeated the same line. pnpm test ran tsup
  * (clean: true) before every vitest invocation, so a second concurrent run deleted and
  * rewrote the binary the first run's golden suites were still reading mid-capture — the
@@ -47,7 +47,7 @@ describe("no test resolves a path into the shared dist/ build output", () => {
 
     expect(
       violations,
-      "resolves into the shared dist/ — read CLI_PATH from tests/e2e/helpers.ts instead"
+      "resolves into the shared dist/ — read cliPath() from tests/e2e/helpers.ts instead"
     ).toEqual([]);
   });
 

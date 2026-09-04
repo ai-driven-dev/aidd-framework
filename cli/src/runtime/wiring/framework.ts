@@ -62,6 +62,7 @@ import type { FileReader } from "../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../kernel/ports/file-writer.js";
 import type { Logger } from "../../kernel/ports/logger.js";
 import type { Prompter } from "../../kernel/ports/prompter.js";
+import type { VersionReader } from "../../kernel/ports/version-reader.js";
 import { CLIOutput } from "../../presentation/output.js";
 import { PluginPickUseCase } from "../../presentation/prompts/plugin-pick-use-case.js";
 import { SetupPluginsPromptUseCase } from "../../presentation/prompts/setup-plugins-prompt-use-case.js";
@@ -76,6 +77,7 @@ import { GhTokenAdapter } from "../auth/gh-token-adapter.js";
 import type { CredentialStore } from "../auth/ports/credential-store.js";
 import { FileAdapter } from "../filesystem/file-adapter.js";
 import { HasherAdapter } from "../filesystem/hasher-adapter.js";
+import { GitAdapter } from "../git/git-adapter.js";
 import { HttpClient } from "../http/http-client.js";
 import { PlatformAdapter } from "../platform/platform-adapter.js";
 import { InquirerPrompterAdapter, SilentPrompterAdapter } from "../prompter/prompter-adapter.js";
@@ -85,9 +87,9 @@ import { GitHubReleaseResolverAdapter } from "../self-update/github-release-reso
 import type { LatestReleaseResolver } from "../self-update/latest-release-resolver.js";
 import { SelfUpdateUseCase } from "../self-update/self-update-use-case.js";
 import { SelfUpdaterAdapter } from "../self-update/self-updater-adapter.js";
-import type { VersionReader } from "../self-update/version-reader.js";
 import { userConfigDir } from "../user-config-dir.js";
 import { wireDistribution } from "./distribution.js";
+import { type TelemetryDeps, wireTelemetry } from "./telemetry.js";
 import { wireTools } from "./tools.js";
 import { createFrameworkBuildUseCase } from "./translate.js";
 
@@ -95,7 +97,7 @@ interface GlobalOptions {
   verbose: boolean;
 }
 
-interface Deps {
+interface Deps extends TelemetryDeps {
   fs: FileReader & FileWriter & FileMerger;
   manifestRepo: ManifestRepository;
   logger: Logger;
@@ -195,7 +197,12 @@ export async function createDeps(
     marketplaceRefreshUseCase,
     marketplaceRegisterFrameworkUseCase,
   } = wireDistribution({ fs, hasher, http, authReader, logger, projectRoot });
-  const pluginRemoveUseCase = new PluginRemoveUseCase(fs, manifestRepo);
+  const pluginRemoveUseCase = new PluginRemoveUseCase(
+    fs,
+    manifestRepo,
+    logger,
+    nativePluginActivators
+  );
   const pluginListUseCase = new PluginListUseCase(manifestRepo);
   const marketplaceRemoveUseCase = new MarketplaceRemoveUseCase(
     fs,
@@ -267,6 +274,7 @@ export async function createDeps(
     ensureBuiltMarketplaceUseCase
   );
   const gitignoreUseCase = new GitignoreUseCase(fs);
+  const git = new GitAdapter(fs);
   const postInstallPipelineUseCase = new PostInstallPipelineUseCase(manifestRepo, gitignoreUseCase);
   const installRuntimeConfigUseCase = new InstallRuntimeConfigUseCase(
     fs,
@@ -417,7 +425,17 @@ export async function createDeps(
   const cleanUseCase = new CleanUseCase(fs, manifestRepo, logger, gitignoreUseCase, prompter);
   const doctorAllUseCase = new DoctorAllUseCase(doctorUseCase);
   const checkUpdateUseCase = new CheckUpdateUseCase(cliUpdater, currentVersionProvider, logger, fs);
+  const telemetry = wireTelemetry({
+    fs,
+    logger,
+    git,
+    projectRoot,
+    gitignoreUseCase,
+    currentVersionProvider,
+    manifestRepo,
+  });
   const deps: Deps = {
+    ...telemetry,
     fs,
     manifestRepo,
     logger,

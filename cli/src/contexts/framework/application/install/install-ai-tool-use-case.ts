@@ -3,8 +3,8 @@ import type { AiToolId } from "../../../../kernel/tool.js";
 import { Manifest } from "../../domain/manifest.js";
 import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
-import type { MarketplaceSyncSettingsUseCase } from "../flows/marketplace-sync-settings-use-case.js";
-import type { PluginInstallFromMarketplaceUseCase } from "../plugin/plugin-install-from-marketplace-use-case.js";
+import type { MarketplaceSyncSettings } from "../flows/marketplace-sync-settings-use-case.js";
+import type { PluginInstallFromMarketplace } from "../plugin/plugin-install-from-marketplace-use-case.js";
 import type {
   InstallRuntimeConfigResult,
   InstallRuntimeConfigUseCase,
@@ -28,8 +28,8 @@ export class InstallAiToolUseCase {
   constructor(
     private readonly installRuntimeConfig: InstallRuntimeConfigUseCase,
     private readonly manifestRepo: ManifestRepository,
-    private readonly pluginInstallFromMarketplace: PluginInstallFromMarketplaceUseCase,
-    private readonly marketplaceSyncSettings: MarketplaceSyncSettingsUseCase,
+    private readonly pluginInstallFromMarketplace: PluginInstallFromMarketplace,
+    private readonly marketplaceSyncSettings: MarketplaceSyncSettings,
     private readonly logger: Logger
   ) {}
 

@@ -77,13 +77,14 @@ export async function buildUnitDeps(_projectRoot: string) {
   const currentVersionProvider = new FakeCurrentVersion();
 
   const syncConflictResolver = new SyncConflictResolverUseCase(fs);
+  const nativePluginActivators = new Map([["codex", new FakeNativePluginActivator()]]);
   const marketplaceSyncSettings = new MarketplaceSyncSettingsUseCase(
     fs,
     manifestRepo,
     marketplaceRegistry,
     hasher,
     logger,
-    new Map([["codex", new FakeNativePluginActivator()]]),
+    nativePluginActivators,
     fakeEnsureBuiltMarketplace()
   );
 
@@ -100,6 +101,7 @@ export async function buildUnitDeps(_projectRoot: string) {
     pluginDistributionReader,
     marketplaceRegistry,
     marketplaceSyncSettings,
+    nativePluginActivators,
     installRuntimeConfigUseCase,
     installIdeConfigUseCase,
     gitignoreUseCase,

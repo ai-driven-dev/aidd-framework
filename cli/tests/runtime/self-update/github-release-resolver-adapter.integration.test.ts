@@ -5,25 +5,28 @@ import {
   CatalogFetchError,
   HttpNotFoundError,
 } from "../../../src/kernel/errors.js";
+import type { HttpGet } from "../../../src/runtime/http/http-client.js";
 import { GitHubReleaseResolverAdapter } from "../../../src/runtime/self-update/github-release-resolver-adapter.js";
 
 const REPO = "owner/repo";
 
 function makeHttp(body: unknown, statusCode = 200) {
-  return {
-    get: vi.fn().mockResolvedValue({ body, statusCode, contentType: "application/json" }),
-  };
+  const get = vi
+    .fn<HttpGet["get"]>()
+    .mockResolvedValue({ body, statusCode, contentType: "application/json" });
+  return { get } satisfies HttpGet;
 }
 
 function makeHttpThrowing(err: Error) {
-  return { get: vi.fn().mockRejectedValue(err) };
+  const get = vi.fn<HttpGet["get"]>().mockRejectedValue(err);
+  return { get } satisfies HttpGet;
 }
 
 describe("GitHubReleaseResolverAdapter", () => {
   describe("resolveLatest", () => {
     it("returns tag_name from first element on successful response with releases", async () => {
       const http = makeHttp([{ tag_name: "v1.2.3" }]);
-      const adapter = new GitHubReleaseResolverAdapter(http as never);
+      const adapter = new GitHubReleaseResolverAdapter(http);
       const result = await adapter.resolveLatest(REPO);
       expect(result).toBe("v1.2.3");
     });
@@ -31,7 +34,7 @@ describe("GitHubReleaseResolverAdapter", () => {
     it("calls the correct GitHub releases?per_page=1 URL", async () => {
       const http = makeHttp([{ tag_name: "v1.0.0" }]);
       const tokenProvider = { resolve: async () => "my-token" as string | null };
-      const adapter = new GitHubReleaseResolverAdapter(http as never, tokenProvider);
+      const adapter = new GitHubReleaseResolverAdapter(http, tokenProvider);
       await adapter.resolveLatest(REPO);
       expect(http.get).toHaveBeenCalledWith(
         "https://api.github.com/repos/owner/repo/releases?per_page=1",
@@ -41,14 +44,14 @@ describe("GitHubReleaseResolverAdapter", () => {
 
     it("returns null when response body is an empty array", async () => {
       const http = makeHttp([]);
-      const adapter = new GitHubReleaseResolverAdapter(http as never);
+      const adapter = new GitHubReleaseResolverAdapter(http);
       const result = await adapter.resolveLatest(REPO);
       expect(result).toBeNull();
     });
 
     it("returns null when response body is not an array", async () => {
       const http = makeHttp({ message: "Not Found" });
-      const adapter = new GitHubReleaseResolverAdapter(http as never);
+      const adapter = new GitHubReleaseResolverAdapter(http);
       const result = await adapter.resolveLatest(REPO);
       expect(result).toBeNull();
     });
@@ -57,20 +60,20 @@ describe("GitHubReleaseResolverAdapter", () => {
       const http = makeHttpThrowing(
         new HttpNotFoundError("https://api.github.com/repos/owner/repo/releases/latest")
       );
-      const adapter = new GitHubReleaseResolverAdapter(http as never);
+      const adapter = new GitHubReleaseResolverAdapter(http);
       const result = await adapter.resolveLatest(REPO);
       expect(result).toBeNull();
     });
 
     it("throws CatalogFetchAuthError on HTTP 401/403", async () => {
       const http = makeHttpThrowing(new AuthenticationError("HTTP 401"));
-      const adapter = new GitHubReleaseResolverAdapter(http as never);
+      const adapter = new GitHubReleaseResolverAdapter(http);
       await expect(adapter.resolveLatest(REPO)).rejects.toThrow(CatalogFetchAuthError);
     });
 
     it("throws CatalogFetchError on network error", async () => {
       const http = makeHttpThrowing(new Error("ECONNREFUSED"));
-      const adapter = new GitHubReleaseResolverAdapter(http as never);
+      const adapter = new GitHubReleaseResolverAdapter(http);
       await expect(adapter.resolveLatest(REPO)).rejects.toThrow(CatalogFetchError);
     });
   });
@@ -84,21 +87,21 @@ describe("GitHubReleaseResolverAdapter", () => {
         { tag_name: "v3.9.1" },
         { tag_name: "v3.7.3-pm.1" },
       ]);
-      const adapter = new GitHubReleaseResolverAdapter(http as never);
+      const adapter = new GitHubReleaseResolverAdapter(http);
       const result = await adapter.listRootReleases(REPO);
       expect(result).toEqual(["v4.0.0", "v3.9.1", "v3.7.3-pm.1"]);
     });
 
     it("preserves GitHub order (newest first) for root tags", async () => {
       const http = makeHttp([{ tag_name: "v4.0.0" }, { tag_name: "v3.9.1" }]);
-      const adapter = new GitHubReleaseResolverAdapter(http as never);
+      const adapter = new GitHubReleaseResolverAdapter(http);
       const result = await adapter.listRootReleases(REPO);
       expect(result[0]).toBe("v4.0.0");
     });
 
     it("requests per_page=100 so root tags are not buried", async () => {
       const http = makeHttp([{ tag_name: "v1.0.0" }]);
-      const adapter = new GitHubReleaseResolverAdapter(http as never);
+      const adapter = new GitHubReleaseResolverAdapter(http);
       await adapter.listRootReleases(REPO);
       expect(http.get).toHaveBeenCalledWith(
         "https://api.github.com/repos/owner/repo/releases?per_page=100",
@@ -110,14 +113,14 @@ describe("GitHubReleaseResolverAdapter", () => {
       const http = makeHttpThrowing(
         new HttpNotFoundError("https://api.github.com/repos/owner/repo/releases")
       );
-      const adapter = new GitHubReleaseResolverAdapter(http as never);
+      const adapter = new GitHubReleaseResolverAdapter(http);
       const result = await adapter.listRootReleases(REPO);
       expect(result).toEqual([]);
     });
 
     it("throws CatalogFetchAuthError on HTTP 401/403", async () => {
       const http = makeHttpThrowing(new AuthenticationError("HTTP 401"));
-      const adapter = new GitHubReleaseResolverAdapter(http as never);
+      const adapter = new GitHubReleaseResolverAdapter(http);
       await expect(adapter.listRootReleases(REPO)).rejects.toThrow(CatalogFetchAuthError);
     });
   });
@@ -125,7 +128,7 @@ describe("GitHubReleaseResolverAdapter", () => {
   describe("isRepoPublic", () => {
     it("returns true when the unauthenticated repo request succeeds (public)", async () => {
       const http = makeHttp({ full_name: REPO, private: false });
-      const adapter = new GitHubReleaseResolverAdapter(http as never);
+      const adapter = new GitHubReleaseResolverAdapter(http);
       expect(await adapter.isRepoPublic(REPO)).toBe(true);
       expect(http.get).toHaveBeenCalledWith("https://api.github.com/repos/owner/repo");
     });
@@ -134,13 +137,13 @@ describe("GitHubReleaseResolverAdapter", () => {
       const http = makeHttpThrowing(
         new HttpNotFoundError("https://api.github.com/repos/owner/repo")
       );
-      const adapter = new GitHubReleaseResolverAdapter(http as never);
+      const adapter = new GitHubReleaseResolverAdapter(http);
       expect(await adapter.isRepoPublic(REPO)).toBe(false);
     });
 
     it("returns true on non-404 errors so a rate-limited public user is not gated", async () => {
       const http = makeHttpThrowing(new AuthenticationError("HTTP 403 rate limit"));
-      const adapter = new GitHubReleaseResolverAdapter(http as never);
+      const adapter = new GitHubReleaseResolverAdapter(http);
       expect(await adapter.isRepoPublic(REPO)).toBe(true);
     });
   });

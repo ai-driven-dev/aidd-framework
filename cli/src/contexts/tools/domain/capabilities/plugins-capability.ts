@@ -64,6 +64,18 @@ export interface NativeActivation {
    * second way of doing the same thing, not a better one.
    */
   enableVerb?: string;
+  /**
+   * How the tool spells removing a plugin it installed: `remove` for codex, `uninstall` for
+   * claude and copilot. Absent for a tool whose plugins this CLI enables through a file it
+   * writes — there is nothing to ask the tool to undo.
+   */
+  disableVerb?: string;
+  /**
+   * Arguments every `plugin <verb> <ref>` call carries, after the reference. Claude needs
+   * `--yes` on both install and uninstall: it gates a prune confirmation the call never
+   * requests, but a headless stdin has no terminal to answer any prompt at all.
+   */
+  pluginArgs?: readonly string[];
 }
 
 export interface NativePluginsParams {
@@ -74,8 +86,21 @@ export interface NativePluginsParams {
   mcpRelativePath?: string;
   hooksRelativePath?: string;
   hooksContentFormat?: HooksContentFormat;
-  acceptsHooks?: boolean;
+  /**
+   * Where a delivered hook actually lands. `"plugin"` (default): under this
+   * capability's own plugin directory, at `hooksRelativePath` — read by nothing for
+   * a tool whose hooks only fire from project scope. `"project"`: merged into the
+   * project's own hooks file instead (see `mergeCursorProjectHooksJson`), the
+   * destination measured to actually fire. Declared per capability, not guessed
+   * per tool, so a tool proven to need it is the only one that sets it.
+   */
+  hooksDestination?: "plugin" | "project";
   acceptsMcp?: boolean;
+  /**
+   * The variable this tool expands to the installed plugin's directory, as
+   * written in a hook or MCP command. Absent means nothing is substituted.
+   */
+  pluginRootToken?: string;
   marketplaceSettings?: MarketplaceSettings;
   /** Enables native CLI-driven plugin activation (e.g. Codex). See {@link NativeActivation}. */
   nativeActivation?: NativeActivation;
@@ -98,16 +123,47 @@ export interface NativePluginsParams {
   userPluginsDir?: (homedir: string) => string;
 }
 
-export interface FlatPluginsParams {
+/**
+ * Flat mode's own hooks declaration. Unlike native mode's `hooksRelativePath` (a file
+ * beside a manifest a merge writes to), a flat-mode hook lands as files an extension
+ * loader scans a directory for — `flatHooksDir` names that directory, relative to the
+ * project root. See {@link HooksSupport} for the shape of the "no" case.
+ */
+export type FlatHooksSupport =
+  | { acceptsHooks: true; flatHooksDir: string }
+  | { acceptsHooks: false; hooksUnsupportedReason: string };
+
+export type FlatPluginsParams = {
   mode: "flat";
   flatNamespacePrefix: string;
-}
+} & FlatHooksSupport;
 
 export interface UnsupportedPluginsParams {
   mode: "unsupported";
+  /** See {@link FlatPluginsParams.hooksUnsupportedReason}. */
+  hooksUnsupportedReason: string;
 }
 
-type PluginsParams = NativePluginsParams | FlatPluginsParams | UnsupportedPluginsParams;
+/**
+ * Whether this tool runs the hooks a plugin ships. Stated, never defaulted: a tool nobody
+ * considered loses its hooks quietly when the field falls back to `false`, and one that
+ * runs none owes whoever installs a plugin a reason.
+ *
+ * `hooksTrustNotice` is the opposite case: the tool runs a delivered hook, but only once
+ * something outside the install grants it — a per-hook trust the tool itself gates and
+ * that a headless run never gets prompted for (measured on Codex: four clean `codex exec`
+ * sessions wrote no journal and said nothing, until `--dangerously-bypass-hook-trust` did).
+ * `null`/omitted for a tool that runs what it delivers with no such gate — told nothing,
+ * same as `hooksUnsupportedReason` for a tool that never runs hooks at all.
+ */
+export type HooksSupport =
+  | { acceptsHooks: true; hooksTrustNotice?: string }
+  | { acceptsHooks: false; hooksUnsupportedReason: string };
+
+type PluginsParams =
+  | (NativePluginsParams & HooksSupport)
+  | FlatPluginsParams
+  | UnsupportedPluginsParams;
 
 export class PluginsCapability {
   readonly mode: PluginsMode;
@@ -115,10 +171,20 @@ export class PluginsCapability {
   readonly pluginManifestRelativePath: string | null;
   readonly flatNamespacePrefix: string | null;
   readonly acceptsHooks: boolean;
+  /** Why no hook is delivered, or `null` when they are. */
+  readonly hooksUnsupportedReason: string | null;
+  /** What still has to happen before a delivered hook actually runs, or `null` when
+   * nothing does. See {@link HooksSupport}. */
+  readonly hooksTrustNotice: string | null;
+  readonly pluginRootToken: string | null;
   readonly acceptsMcp: boolean;
   readonly mcpRelativePath: string;
   readonly hooksRelativePath: string;
   readonly hooksContentFormat: HooksContentFormat;
+  readonly hooksDestination: "plugin" | "project";
+  /** Where a flat-mode hook lands, relative to the project root, or `null` when this
+   * capability's `acceptsHooks` is `false`. See {@link FlatHooksSupport}. */
+  readonly flatHooksDir: string | null;
   readonly marketplaceSettings: MarketplaceSettings | null;
   /** Native CLI-driven plugin activation declaration, or `null` when not applicable. */
   readonly nativeActivation: NativeActivation | null;
@@ -150,23 +216,50 @@ export class PluginsCapability {
       this.pluginsDir = params.pluginsDir;
       this.pluginManifestRelativePath = params.pluginManifestRelativePath;
       this.flatNamespacePrefix = null;
-      this.acceptsHooks = params.acceptsHooks ?? false;
+      this.acceptsHooks = params.acceptsHooks;
+      this.hooksUnsupportedReason = params.acceptsHooks ? null : params.hooksUnsupportedReason;
+      this.hooksTrustNotice = params.acceptsHooks ? (params.hooksTrustNotice ?? null) : null;
+      this.pluginRootToken = params.pluginRootToken ?? null;
       this.acceptsMcp = params.acceptsMcp ?? false;
       this.mcpRelativePath = params.mcpRelativePath ?? DEFAULT_MCP_PATH;
       this.hooksRelativePath = params.hooksRelativePath ?? DEFAULT_HOOKS_PATH;
       this.hooksContentFormat = params.hooksContentFormat ?? DEFAULT_HOOKS_FORMAT;
+      this.hooksDestination = params.hooksDestination ?? "plugin";
+      this.flatHooksDir = null;
       this.marketplaceSettings = params.marketplaceSettings ?? null;
       this.nativeActivation = params.nativeActivation ?? null;
       this._userPluginsDir = params.userPluginsDir;
-    } else {
+    } else if (params.mode === "flat") {
       this.pluginsDir = null;
       this.pluginManifestRelativePath = null;
-      this.flatNamespacePrefix = params.mode === "flat" ? params.flatNamespacePrefix : null;
-      this.acceptsHooks = false;
+      this.flatNamespacePrefix = params.flatNamespacePrefix;
+      this.acceptsHooks = params.acceptsHooks;
+      this.hooksUnsupportedReason = params.acceptsHooks ? null : params.hooksUnsupportedReason;
+      this.flatHooksDir = params.acceptsHooks ? params.flatHooksDir : null;
+      this.hooksTrustNotice = null;
+      this.pluginRootToken = null;
       this.acceptsMcp = false;
       this.mcpRelativePath = DEFAULT_MCP_PATH;
       this.hooksRelativePath = DEFAULT_HOOKS_PATH;
       this.hooksContentFormat = DEFAULT_HOOKS_FORMAT;
+      this.hooksDestination = "plugin";
+      this.marketplaceSettings = null;
+      this.nativeActivation = null;
+      this._userPluginsDir = undefined;
+    } else {
+      this.pluginsDir = null;
+      this.pluginManifestRelativePath = null;
+      this.flatNamespacePrefix = null;
+      this.acceptsHooks = false;
+      this.hooksUnsupportedReason = params.hooksUnsupportedReason;
+      this.flatHooksDir = null;
+      this.hooksTrustNotice = null;
+      this.pluginRootToken = null;
+      this.acceptsMcp = false;
+      this.mcpRelativePath = DEFAULT_MCP_PATH;
+      this.hooksRelativePath = DEFAULT_HOOKS_PATH;
+      this.hooksContentFormat = DEFAULT_HOOKS_FORMAT;
+      this.hooksDestination = "plugin";
       this.marketplaceSettings = null;
       this.nativeActivation = null;
       this._userPluginsDir = undefined;

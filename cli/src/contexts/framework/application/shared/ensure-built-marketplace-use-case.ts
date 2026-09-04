@@ -1,22 +1,26 @@
 // Called from use-cases/marketplace and use-cases/plugin.
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { builtMarketplaceDir, userBuiltMarketplaceDir } from "../../../../kernel/paths.js";
+import {
+  builtMarketplaceDir,
+  pathsOverlap,
+  userBuiltMarketplaceDir,
+} from "../../../../kernel/paths.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
-import type { VersionReader } from "../../../../runtime/self-update/version-reader.js";
-import type { ResolveMarketplaceUseCase } from "../../../distribution/application/resolve-marketplace-use-case.js";
+import type { VersionReader } from "../../../../kernel/ports/version-reader.js";
+import type { ResolveMarketplace } from "../../../distribution/application/resolve-marketplace-use-case.js";
 import type { Marketplace } from "../../../distribution/domain/marketplace.js";
 import type { FrameworkBuildMode } from "../../../tools/domain/registry.js";
-import type { FrameworkBuildUseCase } from "../../../translate/application/translate-source.js";
+import type { FrameworkBuild } from "../../../translate/application/translate-source.js";
 import type { FrameworkBuildTarget } from "../../../translate/domain/build-target.js";
 
-/** Builds a FrameworkBuildUseCase for a target/mode writing to outDir, or undefined when unsupported. */
+/** Builds a framework build for a target/mode writing to outDir, or undefined when unsupported. */
 export type FrameworkBuildFor = (
   target: FrameworkBuildTarget,
   mode: FrameworkBuildMode,
   outDir: string
-) => FrameworkBuildUseCase | undefined;
+) => FrameworkBuild | undefined;
 
 export interface EnsureBuiltMarketplaceOptions {
   readonly projectRoot: string;
@@ -41,12 +45,17 @@ const UNVERSIONED = "unversioned";
  * the single source of truth; this owns source resolution, staleness, and the
  * guard-safe outDir (build to temp then copy when the cache nests under the source).
  */
-export class EnsureBuiltMarketplaceUseCase {
+/** Getting a built tree for a target, as its callers need it. */
+export interface EnsureBuiltMarketplace {
+  execute(options: EnsureBuiltMarketplaceOptions): Promise<EnsureBuiltMarketplaceResult>;
+}
+
+export class EnsureBuiltMarketplaceUseCase implements EnsureBuiltMarketplace {
   private readonly memo = new Map<string, EnsureBuiltMarketplaceResult>();
 
   constructor(
     private readonly fs: FileReader & FileWriter,
-    private readonly resolveMarketplace: ResolveMarketplaceUseCase,
+    private readonly resolveMarketplace: ResolveMarketplace,
     private readonly buildFor: FrameworkBuildFor,
     private readonly version: VersionReader,
     /**
@@ -59,10 +68,16 @@ export class EnsureBuiltMarketplaceUseCase {
   ) {}
 
   async execute(options: EnsureBuiltMarketplaceOptions): Promise<EnsureBuiltMarketplaceResult> {
-    const builtDir =
+    // resolve(), matching sourceDir below: builtMarketplaceDir() joins with the platform
+    // separator, and on Windows a drive-less projectRoot yields a drive-less builtDir here
+    // while FrameworkBuildUseCase.execute() resolves its own outDir copy for validation only
+    // — leaving FlatBuildStrategy's write target (captured unresolved at construction) to
+    // diverge from the path that gets checked. Both scopes need it, not just the project one.
+    const builtDir = resolve(
       options.marketplace.scope === "user"
         ? userBuiltMarketplaceDir(this.userCacheRoot(), options.marketplace.name, options.target)
-        : builtMarketplaceDir(options.projectRoot, options.marketplace.name, options.target);
+        : builtMarketplaceDir(options.projectRoot, options.marketplace.name, options.target)
+    );
     const resolved = await this.resolveMarketplace.execute({
       marketplace: options.marketplace,
       projectRoot: options.projectRoot,
@@ -142,11 +157,7 @@ export class EnsureBuiltMarketplaceUseCase {
   }
 
   private nested(sourceDir: string, builtDir: string): boolean {
-    return (
-      sourceDir === builtDir ||
-      builtDir.startsWith(`${sourceDir}/`) ||
-      sourceDir.startsWith(`${builtDir}/`)
-    );
+    return pathsOverlap(sourceDir, builtDir);
   }
 
   private async buildViaTemp(

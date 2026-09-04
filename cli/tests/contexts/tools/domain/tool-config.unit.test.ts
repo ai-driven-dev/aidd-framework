@@ -17,6 +17,9 @@ const makeStubConfig = (toolId: AiToolId, toolSuffix: string): AiTool<unknown> =
   directory: `.${toolId}/`,
   toolSuffix,
   signalDir: `.${toolId}/commands`,
+  displayName: toolId,
+  telemetryLocalRead: { kind: "unmeasured" },
+  telemetryTaskAttributable: false,
   capabilities: {},
   rewriteContent: (content: string) => content,
 });

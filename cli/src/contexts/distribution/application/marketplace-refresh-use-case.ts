@@ -31,7 +31,12 @@ export interface MarketplaceRefreshResult {
 
 const CLAUDE_CATALOG_PATH = ".claude-plugin/marketplace.json";
 
-export class MarketplaceRefreshUseCase {
+/** Refreshing registered marketplace catalogs, as its callers need it. */
+export interface MarketplaceRefresh {
+  execute(options: MarketplaceRefreshOptions): Promise<MarketplaceRefreshResult>;
+}
+
+export class MarketplaceRefreshUseCase implements MarketplaceRefresh {
   constructor(
     private readonly registry: MarketplaceRegistry,
     private readonly resolveMarketplace: ResolveMarketplaceUseCase,

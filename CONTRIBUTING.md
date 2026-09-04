@@ -42,20 +42,6 @@ make setup   # deps, git hooks, registers the marketplace, installs plugins into
 
 `make` lists every target; `make doctor` checks your environment, `make check` runs the pre-commit checks.
 
-On **pnpm 11**, the first root install stops with `ERR_PNPM_IGNORED_BUILDS: lefthook`. pnpm 11 will
-not run a dependency's build script until you allow it, and lefthook's is what installs the git
-hooks. Either:
-
-```bash
-pnpm install --ignore-scripts && pnpm exec lefthook install   # no repo file created
-pnpm approve-builds lefthook                                   # writes pnpm-workspace.yaml
-```
-
-The first leaves nothing behind. The second writes a `pnpm-workspace.yaml` at the root, which is not
-committed: with it present, `pnpm --version` inside `kanban/` reports 11.20.0 instead of 10.14.0 —
-reproducible, cause not identified. CI is unaffected either way, since its only root install passes
-`--ignore-scripts`.
-
 ## ✏️ Make your change
 
 - **Follow the [Principles](#-principles).**

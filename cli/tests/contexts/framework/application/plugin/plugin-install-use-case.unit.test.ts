@@ -3,8 +3,11 @@ import "../../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { MarketplaceTrustStore } from "../../../../../src/contexts/distribution/domain/ports/marketplace-trust-store.js";
-import type { PluginAddUseCase } from "../../../../../src/contexts/framework/application/plugin/plugin-add-use-case.js";
-import type { PluginInstallFromMarketplaceUseCase } from "../../../../../src/contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.js";
+import type {
+  PluginAdd,
+  PluginAddUseCase,
+} from "../../../../../src/contexts/framework/application/plugin/plugin-add-use-case.js";
+import type { PluginInstallFromMarketplace } from "../../../../../src/contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.js";
 import { PluginInstallUseCase } from "../../../../../src/contexts/framework/application/plugin/plugin-install-use-case.js";
 import {
   InteractiveOnlyError,
@@ -12,7 +15,10 @@ import {
   TrustDeniedError,
 } from "../../../../../src/kernel/errors.js";
 import type { Prompter } from "../../../../../src/kernel/ports/prompter.js";
-import type { PluginPickUseCase } from "../../../../../src/presentation/prompts/plugin-pick-use-case.js";
+import type {
+  PluginPick,
+  PluginPickUseCase,
+} from "../../../../../src/presentation/prompts/plugin-pick-use-case.js";
 import { InMemoryManifestRepository } from "../../../../helpers/ports/in-memory-manifest-repository.js";
 
 const PLUGIN_FIXTURE = join(process.cwd(), "tests/fixtures/plugins/claude-format/sample-plugin");
@@ -32,7 +38,8 @@ function makeSilentPrompter(): Prompter {
     select: vi.fn(),
     checkbox: vi.fn(),
     resolveConflict: vi.fn(),
-  } as unknown as Prompter;
+    resolveConflictBulk: vi.fn(),
+  };
 }
 
 function makeUseCases(overrides?: {
@@ -45,11 +52,11 @@ function makeUseCases(overrides?: {
   const pickExecute = overrides?.pickExecute ?? vi.fn();
   const addExecute = overrides?.addExecute ?? vi.fn();
   const marketplaceExecute = overrides?.marketplaceExecute ?? vi.fn();
-  const pluginPickUseCase = { execute: pickExecute } as unknown as PluginPickUseCase;
-  const pluginAddUseCase = { execute: addExecute } as unknown as PluginAddUseCase;
-  const pluginInstallFromMarketplaceUseCase = {
+  const pluginPickUseCase: PluginPick = { execute: pickExecute };
+  const pluginAddUseCase: PluginAdd = { execute: addExecute };
+  const pluginInstallFromMarketplaceUseCase: PluginInstallFromMarketplace = {
     execute: marketplaceExecute,
-  } as unknown as PluginInstallFromMarketplaceUseCase;
+  };
   const manifestRepo = new InMemoryManifestRepository();
   const trustStore = overrides?.trustStore ?? makeAlwaysTrustStore();
   const prompter = overrides?.prompter ?? makeSilentPrompter();
@@ -181,7 +188,7 @@ describe("PluginInstallUseCase", () => {
       expect(result.kind).toBe("local");
     });
 
-    it("delegates to PluginInstallFromMarketplaceUseCase when arg is a plugin name", async () => {
+    it("delegates to PluginInstallFromMarketplace when arg is a plugin name", async () => {
       const marketplaceExecute = vi.fn().mockResolvedValue({ entry: { name: "my-plugin" } });
 
       const result = await makeUseCase({ marketplaceExecute }).execute({
@@ -210,7 +217,8 @@ describe("PluginInstallUseCase", () => {
         select: vi.fn(),
         checkbox: vi.fn(),
         resolveConflict: vi.fn(),
-      } as unknown as Prompter;
+        resolveConflictBulk: vi.fn(),
+      };
 
       await expect(
         makeUseCase({
@@ -240,7 +248,8 @@ describe("PluginInstallUseCase", () => {
         select: vi.fn(),
         checkbox: vi.fn(),
         resolveConflict: vi.fn(),
-      } as unknown as Prompter;
+        resolveConflictBulk: vi.fn(),
+      };
 
       const result = await makeUseCase({
         addExecute,

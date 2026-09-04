@@ -17,8 +17,10 @@ import { PostInstallPipelineUseCase } from "../../../../src/contexts/framework/a
 import { Manifest } from "../../../../src/contexts/framework/domain/manifest.js";
 import { ManifestRepositoryAdapter } from "../../../../src/contexts/framework/infrastructure/manifest-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "../../../../src/contexts/framework/infrastructure/plugin-distribution-reader-adapter.js";
+import type { VersionControl } from "../../../../src/contexts/telemetry/domain/ports/version-control.js";
 import { isIdeToolId } from "../../../../src/contexts/tools/domain/registry.js";
 import type { Prompter } from "../../../../src/kernel/ports/prompter.js";
+import type { VersionReader } from "../../../../src/kernel/ports/version-reader.js";
 import type { ToolId } from "../../../../src/kernel/tool.js";
 import { CLIOutput } from "../../../../src/presentation/output.js";
 import { BundledAssetProviderAdapter } from "../../../../src/runtime/assets/asset-loader.js";
@@ -27,10 +29,20 @@ import { HasherAdapter } from "../../../../src/runtime/filesystem/hasher-adapter
 import type { Platform } from "../../../../src/runtime/platform/platform.js";
 import { SilentPrompterAdapter } from "../../../../src/runtime/prompter/prompter-adapter.js";
 import { CurrentVersionAdapter } from "../../../../src/runtime/self-update/current-version-adapter.js";
-import type { VersionReader } from "../../../../src/runtime/self-update/version-reader.js";
-
 export const linuxPlatform: Platform = { current: () => "linux" };
 export const win32Platform: Platform = { current: () => "win32" };
+export const noGit: VersionControl = {
+  installCommitMessageDelegate: async () => false,
+  removeCommitMessageDelegate: async () => false,
+  listTrackedFiles: async () => [],
+  isRepository: async () => false,
+  hasHistoryFor: async () => false,
+  readCommitTrailerSetup: async () => ({
+    delegate: "absent",
+    callSite: "no-hook-file",
+    hookHasOtherContent: false,
+  }),
+};
 
 export { SilentPrompterAdapter as OverwritePrompter };
 

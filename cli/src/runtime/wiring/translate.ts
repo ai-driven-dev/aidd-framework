@@ -1,7 +1,7 @@
 import { stat } from "node:fs/promises";
 // FRAMEWORK_BUILD_REGISTRY below is built eagerly at module load from `buildContractFor`,
 // which reads the tool registry — so this module must register profiles itself rather
-// than rely on import order relative to `./tools.js` or `./framework.js`.
+// than rely on import order relative to `tools.ts` or `framework.ts`.
 import "../../contexts/tools/domain/profiles/claude/profile.js";
 import "../../contexts/tools/domain/profiles/codex/profile.js";
 import "../../contexts/tools/domain/profiles/copilot/profile.js";

@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { CLI_PATH, createTestEnv, runCli } from "./helpers.js";
+import { cliPath, createTestEnv, runCli } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -63,7 +63,7 @@ describe.concurrent("E2E: persona journeys", () => {
         projectDir,
         fakeHome,
         `
-spawn node ${CLI_PATH}
+spawn node ${cliPath()}
 expect {
   -re {AI-Driven Development CLI} { puts "BANNER_OK" }
   timeout { puts "TIMEOUT"; exit 1 }
@@ -248,7 +248,7 @@ exit 0
         projectDir,
         fakeHome,
         `
-spawn bash -c "cd '${projectDir}' && node ${CLI_PATH}"
+spawn bash -c "cd '${projectDir}' && node ${cliPath()}"
 expect {
   -re {AI-Driven Development CLI} { puts "BANNER_OK" }
   timeout { puts "TIMEOUT"; exit 1 }

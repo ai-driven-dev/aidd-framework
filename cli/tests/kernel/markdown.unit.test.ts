@@ -111,6 +111,24 @@ describe("parseFrontmatter() — block scalars", () => {
     const { frontmatter } = parseFrontmatter(content);
     expect(frontmatter.tools).toBe("[invalid json}");
   });
+  // A Windows checkout hands the parser the same document with CRLF (#707). Pinned here
+  // rather than only on the Windows runner: the defect is a pure string transform, so a
+  // test that fails when the fix is reverted runs on any platform.
+  it("parses the same document whichever way its lines end", () => {
+    const lf = "---\nname: hi\nallowed_tools:\n  - Read\n  - Bash\n---\nbody\n";
+    const crlf = lf.replace(/\n/g, "\r\n");
+    expect(parseFrontmatter(crlf).frontmatter).toEqual(parseFrontmatter(lf).frontmatter);
+    expect(parseFrontmatter(crlf).frontmatter).toEqual({
+      name: "hi",
+      allowed_tools: ["Read", "Bash"],
+    });
+  });
+
+  it("keeps a carriage return that is content rather than a line ending", () => {
+    const content = "---\nname: a\rb\n---\nbody";
+    const { frontmatter } = parseFrontmatter(content);
+    expect(frontmatter.name).toBe("a\rb");
+  });
 });
 
 /**

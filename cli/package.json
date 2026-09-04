@@ -1,7 +1,7 @@
 {
   "name": "@ai-driven-dev/cli",
-  "version": "5.2.1",
-  "description": "AI-Driven Development CLI \u2014 install AI tool configs and plugins from the AIDD marketplace",
+  "version": "5.2.2",
+  "description": "AI-Driven Development CLI — install AI tool configs and plugins from the AIDD marketplace",
   "license": "MIT",
   "keywords": [
     "cli",
@@ -44,7 +44,7 @@
       "qs": ">=6.15.2"
     }
   },
-  "bundleBudgetKB": 500,
+  "bundleBudgetKB": 590,
   "scripts": {
     "build": "tsup && node scripts/check-bundle-size.mjs",
     "build:check-size": "node scripts/check-bundle-size.mjs",
@@ -68,6 +68,7 @@
     "test:mutation": "node scripts/run-mutation.mjs",
     "test:mutation:kernel": "node scripts/run-mutation.mjs kernel",
     "test:mutation:tools": "node scripts/run-mutation.mjs tools",
+    "test:mutation:telemetry": "node scripts/run-mutation.mjs telemetry",
     "test:mutation:translate": "node scripts/run-mutation.mjs translate",
     "test:mutation:distribution": "node scripts/run-mutation.mjs distribution",
     "test:mutation:framework": "node scripts/run-mutation.mjs framework",

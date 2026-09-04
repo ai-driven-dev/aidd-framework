@@ -33,6 +33,7 @@ describe("resolveTranslator", () => {
       const deps = buildDeps();
       const plugins = new PluginsCapability({
         mode: "native",
+        acceptsHooks: true,
         pluginsDir: ".claude/plugins/",
         pluginManifestRelativePath: "plugin.json",
         translationMode: "marketplace",
@@ -49,6 +50,7 @@ describe("resolveTranslator", () => {
       const deps = buildDeps();
       const plugins = new PluginsCapability({
         mode: "native",
+        acceptsHooks: true,
         pluginsDir: "",
         pluginManifestRelativePath: null,
         installScope: "user",
@@ -65,6 +67,8 @@ describe("resolveTranslator", () => {
       const deps = buildDeps();
       const plugins = new PluginsCapability({
         mode: "flat",
+        acceptsHooks: false,
+        hooksUnsupportedReason: "a test double that hosts no plugin directory",
         flatNamespacePrefix: "aidd-",
       });
       const adapter = resolveTranslator(plugins, deps);
@@ -76,7 +80,10 @@ describe("resolveTranslator", () => {
   describe("when translationMode is null (unsupported)", () => {
     it("returns null", () => {
       const deps = buildDeps();
-      const plugins = new PluginsCapability({ mode: "unsupported" });
+      const plugins = new PluginsCapability({
+        mode: "unsupported",
+        hooksUnsupportedReason: "a test double that hosts no plugin directory",
+      });
       const adapter = resolveTranslator(plugins, deps);
       expect(adapter).toBeNull();
     });
@@ -87,6 +94,7 @@ describe("resolveTranslator", () => {
       const deps = buildDeps();
       const plugins = new PluginsCapability({
         mode: "native",
+        acceptsHooks: true,
         pluginsDir: ".custom/plugins/",
         pluginManifestRelativePath: "plugin.json",
       });

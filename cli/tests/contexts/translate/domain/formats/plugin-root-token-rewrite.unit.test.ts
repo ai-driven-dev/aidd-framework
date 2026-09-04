@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  CLAUDE_PLUGIN_ROOT_TOKEN,
-  rewritePluginRootToken,
-} from "../../../../../src/contexts/translate/domain/formats/plugin-root-token-rewrite.js";
+import { CLAUDE_PLUGIN_ROOT_TOKEN } from "../../../../../src/contexts/tools/domain/formats/plugin-root-token.js";
+import { rewritePluginRootToken } from "../../../../../src/contexts/translate/domain/formats/plugin-root-token-rewrite.js";
 
 // Avoid biome noTemplateCurlyInString: split literals
 const CLAUDE_TOKEN = "$" + "{CLAUDE_PLUGIN_ROOT}";

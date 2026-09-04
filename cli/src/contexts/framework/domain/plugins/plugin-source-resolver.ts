@@ -1,7 +1,6 @@
-import { relative } from "node:path";
+import { isAbsolute, relative } from "node:path";
 import type { PluginSource, PluginSourceGitSubdir } from "../../../../kernel/source.js";
 import type { Marketplace } from "../../../distribution/domain/marketplace.js";
-
 export function resolvePluginSourceFromMarketplace(
   entrySource: PluginSource,
   marketplace: Marketplace,
@@ -22,8 +21,11 @@ export function resolvePluginSourceFromMarketplace(
   return resolved;
 }
 
+// isAbsolute(), never a leading "/": a Windows path is absolute and starts with its drive
+// letter, so the "/" test read "D:\\gh-mkt\\sample-plugin" as already-relative and handed
+// the whole absolute path back as the git subdir.
 function toRelativePath(sourcePath: string, localBase: string): string | null {
-  if (!sourcePath.startsWith("/")) {
+  if (!isAbsolute(sourcePath)) {
     const stripped = sourcePath.startsWith("./") ? sourcePath.slice(2) : sourcePath;
     return stripped.length > 0 ? stripped : null;
   }

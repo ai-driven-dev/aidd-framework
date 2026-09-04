@@ -4,4 +4,5 @@ export interface FileWriter {
   createDirectory(path: string): Promise<void>;
   deleteEmptyDirectories(path: string): Promise<void>;
   deleteDirectory(path: string): Promise<void>;
+  chmodExecutable(path: string): Promise<void>;
 }

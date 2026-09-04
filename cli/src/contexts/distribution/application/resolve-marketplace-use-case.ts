@@ -18,7 +18,12 @@ export interface ResolveMarketplaceResult {
   catalog: PluginCatalog | null;
 }
 
-export class ResolveMarketplaceUseCase {
+/** Resolving a marketplace to a local path and catalog, as its callers need it. */
+export interface ResolveMarketplace {
+  execute(options: ResolveMarketplaceOptions): Promise<ResolveMarketplaceResult>;
+}
+
+export class ResolveMarketplaceUseCase implements ResolveMarketplace {
   constructor(
     private readonly fetchMarketplaceSource: FetchMarketplaceSourceUseCase,
     private readonly catalogRepo: PluginCatalogRepository

@@ -1,0 +1,19 @@
+{
+  "type": "session.created",
+  "properties": {
+    "info": {
+      "id": "ses_aaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "slug": "synthetic-session",
+      "projectID": "global",
+      "directory": "/home/user/probe/project",
+      "title": "New session - 2026-08-31T00:00:00.000Z",
+      "version": "1.14.20",
+      "permission": [
+        { "permission": "question", "pattern": "*", "action": "deny" },
+        { "permission": "plan_enter", "pattern": "*", "action": "deny" },
+        { "permission": "plan_exit", "pattern": "*", "action": "deny" }
+      ],
+      "time": { "created": 1788134400000, "updated": 1788134400000 }
+    }
+  }
+}

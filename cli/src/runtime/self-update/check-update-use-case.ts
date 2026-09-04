@@ -3,9 +3,9 @@ import { join } from "node:path";
 import type { FileReader } from "../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../kernel/ports/file-writer.js";
 import type { Logger } from "../../kernel/ports/logger.js";
+import type { VersionReader } from "../../kernel/ports/version-reader.js";
 import { compareSemver, isSemver } from "../../kernel/semver.js";
 import type { SelfUpdater } from "./self-updater.js";
-import type { VersionReader } from "./version-reader.js";
 
 interface CachedCheck {
   checkedAt: number;
@@ -16,9 +16,23 @@ function isOutdated(version: string, latest: string): boolean {
   return isSemver(version) && compareSemver(version, latest) < 0;
 }
 
+function resolveConfigDir(): string {
+  return process.env.AIDD_USER_CONFIG_DIR ?? join(homedir(), ".config", "aidd");
+}
+
+/** Where this cache is written: under `cache/`, beside every other disposable thing, rather
+ * than loose among the files a person chose. Nothing here is a choice — it is the last
+ * version seen and when, refetched whenever it is missing. */
 function resolveCachePath(): string {
-  const dir = process.env.AIDD_USER_CONFIG_DIR ?? join(homedir(), ".config", "aidd");
-  return join(dir, "update-check.json");
+  return join(resolveConfigDir(), "cache", "update-check.json");
+}
+
+/** Where it used to be written, read when the current path holds nothing. A cache that
+ * appeared to be missing would cost one needless network call on the next online command —
+ * harmless, and still worth not doing to every existing install at once. Never written to,
+ * so the old file simply stops being touched and can be deleted by hand. */
+function legacyCachePath(): string {
+  return join(resolveConfigDir(), "update-check.json");
 }
 
 export class CheckUpdateUseCase {
@@ -48,7 +62,10 @@ export class CheckUpdateUseCase {
   }
 
   private async readCacheRaw(): Promise<CachedCheck | null> {
-    const path = resolveCachePath();
+    return (await this.readCacheAt(resolveCachePath())) ?? this.readCacheAt(legacyCachePath());
+  }
+
+  private async readCacheAt(path: string): Promise<CachedCheck | null> {
     if (!(await this.fs.fileExists(path))) return null;
     try {
       const raw = await this.fs.readFile(path);

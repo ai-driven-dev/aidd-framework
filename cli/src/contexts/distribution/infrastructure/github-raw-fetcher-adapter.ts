@@ -9,7 +9,7 @@ import {
 } from "../../../kernel/errors.js";
 import type { PluginSourceGitHub } from "../../../kernel/source.js";
 import type { TokenProvider } from "../../../runtime/auth/ports/token-provider.js";
-import type { HttpClient } from "../../../runtime/http/http-client.js";
+import type { HttpClient, HttpGet } from "../../../runtime/http/http-client.js";
 import type { RawCatalogFetcher } from "../domain/ports/raw-catalog-fetcher.js";
 
 const GITHUB_API_BASE = "https://api.github.com";
@@ -17,7 +17,7 @@ const RAW_ACCEPT = "application/vnd.github.raw";
 
 export class GitHubRawFetcherAdapter implements RawCatalogFetcher {
   constructor(
-    private readonly http: HttpClient,
+    private readonly http: HttpGet,
     private readonly tokenProvider?: TokenProvider
   ) {}
 

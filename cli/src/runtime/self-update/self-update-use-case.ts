@@ -1,6 +1,6 @@
+import type { VersionReader } from "../../kernel/ports/version-reader.js";
 import { compareSemver } from "../../kernel/semver.js";
 import type { SelfUpdater } from "./self-updater.js";
-import type { VersionReader } from "./version-reader.js";
 
 export interface SelfUpdateInput {
   check: boolean;

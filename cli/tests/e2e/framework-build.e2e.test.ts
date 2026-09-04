@@ -368,7 +368,12 @@ describe.concurrent("E2E: aidd translate", () => {
 
       const mcpRaw = await readFile(join(projRoot, ".vscode", "mcp.json"), "utf-8");
       expect(mcpRaw).not.toContain(varRef);
-      expect(mcpRaw).toContain(projRoot);
+      // The written value is "/"-separated on purpose (see resolveClaudeRootAbsolute): a
+      // backslash-native path embedded in JSON comes back doubly escaped, and a forward
+      // slash is a valid path separator on Windows too. The claim is unchanged - the MCP
+      // command names this project root - so the expected value is spelled the way the
+      // file spells it, rather than the assertion being dropped (#707).
+      expect(mcpRaw).toContain(projRoot.replace(/\\/g, "/"));
 
       // AC #7: top-level key must be "servers"; plugin keys prefixed with "aidd-test-"
       const mcpParsed = JSON.parse(mcpRaw) as { servers: Record<string, unknown> };

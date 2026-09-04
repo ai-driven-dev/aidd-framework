@@ -9,6 +9,8 @@
  * Claude event names (source) are PascalCase; Cursor maps supported events to camelCase.
  */
 
+import { asPlainObject } from "../../../../kernel/reading/plain-object.js";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type ClaudeHookItem = { type?: string; command?: string; [key: string]: unknown };
@@ -29,14 +31,55 @@ type CodexHooksShape = { hooks?: Record<string, CodexHookEntry[]> };
 
 // ── Event mapping ─────────────────────────────────────────────────────────────
 
-const CURSOR_EVENT_MAP: Record<string, string> = {
-  SessionStart: "sessionStart",
-  UserPromptSubmit: "beforeSubmitPrompt",
-  PreToolUse: "preToolUse",
-  PostToolUse: "postToolUse",
-  Stop: "stop",
-  SubagentStop: "subagentStop",
+// `Stop` fans out to two Cursor events, not one: measured (2026-08-22, see
+// measurements.md Phase 6) interactive sessions fire `stop` and headless sessions
+// fire `sessionEnd` instead — never both from the same run, but which one depends
+// on how the session ends, so both are subscribed. A run file already tolerates
+// more than one `turn_end` line (two real `stop` firings, one interactive session,
+// Phase 4 addendum), so a session that happens to fire both is not a problem.
+const CURSOR_EVENT_MAP: Record<string, readonly string[]> = {
+  SessionStart: ["sessionStart"],
+  UserPromptSubmit: ["beforeSubmitPrompt"],
+  PreToolUse: ["preToolUse"],
+  PostToolUse: ["postToolUse"],
+  Stop: ["stop", "sessionEnd"],
+  SubagentStop: ["subagentStop"],
 };
+
+// Codex keeps Claude's event names, with one exception it does not have: there is no
+// `Stop`. Its vocabulary, read out of the 0.149.0 binary itself, is PreToolUse,
+// PermissionRequest, PostToolUse, PreCompact, PostCompact, SessionStart, SessionEnd,
+// SubagentStart, SubagentStop - and a live probe confirmed it: a `codex exec` run with all
+// four subscribed fired SessionStart and SessionEnd and never Stop, so a turn was never
+// closed and every Codex session journalled a session_start with nothing after it.
+//
+// SessionEnd is coarser than Stop by nature: it bounds the session, not each turn. For
+// `codex exec` the two coincide, and for an interactive session one turn_end bounding the
+// whole session is the honest answer rather than none at all. The journal already tolerates
+// more than one turn_end line, so nothing downstream depends on there being exactly one.
+const CODEX_EVENT_MAP: Record<string, readonly string[]> = {
+  Stop: ["SessionEnd"],
+};
+
+/**
+ * Renames a plugin hooks.json's events to the ones Codex delivers, without merging.
+ *
+ * Codex is installed two ways - a built marketplace tree and a merged project config - and
+ * the two have drifted apart three times. Both call this, so the rename cannot land on one
+ * route and not the other, which is exactly how a Codex session came to journal a
+ * session_start with nothing after it.
+ */
+export function renameCodexHookEvents(pluginHooksJson: string): string {
+  const parsed = JSON.parse(pluginHooksJson) as ClaudeHooksShape;
+  if (!parsed.hooks) return pluginHooksJson;
+  const renamed: Record<string, ClaudeMatcherGroup[]> = {};
+  for (const [event, matchers] of Object.entries(parsed.hooks)) {
+    for (const codexEvent of CODEX_EVENT_MAP[event] ?? [event]) {
+      renamed[codexEvent] = [...(renamed[codexEvent] ?? []), ...matchers];
+    }
+  }
+  return `${JSON.stringify({ ...parsed, hooks: renamed }, null, 2)}\n`;
+}
 
 // ── Claude: merge hooks into .claude/settings.json ────────────────────────────
 
@@ -135,13 +178,15 @@ export function mergeCursorFlatHooks(
   const warnings: string[] = [];
 
   for (const [claudeEvent, matchers] of Object.entries(pluginHooks)) {
-    const cursorEvent = CURSOR_EVENT_MAP[claudeEvent];
-    if (!cursorEvent) {
+    const cursorEvents = CURSOR_EVENT_MAP[claudeEvent];
+    if (!cursorEvents) {
       warnings.push(`cursor: unmapped event '${claudeEvent}' skipped`);
       continue;
     }
     const entries = extractCursorEntries(matchers);
-    cursor.hooks[cursorEvent] = [...(cursor.hooks[cursorEvent] ?? []), ...entries];
+    for (const cursorEvent of cursorEvents) {
+      cursor.hooks[cursorEvent] = [...(cursor.hooks[cursorEvent] ?? []), ...entries];
+    }
   }
 
   return { content: `${JSON.stringify(cursor, null, 2)}\n`, warnings };
@@ -185,7 +230,12 @@ export function mergeCodexFrameworkHooksJson(
   const pluginHooks = plugin.hooks ?? {};
 
   for (const [event, matchers] of Object.entries(pluginHooks)) {
-    codex.hooks[event] = [...(codex.hooks[event] ?? []), ...convertToCodexEntries(matchers)];
+    for (const codexEvent of CODEX_EVENT_MAP[event] ?? [event]) {
+      codex.hooks[codexEvent] = [
+        ...(codex.hooks[codexEvent] ?? []),
+        ...convertToCodexEntries(matchers),
+      ];
+    }
   }
 
   return {
@@ -224,4 +274,51 @@ function buildCodexHookItem(item: ClaudeHookItem): {
   if (typeof item.timeout === "number") entry.timeout = item.timeout;
   if (typeof item.statusMessage === "string") entry.statusMessage = item.statusMessage;
   return entry;
+}
+
+// ── Detection: does an already-written hooks file register a command? ─────────
+
+/**
+ * Every `command` string registered for `claudeEvent` in a hooks file already written in
+ * any of the four shapes this module writes — Claude/Codex's nested matcher groups, or
+ * Copilot/Cursor's flat `{command}` entries — plus whatever alias `CURSOR_EVENT_MAP` maps
+ * `claudeEvent` to (Cursor renames `SessionStart` to `sessionStart`; Codex and Copilot
+ * keep it as written). Malformed content, or a shape none of the four writers produce,
+ * answers `[]` rather than throwing: a shape this module does not recognise is not
+ * evidence of anything.
+ *
+ * The one shape-parsing routine a *reader* needs for "did a hooks block ask for this
+ * command" — `telemetry-evidence-adapter.ts`'s recorder-declaration check calls this
+ * rather than restating the four shapes' knowledge, so a fifth shape recognised here is
+ * recognised there too.
+ */
+export function hookCommandsForEvent(hooksFileContent: string, claudeEvent: string): string[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(hooksFileContent);
+  } catch {
+    return [];
+  }
+  const hooks = asPlainObject(asPlainObject(parsed)?.hooks);
+  if (hooks === null) return [];
+  const commands: string[] = [];
+  for (const eventName of [claudeEvent, ...(CURSOR_EVENT_MAP[claudeEvent] ?? [])]) {
+    const entries = hooks[eventName];
+    if (Array.isArray(entries)) for (const entry of entries) collectCommands(entry, commands);
+  }
+  return commands;
+}
+
+// Handles both known entry depths in one walk: a nested group (`{ hooks: [...] }`,
+// Claude/Codex) recurses one level into its own `hooks` array; a flat entry
+// (`{ command }` or `{ type, command }`, Copilot/Cursor) has none to recurse into and
+// contributes its own command directly.
+function collectCommands(entry: unknown, out: string[]): void {
+  const record = asPlainObject(entry);
+  if (record === null) return;
+  if (Array.isArray(record.hooks)) {
+    for (const nested of record.hooks) collectCommands(nested, out);
+    return;
+  }
+  if (typeof record.command === "string") out.push(record.command);
 }

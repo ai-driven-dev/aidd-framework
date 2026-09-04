@@ -1,21 +1,42 @@
-# Coding Guidelines
+# Coding Assertions
 
-> Those rules must be minimal because they MUST be checked after EVERY CODE GENERATION.
+The checks that must pass for code to count as done. Minimal, run after every change.
 
-## Requirements to complete a feature
+## Before the code
 
-**A feature is really completed if ALL of the above are satisfied: if not, iterate to fix all until all are green.**
+**Write the test first, and watch it fail for the reason it names.** A test written after the
+code it covers confirms what was built; only one that failed first can tell you it is
+checking anything at all.
 
-## Commands to run
+Two consequences, both learned by paying for them:
 
-### Before commit
+- **A guard ships with the mutation that proves it.** Break the thing the test is named for
+  and watch that test — not another — go red. A guard nothing fails for is not a guard, and
+  it is indistinguishable from a comment.
+- **After any scripted edit, read the file back before running anything.** A replacement
+  whose anchor drifted applies to nothing and reports nothing, which is how a field can be
+  declared in a type, believed by a display and produced by no code. An inconsistent state is
+  worse than a missing feature: nobody designed it, so nobody can reason about it.
 
-| Order | Command | Description |
-| ----- | ------- | ----------- |
-| 1 | `pnpm exec commitlint --edit` | Validate commit message against conventional commit spec |
+Never state in a commit message or a report anything not just observed in output.
 
-### Before push
+> CLI-specific completion criteria: [`cli/aidd_docs/memory/coding-assertions.md`](../../cli/aidd_docs/memory/coding-assertions.md).
 
-| Order | Command | Description |
-| ----- | ------- | ----------- |
-| 1 | `pnpm exec lefthook run pre-push` | Run parent repo hooks (delegates to parent lefthook.yml) |
+## Before commit
+
+| Order | Command | Checks |
+| ----- | ------- | ------ |
+| 1 | `pnpm exec lefthook run pre-commit` | JSON and YAML validity, skill frontmatter and argument hints, context imports, markdown links, `scripts/` tests; `cli lint` and `cli typecheck` when `cli/` or `kanban/` changed |
+| 2 | `pnpm exec commitlint --edit` | the message against `commitlint.config.cjs` |
+
+Same hook regenerates each plugin's `CATALOG.md` and the README counts, and stages them.
+
+## Before push
+
+| Order | Command | Checks |
+| ----- | ------- | ------ |
+| 1 | `pnpm exec lefthook run pre-push` | `cli knip:production`, then the full `cli` suite, when `cli/` changed |
+
+## Behavior
+
+Done means every gate green. On failure, one agent per failing assertion — typecheck, tests, rules — not one agent for all.

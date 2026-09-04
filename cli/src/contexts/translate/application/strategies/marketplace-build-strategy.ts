@@ -16,7 +16,8 @@ import {
 import { rewritePluginRootToken } from "../../domain/formats/plugin-root-token-rewrite.js";
 import { assertNoToolsPlaceholder } from "../shared-plugin-helpers.js";
 import type { BuildOutputStrategy, SourceMarketplace } from "./build-output-strategy.js";
-import { detectPluginPresenceFlags, writeSkillTree } from "./marketplace-strategy-helpers.js";
+import { detectPluginPresenceFlags } from "./plugin-source-tree-reader.js";
+import { writeSkillTree } from "./write-skill-tree.js";
 
 export class MarketplaceBuildStrategy implements BuildOutputStrategy {
   constructor(
@@ -129,7 +130,7 @@ export class MarketplaceBuildStrategy implements BuildOutputStrategy {
     if (!this.contract.buildMarketplaceCatalog || !this.contract.buildMarketplaceEntry) return 0;
     const entries = await this.buildAllEntries(sourceMarketplace, builtPlugins, outDir);
     const { catalog, schemaName, destRelPath } = await this.contract.buildMarketplaceCatalog(
-      sourceMarketplace as unknown as SourceMarketplaceRef,
+      sourceMarketplace,
       entries,
       this.fs
     );
@@ -157,9 +158,7 @@ export class MarketplaceBuildStrategy implements BuildOutputStrategy {
   ): Promise<Record<string, unknown>[]> {
     const entries: Record<string, unknown>[] = [];
     for (const built of builtPlugins) {
-      const srcEntry = sourceMarketplace.plugins.find((p) => p.name === built.name) as
-        | SourcePluginEntryRef
-        | undefined;
+      const srcEntry = sourceMarketplace.plugins.find((p) => p.name === built.name);
       const pluginSrc = join(outDir, "plugins", built.name);
       if (!this.contract.buildMarketplaceEntry) continue;
       const entry = await this.contract.buildMarketplaceEntry(

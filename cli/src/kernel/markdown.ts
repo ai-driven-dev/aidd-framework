@@ -4,7 +4,13 @@ export function parseFrontmatter(content: string): {
   frontmatter: Record<string, unknown>;
   body: string;
 } {
-  const lines = content.split("\n");
+  // A line ends either way: a Windows checkout (no .gitattributes here) hands this the
+  // same document with CRLF, and the key/value patterns below are `$`-anchored, so a
+  // trailing carriage return made every one of them miss — `allowed_tools:` matched as a
+  // key with no items and the document came back all but empty. Splitting on
+  // either ending is not the same as stripping every `\r`: one inside a value is content,
+  // and stays.
+  const lines = content.split(/\r?\n/);
 
   if (lines[0]?.trim() !== FRONTMATTER_DELIMITER) {
     return { frontmatter: {}, body: content };
@@ -59,13 +65,16 @@ export function serializeFrontmatter(frontmatter: Record<string, unknown>, body:
   return `${lines.join("\n")}\n${body}`;
 }
 
+// `[^\n]` rather than `.` throughout: `.` excludes a carriage return, so a `$`-anchored
+// value pattern silently missed any line carrying one. Splitting already removed the `\r`
+// of a CRLF ending, so what is left here is content and must survive.
 function parseYamlLike(lines: string[]): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   let i = 0;
   while (i < lines.length) {
     const line = lines[i];
     const keyOnlyMatch = /^(\w[\w-]*):\s*$/.exec(line);
-    const keyValueMatch = /^(\w[\w-]*):\s*(.+)$/.exec(line);
+    const keyValueMatch = /^(\w[\w-]*):\s*([^\n]+)$/.exec(line);
     if (keyOnlyMatch) {
       const { items, next } = collectListBlock(lines, i + 1);
       result[keyOnlyMatch[1]] = items;
@@ -91,7 +100,7 @@ function collectListBlock(lines: string[], start: number): { items: string[]; ne
   const items: string[] = [];
   let i = start;
   while (i < lines.length) {
-    const match = /^\s{2,}-\s+(.+)$/.exec(lines[i]);
+    const match = /^\s{2,}-\s+([^\n]+)$/.exec(lines[i]);
     if (!match) break;
     items.push(String(parseScalar(match[1].trim())));
     i++;

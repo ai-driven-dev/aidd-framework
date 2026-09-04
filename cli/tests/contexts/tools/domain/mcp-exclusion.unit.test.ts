@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { transformFor } from "../../../../src/contexts/tools/domain/mcp-exclusion.js";
-import { InstallationFile } from "../../../../src/kernel/file.js";
-import type { Hasher } from "../../../../src/kernel/ports/hasher.js";
 
 function makeConfig(servers: Record<string, object>): string {
   return JSON.stringify({ mcpServers: servers }, null, 2);
@@ -82,53 +80,3 @@ describe("transformFor()", () => {
     });
   });
 });
-
-// ── Helpers for domain function tests ────────────────────────────────────────
-
-const _stubHasher: Hasher = { hash: (v) => v as unknown as ReturnType<Hasher["hash"]> };
-
-function makeGetEntrySection(
-  sectionKey: string | null,
-  lookup: Map<string, string>
-): (frameworkPath: string) => string | null {
-  return (frameworkPath) => {
-    const configName = lookup.get(frameworkPath);
-    if (!configName) return null;
-    return sectionKey;
-  };
-}
-
-function _makeMcpFile(
-  relativePath: string,
-  servers: Record<string, object>,
-  frameworkPath = "config/mcp.json"
-): InstallationFile {
-  const content = JSON.stringify({ mcpServers: servers }, null, 2);
-  return new InstallationFile({
-    relativePath,
-    content,
-    hash: content as unknown as ReturnType<Hasher["hash"]>,
-    mergeStrategy: "framework-prime",
-    frameworkPath,
-  });
-}
-
-function _makeRegularFile(relativePath: string): InstallationFile {
-  return new InstallationFile({
-    relativePath,
-    content: "# doc",
-    hash: "h" as unknown as ReturnType<Hasher["hash"]>,
-    mergeStrategy: "none",
-  });
-}
-
-const lookup = new Map([["config/mcp.json", "mcp"]]);
-const _mcpGetEntrySection = makeGetEntrySection("mcpServers", lookup);
-
-// ── extractMcpKeys ───────────────────────────────────────────────────────────
-
-// ── filterMcpExclusions ──────────────────────────────────────────────────────
-
-// ── computeMcpExclusions ─────────────────────────────────────────────────────
-
-// ── detectNewMcpEntries ──────────────────────────────────────────────────────

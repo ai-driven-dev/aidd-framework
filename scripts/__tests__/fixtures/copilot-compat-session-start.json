@@ -1,0 +1,8 @@
+{
+  "hook_event_name": "SessionStart",
+  "session_id": "b1f8194a-7d49-484a-985e-21ff4c314dc1",
+  "timestamp": "2026-08-21T21:47:21.187Z",
+  "cwd": "/home/user/probe/project-copilot-compat",
+  "source": "new",
+  "initial_prompt": "Run: ls -a . Then say DONE."
+}

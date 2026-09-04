@@ -10,15 +10,17 @@
 import { InvalidMcpServerConfigError, McpConfigError } from "../../../../../kernel/errors.js";
 import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
 import {
+  flatHooksSharedDirPath,
   flatMcpKeyPrefix,
   genericFlatAgentPath,
-  genericFlatSkillPath,
+  genericFlatSkillTreePath,
 } from "../../../../../kernel/materialization/flat-paths.js";
 import { rewriteRelativeLinks } from "../../../../../kernel/materialization/relative-link-rewrite.js";
 import type { FileReader } from "../../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../../kernel/ports/file-writer.js";
-import type { ToolBuildContract } from "../../build-contract.js";
+import type { ArtifactContract, ToolBuildContract } from "../../build-contract.js";
 import { buildOpencodeFlatConfig } from "../../formats/opencode-mcp-merge.js";
+import { OPENCODE_FLAT_HOOKS_DIR } from "./opencode-paths.js";
 
 type FsType = FileReader & FileWriter;
 
@@ -83,7 +85,24 @@ function opencodeFlatAgentPath(plugin: string, rel: string): string {
 }
 
 function opencodeFlatSkillPath(plugin: string, rel: string): string {
-  return genericFlatSkillPath(".opencode/skills/", plugin, rel.replace(/^skills\//, ""));
+  return genericFlatSkillTreePath(".opencode/skills/", plugin, rel.replace(/^skills\//, ""));
+}
+
+/** OpenCode's loader scans one flat directory, so a plugin's hook scripts land there under
+ * their own subtree rather than under a per-plugin directory of their own. */
+function makeOpencodeFlatHooksPath(flatHooksDir: string): (plugin: string, rel: string) => string {
+  return (_plugin, rel) => flatHooksSharedDirPath(flatHooksDir, rel);
+}
+
+/** Supported exactly when the profile names a directory to deliver into — the same
+ * declaration `acceptsHooks` is paired with, read once rather than restated here. */
+function buildOpencodeFlatHooksArtifact(): ArtifactContract {
+  return {
+    supported: true,
+    source: { kind: "hooksBundle", jsonPath: "hooks/hooks.json", scriptDir: "hooks" },
+    path: makeOpencodeFlatHooksPath(OPENCODE_FLAT_HOOKS_DIR),
+    skipHooksJson: true,
+  };
 }
 
 function opencodeFlatResolveTarget(plugin: string, rel: string): string {
@@ -153,7 +172,7 @@ export function buildOpencodeFlatContract(): ToolBuildContract {
         transform: transformOpencodeFlatAgent,
       },
       mcp: { supported: false }, // handled by emitConfigArtifact (opencode.json mcp)
-      hooks: { supported: false }, // opencode has no HasHooks capability
+      hooks: buildOpencodeFlatHooksArtifact(),
       rules: { supported: false },
       commands: { supported: false },
     },

@@ -1,12 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { AIDD_DIR } from "../../../kernel/paths.js";
+import { AIDD_DIR, AIDD_MARKETPLACES_FILENAME } from "../../../kernel/paths.js";
 import type { MarketplaceScope } from "../../../kernel/scope.js";
 import { userConfigDir } from "../../../runtime/user-config-dir.js";
 import { Marketplace, type MarketplaceData } from "../domain/marketplace.js";
 import type { MarketplaceRegistry } from "../domain/ports/marketplace-registry.js";
 
-const REGISTRY_FILENAME = "marketplaces.json";
 const SCHEMA_VERSION = 1;
 
 interface RegistryFile {
@@ -67,11 +66,11 @@ export class MarketplaceRegistryAdapter implements MarketplaceRegistry {
   }
 
   private projectPath(projectRoot: string): string {
-    return join(projectRoot, AIDD_DIR, REGISTRY_FILENAME);
+    return join(projectRoot, AIDD_DIR, AIDD_MARKETPLACES_FILENAME);
   }
 
   private userPath(): string {
-    return join(userConfigDir(), REGISTRY_FILENAME);
+    return join(userConfigDir(), AIDD_MARKETPLACES_FILENAME);
   }
 
   private async read(path: string, scope: MarketplaceScope): Promise<Marketplace[]> {

@@ -4,7 +4,12 @@ import {
   type MergeFileEntry,
   removeEntriesFromJson,
 } from "../../../kernel/merge.js";
-import { AIDD_DIR } from "../../../kernel/paths.js";
+import {
+  AIDD_CONFIG_FILENAME,
+  AIDD_DIR,
+  AIDD_MARKETPLACES_FILENAME,
+  PLUGIN_CACHE_SUBDIR,
+} from "../../../kernel/paths.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";
 import type { Logger } from "../../../kernel/ports/logger.js";
@@ -52,9 +57,32 @@ export class CleanUseCase {
     const dryRunResult = await this.confirmOrDryRun(options, preview);
     if (dryRunResult !== null) return dryRunResult;
     const deleted = await this.deleteAllToolFiles(manifest, options.projectRoot);
-    await this.fs.deleteDirectory(join(options.projectRoot, AIDD_DIR));
+    await this.removeAiddState(options.projectRoot);
     await this.gitignoreUseCase.remove(options.projectRoot, [`${AIDD_DIR}/cache/`]);
     return { dryRun: false, manifestFound: true, preview, fileCount: deleted };
+  }
+
+  // config.json is the committed telemetry switch: a file clean did not write,
+  // so clean never removes it. Everything AIDD did write must go before the
+  // emptiness check, or its own presence blocks a removal that should happen —
+  // the registry `marketplace add` writes included, which is a file and was
+  // missed while only the directories were listed.
+  private async removeAiddState(projectRoot: string): Promise<void> {
+    const aiddDir = join(projectRoot, AIDD_DIR);
+    const configKept = await this.fs.fileExists(join(aiddDir, AIDD_CONFIG_FILENAME));
+
+    await this.fs.deleteDirectory(join(aiddDir, "cache"));
+    await this.fs.deleteDirectory(join(projectRoot, PLUGIN_CACHE_SUBDIR));
+    await this.fs.deleteFile(join(aiddDir, AIDD_MARKETPLACES_FILENAME));
+    await this.manifestRepo.delete();
+
+    if (!(await this.fs.fileExists(aiddDir))) return;
+    const remaining = await this.fs.listDirectory(aiddDir);
+    if (remaining.length === 0) {
+      await this.fs.deleteDirectory(aiddDir);
+      return;
+    }
+    if (configKept) this.logger.info(`Kept ${AIDD_DIR}/${AIDD_CONFIG_FILENAME}`);
   }
 
   private buildPreview(manifest: Manifest): CleanPreview {

@@ -17,7 +17,11 @@ import {
 import type { FileReader } from "../../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../../kernel/ports/file-writer.js";
 import type { PluginPresence, ToolBuildContract } from "../../build-contract.js";
-import { mergeCodexFrameworkHooksJson } from "../../formats/flat-hooks-merge.js";
+import {
+  mergeCodexFrameworkHooksJson,
+  renameCodexHookEvents,
+} from "../../formats/flat-hooks-merge.js";
+import { PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token.js";
 import { buildCodexMarketplace, buildCodexMarketplaceEntry } from "../../marketplace-catalog.js";
 import { codexAgentMarkdownToToml } from "./codex-agent-toml.js";
 import {
@@ -140,9 +144,8 @@ export function buildCodexContract(): ToolBuildContract {
   const manifestRelative = OUTPUT_CODEX_MANIFEST_RELATIVE;
   const marketplaceRelative = OUTPUT_CODEX_MARKETPLACE_RELATIVE;
   // Split literal to avoid biome's noTemplateCurlyInString warning.
-  const codexToken = "$" + "{PLUGIN_ROOT}";
   return {
-    pluginRootToken: codexToken,
+    pluginRootToken: PLUGIN_ROOT_TOKEN,
     manifestFileRelative: manifestRelative,
     synthesizeManifest: buildCodexManifest,
     manifestSchemaName: "codex-plugin-manifest",
@@ -169,6 +172,11 @@ export function buildCodexContract(): ToolBuildContract {
         supported: true,
         source: { kind: "hooksBundle", jsonPath: "hooks/hooks.json", scriptDir: "hooks" },
         path: (_p, rel) => rel,
+        // The same rename the merged install route applies. Codex has no `Stop`, so without
+        // this the built tree subscribes the turn-end hook to an event that never arrives
+        // and the turn is never closed, in silence.
+        transform: (content, _plugin, base) =>
+          base === "hooks.json" ? renameCodexHookEvents(content) : content,
       },
       rules: { supported: false },
       commands: { supported: false },

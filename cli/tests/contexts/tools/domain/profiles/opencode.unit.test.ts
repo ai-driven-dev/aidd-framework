@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { opencode } from "../../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
 import { OpencodeDualConfigError } from "../../../../../src/kernel/errors.js";
+import { FileHash } from "../../../../../src/kernel/file.js";
 import type { FileReader } from "../../../../../src/kernel/ports/file-reader.js";
 
 function makeFs(existingPaths: string[]): FileReader {
   return {
     fileExists: async (path: string) => existingPaths.some((p) => path.endsWith(p)),
-  } as unknown as FileReader;
+    isExecutable: async () => false,
+    readFile: async () => "",
+    readFileHash: async () => new FileHash("00000000000000000000000000000000"),
+    listDirectory: async () => [],
+    listFilesRecursive: async () => [],
+  };
 }
 
 describe("opencode", () => {

@@ -32,11 +32,34 @@ const BASELINE: readonly { readonly path: string; readonly injected: number }[] 
   { path: "src/contexts/framework/application/setup-use-case.ts", injected: 6 },
 ];
 
+/**
+ * Every type this module imports from a `*-use-case.ts` module.
+ *
+ * Counting by the `UseCase` suffix alone was blind, and measurably so: naming a
+ * collaborator by the narrow interface its own module exports — `PluginAdd` rather than
+ * `PluginAddUseCase` — took three collaborators off `setup-use-case.ts`'s count without
+ * removing one. What makes something a use case is where it is declared, not how it reads.
+ */
+function useCaseTypesImportedBy(source: string): ReadonlySet<string> {
+  const named = new Set<string>();
+  for (const line of source.matchAll(/import type \{([^}]*)\} from "([^"]*)";/g)) {
+    if (!line[2].endsWith("-use-case.js")) continue;
+    for (const name of line[1].split(",")) {
+      const cleaned = name.replace(/\btype\b/, "").trim();
+      if (cleaned) named.add(cleaned);
+    }
+  }
+  return named;
+}
+
 function injectedUseCaseCount(source: string): number {
   const signature = /constructor\((.*?)\)\s*\{/s.exec(source);
   if (!signature) return 0;
+  const fromUseCaseModules = useCaseTypesImportedBy(source);
   const params = [...signature[1].matchAll(/private readonly \w+:\s*([\w<>[\]| ]+)/g)];
-  return params.filter((param) => param[1].includes("UseCase")).length;
+  return params.filter(
+    (param) => param[1].includes("UseCase") || fromUseCaseModules.has(param[1].trim())
+  ).length;
 }
 
 /** Where a use case lives: inside a context's application layer. */

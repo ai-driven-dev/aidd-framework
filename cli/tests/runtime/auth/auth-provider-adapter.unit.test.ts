@@ -10,7 +10,10 @@ import { describe, expect, it } from "vitest";
 import { AuthenticationError } from "../../../src/kernel/errors.js";
 import type { AuthConfig } from "../../../src/runtime/auth/auth.js";
 import { AuthProviderAdapter } from "../../../src/runtime/auth/auth-provider-adapter.js";
-import type { AuthStorage } from "../../../src/runtime/auth/auth-storage.js";
+import type {
+  CredentialFileSaveOptions,
+  CredentialFileStore,
+} from "../../../src/runtime/auth/ports/credential-file-store.js";
 import type {
   CliAuthProvider,
   TokenAuthProvider,
@@ -18,17 +21,13 @@ import type {
 
 const PROJECT_ROOT = "/work/project";
 
-interface Saved {
-  credential: { method: string; token?: string; provider?: string };
-  level: string;
-  projectRoot: string;
-}
+type Saved = CredentialFileSaveOptions;
 
-function storage(active: AuthConfig | null = null) {
+function storage(active: AuthConfig | null = null): CredentialFileStore & { saves: Saved[] } {
   const saves: Saved[] = [];
-  const fake = {
+  return {
     saves,
-    save: async (options: Saved) => {
+    save: async (options) => {
       saves.push(options);
     },
     readActive: async () => active,
@@ -37,7 +36,6 @@ function storage(active: AuthConfig | null = null) {
     projectConfigPath: () => `${PROJECT_ROOT}/.aidd/auth.json`,
     userConfigPath: () => "/home/user/.config/aidd/auth.json",
   };
-  return fake as unknown as AuthStorage & { saves: Saved[] };
 }
 
 function tokenVerifier(login = "token-user"): TokenAuthProvider & { seen: string[] } {

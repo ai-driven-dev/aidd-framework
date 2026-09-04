@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { Marketplace } from "../../../../../src/contexts/distribution/domain/marketplace.js";
 import { MarketplaceSyncSettingsUseCase } from "../../../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
 import { ModeAMarketplaceTranslator } from "../../../../../src/contexts/framework/application/framework/translator/mode-a-marketplace-translator.js";
-import type { EnsureBuiltMarketplaceUseCase } from "../../../../../src/contexts/framework/application/shared/ensure-built-marketplace-use-case.js";
+import type { EnsureBuiltMarketplace } from "../../../../../src/contexts/framework/application/shared/ensure-built-marketplace-use-case.js";
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
 import { PluginDistribution } from "../../../../../src/contexts/translate/domain/plugin-distribution.js";
 import { CapturingLogger } from "../../../../helpers/ports/capturing-logger.js";
@@ -33,7 +33,7 @@ interface SyncSetup {
   readonly settings?: string;
   /** Marketplaces to register; the first is the one plugins are attached to. */
   readonly marketplaceNames?: readonly string[];
-  readonly ensureBuilt?: EnsureBuiltMarketplaceUseCase;
+  readonly ensureBuilt?: EnsureBuiltMarketplace;
   /** Whether the tool's own CLI enables plugins, which decides what it registers. */
   readonly enablesPlugins?: boolean;
 }
@@ -69,28 +69,24 @@ async function sync(setup: SyncSetup = {}) {
   }
   if (setup.settings !== undefined) await fs.writeFile(SHARED_SETTINGS, setup.settings);
 
+  const activator = new FakeNativePluginActivator({
+    available: true,
+    enablesPlugins: setup.enablesPlugins ?? false,
+  });
   const useCase = new MarketplaceSyncSettingsUseCase(
     fs,
     manifestRepo,
     registry,
     new DeterministicHasher(),
     logger,
-    new Map([
-      [
-        "claude",
-        new FakeNativePluginActivator({
-          available: true,
-          enablesPlugins: setup.enablesPlugins ?? false,
-        }),
-      ],
-    ]),
+    new Map([["claude", activator]]),
     setup.ensureBuilt ?? fakeEnsureBuiltMarketplace()
   );
   const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
   const written = (await fs.fileExists(SHARED_SETTINGS))
     ? (JSON.parse(await fs.readFile(SHARED_SETTINGS)) as Record<string, unknown>)
     : undefined;
-  return { result, written, logger, fs };
+  return { result, written, logger, fs, activator };
 }
 
 /**
@@ -170,13 +166,12 @@ describe("the settings file a user also edits", () => {
  * `buildAllForTool` — `builtSourcesForTool` when this was written — had seven mutants and no test killed one.
  */
 describe("a marketplace that will not build", () => {
-  const failingBuild = (failFor: string): EnsureBuiltMarketplaceUseCase =>
-    ({
-      execute: async (options: { marketplace: { name: string }; target: string }) => {
-        if (options.marketplace.name === failFor) throw new Error("no catalog at that source");
-        return { builtDir: `/built/${options.target}`, version: "test", rebuilt: true };
-      },
-    }) as unknown as EnsureBuiltMarketplaceUseCase;
+  const failingBuild = (failFor: string): EnsureBuiltMarketplace => ({
+    execute: async (options) => {
+      if (options.marketplace.name === failFor) throw new Error("no catalog at that source");
+      return { builtDir: `/built/${options.target}`, version: "test", rebuilt: true };
+    },
+  });
 
   it("says which marketplace and which tool were skipped", async () => {
     const { logger } = await sync({
@@ -214,15 +209,13 @@ describe("a marketplace no plugin points at", () => {
   it("is still built", async () => {
     const built: string[] = [];
 
-    const recordingBuild = {
-      execute: async (options: { marketplace: { name: string }; target: string }) => {
+    const recordingBuild: EnsureBuiltMarketplace = {
+      execute: async (options) => {
         built.push(options.marketplace.name);
         return { builtDir: `/built/${options.target}`, version: "test", rebuilt: true };
       },
-    } as unknown as EnsureBuiltMarketplaceUseCase;
+    };
 
-    // With the tool's CLI enabling plugins, it registers only the marketplaces a plugin
-    // points at, so "unused" is built here or nowhere.
     await sync({
       marketplaceNames: ["aidd-framework", "unused"],
       ensureBuilt: recordingBuild,
@@ -230,5 +223,19 @@ describe("a marketplace no plugin points at", () => {
     });
 
     expect(built).toContain("unused");
+  });
+  it("is registered anyway, whether or not the tool enables its own plugins", async () => {
+    // Declaring a marketplace and installing a plugin from it are two acts, and a person
+    // does the first alone all the time. Reading `enableVerb` as "this tool learns its
+    // marketplaces while enabling a plugin" left a marketplace nobody had installed from
+    // unknown to the tool — measured against the real `claude` binary by
+    // `scripts/smoke-tools.sh` ("claude declares the project marketplace at local scope"),
+    // which found it told about neither of the two the project had registered.
+    const { activator } = await sync({
+      marketplaceNames: ["aidd-framework", "unused"],
+      enablesPlugins: true,
+    });
+
+    expect(activator.addedMarketplaces).toHaveLength(2);
   });
 });
