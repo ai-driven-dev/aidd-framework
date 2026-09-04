@@ -52,6 +52,17 @@ import { namesTheSameSkill } from "./skill-name.js";
  * OpenCode names no skill at all on any route (`opencode.cjs`'s own `stepStart: null` - the
  * same limit `bySteps` already lives with), so no third spelling exists to add.
  */
+/** How a record's flow came to be known - the same three-way shape `by_step` carries, and
+ * for the same reason: a flow an interval placed a record inside and one the record's own
+ * tool named are two different claims, and merging them presents an inference as a
+ * measurement.
+ *
+ * Narrower than `StepAttributionSource`, deliberately. `prompt-matched` resolves a step
+ * from the prompt a `step_start` line was opened under, which names a step and never a
+ * flow; carrying a value nothing here can produce would invite a consumer to handle a case
+ * that cannot arise. */
+export type FlowAttributionSource = "journal-interval" | "tool-stated" | "unattributed";
+
 export const ORCHESTRATING_SKILLS: ReadonlySet<string> = new Set([
   "aidd-orchestrator:00-async-dev",
   "00-async-dev",

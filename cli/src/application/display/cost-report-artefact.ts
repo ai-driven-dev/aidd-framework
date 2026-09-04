@@ -282,21 +282,40 @@ function backlogArtefact(envelope: CostReportEnvelope): string {
 const OUTSIDE_EVERY_FLOW_LABEL = "outside any flow";
 
 /** What this axis cannot tell apart, printed with the figures rather than left in a doc
- * comment no reader of a report ever opens. Both are standing properties of reading a flow
- * out of the journal, never a damaged read the way `caveats()`'s own lines are - which is
- * why they are assembled here and not there.
+ * comment no reader of a report ever opens. Every line here is a standing property of how a
+ * flow is read, never a damaged read the way `caveats()`'s own lines are - which is why they
+ * are assembled here and not there.
  *
- * Only when a named flow row exists: with no flow in the period, neither limit has bitten
- * anything, and a report that lists what could have gone wrong with an answer it did not
- * give is noise. */
+ * Each set is gated on a row it actually describes being present. A limit is a statement
+ * about a mechanism that ran: printing the journal's own two for a period whose only flow
+ * came from a record's own tool would name a reading nothing here performed, and a report
+ * that lists what could have gone wrong with an answer it did not give is noise. */
 function flowLimits(envelope: CostReportEnvelope): readonly string[] {
-  if (!envelope.by_flow.some((row) => row.flow !== undefined)) return [];
+  return [...journalFlowLimits(envelope), ...toolStatedFlowLimits(envelope)];
+}
+
+/** Both properties of walking the journal's own step sequence, so both are gated on a row
+ * that walk produced. */
+function journalFlowLimits(envelope: CostReportEnvelope): readonly string[] {
+  if (!envelope.by_flow.some((row) => row.attribution === "journal-interval")) return [];
   return [
     "a skill run by hand while a flow was open is counted inside it: the orchestrator's own " +
       "call and a person's write the identical step_start line",
     `a skill of this project named ${orAny(bareOrchestratingSkillNames())} opens a flow of ` +
       "its own: outside a plugin a host names a skill by its folder alone, and this axis " +
       "has only that name to go on",
+  ];
+}
+
+/** The one property of a flow no interval bounded: it is a name, and a name cannot say how
+ * many runs it stands for. Stated wherever such a row is printed, because a reader who takes
+ * it for a single run reads its total as one orchestration's cost. */
+function toolStatedFlowLimits(envelope: CostReportEnvelope): readonly string[] {
+  if (!envelope.by_flow.some((row) => row.attribution === "tool-stated")) return [];
+  return [
+    "a flow only a record's own tool named is every run of that skill at once: its journal " +
+      "opened no flow to bound one run from the next, so the row has no opening moment and " +
+      "its total is not one orchestration's",
   ];
 }
 
@@ -308,23 +327,26 @@ function orAny(names: readonly string[]): string {
   return `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
 }
 
-/** A third column beside the generic `table()` helper's two, for the same reason
+/** Two columns beside the generic `table()` helper's two, for the same reason
  * `stepArtefact` carries one: two rows can share a `flow` name - the same orchestrating
- * skill run twice in one session - and this table must never let the two read as one run
- * double-counted. `startedAt` is what tells them apart; the row for work outside every
- * flow carries neither and prints an em dash the same way `taskArtefact` does for a
- * reason-only row's own missing attribution. */
+ * skill run twice in one session, or a run the journal witnessed beside one only the tool
+ * named - and this table must never let them read as one flow double-counted. `Attribution`
+ * and `Opened at` are what tell them apart; a `tool-stated` row is a bucket drawn from
+ * however many runs the tool named, so it has no single opening moment and prints an em
+ * dash there, as does the row for work outside every flow - the same way `taskArtefact`
+ * does for a reason-only row's own missing attribution. */
 function flowArtefact(envelope: CostReportEnvelope): string {
   const rows = envelope.by_flow.map((row) => {
     const flow = row.flow ?? OUTSIDE_EVERY_FLOW_LABEL;
     const openedAt = row.started_at ?? "—";
-    return `| ${flow} | ${openedAt} | ${figure(row.totals, envelope)} |`;
+    const attribution = ATTRIBUTION_LABELS[row.attribution];
+    return `| ${flow} | ${attribution} | ${openedAt} | ${figure(row.totals, envelope)} |`;
   });
   return [
     header(envelope, "by flow"),
     "",
-    "| Flow | Opened at | Total |",
-    "| --- | --- | --- |",
+    "| Flow | Attribution | Opened at | Total |",
+    "| --- | --- | --- | --- |",
     ...rows,
     ...flowLimits(envelope),
     ...caveats(envelope),

@@ -13,6 +13,10 @@ import { createTestEnv, gitInit, runCli } from "./helpers.js";
  */
 const RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FBY";
 const VENDOR_ID = "66666666-6666-4666-8666-666666666666";
+// A second session with no run journal on disk at all - the shape a session resumed after
+// its context was compacted leaves behind: nothing is invoked again, so no `step_start`
+// hook fires, while the transcript goes on stating the step on every record it produces.
+const NO_JOURNAL_VENDOR_ID = "77777777-7777-4777-8777-777777777777";
 const PROJECT_ID = "acme/widgets";
 const PERIOD = ["--from", "2026-03-01", "--to", "2026-03-31"];
 
@@ -71,10 +75,28 @@ const RECORDS = [
   }),
   // Inside the second, distinct sdlc run.
   record({ turn_id: "second-run", event_timestamp: "2026-03-10T10:10:00Z", cost_usd: 4 }),
+  // A session whose journal opened no flow, whose own tool named the orchestrating skill.
+  record({
+    vendor_id: NO_JOURNAL_VENDOR_ID,
+    turn_id: "stated-one",
+    event_timestamp: "2026-03-11T09:00:00Z",
+    cost_usd: 6,
+    step_attribution: "tool-stated",
+    step: "aidd-orchestrator:01-sdlc",
+  }),
+  record({
+    vendor_id: NO_JOURNAL_VENDOR_ID,
+    turn_id: "stated-two",
+    event_timestamp: "2026-03-11T10:00:00Z",
+    cost_usd: 7,
+    step_attribution: "tool-stated",
+    step: "aidd-orchestrator:01-sdlc",
+  }),
 ];
 
 interface FlowRow {
   readonly flow?: string;
+  readonly attribution: string;
   readonly started_at?: string;
   readonly totals: { readonly requests: number; readonly cost_micro_usd?: number };
 }
@@ -128,7 +150,11 @@ describe("aidd telemetry report — by_flow through the real adapter, on real di
     expect(result.exitCode, result.stderr).toBe(0);
     const envelope = JSON.parse(result.stdout) as Envelope;
 
-    const sdlcRuns = envelope.by_flow.filter((row) => row.flow === "aidd-orchestrator:01-sdlc");
+    // Only the runs the journal itself witnessed: the row a second session's own tool named
+    // shares the skill's name and is a different claim, told apart by `attribution`.
+    const sdlcRuns = envelope.by_flow.filter(
+      (row) => row.flow === "aidd-orchestrator:01-sdlc" && row.attribution === "journal-interval"
+    );
     expect(sdlcRuns).toHaveLength(2);
     expect(new Set(sdlcRuns.map((row) => row.started_at)).size).toBe(2);
     // The first run holds both the orchestrator's own record and the hand-run skill's -
@@ -176,7 +202,8 @@ describe("aidd telemetry report — by_flow through the real adapter, on real di
 
     const sum = envelope.by_flow.reduce((total, row) => total + row.totals.requests, 0);
     expect(sum).toBe(envelope.totals.requests);
-    expect(envelope.by_flow).toHaveLength(3); // outside-flow row + two distinct sdlc runs
+    // outside-flow row + two distinct sdlc runs + the run only the tool named
+    expect(envelope.by_flow).toHaveLength(4);
   });
 
   it("prints the flow axis through --axis, naming both runs and the outside-flow row", async () => {
@@ -192,5 +219,41 @@ describe("aidd telemetry report — by_flow through the real adapter, on real di
     expect(result.stdout).toContain("axis: by flow");
     expect(result.stdout).toContain("aidd-orchestrator:01-sdlc");
     expect(result.stdout).toContain("outside any flow");
+    // The table's own shape, not only the names in it: this artefact exists to be pasted,
+    // so a column added or dropped is a break for whatever reads the paste.
+    expect(result.stdout).toContain("| Flow | Attribution | Opened at | Total |");
+    // A tool-stated row prints its attribution and an em dash where a run would name its
+    // opening moment.
+    expect(result.stdout).toContain("| aidd-orchestrator:01-sdlc | stated by the tool | — |");
+  });
+
+  it("states the limit that belongs to each kind of flow row, and no other", async () => {
+    const { projectDir, fakeHome } = await seed();
+
+    const result = await runCli(
+      ["telemetry", "report", ...PERIOD, "--axis", "flow"],
+      projectDir,
+      fakeHome
+    );
+
+    // This period holds both kinds, so both sets of limits apply.
+    expect(result.stdout).toContain("a skill run by hand while a flow was open");
+    expect(result.stdout).toContain("is every run of that skill at once");
+  });
+
+  it("names the flow a session's own tool stated, where its journal opened none", async () => {
+    const { projectDir, fakeHome } = await seed();
+
+    const result = await runCli(["telemetry", "report", ...PERIOD, "--json"], projectDir, fakeHome);
+    const envelope = JSON.parse(result.stdout) as Envelope;
+
+    const stated = envelope.by_flow.find((row) => row.attribution === "tool-stated");
+    expect(stated?.flow).toBe("aidd-orchestrator:01-sdlc");
+    expect(stated?.totals.cost_micro_usd).toBe(13_000_000); // 6 + 7
+    // A name is not a run: the row is a bucket drawn from however many runs the tool named.
+    expect(stated?.started_at).toBeUndefined();
+    // And it never swallows the runs the journal did witness.
+    const witnessed = envelope.by_flow.filter((row) => row.attribution === "journal-interval");
+    expect(witnessed).toHaveLength(2);
   });
 });

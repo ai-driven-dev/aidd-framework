@@ -282,7 +282,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "by_project": [{ "project": "acme/widgets", "totals": {} }],   // a row with no `project` names none known
   "by_task":    [{ "task": "2026_08/2026_08_21_cost-reporter", "attribution": "declared", "totals": {} }, { "reason": "precedes-declaration", "totals": {} }],  // a row with no `task` carries `reason` instead, naming which of five facts applies; up to five such rows
   "by_backlog": [{ "backlog": "ai-driven-dev/framework#661", "totals": {} }, { "declaration": "none", "totals": {} }, { "declaration": "unreadable", "totals": {} }, { "reason": "precedes-declaration", "totals": {} }],  // a row with no `backlog` carries `declaration` (a known task naming none, or one whose declaration could not be read) or `reason` (a record in no task at all) — never both, never neither
-  "by_flow":    [{ "flow": "aidd-orchestrator:01-sdlc", "started_at": "2026-07-01T09:00:00Z", "totals": {} }, { "flow": "aidd-orchestrator:01-sdlc", "started_at": "2026-07-01T11:00:00Z", "totals": {} }, { "totals": {} }],  // two runs of the same skill are two rows, told apart by `started_at`; the last row is work that fell in no flow interval at all
+  "by_flow":    [{ "flow": "aidd-orchestrator:01-sdlc", "attribution": "journal-interval", "started_at": "2026-07-01T09:00:00Z", "totals": {} }, { "flow": "aidd-orchestrator:01-sdlc", "attribution": "journal-interval", "started_at": "2026-07-01T11:00:00Z", "totals": {} }, { "flow": "aidd-orchestrator:01-sdlc", "attribution": "tool-stated", "totals": {} }, { "attribution": "unattributed", "totals": {} }],  // two runs of the same skill are two rows, told apart by `started_at`; a `tool-stated` row is every run of that skill only the record's own tool named, so it carries no `started_at`; the last row is work that joined neither
   "by_day":     [{ "day": "2026-07-01", "totals": {} }],         // every day in the period, in order, gaps included
   "by_person":  [{ "resolution": "mapped", "person": "a-person-id", "identities": ["a-person-id", "a-machine-id"], "totals": {} }],  // mapped rows first, then every unplaced identity, then the one row for records carrying none
   "attribution": [{ "attribution": "tool-stated", "totals": {} }],
@@ -437,8 +437,10 @@ unrelated to a task: `aidd-orchestrator:01-sdlc` running end to end is one flow,
 tasks or backlog items it touched along the way. Nothing new is captured for it. Skill
 detection already writes a `step_start` line for any skill, orchestrating or not (the same
 lines `by_step` reads), so a flow is *read* from that sequence, never declared by a hook:
-one flow opens at an orchestrating skill's own `step_start` and closes at whichever of the
-next orchestrating `step_start` or a `turn_end` comes first.
+one flow opens at an orchestrating skill's own `step_start` and closes at a `step_end`
+naming that same skill, at the next orchestrating `step_start`, or — for a flow nothing ever
+closes — at the journal's own last witnessed moment. A `turn_end` is a pause, not a close: a
+flow spanning three prompts is exactly the case a `turn_end` used to cut short.
 
 **Which skills orchestrate is declared, once, never matched from a plugin string.** No
 skill's own frontmatter says it orchestrates, and more than one skill in this framework's
@@ -448,15 +450,34 @@ argument-stated name and a bare directory name — see that module's own doc com
 why both exist) — extending it for a project's own orchestrator is the one change adding a
 new one to this axis ever needs.
 
-A row's `flow` names the orchestrating skill; `started_at` names the moment it opened. Both
-are needed to tell two rows apart: **two orchestrated runs of the same skill in one session
-are two rows, never merged into one** — `by_flow` groups by the closed interval a record's
-own moment falls inside, not by the skill's name alone, the same distinction `by_step`
-already draws between a step reached by two different routes. A row with neither field is
-every record whose own moment fell in no flow interval at all — work before the first
-orchestrating step, or between one flow's `turn_end` and the next flow's own opening. There
-is no `reason` breakdown the way `by_task`'s remainder has one: a flow is read from the same
-sequence whichever way a record misses it, so there is only ever the one fact to state.
+A row's `flow` names the orchestrating skill, `attribution` says how that flow came to be
+known, and `started_at` names the moment it opened. All three tell two rows apart: **two
+orchestrated runs of the same skill in one session are two rows, never merged into one** —
+an `attribution: "journal-interval"` row groups by the closed interval a record's own moment
+falls inside, not by the skill's name alone, the same distinction `by_step` already draws
+between a step reached by two different routes. A row with no `flow` at all, carrying
+`attribution: "unattributed"`, is every record that joined neither an interval nor a stated
+flow. There is no `reason` breakdown the way `by_task`'s remainder has one: a flow is read
+from the same sequence whichever way a record misses it, so there is only ever the one fact
+to state.
+
+**A flow a record's own tool named is a flow.** A session resumed after its context was
+compacted invokes nothing again, so no `step_start` hook fires and its journal opens no flow
+— while the transcript goes on stating the step on every record it produces. A record no
+interval covers, whose own `step_attribution` is `tool-stated` and whose `step` names an
+orchestrating skill, joins a row for that skill carrying `attribution: "tool-stated"`. That
+row has no `started_at`: it is a bucket drawn from however many runs of that skill the tool
+named, and a name is not a run. Only the tool's own statement opens such a row — a
+`journal-interval` step is an inference from the very intervals already checked, and a
+`prompt-matched` one names a step rather than an orchestration.
+
+**An interval wins over a stated flow, and the reason is granularity, not strength.** Where
+a record falls inside an interval, that interval's row is the one it joins, even though its
+tool stated the same skill. Elsewhere the preference runs the other way — `withStepBackfill`
+prefers a tool-stated step over a journal-interval one — and the two are not in conflict,
+because they answer different questions. There the question is *which skill*, and the tool
+naming its own beats an inference from a moment. Here the question is *which run*, and only
+an interval can say.
 
 **A skill a person runs by hand while a flow is open counts inside it.** The journal cannot
 tell a hand-run skill from one the orchestrator itself invoked — both write the identical

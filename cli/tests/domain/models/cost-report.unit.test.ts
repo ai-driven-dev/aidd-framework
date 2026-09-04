@@ -1268,6 +1268,141 @@ describe("buildCostReport — by_flow reads the journal's own sequence, nothing 
     expect(outside?.totals.requests).toBe(1);
   });
 
+  // A session resumed after its context was compacted invokes nothing again, so no
+  // `step_start` hook fires and its journal opens no flow - while the transcript goes on
+  // stating the step on every record it produces. Measured on this machine: one such
+  // session, six `step_end` lines, no `step_start`, and 2,220 records in a 30-day period
+  // that `by_flow` reported as belonging to no flow at all.
+  it("names the flow a record's own tool stated, where no interval covers it", () => {
+    const records: readonly TelemetrySinkRecord[] = [
+      request({
+        vendor_id: "s-no-journal",
+        cost_usd: 4,
+        event_timestamp: "2026-08-17T10:30:00Z",
+        step_attribution: "tool-stated",
+        step: "aidd-orchestrator:01-sdlc",
+      }),
+    ];
+
+    const built = report({ records, journals: [] });
+
+    const named = built.byFlows.find((row) => row.flow === "aidd-orchestrator:01-sdlc");
+    expect(named?.attribution).toBe("tool-stated");
+    expect(named?.totals.requests).toBe(1);
+    // A name is not a run: the row is a bucket drawn from every run of that skill the tool
+    // named, so it asserts no single moment the way an interval-derived row does.
+    expect(named?.startedAt).toBeUndefined();
+  });
+
+  it("keeps a record the journal witnessed on the interval's row, never the tool-stated one", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-both",
+        tool: "claude-code",
+        writtenPaths: [],
+        taskIntervals: [],
+        flowIntervals: [
+          {
+            skill: "aidd-orchestrator:01-sdlc",
+            startMs: Date.parse("2026-08-17T10:00:00Z"),
+            endMs: Date.parse("2026-08-17T11:00:00Z"),
+          },
+        ],
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({
+        vendor_id: "s-both",
+        cost_usd: 5,
+        event_timestamp: "2026-08-17T10:30:00Z",
+        step_attribution: "tool-stated",
+        step: "aidd-orchestrator:01-sdlc",
+      }),
+    ];
+
+    const built = report({ records, journals });
+
+    const rows = built.byFlows.filter((row) => row.flow === "aidd-orchestrator:01-sdlc");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.attribution).toBe("journal-interval");
+    expect(rows[0]?.startedAt).toBe("2026-08-17T10:00:00Z");
+  });
+
+  it("opens no flow for a tool-stated step that names no orchestrating skill", () => {
+    const records: readonly TelemetrySinkRecord[] = [
+      request({
+        vendor_id: "s-plain-skill",
+        cost_usd: 6,
+        event_timestamp: "2026-08-17T10:30:00Z",
+        step_attribution: "tool-stated",
+        step: "aidd-dev:01-plan",
+      }),
+    ];
+
+    const built = report({ records, journals: [] });
+
+    expect(built.byFlows.map((row) => row.flow)).toEqual([undefined]);
+    expect(built.byFlows[0]?.attribution).toBe("unattributed");
+  });
+
+  // An interval is the only thing that can say *which run*. A step the reader inferred from
+  // a moment says neither run nor, on its own, that a flow was ever orchestrated - so it
+  // opens no flow row, and only the tool's own statement does.
+  it("opens no flow for an orchestrating step the reader merely inferred", () => {
+    const records: readonly TelemetrySinkRecord[] = [
+      request({
+        vendor_id: "s-inferred",
+        cost_usd: 7,
+        event_timestamp: "2026-08-17T10:30:00Z",
+        step_attribution: "journal-interval",
+        step: "aidd-orchestrator:01-sdlc",
+      }),
+    ];
+
+    const built = report({ records, journals: [] });
+
+    expect(built.byFlows.map((row) => row.flow)).toEqual([undefined]);
+  });
+
+  it("reconciles by_flow to the same total when a tool-stated flow row is present", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-interval",
+        tool: "claude-code",
+        writtenPaths: [],
+        taskIntervals: [],
+        flowIntervals: [
+          {
+            skill: "aidd-orchestrator:01-sdlc",
+            startMs: Date.parse("2026-08-17T10:00:00Z"),
+            endMs: Date.parse("2026-08-17T11:00:00Z"),
+          },
+        ],
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({ vendor_id: "s-interval", cost_usd: 1, event_timestamp: "2026-08-17T10:30:00Z" }),
+      request({
+        vendor_id: "s-stated",
+        cost_usd: 2,
+        event_timestamp: "2026-08-17T12:00:00Z",
+        step_attribution: "tool-stated",
+        step: "aidd-orchestrator:02-backlog",
+      }),
+      request({ vendor_id: "s-neither", cost_usd: 3, event_timestamp: "2026-08-17T13:00:00Z" }),
+    ];
+
+    const built = report({ records, journals });
+
+    expect(built.byFlows).toHaveLength(3);
+    expect(sumOf(built.byFlows)).toEqual({
+      requests: built.totals.requests,
+      costMicroUsd: built.totals.costMicroUsd,
+      inputTokens: built.totals.inputTokens ?? 0,
+      outputTokens: built.totals.outputTokens ?? 0,
+    });
+  });
+
   it("reconciles by_flow to the same total as every other breakdown", () => {
     const journals: readonly CostReportSessionJournal[] = [
       {
