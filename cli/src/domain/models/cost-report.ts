@@ -690,7 +690,10 @@ function soleWrittenTaskOf(journal: CostReportSessionJournal | undefined): TaskI
 
 /** Whether this journal witnessed `momentIso` at all - never an unbounded yes for a journal
  * that carries no readable moment. */
-function witnessed(journal: CostReportSessionJournal | undefined, momentIso: string | undefined): boolean {
+function witnessed(
+  journal: CostReportSessionJournal | undefined,
+  momentIso: string | undefined
+): boolean {
   const span = journal?.witnessed;
   if (span === undefined || momentIso === undefined) return false;
   const momentMs = Date.parse(momentIso);

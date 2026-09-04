@@ -122,7 +122,10 @@ function witnessedSpan(journal: RunJournal): { fromMs: number; toMs: number } | 
   // landed inside the very second the journal last wrote. Measured, that rounding cost one
   // record of 1073 on a real session. The start needs no such widening: a truncated moment
   // already sits at the first instant of its own second.
-  return { fromMs: Math.min(...moments), toMs: Math.max(...moments) + LAST_MILLISECOND_OF_A_SECOND };
+  return {
+    fromMs: Math.min(...moments),
+    toMs: Math.max(...moments) + LAST_MILLISECOND_OF_A_SECOND,
+  };
 }
 
 function toSessionJournal(
