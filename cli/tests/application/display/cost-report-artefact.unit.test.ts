@@ -65,6 +65,22 @@ function onePersonMapping(): PersonIdentity {
 }
 
 describe("buildCostReportArtefact", () => {
+  // The row a declared identity now names retroactively. Rendered as that person, never as
+  // "nobody opted in": `personLabel` used to fall through to the no-identifier label for
+  // every resolution it did not name, so a value added to `PersonResolution` reached a
+  // reader as its opposite without the compiler saying a word.
+  it("names a row this machine's identity claims after that person, not as nobody", () => {
+    const envelope = envelopeOf({
+      records: [request({ turn_id: "a", event_timestamp: "2026-08-17T10:00:00Z" })],
+      identity: onePersonMapping(),
+    });
+
+    const artefact = buildCostReportArtefact(envelope, "person");
+
+    expect(artefact).toContain("Ada");
+    expect(artefact).not.toContain("nobody opted in");
+  });
+
   it("lists person among the known axes", () => {
     expect(ARTEFACT_AXES).toContain("person");
     expect(isArtefactAxis("person")).toBe(true);
@@ -143,9 +159,11 @@ describe("buildCostReportArtefact", () => {
     expect(unresolvedLines).toHaveLength(2);
   });
 
+  // No identity declared on this machine: only then is "nobody opted in" the truth for a
+  // record that carried no identifier. With one declared, that same record is this
+  // machine's own person - the case the test above pins.
   it("labels the no-identifier row distinctly from an unresolved one", () => {
     const envelope = envelopeOf({
-      identity: onePersonMapping(),
       records: [request({ turn_id: "a" }), request({ turn_id: "b", person_id: "a-stranger" })],
     });
 
