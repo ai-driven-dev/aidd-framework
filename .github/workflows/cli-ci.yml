@@ -13,6 +13,11 @@ on:
     paths:
       - "cli/**"
       - "kanban/**"
+      # This file. A change to how the suite runs - a worker pool, an exclusion, a step
+      # order - is a change nothing else in the filter matches, so without this the
+      # workflow that decides whether the suite passes never runs on the commit that
+      # changed it, and lands unverified.
+      - ".github/workflows/cli-ci.yml"
       # The plugin ships the hooks and skills these jobs exercise, and the Windows job
       # exists for them in particular - without this, changing any of it runs nothing.
       - "plugins/aidd-telemetry/**"
@@ -36,6 +41,11 @@ on:
     paths:
       - "cli/**"
       - "kanban/**"
+      # This file. A change to how the suite runs - a worker pool, an exclusion, a step
+      # order - is a change nothing else in the filter matches, so without this the
+      # workflow that decides whether the suite passes never runs on the commit that
+      # changed it, and lands unverified.
+      - ".github/workflows/cli-ci.yml"
       # The plugin ships the hooks and skills these jobs exercise, and the Windows job
       # exists for them in particular - without this, changing any of it runs nothing.
       - "plugins/aidd-telemetry/**"
@@ -289,9 +299,22 @@ jobs:
       # backslashes is not, and nothing but this catches it. Exclude it only for a reason as
       # concrete as the two below.
       - name: cli e2e
+        # `--max-workers=2`, and only here. Vitest transforms modules on its own main
+        # thread while every worker calls back into it (`onTaskUpdate` after each test),
+        # and that call has a fixed 60 s timeout no configuration exposes. On this runner
+        # - a slower filesystem than the Linux jobs, and an e2e test that spawns `node
+        # dist/cli.js` inside every worker - the default pool (one fork per CPU but one)
+        # queued that main thread past 60 s, and the step failed with `[vitest-worker]:
+        # Timeout calling "onTaskUpdate"` while every test passed: 39 files, 279 tests, 0
+        # failures, exit 1. Measured on five runs between 2026-09-02 and 2026-09-04,
+        # including three plain merges to `next` and one re-run of the same commit, so it
+        # is neither a branch nor a one-off. A fixed pool of two caps the transform
+        # requests competing for that thread whatever the runner's core count - a figure
+        # the job log does not state, so nothing here assumes one. The Linux jobs keep the
+        # default: they have never produced this, and slowing them down would buy nothing.
         run: |
           cd cli
-          pnpm exec vitest run --project=e2e \
+          pnpm exec vitest run --project=e2e --max-workers=2 \
             --exclude "tests/e2e/persona.e2e.test.ts" \
             --exclude "tests/e2e/telemetry-multi-tool.e2e.test.ts"
         # persona.e2e.test.ts hardcodes /usr/bin/expect for TTY emulation, which windows-latest
