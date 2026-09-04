@@ -391,6 +391,23 @@ plugin alongside the step name; a journal interval never carries a plugin at
 all, so `step_plugin` is absent whenever `step_attribution` is
 `"journal-interval"`, even though `step` itself is present there.
 
+**A journal interval ends where the journal says, and only a skill can say it.** The
+interval runs from the `step_start` a skill's invocation wrote to the first of: a `step_end`
+line naming that same skill, another `step_start`, or a `turn_end`. Only the first of those
+is the end itself; the other two stand in for it. That matters because a `turn_end` is a
+**pause** — a skill working across three prompts is credited with its first turn and nothing
+after — and nothing any host emits says when a skill's work finished. Measured: a `Skill`
+tool call's own `tool_result` returns about a tenth of a second after the call, which is the
+dispatch, not the completion. So a skill declares its own end through a tool call it makes,
+carrying `aidd:step-end <skill>` in that call's arguments, and the hook writes the line. An
+end naming a skill the session never started closes nothing, and an end never closes a step
+other than the one it names — a skill invoking another must not end it.
+
+A step whose interval was closed by a stated `step_end` still reads `"journal-interval"`, not
+a stronger value: the record was still placed by its moment falling inside a span, which is
+the inference that value names. What the end changes is the span, never how the record met
+it.
+
 **`step_attribution: "unattributed"` does not mean "this request ran outside any
 step."** Claude Code's own attribution field is omitted from its transcript both
 when no skill was running and when the running Claude Code version predates the

@@ -25,7 +25,21 @@ export interface RunJournalTurnEnd {
   readonly at: string;
 }
 
-export type RunJournalBoundary = RunJournalStepStart | RunJournalTurnEnd;
+/** One `step_end` line: the moment a skill said its own work was over, and the skill it
+ * says it for. Mirrors `plugins/aidd-telemetry/hooks/lib/record.cjs`'s `buildStepEndLine`.
+ *
+ * The one thing about a step no host emits, which is why the skill declares it and the hook
+ * writes it (`plugins/aidd-telemetry/hooks/lib/step-ends.cjs`). Carries its skill, and closes only that skill's own
+ * open interval: closing "whatever is open" would close the wrong one the moment a skill
+ * invokes another, and an end naming a skill this session never started closes nothing at
+ * all rather than truncating whatever was running. */
+export interface RunJournalStepEnd {
+  readonly type: "step_end";
+  readonly at: string;
+  readonly skill: string;
+}
+
+export type RunJournalBoundary = RunJournalStepStart | RunJournalTurnEnd | RunJournalStepEnd;
 
 /** The `session_start` line: the one line naming what a session was. `tool` holds the
  * journal hook's own host identifier ("claude-code", "codex", "copilot", "cursor"), which

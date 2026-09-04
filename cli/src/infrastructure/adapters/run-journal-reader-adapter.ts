@@ -67,15 +67,19 @@ function parseLine(line: string): RawJournalLine | null {
   }
 }
 
-/** One `step_start` or `turn_end` line, or `null` for every other line type and every line
+/** One `step_start`, `turn_end` or `step_end` line, or `null` for every other line type and every line
  * this file cannot parse — a torn final line from a session still in progress reads as
  * nothing, not as a boundary at the wrong moment. */
 function parseBoundary(parsed: RawJournalLine): RunJournalBoundary | null {
   const at = asString(parsed.at);
   if (at === undefined) return null;
   if (parsed.type === "turn_end") return { type: "turn_end", at };
-  const skill = parsed.type === "step_start" ? asString(parsed.skill) : undefined;
+  const skill = asString(parsed.skill);
   if (skill === undefined) return null;
+  // An end with no skill is dropped rather than read as a bare boundary: it would close a
+  // step it cannot name, which is the one thing `RunJournalStepEnd` exists to prevent.
+  if (parsed.type === "step_end") return { type: "step_end", at, skill };
+  if (parsed.type !== "step_start") return null;
   const turnId = asString(parsed.turn_id);
   return { type: "step_start", at, skill, ...(turnId === undefined ? {} : { turn_id: turnId }) };
 }
