@@ -28,6 +28,7 @@ import type { CLIOutput } from "../output.js";
  * reading would be a fact this layer invented. */
 export const ATTRIBUTION_LABELS: Record<StepAttributionSource, string> = {
   "tool-stated": "stated by the tool",
+  "prompt-matched": "matched on the prompt",
   "journal-interval": "from a journal interval",
   unattributed: "unattributed",
 };
@@ -56,11 +57,15 @@ export const BACKLOG_DECLARATION_LABELS: Record<"none" | "unreadable", string> =
 };
 
 /** Printed where a figure is genuinely not known, never as `$0.00`. A tool whose own files
- * carry no amount has an unknown cost, not a free one. */
-const UNKNOWN_AMOUNT = "amount unknown";
+ * carry no amount has an unknown cost, not a free one. Exported so another renderer of the
+ * same report — the interactive telemetry screen — prints the identical words rather than
+ * a second literal that could drift from this one. */
+export const UNKNOWN_AMOUNT = "amount unknown";
 /** A covered tool with no records, and a wholly unfiltered period with none at all.
  * Distinct from both an unknown amount and a zero: this one really did measure nothing,
- * and saying so is the only reading the records support. */
+ * and saying so is the only reading the records support. Not exported: every reader outside
+ * this module reaches this string through `nothingLabel`, which decides between this and
+ * `NOTHING_IN_SELECTION` — never through the literal itself. */
 const NOTHING_MEASURED = "nothing in this period";
 /** The same zero, under a selection narrower than the whole period. `task` and every
  * generic filter already narrow the record set before any breakdown is computed, so a
@@ -81,18 +86,21 @@ const NO_KNOWN_MODEL = "no known model";
 // render.cjs's own MAX_PRINTED_DAYS: the byte-compare e2e test holds the two to it.
 const MAX_PRINTED_DAYS = 31;
 
-function formatCount(value: number): string {
+/** Exported alongside `formatAmount` and `totalTokens` so the interactive telemetry screen
+ * renders the same figures this text report does, rather than a second formatting routine
+ * that could read a count differently from this one. */
+export function formatCount(value: number): string {
   return value.toLocaleString("en-US");
 }
 
-function formatAmount(microUsd: number): string {
+export function formatAmount(microUsd: number): string {
   return `$${fromMicroUsd(microUsd).toFixed(2)}`;
 }
 
 /** Every token a record counted, across the four disjoint counters — a tool's `input` is
  * exclusive of its cache figures on every reader here, so adding them counts nothing
- * twice. */
-function totalTokens(totals: CostTotals): number {
+ * twice. Exported for the same reason `formatCount` is. */
+export function totalTokens(totals: CostTotals): number {
   return (
     (totals.inputTokens ?? 0) +
     (totals.outputTokens ?? 0) +
@@ -103,14 +111,18 @@ function totalTokens(totals: CostTotals): number {
 
 /** What a share is taken of. Cost where the period has one, tokens where it does not — a
  * period made only of tools that carry no amount still breaks down, by the quantity it
- * does have. Named in the output so nobody has to guess which. */
-function shareBasis(totals: CostTotals): { readonly label: string; readonly of: number } {
+ * does have. Named in the output so nobody has to guess which. Exported so the interactive
+ * telemetry screen takes a row's share by the identical rule this text report already
+ * applies to every breakdown, rather than a second percentage rule that could drift from
+ * this one. */
+export function shareBasis(totals: CostTotals): { readonly label: string; readonly of: number } {
   return totals.costMicroUsd === undefined
     ? { label: "of tokens", of: totalTokens(totals) }
     : { label: "of cost", of: totals.costMicroUsd };
 }
 
-function shareOf(totals: CostTotals, basis: number, useCost: boolean): string {
+/** Exported for the same reason `shareBasis` is. */
+export function shareOf(totals: CostTotals, basis: number, useCost: boolean): string {
   if (basis === 0) return "  - ";
   const part = useCost ? (totals.costMicroUsd ?? 0) : totalTokens(totals);
   return `${Math.round((part / basis) * 100)
@@ -118,8 +130,21 @@ function shareOf(totals: CostTotals, basis: number, useCost: boolean): string {
     .padStart(3)}%`;
 }
 
+/** A label, in a column of `width` — and always followed by something.
+ *
+ * `padEnd` returns a longer string unchanged, so a label wider than the column would run
+ * straight into whatever comes after it: a real project id is the repository's own remote,
+ * and `git@github.com:…/framework.git` printed as `…framework.git100%`. Measured on a live
+ * report; no fixture had ever carried an identifier that long. Exported so every
+ * column-padded reader of a label — this file's own `pad`, and the interactive telemetry
+ * screen's row list, whose own attribution-carrying labels (F2) are wider still — shares
+ * this one guarantee rather than each risking the same collision at its own width. */
+export function padTo(label: string, width: number): string {
+  return label.length >= width ? `${label} ` : label.padEnd(width);
+}
+
 function pad(label: string): string {
-  return label.padEnd(LABEL_WIDTH);
+  return padTo(label, LABEL_WIDTH);
 }
 
 /** `task` and the four generic filters both narrow the record set before any breakdown
@@ -131,7 +156,12 @@ function hasSelection(report: Pick<CostReport, "task" | "filters">): boolean {
   return report.task !== undefined || report.filters !== undefined;
 }
 
-function nothingLabel(report: Pick<CostReport, "task" | "filters">): string {
+/** Never a bare `0` and never `NOTHING_MEASURED` under a selection: `task` and the four
+ * generic filters both narrow the record set before any breakdown runs, so a zero under
+ * either reads as the selection's own doing, not the period's. Exported so the interactive
+ * telemetry screen tells the two absences apart the identical way this text report already
+ * does, rather than a second rule that could drift from this one. */
+export function nothingLabel(report: Pick<CostReport, "task" | "filters">): string {
   return hasSelection(report) ? NOTHING_IN_SELECTION : NOTHING_MEASURED;
 }
 
@@ -157,8 +187,10 @@ function unknownReason(filter: CostReportFilterName): string {
 
 /** What a filter matching nothing says, told apart from a period that genuinely holds no
  * work: that case never reaches here, since the report only ever carries an
- * `emptySelection` when a filter - not the period itself - is what emptied it. */
-function emptySelectionMessage({
+ * `emptySelection` when a filter - not the period itself - is what emptied it. Exported so
+ * the interactive telemetry screen names the same culprit in the same words, rather than a
+ * second rendering of `CostReportEmptySelection` that could disagree with this one. */
+export function emptySelectionMessage({
   filter,
   value,
   known,
@@ -172,9 +204,20 @@ function emptySelectionMessage({
 
 /** Never a bare `0`: a period nothing was measured in reads as "nothing in this period"
  * (or selection), the same refusal `requests` already makes below - a session count is no
- * less a claim about what was measured than a request count is. */
-function sessionsFigure(report: CostReport): string {
+ * less a claim about what was measured than a request count is. Exported for the same
+ * reason `formatCount` is. */
+export function sessionsFigure(report: CostReport): string {
   return report.sessions === 0 ? nothingLabel(report) : formatCount(report.sessions);
+}
+
+/** Cache reads' share of `tokens`, rounded to a whole percent - `0` when there are no
+ * tokens to divide, never `NaN`. `tokens` arrives as a parameter rather than being
+ * recomputed here: every caller already has its own `totalTokens(totals)` at hand, and
+ * this stays the one place the rounding happens rather than a formula copied at each call
+ * site. Exported so the interactive telemetry screen reads the same figure through this one
+ * function rather than a second copy that could drift from it. */
+export function cacheReadSharePercent(totals: CostTotals, tokens: number): number {
+  return tokens === 0 ? 0 : Math.round(((totals.cacheReadTokens ?? 0) / tokens) * 100);
 }
 
 function printTotals(output: CLIOutput, report: CostReport): void {
@@ -185,7 +228,7 @@ function printTotals(output: CLIOutput, report: CostReport): void {
     return;
   }
   const tokens = totalTokens(totals);
-  const cacheShare = tokens === 0 ? 0 : Math.round(((totals.cacheReadTokens ?? 0) / tokens) * 100);
+  const cacheShare = cacheReadSharePercent(totals, tokens);
   output.print(`  ${pad("sessions")}${sessionsFigure(report)}`);
   output.print(`  ${pad("requests")}${formatCount(totals.requests)}`);
   output.print(`  ${pad("tokens")}${formatCount(tokens)}    ${cacheShare}% cache`);

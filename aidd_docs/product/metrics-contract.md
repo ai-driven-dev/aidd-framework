@@ -696,6 +696,27 @@ ignores it exactly as it would any other field it does not recognize.
   all — its route does not name subagents as a concept, so its absence there
   says nothing about whether one ran.
 
+#### `prompt_id`
+- **Type**: string.
+- **Present**: conditional — Claude Code only, and only where its transcript
+  lets the prompt be resolved.
+- **Meaning**: the prompt this billed call belongs to. A billed call and the
+  prompt that caused it never share a transcript line: measured on a real
+  810-record session, zero lines carry both `requestId` and `promptId`, only
+  `type: "user"` lines carry the second, and all 209 lines bearing counters
+  reach one by following `parentUuid` — three hops in the median. The reader
+  walks that chain and stores what it finds.
+- **Why it exists**: the run journal writes the same identifier on `step_start`
+  (Claude Code hands its hooks `prompt_id`, stored there under the name
+  `turn_id`). Matching the two joins a step to a record exactly, rather than
+  inferring it from which interval each moment happens to fall in — the only
+  route that stays true when two tasks advance at once, since two prompts remain
+  two prompts however their moments overlap. Two tasks inside **one** prompt stay
+  indivisible: a billed amount cannot be split without inventing a ratio.
+- **If absent**: the chain reached no line naming a prompt — a transcript
+  truncated mid-write, or a host whose files carry no such identifier, which is
+  every tool but Claude Code today. Never read as "no prompt ran".
+
 #### `duration_ms`
 - **Type**: number.
 - **Present**: conditional — measured so far only on Claude Code's export

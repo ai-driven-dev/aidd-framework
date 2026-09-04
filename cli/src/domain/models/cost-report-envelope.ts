@@ -18,6 +18,12 @@ import type { AiToolId } from "./tool-ids.js";
  * `sink_schema_version` exists on a stored line. Adding a field a consumer may ignore is
  * not a bump; changing what an existing field means is.
  *
+ * Bumped to 9: `attribution` gains a fourth value, `prompt-matched`. A consumer that
+ * understood the three before it — mapping them to labels, or switching exhaustively — meets
+ * a value it has no case for, which is a misread rather than a field it may ignore. It ranks
+ * above `journal-interval` and below `tool-stated`: an identifier two sources independently
+ * name is stronger than an inference from moments, weaker than the tool saying it outright.
+ *
  * Bumped to 8: `by_flow` is a new top-level breakdown - a consumer summing every
  * breakdown's `requests` against `totals.requests` to check nothing was dropped now has a
  * seventh breakdown to include, the same reasoning that bumped `by_backlog` in. Grouped
@@ -65,7 +71,7 @@ import type { AiToolId } from "./tool-ids.js";
  * `by_project`'s `project` to optional back when that row was added.
  *
  * Bumped to 2: `by_project` and `by_day` are new top-level breakdowns. */
-export const COST_REPORT_ENVELOPE_VERSION = 8;
+export const COST_REPORT_ENVELOPE_VERSION = 9;
 
 /** Money as whole micro-dollars, the way the report carries it: an integer, so a consumer
  * summing several reports gets the same answer this one did. Divide by 1,000,000 for

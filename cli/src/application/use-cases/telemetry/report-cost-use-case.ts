@@ -11,6 +11,11 @@ import {
 } from "../../../domain/models/cost-report.js";
 import { buildFlowIntervals } from "../../../domain/models/flow-attribution.js";
 import type { ResolvedReportPeriod } from "../../../domain/models/report-period.js";
+import {
+  attributeMoment,
+  buildStepIntervals,
+  type StepInterval,
+} from "../../../domain/models/step-attribution.js";
 import { buildTaskIntervals } from "../../../domain/models/task-attribution.js";
 import {
   type TaskBacklogDeclaration,
@@ -201,6 +206,83 @@ function identityInputFields(
   };
 }
 
+/** Which skill each prompt opened, from the journal's own `step_start` lines.
+ *
+ * **First wins.** Three steps can open under one prompt — measured on a live session, where
+ * `aidd-orchestrator:01-sdlc`, `aidd-pm:04-spec` and `aidd-dev:01-plan` all carried
+ * `839ab4a8-…`. A prompt therefore names the step its work *began* in, and a later opener
+ * never rewrites it: taking the last would answer "plan" for the reasoning that produced the
+ * spec, which is a different claim and a wrong one. */
+function promptToSkill(journal: RunJournal): ReadonlyMap<string, string> {
+  const byPrompt = new Map<string, string>();
+  for (const boundary of journal.boundaries) {
+    if (boundary.type !== "step_start" || boundary.turn_id === undefined) continue;
+    if (!byPrompt.has(boundary.turn_id)) byPrompt.set(boundary.turn_id, boundary.skill);
+  }
+  return byPrompt;
+}
+
+/** The step a record's own prompt opened, where both sides name the same one.
+ *
+ * Outranks the interval, and says so: `prompt-matched` is an identifier two sources agree
+ * on, where `journal-interval` is an inference from moments. It is the only reading that
+ * stays true when two tasks advance at once — two prompts remain two prompts however their
+ * moments overlap. Two tasks inside *one* prompt stay indivisible: a billed amount cannot be
+ * split without inventing a ratio, and this returns the one step that prompt opened. */
+function matchOnPrompt(
+  record: TelemetrySinkRecord,
+  byPrompt: ReadonlyMap<string, string> | undefined
+): { readonly source: "prompt-matched"; readonly step: string } | null {
+  if (record.prompt_id === undefined || byPrompt === undefined) return null;
+  const step = byPrompt.get(record.prompt_id);
+  return step === undefined ? null : { source: "prompt-matched", step };
+}
+
+/** Every record's step, taken from the journal rather than from the record.
+ *
+ * **A judgement is derived; only an observation is trusted from disk.** `step_attribution`
+ * is written into the record when it is read, so a record stored before a rule was
+ * corrected keeps whatever that rule answered — for good. Measured on a live sink: it
+ * reported 91% `unattributed` while a fresh read of the very same session, under the same
+ * build, reported 0%. Nothing in the store was wrong when it was written; it was simply
+ * frozen at the moment the least was known about it.
+ *
+ * `tool-stated` is left alone. The tool naming a skill on the line carrying the counters is
+ * something it witnessed, not something anyone inferred, and no journal can improve on it.
+ *
+ * A session the period's journals say nothing about is left alone too — there is no
+ * interval to judge it against, and overwriting a stored answer with a blanker one would
+ * trade a stale reading for no reading at all. */
+function withDerivedStep(
+  records: readonly TelemetrySinkRecord[],
+  journals: readonly RunJournal[]
+): readonly TelemetrySinkRecord[] {
+  const bySession = new Map<string, readonly StepInterval[]>();
+  const skillByPrompt = new Map<string, ReadonlyMap<string, string>>();
+  for (const journal of journals) {
+    if (!journal.session) continue;
+    bySession.set(journal.session.vendor_id, buildStepIntervals(journal));
+    skillByPrompt.set(journal.session.vendor_id, promptToSkill(journal));
+  }
+
+  return records.map((record) => {
+    if (record.step_attribution === "tool-stated") return record;
+    const intervals = bySession.get(record.vendor_id);
+    if (intervals === undefined) return record;
+
+    const matched = matchOnPrompt(record, skillByPrompt.get(record.vendor_id));
+    const derived = matched ?? attributeMoment(intervals, record.event_timestamp);
+    // Rebuilt rather than spread over: a record that carried a step from an earlier reading
+    // must lose it when the journal no longer names one, and a spread would keep it.
+    const { step: _step, step_plugin: _plugin, ...rest } = record;
+    return {
+      ...rest,
+      step_attribution: derived.source,
+      ...(derived.step === undefined ? {} : { step: derived.step }),
+    };
+  });
+}
+
 /** Every gathered read, folded into the one shape `buildCostReport` wants - kept on its own
  * so `execute` reads as "gather, then assemble," not a wall of field assignments. */
 function toReportInput(
@@ -216,7 +298,7 @@ function toReportInput(
   return {
     fromDay,
     toDay,
-    records: read.records,
+    records: withDerivedStep(read.records, journals),
     journals: journals
       .map((journal) => toSessionJournal(journal, periodEndMs))
       .filter((journal) => journal !== null),
@@ -241,29 +323,53 @@ function toReportInput(
  * in particular no amount, since the rates live outside this repository and an amount is
  * only ever reported where a tool's own files already carried one.
  */
-/** Sessions the journal knows about that the period's stored records say nothing about,
- * and whose own session_start falls inside the period.
+/** Sessions holding at least one stored record a re-read could never be matched against.
  *
- * Both halves matter. Without the first, a report re-reads sessions already stored, for
- * nothing. Without the second, a report over one week would re-read every session a
- * repository has ever journalled, and the cost of catching up would grow with the age of
- * the project rather than with the length of the period asked about.
+ * A re-read is reconciled with what is stored on `turn_id`, and `groupByTurnId` indexes
+ * nothing without one — so re-reading such a session appends its records a second time.
+ * That was a documented edge while only unseen sessions were read; once every session in
+ * the period is, it would double a figure on every report.
  *
- * A session that genuinely billed nothing stays in this list, and is re-read on every
- * report over its own week. That is the honest cost of not keeping a second file recording
- * which sessions have already been looked at — a file whose only job would be to remember
- * an answer the sink can already be asked for. */
-function sessionsNotYetRead(
+ * Found by the reference week going from 7 requests to 10, not by reasoning: its transcripts
+ * are hand-written and carry no `requestId`. Claude Code writes one on every line — 0 of 810
+ * records without one on a live sink — but a host that does not must not be silently
+ * doubled, and "in general it has one" is not a guard. */
+function sessionsWithAnUnmatchableRecord(
+  stored: readonly TelemetrySinkRecord[]
+): ReadonlySet<string> {
+  const sessions = new Set<string>();
+  for (const record of stored) {
+    if (record.turn_id === undefined) sessions.add(record.vendor_id);
+  }
+  return sessions;
+}
+
+/** Every session the journal names whose own `session_start` falls inside the period.
+ *
+ * **Not "the ones the sink has never seen".** That was the rule until 2026-09-04, keyed on
+ * whether a session appeared in the stored records at all, and it froze a session the
+ * moment its first turn was stored: a session still running was declared read and never
+ * looked at again. Measured live — the sink held 285 records while the transcript had 541,
+ * and `report` caught up none of them. It answered with a plausible wrong figure, which is
+ * the one thing every other rule in this layer refuses.
+ *
+ * Re-reading costs little and is safe: `read-local-cost-use-case.ts` dedupes per `turn_id`
+ * and appends only what is missing, so the session-level gate was a second filter at the
+ * wrong granularity.
+ *
+ * The period bound is what keeps the cost from growing with the age of the project: without
+ * it a report over one week would re-read every session a repository has ever journalled. */
+function sessionsToCatchUp(
   stored: readonly TelemetrySinkRecord[],
   journals: readonly RunJournal[],
   fromMs: number,
   periodEndMs: number
 ): readonly string[] {
-  const known = new Set(stored.map((record) => record.vendor_id));
+  const unmatchable = sessionsWithAnUnmatchableRecord(stored);
   const missing: string[] = [];
   for (const journal of journals) {
     const session = journal.session;
-    if (session === undefined || known.has(session.vendor_id)) continue;
+    if (session === undefined || unmatchable.has(session.vendor_id)) continue;
     const atMs = Date.parse(session.at);
     // `periodEndMs` is the first instant *after* the period, which is why this is `>=` and
     // not `>`. Computing an end here rather than taking the one `periodEndMsOf` already
@@ -342,7 +448,7 @@ export class ReportCostUseCase {
     period: { from: Date; to: Date; periodEndMs: number }
   ): Promise<TelemetrySinkPeriodRead> {
     if (this.readLocalCost === undefined) return read;
-    const missing = sessionsNotYetRead(
+    const missing = sessionsToCatchUp(
       read.records,
       journals,
       period.from.getTime(),

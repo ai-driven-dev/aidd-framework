@@ -19,6 +19,87 @@ function loadFixture(relativePath: string): string {
 const MAIN_PATH = `.claude/projects/fake-project/${SID}.jsonl`;
 const SUBAGENT_PATH = `.claude/projects/fake-project/${SID}/subagents/agent-aa81cdef3bb58820c.jsonl`;
 
+/** A billed call and the prompt that caused it never share a line.
+ *
+ * Measured on a real 810-record session: zero lines carry both `requestId` and `promptId`.
+ * Only `type: "user"` lines carry a `promptId` — 112 of them — and every one of the 209
+ * lines bearing counters reaches one by following `parentUuid`, three hops in the median.
+ *
+ * The journal already writes that same identifier on `step_start` (Claude Code's
+ * `prompt_id`), so resolving it here is what lets a step be joined to a record exactly,
+ * instead of inferred from the moment each happened to fall on. */
+function chain(lines: readonly Record<string, unknown>[]): string {
+  return lines.map((line) => JSON.stringify(line)).join("\n");
+}
+
+function assistantLine(overrides: Record<string, unknown>): Record<string, unknown> {
+  return {
+    type: "assistant",
+    sessionId: SID,
+    requestId: "req_1",
+    // All four counters or none: `readCounters` refuses a partial `usage` rather than
+    // reading a missing one as zero, so a fixture with two of them yields no record at all.
+    message: {
+      id: "msg_1",
+      model: "claude-opus-5",
+      usage: {
+        input_tokens: 10,
+        output_tokens: 5,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 0,
+      },
+    },
+    ...overrides,
+  };
+}
+
+describe("mapClaudeCodeTranscriptToSinkRecords — the prompt a billed call belongs to", () => {
+  it("follows parentUuid up to the user line that carries the prompt id", () => {
+    const content = chain([
+      { type: "user", uuid: "u1", promptId: "p-abc" },
+      { type: "assistant", uuid: "a1", parentUuid: "u1", sessionId: SID },
+      assistantLine({ uuid: "a2", parentUuid: "a1" }),
+    ]);
+
+    const [record] = mapClaudeCodeTranscriptToSinkRecords(content);
+
+    expect(record?.prompt_id).toBe("p-abc");
+  });
+
+  it("carries no prompt id when the chain reaches no line that names one", () => {
+    const content = chain([assistantLine({ uuid: "a1" })]);
+
+    const [record] = mapClaudeCodeTranscriptToSinkRecords(content);
+
+    expect(record?.prompt_id).toBeUndefined();
+  });
+
+  // A transcript is appended to by a live process and can be truncated mid-write; a parent
+  // pointing at a line that never arrived must end the walk, not search forever.
+  it("stops at a parent the transcript does not hold, rather than looping", () => {
+    const content = chain([assistantLine({ uuid: "a1", parentUuid: "missing" })]);
+
+    const [record] = mapClaudeCodeTranscriptToSinkRecords(content);
+
+    expect(record?.prompt_id).toBeUndefined();
+  });
+
+  // This one fails by *hanging*, not by going red: the walk is synchronous, so a cycle
+  // wedges the worker and no `--testTimeout` can cut it. Measured — removing the `seen`
+  // guard runs the suite past two minutes until it is killed. Worth stating, because a
+  // reader who saw only a green tick might take the guard for decoration.
+  it("terminates on a chain that points back at itself", () => {
+    const content = chain([
+      { type: "user", uuid: "u1", parentUuid: "a1", promptId: undefined },
+      assistantLine({ uuid: "a1", parentUuid: "u1" }),
+    ]);
+
+    const [record] = mapClaudeCodeTranscriptToSinkRecords(content);
+
+    expect(record?.prompt_id).toBeUndefined();
+  });
+});
+
 describe("mapClaudeCodeTranscriptToSinkRecords", () => {
   it("yields one record per real assistant turn, by value, under the stored field names", () => {
     const records = mapClaudeCodeTranscriptToSinkRecords(loadFixture(MAIN_PATH));

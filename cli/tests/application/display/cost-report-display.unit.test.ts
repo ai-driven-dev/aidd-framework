@@ -4,7 +4,7 @@ import "../../../src/domain/tools/ai/codex.js";
 import "../../../src/domain/tools/ai/copilot.js";
 import "../../../src/domain/tools/ai/cursor.js";
 import "../../../src/domain/tools/ai/opencode.js";
-import { printCostReport } from "../../../src/application/display/cost-report-display.js";
+import { padTo, printCostReport } from "../../../src/application/display/cost-report-display.js";
 import { CLIOutput } from "../../../src/application/output.js";
 import { buildCostReport, type CostReportInput } from "../../../src/domain/models/cost-report.js";
 import type { TelemetrySinkRecord } from "../../../src/domain/models/telemetry-sink-record.js";
@@ -380,6 +380,37 @@ describe("printCostReport", () => {
 
     expect(models).toContain("opus");
     expect(models).toContain("no known model");
+  });
+});
+
+describe("printCostReport — a label wider than its column", () => {
+  // Measured on a real report: a project id is the repository's own remote, and
+  // `git@github.com:ai-driven-dev/framework.git` is 41 characters against a 26-wide column.
+  // `padEnd` returns a longer string unchanged, so the share ran straight into the label and
+  // printed `…framework.git100%`. No fixture had ever carried an identifier that long.
+  it("keeps a separator between an overlong label and its share", () => {
+    const long = "git@github.com:ai-driven-dev/framework.git";
+
+    const out = printed({ records: [record({ cost_usd: 1, project_id: long })] });
+    const row = out.split("\n").find((line) => line.includes(long));
+
+    expect(row).toBeDefined();
+    expect(row).not.toContain(`${long}100%`);
+    expect(row).toMatch(new RegExp(`${long.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\s`, "u"));
+  });
+
+  it("still separates a label exactly as wide as its column from what follows it", () => {
+    // 26 is `LABEL_WIDTH`, private to this module - the one length where `padTo`'s own
+    // branches diverge. Shorter, `padEnd` alone already reserves the gap; longer, both the
+    // `padEnd` branch and the "at least as wide" branch agree on a single trailing space.
+    // Exactly 26 is the only length where `>=` and `>` decide something different, and
+    // nothing above ever exercised it - the 41-character label is already past it, never
+    // sitting on the boundary itself.
+    const exact = "a".repeat(26);
+
+    const padded = padTo(exact, 26);
+
+    expect(padded).toBe(`${exact} `);
   });
 });
 

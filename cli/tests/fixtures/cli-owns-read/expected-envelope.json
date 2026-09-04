@@ -1,5 +1,5 @@
 {
-  "cost_report_version": 8,
+  "cost_report_version": 9,
   "period": {
     "from_day": "2026-01-01",
     "to_day": "2026-01-31"
@@ -443,6 +443,12 @@
         "output_tokens": 500,
         "cache_read_tokens": 12000,
         "cache_creation_tokens": 1000
+      }
+    },
+    {
+      "attribution": "prompt-matched",
+      "totals": {
+        "requests": 0
       }
     },
     {

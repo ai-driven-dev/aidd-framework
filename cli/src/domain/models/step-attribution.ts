@@ -6,7 +6,11 @@ import type { RunJournal, RunJournalBoundary } from "../ports/run-journal-reader
  * inference. `unattributed` is a value returned here, never the caller's own omission —
  * an absent field would be read as "no step ran", which is the assertion nothing on a
  * transcript or a journal can support. */
-export type StepAttributionSource = "tool-stated" | "journal-interval" | "unattributed";
+export type StepAttributionSource =
+  | "tool-stated"
+  | "prompt-matched"
+  | "journal-interval"
+  | "unattributed";
 
 /** Strongest first, and fixed: a consumer reading a report should find the three in the
  * same order every time, whatever the records happened to contain. Ordering them by how
@@ -14,6 +18,7 @@ export type StepAttributionSource = "tool-stated" | "journal-interval" | "unattr
  * the one thing a stable contract must not do. */
 export const STEP_ATTRIBUTION_SOURCES: readonly StepAttributionSource[] = [
   "tool-stated",
+  "prompt-matched",
   "journal-interval",
   "unattributed",
 ];

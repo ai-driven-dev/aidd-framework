@@ -555,10 +555,11 @@ describe("buildCostReport — every breakdown reconciles", () => {
     }
   });
 
-  it("splits the total three ways by how strongly each part was attributed", () => {
+  it("splits the total four ways by how strongly each part was attributed", () => {
     const built = report({ records: RECORDS });
     expect(built.attributionMix.map((row) => [row.attribution, row.totals.requests])).toEqual([
       ["tool-stated", 2],
+      ["prompt-matched", 0],
       ["journal-interval", 1],
       ["unattributed", 1],
     ]);
@@ -1212,10 +1213,11 @@ describe("buildCostReport — what it says about itself", () => {
     expect(built.totals).toEqual({ requests: 0 });
     expect(built.bySteps).toEqual([]);
     expect(built.byModels).toEqual([]);
-    // Three rows even here: the total is known to be nothing, and none of it came from
+    // Four rows even here: the total is known to be nothing, and none of it came from
     // any source. That is a measurement, not an absence.
     expect(built.attributionMix.map((row) => [row.attribution, row.totals.requests])).toEqual([
       ["tool-stated", 0],
+      ["prompt-matched", 0],
       ["journal-interval", 0],
       ["unattributed", 0],
     ]);

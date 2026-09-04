@@ -72,6 +72,21 @@ export interface TelemetrySinkRecord {
    * a tool, into one — see "One billed call, both routes" in metrics-contract.md. Never used
    * for the local-read re-read match `turn_id` exists for. */
   readonly billed_request_id?: string;
+  /** The prompt this billed call belongs to, where its tool's own files can say.
+   *
+   * A billed call and the prompt that caused it never share a transcript line — measured on
+   * a real 810-record session, zero lines carry both `requestId` and `promptId`, and only
+   * `type: "user"` lines carry the second. Every line bearing counters reaches one by
+   * following `parentUuid`, three hops in the median, which is how the reader resolves it.
+   *
+   * The run journal writes the same identifier on `step_start` (Claude Code hands its hooks
+   * `prompt_id`, stored there under the name `turn_id`). Matching the two joins a step to a
+   * record **exactly**, instead of inferring it from which interval each moment happens to
+   * fall in — the one route that stays true when two tasks advance at once, since two
+   * prompts remain two prompts however their moments overlap.
+   *
+   * Absent wherever a tool's files cannot say, which is every host but Claude Code today. */
+  readonly prompt_id?: string;
   /** How `step` came to be known. Never optional, for the same reason `provenance` is not:
    * an absent field would be read as "no step ran", which is exactly the assertion nothing
    * on a transcript or a journal can support. See `domain/models/step-attribution.ts`. */

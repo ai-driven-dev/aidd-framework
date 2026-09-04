@@ -4,7 +4,11 @@ import {
   SESSION_TRAILER_TOKEN,
 } from "../../../domain/formats/commit-session-trailer.js";
 import { resolveSessionAnchor } from "../../../domain/models/session-anchor.js";
-import { attributeMoment, buildStepIntervals } from "../../../domain/models/step-attribution.js";
+import {
+  attributeMoment,
+  buildStepIntervals,
+  type StepAttributionSource,
+} from "../../../domain/models/step-attribution.js";
 import {
   diagnoseTelemetryClaims,
   type TelemetryClaim,
@@ -333,7 +337,7 @@ export class DiagnoseTelemetryUseCase {
 function stampAttribution(
   record: { readonly step?: string; readonly event_timestamp?: string },
   intervals: ReturnType<typeof buildStepIntervals>
-): { readonly stepAttribution: "tool-stated" | "journal-interval" | "unattributed" } {
+): { readonly stepAttribution: StepAttributionSource } {
   if (record.step !== undefined) return { stepAttribution: "tool-stated" };
   return { stepAttribution: attributeMoment(intervals, record.event_timestamp).source };
 }

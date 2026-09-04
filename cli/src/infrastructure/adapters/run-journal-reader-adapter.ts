@@ -44,6 +44,7 @@ interface RawJournalLine {
   readonly type?: unknown;
   readonly at?: unknown;
   readonly skill?: unknown;
+  readonly turn_id?: unknown;
   readonly run_id?: unknown;
   readonly tool?: unknown;
   readonly vendor_id?: unknown;
@@ -73,7 +74,9 @@ function parseBoundary(parsed: RawJournalLine): RunJournalBoundary | null {
   if (at === undefined) return null;
   if (parsed.type === "turn_end") return { type: "turn_end", at };
   const skill = parsed.type === "step_start" ? asString(parsed.skill) : undefined;
-  return skill !== undefined ? { type: "step_start", at, skill } : null;
+  if (skill === undefined) return null;
+  const turnId = asString(parsed.turn_id);
+  return { type: "step_start", at, skill, ...(turnId === undefined ? {} : { turn_id: turnId }) };
 }
 
 /** The worktree a session ran in, where the line names one. A plain checkout writes
