@@ -33,7 +33,7 @@ const CLAUDE_SESSION = "22222222-2222-4222-8222-222222222222";
 const CODEX_SESSION = "019fae6f-2009-7cd3-86b2-b8f83481b160";
 const COPILOT_SESSION = "33333333-3333-4333-8333-333333333333";
 
-/** Whatever a capture yields, reduced to the three facts a route declares. */
+/** Whatever a capture yields, reduced to the four facts a route declares. */
 function observe(records: readonly Partial<TelemetrySinkRecord>[]): TelemetryRouteSupply {
   const some = (has: (record: Partial<TelemetrySinkRecord>) => boolean) => records.some(has);
   return {
@@ -46,6 +46,7 @@ function observe(records: readonly Partial<TelemetrySinkRecord>[]): TelemetryRou
     ),
     amount: some((record) => record.cost_usd !== undefined),
     toolStatedStep: some((record) => record.step !== undefined),
+    agentName: some((record) => record.agent_name !== undefined),
   };
 }
 
@@ -121,6 +122,7 @@ describe("what a route declares it supplies, against what its reader actually pr
           tokenCounters: false,
           amount: false,
           toolStatedStep: false,
+          agentName: false,
         });
       });
       continue;

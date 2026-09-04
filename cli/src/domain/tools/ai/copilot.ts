@@ -355,7 +355,7 @@ export const copilot: AiTool<
   // copilot-events.ts for the reader and the arithmetic that settles it.
   telemetryLocalRead: {
     kind: "declared",
-    supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
+    supplies: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: false },
     // The exclusivity of `input` against `cache_read` is NOT established. The only capture
     // this repository holds (tests/fixtures/local-cost/.copilot/.../events.jsonl) reports
     // `cache_read: 0`, so "input excludes the cached prompt" and "input already includes it"

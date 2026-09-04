@@ -215,8 +215,8 @@ describe("printCostReport", () => {
   it("prints a session total on its own tool row, not 'nothing in this period' (#697)", () => {
     const output = new CapturingOutput();
     const COPILOT_CAPABILITY = {
-      localRead: { tokenCounters: true, amount: false, toolStatedStep: false },
-      export: { tokenCounters: false, amount: false, toolStatedStep: false },
+      localRead: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: false },
+      export: { tokenCounters: false, amount: false, toolStatedStep: false, agentName: false },
       journalAttributable: true,
       taskAttributable: false,
     } as const;

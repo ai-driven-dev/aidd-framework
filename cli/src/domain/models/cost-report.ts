@@ -78,14 +78,28 @@ export interface CostReportModelRow {
   readonly totals: CostTotals;
 }
 
-/** One agent's own share of a period, `agent` absent for the main thread.
+/** How a record's agent came to be known, so a row that names none says which of the two
+ * silences it is. `main-thread` is a measurement — the tool names agents and said this
+ * record belongs to none of them; `not-stated` is the absence of one, from a tool whose
+ * route never names an agent at all, and reading it as a main thread would assert a fact
+ * nothing observed. */
+export type AgentAttributionSource = "tool-stated" | "main-thread" | "not-stated";
+
+/** One agent's own share of a period, `agent` absent unless `attribution` is `tool-stated`.
  *
  * Where the spend actually is: measured on a live session, ten subagent files held 432M of
  * its 466M tokens, and every one of their lines names its agent where almost none names a
  * skill (100% against 2.7%). `by_step` reads a few percent not because the reader drops
- * anything but because the host names a skill on the main thread alone. */
+ * anything but because the host names a skill on the main thread alone.
+ *
+ * **The limit this axis still lives with.** A line marked as a subagent's that carries no
+ * agent name reads as the main thread, because nothing on the stored record separates the
+ * two. Measured 2026-09-05 across 1,852 transcripts: 157 of 122,637 subagent lines name no
+ * agent, 0.07%. Closing it means a new field on the record, which no record already stored
+ * could ever gain (see `storeNewCandidates`), so it is stated rather than captured. */
 export interface CostReportAgentRow {
   readonly agent?: string;
+  readonly attribution: AgentAttributionSource;
   readonly totals: CostTotals;
 }
 
@@ -625,13 +639,42 @@ function projectKeyOf(record: TelemetrySinkRecord): ProjectKey {
 const NO_KNOWN_MODEL = Symbol("no known model");
 type ModelKey = string | typeof NO_KNOWN_MODEL;
 
-// The main thread's own row. A symbol for the same reason `NO_KNOWN_MODEL` is one: an agent
-// really can be named anything, so no string is safe to reserve.
-const NO_AGENT = Symbol("the main thread");
-type AgentKey = string | typeof NO_AGENT;
+// The main thread's own row, and the row for a tool that could never have named one. Symbols
+// for the same reason `NO_KNOWN_MODEL` is one: an agent really can be named anything, so no
+// string is safe to reserve.
+const MAIN_THREAD = Symbol("the main thread");
+const AGENT_NOT_STATED = Symbol("a tool whose route never names an agent");
+type AgentKey = string | typeof MAIN_THREAD | typeof AGENT_NOT_STATED;
 
-function agentKeyOf(record: TelemetrySinkRecord): AgentKey {
-  return record.agent_name === undefined ? NO_AGENT : record.agent_name;
+/** Which of the three rows a record joins. `agent_name` present is the tool's own statement
+ * and needs nothing else; absent means one of two different things, and only the tool's
+ * declaration tells them apart.
+ *
+ * This axis used to answer `NO_AGENT` for every record with no `agent_name`, whatever the
+ * tool. Only Claude Code's reader ever sets the field, so on Codex, Copilot and OpenCode
+ * every record was reported as the main thread — 100% of the axis, on no evidence. The
+ * declaration is read rather than the record because the record cannot carry the absence:
+ * a tool that never names an agent writes exactly what a main-thread line writes. */
+function agentKeyOf(
+  record: TelemetrySinkRecord,
+  namesAgents: (tool: AiToolId) => boolean
+): AgentKey {
+  if (record.agent_name !== undefined) return record.agent_name;
+  return namesAgents(record.tool) ? MAIN_THREAD : AGENT_NOT_STATED;
+}
+
+/** Whether a tool's own declared route names agents, answered from `declaredTools` alone.
+ * A tool with no declared local read supplies nothing, so it names no agent either — the
+ * same reading `NO_CAPABILITY` gives every other supply. */
+function agentNamingTools(
+  declaredTools: readonly CostReportToolDeclaration[]
+): (tool: AiToolId) => boolean {
+  const naming = new Set(
+    declaredTools
+      .filter((declaration) => declaration.capability.localRead?.agentName === true)
+      .map((declaration) => declaration.tool)
+  );
+  return (tool) => naming.has(tool);
 }
 
 // The row for what named no prompt. A symbol for the same reason `NO_AGENT` is one: a prompt
@@ -1290,33 +1333,50 @@ function accumulateSessionRecord(groups: Groups, record: TelemetrySinkRecord): v
   }
 }
 
+/** Everything one record needs to be placed on every axis, resolved once per report rather
+ * than once per record. Gathered into a shape because the list had grown past what a
+ * positional signature reads as: nine parameters in a fixed order is a call nobody can check
+ * by eye, and every one of them is the same for every record in the run. */
+interface RecordContext {
+  readonly membership: TaskMembership | null;
+  readonly taskIntervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>;
+  readonly flowIntervalsByVendorId: ReadonlyMap<string, readonly FlowInterval[]>;
+  readonly journalsByVendorId: ReadonlyMap<string, CostReportSessionJournal>;
+  readonly identity: PersonIdentity | null;
+  readonly taskBacklogDeclarations: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration> | undefined;
+  readonly namesAgents: (tool: AiToolId) => boolean;
+}
+
 function accumulateRequestRecord(
   groups: Groups,
   record: TelemetrySinkRecord,
-  membership: TaskMembership | null,
-  taskIntervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>,
-  flowIntervalsByVendorId: ReadonlyMap<string, readonly FlowInterval[]>,
-  journalsByVendorId: ReadonlyMap<string, CostReportSessionJournal>,
-  identity: PersonIdentity | null,
-  taskBacklogDeclarations: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration> | undefined
+  context: RecordContext
 ): void {
   groups.totals.add(record);
   addToStepGroup(groups.steps, record);
   accumulateInto(groups.attributions, record.step_attribution, record);
   accumulateInto(groups.tools, record.tool, record);
   accumulateInto(groups.models, modelKeyOf(record), record);
-  accumulateInto(groups.agents, agentKeyOf(record), record);
+  accumulateInto(groups.agents, agentKeyOf(record, context.namesAgents), record);
   addToPromptGroup(groups.prompts, record);
   accumulateInto(groups.projects, projectKeyOf(record), record);
-  const taskRow = taskRowOf(record, taskIntervalsByVendorId, journalsByVendorId);
+  const taskRow = taskRowOf(record, context.taskIntervalsByVendorId, context.journalsByVendorId);
   addToTaskGroup(groups.tasks, taskRow, record);
-  accumulateInto(groups.backlog, backlogKeyOf(taskRow, taskBacklogDeclarations), record);
-  accumulateInto(groups.flows, flowKeyOf(record, flowIntervalsByVendorId), record);
-  addToPersonGroup(groups.people, record, resolvePerson(identity, personRawIdOf(record)));
-  const day = telemetrySinkRecordDayKey(record);
-  if (day !== undefined && groups.days.has(day)) groups.days.get(day)?.add(record);
+  accumulateInto(groups.backlog, backlogKeyOf(taskRow, context.taskBacklogDeclarations), record);
+  accumulateInto(groups.flows, flowKeyOf(record, context.flowIntervalsByVendorId), record);
+  addToPersonGroup(groups.people, record, resolvePerson(context.identity, personRawIdOf(record)));
+  addToDayGroup(groups.days, record);
+  const { membership } = context;
   const attribution = membership === null ? undefined : taskAttributionOf(record, membership);
   if (attribution !== undefined) accumulateInto(groups.taskAttributions, attribution, record);
+}
+
+/** Only a day the period itself spans: `emptyGroups` seeded every one of them, so a record
+ * dated outside the period joins nothing rather than adding a day the report never claimed
+ * to cover. */
+function addToDayGroup(days: Map<string, TotalsAccumulator>, record: TelemetrySinkRecord): void {
+  const day = telemetrySinkRecordDayKey(record);
+  if (day !== undefined && days.has(day)) days.get(day)?.add(record);
 }
 
 function accumulate(
@@ -1326,27 +1386,22 @@ function accumulate(
   membership: TaskMembership | null,
   journals: readonly CostReportSessionJournal[],
   identity: PersonIdentity | null,
-  taskBacklogDeclarations: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration> | undefined
+  taskBacklogDeclarations: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration> | undefined,
+  declaredTools: readonly CostReportToolDeclaration[]
 ): Groups {
   const groups = emptyGroups(fromDay, toDay);
-  const taskIntervalsByVendorId = allTaskIntervalsByVendorId(journals);
-  const flowIntervalsByVendorId = allFlowIntervalsByVendorId(journals);
-  const journalsByVendorId = new Map(journals.map((journal) => [journal.vendorId, journal]));
+  const context: RecordContext = {
+    membership,
+    taskIntervalsByVendorId: allTaskIntervalsByVendorId(journals),
+    flowIntervalsByVendorId: allFlowIntervalsByVendorId(journals),
+    journalsByVendorId: new Map(journals.map((journal) => [journal.vendorId, journal])),
+    identity,
+    taskBacklogDeclarations,
+    namesAgents: agentNamingTools(declaredTools),
+  };
   for (const record of records) {
-    if (record.kind === "session") {
-      accumulateSessionRecord(groups, record);
-      continue;
-    }
-    accumulateRequestRecord(
-      groups,
-      record,
-      membership,
-      taskIntervalsByVendorId,
-      flowIntervalsByVendorId,
-      journalsByVendorId,
-      identity,
-      taskBacklogDeclarations
-    );
+    if (record.kind === "session") accumulateSessionRecord(groups, record);
+    else accumulateRequestRecord(groups, record, context);
   }
   return groups;
 }
@@ -1557,14 +1612,15 @@ function dayRows(days: ReadonlyMap<string, TotalsAccumulator>): readonly CostRep
 function agentRows(
   agents: ReadonlyMap<AgentKey, TotalsAccumulator>
 ): readonly CostReportAgentRow[] {
-  const rows: CostReportAgentRow[] = [...agents].map(([key, accumulator]) => ({
-    ...(key === NO_AGENT ? {} : { agent: key }),
-    totals: accumulator.build(),
-  }));
+  const rows: CostReportAgentRow[] = [...agents].map(([key, accumulator]) => {
+    if (key === MAIN_THREAD) return { attribution: "main-thread", totals: accumulator.build() };
+    if (key === AGENT_NOT_STATED) return { attribution: "not-stated", totals: accumulator.build() };
+    return { agent: key, attribution: "tool-stated", totals: accumulator.build() };
+  });
   return bySize(
     rows,
     (row) => row.totals,
-    (row) => row.agent ?? ""
+    (row) => `${row.agent ?? ""}@${row.attribution}`
   );
 }
 
@@ -1989,7 +2045,8 @@ export function buildCostReport(input: CostReportInput): CostReport {
     membership,
     input.journals,
     identity,
-    input.taskBacklogDeclarations
+    input.taskBacklogDeclarations,
+    input.declaredTools
   );
 
   return assembleCostReport(input, inScope, groups, membership, emptySelection);

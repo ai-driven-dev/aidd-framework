@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import "../../../src/domain/tools/ai/claude.js";
+import "../../../src/domain/tools/ai/codex.js";
 import {
   ARTEFACT_AXES,
   buildCostReportArtefact,
@@ -310,6 +311,62 @@ describe("buildCostReportArtefact — by step, two rows sharing one name", () =>
     expect(journalIntervalRow).toContain("500 tokens");
     // 1,500 total input tokens across the two records - never printed as one row by either
     // renderer, but recoverable from the two rows a reader is given.
+  });
+});
+
+describe("buildCostReportArtefact — the agent axis names which silence a row is", () => {
+  const NAMES_AGENTS = {
+    localRead: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: true },
+    export: null,
+    journalAttributable: false,
+    taskAttributable: false,
+  } as const;
+
+  // Two rows carry no agent name and mean opposite things. A table that printed "the main
+  // thread" for both would state, of a tool that never names an agent, a fact nothing
+  // observed — the reading this axis gave every Codex, Copilot and OpenCode record.
+  it("prints the main thread and a tool that names no agent as different rows", () => {
+    const envelope = envelopeOf({
+      declaredTools: [
+        { tool: "claude", coverage: "covered", capability: NAMES_AGENTS },
+        { tool: "codex", coverage: "covered", capability: NO_CAPABILITY },
+      ],
+      records: [
+        request({ input_tokens: 10 }),
+        request({ tool: "codex", vendor_id: "s-codex", input_tokens: 10 }),
+      ],
+    });
+
+    const artefact = buildCostReportArtefact(envelope, "agent");
+
+    expect(artefact).toContain("| the main thread |");
+    expect(artefact).toContain("| the tool names no agent |");
+  });
+
+  it("prints the same two labels in the terminal rendering", () => {
+    const report = buildCostReport({
+      fromDay: "2026-08-17",
+      toDay: "2026-08-21",
+      journals: [],
+      undatedRecords: 0,
+      unreadableLines: 0,
+      measurementEnabled: true,
+      declaredTools: [
+        { tool: "claude", coverage: "covered", capability: NAMES_AGENTS },
+        { tool: "codex", coverage: "covered", capability: NO_CAPABILITY },
+      ],
+      records: [
+        request({ input_tokens: 10 }),
+        request({ tool: "codex", vendor_id: "s-codex", input_tokens: 10 }),
+      ],
+    });
+    const output = new CapturingOutput();
+
+    printCostReport(output, report);
+
+    const printed = output.lines.join("\n");
+    expect(printed).toContain("the main thread");
+    expect(printed).toContain("the tool names no agent");
   });
 });
 

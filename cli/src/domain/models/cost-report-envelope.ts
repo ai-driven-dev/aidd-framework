@@ -1,5 +1,6 @@
 import type { TelemetryRouteSupply } from "../capabilities/telemetry-capability.js";
 import type {
+  AgentAttributionSource,
   CostReport,
   CostReportEmptySelection,
   CostReportFilters,
@@ -136,6 +137,10 @@ export interface CostReportEnvelopeRouteSupply {
   readonly token_counters: boolean;
   readonly amount: boolean;
   readonly tool_stated_step: boolean;
+  /** The route names the agent a record belongs to, and so also says when one is the main
+   * thread's own. Without it `by_agent` reads this tool's records as stating no agent, never
+   * as the main thread. */
+  readonly agent_name: boolean;
 }
 
 export interface CostReportEnvelopeCapability {
@@ -204,12 +209,14 @@ export interface CostReportEnvelopeBacklogRow {
   readonly totals: CostReportEnvelopeTotals;
 }
 
-/** One orchestrated run's figures — see `CostReportFlowRow`. `flow` names the orchestrating
- * skill and `startedAt` when it opened, together telling apart two rows that share a name:
- * the same skill run twice in one session is two rows, never merged into one. Both are
- * absent on the one row for work that fell in no flow interval at all. */
+/** One agent's figures — see `CostReportAgentRow`. `agent` names it and is present exactly
+ * when `attribution` is `tool-stated`. The two rows that name none are different facts and
+ * never merged: `main-thread` is a tool that names agents saying this record belongs to
+ * none of them, `not-stated` is a tool whose route never names one, where reading a main
+ * thread would assert something nothing observed. */
 export interface CostReportEnvelopeAgentRow {
   readonly agent?: string;
+  readonly attribution: AgentAttributionSource;
   readonly totals: CostReportEnvelopeTotals;
 }
 
@@ -330,6 +337,7 @@ function supply(from: TelemetryRouteSupply | null): CostReportEnvelopeRouteSuppl
         token_counters: from.tokenCounters,
         amount: from.amount,
         tool_stated_step: from.toolStatedStep,
+        agent_name: from.agentName,
       };
 }
 
@@ -407,7 +415,11 @@ function backlogRow(row: CostReport["byBacklog"][number]): CostReportEnvelopeBac
 }
 
 function agentRow(row: CostReport["byAgents"][number]): CostReportEnvelopeAgentRow {
-  return { ...(row.agent === undefined ? {} : { agent: row.agent }), totals: totals(row.totals) };
+  return {
+    ...(row.agent === undefined ? {} : { agent: row.agent }),
+    attribution: row.attribution,
+    totals: totals(row.totals),
+  };
 }
 
 function promptRow(row: CostReport["byPrompts"][number]): CostReportEnvelopePromptRow {

@@ -177,7 +177,7 @@ export const opencode: AiTool<
     // Counters per message, and no amount: `info.cost` is `0` in every message captured
     // and its denomination was never established, so it is deliberately never read. No
     // field names a running skill either.
-    supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
+    supplies: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: false },
     // Measured 2026-08-20: `input` is exclusive of `cache.read` for providerID "anthropic",
     // matching that API's own documented behaviour. A second provider was probed 2026-08-24
     // (providerID "opencode") and reconciled the same way, but never exercised its cache

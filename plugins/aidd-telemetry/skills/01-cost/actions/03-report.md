@@ -115,7 +115,11 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    gained a fourth, `"no-journal"`, which says no usable run journal reached that record's
    session - a fact about the read, never the claim that the session declared no task. The
    bump from `9` to `10` added `by_agent` to the top-level breakdowns: which agent ran,
-   which on Claude Code is where most of the spend is. The bump from `8` to `9` added a
+   which on Claude Code is where most of the spend is. Read its `attribution` before
+   reading a row that names no agent: `main-thread` is a tool that names agents saying this
+   record belongs to none of them, `not-stated` is a tool whose route never names one -
+   every Codex, Copilot and OpenCode record - and calling the second a main thread would
+   state a fact nothing observed. The bump from `8` to `9` added a
    fourth value to `attribution`, `prompt-matched`. The bump from `7` to `8` added `by_flow`
    to the top-level breakdowns: which orchestrated run the journal's own step sequence
    already names (see [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md)),
