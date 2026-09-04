@@ -65,7 +65,7 @@ else.
 
 | Task | Share | Tokens | Attribution |
 | --- | --- | --- | --- |
-| <task, or the reason it fell in none: "no usable run journal for this session" \| "no usable task declaration in this session" \| "before the next task this session declares" \| "the journal falls silent before this record"> | <n>% | <tokens> | <declared by the flow \| inferred from a written file \| —> |
+| <task, or the reason it fell in none: "no usable run journal for this session" \| "older than anything this session's journal witnessed" \| "no usable task declaration in this session" \| "before the next task this session declares" \| "the journal falls silent before this record"> | <n>% | <tokens> | <declared by the flow \| inferred from a written file \| —> |
 
 **By backlog item**
 
@@ -93,9 +93,14 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    - One axis: `aidd telemetry report --axis <axis> --from 2026-08-01 --to 2026-08-31`.
    - Everything: `aidd telemetry report --from 2026-08-01 --to 2026-08-31 --json`, reading the shape from [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md).
    - The figure will be kept or compared: give `--from` and `--to`, since `--days` resolves against today and two identical calls on two days cover two different periods.
-3. **Refuse an unknown shape.** `cost_report_version` is `13` today, read from the `--json`
+3. **Refuse an unknown shape.** `cost_report_version` is `14` today, read from the `--json`
    path - the `--axis` path prints text the script already built from that same object, so
-   there is no separate version to check there. The bump from `12` to `13` added `by_prompt`
+   there is no separate version to check there. The bump from `13` to `14` did not add a
+   breakdown: the reasons a `by_task` or `by_backlog` row can carry gained a fifth,
+   `precedes-journal`, for a record older than everything its own session's journal
+   witnessed. Report it as what it is - work billed before that session opened a journal,
+   which a resumed transcript carries - never as the flow declaring its task late. The bump
+   from `12` to `13` added `by_prompt`
    to the top-level breakdowns: the prompt that caused the work, the one breakdown no host
    limit can leave empty, since every record the reader stores already carries the turn it
    came from. The bump from `11` to `12` did not add a

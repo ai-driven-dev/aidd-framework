@@ -300,6 +300,22 @@ test("the check skill calls the CLI, never a script of its own", () => {
   assert.ok(!/\.cjs\b/u.test(check), "must not name a script beside itself any more");
 });
 
+// The skill names the version it refuses to read past. Nothing checked that number against
+// the one the CLI emits, so a bump could ship with the skill still naming the version
+// before it - a skill that then refuses the object it was built to read. Same guard the
+// contract document already has (`cost-report-contract.unit.test.ts`), for the second place
+// the number is written down.
+test("the cost skill names the envelope version the CLI actually emits", () => {
+  const envelopeSource = fs.readFileSync(
+    path.resolve(__dirname, "../../cli/src/contexts/telemetry/domain/cost-report-envelope.ts"),
+    "utf8",
+  );
+  const emitted = /COST_REPORT_ENVELOPE_VERSION = (\d+)/u.exec(envelopeSource)?.[1];
+  const named = /`cost_report_version` is `(\d+)` today/u.exec(everything)?.[1];
+
+  assert.equal(named, emitted, "the skill's stated version must be the one the CLI emits");
+});
+
 // A skill told to "report what it printed" leaves the shape to the model, and two runs
 // answer differently. The shape is stated so a user reads the same table every time.
 test("the cost skill states the shape of its answer", () => {

@@ -102,7 +102,7 @@ import type { TaskAttributionSource, TaskUnattributedReason } from "./task-attri
  * `by_project`'s `project` to optional back when that row was added.
  *
  * Bumped to 2: `by_project` and `by_day` are new top-level breakdowns. */
-export const COST_REPORT_ENVELOPE_VERSION = 13;
+export const COST_REPORT_ENVELOPE_VERSION = 14;
 
 /** Money as whole micro-dollars, the way the report carries it: an integer, so a consumer
  * summing several reports gets the same answer this one did. Divide by 1,000,000 for

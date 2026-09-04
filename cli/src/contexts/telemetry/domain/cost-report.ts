@@ -221,7 +221,7 @@ export interface CostReportTaskRow {
  *   still counted, here and in every other breakdown, exactly as `by_task` counts a record
  *   whose declaration could not be read.
  * - `reason` — the record belongs to no task at all, carrying the same
- *   `TaskUnattributedReason` `CostReportTaskRow` gives it; up to four such rows, one per
+ *   `TaskUnattributedReason` `CostReportTaskRow` gives it; up to five such rows, one per
  *   reason actually present, never collapsed into one. */
 export interface CostReportBacklogRow {
   readonly backlog?: string;
@@ -804,7 +804,11 @@ function taskRowOf(
   if (inferred !== null && witnessed(journal, record.event_timestamp)) {
     return { task: inferred, attribution: "inferred" };
   }
-  return taskUnattributedReason(intervals, record.event_timestamp);
+  // The journal's own earliest witnessed moment, so a record older than everything this
+  // session saw is named for that rather than for declaring late - the distinction 96.2% of
+  // a real period turns on. Absent for a journal with no readable moment, which then makes
+  // no coverage claim at all.
+  return taskUnattributedReason(intervals, record.event_timestamp, journal?.witnessed?.fromMs);
 }
 
 /** Which `byBacklog` row a record's own task-row key belongs in - built from

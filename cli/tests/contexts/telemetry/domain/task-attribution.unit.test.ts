@@ -247,7 +247,7 @@ describe("task-attribution — pure: journal lines -> bounded intervals", () => 
   });
 });
 
-describe("taskUnattributedReason — which of three distinct facts applies", () => {
+describe("taskUnattributedReason — which of four distinct facts applies", () => {
   it("names no-declaration for a session whose journal never declared a task", () => {
     expect(taskUnattributedReason([], "2026-08-17T10:00:00Z")).toBe("no-declaration");
   });
@@ -264,6 +264,47 @@ describe("taskUnattributedReason — which of three distinct facts applies", () 
   // contiguously from each declaration to the next and no such gap can arise.
   // `precedes-declaration` stays reachable only before a session's first declaration,
   // which the test above covers.
+
+  // The live case, and the reason this reason exists. A resumed transcript carries turns
+  // billed days before the session that read them ever started, so the sink dates them
+  // before its journal witnessed anything. Measured on 2026-09-04: 96.2% of a real period
+  // fell here and read `precedes-declaration`, which asserts the flow declared late.
+  it("names precedes-journal for a record older than everything its journal witnessed", () => {
+    const intervals = buildTaskIntervals(journalOf([WANTED], [TURN_END]));
+    const journalFromMs = Date.parse("2026-08-17T09:30:00Z");
+
+    expect(taskUnattributedReason(intervals, "2026-08-10T12:00:00Z", journalFromMs)).toBe(
+      "precedes-journal"
+    );
+  });
+
+  it("still names precedes-declaration inside the span, before the first declaration", () => {
+    const intervals = buildTaskIntervals(journalOf([WANTED], [TURN_END]));
+    const journalFromMs = Date.parse("2026-08-17T09:30:00Z");
+
+    expect(taskUnattributedReason(intervals, "2026-08-17T09:45:00Z", journalFromMs)).toBe(
+      "precedes-declaration"
+    );
+  });
+
+  // Why the coverage check runs first: a journal that declared nothing and never covered
+  // this record is described by the coverage fact, which is the one that explains why no
+  // declaration could have covered it.
+  it("names precedes-journal, not no-declaration, when the journal declared nothing either", () => {
+    const journalFromMs = Date.parse("2026-08-17T09:30:00Z");
+
+    expect(taskUnattributedReason([], "2026-08-10T12:00:00Z", journalFromMs)).toBe(
+      "precedes-journal"
+    );
+  });
+
+  it("never claims coverage for a journal that carries no readable moment", () => {
+    const intervals = buildTaskIntervals(journalOf([WANTED], [TURN_END]));
+
+    expect(taskUnattributedReason(intervals, "2026-08-10T12:00:00Z", undefined)).toBe(
+      "precedes-declaration"
+    );
+  });
 
   it("names journal-silent for a record after the last declared interval's own end", () => {
     const intervals = buildTaskIntervals(journalOf([WANTED], [TURN_END]));

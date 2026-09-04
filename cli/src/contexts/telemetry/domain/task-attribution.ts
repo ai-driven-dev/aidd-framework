@@ -97,8 +97,8 @@ export function buildTaskIntervals(
 }
 
 /** Why a record belongs to no task - the distinct facts a person acts on differently, and
- * no more than those. This function itself answers only the three that are facts about the
- * work; `"no-journal"`, the fact about the read, is decided by `declaredTaskKeyOf` before
+ * no more than those. This function itself answers only the four that are facts about the
+ * record; `"no-journal"`, the fact about the read, is decided by `declaredTaskKeyOf` before
  * this is ever called. Never called for a moment `momentFallsWithin`
  * already reads as covered; that caller already knows which interval and needs no reason for
  * what it found.
@@ -115,8 +115,8 @@ export function buildTaskIntervals(
  *   own per-session map. It belongs in
  *   this type all the same: it is one of the reasons a `by_task` row carries, and keeping it
  *   in the same closed set is what makes `Record<TaskUnattributedReason, string>` force
- *   every consumer to name it. The three below are facts about the work; this one is a fact
- *   about the read, and merging it into `"no-declaration"` asserted that a session declared
+ *   every consumer to name it. The four below are facts about the record itself; this one is
+ *   a fact about the read, and merging it into `"no-declaration"` asserted that a session declared
  *   nothing when the truth was that its journal was never found - measured on 2026-09-04,
  *   where running the report from a subdirectory reported 100% "no usable task declaration"
  *   for a period whose journals were all present one directory up.
@@ -126,11 +126,26 @@ export function buildTaskIntervals(
  *   The two are indistinguishable from here, which is why this reason is worded "no usable
  *   declaration" rather than "none was ever declared" - the latter would be false for a
  *   session whose journal really does hold a line, just not a readable one.
+ * - `"precedes-journal"`: this record's moment is older than the earliest moment its
+ *   session's journal witnessed. Nothing was declared late here; no journal existed yet.
+ *   The population is large and it is not an anomaly: reading a resumed transcript stores
+ *   the turns it inherited under the session that read them, dated when each was *billed* -
+ *   days before that session ever started. Measured on 2026-09-04, 96.2% of a real period
+ *   fell here and read `"precedes-declaration"`, which told a person their flow declares its
+ *   task late in 96% of cases when fewer than one in five hundred of those records actually
+ *   did. Separated for the same reason `"no-journal"` was separated from `"no-declaration"`:
+ *   a fact about what the journal could cover is not a fact about how the work behaved.
+ *   Decided before `"no-declaration"`, so a journal that declared nothing *and* did not cover
+ *   the record is named by the coverage fact - the one that explains why no declaration
+ *   could have covered it. Keyed on the journal's own earliest witnessed moment, never on
+ *   its `session_start` line, which would be a second notion of when a session began.
  * - `"precedes-declaration"`: a task was declared, but some declared interval starts *after*
  *   this moment. Since 2026-09-04 that means one thing only — a record before the session's
  *   very first declaration. Intervals now run contiguously from each declaration to the
  *   next, so the gap a `turn_end` used to leave between two of them no longer exists, and
- *   the test that described it was deleted rather than reworded.
+ *   the test that described it was deleted rather than reworded. Since the reason above
+ *   joined it, this is only ever a record the journal did witness: a genuinely late
+ *   declaration, which is what the words say.
  * - `"journal-silent"`: a task was declared, every declared interval starts at or before this
  *   moment, and still none of them reaches it - the journal's own declared coverage ran out
  *   before this record's moment did. A record with no moment at all, or an unparseable one,
@@ -140,6 +155,7 @@ export function buildTaskIntervals(
  *   undated record off before any of this runs - but the function stays correct standalone. */
 export type TaskUnattributedReason =
   | "no-journal"
+  | "precedes-journal"
   | "no-declaration"
   | "precedes-declaration"
   | "journal-silent";
@@ -149,17 +165,30 @@ export type TaskUnattributedReason =
  * ordered by how much of a period each accounted for. */
 export const TASK_UNATTRIBUTED_REASONS: readonly TaskUnattributedReason[] = [
   "no-journal",
+  "precedes-journal",
   "no-declaration",
   "precedes-declaration",
   "journal-silent",
 ];
 
+/** `journalFirstWitnessedMs` is the earliest moment this session's journal witnessed, absent
+ * for a journal that carries no readable moment at all. Absent means no coverage claim, never
+ * a `0` that would place every record after it: a journal that witnessed nothing cannot
+ * testify that a record predates it. */
 export function taskUnattributedReason(
   intervals: readonly TaskInterval[],
-  momentIso: string | undefined
+  momentIso: string | undefined,
+  journalFirstWitnessedMs?: number
 ): TaskUnattributedReason {
-  if (intervals.length === 0) return "no-declaration";
   const momentMs = momentIso === undefined ? Number.NaN : Date.parse(momentIso);
+  if (
+    !Number.isNaN(momentMs) &&
+    journalFirstWitnessedMs !== undefined &&
+    momentMs < journalFirstWitnessedMs
+  ) {
+    return "precedes-journal";
+  }
+  if (intervals.length === 0) return "no-declaration";
   if (Number.isNaN(momentMs)) return "journal-silent";
   const somethingDeclaredAfter = intervals.some((interval) => interval.startMs > momentMs);
   return somethingDeclaredAfter ? "precedes-declaration" : "journal-silent";

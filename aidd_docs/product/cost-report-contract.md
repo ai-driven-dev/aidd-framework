@@ -131,7 +131,29 @@ real count is the ordinary case of reporting from a project whose switch never c
 work, never a contradiction (see "Attributing records to a task" for the same scope split
 elsewhere in this object).
 
-Every object carries `cost_report_version`, currently `13`.
+Every object carries `cost_report_version`, currently `14`.
+
+Bumped from `13` when the reasons a `by_task` or `by_backlog` row can carry gained a
+fifth, **`"precedes-journal"`**: this record's moment is older than the earliest moment its
+own session's journal witnessed. Until then those records read `"precedes-declaration"`,
+which asserts that the work named its task late — and measured on 2026-09-04, 96.2% of a
+real period (28,570 of 29,207 requests) read that way while fewer than one in five hundred
+of them had actually declared late. The population is ordinary, not an anomaly: reading a
+resumed transcript stores the turns it inherited under the session that read them, dated
+when each was *billed*, days before that session opened a journal. Keyed on the journal's
+own earliest witnessed moment, the same field the `"inferred"` bound above already reads,
+never on its `session_start` line. Decided before `"no-declaration"`, so a journal that
+declared nothing *and* did not cover the record is named by the coverage fact. A consumer
+that switched exhaustively on the four previous reasons must add this one; every row's
+`totals` still reconciles to the period total.
+
+Bumped from `12` when **`by_prompt`** joined the top-level breakdowns — the prompt that
+caused the work, grouped by the turn each record came from. It is the one breakdown no host
+limit can leave empty: every record the reader stores already carries its own turn, where
+`by_step` depends on a host naming a skill and reads a few percent on a session whose real
+cost sits in subagents. A row with no `prompt` is a record whose turn nothing named, placed
+last like every other axis' remainder rather than dropped. A consumer that summed every
+breakdown's `requests` against `totals.requests` has one more breakdown to sum.
 
 Bumped from `11` when **`by_task`'s `attribution` stopped being always `"declared"`**. A
 record no declaration covers is now named after the one task folder its session wrote into,
@@ -230,7 +252,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
 
 ```jsonc
 {
-  "cost_report_version": 13,
+  "cost_report_version": 14,
   "period": { "from_day": "2026-07-01", "to_day": "2026-07-31" },
   "measurement_enabled": true,                  // this project's own switch, right now — see Versioning
   "task": "2026_08/2026_08_21_cost-reporter",   // absent unless --task was given
@@ -245,7 +267,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "by_prompt":  [{ "prompt": "a-prompt-id", "started_at": "2026-07-01T09:00:00Z", "totals": {} }, { "totals": {} }],  // one row per prompt, largest first; the last row, undated, is every record that named none
   "by_tool":    [{ "tool": "codex", "coverage": "covered", "reason": "…", "capability": {}, "totals": {}, "session_totals": {} }],  // session_totals absent unless the tool has one (Copilot, today)
   "by_project": [{ "project": "acme/widgets", "totals": {} }],   // a row with no `project` names none known
-  "by_task":    [{ "task": "2026_08/2026_08_21_cost-reporter", "attribution": "declared", "totals": {} }, { "reason": "precedes-declaration", "totals": {} }],  // a row with no `task` carries `reason` instead, naming which of four facts applies; up to four such rows
+  "by_task":    [{ "task": "2026_08/2026_08_21_cost-reporter", "attribution": "declared", "totals": {} }, { "reason": "precedes-declaration", "totals": {} }],  // a row with no `task` carries `reason` instead, naming which of five facts applies; up to five such rows
   "by_backlog": [{ "backlog": "ai-driven-dev/framework#661", "totals": {} }, { "declaration": "none", "totals": {} }, { "declaration": "unreadable", "totals": {} }, { "reason": "precedes-declaration", "totals": {} }],  // a row with no `backlog` carries `declaration` (a known task naming none, or one whose declaration could not be read) or `reason` (a record in no task at all) — never both, never neither
   "by_flow":    [{ "flow": "aidd-orchestrator:01-sdlc", "started_at": "2026-07-01T09:00:00Z", "totals": {} }, { "flow": "aidd-orchestrator:01-sdlc", "started_at": "2026-07-01T11:00:00Z", "totals": {} }, { "totals": {} }],  // two runs of the same skill are two rows, told apart by `started_at`; the last row is work that fell in no flow interval at all
   "by_day":     [{ "day": "2026-07-01", "totals": {} }],         // every day in the period, in order, gaps included
@@ -286,7 +308,7 @@ read. Ordered by `cost_micro_usd` where a row has one, and by all four token cou
 summed where it does not — never by `input_tokens` and `output_tokens` alone, which every
 tool here dwarfs with cache. `by_task` places every row for what fell in no declared
 interval last regardless of size, in `reason`'s own fixed order (`"no-journal"`,
-`"no-declaration"`, `"precedes-declaration"`, `"journal-silent"`) — the same convention
+`"precedes-journal"`, `"no-declaration"`, `"precedes-declaration"`, `"journal-silent"`) — the same convention
 `by_person` gives its own no-identifier row, a reader sees tasks before the remainder, and
 the remainder in the
 same order every time. `by_backlog` places its own named rows first, then the row for a
@@ -342,11 +364,12 @@ read, the rest facts about the work:
 | `reason` | What it means |
 | --- | --- |
 | `"no-journal"` | No usable run journal reached this record's session. Either none was read for it at all — the journals are on another machine, the period was read from outside any checkout, the session's own journal was removed — or one was read and could not be used, its `session_start` header torn, so nothing here knows which session its lines belong to. Never says the work declared nothing. |
+| `"precedes-journal"` | This record's moment is older than the earliest moment its session's journal witnessed. Nothing declared late here; no journal existed yet. Reading a resumed transcript stores the turns it inherited under the session that read them, dated when each was billed — so this row is ordinarily the largest one in a period, and says nothing about how the work behaved. |
 | `"no-declaration"` | This record's session never declared a task at all. |
-| `"precedes-declaration"` | A task was declared, but some declared interval in this session starts *after* this record's own moment — true both for a record before the session's very first declaration and for one landing in the gap a `turn_end` leaves between two declarations. That gap is real, but it is the journal still going, never the journal falling silent. |
+| `"precedes-declaration"` | A task was declared, this record's moment falls inside what the journal witnessed, and some declared interval starts *after* it — a record before the session's very first declaration. Declared intervals run contiguously from each declaration to the next, so no gap exists between two of them. |
 | `"journal-silent"` | A task was declared, every declared interval starts at or before this record's moment, and none of them reaches it — the journal's own declared coverage ran out before this record's moment did. |
 
-Up to four such rows can appear in one period — one per reason actually present, never
+Up to five such rows can appear in one period — one per reason actually present, never
 fewer, and never two different gaps collapsed into one row the way a single, undifferentiated
 "no declared interval" row used to read before `cost_report_version` `6`. A session whose
 declaration could not be read produces the same `"no-declaration"` row a session that never
