@@ -2975,6 +2975,67 @@ function sessionStartPayload(host, { cwd, sessionId }) {
   return payload;
 }
 
+// Built from the same captured Claude Code payload the step_start tests replay, with only
+// the tool call swapped for the shell command a skill runs to declare its end - so the shape
+// under test is one that host really sends, never one hand-written to pass.
+function endPayload(cwd, sessionId, skill) {
+  const payload = loadFixture(STEP_FIXTURE_BY_HOST["claude-code"]);
+  payload.session_id = sessionId;
+  payload.cwd = cwd;
+  payload.tool_name = "Bash";
+  payload.tool_input = { command: `echo "aidd:step-end ${skill}"` };
+  return payload;
+}
+
+// A skill's end is the one thing about a step no host emits - measured, a `Skill` call's own
+// `tool_result` returns in about a tenth of a second, which is the dispatch and not the
+// completion. So the skill declares it, through a tool call it makes, and the hook - which
+// alone holds the session id and the working directory - writes the line.
+test("a skill declaring its own end leaves a step_end naming it", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/step-end.git" });
+  try {
+    const sessionId = "00000000-0000-4000-8000-00000000e0de";
+    replayIn(sessionStartPayload("claude-code", { cwd: repo, sessionId }), "session-start");
+    const result = replayIn(endPayload(repo, sessionId, "aidd-dev:01-plan"), "tool-used");
+    assert.equal(result.status, 0);
+
+    const ends = readRunFiles(runsDirOf(repo))
+      .flatMap((file) => readLines(file))
+      .filter((line) => line.type === "step_end");
+    assert.equal(ends.length, 1);
+    assert.equal(ends[0].skill, "aidd-dev:01-plan");
+    assert.ok(typeof ends[0].at === "string" && ends[0].at.length > 0);
+  } finally {
+    cleanup(repo);
+  }
+});
+
+// The same watermark `task-declared.cjs` protects, and for the same reason: file-writes.cjs
+// reads the run file's own mtime as "the moment this session last wrote a line" to know what
+// changed since. A step end landing between a shell write and the turn end that observes it
+// would push that mark past the write, silently dropping it.
+test("a step end never costs the turn a write it should have observed", () => {
+  const repo = makeTempRepo({ remote: "git@github.com:acme/step-end-mtime.git" });
+  const sessionId = "00000000-0000-4000-8000-00000000e0df";
+  try {
+    replayIn(makePayload({ cwd: repo, sessionId, event: "SessionStart" }));
+    writeIntoTaskFolder(repo, "2026_08_21_ended");
+    // Between the write and the turn end that observes it - the exact placement that costs
+    // the write if this line moves the watermark past it.
+    replayIn(endPayload(repo, sessionId, "aidd-dev:01-plan"), "tool-used");
+    replayIn({ ...makePayload({ cwd: repo, sessionId }), hook_event_name: "Stop" }, "turn-end");
+
+    const lines = readLines(readRunFiles(runsDirOf(repo))[0]);
+    assert.equal(lines.filter((line) => line.type === "step_end").length, 1);
+    assert.deepEqual(
+      lines.filter((line) => line.type === "file_written").map((line) => line.source),
+      ["observed"]
+    );
+  } finally {
+    cleanup(repo);
+  }
+});
+
 function stepLinesIn(repo) {
   const written = readRunFiles(runsDirOf(repo));
   if (written.length === 0) return [];
