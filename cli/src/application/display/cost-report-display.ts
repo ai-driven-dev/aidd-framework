@@ -42,12 +42,20 @@ export const TASK_ATTRIBUTION_LABELS: Record<TaskAttributionSource, string> = {
  * it - never one label standing in for all of them, which is the fault this breakdown
  * exists to avoid (see `CostReportTaskRow`).
  *
- * The first names a fact about the read, the rest facts about the work, and the wording
- * keeps them apart: "no usable run journal" says this layer never had a journal it could
- * attach to this session - none read, or one read whose header was torn - where "no usable
- * task declaration" says it had one and found no declaration in it. */
+ * The first names a fact about the read, the second a fact about the record's own age, the
+ * rest facts about how the work behaved, and the wording keeps all three apart: "no usable
+ * run journal" says this layer never had a journal it could attach to this session - none
+ * read, or one read whose header was torn - where "no usable task declaration" says it had
+ * one and found no declaration in it.
+ *
+ * The second is worded as a fact about the record's age, not about declaring, because that
+ * is what it is: a resumed transcript's inherited turns were billed before the session that
+ * read them ever opened a journal. Saying "before this session declared a task" of them -
+ * which this breakdown did until 2026-09-04, for 96.2% of a real period - reads as a
+ * complaint about the flow. */
 export const TASK_UNATTRIBUTED_LABELS: Record<TaskUnattributedReason, string> = {
   "no-journal": "no usable run journal for this session",
+  "precedes-journal": "older than anything this session's journal witnessed",
   "no-declaration": "no usable task declaration in this session",
   "precedes-declaration": "before the next task this session declares",
   "journal-silent": "the journal falls silent before this record",
