@@ -319,6 +319,48 @@ describe("buildCostReport — by_task groups by the declared interval a record f
 
     expect(built.byTasks).toHaveLength(1);
     expect(built.byTasks[0]?.task).toBeUndefined();
+    expect(built.byTasks[0]?.reason).toBe("precedes-journal");
+  });
+
+  // The live shape, and what the reason is for. A resumed transcript hands over turns billed
+  // days before the session that read them opened its journal; the same session then declares
+  // a task and works inside it. Both records are unattributed and they are unattributed for
+  // two different reasons - one predates the journal entirely, one is a genuinely late
+  // declaration - and one row for both would say the flow declared late in every case.
+  it("separates a record older than its journal from one that merely preceded a declaration", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-resumed",
+        tool: "claude-code",
+        writtenPaths: [],
+        taskIntervals: [
+          {
+            path: "aidd_docs/tasks/2026_08/first-task/plan.md",
+            startMs: Date.parse("2026-08-21T10:00:00Z"),
+            endMs: Date.parse("2026-08-21T12:00:00Z"),
+          },
+        ],
+        flowIntervals: [],
+        witnessed: {
+          fromMs: Date.parse("2026-08-21T09:00:00Z"),
+          toMs: Date.parse("2026-08-21T12:00:00Z"),
+        },
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({ vendor_id: "s-resumed", event_timestamp: "2026-08-17T10:00:00Z" }),
+      request({ vendor_id: "s-resumed", event_timestamp: "2026-08-21T09:30:00Z" }),
+      request({ vendor_id: "s-resumed", event_timestamp: "2026-08-21T11:00:00Z" }),
+    ];
+
+    const built = report({ records, journals });
+
+    expect(built.byTasks).toEqual([
+      { task: FIRST_TASK, attribution: "declared", totals: expect.anything() },
+      { reason: "precedes-journal", totals: expect.anything() },
+      { reason: "precedes-declaration", totals: expect.anything() },
+    ]);
+    expect(sumOf(built.byTasks).requests).toBe(built.totals.requests);
   });
 
   it("never lets the whole-session written-path inference the --task filter uses leak into this breakdown", () => {

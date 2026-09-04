@@ -42,12 +42,20 @@ export const TASK_ATTRIBUTION_LABELS: Record<TaskAttributionSource, string> = {
  * it - never one label standing in for all of them, which is the fault this breakdown
  * exists to avoid (see `CostReportTaskRow`).
  *
- * The first names a fact about the read, the rest facts about the work, and the wording
- * keeps them apart: "no usable run journal" says this layer never had a journal it could
- * attach to this session - none read, or one read whose header was torn - where "no usable
- * task declaration" says it had one and found no declaration in it. */
+ * The first names a fact about the read, the second a fact about the record's own age, the
+ * rest facts about how the work behaved, and the wording keeps all three apart: "no usable
+ * run journal" says this layer never had a journal it could attach to this session - none
+ * read, or one read whose header was torn - where "no usable task declaration" says it had
+ * one and found no declaration in it.
+ *
+ * The second is worded as a fact about the record's age, not about declaring, because that
+ * is what it is: a resumed transcript's inherited turns were billed before the session that
+ * read them ever opened a journal. Saying "before this session declared a task" of them -
+ * which this breakdown did until 2026-09-04, for 96.2% of a real period - reads as a
+ * complaint about the flow. */
 export const TASK_UNATTRIBUTED_LABELS: Record<TaskUnattributedReason, string> = {
   "no-journal": "no usable run journal for this session",
+  "precedes-journal": "older than anything this session's journal witnessed",
   "no-declaration": "no usable task declaration in this session",
   "precedes-declaration": "before the next task this session declares",
   "journal-silent": "the journal falls silent before this record",
@@ -100,8 +108,10 @@ const MAX_PRINTED_PROMPTS = 10;
 
 // A year asked for by day is 365 rows - the envelope always carries every one of them, but
 // a terminal is not the place to read that many. Above this, the text rendering names the
-// count and points at --json rather than printing a screen nobody can scan. Must match
-// render.cjs's own MAX_PRINTED_DAYS: the byte-compare e2e test holds the two to it.
+// count and points at --json rather than printing a screen nobody can scan. This used to
+// carry a second sentence pinning it to a plugin script's own copy of the number, held
+// equal by a byte-compare e2e test; both went when the CLI took the read path, so this is
+// the only place the limit lives.
 const MAX_PRINTED_DAYS = 31;
 
 /** Exported alongside `formatAmount` and `totalTokens` so the interactive telemetry screen
