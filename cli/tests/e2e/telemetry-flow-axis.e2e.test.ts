@@ -61,6 +61,14 @@ const RECORDS = [
   }),
   // Inside the first sdlc run, but from the hand-run skill - the journal cannot tell it apart.
   record({ turn_id: "first-run-hand-run", event_timestamp: "2026-03-10T09:35:00Z", cost_usd: 3 }),
+  // After the turn ended, before the next orchestrating step opens - still the first sdlc
+  // run, which a pause does not end. The separating record for this axis: while a turn_end
+  // closed a flow, this one fell outside every flow.
+  record({
+    turn_id: "first-run-after-pause",
+    event_timestamp: "2026-03-10T09:55:00Z",
+    cost_usd: 5,
+  }),
   // Inside the second, distinct sdlc run.
   record({ turn_id: "second-run", event_timestamp: "2026-03-10T10:10:00Z", cost_usd: 4 }),
 ];
@@ -126,8 +134,8 @@ describe("aidd telemetry report — by_flow through the real adapter, on real di
     // The first run holds both the orchestrator's own record and the hand-run skill's -
     // the journal cannot tell them apart, so both count inside it.
     const firstRun = sdlcRuns.find((row) => row.started_at === "2026-03-10T09:20:00Z");
-    expect(firstRun?.totals.requests).toBe(2);
-    expect(firstRun?.totals.cost_micro_usd).toBe(5_000_000);
+    expect(firstRun?.totals.requests).toBe(3);
+    expect(firstRun?.totals.cost_micro_usd).toBe(10_000_000);
     const secondRun = sdlcRuns.find((row) => row.started_at === "2026-03-10T10:00:00Z");
     expect(secondRun?.totals.requests).toBe(1);
     expect(secondRun?.totals.cost_micro_usd).toBe(4_000_000);
@@ -142,6 +150,22 @@ describe("aidd telemetry report — by_flow through the real adapter, on real di
     const outside = envelope.by_flow.find((row) => row.flow === undefined);
     expect(outside?.totals.requests).toBe(1);
     expect(outside?.totals.cost_micro_usd).toBe(1_000_000);
+  });
+
+  it("keeps a record made after the turn ended inside the flow that was still running", async () => {
+    // The rule this axis changed on 2026-09-04, end to end: a `turn_end` is a pause, not the
+    // end of an orchestration. This record sits between the pause at 09:50 and the next
+    // orchestrating step at 10:00, so where it lands is the whole difference between the two
+    // rules - it used to be counted outside every flow.
+    const { projectDir, fakeHome } = await seed();
+
+    const result = await runCli(["telemetry", "report", ...PERIOD, "--json"], projectDir, fakeHome);
+    const envelope = JSON.parse(result.stdout) as Envelope;
+
+    const firstRun = envelope.by_flow.find((row) => row.started_at === "2026-03-10T09:20:00Z");
+    expect(firstRun?.totals.cost_micro_usd).toBe(10_000_000); // 2 + 3 + 5, the record at 09:55 included
+    const outside = envelope.by_flow.find((row) => row.flow === undefined);
+    expect(outside?.totals.cost_micro_usd).toBe(1_000_000); // the 09:10 record alone
   });
 
   it("reconciles by_flow to the same total as the period", async () => {
