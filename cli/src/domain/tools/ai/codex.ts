@@ -271,7 +271,7 @@ export const codex: AiTool<
     transcript: CODEX_ROLLOUT_LOCATION,
     // Complete counters per turn, no currency anywhere in a rollout, and no field naming a
     // running skill - so a step here can only ever come from a run journal interval.
-    supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
+    supplies: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: false },
   },
   // Codex's payload carries no write-path field for any tool (writes go through
   // apply_patch), but a declaration never needed one - it reads the same Bash command text

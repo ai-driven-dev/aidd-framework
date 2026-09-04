@@ -127,7 +127,12 @@ describe("ReadLocalCostUseCase", () => {
 
   // What this stub route supplies is not what this file is about; it declares the minimum
   // the type requires so the use case's own orchestration is what gets tested.
-  const SUPPLIES_NOTHING = { tokenCounters: false, amount: false, toolStatedStep: false } as const;
+  const SUPPLIES_NOTHING = {
+    tokenCounters: false,
+    amount: false,
+    toolStatedStep: false,
+    agentName: false,
+  } as const;
 
   function declareClaudeReadable(): void {
     registerTool({
@@ -1520,7 +1525,12 @@ describe("a refusal holds on the one writer left", () => {
  */
 describe("which readers a session reaches", () => {
   const SPIED_SESSION = "spied-session";
-  const SUPPLIES = { tokenCounters: true, amount: false, toolStatedStep: false } as const;
+  const SUPPLIES = {
+    tokenCounters: true,
+    amount: false,
+    toolStatedStep: false,
+    agentName: false,
+  } as const;
 
   let claudeConfig: AiTool<unknown>;
   let codexConfig: AiTool<unknown>;

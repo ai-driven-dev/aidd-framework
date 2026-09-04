@@ -12,7 +12,10 @@ const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 // the bundle to 567.7 KB - tighter headroom than the 560 raise left, on
 // purpose, rather than padding past what was actually measured.
 // 593 was set when `by_prompt` joined the breakdowns: measured 588.4 -> 590.6 KB,
-// +2.2 KB for the axis that is complete by construction. Same tight headroom.
+// +2.2 KB for the axis no host limit can empty. Same tight headroom.
+// 596 was set when `by_agent` learned to tell a main thread from a tool that never
+// names an agent: measured 592.0 -> 593.8 KB across two changes, the flow axis's own
+// tool-stated row included. Same 2.2 KB headroom the raise before it left.
 const budgetKB = pkg.bundleBudgetKB ?? 500;
 const budgetBytes = budgetKB * 1024;
 

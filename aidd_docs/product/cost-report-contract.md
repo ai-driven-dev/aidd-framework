@@ -61,7 +61,7 @@ up, by what each task's folder declares. `by_flow` is a ninth, also with no filt
 own — see **`by_flow`** below — grouping by which orchestrated run the journal's own step
 sequence names, never a second capture. `by_agent` is a tenth, also with no filter of its
 own — see **`by_agent`** below — grouping by which agent ran, the main thread carrying its
-own row rather than an absence. `by_prompt` is an eleventh, also with no filter of its own —
+own row rather than an absence, and a tool that names no agent at all carrying a third. `by_prompt` is an eleventh, also with no filter of its own —
 see **`by_prompt`** below — grouping by the prompt that caused the work, the one breakdown
 no host limit can leave empty. `aidd telemetry report` also takes
 `--axis <name>` (`total`, `day`, `step`, `model`, `agent`, `prompt`, `task`, `backlog`,
@@ -215,9 +215,12 @@ is where the spend is: measured on a live session, ten subagent transcripts held
 subagent tokens) where almost none names a skill (2.7%). That is why `by_step` can read a
 few percent while a session's real cost sits elsewhere — the host names a skill on the main
 thread alone, and no reader can invent one. `by_agent` needs no new capture: `agent_name` was
-already on the record. A row with no `agent` is the main thread's own, never "no agent" — a
-session starts there. On every tool but Claude Code the field is never set at all, so that
-one row carries the whole period, which is the truth for a route that names no subagents.
+already on the record. Every row carries `attribution`, and it is what tells the two rows
+that name no agent apart: `main-thread` is a tool that names agents saying this record
+belongs to none of them — a session starts there, and it is never "no agent" — while
+`not-stated` is a tool whose route never names one. Only Claude Code's route does today, so
+on Codex, Copilot and OpenCode every record joins the `not-stated` row. It used to join the
+main thread's, which asserted of those tools a fact nothing observed.
 
 Bumped from `8` to `9` when `attribution` gained a fourth value, `prompt-matched`.
 
@@ -277,7 +280,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "active_time_s": 2820,                        // absent when no record carried it
   "by_step":    [{ "step": "aidd-dev:02-implement", "attribution": "journal-interval", "totals": {} }],
   "by_model":   [{ "model": "gpt-5.6-sol", "totals": {} }],  // a row with no "model" names none known
-  "by_agent":   [{ "agent": "aidd-dev:executor", "totals": {} }, { "totals": {} }],  // a row with no "agent" is the main thread's own, never "no agent"
+  "by_agent":   [{ "agent": "aidd-dev:executor", "attribution": "tool-stated", "totals": {} }, { "attribution": "main-thread", "totals": {} }, { "attribution": "not-stated", "totals": {} }],  // "main-thread" is a tool that names agents saying this is none of them; "not-stated" is a tool whose route never names one
   "by_prompt":  [{ "prompt": "a-prompt-id", "started_at": "2026-07-01T09:00:00Z", "totals": {} }, { "totals": {} }],  // one row per prompt, largest first; the last row, undated, is every record that named none
   "by_tool":    [{ "tool": "codex", "coverage": "covered", "reason": "…", "capability": {}, "totals": {}, "session_totals": {} }],  // session_totals absent unless the tool has one (Copilot, today)
   "by_project": [{ "project": "acme/widgets", "totals": {} }],   // a row with no `project` names none known
@@ -606,7 +609,7 @@ supply an amount and a session that cost nothing look identical in the numbers.
 
 ```jsonc
 "capability": {
-  "local_read": { "token_counters": true, "amount": false, "tool_stated_step": false },
+  "local_read": { "token_counters": true, "amount": false, "tool_stated_step": false, "agent_name": false },
   "export": null,
   "journal_attributable": true,
   "task_attributable": false
@@ -620,6 +623,7 @@ supply an amount and a session that cost nothing look identical in the numbers.
 | `token_counters` | That route yields the four counters. |
 | `amount` | That route yields a figure denominated in currency. Never a credit or a premium request. |
 | `tool_stated_step` | The tool names the running step itself. A journal interval is not this. |
+| `agent_name` | The route names the agent a record belongs to, and so also says when one is the main thread's own. Without it, `by_agent` reads this tool's records as `not-stated`, never as the main thread. |
 | `journal_attributable` | The run journal names this tool's sessions. **False means two things:** no step can come from an interval, *and* a read that sweeps the journal never reaches one of its sessions — so the tool can be perfectly readable and still report nothing until someone names a session by hand. |
 | `task_attributable` | A session on this tool can be traced to the task it worked on — declared, inferred, or both. False only where the journal hook never reaches a tool call for this host at all, since a declaration needs a tool call's own arguments to read; true for every declared host today, OpenCode included as of 2026-08-31 (`registry-conformance.unit.test.ts` keeps this tied to the journal hook's own dispatch rather than typed in twice by hand). |
 

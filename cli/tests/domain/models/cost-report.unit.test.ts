@@ -42,6 +42,30 @@ const NO_CAPABILITY = {
   taskAttributable: false,
 } as const;
 
+/** A tool whose local read does name the agent that ran - what tells "the main thread" apart
+ * from "a tool that could never have said". Only a declaration says which; `NO_CAPABILITY`
+ * declares no route at all, so a record of that tool can support neither reading. */
+const NAMES_AGENTS = {
+  localRead: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: true },
+  export: null,
+  journalAttributable: false,
+  taskAttributable: false,
+} as const;
+
+/** Codex's real shape: a declared local read that supplies token counters and names no
+ * agent. Distinct from `NO_CAPABILITY`, which declares no route at all - the reading must
+ * be the same for both, and only a route that says `agentName` can support a main thread. */
+const READS_BUT_NAMES_NO_AGENT = {
+  localRead: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: false },
+  export: null,
+  journalAttributable: false,
+  taskAttributable: false,
+} as const;
+
+const TOOL_THAT_NAMES_AGENTS = [
+  { tool: "claude" as const, coverage: "covered" as const, capability: NAMES_AGENTS },
+];
+
 function report(overrides: Partial<CostReportInput> = {}) {
   return buildCostReport({
     fromDay: "2026-08-17",
@@ -390,8 +414,8 @@ describe("buildCostReport — a still-open local-read turn is superseded, never 
 
 describe("buildCostReport — a local-read session total, the first kind: 'session' report figure (#697)", () => {
   const COPILOT_CAPABILITY = {
-    localRead: { tokenCounters: true, amount: false, toolStatedStep: false },
-    export: { tokenCounters: false, amount: false, toolStatedStep: false },
+    localRead: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: false },
+    export: { tokenCounters: false, amount: false, toolStatedStep: false, agentName: false },
     journalAttributable: true,
     taskAttributable: false,
   } as const;
@@ -562,6 +586,7 @@ describe("buildCostReport — every breakdown reconciles", () => {
   // `agent_name` — 924 of 1018 stored records hold one — and nothing exposed it.
   it("breaks the period down by the agent that ran, main thread included as its own row", () => {
     const built = report({
+      declaredTools: TOOL_THAT_NAMES_AGENTS,
       records: [
         request({ agent_name: "aidd-dev:executor", input_tokens: 100 }),
         request({ agent_name: "aidd-dev:executor", input_tokens: 50 }),
@@ -570,15 +595,83 @@ describe("buildCostReport — every breakdown reconciles", () => {
       ],
     });
 
-    expect(built.byAgents.map((row) => [row.agent, row.totals.requests])).toEqual([
-      ["aidd-dev:executor", 2],
-      ["Explore", 1],
-      [undefined, 1],
+    expect(built.byAgents.map((row) => [row.agent, row.attribution, row.totals.requests])).toEqual([
+      ["aidd-dev:executor", "tool-stated", 2],
+      ["Explore", "tool-stated", 1],
+      [undefined, "main-thread", 1],
     ]);
+  });
+
+  // The reading this axis used to give every tool: `agent_name` absent was read as the main
+  // thread, whatever the tool was. Only Claude Code's reader ever sets the field - Codex,
+  // Copilot and OpenCode never do - so on those tools every record was reported as the main
+  // thread on no evidence at all. An unknown is never a zero, and it is never a main thread
+  // either.
+  it("claims no main thread for a tool whose route never names an agent", () => {
+    const built = report({
+      declaredTools: [{ tool: "codex", coverage: "covered", capability: NO_CAPABILITY }],
+      records: [request({ tool: "codex", input_tokens: 4 })],
+    });
+
+    expect(built.byAgents.map((row) => [row.agent, row.attribution])).toEqual([
+      [undefined, "not-stated"],
+    ]);
+  });
+
+  // A declared route is not the same as a route that names agents. Codex reads token
+  // counters from its own rollout files and names no agent anywhere in them, so its records
+  // must read exactly as a tool with no declared route at all does.
+  it("claims no main thread for a route that is declared and still names no agent", () => {
+    const built = report({
+      declaredTools: [{ tool: "codex", coverage: "covered", capability: READS_BUT_NAMES_NO_AGENT }],
+      records: [request({ tool: "codex", input_tokens: 4 })],
+    });
+
+    expect(built.byAgents.map((row) => row.attribution)).toEqual(["not-stated"]);
+  });
+
+  // Two records that named no agent, from two tools, are two rows and not one: merging them
+  // would put work nobody could attribute in the same row as work a tool measured as its own
+  // main thread.
+  it("keeps a main thread apart from a tool that could never have named one", () => {
+    const built = report({
+      declaredTools: [
+        ...TOOL_THAT_NAMES_AGENTS,
+        { tool: "codex", coverage: "covered", capability: NO_CAPABILITY },
+      ],
+      records: [
+        request({ input_tokens: 5 }),
+        request({ tool: "codex", input_tokens: 5, vendor_id: "v-codex" }),
+      ],
+    });
+
+    expect(built.byAgents.map((row) => row.attribution).sort()).toEqual([
+      "main-thread",
+      "not-stated",
+    ]);
+  });
+
+  it("reconciles the agent breakdown when a named, a main-thread and an unstated row all exist", () => {
+    const built = report({
+      declaredTools: [
+        ...TOOL_THAT_NAMES_AGENTS,
+        { tool: "codex", coverage: "covered", capability: NO_CAPABILITY },
+      ],
+      records: [
+        request({ agent_name: "aidd-dev:checker", input_tokens: 7 }),
+        request({ input_tokens: 3 }),
+        request({ tool: "codex", input_tokens: 11, vendor_id: "v-codex" }),
+      ],
+    });
+
+    expect(built.byAgents).toHaveLength(3);
+    const summed = built.byAgents.reduce((total, row) => total + (row.totals.inputTokens ?? 0), 0);
+    expect(summed).toBe(built.totals.inputTokens);
   });
 
   it("reconciles the agent breakdown to the same total as every other axis", () => {
     const built = report({
+      declaredTools: TOOL_THAT_NAMES_AGENTS,
       records: [
         request({ agent_name: "aidd-dev:checker", input_tokens: 7 }),
         request({ input_tokens: 3 }),
