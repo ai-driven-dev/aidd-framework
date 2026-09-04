@@ -220,6 +220,26 @@ describe("toCostReportEnvelope", () => {
     expect(unknown?.totals.requests).toBe(1);
   });
 
+  // snake_case on the wire like every other row, and `started_at` beside the id because an
+  // opaque prompt id alone is not something a person can look up. The row for records that
+  // named no prompt carries neither field - see `CostReportPromptRow`.
+  it("carries one row per prompt, dated, and one undated row for records that named none", () => {
+    const envelope = envelopeOf({
+      records: [
+        record({ turn_id: "a", prompt_id: "p-1", event_timestamp: "2026-08-18T09:00:00.000Z" }),
+        record({ turn_id: "b", prompt_id: "p-1", event_timestamp: "2026-08-18T09:05:00.000Z" }),
+        record({ turn_id: "c", event_timestamp: "2026-08-18T10:00:00.000Z" }),
+      ],
+    });
+
+    expect(
+      envelope.by_prompt.map((row) => [row.prompt, row.started_at, row.totals.requests])
+    ).toEqual([
+      ["p-1", "2026-08-18T09:00:00Z", 2],
+      [undefined, undefined, 1],
+    ]);
+  });
+
   it("carries every day the period spans, a gap included, never sorted by size", () => {
     const envelope = envelopeOf({
       records: [

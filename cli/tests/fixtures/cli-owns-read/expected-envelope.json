@@ -1,5 +1,5 @@
 {
-  "cost_report_version": 12,
+  "cost_report_version": 13,
   "period": {
     "from_day": "2026-01-01",
     "to_day": "2026-01-31"
@@ -70,6 +70,17 @@
     }
   ],
   "by_agent": [
+    {
+      "totals": {
+        "requests": 4,
+        "input_tokens": 935,
+        "output_tokens": 590,
+        "cache_read_tokens": 14100,
+        "cache_creation_tokens": 1000
+      }
+    }
+  ],
+  "by_prompt": [
     {
       "totals": {
         "requests": 4,

@@ -61,12 +61,14 @@ up, by what each task's folder declares. `by_flow` is a ninth, also with no filt
 own — see **`by_flow`** below — grouping by which orchestrated run the journal's own step
 sequence names, never a second capture. `by_agent` is a tenth, also with no filter of its
 own — see **`by_agent`** below — grouping by which agent ran, the main thread carrying its
-own row rather than an absence. `aidd telemetry report` also takes
-`--axis <name>` (`total`, `day`, `step`, `model`, `agent`, `task`, `backlog`, `flow`,
-`tool`, `project` or `person`), which picks one of those arrays and renders it alone as a small
+own row rather than an absence. `by_prompt` is an eleventh, also with no filter of its own —
+see **`by_prompt`** below — grouping by the prompt that caused the work, the one breakdown
+no host limit can leave empty. `aidd telemetry report` also takes
+`--axis <name>` (`total`, `day`, `step`, `model`, `agent`, `prompt`, `task`, `backlog`,
+`flow`, `tool`, `project` or `person`), which picks one of those arrays and renders it alone as a small
 pasteable artefact instead of the whole object — a convenience for copying one figure out,
 not a second way to group. Every figure `--axis` can show is already in the plain `--json`
-object; only the one-artefact-at-a-time rendering is what it adds. A name outside the ten
+object; only the one-artefact-at-a-time rendering is what it adds. A name outside the twelve
 is a usage error naming the valid list (`Error: Unknown axis 'bogus'. Expected one of:
 total, day, step, model, task, backlog, flow, tool, project, person.`, exit `1`), not a
 silently empty artefact. Given both flags at once, `--json` wins and `--axis` is ignored, never the
@@ -129,7 +131,7 @@ real count is the ordinary case of reporting from a project whose switch never c
 work, never a contradiction (see "Attributing records to a task" for the same scope split
 elsewhere in this object).
 
-Every object carries `cost_report_version`, currently `12`.
+Every object carries `cost_report_version`, currently `13`.
 
 Bumped from `11` when **`by_task`'s `attribution` stopped being always `"declared"`**. A
 record no declaration covers is now named after the one task folder its session wrote into,
@@ -156,6 +158,20 @@ this reason covers what the anchor cannot reach: a project whose journals are on
 machine, a period read outside any checkout, a session whose journal was removed. A
 consumer that switched exhaustively on the three previous reasons must add this one; every
 row's `totals` still reconciles to the period total exactly as before.
+
+Bumped from `12` when **`by_prompt`** joined the top-level breakdowns. It is the only
+breakdown complete by construction: every other one depends on a capture that may not have
+happened — a run journal, an identity file, a task declaration, a host that names the skill
+it is running — while this one depends on a field the transcript reader already resolves for
+every usage line by walking `parentUuid` back to the turn that caused it. Measured 2026-09-04
+on the built binary against one real session: 1073 of 1073 records carried a `prompt_id`, its
+972 subagent records included, across 12 distinct prompts. Nothing new is captured for it.
+A row carries `started_at`, the earliest moment in that prompt, because a prompt id alone is
+opaque — it is what a person greps for in their own transcript. The row for records that
+named no prompt carries neither `prompt` nor `started_at`, is placed last rather than ranked
+among the prompts, and holds the whole period on every tool but Claude Code, which is the
+truth for a route whose files cannot say which turn caused what. A consumer summing every
+breakdown's `requests` against `totals.requests` has one more to include.
 
 Bumped from `9` when **`by_agent`** joined the top-level breakdowns. It exists because that
 is where the spend is: measured on a live session, ten subagent transcripts held 432M of its
@@ -214,7 +230,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
 
 ```jsonc
 {
-  "cost_report_version": 12,
+  "cost_report_version": 13,
   "period": { "from_day": "2026-07-01", "to_day": "2026-07-31" },
   "measurement_enabled": true,                  // this project's own switch, right now — see Versioning
   "task": "2026_08/2026_08_21_cost-reporter",   // absent unless --task was given
@@ -225,6 +241,8 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "active_time_s": 2820,                        // absent when no record carried it
   "by_step":    [{ "step": "aidd-dev:02-implement", "attribution": "journal-interval", "totals": {} }],
   "by_model":   [{ "model": "gpt-5.6-sol", "totals": {} }],  // a row with no "model" names none known
+  "by_agent":   [{ "agent": "aidd-dev:executor", "totals": {} }, { "totals": {} }],  // a row with no "agent" is the main thread's own, never "no agent"
+  "by_prompt":  [{ "prompt": "a-prompt-id", "started_at": "2026-07-01T09:00:00Z", "totals": {} }, { "totals": {} }],  // one row per prompt, largest first; the last row, undated, is every record that named none
   "by_tool":    [{ "tool": "codex", "coverage": "covered", "reason": "…", "capability": {}, "totals": {}, "session_totals": {} }],  // session_totals absent unless the tool has one (Copilot, today)
   "by_project": [{ "project": "acme/widgets", "totals": {} }],   // a row with no `project` names none known
   "by_task":    [{ "task": "2026_08/2026_08_21_cost-reporter", "attribution": "declared", "totals": {} }, { "reason": "precedes-declaration", "totals": {} }],  // a row with no `task` carries `reason` instead, naming which of four facts applies; up to four such rows
@@ -411,6 +429,25 @@ it.
 
 `by_flow` sums to `totals.requests` exactly like every other breakdown, and carries no
 filter of its own — grouping only, the same as `by_person`.
+
+### `by_prompt` — the axis no host limit can empty
+
+Every other breakdown can read low for a reason that is about the capture, not the work: a
+skill the host never named, a journal that was never written, an identity nobody declared.
+This one groups on `prompt_id`, which the transcript reader resolves for every usage line it
+stores — subagent lines included, by walking each file's own `parentUuid` chain back to the
+turn that caused the work.
+
+| Row | Means |
+| --- | --- |
+| `prompt` and `started_at` | one prompt, and the earliest moment measured inside it |
+| neither field | every record whose tool cannot say which prompt caused it |
+
+Ordered largest first, like every breakdown but `by_day`; the remainder row is placed last
+rather than ranked, because a bucket drawn from many turns has no size comparable to a single
+turn's. The text rendering prints the ten largest and then says how many it withheld — one
+row per turn is unbounded where every other axis has a small vocabulary — while this object
+always carries them all.
 
 ### `by_person` — three outcomes, never a merge
 

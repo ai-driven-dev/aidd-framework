@@ -88,6 +88,16 @@ const NO_KNOWN_MODEL = "no known model";
 // Not "no agent": the main thread is where a session starts, not an absence.
 const MAIN_THREAD = "the main thread";
 
+// A prompt id is a uuid, wider than `LABEL_WIDTH`, and `padTo` never truncates - so the
+// column is its own width rather than colliding with the one every named label shares.
+const PROMPT_WIDTH = 38;
+const NO_PROMPT = "no prompt named";
+// One row per turn, unbounded where every other axis has a small vocabulary: 12 on one
+// session, 31,435 over the measured history. Truncated rather than suppressed the way
+// `printDays` suppresses - a partial series is a lie about continuity, a top N of a ranking
+// is not, and the line below says how many it withheld. The envelope still carries them all.
+const MAX_PRINTED_PROMPTS = 10;
+
 // A year asked for by day is 365 rows - the envelope always carries every one of them, but
 // a terminal is not the place to read that many. Above this, the text rendering names the
 // count and points at --json rather than printing a screen nobody can scan. Must match
@@ -386,6 +396,24 @@ function printAgents(output: CLIOutput, report: CostReport, basis: Basis): void 
   }
 }
 
+/** The one axis no host limit can empty: every record the transcript reader resolves carries
+ * a `prompt_id`, where a skill name, an identity and a declaration each may be missing. */
+function printPrompts(output: CLIOutput, report: CostReport, basis: Basis): void {
+  if (report.byPrompts.length === 0) return;
+  output.print("");
+  output.print(`  by prompt   ${basis.label}`);
+  for (const row of report.byPrompts.slice(0, MAX_PRINTED_PROMPTS)) {
+    const share = shareOf(row.totals, basis.of, basis.useCost);
+    output.print(
+      `    ${padTo(row.prompt ?? NO_PROMPT, PROMPT_WIDTH)}${padTo(row.startedAt ?? "", 22)}${share}   ${figureFor(row.totals, basis.useCost)}`
+    );
+  }
+  const withheld = report.byPrompts.length - MAX_PRINTED_PROMPTS;
+  if (withheld > 0) {
+    output.print(`    ${formatCount(withheld)} more prompts — see --json for all of them`);
+  }
+}
+
 function printModels(output: CLIOutput, report: CostReport, basis: Basis): void {
   if (report.byModels.length === 0) return;
   output.print("");
@@ -537,6 +565,7 @@ function printBreakdowns(output: CLIOutput, report: CostReport): void {
   printTaskAttribution(output, report, basis);
   printStepsAndAttribution(output, report, basis);
   printAgents(output, report, basis);
+  printPrompts(output, report, basis);
   printModels(output, report, basis);
   printProjects(output, report.byProjects, basis);
   printTasks(output, report.byTasks, basis);

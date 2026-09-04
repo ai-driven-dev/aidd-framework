@@ -18,6 +18,14 @@ import type { AiToolId } from "./tool-ids.js";
  * `sink_schema_version` exists on a stored line. Adding a field a consumer may ignore is
  * not a bump; changing what an existing field means is.
  *
+ * Bumped to 13: `by_prompt` is a new top-level breakdown, and a consumer summing every
+ * breakdown's `requests` against `totals.requests` to check nothing was dropped now has one
+ * more to include. It is the only breakdown complete by construction: every other depends on
+ * a capture that may not have happened, this one on a field the transcript reader already
+ * resolves for every usage line. Measured 2026-09-04 on the built binary - 1073 of 1073
+ * records of one real session carried a `prompt_id`, its 972 subagent records included,
+ * across 12 distinct prompts.
+ *
  * Bumped to 12: `by_task`'s `attribution` stops being always `"declared"`. A record no
  * declaration covers, in a session whose journal witnessed it and that wrote into exactly
  * one task folder, is now named after that folder and marked `"inferred"` - so one task can
@@ -94,7 +102,7 @@ import type { AiToolId } from "./tool-ids.js";
  * `by_project`'s `project` to optional back when that row was added.
  *
  * Bumped to 2: `by_project` and `by_day` are new top-level breakdowns. */
-export const COST_REPORT_ENVELOPE_VERSION = 12;
+export const COST_REPORT_ENVELOPE_VERSION = 13;
 
 /** Money as whole micro-dollars, the way the report carries it: an integer, so a consumer
  * summing several reports gets the same answer this one did. Divide by 1,000,000 for
@@ -204,6 +212,15 @@ export interface CostReportEnvelopeAgentRow {
   readonly totals: CostReportEnvelopeTotals;
 }
 
+/** `started_at` is the earliest moment in the prompt, and only a named prompt carries one:
+ * the row for records that named no prompt is drawn from many turns, so a start moment there
+ * would assert a unit that never existed. */
+export interface CostReportEnvelopePromptRow {
+  readonly prompt?: string;
+  readonly started_at?: string;
+  readonly totals: CostReportEnvelopeTotals;
+}
+
 export interface CostReportEnvelopeFlowRow {
   readonly flow?: string;
   readonly started_at?: string;
@@ -282,6 +299,9 @@ export interface CostReportEnvelope {
   readonly by_flow: readonly CostReportEnvelopeFlowRow[];
   /** One row per agent that ran, `agent` absent on the main thread's own row. */
   readonly by_agent: readonly CostReportEnvelopeAgentRow[];
+  /** One row per prompt that caused work, largest first, plus the row for records that
+   * named none. The one breakdown no host limit can empty. */
+  readonly by_prompt: readonly CostReportEnvelopePromptRow[];
   /** Every day the period spans, always — a long period stays readable by how the text
    * rendering chooses to show it, never by what this envelope omits. */
   readonly by_day: readonly CostReportEnvelopeDayRow[];
@@ -383,6 +403,14 @@ function agentRow(row: CostReport["byAgents"][number]): CostReportEnvelopeAgentR
   return { ...(row.agent === undefined ? {} : { agent: row.agent }), totals: totals(row.totals) };
 }
 
+function promptRow(row: CostReport["byPrompts"][number]): CostReportEnvelopePromptRow {
+  return {
+    ...(row.prompt === undefined ? {} : { prompt: row.prompt }),
+    ...(row.startedAt === undefined ? {} : { started_at: row.startedAt }),
+    totals: totals(row.totals),
+  };
+}
+
 function flowRow(row: CostReport["byFlows"][number]): CostReportEnvelopeFlowRow {
   return {
     ...(row.flow === undefined ? {} : { flow: row.flow }),
@@ -455,6 +483,7 @@ function breakdownFields(
   | "by_backlog"
   | "by_flow"
   | "by_agent"
+  | "by_prompt"
   | "by_day"
   | "by_person"
 > {
@@ -467,6 +496,7 @@ function breakdownFields(
     by_backlog: report.byBacklog.map(backlogRow),
     by_flow: report.byFlows.map(flowRow),
     by_agent: report.byAgents.map(agentRow),
+    by_prompt: report.byPrompts.map(promptRow),
     by_day: report.byDays.map((row) => ({ day: row.day, totals: totals(row.totals) })),
     by_person: report.byPeople.map(personRow),
   };

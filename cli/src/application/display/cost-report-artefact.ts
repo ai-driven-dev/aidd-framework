@@ -36,6 +36,7 @@ export const ARTEFACT_AXES = [
   "step",
   "model",
   "agent",
+  "prompt",
   "task",
   "backlog",
   "flow",
@@ -46,6 +47,7 @@ export const ARTEFACT_AXES = [
 
 export type ArtefactAxis = (typeof ARTEFACT_AXES)[number];
 
+const NO_PROMPT_LABEL = "no prompt named";
 const UNKNOWN_AMOUNT = "amount unknown";
 const NOTHING_MEASURED = "nothing in this period";
 const NOTHING_IN_SELECTION = "nothing in this selection";
@@ -339,6 +341,24 @@ function agentArtefact(envelope: CostReportEnvelope): string {
   );
 }
 
+/** An id and the moment its turn began: the id alone is opaque, and the moment is what a
+ * person greps for in their own transcript. `—` where a row carries none, which is the row
+ * for records that named no prompt - never a moment borrowed from another turn. */
+function promptArtefact(envelope: CostReportEnvelope): string {
+  const rows = envelope.by_prompt.map(
+    (row) =>
+      `| ${row.prompt ?? NO_PROMPT_LABEL} | ${row.started_at ?? "—"} | ${figure(row.totals, envelope)} |`
+  );
+  return [
+    header(envelope, "by prompt"),
+    "",
+    "| Prompt | Started at | Total |",
+    "| --- | --- | --- |",
+    ...rows,
+    ...caveats(envelope),
+  ].join("\n");
+}
+
 function modelArtefact(envelope: CostReportEnvelope): string {
   return table(
     envelope,
@@ -416,6 +436,7 @@ const BUILDERS: Record<ArtefactAxis, (envelope: CostReportEnvelope) => string> =
   step: stepArtefact,
   model: modelArtefact,
   agent: agentArtefact,
+  prompt: promptArtefact,
   task: taskArtefact,
   backlog: backlogArtefact,
   flow: flowArtefact,

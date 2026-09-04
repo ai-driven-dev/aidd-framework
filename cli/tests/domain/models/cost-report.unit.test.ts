@@ -589,6 +589,106 @@ describe("buildCostReport — every breakdown reconciles", () => {
     expect(summed).toBe(built.totals.inputTokens);
   });
 
+  // The one axis that is complete by construction. Measured 2026-09-04 on the built binary
+  // against a sandboxed copy of one real session: 1073 of 1073 records carried a
+  // `prompt_id`, its 972 subagent records included, across 12 distinct prompts. Every other
+  // breakdown depends on a capture that may not have happened; this one depends on a field
+  // the reader already resolves for every usage line by walking `parentUuid`.
+  it("breaks the period down by the prompt that caused the work, largest first", () => {
+    const built = report({
+      records: [
+        request({ prompt_id: "p-1", input_tokens: 100 }),
+        request({ prompt_id: "p-1", input_tokens: 50 }),
+        request({ prompt_id: "p-2", input_tokens: 10 }),
+        request({ input_tokens: 1 }),
+      ],
+    });
+
+    expect(built.byPrompts.map((row) => [row.prompt, row.totals.requests])).toEqual([
+      ["p-1", 2],
+      ["p-2", 1],
+      [undefined, 1],
+    ]);
+  });
+
+  // An opaque id alone is unreadable, so the row carries the earliest moment in its group -
+  // the one a person greps for in their own transcript. Earliest, never the first seen: the
+  // sink is append-ordered by read, not by turn.
+  it("dates each prompt row by the earliest moment in that prompt, not the first record read", () => {
+    const built = report({
+      records: [
+        request({ prompt_id: "p-1", event_timestamp: "2026-08-18T09:30:00.500Z" }),
+        request({ prompt_id: "p-1", event_timestamp: "2026-08-18T09:00:00.000Z" }),
+      ],
+    });
+
+    expect(built.byPrompts.map((row) => row.startedAt)).toEqual(["2026-08-18T09:00:00Z"]);
+  });
+
+  // A record whose tool cannot say which prompt caused it is its own row, never merged into
+  // one that named a prompt - the same rule `by_agent` and `by_model` follow for an absent
+  // key. Every host but Claude Code is in that row today.
+  it("leaves records that named no prompt undated rather than dating them from another prompt", () => {
+    const built = report({
+      records: [
+        request({ prompt_id: "p-1", event_timestamp: "2026-08-18T09:00:00.000Z" }),
+        request({ event_timestamp: "2026-08-18T10:00:00.000Z" }),
+      ],
+    });
+    const noPrompt = built.byPrompts.filter((row) => row.prompt === undefined);
+
+    expect(noPrompt.map((row) => row.startedAt)).toEqual([undefined]);
+  });
+
+  // A remainder, not a prompt: sorting it among the prompts by size would rank a bucket
+  // drawn from many turns against single turns. `by_flow` places its own remainder the same
+  // way, and for the same reason.
+  it("keeps the row for records that named no prompt last, even when it is the largest", () => {
+    const built = report({
+      records: [request({ input_tokens: 900 }), request({ prompt_id: "p-1", input_tokens: 10 })],
+    });
+
+    expect(built.byPrompts.map((row) => row.prompt)).toEqual(["p-1", undefined]);
+  });
+
+  // Every counter, not only the one this session happens to look at: 99% of a real session's
+  // tokens are cache, so a guard summing `input_tokens` alone would pass while the counter
+  // carrying the money went missing. `requests` too, which is what a session-kind record
+  // leaking into a prompt group would break.
+  it("reconciles the prompt breakdown to the same total as every other axis", () => {
+    const built = report({
+      records: [
+        request({ prompt_id: "p-1", input_tokens: 7, output_tokens: 5, cache_read_tokens: 4000 }),
+        request({ input_tokens: 3, output_tokens: 2, cache_creation_tokens: 900 }),
+      ],
+    });
+
+    const summed = built.byPrompts.reduce(
+      (total, row) => ({
+        requests: total.requests + row.totals.requests,
+        inputTokens: total.inputTokens + (row.totals.inputTokens ?? 0),
+        outputTokens: total.outputTokens + (row.totals.outputTokens ?? 0),
+        cacheReadTokens: total.cacheReadTokens + (row.totals.cacheReadTokens ?? 0),
+        cacheCreationTokens: total.cacheCreationTokens + (row.totals.cacheCreationTokens ?? 0),
+      }),
+      {
+        requests: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+      }
+    );
+
+    expect(summed).toEqual({
+      requests: built.totals.requests,
+      inputTokens: built.totals.inputTokens,
+      outputTokens: built.totals.outputTokens,
+      cacheReadTokens: built.totals.cacheReadTokens,
+      cacheCreationTokens: built.totals.cacheCreationTokens,
+    });
+  });
+
   it("splits the total four ways by how strongly each part was attributed", () => {
     const built = report({ records: RECORDS });
     expect(built.attributionMix.map((row) => [row.attribution, row.totals.requests])).toEqual([
