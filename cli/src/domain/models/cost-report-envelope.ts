@@ -7,6 +7,7 @@ import type {
   CostTotals,
   PersonIdentityUnusableCause,
 } from "./cost-report.js";
+import type { FlowAttributionSource } from "./flow-attribution.js";
 import type { PersonResolution } from "./person-resolution.js";
 import type { StepAttributionSource } from "./step-attribution.js";
 import type { TaskAttributionSource, TaskUnattributedReason } from "./task-attribution.js";
@@ -221,8 +222,14 @@ export interface CostReportEnvelopePromptRow {
   readonly totals: CostReportEnvelopeTotals;
 }
 
+/** `attribution` says how this flow came to be known, the same three-way shape `by_step`
+ * carries: `journal-interval` for a flow the journal opened and closed, `tool-stated` for
+ * one only a record's own tool named, `unattributed` for the row of work that joined
+ * neither. A `tool-stated` row carries no `started_at` - it is a bucket drawn from however
+ * many runs of that skill the tool named, and a name is not a run. */
 export interface CostReportEnvelopeFlowRow {
   readonly flow?: string;
+  readonly attribution: FlowAttributionSource;
   readonly started_at?: string;
   readonly totals: CostReportEnvelopeTotals;
 }
@@ -414,6 +421,7 @@ function promptRow(row: CostReport["byPrompts"][number]): CostReportEnvelopeProm
 function flowRow(row: CostReport["byFlows"][number]): CostReportEnvelopeFlowRow {
   return {
     ...(row.flow === undefined ? {} : { flow: row.flow }),
+    attribution: row.attribution,
     ...(row.startedAt === undefined ? {} : { started_at: row.startedAt }),
     totals: totals(row.totals),
   };

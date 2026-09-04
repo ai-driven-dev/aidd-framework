@@ -146,11 +146,15 @@ A breakdown the object leaves empty is a section left out, never a table of zero
      item - "issue #661 cost X", never "this task cost X". Two tasks declaring the same
      item are already merged into one row; nothing here re-merges anything.
    - `by_flow` answers "what did this orchestrated run cost" - unrelated to task or
-     backlog, and read from the journal's own step sequence with nothing new captured for
-     it. Two runs of the *same* orchestrating skill in one session are two rows, told apart
-     by when each opened - never merge them by name. A skill a person ran by hand while a
-     flow was open is counted inside it, since the journal cannot tell it from one the
-     orchestrator itself invoked - say so if it changes how a figure reads.
+     backlog, and read with nothing new captured for it. Two runs of the *same*
+     orchestrating skill in one session are two rows, told apart by when each opened -
+     never merge them by name. Read `attribution` before comparing two rows:
+     `journal-interval` is a run the journal opened and closed, `tool-stated` is every run
+     of that skill only the record's own tool named, in a session whose journal opened no
+     flow at all - it names no opening moment, because a name is not a run. A skill a
+     person ran by hand while a flow was open is counted inside it, since the journal
+     cannot tell it from one the orchestrator itself invoked - say so if it changes how a
+     figure reads.
 5. **Read `capability` before explaining an absent figure.** A tool that cannot supply a number and a session that consumed nothing look identical in the numbers.
 
    | False field | Means |

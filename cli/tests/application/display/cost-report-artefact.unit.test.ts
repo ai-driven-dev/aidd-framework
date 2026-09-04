@@ -368,6 +368,35 @@ describe("buildCostReportArtefact — the flow axis states its own limits with t
     expect(artefact).not.toContain("opens a flow of its own");
   });
 
+  // A limit is a statement about a mechanism that ran. A period whose only flow came from a
+  // record's own tool never walked a step sequence, so the two limits of that walk describe
+  // nothing that happened here and must not be printed.
+  it("states no journal limit for a period whose only flow its own tool named", () => {
+    const statedOnly = envelopeOf({
+      records: [
+        request({
+          event_timestamp: "2026-08-17T10:30:00Z",
+          input_tokens: 10,
+          step_attribution: "tool-stated",
+          step: "aidd-orchestrator:01-sdlc",
+        }),
+      ],
+      journals: [],
+    });
+
+    const artefact = buildCostReportArtefact(statedOnly, "flow");
+
+    expect(artefact).toContain("is every run of that skill at once");
+    expect(artefact).not.toContain("counted inside it");
+    expect(artefact).not.toContain("opens a flow of its own");
+  });
+
+  it("states no tool-stated limit for a period whose flows the journal all witnessed", () => {
+    expect(buildCostReportArtefact(withOneFlow(), "flow")).not.toContain(
+      "is every run of that skill at once"
+    );
+  });
+
   it("states them on the flow axis alone, never on every axis", () => {
     const envelope = withOneFlow();
     for (const axis of ARTEFACT_AXES.filter((name) => name !== "flow")) {

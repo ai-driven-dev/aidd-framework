@@ -1,6 +1,7 @@
 import type { TelemetryRouteSupply } from "../capabilities/telemetry-capability.js";
 import type { PersonIdentity } from "../ports/person-identity-reader.js";
-import type { FlowInterval } from "./flow-attribution.js";
+import type { FlowAttributionSource, FlowInterval } from "./flow-attribution.js";
+import { ORCHESTRATING_SKILLS } from "./flow-attribution.js";
 import { type PersonResolution, type ResolvedPerson, resolvePerson } from "./person-resolution.js";
 import { STEP_ATTRIBUTION_SOURCES, type StepAttributionSource } from "./step-attribution.js";
 import {
@@ -250,6 +251,7 @@ export interface CostReportBacklogRow {
  * neither can this breakdown. */
 export interface CostReportFlowRow {
   readonly flow?: string;
+  readonly attribution: FlowAttributionSource;
   readonly startedAt?: string;
   readonly totals: CostTotals;
 }
@@ -848,7 +850,7 @@ const OUTSIDE_EVERY_FLOW = Symbol("record falls outside every flow interval");
 // `byFlows` for free the property `phase-1.md` asks of it: a record outside every flow can
 // never collide with one inside, since `OUTSIDE_EVERY_FLOW` is a symbol no interval object
 // can ever equal.
-type FlowRowKey = FlowInterval | typeof OUTSIDE_EVERY_FLOW;
+type FlowRowKey = FlowInterval | string | typeof OUTSIDE_EVERY_FLOW;
 
 /** Every session's own closed flow intervals, keyed by vendor id - the same shape
  * `allTaskIntervalsByVendorId` gives task intervals, one layer wider. */
@@ -877,7 +879,30 @@ function flowKeyOf(
   const interval = intervals.find((candidate) =>
     momentFallsWithin([candidate], record.event_timestamp)
   );
-  return interval ?? OUTSIDE_EVERY_FLOW;
+  return interval ?? flowTheToolNamed(record) ?? OUTSIDE_EVERY_FLOW;
+}
+
+/** The orchestrating skill a record's own tool named, for a record no interval covers -
+ * the skill name itself as the key, which no `FlowInterval` object and no symbol can ever
+ * equal, so the two row kinds never collide.
+ *
+ * Only `tool-stated`. A `journal-interval` step is an inference from a moment, and the
+ * intervals it was inferred from are the very ones just checked; a `prompt-matched` one
+ * names the step a prompt opened, which is a step and not an orchestration. Neither says a
+ * flow was orchestrated, and reading either as one would put work inside a flow on the
+ * strength of the reader's own guess.
+ *
+ * Why this capture exists at all: a session resumed after its context was compacted invokes
+ * nothing again, so no `step_start` hook fires and its journal opens no flow, while the
+ * transcript goes on stating the step on every record it produces. Measured on this
+ * machine - one such session, six `step_end` lines, no `step_start`, and 2,220 records in a
+ * 30-day period that `by_flow` placed outside every flow while `by_step` named the very
+ * skill they ran under. */
+function flowTheToolNamed(record: TelemetrySinkRecord): string | undefined {
+  if (record.step_attribution !== "tool-stated") return undefined;
+  return record.step !== undefined && ORCHESTRATING_SKILLS.has(record.step)
+    ? record.step
+    : undefined;
 }
 
 // A record with no identifier is its own row, keyed on a symbol the same way
@@ -1497,11 +1522,19 @@ function flowRows(flows: ReadonlyMap<FlowRowKey, TotalsAccumulator>): readonly C
   let outsideEveryFlow: CostReportFlowRow | undefined;
   for (const [key, accumulator] of flows) {
     if (key === OUTSIDE_EVERY_FLOW) {
-      outsideEveryFlow = { totals: accumulator.build() };
+      outsideEveryFlow = { attribution: "unattributed", totals: accumulator.build() };
+      continue;
+    }
+    // A name is not a run. The tool-stated row is a bucket drawn from however many runs of
+    // that skill the tool named, so it carries no `startedAt` - the same reason the row for
+    // records that named no prompt carries none.
+    if (typeof key === "string") {
+      named.push({ flow: key, attribution: "tool-stated", totals: accumulator.build() });
       continue;
     }
     named.push({
       flow: key.skill,
+      attribution: "journal-interval",
       startedAt: isoSecondsFromMs(key.startMs),
       totals: accumulator.build(),
     });
@@ -1509,7 +1542,7 @@ function flowRows(flows: ReadonlyMap<FlowRowKey, TotalsAccumulator>): readonly C
   const sorted = bySize(
     named,
     (row) => row.totals,
-    (row) => `${row.flow ?? ""}@${row.startedAt ?? ""}`
+    (row) => `${row.flow ?? ""}@${row.attribution}@${row.startedAt ?? ""}`
   );
   return outsideEveryFlow === undefined ? sorted : [...sorted, outsideEveryFlow];
 }
