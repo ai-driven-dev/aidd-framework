@@ -22,7 +22,11 @@ export class RestoreAllUseCase {
     private readonly restoreUseCase: RestoreUseCase
   ) {}
 
-  async execute(projectRoot: string, interactive: boolean): Promise<RestoreAllResult> {
+  async execute(
+    projectRoot: string,
+    interactive: boolean,
+    force: boolean
+  ): Promise<RestoreAllResult> {
     const errors: GlobalExecutionError[] = [];
     const manifest = await this.manifestRepo.load();
     if (manifest === null) throw new NoManifestError();
@@ -34,6 +38,7 @@ export class RestoreAllUseCase {
       version,
       effectiveFiles,
       interactive,
+      force,
       manifest,
       errors
     );
@@ -76,6 +81,7 @@ export class RestoreAllUseCase {
     version: string,
     files: string[] | undefined,
     interactive: boolean,
+    force: boolean,
     manifest: Awaited<ReturnType<ManifestRepository["load"]>>,
     errors: GlobalExecutionError[]
   ): Promise<{
@@ -92,7 +98,10 @@ export class RestoreAllUseCase {
         docsDir: DOCS_DIR,
         projectRoot,
         files,
-        force: interactive,
+        // Consent to overwrite a modified file comes from one of two places: the
+        // checkbox the interactive run already made the user answer, or --force
+        // when there is no TTY to ask. Neither is a reason to ask a second time.
+        force: force || interactive,
         interactive,
         manifest,
       });
