@@ -108,8 +108,10 @@ const MAX_PRINTED_PROMPTS = 10;
 
 // A year asked for by day is 365 rows - the envelope always carries every one of them, but
 // a terminal is not the place to read that many. Above this, the text rendering names the
-// count and points at --json rather than printing a screen nobody can scan. Must match
-// render.cjs's own MAX_PRINTED_DAYS: the byte-compare e2e test holds the two to it.
+// count and points at --json rather than printing a screen nobody can scan. This used to
+// carry a second sentence pinning it to a plugin script's own copy of the number, held
+// equal by a byte-compare e2e test; both went when the CLI took the read path, so this is
+// the only place the limit lives.
 const MAX_PRINTED_DAYS = 31;
 
 /** Exported alongside `formatAmount` and `totalTokens` so the interactive telemetry screen
