@@ -5,7 +5,12 @@ import {
   type MergeFileEntry,
   removeEntriesFromJson,
 } from "../../domain/models/merge.js";
-import { AIDD_CONFIG_FILENAME, AIDD_DIR, PLUGIN_CACHE_SUBDIR } from "../../domain/models/paths.js";
+import {
+  AIDD_CONFIG_FILENAME,
+  AIDD_DIR,
+  AIDD_MARKETPLACES_FILENAME,
+  PLUGIN_CACHE_SUBDIR,
+} from "../../domain/models/paths.js";
 import { isAiToolId } from "../../domain/models/tool-ids.js";
 import type { FileReader } from "../../domain/ports/file-reader.js";
 import type { FileWriter } from "../../domain/ports/file-writer.js";
@@ -58,15 +63,18 @@ export class CleanUseCase {
   }
 
   // config.json is the committed telemetry switch: a file clean did not write,
-  // so clean never removes it. Every directory clean did write must go before
-  // the emptiness check, or its own presence blocks a removal that should
-  // happen.
+  // so clean never removes it. marketplaces.json is the opposite case and goes:
+  // the CLI wrote it itself, and left behind it kept `.aidd` alive after a run
+  // that reported it had cleaned all AIDD files. Every directory and file clean
+  // did write must go before the emptiness check, or its own presence blocks a
+  // removal that should happen.
   private async removeAiddState(projectRoot: string): Promise<void> {
     const aiddDir = join(projectRoot, AIDD_DIR);
     const configKept = await this.fs.fileExists(join(aiddDir, AIDD_CONFIG_FILENAME));
 
     await this.fs.deleteDirectory(join(aiddDir, "cache"));
     await this.fs.deleteDirectory(join(projectRoot, PLUGIN_CACHE_SUBDIR));
+    await this.fs.deleteFile(join(aiddDir, AIDD_MARKETPLACES_FILENAME));
     await this.manifestRepo.delete();
 
     if (!(await this.fs.fileExists(aiddDir))) return;

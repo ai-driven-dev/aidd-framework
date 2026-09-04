@@ -125,4 +125,47 @@ describe("clean", () => {
 
     expect(deps.fs.listUnder(join(PROJECT_ROOT, ".aidd")).length).toBe(0);
   });
+
+  it("removes .aidd/marketplaces.json, which the CLI wrote and no person committed", async () => {
+    // The registry is this tool's own project-scope state, unlike config.json, which a
+    // person commits and clean therefore keeps. Left behind, `.aidd` survives a run that
+    // reported it had cleaned all AIDD files.
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "claude" as ToolId);
+
+    const registry = join(PROJECT_ROOT, ".aidd", "marketplaces.json");
+    await deps.fs.writeFile(registry, JSON.stringify({ version: 1, marketplaces: [] }));
+
+    const useCase = new CleanUseCase(
+      deps.fs,
+      deps.manifestRepo,
+      deps.logger,
+      deps.gitignoreUseCase
+    );
+    await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+    expect(deps.fs.has(registry)).toBe(false);
+    expect(deps.fs.listUnder(join(PROJECT_ROOT, ".aidd")).length).toBe(0);
+  });
+
+  it("still keeps .aidd/config.json when a registry lived beside it", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "claude" as ToolId);
+
+    const config = join(PROJECT_ROOT, ".aidd", "config.json");
+    const registry = join(PROJECT_ROOT, ".aidd", "marketplaces.json");
+    await deps.fs.writeFile(config, JSON.stringify({ telemetry: { enabled: true } }));
+    await deps.fs.writeFile(registry, JSON.stringify({ version: 1, marketplaces: [] }));
+
+    const useCase = new CleanUseCase(
+      deps.fs,
+      deps.manifestRepo,
+      deps.logger,
+      deps.gitignoreUseCase
+    );
+    await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+    expect(deps.fs.has(config)).toBe(true);
+    expect(deps.fs.has(registry)).toBe(false);
+  });
 });

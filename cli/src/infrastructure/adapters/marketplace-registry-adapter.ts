@@ -6,10 +6,9 @@ import {
   type MarketplaceData,
   type MarketplaceScope,
 } from "../../domain/models/marketplace.js";
-import { AIDD_DIR } from "../../domain/models/paths.js";
+import { AIDD_DIR, AIDD_MARKETPLACES_FILENAME } from "../../domain/models/paths.js";
 import type { MarketplaceRegistry } from "../../domain/ports/marketplace-registry.js";
 
-const REGISTRY_FILENAME = "marketplaces.json";
 const SCHEMA_VERSION = 1;
 
 interface RegistryFile {
@@ -70,13 +69,13 @@ export class MarketplaceRegistryAdapter implements MarketplaceRegistry {
   }
 
   private projectPath(projectRoot: string): string {
-    return join(projectRoot, AIDD_DIR, REGISTRY_FILENAME);
+    return join(projectRoot, AIDD_DIR, AIDD_MARKETPLACES_FILENAME);
   }
 
   private userPath(): string {
     const override = process.env.AIDD_USER_CONFIG_DIR;
     const dir = override ?? join(homedir(), ".config", "aidd");
-    return join(dir, REGISTRY_FILENAME);
+    return join(dir, AIDD_MARKETPLACES_FILENAME);
   }
 
   private async read(path: string, scope: MarketplaceScope): Promise<Marketplace[]> {

@@ -2,6 +2,9 @@ import { join } from "node:path";
 
 export const AIDD_DIR = ".aidd";
 export const AIDD_CONFIG_FILENAME = "config.json";
+/** The project-scope marketplace registry, named once: `MarketplaceRegistryAdapter` writes
+ * it and `CleanUseCase` removes it, and a second spelling is how one of them forgets. */
+export const AIDD_MARKETPLACES_FILENAME = "marketplaces.json";
 export const DOCS_DIR = "aidd_docs" as const;
 export const RUNS_SUBDIR = "runs" as const;
 export const PLUGIN_CACHE_SUBDIR = join(AIDD_DIR, "plugin-cache");
