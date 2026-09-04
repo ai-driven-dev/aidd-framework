@@ -135,10 +135,14 @@ function isPresent(value: string | undefined): value is string {
 }
 
 /** Every already-stored record for this session, keyed on its own `turn_id` — a record
- * with none is not indexed, the same as it is never matched by a re-read. */
+ * with none is not indexed, the same as it is never matched by a re-read.
+ *
+ * Mutable on purpose: `storeNewCandidates` adds each record it appends, so a second
+ * candidate for the same turn in the same batch is matched against the first. Read once
+ * and left frozen, it could only ever answer for what an earlier invocation stored. */
 function groupByTurnId(
   records: readonly TelemetrySinkRecord[]
-): ReadonlyMap<string, readonly TelemetrySinkRecord[]> {
+): Map<string, TelemetrySinkRecord[]> {
   const groups = new Map<string, TelemetrySinkRecord[]>();
   for (const record of records) {
     if (record.turn_id === undefined) continue;
@@ -147,6 +151,16 @@ function groupByTurnId(
     else groups.set(record.turn_id, [record]);
   }
   return groups;
+}
+
+function indexStoredRecord(
+  groups: Map<string, TelemetrySinkRecord[]>,
+  record: TelemetrySinkRecord
+): void {
+  if (record.turn_id === undefined) return;
+  const bucket = groups.get(record.turn_id);
+  if (bucket) bucket.push(record);
+  else groups.set(record.turn_id, [record]);
 }
 
 const LOCAL_READ_TURN_COUNTER_KEYS = [
@@ -492,6 +506,14 @@ export class ReadLocalCostUseCase {
    * as the same record is read again. A candidate with no `turn_id` cannot be matched and
    * is always appended: the reader's contract forbids inventing a key for it.
    *
+   * The index grows as this appends, so two candidates for one turn in a single batch match
+   * each other and not only what an earlier invocation left behind. Measured on a live sink:
+   * 339 groups of byte-identical records, 474 extra lines, every one a subagent record —
+   * of that project's 29,741 distinct request ids, 350 appear in more than one transcript
+   * file, and one read hands both copies over as two candidates of the same batch. No
+   * reported figure ever moved, since `collapseBilledRequests` already merges them at
+   * report time; what this stops is the sink storing an observation it already holds.
+   *
    * A candidate whose `turn_id` *is* already stored is dropped — unless it is a
    * `kind: "request"` local-read record correcting an earlier, still-open reading of the
    * same turn (`isLocalReadTurnCorrection`), the one case this match used to refuse
@@ -511,7 +533,9 @@ export class ReadLocalCostUseCase {
     for (const candidate of candidates) {
       const prior = candidate.turn_id === undefined ? undefined : byTurnId.get(candidate.turn_id);
       if (prior && !this.isLocalReadTurnCorrection(candidate, prior)) continue;
-      await this.sink.appendRecord(this.stampProvenanceAndTool(tool, candidate, attribution), at);
+      const record = this.stampProvenanceAndTool(tool, candidate, attribution);
+      await this.sink.appendRecord(record, at);
+      indexStoredRecord(byTurnId, record);
       stored++;
     }
     return stored;

@@ -488,6 +488,73 @@ describe("ReadLocalCostUseCase", () => {
     expect([...sink.files.values()].flat()).toHaveLength(1);
   });
 
+  // Measured 2026-09-04 on a live sink: 339 groups of byte-identical records, 474 extra
+  // lines, every one of them a subagent record. The source explains it - of 29,741 distinct
+  // requestIds in that project's transcripts, 350 appear in more than one file, and one read
+  // of the session hands both copies to this method as two candidates of the same batch. The
+  // index of what is already stored was read once, before the loop, so the first copy was
+  // appended without the second ever being matched against it.
+  it("stores one line when a single read hands it the same turn twice", async () => {
+    declareClaudeReadable();
+    const sink = new InMemoryTelemetrySink();
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE, { ...CANDIDATE }])]]),
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
+    );
+
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SESSION_ID,
+    });
+
+    expect([...sink.files.values()].flat()).toHaveLength(1);
+    expect(result.toolReports.find((r) => r.tool === "claude")?.recordsStored).toBe(1);
+  });
+
+  // The correction route still works inside one batch: a second candidate for the same turn
+  // that strictly improves on the first is what `isLocalReadTurnCorrection` exists for, and
+  // making the index live must not turn it into a drop.
+  it("still lands a correction when the larger reading arrives in the same read", async () => {
+    declareClaudeReadable();
+    const sink = new InMemoryTelemetrySink();
+    const larger: LocalCostCandidateRecord = { ...CANDIDATE, output_tokens: 900 };
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([CANDIDATE, larger])]]),
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
+    );
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
+
+    expect([...sink.files.values()].flat().map((r) => r.output_tokens)).toEqual([20, 900]);
+  });
+
+  // The live index must key on a real identifier and nothing else. Folding the keyless
+  // records under one shared key would let the second of them be matched against the first
+  // and dropped - the opposite of the contract the test below states for a re-read.
+  it("appends every keyless candidate of one batch, never matching two of them to each other", async () => {
+    declareClaudeReadable();
+    const keyless: LocalCostCandidateRecord = { ...CANDIDATE, turn_id: undefined };
+    const sink = new InMemoryTelemetrySink();
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map([["claude", stubReader([keyless, { ...keyless }])]]),
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
+    );
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, env: {}, sessionId: SESSION_ID });
+
+    expect([...sink.files.values()].flat()).toHaveLength(2);
+  });
+
   it("never synthesises a key for a candidate with no request identifier, and cannot dedup it", async () => {
     declareClaudeReadable();
     const noIdCandidate: LocalCostCandidateRecord = { ...CANDIDATE, turn_id: undefined };
