@@ -91,3 +91,40 @@ test("every skill declaring its own end declares it in the form the hook reads",
     assert.equal(read, expected, `${relative} declares an end the hook reads as ${read}`);
   }
 });
+
+// The reader's own list of skills that open a flow, read from where it is declared rather
+// than repeated here - a fourth orchestrator added to that set is covered by this test
+// without this file being told, the same way the test above covers a fifth skill declaring
+// an end. Parsed out of the TypeScript source because that set is the one place the fact
+// lives; a copy kept here would be the second, and the two would disagree first.
+function orchestratingSkillsTheReaderKnows() {
+  const source = fs.readFileSync(
+    path.join(__dirname, "..", "..", "cli", "src", "domain", "models", "flow-attribution.ts"),
+    "utf8"
+  );
+  const declared = /ORCHESTRATING_SKILLS: ReadonlySet<string> = new Set\(\[([^\]]*)\]\)/u.exec(
+    source
+  );
+  assert.ok(declared, "the reader no longer declares its orchestrating skills as a literal set");
+  return [...declared[1].matchAll(/"([^"]+)"/gu)].map((match) => match[1]);
+}
+
+test("every skill that opens a flow also says when that flow is over", () => {
+  // Without the marker a flow closes on the next orchestrating step_start or, failing that,
+  // on the journal's own last witnessed moment - so an orchestration that never says it is
+  // done goes on owning everything the session did afterwards. The reader stopped closing a
+  // flow at a `turn_end` on 2026-09-04, which is what makes this declaration load-bearing
+  // rather than a refinement.
+  const qualified = orchestratingSkillsTheReaderKnows().filter((skill) => skill.includes(":"));
+  assert.ok(qualified.length > 0, "no orchestrating skill is named in the plugin-qualified form");
+
+  for (const skill of qualified) {
+    const [plugin, name] = skill.split(":");
+    const skillFile = path.join(pluginsDir, plugin, "skills", name, "SKILL.md");
+    assert.ok(fs.existsSync(skillFile), `${skill} names no skill in this tree`);
+    const read = declaredStepEnd({
+      tool_input: { command: fs.readFileSync(skillFile, "utf8") },
+    });
+    assert.equal(read, skill, `${skill} declares no end the hook reads as its own`);
+  }
+});
