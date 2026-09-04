@@ -18,6 +18,12 @@ import type { AiToolId } from "./tool-ids.js";
  * `sink_schema_version` exists on a stored line. Adding a field a consumer may ignore is
  * not a bump; changing what an existing field means is.
  *
+ * Bumped to 10: `by_agent` is a new top-level breakdown, and a consumer summing every
+ * breakdown's `requests` against `totals.requests` to check nothing was dropped now has one
+ * more to include. It exists because that is where the spend is: on a live session, ten
+ * subagent files held 432M of 466M tokens, every one of their lines naming its agent and
+ * almost none its skill.
+ *
  * Bumped to 9: `attribution` gains a fourth value, `prompt-matched`. A consumer that
  * understood the three before it — mapping them to labels, or switching exhaustively — meets
  * a value it has no case for, which is a misread rather than a field it may ignore. It ranks
@@ -71,7 +77,7 @@ import type { AiToolId } from "./tool-ids.js";
  * `by_project`'s `project` to optional back when that row was added.
  *
  * Bumped to 2: `by_project` and `by_day` are new top-level breakdowns. */
-export const COST_REPORT_ENVELOPE_VERSION = 9;
+export const COST_REPORT_ENVELOPE_VERSION = 10;
 
 /** Money as whole micro-dollars, the way the report carries it: an integer, so a consumer
  * summing several reports gets the same answer this one did. Divide by 1,000,000 for
@@ -174,6 +180,11 @@ export interface CostReportEnvelopeBacklogRow {
  * skill and `startedAt` when it opened, together telling apart two rows that share a name:
  * the same skill run twice in one session is two rows, never merged into one. Both are
  * absent on the one row for work that fell in no flow interval at all. */
+export interface CostReportEnvelopeAgentRow {
+  readonly agent?: string;
+  readonly totals: CostReportEnvelopeTotals;
+}
+
 export interface CostReportEnvelopeFlowRow {
   readonly flow?: string;
   readonly started_at?: string;
@@ -250,6 +261,8 @@ export interface CostReportEnvelope {
   readonly by_task: readonly CostReportEnvelopeTaskRow[];
   readonly by_backlog: readonly CostReportEnvelopeBacklogRow[];
   readonly by_flow: readonly CostReportEnvelopeFlowRow[];
+  /** One row per agent that ran, `agent` absent on the main thread's own row. */
+  readonly by_agent: readonly CostReportEnvelopeAgentRow[];
   /** Every day the period spans, always — a long period stays readable by how the text
    * rendering chooses to show it, never by what this envelope omits. */
   readonly by_day: readonly CostReportEnvelopeDayRow[];
@@ -347,6 +360,10 @@ function backlogRow(row: CostReport["byBacklog"][number]): CostReportEnvelopeBac
   };
 }
 
+function agentRow(row: CostReport["byAgents"][number]): CostReportEnvelopeAgentRow {
+  return { ...(row.agent === undefined ? {} : { agent: row.agent }), totals: totals(row.totals) };
+}
+
 function flowRow(row: CostReport["byFlows"][number]): CostReportEnvelopeFlowRow {
   return {
     ...(row.flow === undefined ? {} : { flow: row.flow }),
@@ -418,6 +435,7 @@ function breakdownFields(
   | "by_task"
   | "by_backlog"
   | "by_flow"
+  | "by_agent"
   | "by_day"
   | "by_person"
 > {
@@ -429,6 +447,7 @@ function breakdownFields(
     by_task: report.byTasks.map(taskRow),
     by_backlog: report.byBacklog.map(backlogRow),
     by_flow: report.byFlows.map(flowRow),
+    by_agent: report.byAgents.map(agentRow),
     by_day: report.byDays.map((row) => ({ day: row.day, totals: totals(row.totals) })),
     by_person: report.byPeople.map(personRow),
   };

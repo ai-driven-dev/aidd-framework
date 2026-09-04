@@ -59,9 +59,11 @@ never a way to keep only one person's records. `by_backlog` is an eighth, also w
 filter of its own — see **`by_backlog`** below — regrouping `by_task`'s own rows one level
 up, by what each task's folder declares. `by_flow` is a ninth, also with no filter of its
 own — see **`by_flow`** below — grouping by which orchestrated run the journal's own step
-sequence names, never a second capture. `aidd telemetry report` also takes
-`--axis <name>` (`total`, `day`, `step`, `model`, `task`, `backlog`, `flow`, `tool`,
-`project` or `person`), which picks one of those arrays and renders it alone as a small
+sequence names, never a second capture. `by_agent` is a tenth, also with no filter of its
+own — see **`by_agent`** below — grouping by which agent ran, the main thread carrying its
+own row rather than an absence. `aidd telemetry report` also takes
+`--axis <name>` (`total`, `day`, `step`, `model`, `agent`, `task`, `backlog`, `flow`,
+`tool`, `project` or `person`), which picks one of those arrays and renders it alone as a small
 pasteable artefact instead of the whole object — a convenience for copying one figure out,
 not a second way to group. Every figure `--axis` can show is already in the plain `--json`
 object; only the one-artefact-at-a-time rendering is what it adds. A name outside the ten
@@ -127,7 +129,21 @@ real count is the ordinary case of reporting from a project whose switch never c
 work, never a contradiction (see "Attributing records to a task" for the same scope split
 elsewhere in this object).
 
-Every object carries `cost_report_version`, currently `8` — bumped from `7` when `by_flow`
+Every object carries `cost_report_version`, currently `10`.
+
+Bumped from `9` when **`by_agent`** joined the top-level breakdowns. It exists because that
+is where the spend is: measured on a live session, ten subagent transcripts held 432M of its
+466M tokens, and every one of their lines names its agent (`attributionAgent`, 100% of
+subagent tokens) where almost none names a skill (2.7%). That is why `by_step` can read a
+few percent while a session's real cost sits elsewhere — the host names a skill on the main
+thread alone, and no reader can invent one. `by_agent` needs no new capture: `agent_name` was
+already on the record. A row with no `agent` is the main thread's own, never "no agent" — a
+session starts there. On every tool but Claude Code the field is never set at all, so that
+one row carries the whole period, which is the truth for a route that names no subagents.
+
+Bumped from `8` to `9` when `attribution` gained a fourth value, `prompt-matched`.
+
+Bumped from `7` to `8` when `by_flow`
 joined the top-level breakdowns (a consumer summing every breakdown's `requests` against
 `totals.requests` now has a seventh breakdown to include). `by_flow` groups by which
 orchestrated run the journal's own step sequence already names — no skill declares that it

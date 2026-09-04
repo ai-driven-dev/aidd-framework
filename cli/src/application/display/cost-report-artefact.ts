@@ -35,6 +35,7 @@ export const ARTEFACT_AXES = [
   "day",
   "step",
   "model",
+  "agent",
   "task",
   "backlog",
   "flow",
@@ -51,6 +52,8 @@ const NOTHING_IN_SELECTION = "nothing in this selection";
 const SESSION_TOTAL_LABEL = "session total, not requests";
 const NO_KNOWN_PROJECT = "no known project";
 const NO_KNOWN_MODEL = "no known model";
+// Not "no agent": the main thread is where a session starts, not an absence.
+const MAIN_THREAD = "the main thread";
 // Distinct on purpose, per the contract's own three-way shape: an unresolved row names an
 // identity that is real but unplaced, and repeats once per such identity since each is its
 // own row; the no-identity row is singular and says nobody opted in at all. Neither label
@@ -325,6 +328,17 @@ function flowArtefact(envelope: CostReportEnvelope): string {
   ].join("\n");
 }
 
+function agentArtefact(envelope: CostReportEnvelope): string {
+  return table(
+    envelope,
+    "by agent",
+    "Agent",
+    envelope.by_agent.map(
+      (row) => `| ${row.agent ?? MAIN_THREAD} | ${figure(row.totals, envelope)} |`
+    )
+  );
+}
+
 function modelArtefact(envelope: CostReportEnvelope): string {
   return table(
     envelope,
@@ -401,6 +415,7 @@ const BUILDERS: Record<ArtefactAxis, (envelope: CostReportEnvelope) => string> =
   day: dayArtefact,
   step: stepArtefact,
   model: modelArtefact,
+  agent: agentArtefact,
   task: taskArtefact,
   backlog: backlogArtefact,
   flow: flowArtefact,

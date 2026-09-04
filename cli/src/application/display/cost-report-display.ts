@@ -79,6 +79,8 @@ const SESSION_TOTAL_LABEL = "session total, not requests";
 const LABEL_WIDTH = 26;
 const NO_KNOWN_PROJECT = "no known project";
 const NO_KNOWN_MODEL = "no known model";
+// Not "no agent": the main thread is where a session starts, not an absence.
+const MAIN_THREAD = "the main thread";
 
 // A year asked for by day is 365 rows - the envelope always carries every one of them, but
 // a terminal is not the place to read that many. Above this, the text rendering names the
@@ -362,6 +364,22 @@ function printStepsAndAttribution(output: CLIOutput, report: CostReport, basis: 
   printAttributionRows(output, report.attributionMix, basis.of, basis.useCost);
 }
 
+/** Printed straight after the steps, because it answers what they cannot: on a session that
+ * delegates, the step axis names a few percent and this one names the rest. Measured — ten
+ * subagent files held 432M of a live session's 466M tokens. */
+function printAgents(output: CLIOutput, report: CostReport, basis: Basis): void {
+  if (report.byAgents.length === 0) return;
+  output.print("");
+  output.print(`  by agent    ${basis.label}`);
+  for (const row of report.byAgents) {
+    const name = row.agent ?? MAIN_THREAD;
+    const share = shareOf(row.totals, basis.of, basis.useCost);
+    output.print(
+      `    ${padTo(name, LABEL_WIDTH)}${share}   ${figureFor(row.totals, basis.useCost)}`
+    );
+  }
+}
+
 function printModels(output: CLIOutput, report: CostReport, basis: Basis): void {
   if (report.byModels.length === 0) return;
   output.print("");
@@ -512,6 +530,7 @@ function printBreakdowns(output: CLIOutput, report: CostReport): void {
   };
   printTaskAttribution(output, report, basis);
   printStepsAndAttribution(output, report, basis);
+  printAgents(output, report, basis);
   printModels(output, report, basis);
   printProjects(output, report.byProjects, basis);
   printTasks(output, report.byTasks, basis);

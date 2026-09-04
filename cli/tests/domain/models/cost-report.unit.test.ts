@@ -555,6 +555,40 @@ describe("buildCostReport — every breakdown reconciles", () => {
     }
   });
 
+  // 93% of a real session's tokens are a subagent's: measured on a live transcript, 432M of
+  // 466M, across ten subagent files. Every one of those lines names its agent
+  // (`attributionAgent`, 100% of subagent tokens) and almost never its skill (2.7%), which is
+  // why `by_step` reads 3.7% while the spend is elsewhere. The record already carried
+  // `agent_name` — 924 of 1018 stored records hold one — and nothing exposed it.
+  it("breaks the period down by the agent that ran, main thread included as its own row", () => {
+    const built = report({
+      records: [
+        request({ agent_name: "aidd-dev:executor", input_tokens: 100 }),
+        request({ agent_name: "aidd-dev:executor", input_tokens: 50 }),
+        request({ agent_name: "Explore", input_tokens: 10 }),
+        request({ input_tokens: 1 }),
+      ],
+    });
+
+    expect(built.byAgents.map((row) => [row.agent, row.totals.requests])).toEqual([
+      ["aidd-dev:executor", 2],
+      ["Explore", 1],
+      [undefined, 1],
+    ]);
+  });
+
+  it("reconciles the agent breakdown to the same total as every other axis", () => {
+    const built = report({
+      records: [
+        request({ agent_name: "aidd-dev:checker", input_tokens: 7 }),
+        request({ input_tokens: 3 }),
+      ],
+    });
+
+    const summed = built.byAgents.reduce((total, row) => total + (row.totals.inputTokens ?? 0), 0);
+    expect(summed).toBe(built.totals.inputTokens);
+  });
+
   it("splits the total four ways by how strongly each part was attributed", () => {
     const built = report({ records: RECORDS });
     expect(built.attributionMix.map((row) => [row.attribution, row.totals.requests])).toEqual([

@@ -444,7 +444,7 @@ describe("the flow a person can actually follow", () => {
     expect(first.exitCode, first.stderr).toBe(0);
     expect(second.stdout).toBe(first.stdout);
     const parsed = JSON.parse(first.stdout);
-    expect(parsed.cost_report_version).toBe(9);
+    expect(parsed.cost_report_version).toBe(10);
     expect(parsed.period).toEqual({ from_day: "2026-07-01", to_day: "2026-07-31" });
     expect(parsed.attribution.map((row: { attribution: string }) => row.attribution)).toEqual([
       "tool-stated",

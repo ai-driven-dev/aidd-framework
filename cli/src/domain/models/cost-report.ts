@@ -77,6 +77,17 @@ export interface CostReportModelRow {
   readonly totals: CostTotals;
 }
 
+/** One agent's own share of a period, `agent` absent for the main thread.
+ *
+ * Where the spend actually is: measured on a live session, ten subagent files held 432M of
+ * its 466M tokens, and every one of their lines names its agent where almost none names a
+ * skill (100% against 2.7%). `by_step` reads a few percent not because the reader drops
+ * anything but because the host names a skill on the main thread alone. */
+export interface CostReportAgentRow {
+  readonly agent?: string;
+  readonly totals: CostTotals;
+}
+
 /** Why a tool contributes nothing, when it contributes nothing. `covered` with no records
  * is a tool that could have been read and did nothing in this period; `not-covered` is a
  * tool nothing here can read at all. A consumer prints the second as its reason, never as
@@ -371,6 +382,7 @@ export interface CostReport {
   readonly activeTimeSeconds?: number;
   readonly bySteps: readonly CostReportStepRow[];
   readonly byModels: readonly CostReportModelRow[];
+  readonly byAgents: readonly CostReportAgentRow[];
   readonly byTools: readonly CostReportToolRow[];
   readonly byProjects: readonly CostReportProjectRow[];
   readonly byTasks: readonly CostReportTaskRow[];
@@ -574,6 +586,15 @@ function projectKeyOf(record: TelemetrySinkRecord): ProjectKey {
 // than also folding in `""` - a rule this module has no evidence for yet.
 const NO_KNOWN_MODEL = Symbol("no known model");
 type ModelKey = string | typeof NO_KNOWN_MODEL;
+
+// The main thread's own row. A symbol for the same reason `NO_KNOWN_MODEL` is one: an agent
+// really can be named anything, so no string is safe to reserve.
+const NO_AGENT = Symbol("the main thread");
+type AgentKey = string | typeof NO_AGENT;
+
+function agentKeyOf(record: TelemetrySinkRecord): AgentKey {
+  return record.agent_name === undefined ? NO_AGENT : record.agent_name;
+}
 
 function modelKeyOf(record: TelemetrySinkRecord): ModelKey {
   return record.model === undefined ? NO_KNOWN_MODEL : record.model;
@@ -1013,6 +1034,7 @@ interface Groups {
   readonly totals: TotalsAccumulator;
   readonly steps: Map<string, StepGroup>;
   readonly models: Map<ModelKey, TotalsAccumulator>;
+  readonly agents: Map<AgentKey, TotalsAccumulator>;
   readonly tools: Map<AiToolId, TotalsAccumulator>;
   readonly toolSessionTotals: Map<AiToolId, TotalsAccumulator>;
   readonly attributions: Map<StepAttributionSource, TotalsAccumulator>;
@@ -1033,6 +1055,7 @@ function emptyGroups(fromDay: string, toDay: string): Groups {
     totals: new TotalsAccumulator(),
     steps: new Map(),
     models: new Map(),
+    agents: new Map(),
     tools: new Map(),
     toolSessionTotals: new Map(),
     attributions: new Map(),
@@ -1087,6 +1110,7 @@ function accumulateRequestRecord(
   accumulateInto(groups.attributions, record.step_attribution, record);
   accumulateInto(groups.tools, record.tool, record);
   accumulateInto(groups.models, modelKeyOf(record), record);
+  accumulateInto(groups.agents, agentKeyOf(record), record);
   accumulateInto(groups.projects, projectKeyOf(record), record);
   const taskRowKey = declaredTaskKeyOf(record, taskIntervalsByVendorId);
   accumulateInto(groups.tasks, taskRowKey, record);
@@ -1318,6 +1342,21 @@ function dayRows(days: ReadonlyMap<string, TotalsAccumulator>): readonly CostRep
   return [...days].map(([day, accumulator]) => ({ day, totals: accumulator.build() }));
 }
 
+/** Every agent that ran, largest first, plus one row for the main thread. */
+function agentRows(
+  agents: ReadonlyMap<AgentKey, TotalsAccumulator>
+): readonly CostReportAgentRow[] {
+  const rows: CostReportAgentRow[] = [...agents].map(([key, accumulator]) => ({
+    ...(key === NO_AGENT ? {} : { agent: key }),
+    totals: accumulator.build(),
+  }));
+  return bySize(
+    rows,
+    (row) => row.totals,
+    (row) => row.agent ?? ""
+  );
+}
+
 /** Every model a record named, largest first, plus one row for what named none. */
 function modelRows(
   models: ReadonlyMap<ModelKey, TotalsAccumulator>
@@ -1432,6 +1471,7 @@ function breakdownFields(
   CostReport,
   | "bySteps"
   | "byModels"
+  | "byAgents"
   | "byTools"
   | "byProjects"
   | "byTasks"
@@ -1443,6 +1483,7 @@ function breakdownFields(
   return {
     bySteps: stepRows(groups.steps),
     byModels: modelRows(groups.models),
+    byAgents: agentRows(groups.agents),
     byTools: toolRowsInScope(input, groups),
     byProjects: projectRows(groups.projects),
     byTasks: taskRows(groups.tasks),
