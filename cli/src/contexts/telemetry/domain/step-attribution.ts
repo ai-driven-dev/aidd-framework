@@ -6,7 +6,11 @@ import type { RunJournal, RunJournalBoundary } from "./ports/run-journal-reader.
  * inference. `unattributed` is a value returned here, never the caller's own omission —
  * an absent field would be read as "no step ran", which is the assertion nothing on a
  * transcript or a journal can support. */
-export type StepAttributionSource = "tool-stated" | "journal-interval" | "unattributed";
+export type StepAttributionSource =
+  | "tool-stated"
+  | "prompt-matched"
+  | "journal-interval"
+  | "unattributed";
 
 /** Strongest first, and fixed: a consumer reading a report should find the three in the
  * same order every time, whatever the records happened to contain. Ordering them by how
@@ -14,6 +18,7 @@ export type StepAttributionSource = "tool-stated" | "journal-interval" | "unattr
  * the one thing a stable contract must not do. */
 export const STEP_ATTRIBUTION_SOURCES: readonly StepAttributionSource[] = [
   "tool-stated",
+  "prompt-matched",
   "journal-interval",
   "unattributed",
 ];
@@ -74,14 +79,34 @@ function parseableBoundaries(boundaries: readonly RunJournalBoundary[]): readonl
  * (A, then B, then A) yield three intervals and two names, exactly as the boundaries
  * dictate; nothing here decides which record falls into which, that is `attributeMoment`'s
  * job, kept separate so an interval list can be built once per session and reused. */
+/** Where a step that opened at `from` ends.
+ *
+ * A `step_end` naming this very skill wins over everything between, however many pauses that
+ * is: it is the only line in the journal that states the end rather than standing in for it,
+ * and a skill spanning three prompts is exactly the case a `turn_end` used to cut short.
+ *
+ * With no such line, the rule is the one this reader always had - the next `step_start` or
+ * `turn_end`, or nothing. A `step_end` naming a *different* skill is never a closer here: it
+ * would truncate a step it has no claim on, which is the fault naming the skill exists to
+ * prevent. */
+function stepEndsAt(timed: readonly TimedBoundary[], from: number, skill: string): number {
+  for (let i = from + 1; i < timed.length; i++) {
+    const { boundary } = timed[i];
+    if (boundary.type === "step_end" && boundary.skill === skill) return timed[i].atMs;
+  }
+  for (let i = from + 1; i < timed.length; i++) {
+    if (timed[i].boundary.type !== "step_end") return timed[i].atMs;
+  }
+  return Number.POSITIVE_INFINITY;
+}
+
 export function buildStepIntervals(journal: RunJournal): readonly StepInterval[] {
   const timed = parseableBoundaries(journal.boundaries);
   const intervals: StepInterval[] = [];
   for (let i = 0; i < timed.length; i++) {
     const { atMs: startMs, boundary } = timed[i];
     if (boundary.type !== "step_start") continue;
-    const endMs = timed[i + 1]?.atMs ?? Number.POSITIVE_INFINITY;
-    intervals.push({ skill: boundary.skill, startMs, endMs });
+    intervals.push({ skill: boundary.skill, startMs, endMs: stepEndsAt(timed, i, boundary.skill) });
   }
   return intervals;
 }

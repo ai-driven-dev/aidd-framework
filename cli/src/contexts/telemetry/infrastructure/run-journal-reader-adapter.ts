@@ -2,6 +2,7 @@ import { readdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { DOCS_DIR, RUNS_SUBDIR } from "../../../kernel/paths.js";
 import { isBareFileName } from "../../../kernel/reading/confined-file-name.js";
+import { repositoryRootAbove } from "../../../kernel/reading/repository-root.js";
 import type {
   RunJournal,
   RunJournalBoundary,
@@ -44,6 +45,7 @@ interface RawJournalLine {
   readonly type?: unknown;
   readonly at?: unknown;
   readonly skill?: unknown;
+  readonly turn_id?: unknown;
   readonly run_id?: unknown;
   readonly tool?: unknown;
   readonly vendor_id?: unknown;
@@ -65,15 +67,21 @@ function parseLine(line: string): RawJournalLine | null {
   }
 }
 
-/** One `step_start` or `turn_end` line, or `null` for every other line type and every line
+/** One `step_start`, `turn_end` or `step_end` line, or `null` for every other line type and every line
  * this file cannot parse — a torn final line from a session still in progress reads as
  * nothing, not as a boundary at the wrong moment. */
 function parseBoundary(parsed: RawJournalLine): RunJournalBoundary | null {
   const at = asString(parsed.at);
   if (at === undefined) return null;
   if (parsed.type === "turn_end") return { type: "turn_end", at };
-  const skill = parsed.type === "step_start" ? asString(parsed.skill) : undefined;
-  return skill !== undefined ? { type: "step_start", at, skill } : null;
+  const skill = asString(parsed.skill);
+  if (skill === undefined) return null;
+  // An end with no skill is dropped rather than read as a bare boundary: it would close a
+  // step it cannot name, which is the one thing `RunJournalStepEnd` exists to prevent.
+  if (parsed.type === "step_end") return { type: "step_end", at, skill };
+  if (parsed.type !== "step_start") return null;
+  const turnId = asString(parsed.turn_id);
+  return { type: "step_start", at, skill, ...(turnId === undefined ? {} : { turn_id: turnId }) };
 }
 
 /** The worktree a session ran in, where the line names one. A plain checkout writes
@@ -188,7 +196,8 @@ export class RunJournalReaderAdapter implements RunJournalStore {
   readonly runsDir: string;
 
   constructor(projectRoot: string) {
-    this.runsDir = process.env.AIDD_RUNS_DIR || join(projectRoot, DOCS_DIR, RUNS_SUBDIR);
+    this.runsDir =
+      process.env.AIDD_RUNS_DIR || join(repositoryRootAbove(projectRoot), DOCS_DIR, RUNS_SUBDIR);
   }
 
   async read(sessionId: string): Promise<RunJournal | null> {

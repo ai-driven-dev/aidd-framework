@@ -18,6 +18,43 @@ import type { TaskAttributionSource, TaskUnattributedReason } from "./task-attri
  * `sink_schema_version` exists on a stored line. Adding a field a consumer may ignore is
  * not a bump; changing what an existing field means is.
  *
+ * Bumped to 13: `by_prompt` is a new top-level breakdown, and a consumer summing every
+ * breakdown's `requests` against `totals.requests` to check nothing was dropped now has one
+ * more to include. It is the only breakdown complete by construction: every other depends on
+ * a capture that may not have happened, this one on a field the transcript reader already
+ * resolves for every usage line. Measured 2026-09-04 on the built binary - 1073 of 1073
+ * records of one real session carried a `prompt_id`, its 972 subagent records included,
+ * across 12 distinct prompts.
+ *
+ * Bumped to 12: `by_task`'s `attribution` stops being always `"declared"`. A record no
+ * declaration covers, in a session whose journal witnessed it and that wrote into exactly
+ * one task folder, is now named after that folder and marked `"inferred"` - so one task can
+ * hold two rows, one per route, the same `(name x attribution)` shape `by_step` already has.
+ * A consumer that read `attribution` as constant, or `by_task` as one row per task,
+ * misreads this version. Measured: on the one session with a complete journal, 1045 of 1073
+ * records fell inside a declared interval and the remaining 27 sat between `session_start`
+ * and the first declaration, 38 minutes of work before the flow named its ticket.
+ *
+ * Bumped to 11: a `by_task` or `by_backlog` row with no task gains a fourth possible
+ * `reason`, `no-journal`. A consumer that switched exhaustively on the three before it meets
+ * a value it has no case for, which is a misread rather than a field it may ignore. It
+ * separates a fact about the read from a fact about the work: a session with no journal read
+ * for it used to be given `no-declaration`, which asserts the session declared no task.
+ * Measured 2026-09-04 - a report run from a subdirectory put 100% of a period into that row
+ * while every journal sat one directory up, unread.
+ *
+ * Bumped to 10: `by_agent` is a new top-level breakdown, and a consumer summing every
+ * breakdown's `requests` against `totals.requests` to check nothing was dropped now has one
+ * more to include. It exists because that is where the spend is: on a live session, ten
+ * subagent files held 432M of 466M tokens, every one of their lines naming its agent and
+ * almost none its skill.
+ *
+ * Bumped to 9: `attribution` gains a fourth value, `prompt-matched`. A consumer that
+ * understood the three before it — mapping them to labels, or switching exhaustively — meets
+ * a value it has no case for, which is a misread rather than a field it may ignore. It ranks
+ * above `journal-interval` and below `tool-stated`: an identifier two sources independently
+ * name is stronger than an inference from moments, weaker than the tool saying it outright.
+ *
  * Bumped to 8: `by_flow` is a new top-level breakdown - a consumer summing every
  * breakdown's `requests` against `totals.requests` to check nothing was dropped now has a
  * seventh breakdown to include, the same reasoning that bumped `by_backlog` in. Grouped
@@ -65,7 +102,7 @@ import type { TaskAttributionSource, TaskUnattributedReason } from "./task-attri
  * `by_project`'s `project` to optional back when that row was added.
  *
  * Bumped to 2: `by_project` and `by_day` are new top-level breakdowns. */
-export const COST_REPORT_ENVELOPE_VERSION = 8;
+export const COST_REPORT_ENVELOPE_VERSION = 13;
 
 /** Money as whole micro-dollars, the way the report carries it: an integer, so a consumer
  * summing several reports gets the same answer this one did. Divide by 1,000,000 for
@@ -145,9 +182,11 @@ export interface CostReportEnvelopeProjectRow {
 }
 
 /** One framework task's figures, keyed on the closed interval a record's own moment falls
- * in - see `CostReportTaskRow`. `attribution` is present, and always `"declared"`, only
- * alongside `task`; a row for what fell in no declared interval carries `reason` instead,
- * naming which of three distinct facts applies - never both, and never neither. */
+ * in - see `CostReportTaskRow`. `attribution` is present only alongside `task`, and says
+ * which route named it: `"declared"` where a `task_declared` interval covers the record,
+ * `"inferred"` where the session wrote into exactly one task folder and no declaration
+ * covered it. One task can therefore carry two rows, one per route; a row for what fell in no declared interval carries `reason` instead,
+ * naming which distinct fact applies - never both, and never neither. */
 export interface CostReportEnvelopeTaskRow {
   readonly task?: string;
   readonly attribution?: TaskAttributionSource;
@@ -168,6 +207,20 @@ export interface CostReportEnvelopeBacklogRow {
  * skill and `startedAt` when it opened, together telling apart two rows that share a name:
  * the same skill run twice in one session is two rows, never merged into one. Both are
  * absent on the one row for work that fell in no flow interval at all. */
+export interface CostReportEnvelopeAgentRow {
+  readonly agent?: string;
+  readonly totals: CostReportEnvelopeTotals;
+}
+
+/** `started_at` is the earliest moment in the prompt, and only a named prompt carries one:
+ * the row for records that named no prompt is drawn from many turns, so a start moment there
+ * would assert a unit that never existed. */
+export interface CostReportEnvelopePromptRow {
+  readonly prompt?: string;
+  readonly started_at?: string;
+  readonly totals: CostReportEnvelopeTotals;
+}
+
 export interface CostReportEnvelopeFlowRow {
   readonly flow?: string;
   readonly started_at?: string;
@@ -244,6 +297,11 @@ export interface CostReportEnvelope {
   readonly by_task: readonly CostReportEnvelopeTaskRow[];
   readonly by_backlog: readonly CostReportEnvelopeBacklogRow[];
   readonly by_flow: readonly CostReportEnvelopeFlowRow[];
+  /** One row per agent that ran, `agent` absent on the main thread's own row. */
+  readonly by_agent: readonly CostReportEnvelopeAgentRow[];
+  /** One row per prompt that caused work, largest first, plus the row for records that
+   * named none. The one breakdown no host limit can empty. */
+  readonly by_prompt: readonly CostReportEnvelopePromptRow[];
   /** Every day the period spans, always — a long period stays readable by how the text
    * rendering chooses to show it, never by what this envelope omits. */
   readonly by_day: readonly CostReportEnvelopeDayRow[];
@@ -341,6 +399,18 @@ function backlogRow(row: CostReport["byBacklog"][number]): CostReportEnvelopeBac
   };
 }
 
+function agentRow(row: CostReport["byAgents"][number]): CostReportEnvelopeAgentRow {
+  return { ...(row.agent === undefined ? {} : { agent: row.agent }), totals: totals(row.totals) };
+}
+
+function promptRow(row: CostReport["byPrompts"][number]): CostReportEnvelopePromptRow {
+  return {
+    ...(row.prompt === undefined ? {} : { prompt: row.prompt }),
+    ...(row.startedAt === undefined ? {} : { started_at: row.startedAt }),
+    totals: totals(row.totals),
+  };
+}
+
 function flowRow(row: CostReport["byFlows"][number]): CostReportEnvelopeFlowRow {
   return {
     ...(row.flow === undefined ? {} : { flow: row.flow }),
@@ -412,6 +482,8 @@ function breakdownFields(
   | "by_task"
   | "by_backlog"
   | "by_flow"
+  | "by_agent"
+  | "by_prompt"
   | "by_day"
   | "by_person"
 > {
@@ -423,6 +495,8 @@ function breakdownFields(
     by_task: report.byTasks.map(taskRow),
     by_backlog: report.byBacklog.map(backlogRow),
     by_flow: report.byFlows.map(flowRow),
+    by_agent: report.byAgents.map(agentRow),
+    by_prompt: report.byPrompts.map(promptRow),
     by_day: report.byDays.map((row) => ({ day: row.day, totals: totals(row.totals) })),
     by_person: report.byPeople.map(personRow),
   };

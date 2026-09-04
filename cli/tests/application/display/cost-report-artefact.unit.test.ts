@@ -73,6 +73,30 @@ describe("buildCostReportArtefact", () => {
     expect(isArtefactAxis("person")).toBe(true);
   });
 
+  it("answers the prompt axis with one dated row per prompt, and the remainder last", () => {
+    const artefact = buildCostReportArtefact(
+      envelopeOf({
+        records: [
+          request({
+            turn_id: "a",
+            prompt_id: "p-1",
+            cost_usd: 2,
+            event_timestamp: "2026-08-18T09:00:00Z",
+          }),
+          request({ turn_id: "b", cost_usd: 1, event_timestamp: "2026-08-18T10:00:00Z" }),
+        ],
+      }),
+      "prompt"
+    );
+
+    expect(artefact).toContain("| Prompt | Started at | Total |");
+    const lines = artefact
+      .split("\n")
+      .filter((line) => line.startsWith("| p-1") || line.includes("no prompt named"));
+    expect(lines[0]).toContain("| p-1 | 2026-08-18T09:00:00Z |");
+    expect(lines[1]).toContain("| no prompt named | — |");
+  });
+
   it("refuses an unknown axis by name, listing the ones that exist", () => {
     expect(() => buildCostReportArtefact(envelopeOf(), "bogus")).toThrow(
       /Unknown axis 'bogus'.*person/su

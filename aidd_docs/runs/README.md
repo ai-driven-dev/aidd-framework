@@ -16,12 +16,31 @@ Every line carries `at` (ISO 8601, UTC, second precision) and `type`:
 | `turn_end` | `prompt_id` when the host provides one, omitted otherwise | Stop |
 | `file_written` | `path`, repository-relative and `/`-separated, plus `source` (`"tool-stated"` \| `"observed"`) | PostToolUse, for a write that lands inside a task folder |
 | `task_declared` | `path`, repository-relative and `/`-separated | PostToolUse, for a call whose own arguments name a file under a task folder |
-| `step_start` | `skill` (sanitised as a value, never as a path segment), plus `turn_id` when the host provides one | PostToolUse, for a call that names a skill being run — a start only, since no tool exposes when a skill's work finishes |
+| `step_start` | `skill` (sanitised as a value, never as a path segment), plus `turn_id` when the host provides one | PostToolUse, for a call that names a skill being run |
+| `step_end` | `skill`, sanitised the same way | PostToolUse, for a call whose own arguments carry `aidd:step-end <skill>` — the skill saying its own work is over, since no host emits that |
 | `scan_truncated` | `cap`, `scanned` | Stop, when the sweep for files a task folder gained since the turn began hit its budget before finishing — so a reader can tell "nothing else changed" from "the walk gave up before it could tell" |
 
 `step_start` is the line that names which skill was running, and the one this table most
 recently caught up on documenting: complete coverage of what the journal writes is the
 whole reason a report can attribute a token to a step at all.
+
+`step_end` is its counterpart, and it exists because nothing else can supply it. A `Skill`
+tool call's own `tool_result` comes back about a tenth of a second later — that is the
+dispatch, not the completion — so no hook can observe when a skill finished. Without a stated
+end a reader must close a step at the next `step_start` or `turn_end`, and a `turn_end` is a
+pause: a skill working across three prompts is credited with its first turn and nothing
+after. So the skill declares its own end through a tool call it makes, carrying
+`aidd:step-end <skill>` in that call's arguments, and the hook — which alone holds the
+session id and the working directory — writes the line. It is read out of free-form arguments
+exactly as `task_declared` is, so every host that forwards tool arguments is covered rather
+than one.
+
+The line names its skill, never only a moment. An end closes only the interval its own skill
+opened: closing "whatever is open" would close the wrong one the moment a skill invokes
+another, and an end naming a skill the session never started closes nothing at all rather
+than truncating whatever was running. Like `task_declared`, it restores the run file's mtime
+after appending, so it can never push the write watermark past a file the turn should still
+observe.
 
 `plugin_version` is this plugin's own version, from `.claude-plugin/plugin.json` — read
 once per process by `lib/plugin-version.cjs`, never per line, and stamped only on

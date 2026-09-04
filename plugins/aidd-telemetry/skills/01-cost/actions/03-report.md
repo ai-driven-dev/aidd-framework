@@ -10,7 +10,7 @@ The path to `aidd telemetry`, and the question the user asked, in their own word
 ## Output
 
 **One axis, asked for by name.** Run
-`aidd telemetry report --axis <total|day|step|model|task|backlog|flow|tool|project|person> --from <day> --to <day>`,
+`aidd telemetry report --axis <total|day|step|model|agent|prompt|task|backlog|flow|tool|project|person> --from <day> --to <day>`,
 never alongside `--json` - the axis flag already picks the one rendering that answers the
 question, printed exactly as the script wrote it:
 
@@ -65,7 +65,7 @@ else.
 
 | Task | Share | Tokens | Attribution |
 | --- | --- | --- | --- |
-| <task, or the reason it fell in none: "no usable task declaration in this session" \| "before the next task this session declares" \| "the journal falls silent before this record"> | <n>% | <tokens> | <declared by the flow \| —> |
+| <task, or the reason it fell in none: "no usable run journal for this session" \| "no usable task declaration in this session" \| "before the next task this session declares" \| "the journal falls silent before this record"> | <n>% | <tokens> | <declared by the flow \| inferred from a written file \| —> |
 
 **By backlog item**
 
@@ -93,9 +93,21 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    - One axis: `aidd telemetry report --axis <axis> --from 2026-08-01 --to 2026-08-31`.
    - Everything: `aidd telemetry report --from 2026-08-01 --to 2026-08-31 --json`, reading the shape from [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md).
    - The figure will be kept or compared: give `--from` and `--to`, since `--days` resolves against today and two identical calls on two days cover two different periods.
-3. **Refuse an unknown shape.** `cost_report_version` is `8` today, read from the `--json`
+3. **Refuse an unknown shape.** `cost_report_version` is `13` today, read from the `--json`
    path - the `--axis` path prints text the script already built from that same object, so
-   there is no separate version to check there. The bump from `7` to `8` added `by_flow`
+   there is no separate version to check there. The bump from `12` to `13` added `by_prompt`
+   to the top-level breakdowns: the prompt that caused the work, the one breakdown no host
+   limit can leave empty, since every record the reader stores already carries the turn it
+   came from. The bump from `11` to `12` did not add a
+   breakdown either: `by_task`'s `attribution` stopped being always `declared`, so one task
+   can now hold two rows - one for what a declaration covered, one for what only a written
+   file names. The bump from `10` to `11` did not add a
+   breakdown: the reasons a `by_task` or `by_backlog` row can carry for a record in no task
+   gained a fourth, `"no-journal"`, which says no usable run journal reached that record's
+   session - a fact about the read, never the claim that the session declared no task. The
+   bump from `9` to `10` added `by_agent` to the top-level breakdowns: which agent ran,
+   which on Claude Code is where most of the spend is. The bump from `8` to `9` added a
+   fourth value to `attribution`, `prompt-matched`. The bump from `7` to `8` added `by_flow`
    to the top-level breakdowns: which orchestrated run the journal's own step sequence
    already names (see [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md)),
    nothing newly captured for it. The bump from `6` to `7` added `by_backlog`
@@ -103,9 +115,8 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    declares (see [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md)),
    never a second notion of which task a record belongs to. The bump from `5` to `6` did
    not add a breakdown: what `by_task` gives for a record that fell in no declared
-   interval can now be up to three rows instead of always one, each carrying `reason` -
-   naming which of three distinct facts applies, so two different gaps are never read as
-   one. The bump from `4` added `by_task` to the top-level breakdowns, grouped by the same
+   interval can now be more than one row, each carrying `reason` - naming which distinct
+   fact applies, so two different gaps are never read as one. The bump from `4` added `by_task` to the top-level breakdowns, grouped by the same
    declared intervals `--task` already filters on - never by a written file, which could
    place one session under two task rows at once. The bump from `3` to `4` added
    `by_person` to the top-level breakdowns and `identity_unusable` to `read`.

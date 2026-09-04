@@ -170,6 +170,157 @@ describe("buildCostReport — by_task groups by the declared interval a record f
     expect(sumOf(built.byTasks).requests).toBe(built.totals.requests);
   });
 
+  // Two absences a person acts on differently, and the report used to give them one name.
+  // A session whose journal was read and declared nothing is a fact about the work. A
+  // session with no journal at all is a fact about the read - the directory was missing,
+  // the machine that wrote it was another one, the project is not this one. Calling the
+  // second "no usable task declaration in this session" asserts something about work this
+  // layer never looked at, which is an unknown reported as a zero.
+  it("says no journal was read, rather than that the session declared nothing", () => {
+    const records: readonly TelemetrySinkRecord[] = [
+      request({ vendor_id: "s-unjournalled", event_timestamp: "2026-08-17T10:00:00Z" }),
+    ];
+
+    const built = report({ records, journals: [] });
+
+    expect(built.byTasks).toHaveLength(1);
+    expect(built.byTasks[0]?.task).toBeUndefined();
+    expect(built.byTasks[0]?.reason).toBe("no-journal");
+    expect(sumOf(built.byTasks).requests).toBe(built.totals.requests);
+  });
+
+  it("still says the session declared nothing when its journal was read and held no declaration", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-read-but-silent",
+        tool: "claude-code",
+        writtenPaths: [],
+        taskIntervals: [],
+        flowIntervals: [],
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({ vendor_id: "s-read-but-silent", event_timestamp: "2026-08-17T10:00:00Z" }),
+    ];
+
+    const built = report({ records, journals });
+
+    expect(built.byTasks[0]?.reason).toBe("no-declaration");
+  });
+
+  // The backlog axis keys off `by_task`'s own row key, so an unread journal must not arrive
+  // there as a task that declared no backlog item either.
+  it("carries the unread journal through to the backlog axis unchanged", () => {
+    const records: readonly TelemetrySinkRecord[] = [
+      request({ vendor_id: "s-unjournalled", event_timestamp: "2026-08-17T10:00:00Z" }),
+    ];
+
+    const built = report({ records, journals: [] });
+
+    expect(built.byBacklog).toHaveLength(1);
+    expect(built.byBacklog[0]?.reason).toBe("no-journal");
+  });
+
+  // 27 of a real session's 1073 records sat between `session_start` and its first
+  // declaration - 38 minutes of work before the flow named its ticket. That session wrote
+  // into exactly one task folder for its whole life, so those records have an answer the
+  // breakdown was not reading. Marked `inferred`, never merged into the declared row: the
+  // same task holds 1045 records the journal declared and 27 it did not, and one row
+  // carrying the weaker attribution would state something false about the 1045.
+  it("names a record no declaration covers after the only task folder the session wrote into", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-one-folder",
+        tool: "claude-code",
+        writtenPaths: ["aidd_docs/tasks/2026_08/first-task/plan.md"],
+        taskIntervals: [
+          {
+            path: "aidd_docs/tasks/2026_08/first-task/plan.md",
+            startMs: Date.parse("2026-08-17T11:00:00Z"),
+            endMs: Date.parse("2026-08-17T12:00:00Z"),
+          },
+        ],
+        flowIntervals: [],
+        witnessed: {
+          fromMs: Date.parse("2026-08-17T09:00:00Z"),
+          toMs: Date.parse("2026-08-17T12:00:00Z"),
+        },
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({ vendor_id: "s-one-folder", event_timestamp: "2026-08-17T10:00:00Z" }),
+      request({ vendor_id: "s-one-folder", event_timestamp: "2026-08-17T11:30:00Z" }),
+    ];
+
+    const built = report({ records, journals });
+
+    expect(built.byTasks).toEqual([
+      { task: FIRST_TASK, attribution: "declared", totals: expect.anything() },
+      { task: FIRST_TASK, attribution: "inferred", totals: expect.anything() },
+    ]);
+    expect(sumOf(built.byTasks).requests).toBe(built.totals.requests);
+  });
+
+  // Two candidates and no reason to choose between them. The objection that kept written
+  // paths out of this breakdown entirely - one session placed under two task rows at once -
+  // is answered by refusing, never by picking the first.
+  it("infers nothing for a session that wrote into two task folders", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-two-folders",
+        tool: "claude-code",
+        writtenPaths: [
+          "aidd_docs/tasks/2026_08/first-task/plan.md",
+          "aidd_docs/tasks/2026_08/second-task/plan.md",
+        ],
+        taskIntervals: [],
+        flowIntervals: [],
+        witnessed: {
+          fromMs: Date.parse("2026-08-17T09:00:00Z"),
+          toMs: Date.parse("2026-08-17T12:00:00Z"),
+        },
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({ vendor_id: "s-two-folders", event_timestamp: "2026-08-17T10:00:00Z" }),
+    ];
+
+    const built = report({ records, journals });
+
+    expect(built.byTasks).toHaveLength(1);
+    expect(built.byTasks[0]?.task).toBeUndefined();
+    expect(built.byTasks[0]?.reason).toBe("no-declaration");
+  });
+
+  // The bound that stops this route from inventing history. A session whose journal was lost
+  // and recreated witnesses only the time since: its earlier records are in the sink, and
+  // attributing them to a folder that session touched today would be false by days. Measured
+  // on a live machine, where one session's journal began at 09:54 while its own records ran
+  // back a week.
+  it("infers nothing for a record outside the span its journal actually witnessed", () => {
+    const journals: readonly CostReportSessionJournal[] = [
+      {
+        vendorId: "s-short-journal",
+        tool: "claude-code",
+        writtenPaths: ["aidd_docs/tasks/2026_08/first-task/plan.md"],
+        taskIntervals: [],
+        flowIntervals: [],
+        witnessed: {
+          fromMs: Date.parse("2026-08-21T09:00:00Z"),
+          toMs: Date.parse("2026-08-21T12:00:00Z"),
+        },
+      },
+    ];
+    const records: readonly TelemetrySinkRecord[] = [
+      request({ vendor_id: "s-short-journal", event_timestamp: "2026-08-17T10:00:00Z" }),
+    ];
+
+    const built = report({ records, journals });
+
+    expect(built.byTasks).toHaveLength(1);
+    expect(built.byTasks[0]?.task).toBeUndefined();
+  });
+
   it("never lets the whole-session written-path inference the --task filter uses leak into this breakdown", () => {
     // A session that wrote into a task folder, but never declared - the --task filter's
     // own "inferred" route would attribute the whole session to it; this breakdown does

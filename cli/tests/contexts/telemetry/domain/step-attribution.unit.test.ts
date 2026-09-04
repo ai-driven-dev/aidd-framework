@@ -37,6 +37,61 @@ describe("step-attribution — pure: journal lines + records -> intervals", () =
     expect(attribution).toEqual({ source: "journal-interval", step: "aidd-dev:02-implement" });
   });
 
+  // A `turn_end` is a pause: a skill that spans three prompts is credited with its first
+  // turn and nothing after. Nothing any host emits says when a skill's work finished -
+  // measured, a `Skill` call's own `tool_result` returns in about a tenth of a second, which
+  // is the dispatch - so the skill declares its own end and the hook writes it. Stated, the
+  // end wins over every pause between it and the start.
+  it("runs a step past every pause, to the end its own skill declared", () => {
+    const intervals = buildStepIntervals(
+      journalOf(
+        A_START,
+        TURN_END,
+        { type: "turn_end", at: "2026-08-20T10:20:00Z" },
+        { type: "step_end", at: "2026-08-20T10:30:00Z", skill: "aidd-dev:02-implement" }
+      )
+    );
+
+    const attribution = attributeMoment(intervals, "2026-08-20T10:25:00Z");
+
+    expect(attribution).toEqual({ source: "journal-interval", step: "aidd-dev:02-implement" });
+  });
+
+  // An end names its skill so that closing one never closes another. A skill invoking a
+  // second one leaves two open intervals; an end for the inner skill must leave the outer
+  // one running.
+  it("closes only the step its own skill names", () => {
+    const intervals = buildStepIntervals(
+      journalOf(A_START, B_START, {
+        type: "step_end",
+        at: "2026-08-20T10:07:00Z",
+        skill: "aidd-dev:06-test",
+      })
+    );
+
+    const outer = intervals.find((interval) => interval.skill === "aidd-dev:02-implement");
+    const inner = intervals.find((interval) => interval.skill === "aidd-dev:06-test");
+    expect(inner?.endMs).toBe(Date.parse("2026-08-20T10:07:00Z"));
+    expect(outer?.endMs).toBe(Date.parse("2026-08-20T10:05:00Z"));
+  });
+
+  // An end for a skill that never started names nothing to close. Read as a boundary all the
+  // same it would truncate whatever interval was running, which is a step it has no claim on.
+  it("ignores an end for a skill this session never started", () => {
+    const intervals = buildStepIntervals(
+      journalOf(A_START, {
+        type: "step_end",
+        at: "2026-08-20T10:02:00Z",
+        skill: "some-other:skill",
+      })
+    );
+
+    expect(attributeMoment(intervals, "2026-08-20T10:03:00Z")).toEqual({
+      source: "journal-interval",
+      step: "aidd-dev:02-implement",
+    });
+  });
+
   it("closes an interval at the next step_start, not at the turn's end past it", () => {
     const intervals = buildStepIntervals(journalOf(A_START, B_START, TURN_END));
 

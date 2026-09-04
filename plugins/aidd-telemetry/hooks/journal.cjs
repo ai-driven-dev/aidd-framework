@@ -9,6 +9,7 @@ const repo = require("./lib/repo.cjs");
 const record = require("./lib/record.cjs");
 const fileWrites = require("./lib/file-writes.cjs");
 const stepStarts = require("./lib/step-starts.cjs");
+const stepEnds = require("./lib/step-ends.cjs");
 const taskDeclared = require("./lib/task-declared.cjs");
 
 function readStdin() {
@@ -76,6 +77,7 @@ function processPayload(payload, event) {
     // declaration reads the call's own arguments rather than a named field.
     fileWrites.handleFileWritten(payload, host, sessionId);
     stepStarts.handleStepStart(payload, host, sessionId);
+    stepEnds.handleStepEnd(payload, host, sessionId);
     taskDeclared.handleTaskDeclared(payload, host, sessionId);
   }
 }

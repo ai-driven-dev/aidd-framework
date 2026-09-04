@@ -77,6 +77,36 @@ export interface CostReportModelRow {
   readonly totals: CostTotals;
 }
 
+/** One agent's own share of a period, `agent` absent for the main thread.
+ *
+ * Where the spend actually is: measured on a live session, ten subagent files held 432M of
+ * its 466M tokens, and every one of their lines names its agent where almost none names a
+ * skill (100% against 2.7%). `by_step` reads a few percent not because the reader drops
+ * anything but because the host names a skill on the main thread alone. */
+export interface CostReportAgentRow {
+  readonly agent?: string;
+  readonly totals: CostTotals;
+}
+
+/** One prompt's own share of a period, `prompt` absent on the row for records that named
+ * none.
+ *
+ * The one breakdown that is complete by construction. Every other depends on a capture that
+ * may not have happened — a journal, an identity file, a declaration, a host that names a
+ * skill. This one depends on a field the transcript reader already resolves for every usage
+ * line by walking `parentUuid`: measured 2026-09-04 on the built binary, 1073 of 1073
+ * records of one real session carried a `prompt_id`, its 972 subagent records included,
+ * across 12 distinct prompts.
+ *
+ * `startedAt` is the earliest moment in the group, and only a named prompt gets one: the
+ * row for records that named no prompt is a bucket drawn from many turns, so a start moment
+ * there would assert a unit that never existed. */
+export interface CostReportPromptRow {
+  readonly prompt?: string;
+  readonly startedAt?: string;
+  readonly totals: CostTotals;
+}
+
 /** Why a tool contributes nothing, when it contributes nothing. `covered` with no records
  * is a tool that could have been read and did nothing in this period; `not-covered` is a
  * tool nothing here can read at all. A consumer prints the second as its reason, never as
@@ -154,14 +184,15 @@ export interface CostReportProjectRow {
  * never has to assume a strength this object does not state.
  *
  * A record that fell in no declared interval carries `reason` instead of `task` -
- * `TaskUnattributedReason` names which of three distinct facts applies, never one label
- * standing in for all three: no usable task declaration exists in that record's session; a
+ * `TaskUnattributedReason` names which distinct fact applies, never one label standing in
+ * for all of them: no usable journal reached that record's session at all; no usable task
+ * declaration exists in a session whose journal was read; a
  * task was declared but this record precedes it (whether every declaration, or the gap a `turn_end`
  * leaves before the next one); or a task was declared and the journal's own declared
  * coverage runs out before this record's moment. Never for a written file this breakdown
  * does not consult, and never split from a declaration the journal simply could not read:
  * the journal records a `task_declared` line or it does not, and those two read as
- * `"no-declaration"` alike. Up to three such rows can appear in one period, one per reason
+ * `"no-declaration"` alike. Up to four such rows can appear in one period, one per reason
  * actually present - never collapsed into one, since two different gaps are not one gap.
  * Sorted apart from every other breakdown: largest first among named tasks, with every
  * reason row last, in `TASK_UNATTRIBUTED_REASONS`' own fixed order, so a reader sees tasks
@@ -190,7 +221,7 @@ export interface CostReportTaskRow {
  *   still counted, here and in every other breakdown, exactly as `by_task` counts a record
  *   whose declaration could not be read.
  * - `reason` — the record belongs to no task at all, carrying the same
- *   `TaskUnattributedReason` `CostReportTaskRow` gives it; up to three such rows, one per
+ *   `TaskUnattributedReason` `CostReportTaskRow` gives it; up to four such rows, one per
  *   reason actually present, never collapsed into one. */
 export interface CostReportBacklogRow {
   readonly backlog?: string;
@@ -261,6 +292,19 @@ export interface CostReportSessionJournal {
   /** Straight from `buildFlowIntervals`, the same way `taskIntervals` comes from
    * `buildTaskIntervals` - built once per session, never re-derived per record. */
   readonly flowIntervals: readonly FlowInterval[];
+  /** The first and last moment this journal actually witnessed, from its own lines - the
+   * bound the written-file route infers inside and never outside.
+   *
+   * A journal witnesses only the time it was open for, which is not the time its session
+   * produced records: a journal lost and recreated mid-session witnesses the minutes since,
+   * while the sink still holds that session's records from days before. Measured on a live
+   * machine - one session's journal began at 09:54 while its own records ran back a week -
+   * and without this bound the written-file route would have attributed all seven days to a
+   * task folder that session touched today.
+   *
+   * Absent when no line in the journal carried a moment this reader could parse: nothing
+   * was witnessed, so nothing can be inferred. */
+  readonly witnessed?: { readonly fromMs: number; readonly toMs: number };
 }
 
 /** The four dimensions that narrow on an equal record field - `task` keeps its own route
@@ -371,6 +415,10 @@ export interface CostReport {
   readonly activeTimeSeconds?: number;
   readonly bySteps: readonly CostReportStepRow[];
   readonly byModels: readonly CostReportModelRow[];
+  readonly byAgents: readonly CostReportAgentRow[];
+  /** One row per prompt that caused work, largest first, plus the row for records that
+   * named none — see `CostReportPromptRow`. */
+  readonly byPrompts: readonly CostReportPromptRow[];
   readonly byTools: readonly CostReportToolRow[];
   readonly byProjects: readonly CostReportProjectRow[];
   readonly byTasks: readonly CostReportTaskRow[];
@@ -575,17 +623,114 @@ function projectKeyOf(record: TelemetrySinkRecord): ProjectKey {
 const NO_KNOWN_MODEL = Symbol("no known model");
 type ModelKey = string | typeof NO_KNOWN_MODEL;
 
+// The main thread's own row. A symbol for the same reason `NO_KNOWN_MODEL` is one: an agent
+// really can be named anything, so no string is safe to reserve.
+const NO_AGENT = Symbol("the main thread");
+type AgentKey = string | typeof NO_AGENT;
+
+function agentKeyOf(record: TelemetrySinkRecord): AgentKey {
+  return record.agent_name === undefined ? NO_AGENT : record.agent_name;
+}
+
+// The row for what named no prompt. A symbol for the same reason `NO_AGENT` is one: a prompt
+// id is opaque and host-assigned, so no string is safe to reserve against it.
+const NO_PROMPT = Symbol("no prompt named");
+type PromptKey = string | typeof NO_PROMPT;
+
+function promptKeyOf(record: TelemetrySinkRecord): PromptKey {
+  return record.prompt_id === undefined ? NO_PROMPT : record.prompt_id;
+}
+
 function modelKeyOf(record: TelemetrySinkRecord): ModelKey {
   return record.model === undefined ? NO_KNOWN_MODEL : record.model;
 }
 
 // The same idea, for the task a record's own moment fell inside - a record whose session
 // never declared one, whose moment falls before a declaration, or whose moment the
-// journal's own declared coverage has run out before, is its own group, keyed on *which* of
-// those three this record is, never dropped and never collapsed into one bucket. A plain
+// journal's own declared coverage has run out before - and one whose session no usable
+// journal ever reached - is its own group, keyed on *which* of those this record is, never
+// dropped and never collapsed into one bucket. A plain
 // string, unlike `NO_KNOWN_PROJECT` and `NO_KNOWN_MODEL`: `TaskIdentity` is always
 // `${month}/${name}`, which a reason string never is, so the two can never collide.
 type TaskRowKey = TaskIdentity | TaskUnattributedReason;
+
+/** How a record came to belong to a task, or why it belongs to none - the value every task
+ * axis keys on, computed once per record. A named membership carries `attribution` beside
+ * the identity rather than only the identity, because the same task holds records from both
+ * routes: on the session this route was measured against, 1045 records fell inside a
+ * declared interval and 27 preceded the first declaration entirely. One row carrying the
+ * weaker attribution would state something false about the 1045. */
+interface TaskGroup {
+  readonly task?: TaskIdentity;
+  readonly attribution?: TaskAttributionSource;
+  readonly reason?: TaskUnattributedReason;
+  readonly totals: TotalsAccumulator;
+}
+
+/** Mirrors `addToStepGroup`, which folds that axis' own pairs the same way. */
+function addToTaskGroup(
+  groups: Map<string, TaskGroup>,
+  row: TaskRow,
+  record: TelemetrySinkRecord
+): void {
+  const key = taskRowKeyOf(row);
+  const existing = groups.get(key);
+  if (existing) {
+    existing.totals.add(record);
+    return;
+  }
+  const created: TaskGroup =
+    typeof row === "string"
+      ? { reason: row, totals: new TotalsAccumulator() }
+      : { task: row.task, attribution: row.attribution, totals: new TotalsAccumulator() };
+  created.totals.add(record);
+  groups.set(key, created);
+}
+
+interface TaskMembershipRow {
+  readonly task: TaskIdentity;
+  readonly attribution: TaskAttributionSource;
+}
+
+type TaskRow = TaskMembershipRow | TaskUnattributedReason;
+
+const TASK_ROW_SEPARATOR = " ";
+
+/** Mirrors `stepRowKey`, which keys that axis' own `(name x attribution)` pairs the same
+ * way, rather than inventing a second way to key a pair. A `TaskIdentity` is always
+ * `${month}/${name}` and an attribution is never one, so a named key can never collide with
+ * a reason key. */
+function taskRowKeyOf(row: TaskRow): string {
+  return typeof row === "string" ? row : `${row.attribution}${TASK_ROW_SEPARATOR}${row.task}`;
+}
+
+/** The one task a session's written files name, when they name exactly one.
+ *
+ * Two written folders infer nothing: two candidates and no reason to choose between them.
+ * That refusal is what answers the objection that kept written paths out of this breakdown
+ * until now - the `--task` filter's own inferred route attributes a whole session, which can
+ * place one session under two task rows at once. Refusing is not a fallback here, it is the
+ * bound that makes the route sound. */
+function soleWrittenTaskOf(journal: CostReportSessionJournal | undefined): TaskIdentity | null {
+  if (journal === undefined) return null;
+  const identities = new Set(taskIdentitiesFromWrittenPaths(journal.writtenPaths));
+  if (identities.size !== 1) return null;
+  const [only] = identities;
+  return only ?? null;
+}
+
+/** Whether this journal witnessed `momentIso` at all - never an unbounded yes for a journal
+ * that carries no readable moment. */
+function witnessed(
+  journal: CostReportSessionJournal | undefined,
+  momentIso: string | undefined
+): boolean {
+  const span = journal?.witnessed;
+  if (span === undefined || momentIso === undefined) return false;
+  const momentMs = Date.parse(momentIso);
+  if (Number.isNaN(momentMs)) return false;
+  return momentMs >= span.fromMs && momentMs <= span.toMs;
+}
 
 // The same idea, one level above a task: a task whose folder declares no backlog item, or
 // whose declaration exists but could not be read, is its own group - never folded into
@@ -605,14 +750,19 @@ type BacklogRowKey =
  * `buildTaskIntervals`'s own output, never a second notion of when a task was running.
  * Unlike `declaredIntervalsForTask`, this keeps every task a session ever declared, not
  * only one: `byTasks` groups by whichever task a record's moment falls in, not by
- * membership in a single task asked for. */
+ * membership in a single task asked for.
+ *
+ * **Every journal gets an entry, including one that declared nothing.** The empty list and
+ * the absent key are two different facts and `taskRowOf` reads them as two: a key
+ * mapped to `[]` is a journal that was read and declared nothing, an absent key is a
+ * session no journal was read for at all. Skipping the empty ones - which this did until
+ * 2026-09-04 - collapsed both into `"no-declaration"`, so a report that never found the
+ * runs directory announced that the work had declared no task. */
 function allTaskIntervalsByVendorId(
   journals: readonly CostReportSessionJournal[]
 ): ReadonlyMap<string, readonly TaskInterval[]> {
   const byVendorId = new Map<string, readonly TaskInterval[]>();
-  for (const journal of journals) {
-    if (journal.taskIntervals.length > 0) byVendorId.set(journal.vendorId, journal.taskIntervals);
-  }
+  for (const journal of journals) byVendorId.set(journal.vendorId, journal.taskIntervals);
   return byVendorId;
 }
 
@@ -631,20 +781,34 @@ function allTaskIntervalsByVendorId(
  * being deleted as dead code. Reading such a moment the same as no interval covering it at
  * all is deliberate, not an invented fourth reason: a path this layer cannot turn into an
  * identity names no task a person could act on by name either. */
-function declaredTaskKeyOf(
+function taskRowOf(
   record: TelemetrySinkRecord,
-  intervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>
-): TaskRowKey {
-  const intervals = intervalsByVendorId.get(record.vendor_id) ?? [];
+  intervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>,
+  journalsByVendorId: ReadonlyMap<string, CostReportSessionJournal>
+): TaskRow {
+  const intervals = intervalsByVendorId.get(record.vendor_id);
+  // No entry at all means no journal was read for this session - never that it declared
+  // nothing. `allTaskIntervalsByVendorId` gives every journal it read an entry, so the two
+  // cases are distinguishable here and nowhere else.
+  if (intervals === undefined) return "no-journal";
   const interval = intervals.find((candidate) =>
     momentFallsWithin([candidate], record.event_timestamp)
   );
-  const identity = interval && taskIdentityFromWrittenPath(interval.path);
-  return identity ?? taskUnattributedReason(intervals, record.event_timestamp);
+  const declared = interval && taskIdentityFromWrittenPath(interval.path);
+  if (declared) return { task: declared, attribution: "declared" };
+  // Only now the weaker route, and only inside what this journal witnessed: a declaration
+  // that covers the record always wins, so this never overrides a stated fact with an
+  // inferred one.
+  const journal = journalsByVendorId.get(record.vendor_id);
+  const inferred = soleWrittenTaskOf(journal);
+  if (inferred !== null && witnessed(journal, record.event_timestamp)) {
+    return { task: inferred, attribution: "inferred" };
+  }
+  return taskUnattributedReason(intervals, record.event_timestamp);
 }
 
 /** Which `byBacklog` row a record's own task-row key belongs in - built from
- * `declaredTaskKeyOf`'s own output, never a second notion of which task a record fell
+ * `taskRowOf`'s own output, never a second notion of which task a record fell
  * inside. A reason (the record belongs to no task at all) passes straight through
  * unchanged, exactly as `by_task` gives it; a named task looks up its folder's declaration
  * once, in the map `ReportCostUseCase` already resolved for every distinct task identity
@@ -653,15 +817,15 @@ function declaredTaskKeyOf(
  * A named task missing from `declarations` is unreachable through this module's one
  * production caller - `report-cost-use-case.ts` resolves every task identity `byTasks` can
  * ever key on before this ever runs - but is read as `{ kind: "none" }` rather than
- * throwing or dropping the record, the same defensive default `declaredTaskKeyOf`'s own
+ * throwing or dropping the record, the same defensive default `taskRowOf`'s own
  * `interval.path` fallback documents: a caller a test can still construct must never lose a
  * record's figures to a gap in wiring this module cannot see from here. */
 function backlogKeyOf(
-  taskRowKey: TaskRowKey,
+  taskRow: TaskRow,
   declarations: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration> | undefined
 ): BacklogRowKey {
-  if (isTaskUnattributedReason(taskRowKey)) return taskRowKey;
-  const declaration = declarations?.get(taskRowKey) ?? { kind: "none" as const };
+  if (typeof taskRow === "string") return taskRow;
+  const declaration = declarations?.get(taskRow.task) ?? { kind: "none" as const };
   if (declaration.kind === "none") return NO_BACKLOG_DECLARED;
   if (declaration.kind === "unreadable") return UNREADABLE_BACKLOG_DECLARATION;
   return declaration.link.backlog;
@@ -761,6 +925,26 @@ function addToPersonGroup(
   const created: PersonGroup = { resolved, totals: new TotalsAccumulator() };
   created.totals.add(record);
   groups.set(key, created);
+}
+
+/** A prompt's running totals plus the earliest moment seen in it. The moment is tracked
+ * here rather than read back off the records because the pass over them happens once, and
+ * because a sink is append-ordered by when it was read, never by when a turn began. */
+interface PromptGroup {
+  readonly totals: TotalsAccumulator;
+  earliestMs?: number;
+}
+
+function addToPromptGroup(groups: Map<PromptKey, PromptGroup>, record: TelemetrySinkRecord): void {
+  const key = promptKeyOf(record);
+  const group = groups.get(key) ?? { totals: new TotalsAccumulator() };
+  group.totals.add(record);
+  const atMs =
+    record.event_timestamp === undefined ? Number.NaN : Date.parse(record.event_timestamp);
+  if (!Number.isNaN(atMs) && (group.earliestMs === undefined || atMs < group.earliestMs)) {
+    group.earliestMs = atMs;
+  }
+  groups.set(key, group);
 }
 
 /** Every UTC day from `fromDay` to `toDay`, inclusive — the full period, whether or not a
@@ -1013,12 +1197,14 @@ interface Groups {
   readonly totals: TotalsAccumulator;
   readonly steps: Map<string, StepGroup>;
   readonly models: Map<ModelKey, TotalsAccumulator>;
+  readonly agents: Map<AgentKey, TotalsAccumulator>;
+  readonly prompts: Map<PromptKey, PromptGroup>;
   readonly tools: Map<AiToolId, TotalsAccumulator>;
   readonly toolSessionTotals: Map<AiToolId, TotalsAccumulator>;
   readonly attributions: Map<StepAttributionSource, TotalsAccumulator>;
   readonly taskAttributions: Map<TaskAttributionSource, TotalsAccumulator>;
   readonly projects: Map<ProjectKey, TotalsAccumulator>;
-  readonly tasks: Map<TaskRowKey, TotalsAccumulator>;
+  readonly tasks: Map<string, TaskGroup>;
   readonly backlog: Map<BacklogRowKey, TotalsAccumulator>;
   readonly flows: Map<FlowRowKey, TotalsAccumulator>;
   readonly people: Map<PersonRowKey, PersonGroup>;
@@ -1033,6 +1219,8 @@ function emptyGroups(fromDay: string, toDay: string): Groups {
     totals: new TotalsAccumulator(),
     steps: new Map(),
     models: new Map(),
+    agents: new Map(),
+    prompts: new Map(),
     tools: new Map(),
     toolSessionTotals: new Map(),
     attributions: new Map(),
@@ -1079,6 +1267,7 @@ function accumulateRequestRecord(
   membership: TaskMembership | null,
   taskIntervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>,
   flowIntervalsByVendorId: ReadonlyMap<string, readonly FlowInterval[]>,
+  journalsByVendorId: ReadonlyMap<string, CostReportSessionJournal>,
   identity: PersonIdentity | null,
   taskBacklogDeclarations: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration> | undefined
 ): void {
@@ -1087,10 +1276,12 @@ function accumulateRequestRecord(
   accumulateInto(groups.attributions, record.step_attribution, record);
   accumulateInto(groups.tools, record.tool, record);
   accumulateInto(groups.models, modelKeyOf(record), record);
+  accumulateInto(groups.agents, agentKeyOf(record), record);
+  addToPromptGroup(groups.prompts, record);
   accumulateInto(groups.projects, projectKeyOf(record), record);
-  const taskRowKey = declaredTaskKeyOf(record, taskIntervalsByVendorId);
-  accumulateInto(groups.tasks, taskRowKey, record);
-  accumulateInto(groups.backlog, backlogKeyOf(taskRowKey, taskBacklogDeclarations), record);
+  const taskRow = taskRowOf(record, taskIntervalsByVendorId, journalsByVendorId);
+  addToTaskGroup(groups.tasks, taskRow, record);
+  accumulateInto(groups.backlog, backlogKeyOf(taskRow, taskBacklogDeclarations), record);
   accumulateInto(groups.flows, flowKeyOf(record, flowIntervalsByVendorId), record);
   addToPersonGroup(groups.people, record, resolvePerson(identity, personRawIdOf(record)));
   const day = telemetrySinkRecordDayKey(record);
@@ -1111,6 +1302,7 @@ function accumulate(
   const groups = emptyGroups(fromDay, toDay);
   const taskIntervalsByVendorId = allTaskIntervalsByVendorId(journals);
   const flowIntervalsByVendorId = allFlowIntervalsByVendorId(journals);
+  const journalsByVendorId = new Map(journals.map((journal) => [journal.vendorId, journal]));
   for (const record of records) {
     if (record.kind === "session") {
       accumulateSessionRecord(groups, record);
@@ -1122,6 +1314,7 @@ function accumulate(
       membership,
       taskIntervalsByVendorId,
       flowIntervalsByVendorId,
+      journalsByVendorId,
       identity,
       taskBacklogDeclarations
     );
@@ -1145,7 +1338,8 @@ function attributionRows(
   }));
 }
 
-/** Both sources, always - the same reason `attributionRows` always gives all three: a
+/** Both sources, always - the same reason `attributionRows` always gives every one of its
+ * own: a
  * source that accounted for nothing is still a fact about this task, not an absent field. */
 function taskAttributionRows(
   taskAttributions: ReadonlyMap<TaskAttributionSource, TotalsAccumulator>
@@ -1194,22 +1388,26 @@ function isTaskUnattributedReason(key: string | symbol): key is TaskUnattributed
 /** Every task a record's own moment fell inside, largest first, then one row per reason
  * actually present for what fell in none - `TASK_UNATTRIBUTED_REASONS`' own fixed order,
  * always after every named task regardless of size, the same convention `personRows` gives
- * its own `none` row. Up to three such rows, never fewer than the reasons present: two
+ * its own `none` row. Up to four such rows, never fewer than the reasons present: two
  * different gaps collapsed into one row is the fault this breakdown exists to avoid. */
-function taskRows(tasks: ReadonlyMap<TaskRowKey, TotalsAccumulator>): readonly CostReportTaskRow[] {
+function taskRows(tasks: ReadonlyMap<string, TaskGroup>): readonly CostReportTaskRow[] {
   const named: CostReportTaskRow[] = [];
   const byReason = new Map<TaskUnattributedReason, CostReportTaskRow>();
-  for (const [key, accumulator] of tasks) {
-    if (isTaskUnattributedReason(key)) {
-      byReason.set(key, { reason: key, totals: accumulator.build() });
+  for (const group of tasks.values()) {
+    const totals = group.totals.build();
+    if (group.reason !== undefined) {
+      byReason.set(group.reason, { reason: group.reason, totals });
       continue;
     }
-    named.push({ task: key, attribution: "declared", totals: accumulator.build() });
+    if (group.task === undefined || group.attribution === undefined) continue;
+    named.push({ task: group.task, attribution: group.attribution, totals });
   }
+  // Tie-broken on the pair, not on the task alone: one task can hold both a declared row and
+  // an inferred one, and a tie-break blind to the attribution would order them arbitrarily.
   const sorted = bySize(
     named,
     (row) => row.totals,
-    (row) => row.task ?? ""
+    (row) => `${row.task ?? ""}/${row.attribution ?? ""}`
   );
   const reasonRows = TASK_UNATTRIBUTED_REASONS.map((reason) => byReason.get(reason)).filter(
     (row): row is CostReportTaskRow => row !== undefined
@@ -1316,6 +1514,49 @@ function flowRows(flows: ReadonlyMap<FlowRowKey, TotalsAccumulator>): readonly C
  * here. A series read out of order is not a series. */
 function dayRows(days: ReadonlyMap<string, TotalsAccumulator>): readonly CostReportDayRow[] {
   return [...days].map(([day, accumulator]) => ({ day, totals: accumulator.build() }));
+}
+
+/** Every agent that ran, largest first, plus one row for the main thread. */
+function agentRows(
+  agents: ReadonlyMap<AgentKey, TotalsAccumulator>
+): readonly CostReportAgentRow[] {
+  const rows: CostReportAgentRow[] = [...agents].map(([key, accumulator]) => ({
+    ...(key === NO_AGENT ? {} : { agent: key }),
+    totals: accumulator.build(),
+  }));
+  return bySize(
+    rows,
+    (row) => row.totals,
+    (row) => row.agent ?? ""
+  );
+}
+
+/** Every prompt that caused work, largest first, plus one row for what named none.
+ * Largest first and not chronological: unlike `by_day` this is a ranking, and a ranking has
+ * no continuity to break by reordering. The row for what named none is placed last rather
+ * than ranked among them - it is a remainder drawn from many turns, not a turn, so its size
+ * is not comparable to theirs. `by_flow` places its own remainder the same way. */
+function promptRows(prompts: ReadonlyMap<PromptKey, PromptGroup>): readonly CostReportPromptRow[] {
+  const named: CostReportPromptRow[] = [];
+  let namedNone: CostReportPromptRow | undefined;
+  for (const [key, group] of prompts) {
+    const totals = group.totals.build();
+    if (key === NO_PROMPT) {
+      namedNone = { totals };
+      continue;
+    }
+    named.push({
+      prompt: key,
+      ...(group.earliestMs === undefined ? {} : { startedAt: isoSecondsFromMs(group.earliestMs) }),
+      totals,
+    });
+  }
+  const sorted = bySize(
+    named,
+    (row) => row.totals,
+    (row) => row.prompt ?? ""
+  );
+  return namedNone === undefined ? sorted : [...sorted, namedNone];
 }
 
 /** Every model a record named, largest first, plus one row for what named none. */
@@ -1432,6 +1673,8 @@ function breakdownFields(
   CostReport,
   | "bySteps"
   | "byModels"
+  | "byAgents"
+  | "byPrompts"
   | "byTools"
   | "byProjects"
   | "byTasks"
@@ -1443,6 +1686,8 @@ function breakdownFields(
   return {
     bySteps: stepRows(groups.steps),
     byModels: modelRows(groups.models),
+    byAgents: agentRows(groups.agents),
+    byPrompts: promptRows(groups.prompts),
     byTools: toolRowsInScope(input, groups),
     byProjects: projectRows(groups.projects),
     byTasks: taskRows(groups.tasks),

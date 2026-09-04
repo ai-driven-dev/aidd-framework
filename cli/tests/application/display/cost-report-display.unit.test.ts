@@ -9,7 +9,7 @@ import {
   type CostReportInput,
 } from "../../../src/contexts/telemetry/domain/cost-report.js";
 import type { TelemetrySinkRecord } from "../../../src/contexts/telemetry/domain/telemetry-sink-record.js";
-import { printCostReport } from "../../../src/presentation/display/cost-report-display.js";
+import { padTo, printCostReport } from "../../../src/presentation/display/cost-report-display.js";
 import { CLIOutput } from "../../../src/presentation/output.js";
 
 /** Extends the real output rather than standing in for it: a double built from an object
@@ -359,6 +359,46 @@ describe("printCostReport", () => {
     expect(out).not.toContain("2026-01-15");
   });
 
+  it("prints the prompt that caused the work, dated, largest first", () => {
+    const out = printed({
+      records: [
+        record({
+          turn_id: "a",
+          prompt_id: "p-1",
+          cost_usd: 2,
+          event_timestamp: "2026-08-18T09:00:00Z",
+        }),
+        record({
+          turn_id: "b",
+          prompt_id: "p-2",
+          cost_usd: 1,
+          event_timestamp: "2026-08-18T10:00:00Z",
+        }),
+      ],
+    });
+
+    expect(out).toContain("by prompt");
+    const prompts = out.split("\n").filter((line) => line.includes("p-1") || line.includes("p-2"));
+    expect(prompts[0]).toContain("p-1");
+    expect(prompts[0]).toContain("2026-08-18T09:00:00Z");
+  });
+
+  // The first axis whose cardinality is unbounded: one row per turn, 12 on a session and
+  // 31,435 over the measured history. Unlike `by day` this truncates rather than suppressing
+  // every row - a partial series is a lie about continuity, a top N of a ranking is not, and
+  // it says how many it withheld.
+  it("names how many prompts a long period carries beyond the ones it prints", () => {
+    const records = Array.from({ length: 30 }, (_, i) =>
+      record({ turn_id: `t-${i}`, prompt_id: `p-${i}`, cost_usd: 30 - i })
+    );
+    const out = printed({ records });
+
+    expect(out).toContain("p-0");
+    expect(out).not.toContain("p-29");
+    expect(out).toContain("20 more prompts");
+    expect(out).toContain("--json");
+  });
+
   it("gives a record with no project its own row, named as unknown", () => {
     const out = printed({
       records: [
@@ -383,6 +423,37 @@ describe("printCostReport", () => {
 
     expect(models).toContain("opus");
     expect(models).toContain("no known model");
+  });
+});
+
+describe("printCostReport — a label wider than its column", () => {
+  // Measured on a real report: a project id is the repository's own remote, and
+  // `git@github.com:ai-driven-dev/framework.git` is 41 characters against a 26-wide column.
+  // `padEnd` returns a longer string unchanged, so the share ran straight into the label and
+  // printed `…framework.git100%`. No fixture had ever carried an identifier that long.
+  it("keeps a separator between an overlong label and its share", () => {
+    const long = "git@github.com:ai-driven-dev/framework.git";
+
+    const out = printed({ records: [record({ cost_usd: 1, project_id: long })] });
+    const row = out.split("\n").find((line) => line.includes(long));
+
+    expect(row).toBeDefined();
+    expect(row).not.toContain(`${long}100%`);
+    expect(row).toMatch(new RegExp(`${long.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\s`, "u"));
+  });
+
+  it("still separates a label exactly as wide as its column from what follows it", () => {
+    // 26 is `LABEL_WIDTH`, private to this module - the one length where `padTo`'s own
+    // branches diverge. Shorter, `padEnd` alone already reserves the gap; longer, both the
+    // `padEnd` branch and the "at least as wide" branch agree on a single trailing space.
+    // Exactly 26 is the only length where `>=` and `>` decide something different, and
+    // nothing above ever exercised it - the 41-character label is already past it, never
+    // sitting on the boundary itself.
+    const exact = "a".repeat(26);
+
+    const padded = padTo(exact, 26);
+
+    expect(padded).toBe(`${exact} `);
   });
 });
 

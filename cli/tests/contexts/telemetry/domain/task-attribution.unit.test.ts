@@ -37,6 +37,27 @@ describe("task-attribution — pure: journal lines -> bounded intervals", () => 
     ]);
   });
 
+  // The live case, and the reason `turn_end` stopped closing a declaration on 2026-09-04.
+  // A `turn_end` is a pause, not a change of subject: the session declared
+  // `telemetry-screen` at 05:59, paused at 06:02, and worked on that same task for three
+  // more hours. Closed at the pause, 78% of the session read "before the next task this
+  // session declares" while only 1.8% of its tokens truly preceded any declaration.
+  //
+  // `turn_end` stays a *witness*, so an interval with nothing after it still ends there —
+  // the same moment, for the honest reason. What changes is an interval with work after it.
+  it("keeps a declaration open across a turn_end, ending at the work that followed", () => {
+    const wrote = {
+      type: "file_written",
+      at: "2026-08-17T10:20:00Z",
+      path: "aidd_docs/tasks/2026_08/wanted/phase-1.md",
+    } as const;
+    const intervals = buildTaskIntervals(journalOf([WANTED], [TURN_END], [wrote]));
+
+    expect(intervals).toEqual([
+      { path: WANTED.path, startMs: Date.parse(WANTED.at), endMs: Date.parse(wrote.at) },
+    ]);
+  });
+
   it("closes a declaration at a later declaration, never at the turn's own end past it", () => {
     const intervals = buildTaskIntervals(journalOf([WANTED, OTHER], [TURN_END]));
 
@@ -237,20 +258,12 @@ describe("taskUnattributedReason — which of three distinct facts applies", () 
     expect(taskUnattributedReason(intervals, "2026-08-17T09:00:00Z")).toBe("precedes-declaration");
   });
 
-  it("names precedes-declaration for a record in the gap a turn_end leaves before the next declaration - never journal-silent, since the journal keeps going right through it", () => {
-    // WANTED closes at TURN_END (10:15); a further declaration follows once the journal is
-    // alive again, at 11:00, leaving a real gap in between that no interval covers.
-    const laterDeclaration = {
-      type: "task_declared",
-      at: "2026-08-17T11:00:00Z",
-      path: "aidd_docs/tasks/2026_08/later/spec.md",
-    } as const;
-    const intervals = buildTaskIntervals(journalOf([WANTED, laterDeclaration], [TURN_END]));
-
-    // 10:30 falls after WANTED's own interval closed at TURN_END (10:15) and before
-    // laterDeclaration opens at 11:00 - a real gap the journal is not silent through.
-    expect(taskUnattributedReason(intervals, "2026-08-17T10:30:00Z")).toBe("precedes-declaration");
-  });
+  // Deleted on 2026-09-04, not moved: it asserted a reason for a moment that is now
+  // attributed, so it passed while proving nothing. It described a gap a `turn_end` left
+  // between two declarations — and a `turn_end` no longer closes one, so intervals run
+  // contiguously from each declaration to the next and no such gap can arise.
+  // `precedes-declaration` stays reachable only before a session's first declaration,
+  // which the test above covers.
 
   it("names journal-silent for a record after the last declared interval's own end", () => {
     const intervals = buildTaskIntervals(journalOf([WANTED], [TURN_END]));

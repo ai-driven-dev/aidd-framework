@@ -1,4 +1,5 @@
 import type { AiToolId } from "../../../kernel/tool.js";
+import type { StepAttributionSource } from "./step-attribution.js";
 
 /**
  * Four independently verifiable claims about the measurement chain, each answered from
@@ -90,7 +91,7 @@ export interface TelemetryClaimToolRead {
   readonly sessionFound: boolean;
   readonly hasIntervals: boolean;
   readonly records: readonly {
-    readonly stepAttribution: "tool-stated" | "journal-interval" | "unattributed";
+    readonly stepAttribution: StepAttributionSource;
   }[];
   readonly error?: string;
 }

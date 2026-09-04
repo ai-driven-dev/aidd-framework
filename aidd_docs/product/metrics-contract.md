@@ -391,6 +391,23 @@ plugin alongside the step name; a journal interval never carries a plugin at
 all, so `step_plugin` is absent whenever `step_attribution` is
 `"journal-interval"`, even though `step` itself is present there.
 
+**A journal interval ends where the journal says, and only a skill can say it.** The
+interval runs from the `step_start` a skill's invocation wrote to the first of: a `step_end`
+line naming that same skill, another `step_start`, or a `turn_end`. Only the first of those
+is the end itself; the other two stand in for it. That matters because a `turn_end` is a
+**pause** — a skill working across three prompts is credited with its first turn and nothing
+after — and nothing any host emits says when a skill's work finished. Measured: a `Skill`
+tool call's own `tool_result` returns about a tenth of a second after the call, which is the
+dispatch, not the completion. So a skill declares its own end through a tool call it makes,
+carrying `aidd:step-end <skill>` in that call's arguments, and the hook writes the line. An
+end naming a skill the session never started closes nothing, and an end never closes a step
+other than the one it names — a skill invoking another must not end it.
+
+A step whose interval was closed by a stated `step_end` still reads `"journal-interval"`, not
+a stronger value: the record was still placed by its moment falling inside a span, which is
+the inference that value names. What the end changes is the span, never how the record met
+it.
+
 **`step_attribution: "unattributed"` does not mean "this request ran outside any
 step."** Claude Code's own attribution field is omitted from its transcript both
 when no skill was running and when the running Claude Code version predates the
@@ -695,6 +712,27 @@ ignores it exactly as it would any other field it does not recognize.
   subagent's. For every other tool measured so far, this field is never set at
   all — its route does not name subagents as a concept, so its absence there
   says nothing about whether one ran.
+
+#### `prompt_id`
+- **Type**: string.
+- **Present**: conditional — Claude Code only, and only where its transcript
+  lets the prompt be resolved.
+- **Meaning**: the prompt this billed call belongs to. A billed call and the
+  prompt that caused it never share a transcript line: measured on a real
+  810-record session, zero lines carry both `requestId` and `promptId`, only
+  `type: "user"` lines carry the second, and all 209 lines bearing counters
+  reach one by following `parentUuid` — three hops in the median. The reader
+  walks that chain and stores what it finds.
+- **Why it exists**: the run journal writes the same identifier on `step_start`
+  (Claude Code hands its hooks `prompt_id`, stored there under the name
+  `turn_id`). Matching the two joins a step to a record exactly, rather than
+  inferring it from which interval each moment happens to fall in — the only
+  route that stays true when two tasks advance at once, since two prompts remain
+  two prompts however their moments overlap. Two tasks inside **one** prompt stay
+  indivisible: a billed amount cannot be split without inventing a ratio.
+- **If absent**: the chain reached no line naming a prompt — a transcript
+  truncated mid-write, or a host whose files carry no such identifier, which is
+  every tool but Claude Code today. Never read as "no prompt ran".
 
 #### `duration_ms`
 - **Type**: number.

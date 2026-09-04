@@ -35,6 +35,8 @@ export const ARTEFACT_AXES = [
   "day",
   "step",
   "model",
+  "agent",
+  "prompt",
   "task",
   "backlog",
   "flow",
@@ -45,12 +47,15 @@ export const ARTEFACT_AXES = [
 
 export type ArtefactAxis = (typeof ARTEFACT_AXES)[number];
 
+const NO_PROMPT_LABEL = "no prompt named";
 const UNKNOWN_AMOUNT = "amount unknown";
 const NOTHING_MEASURED = "nothing in this period";
 const NOTHING_IN_SELECTION = "nothing in this selection";
 const SESSION_TOTAL_LABEL = "session total, not requests";
 const NO_KNOWN_PROJECT = "no known project";
 const NO_KNOWN_MODEL = "no known model";
+// Not "no agent": the main thread is where a session starts, not an absence.
+const MAIN_THREAD = "the main thread";
 // Distinct on purpose, per the contract's own three-way shape: an unresolved row names an
 // identity that is real but unplaced, and repeats once per such identity since each is its
 // own row; the no-identity row is singular and says nobody opted in at all. Neither label
@@ -325,6 +330,35 @@ function flowArtefact(envelope: CostReportEnvelope): string {
   ].join("\n");
 }
 
+function agentArtefact(envelope: CostReportEnvelope): string {
+  return table(
+    envelope,
+    "by agent",
+    "Agent",
+    envelope.by_agent.map(
+      (row) => `| ${row.agent ?? MAIN_THREAD} | ${figure(row.totals, envelope)} |`
+    )
+  );
+}
+
+/** An id and the moment its turn began: the id alone is opaque, and the moment is what a
+ * person greps for in their own transcript. `—` where a row carries none, which is the row
+ * for records that named no prompt - never a moment borrowed from another turn. */
+function promptArtefact(envelope: CostReportEnvelope): string {
+  const rows = envelope.by_prompt.map(
+    (row) =>
+      `| ${row.prompt ?? NO_PROMPT_LABEL} | ${row.started_at ?? "—"} | ${figure(row.totals, envelope)} |`
+  );
+  return [
+    header(envelope, "by prompt"),
+    "",
+    "| Prompt | Started at | Total |",
+    "| --- | --- | --- |",
+    ...rows,
+    ...caveats(envelope),
+  ].join("\n");
+}
+
 function modelArtefact(envelope: CostReportEnvelope): string {
   return table(
     envelope,
@@ -401,6 +435,8 @@ const BUILDERS: Record<ArtefactAxis, (envelope: CostReportEnvelope) => string> =
   day: dayArtefact,
   step: stepArtefact,
   model: modelArtefact,
+  agent: agentArtefact,
+  prompt: promptArtefact,
   task: taskArtefact,
   backlog: backlogArtefact,
   flow: flowArtefact,

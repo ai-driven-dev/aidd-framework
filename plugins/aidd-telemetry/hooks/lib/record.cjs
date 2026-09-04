@@ -194,6 +194,13 @@ function buildStepStartLine({ at, skill, turnId }) {
   return line;
 }
 
+// The end of the step `skill` names, told rather than inferred - see step-ends.cjs for why no
+// hook can observe it. Carries the skill, never only the moment: a bare end would have to
+// close whatever step is open, which closes the wrong one the moment a skill invokes another.
+function buildStepEndLine({ at, skill }) {
+  return { type: "step_end", at, skill: sanitizeSkillName(skill) };
+}
+
 // A start, told rather than inferred, the same way step_start is: a tool call named a task
 // path, so this session is on that task from here. No end on this line either, and for the
 // same reason step_start carries none - closing is the reader's derivation, from whichever
@@ -314,6 +321,7 @@ module.exports = {
   buildTurnEndLine,
   buildFileWrittenLine,
   buildStepStartLine,
+  buildStepEndLine,
   buildTaskDeclaredLine,
   sanitizeSkillName,
   PRIVATE_FILE_MODE,

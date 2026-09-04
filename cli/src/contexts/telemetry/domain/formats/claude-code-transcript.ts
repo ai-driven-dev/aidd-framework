@@ -39,6 +39,9 @@ interface ClaudeUsage {
 interface ClaudeTranscriptLine {
   readonly type?: unknown;
   readonly sessionId?: unknown;
+  readonly uuid?: unknown;
+  readonly parentUuid?: unknown;
+  readonly promptId?: unknown;
   readonly requestId?: unknown;
   readonly isSidechain?: unknown;
   readonly timestamp?: unknown;
@@ -156,6 +159,51 @@ function buildRecord(
   };
 }
 
+/** One JSONL line as an object, or `null` for a blank or unparseable one. Shared by the
+ * billed-turn parser and the link walk, so a line either reaches both or neither. */
+function parseLine(line: string): ClaudeTranscriptLine | null {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+  try {
+    return JSON.parse(trimmed) as ClaudeTranscriptLine;
+  } catch {
+    return null;
+  }
+}
+
+function uuidOf(line: string): string | undefined {
+  const parsed = parseLine(line);
+  return parsed === null ? undefined : asString(parsed.uuid);
+}
+
+/** The prompt a line belongs to, found by walking `parentUuid` upward.
+ *
+ * A billed call and the prompt that caused it never share a line: measured on a real
+ * 810-record session, zero lines carry both `requestId` and `promptId`, only `type: "user"`
+ * lines carry the second, and all 209 lines bearing counters reach one this way — three hops
+ * in the median.
+ *
+ * `seen` bounds the walk instead of a hop count: a transcript is appended to by a live
+ * process and can be truncated mid-write, so a parent that points at a line which never
+ * arrived, or a cycle a damaged file leaves behind, must end the walk rather than search
+ * forever. A hop cap would also terminate, but it would silently stop answering for a
+ * legitimately deep chain, which is the kind of number nobody could ever justify. */
+function resolvePromptId(
+  startUuid: string | undefined,
+  parents: ReadonlyMap<string, string>,
+  prompts: ReadonlyMap<string, string>
+): string | undefined {
+  const seen = new Set<string>();
+  let current = startUuid;
+  while (current !== undefined && !seen.has(current)) {
+    const prompt = prompts.get(current);
+    if (prompt !== undefined) return prompt;
+    seen.add(current);
+    current = parents.get(current);
+  }
+  return undefined;
+}
+
 /** One parsed JSONL line, keyed by `message.id` — the identifier that ties together the
  * separate log lines one API call can produce. Mapping every such line to its own record
  * would count that single call's tokens more than once.
@@ -202,15 +250,42 @@ class ClaudeCodeTranscriptAccumulator implements TranscriptLineAccumulator {
   // position stays where the call first appeared, so the order a reader sees is the order
   // the calls happened.
   private readonly byKey = new Map<string, LocalCostCandidateRecord>();
+  // Which line each record came from, so its prompt can be resolved once every line has
+  // been seen — a parent almost always appears earlier, but nothing in the format promises
+  // it, and a walk run mid-stream would answer from a half-built map.
+  private readonly uuidByKey = new Map<string, string>();
+  // Every line's own links, gathered from *all* lines rather than only billed ones: the
+  // chain from a call to its prompt runs through lines that carry no counters at all.
+  private readonly parents = new Map<string, string>();
+  private readonly prompts = new Map<string, string>();
 
   push(line: string): void {
+    this.rememberLinks(line);
     const parsed = parseAssistantLine(line);
     if (!parsed) return;
     this.byKey.set(parsed.dedupeKey, parsed.record);
+    const uuid = uuidOf(line);
+    if (uuid !== undefined) this.uuidByKey.set(parsed.dedupeKey, uuid);
+  }
+
+  /** Parsed a second time, deliberately: `parseAssistantLine` answers `null` for every line
+   * that is not a billed assistant turn, and those are exactly the lines this walk needs. */
+  private rememberLinks(line: string): void {
+    const parsed = parseLine(line);
+    if (parsed === null) return;
+    const uuid = asString(parsed.uuid);
+    if (uuid === undefined) return;
+    const parent = asString(parsed.parentUuid);
+    if (parent !== undefined) this.parents.set(uuid, parent);
+    const prompt = asString(parsed.promptId);
+    if (prompt !== undefined) this.prompts.set(uuid, prompt);
   }
 
   build(): readonly LocalCostCandidateRecord[] {
-    return [...this.byKey.values()];
+    return [...this.byKey.entries()].map(([key, record]) => {
+      const promptId = resolvePromptId(this.uuidByKey.get(key), this.parents, this.prompts);
+      return promptId === undefined ? record : { ...record, prompt_id: promptId };
+    });
   }
 }
 

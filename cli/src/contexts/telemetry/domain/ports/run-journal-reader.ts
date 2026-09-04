@@ -7,6 +7,15 @@ export interface RunJournalStepStart {
   readonly type: "step_start";
   readonly at: string;
   readonly skill: string;
+  /** The host's own identifier for the prompt this step opened under, where it hands one to
+   * a hook — Claude Code's `prompt_id`. Named `turn_id` on the line because that is what
+   * `buildStepStartLine` has always written; it is a prompt, not a turn, and three steps
+   * opened under one prompt share it.
+   *
+   * Matched against a record's `prompt_id`, it attributes a step **exactly** rather than by
+   * asking which interval a moment fell in — the only reading that survives two tasks
+   * advancing at once. Absent for every host that hands its hooks no such identifier. */
+  readonly turn_id?: string;
 }
 
 /** One `turn_end` line: closes whatever step was open, even where no further step opens
@@ -16,7 +25,21 @@ export interface RunJournalTurnEnd {
   readonly at: string;
 }
 
-export type RunJournalBoundary = RunJournalStepStart | RunJournalTurnEnd;
+/** One `step_end` line: the moment a skill said its own work was over, and the skill it
+ * says it for. Mirrors `plugins/aidd-telemetry/hooks/lib/record.cjs`'s `buildStepEndLine`.
+ *
+ * The one thing about a step no host emits, which is why the skill declares it and the hook
+ * writes it (`plugins/aidd-telemetry/hooks/lib/step-ends.cjs`). Carries its skill, and closes only that skill's own
+ * open interval: closing "whatever is open" would close the wrong one the moment a skill
+ * invokes another, and an end naming a skill this session never started closes nothing at
+ * all rather than truncating whatever was running. */
+export interface RunJournalStepEnd {
+  readonly type: "step_end";
+  readonly at: string;
+  readonly skill: string;
+}
+
+export type RunJournalBoundary = RunJournalStepStart | RunJournalTurnEnd | RunJournalStepEnd;
 
 /** The `session_start` line: the one line naming what a session was. `tool` holds the
  * journal hook's own host identifier ("claude-code", "codex", "copilot", "cursor"), which

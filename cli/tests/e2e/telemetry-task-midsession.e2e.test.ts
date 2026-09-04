@@ -19,6 +19,8 @@ const RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAX";
 const ALPHA_VENDOR_ID = "33333333-3333-4333-8333-333333333333";
 const SILENT_RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
 const SILENT_VENDOR_ID = "44444444-4444-4444-8444-444444444444";
+const AMBIGUOUS_RUN_ID = "01ARZ3NDEKTSV4RRFFQ69G5FAZ";
+const AMBIGUOUS_VENDOR_ID = "55555555-5555-4555-8555-555555555555";
 const PROJECT_ID = "acme/widgets";
 const ALPHA_TASK = "2026_02/2026_02_10_alpha";
 const PERIOD = ["--from", "2026-02-01", "--to", "2026-02-28"];
@@ -65,6 +67,36 @@ const SILENT_JOURNAL_LINES = [
   },
 ];
 
+/** A third session that declares a task and writes into TWO task folders. Two candidates
+ * and no reason to choose, so the written-file route infers nothing here - which is what
+ * keeps a record before this session's own declaration reading `precedes-declaration`, and
+ * proves the refusal bound end to end rather than only in a unit test. */
+const AMBIGUOUS_JOURNAL_LINES = [
+  {
+    type: "session_start",
+    at: "2026-02-10T14:00:00Z",
+    run_id: AMBIGUOUS_RUN_ID,
+    tool: "codex",
+    vendor_id: AMBIGUOUS_VENDOR_ID,
+    project_id: PROJECT_ID,
+  },
+  {
+    type: "file_written",
+    at: "2026-02-10T14:10:00Z",
+    path: `aidd_docs/tasks/${ALPHA_TASK}/plan.md`,
+  },
+  {
+    type: "file_written",
+    at: "2026-02-10T14:12:00Z",
+    path: "aidd_docs/tasks/2026_02/2026_02_10_beta/plan.md",
+  },
+  {
+    type: "task_declared",
+    at: "2026-02-10T14:30:00Z",
+    path: `aidd_docs/tasks/${ALPHA_TASK}/spec.md`,
+  },
+];
+
 function record(overrides: Record<string, unknown>): Record<string, unknown> {
   return {
     kind: "request",
@@ -101,6 +133,14 @@ const AFTER_LAST_WITNESS = record({
   event_timestamp: "2026-02-10T10:30:00Z",
   cost_usd: 4,
 });
+// Before the ambiguous session's own declaration, and its two written folders refuse the
+// inferred route - precedes-declaration.
+const PRECEDES_IN_AMBIGUOUS = record({
+  vendor_id: AMBIGUOUS_VENDOR_ID,
+  turn_id: "ambiguous",
+  event_timestamp: "2026-02-10T14:05:00Z",
+  cost_usd: 16,
+});
 // A session whose journal never declared a task at all - no-declaration.
 const NEVER_DECLARED = record({
   vendor_id: SILENT_VENDOR_ID,
@@ -109,10 +149,17 @@ const NEVER_DECLARED = record({
   cost_usd: 8,
 });
 
-const RECORDS = [BEFORE_DECLARATION, DURING_ALPHA_NO_TURN_END, AFTER_LAST_WITNESS, NEVER_DECLARED];
+const RECORDS = [
+  BEFORE_DECLARATION,
+  DURING_ALPHA_NO_TURN_END,
+  AFTER_LAST_WITNESS,
+  PRECEDES_IN_AMBIGUOUS,
+  NEVER_DECLARED,
+];
 
 interface TaskRow {
   readonly task?: string;
+  readonly attribution?: string;
   readonly reason?: string;
   readonly totals: { readonly requests: number; readonly cost_micro_usd?: number };
 }
@@ -152,6 +199,11 @@ describe("aidd telemetry report — a task declared while the work is still goin
     await writeFile(
       join(runsDir, `${SILENT_RUN_ID}__${SILENT_VENDOR_ID}.jsonl`),
       `${SILENT_JOURNAL_LINES.map((line) => JSON.stringify(line)).join("\n")}\n`,
+      "utf-8"
+    );
+    await writeFile(
+      join(runsDir, `${AMBIGUOUS_RUN_ID}__${AMBIGUOUS_VENDOR_ID}.jsonl`),
+      `${AMBIGUOUS_JOURNAL_LINES.map((line) => JSON.stringify(line)).join("\n")}\n`,
       "utf-8"
     );
     const sinkDir = join(env.fakeHome, ".config", "aidd", "telemetry");
@@ -198,14 +250,20 @@ describe("aidd telemetry report — a task declared while the work is still goin
     expect(taskRowOfCost(afterClose, 2)?.task).toBe(ALPHA_TASK);
   });
 
-  it("names each of the three unattributed reasons distinctly, never collapsing two into one", async () => {
+  // The record at 09:05 precedes its session's declaration, but that session wrote into one
+  // task folder and nothing else, and its journal witnessed 09:05 - so the written-file
+  // route names it, marked `inferred`. `precedes-declaration` is proven on the ambiguous
+  // session instead, where two written folders refuse that route.
+  it("names each unattributed reason distinctly, never collapsing two into one", async () => {
     const { projectDir, fakeHome } = await seed();
 
     const result = await runCli(["telemetry", "report", ...PERIOD, "--json"], projectDir, fakeHome);
     expect(result.exitCode).toBe(0);
     const envelope = JSON.parse(result.stdout) as Envelope;
 
-    expect(taskRowOfCost(envelope, 1)?.reason).toBe("precedes-declaration");
+    expect(taskRowOfCost(envelope, 1)?.attribution).toBe("inferred");
+    expect(taskRowOfCost(envelope, 1)?.task).toBe(ALPHA_TASK);
+    expect(taskRowOfCost(envelope, 16)?.reason).toBe("precedes-declaration");
     expect(taskRowOfCost(envelope, 4)?.reason).toBe("journal-silent");
     expect(taskRowOfCost(envelope, 8)?.reason).toBe("no-declaration");
 
@@ -213,7 +271,7 @@ describe("aidd telemetry report — a task declared while the work is still goin
     expect(new Set(reasonRows.map((row) => row.reason)).size).toBe(reasonRows.length);
   });
 
-  it("prints each reason in the text rendering too, never one label for all three", async () => {
+  it("prints each reason in the text rendering too, never one label for all of them", async () => {
     const { projectDir, fakeHome } = await seed();
 
     const result = await runCli(["telemetry", "report", ...PERIOD], projectDir, fakeHome);

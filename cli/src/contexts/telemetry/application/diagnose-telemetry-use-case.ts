@@ -16,7 +16,11 @@ import type { SessionCostReader } from "../domain/ports/session-cost-reader.js";
 import type { TelemetryEvidenceReader } from "../domain/ports/telemetry-evidence-reader.js";
 import type { TelemetrySink } from "../domain/ports/telemetry-sink.js";
 import { resolveSessionAnchor } from "../domain/session-anchor.js";
-import { attributeMoment, buildStepIntervals } from "../domain/step-attribution.js";
+import {
+  attributeMoment,
+  buildStepIntervals,
+  type StepAttributionSource,
+} from "../domain/step-attribution.js";
 import {
   diagnoseTelemetryClaims,
   type TelemetryClaim,
@@ -333,7 +337,7 @@ export class DiagnoseTelemetryUseCase {
 function stampAttribution(
   record: { readonly step?: string; readonly event_timestamp?: string },
   intervals: ReturnType<typeof buildStepIntervals>
-): { readonly stepAttribution: "tool-stated" | "journal-interval" | "unattributed" } {
+): { readonly stepAttribution: StepAttributionSource } {
   if (record.step !== undefined) return { stepAttribution: "tool-stated" };
   return { stepAttribution: attributeMoment(intervals, record.event_timestamp).source };
 }
