@@ -9,8 +9,9 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 | Surface | Validated by |
 | --- | --- |
 | Skills, agents, rules (markdown) | each action's own `## Test`, run end to end against a real project |
-| `scripts/` and bundled hooks | `node --test scripts/__tests__/*.test.js` |
-| `cli/` and `kanban/` | vitest, three tiers — see the CLI bank |
+| `scripts/` and bundled hooks | `node --test` under the wrapper below |
+| `cli/` | vitest, four projects — see the CLI bank |
+| `kanban/` | its own vitest suite. It shares no code with `cli/` |
 | Per-tool distributions | golden snapshots in `cli/tests/golden/`, mirrored by the `build-per-tool` CI matrix |
 | Browser journeys | `aidd-dev:11-browser-qa`, see below |
 
@@ -19,8 +20,6 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 | Tool | Use |
 | --- | --- |
 | vitest | `cli/`, `kanban/` |
-| fast-check | property-based cases |
-| ink-testing-library | terminal views |
 | stryker | mutation, on demand, never in CI |
 | knip | dead code, before push and in `cli-ci.yml` |
 | `@playwright/cli` | browser QA evidence, pinned, never an app dependency |
@@ -28,18 +27,20 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 ## Conventions
 
 - A plugin never holds its own tests: `hooks/` ships recursively into user projects. Tests for a bundled script go in `scripts/__tests__/`.
-- `cli/tests/fixtures/` is excluded from the JSON and link checks; it holds deliberately invalid inputs.
-- Adapters are substituted, not mocked, wherever the seam exists.
+- The scripts suite writes into a git repository. Run it wrapped, never bare: unwrapped it can overwrite this repository's own `.git/hooks`, and `.git` is in no history.
 
 ## Run
 
 | Command | Scope |
 | --- | --- |
 | `pnpm test:changed` | only the specs a change can break — vitest resolves the CLI's import graph, and the plugin specs are selected by the paths their own text names. What to run while working |
-| `node --test 'scripts/__tests__/*.test.js'` | repository scripts and hooks |
-| `cd cli && pnpm test` | build, then all three CLI tiers |
-| `cd cli && pnpm smoke` | built binary against `scripts/smoke-tools.sh` |
-| `pnpm exec lefthook run pre-push` | what CI runs |
+| `node scripts/check-tests-leave-git-alone.js -- node --test 'scripts/__tests__/*.test.js'` | repository scripts and hooks |
+| `cd cli && pnpm test` | the four CLI projects. It does not build |
+| `cd cli && pnpm smoke` | built binary against `cli/scripts/smoke-tools.sh` |
+| `cd kanban && pnpm test` | the board |
+| `pnpm exec lefthook run pre-push` | the local gate before pushing |
+
+CI runs more: `validate.yml` re-runs the whole pre-commit over the whole tree on every push and pull request, and `cli-ci.yml` adds jobs no local hook has. Both are in `deployment.md`.
 
 ## Browser QA
 

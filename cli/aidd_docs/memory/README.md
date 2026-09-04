@@ -18,6 +18,7 @@ The list below is refreshed automatically by the memory hook. Do not edit it by 
 - [codebase-map.md](codebase-map.md)
 - [coding-assertions.md](coding-assertions.md)
 - [deployment.md](deployment.md)
+- [ecosystem.md](ecosystem.md)
 - [project-brief.md](project-brief.md)
 - [testing.md](testing.md)
 - [vcs.md](vcs.md)

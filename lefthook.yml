@@ -22,17 +22,27 @@ pre-commit:
         fi
         node scripts/validate-yaml.mjs {files}
     scripts-tests:
-      glob: "{scripts,plugins/aidd-context/hooks}/**"
+      glob: "{scripts,plugins}/**"
       run: |
         if ! command -v node >/dev/null 2>&1; then
           echo "ℹ️  node not available; skipping scripts-tests"
           exit 0
         fi
+        # `node --test <dir>` treats the directory as a module path and fails, so
+        # the glob is required. A glob that matches nothing exits 0 in silence,
+        # which would make a renamed folder read as a green run — count first.
+        found=$(ls scripts/__tests__/*.test.js 2>/dev/null | wc -l | tr -d ' ')
+        if [ "$found" -eq 0 ]; then
+          echo "❌ no test files under scripts/__tests__/; the runner is not wired"
+          exit 1
+        fi
         # Wrapped, because a suite that writes into this repository's own .git/hooks passes
         # every assertion and destroys an install nothing can restore — `.git` is in no
-        # history. The wrapper passes the suite's own exit code through untouched.
+        # history. The wrapper passes the suite's own exit code through untouched. One job,
+        # not two: a second, unwrapped copy of this call is the very thing the wrapper exists
+        # to prevent, and it ran here until 2026-09-04.
         node scripts/check-tests-leave-git-alone.js -- \
-          node --test 'scripts/__tests__/*.test.js'
+          node --test 'scripts/__tests__/**/*.test.js'
     skill-frontmatter:
       glob: "plugins/*/skills/*/SKILL.md"
       run: |
@@ -81,6 +91,15 @@ pre-commit:
           exit 0
         fi
         node scripts/check-context-reference-form.js
+    referenced-paths:
+      glob: "{*.md,docs/**,aidd_docs/memory/**}"
+      run: |
+        if ! command -v node >/dev/null 2>&1; then
+          echo "ℹ️  node not available; skipping referenced-paths"
+          exit 0
+        fi
+        node scripts/check-referenced-paths.js
+
     markdown-links:
       glob: "**/*.md"
       run: |
@@ -132,22 +151,6 @@ pre-commit:
         fi
         node scripts/sync-readme-counts.mjs >/dev/null
         git add README.md 2>/dev/null || true
-    scripts-test:
-      glob: "{scripts,plugins}/**"
-      run: |
-        if ! command -v node >/dev/null 2>&1; then
-          echo "ℹ️  node not available; skipping scripts-test"
-          exit 0
-        fi
-        # `node --test <dir>` treats the directory as a module path and fails, so
-        # the glob is required. A glob that matches nothing exits 0 in silence,
-        # which would make a renamed folder read as a green run — count first.
-        found=$(ls scripts/__tests__/*.test.js 2>/dev/null | wc -l | tr -d ' ')
-        if [ "$found" -eq 0 ]; then
-          echo "❌ no test files under scripts/__tests__/; the runner is not wired"
-          exit 1
-        fi
-        node --test "scripts/__tests__/**/*.test.js"
     cli-biome:
       glob: "cli/**"
       run: cd cli && pnpm lint

@@ -6,6 +6,7 @@ const test = require("node:test");
 
 const {
   formatIssue,
+  problemForTarget,
   reportProblems,
 } = require("../check-markdown-links.js");
 
@@ -201,4 +202,50 @@ test("repository scan ignores interrupted test temp directories", () => {
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+test("problemForTarget reports a fragment no heading in the target file answers", () => {
+  const tempDir = fs.mkdtempSync(path.join(root, "scripts/__tests__/.tmp-check-markdown-links-"));
+
+  try {
+    const target = path.join(tempDir, "target.md");
+    fs.writeFileSync(target, ["# Target", "", "## Commits", "", "## ✅ Code decisions", ""].join("\n"));
+    const source = path.join(tempDir, "source.md");
+
+    // The five anchors this repository shipped dead for months all had this shape: a
+    // target file that resolves, a fragment nothing in it answers.
+    assert.deepEqual(problemForTarget("./target.md#types", source), {
+      raw: "./target.md#types",
+      reason: "anchor-not-found",
+    });
+
+    // Slugging is GitHub's: punctuation dropped, every remaining space a hyphen — so a
+    // leading emoji leaves the hyphen it was separated by, and `&` leaves two.
+    assert.equal(problemForTarget("./target.md#commits", source), null);
+    assert.equal(problemForTarget("./target.md#-code-decisions", source), null);
+
+    // A target that does not resolve is already reported as a missing path; naming the
+    // fragment too would be two findings for one fix.
+    assert.deepEqual(problemForTarget("./missing.md#commits", source), {
+      raw: "./missing.md#commits",
+      reason: "local-path-not-found",
+    });
+
+    // GitHub's line fragments resolve against the file, not a heading.
+    assert.equal(problemForTarget("./target.md#L119", source), null);
+    assert.equal(problemForTarget("./target.md#L119-L130", source), null);
+
+    // Only markdown carries headings. A fragment on anything else is the reader's business.
+    const asset = path.relative(tempDir, path.join(root, "docs/assets/logo.png")).replaceAll(path.sep, "/");
+    assert.equal(problemForTarget(`${asset}#anything`, source), null);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test("formatIssue explains a dead fragment", () => {
+  assert.equal(
+    formatIssue({ raw: "aidd_docs/memory/vcs.md#types", reason: "anchor-not-found" }),
+    "aidd_docs/memory/vcs.md#types (no heading in the target file answers that fragment)",
+  );
 });

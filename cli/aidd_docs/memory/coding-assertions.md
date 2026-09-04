@@ -1,39 +1,36 @@
-# Coding Guidelines
+# Coding Assertions
 
-> Those rules must be minimal because they MUST be checked after EVERY CODE GENERATION.
+The checks that must pass for code here to count as done. The repository's own hooks also run; this page holds the `cli/` ones.
 
-## Requirements to complete a feature
+## Requirements
 
-**A feature is really completed if ALL of the above are satisfied: if not, iterate to fix all until all are green.**
+- No silent errors. A use case or an adapter throws; only the command layer catches.
+- Validate at the adapter boundary into typed values. `unknown` never leaks past an adapter.
+- No duplication. One fact, one home.
+- A context's `domain/` imports no infrastructure, and nothing widens a type through `unknown` or `never` — in `tests/` as much as in `src/`.
+- The tree is organised by bounded context (`src/contexts/`), not by layer. Placement rules: `.claude/rules/00-architecture/`.
+- Runtime dependencies are capped; the list and its reason are in `architecture.md`.
 
-- No silent errors — throw early, fail loudly
-- Validate I/O at the adapter boundary into typed domain values — `unknown` never leaks past an adapter, and absence is modeled explicitly, not with empty-string sentinels
-- No duplication — eliminate ruthlessly, reuse existing code
-- Domain layer has zero infrastructure imports
-- Runtime deps capped at the 6 justified in `architecture.md` (`commander`, `@inquirer/prompts`, `ajv`, `ajv-formats`, `simple-git`, `smol-toml`); a new one needs an ADR
-- 3-layer architecture respected: Domain → Application → Infrastructure (no Presentation layer — output formatting lives in `application/output.ts`)
+## Before commit
 
-## Steps to follow
+| Order | Command | Checks |
+| ----- | ------- | ------ |
+| 1 | `pnpm lint` | biome, lint and format |
+| 2 | `pnpm test:arch` | the architecture ratchets |
+| 3 | `pnpm typecheck` | `tsc --noEmit` |
+| 4 | `node scripts/check-cli-layering.mjs` | dependencies point inward, no widened type. Run it from the repository root |
 
-1. Check there is no duplication
-2. Ensure code is re-used
-3. Run all those commands, in order to ensure code is perfect.
+## Before push
 
-## Commands to run
+| Order | Command | Checks |
+| ----- | ------- | ------ |
+| 1 | `pnpm knip` | dead code, unused exports |
+| 2 | `pnpm test` | every tier |
 
-### Before commit
+## In CI only
 
-| Order | Command               | Description                        |
-| ----- | --------------------- | ---------------------------------- |
-| 1     | `pnpm typecheck`      | Type checking                      |
-| 2     | `pnpm lint`           | Lint + format (biome)              |
-| 3     | `pnpm knip`| Dead code / unused exports (knip)  |
-| 4     | `pnpm jscpd`          | Duplication check (jscpd)          |
-| 5     | `pnpm test`           | Run unit tests                     |
+- `pnpm test:coverage` against the thresholds in `vitest.config.ts`, `pnpm smoke`, `pnpm build` with its bundle budget, `pnpm jscpd`. All blocking on a `cli/` pull request.
 
-### Before push
+## Behavior
 
-| Order | Command      | Description         |
-| ----- | ------------ | ------------------- |
-| 1     | `pnpm build` | Verify build output |
-| 2     | `pnpm test`  | Full test suite     |
+Done means every gate green. On failure, one agent per failing assertion — typecheck, tests, rules — not one agent for all.

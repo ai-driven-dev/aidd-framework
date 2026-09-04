@@ -1,7 +1,7 @@
 ---
 paths:
-  - "src/infrastructure/auth/**/*.ts"
-  - "src/application/use-cases/**/*.ts"
+  - "src/runtime/auth/**/*.ts"
+  - "src/contexts/*/application/**/*.ts"
 ---
 
 # Auth
@@ -21,6 +21,5 @@ paths:
 
 ## Auth entry point
 
-- `RequireAuthUseCase` — single source of auth validation
 - Never duplicate auth checks across commands or use-cases
 - Auth for local framework paths is never required

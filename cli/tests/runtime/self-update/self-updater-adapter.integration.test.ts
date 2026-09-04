@@ -34,7 +34,9 @@ function jsonResponse(body: unknown): HttpResponse {
 }
 
 const NPM_DIST_TAGS_URL = "https://registry.npmjs.org/-/package/@ai-driven-dev/cli/dist-tags";
-const GH_TAG_URL = "https://api.github.com/repos/ai-driven-dev/aidd-cli/releases/tags/v5.1.2";
+// The repository this package lives in, and the tag release-please gives it:
+// `include-component-in-tag` makes it `cli-v<semver>`, never a bare `v<semver>`.
+const GH_TAG_URL = "https://api.github.com/repos/ai-driven-dev/framework/releases/tags/cli-v5.1.2";
 
 vi.mock("node:child_process", () => ({ execSync: vi.fn() }));
 vi.mock("node:os", () => ({ platform: vi.fn() }));

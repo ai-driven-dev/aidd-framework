@@ -1,7 +1,7 @@
 ---
 paths:
   - "src/cli.ts"
-  - "src/application/commands/**/*.ts"
+  - "src/presentation/commands/**/*.ts"
 ---
 
 # CLI Process Lifecycle

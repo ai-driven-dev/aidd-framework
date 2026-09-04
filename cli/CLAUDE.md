@@ -45,6 +45,7 @@ Project docs, memory, specs, and plans live in `aidd_docs/`.
 @aidd_docs/memory/codebase-map.md
 @aidd_docs/memory/coding-assertions.md
 @aidd_docs/memory/deployment.md
+@aidd_docs/memory/ecosystem.md
 @aidd_docs/memory/project-brief.md
 @aidd_docs/memory/testing.md
 @aidd_docs/memory/vcs.md

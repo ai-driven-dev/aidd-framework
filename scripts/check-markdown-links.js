@@ -241,6 +241,51 @@ function stripAnchor(target) {
   return hashIndex === -1 ? target : target.slice(0, hashIndex);
 }
 
+function anchorOf(target) {
+  const hashIndex = target.indexOf("#");
+  return hashIndex === -1 ? "" : target.slice(hashIndex + 1);
+}
+
+/** GitHub's rule: drop everything that is not a letter, digit, space, underscore or
+ * hyphen — emoji and punctuation included — lowercase, then turn every remaining space
+ * into a hyphen. Nothing is collapsed, which is why a leading emoji leaves the hyphen it
+ * was separated by and an `&` leaves two. */
+function headingSlug(text) {
+  return text
+    .replace(/\[([^\]]*)\]\([^)]*\)/gu, "$1")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N} _-]/gu, "")
+    .replaceAll(" ", "-");
+}
+
+/** Every fragment the target file answers. A duplicate heading takes GitHub's `-1`, `-2`
+ * suffix, so both the bare slug and the numbered one resolve. */
+function headingSlugs(absolutePath) {
+  const slugs = new Set();
+  const seen = new Map();
+  let inFence = false;
+
+  for (const line of fs.readFileSync(absolutePath, "utf8").split("\n")) {
+    if (/^\s*(```|~~~)/u.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+
+    const heading = line.match(/^ {0,3}#{1,6}\s+(.*?)\s*#*\s*$/u);
+    if (!heading) continue;
+
+    const base = headingSlug(heading[1]);
+    if (!base) continue;
+
+    const count = seen.get(base) ?? 0;
+    seen.set(base, count + 1);
+    slugs.add(count === 0 ? base : `${base}-${count}`);
+  }
+
+  return slugs;
+}
+
 function safeDecodeUri(target) {
   try {
     return decodeURI(target);
@@ -320,6 +365,17 @@ function problemForTarget(target, sourceFile) {
     return { raw: target, reason: "local-path-not-found" };
   }
 
+  // A fragment only means something in markdown, and only once the file itself resolves —
+  // otherwise a missing file would report twice for one fix.
+  // `#L119` and `#L119-L130` are GitHub's line fragments; they resolve against the file,
+  // never against a heading.
+  const anchor = /^L\d+(-L\d+)?$/u.test(anchorOf(validationTarget)) ? "" : anchorOf(validationTarget);
+  if (anchor && MARKDOWN_EXTENSIONS.has(path.extname(resolved.absolute).toLowerCase())) {
+    if (!headingSlugs(resolved.absolute).has(safeDecodeUri(anchor).toLowerCase())) {
+      return { raw: target, reason: "anchor-not-found" };
+    }
+  }
+
   return null;
 }
 
@@ -388,6 +444,8 @@ function formatIssue(problem) {
       return `${link} (template path not found in framework source)`;
     case "local-path-not-found":
       return `${link} (local path not found)`;
+    case "anchor-not-found":
+      return `${link} (no heading in the target file answers that fragment)`;
     default:
       return `${link} (file not found)`;
   }

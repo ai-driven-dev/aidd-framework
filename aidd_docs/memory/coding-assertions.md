@@ -26,16 +26,20 @@ Never state in a commit message or a report anything not just observed in output
 
 | Order | Command | Checks |
 | ----- | ------- | ------ |
-| 1 | `pnpm exec lefthook run pre-commit` | JSON and YAML validity, skill frontmatter and argument hints, context imports, markdown links, `scripts/` tests; `cli lint` and `cli typecheck` when `cli/` or `kanban/` changed |
+| 1 | `pnpm exec lefthook run pre-commit` | JSON and YAML validity, `scripts/` tests, skill frontmatter and argument hints, context imports and reference form, markdown links and the paths the prose names; `cli` lint, architecture, typecheck, layering, knip and tests when `cli/` changed |
 | 2 | `pnpm exec commitlint --edit` | the message against `commitlint.config.cjs` |
 
-Same hook regenerates each plugin's `CATALOG.md` and the README counts, and stages them.
+Same hook regenerates each plugin's `CATALOG.md`, the README counts and `docs/prompts-documentation.md`, and stages them.
+
+Every `cli` job is globbed on `cli/**`. A change under `kanban/` alone fires none of them; run `cd kanban && pnpm test` by hand.
 
 ## Before push
 
 | Order | Command | Checks |
 | ----- | ------- | ------ |
-| 1 | `pnpm exec lefthook run pre-push` | `cli knip:production`, then the full `cli` suite, when `cli/` changed |
+| 1 | `pnpm exec lefthook run pre-push` | `cli knip`, then the full `cli` suite, when `cli/` changed |
+
+`--no-verify` buys nothing: `validate.yml` re-runs the whole pre-commit over the whole tree on every push and pull request.
 
 ## Behavior
 

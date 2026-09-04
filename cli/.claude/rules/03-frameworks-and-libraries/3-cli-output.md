@@ -1,6 +1,6 @@
 ---
 paths:
-  - "src/application/**/*.ts"
+  - "src/presentation/**/*.ts"
 ---
 
 # CLI Output

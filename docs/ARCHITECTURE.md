@@ -39,7 +39,7 @@ Declared in `plugins/<plugin>/hooks/hooks.json`. They run Node, so users need `n
 
 | Plugin           | Event                                    | Runs                      | Purpose                                                              |
 | ---------------- | ----------------------------------------- | ------------------------- | --------------------------------------------------------------------- |
-| `aidd-context`   | `SessionStart`                            | `hooks/update_memory.cjs`  | Refresh the project memory block in the AI context files              |
+| `aidd-context`   | `SessionStart`                            | `hooks/update_memory.js`  | Refresh the project memory block in the AI context files              |
 | `aidd-telemetry` | `SessionStart` · `Stop` · `PostToolUse`   | `hooks/journal.cjs`        | Journal every session so a unit of work can be tied to what it cost   |
 
 A hook is authored once, with `${CLAUDE_PLUGIN_ROOT}`, and the installer rewrites it to whatever the target tool expands. Which tools run a bundled hook at all, and what each resolves:
@@ -71,7 +71,7 @@ Every capability lives in exactly one plugin, chosen by **concern**. This taxono
 
 `aidd-ui` is alpha: smoke-test only, off the curated install path.
 
-`aidd-telemetry` is beta, off the curated install path: opt-in only — a repository must commit `.aidd/config.json` with `telemetry.enabled: true`. Each session appends observations, one JSON object per line, to its own `aidd_docs/runs/<run_id>__<vendor_id>.jsonl`, created on demand and git-ignored; that directory's presence is a location, not a permission. A line is never rewritten, only appended — `session_start`, `turn_end`, and `file_written` (a repository-relative path, never a task_id: task identity is a derivation, and belongs to whatever reads the log). Never a measurement; tokens and cost are joined afterwards from the provider's telemetry.
+`aidd-telemetry` is beta, off the curated install path: opt-in only — a repository must commit `.aidd/config.json` with `telemetry.enabled: true`. Each session appends observations, one JSON object per line, to its own `aidd_docs/runs/<run_id>__<vendor_id>.jsonl`, created on demand and git-ignored; that directory's presence is a location, not a permission. A line is never rewritten, only appended — `session_start`, `turn_end`, `file_written`, `step_start`, `task_declared` and `unrecognised_payload` (a path is repository-relative, never a task_id: task identity is a derivation, and belongs to whatever reads the log). Never a measurement; tokens and cost are joined afterwards from the provider's telemetry.
 
 **Observation** writes only *about* the other layers, never the artifact it describes, and nothing may depend on it.
 

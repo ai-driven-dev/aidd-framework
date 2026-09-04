@@ -199,7 +199,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        plugin: [aidd-context, aidd-dev, aidd-vcs, aidd-pm, aidd-orchestrator, aidd-refine]
+        # Every plugin `marketplace.json` lists, and nothing else — asserted by
+        # scripts/__tests__/release-covers-every-plugin.test.js, because this list was
+        # written once and two later plugins were tagged with no archive for months.
+        plugin:
+          [
+            aidd-context,
+            aidd-dev,
+            aidd-vcs,
+            aidd-pm,
+            aidd-orchestrator,
+            aidd-refine,
+            aidd-ui,
+            aidd-telemetry,
+          ]
     steps:
       - name: Check if this plugin was released
         id: check
@@ -256,9 +269,9 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
-      # kanban/ is bundled into the CLI from source, so its dependencies must be
-      # installed before the build can resolve them.
-      - run: cd kanban && pnpm install --frozen-lockfile
+      # No kanban install: the `aidd kanban` command was unwired, `cli/src/` names kanban
+      # nowhere, and the bundle carries none of its symbols. Verified by building with
+      # kanban/node_modules absent.
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm build
 

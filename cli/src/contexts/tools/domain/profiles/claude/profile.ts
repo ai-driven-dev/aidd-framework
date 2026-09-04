@@ -116,16 +116,13 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         pluginRootToken: CLAUDE_PLUGIN_ROOT_TOKEN,
         acceptsMcp: true,
         translationMode: "marketplace",
-        // Claude registers its own marketplaces. An earlier attempt drove the command
-        // at project scope, where it rewrites `.claude/settings.json` after this CLI
-        // hashed it — two writers, one recorder, and `status` reporting drift forever.
-        // `--scope local` writes `.claude/settings.local.json` instead, a file this CLI
-        // does not write and does not track, so nothing collides. Measured.
-        //
-        // No `enableVerb`: `claude plugin install --scope project` writes exactly
-        // `{"<plugin>@<marketplace>": true}` into `.claude/settings.json`, character for
-        // character what this CLI already writes there. Driving it would be a second way
-        // of doing the same thing, and would hand a tracked file a second writer.
+        // Claude registers its own marketplaces and enables its own plugins, both driven
+        // here. An earlier attempt drove them at project scope, where the command rewrites
+        // `.claude/settings.json` after this CLI hashed it — two writers, one recorder, and
+        // `status` reporting drift forever. `--scope local` writes `.claude/settings.local.json`
+        // instead, a file this CLI neither writes nor tracks, so nothing collides. Measured.
+        // That is what makes the verbs below safe to declare, and it is the whole of the
+        // reason: without the scope mapping they would be the second writer again.
         nativeActivation: {
           binary: "claude",
           scopeArgs: { project: ["--scope", "local"], user: ["--scope", "user"] },

@@ -11,7 +11,12 @@ import type { TokenProvider } from "../auth/ports/token-provider.js";
 import type { HttpClient, HttpGet } from "../http/http-client.js";
 import type { CliRelease, SelfUpdater } from "./self-updater.js";
 
-const CLI_REPO = "ai-driven-dev/aidd-cli";
+// This package moved into the framework repository, and release-please tags it per
+// component: `cli-v<semver>`, never a bare `v<semver>`, which is the root marketplace's.
+// Both halves were wrong at once, and `fetchChangelog` swallows its own 404 — so the
+// notice shipped without a changelog and nothing ever said why.
+const CLI_REPO = "ai-driven-dev/framework";
+const CLI_TAG_PREFIX = "cli-v";
 const CLI_PACKAGE = "@ai-driven-dev/cli";
 const DEFAULT_GITHUB_API_BASE = "https://api.github.com";
 const DEFAULT_NPM_REGISTRY_BASE = "https://registry.npmjs.org";
@@ -106,7 +111,7 @@ export class SelfUpdaterAdapter implements SelfUpdater {
   // Changelog is best-effort: the GitHub release body enriches the update notice
   // but is optional. A private repo without a token 404s here — swallow it.
   private async fetchChangelog(version: string): Promise<string | null> {
-    const url = `${this.githubApiBase}/repos/${CLI_REPO}/releases/tags/v${version}`;
+    const url = `${this.githubApiBase}/repos/${CLI_REPO}/releases/tags/${CLI_TAG_PREFIX}${version}`;
     const token = (await this.tokenProvider?.resolve()) ?? undefined;
     try {
       const response = await this.http.get(url, { token });

@@ -27,6 +27,13 @@ const FENCED_BLOCK = /```[\s\S]*?```/g;
  * The second form was invisible here until a moved file proved it: `kernel/flat-paths.ts`
  * went to `kernel/materialization/` and this test stayed green over a dead reference,
  * because the regex demanded a prefix the document did not write.
+ *
+ * It cannot see the pre-refactor spellings — `application/`, `infrastructure/`, and a bare
+ * `domain/…`. Three dead citations survived in `auth.md` and one in `testing.md` for exactly
+ * that reason. Widening the prefix list alone is not the fix, and was tried: `application/json`
+ * and `application/vnd.github` are media types, and `domain/ports` is how a document names a
+ * fragment relative to a context, so a wider regex reports more noise than drift. Closing it
+ * needs a resolver that knows both shapes, which is a change of its own.
  */
 const CITED_PATH =
   /\b(?:src|tests)\/[A-Za-z0-9_./-]+|\b(?:kernel|contexts|presentation|runtime)\/[A-Za-z0-9_./-]+/g;

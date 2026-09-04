@@ -8,14 +8,15 @@ Where the project runs and how it ships: CI/CD, environments, and release.
 
 | Workflow | Runs |
 | --- | --- |
-| `ci.yml` | commitlint on PRs, release-please on `main`, then the release jobs |
-| `cli-ci.yml` | typecheck, lint, test, build with its bundle budget, knip on `cli/` |
-| `validate.yml` | plugin and marketplace manifests against their schemas |
+| `ci.yml` | commitlint on pull requests and on `main`'s tip, release-please on `main`, then the release jobs |
+| `cli-ci.yml` | the `cli` and `kanban` gates — job list in the CLI bank. Filtered on `cli/**`, `kanban/**`, the telemetry plugin and `scripts/__tests__/**` |
+| `validate.yml` | plugin and marketplace manifests against their schemas, plus the whole pre-commit over the whole tree |
 | `codeql.yml` | code scanning |
 | `promote.yml` | opens the `next` to `main` promote PR, merge auto-merge |
 | `back-merge.yml` | folds `main` back into `next` after each release |
 | `dependabot-auto-merge.yml` | merges dependency PRs that pass |
 | `close-finished-milestones.yml` | closes a milestone once its issues are |
+| `star-history.yml` | refreshes the README star chart |
 
 ```mermaid
 flowchart LR
@@ -26,7 +27,7 @@ flowchart LR
     Release --> Back["back-merge.yml"]
 ```
 
-Automatic on a push to `main`. `promote.yml` is the only manual entry.
+Automatic on a push to `main`. Three workflows also accept a manual run: `promote.yml`, `close-finished-milestones.yml`, `star-history.yml`.
 
 ## Environments
 
@@ -36,19 +37,24 @@ None — no server, no container, no IaC. What ships are release assets and publ
 | --- | --- |
 | Repository | <https://github.com/ai-driven-dev/framework> |
 | npm | `@ai-driven-dev/cli`, OIDC trusted publishing, no token |
-| Archives | GitHub Releases and GitHub Packages |
+| Archives | GitHub Releases |
+| Mirror | GitHub Packages, npm package only, best-effort |
 
 ## Release
 
 Branch model in `vcs.md`, cadence and safety rules in [`RELEASE.md`](../../RELEASE.md).
 
-1. release-please opens the Release PR, bumping `marketplace.json` and each `plugin.json`. CI auto-merges it, so `main` never holds merged but unversioned code.
-2. Merging creates the release and its tags — per plugin, `include-component-in-tag: true`, shaped `<plugin>-v<semver>`.
-3. Release jobs: `build-and-attach` (marketplace bundle), `build-per-tool` (nine distributions, CLI at a **pinned** version), `build-plugin` (one archive per released path), `publish-cli`.
+1. release-please opens the Release PR. Only paths with commits bump; the root bumps every cycle. CI auto-merges it with `--squash --admin`, because the branch policy refuses a plain merge, so `main` never holds merged but unversioned code.
+2. Merging creates the release and its tags — a root umbrella tag, `cli-v<semver>`, and one `<plugin>-v<semver>` per plugin, `include-component-in-tag: true`.
+3. Release jobs: `build-and-attach` (marketplace bundle), `build-per-tool` (nine distributions), `build-plugin` (one archive per released path), `publish-cli`.
 4. Archives are staged outside the repo tree, uploaded with `gh release upload --clobber`.
 5. `back-merge.yml` folds `main` into `next`.
 
-Config: `release-please-config.json`. Manifest: `.release-please-manifest.json`.
+Config: `release-please-config.json`, ten packages. Manifest: `.release-please-manifest.json`.
+
+## Gotchas
+
+- `build-per-tool` calls the CLI at a **frozen** version, `@ai-driven-dev/cli@5.1.1`. The command it calls, `framework build`, no longer exists in the CLI; bumping the pin means rewriting the job.
 
 ## Monitoring
 

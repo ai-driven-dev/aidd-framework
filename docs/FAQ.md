@@ -65,8 +65,9 @@ installed.
 **No prompt, no code, no diff** — the stored shape is an allowlist, field by field, in
 [`metrics-contract.md`](../aidd_docs/product/metrics-contract.md).
 
-Turning it off stops the recording and keeps what you already measured; both directories are
-ordinary files you can delete. Coverage differs per AI tool, and a tool that cannot be
+Turning it off stops the recording and keeps what you already measured. `aidd telemetry off`
+removes the switch and the commit trailer, `aidd telemetry forget` the records; both
+directories, and the `.aidd/config.json` that opted you in, are ordinary files you can delete. Coverage differs per AI tool, and a tool that cannot be
 measured is named rather than shown as a zero →
 [the plugin's README](../plugins/aidd-telemetry/README.md).
 
