@@ -91,7 +91,7 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    than that.
 2. **Ask, as one axis or as the whole object.**
    - One axis: `aidd telemetry report --axis <axis> --from 2026-08-01 --to 2026-08-31`.
-   - Everything: `aidd telemetry report --from 2026-08-01 --to 2026-08-31 --json`, reading the shape from [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md).
+   - Everything: `aidd telemetry report --from 2026-08-01 --to 2026-08-31 --json`, reading the shape from the report contract, `aidd_docs/product/cost-report-contract.md` in the framework repository.
    - The figure will be kept or compared: give `--from` and `--to`, since `--days` resolves against today and two identical calls on two days cover two different periods.
 3. **Refuse an unknown shape.** `cost_report_version` is `15` today, read from the `--json`
    path - the `--axis` path prints text the script already built from that same object, so
@@ -123,10 +123,10 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    state a fact nothing observed. The bump from `8` to `9` added a
    fourth value to `attribution`, `prompt-matched`. The bump from `7` to `8` added `by_flow`
    to the top-level breakdowns: which orchestrated run the journal's own step sequence
-   already names (see [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md)),
+   already names (see the report contract, `aidd_docs/product/cost-report-contract.md`),
    nothing newly captured for it. The bump from `6` to `7` added `by_backlog`
    to the top-level breakdowns: every task's records regrouped by what its own folder
-   declares (see [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md)),
+   declares (see the report contract, `aidd_docs/product/cost-report-contract.md`),
    never a second notion of which task a record belongs to. The bump from `5` to `6` did
    not add a breakdown: what `by_task` gives for a record that fell in no declared
    interval can now be more than one row, each carrying `reason` - naming which distinct
@@ -170,7 +170,7 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    | `task_attributable` | a session on this tool cannot be traced to a task, so it is absent from a task report without having done nothing |
 
 6. **Keep `unattributed` as itself.** Nothing measured supports reading it as no step having run, and it is never a residual.
-7. **Say when the answer is partial.** A non-zero `read.undated_records` or `read.unreadable_lines` means the total is incomplete, and the reasons are in [the plugin README](../../../README.md). The `--axis` path already carries this in its own last lines; the `--json` path carries it in `read`.
+7. **Say when the answer is partial.** A non-zero `read.undated_records` or `read.unreadable_lines` means the total is incomplete, and the reasons are in this plugin's own README. The `--axis` path already carries this in its own last lines; the `--json` path carries it in `read`.
 8. **Say when this project's own switch is off.** `measurement_enabled: false` on the `--json` path (a "switch is off" line in the `--axis` header) means these figures are not scoped to this project — the sink they come from is scoped to this person, across every project they ever measured. Relay both facts together: the switch is off here, and the figures shown are real, from wherever they were measured. Never read `false` as "these numbers are made up" or drop them for it.
 
 ## Test
