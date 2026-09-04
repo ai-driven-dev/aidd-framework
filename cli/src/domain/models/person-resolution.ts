@@ -7,11 +7,27 @@ import type { PersonIdentity } from "../ports/person-identity-reader.js";
  * - `"mapped"` — the identifier is this machine's own person: their `personId`, or one of
  *   the identifiers listed in `alsoMe`.
  * - `"unresolved"` — the identifier is real, but nobody's identity covers it.
- * - `"none"` — there was no identifier to resolve at all, a different fact from one nobody
- *   claimed: a record with no identifier says nobody opted in, while an unresolved one says
+ * - `"this-machine"` — the record carried no identifier of its own, and this machine has
+ *   declared an identity. Not folded into `"mapped"`, which is the record naming a person
+ *   this identity claims; this is the identity claiming a record that named nobody.
+ *
+ *   It exists because `person_id` is stamped when a record is *stored*
+ *   (`stampProvenanceAndTool`), so whether a record carries one depends on when the identity
+ *   was declared relative to when that record was read - never on the work itself. Two reads
+ *   of one sink, with one `identity.json`, answered differently depending on the order those
+ *   two things happened in. Measured on a live machine: 29,207 requests, every one read by
+ *   that machine's own `aidd`, and `by_person` could name none of them.
+ *
+ *   Sound because the sink has exactly one writer - `read-local-cost-use-case.ts` is the
+ *   only caller of `TelemetrySink.appendRecord`, and every line it writes carries
+ *   `provenance: "local-read"`. A record in this sink was read by this machine's own reader,
+ *   and this machine has said who that is. If a second writer is ever added, this branch is
+ *   the one that stops being true.
+ * - `"none"` — there was no identifier to resolve **and** no identity declared, a different
+ *   fact from one nobody claimed: it says nobody opted in, while an unresolved one says
  *   somebody did, on a machine or under a tool this identity has not heard of yet.
  */
-export type PersonResolution = "mapped" | "unresolved" | "none";
+export type PersonResolution = "mapped" | "unresolved" | "none" | "this-machine";
 
 /** What resolving one raw identifier against an identity answers. `identities` always
  * carries what produced the row — including the canonical `personId` when mapped, and the
@@ -28,6 +44,21 @@ function matches(identity: PersonIdentity, rawId: string): boolean {
   return identity.personId === rawId || identity.alsoMe.includes(rawId);
 }
 
+/** One identity, as the person a row names and the evidence behind it — shared by the two
+ * routes that end at this machine's own person so they cannot describe them differently.
+ *
+ * `alsoMe` can no longer contain `identity.personId` itself: `link` treats an identifier
+ * equal to the person's own as already listed and refuses to append it
+ * (`PersonIdentityUseCase.link`). No runtime check replaces that guard here — do not
+ * reintroduce a branch for a shape `link` no longer lets anyone write. */
+function claimedBy(identity: PersonIdentity): Omit<ResolvedPerson, "resolution"> {
+  return {
+    personId: identity.personId,
+    ...(identity.displayName === undefined ? {} : { displayName: identity.displayName }),
+    identities: [identity.personId, ...identity.alsoMe],
+  };
+}
+
 /**
  * Resolves one raw identifier against this machine's own identity — `identity` is `null`
  * for no identity declared at all, which resolves every identifier as `unresolved` exactly
@@ -35,9 +66,11 @@ function matches(identity: PersonIdentity, rawId: string): boolean {
  * figure the same way whether the gap is "no identity" or "an identity that does not know
  * this identifier".
  *
- * `rawId` undefined or empty answers `"none"` with no identities: nobody opted in is not a
- * failure to resolve, and is never conflated with an identifier this identity failed to
- * place.
+ * `rawId` undefined or empty answers `"this-machine"` when an identity is declared, and
+ * `"none"` with no identities when none is - nobody opted in is not a failure to resolve,
+ * and neither is ever conflated with an identifier this identity failed to place. The
+ * fallback is reached only when the record named nobody: an identifier it did carry is
+ * resolved on its own merits, mapped or unresolved, and this never overrules it.
  *
  * There is no shape here for two people claiming one identifier — `PersonIdentity`
  * describes exactly one machine's own user, so that ambiguity cannot be constructed, let
@@ -47,20 +80,15 @@ export function resolvePerson(
   identity: PersonIdentity | null,
   rawId: string | undefined
 ): ResolvedPerson {
-  if (rawId === undefined || rawId === "") return { resolution: "none", identities: [] };
+  if (rawId === undefined || rawId === "") {
+    return identity === null
+      ? { resolution: "none", identities: [] }
+      : { ...claimedBy(identity), resolution: "this-machine" };
+  }
   if (identity === null || !matches(identity, rawId)) {
     return { resolution: "unresolved", identities: [rawId] };
   }
-  return {
-    resolution: "mapped",
-    personId: identity.personId,
-    ...(identity.displayName === undefined ? {} : { displayName: identity.displayName }),
-    // `alsoMe` can no longer contain `identity.personId` itself: `link` treats an
-    // identifier equal to the person's own as already listed and refuses to append it
-    // (`PersonIdentityUseCase.link`). No runtime check replaces that guard here either -
-    // do not reintroduce a branch for a shape `link` no longer lets anyone write.
-    identities: [identity.personId, ...identity.alsoMe],
-  };
+  return { ...claimedBy(identity), resolution: "mapped" };
 }
 
 /** `identity` with `value` added to `alsoMe`, deduplicated, and never the person's own

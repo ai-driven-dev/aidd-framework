@@ -115,17 +115,31 @@ describe("byPeople — one raw identity resolved per group, never merged or drop
     ]);
   });
 
-  it("a record with no identifier lands in its own row, distinct from every unresolved one", () => {
+  // With an identity declared, a record that carried no identifier is this machine's own
+  // person: the sink has one writer, and every line in it was read by this machine. Kept
+  // apart from `mapped`, which is the record naming a person this identity claims.
+  it("a record with no identifier lands in this machine's own row, distinct from every unresolved one", () => {
     const built = report({
       identity: twoIdentitiesOnePerson(),
       records: [request({ turn_id: "a", person_id: "a-stranger" }), request({ turn_id: "b" })],
     });
 
+    const thisMachine = built.byPeople.filter((row) => row.resolution === "this-machine");
+    expect(thisMachine).toHaveLength(1);
+    expect(thisMachine[0]?.person).toBe("person-a");
+    const unresolved = built.byPeople.filter((row) => row.resolution === "unresolved");
+    expect(unresolved).toHaveLength(1);
+    expect(built.byPeople.filter((row) => row.resolution === "none")).toHaveLength(0);
+  });
+
+  // The other half of the same contract: with nothing declared, nobody opted in, and the
+  // report says exactly that rather than naming a person no file names.
+  it("a record with no identifier stays a no-identifier row when no identity was declared", () => {
+    const built = report({ records: [request({ turn_id: "b" })] });
+
     const none = built.byPeople.filter((row) => row.resolution === "none");
     expect(none).toHaveLength(1);
     expect(none[0]?.person).toBeUndefined();
-    const unresolved = built.byPeople.filter((row) => row.resolution === "unresolved");
-    expect(unresolved).toHaveLength(1);
   });
 
   it("summing every person row's requests equals the report's own total", () => {
@@ -189,8 +203,11 @@ describe("byPeople — one raw identity resolved per group, never merged or drop
     expect(built.totals.cacheCreationTokens).toBe(20);
   });
 
-  it("orders mapped rows first, then unresolved, then the no-identifier row last", () => {
-    const built = report({
+  // Strongest claim first, and every resolution present is placed - a filter per group
+  // drops whatever it does not name, which is exactly how `this-machine` rows went missing
+  // from this breakdown while the totals they belonged to stayed.
+  it("orders mapped rows first, then this machine's own, then unresolved, then no identifier", () => {
+    const withIdentity = report({
       identity: twoIdentitiesOnePerson(),
       records: [
         request({ turn_id: "a", person_id: "machine-1" }),
@@ -198,8 +215,30 @@ describe("byPeople — one raw identity resolved per group, never merged or drop
         request({ turn_id: "c" }),
       ],
     });
+    const withoutIdentity = report({ records: [request({ turn_id: "c" })] });
 
-    expect(built.byPeople.map((row) => row.resolution)).toEqual(["mapped", "unresolved", "none"]);
+    expect(withIdentity.byPeople.map((row) => row.resolution)).toEqual([
+      "mapped",
+      "this-machine",
+      "unresolved",
+    ]);
+    expect(withoutIdentity.byPeople.map((row) => row.resolution)).toEqual(["none"]);
+  });
+
+  // The determinism claim itself, stated as a test: the same sink and the same identity
+  // answer the same way whether or not the records were stamped when they were stored.
+  it("answers the same whether a record was stamped at store time or named at report time", () => {
+    const stamped = report({
+      identity: twoIdentitiesOnePerson(),
+      records: [request({ turn_id: "a", person_id: "person-a" })],
+    });
+    const unstamped = report({
+      identity: twoIdentitiesOnePerson(),
+      records: [request({ turn_id: "a" })],
+    });
+
+    expect(unstamped.byPeople[0]?.person).toBe(stamped.byPeople[0]?.person);
+    expect(unstamped.byPeople[0]?.totals.requests).toBe(stamped.byPeople[0]?.totals.requests);
   });
 });
 

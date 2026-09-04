@@ -93,9 +93,13 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    - One axis: `aidd telemetry report --axis <axis> --from 2026-08-01 --to 2026-08-31`.
    - Everything: `aidd telemetry report --from 2026-08-01 --to 2026-08-31 --json`, reading the shape from [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md).
    - The figure will be kept or compared: give `--from` and `--to`, since `--days` resolves against today and two identical calls on two days cover two different periods.
-3. **Refuse an unknown shape.** `cost_report_version` is `14` today, read from the `--json`
+3. **Refuse an unknown shape.** `cost_report_version` is `15` today, read from the `--json`
    path - the `--axis` path prints text the script already built from that same object, so
-   there is no separate version to check there. The bump from `13` to `14` did not add a
+   there is no separate version to check there. The bump from `14` to `15` did not add a
+   breakdown: `by_person`'s `resolution` gained a fourth value, `this-machine`, for a record
+   that named nobody on a machine that has declared an identity. Report such a row as that
+   person - declaring an identity names past work too, not only what follows. The bump
+   from `13` to `14` did not add a
    breakdown: the reasons a `by_task` or `by_backlog` row can carry gained a fifth,
    `precedes-journal`, for a record older than everything its own session's journal
    witnessed. Report it as what it is - work billed before that session opened a journal,

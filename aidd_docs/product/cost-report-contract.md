@@ -131,7 +131,20 @@ real count is the ordinary case of reporting from a project whose switch never c
 work, never a contradiction (see "Attributing records to a task" for the same scope split
 elsewhere in this object).
 
-Every object carries `cost_report_version`, currently `14`.
+Every object carries `cost_report_version`, currently `15`.
+
+Bumped from `14` when `by_person`'s `resolution` gained a fourth value,
+**`"this-machine"`**: the record carried no identifier of its own, and this machine has
+declared an identity. It exists because `person_id` is written onto a record when the record
+is *stored*, so whether one carries it depends on when the identity was declared relative to
+when that record was read — never on the work. Measured on a live machine: 29,207 requests,
+every one read by that machine's own `aidd`, and `by_person` could name none of them; the
+same sink, the same identity file, answered differently depending on the order those two
+things happened in. Declaring an identity now names the whole history rather than only what
+follows. Sound because the sink has exactly one writer and every line it holds carries
+`provenance: "local-read"` — a record in it was read by this machine's own reader. A consumer
+that switched exhaustively on the three previous values must add this one; every row's
+`totals` still reconciles to the period total.
 
 Bumped from `13` when the reasons a `by_task` or `by_backlog` row can carry gained a
 fifth, **`"precedes-journal"`**: this record's moment is older than the earliest moment its
@@ -252,7 +265,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
 
 ```jsonc
 {
-  "cost_report_version": 14,
+  "cost_report_version": 15,
   "period": { "from_day": "2026-07-01", "to_day": "2026-07-31" },
   "measurement_enabled": true,                  // this project's own switch, right now — see Versioning
   "task": "2026_08/2026_08_21_cost-reporter",   // absent unless --task was given
@@ -479,20 +492,21 @@ always carries them all.
 never against a git author, an email or a hostname. That file describes exactly one person:
 its own `person_id`, how it was obtained (`origin`: `"minted"` here or `"adopted"` from
 another machine), and every identifier added onto it with `aidd telemetry identity link`
-(`also_me`). Each row's `resolution` is one of three:
+(`also_me`). Each row's `resolution` is one of four:
 
 | `resolution` | Means |
 | --- | --- |
 | `mapped` | The identifier is this machine's own person — its `person_id` or a member of `also_me`. `person` carries the canonical identifier, and `identities` carries every raw identifier behind the row, including that canonical one. |
 | `unresolved` | The identifier is real, but the identity file does not cover it. `identities` carries that one raw identifier; `person` is absent. |
-| `none` | The record carried no identifier at all — a different fact from `unresolved`: nobody opted in, rather than somebody did on a machine or tool this identity has not heard of. |
+| `this-machine` | The record carried no identifier of its own, and this machine has declared an identity. `person` and `identities` carry that identity exactly as a `mapped` row does; the two are kept apart because they are different facts — `mapped` is the record naming a person this identity claims, this is the identity claiming a record that named nobody. |
+| `none` | The record carried no identifier at all **and** no identity is declared — a different fact from `unresolved`: nobody opted in, rather than somebody did on a machine or tool this identity has not heard of. |
 
 **Two raw identifiers one person declared merge into one `mapped` row; two unplaced
 identifiers never merge into each other.** The identity file describes exactly one person,
 so there is no shape in which two people could claim one identifier in the first place —
-unlike a lookup table, nothing here can be edited into that state. Rows are ordered mapped
-first, then every unresolved identity, then the one `none` row last; largest first within
-the mapped and the unresolved groups.
+unlike a lookup table, nothing here can be edited into that state. Rows are ordered by how strong the claim is: `mapped`
+first, then the one `this-machine` row, then every unresolved identity, then the one `none`
+row last; largest first within each group.
 
 `by_person` sums to `totals.requests` exactly like every other breakdown — a damaged or
 undeclared identity changes how records are labelled, never how many are counted.

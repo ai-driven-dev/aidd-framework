@@ -1,5 +1,5 @@
 {
-  "cost_report_version": 14,
+  "cost_report_version": 15,
   "period": {
     "from_day": "2026-01-01",
     "to_day": "2026-01-31"

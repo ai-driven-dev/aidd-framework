@@ -10,6 +10,7 @@ import type {
   CostReportEnvelopeTotals,
 } from "../../domain/models/cost-report-envelope.js";
 import { bareOrchestratingSkillNames } from "../../domain/models/flow-attribution.js";
+import type { PersonResolution } from "../../domain/models/person-resolution.js";
 import { getAiToolConfig } from "../../domain/tools/registry.js";
 import {
   ATTRIBUTION_LABELS,
@@ -376,10 +377,24 @@ function mappedPersonLabel(row: CostReportEnvelopePersonRow): string {
   return row.display_name ?? row.person ?? "";
 }
 
+/** One label per resolution, exhaustively - a `Record` rather than an if-chain with a
+ * fallback, so a value added to `PersonResolution` fails to compile here instead of
+ * reaching a reader as "nobody opted in". That is not hypothetical: `this-machine` was
+ * added on 2026-09-04 and the fallback swallowed it silently, printing rows a declared
+ * identity claims as rows nobody claimed. Same mechanism `TASK_UNATTRIBUTED_LABELS` uses
+ * one axis over. */
+const PERSON_LABELS: Record<PersonResolution, (row: CostReportEnvelopePersonRow) => string> = {
+  mapped: mappedPersonLabel,
+  // This machine's own person, reached because the record named nobody. The same label a
+  // mapped row gets: it is the same person, and the row's `resolution` already carries how
+  // it was reached for a reader who needs that.
+  "this-machine": mappedPersonLabel,
+  unresolved: (row) => unresolvedPersonLabel(row.identities[0] ?? ""),
+  none: () => NO_PERSON_IDENTIFIER,
+};
+
 function personLabel(row: CostReportEnvelopePersonRow): string {
-  if (row.resolution === "mapped") return mappedPersonLabel(row);
-  if (row.resolution === "unresolved") return unresolvedPersonLabel(row.identities[0] ?? "");
-  return NO_PERSON_IDENTIFIER;
+  return PERSON_LABELS[row.resolution](row);
 }
 
 /** A third column beside every other axis's two, because a person line the contract can

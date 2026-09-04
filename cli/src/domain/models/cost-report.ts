@@ -1589,28 +1589,42 @@ function personRowOf(group: PersonGroup): CostReportPersonRow {
   };
 }
 
-/** Mapped people first, then every unplaced identity, then the one no-identifier row last -
- * `bySize` alone cannot give this order, since it sorts purely on weight and a large
- * unresolved row would otherwise outrank a small mapped one. Largest first within the
- * mapped group and within the unresolved group; the no-identifier row is never sorted
- * against either, since there is at most one. */
+/** The order every `by_person` breakdown is read in, strongest claim first: a person the
+ * record itself named, then the one this machine's identity claims for records that named
+ * nobody, then every unplaced identity, then the one no-identifier row.
+ *
+ * A `Record` over the whole union rather than a filter per group, because a filter per
+ * group silently *drops* whatever it does not name - which is what happened when
+ * `"this-machine"` was added on 2026-09-04: the rows existed, summed into no group, and
+ * vanished from the breakdown while the totals they belonged to stayed. This shape makes
+ * that a compile error. */
+const PERSON_ROW_ORDER: Record<PersonResolution, number> = {
+  mapped: 0,
+  "this-machine": 1,
+  unresolved: 2,
+  none: 3,
+};
+
+/** Grouped in `PERSON_ROW_ORDER`, largest first within each group - `bySize` alone cannot
+ * give this order, since it sorts purely on weight and a large unresolved row would
+ * otherwise outrank a small mapped one. Sorting inside the single-row groups
+ * (`"this-machine"`, `"none"`, at most one each) costs nothing and needs no exception. */
 function personRows(
   people: ReadonlyMap<PersonRowKey, PersonGroup>
 ): readonly CostReportPersonRow[] {
   const rows = [...people.values()].map(personRowOf);
   const keyOf = (row: CostReportPersonRow) => row.person ?? row.identities[0] ?? "";
-  const mapped = bySize(
-    rows.filter((row) => row.resolution === "mapped"),
-    (row) => row.totals,
-    keyOf
-  );
-  const unresolved = bySize(
-    rows.filter((row) => row.resolution === "unresolved"),
-    (row) => row.totals,
-    keyOf
-  );
-  const none = rows.filter((row) => row.resolution === "none");
-  return [...mapped, ...unresolved, ...none];
+  return Object.keys(PERSON_ROW_ORDER)
+    .sort(
+      (a, b) => PERSON_ROW_ORDER[a as PersonResolution] - PERSON_ROW_ORDER[b as PersonResolution]
+    )
+    .flatMap((resolution) =>
+      bySize(
+        rows.filter((row) => row.resolution === resolution),
+        (row) => row.totals,
+        keyOf
+      )
+    );
 }
 
 /**
