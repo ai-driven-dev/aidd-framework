@@ -75,6 +75,38 @@ describe("step-attribution — pure: journal lines + records -> intervals", () =
     expect(outer?.endMs).toBe(Date.parse("2026-08-20T10:05:00Z"));
   });
 
+  // Cursor and Codex name a skill by its folder alone - the plugin never reaches the journal
+  // - while the end a skill echoes always carries the plugin, because that is what the skill
+  // knows itself as. Compared exactly, a declared end closed nothing at all on those hosts.
+  it("closes a step opened by its bare name with the end its skill declares in full", () => {
+    const bareStart = {
+      type: "step_start",
+      at: "2026-08-20T10:00:00Z",
+      skill: "02-implement",
+    } as const;
+    const intervals = buildStepIntervals(
+      journalOf(
+        bareStart,
+        { type: "turn_end", at: "2026-08-20T10:10:00Z" },
+        { type: "step_end", at: "2026-08-20T10:30:00Z", skill: "aidd-dev:02-implement" }
+      )
+    );
+
+    expect(intervals[0]?.endMs).toBe(Date.parse("2026-08-20T10:30:00Z"));
+  });
+
+  it("still refuses an end whose plugin disagrees with the one that opened the step", () => {
+    const intervals = buildStepIntervals(
+      journalOf(A_START, {
+        type: "step_end",
+        at: "2026-08-20T10:02:00Z",
+        skill: "aidd-pm:02-implement",
+      })
+    );
+
+    expect(intervals[0]?.endMs).not.toBe(Date.parse("2026-08-20T10:02:00Z"));
+  });
+
   // An end for a skill that never started names nothing to close. Read as a boundary all the
   // same it would truncate whatever interval was running, which is a step it has no claim on.
   it("ignores an end for a skill this session never started", () => {

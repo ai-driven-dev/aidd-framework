@@ -6,6 +6,7 @@ import type {
   RunJournalTaskDeclared,
 } from "../ports/run-journal-reader.js";
 import { buildClosedIntervals, type ClosedInterval } from "./journal-intervals.js";
+import { namesTheSameSkill } from "./skill-name.js";
 
 /**
  * Which skills open a flow when their own `step_start` fires - declared here, once, rather
@@ -133,7 +134,8 @@ export function buildFlowIntervals(
     periodEndMs,
     (boundary): boundary is RunJournalStepStart =>
       boundary.type === "step_start" && ORCHESTRATING_SKILLS.has(boundary.skill),
-    (boundary, opener) => boundary.type === "step_end" && boundary.skill === opener.skill,
+    (boundary, opener) =>
+      boundary.type === "step_end" && namesTheSameSkill(boundary.skill, opener.skill),
     (opener, startMs, endMs) => ({ skill: opener.skill, startMs, endMs })
   );
 }
