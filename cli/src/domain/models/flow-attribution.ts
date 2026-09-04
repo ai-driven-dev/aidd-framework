@@ -76,8 +76,15 @@ export function bareOrchestratingSkillNames(
 }
 
 /** One closed flow interval: from an orchestrating skill's own `step_start` to whichever of
- * the next orchestrating `step_start` or a `turn_end` comes first, or - unclosed - the
- * journal's own last witnessed moment. Read from exactly the same journal a declared task
+ * a `step_end` naming that same skill or the next orchestrating `step_start` comes first,
+ * or - unclosed - the journal's own last witnessed moment.
+ *
+ * **A `turn_end` stopped closing one on 2026-09-04**, for the reason `task-attribution.ts`
+ * already gives for a declared task: it is a pause, not the end of an orchestration. On the
+ * one orchestrated session measured, the flow opened at 05:56:27, the first pause fell at
+ * 06:02:34, and the same orchestration went on writing into the same task folder until
+ * 09:27:21 - six minutes named against three and a half hours not. The step axis inside it
+ * named 2,220 requests for the same skill while the flow, the wider concept, named 56. Read from exactly the same journal a declared task
  * interval already reads (`task-attribution.ts`), one layer wider: no boundary is added for
  * this, and none is captured that was not captured already - see `phase-1.md`'s own "why an
  * axis, not a capture". A non-orchestrating `step_start` neither opens nor closes one of
@@ -91,19 +98,27 @@ export interface FlowInterval extends ClosedInterval {
  * Journal lines in, closed flow intervals out - the same merge and the same "journal's own
  * last witnessed moment" cap `buildTaskIntervals` uses, run through the one shared walk
  * (`buildClosedIntervals`) rather than a second copy of it. An orchestrating `step_start`
- * opens an interval; the next orchestrating `step_start` or a `turn_end` closes it; every
- * other boundary - a non-orchestrating `step_start`, a `file_written`, a `task_declared` -
+ * opens an interval; a `step_end` naming that same skill, or the next orchestrating
+ * `step_start`, closes it; every other boundary - a non-orchestrating `step_start`, a
+ * `step_end` naming another skill, a `turn_end`, a `file_written`, a `task_declared` -
  * neither opens nor closes one, and only ever contributes its own moment toward the
- * journal's last witnessed one for an interval a session crashed before closing.
+ * journal's last witnessed one for an interval nothing ever closed.
+ *
+ * A `step_end` naming a *different* skill is never a closer, the same rule
+ * `buildStepIntervals` follows: a step run inside the orchestration finishing is not the
+ * orchestration finishing, and truncating there is exactly the fault naming the skill
+ * exists to prevent. Only `aidd-dev:01-plan` emits the marker today, so most flows still
+ * close on the next orchestrating `step_start` or the journal's own last witnessed moment;
+ * that fallback is the cost of this rule, stated rather than hidden.
  *
  * Two orchestrated runs of the very same skill in one session yield two distinct
  * `FlowInterval` objects here, never one merged by name: `cost-report.ts`'s own grouping
  * keys a record's flow membership on the interval it actually fell inside, by reference,
  * not on `skill` alone - the fact this function's own two-row acceptance criterion rests
- * on. Never open-ended, for the same reason `buildTaskIntervals` never is: no boundary
- * exposes when an orchestrating skill's own work finishes, so a boundless interval would
- * attribute everything a long-running session goes on to do afterward to the first
- * orchestrating step it ever saw.
+ * on. Never open-ended, for the same reason `buildTaskIntervals` never is: a journal that
+ * ends without the orchestrating skill ever saying it was done exposes nothing about when
+ * it finished, so a boundless interval would attribute everything a long-running session
+ * goes on to do afterward to the first orchestrating step it ever saw.
  */
 export function buildFlowIntervals(
   journal: RunJournal,
@@ -118,7 +133,7 @@ export function buildFlowIntervals(
     periodEndMs,
     (boundary): boundary is RunJournalStepStart =>
       boundary.type === "step_start" && ORCHESTRATING_SKILLS.has(boundary.skill),
-    (boundary) => boundary.type === "turn_end",
+    (boundary, opener) => boundary.type === "step_end" && boundary.skill === opener.skill,
     (opener, startMs, endMs) => ({ skill: opener.skill, startMs, endMs })
   );
 }

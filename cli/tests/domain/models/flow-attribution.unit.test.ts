@@ -31,6 +31,26 @@ const HAND_RUN_STEP = {
   skill: "aidd-dev:02-implement",
 } as const;
 const TURN_END = { type: "turn_end", at: "2026-08-17T12:00:00Z" } as const;
+const EARLIER_TURN_END = { type: "turn_end", at: "2026-08-17T11:00:00Z" } as const;
+/** The orchestrating skill saying its own work is over. */
+const SDLC_ENDS = {
+  type: "step_end",
+  at: "2026-08-17T11:00:00Z",
+  skill: "aidd-orchestrator:01-sdlc",
+} as const;
+/** A step *inside* the orchestration saying it is done - which the orchestration is not. */
+const PLAN_ENDS = {
+  type: "step_end",
+  at: "2026-08-17T11:00:00Z",
+  skill: "aidd-dev:01-plan",
+} as const;
+/** Something the journal witnessed after all of the above, so "closed there" and "not closed
+ * there" are two different numbers rather than the same one twice. */
+const WRITTEN_LATE = {
+  type: "file_written",
+  at: "2026-08-17T11:30:00Z",
+  path: "aidd_docs/tasks/x/spec.md",
+} as const;
 
 describe("ORCHESTRATING_SKILLS — declared once, both capture spellings", () => {
   it("names every orchestrator skill, in the argument spelling and the bare directory spelling", () => {
@@ -85,52 +105,55 @@ describe("buildFlowIntervals — pure: journal lines -> bounded flow intervals",
     ]);
   });
 
-  it("closes a flow at turn_end when nothing else orchestrates first", () => {
-    const intervals = buildFlowIntervals(journalOf([SDLC_OPENS, TURN_END]));
+  it("closes a flow where its own skill said it was done", () => {
+    const intervals = buildFlowIntervals(journalOf([SDLC_OPENS, SDLC_ENDS, TURN_END]));
 
     expect(intervals).toEqual([
       {
         skill: SDLC_OPENS.skill,
         startMs: Date.parse(SDLC_OPENS.at),
-        endMs: Date.parse(TURN_END.at),
+        endMs: Date.parse(SDLC_ENDS.at),
       },
     ]);
   });
 
-  it("closes at the turn_end itself, not at whatever the journal witnessed after it", () => {
-    // The separating case, and the one every other fixture here missed: with `turn_end`
-    // last, the moment it closes at and the journal's own last witnessed moment are the
-    // same number, so a build that ignored the closer entirely produced identical intervals
-    // and every test stayed green. Something witnessed *after* the turn end is what tells
-    // the two apart — replacing the closer with `() => false` moves this end from 11:00 to
-    // 11:30 and turns this red.
-    const writtenAfterTheTurnEnded = {
-      type: "file_written",
-      at: "2026-08-17T11:30:00Z",
-      path: "aidd_docs/tasks/x/spec.md",
-    } as const;
-    const earlierTurnEnd = { type: "turn_end", at: "2026-08-17T11:00:00Z" } as const;
+  it("never closes a flow on a step_end naming some other skill", () => {
+    // A step run inside the orchestration ends; the orchestration does not. Distinguishing:
+    // something is witnessed after that end, so closing there and not closing there are two
+    // different numbers.
+    const intervals = buildFlowIntervals(journalOf([SDLC_OPENS, PLAN_ENDS], [], [WRITTEN_LATE]));
 
-    const intervals = buildFlowIntervals(
-      journalOf([SDLC_OPENS, earlierTurnEnd], [], [writtenAfterTheTurnEnded])
-    );
-
-    expect(intervals[0]?.endMs).toBe(Date.parse(earlierTurnEnd.at));
-    expect(intervals[0]?.endMs).not.toBe(Date.parse(writtenAfterTheTurnEnded.at));
+    expect(intervals[0]?.endMs).toBe(Date.parse(WRITTEN_LATE.at));
+    expect(intervals[0]?.endMs).not.toBe(Date.parse(PLAN_ENDS.at));
   });
 
-  it("leaves work done after the turn ended outside the flow that turn opened", () => {
-    // The consequence a person actually reads. A flow that failed to close swallows every
-    // record through to the next one — so this asserts the moment, not just the interval.
-    const writtenAfterTheTurnEnded = {
-      type: "file_written",
-      at: "2026-08-17T11:30:00Z",
-      path: "aidd_docs/tasks/x/spec.md",
-    } as const;
-    const earlierTurnEnd = { type: "turn_end", at: "2026-08-17T11:00:00Z" } as const;
+  it("does not close a flow at a turn_end - a pause is not the end of an orchestration", () => {
+    // The separating case: with `turn_end` last, the moment it would close at and the
+    // journal's own last witnessed moment are the same number, so a fixture ending on the
+    // pause proves nothing either way. Something witnessed *after* the pause is what tells
+    // the two rules apart — this end is 11:30, and was 11:00 while a `turn_end` closed one.
     const intervals = buildFlowIntervals(
-      journalOf([SDLC_OPENS, earlierTurnEnd], [], [writtenAfterTheTurnEnded])
+      journalOf([SDLC_OPENS, EARLIER_TURN_END], [], [WRITTEN_LATE])
     );
+
+    expect(intervals[0]?.endMs).toBe(Date.parse(WRITTEN_LATE.at));
+    expect(intervals[0]?.endMs).not.toBe(Date.parse(EARLIER_TURN_END.at));
+  });
+
+  it("keeps work done after the pause inside the flow that was still running", () => {
+    // The consequence a person actually reads: the orchestration measured here paused at
+    // 06:02 and worked on for three more hours, and every one of those records used to fall
+    // outside its own flow.
+    const intervals = buildFlowIntervals(
+      journalOf([SDLC_OPENS, EARLIER_TURN_END], [], [WRITTEN_LATE])
+    );
+
+    expect(momentFallsWithin(intervals, "2026-08-17T10:30:00Z")).toBe(true);
+    expect(momentFallsWithin(intervals, "2026-08-17T11:15:00Z")).toBe(true);
+  });
+
+  it("stops at the end its own skill declared, even with work witnessed after it", () => {
+    const intervals = buildFlowIntervals(journalOf([SDLC_OPENS, SDLC_ENDS], [], [WRITTEN_LATE]));
 
     expect(momentFallsWithin(intervals, "2026-08-17T10:30:00Z")).toBe(true);
     expect(momentFallsWithin(intervals, "2026-08-17T11:15:00Z")).toBe(false);
@@ -158,6 +181,8 @@ describe("buildFlowIntervals — pure: journal lines -> bounded flow intervals",
       SDLC_OPENS.skill,
       SDLC_OPENS.skill,
     ]);
+    // The first closes on the second's own start, not on the pause between them.
+    expect(intervals[0]?.endMs).toBe(Date.parse(secondSdlcRun.at));
     expect(intervals[1]?.endMs).toBe(Date.parse(secondSdlcRun.at)); // unclosed - capped at its own start
   });
 

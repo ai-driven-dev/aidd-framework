@@ -71,9 +71,10 @@ export function momentFallsWithin(
  * already carrying every moment either interval kind might need to cap an unclosed one at.
  *
  * `isOpener` names which boundary starts an interval; `isCloser` names every *other*
- * boundary that can end one early (a `task_declared` interval also closes on the next
- * `task_declared`, which `isOpener` already covers - `closers` below is `isOpener` union
- * `isCloser`, not `isCloser` alone). An opener the walk reaches with no later opener or
+ * boundary that can end one early, and is asked about the open interval's own opener as
+ * well as the candidate (a `task_declared` interval also closes on the next
+ * `task_declared`, which `isOpener` already covers - an interval ends at the first later
+ * boundary either predicate accepts, not at the first `isCloser` alone). An opener the walk reaches with no later opener or
  * closer ends at the journal's own last witnessed moment - itself at the earliest, since
  * the opener is one of those moments - never left open-ended: no
  * boundary here exposes when an interval's own work actually finishes, so an unbounded
@@ -95,7 +96,7 @@ export function buildClosedIntervals<
   boundaryLike: readonly TBoundary[],
   periodEndMs: number | undefined,
   isOpener: (boundary: TBoundary) => boundary is TOpener,
-  isCloser: (boundary: TBoundary) => boolean,
+  isCloser: (boundary: TBoundary, opener: TOpener) => boolean,
   toInterval: (opener: TOpener, startMs: number, endMs: number) => TInterval | null
 ): readonly TInterval[] {
   const everyWitnessedMoment = timed(boundaryLike);
@@ -107,16 +108,34 @@ export function buildClosedIntervals<
     everyWitnessedMoment[everyWitnessedMoment.length - 1].atMs,
     periodEndMs
   );
-  const closers = everyWitnessedMoment.filter(
-    (entry) => isOpener(entry.boundary) || isCloser(entry.boundary)
-  );
   const intervals: TInterval[] = [];
-  for (let i = 0; i < closers.length; i++) {
-    const { atMs: startMs, boundary } = closers[i];
+  for (let i = 0; i < everyWitnessedMoment.length; i++) {
+    const { atMs: startMs, boundary } = everyWitnessedMoment[i];
     if (!isOpener(boundary)) continue;
-    const endMs = closers[i + 1]?.atMs ?? lastMs;
+    const endMs = firstCloserAfter(everyWitnessedMoment, i, boundary, isOpener, isCloser) ?? lastMs;
     const interval = toInterval(boundary, startMs, endMs);
     if (interval !== null) intervals.push(interval);
   }
   return intervals;
+}
+
+/** The moment the interval opened at `from` ends, or `undefined` when nothing closes it.
+ *
+ * Scanned forward from the opener rather than filtered once for the whole journal, because
+ * `isCloser` is asked about the pair: a `step_end` closes the flow whose skill it names and
+ * no other, which a single pre-filtered list of closers cannot express. For an `isCloser`
+ * that ignores its opener - `buildTaskIntervals` passes one - this answers exactly what the
+ * pre-filtered walk answered. */
+function firstCloserAfter<TBoundary extends { readonly at: string }, TOpener extends TBoundary>(
+  everyWitnessedMoment: readonly TimedBoundary<TBoundary>[],
+  from: number,
+  opener: TOpener,
+  isOpener: (boundary: TBoundary) => boundary is TOpener,
+  isCloser: (boundary: TBoundary, opener: TOpener) => boolean
+): number | undefined {
+  for (let i = from + 1; i < everyWitnessedMoment.length; i++) {
+    const { atMs, boundary } = everyWitnessedMoment[i];
+    if (isOpener(boundary) || isCloser(boundary, opener)) return atMs;
+  }
+  return undefined;
 }
