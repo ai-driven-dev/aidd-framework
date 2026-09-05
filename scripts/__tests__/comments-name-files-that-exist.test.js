@@ -71,21 +71,30 @@ function trackedFiles() {
   return cp.execSync("git ls-files", { cwd: ROOT, encoding: "utf8" }).trim().split("\n");
 }
 
+function findFiles(command) {
+  return cp.execSync(command, { cwd: ROOT, encoding: "utf8" }).trim().split(/\r?\n/).filter(Boolean);
+}
+
 function scannedFiles() {
-  const found = cp.execSync(
-    "find cli/src cli/tests plugins scripts -type f " +
-      "\\( -name '*.ts' -o -name '*.cjs' -o -name '*.js' \\) -not -path '*/node_modules/*'; " +
-      // docs/ too, and its markdown alone. A durable doc naming a file makes the same
-      // promise a comment does, and it was the one place nothing kept it: the architecture
-      // doc named the context plugin's session hook with a cjs extension for a file that has
-      // always been js. Markdown anywhere else is deliberately out - a skill's own asset and
-      // a fixture template name illustrative paths on purpose, and scanning those produced
-      // 17 findings of which none was a fault. This comment itself is why the names above
-      // are spelled out in prose rather than quoted: a quoted example would be a finding.
-      "find docs -type f -name '*.md'",
-    { cwd: ROOT, encoding: "utf8" }
-  );
-  return found.trim().split("\n");
+  return [
+    ...findFiles(
+      "find cli/src cli/tests plugins scripts -type f " +
+        "\\( -name '*.ts' -o -name '*.cjs' -o -name '*.js' \\) -not -path '*/node_modules/*'"
+    ),
+    // docs/ too, and its markdown alone. A durable doc naming a file makes the same promise
+    // a comment does, and it was the one place nothing kept it: the architecture doc named
+    // the context plugin's session hook with a cjs extension for a file that has always been
+    // js. Markdown anywhere else is deliberately out - a skill's own asset and a fixture
+    // template name illustrative paths on purpose, and scanning those produced 17 findings of
+    // which none was a fault. This comment itself is why the names above are spelled out in
+    // prose rather than quoted: a quoted example would be a finding.
+    //
+    // Two calls and not one command joined by `;`: `execSync` runs through `cmd.exe` on
+    // Windows, where `;` separates nothing and the second `find` was passed to the first as
+    // an argument. Green on macOS, red on the Windows job, which is exactly what that job is
+    // there for.
+    ...findFiles("find docs -type f -name '*.md'"),
+  ];
 }
 
 function allowed(file, token) {
