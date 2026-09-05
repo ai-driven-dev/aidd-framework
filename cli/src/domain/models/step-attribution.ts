@@ -5,6 +5,7 @@ import type {
   RunJournalStepStart,
   RunJournalTaskDeclared,
 } from "../ports/run-journal-reader.js";
+import { buildFlowIntervals, ORCHESTRATING_SKILLS } from "./flow-attribution.js";
 import { buildClosedIntervals, type ClosedInterval } from "./journal-intervals.js";
 import { namesTheSameSkill } from "./skill-name.js";
 
@@ -93,9 +94,13 @@ export interface StepInterval extends ClosedInterval {
  * Two runs of the very same skill in one session yield two distinct intervals, never one
  * merged by name, exactly as the boundaries dictate; nothing here decides which record
  * falls into which, that is `attributeMoment`'s job. */
-export function buildStepIntervals(
+/** Every step a session opened that does not orchestrate - each closed by its own
+ * `step_end`, by the next `step_start` whatever that one is, or by the journal's own last
+ * witnessed moment. Two ordinary skills in a row are a sequence, so the second ends the
+ * first; that reading is unchanged. */
+function buildInvokedStepIntervals(
   journal: RunJournal,
-  periodEndMs?: number
+  periodEndMs: number | undefined
 ): readonly StepInterval[] {
   return buildClosedIntervals<
     RunJournalBoundary | RunJournalTaskDeclared | RunJournalFileWritten,
@@ -104,17 +109,80 @@ export function buildStepIntervals(
   >(
     [...journal.boundaries, ...journal.taskDeclarations, ...journal.filesWritten],
     periodEndMs,
-    (boundary): boundary is RunJournalStepStart => boundary.type === "step_start",
+    (boundary): boundary is RunJournalStepStart =>
+      boundary.type === "step_start" && !ORCHESTRATING_SKILLS.has(boundary.skill),
+    // Any `step_start` closes one of these, an orchestrating one included: a session that
+    // starts orchestrating is no longer running the plain skill it was running before.
+    // `isOpener` already covers the non-orchestrating half; naming the whole rule here is
+    // what keeps the orchestrating half from being an omission nobody wrote down.
     (boundary, opener) =>
-      boundary.type === "step_end" && namesTheSameSkill(boundary.skill, opener.skill),
+      boundary.type === "step_start" ||
+      (boundary.type === "step_end" && namesTheSameSkill(boundary.skill, opener.skill)),
     (opener, startMs, endMs) => ({ skill: opener.skill, startMs, endMs })
   );
+}
+
+/**
+ * Journal lines in, closed intervals out - no filesystem, no record.
+ *
+ * **An invoked step no longer closes the orchestration that invoked it**, changed
+ * 2026-09-05. Reading every `step_start` as the end of whatever was open assumes a session
+ * only ever runs one skill after another, and an orchestrating skill's whole job is to
+ * invoke others. Measured on the one orchestrated session captured, 2026-09-04:
+ * `aidd-orchestrator:01-sdlc` opened at 05:56:27 and `aidd-pm:04-spec` at 05:59:53, so the
+ * orchestration read as 206 seconds against a session that ran until 09:27:21 - which is
+ * why this axis named 1 record for that skill while `by_flow`, reading the same journal
+ * under the rule this now adopts, named 1,052.
+ *
+ * Which skills orchestrate is `ORCHESTRATING_SKILLS`'s declaration, never inferred from the
+ * lines: nesting and sequence produce the identical journal, so no rule read off the
+ * boundaries alone can separate them. That is also the limit - a skill that invokes another
+ * without being declared an orchestrator is still read as a sequence, and is still cut short
+ * by its own child.
+ *
+ * Built as two walks over the same lines rather than one with a branch inside it. The
+ * orchestrating half **is** `buildFlowIntervals` - a flow is an orchestrating step, and
+ * saying so by calling it is what keeps the two axes from drifting apart again.
+ */
+export function buildStepIntervals(
+  journal: RunJournal,
+  periodEndMs?: number
+): readonly StepInterval[] {
+  return [
+    ...buildFlowIntervals(journal, periodEndMs),
+    ...buildInvokedStepIntervals(journal, periodEndMs),
+  ];
 }
 
 /** Where a record's own moment falls inside one interval, that interval's skill is the
  * attribution, marked as derived. A record with no moment, or one earlier than every
  * interval, is unattributed — never folded into the first step, which would assume work
  * began the instant a marker happened to be written rather than sometime before it. */
+/** The most specific interval a moment falls in: the latest to have opened, and among
+ * equals the first to close. An invoked step and the orchestration around it both contain
+ * the moment, and both claims are true - the inner one is the one that says more, and the
+ * outer one goes on answering for every moment the inner one does not cover. Order in the
+ * array decides nothing: the two walks that build these run separately, so a rule that
+ * read the first match would answer differently for the same journal depending on which
+ * walk happened to run first. */
+function innermostAround(
+  intervals: readonly StepInterval[],
+  momentMs: number
+): StepInterval | undefined {
+  let best: StepInterval | undefined;
+  for (const interval of intervals) {
+    if (momentMs < interval.startMs || momentMs >= interval.endMs) continue;
+    if (
+      best === undefined ||
+      interval.startMs > best.startMs ||
+      (interval.startMs === best.startMs && interval.endMs < best.endMs)
+    ) {
+      best = interval;
+    }
+  }
+  return best;
+}
+
 export function attributeMoment(
   intervals: readonly StepInterval[],
   momentIso: string | undefined
@@ -122,8 +190,6 @@ export function attributeMoment(
   if (momentIso === undefined) return UNATTRIBUTED;
   const momentMs = Date.parse(momentIso);
   if (Number.isNaN(momentMs)) return UNATTRIBUTED;
-  const hit = intervals.find(
-    (interval) => momentMs >= interval.startMs && momentMs < interval.endMs
-  );
+  const hit = innermostAround(intervals, momentMs);
   return hit ? { source: "journal-interval", step: hit.skill } : UNATTRIBUTED;
 }
