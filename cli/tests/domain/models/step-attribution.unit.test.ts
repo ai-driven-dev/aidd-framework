@@ -234,6 +234,28 @@ describe("step-attribution — pure: journal lines + records -> intervals", () =
     });
   });
 
+  // The journal stamps every line with `nowIso()`, whose resolution is the second, so two
+  // lines sharing a moment is the common case rather than a corner. The shared walk sorts
+  // by moment, and a sort that is stable - as V8's is - leaves lines that share one in the
+  // order they were read, which for two `boundaries` entries is file order. Pinned here
+  // because that ordering is now inherited from the sort rather than written out, and a
+  // step whose own end shares its start's moment must cover nothing rather than everything.
+  it("closes a step at an end sharing its own start's moment, covering nothing", () => {
+    const intervals = buildStepIntervals(
+      journalWith(
+        [
+          A_START,
+          { type: "step_end", at: A_START.at, skill: A_START.skill },
+          { type: "turn_end", at: "2026-08-20T11:00:00Z" },
+        ],
+        [{ type: "file_written", at: "2026-08-20T12:00:00Z", path: "aidd_docs/note.md" }]
+      )
+    );
+
+    expect(intervals[0]?.endMs).toBe(Date.parse(A_START.at));
+    expect(attributeMoment(intervals, A_START.at)).toEqual({ source: "unattributed" });
+  });
+
   it("touches no filesystem — the module imports none of Node's fs APIs", () => {
     const url = new URL("../../../src/domain/models/step-attribution.ts", import.meta.url);
     const source = readFileSync(fileURLToPath(url), "utf8");

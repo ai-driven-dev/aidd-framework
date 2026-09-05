@@ -218,6 +218,37 @@ describe("DiagnoseTelemetryUseCase — gathering local evidence", () => {
     expect(result.claims.find((c) => c.claim === "records-join")?.verdict).toBe("ok");
   });
 
+  // The consequence of capping an unclosed step, pinned where a person actually meets it.
+  // Copilot fires no stop event - `journal.cjs`'s own `HOOK_EVENT_NAME_TO_CANONICAL` maps
+  // one for Claude Code, Cursor and OpenCode and none for it - so a Copilot session that
+  // opened a skill and then wrote no file and declared no task leaves a journal whose only
+  // line is the opener. It witnesses no later moment, so the step covers nothing, and a
+  // record carrying no step of its own joins nothing. `check` says so rather than reporting
+  // a join it cannot see: an interval with no end in evidence used to reach forward
+  // indefinitely, which is what made this read ok.
+  it("says records join nothing when the journal's only line is the step that opened", async () => {
+    const journal: RunJournal = {
+      session: sessionStart("s-1"),
+      boundaries: [
+        { type: "step_start", at: "2026-08-20T09:00:30Z", skill: "aidd-dev:02-implement" },
+      ],
+      filesWritten: [],
+      taskDeclarations: [],
+    };
+    const claudeReader = new StubSessionCostReader({ records: [candidate()], sessionFound: true });
+    const { useCase } = buildUseCase({
+      journals: [journal],
+      readers: new Map([["claude", claudeReader]]),
+    });
+
+    const result = await useCase.execute(runOptions({ CLAUDE_CODE_SESSION_ID: "s-1" }));
+
+    if (result.gate !== undefined) throw new Error("expected the run to pass the gate");
+    const join = result.claims.find((claim) => claim.claim === "records-join");
+    expect(join?.verdict).toBe("fail");
+    expect(join?.reason).toBe("all-unattributed");
+  });
+
   it("names a reader that threw as failing to read, never crashing the whole diagnostic", async () => {
     const journal: RunJournal = {
       session: sessionStart("s-1"),
