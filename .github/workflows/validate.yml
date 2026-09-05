@@ -42,7 +42,7 @@ jobs:
           restore-keys: pnpm-${{ runner.os }}-
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile=false --ignore-scripts
+        run: pnpm install --no-frozen-lockfile --ignore-scripts
 
       - name: Install cli dependencies
         # cli/ is a self-contained project (own lockfile, not a pnpm workspace
