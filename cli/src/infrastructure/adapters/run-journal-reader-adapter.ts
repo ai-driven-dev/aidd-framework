@@ -12,6 +12,19 @@ import type {
 import { isBareFileName } from "../confined-file-name.js";
 import { repositoryRootAbove } from "../repository-root.js";
 
+/**
+ * The one schema this reader knows how to read, mirroring `record.cjs`'s own
+ * `SCHEMA_VERSION` — the same kind of mirror `sanitizePathSegment` above is, and pinned the
+ * same way: `run-journal-reader-adapter.integration.test.ts` compares this against the
+ * hook's own exported constant rather than against a second copy of the number.
+ *
+ * Version 1 was a mutable record, not this append-only line log, so its lines are another
+ * shape entirely; a later version can change any line's shape the same way. A journal
+ * stating either is refused rather than read, since reading it would mean guessing that
+ * whatever lines this parser still recognises mean what they used to.
+ */
+export const READABLE_JOURNAL_SCHEMA_VERSION = 2;
+
 const ULID_LENGTH = 26; // encodeTime(10) + encodeRandom(16), matching record.cjs's own ULID_LENGTH.
 const RUN_FILE_EXTENSION = ".jsonl";
 
@@ -41,6 +54,21 @@ function asString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function asNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+/** Whether a journal says outright that it was written under some other schema. Absence is
+ * never that statement: every journal on disk before this reader looked at the field
+ * carries none, and refusing those would drop attribution this reader has always given —
+ * "an unknown is never a zero", applied to the reader rather than to a figure. A value that
+ * is not a finite number is read as absent for the same reason, since a torn or hand-edited
+ * field states nothing either. */
+function statesAnotherSchema(session: RunJournalSessionStart | undefined): boolean {
+  const stated = session?.schema_version;
+  return stated !== undefined && stated !== READABLE_JOURNAL_SCHEMA_VERSION;
+}
+
 interface RawJournalLine {
   readonly type?: unknown;
   readonly at?: unknown;
@@ -55,6 +83,7 @@ interface RawJournalLine {
   readonly worktree_repo_id?: unknown;
   readonly path?: unknown;
   readonly plugin_version?: unknown;
+  readonly schema_version?: unknown;
 }
 
 function parseLine(line: string): RawJournalLine | null {
@@ -110,15 +139,27 @@ function parseSessionStart(parsed: RawJournalLine): RunJournalSessionStart | nul
   if (at === undefined || runId === undefined || tool === undefined || vendorId === undefined) {
     return null;
   }
-  const projectId = asString(parsed.project_id);
-  const projectRemote = asString(parsed.project_remote);
-  const pluginVersion = asString(parsed.plugin_version);
   return {
     type: "session_start",
     at,
     run_id: runId,
     tool,
     vendor_id: vendorId,
+    ...headerExtras(parsed),
+  };
+}
+
+/** Every header field a journal may state and may omit — each absent rather than defaulted,
+ * the same rule `parseWorktree` above already follows: a field the writer left out is one
+ * this reader has nothing to say about, and a default would be an answer nobody wrote. Split
+ * out of `parseSessionStart` so that function stays under the line-count limit. */
+function headerExtras(parsed: RawJournalLine): Partial<RunJournalSessionStart> {
+  const projectId = asString(parsed.project_id);
+  const projectRemote = asString(parsed.project_remote);
+  const pluginVersion = asString(parsed.plugin_version);
+  const schemaVersion = asNumber(parsed.schema_version);
+  return {
+    ...(schemaVersion === undefined ? {} : { schema_version: schemaVersion }),
     ...(projectId === undefined ? {} : { project_id: projectId }),
     ...(projectRemote === undefined ? {} : { project_remote: projectRemote }),
     ...parseWorktree(parsed),
@@ -222,6 +263,17 @@ export class RunJournalReaderAdapter implements RunJournalStore {
     return journals;
   }
 
+  async listForeignSchemas(): Promise<readonly number[]> {
+    const stated: number[] = [];
+    for (const fileName of await this.listRunFiles()) {
+      const collector = await this.collect(join(this.runsDir, fileName));
+      const version = collector?.session?.schema_version;
+      if (version !== undefined && version !== READABLE_JOURNAL_SCHEMA_VERSION)
+        stated.push(version);
+    }
+    return stated;
+  }
+
   async listRunFiles(): Promise<readonly string[]> {
     try {
       const entries = await readdir(this.runsDir);
@@ -257,7 +309,7 @@ export class RunJournalReaderAdapter implements RunJournalStore {
     return match ? join(dir, match) : null;
   }
 
-  private async readJournal(filePath: string): Promise<RunJournal | null> {
+  private async collect(filePath: string): Promise<JournalCollector | null> {
     let content: string;
     try {
       content = await readFile(filePath, "utf8");
@@ -269,6 +321,12 @@ export class RunJournalReaderAdapter implements RunJournalStore {
       const parsed = parseLine(line);
       if (parsed) classifyLine(collector, parsed);
     }
+    return collector;
+  }
+
+  private async readJournal(filePath: string): Promise<RunJournal | null> {
+    const collector = await this.collect(filePath);
+    if (!collector || statesAnotherSchema(collector.session)) return null;
     const { boundaries, filesWritten, taskDeclarations, session } = collector;
     return { boundaries, filesWritten, taskDeclarations, ...(session ? { session } : {}) };
   }

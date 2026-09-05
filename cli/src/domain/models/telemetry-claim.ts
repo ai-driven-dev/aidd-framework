@@ -46,7 +46,8 @@ export type NoRunFileReason =
   | "recorder-declared-nowhere"
   | "recorder-declared-not-yet-fired"
   | "recorder-declaration-unreadable"
-  | "anchorless-run-file";
+  | "anchorless-run-file"
+  | "journal-in-another-schema";
 
 export type TelemetryClaimReason =
   | "session-anchored"
@@ -132,6 +133,12 @@ export interface TelemetryEvidence {
    * `recorderDeclared` is `true`: a declaration found at one readable location is real
    * regardless of what else could not be read. */
   readonly recorderDeclarationReadable: boolean;
+  /** The schema stated by every run file the journal reader refused, from
+   * `RunJournalReader.listForeignSchemas`. Carried separately from `journals` because a
+   * refused file is absent from that list while being present on disk: without this, the
+   * one fact actually known about it — that it states a schema this build does not read —
+   * is invisible, and the claim below falls through to a branch that is false about it. */
+  readonly foreignSchemaVersions: readonly number[];
 }
 
 function sessionJournalsOf(
@@ -243,14 +250,36 @@ function anchorlessRunFileClaim(runsDirLabel: string, fileCount: number): Teleme
   };
 }
 
+// The schema a journal states is the writer's own statement about its shape, so a build
+// that does not read that schema knows exactly one thing about the file: not what its lines
+// mean. Ahead of `anchorlessRunFileClaim` for that reason — "none carry a readable
+// session_start" is a claim about the file's contents, which is the claim this build has
+// just said it cannot make.
+function foreignSchemaClaim(runsDirLabel: string, stated: readonly number[]): TelemetryClaim {
+  const versions = [...new Set(stated)].sort((left, right) => left - right).join(", ");
+  return {
+    claim: "hook-fired",
+    verdict: "fail",
+    reason: "journal-in-another-schema",
+    detail:
+      `${stated.length} run file(s) in ${runsDirLabel} written under a schema this build does ` +
+      `not read (${versions}) — a journal from another version of the plugin, never a hook ` +
+      "that did not fire",
+  };
+}
+
 function noRunFileClaim(
   runsDirLabel: string,
   hookTrust: TelemetryCodexHookTrust | undefined,
   recorderDeclared: boolean,
   recorderDeclarationReadable: boolean,
-  anchorlessFileCount: number
+  anchorlessFileCount: number,
+  foreignSchemaVersions: readonly number[]
 ): TelemetryClaim {
   if (hookTrust && trustExplainsAbsence(hookTrust)) return untrustedHookClaim(hookTrust);
+  if (foreignSchemaVersions.length > 0) {
+    return foreignSchemaClaim(runsDirLabel, foreignSchemaVersions);
+  }
   if (anchorlessFileCount > 0) return anchorlessRunFileClaim(runsDirLabel, anchorlessFileCount);
   if (!recorderDeclarationReadable) return recorderDeclarationUnreadableClaim(runsDirLabel);
   if (recorderDeclared) return recorderDeclaredNotYetFiredClaim(runsDirLabel);
@@ -308,7 +337,8 @@ function noSessionJournalClaim(evidence: TelemetryEvidence): TelemetryClaim {
     hookTrust,
     evidence.recorderDeclared,
     evidence.recorderDeclarationReadable,
-    journals.length
+    journals.length,
+    evidence.foreignSchemaVersions
   );
 }
 

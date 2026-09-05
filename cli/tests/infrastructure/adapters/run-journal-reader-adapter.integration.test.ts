@@ -3,10 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  READABLE_JOURNAL_SCHEMA_VERSION,
   RunJournalReaderAdapter,
   sanitizePathSegment,
 } from "../../../src/infrastructure/adapters/run-journal-reader-adapter.js";
-import { journalRepo } from "../../helpers/telemetry-journal-hook.js";
+import { journalRecord, journalRepo } from "../../helpers/telemetry-journal-hook.js";
 
 // A real-shaped ULID (26 Crockford-base32 characters), matching what
 // plugins/aidd-telemetry/hooks/lib/record.cjs's generateUlid mints — the adapter splits a
@@ -219,6 +220,7 @@ describe("RunJournalReaderAdapter, beyond the boundaries", () => {
     expect((await adapter.read(SESSION_ID))?.session).toEqual({
       type: "session_start",
       at: "2026-08-20T09:59:00Z",
+      schema_version: 2,
       run_id: RUN_ID,
       project_id: "acme-widgets",
       project_remote: "github.com/acme/widgets",
@@ -409,5 +411,115 @@ describe("RunJournalReaderAdapter.deleteRunFile — confined to the directory it
 
     delete process.env.AIDD_RUNS_DIR;
     await rm(elsewhere, { recursive: true, force: true });
+  });
+});
+
+/** The hook stamps `schema_version` on every `session_start` it writes, and until now this
+ * reader dropped it — so a journal written under a schema whose line shapes had changed was
+ * read as if it were this one, which is a silent misreading rather than a refusal. */
+describe("RunJournalReaderAdapter — the schema a journal states it was written under", () => {
+  let projectRoot: string;
+  let runsDir: string;
+
+  beforeEach(async () => {
+    projectRoot = await mkdtemp(join(tmpdir(), "aidd-run-journal-schema-"));
+    runsDir = join(projectRoot, "aidd_docs", "runs");
+    await mkdir(runsDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    await rm(projectRoot, { recursive: true, force: true });
+  });
+
+  function header(extra: Record<string, unknown>): Record<string, unknown> {
+    return {
+      type: "session_start",
+      at: "2026-08-20T09:59:00Z",
+      run_id: RUN_ID,
+      tool: "claude-code",
+      vendor_id: SESSION_ID,
+      ...extra,
+    };
+  }
+
+  async function writeJournal(...lines: readonly unknown[]): Promise<void> {
+    await writeFile(join(runsDir, `${RUN_ID}__${SESSION_ID}.jsonl`), runFileLines(...lines));
+  }
+
+  // Reached rather than copied: a reader whose own constant is a second copy of the writer's
+  // goes on claiming it can read a schema the writer has already moved past.
+  it("reads exactly the schema the hook writes", () => {
+    expect(READABLE_JOURNAL_SCHEMA_VERSION).toBe(journalRecord.SCHEMA_VERSION);
+  });
+
+  it("carries the stated schema through onto the session it read", async () => {
+    await writeJournal(header({ schema_version: READABLE_JOURNAL_SCHEMA_VERSION }));
+    const adapter = new RunJournalReaderAdapter(projectRoot);
+
+    const journal = await adapter.read(SESSION_ID);
+
+    expect(journal?.session?.schema_version).toBe(READABLE_JOURNAL_SCHEMA_VERSION);
+  });
+
+  // The point of a version field: a key added under the schema this reader knows is a key it
+  // may ignore, never one that costs it the journal.
+  it("reads a journal carrying a key it has never heard of, under a schema it knows", async () => {
+    await writeJournal(
+      header({ schema_version: READABLE_JOURNAL_SCHEMA_VERSION, a_key_from_later: "ignored" }),
+      { type: "step_start", at: "2026-08-20T10:00:00Z", skill: "aidd-dev:02-implement" }
+    );
+    const adapter = new RunJournalReaderAdapter(projectRoot);
+
+    const journal = await adapter.read(SESSION_ID);
+
+    expect(journal?.session?.vendor_id).toBe(SESSION_ID);
+    expect(journal?.boundaries).toHaveLength(1);
+  });
+
+  it("refuses a journal written under a schema newer than the one it reads", async () => {
+    await writeJournal(header({ schema_version: READABLE_JOURNAL_SCHEMA_VERSION + 1 }), {
+      type: "step_start",
+      at: "2026-08-20T10:00:00Z",
+      skill: "aidd-dev:02-implement",
+    });
+    const adapter = new RunJournalReaderAdapter(projectRoot);
+
+    expect(await adapter.read(SESSION_ID)).toBeNull();
+    expect(await adapter.list()).toEqual([]);
+  });
+
+  it("refuses one written under the schema this log replaced, whose lines are another shape", async () => {
+    await writeJournal(header({ schema_version: 1 }));
+    const adapter = new RunJournalReaderAdapter(projectRoot);
+
+    expect(await adapter.read(SESSION_ID)).toBeNull();
+  });
+
+  // Absence is not a stated disagreement. Every journal on disk before this reader looked at
+  // the field was read without it, and refusing them now would drop attribution this reader
+  // has always been able to give - the fault "an unknown is never a zero" names, applied to
+  // the reader rather than to a figure.
+  it("still reads a journal that states no schema at all", async () => {
+    await writeJournal(header({}), {
+      type: "step_start",
+      at: "2026-08-20T10:00:00Z",
+      skill: "aidd-dev:02-implement",
+    });
+    const adapter = new RunJournalReaderAdapter(projectRoot);
+
+    const journal = await adapter.read(SESSION_ID);
+
+    expect(journal?.session?.schema_version).toBeUndefined();
+    expect(journal?.boundaries).toHaveLength(1);
+  });
+
+  // What a refusal must not cost: the fact that a run file is there. Dropped silently, the
+  // diagnostic reads "none carry a readable session_start" about a file whose header it read
+  // perfectly well, and prints a torn write as the cause of a version disagreement.
+  it("still names the schema of every journal it refused", async () => {
+    await writeJournal(header({ schema_version: READABLE_JOURNAL_SCHEMA_VERSION + 1 }));
+    const adapter = new RunJournalReaderAdapter(projectRoot);
+
+    expect(await adapter.listForeignSchemas()).toEqual([READABLE_JOURNAL_SCHEMA_VERSION + 1]);
   });
 });

@@ -16,6 +16,9 @@ const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 // 596 was set when `by_agent` learned to tell a main thread from a tool that never
 // names an agent: measured 592.0 -> 593.8 KB across two changes, the flow axis's own
 // tool-stated row included. Same 2.2 KB headroom the raise before it left.
+// 598 was set when the journal reader began reading the schema a journal states it was
+// written under, and the diagnostic gained the reason for refusing one: measured
+// 594.3 -> 595.8 KB. Same 2.2 KB headroom as the two raises before it.
 const budgetKB = pkg.bundleBudgetKB ?? 500;
 const budgetBytes = budgetKB * 1024;
 
