@@ -734,6 +734,39 @@ ignores it exactly as it would any other field it does not recognize.
   truncated mid-write, or a host whose files carry no such identifier, which is
   every tool but Claude Code today. Never read as "no prompt ran".
 
+#### `prompt_skill`
+- **Type**: string.
+- **Present**: conditional — Claude Code only, and only where a `Skill` call was
+  made inside the record's own prompt.
+- **Meaning**: the skill that call invoked. The same fact the run journal writes
+  as `step_start`'s `turn_id`, read from the transcript instead of from a hook.
+  The first call wins where a prompt made several: a prompt that invokes two
+  skills invoked the second from inside the first, and it is named for the work
+  it began.
+- **Why it exists**: the report never re-reads a transcript — it reads this sink
+  and the journals beside it — so an observation only a transcript holds has to
+  be written down when it is read or it is gone. It names a step for a session
+  the journal never saw, which is every session that ran before the hook was
+  installed. Measured on one machine: 28 such prompts across 22 days, 318 records
+  named by that route and by nothing else.
+- **Scoped to one transcript**: Claude Code writes a session's subagents to their
+  own files, and a prompt is often spread across several — measured on one
+  machine, 1,038 of 5,564 prompts appear in more than one file. A record names the
+  first skill invoked inside its prompt *in the file it sits in*. A subagent that
+  invoked its own skill did that work under that skill; merging the files first
+  would have to pick one answer for both, and neither is true of both.
+- **Not a duplicate of `step`**: that one reads `attributionSkill`, which Claude
+  Code writes per message — exact where it appears and sparse where it does not.
+  Measured inside the window one skill demonstrably ran: 142 lines carry counters
+  and 20 carry that field. Its absence is therefore not the tool saying no skill
+  ran, and naming the skill a prompt invoked contradicts nothing it states.
+- **Never a judgement**: which step a record belongs to is derived fresh on every
+  report, from this and from the journal together. The journal wins where both
+  name a skill for the same prompt — it was written by a hook the host fired,
+  where this is read back afterwards.
+- **If absent**: the record's prompt invoked no skill, the chain reached no
+  prompt at all, or the tool is not Claude Code. Never read as "no skill ran".
+
 #### `duration_ms`
 - **Type**: number.
 - **Present**: conditional — measured so far only on Claude Code's export

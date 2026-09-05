@@ -276,9 +276,25 @@ function matchOnPrompt(
   record: TelemetrySinkRecord,
   byPrompt: ReadonlyMap<string, string> | undefined
 ): { readonly source: "prompt-matched"; readonly step: string } | null {
-  if (record.prompt_id === undefined || byPrompt === undefined) return null;
-  const step = byPrompt.get(record.prompt_id);
+  const step = journalNamedStep(record, byPrompt) ?? record.prompt_skill;
   return step === undefined ? null : { source: "prompt-matched", step };
+}
+
+/** What the run journal says the record's own prompt opened, asked first.
+ *
+ * Both sides name the same fact from the same identifier, so they can only disagree if one
+ * of them is wrong — and the journal was written by a hook the host itself fired, while
+ * `prompt_skill` is read back off a transcript afterwards. The reading with a witness wins.
+ *
+ * A session the journal never saw at all has no answer here and falls through to the
+ * record's own. Measured on the real sink: 28 prompts across 22 days ran before the hook
+ * was installed, and 318 records are named by that route and by nothing else. */
+function journalNamedStep(
+  record: TelemetrySinkRecord,
+  byPrompt: ReadonlyMap<string, string> | undefined
+): string | undefined {
+  if (record.prompt_id === undefined || byPrompt === undefined) return undefined;
+  return byPrompt.get(record.prompt_id);
 }
 
 /** Every record's step, taken from the journal rather than from the record.

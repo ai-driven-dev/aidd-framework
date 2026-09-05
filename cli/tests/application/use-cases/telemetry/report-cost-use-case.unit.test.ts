@@ -646,6 +646,66 @@ describe("a report that catches the sink up first", () => {
     );
   });
 
+  /**
+   * A session whose journal never opened the step, because the hook was not installed when
+   * it ran. The record still carries what its own transcript said: the skill a `Skill` call
+   * invoked inside that prompt. Same fact, same identifier, read from the other side.
+   *
+   * Measured on the real sink: 28 such prompts across 22 days, 318 records named this way
+   * and by nothing else.
+   */
+  it("attributes on the skill the record's own prompt invoked, where no journal saw it", async () => {
+    journals.set(SESSION, journalAt("2026-08-18T09:00:00Z"));
+    await sink.appendRecord(
+      record({
+        vendor_id: SESSION,
+        event_timestamp: "2026-08-18T10:00:00.000Z",
+        prompt_id: "p-abc",
+        prompt_skill: "aidd-dev:01-plan",
+      }),
+      STORED_ON
+    );
+
+    const built = await reportWith().execute({ ...BASE_OPTIONS, period: PERIOD });
+
+    expect(built.bySteps).toContainEqual(
+      expect.objectContaining({ attribution: "prompt-matched", step: "aidd-dev:01-plan" })
+    );
+  });
+
+  // The journal is the stronger of the two: it was written by a hook the host itself fired,
+  // while the transcript is read back afterwards. They can only disagree if one of them is
+  // wrong, and the reading with a witness wins.
+  it("keeps the journal's own answer when both sides name a skill for the same prompt", async () => {
+    const journal = journalAt("2026-08-18T09:00:00Z");
+    journals.set(SESSION, {
+      ...journal,
+      boundaries: [
+        {
+          type: "step_start",
+          at: "2026-08-18T11:00:00Z",
+          skill: "aidd-pm:04-spec",
+          turn_id: "p-abc",
+        },
+      ],
+    });
+    await sink.appendRecord(
+      record({
+        vendor_id: SESSION,
+        event_timestamp: "2026-08-18T10:00:00.000Z",
+        prompt_id: "p-abc",
+        prompt_skill: "aidd-dev:01-plan",
+      }),
+      STORED_ON
+    );
+
+    const built = await reportWith().execute({ ...BASE_OPTIONS, period: PERIOD });
+
+    expect(built.bySteps).toContainEqual(
+      expect.objectContaining({ attribution: "prompt-matched", step: "aidd-pm:04-spec" })
+    );
+  });
+
   it("derives a stored record's step from the journal rather than trusting the stored one", async () => {
     const at = "2026-08-18T10:00:00.000Z";
     const journal = journalAt("2026-08-18T09:00:00Z");
