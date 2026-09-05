@@ -3,7 +3,12 @@ import { toInstalledRule } from "../../../src/domain/models/installed-rule.js";
 
 describe("toInstalledRule — one installed file, read as a rule", () => {
   it("names the rule from its own file, never from the frontmatter", () => {
-    const rule = toInstalledRule("claude", ".claude/rules/01-standards/1-naming.md", ".md", "---\n---\n");
+    const rule = toInstalledRule(
+      "claude",
+      ".claude/rules/01-standards/1-naming.md",
+      ".md",
+      "---\n---\n"
+    );
 
     expect(rule.name).toBe("1-naming");
     expect(rule.path).toBe(".claude/rules/01-standards/1-naming.md");
@@ -24,7 +29,12 @@ describe("toInstalledRule — one installed file, read as a rule", () => {
   });
 
   it("reads the description a rule states, and an empty one where it states none", () => {
-    const described = toInstalledRule("cursor", ".cursor/rules/a.mdc", ".mdc", "---\ndescription: Names files\n---\n");
+    const described = toInstalledRule(
+      "cursor",
+      ".cursor/rules/a.mdc",
+      ".mdc",
+      "---\ndescription: Names files\n---\n"
+    );
     const bare = toInstalledRule("cursor", ".cursor/rules/b.mdc", ".mdc", "# no frontmatter\n");
 
     expect(described.description).toBe("Names files");
@@ -57,7 +67,12 @@ describe("toInstalledRule — one installed file, read as a rule", () => {
   /** `globs: "a, b"` is what `tool-paths.md` tells a generator to write for Cursor, and a
    * reader that kept it whole would answer one glob where the rule states two. */
   it("splits a comma-joined scope, which is the form Cursor is generated with", () => {
-    const rule = toInstalledRule("cursor", ".cursor/rules/a.mdc", ".mdc", '---\nglobs: "src/**, tests/**"\n---\n');
+    const rule = toInstalledRule(
+      "cursor",
+      ".cursor/rules/a.mdc",
+      ".mdc",
+      '---\nglobs: "src/**, tests/**"\n---\n'
+    );
 
     expect(rule.paths).toEqual(["src/**", "tests/**"]);
   });

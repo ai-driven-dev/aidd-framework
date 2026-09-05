@@ -3,13 +3,7 @@ import { flatHooksSharedDirPath } from "../formats/flat-paths.js";
 import { parseFrontmatter, serializeFrontmatter } from "../formats/markdown.js";
 import { rewritePluginRootToken } from "../formats/plugin-root-token-rewrite.js";
 import type { Hasher } from "../ports/hasher.js";
-import type {
-  AiTool,
-  HasAgents,
-  HasCommands,
-  HasPlugins,
-  HasSkills,
-} from "../tools/contracts.js";
+import type { AiTool, HasAgents, HasCommands, HasPlugins, HasSkills } from "../tools/contracts.js";
 import { hasRules } from "../tools/contracts.js";
 import type { ToolConfig } from "../tools/registry.js";
 import { isAiTool } from "../tools/registry.js";

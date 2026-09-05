@@ -40,6 +40,7 @@ import { InstallAiToolUseCase } from "../application/use-cases/install/install-a
 import { InstallIdeConfigUseCase } from "../application/use-cases/install/install-ide-config-use-case.js";
 import { InstallIdeToolUseCase } from "../application/use-cases/install/install-ide-tool-use-case.js";
 import { InstallRuntimeConfigUseCase } from "../application/use-cases/install/install-runtime-config-use-case.js";
+import { ListInstalledRulesUseCase } from "../application/use-cases/list-installed-rules-use-case.js";
 import { MarketplaceAddUseCase } from "../application/use-cases/marketplace/marketplace-add-use-case.js";
 import { MarketplaceCheckUseCase } from "../application/use-cases/marketplace/marketplace-check-use-case.js";
 import { MarketplaceListUseCase } from "../application/use-cases/marketplace/marketplace-list-use-case.js";
@@ -124,7 +125,6 @@ import { CodexCliAdapter } from "./adapters/codex-cli-adapter.js";
 import { CopilotCliAdapter } from "./adapters/copilot-cli-adapter.js";
 import { CopilotCostReaderAdapter } from "./adapters/copilot-cost-reader-adapter.js";
 import { CurrentVersionAdapter } from "./adapters/current-version-adapter.js";
-import { ListInstalledRulesUseCase } from "../application/use-cases/list-installed-rules-use-case.js";
 import { FileAdapter } from "./adapters/file-adapter.js";
 import { GhCliAdapter } from "./adapters/gh-cli-adapter.js";
 import { GhTokenAdapter } from "./adapters/gh-token-adapter.js";
