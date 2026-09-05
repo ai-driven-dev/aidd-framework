@@ -9,16 +9,16 @@ The per-tool rules path and write targets. Rule slice only, nothing about skills
 | Claude Code    | `.claude/rules/<category>/<slug>.md`               | yes        |
 | Cursor         | `.cursor/rules/<category>/<slug>.mdc`              | yes        |
 | GitHub Copilot | `.github/instructions/<NN>-<name>.instructions.md` | yes (flat) |
-| OpenCode       | -                                                  | no         |
-| Codex CLI      | -                                                  | no         |
+| OpenCode       | `.opencode/rules/<category>/<slug>.md`              | yes        |
+| Codex CLI      | `.codex/rules/<category>/<slug>.md`                 | yes        |
 
 `<slug>` is the file name `#-slug` from `rule-authoring.md` (e.g. `2-python-fstrings`). `<name>` is that slug with its leading category digit dropped (`python-fstrings`). `<category>` is the folder `<NN>-<name-of-category>`, the zero-padded category index plus the category name from the taxonomy, e.g. `01-standards`. `<NN>` is that same two-digit index.
 
 Copilot is flat: no category folder. Its file is `<NN>-<name>`, e.g. `2-python-fstrings` becomes `02-python-fstrings` (one category prefix, no folder).
 
-When a tool does not support rules, skip it and say what to do instead:
-- **OpenCode**: no rules surface. Add the convention to AGENTS.md, or list its path under `instructions:` in opencode.json.
-- **Codex CLI**: rules are skipped at install. Keep the convention in AGENTS.md.
+Every tool above installs rules. This table used to say OpenCode and Codex do not, and to tell a generator to put the convention in AGENTS.md instead; both were false. `plugin-content-translator.ts` routes a plugin's `rules/` into every tool whose capability accepts them, and all five accept them — `aidd ai rules` prints where each one lands, asked of the installer itself rather than of a list.
+
+Both use the same frontmatter as Claude Code: `paths` (array of globs), omitted for an all-files rule.
 
 ## Scope frontmatter per tool
 

@@ -4,6 +4,10 @@ import type { AiToolId } from "../../domain/models/tool-ids.js";
 import { AI_TOOL_IDS, isAiToolId } from "../../domain/models/tool-ids.js";
 import type { ToolId } from "../../domain/tools/registry.js";
 import { createDeps, createMenuDeps } from "../../infrastructure/deps.js";
+import {
+  printInstalledRules,
+  printInstalledRulesJson,
+} from "../display/installed-rules-display.js";
 import { printUnrestorable } from "../display/restore-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import { NoManifestError } from "../errors.js";
@@ -107,6 +111,22 @@ export function registerAiCommand(program: Command): void {
           return;
         }
         for (const id of aiIds) output.print(id);
+      } catch (error) {
+        errorHandler.handle(error);
+      }
+    });
+
+  ai.command("rules")
+    .description("List the rules installed in this project, across every AI tool")
+    .option("--json", "Print the inventory as JSON")
+    .action(async (cmdOptions: { json?: boolean }) => {
+      const { verbose, output, projectRoot } = parseGlobalOptions(program);
+      const errorHandler = new ErrorHandler(output);
+      try {
+        const deps = await createDeps(projectRoot, { verbose }, output);
+        const { rules } = await deps.listInstalledRulesUseCase.execute({ projectRoot });
+        if (cmdOptions.json) printInstalledRulesJson(output, rules);
+        else printInstalledRules(output, rules);
       } catch (error) {
         errorHandler.handle(error);
       }

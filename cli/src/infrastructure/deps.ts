@@ -124,6 +124,7 @@ import { CodexCliAdapter } from "./adapters/codex-cli-adapter.js";
 import { CopilotCliAdapter } from "./adapters/copilot-cli-adapter.js";
 import { CopilotCostReaderAdapter } from "./adapters/copilot-cost-reader-adapter.js";
 import { CurrentVersionAdapter } from "./adapters/current-version-adapter.js";
+import { ListInstalledRulesUseCase } from "../application/use-cases/list-installed-rules-use-case.js";
 import { FileAdapter } from "./adapters/file-adapter.js";
 import { GhCliAdapter } from "./adapters/gh-cli-adapter.js";
 import { GhTokenAdapter } from "./adapters/gh-token-adapter.js";
@@ -234,6 +235,7 @@ interface Deps {
    * `warnIfFiguresMoveTheTokenToo`. */
   telemetrySink: TelemetrySinkAdapter;
   forgetTelemetryUseCase: ForgetTelemetryUseCase;
+  listInstalledRulesUseCase: ListInstalledRulesUseCase;
 }
 
 const _cache = new Map<string, Deps>();
@@ -851,6 +853,7 @@ export async function createDeps(
     reportCostUseCase,
     telemetrySink,
     forgetTelemetryUseCase,
+    listInstalledRulesUseCase: new ListInstalledRulesUseCase(fs),
   };
   _cache.set(projectRoot, deps);
   return deps;

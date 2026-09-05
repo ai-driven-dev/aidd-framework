@@ -13,6 +13,7 @@ import {
 } from "../../../src/domain/models/plugin-format.js";
 import { AI_TOOL_IDS } from "../../../src/domain/models/tool-ids.js";
 import type { AiTool } from "../../../src/domain/tools/contracts.js";
+import { hasRules } from "../../../src/domain/tools/contracts.js";
 import {
   getAllRegisteredTools,
   getToolConfig,
@@ -264,5 +265,38 @@ describe("no parallel list references an unregistered tool", () => {
         `"${toolId}" declares a telemetryLocalRead route without saying what it supplies`
       ).toBeDefined();
     }
+  });
+});
+
+/**
+ * Where each tool installs a rule, pinned as a table rather than described.
+ *
+ * The plugin script this replaced carried its own copy of these five rows and was missing
+ * one: it stated "Codex CLI: rules not supported, skipped" while `.codex/rules/` is exactly
+ * where a Codex rule lands. A reader on a Codex project asking what rules it had was
+ * answered "none", silently and wrongly, because the copy had drifted from the installer.
+ *
+ * Written out here so the drift cannot come back quietly: a tool whose install path moves,
+ * or a sixth tool added with rules, fails this and is read by whoever changes it.
+ */
+describe("every tool says where its own installed rules live", () => {
+  const EXPECTED: Readonly<Record<string, { directory: string; extension: string }>> = {
+    claude: { directory: ".claude/rules/", extension: ".md" },
+    codex: { directory: ".codex/rules/", extension: ".md" },
+    copilot: { directory: ".github/instructions/", extension: ".instructions.md" },
+    cursor: { directory: ".cursor/rules/", extension: ".mdc" },
+    opencode: { directory: ".opencode/rules/", extension: ".md" },
+  };
+
+  it("answers the directory and extension each one actually installs into", () => {
+    const answered = Object.fromEntries(
+      AI_TOOL_IDS.map((id) => {
+        const tool = getToolConfig(id);
+        const rules = isAiTool(tool) && hasRules(tool) ? tool.capabilities.rules : undefined;
+        return [id, rules?.installedLocation() ?? null];
+      })
+    );
+
+    expect(answered).toEqual(EXPECTED);
   });
 });

@@ -8,9 +8,9 @@ import type {
   HasAgents,
   HasCommands,
   HasPlugins,
-  HasRules,
   HasSkills,
 } from "../tools/contracts.js";
+import { hasRules } from "../tools/contracts.js";
 import type { ToolConfig } from "../tools/registry.js";
 import { isAiTool } from "../tools/registry.js";
 import { InstallationFile } from "./file.js";
@@ -351,10 +351,6 @@ function hasCommands(tool: AiTool<HasPlugins>): tool is AiTool<HasPlugins & HasC
 
 function hasAgents(tool: AiTool<HasPlugins>): tool is AiTool<HasPlugins & HasAgents> {
   return "agents" in (tool.capabilities as object);
-}
-
-function hasRules(tool: AiTool<HasPlugins>): tool is AiTool<HasPlugins & HasRules> {
-  return "rules" in (tool.capabilities as object);
 }
 
 function hasSkills(tool: AiTool<HasPlugins>): tool is AiTool<HasPlugins & HasSkills> {
