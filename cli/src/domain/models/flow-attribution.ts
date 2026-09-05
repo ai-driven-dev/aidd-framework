@@ -5,7 +5,11 @@ import type {
   RunJournalStepStart,
   RunJournalTaskDeclared,
 } from "../ports/run-journal-reader.js";
-import { buildClosedIntervals, type ClosedInterval } from "./journal-intervals.js";
+import {
+  buildClosedIntervals,
+  type ClosedInterval,
+  type IntervalClosure,
+} from "./journal-intervals.js";
 import { namesTheSameSkill } from "./skill-name.js";
 
 /**
@@ -104,6 +108,10 @@ export function bareOrchestratingSkillNames(
  * none at all. */
 export interface FlowInterval extends ClosedInterval {
   readonly skill: string;
+  /** Whether `endMs` is a moment this journal witnessed or the cap standing in for one it
+   * never did. Carried because `buildStepIntervals` composes these into the step axis and
+   * reads it there; no flow row of its own is printed differently for it. */
+  readonly closedBy: IntervalClosure;
 }
 
 /**
@@ -147,6 +155,6 @@ export function buildFlowIntervals(
       boundary.type === "step_start" && ORCHESTRATING_SKILLS.has(boundary.skill),
     (boundary, opener) =>
       boundary.type === "step_end" && namesTheSameSkill(boundary.skill, opener.skill),
-    (opener, startMs, endMs) => ({ skill: opener.skill, startMs, endMs })
+    (opener, startMs, endMs, closedBy) => ({ skill: opener.skill, startMs, endMs, closedBy })
   );
 }

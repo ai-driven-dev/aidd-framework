@@ -6,7 +6,11 @@ import type {
   RunJournalTaskDeclared,
 } from "../ports/run-journal-reader.js";
 import { buildFlowIntervals, ORCHESTRATING_SKILLS } from "./flow-attribution.js";
-import { buildClosedIntervals, type ClosedInterval } from "./journal-intervals.js";
+import {
+  buildClosedIntervals,
+  type ClosedInterval,
+  type IntervalClosure,
+} from "./journal-intervals.js";
 import { namesTheSameSkill } from "./skill-name.js";
 
 /** How a record's step came to be known. Never collapsed into one field with the step
@@ -75,6 +79,10 @@ const UNATTRIBUTED: StepAttribution = { source: "unattributed" };
  * Claude Code, Cursor and OpenCode by `journal.cjs`'s own `HOOK_EVENT_NAME_TO_CANONICAL`. */
 export interface StepInterval extends ClosedInterval {
   readonly skill: string;
+  /** Whether `endMs` is a moment the journal witnessed or the cap standing in for one it
+   * never did - `answersFor` reads it, and it is the whole reason the cap above is safe to
+   * apply. */
+  readonly closedBy: IntervalClosure;
 }
 
 /** Journal lines in, closed intervals out - no filesystem, no record. Run through the one
@@ -118,7 +126,7 @@ function buildInvokedStepIntervals(
     (boundary, opener) =>
       boundary.type === "step_start" ||
       (boundary.type === "step_end" && namesTheSameSkill(boundary.skill, opener.skill)),
-    (opener, startMs, endMs) => ({ skill: opener.skill, startMs, endMs })
+    (opener, startMs, endMs, closedBy) => ({ skill: opener.skill, startMs, endMs, closedBy })
   );
 }
 
@@ -165,13 +173,9 @@ export function buildStepIntervals(
  * array decides nothing: the two walks that build these run separately, so a rule that
  * read the first match would answer differently for the same journal depending on which
  * walk happened to run first. */
-function innermostAround(
-  intervals: readonly StepInterval[],
-  momentMs: number
-): StepInterval | undefined {
+function innermostOf(intervals: readonly StepInterval[]): StepInterval | undefined {
   let best: StepInterval | undefined;
   for (const interval of intervals) {
-    if (momentMs < interval.startMs || momentMs >= interval.endMs) continue;
     if (
       best === undefined ||
       interval.startMs > best.startMs ||
@@ -183,6 +187,53 @@ function innermostAround(
   return best;
 }
 
+/** Whether an interval nothing closed sits inside another that nothing closed either.
+ *
+ * Every unclosed interval ends at the same moment - the journal's own last witnessed one,
+ * capped identically for all of them - so containment between two of them reduces to which
+ * opened first, and comparing the ends would be a clause no input can make false. The
+ * enclosing one is the answer because the inner one's extent rests on no evidence at all,
+ * while the enclosing one is at least still known to have been open at that moment. */
+function enclosedByAnotherUnclosed(
+  covering: readonly StepInterval[],
+  interval: StepInterval
+): boolean {
+  if (interval.closedBy !== "journal-end") return false;
+  return covering.some(
+    (other) => other.closedBy === "journal-end" && other.startMs < interval.startMs
+  );
+}
+
+/** The interval that answers for a moment.
+ *
+ * The innermost one covering it, *except* that an interval nothing ever closed yields to
+ * one that encloses it and was never closed either. An unclosed interval ends at the
+ * journal's own last witnessed moment, so its extent is a bound and not a measurement; a
+ * step opened shortly before a long session goes on working would otherwise be credited
+ * with all of it, purely for having opened later than the orchestration around it.
+ * Measured on the one orchestrated session captured, 2026-09-04: 972 records attributed to
+ * `aidd-dev:01-plan`, opened at 06:00:50 and never closed, inside an orchestration opened
+ * at 05:56:27 and never closed either.
+ *
+ * Yielding is between two unclosed intervals and no wider. Where the enclosing interval
+ * states its own end, the inner one runs past it and nothing encloses it, so the innermost
+ * claim stands - the same answer it gets when both ends are witnessed. And an unclosed
+ * interval that nothing encloses still answers: what is refused is preferring a bound over
+ * a wider claim that covers the same moment, never the bound itself.
+ *
+ * No tie between two unclosed *sibling* steps can arise to be broken here, and it is not
+ * this function that prevents it: any `step_start` closes whichever plain step was open, so
+ * at most one invoked step is ever left unclosed at a time. */
+function answersFor(
+  intervals: readonly StepInterval[],
+  momentMs: number
+): StepInterval | undefined {
+  const covering = intervals.filter(
+    (interval) => momentMs >= interval.startMs && momentMs < interval.endMs
+  );
+  return innermostOf(covering.filter((interval) => !enclosedByAnotherUnclosed(covering, interval)));
+}
+
 export function attributeMoment(
   intervals: readonly StepInterval[],
   momentIso: string | undefined
@@ -190,6 +241,6 @@ export function attributeMoment(
   if (momentIso === undefined) return UNATTRIBUTED;
   const momentMs = Date.parse(momentIso);
   if (Number.isNaN(momentMs)) return UNATTRIBUTED;
-  const hit = innermostAround(intervals, momentMs);
+  const hit = answersFor(intervals, momentMs);
   return hit ? { source: "journal-interval", step: hit.skill } : UNATTRIBUTED;
 }

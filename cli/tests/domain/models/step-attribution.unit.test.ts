@@ -305,6 +305,75 @@ describe("step-attribution — pure: journal lines + records -> intervals", () =
     });
   });
 
+  // An interval nothing ever closed ends at the journal's own last witnessed moment, which
+  // is a bound and not a measurement. Where one such interval sits inside another, the
+  // enclosing one answers: the inner one's end says only that the journal stopped, while
+  // the outer one is still known to have been open. Measured on the one orchestrated
+  // session captured, 2026-09-04: `aidd-dev:01-plan` opened at 06:00:50 inside an
+  // orchestration opened at 05:56:27, neither was ever closed, and reading the innermost
+  // start alone credited the invoked step with every one of the 972 records written over
+  // the three and a half hours that followed.
+  it("hands a moment to the orchestration when nothing ever closed the step inside it", () => {
+    const intervals = buildStepIntervals(
+      journalOf(
+        { type: "step_start", at: "2026-08-20T10:00:00Z", skill: "aidd-orchestrator:01-sdlc" },
+        { type: "step_start", at: "2026-08-20T10:05:00Z", skill: "aidd-pm:04-spec" },
+        { type: "turn_end", at: "2026-08-20T11:00:00Z" }
+      )
+    );
+
+    expect(attributeMoment(intervals, "2026-08-20T10:30:00Z")).toEqual({
+      source: "journal-interval",
+      step: "aidd-orchestrator:01-sdlc",
+    });
+  });
+
+  // Two invoked steps in a row inside one orchestration. The first is closed by the
+  // second's own start, so its end is a witnessed boundary and it answers for the moments
+  // it covers; only the second is left unclosed, and it is the one that yields. There is
+  // never a tie between two unclosed invoked steps to break, because a `step_start` closes
+  // whichever plain step was open - which is what this case is here to demonstrate rather
+  // than assert in a comment.
+  it("keeps the earlier invoked step, and yields only the one nothing closed", () => {
+    const intervals = buildStepIntervals(
+      journalOf(
+        { type: "step_start", at: "2026-08-20T10:00:00Z", skill: "aidd-orchestrator:01-sdlc" },
+        { type: "step_start", at: "2026-08-20T10:05:00Z", skill: "aidd-pm:04-spec" },
+        { type: "step_start", at: "2026-08-20T10:20:00Z", skill: "aidd-dev:01-plan" },
+        { type: "turn_end", at: "2026-08-20T11:00:00Z" }
+      )
+    );
+
+    expect(attributeMoment(intervals, "2026-08-20T10:10:00Z")).toEqual({
+      source: "journal-interval",
+      step: "aidd-pm:04-spec",
+    });
+    expect(attributeMoment(intervals, "2026-08-20T10:30:00Z")).toEqual({
+      source: "journal-interval",
+      step: "aidd-orchestrator:01-sdlc",
+    });
+  });
+
+  // The yielding is between two intervals nothing closed, and no wider than that. Here the
+  // orchestration states its own end while the step inside it does not, so the step runs
+  // past it and no interval encloses it - the innermost claim stands, exactly as it does
+  // when both ends are witnessed.
+  it("keeps the innermost step when the orchestration around it states its own end", () => {
+    const intervals = buildStepIntervals(
+      journalOf(
+        { type: "step_start", at: "2026-08-20T10:00:00Z", skill: "aidd-orchestrator:01-sdlc" },
+        { type: "step_start", at: "2026-08-20T10:10:00Z", skill: "aidd-pm:04-spec" },
+        { type: "step_end", at: "2026-08-20T10:20:00Z", skill: "aidd-orchestrator:01-sdlc" },
+        { type: "turn_end", at: "2026-08-20T11:00:00Z" }
+      )
+    );
+
+    expect(attributeMoment(intervals, "2026-08-20T10:15:00Z")).toEqual({
+      source: "journal-interval",
+      step: "aidd-pm:04-spec",
+    });
+  });
+
   // Nesting is declared, never inferred: only a skill `ORCHESTRATING_SKILLS` names invokes
   // others. Two ordinary skills in a row are a sequence, and the second still ends the first.
   it("still lets one ordinary step close another, which is a sequence and not a nesting", () => {
@@ -360,6 +429,8 @@ describe("buildStepIntervals — a step the session never closed", () => {
         skill: "aidd-dev:01-plan",
         startMs: Date.parse("2026-08-17T10:00:00Z"),
         endMs: Date.parse("2026-08-17T12:00:00Z"),
+        // The cap, and named as one: nothing in this journal ever closed the step.
+        closedBy: "journal-end",
       },
     ]);
     expect(attributeMoment(intervals, "2026-09-30T23:59:00Z")).toEqual({ source: "unattributed" });

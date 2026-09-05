@@ -96,11 +96,15 @@ describe("buildFlowIntervals — pure: journal lines -> bounded flow intervals",
         skill: SDLC_OPENS.skill,
         startMs: Date.parse(SDLC_OPENS.at),
         endMs: Date.parse(BACKLOG_OPENS.at),
+        closedBy: "boundary",
       },
       {
         skill: BACKLOG_OPENS.skill,
         startMs: Date.parse(BACKLOG_OPENS.at),
         endMs: Date.parse(TURN_END.at),
+        // A pause never closes a flow, so this is the cap at the journal's last moment,
+        // which the pause happens to be.
+        closedBy: "journal-end",
       },
     ]);
   });
@@ -113,6 +117,7 @@ describe("buildFlowIntervals — pure: journal lines -> bounded flow intervals",
         skill: SDLC_OPENS.skill,
         startMs: Date.parse(SDLC_OPENS.at),
         endMs: Date.parse(SDLC_ENDS.at),
+        closedBy: "boundary",
       },
     ]);
   });
@@ -192,6 +197,7 @@ describe("buildFlowIntervals — pure: journal lines -> bounded flow intervals",
         skill: SDLC_OPENS.skill,
         startMs: Date.parse(SDLC_OPENS.at),
         endMs: Date.parse(TURN_END.at),
+        closedBy: "journal-end",
       },
     ]);
   });
@@ -220,7 +226,12 @@ describe("buildFlowIntervals — pure: journal lines -> bounded flow intervals",
     const intervals = buildFlowIntervals(journalOf([bareSpelling, TURN_END]));
 
     expect(intervals).toEqual([
-      { skill: "01-sdlc", startMs: Date.parse(bareSpelling.at), endMs: Date.parse(TURN_END.at) },
+      {
+        skill: "01-sdlc",
+        startMs: Date.parse(bareSpelling.at),
+        endMs: Date.parse(TURN_END.at),
+        closedBy: "journal-end",
+      },
     ]);
   });
 
@@ -232,6 +243,7 @@ describe("buildFlowIntervals — pure: journal lines -> bounded flow intervals",
         skill: SDLC_OPENS.skill,
         startMs: Date.parse(SDLC_OPENS.at),
         endMs: Date.parse(SDLC_OPENS.at),
+        closedBy: "journal-end",
       },
     ]);
   });
@@ -307,6 +319,7 @@ describe("buildFlowIntervals — a journal with no readable moment in it", () =>
         skill: SDLC_OPENS.skill,
         startMs: Date.parse(SDLC_OPENS.at),
         endMs: Date.parse(wroteLater.at),
+        closedBy: "journal-end",
       },
     ]);
   });
