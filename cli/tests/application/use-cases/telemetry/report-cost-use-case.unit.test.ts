@@ -651,8 +651,11 @@ describe("a report that catches the sink up first", () => {
     const journal = journalAt("2026-08-18T09:00:00Z");
     journals.set(SESSION, {
       ...journal,
+      // The pause after the record is what the step is capped at: a step runs past a pause
+      // but never past the last moment its own journal witnessed.
       boundaries: [
         { type: "step_start", at: "2026-08-18T09:30:00Z", skill: "aidd-dev:02-implement" },
+        { type: "turn_end", at: "2026-08-18T10:30:00Z" },
       ],
     });
     await sink.appendRecord(

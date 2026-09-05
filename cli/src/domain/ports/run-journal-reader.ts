@@ -86,10 +86,12 @@ export interface RunJournalFileWritten {
  * on that task from here on — told rather than inferred, the way `step_start` names a
  * skill. Carries no task identity for the same reason `file_written` does not: `path` is
  * the same repository-relative shape, and deriving the task from it is `task-identity.ts`'s
- * job. Deliberately kept out of `RunJournalBoundary` — pairing it into `boundaries` would
- * let it close a running step early (see `step-attribution.ts`'s `buildStepIntervals`), so
- * a task interval is built from this array plus `boundaries`' own `turn_end` lines instead,
- * in `domain/models/task-attribution.ts`. */
+ * job. Deliberately kept out of `RunJournalBoundary`: what opens or closes a step is a
+ * `step_start` and a `step_end` naming its skill, and a declaration is neither. It reaches
+ * every interval walk all the same - `buildTaskIntervals`, `buildFlowIntervals` and
+ * `buildStepIntervals` each merge this array and `filesWritten` into `boundaries` before
+ * walking - but as a moment the journal witnessed, never as a boundary that ends something.
+ * The type keeps the two apart so a later reader cannot confuse them by accident. */
 export interface RunJournalTaskDeclared {
   readonly type: "task_declared";
   readonly at: string;
