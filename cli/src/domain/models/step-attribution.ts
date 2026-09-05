@@ -1,4 +1,11 @@
-import type { RunJournal, RunJournalBoundary } from "../ports/run-journal-reader.js";
+import type {
+  RunJournal,
+  RunJournalBoundary,
+  RunJournalFileWritten,
+  RunJournalStepStart,
+  RunJournalTaskDeclared,
+} from "../ports/run-journal-reader.js";
+import { buildClosedIntervals, type ClosedInterval } from "./journal-intervals.js";
 import { namesTheSameSkill } from "./skill-name.js";
 
 /** How a record's step came to be known. Never collapsed into one field with the step
@@ -31,88 +38,77 @@ export interface StepAttribution {
 
 const UNATTRIBUTED: StepAttribution = { source: "unattributed" };
 
-/** One `step_start`, closed by whichever boundary — another `step_start` or a `turn_end` —
- * comes next in file order, or left open if none does. `endMs` is exclusive, matching the
- * half-open interval the run journal itself defines.
+/** One `step_start`, closed by a `step_end` naming that same skill or by the next
+ * `step_start`, and - unclosed - by the journal's own last witnessed moment. `endMs` is
+ * exclusive, matching the half-open interval the run journal itself defines.
  *
- * **Left open, unlike a task or a flow interval, and the difference is deliberate.**
- * `journal-intervals.ts` caps an unclosed task or flow at the journal's own last witnessed
- * moment, because leaving one open "would go on attributing everything a long-running
- * session does afterward to the first opener it ever saw". The same cap cannot be applied
- * here: those two walks see `filesWritten` and `taskDeclarations` as well as boundaries, so
- * there are later moments to cap at, while this one sees boundaries alone. The last
- * boundary of a session that never wrote `turn_end` *is* the open `step_start`, so capping
- * would give it a zero-width interval covering nothing — trading "attributes too much" for
- * "attributes nothing", which is not obviously the better error.
+ * **A `turn_end` stopped closing one on 2026-09-05.** It is a pause, not the end of a
+ * step, which is the rule `buildTaskIntervals` and `buildFlowIntervals` already read from
+ * this very journal; a step spanning three prompts was being credited with its first turn
+ * and nothing after. Measured on the one orchestrated session captured, 2026-09-04: four
+ * steps opened across four hours of continuous work, every one of them closed by the next
+ * pause, the last at 06:02:34 against a session that went on until 09:27:21. Of its 1,073
+ * records, 69 fell inside a step interval; with a pause no longer closing one, 1,065 do.
+ * The same journal already gave the flow axis 1,052 records and this axis 1 - two walks
+ * over identical evidence disagreeing by three orders of magnitude, which is what this
+ * change removes.
  *
- * A session ends without `turn_end` whenever its host fires no stop event; `journal.cjs`'s
- * own `HOOK_EVENT_NAME_TO_CANONICAL` maps one for Claude Code, Cursor and OpenCode, and
- * none for Copilot. So this is a live case, not a theoretical one, and
- * `aidd telemetry check`'s own `records-join` claim currently depends on the open reading —
- * change it and that claim starts failing for every unclosed session. Pinned by
- * `buildStepIntervals` tests below so the choice stays visible rather than incidental. */
-export interface StepInterval {
+ * **Capped rather than left open, which reverses the choice this comment used to pin.**
+ * That choice rested on one premise: the cap "cannot be applied here" because this walk saw
+ * `boundaries` alone, while a task or flow interval also saw `filesWritten` and
+ * `taskDeclarations`, so it had later moments to cap at and this had none. The premise is
+ * now false by construction - `buildStepIntervals` reads the same three arrays they do. All
+ * that survives of it is the degenerate journal whose very last line is the opener, where
+ * the cap does give a zero-width interval covering nothing. Open is not the safer error
+ * there: one captured session carries a single `vendor_id` spanning 22 days, so
+ * "everything the session does afterward" is three weeks of unrelated work.
+ *
+ * `aidd telemetry check`'s `records-join` claim was said to depend on the open reading, and
+ * in that degenerate journal it genuinely does: `joinedVerdict` fails when *every* record is
+ * unattributed, so a session whose journal holds the opener and nothing else, and whose
+ * records carry no tool-stated step of their own, flips that claim from ok to fail. Found by
+ * running it, not reasoned about - `diagnose-telemetry-use-case.unit.test.ts` held exactly
+ * that journal. Failing there is the honest answer: nothing in such a journal says the step
+ * was still running, and a claim reading ok on the strength of an unbounded interval was
+ * asserting what it could not see. Every host that writes a pause is unaffected, which is
+ * Claude Code, Cursor and OpenCode by `journal.cjs`'s own `HOOK_EVENT_NAME_TO_CANONICAL`. */
+export interface StepInterval extends ClosedInterval {
   readonly skill: string;
-  readonly startMs: number;
-  readonly endMs: number;
 }
 
-interface TimedBoundary {
-  readonly atMs: number;
-  readonly boundary: RunJournalBoundary;
-}
-
-/** Drops a boundary whose own `at` cannot be parsed, before any pairing happens — never
- * leaving it in as a mid-list gap. Left in, an unparseable boundary would vanish from
- * `nextBoundaryMs`'s view while still occupying a list index, so the interval before it
- * would silently inherit the *next* boundary's moment as its own end, misattributing every
- * record in between to the wrong skill rather than reading them as unattributed. */
-function parseableBoundaries(boundaries: readonly RunJournalBoundary[]): readonly TimedBoundary[] {
-  const timed: TimedBoundary[] = [];
-  for (const boundary of boundaries) {
-    const atMs = Date.parse(boundary.at);
-    if (!Number.isNaN(atMs)) timed.push({ atMs, boundary });
-  }
-  return timed;
-}
-
-/** Journal lines in, intervals out — no filesystem, no record. Two skills that interleave
- * (A, then B, then A) yield three intervals and two names, exactly as the boundaries
- * dictate; nothing here decides which record falls into which, that is `attributeMoment`'s
- * job, kept separate so an interval list can be built once per session and reused. */
-/** Where a step that opened at `from` ends.
+/** Journal lines in, closed intervals out - no filesystem, no record. Run through the one
+ * shared walk (`buildClosedIntervals`) rather than a second copy of it: this module used to
+ * carry its own `timed`/`parseableBoundaries` pair and its own closer scan, which is how it
+ * came to disagree with the two walks reading the same journal beside it.
  *
- * A `step_end` naming this very skill wins over everything between, however many pauses that
- * is: it is the only line in the journal that states the end rather than standing in for it,
- * and a skill spanning three prompts is exactly the case a `turn_end` used to cut short.
+ * Any `step_start` opens an interval - unlike `buildFlowIntervals`, which opens one only
+ * for a skill declared to orchestrate. A `step_end` naming that same skill closes it, by
+ * `namesTheSameSkill` and never `===`: the host that opened the step may have written the
+ * skill's bare directory name while the end the skill echoes carries its plugin. A
+ * `step_end` naming a *different* skill is never a closer, which is the fault naming the
+ * skill exists to prevent. Every other line - a `turn_end`, a `file_written`, a
+ * `task_declared` - neither opens nor closes one, and only ever contributes its own moment
+ * toward the journal's last witnessed one.
  *
- * With no such line, the rule is the one this reader always had - the next `step_start` or
- * `turn_end`, or nothing. A `step_end` naming a *different* skill is never a closer here: it
- * would truncate a step it has no claim on, which is the fault naming the skill exists to
- * prevent. Same or different is `namesTheSameSkill`'s answer, not `===`: the host that
- * opened the step may have written the skill's bare directory name while the end the skill
- * echoes carries its plugin. */
-function stepEndsAt(timed: readonly TimedBoundary[], from: number, skill: string): number {
-  for (let i = from + 1; i < timed.length; i++) {
-    const { boundary } = timed[i];
-    if (boundary.type === "step_end" && namesTheSameSkill(boundary.skill, skill))
-      return timed[i].atMs;
-  }
-  for (let i = from + 1; i < timed.length; i++) {
-    if (timed[i].boundary.type !== "step_end") return timed[i].atMs;
-  }
-  return Number.POSITIVE_INFINITY;
-}
-
-export function buildStepIntervals(journal: RunJournal): readonly StepInterval[] {
-  const timed = parseableBoundaries(journal.boundaries);
-  const intervals: StepInterval[] = [];
-  for (let i = 0; i < timed.length; i++) {
-    const { atMs: startMs, boundary } = timed[i];
-    if (boundary.type !== "step_start") continue;
-    intervals.push({ skill: boundary.skill, startMs, endMs: stepEndsAt(timed, i, boundary.skill) });
-  }
-  return intervals;
+ * Two runs of the very same skill in one session yield two distinct intervals, never one
+ * merged by name, exactly as the boundaries dictate; nothing here decides which record
+ * falls into which, that is `attributeMoment`'s job. */
+export function buildStepIntervals(
+  journal: RunJournal,
+  periodEndMs?: number
+): readonly StepInterval[] {
+  return buildClosedIntervals<
+    RunJournalBoundary | RunJournalTaskDeclared | RunJournalFileWritten,
+    RunJournalStepStart,
+    StepInterval
+  >(
+    [...journal.boundaries, ...journal.taskDeclarations, ...journal.filesWritten],
+    periodEndMs,
+    (boundary): boundary is RunJournalStepStart => boundary.type === "step_start",
+    (boundary, opener) =>
+      boundary.type === "step_end" && namesTheSameSkill(boundary.skill, opener.skill),
+    (opener, startMs, endMs) => ({ skill: opener.skill, startMs, endMs })
+  );
 }
 
 /** Where a record's own moment falls inside one interval, that interval's skill is the

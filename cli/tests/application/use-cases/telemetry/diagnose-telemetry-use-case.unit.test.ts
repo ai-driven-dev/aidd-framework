@@ -193,8 +193,14 @@ describe("DiagnoseTelemetryUseCase — gathering local evidence", () => {
   it("reads every covered tool's own files for every journalled session", async () => {
     const journal: RunJournal = {
       session: sessionStart("s-1"),
+      // The pause is what the step interval is capped at, and it is why the candidate below
+      // falls inside one at all. A journal whose only line is the opener witnesses no later
+      // moment, so the step it opened covers nothing and `records-join` reads fail - see
+      // `buildStepIntervals`'s own doc comment. Every host this fixture stands for writes a
+      // pause: `journal.cjs` maps a stop event for Claude Code, Cursor and OpenCode.
       boundaries: [
         { type: "step_start", at: "2026-08-20T09:00:30Z", skill: "aidd-dev:02-implement" },
+        { type: "turn_end", at: "2026-08-20T09:30:00Z" },
       ],
       filesWritten: [],
       taskDeclarations: [],

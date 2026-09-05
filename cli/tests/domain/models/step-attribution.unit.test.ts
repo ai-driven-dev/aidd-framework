@@ -11,6 +11,13 @@ function journalOf(...boundaries: RunJournal["boundaries"]): RunJournal {
   return { boundaries, filesWritten: [], taskDeclarations: [] };
 }
 
+function journalWith(
+  boundaries: RunJournal["boundaries"],
+  filesWritten: RunJournal["filesWritten"]
+): RunJournal {
+  return { boundaries, filesWritten, taskDeclarations: [] };
+}
+
 const A_START = {
   type: "step_start",
   at: "2026-08-20T10:00:00Z",
@@ -35,6 +42,26 @@ describe("step-attribution — pure: journal lines + records -> intervals", () =
     const attribution = attributeMoment(intervals, "2026-08-20T10:02:00Z");
 
     expect(attribution).toEqual({ source: "journal-interval", step: "aidd-dev:02-implement" });
+  });
+
+  // A `turn_end` is a pause, not the end of a step - the rule `buildTaskIntervals` and
+  // `buildFlowIntervals` already read from this very journal. Measured on the one
+  // orchestrated session captured, 2026-09-04: four steps opened over four hours, every one
+  // closed by the next pause, and 69 of the session's 1,073 records fell inside a step
+  // interval. With a pause no longer closing one, 1,065 of them do.
+  it("runs a step past a pause, to the journal's own last witnessed moment", () => {
+    const intervals = buildStepIntervals(
+      journalWith(
+        [A_START, TURN_END],
+        [{ type: "file_written", at: "2026-08-20T11:00:00Z", path: "aidd_docs/note.md" }]
+      )
+    );
+
+    expect(attributeMoment(intervals, "2026-08-20T10:30:00Z")).toEqual({
+      source: "journal-interval",
+      step: "aidd-dev:02-implement",
+    });
+    expect(intervals[0]?.endMs).toBe(Date.parse("2026-08-20T11:00:00Z"));
   });
 
   // A `turn_end` is a pause: a skill that spans three prompts is credited with its first
@@ -95,27 +122,28 @@ describe("step-attribution — pure: journal lines + records -> intervals", () =
     expect(intervals[0]?.endMs).toBe(Date.parse("2026-08-20T10:30:00Z"));
   });
 
+  // The journal carries a later moment than the disagreeing end, deliberately: with the end
+  // as its last line the interval would stop there anyway - at the journal's own last
+  // witnessed moment - and the assertion could not tell a refused closer from a cap.
   it("still refuses an end whose plugin disagrees with the one that opened the step", () => {
     const intervals = buildStepIntervals(
-      journalOf(A_START, {
-        type: "step_end",
-        at: "2026-08-20T10:02:00Z",
-        skill: "aidd-pm:02-implement",
-      })
+      journalWith(
+        [A_START, { type: "step_end", at: "2026-08-20T10:02:00Z", skill: "aidd-pm:02-implement" }],
+        [{ type: "file_written", at: "2026-08-20T10:20:00Z", path: "aidd_docs/note.md" }]
+      )
     );
 
-    expect(intervals[0]?.endMs).not.toBe(Date.parse("2026-08-20T10:02:00Z"));
+    expect(intervals[0]?.endMs).toBe(Date.parse("2026-08-20T10:20:00Z"));
   });
 
   // An end for a skill that never started names nothing to close. Read as a boundary all the
   // same it would truncate whatever interval was running, which is a step it has no claim on.
   it("ignores an end for a skill this session never started", () => {
     const intervals = buildStepIntervals(
-      journalOf(A_START, {
-        type: "step_end",
-        at: "2026-08-20T10:02:00Z",
-        skill: "some-other:skill",
-      })
+      journalWith(
+        [A_START, { type: "step_end", at: "2026-08-20T10:02:00Z", skill: "some-other:skill" }],
+        [{ type: "file_written", at: "2026-08-20T10:20:00Z", path: "aidd_docs/note.md" }]
+      )
     );
 
     expect(attributeMoment(intervals, "2026-08-20T10:03:00Z")).toEqual({
@@ -137,7 +165,11 @@ describe("step-attribution — pure: journal lines + records -> intervals", () =
     });
   });
 
-  it("closes the last step at its own turn_end, leaving nothing beyond it covered", () => {
+  // A pause is not a closer, so what bounds the last step here is the journal's own last
+  // witnessed moment - which this journal's `turn_end` happens to be. Same moment as the
+  // old rule gave, reached for a different reason, so the boundary between covered and not
+  // stays pinned either way.
+  it("leaves nothing beyond the journal's last witnessed moment covered", () => {
     const intervals = buildStepIntervals(journalOf(B_START, TURN_END));
 
     expect(attributeMoment(intervals, "2026-08-20T10:14:59Z")).toMatchObject({
@@ -212,37 +244,47 @@ describe("step-attribution — pure: journal lines + records -> intervals", () =
 });
 
 describe("buildStepIntervals — a step the session never closed", () => {
-  // Pinned because it is a choice, not an accident, and one that differs from how
-  // `journal-intervals.ts` treats an unclosed task or flow. See `StepInterval`'s own doc
-  // comment for why the cap those two apply cannot be applied here — and note that
-  // `aidd telemetry check`'s `records-join` claim depends on this reading, so changing it
-  // is a behaviour change, not a tidy-up.
-  it("leaves the last step open when no turn_end ever closed it", () => {
-    const intervals = buildStepIntervals({
-      boundaries: [{ type: "step_start", at: "2026-08-17T10:00:00Z", skill: "aidd-dev:01-plan" }],
-      filesWritten: [],
-      taskDeclarations: [],
-    });
+  // Capped, not left open, and the objection this used to carry is gone rather than
+  // overruled: it said the cap "cannot be applied here" because this walk saw boundaries
+  // alone while a task or flow interval also saw `filesWritten` and `taskDeclarations`.
+  // This walk now reads the same three arrays they do, so the later moments it was said to
+  // lack are the ones it caps at. What is left is the degenerate journal below - one whose
+  // very last line is the opener - and there an open interval is not the safer error: one
+  // captured session carries a single `vendor_id` spanning 22 days, so "everything
+  // afterward" is three weeks of unrelated work, not a few minutes of it.
+  it("caps a step nothing closed at the journal's own last witnessed moment", () => {
+    const intervals = buildStepIntervals(
+      journalWith(
+        [{ type: "step_start", at: "2026-08-17T10:00:00Z", skill: "aidd-dev:01-plan" }],
+        [{ type: "file_written", at: "2026-08-17T12:00:00Z", path: "aidd_docs/note.md" }]
+      )
+    );
 
     expect(intervals).toEqual([
       {
         skill: "aidd-dev:01-plan",
         startMs: Date.parse("2026-08-17T10:00:00Z"),
-        endMs: Number.POSITIVE_INFINITY,
+        endMs: Date.parse("2026-08-17T12:00:00Z"),
       },
     ]);
+    expect(attributeMoment(intervals, "2026-09-30T23:59:00Z")).toEqual({ source: "unattributed" });
   });
 
-  it("attributes a much later moment to it, which is what leaving it open means", () => {
-    const intervals = buildStepIntervals({
-      boundaries: [{ type: "step_start", at: "2026-08-17T10:00:00Z", skill: "aidd-dev:01-plan" }],
-      filesWritten: [],
-      taskDeclarations: [],
-    });
+  // The price of the cap, stated rather than discovered later: a journal whose only line is
+  // the opener has no later moment to cap at, so the interval covers nothing at all. A
+  // session reaches this only by opening a skill and then writing no file, declaring no
+  // task and firing no stop event - Copilot fires none, per `journal.cjs`'s own
+  // `HOOK_EVENT_NAME_TO_CANONICAL`. `records-join` survives it: that claim fails only when
+  // *every* record is unattributed, and a record whose own tool named its step is joined
+  // without any interval at all.
+  it("covers nothing when the opener is the only moment the journal ever witnessed", () => {
+    const intervals = buildStepIntervals(
+      journalOf({ type: "step_start", at: "2026-08-17T10:00:00Z", skill: "aidd-dev:01-plan" })
+    );
 
-    expect(attributeMoment(intervals, "2026-09-30T23:59:00Z")).toEqual({
-      source: "journal-interval",
-      step: "aidd-dev:01-plan",
+    expect(intervals[0]?.endMs).toBe(Date.parse("2026-08-17T10:00:00Z"));
+    expect(attributeMoment(intervals, "2026-08-17T10:00:01Z")).toEqual({
+      source: "unattributed",
     });
   });
 });
