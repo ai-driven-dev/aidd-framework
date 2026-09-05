@@ -33,3 +33,17 @@ Run the flow above. Read only the next action file.
 - `ok`, `FAIL` and `--` are three different answers. `--` means there was nothing to evaluate, not that the chain is healthy.
 - A declaration that the recorder is set up is not proof it fired. Relay it as what it is — a fact about configuration, never a promise about behaviour.
 - The `aidd` command cannot be found: say so and check nothing.
+
+## Say when this skill's work is done
+
+Once this skill has produced what it was called for, and only then, run:
+
+```shell
+echo "aidd:step-end aidd-telemetry:02-check"
+```
+
+No host reports when a skill's work finished. A skill call's own result comes back in a
+tenth of a second, which is the dispatch and not the completion, so a measurement that
+never hears this ends the step where the next one begins — or, where none follows, at the
+journal's own last witnessed moment, which credits this skill with everything the session
+did afterwards.

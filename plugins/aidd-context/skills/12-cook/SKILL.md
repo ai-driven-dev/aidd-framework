@@ -29,3 +29,17 @@ Before running an action, read its file in `actions/`, not only the table or ass
 
 - `assets/recipe-template.md`: the canonical recipe scaffold `upsert` renders from, and the shape `list` parses.
 - `assets/recipes/`: bundled recipes shipped with this skill.
+
+## Say when this skill's work is done
+
+Once this skill has produced what it was called for, and only then, run:
+
+```shell
+echo "aidd:step-end aidd-context:12-cook"
+```
+
+No host reports when a skill's work finished. A skill call's own result comes back in a
+tenth of a second, which is the dispatch and not the completion, so a measurement that
+never hears this ends the step where the next one begins — or, where none follows, at the
+journal's own last witnessed moment, which credits this skill with everything the session
+did afterwards.

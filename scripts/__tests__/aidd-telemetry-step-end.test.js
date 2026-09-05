@@ -128,3 +128,44 @@ test("every skill that opens a flow also says when that flow is over", () => {
     assert.equal(read, skill, `${skill} declares no end the hook reads as its own`);
   }
 });
+
+// Every skill, not only the ones that opted in. A skill that never says it is done leaves an
+// interval nothing closes: it runs to the next `step_start` or, failing that, to the journal's
+// own last witnessed moment, and everything the session did afterwards reads as that skill's
+// work. Measured on the one orchestrated session captured, 2026-09-04, before the three
+// orchestrators declared theirs: `aidd-dev:01-plan` opened at 06:00:50, closed nothing, and
+// took every one of the 972 records written over the three and a half hours that followed.
+//
+// A sweep and not a list, for the reason the sweep above already gives: a skill added to this
+// tree is covered without this file being told.
+function everySkillFile() {
+  const found = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name === "SKILL.md") found.push(full);
+    }
+  };
+  walk(pluginsDir);
+  return found;
+}
+
+test("every skill says when its own work is done", () => {
+  const silent = [];
+
+  for (const full of everySkillFile()) {
+    const relative = path.relative(pluginsDir, full);
+    const [plugin, , skillDir] = relative.split(path.sep);
+    const read = declaredStepEnd({
+      tool_input: { command: fs.readFileSync(full, "utf8") },
+    });
+    if (read !== `${plugin}:${skillDir}`) silent.push(`${relative} declares ${read}`);
+  }
+
+  assert.deepEqual(
+    silent,
+    [],
+    `A skill that never declares its end leaves an interval nothing closes.\n${silent.join("\n")}`
+  );
+});

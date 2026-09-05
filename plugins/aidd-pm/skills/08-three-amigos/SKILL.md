@@ -28,3 +28,17 @@ Run the flow above. Read only the next action file.
 - Treat roles as analytical lenses, not human authorities.
 - Ground every finding and question in cited evidence; never invent a decision.
 - Return proposals only; the caller decides what to do with them.
+
+## Say when this skill's work is done
+
+Once this skill has produced what it was called for, and only then, run:
+
+```shell
+echo "aidd:step-end aidd-pm:08-three-amigos"
+```
+
+No host reports when a skill's work finished. A skill call's own result comes back in a
+tenth of a second, which is the dispatch and not the completion, so a measurement that
+never hears this ends the step where the next one begins — or, where none follows, at the
+journal's own last witnessed moment, which credits this skill with everything the session
+did afterwards.

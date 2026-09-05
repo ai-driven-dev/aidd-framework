@@ -27,3 +27,17 @@ Before running an action, read its file in `actions/`, not only the table or ass
 - Audit-fed, optional: when the caller pushes an audit report (a path under `aidd_docs/tasks/audits/` or pasted findings), take its findings for this axis as the fix list and skip the scan. The bridge is the report artifact; this skill never loads or calls another skill. The audit `code-quality` pillar feeds the `cleanup` axis; the other axes map by name.
 - Severity uses the shared 3-level scale: 🔴 critical, 🟡 warning, 🟢 minor.
 - Stay inside the axis: dependency upgrades and UI redesign are out of scope. Add tests only as a regression for a security fix, never otherwise.
+
+## Say when this skill's work is done
+
+Once this skill has produced what it was called for, and only then, run:
+
+```shell
+echo "aidd:step-end aidd-dev:07-refactor"
+```
+
+No host reports when a skill's work finished. A skill call's own result comes back in a
+tenth of a second, which is the dispatch and not the completion, so a measurement that
+never hears this ends the step where the next one begins — or, where none follows, at the
+journal's own last witnessed moment, which credits this skill with everything the session
+did afterwards.

@@ -55,3 +55,17 @@ Run the flow above. Read only the next action file.
 - Removing what was measured is irreversible, and reaches further than one project: this machine's stored records span every project ever measured on it, not only the one being discussed. Never presented as reversible, and never presented as scoped to one project when it is not.
 - What history keeps is relayed exactly as `aidd telemetry forget` states it — a journal already committed as certainly held, one merely staged but never committed as not yet held, one not tracked at all as possibly held — and is never presented as removable. No command in this skill rewrites git history.
 - The `aidd` command cannot be found: say so and change nothing.
+
+## Say when this skill's work is done
+
+Once this skill has produced what it was called for, and only then, run:
+
+```shell
+echo "aidd:step-end aidd-telemetry:00-init"
+```
+
+No host reports when a skill's work finished. A skill call's own result comes back in a
+tenth of a second, which is the dispatch and not the completion, so a measurement that
+never hears this ends the step where the next one begins — or, where none follows, at the
+journal's own last witnessed moment, which credits this skill with everything the session
+did afterwards.

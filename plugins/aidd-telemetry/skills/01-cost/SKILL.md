@@ -50,3 +50,17 @@ menu and ask them to pick.
 - An absent number is not a zero. Say the figure is unknown and give what is known instead.
 - Turning measurement on belongs elsewhere. Stop and say so rather than doing it here.
 - The script cannot be found or fails: say so and show no figure.
+
+## Say when this skill's work is done
+
+Once this skill has produced what it was called for, and only then, run:
+
+```shell
+echo "aidd:step-end aidd-telemetry:01-cost"
+```
+
+No host reports when a skill's work finished. A skill call's own result comes back in a
+tenth of a second, which is the dispatch and not the completion, so a measurement that
+never hears this ends the step where the next one begins — or, where none follows, at the
+journal's own last witnessed moment, which credits this skill with everything the session
+did afterwards.

@@ -29,3 +29,17 @@ Before running an action, read its file in `actions/`, not only the table or ass
 ## Assets
 
 - `assets/report-template.md`: findings report skeleton, filled per run.
+
+## Say when this skill's work is done
+
+Once this skill has produced what it was called for, and only then, run:
+
+```shell
+echo "aidd:step-end aidd-refine:02-challenge"
+```
+
+No host reports when a skill's work finished. A skill call's own result comes back in a
+tenth of a second, which is the dispatch and not the completion, so a measurement that
+never hears this ends the step where the next one begins — or, where none follows, at the
+journal's own last witnessed moment, which credits this skill with everything the session
+did afterwards.

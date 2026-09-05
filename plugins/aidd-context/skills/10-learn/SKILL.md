@@ -33,3 +33,17 @@ Run the flow above. Read only the next action file.
 - Write only the user-approved plan.
 - Preserve user edits and touch affected files only.
 - Write project files only, never personal or global memory.
+
+## Say when this skill's work is done
+
+Once this skill has produced what it was called for, and only then, run:
+
+```shell
+echo "aidd:step-end aidd-context:10-learn"
+```
+
+No host reports when a skill's work finished. A skill call's own result comes back in a
+tenth of a second, which is the dispatch and not the completion, so a measurement that
+never hears this ends the step where the next one begins — or, where none follows, at the
+journal's own last witnessed moment, which credits this skill with everything the session
+did afterwards.

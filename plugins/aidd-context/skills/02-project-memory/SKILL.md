@@ -31,3 +31,17 @@ Run the flow above, reading only the next action file.
 - Ask before anything ambiguous. Never default silently.
 - A bank that already exists changes only through what the user approved, file by file and line by line.
 - End with a short report of what changed.
+
+## Say when this skill's work is done
+
+Once this skill has produced what it was called for, and only then, run:
+
+```shell
+echo "aidd:step-end aidd-context:02-project-memory"
+```
+
+No host reports when a skill's work finished. A skill call's own result comes back in a
+tenth of a second, which is the dispatch and not the completion, so a measurement that
+never hears this ends the step where the next one begins — or, where none follows, at the
+journal's own last witnessed moment, which credits this skill with everything the session
+did afterwards.
