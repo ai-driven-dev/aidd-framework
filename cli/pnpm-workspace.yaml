@@ -5,3 +5,13 @@
 #
 # Empty on purpose - cli/ has its own lockfile and installs alone.
 packages: []
+
+# Moved here from `package.json`'s own `pnpm` field, which pnpm 12 stopped reading:
+# "The 'pnpm' field in package.json is no longer read by pnpm". Left there, these four
+# security floors were silently ignored while the lockfile still recorded them, which is
+# the ERR_PNPM_LOCKFILE_CONFIG_MISMATCH every `cli` install answered with.
+overrides:
+  fast-uri: '>=3.1.2'
+  picomatch: '>=4.0.4'
+  postcss: '>=8.5.10'
+  qs: '>=6.15.2'
