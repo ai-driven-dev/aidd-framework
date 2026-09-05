@@ -11,6 +11,9 @@ import type { RunJournal, RunJournalStore } from "../../../src/domain/ports/run-
 export class InMemoryRunJournalReader implements RunJournalStore {
   readonly runsDir = "/fake/project/aidd_docs/runs";
   runFileNames: string[] = [];
+  /** Settable directly, like `runFileNames` and for the same reason: a refused journal is
+   * one `list()` never returns, so it cannot be derived from what this double holds. */
+  foreignSchemaVersions: number[] = [];
   readonly deletedFiles: string[] = [];
   readonly deletedFromDirs: string[] = [];
   readonly undeletable = new Set<string>();
@@ -32,6 +35,10 @@ export class InMemoryRunJournalReader implements RunJournalStore {
     return this.runFileNames;
   }
 
+  async listForeignSchemas(): Promise<readonly number[]> {
+    return this.foreignSchemaVersions;
+  }
+
   async deleteRunFile(dir: string, fileName: string): Promise<void> {
     if (this.undeletable.has(fileName)) throw new Error(`cannot delete ${fileName}`);
     this.deletedFromDirs.push(dir);
@@ -47,5 +54,6 @@ export const NULL_RUN_JOURNAL_READER: RunJournalStore = {
   read: async () => null,
   list: async () => [],
   listRunFiles: async () => [],
+  listForeignSchemas: async () => [],
   deleteRunFile: async () => {},
 };

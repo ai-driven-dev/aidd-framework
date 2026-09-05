@@ -29,6 +29,10 @@ export const journalRepo: JournalRepoModule = createRequire(import.meta.url)(
 interface JournalRecordModule {
   codexSessionIdFromTranscriptPath(transcriptPath: unknown): string | undefined;
   readSessionId(host: string, payload: Record<string, unknown>): string | undefined;
+  /** The schema the hook stamps on every `session_start` it writes. Reached rather than
+   * copied so the reader's own notion of which schema it can read is pinned against the
+   * writer's, not against a second constant that can drift from it silently. */
+  SCHEMA_VERSION: number;
 }
 
 export const journalRecord: JournalRecordModule = createRequire(import.meta.url)(
