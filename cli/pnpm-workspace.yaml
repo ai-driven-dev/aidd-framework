@@ -15,3 +15,10 @@ overrides:
   picomatch: '>=4.0.4'
   postcss: '>=8.5.10'
   qs: '>=6.15.2'
+
+# pnpm refuses a dependency's install scripts unless it is named here, and pnpm 12 makes
+# that refusal a hard error rather than a warning: `ERR_PNPM_IGNORED_BUILDS`. Measured by
+# running the install, never guessed - these are the packages pnpm 12 named itself.
+allowBuilds:
+  esbuild: true
+  lefthook: true
