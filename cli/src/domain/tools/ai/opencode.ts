@@ -186,8 +186,10 @@ export const opencode: AiTool<
     // provider that reports prompt tokens inclusive of the cached ones, the way native
     // OpenAI's usage does, has never been captured here. See plugins/aidd-telemetry/README.md.
     limitation:
-      "Its four counters are measured correct for the anthropic provider — not " +
-      "independently confirmed for any other provider OpenCode can route to.",
+      "Its four counters are measured disjoint for the anthropic provider and for one " +
+      "OpenAI-compatible provider whose cache was exercised — not confirmed for a " +
+      "provider that reports prompt tokens inclusive of the cached ones, which none " +
+      "captured here does.",
   },
   // The journal hook detects this host by a self-declared `tool: "opencode"` field, not by
   // a vendor payload shape — OpenCode has none. hooks/opencode-plugin.js builds that payload
