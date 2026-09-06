@@ -1,4 +1,3 @@
-// Called from use-cases/plugin and use-cases/restore.
 import { join } from "node:path";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";

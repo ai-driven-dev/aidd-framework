@@ -25,11 +25,23 @@ const BASELINE: readonly { readonly path: string; readonly injected: number }[] 
   // fan-out is the feature. It resolves by giving each check a result type and asking a
   // single `DriftReport` to collect them, not by removing a check.
   { path: "src/contexts/framework/application/doctor/doctor-use-case.ts", injected: 6 },
-  // Six steps of one flow: resolve the marketplace source, register the framework, refresh,
-  // sync settings, install tools, prompt for plugins. `setup` is the command that brings a
+  // Nine collaborators, six required plus three optional the old regex never counted
+  // (`private readonly x?:` has a `?` between the name and the colon it didn't match):
+  // resolve the marketplace source, register the framework, refresh, sync settings,
+  // install tools, prompt for plugins, plus optional prompts for tools and context
+  // detection and an optional release resolver. `setup` is the command that brings a
   // project from nothing to correct, so it necessarily names each stage. It resolves by
   // splitting the flow in two — marketplace groundwork, then tools and plugins.
-  { path: "src/contexts/framework/application/setup-use-case.ts", injected: 6 },
+  { path: "src/contexts/framework/application/setup-use-case.ts", injected: 9 },
+  // Five section generators reached via `new XUseCase(...)` inside a switch on content
+  // section name (agents, commands, rules, skills) plus the config generator called from
+  // both the IDE and AI branches — invisible to the old regex, which only ever looked at
+  // constructor parameters. It resolves by giving each section type its own registered
+  // generator instead of a switch, not by removing a section.
+  {
+    path: "src/contexts/framework/application/restore/generate-tool-distribution-use-case.ts",
+    injected: 5,
+  },
 ];
 
 /**
@@ -52,14 +64,22 @@ function useCaseTypesImportedBy(source: string): ReadonlySet<string> {
   return named;
 }
 
+/**
+ * Constructor-injected collaborators plus the ones a method reaches for on its own via
+ * `new XUseCase(...)`. The two are counted separately then summed, deduped by class name
+ * within each: a use case instantiated twice in two methods is still one collaborator,
+ * the same way a constructor parameter is.
+ */
 function injectedUseCaseCount(source: string): number {
   const signature = /constructor\((.*?)\)\s*\{/s.exec(source);
-  if (!signature) return 0;
   const fromUseCaseModules = useCaseTypesImportedBy(source);
-  const params = [...signature[1].matchAll(/private readonly \w+:\s*([\w<>[\]| ]+)/g)];
-  return params.filter(
-    (param) => param[1].includes("UseCase") || fromUseCaseModules.has(param[1].trim())
-  ).length;
+  const paramCount = signature
+    ? [...signature[1].matchAll(/private readonly \w+\??:\s*([\w<>[\]| ]+)/g)].filter(
+        (param) => param[1].includes("UseCase") || fromUseCaseModules.has(param[1].trim())
+      ).length
+    : 0;
+  const inlineNames = new Set([...source.matchAll(/new (\w+UseCase)\(/g)].map((m) => m[1]));
+  return paramCount + inlineNames.size;
 }
 
 /** Where a use case lives: inside a context's application layer. */
@@ -109,5 +129,30 @@ describe("orchestrators depend on entry points, not on parts", () => {
 
     expect(overLimit(over)).toBe(true);
     expect(overLimit(atLimit)).toBe(false);
+  });
+
+  it("counts an optional constructor dependency, not just a required one", () => {
+    // `private readonly foo?: FooUseCase` has a `?` between the name and the colon that
+    // `\w+:` never matched, so a use case could sit at the limit on paper while carrying
+    // one more optional collaborator undetected.
+    const atLimit = `constructor(
+      ${Array.from({ length: MAX_INJECTED_USE_CASES }, (_, i) => `private readonly a${i}: FooUseCase,`).join("\n")}
+    ) {}`;
+    const withOptionalOverLimit = `constructor(
+      ${Array.from({ length: MAX_INJECTED_USE_CASES }, (_, i) => `private readonly a${i}: FooUseCase,`).join("\n")}
+      private readonly extra?: FooUseCase
+    ) {}`;
+
+    expect(overLimit(atLimit)).toBe(false);
+    expect(overLimit(withOptionalOverLimit)).toBe(true);
+  });
+
+  it("counts a use case instantiated inline in a method body, not just an injected one", () => {
+    const atLimit = `constructor(
+      ${Array.from({ length: MAX_INJECTED_USE_CASES }, (_, i) => `private readonly a${i}: FooUseCase,`).join("\n")}
+    ) {}
+    method(): void { new BarUseCase(this.a0).execute(); }`;
+
+    expect(overLimit(atLimit)).toBe(true);
   });
 });

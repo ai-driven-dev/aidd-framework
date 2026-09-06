@@ -3,8 +3,7 @@ const cp = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const { describe, it } = require("node:test");
-
-const ROOT = path.resolve(__dirname, "../..");
+const { REPO_ROOT: ROOT, repositoryPathExists } = require("../lib/repository-path.cjs");
 
 /**
  * A doc comment that names a source file is a promise the reader can open it.
@@ -39,11 +38,6 @@ const NAMED_AS_HISTORY = Object.freeze({
   ],
   "cli/tests/contexts/telemetry/infrastructure/telemetry-sink-location.unit.test.ts": ["sink.cjs"],
   "scripts/__tests__/aidd-telemetry-cost-skill.test.js": ["telemetry-report.cjs"],
-  "scripts/__tests__/plugin-install-shape.test.js": [
-    "telemetry-switch.cjs",
-    "telemetry-identity.cjs",
-    "telemetry-check.cjs",
-  ],
   "scripts/__tests__/telemetry-where-things-live.test.js": [
     "scripts/telemetry-check.cjs",
     "telemetry-report.cjs",
@@ -70,8 +64,32 @@ const NOT_A_REPOSITORY_FILE = Object.freeze({
   ],
 });
 
+/**
+ * A bare mention the `BARE_SOURCE_TOKEN` sweep newly reaches, genuinely stale — not
+ * deliberate history, not a fixture path, just a comment the pre-context-split layout left
+ * behind — sitting in a file outside this change's own scope. Listed here with the same
+ * shape as the other two allowlists, so fixing the comment (a one-line change, in a file
+ * this pass does not touch) is what shrinks it, exactly like `NAMED_AS_HISTORY` above.
+ */
+const KNOWN_STALE_BARE_MENTION = Object.freeze({
+  "plugins/aidd-telemetry/hooks/lib/plugin-version.cjs": [
+    "cli/src/application/use-cases/framework/strategies/tool-contracts.ts",
+  ],
+  "scripts/__tests__/aidd-telemetry-task-declaration.test.js": [
+    "cli/src/domain/tools/ai/opencode.ts",
+  ],
+});
+
 const SOURCE_FILE_TOKEN = /^[\w./@-]+\.(?:ts|cjs|js|md)$/u;
 const BACKTICKED = /`([^`\n]+)`/gu;
+
+/** A `cli/src/...` or `cli/tests/...` path is unambiguous even outside backticks — nothing
+ * else in prose is spelled that way by accident. Unlike `SOURCE_FILE_TOKEN`, which only
+ * screens a token already isolated by backticks, this pattern has to isolate the token
+ * itself, so it requires the `cli/(src|tests)/` prefix a bare mention needs to read as a
+ * path at all: a stale `cli/src/domain/models/x.ts` sitting in a plain comment, with no
+ * backticks around it, was invisible to the backtick-only scan below it. */
+const BARE_SOURCE_TOKEN = /\bcli\/(?:src|tests)\/[\w./-]+\.(?:ts|cjs|js|md)\b/gu;
 
 function trackedFiles() {
   return cp.execSync("git ls-files", { cwd: ROOT, encoding: "utf8" }).trim().split("\n");
@@ -89,7 +107,8 @@ function scannedFiles() {
 function allowed(file, token) {
   return (
     (NAMED_AS_HISTORY[file] ?? []).includes(token) ||
-    (NOT_A_REPOSITORY_FILE[file] ?? []).includes(token)
+    (NOT_A_REPOSITORY_FILE[file] ?? []).includes(token) ||
+    (KNOWN_STALE_BARE_MENTION[file] ?? []).includes(token)
   );
 }
 
@@ -102,6 +121,9 @@ function namesSomethingReal(token, file, tracked, basenames) {
   const relativeToNamer = path.posix.normalize(path.posix.join(path.posix.dirname(file), token));
   if (tracked.has(relativeToNamer)) return true;
   if (tracked.has(path.posix.normalize(path.posix.join("cli", token)))) return true;
+  // Shared with script-tests-name-cli-files-that-exist.test.js: a real file this repository
+  // holds, whether or not `git ls-files` has caught up with it yet.
+  if (repositoryPathExists(token)) return true;
   return basenames.has(path.basename(token));
 }
 
@@ -167,13 +189,21 @@ describe("a comment about the hooks names .cjs where the file is .cjs", () => {
   });
 });
 
+/** This file's own path: excluded from the scan below. The three allowlists it defines
+ * carry, as literal string values, the very tokens this rule exists to flag — a stale
+ * `KNOWN_STALE_BARE_MENTION` entry names the dead path it excuses, verbatim, so the lookup
+ * can match it; that is a catalog entry, not this file claiming the path is real, the same
+ * distinction `errors-that-are-thrown.arch.test.ts` draws by excluding `kernel/errors.ts`
+ * from its own search for a class that throws itself. */
+const SELF = "scripts/__tests__/comments-name-files-that-exist.test.js";
+
 describe("a comment that names a source file names one that exists", () => {
   it("names no file the repository does not hold, outside the mentions listed as history", () => {
     const tracked = new Set(trackedFiles());
     const basenames = new Set([...tracked].map((file) => path.basename(file)));
     const dangling = [];
 
-    for (const file of scannedFiles()) {
+    for (const file of scannedFiles().filter((candidate) => candidate !== SELF)) {
       const text = fs.readFileSync(path.join(ROOT, file), "utf8");
       for (const match of text.matchAll(BACKTICKED)) {
         const token = match[1].trim();
@@ -181,6 +211,12 @@ describe("a comment that names a source file names one that exists", () => {
         if (namesSomethingReal(token, file, tracked, basenames)) continue;
         if (allowed(file, token)) continue;
         dangling.push(`${file} names \`${token}\`, which no tracked file matches`);
+      }
+      for (const match of text.matchAll(BARE_SOURCE_TOKEN)) {
+        const token = match[0];
+        if (namesSomethingReal(token, file, tracked, basenames)) continue;
+        if (allowed(file, token)) continue;
+        dangling.push(`${file} names ${token} (no backticks), which no tracked file matches`);
       }
     }
 
@@ -198,10 +234,12 @@ describe("a comment that names a source file names one that exists", () => {
     const basenames = new Set([...tracked].map((file) => path.basename(file)));
     const stale = [];
 
-    for (const [file, tokens] of Object.entries(NAMED_AS_HISTORY)) {
-      for (const token of tokens) {
-        if (namesSomethingReal(token, file, tracked, basenames)) {
-          stale.push(`${file} is allowed to name \`${token}\`, but that file exists again`);
+    for (const list of [NAMED_AS_HISTORY, KNOWN_STALE_BARE_MENTION]) {
+      for (const [file, tokens] of Object.entries(list)) {
+        for (const token of tokens) {
+          if (namesSomethingReal(token, file, tracked, basenames)) {
+            stale.push(`${file} is allowed to name \`${token}\`, but that file exists again`);
+          }
         }
       }
     }
@@ -219,6 +257,18 @@ describe("a comment that names a source file names one that exists", () => {
           if (!text.includes(`\`${token}\``)) {
             unused.push(`${file} no longer names \`${token}\` - drop it from the list`);
           }
+        }
+      }
+    }
+
+    // KNOWN_STALE_BARE_MENTION allows tokens that are never backtick-wrapped in the first
+    // place - the whole reason BARE_SOURCE_TOKEN exists - so it is checked without the
+    // backtick wrapper the loop above requires.
+    for (const [file, tokens] of Object.entries(KNOWN_STALE_BARE_MENTION)) {
+      const text = fs.readFileSync(path.join(ROOT, file), "utf8");
+      for (const token of tokens) {
+        if (!text.includes(token)) {
+          unused.push(`${file} no longer names ${token} - drop it from the list`);
         }
       }
     }

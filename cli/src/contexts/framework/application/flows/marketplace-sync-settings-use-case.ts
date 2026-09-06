@@ -88,14 +88,15 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     manifest: Manifest,
     marketplaces: readonly Marketplace[]
   ): Promise<void> {
-    const refs = this.pluginRefsToEnable(toolId, manifest, marketplaces);
     // Every known marketplace, never only the ones a plugin points at — declaring a
     // marketplace and installing a plugin from it are two acts, and a person does the first
     // alone all the time. This used to narrow to the plugins' own marketplaces for a tool
     // that enables plugins through its CLI, on the reasoning that enabling teaches it the
     // marketplace; a smoke run against the real `claude` binary measured the consequence —
     // a project with two registered marketplaces and no plugin told it about neither.
-    if (marketplaces.length === 0 && refs.length === 0) return;
+    // `execute` already returned early when `marketplaces` is empty (see above), so there
+    // is nothing left to guard here.
+    const refs = this.pluginRefsToEnable(toolId, manifest, marketplaces);
     if (!activator.isAvailable()) {
       this.logger.warn(`${binary} CLI not found on PATH — skipping native plugin activation.`);
       return;
@@ -209,8 +210,6 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     }
   }
 
-  // Settings entries must reference the BUILT tree (claude reads plugins from it;
-  // copilot surfaces them as recommendations) so settings match the native CLI install.
   /**
    * Builds every known marketplace for this tool. The registration that points at those
    * trees is written by the tool's own CLI, so nothing here needs the built paths back —

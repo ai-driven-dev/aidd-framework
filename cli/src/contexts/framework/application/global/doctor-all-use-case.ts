@@ -26,7 +26,7 @@ export class DoctorAllUseCase {
       "ide",
       errors
     );
-    const healthy = this.computeHealthy(ai, ide);
+    const healthy = errors.length === 0 && this.computeHealthy(ai, ide);
     return { ai, ide, pluginIssues: ai?.pluginIssues ?? [], healthy, errors };
   }
 
@@ -43,6 +43,8 @@ export class DoctorAllUseCase {
     }
   }
 
+  // A scope that errored is reported by `errors`, never here: a null report means "could
+  // not be checked", not "checked and fine", so healthy must never read the two the same way.
   private computeHealthy(ai: DoctorReport | null, ide: DoctorReport | null): boolean {
     return (ai === null || ai.healthy) && (ide === null || ide.healthy);
   }

@@ -2,8 +2,8 @@
  * A Cursor plugin's own `hooks/hooks.json` never fires from the plugin-scope
  * directory Cursor's native install writes it to (measured — see
  * aidd_docs/tasks/2026_08/2026_08_22_telemetry-every-tool/measurements.md, Phase 4).
- * Only a project-scope `.cursor/hooks.json`, the same file `aidd framework build
- * --target cursor --flat` already writes, is ever observed running. This module
+ * Only a project-scope `.cursor/hooks.json`, the same file `aidd translate --to cursor
+ * --as flat` already writes, is ever observed running. This module
  * gives `aidd plugin install` that same destination for one plugin at a time.
  */
 

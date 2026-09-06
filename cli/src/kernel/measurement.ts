@@ -47,12 +47,6 @@ export interface TelemetryLocalReadDeclared {
   readonly limitation?: string;
 }
 
-/** No reader has been wired for this tool yet in this codebase — a fact about current
- * coverage, not a claim that the tool's file could never be read. */
-export interface TelemetryLocalReadUnmeasured {
-  readonly kind: "unmeasured";
-}
-
 /** This tool's own file cannot yield what a local read needs, established by probe rather
  * than assumed from an empty result. */
 export interface TelemetryLocalReadUnsupported {
@@ -60,7 +54,4 @@ export interface TelemetryLocalReadUnsupported {
   readonly reason: string;
 }
 
-export type TelemetryLocalRead =
-  | TelemetryLocalReadDeclared
-  | TelemetryLocalReadUnmeasured
-  | TelemetryLocalReadUnsupported;
+export type TelemetryLocalRead = TelemetryLocalReadDeclared | TelemetryLocalReadUnsupported;

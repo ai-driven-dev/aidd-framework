@@ -13,7 +13,7 @@
  * **How far that join is measured, by host, because it is not the same distance for both.**
  *
  * On Claude Code it is measured: `CLAUDE_CODE_SESSION_ID` is the transcript filename, and
- * `claude-code-transcript.ts`'s own `matchesMainTranscript` resolves a session by
+ * `claude-transcript-location.ts`'s own `matchesMainTranscript` resolves a session by
  * `<sessionId>.jsonl`, so the variable and the record's `vendor_id` are the same string.
  *
  * On Codex it is measured too, on 2026-09-02, against two real sessions:

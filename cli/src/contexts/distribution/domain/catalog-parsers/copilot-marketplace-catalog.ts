@@ -2,7 +2,7 @@
  * Copilot-native multi-plugin marketplace catalog parser — pure, no I/O.
  *
  * Parses the `.github/plugin/marketplace.json` format produced by
- * `aidd framework build --target copilot`. Schema mirrors `github/awesome-copilot`:
+ * `aidd translate --to copilot`. Schema mirrors `github/awesome-copilot`:
  *   - Top-level: `name`, `metadata: { pluginRoot, ... }`, `owner`, `plugins[]`
  *   - Each plugin entry: `name`, `source` (bare subdirectory name), `description`, `version`
  *

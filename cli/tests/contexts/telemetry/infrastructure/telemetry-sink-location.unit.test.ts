@@ -94,23 +94,35 @@ describe("where the figures land by default", () => {
 /**
  * The rule an e2e test needs and cannot see: where a *sandboxed* run's figures land.
  *
- * `sandboxedEnv` points `APPDATA` inside the fake home, so a Windows run writes under
- * `AppData\\Roaming\\aidd` while a POSIX run writes under `.config`. A test that hardcoded
- * the POSIX path read as "nothing was stored" on Windows instead of as a wrong lookup, and
- * `cli / Windows` was the only job that could ever say so — it caught exactly this, twice.
+ * `sandboxedEnv` sets `AIDD_USER_CONFIG_DIR` unconditionally (added to pin the update-check
+ * cache, `6478f927`), and the adapter's constructor honours that variable ahead of its own
+ * platform-based `defaultConfigDir()` — so a sandboxed run's sink is `.config/aidd/telemetry`
+ * under the fake home on every platform, never `%APPDATA%`. A helper that predicted the
+ * platform-default path instead agreed with the adapter only by accident on POSIX, where the
+ * two paths coincide, and would have disagreed with it on the one job — `cli / Windows` —
+ * that could ever tell.
  *
- * Pinning the helper against the adapter on both platforms is what stops the next test from
- * hardcoding it again: the two can no longer disagree without failing here, on any machine.
+ * Constructs the real adapter under the exact environment `sandboxedEnv` produces, rather
+ * than comparing two independent predictions: a guard that never builds the thing it is
+ * meant to guard cannot fail when that thing changes.
  */
 describe("a sandboxed run's sink, agreed between the helper and the adapter", () => {
+  const previousUserConfigDir = process.env.AIDD_USER_CONFIG_DIR;
+
+  afterEach(() => {
+    if (previousUserConfigDir === undefined) delete process.env.AIDD_USER_CONFIG_DIR;
+    else process.env.AIDD_USER_CONFIG_DIR = previousUserConfigDir;
+  });
+
   for (const platform of ["linux", "win32"] as const) {
     it(`agrees on ${platform}, whichever platform this suite runs on`, () => {
       const home = freshHome();
       const env = sandboxedEnv(home);
       const previousPlatformAppData = process.env.APPDATA;
       process.env.APPDATA = env.APPDATA;
+      process.env.AIDD_USER_CONFIG_DIR = env.AIDD_USER_CONFIG_DIR;
       try {
-        const fromAdapter = join(withPlatform(platform, defaultConfigDir), "telemetry");
+        const fromAdapter = withPlatform(platform, () => new TelemetrySinkAdapter().rootDir);
         const fromHelper = withPlatform(platform, () => sinkDirIn(home));
 
         expect(fromHelper).toBe(fromAdapter);

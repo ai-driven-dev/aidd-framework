@@ -22,17 +22,20 @@ import {
 import type { InstalledPlugin } from "./plugins/installed-plugin.js";
 
 // The last published CLI whose manifest migrations could still read a pre-v6 document.
-// v6 shipped 2026-05-09 (commit 273573fc) in 4.1.0-beta.25; 5.2.1 is the last version
-// published before this guard replaced the migration chain. Named here so the refusal
-// below can tell a user stuck on an old manifest exactly what to run first: downgrade,
-// run it once to upgrade the manifest on disk, then update the CLI again.
-const LAST_MIGRATING_CLI_VERSION = "5.2.1";
+// v6 shipped 2026-05-09 (commit 273573fc) in 4.1.0-beta.25; 5.2.2 is the last version
+// published before this guard replaced the migration chain (5.2.2 is the newest `cli-v*`
+// tag, and its manifest.ts still carries migrateV1toV2…migrateV5toV6 verbatim from 5.2.1).
+// Named here so the refusal below can tell a user stuck on an old manifest exactly what
+// to run first: downgrade, run it once to upgrade the manifest on disk, then update the
+// CLI again.
+const LAST_MIGRATING_CLI_VERSION = "5.2.2";
 
 // `update` alone is not enough: a locally modified tracked file makes it throw
 // InputRequiredError in non-interactive mode before it ever reaches the save that
 // would persist the migrated v6 manifest, leaving the user exactly as stuck as before.
 // `--force` removes that branch — verified empirically against 5.2.1 (plain manifest,
-// modified-tracked-file manifest, and a zero-tool manifest all re-save as v6).
+// modified-tracked-file manifest, and a zero-tool manifest all re-save as v6); 5.2.2 is
+// byte-identical to 5.2.1 at this file, so the same verification holds for it.
 const RECOVERY_COMMAND = "update --force";
 
 export class Manifest {

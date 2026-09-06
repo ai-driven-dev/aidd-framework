@@ -28,8 +28,14 @@ const CLI_SRC_PREFIX = "cli/src/";
  * this test exists to forbid.
  */
 const FORBIDDEN_PATTERNS = [
-  { pattern: /\.createServer\s*\(/u, label: ".createServer(" },
-  { pattern: /\.listen\s*\(\s*(?:port|\d)/u, label: ".listen(<port>" },
+  // No leading `\.`: `createServer` imported by name (`import { createServer } from
+  // "node:http"`) and called bare is the same listener as `http.createServer(...)`, and the
+  // dotted-only pattern missed it.
+  { pattern: /\bcreateServer\s*\(/u, label: "createServer(" },
+  // No constraint on the argument: `.listen(process.env.PORT)`, `.listen({ port })` and
+  // `.listen(PORT)` (an uppercase identifier) all bind a server, and none starts with a
+  // literal "port" or a digit the way `.listen(\s*(?:port|\d)` required.
+  { pattern: /\.listen\s*\(/u, label: ".listen(" },
   { pattern: /from ["']node:net["']/u, label: 'import from "node:net"' },
   { pattern: /require\(["']node:net["']\)/u, label: 'require("node:net")' },
 ];

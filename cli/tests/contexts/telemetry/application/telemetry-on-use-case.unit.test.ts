@@ -9,11 +9,62 @@ import {
 } from "../../../../src/contexts/telemetry/domain/formats/commit-session-trailer.js";
 import type { VersionControl } from "../../../../src/contexts/telemetry/domain/ports/version-control.js";
 import { TelemetryProjectScopeRequiresYesError } from "../../../../src/kernel/errors.js";
+import type { FileReader } from "../../../../src/kernel/ports/file-reader.js";
+import type { FileWriter } from "../../../../src/kernel/ports/file-writer.js";
 import { noGit } from "../../../contexts/framework/application/helpers.js";
 import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
 import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryTelemetrySink } from "../../../helpers/ports/in-memory-telemetry-sink.js";
+
+/** Delegates every read and write to `inner`, except a write to `path`, which throws — a
+ * disk-full or permission failure on one file, never on any other. Used to prove that a
+ * write failing after the switch has not yet been written must not leave the switch
+ * written anyway. */
+class ThrowingWriteAdapter implements FileReader, FileWriter {
+  constructor(
+    private readonly inner: InMemoryFileAdapter,
+    private readonly failingPath: string
+  ) {}
+
+  readFile(path: string): Promise<string> {
+    return this.inner.readFile(path);
+  }
+  listDirectory(path: string): Promise<string[]> {
+    return this.inner.listDirectory(path);
+  }
+  fileExists(path: string): Promise<boolean> {
+    return this.inner.fileExists(path);
+  }
+  readFileHash(path: string): ReturnType<InMemoryFileAdapter["readFileHash"]> {
+    return this.inner.readFileHash(path);
+  }
+  listFilesRecursive(dirPath: string): Promise<string[]> {
+    return this.inner.listFilesRecursive(dirPath);
+  }
+  isExecutable(path: string): Promise<boolean> {
+    return this.inner.isExecutable(path);
+  }
+  async writeFile(path: string, content: string): Promise<void> {
+    if (path === this.failingPath) throw new Error(`disk full writing ${path}`);
+    await this.inner.writeFile(path, content);
+  }
+  deleteFile(path: string): Promise<void> {
+    return this.inner.deleteFile(path);
+  }
+  createDirectory(path: string): Promise<void> {
+    return this.inner.createDirectory(path);
+  }
+  deleteEmptyDirectories(path: string): Promise<void> {
+    return this.inner.deleteEmptyDirectories(path);
+  }
+  deleteDirectory(path: string): Promise<void> {
+    return this.inner.deleteDirectory(path);
+  }
+  chmodExecutable(path: string): Promise<void> {
+    return this.inner.chmodExecutable(path);
+  }
+}
 
 const PROJECT_ROOT = "/repo";
 const SWITCH_PATH = join(PROJECT_ROOT, ".aidd", "config.json");
@@ -34,12 +85,31 @@ describe("TelemetryOnUseCase — the switch alone", () => {
     // cannot be stored. `appendRecord` creates the directory itself, so without this the
     // first failure comes at the first record — long after the decision, and to whoever
     // happens to run `read` rather than to whoever turned it on.
-    const { useCase, sink } = buildUseCase();
+    const { fs, useCase, sink } = buildUseCase();
     sink.unwritable = true;
 
     await expect(useCase.execute({ projectRoot: PROJECT_ROOT, confirmed: true })).rejects.toThrow(
       "not writable"
     );
+    expect(fs.has(SWITCH_PATH)).toBe(false);
+  });
+
+  it("a gitignore write that fails leaves the switch unwritten, never enabled: true over a half-finished setup", async () => {
+    const inner = new InMemoryFileAdapter({}, new DeterministicHasher());
+    const fs = new ThrowingWriteAdapter(inner, join(PROJECT_ROOT, ".gitignore"));
+    const logger = new CapturingLogger();
+    const useCase = new TelemetryOnUseCase(
+      fs,
+      logger,
+      new GitignoreUseCase(fs),
+      noGit,
+      new InMemoryTelemetrySink()
+    );
+
+    await expect(useCase.execute({ projectRoot: PROJECT_ROOT, confirmed: true })).rejects.toThrow(
+      "disk full"
+    );
+    expect(inner.has(SWITCH_PATH)).toBe(false);
   });
 
   it("succeeds with no endpoint anywhere, and writes no tool's settings file", async () => {

@@ -1,10 +1,10 @@
-import { dirname, join } from "node:path";
 import { NoManifestError, PluginNotFoundError } from "../../../../kernel/errors.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { AiToolId, ToolId } from "../../../../kernel/tool.js";
 import { AI_TOOL_IDS } from "../../../../kernel/tool.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
+import { deletePluginFilesForTool } from "../plugin/plugin-helpers.js";
 
 export interface UninstallPluginOptions {
   pluginName: string;
@@ -50,24 +50,15 @@ export class UninstallPluginUseCase {
     for (const toolId of toolIds) {
       const plugin = manifest.getPlugins(toolId).find((p) => p.name === pluginName);
       if (plugin === undefined) continue;
-      const deletedFiles = await this.deleteFiles(plugin.files, projectRoot);
+      const deletedFiles = await deletePluginFilesForTool(
+        plugin.files,
+        toolId,
+        projectRoot,
+        this.fs
+      );
       manifest.removePlugin(toolId, pluginName);
       results.push({ toolId, fileCount: deletedFiles.length, deletedFiles });
     }
     return results;
-  }
-
-  private async deleteFiles(
-    files: ReadonlyMap<string, string>,
-    projectRoot: string
-  ): Promise<string[]> {
-    const deleted: string[] = [];
-    for (const relativePath of files.keys()) {
-      const fullPath = join(projectRoot, relativePath);
-      await this.fs.deleteFile(fullPath);
-      await this.fs.deleteEmptyDirectories(dirname(fullPath));
-      deleted.push(relativePath);
-    }
-    return deleted;
   }
 }

@@ -79,10 +79,10 @@ export function bareOrchestratingSkillNames(
  * the next orchestrating `step_start` or a `turn_end` comes first, or - unclosed - the
  * journal's own last witnessed moment. Read from exactly the same journal a declared task
  * interval already reads (`task-attribution.ts`), one layer wider: no boundary is added for
- * this, and none is captured that was not captured already - see `phase-1.md`'s own "why an
- * axis, not a capture". A non-orchestrating `step_start` neither opens nor closes one of
- * these; it belongs to whichever flow interval its own moment already falls inside, or to
- * none at all. */
+ * this, and none is captured that was not captured already - a flow is an axis over
+ * existing boundaries, not a second capture. A non-orchestrating `step_start` neither opens
+ * nor closes one of these; it belongs to whichever flow interval its own moment already
+ * falls inside, or to none at all. */
 export interface FlowInterval extends ClosedInterval {
   readonly skill: string;
 }

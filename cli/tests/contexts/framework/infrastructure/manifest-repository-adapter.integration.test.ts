@@ -1,4 +1,4 @@
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -23,6 +23,21 @@ describe("ManifestRepositoryAdapter", () => {
     it("returns null when manifest file does not exist", async () => {
       const result = await adapter.load();
       expect(result).toBeNull();
+    });
+
+    it("rejects, rather than returning null, when manifest.json is a directory", async () => {
+      const manifestDir = join(tempDir, ".aidd", "manifest.json");
+      await mkdir(manifestDir, { recursive: true });
+
+      await expect(adapter.load()).rejects.toThrow();
+    });
+
+    it("rejects with an instructive error naming the file when manifest.json is truncated", async () => {
+      const manifestPath = join(tempDir, ".aidd", "manifest.json");
+      await mkdir(join(tempDir, ".aidd"), { recursive: true });
+      await writeFile(manifestPath, '{"version": 6, "tools": {');
+
+      await expect(adapter.load()).rejects.toThrow(manifestPath);
     });
   });
 

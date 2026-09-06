@@ -1,9 +1,6 @@
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import type {
-  MarketplaceRefresh,
-  MarketplaceRefreshUseCase,
-} from "../../../../src/contexts/distribution/application/marketplace-refresh-use-case.js";
+import type { MarketplaceRefresh } from "../../../../src/contexts/distribution/application/marketplace-refresh-use-case.js";
 import type { MarketplaceRegisterFramework } from "../../../../src/contexts/distribution/application/marketplace-register-framework-use-case.js";
 import type { ResolveMarketplace } from "../../../../src/contexts/distribution/application/resolve-marketplace-use-case.js";
 import type { PluginCatalogEntry } from "../../../../src/contexts/distribution/domain/catalog.js";
@@ -143,6 +140,24 @@ function remoteFlow(opts: Partial<{ aiTools: ToolId[]; ideTools: ToolId[] }> = {
     interactive: false,
   });
 }
+
+describe("setup validates before any side effect", () => {
+  it("non-interactive with no --source rejects without writing a manifest or .gitignore", async () => {
+    const { useCase, deps } = await buildUseCase();
+    const flow = new SetupFlow({
+      projectRoot: PROJECT_ROOT,
+      aiTools: [],
+      ideTools: [],
+      pluginMode: "none",
+      interactive: false,
+    });
+
+    await expect(useCase.execute(flow)).rejects.toThrow(/--source/);
+
+    expect(await deps.manifestRepo.load()).toBeNull();
+    expect(deps.fs.has(join(PROJECT_ROOT, ".gitignore"))).toBe(false);
+  });
+});
 
 describe("setup without TTY", () => {
   it("fresh project with all tools flag initializes and installs all tools", async () => {

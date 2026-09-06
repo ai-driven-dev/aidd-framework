@@ -1,4 +1,3 @@
-// Called from use-cases/marketplace and use-cases/plugin.
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {

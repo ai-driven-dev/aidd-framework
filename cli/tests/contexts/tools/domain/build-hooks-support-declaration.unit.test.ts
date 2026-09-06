@@ -2,17 +2,17 @@ import { describe, expect, it } from "vitest";
 import type {
   ArtifactContract,
   ToolBuildContract,
-} from "../../../src/contexts/tools/domain/build-contract.js";
-import { buildClaudeFlatContract } from "../../../src/contexts/tools/domain/profiles/claude/build.js";
-import { claude } from "../../../src/contexts/tools/domain/profiles/claude/profile.js";
-import { buildCodexFlatContract } from "../../../src/contexts/tools/domain/profiles/codex/build.js";
-import { codex } from "../../../src/contexts/tools/domain/profiles/codex/profile.js";
-import { buildCopilotFlatContract } from "../../../src/contexts/tools/domain/profiles/copilot/build.js";
-import { copilot } from "../../../src/contexts/tools/domain/profiles/copilot/profile.js";
-import { buildCursorFlatContract } from "../../../src/contexts/tools/domain/profiles/cursor/build.js";
-import { cursor } from "../../../src/contexts/tools/domain/profiles/cursor/profile.js";
-import { buildOpencodeFlatContract } from "../../../src/contexts/tools/domain/profiles/opencode/build.js";
-import { opencode } from "../../../src/contexts/tools/domain/profiles/opencode/profile.js";
+} from "../../../../src/contexts/tools/domain/build-contract.js";
+import { buildClaudeFlatContract } from "../../../../src/contexts/tools/domain/profiles/claude/build.js";
+import { claude } from "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import { buildCodexFlatContract } from "../../../../src/contexts/tools/domain/profiles/codex/build.js";
+import { codex } from "../../../../src/contexts/tools/domain/profiles/codex/profile.js";
+import { buildCopilotFlatContract } from "../../../../src/contexts/tools/domain/profiles/copilot/build.js";
+import { copilot } from "../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
+import { buildCursorFlatContract } from "../../../../src/contexts/tools/domain/profiles/cursor/build.js";
+import { cursor } from "../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
+import { buildOpencodeFlatContract } from "../../../../src/contexts/tools/domain/profiles/opencode/build.js";
+import { opencode } from "../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
 
 interface HooksDeclaringTool {
   readonly toolId: string;

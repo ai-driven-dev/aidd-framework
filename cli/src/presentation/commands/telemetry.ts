@@ -221,6 +221,11 @@ function registerTelemetryCheckCommand(telemetry: Command, program: Command): vo
           env: process.env,
         });
         printTelemetryCheckReport(output, result);
+        // A gated run judges nothing (measurement off, no repository), so it never fails
+        // the process; only a claim this run actually judged and found wanting does.
+        if (result.gate === undefined && result.claims.some((claim) => claim.verdict === "fail")) {
+          process.exitCode = 1;
+        }
       } catch (error) {
         errorHandler.handle(error);
       }

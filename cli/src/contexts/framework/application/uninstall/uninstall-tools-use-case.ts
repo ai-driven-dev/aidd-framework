@@ -8,8 +8,10 @@ import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Logger } from "../../../../kernel/ports/logger.js";
 import type { ToolId } from "../../../../kernel/tool.js";
+import { isAiToolId } from "../../../../kernel/tool.js";
 import { getToolConfig, isAiTool } from "../../../tools/domain/registry.js";
 import type { Manifest } from "../../domain/manifest.js";
+import { deletePluginFilesForTool } from "../plugin/plugin-helpers.js";
 
 export interface UninstallToolsOptions {
   toolIds: ToolId[];
@@ -98,19 +100,9 @@ export class UninstallToolsUseCase {
     manifest: Manifest,
     projectRoot: string
   ): Promise<void> {
+    if (!isAiToolId(toolId)) return;
     for (const plugin of manifest.getPlugins(toolId)) {
-      await this.deletePluginFiles(plugin.files, projectRoot);
-    }
-  }
-
-  private async deletePluginFiles(
-    files: ReadonlyMap<string, string>,
-    projectRoot: string
-  ): Promise<void> {
-    for (const relativePath of files.keys()) {
-      const fullPath = join(projectRoot, relativePath);
-      await this.fs.deleteFile(fullPath);
-      await this.fs.deleteEmptyDirectories(dirname(fullPath));
+      await deletePluginFilesForTool(plugin.files, toolId, projectRoot, this.fs);
     }
   }
 

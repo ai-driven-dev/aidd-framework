@@ -22,7 +22,7 @@ pre-commit:
         fi
         node scripts/validate-yaml.mjs {files}
     scripts-tests:
-      glob: "{scripts,plugins}/**"
+      glob: "{scripts,plugins,cli/src}/**"
       run: |
         if ! command -v node >/dev/null 2>&1; then
           echo "ℹ️  node not available; skipping scripts-tests"
@@ -155,22 +155,30 @@ pre-commit:
       glob: "cli/**"
       run: cd cli && pnpm lint
     cli-architecture:
-      # Reads source as text only — no build, no imports — so it stays under a second.
-      glob: "{cli/src/**,cli/tests/architecture/**,cli/ARCHITECTURE.md,cli/README.md,cli/aidd_docs/memory/codebase-map.md}"
+      # Reads source as text only — no build, no imports — so it stays under a second
+      # (measured 1.3s). The suite also reads cli/aidd_docs/GUIDELINES.md,
+      # cli/aidd_docs/memory/project-brief.md, cli/biome.json, cli/mutation-scopes.json,
+      # cli/package.json, cli/knip.json, cli/tsup.config.ts, cli/vitest.*.ts,
+      # cli/stryker.conf.json, lefthook.yml and .github/workflows/** — narrower globs
+      # here kept going stale against what the tests actually check, so this one is the
+      # whole surface plus the two automation files the suite reads outside cli/.
+      glob: "{cli/**,lefthook.yml,.github/workflows/**}"
       run: cd cli && pnpm test:arch
     cli-typecheck:
       glob: "cli/**"
       run: cd cli && pnpm typecheck
-    cli-layering:
-      # Reads source as text only, like cli-architecture: dependencies point inward, and no
-      # type is widened through `unknown` or `never` — in tests as much as in src.
+    cli-type-honesty:
+      # Reads source as text only, like cli-architecture: no type is widened through
+      # `unknown`, `any` or `never`, and no `@ts-expect-error`/`@ts-ignore` silences the
+      # compiler in production code — dependency direction between layers and contexts is
+      # biome's own job now (cli/biome.json's noRestrictedImports overrides).
       glob: "{cli/src/**,cli/tests/**}"
       run: |
         if ! command -v node >/dev/null 2>&1; then
-          echo "ℹ️  node not available; skipping cli-layering"
+          echo "ℹ️  node not available; skipping cli-type-honesty"
           exit 0
         fi
-        node scripts/check-cli-layering.mjs
+        node scripts/check-cli-type-honesty.mjs
 
 pre-push:
   commands:

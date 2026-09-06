@@ -1,7 +1,12 @@
 name: cli CI
 
-# Native path-filtered isolation: this whole workflow is skipped when nothing
-# under cli/ or kanban/ changed — no third-party paths-filter action needed.
+# Every push and pull_request triggers this workflow unconditionally — no `paths:`
+# filter — because a `paths:`-filtered workflow that isn't triggered still leaves its
+# required checks "expected" on GitHub's side, which blocks merge on a PR that never
+# touches this scope. The `changes` job below decides, in bash, whether the rest of
+# this workflow has anything to do; every other job is gated on its `relevant` output,
+# and `gate` reports green when nothing was relevant, so a PR outside this scope is
+# never blocked waiting for jobs that skipped on purpose.
 #
 # kanban/ has its own job and its own dependencies. The CLI no longer type-checks
 # or bundles it: the `aidd kanban` command was unwired, so no CLI job needs
@@ -10,51 +15,7 @@ name: cli CI
 on:
   push:
     branches: [main, next]
-    paths:
-      - "cli/**"
-      - "kanban/**"
-      # The plugin ships the hooks and skills these jobs exercise, and the Windows job
-      # exists for them in particular - without this, changing any of it runs nothing.
-      - "plugins/aidd-telemetry/**"
-      - "scripts/__tests__/**"
-      # Except its prose. The plugin's markdown is asserted - the README's coverage
-      # table, where its scripts say they live - but only by `scripts/__tests__`,
-      # which `validate.yml` already runs over the whole tree on every push and
-      # pull request, unfiltered and required. Re-running it here costs a Windows
-      # runner for a paragraph, and proves nothing that job did not.
-      #
-      # `**.md`, not `**/*.md`: GitHub's `**` matches any character including a
-      # slash, so the second form needs a slash after it and would miss the
-      # top-level README.md that this exists for.
-      #
-      # Bounded on purpose: on `pull_request` GitHub matches the whole diff, not
-      # the last push, so a branch that also touches cli/ runs everything however
-      # small its newest commit is. This saves the run on a push to next or main,
-      # and on a pull request whose diff is prose and nothing else.
-      - "!plugins/aidd-telemetry/**.md"
   pull_request:
-    paths:
-      - "cli/**"
-      - "kanban/**"
-      # The plugin ships the hooks and skills these jobs exercise, and the Windows job
-      # exists for them in particular - without this, changing any of it runs nothing.
-      - "plugins/aidd-telemetry/**"
-      - "scripts/__tests__/**"
-      # Except its prose. The plugin's markdown is asserted - the README's coverage
-      # table, where its scripts say they live - but only by `scripts/__tests__`,
-      # which `validate.yml` already runs over the whole tree on every push and
-      # pull request, unfiltered and required. Re-running it here costs a Windows
-      # runner for a paragraph, and proves nothing that job did not.
-      #
-      # `**.md`, not `**/*.md`: GitHub's `**` matches any character including a
-      # slash, so the second form needs a slash after it and would miss the
-      # top-level README.md that this exists for.
-      #
-      # Bounded on purpose: on `pull_request` GitHub matches the whole diff, not
-      # the last push, so a branch that also touches cli/ runs everything however
-      # small its newest commit is. This saves the run on a push to next or main,
-      # and on a pull request whose diff is prose and nothing else.
-      - "!plugins/aidd-telemetry/**.md"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -64,97 +25,180 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: cli / changes
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Decide whether this workflow's scope changed
+        id: filter
+        run: |
+          set -euo pipefail
+          # The scope this workflow's jobs actually exercise, replacing the old
+          # top-level `paths:` filter (kept here, not there, so a skip still lets
+          # every job run and `gate` still report green):
+          #   cli/**, kanban/**            - what the jobs below type-check, lint,
+          #                                  test, and build
+          #   plugins/aidd-telemetry/**    - the hooks and skills the Windows job
+          #                                  drives, except its own prose: that is
+          #                                  asserted by scripts/__tests__, which
+          #                                  validate.yml already runs on every push
+          #                                  and pull request, unfiltered and required
+          #                                  -- indirectly, through its `pnpm exec
+          #                                  lefthook run pre-commit` step, whose
+          #                                  `scripts-tests` hook is the one that
+          #                                  actually invokes `node --test`
+          #   scripts/__tests__/**         - the plugin suite the Windows job runs
+          #   README.md                    - its coverage table, which
+          #                                  scripts/__tests__ asserts
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          fi
+
+          # A brand-new branch or a force-push gives `before` as the all-zero SHA —
+          # there is no base to diff against, so treat that as relevant rather than
+          # letting `git diff` error into a skip that reads as "nothing changed".
+          if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]]; then
+            echo "no usable base SHA (new branch or force-push) - treating as relevant"
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          relevant=false
+          while IFS= read -r f; do
+            [[ -z "$f" ]] && continue
+            case "$f" in
+              cli/*|kanban/*|scripts/__tests__/*|README.md)
+                relevant=true
+                ;;
+              plugins/aidd-telemetry/*)
+                case "$f" in
+                  *.md) ;; # prose only, covered by validate.yml instead
+                  *) relevant=true ;;
+                esac
+                ;;
+            esac
+            [[ "$relevant" == "true" ]] && break
+          done < <(git diff --name-only "$BASE" "$HEAD")
+
+          echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
+
   cli-typecheck:
     name: cli / Typecheck
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
+        run: corepack enable
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('cli/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm typecheck
 
   cli-lint:
     name: cli / Lint
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
+        run: corepack enable
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('cli/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm lint
 
   cli-architecture:
     name: cli / Architecture invariants
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
+        run: corepack enable
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('cli/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm test:arch
 
-  cli-test:
-    name: cli / Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install expect (TTY persona tests)
-        run: sudo apt-get update && sudo apt-get install -y expect
-      - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: "22"
-      - run: cd cli && pnpm install --frozen-lockfile
-      - run: cd cli && pnpm test
-
+  # Runs every tier once, instrumented for coverage — `cli-test` used to run the
+  # same four projects again with no instrumentation, a second 208s run that
+  # proved nothing this one does not. Coverage is the test run now.
   cli-coverage:
-    name: cli / Coverage thresholds
+    name: cli / Test & Coverage thresholds
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install expect (TTY persona tests)
         run: sudo apt-get update && sudo apt-get install -y expect
       - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
+        run: corepack enable
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('cli/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm test:coverage
 
   cli-smoke:
     name: cli / Smoke
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
+        run: corepack enable
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('cli/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
       - run: cd cli && pnpm install --frozen-lockfile
       # Hermetic: every setup uses the local framework fixture, so this needs no
       # token and no network. `smoke:full` adds the remote-fetch section on demand.
@@ -162,46 +206,64 @@ jobs:
 
   cli-build:
     name: cli / Build & Bundle Budget
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
+        run: corepack enable
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('cli/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm build
 
   cli-knip:
     name: cli / Knip (dead code)
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
+        run: corepack enable
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('cli/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm knip
 
   identifier-join:
     name: cli / Identifier join (Claude Code)
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
+        run: corepack enable
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('cli/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm build
       # The probe drives the real tool, so the real tool has to be here. No credentials are
@@ -218,31 +280,43 @@ jobs:
 
   cli-jscpd:
     name: cli / JSCPD (duplication)
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
+        run: corepack enable
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('cli/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
       - run: cd cli && pnpm install --frozen-lockfile
       - run: cd cli && pnpm jscpd
 
   kanban-checks:
     name: kanban / Typecheck, Lint & Test
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
+        run: corepack enable
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('kanban/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
       - run: cd kanban && pnpm install --frozen-lockfile
       - run: cd kanban && pnpm typecheck
       - run: cd kanban && pnpm lint
@@ -251,7 +325,15 @@ jobs:
   windows:
     # Runs under bash (Git Bash, bundled on windows-latest) so every command is the one the
     # Linux jobs run, not a PowerShell rewrite of it.
+    #
+    # No pnpm store cache here: the store's default path differs by platform (this cache
+    # model assumes `~/.local/share/pnpm/store`, a POSIX path, which is where the Linux
+    # jobs' installs land — not where a native Windows pnpm resolves its store), and this
+    # job's dominant cost is the global CLI install, build, and e2e suite below, not the
+    # `pnpm install` steps a cache would shorten.
     name: cli / Windows
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: windows-latest
     defaults:
       run:
@@ -259,9 +341,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
+        run: corepack enable
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
@@ -289,10 +369,13 @@ jobs:
           git add -A
           git status --porcelain >/dev/null
 
+      # Wrapped, because a suite that writes into this repository's own .git/hooks passes
+      # every assertion and destroys an install nothing can restore — `.git` is in no
+      # history. The wrapper passes the suite's own exit code through untouched, the same
+      # guard lefthook.yml's `scripts-tests` hook runs locally.
       - name: Plugin suite
-        run: node --test "scripts/__tests__/*.test.js"
+        run: node scripts/check-tests-leave-git-alone.js -- node --test 'scripts/__tests__/**/*.test.js'
 
-      - run: cd kanban && pnpm install --frozen-lockfile
       - run: cd cli && pnpm install --frozen-lockfile
       # A real global install, not `node dist/cli.js` by path: build, pack, and
       # `npm install -g` the tarball — the same shim generation a person's own
@@ -322,6 +405,8 @@ jobs:
       - name: Chain - diagnose, through the command every skill's own markdown names
         run: |
           aidd --version
+          # This step's whole value depends on `telemetry check` exiting non-zero on FAIL,
+          # not just printing it — nothing here inspects the output.
           aidd telemetry check
       - run: cd cli && pnpm test:unit
       - run: cd cli && pnpm test:integration
@@ -340,3 +425,48 @@ jobs:
         # persona.e2e.test.ts hardcodes /usr/bin/expect for TTY emulation, which windows-latest
         # does not carry. telemetry-multi-tool.e2e.test.ts puts a `#!/bin/sh` stand-in binary
         # with no extension on PATH; Windows resolves an executable by PATHEXT, never a shebang.
+
+  # Fan-in: every job above either ran and passed, or was correctly skipped because
+  # `changes` found nothing relevant. This is the one check the branch rulesets require —
+  # #757 and #759 both merged with the real jobs above red because nothing named them.
+  gate:
+    name: cli / gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - changes
+      - cli-typecheck
+      - cli-lint
+      - cli-architecture
+      - cli-coverage
+      - cli-smoke
+      - cli-build
+      - cli-knip
+      - identifier-join
+      - cli-jscpd
+      - kanban-checks
+      - windows
+    steps:
+      - name: Fail unless changes decided cleanly and every gated job passed or was skipped
+        run: |
+          if [[ "${{ needs.changes.result }}" != "success" ]]; then
+            echo "::error::the changes job did not succeed (${{ needs.changes.result }}) — whether this workflow had anything to do could not be decided, so every job below it reads as skipped without proving it should have been"
+            exit 1
+          fi
+          for result in \
+            "${{ needs.cli-typecheck.result }}" \
+            "${{ needs.cli-lint.result }}" \
+            "${{ needs.cli-architecture.result }}" \
+            "${{ needs.cli-coverage.result }}" \
+            "${{ needs.cli-smoke.result }}" \
+            "${{ needs.cli-build.result }}" \
+            "${{ needs.cli-knip.result }}" \
+            "${{ needs.identifier-join.result }}" \
+            "${{ needs.cli-jscpd.result }}" \
+            "${{ needs.kanban-checks.result }}" \
+            "${{ needs.windows.result }}"; do
+            if [[ "$result" == "failure" || "$result" == "cancelled" ]]; then
+              echo "::error::a required job did not pass (result: $result)"
+              exit 1
+            fi
+          done

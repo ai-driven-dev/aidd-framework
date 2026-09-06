@@ -1,5 +1,16 @@
-import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// Simulates node:path's relative() the way it behaves on Windows: real POSIX-computed
+// segments, but "\"-joined. The suite runs on POSIX, so this is the only way to prove
+// the resolver's own output is always "/"-joined without an actual Windows runner.
+vi.mock("node:path", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:path")>();
+  return {
+    ...actual,
+    relative: (from: string, to: string) => actual.relative(from, to).split(actual.sep).join("\\"),
+  };
+});
+
 import { Marketplace } from "../../../../../src/contexts/distribution/domain/marketplace.js";
 import { resolvePluginSourceFromMarketplace } from "../../../../../src/contexts/framework/domain/plugins/plugin-source-resolver.js";
 import type { PluginSource } from "../../../../../src/kernel/source.js";
@@ -117,9 +128,10 @@ describe("resolvePluginSourceFromMarketplace", () => {
       expect(result).toEqual({
         kind: "git-subdir",
         url: "https://github.com/ai-driven-dev/framework.git",
-        // relative() (used by the resolver for a pre-resolved absolute path) returns the
-        // platform's native separator, unlike the raw string handling for a ./-relative path.
-        path: join("plugins", "aidd-context"),
+        // The resolver must always hand git sparse-checkout a "/"-separated path, even
+        // when node:path's relative() (used here for a pre-resolved absolute path)
+        // would have returned "\"-joined segments on Windows.
+        path: "plugins/aidd-context",
         ref: "v4.1.0-beta.14",
       });
     });

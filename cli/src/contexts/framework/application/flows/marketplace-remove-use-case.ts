@@ -1,4 +1,3 @@
-import { dirname, join } from "node:path";
 import { MarketplaceNotFoundError } from "../../../../kernel/errors.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Prompter } from "../../../../kernel/ports/prompter.js";
@@ -8,6 +7,7 @@ import type { MarketplaceRegistry } from "../../../distribution/domain/ports/mar
 import type { Manifest } from "../../domain/manifest.js";
 import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
+import { deletePluginFilesForTool } from "../plugin/plugin-helpers.js";
 
 export interface MarketplaceRemoveOptions {
   name: string;
@@ -76,21 +76,10 @@ export class MarketplaceRemoveUseCase {
     projectRoot: string
   ): Promise<number> {
     for (const { toolId, plugin } of orphans) {
-      await this.deletePluginFiles(plugin.files, projectRoot);
+      await deletePluginFilesForTool(plugin.files, toolId, projectRoot, this.fs);
       manifest.removePlugin(toolId, plugin.name);
     }
     await this.manifestRepo.save(manifest);
     return orphans.length;
-  }
-
-  private async deletePluginFiles(
-    files: ReadonlyMap<string, string>,
-    projectRoot: string
-  ): Promise<void> {
-    for (const relativePath of files.keys()) {
-      const fullPath = join(projectRoot, relativePath);
-      await this.fs.deleteFile(fullPath);
-      await this.fs.deleteEmptyDirectories(dirname(fullPath));
-    }
   }
 }

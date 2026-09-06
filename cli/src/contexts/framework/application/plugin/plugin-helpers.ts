@@ -1,19 +1,17 @@
-import { join } from "node:path";
+import { homedir as nodeHomedir } from "node:os";
+import { dirname, join } from "node:path";
 import { NoManifestError } from "../../../../kernel/errors.js";
 import type { InstallationFile } from "../../../../kernel/file.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
 import type { AiToolId } from "../../../../kernel/tool.js";
-import { AI_TOOL_IDS } from "../../../../kernel/tool.js";
-import { McpCapability } from "../../../tools/domain/capabilities/mcp-capability.js";
-import type { PluginsCapability } from "../../../tools/domain/capabilities/plugins-capability.js";
-import { getToolConfig, isAiTool } from "../../../tools/domain/registry.js";
 import type { PluginDistribution } from "../../../translate/domain/plugin-distribution.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { PluginTranslator } from "../framework/translator/plugin-translator.js";
+import { resolvePluginBaseDir } from "./plugin-target-resolution.js";
 
 export async function loadPluginManifest(manifestRepo: ManifestRepository): Promise<Manifest> {
   const manifest = await manifestRepo.load();
@@ -39,6 +37,31 @@ export async function deleteOldFiles(
   for (const relativePath of files.keys()) {
     await fs.deleteFile(join(baseDir, relativePath));
   }
+}
+
+/**
+ * Deletes a plugin's tracked files from the base directory its own tool actually
+ * installs to — `projectRoot` for a project-scope tool, the resolved user-scope plugins
+ * dir (e.g. `~/.cursor/plugins/local`) otherwise. Every plugin-file removal path
+ * (`clean`, `plugin remove`, `uninstall`, `marketplace remove`) must resolve the base
+ * dir this way, or a user-scope tool's files are never actually removed and instead a
+ * path under `projectRoot` that was never written gets asked to delete nothing.
+ */
+export async function deletePluginFilesForTool(
+  files: ReadonlyMap<string, string>,
+  toolId: AiToolId,
+  projectRoot: string,
+  fs: FileWriter
+): Promise<string[]> {
+  const baseDir = resolvePluginBaseDir(toolId, projectRoot, nodeHomedir);
+  const deleted: string[] = [];
+  for (const relativePath of files.keys()) {
+    const fullPath = join(baseDir, relativePath);
+    await fs.deleteFile(fullPath);
+    await fs.deleteEmptyDirectories(dirname(fullPath));
+    deleted.push(relativePath);
+  }
+  return deleted;
 }
 
 /** Whether the file already on disk matches the content we would write, so a

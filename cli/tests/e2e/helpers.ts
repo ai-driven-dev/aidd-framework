@@ -210,19 +210,16 @@ export function identityFileIn(fakeHome: string): string {
 }
 
 /**
- * Where a sandboxed run's figures actually land, which is not the same directory on every
- * platform. `sandboxedEnv` points `APPDATA` inside the fake home, so a Windows run writes
- * under `AppData\Roaming\aidd`, never under `.config`.
- *
- * A test that seeds the sink itself before running is insulated from this by the adapter's
- * legacy-data fallback — a home that already journalled under `.config` keeps landing there.
- * A test that lets the CLI create the sink from nothing is not, and asserting the POSIX path
- * there reads as "nothing was stored" on Windows rather than as a wrong lookup.
+ * Where a sandboxed run's figures actually land — the same directory on every platform,
+ * never `%APPDATA%`. `sandboxedEnv` sets `AIDD_USER_CONFIG_DIR` unconditionally, to pin the
+ * update-check cache out of a real profile, and `TelemetrySinkAdapter`'s constructor honours
+ * that variable ahead of its own platform-based `defaultConfigDir()` — so a sandboxed run's
+ * sink is `.config/aidd/telemetry` under the fake home regardless of platform. Predicting the
+ * platform default here instead agreed with the adapter only by accident on POSIX, where the
+ * two paths coincide, and disagreed with it on Windows, where they do not.
  */
 export function sinkDirIn(fakeHome: string): string {
-  return process.platform === "win32"
-    ? join(fakeHome, "AppData", "Roaming", "aidd", "telemetry")
-    : join(fakeHome, ".config", "aidd", "telemetry");
+  return join(fakeHome, ".config", "aidd", "telemetry");
 }
 
 export function sandboxedEnv(

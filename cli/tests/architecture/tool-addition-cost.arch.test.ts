@@ -62,10 +62,13 @@ function code(source: string): string {
 /**
  * Tool identifiers a file names in a way a new tool would force an edit to.
  *
- * Four forms: a quoted literal, an object key, a profile's import path, and a string that
- * enumerates two or more tools — a help line listing five targets is a list a sixth must
- * join. A string naming one tool is left alone: a message about the tool that exists is not
- * a list waiting to be extended.
+ * Five forms: a quoted literal, an object key, a profile's import path, a dotfile
+ * directory literal (`".cursor"`, `".codex"` — the shape a hidden per-tool directory is
+ * always spelled in, which the first form misses because a bare quoted literal must
+ * equal the id exactly, not the id with a leading dot), and a string that enumerates two
+ * or more tools — a help line listing five targets is a list a sixth must join. A string
+ * naming one tool is left alone: a message about the tool that exists is not a list
+ * waiting to be extended.
  */
 function toolsNamedIn(source: string, ids: readonly string[]): string[] {
   const alternation = ids.join("|");
@@ -75,6 +78,7 @@ function toolsNamedIn(source: string, ids: readonly string[]): string[] {
     new RegExp(`["'\`](${alternation})["'\`]`, "g"),
     new RegExp(`(?:^|[\\s{,(])(${alternation})\\s*:`, "gm"),
     new RegExp(`["'][^"']*/(${alternation})/[^"']*["']`, "g"),
+    new RegExp(`["'\`]\\.(${alternation})["'\`]`, "g"),
   ];
   for (const form of forms) {
     for (const match of body.matchAll(form)) named.add(match[1] as string);
@@ -110,6 +114,8 @@ function toolsNamedIn(source: string, ids: readonly string[]): string[] {
  * - **Words shown to a user**, three files. `translate.ts` lists its targets in help text,
  *   `setup.ts` gives examples, `menu-use-case.ts` labels its entries. Deriving those from
  *   the registry is possible and is a presentation change, not a move.
+ *
+ * The dotfile-literal form (below) surfaced four more, documented beside each entry.
  */
 const BASELINE: readonly { readonly path: string; readonly named: number }[] = [
   { path: "src/contexts/framework/domain/tool-recommendations.ts", named: 4 },
@@ -141,6 +147,27 @@ const BASELINE: readonly { readonly path: string; readonly named: number }[] = [
   // `opencode-mcp-merge.ts` and `vscode-mcp-merge.ts` already have here. The directory it
   // writes into is Cursor's own, not a list a sixth tool joins.
   { path: "src/contexts/tools/domain/formats/cursor-hooks-project-merge.ts", named: 1 },
+  // The four below surfaced only once the dotfile-literal form existed — a bare `".opencode"`
+  // or `".codex"` was invisible to the exact-match quoted-literal form. Two are the same
+  // shape already admitted above: an adapter naming the one tool it reads a file for.
+  //
+  // Flat-mode plugin extraction, keyed to the one path prefix flat materialization ever
+  // writes today (`.opencode/`) — the same shape `opencode-cost-reader-adapter.ts` has. A
+  // second flat-mode tool would need its own prefix check here, but there is only one.
+  {
+    path: "src/contexts/framework/application/framework/translator/built-tree-materialization-translator.ts",
+    named: 1,
+  },
+  // An adapter for exactly one tool, naming its own session-state directory.
+  { path: "src/contexts/telemetry/infrastructure/copilot-cost-reader-adapter.ts", named: 1 },
+  // An adapter for exactly one tool, naming its own hook-trust config path.
+  { path: "src/contexts/telemetry/infrastructure/hook-trust-reader-adapter.ts", named: 1 },
+  // Not the same shape: this one reaches into two tools' own directories from one shared
+  // file to detect whether either was ever used (Claude's settings files, Cursor's project
+  // hooks file) — real coupling a third tool would extend, not excused here. Left as found:
+  // owned by the telemetry workstream, which is mid-change on this file in this repository
+  // right now.
+  { path: "src/contexts/telemetry/infrastructure/telemetry-evidence-adapter.ts", named: 2 },
 ];
 
 describe("a tool identifier stays inside its own profile", () => {
@@ -184,7 +211,7 @@ describe("a tool identifier stays inside its own profile", () => {
     ).toEqual(["frobnicator"]);
   });
 
-  it("sees the three forms a quoted-literal match missed, and ignores prose", () => {
+  it("sees the four forms a quoted-literal match missed, and ignores prose", () => {
     const ids = ["claude", "codex"];
 
     expect(toolsNamedIn('codex: { "config.toml": x }', ids), "a bare object key").toEqual([
@@ -203,5 +230,21 @@ describe("a tool identifier stays inside its own profile", () => {
       toolsNamedIn('throw new Error("claude is not installed")', ids),
       "one tool named"
     ).toEqual([]);
+    expect(
+      toolsNamedIn('join(root, ".cursor", "hooks.json")', ["cursor"]),
+      "a dotfile directory literal"
+    ).toEqual(["cursor"]);
+  });
+
+  it("flags a planted dotfile literal outside the baseline the way a real one would be", () => {
+    const ids = ["cursor"];
+    const file = "src/contexts/framework/application/some-new-helper.ts";
+    const content = 'const hooksPath = join(projectRoot, ".cursor", "hooks.json");';
+
+    expect(isAllowed(file, ids), "the planted file is not inside cursor's own profile").toBe(false);
+    expect(
+      toolsNamedIn(content, ids),
+      "the same literal project-hooks-materializer.ts and plugin-remove-use-case.ts carried"
+    ).toEqual(["cursor"]);
   });
 });

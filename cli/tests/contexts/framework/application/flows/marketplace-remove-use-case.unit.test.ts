@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 import { Marketplace } from "../../../../../src/contexts/distribution/domain/marketplace.js";
 import { MarketplaceRemoveUseCase } from "../../../../../src/contexts/framework/application/flows/marketplace-remove-use-case.js";
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
@@ -14,9 +15,20 @@ import { KeepPrompter } from "../../../../helpers/ports/scripted-prompter.js";
 
 const PROJECT_ROOT = "/test-project";
 
+/** Records every path `deleteFile` is called with, so a test can prove where a plugin's
+ * file actually got deleted from without inspecting private use-case state. */
+class RecordingFileAdapter extends InMemoryFileAdapter {
+  readonly deletedPaths: string[] = [];
+
+  override async deleteFile(path: string): Promise<void> {
+    this.deletedPaths.push(path);
+    return super.deleteFile(path);
+  }
+}
+
 function buildUseCase() {
   const hasher = new DeterministicHasher();
-  const fs = new InMemoryFileAdapter({}, hasher);
+  const fs = new RecordingFileAdapter({}, hasher);
   const manifestRepo = new InMemoryManifestRepository();
   const registry = new InMemoryMarketplaceRegistry();
   const useCase = new MarketplaceRemoveUseCase(fs, manifestRepo, registry, new KeepPrompter());
@@ -91,5 +103,47 @@ describe("MarketplaceRemoveUseCase", () => {
     expect(fs.has(filePath)).toBe(false);
     const reloaded = await manifestRepo.load();
     expect(reloaded?.getPlugins("claude")).toHaveLength(0);
+  });
+
+  it("removes a user-scope (cursor) orphan's file from its resolved home directory, not projectRoot", async () => {
+    const { registry, manifestRepo, fs } = buildUseCase();
+    const useCase = new MarketplaceRemoveUseCase(fs, manifestRepo, registry, new KeepPrompter());
+    const manifest = Manifest.create();
+    manifest.addTool("cursor", "1.0.0", []);
+    const pluginKey = "aidd-context/commands/hello.md";
+    manifest.addPlugin(
+      "cursor",
+      InstalledPlugin.fromJSON({
+        name: "aidd-context",
+        source: { kind: "github", repo: "owner/aidd-context" },
+        version: "1.0.0",
+        strict: false,
+        files: { [pluginKey]: "0123456789abcdef0123456789abcdef" },
+        marketplace: "awesome",
+      })
+    );
+    await manifestRepo.save(manifest);
+
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: "awesome",
+        source: { kind: "github", repo: "owner/awesome" },
+        scope: "project",
+        addedAt: "2026-04-29T10:00:00.000Z",
+      })
+    );
+
+    const result = await useCase.execute({
+      name: "awesome",
+      projectRoot: PROJECT_ROOT,
+      autoConfirm: true,
+    });
+
+    expect(result.removedPluginCount).toBe(1);
+    expect(
+      fs.deletedPaths.some((p) => p.endsWith(join(".cursor", "plugins", "local", pluginKey)))
+    ).toBe(true);
+    expect(fs.deletedPaths).not.toContain(join(PROJECT_ROOT, pluginKey));
   });
 });

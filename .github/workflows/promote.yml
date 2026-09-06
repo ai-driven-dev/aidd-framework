@@ -3,10 +3,10 @@ name: Promote next to main
 # One intuitive button to ship `next` to `main` the RIGHT way: a merge commit.
 #
 # The merge commit does two jobs. It carries every conventional commit onto
-# `main` untouched, so commitlint passes and release-please reads each scope to
-# bump the right plugin. And its two parents give `main` and `next` a real merge
-# base, which is the only thing that keeps the back-merge after each release
-# conflict-free.
+# `main` untouched, so commitlint passes and release-please attributes each
+# commit to a package by the path it touched, which a squash would hide. And
+# its two parents give `main` and `next` a real merge base, which is the only
+# thing that keeps the back-merge after each release conflict-free.
 #
 # Neither alternative does the second job. A squash collapses the batch into one
 # subject and hides the scopes. A rebase recopies the commits under new hashes,
@@ -52,7 +52,6 @@ jobs:
 
           git config user.name "aidd-bot[bot]"
           git config user.email "aidd-bot[bot]@users.noreply.github.com"
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
           git fetch origin main next --prune
 
           # Compare trees, not ancestry. After a back-merge, next's tip is a

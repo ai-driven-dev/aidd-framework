@@ -418,34 +418,6 @@ describe("ReadLocalCostUseCase", () => {
     expect(cursor?.reason).toContain("token count");
   });
 
-  it("reports an unmeasured tool as not-covered with no reason invented for it", async () => {
-    // Every AI tool is either declared or explicitly unsupported as of phase 3, so
-    // "unmeasured" is exercised here via an override rather than a real tool — the
-    // use-case must still report it as not-covered, with no reason fabricated for a
-    // fact that has not been established either way.
-    registerTool({ ...claudeConfig, telemetryLocalRead: { kind: "unmeasured" } });
-    const sink = new InMemoryTelemetrySink();
-    const useCase = new ReadLocalCostUseCase(
-      sink,
-      new Map(),
-      NULL_RUN_JOURNAL_READER,
-      NULL_PERSON_IDENTITY_READER,
-      TELEMETRY_EVIDENCE_READER
-    );
-
-    const result = await useCase.execute({
-      projectRoot: PROJECT_ROOT,
-      env: {},
-      sessionId: SESSION_ID,
-    });
-
-    const claude = result.toolReports.find((r) => r.tool === "claude");
-    expect(claude).toMatchObject({ status: "not-covered" });
-    // The key is absent, not present-and-empty: this codebase omits rather than nulls, so
-    // a reason that shows up as a blank line downstream is a bug, not a formatting choice.
-    expect(claude).not.toHaveProperty("reason");
-  });
-
   it("distinguishes not-covered from covered-and-empty", async () => {
     declareClaudeReadable();
     const sink = new InMemoryTelemetrySink();

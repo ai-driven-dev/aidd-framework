@@ -38,7 +38,7 @@ jobs:
           set -euo pipefail
           gh api --paginate "repos/$REPO/milestones?state=open&per_page=100" \
             --jq '.[] | select(.closed_issues > 0 and .open_issues == 0) | "\(.number)\t\(.title)"' \
-            > finished.tsv || true
+            > finished.tsv
 
           if [ ! -s finished.tsv ]; then
             echo "No finished milestone to close."

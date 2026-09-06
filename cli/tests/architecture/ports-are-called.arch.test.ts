@@ -20,18 +20,21 @@
  * above was exactly that.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CLI_ROOT, expectRatchet, SRC, sourceFiles } from "./helpers.js";
 
-/** Files under any `ports/` directory — where this codebase keeps its interfaces. */
+/** Files under any `ports/` directory — where this codebase keeps its interfaces. A plain
+ * substring check (`full.includes("ports/")`) also matched `supports/`, `reports/` or any
+ * other path with "ports" inside a longer segment; the regex requires "ports" to be its own
+ * path segment. */
 function portFiles(): string[] {
   const out: string[] = [];
   const walk = (dir: string): void => {
     for (const entry of readdirSync(dir)) {
       const full = join(dir, entry);
       if (statSync(full).isDirectory()) walk(full);
-      else if (entry.endsWith(".ts") && full.includes(`${join("", "ports")}${"/"}`)) {
+      else if (entry.endsWith(".ts") && /(^|\/)ports\//.test(full.split(sep).join("/"))) {
         out.push(relative(CLI_ROOT, full));
       }
     }

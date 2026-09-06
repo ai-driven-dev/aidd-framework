@@ -564,16 +564,16 @@
   },
   {
     "command": "doctor",
-    "exitCode": 0,
-    "stdout": "\nDrift:\nAI tools:\n  (none installed)\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nInstallation is healthy\n",
+    "exitCode": 1,
+    "stdout": "\nDrift:\nAI tools:\n  (none installed)\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n",
     "stderr": "Warning: [ai] No AIDD manifest found. Run `aidd setup` to initialize your project.\nWarning: [ide] No AIDD manifest found. Run `aidd setup` to initialize your project.\n",
     "filesWritten": [],
     "manifest": null
   },
   {
     "command": "[errors] doctor",
-    "exitCode": 0,
-    "stdout": "\nDrift:\nAI tools:\n  (none installed)\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nInstallation is healthy\n",
+    "exitCode": 1,
+    "stdout": "\nDrift:\nAI tools:\n  (none installed)\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n",
     "stderr": "Warning: [ai] No AIDD manifest found. Run `aidd setup` to initialize your project.\nWarning: [ide] No AIDD manifest found. Run `aidd setup` to initialize your project.\n",
     "filesWritten": [],
     "manifest": null

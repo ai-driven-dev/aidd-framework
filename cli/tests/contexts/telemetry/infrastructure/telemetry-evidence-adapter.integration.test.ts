@@ -205,6 +205,25 @@ describe("a payload that matched no known host", () => {
 
     expect(await adapter().readUnrecognisedPayload(root)).toBeNull();
   });
+
+  // The hook that writes this file anchors at the repository root (`git rev-parse
+  // --show-toplevel`), never at the directory a session happened to start from. A reader
+  // that joined straight onto `projectRoot` instead of walking up to that same root missed
+  // the file whenever a command ran from a subdirectory of the checkout.
+  it("finds the file from a subdirectory of the repository, not only from its root", async () => {
+    const root = project();
+    mkdirSync(join(root, ".git"), { recursive: true });
+    write(
+      join(root, "aidd_docs", "runs", "_unrecognised.jsonl"),
+      `${JSON.stringify({ type: "unrecognised_payload", at: "2026-03-02T08:00:00Z" })}\n`
+    );
+    const subdirectory = join(root, "packages", "app");
+    mkdirSync(subdirectory, { recursive: true });
+
+    expect(await adapter().readUnrecognisedPayload(subdirectory)).toEqual({
+      at: "2026-03-02T08:00:00Z",
+    });
+  });
 });
 
 describe("an export a deleted command left behind in a tool's own settings", () => {

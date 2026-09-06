@@ -106,12 +106,6 @@ function uncoveredTools(): readonly DiagnoseTelemetryUncoveredTool[] {
   });
 }
 
-/**
- * Gathers every claim's evidence from the one route this system reads, then hands it to
- * the pure judge in `domain/models/telemetry-claim.ts`. Never writes anywhere — unlike
- * `ReadLocalCostUseCase`, this never stores a record, since the question is only ever
- * "would a read of this session's figures work", not "read them".
- */
 /** The plugin version the hook itself stamped, taken from the most recently opened session
  * that carries one.
  *
@@ -136,6 +130,12 @@ function isPresent<T>(value: T | undefined): value is T {
   return value !== undefined;
 }
 
+/**
+ * Gathers every claim's evidence from the one route this system reads, then hands it to
+ * the pure judge in `domain/telemetry-claim.ts`. Never writes anywhere — unlike
+ * `ReadLocalCostUseCase`, this never stores a record, since the question is only ever
+ * "would a read of this session's figures work", not "read them".
+ */
 export class DiagnoseTelemetryUseCase {
   constructor(
     private readonly evidence: TelemetryEvidenceReader,
@@ -155,16 +155,22 @@ export class DiagnoseTelemetryUseCase {
     // settings file exports whether or not this project's own switch is on, so a person
     // whose switch is off must still be told about it. `setup` follows the same rule —
     // what is in place is exactly what a person switched off still needs to see.
+    // Read once and passed down: `gatherSetup` needs it for the plugin version, and a
+    // gated run stops before `gatherEvidence` would ever ask for it again.
+    const journals = await this.runJournalReader.list();
     const leftoverExportConfig = await this.evidence.findLeftoverExportConfig(options.projectRoot);
-    const setup = await this.gatherSetup(options);
+    const setup = await this.gatherSetup(options, journals);
     const gate = await this.gateReason(options);
     if (gate !== null) return { gate, setup, leftoverExportConfig };
-    const evidence = await this.gatherEvidence(options, setup.recorderDeclaration);
+    const evidence = await this.gatherEvidence(options, setup.recorderDeclaration, journals);
     const claims = diagnoseTelemetryClaims(evidence);
     return { setup, claims, uncovered: uncoveredTools(), leftoverExportConfig };
   }
 
-  private async gatherSetup(options: DiagnoseTelemetryOptions): Promise<TelemetrySetup> {
+  private async gatherSetup(
+    options: DiagnoseTelemetryOptions,
+    journals: readonly RunJournal[]
+  ): Promise<TelemetrySetup> {
     const [switchSetup, recorderDeclaration] = await Promise.all([
       this.evidence.readSwitchSetup(options.projectRoot),
       this.evidence.readRecorderDeclaration(options.projectRoot),
@@ -183,7 +189,7 @@ export class DiagnoseTelemetryUseCase {
       ),
       versions: {
         cli: this.currentVersion.get(),
-        plugin: pluginVersionFrom(await this.runJournalReader.list()),
+        plugin: pluginVersionFrom(journals),
       },
     };
   }
@@ -250,9 +256,9 @@ export class DiagnoseTelemetryUseCase {
 
   private async gatherEvidence(
     options: DiagnoseTelemetryOptions,
-    recorderDeclaration: TelemetryRecorderDeclarationSetup
+    recorderDeclaration: TelemetryRecorderDeclarationSetup,
+    journals: readonly RunJournal[]
   ): Promise<TelemetryEvidence> {
-    const journals = await this.runJournalReader.list();
     const currentSessionId = resolveSessionAnchor(options.env);
     const unrecognisedPayload = await this.evidence.readUnrecognisedPayload(options.projectRoot);
     const hookTrust = await this.resolveHookTrust(options.env, currentSessionId);
@@ -307,9 +313,9 @@ export class DiagnoseTelemetryUseCase {
     return reads;
   }
 
-  // Mirrors telemetry-check.cjs's own `readTool`: a reader's own contract promises never
-  // to throw, and this catches anyway — a diagnostic that crashed on the one tool whose
-  // file is unreadable would answer nothing about every other claim it could still judge.
+  // A reader's own contract promises never to throw, and this catches anyway — a
+  // diagnostic that crashed on the one tool whose file is unreadable would answer nothing
+  // about every other claim it could still judge.
   private async readOneTool(
     tool: AiToolId,
     sessionId: string,

@@ -1,5 +1,3 @@
-import { sep } from "node:path";
-import type { TranscriptLocation } from "../../../../kernel/measurement.js";
 import type {
   LocalCostCandidateRecord,
   TranscriptLineAccumulator,
@@ -8,12 +6,14 @@ import type {
 // Measured 2026-08-20 against two real files: a main transcript line from
 // ~/.claude/projects/*/*.jsonl (Claude Code 2.1.229) and a subagent's own line from
 // ~/.claude/projects/*/<sessionId>/subagents/agent-*.jsonl (2.1.232). If Claude Code moves
-// any of these field names, tests/domain/formats/claude-code-transcript.unit.test.ts turns
-// red against the captured fixture before a zero could be stored in the moved field's place.
+// any of these field names,
+// tests/contexts/telemetry/domain/formats/claude-code-transcript.unit.test.ts turns red
+// against the captured fixture before a zero could be stored in the moved field's place.
 //
 // A subagent's own messages are never inline in the main transcript — every `isSidechain:
 // true` line measured lives only in its own `<sessionId>/subagents/agent-*.jsonl` file,
-// which is why the adapter's `TranscriptLocation` below matches both layouts.
+// which is why `CLAUDE_CODE_TRANSCRIPT_LOCATION`
+// (contexts/tools/domain/profiles/claude/claude-transcript-location.ts) matches both layouts.
 const VENDOR_FIELD = "sessionId";
 const TURN_FIELD = "requestId";
 

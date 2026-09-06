@@ -95,6 +95,12 @@ export interface NativePluginsParams {
    * per tool, so a tool proven to need it is the only one that sets it.
    */
   hooksDestination?: "plugin" | "project";
+  /**
+   * Where the project-scope hooks file `hooksDestination: "project"` merges into lives,
+   * relative to the project root (e.g. `".cursor/hooks.json"` for Cursor). Required
+   * exactly when `hooksDestination` is `"project"` — nothing reads it otherwise.
+   */
+  projectHooksRelativePath?: string;
   acceptsMcp?: boolean;
   /**
    * The variable this tool expands to the installed plugin's directory, as
@@ -182,6 +188,9 @@ export class PluginsCapability {
   readonly hooksRelativePath: string;
   readonly hooksContentFormat: HooksContentFormat;
   readonly hooksDestination: "plugin" | "project";
+  /** Where the project-scope hooks file `hooksDestination: "project"` merges into lives,
+   * relative to the project root, or `null` when `hooksDestination` is `"plugin"`. */
+  readonly projectHooksRelativePath: string | null;
   /** Where a flat-mode hook lands, relative to the project root, or `null` when this
    * capability's `acceptsHooks` is `false`. See {@link FlatHooksSupport}. */
   readonly flatHooksDir: string | null;
@@ -225,6 +234,7 @@ export class PluginsCapability {
       this.hooksRelativePath = params.hooksRelativePath ?? DEFAULT_HOOKS_PATH;
       this.hooksContentFormat = params.hooksContentFormat ?? DEFAULT_HOOKS_FORMAT;
       this.hooksDestination = params.hooksDestination ?? "plugin";
+      this.projectHooksRelativePath = params.projectHooksRelativePath ?? null;
       this.flatHooksDir = null;
       this.marketplaceSettings = params.marketplaceSettings ?? null;
       this.nativeActivation = params.nativeActivation ?? null;
@@ -243,6 +253,7 @@ export class PluginsCapability {
       this.hooksRelativePath = DEFAULT_HOOKS_PATH;
       this.hooksContentFormat = DEFAULT_HOOKS_FORMAT;
       this.hooksDestination = "plugin";
+      this.projectHooksRelativePath = null;
       this.marketplaceSettings = null;
       this.nativeActivation = null;
       this._userPluginsDir = undefined;
@@ -260,6 +271,7 @@ export class PluginsCapability {
       this.hooksRelativePath = DEFAULT_HOOKS_PATH;
       this.hooksContentFormat = DEFAULT_HOOKS_FORMAT;
       this.hooksDestination = "plugin";
+      this.projectHooksRelativePath = null;
       this.marketplaceSettings = null;
       this.nativeActivation = null;
       this._userPluginsDir = undefined;
@@ -299,6 +311,11 @@ export class PluginsCapability {
     if (params.installScope === "user" && params.userPluginsDir === undefined) {
       throw new CapabilityConfigError(
         "installScope 'user' requires a userPluginsDir resolver function."
+      );
+    }
+    if (params.hooksDestination === "project" && params.projectHooksRelativePath === undefined) {
+      throw new CapabilityConfigError(
+        "hooksDestination 'project' requires a projectHooksRelativePath."
       );
     }
   }

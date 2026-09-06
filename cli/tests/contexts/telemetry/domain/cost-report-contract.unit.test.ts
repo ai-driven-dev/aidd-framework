@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { COST_REPORT_ENVELOPE_VERSION } from "../../../../src/contexts/telemetry/domain/cost-report-envelope.js";
+import { STEP_ATTRIBUTION_SOURCES } from "../../../../src/contexts/telemetry/domain/step-attribution.js";
 import { TASK_UNATTRIBUTED_REASONS } from "../../../../src/contexts/telemetry/domain/task-attribution.js";
+import { ARTEFACT_AXES } from "../../../../src/presentation/display/cost-report-artefact.js";
 
 // The same honesty check `metrics-contract.unit.test.ts` runs over the record: never a
 // hand-maintained list on either side, only the code's own exported values and the
@@ -62,5 +64,26 @@ describe("the cost report contract document", () => {
     const shown = /"cost_report_version": (\d+)/.exec(contractText());
 
     expect(shown?.[1]).toBe(String(COST_REPORT_ENVELOPE_VERSION));
+  });
+
+  // The same drift the task-reason table already guards against: `prompt-matched` joined
+  // the code's own fixed order at `cost_report_version` 9 and never joined the table a
+  // reader parses `attribution` against.
+  it("names every source a step's attribution can carry", () => {
+    const document = contractText();
+
+    const undocumented = STEP_ATTRIBUTION_SOURCES.filter(
+      (source) => !document.includes(`| \`${source}\` |`)
+    );
+
+    expect(undocumented).toEqual([]);
+  });
+
+  // The quoted example in the `--axis` usage error is prose, not code - it drifts the same
+  // way the worked example above does, silently, the moment a new axis is added.
+  it("quotes the exact axis list --axis's own usage error prints", () => {
+    const document = contractText();
+
+    expect(document).toContain(ARTEFACT_AXES.join(", "));
   });
 });

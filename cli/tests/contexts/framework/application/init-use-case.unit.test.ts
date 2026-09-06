@@ -93,6 +93,23 @@ describe("init", () => {
       ).rejects.toThrow(/Already initialized/);
     });
 
+    // `aidd init` is not a command this CLI exposes (see the surface in cli.md) — telling
+    // a user to run `aidd init --force` points them at something that does not exist.
+    it("names a real recovery path, not the nonexistent `aidd init --force`", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await new InitUseCase(deps.fs, deps.manifestRepo).execute({ projectRoot: PROJECT_ROOT });
+      await expect(
+        new InitUseCase(deps.fs, deps.manifestRepo).checkPreconditions({
+          projectRoot: PROJECT_ROOT,
+        })
+      ).rejects.toThrow(/aidd clean --force/);
+      await expect(
+        new InitUseCase(deps.fs, deps.manifestRepo).checkPreconditions({
+          projectRoot: PROJECT_ROOT,
+        })
+      ).rejects.not.toThrow(/aidd init --force/);
+    });
+
     it("--force: fails with guidance when no manifest exists", async () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);
       await expect(

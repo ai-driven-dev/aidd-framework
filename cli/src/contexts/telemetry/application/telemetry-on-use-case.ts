@@ -54,9 +54,12 @@ export class TelemetryOnUseCase {
     // long after the decision, and on whoever runs `read` rather than whoever turned it on.
     await this.sink.ensureWritable();
     this.logger.info(`AIDD telemetry switch -> ${switchPath}`);
-    const switchChanged = await this.writeSwitch(switchPath);
+    // Written last, once everything the switch promises is actually in place: a failure
+    // partway through must never leave `enabled: true` describing a setup that stopped
+    // short of it.
     await this.protectRunsDir(options.projectRoot);
     await this.makeCommitsJoinable(options.projectRoot);
+    const switchChanged = await this.writeSwitch(switchPath);
     return { switchPath, switchChanged };
   }
 

@@ -14,11 +14,13 @@ import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";
 import type { Logger } from "../../../kernel/ports/logger.js";
 import type { Prompter } from "../../../kernel/ports/prompter.js";
-import type { ToolId } from "../../../kernel/tool.js";
+import type { AiToolId, ToolId } from "../../../kernel/tool.js";
 import { isAiToolId } from "../../../kernel/tool.js";
 import type { Manifest } from "../domain/manifest.js";
+import { aiddGitignoreEntries } from "../domain/manifest-gitignore-entries.js";
 import type { ManifestRepository } from "../domain/ports/manifest-repository.js";
 import type { GitignoreUseCase } from "./gitignore-use-case.js";
+import { deletePluginFilesForTool } from "./plugin/plugin-helpers.js";
 
 interface CleanOptions {
   projectRoot: string;
@@ -58,7 +60,9 @@ export class CleanUseCase {
     if (dryRunResult !== null) return dryRunResult;
     const deleted = await this.deleteAllToolFiles(manifest, options.projectRoot);
     await this.removeAiddState(options.projectRoot);
-    await this.gitignoreUseCase.remove(options.projectRoot, [`${AIDD_DIR}/cache/`]);
+    // The same entries the pipeline added on install — clean must remove exactly what
+    // was added, never a subset of it.
+    await this.gitignoreUseCase.remove(options.projectRoot, aiddGitignoreEntries(manifest));
     return { dryRun: false, manifestFound: true, preview, fileCount: deleted };
   }
 
@@ -122,17 +126,13 @@ export class CleanUseCase {
 
   private async deleteToolPluginFiles(
     manifest: Manifest,
-    toolId: ToolId,
+    toolId: AiToolId,
     projectRoot: string
   ): Promise<number> {
     let count = 0;
-    for (const plugin of manifest.getPlugins(toolId as Parameters<Manifest["getPlugins"]>[0])) {
-      for (const relativePath of plugin.files.keys()) {
-        const fullPath = join(projectRoot, relativePath);
-        await this.fs.deleteFile(fullPath);
-        await this.fs.deleteEmptyDirectories(dirname(fullPath));
-        count++;
-      }
+    for (const plugin of manifest.getPlugins(toolId)) {
+      const deleted = await deletePluginFilesForTool(plugin.files, toolId, projectRoot, this.fs);
+      count += deleted.length;
     }
     return count;
   }

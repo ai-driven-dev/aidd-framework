@@ -4,7 +4,9 @@ name: Dependabot auto-merge
 # Major bumps are left for a human to review. The PR still merges only once its
 # required status checks pass (and any required review is satisfied).
 
-on: pull_request_target
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write

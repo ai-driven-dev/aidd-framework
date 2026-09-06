@@ -1,4 +1,4 @@
-import { appendFile, chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { appendFile, chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -91,6 +91,20 @@ describe("TelemetrySinkAdapter", () => {
     const records = await adapter.readRecordsForVendor("s-1");
     expect(records).toHaveLength(2);
     expect(records.every((r) => r.vendor_id === "s-1")).toBe(true);
+  });
+
+  it("tolerates a day file that cannot be read, the same way a full read already does", async () => {
+    const adapter = new TelemetrySinkAdapter(userConfigDir);
+    await adapter.ensureWritable();
+    await adapter.appendRecord(RECORD, new Date("2026-08-15T10:00:00Z"));
+    // A directory happens to match the day-file naming pattern — `listDayFiles` filters by
+    // name alone, so it lists this the same as any other day file, and `readFile` on it
+    // fails the same way a file rotated or deleted between listing and reading would:
+    // listed a moment ago, unreadable now. Deterministic, unlike racing a real deletion
+    // against the read that follows it.
+    await mkdir(join(adapter.rootDir, "2026-08-16.jsonl"));
+
+    await expect(adapter.readRecordsForVendor("s-1")).resolves.toHaveLength(1);
   });
 
   it("skips a torn final line rather than failing the whole scan", async () => {

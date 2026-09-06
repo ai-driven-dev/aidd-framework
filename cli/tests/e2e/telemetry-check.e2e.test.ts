@@ -134,6 +134,21 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
     }
   });
 
+  it("exits 1 when a claim fails, not 0 with the failure only printed", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("check-exit-code-fail");
+    try {
+      await gitInit(projectDir);
+      await writeSwitch(projectDir, true);
+
+      const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
+
+      expect(result.stdout).toContain("FAIL");
+      expect(result.exitCode).toBe(1);
+    } finally {
+      await cleanup();
+    }
+  });
+
   it("names the hook never firing when measurement is on and no run file appears", async () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("check-never-fired");
     try {
@@ -142,7 +157,7 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
 
       const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
 
-      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.exitCode, result.stderr).toBe(1);
       expect(result.stdout).toMatch(/hook fired\s+FAIL\s+no run file/u);
       expect(result.stdout).toMatch(/never been observed firing/u);
       // "Nothing has run yet" is not "everything is broken": with no journal at all, the
@@ -165,7 +180,7 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
 
       const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
 
-      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.exitCode, result.stderr).toBe(1);
       expect(result.stdout).toMatch(/matched no known host/u);
       expect(result.stdout).toContain("2026-08-22T09:00:00Z");
     } finally {
@@ -182,7 +197,7 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
 
       const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
 
-      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.exitCode, result.stderr).toBe(1);
       // A run file demonstrably exists here (torn though it is) — this is never read as
       // "no run file", declared or not: that would say a file this build can see does not
       // exist.
@@ -243,7 +258,7 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
         env: { CODEX_THREAD_ID: "codex-1" },
       });
 
-      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.exitCode, result.stderr).toBe(1);
       expect(result.stdout).toMatch(
         /hook fired\s+FAIL\s+Codex has not trusted this plugin's hook/u
       );
@@ -264,7 +279,7 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
         env: { CODEX_THREAD_ID: "codex-1" },
       });
 
-      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.exitCode, result.stderr).toBe(1);
       expect(result.stdout).toMatch(
         /hook fired\s+FAIL\s+Codex has not trusted this plugin's hook/u
       );
@@ -283,7 +298,7 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
         env: { CODEX_THREAD_ID: "codex-1" },
       });
 
-      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.exitCode, result.stderr).toBe(1);
       expect(result.stdout).toMatch(/hook fired\s+FAIL\s+no run file/u);
       expect(result.stdout).toMatch(/never been observed firing/u);
       expect(result.stdout).toMatch(/could not be read either/u);
@@ -324,7 +339,7 @@ describe("aidd telemetry check — the journey and its edge cases", () => {
 
       const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
 
-      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.exitCode, result.stderr).toBe(1);
       expect(result.stdout).toMatch(/matched no known host/u);
       expect(result.stdout).not.toMatch(/never been observed firing/u);
     } finally {
@@ -429,7 +444,7 @@ describe("aidd telemetry check — what is in place, before any verdict", () => 
 
       const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
 
-      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.exitCode, result.stderr).toBe(1);
       expect(result.stdout).toMatch(/identity attached\s+could not be read/u);
       expect(result.stdout).toContain(identityFileIn(fakeHome));
       // Every other stated fact still appears — one damaged file costs only itself.
@@ -561,7 +576,7 @@ describe("aidd telemetry check — what is in place, before any verdict", () => 
 
       const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
 
-      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.exitCode, result.stderr).toBe(1);
       expect(result.stdout).toMatch(/recorder declared\s+nowhere this build checks/u);
     } finally {
       await cleanup();
@@ -623,7 +638,7 @@ describe("aidd telemetry check — not yet stops being a failure", () => {
       await writeSwitch(projectDir, true);
 
       const beforeDeclaring = await runCli(["telemetry", "check"], projectDir, fakeHome);
-      expect(beforeDeclaring.exitCode, beforeDeclaring.stderr).toBe(0);
+      expect(beforeDeclaring.exitCode, beforeDeclaring.stderr).toBe(1);
       expect(beforeDeclaring.stdout).toMatch(/hook fired\s+FAIL\s+no run file/u);
       expect(beforeDeclaring.stdout).toMatch(/recorder is declared nowhere/u);
 
@@ -660,7 +675,7 @@ describe("aidd telemetry check — not yet stops being a failure", () => {
         env: { CLAUDE_CODE_SESSION_ID: CLAUDE_SESSION },
       });
 
-      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.exitCode, result.stderr).toBe(1);
       expect(result.stdout).toMatch(/hook fired\s+ok/u);
       expect(result.stdout).not.toMatch(/recorder is declared nowhere/u);
     } finally {
@@ -684,7 +699,7 @@ describe("aidd telemetry check — not yet stops being a failure", () => {
 
       const result = await runCli(["telemetry", "check"], projectDir, fakeHome);
 
-      expect(result.exitCode, result.stderr).toBe(0);
+      expect(result.exitCode, result.stderr).toBe(1);
       expect(result.stdout).toMatch(/hook fired\s+FAIL\s+1 run file\(s\)/u);
       expect(result.stdout).toMatch(/none carry a readable session_start/u);
       expect(result.stdout).not.toMatch(/nothing to evaluate/u);

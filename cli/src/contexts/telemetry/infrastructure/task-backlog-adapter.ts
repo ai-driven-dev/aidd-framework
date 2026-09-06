@@ -6,7 +6,7 @@ import type { TaskBacklogReader } from "../domain/ports/task-backlog-reader.js";
 import type { TaskBacklogDeclaration, TaskBacklogLink } from "../domain/task-backlog-link.js";
 
 /** The one file a task folder writes to declare its backlog item — see
- * `domain/models/task-backlog-link.ts` for why this is not `metadata.json`. */
+ * `domain/task-backlog-link.ts` for why this is not `metadata.json`. */
 export const TASK_BACKLOG_LINK_FILENAME = "backlog-link.json";
 
 function nonEmptyString(value: unknown): string | undefined {

@@ -10,33 +10,20 @@ require("../sweep-stale-test-dirs.cjs").sweepStaleTestDirs();
 
 const ROOT = path.resolve(__dirname, "../..");
 
-/** Where the figures land is pinned in cli/tests/infrastructure/adapters/
- * telemetry-sink-location.unit.test.ts, since the sink that writes them now lives only in the
- * CLI. What is left here is about the plugin's own shape: what each skill carries, and that
- * nothing reaches across. */
+/** Where the figures land is pinned in
+ * cli/tests/contexts/telemetry/infrastructure/telemetry-sink-location.unit.test.ts, since
+ * the sink that writes them now lives only in the CLI. What is left here is about the
+ * plugin's own shape: what each skill carries, and that nothing reaches across. */
 
 describe("a library a skill needs is carried by that skill, identically", () => {
-  const SKILLS = path.join(ROOT, "plugins/aidd-telemetry/skills");
-  it("no skill reaches outside its own folder to require code", () => {
-    const offenders = [];
-    const walk = (dir) => {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          walk(full);
-        } else if (entry.name.endsWith(".js")) {
-          for (const m of fs.readFileSync(full, "utf8").matchAll(/require\("(\.\.[^"]*)"\)/gu)) {
-            const resolved = path.resolve(path.dirname(full), m[1]);
-            if (!resolved.startsWith(path.join(SKILLS, path.relative(SKILLS, full).split(path.sep)[0]))) {
-              offenders.push(`${path.relative(SKILLS, full)} -> ${m[1]}`);
-            }
-          }
-        }
-      }
-    };
-    walk(SKILLS);
-    assert.deepEqual(offenders, []);
-  });
+  // There used to be a walk here checking that no skill's own script `require()`d code
+  // outside its folder. It only ever looked at `.js` files, and this plugin's skills carry
+  // none — every script under `skills/` is `.cjs` (see the marker test below), and since
+  // phase 3/5 there are none of those either: `plugin-install-shape.test.js`'s "ships no
+  // skill scripts" already pins that a skill carries zero scripts of its own. A boundary
+  // check with nothing to walk cannot fail on any input, .js or .cjs; it is dropped rather
+  // than widened to a corpus this repository does not have, and its invariant reappears the
+  // day a skill ships a script again, in whichever test adds the corpus back.
 
   /** No `package.json` marker anywhere: every CommonJS file this plugin ships is named
    * `.cjs`, which Node reads as CommonJS whatever the host project declares. A marker is a

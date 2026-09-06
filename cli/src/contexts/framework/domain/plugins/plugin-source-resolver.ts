@@ -31,5 +31,7 @@ function toRelativePath(sourcePath: string, localBase: string): string | null {
   }
   const rel = relative(localBase, sourcePath);
   if (rel.startsWith("..") || rel === "") return null;
-  return rel;
+  // relative() answers in the platform's own separator - "\"-joined on Windows - but
+  // `git sparse-checkout set` always reads a "/"-separated path, whichever OS wrote it.
+  return rel.split("\\").join("/");
 }

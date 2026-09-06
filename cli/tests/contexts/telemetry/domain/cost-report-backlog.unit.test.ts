@@ -209,7 +209,7 @@ describe("buildCostReport — by_backlog regroups tasks by what their folder dec
     // The map a report is actually handed always resolves every task identity its own
     // journals can name (ReportCostUseCase's job) - this proves the domain does not
     // silently lose a record's figures were that ever not true, the same defensive
-    // default `declaredTaskKeyOf`'s own fallback documents.
+    // default `taskRowOf`'s own fallback documents.
     const built = report({
       records: RECORDS,
       journals: JOURNALS,

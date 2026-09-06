@@ -2,7 +2,10 @@ name: Validate
 
 # Runs the framework's pre-commit hooks against the full tree on every push
 # and pull request, so contributions that bypass lefthook locally
-# (--no-verify, fork PRs, web edits) are still gated by the same logic.
+# (--no-verify, fork PRs, web edits) are still gated by the same logic. The
+# generator hooks (catalogs, prompts doc, README counts) `git add` what they
+# regenerate instead of failing on drift, so a step below re-checks their
+# output against HEAD explicitly.
 
 on:
   push:
@@ -30,19 +33,17 @@ jobs:
           node-version: "22"
 
       - name: Install pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
+        run: corepack enable
 
       - name: Cache pnpm store
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.local/share/pnpm/store
-          key: pnpm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'cli/pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile=false --ignore-scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Install cli dependencies
         # cli/ is a self-contained project (own lockfile, not a pnpm workspace
@@ -53,3 +54,16 @@ jobs:
 
       - name: Run pre-commit hooks against the full tree
         run: pnpm exec lefthook run pre-commit --all-files --force
+
+      # summarize-plugin-catalogs, summarize-telemetry-prompts-doc and sync-readme-counts
+      # regenerate their target file and `git add` it, but never fail on drift — a stale
+      # CATALOG.md, docs/prompts-documentation.md or README.md count passed the step above
+      # in silence. Comparing against HEAD, not the index: the generators already staged
+      # their output, so a plain `git diff` (worktree vs index) is empty even when the
+      # regenerated content differs from what is committed.
+      - name: Fail if a generated file drifted from what pre-commit regenerated
+        run: |
+          if ! git diff --exit-code HEAD -- 'plugins/*/CATALOG.md' docs/prompts-documentation.md README.md; then
+            echo "::error::A generated file is stale. Run 'pnpm exec lefthook run pre-commit --all-files --force' locally and commit the result."
+            exit 1
+          fi

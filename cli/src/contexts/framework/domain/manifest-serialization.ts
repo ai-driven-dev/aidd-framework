@@ -1,4 +1,5 @@
-import { InvalidManifestToolIdError } from "../../../kernel/errors.js";
+import { InvalidManifestDataError, InvalidManifestToolIdError } from "../../../kernel/errors.js";
+import { asPlainObject } from "../../../kernel/reading/plain-object.js";
 import { type ToolId, VALID_TOOL_IDS } from "../../../kernel/tool.js";
 import {
   parseToolEntry,
@@ -33,7 +34,22 @@ export function parseManifestTools(raw: Record<string, unknown>): Map<ToolId, To
     if (!VALID_TOOL_IDS.includes(toolId)) {
       throw new InvalidManifestToolIdError(key);
     }
-    tools.set(toolId, parseToolEntry(toolId, value as ToolEntryData));
+    tools.set(toolId, parseToolEntry(toolId, parseToolEntryData(key, value)));
   }
   return tools;
+}
+
+/** Narrows one `tools.<id>` entry before it reaches `parseToolEntry`, which otherwise
+ * throws a raw `TypeError` from deep inside `parseTrackedFiles` for a manifest a person
+ * hand-edited badly. Every failure names the JSON path so the message is actionable. */
+function parseToolEntryData(toolId: string, value: unknown): ToolEntryData {
+  const entry = asPlainObject(value);
+  if (entry === null) {
+    throw new InvalidManifestDataError(`tools.${toolId}: expected an object.`);
+  }
+  if (!Array.isArray(entry.files)) {
+    const got = entry.files === undefined ? "missing" : typeof entry.files;
+    throw new InvalidManifestDataError(`tools.${toolId}.files: expected an array, got ${got}.`);
+  }
+  return value as ToolEntryData;
 }

@@ -18,6 +18,15 @@ import type { TaskAttributionSource, TaskUnattributedReason } from "./task-attri
  * `sink_schema_version` exists on a stored line. Adding a field a consumer may ignore is
  * not a bump; changing what an existing field means is.
  *
+ * Bumped to 14: `by_task` and `by_backlog`'s `reason` gains a fifth value,
+ * `precedes-journal` — a record whose moment predates the earliest moment its session's
+ * journal ever witnessed, nothing declared late here, no journal existed yet
+ * (`task-attribution.ts`'s own doc explains why this population is large). A consumer that
+ * switched exhaustively on the four values before it meets one it has no case for, which is
+ * a misread rather than a field it may ignore. Measured 2026-09-04: 96.2% of a real period
+ * had been read as `precedes-declaration`, telling a person their flow declares its task
+ * late in 96% of cases when fewer than one in five hundred of those records actually did.
+ *
  * Bumped to 13: `by_prompt` is a new top-level breakdown, and a consumer summing every
  * breakdown's `requests` against `totals.requests` to check nothing was dropped now has one
  * more to include. It is the only breakdown complete by construction: every other depends on
@@ -203,10 +212,9 @@ export interface CostReportEnvelopeBacklogRow {
   readonly totals: CostReportEnvelopeTotals;
 }
 
-/** One orchestrated run's figures — see `CostReportFlowRow`. `flow` names the orchestrating
- * skill and `startedAt` when it opened, together telling apart two rows that share a name:
- * the same skill run twice in one session is two rows, never merged into one. Both are
- * absent on the one row for work that fell in no flow interval at all. */
+/** One agent's figures — see `CostReportAgentRow`. `agent` is absent on the main thread's
+ * own row, never on "no agent": a session starts there, so it carries a row rather than an
+ * absence. */
 export interface CostReportEnvelopeAgentRow {
   readonly agent?: string;
   readonly totals: CostReportEnvelopeTotals;
@@ -221,6 +229,10 @@ export interface CostReportEnvelopePromptRow {
   readonly totals: CostReportEnvelopeTotals;
 }
 
+/** One orchestrated run's figures — see `CostReportFlowRow`. `flow` names the orchestrating
+ * skill and `started_at` when it opened, together telling apart two rows that share a name:
+ * the same skill run twice in one session is two rows, never merged into one. Both are
+ * absent on the one row for work that fell in no flow interval at all. */
 export interface CostReportEnvelopeFlowRow {
   readonly flow?: string;
   readonly started_at?: string;
@@ -308,7 +320,7 @@ export interface CostReportEnvelope {
   /** Mapped people first, then every unplaced identity, then the one row for records
    * carrying none at all - see `CostReport["byPeople"]`. */
   readonly by_person: readonly CostReportEnvelopePersonRow[];
-  /** All three strengths, always, strongest first. */
+  /** All four strengths, always, strongest first. */
   readonly attribution: readonly CostReportEnvelopeAttributionRow[];
   /** Present only alongside `task`: an unfiltered period carries no per-record task
    * identity to break down. */
@@ -459,15 +471,6 @@ function readSummary(report: CostReport): CostReportEnvelopeRead {
   };
 }
 
-/**
- * The same report a person reads, rendered for a program.
- *
- * A rendering, never a second computation: every figure here comes from the `CostReport`
- * it is handed, and nothing is derived on the way through. Two ways of computing one
- * number is how they start disagreeing.
- *
- * Pure — no clock, no filesystem, no printing.
- */
 /** Every `by_*` breakdown together - pulled out on its own so `toCostReportEnvelope` reads
  * as one shape assembled from its own reads, not a wall of field-by-field assignments (the
  * same reason `cost-report.ts`'s own `breakdownFields` exists). */
@@ -502,6 +505,15 @@ function breakdownFields(
   };
 }
 
+/**
+ * The same report a person reads, rendered for a program.
+ *
+ * A rendering, never a second computation: every figure here comes from the `CostReport`
+ * it is handed, and nothing is derived on the way through. Two ways of computing one
+ * number is how they start disagreeing.
+ *
+ * Pure — no clock, no filesystem, no printing.
+ */
 export function toCostReportEnvelope(report: CostReport): CostReportEnvelope {
   return {
     cost_report_version: COST_REPORT_ENVELOPE_VERSION,

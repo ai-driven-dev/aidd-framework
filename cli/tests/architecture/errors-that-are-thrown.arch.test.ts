@@ -41,7 +41,10 @@ const BASELINE: string[] = [];
 
 describe("the error catalog carries no class nothing throws", () => {
   it("every declared error is thrown by some production file", () => {
-    const thrown = thrownErrors(sourceFiles());
+    // The catalog is excluded: a class testing its own name in an assertion is not a
+    // caller, and neither is a throw sitting inside the catalog's own file — that would
+    // let a class outlive every real thrower as long as it still mentions itself once.
+    const thrown = thrownErrors(sourceFiles().filter((file) => file !== CATALOG));
     const orphans = declaredErrors()
       .filter((name) => !thrown.has(name))
       .sort();

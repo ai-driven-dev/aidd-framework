@@ -9,8 +9,6 @@ import type { Manifest } from "../../../domain/manifest.js";
  * Contract implemented by both translation strategy adapters.
  *
  * This interface is a translator strategy contract (not a hexagonal port adapter).
- * It lives in `application/use-cases/framework/translator/` following the capability
- * sub-use-case subdir pattern (see the `use-case` skill's capability sub-use-case reference).
  */
 export interface PluginTranslator {
   /** Discriminant identifying which translation strategy this adapter implements. */

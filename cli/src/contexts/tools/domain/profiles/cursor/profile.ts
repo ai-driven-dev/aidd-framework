@@ -120,6 +120,7 @@ export const cursor: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
         hooksRelativePath: "hooks.json",
         hooksContentFormat: "flat",
         hooksDestination: "project",
+        projectHooksRelativePath: ".cursor/hooks.json",
         acceptsMcp: true,
         mcpRelativePath: "mcp.json",
         installScope: "user",

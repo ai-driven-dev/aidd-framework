@@ -36,9 +36,16 @@ export class ProjectHooksMaterializer {
   ): Promise<ReadonlySkipList> {
     const pluginsCap = resolvePluginsCapability(toolId);
     if (pluginsCap === null || pluginsCap.hooksDestination !== "project") return [];
+    const projectHooksRelativePath = pluginsCap.projectHooksRelativePath;
+    if (projectHooksRelativePath === null) return [];
     const manifestFile = dist.components.hooks.find((f) => f.relativePath === HOOKS_MANIFEST_PATH);
     if (manifestFile === undefined) return [];
-    const warnings = await this.mergeProjectHooksJson(dist, manifestFile, projectRoot);
+    const warnings = await this.mergeProjectHooksJson(
+      dist,
+      manifestFile,
+      projectRoot,
+      projectHooksRelativePath
+    );
     await this.writeProjectHooksScripts(dist, projectRoot);
     return warnings.map(
       (reason): PluginTranslationSkip => ({
@@ -53,9 +60,10 @@ export class ProjectHooksMaterializer {
   private async mergeProjectHooksJson(
     dist: PluginDistribution,
     manifestFile: PluginComponentFile,
-    projectRoot: string
+    projectRoot: string,
+    projectHooksRelativePath: string
   ): Promise<readonly string[]> {
-    const destPath = join(projectRoot, ".cursor", "hooks.json");
+    const destPath = join(projectRoot, projectHooksRelativePath);
     const existing = await this.readExistingJson(destPath);
     const { content, warnings } = mergeCursorProjectHooksJson(
       existing,

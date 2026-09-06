@@ -231,8 +231,8 @@ export async function createDeps(
   // disposable cache under .aidd/cache/built/, never a user-owned directory. A
   // collision only means "the cache from a previous build already exists" — the
   // whole point of a rebuild. The real user --force (framework.ts) is unrelated
-  // and already threaded correctly for the direct `framework build --flat` path.
-  // The build's own diagnostics belong to `aidd framework build`, where the user asked
+  // and already threaded correctly for the direct `translate --as flat` path.
+  // The build's own diagnostics belong to `aidd translate`, where the user asked
   // for a build and wants to know what it skipped. Here the build is a cache being
   // brought up to date, which happens behind almost every command — repeating those
   // lines each time would report an implementation detail as if it were news. They are

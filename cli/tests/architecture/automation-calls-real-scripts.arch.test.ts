@@ -11,7 +11,11 @@
  * is not inside it.
  *
  * Only calls that run against this package count — a `cd cli && pnpm x` line, or a call in
- * a job whose steps `cd` here. pnpm's own verbs are not scripts and are excluded.
+ * a `run:` block whose earlier line `cd`s here first. A single-line regex only ever saw the
+ * first form: the windows job's own `run: |` block does `cd cli` on one line and `pnpm
+ * build` two lines later, in the same shell script, and that call was invisible until this
+ * rule followed `cd` line by line instead. pnpm's own verbs are not scripts and are
+ * excluded.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -44,8 +48,6 @@ const PNPM_BUILTINS = new Set([
   "--filter",
 ]);
 
-const CALLS_THIS_PACKAGE = /cd cli && pnpm ([a-z][\w:.-]*)/g;
-
 function manifestScripts(): Set<string> {
   const manifest = JSON.parse(readFileSync(join(CLI_ROOT, "package.json"), "utf8")) as {
     scripts: Record<string, string>;
@@ -61,13 +63,86 @@ function automationFiles(): string[] {
   return files;
 }
 
+/** The indentation of a line — how many leading spaces it carries, tabs aside since YAML
+ * forbids them for indentation. */
+function indentOf(line: string): number {
+  return /^(\s*)/.exec(line)?.[1]?.length ?? 0;
+}
+
+/**
+ * Every `run:` step's body, as its own array of lines.
+ *
+ * A `run: value` on one line is a body of one line; `run: |` (or `|-`, `>`) opens a block
+ * scalar whose body is every following line indented further than the `run:` key itself,
+ * which is how YAML itself delimits it — the block ends at the first line back at or above
+ * that indentation, not at the next blank line.
+ */
+function runBodies(text: string): string[][] {
+  const lines = text.split("\n");
+  const bodies: string[][] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i] as string;
+    const match = /^(\s*)(?:-\s+)?run:\s*(.*)$/.exec(line);
+    if (!match) {
+      i++;
+      continue;
+    }
+    const keyIndent = indentOf(line);
+    const rest = (match[2] as string).trim();
+    if (/^[|>][+-]?$/.test(rest)) {
+      const body: string[] = [];
+      i++;
+      while (i < lines.length) {
+        const bodyLine = lines[i] as string;
+        if (bodyLine.trim() !== "" && indentOf(bodyLine) <= keyIndent) break;
+        body.push(bodyLine);
+        i++;
+      }
+      bodies.push(body);
+    } else {
+      bodies.push([rest]);
+      i++;
+    }
+  }
+  return bodies;
+}
+
+/**
+ * Every `pnpm <script>` a `run:` body calls while its own `cd` state points at `dir` —
+ * tracked line by line, the same way the shell itself would run the block: `cd cli` on one
+ * line changes where every later `pnpm` call in that same body lands, `cd` to anything else
+ * changes it away, and the state does not survive into the next `run:` body — each step's
+ * `run:` is its own shell process, so nothing here needs to model a step boundary as
+ * anything other than a fresh body.
+ */
+function pnpmCallsAgainst(dir: string, body: readonly string[]): string[] {
+  let cwd: string | null = null;
+  const calls: string[] = [];
+  for (const rawLine of body) {
+    for (const segment of rawLine.split("&&")) {
+      const trimmed = segment.trim();
+      const cd = /^cd\s+(\S+)/.exec(trimmed);
+      if (cd) {
+        cwd = cd[1] as string;
+        continue;
+      }
+      const pnpm = /^pnpm\s+([a-z][\w:.-]*)/.exec(trimmed);
+      if (pnpm && cwd === dir) calls.push(pnpm[1] as string);
+    }
+  }
+  return calls;
+}
+
 /** Every `pnpm <script>` an automation file runs against this package, with where it runs. */
 function scriptCalls(files: readonly string[]): { file: string; script: string }[] {
   const calls: { file: string; script: string }[] = [];
   for (const file of files) {
-    for (const match of readFileSync(file, "utf8").matchAll(CALLS_THIS_PACKAGE)) {
-      const script = match[1] as string;
-      if (!PNPM_BUILTINS.has(script)) calls.push({ file, script });
+    const text = readFileSync(file, "utf8");
+    for (const body of runBodies(text)) {
+      for (const script of pnpmCallsAgainst("cli", body)) {
+        if (!PNPM_BUILTINS.has(script)) calls.push({ file, script });
+      }
     }
   }
   return calls;
@@ -108,5 +183,40 @@ describe("the automation calls scripts this package still has", () => {
 
     expect(found, "the real workflow calls this package's scripts").toContain("knip");
     expect(found, "`pnpm install` is not a script").not.toContain("install");
+  });
+
+  it("follows cd line by line inside a run: | block, past where the old regex stopped seeing", () => {
+    const block = [
+      "        run: |",
+      "          cd cli",
+      "          pnpm build",
+      "          pnpm pack --pack-destination ./dist",
+      "          npm install -g ./dist/ai-driven-dev-cli-*.tgz --force",
+    ].join("\n");
+
+    expect(runBodies(block)).toEqual([
+      [
+        "          cd cli",
+        "          pnpm build",
+        "          pnpm pack --pack-destination ./dist",
+        "          npm install -g ./dist/ai-driven-dev-cli-*.tgz --force",
+      ],
+    ]);
+    // A single-line regex (`cd cli && pnpm x`) never matches any line of this block —
+    // `pnpm build` alone is what it missed.
+    expect(pnpmCallsAgainst("cli", runBodies(block)[0] as string[])).toContain("build");
+  });
+
+  it("does not let cd cross into a later, unrelated run: body", () => {
+    const twoSteps = [
+      "      - run: |",
+      "          cd kanban",
+      "      - run: |",
+      "          pnpm bogus-script",
+    ].join("\n");
+
+    for (const body of runBodies(twoSteps)) {
+      expect(pnpmCallsAgainst("cli", body)).toEqual([]);
+    }
   });
 });

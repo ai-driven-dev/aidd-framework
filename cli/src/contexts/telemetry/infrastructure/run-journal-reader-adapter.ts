@@ -1,8 +1,7 @@
 import { readdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { DOCS_DIR, RUNS_SUBDIR } from "../../../kernel/paths.js";
+import { resolvedRunsDir } from "../../../kernel/paths.js";
 import { isBareFileName } from "../../../kernel/reading/confined-file-name.js";
-import { repositoryRootAbove } from "../../../kernel/reading/repository-root.js";
 import type {
   RunJournal,
   RunJournalBoundary,
@@ -18,8 +17,7 @@ const RUN_FILE_EXTENSION = ".jsonl";
 // Mirrors plugins/aidd-telemetry/hooks/lib/repo.cjs's own `sanitizePathSegment`, character
 // for character, so a vendor id sanitized there on write matches what is sanitized here on
 // read. Not a shared runtime import: the hook is a zero-dependency CommonJS script the
-// framework build copies verbatim (see telemetry-project-id.ts's doc comment for the same
-// reasoning, applied to project id sanitizing rather than a run file name). Exported so
+// framework build copies verbatim. Exported so
 // run-journal-reader-adapter.integration.test.ts can assert agreement against the hook's
 // own function directly, the same way telemetry-project-id.unit.test.ts pins its copy.
 export function sanitizePathSegment(segment: string): string {
@@ -196,8 +194,7 @@ export class RunJournalReaderAdapter implements RunJournalStore {
   readonly runsDir: string;
 
   constructor(projectRoot: string) {
-    this.runsDir =
-      process.env.AIDD_RUNS_DIR || join(repositoryRootAbove(projectRoot), DOCS_DIR, RUNS_SUBDIR);
+    this.runsDir = resolvedRunsDir(projectRoot);
   }
 
   async read(sessionId: string): Promise<RunJournal | null> {

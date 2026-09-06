@@ -35,7 +35,7 @@ export function printWelcomeBanner(output: CLIOutput): void {
 export function printNextSteps(output: CLIOutput, installedAnything: boolean): void {
   output.print("");
   output.print("Next steps:");
-  if (installedAnything) output.print("  aidd ai status          # verify drift");
+  if (installedAnything) output.print("  aidd doctor             # verify drift");
   output.print("  aidd marketplace list   # see registered marketplaces");
   output.print("  aidd plugin install     # add plugins");
   output.print("  aidd --help             # explore commands");

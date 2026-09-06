@@ -39,7 +39,7 @@ export class PluginRemoveUseCase {
     private readonly manifestRepo: ManifestRepository,
     private readonly logger: Logger,
     /** Native plugin CLI activators keyed by `NativeActivation.binary`, mirroring the map
-     * `MarketplaceSyncSettingsUseCase` installs through (see deps.ts). */
+     * `MarketplaceSyncSettingsUseCase` installs through (see runtime/wiring/framework.ts). */
     private readonly activators: ReadonlyMap<string, NativePluginActivator>
   ) {}
 
@@ -77,12 +77,12 @@ export class PluginRemoveUseCase {
   // The removal counterpart of MarketplaceSyncSettingsUseCase.activateTool: a tool declared
   // `nativeActivation` (Claude, Codex, Copilot) only loads a plugin once its own CLI registers
   // it in a user-global registry that install never wrote to directly — so removal must drive
-  // the same CLI, not edit that registry file itself (see deps.ts and the adapters under
-  // infrastructure/adapters/*-cli-adapter.ts). A plugin without a recorded marketplace was
-  // never activated this way at install time either (mirrors
-  // MarketplaceSyncSettingsUseCase.pluginActivation's `marketplace == null` skip), so there is
-  // nothing to undo. Best-effort: a host that can't be reached must warn by name with what is
-  // left behind, never fail the whole removal silently.
+  // the same CLI, not edit that registry file itself (see runtime/wiring/framework.ts and
+  // contexts/tools/infrastructure/native-plugin-cli-adapter.ts). A plugin without a recorded
+  // marketplace was never activated this way at install time either (mirrors
+  // MarketplaceSyncSettingsUseCase.pluginRefsToEnable's `marketplace == null` skip), so there
+  // is nothing to undo. Best-effort: a host that can't be reached must warn by name with what
+  // is left behind, never fail the whole removal silently.
   private removeNativeActivation(plugin: InstalledPlugin, toolId: AiToolId): void {
     const nativeActivation = resolvePluginsCapability(toolId)?.nativeActivation;
     if (nativeActivation == null || plugin.marketplace === undefined) return;
@@ -124,8 +124,11 @@ export class PluginRemoveUseCase {
     toolId: AiToolId,
     projectRoot: string
   ): Promise<void> {
-    if (resolvePluginsCapability(toolId)?.hooksDestination !== "project") return;
-    const hooksPath = join(projectRoot, ".cursor", "hooks.json");
+    const pluginsCap = resolvePluginsCapability(toolId);
+    if (pluginsCap?.hooksDestination !== "project") return;
+    const projectHooksRelativePath = pluginsCap.projectHooksRelativePath;
+    if (projectHooksRelativePath === null) return;
+    const hooksPath = join(projectRoot, projectHooksRelativePath);
     const existing = await this.readExistingJson(hooksPath);
     if (existing !== null) {
       await this.fs.writeFile(hooksPath, unmergeCursorProjectHooksJson(existing, pluginName));

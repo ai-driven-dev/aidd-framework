@@ -39,7 +39,7 @@ export class InitUseCase {
 
     if (existing !== null) {
       throw new AlreadyInitializedError(
-        `Already initialized. Use \`aidd init --force\` to reinitialize, or \`aidd clean --force\` to reset completely.`
+        `Already initialized. Run \`aidd clean --force\` then \`aidd setup\` to reset completely.`
       );
     }
 

@@ -13,6 +13,12 @@ const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 // purpose, rather than padding past what was actually measured.
 // 593 was set when `by_prompt` joined the breakdowns: measured 588.4 -> 590.6 KB,
 // +2.2 KB for the axis that is complete by construction. Same tight headroom.
+// 557 was set 2026-09-04: the 593 budget had drifted from reality, measuring
+// 545.7 KB against the current package.json's dependency resolution (the
+// committed lockfile itself was stale and refused a frozen install) - 47 KB of
+// slack nobody could see landing on the next feature at once. Reset to
+// measured + ~2% headroom instead of padding further past a number the last
+// three raises never revisited.
 const budgetKB = pkg.bundleBudgetKB ?? 500;
 const budgetBytes = budgetKB * 1024;
 

@@ -10,13 +10,16 @@ import type {
  * damaged-journal case a caller of `listRunFiles()` needs. `undeletable`, mirroring
  * `InMemoryTelemetrySink`, stands in for a run file that refuses removal. `deletedFromDirs`
  * records every `dir` argument `deleteRunFile` actually received — what a mutation test
- * checks to prove a caller passed the preview's own path, never this double's `runsDir`. */
+ * checks to prove a caller passed the preview's own path, never this double's `runsDir`.
+ * `listCalls` counts every `list()` invocation — what a caller that must read the journal
+ * only once per run is proven against, rather than trusted from its own source. */
 export class InMemoryRunJournalReader implements RunJournalStore {
   readonly runsDir = "/fake/project/aidd_docs/runs";
   runFileNames: string[] = [];
   readonly deletedFiles: string[] = [];
   readonly deletedFromDirs: string[] = [];
   readonly undeletable = new Set<string>();
+  listCalls = 0;
   private readonly journals = new Map<string, RunJournal>();
 
   set(sessionId: string, journal: RunJournal): void {
@@ -28,6 +31,7 @@ export class InMemoryRunJournalReader implements RunJournalStore {
   }
 
   async list(): Promise<readonly RunJournal[]> {
+    this.listCalls += 1;
     return [...this.journals.values()];
   }
 

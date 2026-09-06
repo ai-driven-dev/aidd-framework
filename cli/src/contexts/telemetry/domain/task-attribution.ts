@@ -98,7 +98,7 @@ export function buildTaskIntervals(
 
 /** Why a record belongs to no task - the distinct facts a person acts on differently, and
  * no more than those. This function itself answers only the four that are facts about the
- * record; `"no-journal"`, the fact about the read, is decided by `declaredTaskKeyOf` before
+ * record; `"no-journal"`, the fact about the read, is decided by `taskRowOf` before
  * this is ever called. Never called for a moment `momentFallsWithin`
  * already reads as covered; that caller already knows which interval and needs no reason for
  * what it found.
@@ -111,7 +111,7 @@ export function buildTaskIntervals(
  *   reason turns on: saying "no journal existed" would be false for the second case, which
  *   is the fault this reason exists to stop repeating one level down. Never produced by this
  *   function, which is only ever asked about a session whose journal was usable -
- *   `declaredTaskKeyOf` answers it before calling here, from the absence of an entry in its
+ *   `taskRowOf` answers it before calling here, from the absence of an entry in its
  *   own per-session map. It belongs in
  *   this type all the same: it is one of the reasons a `by_task` row carries, and keeping it
  *   in the same closed set is what makes `Record<TaskUnattributedReason, string>` force

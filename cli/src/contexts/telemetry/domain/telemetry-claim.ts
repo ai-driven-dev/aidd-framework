@@ -420,7 +420,7 @@ function claimToolsReadable(
 
 function hasJoinMaterial(
   toolReads: readonly TelemetryClaimToolRead[],
-  records: readonly { readonly stepAttribution: string }[]
+  records: readonly { readonly stepAttribution: StepAttributionSource }[]
 ): boolean {
   return (
     toolReads.some((read) => read.hasIntervals) ||
@@ -428,7 +428,9 @@ function hasJoinMaterial(
   );
 }
 
-function joinedVerdict(records: readonly { readonly stepAttribution: string }[]): TelemetryClaim {
+function joinedVerdict(
+  records: readonly { readonly stepAttribution: StepAttributionSource }[]
+): TelemetryClaim {
   const joined = records.filter((record) => record.stepAttribution !== "unattributed");
   if (joined.length === 0) {
     return {

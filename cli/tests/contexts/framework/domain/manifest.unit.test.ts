@@ -324,7 +324,7 @@ describe("Manifest", () => {
     // which would leave the user exactly as stuck as the refusal they're trying to fix.
     // `--force` is the verified-reliable path (see RECOVERY_COMMAND in manifest.ts), so a
     // bare /update/ match isn't enough — pin the literal invocation.
-    const RECOVERY_INVOCATION = /npx @ai-driven-dev\/cli@5\.2\.1 update --force/;
+    const RECOVERY_INVOCATION = /npx @ai-driven-dev\/cli@5\.2\.2 update --force/;
 
     it("rejects a version below 6 and names the last CLI able to migrate it", () => {
       const v5 = { version: 5, tools: {} };
@@ -343,7 +343,27 @@ describe("Manifest", () => {
       const v99 = { version: 99, tools: {} };
       expect(() => Manifest.fromJSON(v99)).toThrow(/version/);
       expect(() => Manifest.fromJSON(v99)).toThrow(/aidd update/);
-      expect(() => Manifest.fromJSON(v99)).not.toThrow(/5\.2\.1/);
+      expect(() => Manifest.fromJSON(v99)).not.toThrow(/5\.2\.2/);
+    });
+  });
+
+  describe("malformed tool entry", () => {
+    it("throws an instructive, typed error naming the field when files is missing", () => {
+      const data = { version: 6, tools: { claude: { toolId: "claude", version: "1.0.0" } } };
+      expect(() => Manifest.fromJSON(data)).toThrow(/tools\.claude\.files/);
+    });
+
+    it("throws an instructive, typed error naming the field when files is the wrong type", () => {
+      const data = {
+        version: 6,
+        tools: { claude: { toolId: "claude", version: "1.0.0", files: "nope" } },
+      };
+      expect(() => Manifest.fromJSON(data)).toThrow(/tools\.claude\.files/);
+    });
+
+    it("throws an instructive, typed error when a tool entry is not an object", () => {
+      const data = { version: 6, tools: { claude: "nope" } };
+      expect(() => Manifest.fromJSON(data)).toThrow(/tools\.claude/);
     });
   });
 

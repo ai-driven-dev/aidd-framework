@@ -36,7 +36,7 @@ import type { ReadLocalCostResult, ReadLocalCostUseCase } from "./read-local-cos
 
 export interface ReportCostOptions {
   /** Already two absolute days. Resolving what a caller asked for is
-   * `domain/models/report-period.ts`'s job and happens once, at the edge — so nothing from
+   * `domain/report-period.ts`'s job and happens once, at the edge — so nothing from
    * here down reads a clock, and the same options answer the same twice. */
   readonly period: ResolvedReportPeriod;
   /** Restrict to the sessions that wrote into this task. Absent reports the whole period. */
@@ -140,7 +140,7 @@ function toSessionJournal(
 }
 
 /** Every distinct task identity this period's journals could ever key `by_task` on - the
- * same declared intervals `declaredTaskKeyOf` reads from, built once here from the raw
+ * same declared intervals `taskRowOf` reads from, built once here from the raw
  * `RunJournal`s rather than the already-mapped session journals, so it needs no restructure
  * of `toReportInput`'s own mapping. Each identity is resolved to its folder's declaration
  * exactly once, never once per record. Order is incidental; the report only ever looks this
@@ -351,15 +351,6 @@ function toReportInput(
   };
 }
 
-/**
- * Answers what a period, or one task inside it, cost.
- *
- * Orchestration only: the two reads belong to their ports, the rules belong to
- * `domain/models/cost-report.ts`, and what is left is asking for one period's records and
- * one period's journals and handing both over. It names no tool and computes no figure -
- * in particular no amount, since the rates live outside this repository and an amount is
- * only ever reported where a tool's own files already carried one.
- */
 /** Sessions holding at least one stored record a re-read could never be matched against.
  *
  * A re-read is reconciled with what is stored on `turn_id`, and `groupByTurnId` indexes
@@ -420,6 +411,15 @@ function sessionsToCatchUp(
   return missing;
 }
 
+/**
+ * Answers what a period, or one task inside it, cost.
+ *
+ * Orchestration only: the two reads belong to their ports, the rules belong to
+ * `domain/cost-report.ts`, and what is left is asking for one period's records and
+ * one period's journals and handing both over. It names no tool and computes no figure -
+ * in particular no amount, since the rates live outside this repository and an amount is
+ * only ever reported where a tool's own files already carried one.
+ */
 export class ReportCostUseCase {
   constructor(
     private readonly sink: TelemetrySink,
@@ -515,7 +515,7 @@ export class ReportCostUseCase {
   private warnAboutFailures(sessionId: string, result: ReadLocalCostResult): void {
     // A missing logger cannot be allowed to swallow the failures this exists to surface —
     // that is the rule this method is named for, applied to itself. Production always wires
-    // one (`runtime/wiring/framework.ts`); a caller that does not gets the same sentences on stderr rather than
+    // one (`runtime/wiring/telemetry.ts`); a caller that does not gets the same sentences on stderr rather than
     // silence, because a report that quietly drops unreadable sessions reads as low spend.
     const say =
       this.logger?.warn.bind(this.logger) ?? ((line: string) => process.stderr.write(`${line}\n`));

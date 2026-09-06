@@ -272,7 +272,7 @@ function fakeTool(overrides: Partial<AiTool<unknown>>): AiTool<unknown> {
     toolSuffix: ".md",
     signalDir: null,
     capabilities: {},
-    telemetryLocalRead: { kind: "unmeasured" },
+    telemetryLocalRead: { kind: "unsupported", reason: "a stub reads nothing" },
     telemetryTaskAttributable: false,
     rewriteContent: (content) => content,
     ...overrides,

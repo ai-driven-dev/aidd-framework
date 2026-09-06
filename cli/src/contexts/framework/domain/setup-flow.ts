@@ -62,38 +62,4 @@ export class SetupFlow {
       );
     }
   }
-
-  isScriptable(): boolean {
-    return !this.interactive;
-  }
-
-  hasAnyTool(): boolean {
-    return this.aiTools.length > 0 || this.ideTools.length > 0;
-  }
-
-  equals(other: SetupFlow): boolean {
-    return (
-      this.projectRoot === other.projectRoot &&
-      this.interactive === other.interactive &&
-      this.force === other.force &&
-      this.pluginMode === other.pluginMode &&
-      arraysEqual(this.aiTools, other.aiTools) &&
-      arraysEqual(this.ideTools, other.ideTools) &&
-      arraysEqual(this.pluginNames, other.pluginNames) &&
-      sourcesEqual(this.source, other.source)
-    );
-  }
-}
-
-function arraysEqual<T>(a: readonly T[], b: readonly T[]): boolean {
-  return a.length === b.length && a.every((v, i) => v === b[i]);
-}
-
-function sourcesEqual(
-  a: MarketplaceSourceMode | undefined,
-  b: MarketplaceSourceMode | undefined
-): boolean {
-  if (a === undefined && b === undefined) return true;
-  if (a === undefined || b === undefined) return false;
-  return a.equals(b);
 }

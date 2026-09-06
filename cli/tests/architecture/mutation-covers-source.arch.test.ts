@@ -10,9 +10,8 @@
  * why. This reads both halves, so a new directory belonging to neither is a failure that
  * names it rather than a number that stays flat.
  */
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { read, sourceFiles } from "./helpers.js";
+import { matchesGlob, read, sourceFiles } from "./helpers.js";
 
 interface ScopeDeclaration {
   readonly scopes: Readonly<Record<string, string>>;
@@ -21,27 +20,6 @@ interface ScopeDeclaration {
 
 function declaration(): ScopeDeclaration {
   return JSON.parse(read("mutation-scopes.json")) as ScopeDeclaration;
-}
-
-/**
- * Matches the subset of glob syntax the declaration uses: a literal prefix, `/**\/` for
- * any number of directories including none, `*` within one segment. Written out rather
- * than pulled in, so the rule this test enforces is visible beside the test.
- *
- * The "including none" is the whole subtlety: `src/kernel/**\/*.ts` has to match
- * `src/kernel/errors.ts` as well as `src/kernel/ports/logger.ts`, or a scope silently
- * covers only its subdirectories.
- */
-function matchesGlob(glob: string, path: string): boolean {
-  const pattern = glob
-    .split("/**/")
-    .map((segment) => segment.split("*").map(escapeRegex).join("[^/]*"))
-    .join("/(?:.*/)?");
-  return new RegExp(`^${pattern}$`).test(path);
-}
-
-function escapeRegex(literal: string): string {
-  return literal.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function isCovered(path: string, { scopes, excluded }: ScopeDeclaration): boolean {
@@ -93,11 +71,11 @@ describe("mutation covers every source file", () => {
 
   it("no other file lists what mutation covers", () => {
     // The declaration is the single source; stryker.conf.json carrying its own `mutate`
-    // is exactly the drift this replaces.
-    const stryker = JSON.parse(readFileSync("stryker.conf.json", "utf8")) as Record<
-      string,
-      unknown
-    >;
+    // is exactly the drift this replaces. Read through `read()`, resolved against the cli
+    // package root: a bare relative `readFileSync("stryker.conf.json")` only found the file
+    // because every other gate in this suite happens to run with `cli/` as the cwd — a
+    // repository-root invocation threw ENOENT on this line alone.
+    const stryker = JSON.parse(read("stryker.conf.json")) as Record<string, unknown>;
     expect("mutate" in stryker, "stryker.conf.json declares its own mutate again").toBe(false);
   });
 

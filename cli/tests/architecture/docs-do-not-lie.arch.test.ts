@@ -8,9 +8,22 @@
  * accepted when its line marks it as removed, denies its existence, or is a migration
  * table row mapping an old command to its replacement. That keeps the check honest
  * without a name allowlist going stale the day a command comes back.
+ *
+ * Checking pairs, not just the first word, is what makes this test worth having: reading
+ * only the first word after `aidd` cleared `aidd plugin bogus` outright, because `plugin`
+ * is a real command group and `bogus` was never looked at. `declaredCommands()` and
+ * `unresolvedCommandMentions()` are shared with `errors-that-instruct.arch.test.ts`, which
+ * checks the same property for an error message instead of a document — one extractor, one
+ * pair-aware check, used by both.
  */
 import { describe, expect, it } from "vitest";
-import { read, sourceFiles } from "./helpers.js";
+import {
+  declaredCommands,
+  pluginReadmes,
+  read,
+  readFromRepoRoot,
+  unresolvedCommandMentions,
+} from "./helpers.js";
 
 /**
  * Documents that present the CLI's surface to a reader.
@@ -34,49 +47,65 @@ function isMigrationRow(line: string): boolean {
   return line.trimStart().startsWith("|") && [...line.matchAll(/\baidd\s+[a-z]/g)].length >= 2;
 }
 
-function registeredCommands(): Set<string> {
-  const names = new Set<string>();
-  for (const file of sourceFiles().filter((f) => f.startsWith("src/presentation/commands/"))) {
-    for (const match of read(file).matchAll(/\.command\("([a-z][a-z-]*)/g)) names.add(match[1]);
+/**
+ * Strips every paragraph that talks about a command's history rather than claims it works
+ * today, so the mentions that remain are exactly the ones this rule may hold to account.
+ *
+ * `MARKED_GONE` is checked against the whole paragraph, unwrapped to one line first:
+ * markdown wraps prose at a column width, so a sentence's citation and the word that marks
+ * it gone can land on different physical lines — "you ran `aidd telemetry endpoint` on an
+ * older version, that is a fact ... this plugin can no longer see" wrapped exactly that way,
+ * and a per-line check cleared the citation while missing "no longer" one line down. A
+ * migration table row is still read one line at a time: a row is genuinely one line, and a
+ * whole table has no blank line between its rows to unwrap.
+ */
+function textClaimingCommandsWork(text: string): string {
+  const paragraphs = text.split(/\n\s*\n/);
+  const kept: string[] = [];
+  for (const paragraph of paragraphs) {
+    if (MARKED_GONE.test(paragraph.replace(/\n/g, " "))) continue;
+    kept.push(
+      paragraph
+        .split("\n")
+        .filter((line) => !isMigrationRow(line))
+        .join("\n")
+    );
   }
-  // An empty set would clear every document at once: nothing can be undeclared when
-  // nothing is declared. A sibling rule failed exactly that way when its directory
-  // moved, so the emptiness is checked rather than assumed.
-  if (names.size === 0) throw new Error("no command found — the scope of this rule is stale");
-  return names;
+  return kept.join("\n\n");
 }
 
-/** The rule's citation-gathering half, over raw text instead of a file on disk. */
-function citedAsAvailableInText(text: string): string[] {
-  const cited = new Set<string>();
-  for (const line of text.split("\n")) {
-    if (MARKED_GONE.test(line) || isMigrationRow(line)) continue;
-    for (const match of line.matchAll(/\baidd\s+([a-z][a-z-]*)/g)) cited.add(match[1]);
-  }
-  return [...cited].sort();
-}
-
-/** The rule itself: which cited commands the registered set does not declare. */
-function undeclaredCommands(text: string, registered: ReadonlySet<string>): string[] {
-  return citedAsAvailableInText(text).filter((name) => !registered.has(name));
+/** Which commands a document cites as available today that the CLI does not declare. */
+function undeclaredCommands(text: string, declared: ReadonlySet<string>): string[] {
+  return [...new Set(unresolvedCommandMentions(textClaimingCommandsWork(text), declared))].sort();
 }
 
 describe("documented commands exist", () => {
-  const registered = registeredCommands();
+  const declared = declaredCommands();
 
   it.each(DOCS)("%s presents no command the CLI does not declare", (doc) => {
-    const missing = undeclaredCommands(read(doc), registered);
+    const missing = undeclaredCommands(read(doc), declared);
     expect(missing, `${doc} presents commands that do not exist`).toEqual([]);
   });
 
-  it("flags an undeclared command and clears one marked gone, migrated, or registered", () => {
-    const knownCommands = new Set(["init"]);
+  it.each(pluginReadmes())("%s presents no command the CLI does not declare", (doc) => {
+    const missing = undeclaredCommands(readFromRepoRoot(doc), declared);
+    expect(missing, `${doc} presents commands that do not exist`).toEqual([]);
+  });
+
+  it("flags an undeclared command, a bad pair, and clears one marked gone, migrated, or registered", () => {
+    const knownCommands = new Set(["init", "plugin", "plugin install"]);
 
     expect(undeclaredCommands("Run `aidd bogus-command` to do it.", knownCommands)).toEqual([
       "bogus-command",
     ]);
+    // `plugin` exists; `plugin bogus` does not. Reading only the first word after `aidd`
+    // would clear this, and that is exactly how it shipped wrong.
+    expect(undeclaredCommands("Run `aidd plugin bogus` to do it.", knownCommands)).toEqual([
+      "plugin bogus",
+    ]);
     expect(undeclaredCommands("`aidd bogus-command` was removed.", knownCommands)).toEqual([]);
     expect(undeclaredCommands("| `aidd old-name` | `aidd new-name` |", knownCommands)).toEqual([]);
     expect(undeclaredCommands("Run `aidd init` to start.", knownCommands)).toEqual([]);
+    expect(undeclaredCommands("Run `aidd plugin install` to add one.", knownCommands)).toEqual([]);
   });
 });

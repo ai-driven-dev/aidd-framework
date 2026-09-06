@@ -11,18 +11,20 @@
 # path; this smoke does, including deliberate cache corruption.
 #
 # Hermetic by default: every setup uses the local framework fixture, so a run needs
-# neither the network nor a token. Set SMOKE_REMOTE=1 to add the remote-fetch section.
+# neither the network nor a token, and coverage never depends on one being reachable.
+# Set SMOKE_REMOTE=1 to additionally exercise the opt-in remote-fetch block near the
+# end, which is skipped otherwise and counts toward neither PASS/FAIL nor coverage.
 #
 # Phase 18 moved the surface: `ai`/`ide` folded into `--tool`, `status`/`ai doctor`/
 # `ide doctor`/`plugin doctor` folded into `doctor`, `restore` renamed `sync`,
-# `self-update` renamed `update`, `framework build` renamed `translate`. 22 leaf
-# commands today (was 36) — this file's ALL_COMMANDS below is the same count phase 18's
-# plan measured (`aidd_docs/tasks/2026_08/2026_08_20_refactor-contextes-cli/commandes.md`).
+# `self-update` renamed `update`, `framework build` renamed `translate`. 32 leaf
+# commands today — this file's ALL_COMMANDS below is the same count `derived_leaves`
+# reads live off the built binary, `telemetry identity`'s four verbs (`use`/`off`/
+# `link`/`unlink`) included as their own leaves rather than folded into one.
 #
 # Measured 2026-08-21 (pre-phase-18): hermetic run 92s, 98 checks, 37/37 leaf commands.
 # The remote-gated version it replaces took 7 min 11 s and covered 11 invocations
 # when no GitHub token happened to be reachable.
-# Without one, the remote sections are SKIPPED (coverage will read low).
 
 set -uo pipefail
 
@@ -41,7 +43,8 @@ ALL_COMMANDS=(
   "marketplace add" "marketplace list" "marketplace remove" "marketplace refresh" "marketplace check"
   "auth login" "auth logout" "auth status"
   "telemetry on" "telemetry off" "telemetry read" "telemetry report" "telemetry check"
-  "telemetry forget" "telemetry identity"
+  "telemetry forget"
+  "telemetry identity use" "telemetry identity off" "telemetry identity link" "telemetry identity unlink"
 )
 
 PASS=0; FAIL=0; SKIP=0
@@ -56,9 +59,19 @@ skip() { SKIP=$((SKIP+1)); echo "  ~ $1"; }
 section() { echo; echo "=== $1 === [$(date +%H:%M:%S)]"; }
 
 PARENTS=" plugin marketplace auth framework telemetry "
+# `telemetry identity` is itself a parent, one level deeper than PARENTS above:
+# its own leaves are `use`/`off`/`link`/`unlink`, so a covered key needs three
+# words there, not two.
+GRANDPARENTS=" telemetry identity "
 derive_key() {
-  local first="$1" second="${2:-}"
-  if [[ "$PARENTS" == *" $first "* ]]; then echo "$first $second"; else echo "$first"; fi
+  local first="$1" second="${2:-}" third="${3:-}"
+  if [[ "$GRANDPARENTS" == *" $first $second "* ]]; then
+    echo "$first $second $third"
+  elif [[ "$PARENTS" == *" $first "* ]]; then
+    echo "$first $second"
+  else
+    echo "$first"
+  fi
 }
 
 CMD_TIMEOUT="${SMOKE_CMD_TIMEOUT:-180}"   # hard ceiling per command (seconds)
@@ -106,9 +119,11 @@ new_project() { local p; p=$(mktemp -d "$TMPROOT/proj.XXXXXX"); (cd "$p" && git 
 cache_catalog() { find "$1/.aidd/cache/marketplaces" -path "*marketplace.json" 2>/dev/null | head -1; }
 
 # ── build ───────────────────────────────────────────────────────
-echo "Building dist…"
-(cd "$ROOT" && pnpm build) >/dev/null 2>&1 || { echo "FATAL: build failed"; exit 1; }
-echo "Build OK  ·  CLI: $CLI"
+# `pnpm smoke`/`pnpm smoke:full` already ran `pnpm build` before this script — this
+# script has no other caller — so rebuilding here would just be a second build of
+# the same source. Check the artifact exists instead of rebuilding it.
+[[ -f "$CLI" ]] || { echo "FATAL: $CLI missing — run 'pnpm build' first"; exit 1; }
+echo "Using built CLI: $CLI"
 
 TMPROOT=$(mktemp -d -t aidd-smoke-tools-XXXXXXXX)
 export AIDD_USER_CONFIG_DIR="$TMPROOT/cfg"; mkdir -p "$AIDD_USER_CONFIG_DIR"
@@ -380,6 +395,11 @@ if true; then
   run "telemetry on --yes" 0 "" "$P_TEL" -- telemetry on --yes
   [[ -f "$P_TEL/.aidd/config.json" ]] && ok "telemetry on writes the switch" || bad "no .aidd/config.json after telemetry on"
   run "telemetry identity use" 0 "" "$P_TEL" -- telemetry identity use
+  run "telemetry identity off" 0 "" "$P_TEL" -- telemetry identity off
+  # link/unlink both require a real identifier to act on; --help pins that the leaf
+  # exists and parses, without fabricating one that would mutate the profile.
+  run "telemetry identity link --help" 0 "" "$P_TEL" -- telemetry identity link --help
+  run "telemetry identity unlink --help" 0 "" "$P_TEL" -- telemetry identity unlink --help
   run "telemetry read" 0 "" "$P_TEL" -- telemetry read
   run "telemetry report" 0 "" "$P_TEL" -- telemetry report
   run "telemetry off" 0 "" "$P_TEL" -- telemetry off
@@ -456,22 +476,28 @@ fi
 # The list above is written by hand; the binary is what a person actually gets. A command
 # added to the CLI and not to that list reads as 100% covered while nothing ever ran it —
 # which is exactly what twelve telemetry commands did through a whole merge, with this
-# report saying 22/22 the entire time.
-derived_leaves() {
-  local top sub
+# report saying 22/22 the entire time. Genuinely recursive, not one level deep: a parent
+# whose own children are themselves parents (`telemetry identity`, one level under
+# PARENTS) used to read as a single leaf, so its four real leaves (`use`/`off`/`link`/
+# `unlink`) went unlisted and uncovered under one name nothing in ALL_COMMANDS matched.
+has_subcommands() {
+  node "$CLI" "$@" --help 2>/dev/null | grep -q '^Commands:'
+}
+
+leaves_under() {
+  local path=("$@") name
   # `cut -d'|'`: commander prints an alias as `update|upgrade`, one command with two names.
-  for top in $(node "$CLI" --help 2>/dev/null | awk '/^Commands:/{f=1;next} f && /^  [a-z]/{print $1}' | cut -d'|' -f1); do
-    [[ "$top" == "help" ]] && continue
-    if [[ "$PARENTS" == *" $top "* ]]; then
-      for sub in $(node "$CLI" "$top" --help 2>/dev/null | awk '/^Commands:/{f=1;next} f && /^  [a-z]/{print $1}' | cut -d'|' -f1); do
-        [[ "$sub" == "help" ]] && continue
-        echo "$top $sub"
-      done
+  for name in $(node "$CLI" "${path[@]}" --help 2>/dev/null | awk '/^Commands:/{f=1;next} f && /^  [a-z]/{print $1}' | cut -d'|' -f1); do
+    [[ "$name" == "help" ]] && continue
+    if has_subcommands "${path[@]}" "$name"; then
+      leaves_under "${path[@]}" "$name"
     else
-      echo "$top"
+      echo "${path[*]} $name" | sed 's/^ *//'
     fi
   done
 }
+
+derived_leaves() { leaves_under; }
 
 section "command list"
 declared=$(printf '%s\n' "${ALL_COMMANDS[@]}" | sort)
@@ -500,7 +526,8 @@ echo "PASS: $PASS   FAIL: $FAIL   SKIP: $SKIP   ·   coverage ${pct}%"
 if [[ "$FAIL" -gt 0 ]]; then
   echo; echo "Failures:"; for f in "${FAILURES[@]}"; do echo "  • $f"; echo; done
 fi
-# Fail the smoke if anything broke OR coverage fell below 95% while a token was present.
+# Fail the smoke if anything broke OR coverage fell below 95%. Neither check is
+# gated on a token: the hermetic matrix above runs the same either way.
 if [[ "$FAIL" -gt 0 ]]; then exit 1; fi
 if [[ "$pct" -lt 95 ]]; then echo "Coverage below 95% threshold."; exit 1; fi
 exit 0

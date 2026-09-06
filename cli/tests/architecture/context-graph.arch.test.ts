@@ -16,114 +16,22 @@
  * to contexts to kernel — so a context reaching back into either is recorded here rather
  * than left to prose. It was left to prose until now, and three such imports appeared
  * without a test noticing.
- */
-import { readFileSync } from "node:fs";
-import { dirname, join, normalize, relative, resolve } from "node:path";
-import { describe, expect, it } from "vitest";
-import { CLI_ROOT, expectRatchet, sourceFiles } from "./helpers.js";
-
-const ALLOWED = new Set([
-  "framework->translate",
-  "framework->tools",
-  "framework->distribution",
-  "translate->tools",
-  // Measurement asks a tool what it declares — its registry entry, where its transcripts
-  // live, the shape of its hooks file — and a tool declares nothing about measurement in
-  // return. The vocabulary both speak (`kernel/measurement.ts`) sits in the kernel, which
-  // is what makes the reverse edge structurally impossible rather than merely absent.
-  "telemetry->tools",
-]);
-
-/** Edges that exist and should not. This list may only shrink. */
-/**
- * Edges the chain forbids and the tree still has. The list may only shrink, and each entry
- * carries what it admits, measured — an edge alone says nothing about its weight, so a
- * baselined edge could absorb any number of new imports in silence. `folder-size` already
- * counts its entries; this carries the same shape here.
  *
- * That the counts were missing is not theoretical. The single comment below used to cover
- * two edges at once and got both wrong: it said "fourteen context files import runtime"
- * where `framework` has eleven, and named "the http client and the git token injection" as
- * `framework`'s two implementations when they are `distribution`'s, which has three.
- * `distribution->runtime` sat under that comment with no reason of its own.
+ * ALLOWED, BASELINE and the edge-walking machinery live in `helpers.ts` now: this is the
+ * one place they are declared, so `biome-context-parity.arch.test.ts` checks
+ * `cli/biome.json`'s own per-context overrides against this same data instead of a second,
+ * hand-copied list that only looks like it agrees.
  */
-const BASELINE: readonly {
-  readonly edge: string;
-  readonly imports: number;
-  readonly files: number;
-}[] = [
-  // `marketplace add --overwrite` removes before it adds, and removing deletes the
-  // installed plugin files — framework work. The orchestration belongs to whoever calls
-  // both, not to the context that only knows where content comes from.
-  { edge: "distribution->framework", imports: 1, files: 1 },
-  // Three implementations and one port: the http client, the git token injection and the
-  // user-config directory are concrete, so this edge is a real dependency on runtime and
-  // not a misplaced contract. It resolves by inverting them into ports this context holds.
-  { edge: "distribution->runtime", imports: 5, files: 3 },
-  // Three framework orchestrators still name the prompt classes they are handed. Type-only
-  // imports with unchanged signatures — inverting them into a port is a design change, not
-  // the move phase 16 was. Recorded so it is measured rather than remembered.
-  { edge: "framework->presentation", imports: 4, files: 3 },
-  // Three targets, every one an interface: token provider, platform, latest release
-  // resolver. Those are contracts a context is entitled to depend on, sitting in the wrong
-  // place — a port used by two contexts belongs in the kernel, as phase 9 established.
-  // Nothing concrete crosses here. `version-reader` was the fourth and has since moved to
-  // `kernel/ports/`, which is what this count dropping from thirteen records.
-  { edge: "framework->runtime", imports: 8, files: 7 },
-];
-
-function contextOf(file: string): string {
-  const inContext = /^src\/contexts\/([^/]+)\//.exec(file);
-  if (inContext) return inContext[1];
-  if (file.startsWith("src/kernel/")) return "kernel";
-  if (file.startsWith("src/presentation/")) return "presentation";
-  if (file.startsWith("src/runtime/")) return "runtime";
-  return "outside";
-}
-
-/** A layer a context may not depend on: the arrows run towards the kernel, never back. */
-const BELOW_NOTHING = new Set(["presentation", "runtime"]);
-
-function isContext(name: string): boolean {
-  return !BELOW_NOTHING.has(name) && name !== "kernel" && name !== "outside";
-}
-
-const RELATIVE_IMPORT = /(?:from|import)\s*\(?\s*["'](\.[^"']+\.js)["']/g;
-
-/** Every context-to-context edge the import graph contains, with how much crosses each. */
-function weighedEdges(files: readonly string[]): Map<string, { imports: number; files: number }> {
-  const found = new Map<string, { imports: number; files: Set<string> }>();
-  for (const file of files) {
-    const from = contextOf(file);
-    const source = readFileSync(join(CLI_ROOT, file), "utf8");
-    for (const match of source.matchAll(RELATIVE_IMPORT)) {
-      const target = normalize(
-        relative(CLI_ROOT, resolve(CLI_ROOT, dirname(file), match[1])).replace(/\.js$/, ".ts")
-      );
-      const to = contextOf(target);
-      if (from === to || to === "kernel" || from === "outside" || to === "outside") continue;
-      // presentation and runtime may reach down; only the reverse is an edge worth naming
-      if (BELOW_NOTHING.has(from)) continue;
-      if (BELOW_NOTHING.has(to) && !isContext(from)) continue;
-      const edge = `${from}->${to}`;
-      const weight = found.get(edge) ?? { imports: 0, files: new Set<string>() };
-      weight.imports += 1;
-      weight.files.add(file);
-      found.set(edge, weight);
-    }
-  }
-  return new Map(
-    [...found].map(([edge, weight]) => [
-      edge,
-      { imports: weight.imports, files: weight.files.size },
-    ])
-  );
-}
-
-/** Every context-to-context edge the import graph actually contains. */
-function edgesBetweenContexts(files: readonly string[]): string[] {
-  return [...weighedEdges(files).keys()].sort();
-}
+import { describe, expect, it } from "vitest";
+import {
+  ALLOWED,
+  BASELINE,
+  contextOf,
+  edgesBetweenContexts,
+  expectRatchet,
+  sourceFiles,
+  weighedEdges,
+} from "./helpers.js";
 
 describe("the context graph has only the edges the plan allows", () => {
   it("no context reaches another the chain does not permit", () => {

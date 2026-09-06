@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { cursorProjectHooksScriptDir } from "../../../contexts/tools/domain/formats/cursor-hooks-project-merge.js";
 import { genericFlatHooksScriptPath } from "../../../kernel/materialization/flat-paths.js";
-import { AIDD_DIR, MANIFEST_FILENAME } from "../../../kernel/paths.js";
+import { AIDD_DIR, MANIFEST_FILENAME, resolvedRunsDir } from "../../../kernel/paths.js";
 import { resolveHomeDir } from "../../../kernel/reading/home-dir.js";
 import { isErrnoException } from "../../../kernel/reading/json-file.js";
 import { asPlainObject } from "../../../kernel/reading/plain-object.js";
@@ -32,10 +32,6 @@ import {
 } from "./hook-trust-reader-adapter.js";
 
 const UNRECOGNISED_FILE_NAME = "_unrecognised.jsonl";
-
-function runsDir(projectRoot: string): string {
-  return process.env.AIDD_RUNS_DIR || join(projectRoot, "aidd_docs", "runs");
-}
 
 function manifestPath(projectRoot: string): string {
   return join(projectRoot, AIDD_DIR, MANIFEST_FILENAME);
@@ -196,7 +192,7 @@ async function settingsDeclaresPlugin(path: string, pluginName: string): Promise
 // leaf happened to collide the other way. Three real routes, not two: the unexpanded
 // `${CLAUDE_PLUGIN_ROOT}` token (a hand-authored or copied-verbatim Claude hooks block —
 // Claude Code itself resolves the token, never this build), the path
-// `aidd framework build --target claude --flat` actually rewrites it to
+// `aidd translate --to claude --as flat` actually rewrites it to
 // (`flat-build-strategy.ts`'s own `resolveClaudeRootRelative`, mirrored here via the same
 // `genericFlatHooksScriptPath` primitive so a change to that path shape cannot drift from
 // this one), and Cursor's project-scope directory `stripPluginEntries` already matches on.
@@ -301,7 +297,10 @@ export class TelemetryEvidenceAdapter implements TelemetryEvidenceReader {
 
   async readUnrecognisedPayload(projectRoot: string): Promise<TelemetryUnrecognisedPayload | null> {
     try {
-      const content = await readFile(join(runsDir(projectRoot), UNRECOGNISED_FILE_NAME), "utf8");
+      const content = await readFile(
+        join(resolvedRunsDir(projectRoot), UNRECOGNISED_FILE_NAME),
+        "utf8"
+      );
       return parseUnrecognisedPayload(content);
     } catch {
       return null;

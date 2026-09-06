@@ -1,5 +1,3 @@
-import { sep } from "node:path";
-import type { TranscriptLocation } from "../../../../kernel/measurement.js";
 import type {
   LocalCostCandidateRecord,
   TranscriptLineAccumulator,
@@ -9,8 +7,9 @@ import type {
 // ~/.codex/sessions/2026/07/29/rollout-*-019fae6f-....jsonl (a resumed session, where
 // `session_meta.id` and `session_id` differ) and .../2026/07/16/rollout-*-019f69d0-....jsonl
 // (that resumed session's own parent, a fresh session where the two agree). If Codex moves
-// any of these field names, tests/domain/formats/codex-rollout.unit.test.ts turns red
-// against the captured fixtures before a zero could be stored in the moved field's place.
+// any of these field names,
+// tests/contexts/telemetry/domain/formats/codex-rollout.unit.test.ts turns red against the
+// captured fixtures before a zero could be stored in the moved field's place.
 //
 // A `token_count` event's `info` carries `total_token_usage` (cumulative for the whole
 // rollout) and `last_token_usage` (this call's own increment) — summing the totals across
@@ -230,20 +229,11 @@ export function createCodexRolloutAccumulator(): TranscriptLineAccumulator {
   return new CodexRolloutAccumulator();
 }
 
-/** The `(content: string) => records[]` shape task 1.4 asks for, and what a fixture-driven
- * test targets directly. The adapter instead streams `createCodexRolloutAccumulator` one
- * line at a time, so a large rollout is never held whole in memory. */
+/** A `(content: string) => records[]` shape, for a fixture-driven test to target directly.
+ * The adapter instead streams `createCodexRolloutAccumulator` one line at a time, so a
+ * large rollout is never held whole in memory. */
 export function mapCodexRolloutToSinkRecords(content: string): readonly LocalCostCandidateRecord[] {
   const accumulator = createCodexRolloutAccumulator();
   for (const line of content.split("\n")) accumulator.push(line);
   return accumulator.build();
 }
-
-/**
- * Resolving Codex's session by `session_meta.id`, not `session_meta.session_id`, is
- * task 3's whole point: on a fresh session the two hold the same value, so a reader keyed
- * on the wrong one still passes every test written against a fresh session. This location's
- * `matches` relies on the filename instead of opening the file to check — measured across
- * every rollout on disk, a file's own trailing UUID always equals its `session_meta.id`,
- * including on the resumed session captured above, where it does not equal `session_id`.
- */

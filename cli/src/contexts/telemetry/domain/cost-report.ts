@@ -153,8 +153,8 @@ export interface CostReportToolRow {
   readonly sessionTotals?: CostTotals;
 }
 
-/** How much of the broken-down total each strength accounts for. Printed as three figures
- * rather than as a sentence saying attribution is approximate: three numbers that sum to
+/** How much of the broken-down total each strength accounts for. Printed as four figures
+ * rather than as a sentence saying attribution is approximate: four numbers that sum to
  * the total say strictly more, and unlike the sentence they can be asserted. */
 export interface CostReportAttributionRow {
   readonly attribution: StepAttributionSource;
@@ -192,8 +192,9 @@ export interface CostReportProjectRow {
  * coverage runs out before this record's moment. Never for a written file this breakdown
  * does not consult, and never split from a declaration the journal simply could not read:
  * the journal records a `task_declared` line or it does not, and those two read as
- * `"no-declaration"` alike. Up to four such rows can appear in one period, one per reason
- * actually present - never collapsed into one, since two different gaps are not one gap.
+ * `"no-declaration"` alike. Up to one row per `TASK_UNATTRIBUTED_REASONS` entry actually
+ * present can appear in one period - never collapsed into one, since two different gaps
+ * are not one gap.
  * Sorted apart from every other breakdown: largest first among named tasks, with every
  * reason row last, in `TASK_UNATTRIBUTED_REASONS`' own fixed order, so a reader sees tasks
  * before the remainder and the remainder in the same order every time. */
@@ -645,15 +646,6 @@ function modelKeyOf(record: TelemetrySinkRecord): ModelKey {
   return record.model === undefined ? NO_KNOWN_MODEL : record.model;
 }
 
-// The same idea, for the task a record's own moment fell inside - a record whose session
-// never declared one, whose moment falls before a declaration, or whose moment the
-// journal's own declared coverage has run out before - and one whose session no usable
-// journal ever reached - is its own group, keyed on *which* of those this record is, never
-// dropped and never collapsed into one bucket. A plain
-// string, unlike `NO_KNOWN_PROJECT` and `NO_KNOWN_MODEL`: `TaskIdentity` is always
-// `${month}/${name}`, which a reason string never is, so the two can never collide.
-type TaskRowKey = TaskIdentity | TaskUnattributedReason;
-
 /** How a record came to belong to a task, or why it belongs to none - the value every task
  * axis keys on, computed once per record. A named membership carries `attribution` beside
  * the identity rather than only the identity, because the same task holds records from both
@@ -844,10 +836,9 @@ const OUTSIDE_EVERY_FLOW = Symbol("record falls outside every flow interval");
 // Keyed on the closed `FlowInterval` object itself, by reference, never on `skill` alone:
 // two orchestrated runs of the same skill in one session are two distinct `FlowInterval`
 // objects (`buildFlowIntervals`'s own doc comment), and a `Map` keyed on object identity
-// keeps them two rows without needing a synthesized composite string key. This also gives
-// `byFlows` for free the property `phase-1.md` asks of it: a record outside every flow can
-// never collide with one inside, since `OUTSIDE_EVERY_FLOW` is a symbol no interval object
-// can ever equal.
+// keeps them two rows without needing a synthesized composite string key. A record outside
+// every flow can never collide with one inside, since `OUTSIDE_EVERY_FLOW` is a symbol no
+// interval object can ever equal.
 type FlowRowKey = FlowInterval | typeof OUTSIDE_EVERY_FLOW;
 
 /** Every session's own closed flow intervals, keyed by vendor id - the same shape
@@ -1183,18 +1174,6 @@ function buildToolRows(
   });
 }
 
-/**
- * One period's records and journals, reduced to a report whose every breakdown sums to the
- * total it belongs to.
- *
- * Pure: everything it needs arrives as data, including which tools are covered - so this
- * module names no tool and no skill, and a fifth tool changes a declaration rather than
- * this file. The two rules it exists to enforce come from
- * `aidd_docs/product/metrics-contract.md`, and this is the first thing in the codebase
- * that could break either: money and the four token counters come from `kind: "request"`
- * records alone, and active time from `kind: "session"` records alone. Summing across the
- * two kinds counts the same tokens twice and produces a total that looks right.
- */
 /** Every group one pass over the records fills. Kept together so the pass reads as one
  * decision per record rather than as five parallel loops over the same list. */
 interface Groups {
@@ -1326,11 +1305,11 @@ function accumulate(
   return groups;
 }
 
-/** All three, always, in the declared order.
+/** All four, always, in the declared order.
  *
  * A strength that accounted for nothing is the one place in this report where a zero is
  * the measurement rather than an absence: the total is known, and none of it came from
- * that source. Dropping the row would leave a consumer handling one to three rows in an
+ * that source. Dropping the row would leave a consumer handling one to four rows in an
  * order it cannot predict, and unable to tell "no records were attributed this way" from
  * "this report does not carry that field". */
 function attributionRows(
@@ -1382,9 +1361,9 @@ function projectRows(
   );
 }
 
-// Typed over `string | symbol`, wider than either `TaskRowKey` or `BacklogRowKey` alone,
-// so `taskRows` and `backlogRows` share one check rather than each carrying its own copy -
-// safe because every reason is a plain string and a symbol key never equals one.
+// Typed over `string | symbol`, wider than `BacklogRowKey` alone, since a `backlog` map's
+// key can also be `NO_BACKLOG_DECLARED` or `UNREADABLE_BACKLOG_DECLARATION` - safe because
+// every reason is a plain string and a symbol key never equals one.
 function isTaskUnattributedReason(key: string | symbol): key is TaskUnattributedReason {
   return typeof key === "string" && (TASK_UNATTRIBUTED_REASONS as readonly string[]).includes(key);
 }
@@ -1392,8 +1371,9 @@ function isTaskUnattributedReason(key: string | symbol): key is TaskUnattributed
 /** Every task a record's own moment fell inside, largest first, then one row per reason
  * actually present for what fell in none - `TASK_UNATTRIBUTED_REASONS`' own fixed order,
  * always after every named task regardless of size, the same convention `personRows` gives
- * its own `none` row. Up to four such rows, never fewer than the reasons present: two
- * different gaps collapsed into one row is the fault this breakdown exists to avoid. */
+ * its own `none` row. Up to one row per `TASK_UNATTRIBUTED_REASONS` entry, never fewer than
+ * the reasons present: two different gaps collapsed into one row is the fault this
+ * breakdown exists to avoid. */
 function taskRows(tasks: ReadonlyMap<string, TaskGroup>): readonly CostReportTaskRow[] {
   const named: CostReportTaskRow[] = [];
   const byReason = new Map<TaskUnattributedReason, CostReportTaskRow>();
@@ -1482,9 +1462,9 @@ function isoSecondsFromMs(ms: number): string {
 
 /** Every orchestrated run the period's journals name, largest first, then the one row for
  * work that fell in no flow interval at all - see `CostReportFlowRow`. No reason taxonomy
- * the way `by_task`'s and `by_backlog`'s own remainders carry one: a flow is read from the
- * same sequence either way, so there is only one fact to state about falling outside every
- * one of them, never three.
+ * the way `by_task`'s and `by_backlog`'s own remainders carry one (`TASK_UNATTRIBUTED_REASONS`):
+ * a flow is read from the same sequence either way, so there is only one fact to state
+ * about falling outside every one of them, never several.
  *
  * The remainder is pinned last rather than sorted with the named rows, the same tail
  * convention `taskRows` and `backlogRows` already keep. Sorting it by size put it first
@@ -1613,18 +1593,6 @@ function personRows(
   return [...mapped, ...unresolved, ...none];
 }
 
-/**
- * One period's records and journals, reduced to a report whose every breakdown sums to the
- * total it belongs to.
- *
- * Pure: everything it needs arrives as data, including which tools are covered - so this
- * module names no tool and no skill, and a fifth tool changes a declaration rather than
- * this file. The two rules it exists to enforce come from
- * `aidd_docs/product/metrics-contract.md`, and this is the first thing in the codebase
- * that could break either: money and the four token counters come from `kind: "request"`
- * records alone, and active time from `kind: "session"` records alone. Summing across the
- * two kinds counts the same tokens twice and produces a total that looks right.
- */
 /** `task`, `filters` and `emptySelection` together - the selection this report answered,
  * as opposed to the figures it answered with. Pulled out on its own so the object literal
  * below reads as one shape, not a wall of conditional spreads. */
@@ -1924,6 +1892,18 @@ function collapseBilledRequests(
   return [...rest, ...[...groups.values()].map(mergeBilledRequestGroup)];
 }
 
+/**
+ * One period's records and journals, reduced to a report whose every breakdown sums to the
+ * total it belongs to.
+ *
+ * Pure: everything it needs arrives as data, including which tools are covered - so this
+ * module names no tool and no skill, and a fifth tool changes a declaration rather than
+ * this file. The two rules it exists to enforce come from
+ * `aidd_docs/product/metrics-contract.md`, and this is the first thing in the codebase
+ * that could break either: money and the four token counters come from `kind: "request"`
+ * records alone, and active time from `kind: "session"` records alone. Summing across the
+ * two kinds counts the same tokens twice and produces a total that looks right.
+ */
 export function buildCostReport(input: CostReportInput): CostReport {
   // Turn-supersede first, billed-request-collapse second: the first reconciles two readings
   // of one local-read record before the second ever has to reconcile two routes seeing one

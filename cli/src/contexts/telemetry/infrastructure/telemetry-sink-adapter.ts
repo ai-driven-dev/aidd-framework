@@ -93,12 +93,6 @@ function restrictToCurrentUser(target: string, options: { recursive?: boolean } 
 /** Every write is `appendFile`. `readRecordsForVendor` is the only method that reads a day
  * file's content, and only to let a local re-read know what is already stored. */
 export class TelemetrySinkAdapter implements TelemetrySink {
-  readonly rootDir: string;
-  // A user who names their own location keeps responsibility for its permissions - a shared
-  // directory is what this exists for, and locking it down to one account on Windows would
-  // break exactly that sharing.
-  private readonly userNamed: boolean;
-
   /**
    * `AIDD_TELEMETRY_DIR` names this directory outright; `AIDD_USER_CONFIG_DIR` names the
    * directory *above* it and is kept only so a setup that predates the split keeps working.
@@ -110,6 +104,12 @@ export class TelemetrySinkAdapter implements TelemetrySink {
    * under "Share `AIDD_TELEMETRY_DIR`, never `AIDD_USER_CONFIG_DIR`" - one home, since a
    * copy here would be a second one to keep true.
    */
+  readonly rootDir: string;
+  // A user who names their own location keeps responsibility for its permissions - a shared
+  // directory is what this exists for, and locking it down to one account on Windows would
+  // break exactly that sharing.
+  private readonly userNamed: boolean;
+
   /** Which of the three answers above this directory came from. Carried because one of
    * them has a consequence a person has to be told about: `AIDD_USER_CONFIG_DIR` also names
    * where `auth.json` is written, so anyone who set it on the old advice has a credential in
@@ -255,7 +255,15 @@ export class TelemetrySinkAdapter implements TelemetrySink {
     fileName: string,
     vendorId: string
   ): Promise<readonly TelemetrySinkRecord[]> {
-    const content = await readFile(join(this.rootDir, fileName), "utf8");
+    let content: string;
+    try {
+      content = await readFile(join(this.rootDir, fileName), "utf8");
+    } catch {
+      // Same tolerance as `readAllRecordsFromFile`: a file listed a moment ago and
+      // unreadable now (rotated, deleted, or never ours) must not fail a vendor-scoped
+      // read any more than it fails a full one.
+      return [];
+    }
     const records: TelemetrySinkRecord[] = [];
     for (const line of content.split("\n")) {
       if (line.trim() === "") continue;

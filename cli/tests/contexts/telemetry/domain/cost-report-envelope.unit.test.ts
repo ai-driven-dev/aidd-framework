@@ -290,6 +290,24 @@ describe("toCostReportEnvelope", () => {
     expect(source).not.toContain("node:fs");
     expect(source).not.toContain("Date");
   });
+
+  // The constant is bumped the moment a shape changes; the paragraph explaining why is a
+  // second edit nothing forces a person to make. A version with no paragraph is a bump a
+  // consumer cannot learn the reason for, which is the one thing this comment exists to
+  // give them.
+  it("documents the current version with its own paragraph, not just the one before it", () => {
+    const source = readFileSync(
+      fileURLToPath(
+        new URL(
+          "../../../../src/contexts/telemetry/domain/cost-report-envelope.ts",
+          import.meta.url
+        )
+      ),
+      "utf8"
+    );
+
+    expect(source).toContain(`Bumped to ${COST_REPORT_ENVELOPE_VERSION}:`);
+  });
 });
 
 /** Extends the real output rather than standing in for it, so a widened double cannot stop

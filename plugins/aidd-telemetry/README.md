@@ -176,7 +176,7 @@ tokens; turning tokens into money is a separate service's job.
   the export writer, its endpoint, the server it once talked to — is deleted; everything
   measured is read back from where it was written, on the same machine that wrote it. On a
   machine that ran an older version's `aidd telemetry endpoint`, that settings file is a
-  fact this plugin cannot see or undo any more — `aidd telemetry check` and `aidd telemetry
+  fact this plugin can no longer see or undo — `aidd telemetry check` and `aidd telemetry
   off` both detect it and name what to remove by hand.
 - **`off` keeps what you measured.** It stops the recording, not the record — nothing
   already written is deleted. **`aidd telemetry forget` removes it**: this project's run
@@ -189,7 +189,7 @@ tokens; turning tokens into money is a separate service's job.
 ## Where things live
 
 **The journal** stays in the repository it describes — `aidd_docs/runs/`, git-ignored the
-moment measurement is turned on, through `aidd setup`, `aidd plugin add`, or
+moment measurement is turned on, through `aidd setup`, `aidd plugin install`, or
 `aidd telemetry on`. It is a property of that repository: every line names a
 repository-relative path or a task folder, and moving it out would leave a file about one
 repository with no way to say which. It records the repository, the task folders written
@@ -207,7 +207,7 @@ which it keeps using rather than losing access to what was already written there
 
 **Share `AIDD_TELEMETRY_DIR`, never `AIDD_USER_CONFIG_DIR`.** This document used to name
 the second one here, and that was a mistake worth stating plainly: `AIDD_USER_CONFIG_DIR`
-relocates a machine's whole aidd config, `auth.json` included — a GitHub token. Following
+relocates a machine's whole AIDD configuration, `auth.json` included — a GitHub token. Following
 the advice as written put a credential in the directory a team was told to share. `0600`
 holds on a local POSIX filesystem, but a network share or a synced folder is usually what
 "a directory a team shares" means, and neither guarantees it; and whatever the mode, two

@@ -120,7 +120,7 @@ function buildUseCase(options: {
     ),
     options.hostRegistries ?? new Map()
   );
-  return { useCase, evidence, hookTrustReader };
+  return { useCase, evidence, hookTrustReader, journalReader };
 }
 
 function runOptions(env: NodeJS.ProcessEnv = {}) {
@@ -192,6 +192,23 @@ describe("DiagnoseTelemetryUseCase — a leftover export config", () => {
 });
 
 describe("DiagnoseTelemetryUseCase — gathering local evidence", () => {
+  it("reads the run journal once per check, never once for setup and again for evidence", async () => {
+    const journal: RunJournal = {
+      session: sessionStart("s-1"),
+      boundaries: [
+        { type: "step_start", at: "2026-08-20T09:00:30Z", skill: "aidd-dev:02-implement" },
+      ],
+      filesWritten: [],
+      taskDeclarations: [],
+    };
+    const { useCase, journalReader } = buildUseCase({ journals: [journal] });
+
+    const result = await useCase.execute(runOptions({ CLAUDE_CODE_SESSION_ID: "s-1" }));
+
+    if (result.gate !== undefined) throw new Error("expected the run to pass the gate");
+    expect(journalReader.listCalls).toBe(1);
+  });
+
   it("reads every covered tool's own files for every journalled session", async () => {
     const journal: RunJournal = {
       session: sessionStart("s-1"),

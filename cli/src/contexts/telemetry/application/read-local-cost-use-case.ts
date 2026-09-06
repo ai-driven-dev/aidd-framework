@@ -119,11 +119,6 @@ export interface ReadLocalCostResult {
   readonly refusedReason?: string;
 }
 
-/** Reads what every locally-readable tool's own files hold for one session, normalises it
- * into the stored shape, and appends what is not already there. Which tools are readable
- * is a declaration in `domain/tools/ai/*.ts`, read through the registry — this class names
- * no tool. Which adapter serves a declared tool is decided once, at the composition root,
- * and handed in as `readers`. */
 function isPresent(value: string | undefined): value is string {
   return value !== undefined;
 }
@@ -294,6 +289,11 @@ function mergeToolReports(
 const REFUSED_REASON =
   "measurement is refused — AIDD_TELEMETRY=0 or the project switch is off; nothing read, nothing stored";
 
+/** Reads what every locally-readable tool's own files hold for one session, normalises it
+ * into the stored shape, and appends what is not already there. Which tools are readable
+ * is a declaration in each tool's own `contexts/tools/domain/profiles/<tool>/profile.ts`,
+ * read through the registry — this class names no tool. Which adapter serves a declared
+ * tool is decided once, at the composition root, and handed in as `readers`. */
 export class ReadLocalCostUseCase {
   constructor(
     private readonly sink: TelemetrySink,
@@ -303,10 +303,10 @@ export class ReadLocalCostUseCase {
     private readonly telemetryEvidenceReader: TelemetryEvidenceReader,
     /** The CLI's own version, stamped on every record this sweep stores
      * (`stampProvenanceAndTool`) - read through the same port `current-version-adapter.ts`
-     * already resolves it through, never a second way. Production wiring (`runtime/wiring/framework.ts`)
+     * already resolves it through, never a second way. Production wiring (`runtime/wiring/telemetry.ts`)
      * always supplies the real adapter; that guarantee is not just asserted here, it is
      * enforced - `telemetry-multi-tool.e2e.test.ts` runs the real built binary through
-     * `runtime/wiring/framework.ts` and fails if a stored record ever lacks `cli_version`. Optional on this
+     * `runtime/wiring/telemetry.ts` and fails if a stored record ever lacks `cli_version`. Optional on this
      * constructor only so a caller exercising a concern this field is not about (most unit
      * tests) does not have to invent a version to reach it - absent, this simply omits the
      * field from what gets stored, never guesses at a value. */

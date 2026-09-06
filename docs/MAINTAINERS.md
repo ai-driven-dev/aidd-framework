@@ -76,7 +76,7 @@ Versions live in `.release-please-manifest.json`. Forcing a version / pre-releas
 
 The weekly `next` → `main` promotion **must be a merge commit, never a squash and never a rebase**:
 
-- A squash collapses the batch's conventional commits into one subject from the PR title. If that title isn't a valid conventional type, `Commitlint` fails on `main` and **release-please is skipped** — no release. release-please also reads each commit's type/scope to bump the right package, which a squash hides.
+- A squash collapses the batch's conventional commits into one subject from the PR title. If that title isn't a valid conventional type, `Commitlint` fails on `main` and **release-please is skipped** — no release. release-please attributes each commit to a package by the **path it touched** (`release-please-config.json`'s `packages` map), not by its scope, and a squash hides which paths the batch actually touched.
 - A rebase keeps the commits but recopies them under new hashes, so git never records that the branches were reconciled. The merge base between `main` and `next` then goes stale, and every later back-merge conflicts on the release metadata release-please rewrites each time — a conflict with no real content behind it.
 - A merge commit does both jobs: the commits land verbatim, and its second parent keeps a shared merge base so the back-merge stays clean.
 - Use the **Promote next to main** workflow (it merges); merging by hand, pick **Create a merge commit** and give it a conventional subject.
@@ -110,11 +110,14 @@ Head branches are **not** auto-deleted on merge (`delete_branch_on_merge: false`
 - The back-merge runs unattended (bot App `always` bypass on the `next` ruleset). If it can't push, it opens a tracking issue — resync with a `main` → `next` PR.
 - If `next` is ever missing, recreate it: `git push origin main:next`.
 
-To change protection, edit `.github/rulesets/main.json` (or `next.json`), then apply it live:
+To change protection, edit `.github/rulesets/main.json` (or `next.json`) first — it is the
+source, the live ruleset is applied from it, never the other way round. An admin then applies
+it, either through `gh api` or the UI:
 ```bash
 gh api -X PUT repos/ai-driven-dev/framework/rulesets/<id> --input .github/rulesets/main.json
 ```
-Keep the file and the live ruleset in sync.
+or Settings → Rules → Rulesets → edit the ruleset by hand to match the file. Keep the file and
+the live ruleset in sync either way.
 
 ## 👥 People
 

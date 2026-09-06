@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { repositoryRootAbove } from "./reading/repository-root.js";
 
 export const AIDD_DIR = ".aidd";
 export const AIDD_CONFIG_FILENAME = "config.json";
@@ -16,6 +17,21 @@ export const BUILT_CACHE_SUBDIR = join(AIDD_DIR, "cache", "built");
 // history check both ask `VersionControl.listTrackedFiles` about exactly this path; a
 // second literal of the same string would be a second way of asking the same question.
 export const RUNS_ENTRY = `${DOCS_DIR}/${RUNS_SUBDIR}/`;
+
+/**
+ * Where the run journal actually lives — at the repository root above `projectRoot`, never
+ * `projectRoot` itself. The hook that writes it anchors at `git rev-parse --show-toplevel`
+ * (`repositoryRootAbove`'s own doc explains why), so a session started from a subdirectory
+ * of a checkout still writes one journal at the checkout's root; a reader that joined
+ * straight onto `projectRoot` instead found nothing there.
+ *
+ * The one resolver: `RunJournalReaderAdapter` and `TelemetryEvidenceAdapter` used to derive
+ * this independently — one walked up to the repository root, the other did not — and
+ * disagreed from any subdirectory. `AIDD_RUNS_DIR` overrides it outright, matching the hook.
+ */
+export function resolvedRunsDir(projectRoot: string): string {
+  return process.env.AIDD_RUNS_DIR || join(repositoryRootAbove(projectRoot), DOCS_DIR, RUNS_SUBDIR);
+}
 
 export function marketplaceCacheDir(projectRoot: string, marketplaceName: string): string {
   return join(projectRoot, MARKETPLACE_CACHE_SUBDIR, marketplaceName);

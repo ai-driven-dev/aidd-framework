@@ -8,14 +8,10 @@ import type { SetupPluginsPromptUseCase } from "../../../presentation/prompts/se
 import type { SetupToolsPromptUseCase } from "../../../presentation/prompts/setup-tools-prompt-use-case.js";
 import type { TokenProvider } from "../../../runtime/auth/ports/token-provider.js";
 import type { LatestReleaseResolver } from "../../../runtime/self-update/latest-release-resolver.js";
-import type {
-  MarketplaceRefresh,
-  MarketplaceRefreshUseCase,
-} from "../../distribution/application/marketplace-refresh-use-case.js";
+import type { MarketplaceRefresh } from "../../distribution/application/marketplace-refresh-use-case.js";
 import type {
   MarketplaceRegisterFramework,
   MarketplaceRegisterFrameworkOptions,
-  MarketplaceRegisterFrameworkUseCase,
 } from "../../distribution/application/marketplace-register-framework-use-case.js";
 import type { MarketplaceSourceMode } from "../../distribution/domain/marketplace-source-mode.js";
 import type { ManifestRepository } from "../domain/ports/manifest-repository.js";
@@ -50,9 +46,11 @@ export class SetupUseCase {
 
   async execute(flow: SetupFlow): Promise<SetupResult> {
     const context = await this.detectContext(flow);
+    // Resolved before initManifest: a non-interactive run with no --source must reject
+    // before it ever writes .aidd/manifest.json or touches .gitignore, not after.
+    const source = flow.registerDefaultMarketplace ? await this.resolveSource(flow) : null;
     const isNew = await this.initManifest(flow);
-    if (flow.registerDefaultMarketplace) {
-      const source = await this.resolveSource(flow);
+    if (source !== null) {
       await this.guardRemoteAuth(source);
       await this.registerMarketplace(flow, source);
       await this.refreshCatalog(flow);

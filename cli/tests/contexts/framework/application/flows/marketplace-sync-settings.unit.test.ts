@@ -200,10 +200,10 @@ describe("a marketplace that will not build", () => {
  * The build runs before the branch that decides who writes the registration down, and
  * that position is the whole reason it survived the registration cleanup.
  *
- * A tool whose CLI enables plugins registers only the marketplaces a plugin points at
- * (`toRegister = used`), so a marketplace with no installed plugin is built here and
- * nowhere else. Deleting the call would have left it unbuilt, and the registration the
- * tool later writes would point at a directory that does not exist.
+ * Every known marketplace is registered, whether or not a plugin was installed from it
+ * (see the comment on `activateTool`), so a marketplace with no installed plugin still
+ * needs its tree built here. Deleting the call would have left it unbuilt, and the
+ * registration the tool's own CLI writes would point at a directory that does not exist.
  */
 describe("a marketplace no plugin points at", () => {
   it("is still built", async () => {
@@ -234,6 +234,15 @@ describe("a marketplace no plugin points at", () => {
     const { activator } = await sync({
       marketplaceNames: ["aidd-framework", "unused"],
       enablesPlugins: true,
+    });
+
+    expect(activator.addedMarketplaces).toHaveLength(2);
+  });
+
+  it("is registered anyway when the tool does not enable plugins itself", async () => {
+    const { activator } = await sync({
+      marketplaceNames: ["aidd-framework", "unused"],
+      enablesPlugins: false,
     });
 
     expect(activator.addedMarketplaces).toHaveLength(2);
