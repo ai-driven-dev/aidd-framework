@@ -59,6 +59,9 @@ const BASELINE: string[] = [];
  * the tree as it was is a record, and demanding it stay true would forbid ever moving a file.
  */
 const INSTRUCTING_SOURCES: readonly string[] = [
+  // The rules were the one instructing source this list left out, and nineteen of them
+  // rotted unread: a promised guard that no longer existed, a config path that never did.
+  ".claude/rules",
   ".claude/skills",
   "aidd_docs/memory",
   "aidd_docs/GUIDELINES.md",

@@ -8,11 +8,12 @@ The `aidd` binary, built from `cli/` and published to npm as `@ai-driven-dev/cli
 
 - Eleven groups: `setup`, `framework`, `translate`, `plugin`, `marketplace`, `auth`, `sync`, `update`, `doctor`, `clean`, `telemetry`.
 - No list here. The surface moves; `aidd --help` is the only reading that stays true.
+- `telemetry`'s sink, run journal, record shapes, report axes and per-tool declarations: [`cli/aidd_docs/memory/telemetry.md`](../../cli/aidd_docs/memory/telemetry.md).
 
 ## Interface
 
-- Node `>=22.12`, ESM, Commander.
+- Node (floor in `architecture.md`'s stack table), ESM, Commander.
 
 ## Distribution
 
-npm, through OIDC trusted publishing, no token. `publish-cli` runs when release-please releases the `cli` path.
+Published to npm; the pipeline, its OIDC publishing and its gates are in `deployment.md`.

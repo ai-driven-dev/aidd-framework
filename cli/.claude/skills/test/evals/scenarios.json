@@ -1,8 +1,0 @@
-[
-  { "prompt": "Write unit tests for the new CleanUseCase", "expect_action": "pick-tier" },
-  { "prompt": "Draft test names for the PluginFetcherAdapter error translation scenarios", "expect_action": "name-behaviorally" },
-  { "prompt": "Write the integration test file for the FileAdapter", "expect_action": "write" },
-  { "prompt": "Reproduce the bug where aidd framework install --tool cursor fails with a version mismatch", "expect_action": "empirical-repro" },
-  { "prompt": "Implement the CleanUseCase that removes all installed files", "expect_action": null },
-  { "prompt": "Add a new --dry-run flag to the install command", "expect_action": null }
-]

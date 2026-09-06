@@ -1,56 +1,33 @@
 ---
 name: test
 description: >
-  Creates or modifies tests in tests/ following the project's three-tier pyramid. Use when
-  writing tests for a new or existing use-case, adapter, domain model, or CLI command; when
-  reproducing a user-reported bug; or when auditing coverage. Do NOT use for implementing
+  Holds the two testing disciplines this package learned by paying for them, and points at the
+  rest. Use when writing or changing a test under tests/, touching a golden snapshot, or fixing a
+  user-reported bug. Do NOT use for tier conventions, the vitest projects, doubles, fixtures or
+  how to run a suite — those live in `aidd_docs/memory/testing.md`. Do NOT use for writing
   production code — use the context skill that owns the concept (`tools`, `translate`,
-  `distribution`, `framework`) instead.
+  `distribution`, `framework`, `telemetry`).
 ---
 
 # Test
 
-Writes tests at the correct tier of the project's test pyramid: unit for domain and use-case
-logic, integration for adapter behavior and real-filesystem contracts, E2E for full CLI
-journeys. Bug fixes always start with a failing test that reproduces the exact reported
-scenario before any production code is touched.
+The tiers, the four vitest projects, the doubles, the fixtures and the run commands are in
+`aidd_docs/memory/testing.md`; read that first and do not restate it here. This skill exists for
+the two failure modes that cost this package a shipped bug each, and that a convention page
+states as a rule without saying how to satisfy it.
 
-## Available actions
+## Read before you touch one
 
-| #   | Action                | Role                                              | Input                                   |
-| --- | --------------------- | ------------------------------------------------- | --------------------------------------- |
-| 01  | `pick-tier`           | Choose unit, integration, or e2e based on what is under test | target file or behavior         |
-| 02  | `name-behaviorally`   | Draft behavior-sentence test names               | list of scenarios to cover              |
-| 03  | `write`               | Write the test file following tier conventions    | tier + names from 01-02                 |
-| 04  | `empirical-repro`     | Produce an empirical reproduction transcript for user-reported bugs | bug report   |
-| 05  | `smoke`               | Run real CLI binary in /tmp, verify end-to-end   | command + expected behavior             |
+- `references/golden-machine-independence.md` — a golden that snapshots a value derived from an
+  absolute path passes locally and fails on another machine. The rule is in `testing.md`; this is
+  the symptom, the root cause and the two fixes, plus the proof to run afterwards.
+- `references/bug-empirical-reproduction.md` — a fix for a user-reported bug is not done until
+  the reported scenario has been reproduced end to end against the real binary, before and after.
+  Green unit and E2E tests have shipped an unfixed bug here; the transcript format is what
+  catches that.
 
-## Default flow
+## The order
 
-`01 → 02 → 03`
-
-For user-reported bugs: `01 → 02 → 03 → 04`
-
-Smoke (`05`) is standalone: invoke it when validating that a CLI command or feature works for a real user, after a feature ships or before a release. It is not part of the `01 → 03` write flow.
-
-## Transversal rules
-
-- File suffix must match tier: `*.unit.test.ts`, `*.integration.test.ts`, `*.e2e.test.ts`.
-- Mock only ports (domain interfaces) — never mock use-case internals or adapter implementations.
-- Test name = observable behaviour sentence; use nested `describe` blocks not prefix separators.
-- `describe.concurrent()` is forbidden in unit tests; required in E2E tests.
-- Zero real network, zero real machine state outside temp dirs in any automated test.
-- Write the failing test FIRST for every bug fix.
-- Smoke tests run the real built binary in a fresh `/tmp` dir, never the repo root.
-
-## References
-
-- `references/test-pyramid.md` — tier definitions, rules per tier, forbidden patterns (authoritative)
-- `references/bug-empirical-reproduction.md` — empirical reproduction mandate, transcript format (authoritative)
-- `references/golden-machine-independence.md` — golden/snapshot tests must never snapshot values derived from absolute paths (including hashes over path-bearing content); normalize source content before hashing (authoritative)
-- `references/smoke-in-tmp.md` — smoke/dogfood installs must run in /tmp only; in-repo leaks tool residue; gitignore non-Claude install dirs if unavoidable
-
-## Test infrastructure
-
-- `tests/helpers/ports/` — in-memory port implementations for unit mocking
-- `tests/fixtures/` — local fixture directory (never mutate; copy before use)
+Write the failing test first and watch it fail for the reason its name gives — a bug fix starts
+there, never with the production edit. That discipline is stated for the whole repository in
+`aidd_docs/memory/coding-assertions.md`.

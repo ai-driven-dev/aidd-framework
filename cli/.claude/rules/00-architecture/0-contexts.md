@@ -5,58 +5,62 @@ paths:
 
 # Contexts
 
-The three invariants the context refactor exists to hold. `tests/architecture/` enforces each
-one mechanically — this file is what a contributor reads before the test tells them no.
+The tree is organised by bounded context, never by layer, so a change to one concern opens
+one directory instead of three. Three invariants make that hold, and `tests/architecture/`
+enforces each of them mechanically.
 
 ## 1. The chain
 
-```mermaid
-flowchart LR
-  framework --> translate --> tools --> kernel
-  framework --> tools
-  framework --> distribution --> kernel
-  telemetry --> tools
-  presentation --> contexts
-  contexts --> kernel
-```
+Which context may import which is data, not prose. `tests/architecture/helpers.ts` declares
+`ALLOWED`, the edges the chain permits, and `BASELINE`, the edges the tree still has with the
+count and file count each one admits. Read the edges there and nowhere else: this file states
+the invariant behind them, it does not carry a second copy that could disagree.
 
-The only edges between contexts are `framework → translate`, `translate → tools`,
-`framework → tools`, `framework → distribution`, and `telemetry → tools`. No other
-context-to-context edge exists. Measurement reads what a tool declares and a tool declares
-nothing about measurement: the vocabulary both speak lives in `kernel/measurement.ts`, which
-is what makes the reverse edge impossible rather than merely absent.
-`presentation` and `runtime` may depend on any context; no context may depend on `presentation`
-or `runtime` — the arrows run one way, down toward the kernel, never back up.
-`tests/architecture/context-graph.arch.test.ts` holds this as a ratchet: an edge the chain does
-not name fails the build the moment it appears, and the file's own baseline records the small,
-shrinking set of exceptions that predate the ratchet.
+Two rules read that one declaration. `context-graph.arch.test.ts` fails the build on any edge
+`ALLOWED` does not name, and holds each baselined edge to its recorded weight so an admitted
+edge cannot absorb new imports in silence. `biome-context-parity.arch.test.ts` checks
+`biome.json`'s per-context `noRestrictedImports` overrides against the same data, because
+biome answering to its own memory is how a rule kept naming paths the refactor had deleted.
+
+The invariant itself: arrows run one way, down toward the kernel. `presentation` and `runtime`
+may depend on any context; a context depending on either is a `BASELINE` entry, and that list
+may only shrink.
 
 ## 2. The kernel
 
-`kernel/` imports no context and carries no business logic. It is shared vocabulary — types,
-pure helpers, typed errors, and the ports two or more contexts both need (a port used by exactly
-one context belongs to that context, not the kernel). If a kernel module needs a domain decision
-to be correct, it is not kernel material; move the decision to whichever context makes it and
-keep the kernel a place with nothing to get wrong.
+`kernel/` imports no context and carries no business logic. It is shared vocabulary: types,
+pure helpers, typed errors, and the ports two or more contexts both need. A port used by
+exactly one context belongs to that context, not here. If a kernel module needs a domain
+decision to be correct, it is not kernel material: move the decision to whichever context
+makes it, and keep the kernel a place with nothing to get wrong. Biome refuses the import
+outright, since `src/kernel/**` may reach no context layer, no `presentation` and no
+`runtime`.
+
+This is also what keeps a forbidden edge structurally impossible rather than merely absent.
+Measurement asks a tool what it declares, and a tool declares nothing about measurement: the
+vocabulary both speak lives in `kernel/measurement.ts`, so the reverse edge has nothing to
+import.
 
 ## 3. No reach into a context's interior
 
-An import from outside a context may only target a module that context declares public. There is
-no `index.ts` anywhere — barrels are forbidden (`.claude/rules/01-standards/1-exports.md`,
-Biome's `noBarrelFile`) — so the boundary is not a re-export file, it is a list:
-`tests/architecture/context-boundary.arch.test.ts`'s `PUBLIC_MODULES` names every module each
-context exposes. A new module a caller outside the context needs is invisible until it is added
-to that list; everything else inside the context is internal whether or not anything currently
-reaches for it.
+An import from outside a context may only target a module that context declares public. There
+is no barrel to hold that boundary (`.claude/rules/01-standards/1-conventions.md`), so the
+boundary is a list: `PUBLIC_MODULES` in `tests/architecture/context-boundary.arch.test.ts`
+names every module each context exposes. A module a caller outside the context needs is
+invisible until it is added there, and everything else is internal whether or not anything
+currently reaches for it.
 
-## What this means when adding something
+A context never leaves itself to come back in either. An import that climbs above
+`src/contexts/<X>/` and spells `<X>` out again lands where a shorter specifier already
+reached, and `context-self-reentry.arch.test.ts` carries that as a shrinking baseline.
 
-- Ask which context the concept belongs to before writing anything — the `tools`, `translate`,
-  `distribution`, and `framework` skills each answer what goes in, how, and how it is tested.
-- A cross-context call goes through a module the target context has declared public, in the
-  direction the chain allows. If the direction is wrong, the caller is in the wrong context, not
-  the callee missing an export.
-- `kernel/`, `presentation/`, and `runtime/` are not contexts and carry no context-specific rule
-  here — `presentation` follows `.claude/rules/00-architecture/0-deps-wiring.md`; a context's own
-  ports and use-cases follow `0-ports-adapters.md`, `0-use-case.md`, `0-orchestration.md`, and
-  `0-shared-modules.md`, all scoped to `src/contexts/*/`.
+## Adding something
+
+- Decide which context owns the concept before writing anything. A use case that fits nowhere
+  means the contexts are wrong, not that a landing zone is missing.
+- A cross-context call goes through a public module of the target context, in the direction
+  the chain allows. Wrong direction means the caller sits in the wrong context, not that the
+  callee is missing an export.
+- These rules carry no paths on purpose. Where a file goes is
+  `aidd_docs/memory/codebase-map.md`, held to the tree in both directions by
+  `codebase-map.arch.test.ts`.

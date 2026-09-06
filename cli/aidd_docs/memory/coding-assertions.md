@@ -18,7 +18,7 @@ The checks that must pass for code here to count as done. The repository's own h
 | 1 | `pnpm lint` | biome, lint and format |
 | 2 | `pnpm test:arch` | the architecture ratchets |
 | 3 | `pnpm typecheck` | `tsc --noEmit` |
-| 4 | `node scripts/check-cli-layering.mjs` | dependencies point inward, no widened type. Run it from the repository root |
+| 4 | `node scripts/check-cli-type-honesty.mjs` | no type widened through `unknown`, `any` or `never`, no `@ts-expect-error`/`@ts-ignore` outside a test proving something doesn't compile (`src/` and `tests/`). Dependency direction between layers and contexts is biome's job now (`cli/biome.json`'s `noRestrictedImports`). Run it from the repository root |
 
 ## Before push
 
@@ -29,8 +29,8 @@ The checks that must pass for code here to count as done. The repository's own h
 
 ## In CI only
 
-- `pnpm test:coverage` against the thresholds in `vitest.config.ts`, `pnpm smoke`, `pnpm build` with its bundle budget, `pnpm jscpd`. All blocking on a `cli/` pull request.
+- `pnpm test:coverage` against the thresholds in `vitest.config.ts`, `pnpm smoke`, `pnpm build` with its bundle budget, `pnpm jscpd` — plus `cli-typecheck`, `cli-lint`, `cli-architecture`, `cli-knip`, `kanban-checks` and a Windows run. Every one of them is fanned into one required check, `cli / gate` (`.github/workflows/cli-ci.yml`), which the branch rulesets enforce (`.github/rulesets/main.json`, `next.json`) — so all of them are blocking on a `cli/` pull request, through that one check.
 
 ## Behavior
 
-Done means every gate green. On failure, one agent per failing assertion — typecheck, tests, rules — not one agent for all.
+Same as the repository's own page (`aidd_docs/memory/coding-assertions.md`): every gate green, one agent per failing assertion.

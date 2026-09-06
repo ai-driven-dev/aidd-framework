@@ -17,9 +17,9 @@ description: >
 IDE the CLI supports is one `AiTool<C>` or `IdeToolConfig` object in
 `contexts/tools/domain/profiles/<tool>/profile.ts`, where `C` is the intersection of `Has*`
 capability interfaces the tool actually supports. `translate` depends on `tools` (never the
-reverse) to call the tool's own `rewriteContent`/`reverseRewriteContent` and to read its build
-contract — a tool profile is data and behavior the rest of the CLI is handed, not a place that
-reaches out to fetch or install anything itself.
+reverse) to call the tool's own `rewriteContent` and to read its build contract — a tool profile
+is data and behavior the rest of the CLI is handed, not a place that reaches out to fetch or
+install anything itself.
 
 ## What goes in
 
@@ -52,15 +52,16 @@ reaches out to fetch or install anything itself.
   never a per-tool strategy class, never a per-tool or per-artifact-kind branch in an
   orchestrator. See `references/build-contract.md`.
 - `registerTool(config)` is called once, at the bottom of `profile.ts`, never from a use-case.
-- Follow `.claude/rules/00-architecture/0-ports-adapters.md` for the shape of a port and its
-  adapter, and `0-shared-modules.md` before promoting a helper out of a single profile.
+- Follow the port/adapter rule in `.claude/rules/00-architecture/` for the shape of a port and
+  its adapter, and the shared-module rule there before promoting a helper out of a single profile.
 
 ## Public surface
 
 Nothing outside `contexts/tools/` may import a module this context has not declared public —
 `tests/architecture/context-boundary.arch.test.ts` holds the list (`PUBLIC_MODULES.tools`). A new
 module is invisible to `translate` and `framework` until it is added there; there is no
-`index.ts` and there never will be (barrels are forbidden — `.claude/rules/01-standards/1-exports.md`).
+`index.ts` and there never will be (barrels are forbidden by the export rule in
+`.claude/rules/01-standards/`).
 
 ## How it's tested
 

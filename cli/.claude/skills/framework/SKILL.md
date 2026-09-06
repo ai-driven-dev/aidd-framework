@@ -37,8 +37,8 @@ job that needs all three.
 
 - A use-case class ends in `UseCase`, has a single `async execute(options): Promise<Result>`,
   never catches its own errors except the three carve-outs (global aggregate-error loops,
-  cache/network fallback, typed-throw translation) — see
-  `.claude/rules/00-architecture/0-use-case.md` and `0-orchestration.md`.
+  cache/network fallback, typed-throw translation) — see the use-case and orchestration rules in
+  `.claude/rules/00-architecture/`.
 - A use case that installs framework files saves the manifest and updates `.gitignore`
   through `PostInstallPipelineUseCase`. A use case that only changes the manifest (plugin
   add/remove, marketplace sync, restore) saves it directly. See `references/post-install-pipeline.md`.

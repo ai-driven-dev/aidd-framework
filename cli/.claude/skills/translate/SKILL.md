@@ -13,9 +13,10 @@ description: >
 # Translate
 
 `translate` is the core: it turns the canonical, Claude-format framework source into
-target-native content for every tool at once. Its one outbound edge is `translate → tools`,
-and everything it reaches there is that context's declared public surface (`AiTool<C>`,
-`Has*`, the capability contracts), never an internal file. The other edges are in
+target-native content for every tool at once. It reaches two places and no others: `tools`, its
+one outbound context edge, and `kernel`. Everything it reaches in `tools` is that context's
+declared public surface (`contracts.ts`, `registry.ts`, `build-contract.ts`, and the handful of
+capability and port modules listed as public), never an internal file. The whole graph is in
 `.claude/rules/00-architecture/0-contexts.md`.
 
 ## What goes in
@@ -40,8 +41,9 @@ transform that is *aware* of which target it is producing for.
 
 - `PluginContentTranslator` takes one plugin's canonical files and one tool's `AiTool<C>`, and
   calls the tool's own `rewriteContent` — it does not reimplement a
-  tool's rewrite logic, it invokes what `tools` declared. See the `tools` skill's
-  `references/content-rewrite.md` for the round-trip contract those functions must satisfy.
+  tool's rewrite logic, it invokes what `tools` declared. That function is one-way and has no
+  inverse; the `tools` skill's `references/content-rewrite.md` says why, and names the trap an
+  identity rewrite sets.
 - `FrameworkBuildUseCase` (`aidd translate`) reads a `ToolBuildContract` per target and mode from
   `tools`, and dispatches to `MarketplaceBuildStrategy` or `FlatBuildStrategy` — both implement
   `BuildOutputStrategy` and iterate the six artifact kinds generically, with zero per-tool or
@@ -49,9 +51,9 @@ transform that is *aware* of which target it is producing for.
   it never means adding a case here. See the `tools` skill's `references/build-contract.md`.
 - `runtime/wiring/translate.ts` derives the `"<target>:<mode>"` build registry by iterating every
   registered tool and reading its contract — there is no hand-maintained per-tool row.
-- Follow `.claude/rules/00-architecture/0-use-case.md` and `0-orchestration.md` for the
-  application layer's shape, and `0-shared-modules.md` before promoting a helper used by only one
-  strategy into `shared-plugin-helpers.ts`.
+- Follow the use-case and orchestration rules in `.claude/rules/00-architecture/` for the
+  application layer's shape, and the shared-module rule there before promoting a helper used by
+  only one strategy into `shared-plugin-helpers.ts`.
 
 ## Public surface
 
@@ -66,5 +68,6 @@ by `framework` must be on that list.
   canon, and the two build strategies each have unit or integration coverage.
 - `tests/golden/framework-build-golden.e2e.test.ts` snapshots a full build across every target —
   see `test` skill's golden/machine-independence rules before touching a snapshot.
-- A new target-aware transform needs the same round-trip discipline as a tool's own rewrite pair:
-  trace forward then reverse on a representative input before writing the unit test.
+- A new target-aware transform gets a unit test over a representative input carrying the marker it
+  is meant to rewrite. A transform that is the identity for the fixture it was given is
+  indistinguishable from one that never ran.
