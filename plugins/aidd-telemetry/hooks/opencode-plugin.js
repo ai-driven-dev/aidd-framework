@@ -48,12 +48,12 @@ function runJournal(event, payload) {
 // delivered" - see the fixtures' own README entry for that run's log and two further
 // attempts that could not distinguish the two.
 //
-// Every `opencode run` invocation is a first session, so this cache stays empty for it in
-// practice today, and `session.idle`/`message.part.updated` fall back to `input.directory`
-// below - this plugin's own init-time directory, which happens to be correct for the
-// single-directory case `opencode run` is. The plugin README already named this limit
-// ("OpenCode misses a server process's first session"); this comment is the same fact,
-// now anchored to a measurement rather than left as an assertion.
+// Every `opencode run` invocation is a session OpenCode never announced, so nothing fills
+// this cache from `session.created` there, and `session.idle`/`message.part.updated` fall
+// back to `input.directory` below - this plugin's own init-time directory, which is
+// correct for the single-directory case `opencode run` is. `journalCallsFor` writes that
+// same directory back into this cache when it opens such a session, so the session is
+// opened once and every later event reads the directory its own opening used.
 const directoryBySessionId = new Map();
 
 // Mirrors `lib/task-declared.cjs`'s own `TASK_PATH_PATTERN` and `lib/host.cjs`'s
@@ -118,8 +118,16 @@ function declaredTaskCallFor(event, sessionDirectories, fallbackDirectory) {
 /** One OpenCode event in, the journal call it produces out - or `null` for an event this
  * plugin does not act on. Pure but for the one map mutation `session.created` makes on
  * its way through: kept separate from `runJournal`'s spawn so a captured event can be
- * asserted against without running node as a child process. */
-export function journalCallFor(event, sessionDirectories, fallbackDirectory) {
+ * asserted against without running node as a child process.
+ *
+ * Reached as a property of the plugin below, never as a second named export. OpenCode's
+ * loader calls every function-valued export of a file in `plugin/` as a plugin factory of
+ * its own: measured against opencode 1.14.20 in a freshly installed project, this function
+ * exported beside the plugin was called with one argument, returned `null`, and `opencode
+ * run` died reading `.auth` off it before any session started - the tool this plugin
+ * measures, unusable in every project the framework had installed. A property is invisible
+ * to that loader, and a non-function export would have been ignored by it too. */
+function journalCallFor(event, sessionDirectories, fallbackDirectory) {
   if (event.type === "session.created") {
     const sessionId = event.properties.info.id;
     const cwd = event.properties.info.directory;
@@ -137,9 +145,50 @@ export function journalCallFor(event, sessionDirectories, fallbackDirectory) {
   return null;
 }
 
+/** The session id an event names, whichever field its own type carries it in. */
+function sessionIdOf(event) {
+  if (event.type === "session.created") return event.properties.info.id;
+  return event.properties.sessionID;
+}
+
+/** Every journal call one OpenCode event produces, in the order the journal must receive
+ * them - empty for an event this plugin does not act on.
+ *
+ * `journalCallFor` alone leaves `opencode run` measuring nothing. OpenCode publishes
+ * `session.created` on its own bus and never delivers it to a plugin's event hook
+ * (measured, 2026-08-31 - see plugins/aidd-telemetry/README.md, "OpenCode never announces a
+ * session"), and `opencode run` is always such a session. So the journal
+ * never receives a `session_start`, never creates the run file the rest of the session
+ * appends to, and drops the `turn-end` and every task declaration that follows - while
+ * `telemetryLocalRead` declares the tool covered and `aidd telemetry read`, which reads
+ * only sessions the run journal knows, can never find one. A declaration with nothing
+ * behind it, the same fault this plugin's own second export was.
+ *
+ * So the first call for a session nobody announced opens it. The `session-start` carries
+ * the directory that following call was already going to use - never a new guess: for a
+ * session no `session.created` named, that is this plugin's own init-time directory,
+ * exactly what `journalCallFor` already hands `turn-end` and `tool-used`. An announced
+ * session is untouched, and no session is opened twice. */
+function journalCallsFor(event, sessionDirectories, fallbackDirectory) {
+  const sessionId = sessionIdOf(event);
+  const announced = sessionId !== undefined && sessionDirectories.has(sessionId);
+  const call = journalCallFor(event, sessionDirectories, fallbackDirectory);
+  if (call === null) return [];
+  if (announced || call.script === "session-start") return [call];
+  sessionDirectories.set(sessionId, call.payload.cwd);
+  const opening = { tool: "opencode", session_id: sessionId, cwd: call.payload.cwd };
+  return [{ script: "session-start", payload: opening }, call];
+}
+
 export const AiddTelemetry = async (input) => ({
   event: async ({ event }) => {
-    const call = journalCallFor(event, directoryBySessionId, input.directory);
-    if (call) runJournal(call.script, call.payload);
+    for (const call of journalCallsFor(event, directoryBySessionId, input.directory)) {
+      runJournal(call.script, call.payload);
+    }
   },
 });
+
+// The spawn-free test seams, hung off the one export rather than standing beside it - see
+// journalCallFor's own comment for the measurement that rules out a second export.
+AiddTelemetry.journalCallFor = journalCallFor;
+AiddTelemetry.journalCallsFor = journalCallsFor;
