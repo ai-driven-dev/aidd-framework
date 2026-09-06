@@ -17,17 +17,23 @@ import type { LocalCostCandidateRecord } from "../ports/session-cost-reader.js";
 // machine — `opencode run --model opencode/big-pickle ...` (providerID "opencode", an
 // `@ai-sdk/openai-compatible` backend). Its `total == input + output + cache.read +
 // cache.write + reasoning` reconciled too (`14072 == 13926 + 13 + 128 + 0 + 5`), but that
-// does not settle the question the way the "anthropic" capture does: a second, continued
-// turn in the same session showed `cache.read: 0, cache.write: 0` throughout — this
-// backend never exercised its cache — so no capture here ever put a large `cache.read`
-// beside `input` for a non-Anthropic provider, which is the one comparison that would show
-// `input` failing to shrink if it already counted the cached tokens. Anthropic's own
-// exclusivity is independent of this reconciliation (it is the documented behaviour of its
-// Messages API, corroborated elsewhere in this repo against Claude Code's own `/usage`) —
-// so it alone is measured. Whether a provider that reports prompt tokens *inclusive* of
-// cached ones (the way native OpenAI's Chat Completions usage does) would double-count
-// through this same mapping remains open. See plugins/aidd-telemetry/README.md for the declaration
-// this keeps beside the limit.
+// did not settle the question then: a second, continued turn in that session showed
+// `cache.read: 0, cache.write: 0` throughout — the backend never exercised its cache — so
+// no capture put a large `cache.read` beside `input` for a non-Anthropic provider, which
+// is the one comparison that shows `input` failing to shrink if it already counted the
+// cached tokens.
+//
+// **Captured 2026-09-06** (providerID "opencode", modelID "ling-3.0-flash-fin-free" —
+// tests/fixtures/telemetry-sink/opencode-export-non-anthropic-cache.json): three billed
+// turns of one session with the cache genuinely exercised. `input` falls 28242 → 269 → 196
+// as `cache.read` climbs 640 → 28928 → 29184, and `total == input + output + reasoning +
+// cache.read + cache.write` holds on all three (29089, 29356, 29438). An `input` inclusive
+// of the cached tokens could neither shrink that way nor leave that identity standing, so
+// the counters are disjoint for this provider too. Anthropic's own exclusivity is
+// independent of this (the documented behaviour of its Messages API, corroborated elsewhere
+// in this repo against Claude Code's own `/usage`). What stays open is narrower than it
+// was: a provider that reports prompt tokens *inclusive* of cached ones, the way native
+// OpenAI's Chat Completions usage does, has still never been captured here.
 //
 // That open question does not reopen the choice above to never read `info.providerID`: a
 // per-record check would need a provider field on the stored record to hang a per-provider

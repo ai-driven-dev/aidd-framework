@@ -1,0 +1,155 @@
+{
+  "info": {
+    "id": "ses_test_non_anthropic",
+    "slug": "quick-circuit",
+    "projectID": "0000000000000000000000000000000000000000",
+    "directory": "[redacted:session-directory]",
+    "title": "[redacted:session-title]",
+    "version": "1.14.20",
+    "permission": [
+      {
+        "permission": "question",
+        "pattern": "*",
+        "action": "deny"
+      },
+      {
+        "permission": "plan_enter",
+        "pattern": "*",
+        "action": "deny"
+      },
+      {
+        "permission": "plan_exit",
+        "pattern": "*",
+        "action": "deny"
+      }
+    ],
+    "time": {
+      "created": 1788672555178,
+      "updated": 1788672567780
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1788672555378
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "opencode",
+          "modelID": "ling-3.0-flash-fin-free"
+        },
+        "summary": {
+          "diffs": [
+            {
+              "file": "[redacted:message-diff-file:0]",
+              "patch": "[redacted:message-diff-patch:0]",
+              "additions": 1,
+              "deletions": 0,
+              "status": "added"
+            }
+          ]
+        },
+        "id": "msg_075313972001oFmFIrMP8QKaMI",
+        "sessionID": "ses_test_non_anthropic"
+      }
+    },
+    {
+      "info": {
+        "parentID": "msg_075313972001oFmFIrMP8QKaMI",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "[redacted:cwd:msg_07531399f001zRIlCAkqvcdz38]",
+          "root": "[redacted:root:msg_07531399f001zRIlCAkqvcdz38]"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 29089,
+          "input": 28242,
+          "output": 193,
+          "reasoning": 14,
+          "cache": {
+            "write": 0,
+            "read": 640
+          }
+        },
+        "modelID": "ling-3.0-flash-fin-free",
+        "providerID": "opencode",
+        "time": {
+          "created": 1788672555423,
+          "completed": 1788672565911
+        },
+        "finish": "tool-calls",
+        "id": "msg_07531399f001zRIlCAkqvcdz38",
+        "sessionID": "ses_test_non_anthropic"
+      }
+    },
+    {
+      "info": {
+        "parentID": "msg_075313972001oFmFIrMP8QKaMI",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "[redacted:cwd:msg_075316299001VsJLAfQn01vDdX]",
+          "root": "[redacted:root:msg_075316299001VsJLAfQn01vDdX]"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 29356,
+          "input": 269,
+          "output": 137,
+          "reasoning": 22,
+          "cache": {
+            "write": 0,
+            "read": 28928
+          }
+        },
+        "modelID": "ling-3.0-flash-fin-free",
+        "providerID": "opencode",
+        "time": {
+          "created": 1788672565913,
+          "completed": 1788672567732
+        },
+        "finish": "tool-calls",
+        "id": "msg_075316299001VsJLAfQn01vDdX",
+        "sessionID": "ses_test_non_anthropic"
+      }
+    },
+    {
+      "info": {
+        "parentID": "msg_075313972001oFmFIrMP8QKaMI",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "path": {
+          "cwd": "[redacted:cwd:msg_0753169b5001dX3zYvM2u0UyHn]",
+          "root": "[redacted:root:msg_0753169b5001dX3zYvM2u0UyHn]"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 29438,
+          "input": 196,
+          "output": 56,
+          "reasoning": 2,
+          "cache": {
+            "write": 0,
+            "read": 29184
+          }
+        },
+        "modelID": "ling-3.0-flash-fin-free",
+        "providerID": "opencode",
+        "time": {
+          "created": 1788672567733,
+          "completed": 1788672569281
+        },
+        "finish": "stop",
+        "id": "msg_0753169b5001dX3zYvM2u0UyHn",
+        "sessionID": "ses_test_non_anthropic"
+      }
+    }
+  ]
+}

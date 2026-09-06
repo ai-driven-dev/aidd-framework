@@ -7,7 +7,12 @@ import type { LocalCostCandidateRecord } from "../ports/session-cost-reader.js";
 // `tokenDetails.input.tokenCount` (10) + `tokenDetails.cache_write.tokenCount` (21070) =
 // `modelMetrics.<model>.usage.inputTokens` (21080) — the `usage` object is *inclusive* of
 // the cache-write figure, `tokenDetails` already exclusive, matching every other reader's
-// convention here. `modelMetrics.<model>.requests.cost` (and its session-level twin,
+// convention here. **Confirmed the same way for `cache_read` on 1.0.82, 2026-09-06**
+// (tests/fixtures/local-cost/.copilot/session-state/55555555-.../events.jsonl): 9 + 42038 +
+// 21404 = 63451 = `usage.inputTokens`, with Copilot's own terminal line reading
+// `↑ 63.5k (42.0k cached, 21.4k written)`. That is the capture the earlier one could not
+// give: at `cache_read: 0` an inclusive and an exclusive `input` produce the same number,
+// at 42038 they do not — an inclusive one would read 63451, not 9. `modelMetrics.<model>.requests.cost` (and its session-level twin,
 // `totalPremiumRequests`) is a count times a per-model multiplier, invariant to
 // consumption — measured across fourteen local sessions, it read `0.33` for every
 // single-request `claude-haiku-4.5` session regardless of tokens spent — so neither is ever

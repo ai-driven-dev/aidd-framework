@@ -165,7 +165,7 @@
     {
       "tool": "copilot",
       "coverage": "covered",
-      "reason": "Its own file names outputTokens per turn, but session.shutdown carries all four counters for the whole session \u2014 a session total, never a sum of requests. Whether its input count excludes the cached prompt is unconfirmed: the only session captured read back zero cache, which cannot tell the two apart.",
+      "reason": "Its own file names outputTokens per turn, but session.shutdown carries all four counters for the whole session \u2014 a session total, never a sum of requests. Its four counters are measured disjoint, cached prompt included.",
       "capability": {
         "local_read": {
           "token_counters": true,
@@ -191,7 +191,7 @@
     {
       "tool": "opencode",
       "coverage": "covered",
-      "reason": "Its four counters are measured correct for the anthropic provider \u2014 not independently confirmed for any other provider OpenCode can route to.",
+      "reason": "Its four counters are measured disjoint for the anthropic provider and for one OpenAI-compatible provider whose cache was exercised \u2014 not confirmed for a provider that reports prompt tokens inclusive of the cached ones, which none captured here does.",
       "capability": {
         "local_read": {
           "token_counters": true,
