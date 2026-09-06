@@ -11,7 +11,7 @@ Unify **engineering teams** around **standardized workflows** and **shared best 
 🧱 **IDE agnostic** · 🏗️ **Legacy systems** · 🌱 **Token-optimized** · 🇫🇷 **Made in France**
 
 <p>
-  <!--counts:start--><kbd>8 plugins</kbd> · <kbd>50 skills</kbd> · <kbd>2 agents</kbd><!--counts:end-->
+  <!--counts:start--><kbd>8 plugins</kbd> · <kbd>51 skills</kbd> · <kbd>2 agents</kbd><!--counts:end-->
 </p>
 
 [![Open Source](https://img.shields.io/badge/Open_Source-Yes-yellow?logo=open-source-initiative&logoColor=white)](https://opensource.org/)
@@ -257,9 +257,9 @@ Code transformation: plan, implement, assert, audit, review, test, refactor, deb
 
 ### 🌿 [aidd-vcs](plugins/aidd-vcs/README.md)
 
-`5 skills` · stable
+`6 skills` · stable
 
-Repo init, commits, pull / merge requests, release tags, issues.
+Repo init, commits, pull / merge requests, release tags, issues, conflict resolution.
 
 </td>
 </tr>

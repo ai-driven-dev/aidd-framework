@@ -90,6 +90,7 @@ Version-control workflows: repo init, commit, pull/merge request, release tag, i
 | `02-pull-request` | Create a draft pull or merge request                                            | `01-pull-request`       |
 | `03-release-tag`  | Cut a semver release with annotated tag and notes                              | `01-release-tag`        |
 | `04-issue-create` | Create an issue in the configured ticketing tool                               | `01-issue-create`       |
+| `05-resolve-conflict` | Resolve deterministic conflicts or approved choices | `01-resolve` |
 
 ## 🎼 aidd-orchestrator
 

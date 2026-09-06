@@ -13,6 +13,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
   - [`skills/02-pull-request`](#skills02-pull-request)
   - [`skills/03-release-tag`](#skills03-release-tag)
   - [`skills/04-issue-create`](#skills04-issue-create)
+  - [`skills/05-resolve-conflict`](#skills05-resolve-conflict)
 
 ---
 
@@ -70,4 +71,12 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `assets` | [CONTRIBUTING.md](skills/04-issue-create/assets/CONTRIBUTING.md) | `Project contribution guidelines template` |
 | `assets` | [issue-template.md](skills/04-issue-create/assets/issue-template.md) | `VCS issue/ticket template` |
 | `-` | [SKILL.md](skills/04-issue-create/SKILL.md) | `Create an issue in the configured ticketing tool. Use when the user wants to file a bug, open an issue, or report a problem. Not for committing, opening a pull request, or commenting on an existing issue.` |
+
+#### `skills/05-resolve-conflict`
+
+| Group | File | Description |
+|-------|------|---|
+| `actions` | [01-resolve.md](skills/05-resolve-conflict/actions/01-resolve.md) | - |
+| `assets` | [resolution-table.md](skills/05-resolve-conflict/assets/resolution-table.md) | - |
+| `-` | [SKILL.md](skills/05-resolve-conflict/SKILL.md) | `Resolves deterministic Git conflicts or approved choices. Use when the user wants to resolve a merge, rebase, or cherry-pick conflict. Not for deciding between competing implementations or committing changes.` |
 
