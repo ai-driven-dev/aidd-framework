@@ -7,7 +7,7 @@ import {
 } from "../../../../../src/contexts/telemetry/domain/formats/commit-session-trailer.js";
 
 describe("the line added to a repository's own prepare-commit-msg", () => {
-  it("forwards git's own arguments, so the delegate can tell a merge from an authored commit", () => {
+  it("forwards git's own arguments, so the delegate always gets the message file it needs", () => {
     expect(sessionTrailerHookLine("/repo/.git/hooks/aidd-session-trailer.sh")).toBe(
       'sh "/repo/.git/hooks/aidd-session-trailer.sh" "$@"'
     );
@@ -49,8 +49,8 @@ describe("the delegate a commit's message actually passes through", () => {
     expect(script).toContain('[ -n "$session_id" ] || exit 0');
   });
 
-  it("skips a merge and a squash, so one commit never claims the work it brings in", () => {
-    expect(script).toContain("merge | squash) exit 0 ;;");
+  it("no longer branches on message_source - a merge or a squash is session work too", () => {
+    expect(script).not.toContain("merge | squash");
   });
 
   it("writes the trailer once however often it runs, amend included", () => {

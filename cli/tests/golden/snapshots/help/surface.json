@@ -192,7 +192,7 @@
   {
     "invocation": "aidd translate",
     "exitCode": 0,
-    "help": "Usage: aidd translate [options] <source>\n\nConvert an arbitrary source into a target-native plugin tree — records nothing\n(see `sync` for the manifest-driven, tracked version)\n\nArguments:\n  source                   Path to the source framework directory\n\nOptions:\n  --to <target>            Conversion target (claude, cursor, copilot, codex,\n                           opencode)\n  --out <dir>              Output directory (marketplace dist or project root)\n  --as <marketplace|flat>  Output layout (default: \"marketplace\")\n  --force                  Overwrite existing files at canonical paths (--as\n                           flat only)\n  -h, --help               display help for command"
+    "help": "Usage: aidd translate [options] <source>\n\nConvert an arbitrary source into a target-native plugin tree — records nothing\n(see `sync` for the manifest-driven, tracked version)\n\nArguments:\n  source                   Path to the source framework directory\n\nOptions:\n  --to <target>            Conversion target (claude, cursor, copilot, codex,\n                           opencode)\n  --out <dir>              Output directory (marketplace dist or project root)\n  --as <marketplace|flat>  Output layout (default: \"marketplace\")\n  --force                  Overwrite existing files at canonical paths under\n                           --out\n  -h, --help               display help for command"
   },
   {
     "invocation": "aidd update",

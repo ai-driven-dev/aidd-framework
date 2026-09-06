@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createTestEnv, FRAMEWORK_PATH, initProject, runCli } from "./helpers.js";
@@ -79,8 +79,10 @@ describe.concurrent("E2E: aidd translate", () => {
 
       const snapshot1 = await hashDirectory(outDir);
 
+      // outDir already holds run1's output: a second build now needs --force, same
+      // contract as flat mode's own re-run (see "flat AC #2 + AC #9" below).
       const run2 = await runCli(
-        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir],
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir, "--force"],
         projectDir,
         fakeHome
       );
@@ -485,8 +487,8 @@ describe.concurrent("E2E: aidd translate", () => {
     }
   });
 
-  it("flat guard: --force without --flat exits non-zero with hint", async () => {
-    const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fw-flat-guard-force");
+  it("--force without --as builds marketplace mode normally into a fresh --out", async () => {
+    const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fw-market-force-fresh");
     try {
       const outDir = join(tempDir, "dist");
       const result = await runCli(
@@ -494,8 +496,8 @@ describe.concurrent("E2E: aidd translate", () => {
         projectDir,
         fakeHome
       );
-      expect(result.exitCode).not.toBe(0);
-      expect(result.stderr).toContain("--force requires --as flat");
+      expect(result.exitCode).toBe(0);
+      expect(existsSync(join(outDir, ".plugin", "marketplace.json"))).toBe(true);
     } finally {
       await cleanup();
     }
@@ -620,6 +622,55 @@ describe.concurrent("E2E: aidd translate", () => {
       );
       expect(result.exitCode).not.toBe(0);
       expect(result.stderr).toMatch(/Unsupported target.mode/i);
+    } finally {
+      await cleanup();
+    }
+  });
+});
+
+describe.concurrent("E2E: aidd translate — marketplace mode never erases what it did not write", () => {
+  it("refuses a non-empty --out without --force, and leaves the foreign file untouched", async () => {
+    const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fw-market-preserve");
+    try {
+      const outDir = join(tempDir, "dist");
+      await mkdir(outDir, { recursive: true });
+      const keepPath = join(outDir, "keep.txt");
+      await writeFile(keepPath, "keepme", "utf-8");
+
+      const build = await runCli(
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir],
+        projectDir,
+        fakeHome
+      );
+
+      expect(build.exitCode).not.toBe(0);
+      expect(build.stderr).toContain(outDir);
+      expect(build.stderr).toContain("--force");
+      expect(existsSync(keepPath)).toBe(true);
+      expect(await readFile(keepPath, "utf-8")).toBe("keepme");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("with --force, writes its own output but keeps the foreign file", async () => {
+    const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("fw-market-force");
+    try {
+      const outDir = join(tempDir, "dist");
+      await mkdir(outDir, { recursive: true });
+      const keepPath = join(outDir, "keep.txt");
+      await writeFile(keepPath, "keepme", "utf-8");
+
+      const build = await runCli(
+        ["translate", FRAMEWORK_PATH, "--to", "copilot", "--out", outDir, "--force"],
+        projectDir,
+        fakeHome
+      );
+
+      expect(build.exitCode).toBe(0);
+      expect(existsSync(keepPath)).toBe(true);
+      expect(await readFile(keepPath, "utf-8")).toBe("keepme");
+      expect(existsSync(join(outDir, ".plugin", "marketplace.json"))).toBe(true);
     } finally {
       await cleanup();
     }

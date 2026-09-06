@@ -70,8 +70,8 @@ export const SESSION_TRAILER_HOOK_HEADER = "#!/bin/sh";
 
 /** The line appended to `prepare-commit-msg`, and the marker read back to tell an install
  * that already happened from one that has not. `"$@"` forwards git's own three arguments —
- * the message file, where the message came from, and the commit being amended — because the
- * delegate reads the first two and a hook that dropped them would trailer a merge.
+ * the message file, where the message came from, and the commit being amended — so the
+ * delegate always gets the message file it needs, whatever git calls it for.
  *
  * The separators are forced to `/`, which is the whole of what makes this work on Windows.
  * A hook is shell, run by the `sh` Git for Windows ships, and that shell does not resolve
@@ -99,8 +99,9 @@ export function sessionTrailerHookLine(delegatePath: string): string {
  * name work it did not do. Neither variable set means no AI session made this commit, and
  * the commit gets no trailer at all — an unknown is never a guess.
  *
- * A merge or a squash is skipped: neither is a person authoring work, and a merge commit
- * carrying a session id would attribute every commit it brings in to that one session.
+ * A merge a session resolved by hand is session work: the conflicts it settled cost exactly
+ * as much as any other change, and a commit that hid that cost would undercount every
+ * resolution the same way. Nothing here is skipped by `message_source` any more.
  */
 export function sessionTrailerDelegateScript(): string {
   return `#!/bin/sh
@@ -111,14 +112,8 @@ export function sessionTrailerDelegateScript(): string {
 set -u
 
 message_file="\${1:-}"
-message_source="\${2:-}"
 
 [ -n "$message_file" ] || exit 0
-
-# A merge or a squash is not a person authoring work.
-case "$message_source" in
-  merge | squash) exit 0 ;;
-esac
 
 session_id="\${CODEX_THREAD_ID:-\${CLAUDE_CODE_SESSION_ID:-}}"
 [ -n "$session_id" ] || exit 0

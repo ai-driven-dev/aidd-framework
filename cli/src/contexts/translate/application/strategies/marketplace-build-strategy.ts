@@ -1,4 +1,5 @@
 import { basename, join, relative } from "node:path";
+import { MarketplaceOutDirNotEmptyError } from "../../../../kernel/errors.js";
 import type { AssetProvider, SchemaName } from "../../../../kernel/ports/asset-provider.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
@@ -19,11 +20,22 @@ export class MarketplaceBuildStrategy implements BuildOutputStrategy {
     private readonly fs: FileReader & FileWriter,
     private readonly jsonSchemaValidator: JsonSchemaValidator,
     private readonly assetProvider: AssetProvider,
-    private readonly contract: ToolBuildContract
+    private readonly contract: ToolBuildContract,
+    private readonly force: boolean = false
   ) {}
 
+  /**
+   * Never wipes outDir: a build only ever writes the canonical paths it produces, so
+   * anything else already there survives. A non-empty outDir is refused unless --force,
+   * naming the directory so the message tells the caller exactly what to pass --force at.
+   */
   async preBuild(outDir: string): Promise<void> {
-    await this.fs.deleteDirectory(outDir);
+    if (await this.fs.fileExists(outDir)) {
+      const entries = await this.fs.listDirectory(outDir);
+      if (entries.length > 0 && !this.force) {
+        throw new MarketplaceOutDirNotEmptyError(outDir);
+      }
+    }
     await this.fs.createDirectory(outDir);
   }
 

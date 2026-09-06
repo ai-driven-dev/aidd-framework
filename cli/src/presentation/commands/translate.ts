@@ -76,7 +76,7 @@ export function registerTranslateCommand(program: Command): void {
     .requiredOption("--to <target>", "Conversion target (claude, cursor, copilot, codex, opencode)")
     .requiredOption("--out <dir>", "Output directory (marketplace dist or project root)")
     .option("--as <marketplace|flat>", "Output layout", "marketplace")
-    .option("--force", "Overwrite existing files at canonical paths (--as flat only)")
+    .option("--force", "Overwrite existing files at canonical paths under --out")
     .action(async (source: string, cmdOptions: TranslateCmdOptions) => {
       const { verbose, output, projectRoot } = parseGlobalOptions(program);
 
@@ -96,10 +96,6 @@ export function registerTranslateCommand(program: Command): void {
         process.exit(1);
       }
       const mode: FrameworkBuildMode = cmdOptions.as === "flat" ? "flat" : "marketplace";
-      if (cmdOptions.force && mode !== "flat") {
-        output.error("--force requires --as flat.");
-        process.exit(1);
-      }
 
       await runTranslateCore({
         projectRoot,

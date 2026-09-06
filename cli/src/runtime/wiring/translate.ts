@@ -71,10 +71,11 @@ function frameworkBuildFactoryFor(
   mode: "marketplace" | "flat"
 ): FrameworkBuildFactory {
   if (mode === "marketplace") {
-    return (deps) =>
+    return (deps, ctx) =>
       buildFrameworkUseCase(
         deps,
-        (d, av) => new MarketplaceBuildStrategy(d.fs, av, d.assetProvider, buildContract())
+        (d, av) =>
+          new MarketplaceBuildStrategy(d.fs, av, d.assetProvider, buildContract(), ctx.force)
       );
   }
   return (deps, ctx) =>

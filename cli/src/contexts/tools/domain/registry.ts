@@ -14,11 +14,7 @@ import {
   type ToolId,
 } from "../../../kernel/tool.js";
 import type { ToolBuildContract } from "./build-contract.js";
-import type {
-  NativeActivation,
-  PluginsCapability,
-  PluginsMode,
-} from "./capabilities/plugins-capability.js";
+import type { NativeActivation, PluginsCapability } from "./capabilities/plugins-capability.js";
 import type { AiTool, IdeToolConfig } from "./contracts.js";
 
 /**
@@ -123,10 +119,7 @@ export function nativeActivationOf(toolId: ToolId): NativeActivation | undefined
  * tool's name, so a sixth flat tool needs no edit outside its own profile.
  */
 export function frameworkBuildModeFor(toolId: ToolId): FrameworkBuildMode {
-  const config = getToolConfig(toolId);
-  if (config === undefined || !isAiTool(config)) return "marketplace";
-  const caps = config.capabilities as { plugins?: { mode?: PluginsMode } };
-  return caps.plugins?.mode === "flat" ? "flat" : "marketplace";
+  return resolvePluginsCapability(toolId)?.mode === "flat" ? "flat" : "marketplace";
 }
 
 /**

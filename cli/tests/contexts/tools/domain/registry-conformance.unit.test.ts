@@ -6,6 +6,7 @@ import "../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/vscode/profile.js";
 import type { ToolBuildContract } from "../../../../src/contexts/tools/domain/build-contract.js";
 import type { AiTool } from "../../../../src/contexts/tools/domain/contracts.js";
 import { hasRules } from "../../../../src/contexts/tools/domain/contracts.js";
@@ -355,6 +356,12 @@ describe("frameworkBuildModeFor()", () => {
       const expected = caps.plugins?.mode === "flat" ? "flat" : "marketplace";
       expect(frameworkBuildModeFor(toolId), toolId).toBe(expected);
     }
+  });
+
+  it("defaults an IDE tool with no plugins capability to marketplace", () => {
+    // vscode is `kind: "ide"` and declares no `plugins` capability at all — the one
+    // shipped tool that exercises the "no capability" branch, every AI tool declares one.
+    expect(frameworkBuildModeFor("vscode")).toBe("marketplace");
   });
 });
 
