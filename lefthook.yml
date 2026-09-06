@@ -193,3 +193,13 @@ commit-msg:
   commands:
     commitlint:
       run: pnpm exec commitlint --edit {1}
+
+# `aidd telemetry on` appends its trailer delegate to a prepare-commit-msg it owns; here
+# lefthook owns that hook and regenerates it on install, so the delegate is called from a
+# job instead. Absent delegate, nothing runs: the trailer is opt-in per machine.
+prepare-commit-msg:
+  commands:
+    aidd-session-trailer:
+      run: |
+        delegate="$(git rev-parse --git-common-dir)/hooks/aidd-session-trailer.sh"
+        if [ -f "$delegate" ]; then sh "$delegate" {1} {2}; fi
