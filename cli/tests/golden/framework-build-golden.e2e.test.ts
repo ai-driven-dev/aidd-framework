@@ -43,6 +43,12 @@
  *         and its invariants moved after the baseline was taken. The current content holds
  *         them: `project_doc_max_bytes` 262144, `features.hooks` true, three merged
  *         `mcp_servers`, each pinned by `tests/contexts/tools/domain/profiles/codex.unit.test.ts`.
+ *   opencode:flat — opencode-and-scope.md, Lot A: OpenCode's own plugin loader imports
+ *     every file under `.opencode/plugin/` in-process, and a plain hook script there
+ *     killed the host (uncatchable `process.exit`). `.opencode/plugin/update_memory.js`
+ *     is now `.opencode/hooks/aidd-context/update_memory.js` — namespaced per plugin,
+ *     the same shape `.claude/hooks/<plugin>/` and `.cursor/hooks/<plugin>/` already use.
+ *     Content hash unchanged: only the path moved.
  *
  * USAGE:
  *   Capture all:   UPDATE_FRAMEWORK_GOLDEN=1 pnpm test:e2e tests/golden/framework-build-golden.e2e.test.ts

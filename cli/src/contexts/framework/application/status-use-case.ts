@@ -8,6 +8,7 @@ import type { AiToolId, ToolCategory, ToolId } from "../../../kernel/tool.js";
 import {
   getToolConfig,
   machineLocalFilesOf,
+  nativeActivationOf,
   toolIdsForCategory,
 } from "../../tools/domain/registry.js";
 import type { Manifest } from "../domain/manifest.js";
@@ -31,11 +32,22 @@ interface PluginDriftEntry {
   toolId: AiToolId;
   pluginName: string;
   driftedFiles: string[];
+  notInstalledOnMachine: boolean;
+}
+
+/** A tool whose plugin capability is native activation and that has at least one
+ * installed plugin this CLI tracks zero files for — nothing was checked, which is a
+ * different fact from drift and must never render as "in sync". Kept out of
+ * `pluginDrift`/`inSync` on purpose: see `status-plugin-native-only.unit.test.ts`. */
+export interface PluginNativeOnlyEntry {
+  toolId: AiToolId;
+  binary: string;
 }
 
 export interface StatusReport {
   tools: ToolStatus[];
   pluginDrift: PluginDriftEntry[];
+  pluginNativeOnly: PluginNativeOnlyEntry[];
   inSync: boolean;
 }
 
@@ -78,8 +90,27 @@ export class StatusUseCase implements StatusQuery {
       projectRoot,
       pluginName
     );
+    const pluginNativeOnly = this.checkPluginNativeOnly(installedToolIds, manifest);
     const inSync = tools.every((t) => t.drifted.length === 0) && pluginDrift.length === 0;
-    return { tools, pluginDrift, inSync };
+    return { tools, pluginDrift, pluginNativeOnly, inSync };
+  }
+
+  /** Every tool whose plugin capability declares native activation and that has at
+   * least one installed plugin this CLI tracks zero files for — nothing here was
+   * checked, so it must never be counted as drift, and it must never be silently
+   * absent from a report that otherwise says everything is in sync. */
+  private checkPluginNativeOnly(toolIds: ToolId[], manifest: Manifest): PluginNativeOnlyEntry[] {
+    const entries: PluginNativeOnlyEntry[] = [];
+    for (const toolId of toolIds) {
+      const activation = nativeActivationOf(toolId);
+      if (activation === undefined) continue;
+      const hasUnverifiedPlugin = manifest
+        .getPlugins(toolId as AiToolId)
+        .some((plugin) => plugin.files.size === 0);
+      if (hasUnverifiedPlugin)
+        entries.push({ toolId: toolId as AiToolId, binary: activation.binary });
+    }
+    return entries;
   }
 
   private resolveToolIds(
@@ -229,6 +260,7 @@ export class StatusUseCase implements StatusQuery {
       toolId: drift.toolId,
       pluginName: drift.pluginName,
       driftedFiles: drift.files.map((file) => file.relativePath),
+      notInstalledOnMachine: drift.notInstalledOnMachine,
     }));
   }
 }

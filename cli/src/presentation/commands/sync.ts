@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import { NoManifestError, SyncFailedError } from "../../kernel/errors.js";
 import type { ToolId } from "../../kernel/tool.js";
 import { createDeps } from "../../runtime/wiring/framework.js";
-import { printUnrestorable } from "../display/restore-display.js";
+import { printNativeOnlyTools, printUnrestorable } from "../display/restore-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import type { CLIOutput } from "../output.js";
 import { parseGlobalOptions } from "./global-options.js";
@@ -32,6 +32,7 @@ async function runSyncAction(
     const result = await deps.restoreAllUseCase.execute(projectRoot, cmdOptions.force, interactive);
 
     for (const e of result.errors) output.warn(`[${e.scope}] ${e.message}`);
+    printNativeOnlyTools(output, result.nativeOnlyToolIds);
 
     if (
       result.errors.length === 0 &&
@@ -79,6 +80,7 @@ async function runScopedSync(
     manifest,
     pluginName: cmdOptions.plugin,
   });
+  printNativeOnlyTools(output, result.nativeOnlyToolIds);
   const nothingDone = result.tools.every((t) => t.nothingToRestore);
   if (nothingDone) {
     output.success("Nothing to restore — all files are unmodified.");

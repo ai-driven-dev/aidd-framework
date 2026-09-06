@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  flatHooksPathWithLoaderEntry,
   flatMcpKeyPrefix,
   genericFlatAgentPath,
   genericFlatHooksFile,
@@ -108,6 +109,57 @@ describe("genericFlatHooksScriptPath", () => {
     expect(genericFlatHooksScriptPath(".cursor/hooks/", "aidd-dev", "check.sh")).toBe(
       ".cursor/hooks/aidd-dev/check.sh"
     );
+  });
+});
+
+describe("flatHooksPathWithLoaderEntry", () => {
+  it("namespaces a plain hook script under <perPluginHooksDir>/<plugin>/", () => {
+    expect(
+      flatHooksPathWithLoaderEntry(
+        ".opencode/hooks/",
+        null,
+        "aidd-context",
+        "hooks/update_memory.js"
+      )
+    ).toBe(".opencode/hooks/aidd-context/update_memory.js");
+  });
+
+  it("routes a script matching the loader entry's name flat, renamed to the plugin", () => {
+    const loaderEntry = { dir: ".opencode/plugin/", baseName: "opencode-plugin.js" };
+    expect(
+      flatHooksPathWithLoaderEntry(
+        ".opencode/hooks/",
+        loaderEntry,
+        "aidd-telemetry",
+        "hooks/opencode-plugin.js"
+      )
+    ).toBe(".opencode/plugin/aidd-telemetry.js");
+  });
+
+  it("does not match the loader entry's name for a nested script of the same basename", () => {
+    // "hooks/lib/opencode-plugin.js" is not "hooks/opencode-plugin.js": the exception
+    // matches the top-level script only, not anything sharing its leaf name deeper down.
+    const loaderEntry = { dir: ".opencode/plugin/", baseName: "opencode-plugin.js" };
+    expect(
+      flatHooksPathWithLoaderEntry(
+        ".opencode/hooks/",
+        loaderEntry,
+        "aidd-telemetry",
+        "hooks/lib/opencode-plugin.js"
+      )
+    ).toBe(".opencode/hooks/aidd-telemetry/lib/opencode-plugin.js");
+  });
+
+  it("falls back to full namespacing when no loader entry is declared", () => {
+    expect(flatHooksPathWithLoaderEntry(".codex/hooks/", null, "aidd-dev", "hooks/check.sh")).toBe(
+      ".codex/hooks/aidd-dev/check.sh"
+    );
+  });
+
+  it("keeps two plugins' same-named hook script from colliding", () => {
+    const a = flatHooksPathWithLoaderEntry(".opencode/hooks/", null, "plugin-a", "hooks/x.js");
+    const b = flatHooksPathWithLoaderEntry(".opencode/hooks/", null, "plugin-b", "hooks/x.js");
+    expect(a).not.toBe(b);
   });
 });
 

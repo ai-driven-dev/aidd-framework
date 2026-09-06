@@ -6,7 +6,7 @@ import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
 import type { Logger } from "../../../../kernel/ports/logger.js";
 import type { Prompter } from "../../../../kernel/ports/prompter.js";
-import type { ToolId } from "../../../../kernel/tool.js";
+import type { AiToolId, ToolId } from "../../../../kernel/tool.js";
 import type { Platform } from "../../../../runtime/platform/platform.js";
 import type { PluginFetcher } from "../../../distribution/domain/ports/plugin-fetcher.js";
 import {
@@ -78,6 +78,9 @@ interface RestoreResult {
   totalPluginFilesRestored: number;
   restoredPluginNames: string[];
   unrestorable: string[];
+  /** AI tools this pass could not restore any plugin file for because their
+   * registration is native — see `RestoreAllPluginsUseCase`. */
+  nativeOnlyToolIds: AiToolId[];
 }
 
 export class RestoreUseCase {
@@ -147,7 +150,7 @@ export class RestoreUseCase {
 
   private async runPluginRestore(ctx: RestoreCtx): Promise<RestoreAllPluginsResult> {
     if (this.pluginFetcher === undefined || this.pluginDistributionReader === undefined) {
-      return { totalFiles: 0, pluginNames: [] };
+      return { totalFiles: 0, pluginNames: [], nativeOnlyToolIds: [] };
     }
     return new RestoreAllPluginsUseCase(
       this.fs,
@@ -185,6 +188,7 @@ export class RestoreUseCase {
       totalPluginFilesRestored: pluginResult.totalFiles,
       restoredPluginNames: pluginResult.pluginNames,
       unrestorable: toolResults.flatMap((t) => t.unrestorable),
+      nativeOnlyToolIds: pluginResult.nativeOnlyToolIds,
     };
   }
 

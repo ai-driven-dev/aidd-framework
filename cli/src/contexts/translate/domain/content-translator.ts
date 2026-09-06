@@ -1,6 +1,6 @@
 import { InstallationFile } from "../../../kernel/file.js";
 import { parseFrontmatter, serializeFrontmatter } from "../../../kernel/markdown.js";
-import { flatHooksSharedDirPath } from "../../../kernel/materialization/flat-paths.js";
+import { flatHooksPathWithLoaderEntry } from "../../../kernel/materialization/flat-paths.js";
 import type { Hasher } from "../../../kernel/ports/hasher.js";
 import type {
   AiTool,
@@ -272,17 +272,26 @@ export class PluginContentTranslator {
     return { files: result, skipped };
   }
 
-  // A flat-mode hook is a runtime module a loader scans for, not a manifest a merge
-  // reads — hooks/hooks.json describes the wrong shape for that and is never delivered;
-  // everything else under hooks/ (the module itself and whatever it requires beside it)
-  // is carried verbatim into flatHooksDir, exactly as native mode carries a hook script.
+  // hooks/hooks.json is a manifest a merge reads, never a runtime module a loader
+  // scans for, so it describes the wrong shape here and is never delivered.
+  // Everything else under hooks/ is carried verbatim, namespaced per plugin under
+  // flatHooksDir — unless it is that loader's own plugin module (flatHooksLoaderEntry),
+  // which is delivered flat and renamed instead. See flatHooksPathWithLoaderEntry.
   private flatHooksFiles(dist: PluginDistribution, tool: AiTool<HasPlugins>): InstallationFile[] {
-    const { flatHooksDir } = tool.capabilities.plugins;
+    const { flatHooksDir, flatHooksLoaderEntry } = tool.capabilities.plugins;
     if (flatHooksDir === null) return [];
     return dist.components.hooks
       .filter((file) => file.relativePath !== `${PLUGIN_HOOKS_DIR}/hooks.json`)
       .map((file) =>
-        this.makeFile(flatHooksSharedDirPath(flatHooksDir, file.relativePath), file.content)
+        this.makeFile(
+          flatHooksPathWithLoaderEntry(
+            flatHooksDir,
+            flatHooksLoaderEntry,
+            dist.manifest.name,
+            file.relativePath
+          ),
+          file.content
+        )
       );
   }
 

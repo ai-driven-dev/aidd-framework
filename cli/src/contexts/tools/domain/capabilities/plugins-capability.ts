@@ -1,4 +1,5 @@
 import { CapabilityConfigError } from "../../../../kernel/errors.js";
+import type { FlatHooksLoaderEntry } from "../../../../kernel/materialization/flat-paths.js";
 import type { HooksContentFormat } from "../hooks-format.js";
 import type { MarketplaceSettings } from "../marketplace-settings.js";
 import type { PluginTranslationMode } from "../plugin-translation-mode.js";
@@ -136,7 +137,17 @@ export interface NativePluginsParams {
  * project root. See {@link HooksSupport} for the shape of the "no" case.
  */
 export type FlatHooksSupport =
-  | { acceptsHooks: true; flatHooksDir: string }
+  | {
+      acceptsHooks: true;
+      flatHooksDir: string;
+      /**
+       * The loader's own plugin module: one hook script that is not a script a
+       * bridge must be told to run, but the runtime the loader itself imports.
+       * Omit when a flat hooks loader has no such self-hosting convention. See
+       * {@link FlatHooksLoaderEntry}.
+       */
+      flatHooksLoaderEntry?: FlatHooksLoaderEntry;
+    }
   | { acceptsHooks: false; hooksUnsupportedReason: string };
 
 export type FlatPluginsParams = {
@@ -194,6 +205,9 @@ export class PluginsCapability {
   /** Where a flat-mode hook lands, relative to the project root, or `null` when this
    * capability's `acceptsHooks` is `false`. See {@link FlatHooksSupport}. */
   readonly flatHooksDir: string | null;
+  /** The flat loader's own plugin module, or `null` when this capability declares
+   * none. See {@link FlatHooksSupport.flatHooksLoaderEntry}. */
+  readonly flatHooksLoaderEntry: FlatHooksLoaderEntry | null;
   readonly marketplaceSettings: MarketplaceSettings | null;
   /** Native CLI-driven plugin activation declaration, or `null` when not applicable. */
   readonly nativeActivation: NativeActivation | null;
@@ -236,6 +250,7 @@ export class PluginsCapability {
       this.hooksDestination = params.hooksDestination ?? "plugin";
       this.projectHooksRelativePath = params.projectHooksRelativePath ?? null;
       this.flatHooksDir = null;
+      this.flatHooksLoaderEntry = null;
       this.marketplaceSettings = params.marketplaceSettings ?? null;
       this.nativeActivation = params.nativeActivation ?? null;
       this._userPluginsDir = params.userPluginsDir;
@@ -246,6 +261,9 @@ export class PluginsCapability {
       this.acceptsHooks = params.acceptsHooks;
       this.hooksUnsupportedReason = params.acceptsHooks ? null : params.hooksUnsupportedReason;
       this.flatHooksDir = params.acceptsHooks ? params.flatHooksDir : null;
+      this.flatHooksLoaderEntry = params.acceptsHooks
+        ? (params.flatHooksLoaderEntry ?? null)
+        : null;
       this.hooksTrustNotice = null;
       this.pluginRootToken = null;
       this.acceptsMcp = false;
@@ -264,6 +282,7 @@ export class PluginsCapability {
       this.acceptsHooks = false;
       this.hooksUnsupportedReason = params.hooksUnsupportedReason;
       this.flatHooksDir = null;
+      this.flatHooksLoaderEntry = null;
       this.hooksTrustNotice = null;
       this.pluginRootToken = null;
       this.acceptsMcp = false;

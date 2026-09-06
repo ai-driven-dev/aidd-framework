@@ -1,28 +1,76 @@
+/** An axis owns its own key, sentinels, group shape and order, under `report/axes/`; this
+ * file owns only the accumulators it constructs and the single pass that fills them. The
+ * edge back to this file from `report/**` is `import type` only - a value import there
+ * would recreate the cycle this split exists to avoid. */
+
 import type { TelemetryRouteSupply } from "../../../kernel/measurement.js";
 import type { AiToolId } from "../../../kernel/tool.js";
 import type { FlowAttributionSource, FlowInterval } from "./flow-attribution.js";
-import { ORCHESTRATING_SKILLS } from "./flow-attribution.js";
-import { momentFallsWithin } from "./journal-intervals.js";
 import { type PersonResolution, type ResolvedPerson, resolvePerson } from "./person-resolution.js";
 import type { PersonIdentity } from "./ports/person-identity-reader.js";
-import { STEP_ATTRIBUTION_SOURCES, type StepAttributionSource } from "./step-attribution.js";
+import { addToDayGroup, dayRange, dayRows } from "./report/axes/day-rows.js";
 import {
-  TASK_ATTRIBUTION_SOURCES,
-  TASK_UNATTRIBUTED_REASONS,
-  type TaskAttributionSource,
-  type TaskInterval,
-  type TaskUnattributedReason,
-  taskUnattributedReason,
+  allFlowIntervalsByVendorId,
+  type FlowRowKey,
+  flowKeyOf,
+  flowRows,
+} from "./report/axes/flow-rows.js";
+import {
+  type PersonGroup,
+  type PersonRowKey,
+  personGroupKey,
+  personRawIdOf,
+  personRows,
+} from "./report/axes/person-rows.js";
+import {
+  type AgentKey,
+  agentKeyOf,
+  agentNamingTools,
+  agentRows,
+  type ModelKey,
+  modelKeyOf,
+  modelRows,
+  type ProjectKey,
+  type PromptGroup,
+  type PromptKey,
+  projectKeyOf,
+  projectRows,
+  promptKeyOf,
+  promptRows,
+} from "./report/axes/record-stated-rows.js";
+import { attributionRows, type StepGroup, stepRowKey, stepRows } from "./report/axes/step-rows.js";
+import {
+  allTaskIntervalsByVendorId,
+  type BacklogRowKey,
+  backlogKeyOf,
+  backlogRows,
+  type TaskGroup,
+  type TaskRow,
+  taskAttributionRows,
+  taskRowKeyOf,
+  taskRowOf,
+  taskRows,
+} from "./report/axes/task-rows.js";
+import { buildToolRows, declaredToolsInScope } from "./report/axes/tool-rows.js";
+import { COUNTER_FIELDS, COUNTER_SOURCE, type CounterField } from "./report/record-counters.js";
+import { collapseBilledRequests, collapseSupersededTurns } from "./report/record-reconciliation.js";
+import {
+  activeFilters,
+  emptySelectionOf,
+  selectionStages,
+  type TaskMembership,
+  taskAttributionOf,
+  taskMembership,
+} from "./report/report-selection.js";
+import type { StepAttributionSource } from "./step-attribution.js";
+import type {
+  TaskAttributionSource,
+  TaskInterval,
+  TaskUnattributedReason,
 } from "./task-attribution.js";
 import type { TaskBacklogDeclaration } from "./task-backlog-link.js";
-import {
-  type TaskIdentity,
-  taskIdentitiesFromWrittenPaths,
-  taskIdentityFromWrittenPath,
-} from "./task-identity.js";
-import { type TelemetrySinkRecord, telemetrySinkRecordDayKey } from "./telemetry-sink-record.js";
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+import type { TaskIdentity } from "./task-identity.js";
+import type { TelemetrySinkRecord } from "./telemetry-sink-record.js";
 
 /** Money is carried as whole micro-dollars, never as the floating amount a record stores.
  *
@@ -483,28 +531,9 @@ export interface CostReport {
   readonly measurementEnabled: boolean;
 }
 
-// Declared as the list first and the type derived from it, rather than the other way
-// round: reading the keys back off the table would have to assert their type, and an
-// assertion is exactly what stops holding the day the table and the type disagree.
-const COUNTER_FIELDS = [
-  "inputTokens",
-  "outputTokens",
-  "cacheReadTokens",
-  "cacheCreationTokens",
-] as const;
-
-type CounterField = (typeof COUNTER_FIELDS)[number];
-
-const COUNTER_SOURCE: Readonly<Record<CounterField, keyof TelemetrySinkRecord>> = {
-  inputTokens: "input_tokens",
-  outputTokens: "output_tokens",
-  cacheReadTokens: "cache_read_tokens",
-  cacheCreationTokens: "cache_creation_tokens",
-};
-
 /** Accumulates a group while keeping "never observed" distinct from "observed as zero".
  * A field stays absent until some record in the group carries it. */
-class TotalsAccumulator {
+export class TotalsAccumulator {
   private requests = 0;
   private costMicroUsd: number | undefined;
   private readonly counters = new Map<CounterField, number>();
@@ -562,56 +591,6 @@ function accumulateInto<K>(
   groups.set(key, created);
 }
 
-/** Every token a row counted, across all four disjoint counters. The weight `bySize` falls
- * back to for a costless row - never `inputTokens + outputTokens` alone: every tool this
- * report has ever seen runs at 90%-plus cache, so a weight blind to the two cache counters
- * would order a costless breakdown by the sliver of its volume nobody reads it for, and
- * invert the order a reader actually wants. It is also the same sum the report already
- * prints beside a costless row - weighing by anything else would sort a row by a number the
- * report never shows. */
-function tokensOf(totals: CostTotals): number {
-  return (
-    (totals.inputTokens ?? 0) +
-    (totals.outputTokens ?? 0) +
-    (totals.cacheReadTokens ?? 0) +
-    (totals.cacheCreationTokens ?? 0)
-  );
-}
-
-/** Largest first, so the biggest thing is the first thing read. Weighted by amount where
- * one exists and by tokens where none does, since a tool with no amount would otherwise
- * sort as if it had cost nothing. Ties fall back to the row's own key, so the same records
- * always produce the same report. */
-function bySize<T>(
-  rows: readonly T[],
-  totalsOf: (row: T) => CostTotals,
-  keyOf: (row: T) => string
-): T[] {
-  const weight = (row: T): number => {
-    const totals = totalsOf(row);
-    return totals.costMicroUsd ?? tokensOf(totals);
-  };
-  return [...rows].sort(
-    (left, right) => weight(right) - weight(left) || keyOf(left).localeCompare(keyOf(right))
-  );
-}
-
-// A single space cannot occur in a `step_attribution` value, so it separates the two parts
-// of the key unambiguously even though a skill name could contain almost anything. The
-// group keeps the two parts beside its counters rather than parsing them back out of the
-// key: reading a type back out of a string is an assertion, and this needs none.
-const STEP_ROW_SEPARATOR = " ";
-
-interface StepGroup {
-  readonly attribution: StepAttributionSource;
-  readonly step?: string;
-  readonly totals: TotalsAccumulator;
-}
-
-function stepRowKey(record: TelemetrySinkRecord): string {
-  return `${record.step_attribution}${STEP_ROW_SEPARATOR}${record.step ?? ""}`;
-}
-
 function addToStepGroup(groups: Map<string, StepGroup>, record: TelemetrySinkRecord): void {
   const key = stepRowKey(record);
   const existing = groups.get(key);
@@ -626,96 +605,6 @@ function addToStepGroup(groups: Map<string, StepGroup>, record: TelemetrySinkRec
   };
   created.totals.add(record);
   groups.set(key, created);
-}
-
-// A record with no project is its own group, never folded into one that was actually
-// placed. A symbol can never equal a real `project_id` string, so it is a safe Map key
-// for "unknown" beside every value a record might actually carry.
-const NO_KNOWN_PROJECT = Symbol("no known project");
-type ProjectKey = string | typeof NO_KNOWN_PROJECT;
-
-// An empty string is not a name - it is what a tool writes when it has none to give, and
-// treating it as its own project would print a nameless row a person cannot act on. The
-// `typeof` guard is there for a second reason: a record read off disk carries whatever its
-// own line actually held, not what this field's type declares.
-function projectKeyOf(record: TelemetrySinkRecord): ProjectKey {
-  return typeof record.project_id === "string" && record.project_id !== ""
-    ? record.project_id
-    : NO_KNOWN_PROJECT;
-}
-
-// The same idea, one dimension over: a record with no model is its own group, never
-// dropped. `bySteps` has `unattributed` and `byProjects` has the row above for exactly this
-// reason - both the Codex and OpenCode readers permit a request record with no model, so
-// without this row `byModels` would stop reconciling to its own total with nothing naming
-// the gap. Deliberately narrower than `projectKeyOf`: nothing measured so far ever writes
-// an empty-string `model`, so unlike `project_id` this stays an `undefined` check rather
-// than also folding in `""` - a rule this module has no evidence for yet.
-const NO_KNOWN_MODEL = Symbol("no known model");
-type ModelKey = string | typeof NO_KNOWN_MODEL;
-
-// The main thread's own row, and the row for a tool that could never have named one. Symbols
-// for the same reason `NO_KNOWN_MODEL` is one: an agent really can be named anything, so no
-// string is safe to reserve.
-const MAIN_THREAD = Symbol("the main thread");
-const AGENT_NOT_STATED = Symbol("a tool whose route never names an agent");
-type AgentKey = string | typeof MAIN_THREAD | typeof AGENT_NOT_STATED;
-
-/** Which of the three rows a record joins. `agent_name` present is the tool's own statement
- * and needs nothing else; absent means one of two different things, and only the tool's
- * declaration tells them apart.
- *
- * This axis used to answer `NO_AGENT` for every record with no `agent_name`, whatever the
- * tool. Only Claude Code's reader ever sets the field, so on Codex, Copilot and OpenCode
- * every record was reported as the main thread — 100% of the axis, on no evidence. The
- * declaration is read rather than the record because the record cannot carry the absence:
- * a tool that never names an agent writes exactly what a main-thread line writes. */
-function agentKeyOf(
-  record: TelemetrySinkRecord,
-  namesAgents: (tool: AiToolId) => boolean
-): AgentKey {
-  if (record.agent_name !== undefined) return record.agent_name;
-  return namesAgents(record.tool) ? MAIN_THREAD : AGENT_NOT_STATED;
-}
-
-/** Whether a tool's own declared route names agents, answered from `declaredTools` alone.
- * A tool with no declared local read supplies nothing, so it names no agent either — the
- * same reading `NO_CAPABILITY` gives every other supply. */
-function agentNamingTools(
-  declaredTools: readonly CostReportToolDeclaration[]
-): (tool: AiToolId) => boolean {
-  const naming = new Set(
-    declaredTools
-      .filter((declaration) => declaration.capability.localRead?.agentName === true)
-      .map((declaration) => declaration.tool)
-  );
-  return (tool) => naming.has(tool);
-}
-
-// The row for what named no prompt. A symbol for the same reason `NO_AGENT` is one: a prompt
-// id is opaque and host-assigned, so no string is safe to reserve against it.
-const NO_PROMPT = Symbol("no prompt named");
-type PromptKey = string | typeof NO_PROMPT;
-
-function promptKeyOf(record: TelemetrySinkRecord): PromptKey {
-  return record.prompt_id === undefined ? NO_PROMPT : record.prompt_id;
-}
-
-function modelKeyOf(record: TelemetrySinkRecord): ModelKey {
-  return record.model === undefined ? NO_KNOWN_MODEL : record.model;
-}
-
-/** How a record came to belong to a task, or why it belongs to none - the value every task
- * axis keys on, computed once per record. A named membership carries `attribution` beside
- * the identity rather than only the identity, because the same task holds records from both
- * routes: on the session this route was measured against, 1045 records fell inside a
- * declared interval and 27 preceded the first declaration entirely. One row carrying the
- * weaker attribution would state something false about the 1045. */
-interface TaskGroup {
-  readonly task?: TaskIdentity;
-  readonly attribution?: TaskAttributionSource;
-  readonly reason?: TaskUnattributedReason;
-  readonly totals: TotalsAccumulator;
 }
 
 /** Mirrors `addToStepGroup`, which folds that axis' own pairs the same way. */
@@ -738,256 +627,6 @@ function addToTaskGroup(
   groups.set(key, created);
 }
 
-interface TaskMembershipRow {
-  readonly task: TaskIdentity;
-  readonly attribution: TaskAttributionSource;
-}
-
-type TaskRow = TaskMembershipRow | TaskUnattributedReason;
-
-const TASK_ROW_SEPARATOR = " ";
-
-/** Mirrors `stepRowKey`, which keys that axis' own `(name x attribution)` pairs the same
- * way, rather than inventing a second way to key a pair. A `TaskIdentity` is always
- * `${month}/${name}` and an attribution is never one, so a named key can never collide with
- * a reason key. */
-function taskRowKeyOf(row: TaskRow): string {
-  return typeof row === "string" ? row : `${row.attribution}${TASK_ROW_SEPARATOR}${row.task}`;
-}
-
-/** The one task a session's written files name, when they name exactly one.
- *
- * Two written folders infer nothing: two candidates and no reason to choose between them.
- * That refusal is what answers the objection that kept written paths out of this breakdown
- * until now - the `--task` filter's own inferred route attributes a whole session, which can
- * place one session under two task rows at once. Refusing is not a fallback here, it is the
- * bound that makes the route sound. */
-function soleWrittenTaskOf(journal: CostReportSessionJournal | undefined): TaskIdentity | null {
-  if (journal === undefined) return null;
-  const identities = new Set(taskIdentitiesFromWrittenPaths(journal.writtenPaths));
-  if (identities.size !== 1) return null;
-  const [only] = identities;
-  return only ?? null;
-}
-
-/** Whether this journal witnessed `momentIso` at all - never an unbounded yes for a journal
- * that carries no readable moment. */
-function witnessed(
-  journal: CostReportSessionJournal | undefined,
-  momentIso: string | undefined
-): boolean {
-  const span = journal?.witnessed;
-  if (span === undefined || momentIso === undefined) return false;
-  const momentMs = Date.parse(momentIso);
-  if (Number.isNaN(momentMs)) return false;
-  return momentMs >= span.fromMs && momentMs <= span.toMs;
-}
-
-// The same idea, one level above a task: a task whose folder declares no backlog item, or
-// whose declaration exists but could not be read, is its own group - never folded into
-// each other, and never folded into a named item. Symbols, the same reason `NO_KNOWN_PROJECT`
-// and `NO_KNOWN_MODEL` are: a backlog item is a free-form string on either support (a forge
-// reference or a project-relative path), so nothing here can rule out a real item colliding
-// with a string sentinel the way a plain string could.
-const NO_BACKLOG_DECLARED = Symbol("task declares no backlog item");
-const UNREADABLE_BACKLOG_DECLARATION = Symbol("task's backlog declaration could not be read");
-type BacklogRowKey =
-  | string
-  | typeof NO_BACKLOG_DECLARED
-  | typeof UNREADABLE_BACKLOG_DECLARATION
-  | TaskUnattributedReason;
-
-/** Every session's own closed intervals, keyed by vendor id - built once from
- * `buildTaskIntervals`'s own output, never a second notion of when a task was running.
- * Unlike `declaredIntervalsForTask`, this keeps every task a session ever declared, not
- * only one: `byTasks` groups by whichever task a record's moment falls in, not by
- * membership in a single task asked for.
- *
- * **Every journal gets an entry, including one that declared nothing.** The empty list and
- * the absent key are two different facts and `taskRowOf` reads them as two: a key
- * mapped to `[]` is a journal that was read and declared nothing, an absent key is a
- * session no journal was read for at all. Skipping the empty ones - which this did until
- * 2026-09-04 - collapsed both into `"no-declaration"`, so a report that never found the
- * runs directory announced that the work had declared no task. */
-function allTaskIntervalsByVendorId(
-  journals: readonly CostReportSessionJournal[]
-): ReadonlyMap<string, readonly TaskInterval[]> {
-  const byVendorId = new Map<string, readonly TaskInterval[]>();
-  for (const journal of journals) byVendorId.set(journal.vendorId, journal.taskIntervals);
-  return byVendorId;
-}
-
-/** Which task a record's own moment falls inside, among *all* of its session's declared
- * intervals - `taskUnattributedReason` for a record whose moment falls in none. Intervals
- * within one session are closed and never overlap (`buildTaskIntervals`), so at most one
- * ever matches - this never has to choose between two.
- *
- * `interval.path` failing to resolve here is unreachable for every interval this codebase's
- * own wiring ever produces, not merely untested: `buildTaskIntervals` already refuses to
- * emit a `TaskInterval` for a declared path `taskIdentityFromWrittenPath` cannot turn into
- * an identity (a literal `..` path segment, say). It is not unreachable in the type this
- * function actually takes - `CostReportSessionJournal.taskIntervals` is a plain input
- * field, so a caller (a test, most concretely) can still hand this a `TaskInterval` literal
- * whose `path` resolves to nothing, which is exactly why the fallback stays rather than
- * being deleted as dead code. Reading such a moment the same as no interval covering it at
- * all is deliberate, not an invented fourth reason: a path this layer cannot turn into an
- * identity names no task a person could act on by name either. */
-function taskRowOf(
-  record: TelemetrySinkRecord,
-  intervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>,
-  journalsByVendorId: ReadonlyMap<string, CostReportSessionJournal>
-): TaskRow {
-  const intervals = intervalsByVendorId.get(record.vendor_id);
-  // No entry at all means no journal was read for this session - never that it declared
-  // nothing. `allTaskIntervalsByVendorId` gives every journal it read an entry, so the two
-  // cases are distinguishable here and nowhere else.
-  if (intervals === undefined) return "no-journal";
-  const interval = intervals.find((candidate) =>
-    momentFallsWithin([candidate], record.event_timestamp)
-  );
-  const declared = interval && taskIdentityFromWrittenPath(interval.path);
-  if (declared) return { task: declared, attribution: "declared" };
-  // Only now the weaker route, and only inside what this journal witnessed: a declaration
-  // that covers the record always wins, so this never overrides a stated fact with an
-  // inferred one.
-  const journal = journalsByVendorId.get(record.vendor_id);
-  const inferred = soleWrittenTaskOf(journal);
-  if (inferred !== null && witnessed(journal, record.event_timestamp)) {
-    return { task: inferred, attribution: "inferred" };
-  }
-  // The journal's own earliest witnessed moment, so a record older than everything this
-  // session saw is named for that rather than for declaring late - the distinction 96.2% of
-  // a real period turns on. Absent for a journal with no readable moment, which then makes
-  // no coverage claim at all.
-  return taskUnattributedReason(intervals, record.event_timestamp, journal?.witnessed?.fromMs);
-}
-
-/** Which `byBacklog` row a record's own task-row key belongs in - built from
- * `taskRowOf`'s own output, never a second notion of which task a record fell
- * inside. A reason (the record belongs to no task at all) passes straight through
- * unchanged, exactly as `by_task` gives it; a named task looks up its folder's declaration
- * once, in the map `ReportCostUseCase` already resolved for every distinct task identity
- * this period's records could name.
- *
- * A named task missing from `declarations` is unreachable through this module's one
- * production caller - `report-cost-use-case.ts` resolves every task identity `byTasks` can
- * ever key on before this ever runs - but is read as `{ kind: "none" }` rather than
- * throwing or dropping the record, the same defensive default `taskRowOf`'s own
- * `interval.path` fallback documents: a caller a test can still construct must never lose a
- * record's figures to a gap in wiring this module cannot see from here. */
-function backlogKeyOf(
-  taskRow: TaskRow,
-  declarations: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration> | undefined
-): BacklogRowKey {
-  if (typeof taskRow === "string") return taskRow;
-  const declaration = declarations?.get(taskRow.task) ?? { kind: "none" as const };
-  if (declaration.kind === "none") return NO_BACKLOG_DECLARED;
-  if (declaration.kind === "unreadable") return UNREADABLE_BACKLOG_DECLARATION;
-  return declaration.link.backlog;
-}
-
-// A record falling in no flow interval at all is its own group, keyed on this symbol -
-// never a plain string sentinel: a `FlowInterval` is never itself a valid key value here
-// (see `FlowRowKey` below), so nothing about a real interval could ever collide with it,
-// unlike `NO_BACKLOG_DECLARED`'s own worry about a free-form backlog string.
-const OUTSIDE_EVERY_FLOW = Symbol("record falls outside every flow interval");
-
-// Keyed on the closed `FlowInterval` object itself, by reference, never on `skill` alone:
-// two orchestrated runs of the same skill in one session are two distinct `FlowInterval`
-// objects (`buildFlowIntervals`'s own doc comment), and a `Map` keyed on object identity
-// keeps them two rows without needing a synthesized composite string key. A record outside
-// every flow can never collide with one inside, since `OUTSIDE_EVERY_FLOW` is a symbol no
-// interval object can ever equal.
-type FlowRowKey = FlowInterval | string | typeof OUTSIDE_EVERY_FLOW;
-
-/** Every session's own closed flow intervals, keyed by vendor id - the same shape
- * `allTaskIntervalsByVendorId` gives task intervals, one layer wider. */
-function allFlowIntervalsByVendorId(
-  journals: readonly CostReportSessionJournal[]
-): ReadonlyMap<string, readonly FlowInterval[]> {
-  const byVendorId = new Map<string, readonly FlowInterval[]>();
-  for (const journal of journals) {
-    if (journal.flowIntervals.length > 0) byVendorId.set(journal.vendorId, journal.flowIntervals);
-  }
-  return byVendorId;
-}
-
-/** Which flow interval a record's own moment falls inside, among all of its session's
- * orchestrated runs - `OUTSIDE_EVERY_FLOW` for a record whose moment falls in none, the
- * same "no reason taxonomy" spec's own hard constraint gives this axis: unlike a task's
- * three distinct gaps, nothing here needs telling apart *why* a record sits outside every
- * flow, since a flow is read from the same sequence either way. Intervals within one
- * session are closed and never overlap (`buildFlowIntervals`), so at most one ever
- * matches. */
-function flowKeyOf(
-  record: TelemetrySinkRecord,
-  intervalsByVendorId: ReadonlyMap<string, readonly FlowInterval[]>
-): FlowRowKey {
-  const intervals = intervalsByVendorId.get(record.vendor_id) ?? [];
-  const interval = intervals.find((candidate) =>
-    momentFallsWithin([candidate], record.event_timestamp)
-  );
-  return interval ?? flowTheToolNamed(record) ?? OUTSIDE_EVERY_FLOW;
-}
-
-/** The orchestrating skill a record's own tool named, for a record no interval covers -
- * the skill name itself as the key, which no `FlowInterval` object and no symbol can ever
- * equal, so the two row kinds never collide.
- *
- * Only `tool-stated`. A `journal-interval` step is an inference from a moment, and the
- * intervals it was inferred from are the very ones just checked; a `prompt-matched` one
- * names the step a prompt opened, which is a step and not an orchestration. Neither says a
- * flow was orchestrated, and reading either as one would put work inside a flow on the
- * strength of the reader's own guess.
- *
- * Why this capture exists at all: a session resumed after its context was compacted invokes
- * nothing again, so no `step_start` hook fires and its journal opens no flow, while the
- * transcript goes on stating the step on every record it produces. Measured on this
- * machine - one such session, six `step_end` lines, no `step_start`, and 2,220 records in a
- * 30-day period that `by_flow` placed outside every flow while `by_step` named the very
- * skill they ran under. */
-function flowTheToolNamed(record: TelemetrySinkRecord): string | undefined {
-  if (record.step_attribution !== "tool-stated") return undefined;
-  return record.step !== undefined && ORCHESTRATING_SKILLS.has(record.step)
-    ? record.step
-    : undefined;
-}
-
-// A record with no identifier is its own row, keyed on a symbol the same way
-// `NO_KNOWN_PROJECT` keys the row for no known project - never folded into an unresolved
-// row, which the spec's own three-way shape (`PersonResolution`) requires stay distinct.
-const NO_KNOWN_PERSON = Symbol("no known person");
-type PersonRowKey = string | typeof NO_KNOWN_PERSON;
-
-// An empty string reads the same as absent, the same reading `projectKeyOf` already gives
-// an empty `project_id` - a tool writing `person_id: ""` has stated nothing, not named an
-// identity nobody could ever claim.
-function personRawIdOf(record: TelemetrySinkRecord): string | undefined {
-  return typeof record.person_id === "string" && record.person_id !== ""
-    ? record.person_id
-    : undefined;
-}
-
-/** One resolved person's group - keyed once, on whichever field makes two records the same
- * row: a mapped record's canonical `personId`, so two raw identities one person declared
- * merge; an unresolved record's own raw identifier, so two unplaced identities never merge
- * into each other; or the shared `NO_KNOWN_PERSON` symbol for a record with none. */
-interface PersonGroup {
-  readonly resolved: ResolvedPerson;
-  readonly totals: TotalsAccumulator;
-}
-
-function personGroupKey(resolved: ResolvedPerson): PersonRowKey {
-  if (resolved.resolution === "mapped" && resolved.personId !== undefined) {
-    return resolved.personId;
-  }
-  if (resolved.resolution === "unresolved") {
-    const [rawId] = resolved.identities;
-    if (rawId !== undefined) return rawId;
-  }
-  return NO_KNOWN_PERSON;
-}
-
 function addToPersonGroup(
   groups: Map<PersonRowKey, PersonGroup>,
   record: TelemetrySinkRecord,
@@ -1004,14 +643,6 @@ function addToPersonGroup(
   groups.set(key, created);
 }
 
-/** A prompt's running totals plus the earliest moment seen in it. The moment is tracked
- * here rather than read back off the records because the pass over them happens once, and
- * because a sink is append-ordered by when it was read, never by when a turn began. */
-interface PromptGroup {
-  readonly totals: TotalsAccumulator;
-  earliestMs?: number;
-}
-
 function addToPromptGroup(groups: Map<PromptKey, PromptGroup>, record: TelemetrySinkRecord): void {
   const key = promptKeyOf(record);
   const group = groups.get(key) ?? { totals: new TotalsAccumulator() };
@@ -1022,238 +653,6 @@ function addToPromptGroup(groups: Map<PromptKey, PromptGroup>, record: Telemetry
     group.earliestMs = atMs;
   }
   groups.set(key, group);
-}
-
-/** Every UTC day from `fromDay` to `toDay`, inclusive — the full period, whether or not a
- * record ever lands on a given day. A day with nothing is still a row: a gap in a series
- * reads as continuity, so the row has to exist to be a zero. */
-function dayRange(fromDay: string, toDay: string): readonly string[] {
-  const days: string[] = [];
-  const end = Date.parse(`${toDay}T00:00:00Z`);
-  for (let at = Date.parse(`${fromDay}T00:00:00Z`); at <= end; at += MS_PER_DAY) {
-    days.push(new Date(at).toISOString().slice(0, 10));
-  }
-  return days;
-}
-
-/** The vendor ids whose sessions wrote into `task` at some point - unchanged from before a
- * task could be declared at all, and deliberately still whole-session: nothing about the
- * existing per-file attribution changes for a tool that already has it. */
-function inferredVendorIdsForTask(
-  journals: readonly CostReportSessionJournal[],
-  task: TaskIdentity
-): ReadonlySet<string> {
-  const vendorIds = new Set<string>();
-  for (const journal of journals) {
-    if (taskIdentitiesFromWrittenPaths(journal.writtenPaths).includes(task)) {
-      vendorIds.add(journal.vendorId);
-    }
-  }
-  return vendorIds;
-}
-
-/** Every session's own declared intervals that name `task`, keyed by vendor id so a
- * record's session is a lookup rather than a walk of every journal again. A session that
- * never declared this task carries no entry - what makes an undeclared session read as
- * belonging to none, never to the last one seen. */
-function declaredIntervalsForTask(
-  journals: readonly CostReportSessionJournal[],
-  task: TaskIdentity
-): ReadonlyMap<string, readonly TaskInterval[]> {
-  const byVendorId = new Map<string, readonly TaskInterval[]>();
-  for (const journal of journals) {
-    const intervals = journal.taskIntervals.filter(
-      (interval) => taskIdentityFromWrittenPath(interval.path) === task
-    );
-    if (intervals.length > 0) byVendorId.set(journal.vendorId, intervals);
-  }
-  return byVendorId;
-}
-
-/** Both routes to `task`, kept apart rather than merged into one vendor-id set: a declared
- * interval decides per record, at the precision `buildTaskIntervals` bounds it to, while a
- * written file decides for a session's records as a whole, exactly as it always has.
- * Merging them would let a session's own zero-width or long-closed declaration - real, but
- * covering no record - drag in records a written file never touched either. */
-interface TaskMembership {
-  readonly declaredIntervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>;
-  readonly inferredVendorIds: ReadonlySet<string>;
-}
-
-function taskMembership(
-  journals: readonly CostReportSessionJournal[],
-  task: TaskIdentity
-): TaskMembership {
-  return {
-    declaredIntervalsByVendorId: declaredIntervalsForTask(journals, task),
-    inferredVendorIds: inferredVendorIdsForTask(journals, task),
-  };
-}
-
-/** How, if at all, one record belongs to the task `membership` was built for - `undefined`
- * for neither route, which is what excludes it from a `--task` report entirely. A record
- * whose own moment falls in a declared interval is `"declared"` even when its session also
- * wrote into the folder; only a record a declaration does not cover falls back to whether
- * its whole session did. */
-function taskAttributionOf(
-  record: TelemetrySinkRecord,
-  membership: TaskMembership
-): TaskAttributionSource | undefined {
-  const intervals = membership.declaredIntervalsByVendorId.get(record.vendor_id);
-  if (intervals && momentFallsWithin(intervals, record.event_timestamp)) return "declared";
-  return membership.inferredVendorIds.has(record.vendor_id) ? "inferred" : undefined;
-}
-
-// The field a generic filter narrows on, and the fixed order they are applied in - after
-// `task`, which already existed and uses its own membership route rather than an equality
-// check. Fixed so two people asking for the same selection always see the same filter
-// named as the one that emptied it.
-const GENERIC_FILTER_FIELDS: Readonly<Record<keyof CostReportFilters, keyof TelemetrySinkRecord>> =
-  {
-    project: "project_id",
-    step: "step",
-    model: "model",
-    tool: "tool",
-  };
-const GENERIC_FILTER_ORDER: readonly (keyof CostReportFilters)[] = [
-  "project",
-  "step",
-  "model",
-  "tool",
-];
-
-interface SelectionStage {
-  readonly name: CostReportFilterName | undefined;
-  readonly value: string | undefined;
-  readonly records: readonly TelemetrySinkRecord[];
-}
-
-/** One stage per active filter, each narrowing what the stage before it kept. Filters
- * compose by `and` and nothing else: every stage only ever removes records the one before
- * it was already going to keep, never adds one back. */
-function selectionStages(
-  records: readonly TelemetrySinkRecord[],
-  input: CostReportInput,
-  membership: TaskMembership | null
-): readonly SelectionStage[] {
-  const stages: SelectionStage[] = [{ name: undefined, value: undefined, records }];
-  if (membership !== null) {
-    const kept = records.filter((r) => taskAttributionOf(r, membership) !== undefined);
-    stages.push({ name: "task", value: input.task, records: kept });
-  }
-  for (const name of GENERIC_FILTER_ORDER) {
-    const value = input.filters?.[name];
-    if (value === undefined) continue;
-    const field = GENERIC_FILTER_FIELDS[name];
-    const previous = stages[stages.length - 1]?.records ?? [];
-    stages.push({ name, value, records: previous.filter((r) => r[field] === value) });
-  }
-  return stages;
-}
-
-/** Whether a filter's own value is known at all - anywhere this call can see, not only in
- * this selection. `task` reads the same membership `buildCostReport` already computed;
- * `tool` reads the declared list, a closed set no read is needed for; the rest read
- * `knownValues`, gathered once across every day file the caller looked at, not only the
- * period's own records. */
-function isKnownFilterValue(
-  name: CostReportFilterName,
-  value: string,
-  input: CostReportInput,
-  membership: TaskMembership | null
-): boolean {
-  if (name === "task") {
-    return (
-      (membership?.declaredIntervalsByVendorId.size ?? 0) > 0 ||
-      (membership?.inferredVendorIds.size ?? 0) > 0
-    );
-  }
-  if (name === "tool") return input.declaredTools.some((tool) => tool.tool === value);
-  const known = input.knownValues ?? { projects: new Set(), steps: new Set(), models: new Set() };
-  const set = { project: known.projects, step: known.steps, model: known.models }[name];
-  return set?.has(value) ?? false;
-}
-
-/** True when the culprit filter's own value matched something before any generic filter
- * ran, meaning the emptiness comes from its intersection with a filter already applied
- * rather than from this value alone. `task` has no "alone" reading - it is the only route
- * to a task, not one of several composed equality checks. */
-function isCombinationCulprit(
-  stages: readonly SelectionStage[],
-  membership: TaskMembership | null,
-  culprit: SelectionStage
-): boolean {
-  if (culprit.name === undefined || culprit.name === "task") return false;
-  const field = GENERIC_FILTER_FIELDS[culprit.name];
-  const baseline = stages[membership === null ? 0 : 1]?.records ?? [];
-  return baseline.some((r) => r[field] === culprit.value);
-}
-
-/** The first filter that narrowed a non-empty selection down to nothing - never the
- * period itself, which is an honest zero rather than a filter's doing. Stages only ever
- * shrink, so the first empty one is the whole answer to "which filter emptied it". */
-function emptySelectionOf(
-  stages: readonly SelectionStage[],
-  input: CostReportInput,
-  membership: TaskMembership | null
-): CostReportEmptySelection | undefined {
-  if ((stages[0]?.records.length ?? 0) === 0) return undefined;
-  const culprit = stages.find((stage) => stage.records.length === 0);
-  if (!culprit || culprit.name === undefined || culprit.value === undefined) return undefined;
-  const known = isKnownFilterValue(culprit.name, culprit.value, input, membership);
-  const combination = isCombinationCulprit(stages, membership, culprit);
-  return {
-    filter: culprit.name,
-    value: culprit.value,
-    known,
-    ...(combination ? { combination: true } : {}),
-  };
-}
-
-/** Which of the four generic filters were actually given, in the same fixed order - never
- * `task`, which keeps its own top-level field unchanged. `undefined` when none were, so
- * an unfiltered period carries no empty object. */
-function activeFilters(filters: CostReportFilters | undefined): CostReportFilters | undefined {
-  if (!filters) return undefined;
-  const given = GENERIC_FILTER_ORDER.filter((name) => filters[name] !== undefined);
-  if (given.length === 0) return undefined;
-  return Object.fromEntries(given.map((name) => [name, filters[name]]));
-}
-
-/** `by_tool` is a breakdown of every *declared* tool, not only the ones a record touched -
- * that is what lets an unreadable one show its own reason instead of a false zero. A
- * `--tool` filter has to narrow that same list, or every tool it excluded would still
- * print a row reading "nothing in this period" - indistinguishable from one genuinely
- * measured idle, exactly the lie a filter's whole point is to remove. */
-function declaredToolsInScope(
-  declaredTools: readonly CostReportToolDeclaration[],
-  filters: CostReportFilters | undefined
-): readonly CostReportToolDeclaration[] {
-  const wanted = filters?.tool;
-  return wanted === undefined
-    ? declaredTools
-    : declaredTools.filter((tool) => tool.tool === wanted);
-}
-
-/** Every declared tool gets a row, in the declared order, whether or not it contributed -
- * a tool absent from the output is a tool a reader assumes did nothing, and for an
- * unreadable one that assumption is exactly the false zero this layer exists to prevent. */
-function buildToolRows(
-  declaredTools: readonly CostReportToolDeclaration[],
-  measured: ReadonlyMap<AiToolId, TotalsAccumulator>,
-  sessionTotals: ReadonlyMap<AiToolId, TotalsAccumulator>
-): readonly CostReportToolRow[] {
-  return declaredTools.map((declaration) => {
-    const session = sessionTotals.get(declaration.tool);
-    return {
-      tool: declaration.tool,
-      coverage: declaration.coverage,
-      ...(declaration.reason === undefined ? {} : { reason: declaration.reason }),
-      capability: declaration.capability,
-      totals: measured.get(declaration.tool)?.build() ?? { requests: 0 },
-      ...(session === undefined ? {} : { sessionTotals: session.build() }),
-    };
-  });
 }
 
 /** Every group one pass over the records fills. Kept together so the pass reads as one
@@ -1313,7 +712,7 @@ function accumulateSessionRecord(groups: Groups, record: TelemetrySinkRecord): v
   // `typeof`, not `!== undefined`, for the same reason `TotalsAccumulator` guards every
   // counter that way: `parseTelemetrySinkLine` validates `sink_schema_version` and casts
   // the rest, so a field's declared type is a claim about what this system writes, never
-  // about what a line on disk holds. This one was the exception until it was not — `null`
+  // about what a line on disk holds. This one is the exception — `null`
   // is `!== undefined` and would have read as an observed zero, and a string would have
   // concatenated into the running total and reached the terminal as `NaN` minutes.
   if (typeof record.active_time_s === "number") {
@@ -1364,14 +763,6 @@ function accumulateRequestRecord(
   if (attribution !== undefined) accumulateInto(groups.taskAttributions, attribution, record);
 }
 
-/** Only a day the period itself spans: `emptyGroups` seeded every one of them, so a record
- * dated outside the period joins nothing rather than adding a day the report never claimed
- * to cover. */
-function addToDayGroup(days: Map<string, TotalsAccumulator>, record: TelemetrySinkRecord): void {
-  const day = telemetrySinkRecordDayKey(record);
-  if (day !== undefined && days.has(day)) days.get(day)?.add(record);
-}
-
 function accumulate(
   records: readonly TelemetrySinkRecord[],
   fromDay: string,
@@ -1397,317 +788,6 @@ function accumulate(
     else accumulateRequestRecord(groups, record, context);
   }
   return groups;
-}
-
-/** All four, always, in the declared order.
- *
- * A strength that accounted for nothing is the one place in this report where a zero is
- * the measurement rather than an absence: the total is known, and none of it came from
- * that source. Dropping the row would leave a consumer handling one to four rows in an
- * order it cannot predict, and unable to tell "no records were attributed this way" from
- * "this report does not carry that field". */
-function attributionRows(
-  attributions: ReadonlyMap<StepAttributionSource, TotalsAccumulator>
-): readonly CostReportAttributionRow[] {
-  return STEP_ATTRIBUTION_SOURCES.map((attribution) => ({
-    attribution,
-    totals: attributions.get(attribution)?.build() ?? { requests: 0 },
-  }));
-}
-
-/** Both sources, always - the same reason `attributionRows` always gives every one of its
- * own: a
- * source that accounted for nothing is still a fact about this task, not an absent field. */
-function taskAttributionRows(
-  taskAttributions: ReadonlyMap<TaskAttributionSource, TotalsAccumulator>
-): readonly CostReportTaskAttributionRow[] {
-  return TASK_ATTRIBUTION_SOURCES.map((attribution) => ({
-    attribution,
-    totals: taskAttributions.get(attribution)?.build() ?? { requests: 0 },
-  }));
-}
-
-function stepRows(steps: ReadonlyMap<string, StepGroup>): readonly CostReportStepRow[] {
-  const rows: CostReportStepRow[] = [...steps.values()].map((group) => ({
-    attribution: group.attribution,
-    ...(group.step === undefined ? {} : { step: group.step }),
-    totals: group.totals.build(),
-  }));
-  return bySize(
-    rows,
-    (row) => row.totals,
-    (row) => `${row.step ?? ""}/${row.attribution}`
-  );
-}
-
-/** Every project a record named, largest first, plus one row for what named none. */
-function projectRows(
-  projects: ReadonlyMap<ProjectKey, TotalsAccumulator>
-): readonly CostReportProjectRow[] {
-  const rows: CostReportProjectRow[] = [...projects].map(([key, accumulator]) => ({
-    ...(key === NO_KNOWN_PROJECT ? {} : { project: key }),
-    totals: accumulator.build(),
-  }));
-  return bySize(
-    rows,
-    (row) => row.totals,
-    (row) => row.project ?? ""
-  );
-}
-
-// Typed over `string | symbol`, wider than `BacklogRowKey` alone, since a `backlog` map's
-// key can also be `NO_BACKLOG_DECLARED` or `UNREADABLE_BACKLOG_DECLARATION` - safe because
-// every reason is a plain string and a symbol key never equals one.
-function isTaskUnattributedReason(key: string | symbol): key is TaskUnattributedReason {
-  return typeof key === "string" && (TASK_UNATTRIBUTED_REASONS as readonly string[]).includes(key);
-}
-
-/** Every task a record's own moment fell inside, largest first, then one row per reason
- * actually present for what fell in none - `TASK_UNATTRIBUTED_REASONS`' own fixed order,
- * always after every named task regardless of size, the same convention `personRows` gives
- * its own `none` row. Up to one row per `TASK_UNATTRIBUTED_REASONS` entry, never fewer than
- * the reasons present: two different gaps collapsed into one row is the fault this
- * breakdown exists to avoid. */
-function taskRows(tasks: ReadonlyMap<string, TaskGroup>): readonly CostReportTaskRow[] {
-  const named: CostReportTaskRow[] = [];
-  const byReason = new Map<TaskUnattributedReason, CostReportTaskRow>();
-  for (const group of tasks.values()) {
-    const totals = group.totals.build();
-    if (group.reason !== undefined) {
-      byReason.set(group.reason, { reason: group.reason, totals });
-      continue;
-    }
-    if (group.task === undefined || group.attribution === undefined) continue;
-    named.push({ task: group.task, attribution: group.attribution, totals });
-  }
-  // Tie-broken on the pair, not on the task alone: one task can hold both a declared row and
-  // an inferred one, and a tie-break blind to the attribution would order them arbitrarily.
-  const sorted = bySize(
-    named,
-    (row) => row.totals,
-    (row) => `${row.task ?? ""}/${row.attribution ?? ""}`
-  );
-  const reasonRows = TASK_UNATTRIBUTED_REASONS.map((reason) => byReason.get(reason)).filter(
-    (row): row is CostReportTaskRow => row !== undefined
-  );
-  return [...sorted, ...reasonRows];
-}
-
-interface BacklogGroups {
-  readonly named: readonly CostReportBacklogRow[];
-  readonly byReason: ReadonlyMap<TaskUnattributedReason, CostReportBacklogRow>;
-  readonly none: CostReportBacklogRow | undefined;
-  readonly unreadable: CostReportBacklogRow | undefined;
-}
-
-// One pass classifying every backlog key into the four shapes a row can be - named,
-// unattributed-by-reason, declared none, or unreadable - nothing sorted yet.
-function classifyBacklogGroups(
-  backlog: ReadonlyMap<BacklogRowKey, TotalsAccumulator>
-): BacklogGroups {
-  const named: CostReportBacklogRow[] = [];
-  const byReason = new Map<TaskUnattributedReason, CostReportBacklogRow>();
-  let none: CostReportBacklogRow | undefined;
-  let unreadable: CostReportBacklogRow | undefined;
-  for (const [key, accumulator] of backlog) {
-    if (isTaskUnattributedReason(key)) {
-      byReason.set(key, { reason: key, totals: accumulator.build() });
-    } else if (key === NO_BACKLOG_DECLARED) {
-      none = { declaration: "none", totals: accumulator.build() };
-    } else if (key === UNREADABLE_BACKLOG_DECLARATION) {
-      unreadable = { declaration: "unreadable", totals: accumulator.build() };
-    } else {
-      named.push({ backlog: key, totals: accumulator.build() });
-    }
-  }
-  return { named, byReason, none, unreadable };
-}
-
-/** Every backlog item a task declared, largest first, then the two rows for a known task
- * that named none or could not be read, then one row per reason a record fell in no task at
- * all - `TASK_UNATTRIBUTED_REASONS`' own fixed order, the same tail convention `taskRows`
- * uses. Two tasks declaring the same item merge here by construction: `backlogKeyOf` keys
- * both on the identical `backlog` string, so `accumulateInto` folds them into one
- * accumulator before this ever runs - never a second merge step that could disagree with
- * how every other axis already reconciles. */
-function backlogRows(
-  backlog: ReadonlyMap<BacklogRowKey, TotalsAccumulator>
-): readonly CostReportBacklogRow[] {
-  const { named, byReason, none, unreadable } = classifyBacklogGroups(backlog);
-  const sorted = bySize(
-    named,
-    (row) => row.totals,
-    (row) => row.backlog ?? ""
-  );
-  const reasonRows = TASK_UNATTRIBUTED_REASONS.map((reason) => byReason.get(reason)).filter(
-    (row): row is CostReportBacklogRow => row !== undefined
-  );
-  return [...sorted, ...(none ? [none] : []), ...(unreadable ? [unreadable] : []), ...reasonRows];
-}
-
-// Second precision, no milliseconds - the same spelling `record.cjs`'s own `nowIso` writes
-// to the journal's `at` field. `startMs` here always comes from `Date.parse`-ing one such
-// value, so its own milliseconds are already zero; this only strips the ".000" `toISOString`
-// would otherwise append, so a row's `startedAt` string-matches the journal line it opened
-// on rather than looking like a different moment.
-function isoSecondsFromMs(ms: number): string {
-  return new Date(ms).toISOString().replace(/\.\d{3}Z$/u, "Z");
-}
-
-/** Every orchestrated run the period's journals name, largest first, then the one row for
- * work that fell in no flow interval at all - see `CostReportFlowRow`. No reason taxonomy
- * the way `by_task`'s and `by_backlog`'s own remainders carry one (`TASK_UNATTRIBUTED_REASONS`):
- * a flow is read from the same sequence either way, so there is only one fact to state
- * about falling outside every one of them, never several.
- *
- * The remainder is pinned last rather than sorted with the named rows, the same tail
- * convention `taskRows` and `backlogRows` already keep. Sorting it by size put it first
- * whenever work outside every flow outweighed each single run - which is the ordinary case,
- * not a corner one - so the axis led with its own remainder while the two axes beside it
- * led with their largest named row. One breakdown that orders itself differently from its
- * neighbours is read as a different kind of answer, and it is not one. */
-function flowRows(flows: ReadonlyMap<FlowRowKey, TotalsAccumulator>): readonly CostReportFlowRow[] {
-  const named: CostReportFlowRow[] = [];
-  let outsideEveryFlow: CostReportFlowRow | undefined;
-  for (const [key, accumulator] of flows) {
-    if (key === OUTSIDE_EVERY_FLOW) {
-      outsideEveryFlow = { attribution: "unattributed", totals: accumulator.build() };
-      continue;
-    }
-    // A name is not a run. The tool-stated row is a bucket drawn from however many runs of
-    // that skill the tool named, so it carries no `startedAt` - the same reason the row for
-    // records that named no prompt carries none.
-    if (typeof key === "string") {
-      named.push({ flow: key, attribution: "tool-stated", totals: accumulator.build() });
-      continue;
-    }
-    named.push({
-      flow: key.skill,
-      attribution: "journal-interval",
-      startedAt: isoSecondsFromMs(key.startMs),
-      totals: accumulator.build(),
-    });
-  }
-  const sorted = bySize(
-    named,
-    (row) => row.totals,
-    (row) => `${row.flow ?? ""}@${row.attribution}@${row.startedAt ?? ""}`
-  );
-  return outsideEveryFlow === undefined ? sorted : [...sorted, outsideEveryFlow];
-}
-
-/** Every day in the period, in order — never sorted by size, unlike every other breakdown
- * here. A series read out of order is not a series. */
-function dayRows(days: ReadonlyMap<string, TotalsAccumulator>): readonly CostReportDayRow[] {
-  return [...days].map(([day, accumulator]) => ({ day, totals: accumulator.build() }));
-}
-
-/** Every agent that ran, largest first, plus one row for the main thread. */
-function agentRows(
-  agents: ReadonlyMap<AgentKey, TotalsAccumulator>
-): readonly CostReportAgentRow[] {
-  const rows: CostReportAgentRow[] = [...agents].map(([key, accumulator]) => {
-    if (key === MAIN_THREAD) return { attribution: "main-thread", totals: accumulator.build() };
-    if (key === AGENT_NOT_STATED) return { attribution: "not-stated", totals: accumulator.build() };
-    return { agent: key, attribution: "tool-stated", totals: accumulator.build() };
-  });
-  return bySize(
-    rows,
-    (row) => row.totals,
-    (row) => `${row.agent ?? ""}@${row.attribution}`
-  );
-}
-
-/** Every prompt that caused work, largest first, plus one row for what named none.
- * Largest first and not chronological: unlike `by_day` this is a ranking, and a ranking has
- * no continuity to break by reordering. The row for what named none is placed last rather
- * than ranked among them - it is a remainder drawn from many turns, not a turn, so its size
- * is not comparable to theirs. `by_flow` places its own remainder the same way. */
-function promptRows(prompts: ReadonlyMap<PromptKey, PromptGroup>): readonly CostReportPromptRow[] {
-  const named: CostReportPromptRow[] = [];
-  let namedNone: CostReportPromptRow | undefined;
-  for (const [key, group] of prompts) {
-    const totals = group.totals.build();
-    if (key === NO_PROMPT) {
-      namedNone = { totals };
-      continue;
-    }
-    named.push({
-      prompt: key,
-      ...(group.earliestMs === undefined ? {} : { startedAt: isoSecondsFromMs(group.earliestMs) }),
-      totals,
-    });
-  }
-  const sorted = bySize(
-    named,
-    (row) => row.totals,
-    (row) => row.prompt ?? ""
-  );
-  return namedNone === undefined ? sorted : [...sorted, namedNone];
-}
-
-/** Every model a record named, largest first, plus one row for what named none. */
-function modelRows(
-  models: ReadonlyMap<ModelKey, TotalsAccumulator>
-): readonly CostReportModelRow[] {
-  const rows: CostReportModelRow[] = [...models].map(([key, accumulator]) => ({
-    ...(key === NO_KNOWN_MODEL ? {} : { model: key }),
-    totals: accumulator.build(),
-  }));
-  return bySize(
-    rows,
-    (row) => row.totals,
-    (row) => row.model ?? ""
-  );
-}
-
-function personRowOf(group: PersonGroup): CostReportPersonRow {
-  const { resolved } = group;
-  return {
-    resolution: resolved.resolution,
-    ...(resolved.personId === undefined ? {} : { person: resolved.personId }),
-    ...(resolved.displayName === undefined ? {} : { displayName: resolved.displayName }),
-    identities: resolved.identities,
-    totals: group.totals.build(),
-  };
-}
-
-/** The order every `by_person` breakdown is read in, strongest claim first: a person the
- * record itself named, then the one this machine's identity claims for records that named
- * nobody, then every unplaced identity, then the one no-identifier row.
- *
- * A `Record` over the whole union rather than a filter per group, because a filter per
- * group silently *drops* whatever it does not name - which is what happened when
- * `"this-machine"` was added on 2026-09-04: the rows existed, summed into no group, and
- * vanished from the breakdown while the totals they belonged to stayed. This shape makes
- * that a compile error. */
-const PERSON_ROW_ORDER: Record<PersonResolution, number> = {
-  mapped: 0,
-  "this-machine": 1,
-  unresolved: 2,
-  none: 3,
-};
-
-/** Grouped in `PERSON_ROW_ORDER`, largest first within each group - `bySize` alone cannot
- * give this order, since it sorts purely on weight and a large unresolved row would
- * otherwise outrank a small mapped one. Sorting inside the single-row groups
- * (`"this-machine"`, `"none"`, at most one each) costs nothing and needs no exception. */
-function personRows(
-  people: ReadonlyMap<PersonRowKey, PersonGroup>
-): readonly CostReportPersonRow[] {
-  const rows = [...people.values()].map(personRowOf);
-  const keyOf = (row: CostReportPersonRow) => row.person ?? row.identities[0] ?? "";
-  return Object.keys(PERSON_ROW_ORDER)
-    .sort(
-      (a, b) => PERSON_ROW_ORDER[a as PersonResolution] - PERSON_ROW_ORDER[b as PersonResolution]
-    )
-    .flatMap((resolution) =>
-      bySize(
-        rows.filter((row) => row.resolution === resolution),
-        (row) => row.totals,
-        keyOf
-      )
-    );
 }
 
 /** `task`, `filters` and `emptySelection` together - the selection this report answered,
@@ -1810,203 +890,6 @@ function assembleCostReport(
       : { taskAttributionMix: taskAttributionRows(groups.taskAttributions) }),
     ...readFields(input),
   };
-}
-
-/** A group key only for a `kind: "request"`, `provenance: "local-read"` record carrying a
- * `turn_id` — the shape a local re-read of a still-running turn produces more than one of
- * (see `read-local-cost-use-case.ts`'s `storeNewCandidates`, and metrics-contract.md's "The
- * other way to double count"). Restricted to `kind: "request"`: a `kind: "session"` record
- * can carry a `turn_id` too — Copilot's shutdown total is keyed on the shutdown event's own
- * id — but it is a one-shot cumulative figure with no provisional reading to collapse,
- * grouping it here would treat a whole-session total as one more corrigible turn.
- * Restricted to `provenance: "local-read"`: on the export route the same field is a prompt
- * id several billed calls share (see `billedRequestKey` below), so the identical key there
- * would merge distinct calls instead of two readings of one. */
-function localReadTurnKey(record: TelemetrySinkRecord): string | null {
-  if (record.kind !== "request" || record.provenance !== "local-read") return null;
-  return record.turn_id === undefined
-    ? null
-    : `${record.tool} ${record.vendor_id} ${record.turn_id}`;
-}
-
-/** How much of a group a record accounts for, used only to pick the largest of several
- * readings of the same still-growing turn — never stored, never itself summed into a
- * total. */
-function counterWeight(record: TelemetrySinkRecord): number {
-  return COUNTER_FIELDS.reduce((sum, field) => {
-    const value = record[COUNTER_SOURCE[field]];
-    return sum + (typeof value === "number" ? value : 0);
-  }, 0);
-}
-
-/** How many of the four counters a record states at all, whether zero or not — the
- * tie-break `mergeSupersededTurnGroup` needs beyond `counterWeight` alone, since an
- * *observed* zero (Codex sometimes reports `cache_write_input_tokens: 0` once a later
- * event states it) and a counter never mentioned both add zero to the weight, and only
- * this distinguishes them. Preferring the record that states more never risks preferring a
- * shrink: `strictlyImprovesOn`'s write-time guard already refused any candidate that would
- * have dropped a counter the stored one had, so within one group nothing here ever loses
- * a counter a heavier-weighted sibling also states. */
-function definedCounterCount(record: TelemetrySinkRecord): number {
-  return COUNTER_FIELDS.reduce(
-    (count, field) => count + (typeof record[COUNTER_SOURCE[field]] === "number" ? 1 : 0),
-    0
-  );
-}
-
-/**
- * One Codex-shaped turn, read more than once while it was still open, collapsed to the one
- * record carrying the most complete counters. Never done at write time: the sink is
- * append-only, so an earlier, partial reading of a turn is never edited in place — only
- * reconciled by whatever reads it back, which is here, the same way `mergeBilledRequestGroup`
- * reconciles two routes seeing one call.
- *
- * Unlike that merge, every record in this group came from the *same* route reading the
- * *same* file at different moments, so the survivor is simply whichever carries the largest
- * counters — never a blend of two, which would state a combination of token counts the
- * tool's own file never actually reported together. A later record that reads smaller than
- * an earlier one (a shrink, not a correction) is never picked over the larger one this way,
- * whatever order the two arrived in. */
-function mergeSupersededTurnGroup(group: readonly TelemetrySinkRecord[]): TelemetrySinkRecord {
-  if (group.length === 1) return group[0];
-  const heaviest = Math.max(...group.map(counterWeight));
-  const largest = group.filter((record) => counterWeight(record) === heaviest);
-  const mostDefined = Math.max(...largest.map(definedCounterCount));
-  return pickDeterministically(
-    largest.filter((record) => definedCounterCount(record) === mostDefined)
-  );
-}
-
-/** Every other kind and route passes through untouched — see `localReadTurnKey`. */
-function collapseSupersededTurns(
-  records: readonly TelemetrySinkRecord[]
-): readonly TelemetrySinkRecord[] {
-  const groups = new Map<string, TelemetrySinkRecord[]>();
-  const rest: TelemetrySinkRecord[] = [];
-  for (const record of records) {
-    const key = localReadTurnKey(record);
-    if (key === null) {
-      rest.push(record);
-      continue;
-    }
-    const bucket = groups.get(key);
-    if (bucket) bucket.push(record);
-    else groups.set(key, [record]);
-  }
-  return [...rest, ...[...groups.values()].map(mergeSupersededTurnGroup)];
-}
-
-/** A group key only where `billed_request_id` is present — the one field measured so far
- * to be a stable, cross-route identifier for a single billed call (unlike `turn_id`, which
- * a main-agent request and its subagent share). A record with none joins nothing and is
- * left exactly as it arrived, the same rule an unmatched `turn_id` already follows for a
- * local re-read. */
-function billedRequestKey(record: TelemetrySinkRecord): string | null {
-  return record.billed_request_id === undefined
-    ? null
-    : `${record.tool}\u0000${record.vendor_id}\u0000${record.billed_request_id}`;
-}
-
-/** The same group, from any starting order, always answers the same record — the same
- * property `accumulate` already guarantees for the records it is handed (see "the same
- * records, however they arrive" below). A group's own order is never guaranteed: OTLP
- * redelivery can duplicate an export record, and a re-read joins a session's already-stored
- * records in whatever order the day files listed them, not the order they were billed in.
- * Picking `group[0]` would make the survivor depend on that accident; sorting on each
- * candidate's own serialized content does not. */
-function pickDeterministically(candidates: readonly TelemetrySinkRecord[]): TelemetrySinkRecord {
-  return [...candidates].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))[0];
-}
-
-/** Borrows `step_attribution`/`step`/`step_plugin` from a sibling that resolved one, when
- * `base`'s own is `"unattributed"` — the export route never states a step at all, so
- * leaving it as the survivor by default would throw away the one thing the local-read
- * route in the same group did know, preferring a tool-stated step over a journal-interval
- * one where both exist. */
-function withStepBackfill(
-  base: TelemetrySinkRecord,
-  group: readonly TelemetrySinkRecord[]
-): TelemetrySinkRecord {
-  if (base.step_attribution !== "unattributed") return base;
-  const stepDonors = group.filter(
-    (record) => record !== base && record.step_attribution !== "unattributed"
-  );
-  if (stepDonors.length === 0) return base;
-  const toolStated = stepDonors.filter((record) => record.step_attribution === "tool-stated");
-  const donor = pickDeterministically(toolStated.length > 0 ? toolStated : stepDonors);
-  return {
-    ...base,
-    step_attribution: donor.step_attribution,
-    step: donor.step,
-    step_plugin: donor.step_plugin,
-  };
-}
-
-/** `person_id` and `person_display_name`, backfilled onto `base` from the group as a pair —
- * never one field from each — the day a person-scoped view was added, discharging the note
- * this function's own doc comment used to carry: "nothing in `CostReport` groups or filters
- * on person, so a survivor without them loses no figure this report shows. Revisit this the
- * day a person-scoped view is added." That day is `byPeople`. A local-read record and its
- * export-route sibling can share one `billed_request_id` (Claude Code's own `requestId`,
- * stated by both routes — see `telemetry-sink-record.ts`), and only the local-read side
- * ever carries a person; leaving the survivor without it whenever `pickDeterministically`
- * happened to keep the export side would silently report a mapped person's own work as
- * `"none"`, the exact false reading this feature exists to refuse. Independent of
- * `withStepBackfill`, never chained after it: that helper returns early the moment a step
- * is already resolved, and person still has to be checked even then. */
-function withPersonBackfill(
-  base: TelemetrySinkRecord,
-  group: readonly TelemetrySinkRecord[]
-): TelemetrySinkRecord {
-  if (base.person_id !== undefined) return base;
-  const donors = group.filter((record) => record.person_id !== undefined);
-  if (donors.length === 0) return base;
-  const donor = pickDeterministically(donors);
-  return {
-    ...base,
-    person_id: donor.person_id,
-    ...(donor.person_display_name === undefined
-      ? {}
-      : { person_display_name: donor.person_display_name }),
-  };
-}
-
-/** One billed call, seen once by each of two live routes, collapsed to the one record a
- * report may safely sum. Never done at write time: the sink is append-only (see
- * metrics-contract.md, "Where records live"), so a record already stored can never be
- * corrected in place — only reconciled by whatever reads it back, which is here.
- *
- * The survivor keeps whichever record carries `cost_usd` — on every tool measured so far,
- * that is also the one whose four token counters are complete for the call
- * (metrics-contract.md, "Cost and token counters"), so nothing about the group's money is
- * ever summed from more than one record. `withStepBackfill` and `withPersonBackfill` then
- * each independently fill in what the survivor itself lacks from a sibling that has it. */
-function mergeBilledRequestGroup(group: readonly TelemetrySinkRecord[]): TelemetrySinkRecord {
-  if (group.length === 1) return group[0];
-  const costBearing = group.filter((record) => record.cost_usd !== undefined);
-  const base = pickDeterministically(costBearing.length > 0 ? costBearing : group);
-  return withPersonBackfill(withStepBackfill(base, group), group);
-}
-
-/** `kind: "session"` records are never part of a billed-call group — no metric datapoint
- * measured so far carries `billed_request_id` at all — so this only ever touches
- * `kind: "request"` records, and only ones that carry the field. */
-function collapseBilledRequests(
-  records: readonly TelemetrySinkRecord[]
-): readonly TelemetrySinkRecord[] {
-  const groups = new Map<string, TelemetrySinkRecord[]>();
-  const rest: TelemetrySinkRecord[] = [];
-  for (const record of records) {
-    const key = record.kind === "request" ? billedRequestKey(record) : null;
-    if (key === null) {
-      rest.push(record);
-      continue;
-    }
-    const bucket = groups.get(key);
-    if (bucket) bucket.push(record);
-    else groups.set(key, [record]);
-  }
-  return [...rest, ...[...groups.values()].map(mergeBilledRequestGroup)];
 }
 
 /**

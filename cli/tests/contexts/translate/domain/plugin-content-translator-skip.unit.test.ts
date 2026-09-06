@@ -68,12 +68,15 @@ describe("PluginContentTranslator skip list", () => {
       expect(result.skipped).toEqual([]);
     });
 
-    it("delivers every hooks/ file but hooks.json under the tool's flatHooksDir", () => {
+    it("delivers every hooks/ file but hooks.json namespaced under the plugin's own flatHooksDir subtree", () => {
       const dist = buildDistWithHooks("aidd-pm");
       const result = translator.translateWithComponentPaths(dist, opencode);
       const paths = result.files.map((f) => f.relativePath);
-      expect(paths).toContain(".opencode/plugin/pre.js");
-      expect(paths).not.toContain(".opencode/plugin/hooks.json");
+      expect(paths).toContain(".opencode/hooks/aidd-pm/pre.js");
+      expect(paths).not.toContain(".opencode/hooks/aidd-pm/hooks.json");
+      // Never OpenCode's own scanned plugin directory: a plain hook script there is
+      // imported in-process and kills the host.
+      expect(paths).not.toContain(".opencode/plugin/pre.js");
     });
   });
 

@@ -40,15 +40,40 @@ export function printScopeReport(
   }
 }
 
+interface PluginDriftLine {
+  pluginName: string;
+  toolId: string;
+  driftedFiles: string[];
+  /** True when every one of this plugin's tracked files is missing because it lives
+   * in a user-scope directory this machine never populated — one line, not one per
+   * file. See `DetectPluginDriftUseCase`. */
+  notInstalledOnMachine: boolean;
+}
+
+interface PluginNativeOnlyLine {
+  toolId: string;
+  binary: string;
+}
+
 export function printPluginDrift(
   output: CLIOutput,
-  report: { pluginDrift: { pluginName: string; toolId: string; driftedFiles: string[] }[] }
+  report: { pluginDrift: PluginDriftLine[]; pluginNativeOnly?: PluginNativeOnlyLine[] }
 ): void {
-  if (report.pluginDrift.length === 0) {
+  const nativeOnly = report.pluginNativeOnly ?? [];
+  if (report.pluginDrift.length === 0 && nativeOnly.length === 0) {
     output.print("  (all in sync)");
     return;
   }
-  for (const entry of report.pluginDrift) {
+  for (const entry of nativeOnly) {
+    output.print(`  ${entry.toolId}: registered by ${entry.binary}, not verified here`);
+  }
+  const notInstalledTools = new Set(
+    report.pluginDrift.filter((e) => e.notInstalledOnMachine).map((e) => e.toolId)
+  );
+  for (const toolId of notInstalledTools) {
+    output.print(`  ${toolId}: plugins not installed on this machine, run \`aidd sync\``);
+  }
+  for (const entry of report.pluginDrift.filter((e) => !e.notInstalledOnMachine)) {
     output.print(`  plugin ${entry.pluginName} (${entry.toolId}):`);
     for (const f of entry.driftedFiles) {
       output.print(`    ~ ${f}`);

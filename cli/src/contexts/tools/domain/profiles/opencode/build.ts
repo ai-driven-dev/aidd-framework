@@ -10,7 +10,7 @@
 import { InvalidMcpServerConfigError, McpConfigError } from "../../../../../kernel/errors.js";
 import { parseFrontmatter, serializeFrontmatter } from "../../../../../kernel/markdown.js";
 import {
-  flatHooksSharedDirPath,
+  flatHooksPathWithLoaderEntry,
   flatMcpKeyPrefix,
   genericFlatAgentPath,
   genericFlatSkillTreePath,
@@ -20,7 +20,11 @@ import type { FileReader } from "../../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../../kernel/ports/file-writer.js";
 import type { ArtifactContract, ToolBuildContract } from "../../build-contract.js";
 import { buildOpencodeFlatConfig } from "../../formats/opencode-mcp-merge.js";
-import { OPENCODE_FLAT_HOOKS_DIR } from "./opencode-paths.js";
+import {
+  OPENCODE_FLAT_HOOKS_DIR,
+  OPENCODE_HOOKS_DIR,
+  OPENCODE_PLUGIN_ENTRY_BASENAME,
+} from "./opencode-paths.js";
 
 type FsType = FileReader & FileWriter;
 
@@ -88,10 +92,19 @@ function opencodeFlatSkillPath(plugin: string, rel: string): string {
   return genericFlatSkillTreePath(".opencode/skills/", plugin, rel.replace(/^skills\//, ""));
 }
 
-/** OpenCode's loader scans one flat directory, so a plugin's hook scripts land there under
- * their own subtree rather than under a per-plugin directory of their own. */
-function makeOpencodeFlatHooksPath(flatHooksDir: string): (plugin: string, rel: string) => string {
-  return (_plugin, rel) => flatHooksSharedDirPath(flatHooksDir, rel);
+/** OpenCode's loader scans one flat directory for its own plugin modules, never a
+ * "hooks" family (F3) — so a plugin's hook scripts are namespaced under
+ * OPENCODE_HOOKS_DIR instead, with one exception: a script literally named
+ * OPENCODE_PLUGIN_ENTRY_BASENAME is that loader's own module, delivered flat into
+ * OPENCODE_FLAT_HOOKS_DIR and renamed to the plugin's own name. */
+function makeOpencodeFlatHooksPath(): (plugin: string, rel: string) => string {
+  return (plugin, rel) =>
+    flatHooksPathWithLoaderEntry(
+      OPENCODE_HOOKS_DIR,
+      { dir: OPENCODE_FLAT_HOOKS_DIR, baseName: OPENCODE_PLUGIN_ENTRY_BASENAME },
+      plugin,
+      rel
+    );
 }
 
 /** Supported exactly when the profile names a directory to deliver into — the same
@@ -100,7 +113,7 @@ function buildOpencodeFlatHooksArtifact(): ArtifactContract {
   return {
     supported: true,
     source: { kind: "hooksBundle", jsonPath: "hooks/hooks.json", scriptDir: "hooks" },
-    path: makeOpencodeFlatHooksPath(OPENCODE_FLAT_HOOKS_DIR),
+    path: makeOpencodeFlatHooksPath(),
     skipHooksJson: true,
   };
 }

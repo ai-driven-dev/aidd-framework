@@ -130,6 +130,32 @@ describe("DoctorUseCase — plugin integrity", () => {
     });
   });
 
+  describe("when a user-scope plugin was never installed on this machine", () => {
+    it("reports one not-installed-on-machine issue, not one 'missing' issue per file", async () => {
+      const manifest = Manifest.create();
+      manifest.addTool("cursor", "1.0.0", []);
+      manifest.addPlugin(
+        "cursor",
+        InstalledPlugin.fromJSON({
+          name: "aidd-test",
+          source: { kind: "local", path: "/some/path" },
+          version: "1.0.0",
+          strict: false,
+          files: { "a/one.md": EXPECTED_HASH, "a/two.md": EXPECTED_HASH },
+        })
+      );
+      const fs = makeFs(false, EXPECTED_HASH);
+      const useCase = new DoctorPluginUseCase(new DetectPluginDriftUseCase(fs));
+
+      const issues = await useCase.execute({ manifest, projectRoot: "/proj", allowedIds: null });
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0].issue).toBe("not-installed-on-machine");
+      expect(issues[0].toolId).toBe("cursor");
+      expect(issues.filter((i) => i.issue === "missing")).toHaveLength(0);
+    });
+  });
+
   describe("when plugin is installed under user-scope (Cursor Mode B)", () => {
     it("checks files under the resolved user-scope base dir, not projectRoot", async () => {
       const manifest = Manifest.create();

@@ -105,6 +105,36 @@ describe("StatusUseCase — cursor plugin drift (user-scope)", () => {
     });
   });
 
+  describe("when cursor was never installed on this machine (every tracked file missing)", () => {
+    it("reports one collapsed drift entry instead of one per file", async () => {
+      const manifest = Manifest.create();
+      manifest.addTool("cursor", "1.0.0", []);
+      manifest.addPlugin(
+        "cursor",
+        InstalledPlugin.fromJSON({
+          name: "aidd-context",
+          source: { kind: "local", path: "/some/path" },
+          version: "1.0.0",
+          strict: false,
+          files: { "aidd-context/a.md": EXPECTED_HASH, "aidd-context/b.md": EXPECTED_HASH },
+        })
+      );
+      const fs = makeFs(false, EXPECTED_HASH);
+      const useCase = new StatusUseCase(
+        fs,
+        makeManifestRepo(manifest),
+        noopHasher,
+        new DetectPluginDriftUseCase(fs)
+      );
+
+      const report = await useCase.execute({ projectRoot: "/proj" });
+
+      expect(report.pluginDrift).toHaveLength(1);
+      expect(report.pluginDrift[0].notInstalledOnMachine).toBe(true);
+      expect(report.pluginDrift[0].driftedFiles).toEqual([]);
+    });
+  });
+
   describe("when cursor plugin file is in sync (base-relative key)", () => {
     it("returns empty pluginDrift", async () => {
       const manifest = makeManifest(EXPECTED_HASH);

@@ -1,5 +1,6 @@
 import { NoManifestError } from "../../../../kernel/errors.js";
 import type { Prompter } from "../../../../kernel/ports/prompter.js";
+import type { AiToolId } from "../../../../kernel/tool.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { RestoreUseCase } from "../restore/restore-use-case.js";
@@ -12,6 +13,9 @@ export interface RestoreAllResult {
   pluginNamesRestored: string[];
   errors: GlobalExecutionError[];
   unrestorable: string[];
+  /** AI tools this run could not restore any plugin file for because their
+   * registration is native — the tool's own CLI owns it, not a file tree. */
+  nativeOnlyToolIds: AiToolId[];
 }
 
 export class RestoreAllUseCase {
@@ -49,6 +53,7 @@ export class RestoreAllUseCase {
       pluginNamesRestored: restoreResult.restoredPluginNames,
       errors,
       unrestorable: restoreResult.unrestorable,
+      nativeOnlyToolIds: restoreResult.nativeOnlyToolIds,
     };
   }
 
@@ -89,8 +94,15 @@ export class RestoreAllUseCase {
     totalKept: number;
     restoredPluginNames: string[];
     unrestorable: string[];
+    nativeOnlyToolIds: AiToolId[];
   }> {
-    const empty = { totalRestored: 0, totalKept: 0, restoredPluginNames: [], unrestorable: [] };
+    const empty = {
+      totalRestored: 0,
+      totalKept: 0,
+      restoredPluginNames: [],
+      unrestorable: [],
+      nativeOnlyToolIds: [],
+    };
     try {
       if (manifest === null) return empty;
       const result = await this.restoreUseCase.execute({
@@ -109,6 +121,7 @@ export class RestoreAllUseCase {
         totalKept: result.totalKept,
         restoredPluginNames: result.restoredPluginNames,
         unrestorable: result.unrestorable,
+        nativeOnlyToolIds: result.nativeOnlyToolIds,
       };
     } catch (err) {
       errors.push({

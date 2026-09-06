@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { AiToolId, ToolId } from "../../../../kernel/tool.js";
+import { resolvePluginsCapability } from "../../../tools/domain/registry.js";
 import type { Manifest } from "../../domain/manifest.js";
 import { resolvePluginBaseDir } from "../plugin/plugin-target-resolution.js";
 
@@ -16,6 +17,17 @@ export interface PluginDrift {
   toolId: AiToolId;
   pluginName: string;
   files: PluginFileDrift[];
+  /**
+   * True when every one of this plugin's tracked files is missing and the tool
+   * installs to a user-scope directory (`~/.cursor/...`) rather than the project.
+   *
+   * A committed manifest describes that directory as it stood on the machine that
+   * wrote it; on any other machine it is simply unpopulated until `aidd sync` runs
+   * there, which is not the same fact as a project-scope file someone deleted.
+   * `files` is left empty here: there is nothing left to enumerate file by file, only
+   * the one fact a caller renders as one line instead of one per file.
+   */
+  notInstalledOnMachine: boolean;
 }
 
 export interface DetectPluginDriftOptions {
@@ -40,9 +52,17 @@ export class DetectPluginDriftUseCase {
       const plugins = manifest.getPlugins(toolId);
       const targets = pluginName ? plugins.filter((p) => p.name === pluginName) : plugins;
       const baseDir = resolvePluginBaseDir(toolId, projectRoot, homedir);
+      const installScope = resolvePluginsCapability(toolId)?.installScope;
       for (const plugin of targets) {
         const files = await this.driftedFiles(plugin.files, baseDir);
-        if (files.length > 0) drifts.push({ toolId, pluginName: plugin.name, files });
+        if (files.length === 0) continue;
+        const allMissing =
+          files.length === plugin.files.size && files.every((f) => f.kind === "missing");
+        if (allMissing && installScope === "user") {
+          drifts.push({ toolId, pluginName: plugin.name, files: [], notInstalledOnMachine: true });
+        } else {
+          drifts.push({ toolId, pluginName: plugin.name, files, notInstalledOnMachine: false });
+        }
       }
     }
     return drifts;

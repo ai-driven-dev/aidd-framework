@@ -118,15 +118,43 @@ export function flatMcpKeyPrefix(plugin: string): string {
 }
 
 /**
- * Returns the flat-output path for a hook file under a shared, non-namespaced
- * `flatHooksDir` — a loader that scans one directory for its own runtime module
- * (opencode's `.opencode/plugin/`), not a per-plugin subtree. No plugin segment is
- * added: two plugins delivering the same filename there collide by design, the same
- * way the tool's own loader would see them.
- *
- * @param flatHooksDir       - The tool's declared flat hooks directory, trailing slash included
- * @param hooksRelativePath  - A hook component's path, e.g. "hooks/journal.cjs"
+ * A flat-mode loader's own module: the one hook script a plugin ships that the
+ * loader imports as itself, rather than as something an external bridge must be
+ * told to run. Kept in its own directory, separate from the per-plugin hooks
+ * tree, so renaming it to the plugin's name can never collide with another
+ * plugin shipping one of these.
  */
-export function flatHooksSharedDirPath(flatHooksDir: string, hooksRelativePath: string): string {
-  return `${flatHooksDir}${hooksRelativePath.replace(/^hooks\//, "")}`;
+export interface FlatHooksLoaderEntry {
+  readonly dir: string;
+  readonly baseName: string;
+}
+
+/**
+ * Returns the flat-output path for a hook script under a loader that scans a
+ * per-plugin hooks tree, with one exception: a script named `loaderEntry.baseName`
+ * IS that loader's own runtime module (see {@link FlatHooksLoaderEntry}) — delivered
+ * flat into `loaderEntry.dir` and renamed to the plugin's own name, so two plugins
+ * shipping one cannot collide there. Every other script is namespaced under
+ * `perPluginHooksDir`, the same per-plugin subtree `genericFlatHooksScriptPath`
+ * already gives claude, cursor and codex — so a loader that also happens to scan
+ * one flat plugin directory still gets a namespaced landing spot for the scripts
+ * it does not import directly.
+ *
+ * @param perPluginHooksDir - Prefix for the namespaced hooks tree (trailing slash included)
+ * @param loaderEntry       - The loader's own module name and directory, or `null` when
+ *                            this loader has no such self-hosting convention
+ * @param plugin            - Plugin name
+ * @param hooksRelativePath - A hook component's path, e.g. "hooks/foo.js"
+ */
+export function flatHooksPathWithLoaderEntry(
+  perPluginHooksDir: string,
+  loaderEntry: FlatHooksLoaderEntry | null,
+  plugin: string,
+  hooksRelativePath: string
+): string {
+  const rest = hooksRelativePath.replace(/^hooks\//, "");
+  if (loaderEntry !== null && rest === loaderEntry.baseName) {
+    return `${loaderEntry.dir}${plugin}.js`;
+  }
+  return genericFlatHooksScriptPath(perPluginHooksDir, plugin, rest);
 }

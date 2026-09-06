@@ -23,13 +23,18 @@ export class DoctorPluginUseCase {
       toolIds,
       pluginName,
     });
-    return drifts.flatMap((drift) =>
-      drift.files.map((file) => ({
+    return drifts.flatMap((drift): PluginIssueEntry[] => {
+      if (drift.notInstalledOnMachine) {
+        return [
+          { toolId: drift.toolId, pluginName: drift.pluginName, issue: "not-installed-on-machine" },
+        ];
+      }
+      return drift.files.map((file) => ({
         toolId: drift.toolId,
         pluginName: drift.pluginName,
         issue: file.kind,
         filePath: file.relativePath,
-      }))
-    );
+      }));
+    });
   }
 }

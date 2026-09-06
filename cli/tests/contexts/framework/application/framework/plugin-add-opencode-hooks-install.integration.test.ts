@@ -1,9 +1,15 @@
 /**
  * Phase 7 — OpenCode hooks install: installing a plugin with hooks/ against OpenCode
- * delivers the module its loader scans for, instead of skipping the component.
- * Renamed from plugin-add-opencode-hooks-skip.integration.test.ts (Phase 3), whose
- * premise this phase reverses — see aidd_docs/tasks/2026_08/2026_08_22_telemetry-every-tool/
+ * delivers the script, instead of skipping the component. Renamed from
+ * plugin-add-opencode-hooks-skip.integration.test.ts (Phase 3), whose premise this
+ * phase reverses — see aidd_docs/tasks/2026_08/2026_08_22_telemetry-every-tool/
  * measurements.md, Phase 7.
+ *
+ * Lot A (opencode-and-scope.md): the script no longer lands under .opencode/plugin/,
+ * the directory OpenCode's own loader imports in-process — a plain hook script there
+ * killed the host (process.exit, uncatchable). It is namespaced under
+ * .opencode/hooks/<plugin>/ instead, the same shape .claude/hooks/<plugin>/ and
+ * .cursor/hooks/<plugin>/ already use.
  */
 
 import { join, posix } from "node:path";
@@ -45,7 +51,7 @@ async function installSamplePlugin() {
 }
 
 describe("PluginAddUseCase OpenCode hooks install (Phase 7)", () => {
-  it("writes every hooks/ script but the manifest under .opencode/plugin/", async () => {
+  it("writes every hooks/ script but the manifest under .opencode/hooks/<plugin>/", async () => {
     const { deps } = await installSamplePlugin();
 
     // deps.fs is the in-memory adapter, whose listUnder() returns its own "/"-normalised
@@ -53,10 +59,15 @@ describe("PluginAddUseCase OpenCode hooks install (Phase 7)", () => {
     // and never match one of those keys.
     const writtenPaths = deps.fs.listUnder(PROJECT_ROOT);
     expect(writtenPaths).toContain(
-      posix.join(PROJECT_ROOT, ".opencode", "plugin", "update_memory.js")
+      posix.join(PROJECT_ROOT, ".opencode", "hooks", "sample-plugin", "update_memory.js")
     );
     expect(writtenPaths).not.toContain(
-      posix.join(PROJECT_ROOT, ".opencode", "plugin", "hooks.json")
+      posix.join(PROJECT_ROOT, ".opencode", "hooks", "sample-plugin", "hooks.json")
+    );
+    // Never under .opencode/plugin/ either: that is the directory OpenCode's own
+    // loader imports in-process, and a plain hook script there kills the host.
+    expect(writtenPaths).not.toContain(
+      posix.join(PROJECT_ROOT, ".opencode", "plugin", "update_memory.js")
     );
   });
 

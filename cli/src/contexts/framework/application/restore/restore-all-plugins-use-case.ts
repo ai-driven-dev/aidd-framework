@@ -3,11 +3,17 @@ import { PLUGIN_CACHE_SUBDIR } from "../../../../kernel/paths.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
-import type { ToolId } from "../../../../kernel/tool.js";
+import type { AiToolId, ToolId } from "../../../../kernel/tool.js";
 import { AI_TOOL_IDS } from "../../../../kernel/tool.js";
 import type { PluginFetcher } from "../../../distribution/domain/ports/plugin-fetcher.js";
-import { getToolConfig, isAiTool, type ToolConfig } from "../../../tools/domain/registry.js";
+import {
+  getToolConfig,
+  isAiTool,
+  nativeActivationOf,
+  type ToolConfig,
+} from "../../../tools/domain/registry.js";
 import type { Manifest } from "../../domain/manifest.js";
+import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { PluginDistributionReader } from "../../domain/ports/plugin-distribution-reader.js";
 import {
   ApplyPluginFilesUseCase,
@@ -27,6 +33,10 @@ export interface RestoreAllPluginsResult {
   totalFiles: number;
   /** Names of plugins that had >=1 file actually restored, deduped across tools. */
   pluginNames: string[];
+  /** AI tools with an installed plugin this pass could not restore anything for,
+   * because that tool's own CLI owns the registration and this CLI tracks zero
+   * files for it — not a failure, a fact about who owns the file tree. */
+  nativeOnlyToolIds: AiToolId[];
 }
 
 export class RestoreAllPluginsUseCase {
@@ -43,11 +53,16 @@ export class RestoreAllPluginsUseCase {
     const cacheDir = join(projectRoot, PLUGIN_CACHE_SUBDIR);
     let totalFiles = 0;
     const restoredNames = new Set<string>();
+    const nativeOnlyToolIds: AiToolId[] = [];
     for (const toolId of AI_TOOL_IDS) {
       if (!manifest.hasTool(toolId)) continue;
       if (toolIds !== undefined && !toolIds.includes(toolId)) continue;
       const toolConfig = getToolConfig(toolId);
       if (!isAiTool(toolConfig)) continue;
+      const targets = this.targetPlugins(toolId, manifest, pluginName);
+      if (targets.length > 0 && this.everyTargetUntracked(targets) && nativeActivationOf(toolId)) {
+        nativeOnlyToolIds.push(toolId);
+      }
       const result = await this.restoreToolPlugins(
         toolId,
         manifest,
@@ -60,7 +75,20 @@ export class RestoreAllPluginsUseCase {
       totalFiles += result.totalFiles;
       for (const name of result.pluginNames) restoredNames.add(name);
     }
-    return { totalFiles, pluginNames: [...restoredNames] };
+    return { totalFiles, pluginNames: [...restoredNames], nativeOnlyToolIds };
+  }
+
+  private targetPlugins(
+    toolId: (typeof AI_TOOL_IDS)[number],
+    manifest: Manifest,
+    pluginName: string | undefined
+  ): readonly InstalledPlugin[] {
+    const plugins = manifest.getPlugins(toolId);
+    return pluginName !== undefined ? plugins.filter((p) => p.name === pluginName) : plugins;
+  }
+
+  private everyTargetUntracked(targets: readonly InstalledPlugin[]): boolean {
+    return targets.every((plugin) => plugin.files.size === 0);
   }
 
   private async restoreToolPlugins(
@@ -71,12 +99,10 @@ export class RestoreAllPluginsUseCase {
     cacheDir: string,
     fileFilter: ((p: string) => boolean) | null,
     pluginName: string | undefined
-  ): Promise<RestoreAllPluginsResult> {
+  ): Promise<{ totalFiles: number; pluginNames: string[] }> {
     let totalFiles = 0;
     const pluginNames: string[] = [];
-    const plugins = manifest.getPlugins(toolId);
-    const targets =
-      pluginName !== undefined ? plugins.filter((p) => p.name === pluginName) : plugins;
+    const targets = this.targetPlugins(toolId, manifest, pluginName);
     for (const plugin of targets) {
       const filesWritten = await new ApplyPluginFilesUseCase(
         this.fs,

@@ -57,7 +57,10 @@ async function runFullDoctor(
   output.print("IDE tools:");
   printScopeReport(output, statusResult.ideTools);
   output.print("Plugins:");
-  printPluginDrift(output, { pluginDrift: statusResult.pluginDrift });
+  printPluginDrift(output, {
+    pluginDrift: statusResult.pluginDrift,
+    pluginNativeOnly: statusResult.pluginNativeOnly,
+  });
 
   // Drift is informational here, same as the `status` it absorbs: it never gates the
   // exit code. Only structural health issues (below) do — unchanged from before this
@@ -111,7 +114,10 @@ async function runScopedDoctor(
   output.print("\nDrift:");
   printScopeReport(output, statusReport);
   output.print("Plugins:");
-  printPluginDrift(output, { pluginDrift: statusReport.pluginDrift });
+  printPluginDrift(output, {
+    pluginDrift: statusReport.pluginDrift,
+    pluginNativeOnly: statusReport.pluginNativeOnly,
+  });
 
   // Same plugin-scoped gate as the unscoped path above — see the comment there.
   const healthy =

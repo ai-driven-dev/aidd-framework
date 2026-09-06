@@ -36,6 +36,7 @@ function distWithHooks(): PluginDistribution {
         { relativePath: "hooks/hooks.json", content: "{}" },
         { relativePath: "hooks/journal.cjs", content: "// journal" },
         { relativePath: "hooks/lib/host.cjs", content: "// host" },
+        { relativePath: "hooks/opencode-plugin.js", content: "export const plugin = 1;" },
       ],
     },
   });
@@ -94,16 +95,17 @@ describe("BuiltTreeMaterializationTranslator — opencode (integration)", () => 
     expect(installed?.files.size).toBe(2);
   });
 
-  // finding #1: the built tree's flat hooks land in one shared, non-namespaced directory
-  // (.opencode/plugin/), not under a "<plugin>-"-prefixed segment like skills/agents —
-  // so belongsToPlugin's naming-convention filter dropped every hook file here, even
-  // though the build itself now delivers them. This plugin's own hook filenames, read
-  // from its distribution, are what scope the copy instead.
-  it("copies this plugin's flat hooks by filename, not by naming convention", async () => {
+  // Hooks land under .opencode/hooks/<plugin>/, and the one script that is OpenCode's own
+  // runtime module goes to .opencode/plugin/<plugin>.js: neither follows the "<plugin>-"
+  // naming convention belongsToPlugin reads for agents and skills, so this plugin's hook
+  // paths are computed from its own distribution and matched by path instead.
+  it("copies this plugin's flat hooks by their computed paths, not by naming convention", async () => {
     const fs = new InMemoryFileAdapter();
-    fs.setFile(`${BUILT}/.opencode/plugin/journal.cjs`, "// journal");
-    fs.setFile(`${BUILT}/.opencode/plugin/lib/host.cjs`, "// host");
-    fs.setFile(`${BUILT}/.opencode/plugin/other-plugin-hook.js`, "OTHER PLUGIN");
+    fs.setFile(`${BUILT}/.opencode/hooks/aidd-vcs/journal.cjs`, "// journal");
+    fs.setFile(`${BUILT}/.opencode/hooks/aidd-vcs/lib/host.cjs`, "// host");
+    fs.setFile(`${BUILT}/.opencode/plugin/aidd-vcs.js`, "export const plugin = 1;");
+    fs.setFile(`${BUILT}/.opencode/hooks/other-plugin/hook.js`, "OTHER PLUGIN");
+    fs.setFile(`${BUILT}/.opencode/plugin/other-plugin.js`, "OTHER PLUGIN");
 
     const manifest = Manifest.create();
     manifest.addTool("opencode", "test", []);
@@ -124,9 +126,13 @@ describe("BuiltTreeMaterializationTranslator — opencode (integration)", () => 
       "aidd-framework"
     );
 
-    expect(fs.getFile(`${PROJECT_ROOT}/.opencode/plugin/journal.cjs`)).toBe("// journal");
-    expect(fs.getFile(`${PROJECT_ROOT}/.opencode/plugin/lib/host.cjs`)).toBe("// host");
-    expect(fs.has(`${PROJECT_ROOT}/.opencode/plugin/hooks.json`)).toBe(false);
-    expect(fs.has(`${PROJECT_ROOT}/.opencode/plugin/other-plugin-hook.js`)).toBe(false);
+    expect(fs.getFile(`${PROJECT_ROOT}/.opencode/hooks/aidd-vcs/journal.cjs`)).toBe("// journal");
+    expect(fs.getFile(`${PROJECT_ROOT}/.opencode/hooks/aidd-vcs/lib/host.cjs`)).toBe("// host");
+    expect(fs.getFile(`${PROJECT_ROOT}/.opencode/plugin/aidd-vcs.js`)).toBe(
+      "export const plugin = 1;"
+    );
+    expect(fs.has(`${PROJECT_ROOT}/.opencode/hooks/aidd-vcs/hooks.json`)).toBe(false);
+    expect(fs.has(`${PROJECT_ROOT}/.opencode/hooks/other-plugin/hook.js`)).toBe(false);
+    expect(fs.has(`${PROJECT_ROOT}/.opencode/plugin/other-plugin.js`)).toBe(false);
   });
 });

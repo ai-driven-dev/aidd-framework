@@ -314,6 +314,7 @@ describe("RestoreAllUseCase — consent to overwrite", () => {
         totalPluginFilesRestored: 0,
         restoredPluginNames: [],
         unrestorable: [],
+        nativeOnlyToolIds: [],
       };
     };
     return seen;
@@ -358,5 +359,45 @@ describe("RestoreAllUseCase — consent to overwrite", () => {
 
   it("treats the interactive file selection as the consent, so nothing is asked twice", async () => {
     expect((await askedWith(true, false)).force).toBe(true);
+  });
+});
+
+describe("RestoreAllUseCase — native-only tools", () => {
+  it("forwards the native-only tool ids the restore it delegates to found", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "claude");
+    const prompter = new OverwritePrompter();
+    const statusUseCase = new StatusUseCase(
+      deps.fs,
+      deps.manifestRepo,
+      deps.hasher,
+      new DetectPluginDriftUseCase(deps.fs)
+    );
+    const restoreUseCase = new RestoreUseCase(
+      deps.fs,
+      deps.manifestRepo,
+      deps.hasher,
+      deps.logger,
+      new FakePlatform("linux"),
+      prompter
+    );
+    restoreUseCase.execute = async () => ({
+      tools: [],
+      totalRestored: 0,
+      totalKept: 0,
+      totalPluginFilesRestored: 0,
+      restoredPluginNames: [],
+      unrestorable: [],
+      nativeOnlyToolIds: ["claude"],
+    });
+
+    const result = await new RestoreAllUseCase(
+      deps.manifestRepo,
+      prompter,
+      statusUseCase,
+      restoreUseCase
+    ).execute(PROJECT_ROOT, true, false);
+
+    expect(result.nativeOnlyToolIds).toEqual(["claude"]);
   });
 });

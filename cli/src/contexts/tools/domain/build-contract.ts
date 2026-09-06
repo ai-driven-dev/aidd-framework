@@ -76,8 +76,11 @@ export type ArtifactContract =
       readonly hooksTransform?: (rewrittenJson: string) => string;
       /**
        * When true, `writeHooks` delivers everything under hooks/ except hooks.json —
-       * for a tool whose hook is a runtime module a loader scans for, not a manifest a
-       * merge reads (opencode's flat plugin directory).
+       * for a tool that writes no hooks.json at all, because nothing on that tool's
+       * side reads one. OpenCode is the one case today: its scripts are delivered
+       * (namespaced per plugin, or renamed flat for its own plugin module — see
+       * opencode/opencode-paths.ts) but nothing triggers them yet. Wiring an event
+       * bridge that runs them is separate, later work.
        */
       readonly skipHooksJson?: boolean;
     };

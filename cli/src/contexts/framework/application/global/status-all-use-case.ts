@@ -5,6 +5,8 @@ export interface StatusAllResult {
   ideTools: StatusReport;
   /** Plugin drift only. Plugins hang off AI tools, so the ai scope already carries them all. */
   pluginDrift: StatusReport["pluginDrift"];
+  /** Same reasoning: native-activation tools are AI tools, so the ai scope carries them all. */
+  pluginNativeOnly: StatusReport["pluginNativeOnly"];
   errors: GlobalExecutionError[];
 }
 
@@ -22,6 +24,7 @@ export class StatusAllUseCase {
       aiTools: aiTools ?? emptyReport(),
       ideTools: ideTools ?? emptyReport(),
       pluginDrift: aiTools?.pluginDrift ?? [],
+      pluginNativeOnly: aiTools?.pluginNativeOnly ?? [],
       errors,
     };
   }
@@ -59,5 +62,5 @@ export class StatusAllUseCase {
 }
 
 function emptyReport() {
-  return { tools: [], pluginDrift: [], inSync: true };
+  return { tools: [], pluginDrift: [], pluginNativeOnly: [], inSync: true };
 }

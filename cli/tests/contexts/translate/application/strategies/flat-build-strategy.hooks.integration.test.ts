@@ -321,8 +321,12 @@ describe("codex flat hooks (no install-hook leak)", () => {
 // Regression coverage for the route `aidd setup --ai opencode` and
 // `aidd framework build --target opencode --flat` both drive (finding #1): before this
 // fix `buildOpencodeFlatContract` declared `hooks: { supported: false }` regardless of
-// opencode.ts's own `acceptsHooks: true`, so neither route delivered the plugin module
-// OpenCode's loader scans `.opencode/plugin/` for, and both warned hooks were skipped.
+// opencode.ts's own `acceptsHooks: true`, so neither route delivered a plugin's hook
+// script, and both warned hooks were skipped.
+//
+// Lot A (opencode-and-scope.md): a plain hook script no longer lands under
+// .opencode/plugin/, the directory OpenCode's own loader imports in-process — it
+// killed the host there. It is namespaced under .opencode/hooks/<plugin>/ instead.
 describe("opencode flat hooks", () => {
   let memFs: InMemoryFileAdapter;
   let logger: CapturingLogger;
@@ -353,17 +357,21 @@ describe("opencode flat hooks", () => {
     await useCase.execute({ sourceDir: FIXTURE_DIR, outDir: ABS_OUT, target: "opencode" });
   }
 
-  it("delivers the hook script into .opencode/plugin/, with no plugin-name segment", async () => {
+  it("delivers the hook script into .opencode/hooks/<plugin>/, namespaced", async () => {
     await runOpencodeBuild();
 
-    expect(memFs.has(`${ABS_OUT}/.opencode/plugin/check.sh`)).toBe(true);
+    expect(memFs.has(`${ABS_OUT}/.opencode/hooks/${PLUGIN}/check.sh`)).toBe(true);
+    // Never OpenCode's own scanned plugin directory: a plain hook script there is
+    // imported in-process and kills the host.
+    expect(memFs.has(`${ABS_OUT}/.opencode/plugin/check.sh`)).toBe(false);
   });
 
   it("never writes a hooks.json — opencode's loader reads a runtime module, not a manifest", async () => {
     await runOpencodeBuild();
 
-    expect(memFs.has(`${ABS_OUT}/.opencode/plugin/hooks.json`)).toBe(false);
-    expect(memFs.has(`${ABS_OUT}/.opencode/plugin/${PLUGIN}.hooks.json`)).toBe(false);
+    expect(memFs.has(`${ABS_OUT}/.opencode/hooks/hooks.json`)).toBe(false);
+    expect(memFs.has(`${ABS_OUT}/.opencode/hooks/${PLUGIN}/hooks.json`)).toBe(false);
+    expect(memFs.has(`${ABS_OUT}/.opencode/hooks/${PLUGIN}.hooks.json`)).toBe(false);
   });
 
   it("emits no logger.warn about hooks — they are delivered, not skipped", async () => {

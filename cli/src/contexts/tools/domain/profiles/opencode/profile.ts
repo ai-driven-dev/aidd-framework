@@ -23,10 +23,14 @@ import {
 } from "../../formats/command.js";
 import { registerTool } from "../../registry.js";
 import { buildOpencodeFlatContract, transformMcpToOpencode } from "./build.js";
-import { OPENCODE_DIRECTORY, OPENCODE_FLAT_HOOKS_DIR } from "./opencode-paths.js";
+import {
+  OPENCODE_DIRECTORY,
+  OPENCODE_FLAT_HOOKS_DIR,
+  OPENCODE_HOOKS_DIR,
+  OPENCODE_PLUGIN_ENTRY_BASENAME,
+} from "./opencode-paths.js";
 
 const DIRECTORY = OPENCODE_DIRECTORY;
-const FLAT_HOOKS_DIR = OPENCODE_FLAT_HOOKS_DIR;
 const TOOL_SUFFIX = ".opencode.md";
 
 export const opencode: AiTool<
@@ -119,7 +123,11 @@ export const opencode: AiTool<
       mode: "flat",
       flatNamespacePrefix: "aidd-",
       acceptsHooks: true,
-      flatHooksDir: FLAT_HOOKS_DIR,
+      flatHooksDir: OPENCODE_HOOKS_DIR,
+      flatHooksLoaderEntry: {
+        dir: OPENCODE_FLAT_HOOKS_DIR,
+        baseName: OPENCODE_PLUGIN_ENTRY_BASENAME,
+      },
     }),
   },
 

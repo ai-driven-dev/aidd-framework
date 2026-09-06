@@ -94,6 +94,27 @@ describe("PluginsCapability", () => {
     it("hooksUnsupportedReason is null", () => {
       expect(cap.hooksUnsupportedReason).toBeNull();
     });
+
+    it("flatHooksLoaderEntry is null when not declared", () => {
+      expect(cap.flatHooksLoaderEntry).toBeNull();
+    });
+  });
+
+  describe("flat mode, hooks accepted, with a loader entry", () => {
+    const cap = new PluginsCapability({
+      mode: "flat",
+      acceptsHooks: true,
+      flatHooksDir: ".test-tool/hooks/",
+      flatHooksLoaderEntry: { dir: ".test-tool/plugin/", baseName: "test-tool-plugin.js" },
+      flatNamespacePrefix: "aidd-",
+    });
+
+    it("exposes flatHooksLoaderEntry", () => {
+      expect(cap.flatHooksLoaderEntry).toEqual({
+        dir: ".test-tool/plugin/",
+        baseName: "test-tool-plugin.js",
+      });
+    });
   });
 
   describe("unsupported mode", () => {

@@ -14,13 +14,15 @@ export interface ToolHealth {
   mergeFileCount: number;
 }
 
-export type PluginIssueKind = "missing" | "hash-mismatch";
+export type PluginIssueKind = "missing" | "hash-mismatch" | "not-installed-on-machine";
 
 export interface PluginIssueEntry {
   toolId: AiToolId;
   pluginName: string;
   issue: PluginIssueKind;
-  filePath: string;
+  /** Absent for `not-installed-on-machine`: the fact is one line for the whole
+   * plugin, not one path per tracked file. */
+  filePath?: string;
 }
 
 export interface DoctorReport {

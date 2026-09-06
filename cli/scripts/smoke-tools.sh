@@ -321,6 +321,15 @@ if true; then
       && ok "$t dir present" || bad "$t dir missing after --ai all"
   done
   [[ -d "$BASE/.vscode" ]] && ok "vscode dir present" || bad "vscode dir missing"
+  # Cursor is user-scope (installScope "user"): its plugin files never land under the
+  # project at all, only under $HOME. Every other tool above is checked inside "$BASE";
+  # nothing until now ever read $HOME/.cursor, so a regression there passed silently.
+  # The literal path is what this exact `--plugins recommended` run produces for the
+  # fixture's own "aidd-test" plugin, not a `find`: the isolation test forbids one.
+  cursor_plugin_file="$HOME/.cursor/plugins/local/aidd-test/.cursor-plugin/plugin.json"
+  [[ -f "$cursor_plugin_file" ]] \
+    && ok "cursor user-scope plugin file present under \$HOME" \
+    || bad "cursor user-scope plugin file missing: $cursor_plugin_file"
 
   section "global read-only commands (no crash)"
   # doctor exits 1 by design when it finds drift/issues (e.g. framework-shipped broken

@@ -9,7 +9,7 @@ import { InstallationFile } from "../../../../../kernel/file.js";
  * componentPaths is left empty (sync does not propagate built plugins), matching the
  * existing local-marketplace behavior in PluginUpdateUseCase.
  */
-import { flatHooksSharedDirPath } from "../../../../../kernel/materialization/flat-paths.js";
+import { flatHooksPathWithLoaderEntry } from "../../../../../kernel/materialization/flat-paths.js";
 import type { FileReader } from "../../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../../kernel/ports/hasher.js";
@@ -142,10 +142,11 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
   // under .opencode/skills/<plugin>/... (genericFlatSkillTreePath — a skill's own
   // script can require() a sibling by relative path, which only keeps resolving
   // when nothing under the plugin's skills/ subtree gets renamed). Install copies
-  // only this plugin's files by whichever convention its section uses. Hooks are not
-  // namespaced — flatHooksDir is one directory the tool's loader scans flat (see
-  // flatHooksSharedDirPath) — so this plugin's own hook filenames are matched by name
-  // instead, from its own distribution.
+  // only this plugin's files by whichever convention its section uses. Hooks land under
+  // flatHooksDir/<plugin>/, except the one script that is the loader's own runtime module,
+  // renamed to the plugin's name in the loader's directory (flatHooksPathWithLoaderEntry);
+  // so this plugin's hook paths are computed from its own distribution and matched by
+  // path, not by naming convention.
   private async readFlatFiles(
     builtDir: string,
     dist: PluginDistribution,
@@ -176,12 +177,21 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
   }
 
   private flatHookOutputPaths(dist: PluginDistribution, toolId: AiToolId): ReadonlySet<string> {
-    const flatHooksDir = resolvePluginsCapability(toolId)?.flatHooksDir;
-    if (flatHooksDir === null || flatHooksDir === undefined) return new Set();
+    const plugins = resolvePluginsCapability(toolId);
+    const flatHooksDir = plugins?.flatHooksDir;
+    if (plugins === null || flatHooksDir === null || flatHooksDir === undefined) return new Set();
+    const name = dist.manifest.name;
     return new Set(
       dist.components.hooks
         .filter((f) => f.relativePath !== "hooks/hooks.json")
-        .map((f) => flatHooksSharedDirPath(flatHooksDir, f.relativePath))
+        .map((f) =>
+          flatHooksPathWithLoaderEntry(
+            flatHooksDir,
+            plugins.flatHooksLoaderEntry,
+            name,
+            f.relativePath
+          )
+        )
     );
   }
 
