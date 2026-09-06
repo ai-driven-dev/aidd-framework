@@ -382,6 +382,7 @@ describe("buildCostReportArtefact — the flow axis states its own limits with t
           skill: "aidd-orchestrator:01-sdlc",
           startMs: Date.parse("2026-08-17T10:00:00Z"),
           endMs: Date.parse("2026-08-17T11:00:00Z"),
+          closedBy: "boundary" as const,
         },
       ],
     },

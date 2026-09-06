@@ -60,6 +60,7 @@ const JOURNALS: readonly CostReportSessionJournal[] = [
         skill: "aidd-orchestrator:01-sdlc",
         startMs: Date.parse("2026-08-18T09:00:00Z"),
         endMs: Date.parse("2026-08-18T10:30:00Z"),
+        closedBy: "boundary",
       },
     ],
   },

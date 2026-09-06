@@ -256,6 +256,148 @@ describe("step-attribution — pure: journal lines + records -> intervals", () =
     expect(attributeMoment(intervals, A_START.at)).toEqual({ source: "unattributed" });
   });
 
+  // An orchestrating skill invokes others; that is what `ORCHESTRATING_SKILLS` declares it
+  // does. Reading the invoked skill's own `step_start` as the end of the orchestration
+  // credits an orchestration that ran for hours with the seconds before its first child.
+  // Measured on the one orchestrated session captured, 2026-09-04: `aidd-orchestrator:01-sdlc`
+  // opened at 05:56:27 and `aidd-pm:04-spec` opened at 05:59:53, so the orchestration was
+  // read as 206 seconds long against a session that ran until 09:27:21. The flow axis, which
+  // already refuses to let a non-orchestrating start close one, named 1,052 records for that
+  // same skill while this axis named 1.
+  it("does not let an invoked step close the orchestration that invoked it", () => {
+    const intervals = buildStepIntervals(
+      journalOf(
+        { type: "step_start", at: "2026-08-20T10:00:00Z", skill: "aidd-orchestrator:01-sdlc" },
+        { type: "step_start", at: "2026-08-20T10:05:00Z", skill: "aidd-pm:04-spec" },
+        { type: "turn_end", at: "2026-08-20T11:00:00Z" }
+      )
+    );
+
+    const sdlc = intervals.find((interval) => interval.skill === "aidd-orchestrator:01-sdlc");
+    expect(sdlc?.endMs).toBe(Date.parse("2026-08-20T11:00:00Z"));
+  });
+
+  // The invoked step is inside the orchestration, not beside it, so both intervals contain
+  // the same moment. The innermost is the one that answers: it is the more specific claim,
+  // and the outer one is still true of it.
+  it("attributes a moment inside both to the step, and one outside it to the orchestration", () => {
+    const intervals = buildStepIntervals(
+      journalOf(
+        { type: "step_start", at: "2026-08-20T10:00:00Z", skill: "aidd-orchestrator:01-sdlc" },
+        { type: "step_start", at: "2026-08-20T10:05:00Z", skill: "aidd-pm:04-spec" },
+        { type: "step_end", at: "2026-08-20T10:10:00Z", skill: "aidd-pm:04-spec" },
+        { type: "turn_end", at: "2026-08-20T11:00:00Z" }
+      )
+    );
+
+    expect(attributeMoment(intervals, "2026-08-20T10:02:00Z")).toEqual({
+      source: "journal-interval",
+      step: "aidd-orchestrator:01-sdlc",
+    });
+    expect(attributeMoment(intervals, "2026-08-20T10:07:00Z")).toEqual({
+      source: "journal-interval",
+      step: "aidd-pm:04-spec",
+    });
+    // Past the invoked step's own declared end, back inside the orchestration alone.
+    expect(attributeMoment(intervals, "2026-08-20T10:30:00Z")).toEqual({
+      source: "journal-interval",
+      step: "aidd-orchestrator:01-sdlc",
+    });
+  });
+
+  // An interval nothing ever closed ends at the journal's own last witnessed moment, which
+  // is a bound and not a measurement. Where one such interval sits inside another, the
+  // enclosing one answers: the inner one's end says only that the journal stopped, while
+  // the outer one is still known to have been open. Measured on the one orchestrated
+  // session captured, 2026-09-04: `aidd-dev:01-plan` opened at 06:00:50 inside an
+  // orchestration opened at 05:56:27, neither was ever closed, and reading the innermost
+  // start alone credited the invoked step with every one of the 972 records written over
+  // the three and a half hours that followed.
+  it("hands a moment to the orchestration when nothing ever closed the step inside it", () => {
+    const intervals = buildStepIntervals(
+      journalOf(
+        { type: "step_start", at: "2026-08-20T10:00:00Z", skill: "aidd-orchestrator:01-sdlc" },
+        { type: "step_start", at: "2026-08-20T10:05:00Z", skill: "aidd-pm:04-spec" },
+        { type: "turn_end", at: "2026-08-20T11:00:00Z" }
+      )
+    );
+
+    expect(attributeMoment(intervals, "2026-08-20T10:30:00Z")).toEqual({
+      source: "journal-interval",
+      step: "aidd-orchestrator:01-sdlc",
+    });
+  });
+
+  // Two invoked steps in a row inside one orchestration. The first is closed by the
+  // second's own start, so its end is a witnessed boundary and it answers for the moments
+  // it covers; only the second is left unclosed, and it is the one that yields. There is
+  // never a tie between two unclosed invoked steps to break, because a `step_start` closes
+  // whichever plain step was open - which is what this case is here to demonstrate rather
+  // than assert in a comment.
+  it("keeps the earlier invoked step, and yields only the one nothing closed", () => {
+    const intervals = buildStepIntervals(
+      journalOf(
+        { type: "step_start", at: "2026-08-20T10:00:00Z", skill: "aidd-orchestrator:01-sdlc" },
+        { type: "step_start", at: "2026-08-20T10:05:00Z", skill: "aidd-pm:04-spec" },
+        { type: "step_start", at: "2026-08-20T10:20:00Z", skill: "aidd-dev:01-plan" },
+        { type: "turn_end", at: "2026-08-20T11:00:00Z" }
+      )
+    );
+
+    expect(attributeMoment(intervals, "2026-08-20T10:10:00Z")).toEqual({
+      source: "journal-interval",
+      step: "aidd-pm:04-spec",
+    });
+    expect(attributeMoment(intervals, "2026-08-20T10:30:00Z")).toEqual({
+      source: "journal-interval",
+      step: "aidd-orchestrator:01-sdlc",
+    });
+  });
+
+  // The yielding is between two intervals nothing closed, and no wider than that. Here the
+  // orchestration states its own end while the step inside it does not, so the step runs
+  // past it and no interval encloses it - the innermost claim stands, exactly as it does
+  // when both ends are witnessed.
+  it("keeps the innermost step when the orchestration around it states its own end", () => {
+    const intervals = buildStepIntervals(
+      journalOf(
+        { type: "step_start", at: "2026-08-20T10:00:00Z", skill: "aidd-orchestrator:01-sdlc" },
+        { type: "step_start", at: "2026-08-20T10:10:00Z", skill: "aidd-pm:04-spec" },
+        { type: "step_end", at: "2026-08-20T10:20:00Z", skill: "aidd-orchestrator:01-sdlc" },
+        { type: "turn_end", at: "2026-08-20T11:00:00Z" }
+      )
+    );
+
+    expect(attributeMoment(intervals, "2026-08-20T10:15:00Z")).toEqual({
+      source: "journal-interval",
+      step: "aidd-pm:04-spec",
+    });
+  });
+
+  // Nesting is declared, never inferred: only a skill `ORCHESTRATING_SKILLS` names invokes
+  // others. Two ordinary skills in a row are a sequence, and the second still ends the first.
+  it("still lets one ordinary step close another, which is a sequence and not a nesting", () => {
+    const intervals = buildStepIntervals(journalOf(A_START, B_START, TURN_END));
+
+    const first = intervals.find((interval) => interval.skill === A_START.skill);
+    expect(first?.endMs).toBe(Date.parse(B_START.at));
+  });
+
+  // One orchestration does not nest inside another by default - the same rule
+  // `buildFlowIntervals` already applies to the wider concept, read from the same lines.
+  it("lets one orchestration close another", () => {
+    const intervals = buildStepIntervals(
+      journalOf(
+        { type: "step_start", at: "2026-08-20T10:00:00Z", skill: "aidd-orchestrator:01-sdlc" },
+        { type: "step_start", at: "2026-08-20T10:05:00Z", skill: "aidd-orchestrator:02-backlog" },
+        { type: "turn_end", at: "2026-08-20T11:00:00Z" }
+      )
+    );
+
+    const first = intervals.find((interval) => interval.skill === "aidd-orchestrator:01-sdlc");
+    expect(first?.endMs).toBe(Date.parse("2026-08-20T10:05:00Z"));
+  });
+
   it("touches no filesystem — the module imports none of Node's fs APIs", () => {
     const url = new URL("../../../src/domain/models/step-attribution.ts", import.meta.url);
     const source = readFileSync(fileURLToPath(url), "utf8");
@@ -287,6 +429,8 @@ describe("buildStepIntervals — a step the session never closed", () => {
         skill: "aidd-dev:01-plan",
         startMs: Date.parse("2026-08-17T10:00:00Z"),
         endMs: Date.parse("2026-08-17T12:00:00Z"),
+        // The cap, and named as one: nothing in this journal ever closed the step.
+        closedBy: "journal-end",
       },
     ]);
     expect(attributeMoment(intervals, "2026-09-30T23:59:00Z")).toEqual({ source: "unattributed" });
