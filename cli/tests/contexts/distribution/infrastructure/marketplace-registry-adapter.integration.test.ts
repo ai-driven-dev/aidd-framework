@@ -55,6 +55,37 @@ describe("MarketplaceRegistryAdapter", () => {
       expect(result).toEqual([]);
     });
 
+    // A registry file that exists but does not hold the list is not an empty registry, and
+    // reading it as one is how a person loses every marketplace they registered: `save()`
+    // reads this same list, appends to it and writes the whole file back, so one silent
+    // empty read turns into a file with one entry where there were five. Found on a real
+    // `~/.config/aidd/marketplaces.json` holding `{"version":1}`, which crashed
+    // `aidd marketplace list` with "Cannot read properties of undefined (reading 'map')" -
+    // a stack trace naming nothing a person can act on.
+    it("refuses a registry file that carries no list, naming the file rather than crashing", async () => {
+      const userFile = join(homeDir, ".config", "aidd", "marketplaces.json");
+      await mkdir(join(homeDir, ".config", "aidd"), { recursive: true });
+      await writeFile(userFile, '{"version":1}', "utf-8");
+
+      await expect(adapter.list(projectRoot)).rejects.toThrow(userFile);
+    });
+
+    it("refuses a registry file that is not JSON at all, naming the file", async () => {
+      const userFile = join(homeDir, ".config", "aidd", "marketplaces.json");
+      await mkdir(join(homeDir, ".config", "aidd"), { recursive: true });
+      await writeFile(userFile, "not json", "utf-8");
+
+      await expect(adapter.list(projectRoot)).rejects.toThrow(userFile);
+    });
+
+    it("reads a registry file whose list is present and empty as an empty registry", async () => {
+      const userFile = join(homeDir, ".config", "aidd", "marketplaces.json");
+      await mkdir(join(homeDir, ".config", "aidd"), { recursive: true });
+      await writeFile(userFile, '{"version":1,"marketplaces":[]}', "utf-8");
+
+      await expect(adapter.list(projectRoot)).resolves.toEqual([]);
+    });
+
     it("returns project entries first, user entries after", async () => {
       const project = Marketplace.fromJSON(baseData({ name: "p1" }));
       const user = Marketplace.fromJSON(baseData({ name: "u1", scope: "user" }));

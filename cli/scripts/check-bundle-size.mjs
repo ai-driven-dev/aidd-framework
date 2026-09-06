@@ -29,6 +29,8 @@ const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 // the merge, budget = measured + ~2 %, see the line below.
 // 567 was set 2026-09-06 after merging next through #786: measured 555.7 KB, the four
 // telemetry axes and `framework rules` included. Same ~2 % headroom.
+// #787, the registry guard next raised its own line 601 -> 603 for, lands here at
+// 556.2 KB: inside the headroom, no raise.
 const budgetKB = pkg.bundleBudgetKB ?? 500;
 const budgetBytes = budgetKB * 1024;
 
