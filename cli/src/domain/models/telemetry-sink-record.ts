@@ -87,6 +87,30 @@ export interface TelemetrySinkRecord {
    *
    * Absent wherever a tool's files cannot say, which is every host but Claude Code today. */
   readonly prompt_id?: string;
+  /** The skill a `Skill` call invoked inside this record's own prompt — the same fact the
+   * run journal writes as `step_start`'s `turn_id`, seen from the transcript instead.
+   *
+   * Stored because the report never re-reads a transcript: it reads this sink and the
+   * journals beside it, so an observation only a transcript holds has to be written down
+   * when it is read or it is gone. An observation, and never a judgement — which step a
+   * record belongs to is `report-cost-use-case.ts`'s question, derived fresh every run
+   * from this and from the journal together.
+   *
+   * Scoped to the transcript the record itself sits in, which is what the reader accumulates:
+   * Claude Code writes a session's subagents to their own files under
+   * `<sessionId>/subagents/`, and a prompt is often spread across several — measured on one
+   * machine, 1,038 of 5,564 prompts appear in more than one file. A subagent that invoked its
+   * own skill did that work under that skill, so its records name it, while the main
+   * transcript's records name whatever the main flow invoked. Merging the files first would
+   * have to pick one of the two for both, and neither choice is true of both.
+   *
+   * It does not duplicate `step`. That one reads `attributionSkill`, which Claude Code
+   * writes per message: exact where it appears and sparse where it does not. Measured on
+   * the one orchestrated session captured, 2026-09-04, inside the window
+   * `aidd-dev:01-plan` demonstrably ran, 142 lines carry counters and 20 carry that field.
+   * So its absence is not the tool saying no skill ran, and naming the skill a prompt
+   * invoked contradicts nothing the tool states. */
+  readonly prompt_skill?: string;
   /** How `step` came to be known. Never optional, for the same reason `provenance` is not:
    * an absent field would be read as "no step ran", which is exactly the assertion nothing
    * on a transcript or a journal can support. See `domain/models/step-attribution.ts`. */
