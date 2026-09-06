@@ -32,7 +32,6 @@ jobs:
       - name: Install pnpm
         run: |
           corepack enable
-          corepack prepare pnpm@latest --activate
 
       - name: Cache pnpm store
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -42,7 +41,7 @@ jobs:
           restore-keys: pnpm-${{ runner.os }}-
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile=false --ignore-scripts
+        run: pnpm install --no-frozen-lockfile --ignore-scripts
 
       - name: Install cli dependencies
         # cli/ is a self-contained project (own lockfile, not a pnpm workspace

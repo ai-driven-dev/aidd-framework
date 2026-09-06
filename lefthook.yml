@@ -162,13 +162,18 @@ pre-commit:
     cli-typecheck:
       # The CLI type-checks `kanban/` too, so that folder's dependencies must be
       # resolvable. Install them only when they are missing, to keep the hook fast.
-      # `--ignore-workspace` because the repository root declares one (for pnpm's
-      # build allowlist); without the flag pnpm resolves kanban to that root, finds
-      # it lists no members, reports "Already up to date" and installs nothing —
-      # leaving this step to fail on a sibling package it was meant to repair.
+      #
+      # `--ignore-workspace` was here so pnpm would not resolve kanban to the
+      # repository root, find it lists no members, report "Already up to date" and
+      # install nothing. `kanban/pnpm-workspace.yaml` now stops that upward search on
+      # its own — that is the whole reason the file exists — and the flag had turned
+      # harmful: it discards that same file, and with it the `allowBuilds` entry pnpm
+      # needs to run esbuild's install script. Measured in the real layout under
+      # pnpm 12.3.4, a root workspace above and kanban's own file present: without the
+      # flag the install exits 0, with it, ERR_PNPM_IGNORED_BUILDS.
       glob: "{cli,kanban}/**"
       run: |
-        [ -d kanban/node_modules ] || (cd kanban && pnpm install --frozen-lockfile --ignore-workspace)
+        [ -d kanban/node_modules ] || (cd kanban && pnpm install --frozen-lockfile)
         cd cli && pnpm typecheck
 
 pre-push:

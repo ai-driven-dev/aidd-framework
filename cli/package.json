@@ -35,15 +35,7 @@
   "engines": {
     "node": ">=22.12"
   },
-  "packageManager": "pnpm@10.14.0",
-  "pnpm": {
-    "overrides": {
-      "fast-uri": ">=3.1.2",
-      "picomatch": ">=4.0.4",
-      "postcss": ">=8.5.10",
-      "qs": ">=6.15.2"
-    }
-  },
+  "packageManager": "pnpm@12.3.4",
   "bundleBudgetKB": 598,
   "scripts": {
     "build": "tsup && node scripts/check-bundle-size.mjs",
