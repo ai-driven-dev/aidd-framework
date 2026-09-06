@@ -102,3 +102,17 @@ export interface IdeToolConfig {
   readonly directory: string;
   readonly signalDir: string | null;
 }
+
+/** Whether this tool declares a rules capability at all.
+ *
+ * Generic over the tool's own capability set so a caller keeps whatever it had already
+ * narrowed: `plugin-content-translator.ts` asks it of a tool it has narrowed to
+ * `HasPlugins` and keeps that, while a caller holding an unnarrowed tool gets `HasRules`
+ * alone. It lived privately in that translator until a second caller needed it; a copy
+ * beside it would have been free to answer differently about the same tool.
+ */
+export function hasRules<TCapabilities>(
+  tool: AiTool<TCapabilities>
+): tool is AiTool<TCapabilities & HasRules> {
+  return "rules" in (tool.capabilities as object);
+}

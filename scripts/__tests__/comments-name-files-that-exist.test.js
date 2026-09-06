@@ -53,6 +53,10 @@ const NAMED_AS_HISTORY = Object.freeze({
 
 /** Named inside a fixture or a runtime path a test builds, never a file of this repository. */
 const NOT_A_REPOSITORY_FILE = Object.freeze({
+  // A seam artefact one plugin writes into a reader's own project and another reads back —
+  // named here as the shape of that seam, never as a file this repository holds.
+  "docs/ARCHITECTURE.md": ["INSTALL.md"],
+  "docs/CATALOG.md": ["INSTALL.md"],
   "cli/tests/application/use-cases/doctor-use-case.unit.test.ts": ["@.claude/rules/test.md"],
   "cli/tests/e2e/telemetry-plugin-standalone.e2e.test.ts": [
     "dist/cli.js",
@@ -67,13 +71,30 @@ function trackedFiles() {
   return cp.execSync("git ls-files", { cwd: ROOT, encoding: "utf8" }).trim().split("\n");
 }
 
+function findFiles(command) {
+  return cp.execSync(command, { cwd: ROOT, encoding: "utf8" }).trim().split(/\r?\n/).filter(Boolean);
+}
+
 function scannedFiles() {
-  const found = cp.execSync(
-    "find cli/src cli/tests plugins scripts -type f " +
-      "\\( -name '*.ts' -o -name '*.cjs' -o -name '*.js' \\) -not -path '*/node_modules/*'",
-    { cwd: ROOT, encoding: "utf8" }
-  );
-  return found.trim().split("\n");
+  return [
+    ...findFiles(
+      "find cli/src cli/tests plugins scripts -type f " +
+        "\\( -name '*.ts' -o -name '*.cjs' -o -name '*.js' \\) -not -path '*/node_modules/*'"
+    ),
+    // docs/ too, and its markdown alone. A durable doc naming a file makes the same promise
+    // a comment does, and it was the one place nothing kept it: the architecture doc named
+    // the context plugin's session hook with a cjs extension for a file that has always been
+    // js. Markdown anywhere else is deliberately out - a skill's own asset and a fixture
+    // template name illustrative paths on purpose, and scanning those produced 17 findings of
+    // which none was a fault. This comment itself is why the names above are spelled out in
+    // prose rather than quoted: a quoted example would be a finding.
+    //
+    // Two calls and not one command joined by `;`: `execSync` runs through `cmd.exe` on
+    // Windows, where `;` separates nothing and the second `find` was passed to the first as
+    // an argument. Green on macOS, red on the Windows job, which is exactly what that job is
+    // there for.
+    ...findFiles("find docs -type f -name '*.md'"),
+  ];
 }
 
 function allowed(file, token) {

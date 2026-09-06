@@ -19,6 +19,11 @@ const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 // 598 was set when the journal reader began reading the schema a journal states it was
 // written under, and the diagnostic gained the reason for refusing one: measured
 // 594.3 -> 595.8 KB. Same 2.2 KB headroom as the two raises before it.
+// 601 was set when `aidd ai rules` took over the rule inventory the explore skill used to
+// run as its own script: measured 596.6 -> 599.0 KB, +2.4 KB for a use case, a model, a
+// display and the subcommand. It deletes 198 lines from a plugin, which the bundle does
+// not carry either way - the trade is a plugin script that had drifted for bytes that are
+// measured. Same 2.2 KB headroom as the three raises before it.
 const budgetKB = pkg.bundleBudgetKB ?? 500;
 const budgetBytes = budgetKB * 1024;
 

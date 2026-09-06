@@ -40,6 +40,7 @@ import { InstallAiToolUseCase } from "../application/use-cases/install/install-a
 import { InstallIdeConfigUseCase } from "../application/use-cases/install/install-ide-config-use-case.js";
 import { InstallIdeToolUseCase } from "../application/use-cases/install/install-ide-tool-use-case.js";
 import { InstallRuntimeConfigUseCase } from "../application/use-cases/install/install-runtime-config-use-case.js";
+import { ListInstalledRulesUseCase } from "../application/use-cases/list-installed-rules-use-case.js";
 import { MarketplaceAddUseCase } from "../application/use-cases/marketplace/marketplace-add-use-case.js";
 import { MarketplaceCheckUseCase } from "../application/use-cases/marketplace/marketplace-check-use-case.js";
 import { MarketplaceListUseCase } from "../application/use-cases/marketplace/marketplace-list-use-case.js";
@@ -234,6 +235,7 @@ interface Deps {
    * `warnIfFiguresMoveTheTokenToo`. */
   telemetrySink: TelemetrySinkAdapter;
   forgetTelemetryUseCase: ForgetTelemetryUseCase;
+  listInstalledRulesUseCase: ListInstalledRulesUseCase;
 }
 
 const _cache = new Map<string, Deps>();
@@ -851,6 +853,7 @@ export async function createDeps(
     reportCostUseCase,
     telemetrySink,
     forgetTelemetryUseCase,
+    listInstalledRulesUseCase: new ListInstalledRulesUseCase(fs),
   };
   _cache.set(projectRoot, deps);
   return deps;
