@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import "../../../src/contexts/tools/domain/profiles/claude/profile.js";
-import "../../../src/contexts/tools/domain/profiles/codex/profile.js";
-import { printNativeOnlyTools } from "../../../src/presentation/display/restore-display.js";
+import { printNativeActivation } from "../../../src/presentation/display/restore-display.js";
 import { CLIOutput } from "../../../src/presentation/output.js";
 
 class CapturingOutput extends CLIOutput {
@@ -12,23 +10,26 @@ class CapturingOutput extends CLIOutput {
   }
 }
 
-describe("printNativeOnlyTools", () => {
-  it("prints nothing when no tool was skipped", () => {
+describe("printNativeActivation", () => {
+  it("prints nothing when every tool's CLI ran", () => {
     const output = new CapturingOutput(false);
 
-    printNativeOnlyTools(output, []);
+    printNativeActivation(output, []);
 
     expect(output.lines).toEqual([]);
   });
 
-  it("names each skipped tool and the command that registers it", () => {
+  it("names each tool and binary whose CLI was not on PATH, and what that means for the plugin", () => {
     const output = new CapturingOutput(false);
 
-    printNativeOnlyTools(output, ["claude", "codex"]);
+    printNativeActivation(output, [
+      { toolId: "claude", binary: "claude" },
+      { toolId: "codex", binary: "codex" },
+    ]);
 
     expect(output.lines).toEqual([
-      "claude: plugins are registered by the claude CLI, not by this file tree; run `aidd framework install --tool claude` to register them.",
-      "codex: plugins are registered by the codex CLI, not by this file tree; run `aidd framework install --tool codex` to register them.",
+      "claude: the plugin will not load until the claude CLI has run.",
+      "codex: the plugin will not load until the codex CLI has run.",
     ]);
   });
 });

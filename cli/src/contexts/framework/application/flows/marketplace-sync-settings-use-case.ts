@@ -18,6 +18,10 @@ import type { EnsureBuiltMarketplace } from "../shared/ensure-built-marketplace-
 
 export interface MarketplaceSyncSettingsOptions {
   projectRoot: string;
+  /** Limits both the settings sync and the native activation to these tools — what
+   * `sync --tool <id>` needs so fixing one tool's registration does not silently
+   * re-drive every other installed tool's CLI too. Every installed tool when absent. */
+  toolIds?: readonly ToolId[];
 }
 
 /** What one tool's own CLI actually registered, once its `activateTool` run finished —
@@ -28,9 +32,44 @@ interface ActivationOutcome {
   pluginRefs: readonly string[];
 }
 
+/** What activation did, per tool — the fact `execute` used to throw away by returning
+ * `void`, which is the one reason `sync` never called it at all. */
+export interface MarketplaceSyncSettingsResult {
+  /** Tools whose own CLI actually ran, whether or not every step inside it succeeded. */
+  activated: readonly ToolId[];
+  /** Tools with a native activation whose binary was not on PATH — nothing of theirs
+   * ran, so the settings this pass wrote will not load until it has. */
+  binaryMissing: readonly { toolId: ToolId; binary: string }[];
+  /** What a recoverable, best-effort step logged — the same text `logger.warn` already
+   * received, returned so a caller can act on it without capturing output. */
+  warnings: readonly string[];
+  /** A hard failure a tool's activation raised that is not the recoverable
+   * `NativePluginCliError` family — a real adapter never produces one (every failure it
+   * throws is that class), so this is a bug in the activator itself, not a fact about
+   * the tool. Returned rather than thrown: whether that makes the whole command fail is
+   * `sync.ts`'s decision, the same split `restoreAllUseCase` already holds for a
+   * restore failure. */
+  errors: readonly { scope: string; message: string }[];
+}
+
+const EMPTY_RESULT: MarketplaceSyncSettingsResult = {
+  activated: [],
+  binaryMissing: [],
+  warnings: [],
+  errors: [],
+};
+
 /** Syncing marketplace settings into the tools that read them, as its callers need it. */
 export interface MarketplaceSyncSettings {
-  execute(options: MarketplaceSyncSettingsOptions): Promise<void>;
+  execute(options: MarketplaceSyncSettingsOptions): Promise<MarketplaceSyncSettingsResult>;
+}
+
+/** What one execute() run's native activation did, across every tool it touched. */
+interface ActivationRun {
+  outcomes: ReadonlyMap<ToolId, ActivationOutcome>;
+  binaryMissing: readonly { toolId: ToolId; binary: string }[];
+  warnings: readonly string[];
+  errors: readonly { scope: string; message: string }[];
 }
 
 export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
@@ -45,52 +84,83 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     private readonly ensureBuilt: EnsureBuiltMarketplace
   ) {}
 
-  async execute(options: MarketplaceSyncSettingsOptions): Promise<void> {
+  async execute(options: MarketplaceSyncSettingsOptions): Promise<MarketplaceSyncSettingsResult> {
     const { projectRoot } = options;
     const [manifest, marketplaces] = await Promise.all([
       this.manifestRepo.load().catch(() => null),
       this.marketplaceRegistry.list(projectRoot),
     ]);
-    if (manifest === null || marketplaces.length === 0) return;
+    if (manifest === null || marketplaces.length === 0) return EMPTY_RESULT;
+    const toolIds = this.selectToolIds(manifest, options.toolIds);
     let anyToolUpdated = false;
-    for (const toolId of manifest.getInstalledToolIds()) {
+    for (const toolId of toolIds) {
       if (await this.syncTool(toolId, projectRoot, manifest, marketplaces)) anyToolUpdated = true;
     }
     if (anyToolUpdated) await this.manifestRepo.save(manifest);
-    const activated = await this.activateNativeTools(projectRoot, manifest, marketplaces);
+    const activation = await this.activateNativeTools(projectRoot, manifest, marketplaces, toolIds);
     const wroteHashes = await this.recordWhatActivationWrote(projectRoot, manifest, [
-      ...activated.keys(),
+      ...activation.outcomes.keys(),
     ]);
-    const wroteRegistrations = this.recordNativeRegistrations(manifest, activated);
+    const wroteRegistrations = this.recordNativeRegistrations(manifest, activation.outcomes);
     if (wroteHashes || wroteRegistrations) await this.manifestRepo.save(manifest);
+    return {
+      activated: [...activation.outcomes.keys()],
+      binaryMissing: activation.binaryMissing,
+      warnings: activation.warnings,
+      errors: activation.errors,
+    };
   }
 
-  /** Answers the tools whose own CLI actually ran, keyed to what it was asked to
-   * register — never every installed tool. A tool whose binary is absent, or that has
-   * no native activation at all, wrote nothing, so a settings file that differs for it
-   * differs because a person changed it. Blessing that as ours is the one thing this
-   * must not do. */
+  /** Every installed tool, narrowed to `toolIds` when the caller named one — what
+   * `sync --tool <id>` needs so it touches only that tool's settings and activation. */
+  private selectToolIds(
+    manifest: Manifest,
+    toolIds: readonly ToolId[] | undefined
+  ): readonly ToolId[] {
+    const installed = manifest.getInstalledToolIds();
+    if (toolIds === undefined) return installed;
+    const requested = new Set(toolIds);
+    return installed.filter((toolId) => requested.has(toolId));
+  }
+
+  /** Runs each tool's own CLI, keyed to what it was asked to register — never a tool
+   * with no native activation at all, and never one whose binary is absent: neither
+   * wrote anything, so a settings file that differs for it differs because a person
+   * changed it. Blessing that as ours is the one thing this must not do. */
   private async activateNativeTools(
     projectRoot: string,
     manifest: Manifest,
-    marketplaces: readonly Marketplace[]
-  ): Promise<ReadonlyMap<ToolId, ActivationOutcome>> {
-    const activated = new Map<ToolId, ActivationOutcome>();
-    for (const toolId of manifest.getInstalledToolIds()) {
+    marketplaces: readonly Marketplace[],
+    toolIds: readonly ToolId[]
+  ): Promise<ActivationRun> {
+    const outcomes = new Map<ToolId, ActivationOutcome>();
+    const binaryMissing: { toolId: ToolId; binary: string }[] = [];
+    const warnings: string[] = [];
+    const errors: { scope: string; message: string }[] = [];
+    for (const toolId of toolIds) {
       const binary = this.nativeActivationBinary(toolId);
       const activator = binary === undefined ? undefined : this.activators.get(binary);
       if (binary === undefined || activator === undefined) continue;
-      const outcome = await this.activateTool(
-        toolId,
-        binary,
-        activator,
-        projectRoot,
-        manifest,
-        marketplaces
-      );
-      if (outcome !== null) activated.set(toolId, outcome);
+      if (!activator.isAvailable()) {
+        this.logger.warn(`${binary} CLI not found on PATH — skipping native plugin activation.`);
+        binaryMissing.push({ toolId, binary });
+        continue;
+      }
+      try {
+        const outcome = await this.activateTool(
+          toolId,
+          activator,
+          projectRoot,
+          manifest,
+          marketplaces,
+          warnings
+        );
+        outcomes.set(toolId, outcome);
+      } catch (error) {
+        errors.push({ scope: toolId, message: (error as Error).message });
+      }
     }
-    return activated;
+    return { outcomes, binaryMissing, warnings, errors };
   }
 
   /** Writes the manifest's own record of what each tool's CLI was asked to register —
@@ -163,21 +233,18 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     return nativeActivationOf(toolId)?.binary;
   }
 
-  /** Runs this tool's own CLI, returning what it was asked to register, or `null` when
-   * the binary is not on PATH — the only case in which the settings file may have been
-   * written by anything but this code, and in which nothing was actually registered. */
+  /** Runs this tool's own CLI, returning what it was asked to register. The caller has
+   * already checked `isAvailable()`, so every failure reaching here is either a
+   * recoverable `NativePluginCliError` — collected into `warnings`, never thrown — or a
+   * genuine bug in the activator, which propagates. */
   private async activateTool(
     toolId: ToolId,
-    binary: string,
     activator: NativePluginActivator,
     projectRoot: string,
     manifest: Manifest,
-    marketplaces: readonly Marketplace[]
-  ): Promise<ActivationOutcome | null> {
-    if (!activator.isAvailable()) {
-      this.logger.warn(`${binary} CLI not found on PATH — skipping native plugin activation.`);
-      return null;
-    }
+    marketplaces: readonly Marketplace[],
+    warnings: string[]
+  ): Promise<ActivationOutcome> {
     // Every known marketplace, never only the ones a plugin points at — declaring a
     // marketplace and installing a plugin from it are two acts, and a person does the first
     // alone all the time. This used to narrow to the plugins' own marketplaces for a tool
@@ -190,24 +257,26 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     // Each step is independently best-effort: one failing plugin or marketplace
     // must warn and let the others through, never abort the whole activation.
     for (const marketplace of marketplaces)
-      await this.registerMarketplace(activator, toolId, marketplace, projectRoot);
+      await this.registerMarketplace(activator, toolId, marketplace, projectRoot, warnings);
     const registeredMarketplaces = marketplaces.map((m) => m.name);
     if (!activator.enablesPlugins())
       return { marketplaces: registeredMarketplaces, pluginRefs: [] };
-    this.bestEffort(() => activator.upgradeMarketplaces(), "upgrade marketplaces");
+    this.bestEffort(() => activator.upgradeMarketplaces(), "upgrade marketplaces", warnings);
     const refs = this.pluginRefsToEnable(toolId, manifest, marketplaces);
     for (const ref of refs) {
-      this.bestEffort(() => activator.enablePlugin(ref), `enable plugin '${ref}'`);
+      this.bestEffort(() => activator.enablePlugin(ref), `enable plugin '${ref}'`, warnings);
     }
     return { marketplaces: registeredMarketplaces, pluginRefs: refs };
   }
 
-  private bestEffort(action: () => void, label: string): void {
+  private bestEffort(action: () => void, label: string, warnings: string[]): void {
     try {
       action();
     } catch (error) {
       if (!(error instanceof NativePluginCliError)) throw error;
-      this.logger.warn(`Native plugin activation — ${label} skipped: ${error.message}`);
+      const message = `Native plugin activation — ${label} skipped: ${error.message}`;
+      this.logger.warn(message);
+      warnings.push(message);
     }
   }
 
@@ -235,7 +304,8 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     activator: NativePluginActivator,
     toolId: ToolId,
     marketplace: Marketplace,
-    projectRoot: string
+    projectRoot: string,
+    warnings: string[]
   ): Promise<void> {
     const builtDir = await this.buildForTool(toolId, marketplace, projectRoot);
     if (builtDir === null) return;
@@ -243,7 +313,7 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
       activator.addMarketplace(builtDir, marketplace.scope);
     } catch (error) {
       if (!(error instanceof NativePluginCliError)) throw error;
-      this.reclaimOrReport(activator, marketplace, builtDir, error);
+      this.reclaimOrReport(activator, marketplace, builtDir, error, warnings);
     }
   }
 
@@ -257,25 +327,28 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     activator: NativePluginActivator,
     marketplace: Marketplace,
     builtDir: string,
-    addError: NativePluginCliError
+    addError: NativePluginCliError,
+    warnings: string[]
   ): void {
     const name = marketplace.name;
     if (activator.registrationState(name) !== "dead") {
-      this.logger.warn(
-        `Native plugin activation — register marketplace '${name}' skipped: ${addError.message}`
-      );
+      const message = `Native plugin activation — register marketplace '${name}' skipped: ${addError.message}`;
+      this.logger.warn(message);
+      warnings.push(message);
       return;
     }
-    this.logger.warn(
-      `Marketplace '${name}' was registered to a directory that no longer exists; re-registering it for this project. Plugins installed from it are removed and the ones this CLI manages are put back.`
-    );
+    const reclaimMessage = `Marketplace '${name}' was registered to a directory that no longer exists; re-registering it for this project. Plugins installed from it are removed and the ones this CLI manages are put back.`;
+    this.logger.warn(reclaimMessage);
+    warnings.push(reclaimMessage);
     this.bestEffort(
       () => activator.removeMarketplace(name, marketplace.scope, { force: true }),
-      `unregister stale marketplace '${name}'`
+      `unregister stale marketplace '${name}'`,
+      warnings
     );
     this.bestEffort(
       () => activator.addMarketplace(builtDir, marketplace.scope),
-      `register marketplace '${name}'`
+      `register marketplace '${name}'`,
+      warnings
     );
   }
 

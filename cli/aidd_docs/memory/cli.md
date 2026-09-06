@@ -24,6 +24,7 @@ Thirty-three leaf commands. Read them live — `aidd --help`, then each group's.
 - The update-check hook is the one place that swallows: it must never fail the command a person asked for.
 - Exit codes: `0` ok; `1` on error, an unhealthy `doctor`, or a non-interactive guard.
 - `doctor`, for a tool whose plugins activate through its own CLI (claude, codex, copilot): compares `nativeRegistrations` against that host's own registry file, four answers — `registered` (no issue), `not-registered` and `registered-disabled` (`error`, gate `doctor` unhealthy, fix names `aidd sync` or `aidd framework install --tool <id>`), `unanswerable` (`info`, never gates — the normal state on a machine that has never run the tool's own binary).
+- `sync` restores tracked files, then drives native activation the same way `setup` and `framework install` do (`MarketplaceSyncSettingsUseCase.execute`, restoration first, activation after — reversing the order would hash a settings file restoration is about to overwrite). `sync --tool <id>` narrows activation to that tool alone. A tool whose binary is absent warns that its plugin will not load until that CLI has run and still exits `0`; a genuine activation failure (not the recoverable, best-effort kind) throws `SyncFailedError` and exits `1`.
 
 ## Distribution
 

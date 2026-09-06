@@ -400,7 +400,7 @@
     "command": "sync --force",
     "exitCode": 0,
     "stdout": "Checking claude for files to restore...\nChecking cursor for files to restore...\nRestored 1 file(s), kept 0 file(s)\n",
-    "stderr": "Warning: claude: plugins are registered by the claude CLI, not by this file tree; run `aidd framework install --tool claude` to register them.\n",
+    "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\nWarning: claude: the plugin will not load until the claude CLI has run.\n",
     "filesWritten": [],
     "manifest": {
       "version": 7,
@@ -411,7 +411,7 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
+              "hash": "267dba9c9c9dbe2190d91ae84213c77b"
             }
           ],
           "mergeFiles": [],
@@ -479,7 +479,7 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
+              "hash": "267dba9c9c9dbe2190d91ae84213c77b"
             }
           ],
           "mergeFiles": [],
@@ -547,7 +547,7 @@
           "files": [
             {
               "relativePath": ".claude/settings.json",
-              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
+              "hash": "267dba9c9c9dbe2190d91ae84213c77b"
             }
           ],
           "mergeFiles": []

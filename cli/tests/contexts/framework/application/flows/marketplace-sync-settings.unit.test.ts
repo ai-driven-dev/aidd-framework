@@ -1,4 +1,5 @@
 import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Marketplace } from "../../../../../src/contexts/distribution/domain/marketplace.js";
@@ -36,6 +37,12 @@ interface SyncSetup {
   readonly ensureBuilt?: EnsureBuiltMarketplace;
   /** Whether the tool's own CLI enables plugins, which decides what it registers. */
   readonly enablesPlugins?: boolean;
+  /** Whether claude's own CLI is on PATH. Defaults to available. */
+  readonly available?: boolean;
+  /** Makes the activator crash on `addMarketplace` with a plain `Error`. */
+  readonly crashOnAddMarketplace?: boolean;
+  /** Refs that fail to enable — a recoverable, best-effort `NativePluginCliError`. */
+  readonly failOnPlugins?: readonly string[];
 }
 
 async function sync(setup: SyncSetup = {}) {
@@ -70,8 +77,10 @@ async function sync(setup: SyncSetup = {}) {
   if (setup.settings !== undefined) await fs.writeFile(SHARED_SETTINGS, setup.settings);
 
   const activator = new FakeNativePluginActivator({
-    available: true,
+    available: setup.available ?? true,
     enablesPlugins: setup.enablesPlugins ?? false,
+    crashOnAddMarketplace: setup.crashOnAddMarketplace ?? false,
+    failOnPlugins: setup.failOnPlugins ?? [],
   });
   const useCase = new MarketplaceSyncSettingsUseCase(
     fs,
@@ -82,11 +91,11 @@ async function sync(setup: SyncSetup = {}) {
     new Map([["claude", activator]]),
     setup.ensureBuilt ?? fakeEnsureBuiltMarketplace()
   );
-  await useCase.execute({ projectRoot: PROJECT_ROOT });
+  const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
   const written = (await fs.fileExists(SHARED_SETTINGS))
     ? (JSON.parse(await fs.readFile(SHARED_SETTINGS)) as Record<string, unknown>)
     : undefined;
-  return { written, logger, fs, activator };
+  return { written, logger, fs, activator, result };
 }
 
 /**
@@ -243,5 +252,98 @@ describe("a marketplace no plugin points at", () => {
     });
 
     expect(activator.addedMarketplaces).toHaveLength(2);
+  });
+});
+
+/**
+ * `execute` used to return `void`: `sync` had no way to tell what activation actually
+ * did, so it never called it at all (#lot-2). This is the return `sync` now reads.
+ */
+describe("what execute reports about activation", () => {
+  it("names the tool whose CLI actually ran, in `activated`", async () => {
+    const { result } = await sync();
+
+    expect(result.activated).toEqual(["claude"]);
+  });
+
+  it("names the tool and the binary in `binaryMissing` when the CLI is not on PATH", async () => {
+    const { result } = await sync({ available: false });
+
+    expect(result.activated).toEqual([]);
+    expect(result.binaryMissing).toEqual([{ toolId: "claude", binary: "claude" }]);
+  });
+
+  it("collects a best-effort failure in `warnings`, the same content the logger gets", async () => {
+    const { result, logger } = await sync({
+      enablesPlugins: true,
+      failOnPlugins: ["aidd-context@aidd-framework"],
+    });
+
+    expect(result.warnings).toEqual(logger.warnMessages);
+    expect(result.warnings.some((w) => w.includes("aidd-context@aidd-framework"))).toBe(true);
+  });
+
+  // The one failure shape a real adapter never produces (see `crashOnAddMarketplace`'s own
+  // doc): activation must not swallow it as best-effort, but `execute` must not throw it
+  // either — that decision belongs to whoever calls `execute` (`sync.ts`), the same split
+  // `restoreAllUseCase` already holds for a restore failure.
+  it("carries a hard, unexpected activator failure in `errors` rather than throwing", async () => {
+    const { result } = await sync({ crashOnAddMarketplace: true });
+
+    expect(result.errors).toEqual([
+      { scope: "claude", message: "activator crashed adding a marketplace" },
+    ]);
+    expect(result.activated).toEqual([]);
+  });
+});
+
+/** `sync --tool <id>` must touch only that tool — otherwise a person fixing one tool's
+ * registration would silently re-drive every other tool's CLI too. */
+describe("toolIds narrows which tool's CLI is driven", () => {
+  it("never calls the activator of a tool not named in toolIds", async () => {
+    const fs = new InMemoryFileAdapter();
+    const manifestRepo = new InMemoryManifestRepository();
+    const registry = new InMemoryMarketplaceRegistry();
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    manifest.addTool("codex", "test", []);
+    await new ModeAMarketplaceTranslator().addPlugin(
+      distribution("aidd-context"),
+      "claude",
+      { kind: "local", path: "/plugin-source" },
+      PROJECT_ROOT,
+      manifest,
+      "aidd-framework"
+    );
+    await manifestRepo.save(manifest);
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: "aidd-framework",
+        source: { kind: "local", path: "/source/aidd-framework" },
+        scope: "project",
+        addedAt: "2026-01-01T00:00:00Z",
+      })
+    );
+    const claudeActivator = new FakeNativePluginActivator({ available: true });
+    const codexActivator = new FakeNativePluginActivator({ available: true });
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      manifestRepo,
+      registry,
+      new DeterministicHasher(),
+      new CapturingLogger(),
+      new Map([
+        ["claude", claudeActivator],
+        ["codex", codexActivator],
+      ]),
+      fakeEnsureBuiltMarketplace()
+    );
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT, toolIds: ["claude"] });
+
+    expect(claudeActivator.addedMarketplaces).not.toEqual([]);
+    expect(codexActivator.addedMarketplaces).toEqual([]);
+    expect(result.activated).toEqual(["claude"]);
   });
 });

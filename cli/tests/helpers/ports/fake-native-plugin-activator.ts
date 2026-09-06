@@ -12,6 +12,10 @@ import { NativePluginCliError } from "../../../src/kernel/errors.js";
  * i.e. an `add` that failed for a reason other than a different-source conflict).
  * `failOnUninstall` makes `uninstallPlugin` throw for the listed refs (simulates the
  * plugin already being absent from the tool's own registry).
+ * `crashOnAddMarketplace` makes `addMarketplace` throw a plain `Error` rather than a
+ * `NativePluginCliError` — the one failure shape a real adapter never produces (every
+ * throw in `AbstractNativePluginCliAdapter.run` is that class), used to simulate a bug
+ * in the activator itself, which activation must not swallow as best-effort.
  */
 export class FakeNativePluginActivator implements NativePluginActivator {
   available: boolean;
@@ -27,6 +31,7 @@ export class FakeNativePluginActivator implements NativePluginActivator {
   private readonly pluginsEnabledHere: boolean;
   private readonly state: "live" | "dead" | "unknown";
   private readonly failOnUninstall: ReadonlySet<string>;
+  private readonly crashOnAddMarketplace: boolean;
 
   constructor(
     options: {
@@ -39,6 +44,7 @@ export class FakeNativePluginActivator implements NativePluginActivator {
       /** What the tool answers about a name already registered. */
       registrationState?: "live" | "dead" | "unknown";
       failOnUninstall?: readonly string[];
+      crashOnAddMarketplace?: boolean;
     } = {}
   ) {
     this.available = options.available ?? false;
@@ -48,6 +54,7 @@ export class FakeNativePluginActivator implements NativePluginActivator {
     this.pluginsEnabledHere = options.enablesPlugins ?? true;
     this.state = options.registrationState ?? "unknown";
     this.failOnUninstall = new Set(options.failOnUninstall ?? []);
+    this.crashOnAddMarketplace = options.crashOnAddMarketplace ?? false;
   }
 
   registrationState(): "live" | "dead" | "unknown" {
@@ -63,6 +70,9 @@ export class FakeNativePluginActivator implements NativePluginActivator {
   }
 
   addMarketplace(source: string, _scope?: unknown): void {
+    if (this.crashOnAddMarketplace) {
+      throw new Error("activator crashed adding a marketplace");
+    }
     if (this.conflictOnAdd && this.removedMarketplaces.length === 0) {
       throw new NativePluginCliError(
         "marketplace is already added from a different source; remove it before adding this source"

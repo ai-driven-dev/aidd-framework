@@ -2,10 +2,15 @@ import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Marketplace } from "../../../../../src/contexts/distribution/domain/marketplace.js";
+import { DoctorRegistrationUseCase } from "../../../../../src/contexts/framework/application/doctor/doctor-registration-use-case.js";
 import { MarketplaceSyncSettingsUseCase } from "../../../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
 import { InstalledPlugin } from "../../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
 import { buildHostRegistration } from "../../../../../src/contexts/tools/domain/host-plugin-registration.js";
+import type {
+  HostPluginRegistryReader,
+  HostPluginRegistryReading,
+} from "../../../../../src/contexts/tools/domain/ports/host-plugin-registry-reader.js";
 import { CapturingLogger } from "../../../../helpers/ports/capturing-logger.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
 import { fakeEnsureBuiltMarketplace } from "../../../../helpers/ports/fake-ensure-built-marketplace.js";
@@ -222,6 +227,36 @@ describe("nativeRegistrations reflects what the host's own CLI was asked to regi
     const reloaded = await manifestRepo.load();
     expect(reloaded?.getNativeRegistrations("claude")).toBeUndefined();
   });
+
+  /**
+   * What `sync` exists to repair: the manifest still carries a prior run's
+   * `nativeRegistrations`, but the host's own registry has lost it (a machine re-clone, a
+   * person clearing it by hand) — the fake starts with none of what it was asked to
+   * register on a previous run. Running `execute` again is what `sync` now does, and it
+   * must drive the CLI again rather than trust the stale manifest record.
+   */
+  it("re-registers through the host CLI when the manifest's record has gone stale", async () => {
+    const activator = new FakeNativePluginActivator({ available: true });
+    const { useCase, registry, manifestRepo } = buildSync(activator);
+    const staleManifest = await manifestRepo.load();
+    staleManifest?.setNativeRegistrations("claude", {
+      binary: "claude",
+      marketplaces: [MARKETPLACE],
+      pluginRefs: [REF],
+    });
+    if (staleManifest) await manifestRepo.save(staleManifest);
+    await registry.save(PROJECT_ROOT, marketplace());
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(activator.enabledPlugins).toContain(REF);
+    const reloaded = await manifestRepo.load();
+    expect(reloaded?.getNativeRegistrations("claude")).toEqual({
+      binary: "claude",
+      marketplaces: [MARKETPLACE],
+      pluginRefs: [REF],
+    });
+  });
 });
 
 /**
@@ -344,5 +379,67 @@ describe("what native activation leaves behind is not reported as the user's dri
     expect(hashAfterSync, "the settings file is tracked at all").toBeDefined();
     expect(tracked?.hash).toEqual(hashAfterSync);
     expect(tracked?.hash).not.toEqual(hasher.hash(edited));
+  });
+});
+
+/**
+ * The guard for the interface between the two lots: `doctor` reads the host's registry
+ * (lot 1) and its fix names `aidd sync`; `sync` now drives the same activation this file
+ * exercises everywhere else (lot 2). This composes both, with one activator double
+ * standing in for the host CLI both sides look at, so `doctor` going healthy again is
+ * read from the same state `sync` was asked to write — not from two doubles that happen
+ * to agree by construction.
+ */
+describe("what doctor tells a person to run becomes true once sync has run", () => {
+  /** Answers `read()` from the activator's own recorded state, so a registry reading
+   * always reflects exactly what the last `execute()` asked the host CLI to enable. */
+  class RegistryBoundToActivator implements HostPluginRegistryReader {
+    constructor(private readonly activator: FakeNativePluginActivator) {}
+
+    async read(): Promise<HostPluginRegistryReading> {
+      return {
+        location: "/home/dev/.claude/plugins/installed_plugins.json",
+        refs: new Map(this.activator.enabledPlugins.map((ref) => [ref, true])),
+      };
+    }
+  }
+
+  it("goes from `aidd sync` to healthy after sync re-registers", async () => {
+    const activator = new FakeNativePluginActivator({ available: true });
+    const { useCase, registry, manifestRepo, fs } = buildSync(activator);
+    await registry.save(PROJECT_ROOT, marketplace());
+    const doctorRegistration = new DoctorRegistrationUseCase(
+      fs,
+      registry,
+      new Map([["claude", activator]]),
+      new Map([["claude", new RegistryBoundToActivator(activator)]])
+    );
+    // `buildSync` seeds the repository with a manifest already carrying a plugin, and
+    // `MarketplaceSyncSettingsUseCase.execute` mutates that same instance in place rather
+    // than replacing it — so one load, kept across both doctor calls below, sees the sync
+    // that runs in between without needing a second, equally-unproven load.
+    const manifest = await manifestRepo.load();
+    expect(manifest, "buildSync always seeds a manifest").not.toBeNull();
+    if (manifest === null) throw new Error("unreachable — asserted above");
+
+    // Before sync ever ran: the host's registry carries nothing this project expects.
+    const before = await doctorRegistration.execute({
+      manifest,
+      projectRoot: PROJECT_ROOT,
+      allowedIds: null,
+    });
+    expect(
+      before.some((issue) => issue.severity === "error" && issue.fix.includes("aidd sync"))
+    ).toBe(true);
+
+    // What `sync` now does: the same activation, re-registering through the same CLI.
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    const after = await doctorRegistration.execute({
+      manifest,
+      projectRoot: PROJECT_ROOT,
+      allowedIds: null,
+    });
+    expect(after.filter((issue) => issue.severity === "error")).toEqual([]);
   });
 });

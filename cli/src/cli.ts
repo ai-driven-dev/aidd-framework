@@ -50,6 +50,7 @@ const ONLINE_COMMAND_PATHS = new Set([
   "marketplace check",
   "marketplace list",
   "marketplace add",
+  "sync",
 ]);
 
 program.hook("preAction", async (_thisCommand, actionCommand) => {

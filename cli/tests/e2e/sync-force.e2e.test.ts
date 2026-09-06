@@ -80,4 +80,26 @@ describe.concurrent("E2E: aidd sync --force", () => {
       await cleanup();
     }
   });
+
+  /**
+   * The sandbox this suite runs in reaches no real `claude` binary
+   * (`sandbox-reaches-no-tool-binary.e2e.test.ts` holds that boundary), so this is the one
+   * case a real built-binary run of `sync` can prove: the binary-missing path. `sync` now
+   * drives native activation the same way `setup` does (lot 2) — this proves it actually
+   * runs from the real command, not only from the use case's own tests, and that the exit
+   * code stays 0: restoration succeeded, and an absent binary is a fact, not a failure.
+   */
+  it("warns that the plugin will not load until the claude CLI has run, and still exits 0", async () => {
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("sync-force-native-activation");
+    try {
+      await installClaude(projectDir, fakeHome);
+
+      const { stderr, exitCode } = await runCli(["sync", "--force"], projectDir, fakeHome);
+
+      expect(exitCode).toBe(0);
+      expect(stderr).toContain("claude: the plugin will not load until the claude CLI has run.");
+    } finally {
+      await cleanup();
+    }
+  });
 });
