@@ -54,21 +54,81 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
       if (updated) updatedTools.push(toolId);
     }
     if (updatedTools.length > 0) await this.manifestRepo.save(manifest);
-    await this.activateNativeTools(projectRoot, manifest, marketplaces);
+    const activated = await this.activateNativeTools(projectRoot, manifest, marketplaces);
+    if (await this.recordWhatActivationWrote(projectRoot, manifest, activated))
+      await this.manifestRepo.save(manifest);
     return { updatedTools };
   }
 
+  /** Answers the tools whose own CLI actually ran — never every installed tool. A tool whose
+   * binary is absent, or that has no native activation at all, wrote nothing, so a settings
+   * file that differs for it differs because a person changed it. Blessing that as ours is
+   * the one thing this must not do. */
   private async activateNativeTools(
     projectRoot: string,
     manifest: Manifest,
     marketplaces: readonly Marketplace[]
-  ): Promise<void> {
+  ): Promise<readonly ToolId[]> {
+    const activated: ToolId[] = [];
     for (const toolId of manifest.getInstalledToolIds()) {
       const binary = this.nativeActivationBinary(toolId);
       const activator = binary === undefined ? undefined : this.activators.get(binary);
       if (binary === undefined || activator === undefined) continue;
-      await this.activateTool(toolId, binary, activator, projectRoot, manifest, marketplaces);
+      const ran = await this.activateTool(
+        toolId,
+        binary,
+        activator,
+        projectRoot,
+        manifest,
+        marketplaces
+      );
+      if (ran) activated.push(toolId);
     }
+    return activated;
+  }
+
+  /**
+   * The host's own CLI writes its registration into the very file `syncTool` had just
+   * hashed — Claude Code declares no separate `enabledPluginsSettingsPath`, so both halves
+   * land in `.claude/settings.json`. The tracked hash then described content that no longer
+   * existed, and nothing re-read it: `status` and `doctor` reported a file the person never
+   * touched as drifted for as long as the manifest stood, and `restore` would have undone
+   * the host's own registration to reach a state AIDD held for the length of one function.
+   *
+   * Re-read rather than re-derive, and only for a tool whose CLI actually ran: what is
+   * stored is what is on disk after the write, which is the observation, not a guess at
+   * what the host would have written.
+   */
+  private async recordWhatActivationWrote(
+    projectRoot: string,
+    manifest: Manifest,
+    activated: readonly ToolId[]
+  ): Promise<boolean> {
+    let changed = false;
+    for (const toolId of activated) {
+      const settingsPath = this.marketplaceSettingsOf(toolId)?.settingsPath;
+      if (settingsPath === undefined) continue;
+      const tracked = manifest
+        .getToolFiles(toolId)
+        .find((file) => file.relativePath === settingsPath);
+      if (tracked === undefined) continue;
+      const content = await this.fs.readFile(resolve(projectRoot, settingsPath)).catch(() => null);
+      if (content === null) continue;
+      const hash = this.hasher.hash(content);
+      if (hash.value === tracked.hash.value) continue;
+      manifest.updateTrackedFileHash(toolId, settingsPath, hash);
+      changed = true;
+    }
+    return changed;
+  }
+
+  private marketplaceSettingsOf(toolId: ToolId): MarketplaceSettings | undefined {
+    const toolConfig = getToolConfig(toolId);
+    if (toolConfig === undefined || !isAiTool(toolConfig)) return undefined;
+    const caps = toolConfig.capabilities as {
+      plugins?: { marketplaceSettings: MarketplaceSettings | null };
+    };
+    return caps.plugins?.marketplaceSettings ?? undefined;
   }
 
   private nativeActivationBinary(toolId: ToolId): string | undefined {
@@ -80,6 +140,8 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     return caps.plugins?.nativeActivation?.binary ?? undefined;
   }
 
+  /** True when this tool's own CLI was actually driven — the only case in which the settings
+   * file may have been written by anything but this code. */
   private async activateTool(
     toolId: ToolId,
     binary: string,
@@ -87,7 +149,7 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     projectRoot: string,
     manifest: Manifest,
     marketplaces: readonly Marketplace[]
-  ): Promise<void> {
+  ): Promise<boolean> {
     // Every known marketplace, never only the ones a plugin points at — declaring a
     // marketplace and installing a plugin from it are two acts, and a person does the first
     // alone all the time. This used to narrow to the plugins' own marketplaces for a tool
@@ -99,17 +161,18 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     const refs = this.pluginRefsToEnable(toolId, manifest, marketplaces);
     if (!activator.isAvailable()) {
       this.logger.warn(`${binary} CLI not found on PATH — skipping native plugin activation.`);
-      return;
+      return false;
     }
     // Each step is independently best-effort: one failing plugin or marketplace
     // must warn and let the others through, never abort the whole activation.
     for (const marketplace of marketplaces)
       await this.registerMarketplace(activator, toolId, marketplace, projectRoot);
-    if (!activator.enablesPlugins()) return;
+    if (!activator.enablesPlugins()) return true;
     this.bestEffort(() => activator.upgradeMarketplaces(), "upgrade marketplaces");
     for (const ref of refs) {
       this.bestEffort(() => activator.enablePlugin(ref), `enable plugin '${ref}'`);
     }
+    return true;
   }
 
   private bestEffort(action: () => void, label: string): void {

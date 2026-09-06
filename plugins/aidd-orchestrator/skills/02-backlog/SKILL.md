@@ -46,3 +46,16 @@ Run the flow above. Read only the next action file.
 - Store each relation once, in its owning artifact.
 - Ask natural questions; never expose internal routes, checks, or unchanged state.
 - Change only authorized artifacts and fields.
+
+## Say when this orchestration is over
+
+Once the flow has reached `done` — an answer given, no change needed, or `verify` reporting a coherent graph, and only then, run:
+
+```shell
+echo "aidd:step-end aidd-orchestrator:02-backlog"
+```
+
+No host reports when an orchestration finished. A skill call's own result comes back in a
+tenth of a second, which is the dispatch and not the completion, so a measurement that never
+hears this ends the run at the next pause — and an orchestration is mostly pauses. Everything
+it drove afterwards then reads as work that belonged to nothing.

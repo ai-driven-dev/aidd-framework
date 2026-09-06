@@ -72,6 +72,8 @@ const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
     // the shapes a rendered answer is made of
     "src/contexts/telemetry/domain/cost-report.ts",
     "src/contexts/telemetry/domain/cost-report-envelope.ts",
+    // How a person id was resolved, which the artefact prints beside each row.
+    "src/contexts/telemetry/domain/person-resolution.ts",
     "src/contexts/telemetry/domain/report-period.ts",
     "src/contexts/telemetry/domain/telemetry-removal.ts",
     "src/contexts/telemetry/domain/telemetry-claim.ts",
@@ -125,6 +127,8 @@ const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
   // ever was. Until this entry existed the mechanism below skipped every framework file, so
   // fifteen imports reached its interior unchecked. Measured, composition root excluded.
   framework: [
+    // The rule inventory `framework rules` prints, one row per installed rule.
+    "src/contexts/framework/domain/installed-rule.ts",
     // the installation record, which is what this context owns
     "src/contexts/framework/domain/manifest.ts",
     "src/contexts/framework/domain/ports/manifest-repository.ts",

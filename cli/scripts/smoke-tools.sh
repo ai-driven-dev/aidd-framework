@@ -38,7 +38,7 @@ IDE_TOOLS=(vscode)
 # Canonical leaf-command surface. Coverage = exercised / total.
 ALL_COMMANDS=(
   "setup" "doctor" "sync" "translate" "update" "clean"
-  "framework install" "framework update" "framework remove"
+  "framework install" "framework update" "framework remove" "framework rules"
   "plugin remove" "plugin list" "plugin install" "plugin search" "plugin update"
   "marketplace add" "marketplace list" "marketplace remove" "marketplace refresh" "marketplace check"
   "auth login" "auth logout" "auth status"
@@ -116,7 +116,39 @@ run() {
 new_project() { local p; p=$(mktemp -d "$TMPROOT/proj.XXXXXX"); (cd "$p" && git init -q); echo "$p"; }
 # Only the marketplaces catalog — NOT the per-target built-marketplace cache
 # (.aidd/cache/built/.../marketplace.json), which also matches a bare *marketplace.json glob.
-cache_catalog() { find "$1/.aidd/cache/marketplaces" -path "*marketplace.json" 2>/dev/null | head -1; }
+# `find` answers in directory order, which is neither sorted nor the same on two machines.
+# Every case below damages the file this returns, so an unsorted pick runs a different case
+# on every run - and a case nobody can name is a case nobody can debug.
+first_file() { LC_ALL=C sort | head -1; }
+
+cache_catalog() { find "$1/.aidd/cache/marketplaces" -path "*marketplace.json" 2>/dev/null | first_file; }
+
+# The drift every restore case writes, and the string its check looks for again afterwards.
+# A marker rather than a bare newline: a blank line is invisible to `grep`, so a case that
+# appended one could only ever assert an exit code.
+DRIFT_MARK="SMOKE_DRIFT"
+
+# A restore that exits 0 having restored nothing is the exact failure #762 fixed in the
+# command. The exit code is checked by `run`; this is what checks the repair.
+# The file a case damages: the first regular file the manifest tracks, in a fixed order,
+# for one tool or for all of them. Reading the manifest rather than `find`ing a `.md`
+# survives a tool whose content its own CLI registers and whose project directory holds
+# nothing but settings; a tracked settings file drifts and is repaired the same way.
+tracked_file() {
+  node -e '
+    const manifest = JSON.parse(require("fs").readFileSync(process.argv[1], "utf-8"));
+    const tools = process.argv[2] ? [manifest.tools[process.argv[2]]] : Object.values(manifest.tools);
+    const files = tools.filter(Boolean).flatMap((t) => t.files.map((f) => f.relativePath)).sort();
+    if (files[0]) console.log(files[0]);
+  ' "$1/.aidd/manifest.json" "${2:-}"
+}
+
+repaired() {
+  local name="$1" file="$2"
+  if [[ -z "$file" ]]; then bad "$name (nothing was drifted to repair)"; return 1; fi
+  if grep -qF -- "$DRIFT_MARK" "$file"; then bad "$name (drift still in $file)"; return 1; fi
+  ok "$name repaired the file it drifted"
+}
 
 # ── build ───────────────────────────────────────────────────────
 # `pnpm smoke`/`pnpm smoke:full` already ran `pnpm build` before this script — this
@@ -297,14 +329,19 @@ if true; then
   done
 
   section "global sync"
-  tgt=$(find "$BASE/.claude" -name "*.md" | head -1)
-  if [[ -n "$tgt" ]]; then printf '\nDRIFT\n' >> "$tgt"; fi
+  tgt=$(tracked_file "$BASE")
+  [[ -n "$tgt" ]] && tgt="$BASE/$tgt" && printf '\n%s\n' "$DRIFT_MARK" >> "$tgt"
   run "sync --force" 0 "" "$BASE" -- sync --force
+  repaired "sync --force" "$tgt"
 
   section "framework install/update/remove --tool × all 5 AI tools + vscode"
   run "framework update (all)" 0 "" "$BASE" -- framework update
-  d=$(find "$BASE/.cursor" -name "*.md" 2>/dev/null | head -1); [[ -n "$d" ]] && printf '\nX\n' >> "$d"
+  run "framework rules" 0 "" "$BASE" -- framework rules
+  run "framework rules --json" 0 "" "$BASE" -- framework rules --json
+    d=$(tracked_file "$BASE" cursor)
+  [[ -n "$d" ]] && d="$BASE/$d" && printf '\n%s\n' "$DRIFT_MARK" >> "$d"
   run "sync --tool cursor" 0 "" "$BASE" -- sync --tool cursor --force
+  repaired "sync --tool cursor" "$d"
   run "sync --plugin" 0 "" "$BASE" -- sync --force --plugin aidd-test
   for t in "${AI_TOOLS[@]}"; do
     run "framework update --tool $t" 0 "" "$BASE" -- framework update --tool "$t"

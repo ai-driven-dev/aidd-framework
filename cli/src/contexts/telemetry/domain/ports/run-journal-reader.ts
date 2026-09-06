@@ -48,6 +48,12 @@ export type RunJournalBoundary = RunJournalStepStart | RunJournalTurnEnd | RunJo
 export interface RunJournalSessionStart {
   readonly type: "session_start";
   readonly at: string;
+  /** The schema the hook stamped this journal with, absent for a journal written before
+   * this reader looked at the field. Read and carried, never derived: which schema a file
+   * was written under is the writer's statement about it, and a reader that infers one
+   * from the shapes it happens to recognise is exactly the silent misreading the field
+   * exists to prevent. */
+  readonly schema_version?: number;
   readonly run_id: string;
   readonly tool: string;
   readonly vendor_id: string;
@@ -86,10 +92,12 @@ export interface RunJournalFileWritten {
  * on that task from here on — told rather than inferred, the way `step_start` names a
  * skill. Carries no task identity for the same reason `file_written` does not: `path` is
  * the same repository-relative shape, and deriving the task from it is `task-identity.ts`'s
- * job. Deliberately kept out of `RunJournalBoundary` — pairing it into `boundaries` would
- * let it close a running step early (see `step-attribution.ts`'s `buildStepIntervals`), so
- * a task interval is built from this array plus `boundaries`' own `turn_end` lines instead,
- * in `domain/models/task-attribution.ts`. */
+ * job. Deliberately kept out of `RunJournalBoundary`: what opens or closes a step is a
+ * `step_start` and a `step_end` naming its skill, and a declaration is neither. It reaches
+ * every interval walk all the same - `buildTaskIntervals`, `buildFlowIntervals` and
+ * `buildStepIntervals` each merge this array and `filesWritten` into `boundaries` before
+ * walking - but as a moment the journal witnessed, never as a boundary that ends something.
+ * The type keeps the two apart so a later reader cannot confuse them by accident. */
 export interface RunJournalTaskDeclared {
   readonly type: "task_declared";
   readonly at: string;
@@ -141,6 +149,13 @@ export interface RunJournalReader {
    * throws; a missing or unreadable runs directory answers an empty list, the same
    * failure direction as `list()`. */
   listRunFiles(): Promise<readonly string[]>;
+  /** The schema stated by every journal this reader refused to read, one entry per file.
+   * `list()` drops such a journal outright — reading it would mean guessing that whatever
+   * lines this parser still recognises mean what they used to — and a caller shown only
+   * that emptiness would report a missing or torn file about one whose header it parsed
+   * perfectly well. Empty is the ordinary answer: every journal on disk states the schema
+   * this build reads, or states none at all. Never throws, like everything else here. */
+  listForeignSchemas(): Promise<readonly number[]>;
 }
 
 /**

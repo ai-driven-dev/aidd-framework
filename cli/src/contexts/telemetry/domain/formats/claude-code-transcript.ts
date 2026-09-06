@@ -53,6 +53,7 @@ interface ClaudeTranscriptLine {
     readonly model?: unknown;
     readonly id?: unknown;
     readonly usage?: ClaudeUsage;
+    readonly content?: unknown;
   };
 }
 
@@ -188,6 +189,26 @@ function uuidOf(line: string): string | undefined {
  * arrived, or a cycle a damaged file leaves behind, must end the walk rather than search
  * forever. A hop cap would also terminate, but it would silently stop answering for a
  * legitimately deep chain, which is the kind of number nobody could ever justify. */
+/** The skill a `Skill` tool call on this line invokes, or `undefined` for every other line.
+ *
+ * Only a `Skill` call names a step. Every other tool call is work done inside whatever step
+ * was already running, and reading one as a start would name a skill for a prompt that
+ * invoked none. `input.skill` is the field Claude Code puts the name in - the same one
+ * `skill-detection.cjs` reads out of the hook payload, so the transcript and the run
+ * journal name a step identically. */
+function skillInvokedOn(line: ClaudeTranscriptLine): string | undefined {
+  const content = line.message?.content;
+  if (!Array.isArray(content)) return undefined;
+  for (const part of content) {
+    if (typeof part !== "object" || part === null) continue;
+    const call = part as { type?: unknown; name?: unknown; input?: { skill?: unknown } };
+    if (call.type !== "tool_use" || call.name !== "Skill") continue;
+    const skill = asString(call.input?.skill);
+    if (skill !== undefined) return skill;
+  }
+  return undefined;
+}
+
 function resolvePromptId(
   startUuid: string | undefined,
   parents: ReadonlyMap<string, string>,
@@ -258,6 +279,10 @@ class ClaudeCodeTranscriptAccumulator implements TranscriptLineAccumulator {
   // chain from a call to its prompt runs through lines that carry no counters at all.
   private readonly parents = new Map<string, string>();
   private readonly prompts = new Map<string, string>();
+  /** Every `Skill` call the transcript holds, in the order it holds them, paired with the
+   * line that made it. Resolved to prompts in `build()` and not here, for the reason the
+   * class already resolves prompts there: a walk run mid-stream reads a half-built chain. */
+  private readonly skillCalls: { readonly uuid: string; readonly skill: string }[] = [];
 
   push(line: string): void {
     this.rememberLinks(line);
@@ -279,12 +304,36 @@ class ClaudeCodeTranscriptAccumulator implements TranscriptLineAccumulator {
     if (parent !== undefined) this.parents.set(uuid, parent);
     const prompt = asString(parsed.promptId);
     if (prompt !== undefined) this.prompts.set(uuid, prompt);
+    const skill = skillInvokedOn(parsed);
+    if (skill !== undefined) this.skillCalls.push({ uuid, skill });
+  }
+
+  /** The skill each prompt invoked, first call wins.
+   *
+   * The first and not the last: a prompt that invokes two skills invoked the second from
+   * inside the first, and the prompt is named for the work it began - the same rule
+   * `promptToSkill` follows over the run journal's own `step_start` lines, so the two
+   * sources cannot disagree about a prompt they both saw. */
+  private skillByPrompt(): ReadonlyMap<string, string> {
+    const byPrompt = new Map<string, string>();
+    for (const { uuid, skill } of this.skillCalls) {
+      const prompt = resolvePromptId(uuid, this.parents, this.prompts);
+      if (prompt !== undefined && !byPrompt.has(prompt)) byPrompt.set(prompt, skill);
+    }
+    return byPrompt;
   }
 
   build(): readonly LocalCostCandidateRecord[] {
+    const skillByPrompt = this.skillByPrompt();
     return [...this.byKey.entries()].map(([key, record]) => {
       const promptId = resolvePromptId(this.uuidByKey.get(key), this.parents, this.prompts);
-      return promptId === undefined ? record : { ...record, prompt_id: promptId };
+      if (promptId === undefined) return record;
+      const promptSkill = skillByPrompt.get(promptId);
+      return {
+        ...record,
+        prompt_id: promptId,
+        ...(promptSkill === undefined ? {} : { prompt_skill: promptSkill }),
+      };
     });
   }
 }

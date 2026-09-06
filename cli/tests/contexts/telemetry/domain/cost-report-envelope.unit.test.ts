@@ -24,8 +24,8 @@ const DECLARED: readonly CostReportToolDeclaration[] = [
     tool: "claude",
     coverage: "covered",
     capability: {
-      localRead: { tokenCounters: true, amount: false, toolStatedStep: true },
-      export: { tokenCounters: true, amount: true, toolStatedStep: false },
+      localRead: { tokenCounters: true, amount: false, toolStatedStep: true, agentName: true },
+      export: { tokenCounters: true, amount: true, toolStatedStep: false, agentName: false },
       journalAttributable: true,
       taskAttributable: true,
     },
@@ -48,8 +48,8 @@ const DECLARED: readonly CostReportToolDeclaration[] = [
       "Its own file names outputTokens per turn, but session.shutdown carries all four " +
       "counters for the whole session — a session total, never a sum of requests.",
     capability: {
-      localRead: { tokenCounters: true, amount: false, toolStatedStep: false },
-      export: { tokenCounters: false, amount: false, toolStatedStep: false },
+      localRead: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: false },
+      export: { tokenCounters: false, amount: false, toolStatedStep: false, agentName: false },
       journalAttributable: true,
       taskAttributable: false,
     },
@@ -149,8 +149,18 @@ describe("toCostReportEnvelope", () => {
     );
 
     expect(byTool.claude).toEqual({
-      local_read: { token_counters: true, amount: false, tool_stated_step: true },
-      export: { token_counters: true, amount: true, tool_stated_step: false },
+      local_read: {
+        token_counters: true,
+        amount: false,
+        tool_stated_step: true,
+        agent_name: true,
+      },
+      export: {
+        token_counters: true,
+        amount: true,
+        tool_stated_step: false,
+        agent_name: false,
+      },
       journal_attributable: true,
       task_attributable: true,
     });

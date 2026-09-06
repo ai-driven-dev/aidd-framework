@@ -45,7 +45,7 @@ export const opencode: AiTool<
     // Counters per message, and no amount: `info.cost` is `0` in every message captured
     // and its denomination was never established, so it is deliberately never read. No
     // field names a running skill either.
-    supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
+    supplies: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: false },
     // Measured 2026-08-20: `input` is exclusive of `cache.read` for providerID "anthropic",
     // matching that API's own documented behaviour. A second provider was probed 2026-08-24
     // (providerID "opencode") and reconciled the same way, but never exercised its cache
@@ -54,8 +54,10 @@ export const opencode: AiTool<
     // provider that reports prompt tokens inclusive of the cached ones, the way native
     // OpenAI's usage does, has never been captured here. See plugins/aidd-telemetry/README.md.
     limitation:
-      "Its four counters are measured correct for the anthropic provider — not " +
-      "independently confirmed for any other provider OpenCode can route to.",
+      "Its four counters are measured disjoint for the anthropic provider and for one " +
+      "OpenAI-compatible provider whose cache was exercised — not confirmed for a " +
+      "provider that reports prompt tokens inclusive of the cached ones, which none " +
+      "captured here does.",
   },
   telemetryTaskAttributable: true,
   telemetryJournalHost: "opencode",

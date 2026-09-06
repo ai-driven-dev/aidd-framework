@@ -74,6 +74,119 @@ describe("mapClaudeCodeTranscriptToSinkRecords — the prompt a billed call belo
     expect(record?.prompt_id).toBeUndefined();
   });
 
+  /**
+   * The skill a `Skill` call started inside this record's own prompt.
+   *
+   * `attributionSkill`, which the record's `step` already reads, is exact where it appears
+   * and sparse where it does not: measured on the one orchestrated session captured,
+   * 2026-09-04, inside the window `aidd-dev:01-plan` demonstrably ran, 142 billed lines
+   * carry counters and 20 carry that field. Its absence is not the tool saying no skill
+   * ran, so naming the skill a prompt invoked contradicts nothing it states.
+   *
+   * Stored rather than judged: which step a record belongs to is the reader's question,
+   * and this is the observation it answers from — the same fact the run journal writes as
+   * `step_start`'s `turn_id`, seen from the transcript instead.
+   */
+  it("names the skill a Skill call invoked inside the record's own prompt", () => {
+    const content = chain([
+      { type: "user", uuid: "u1", promptId: "p-abc" },
+      {
+        type: "assistant",
+        uuid: "a1",
+        parentUuid: "u1",
+        sessionId: SID,
+        message: {
+          content: [{ type: "tool_use", name: "Skill", input: { skill: "aidd-dev:01-plan" } }],
+        },
+      },
+      assistantLine({ uuid: "a2", parentUuid: "a1" }),
+    ]);
+
+    const [record] = mapClaudeCodeTranscriptToSinkRecords(content);
+
+    expect(record?.prompt_skill).toBe("aidd-dev:01-plan");
+  });
+
+  // A record whose prompt started no skill states none, rather than borrowing the last one
+  // seen: two prompts are two prompts however their moments overlap, which is the whole
+  // reason this reads a prompt and not a moment.
+  it("names no skill for a prompt that invoked none", () => {
+    const content = chain([
+      { type: "user", uuid: "u1", promptId: "p-one" },
+      {
+        type: "assistant",
+        uuid: "a1",
+        parentUuid: "u1",
+        sessionId: SID,
+        message: {
+          content: [{ type: "tool_use", name: "Skill", input: { skill: "aidd-dev:01-plan" } }],
+        },
+      },
+      { type: "user", uuid: "u2", parentUuid: "a1", promptId: "p-two" },
+      assistantLine({ uuid: "a2", parentUuid: "u2" }),
+    ]);
+
+    const records = mapClaudeCodeTranscriptToSinkRecords(content);
+
+    expect(records.at(-1)?.prompt_skill).toBeUndefined();
+  });
+
+  // The first, never the last: a prompt that invokes two skills invoked the second from
+  // inside the first, and the prompt is named for the work it began.
+  it("keeps the first skill a prompt invoked when it invoked more than one", () => {
+    const content = chain([
+      { type: "user", uuid: "u1", promptId: "p-abc" },
+      {
+        type: "assistant",
+        uuid: "a1",
+        parentUuid: "u1",
+        sessionId: SID,
+        message: {
+          content: [
+            { type: "tool_use", name: "Skill", input: { skill: "aidd-orchestrator:01-sdlc" } },
+          ],
+        },
+      },
+      {
+        type: "assistant",
+        uuid: "a2",
+        parentUuid: "a1",
+        sessionId: SID,
+        message: {
+          content: [{ type: "tool_use", name: "Skill", input: { skill: "aidd-pm:04-spec" } }],
+        },
+      },
+      assistantLine({ uuid: "a3", parentUuid: "a2" }),
+    ]);
+
+    const [record] = mapClaudeCodeTranscriptToSinkRecords(content);
+
+    expect(record?.prompt_skill).toBe("aidd-orchestrator:01-sdlc");
+  });
+
+  // Only a `Skill` call names a step. Every other tool call is work done inside whatever
+  // step was already running, and reading one as a step start would name a skill for a
+  // prompt that never invoked any.
+  it("ignores a tool call that is not a Skill call", () => {
+    const content = chain([
+      { type: "user", uuid: "u1", promptId: "p-abc" },
+      {
+        type: "assistant",
+        uuid: "a1",
+        parentUuid: "u1",
+        sessionId: SID,
+        message: {
+          content: [{ type: "tool_use", name: "Bash", input: { skill: "aidd-dev:01-plan" } }],
+        },
+      },
+      assistantLine({ uuid: "a2", parentUuid: "a1" }),
+    ]);
+
+    const [record] = mapClaudeCodeTranscriptToSinkRecords(content);
+
+    expect(record?.prompt_skill).toBeUndefined();
+  });
+
   // A transcript is appended to by a live process and can be truncated mid-write; a parent
   // pointing at a line that never arrived must end the walk, not search forever.
   it("stops at a parent the transcript does not hold, rather than looping", () => {

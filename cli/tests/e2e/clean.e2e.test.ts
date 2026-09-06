@@ -124,4 +124,26 @@ describe.concurrent("E2E: aidd clean", () => {
       await cleanup();
     }
   });
+
+  it("leaves no .aidd behind when a marketplace was registered", async () => {
+    // The state the CLI wrote itself. Left behind, `.aidd` survived a run that had just
+    // printed that it cleaned all AIDD files.
+    const { projectDir, fakeHome, cleanup } = await createTestEnv("clean-registry");
+    try {
+      await seedManifest(projectDir);
+      await runCli(["ai", "install", "claude"], projectDir, fakeHome);
+      await writeFile(
+        join(projectDir, AIDD_DIR, "marketplaces.json"),
+        JSON.stringify({ version: 1, marketplaces: [] }),
+        "utf-8"
+      );
+
+      const { exitCode } = await runCli(["clean", "--force"], projectDir, fakeHome);
+
+      expect(exitCode).toBe(0);
+      expect(existsSync(join(projectDir, AIDD_DIR))).toBe(false);
+    } finally {
+      await cleanup();
+    }
+  });
 });

@@ -4,7 +4,6 @@ import type {
   StatusOptions,
   StatusQuery,
   StatusReport,
-  StatusUseCase,
 } from "../../../../src/contexts/framework/application/status-use-case.js";
 
 const PROJECT_ROOT = "/test-project";

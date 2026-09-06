@@ -63,6 +63,12 @@ judging anything.
      write, or a hooks block that registers another event without `SessionStart`): reads
      `FAIL` regardless of the recorder's own declaration, since a file this build can see
      is never "no run file" about.
+   - A run file was written under a schema this build does not read: reads `FAIL`, naming
+     every schema stated, since a journal from another version of the plugin is never a
+     hook that did not fire. This reading wins ahead of the anchorless one above: a build
+     that cannot read a journal's schema cannot tell a missing `session_start` from one
+     shaped differently, so blaming a torn write would assert what it just said it cannot
+     see.
 
    Every one of these is distinct from a hook that already ran and stopped: a run file
    that exists, carries its own session_start, but is not this session's own reads as this

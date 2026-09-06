@@ -29,8 +29,8 @@ echo "aidd:step-end aidd-dev:01-plan"
 This is the one thing about a step nothing else can supply. No host reports when a skill's
 work finished — a skill call's own result comes back in a tenth of a second, which is the
 dispatch, not the completion — so a measurement that never hears this ends the step at the
-next pause and credits planning with one turn out of however many it took. See
-[`aidd_docs/runs/README.md`](../../../../aidd_docs/runs/README.md).
+next pause and credits planning with one turn out of however many it took. The framework
+repository documents the run journal this writes into, in `aidd_docs/runs/README.md`.
 
 ## References
 

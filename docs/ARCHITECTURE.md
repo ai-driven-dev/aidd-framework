@@ -54,6 +54,34 @@ A hook is authored once, with `${CLAUDE_PLUGIN_ROOT}`, and the installer rewrite
 
 A tool that runs no hook says why, and an install that carries one tells whoever ran it what was skipped.
 
+## ⚖️ What runs on every event, and what runs when someone asks
+
+Measured on one machine, 12 runs each, median: the bundled hook starts in **27 ms**, the CLI
+in **180 ms** — 6.7× — and `PostToolUse` fires on every tool call a session makes. A
+thousand tool calls is 153 seconds of added latency, so the difference is not a preference.
+
+The line is therefore **not** "plugin or CLI". It is what the code is answering to:
+
+| | Triggered by | Latency | Runs as |
+| --- | --- | --- | --- |
+| Observing | a tool event, thousands of times a session | must not be felt | plain Node in `hooks/`, no install, no dependency |
+| Answering | a person or a skill, once | irrelevant | the `aidd` CLI |
+
+Two consequences, both already paid for:
+
+- A capability that answers belongs in the CLI even when a plugin is what asks for it. The
+  telemetry pivot deleted 25 files and 4,355 lines of skill-owned scripts on that argument:
+  one implementation cannot drift from a copy of itself, and the copies had drifted.
+- A skill that needs the CLI must say so out loud when it is absent, never quietly do
+  nothing. The wording is pinned identically across every such skill by
+  `scripts/__tests__/telemetry-cli-required.test.js`, so a fourth skill cannot invent a
+  fourth phrasing.
+
+The cost of the pivot is real and is stated rather than argued away: a plugin that once
+promised "no npm install, no CLI, no account" now needs `node` to measure and `aidd` to
+answer. Writing that a hook can move to the CLI, or that a skill may keep its own script
+because it is small, re-opens a question that was settled with numbers.
+
 ## 🧠 Plugin concerns and layers
 
 Every capability lives in exactly one plugin, chosen by **concern**. This taxonomy decides placement; it is only implicit in each `plugin.json`, so it is canonical here.

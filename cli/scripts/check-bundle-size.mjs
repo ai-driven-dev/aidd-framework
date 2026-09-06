@@ -12,13 +12,23 @@ const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 // the bundle to 567.7 KB - tighter headroom than the 560 raise left, on
 // purpose, rather than padding past what was actually measured.
 // 593 was set when `by_prompt` joined the breakdowns: measured 588.4 -> 590.6 KB,
-// +2.2 KB for the axis that is complete by construction. Same tight headroom.
-// 557 was set 2026-09-04: the 593 budget had drifted from reality, measuring
-// 545.7 KB against the current package.json's dependency resolution (the
-// committed lockfile itself was stale and refused a frozen install) - 47 KB of
-// slack nobody could see landing on the next feature at once. Reset to
-// measured + ~2% headroom instead of padding further past a number the last
-// three raises never revisited.
+// +2.2 KB for the axis no host limit can empty. Same tight headroom.
+// 596 was set when `by_agent` learned to tell a main thread from a tool that never
+// names an agent: measured 592.0 -> 593.8 KB across two changes, the flow axis's own
+// tool-stated row included. Same 2.2 KB headroom the raise before it left.
+// 598 was set when the journal reader began reading the schema a journal states it was
+// written under, and the diagnostic gained the reason for refusing one: measured
+// 594.3 -> 595.8 KB. Same 2.2 KB headroom as the two raises before it.
+// 601 was set when `aidd ai rules` took over the rule inventory the explore skill used to
+// run as its own script: measured 596.6 -> 599.0 KB, +2.4 KB for a use case, a model, a
+// display and the subcommand. It deletes 198 lines from a plugin, which the bundle does
+// not carry either way - the trade is a plugin script that had drifted for bytes that are
+// measured. Same 2.2 KB headroom as the three raises before it.
+// The reset to 557 on 2026-09-04 measured 545.7 KB against a lockfile the refactor had
+// left stale; the three raises above landed on next in the same two days. Remeasured after
+// the merge, budget = measured + ~2 %, see the line below.
+// 567 was set 2026-09-06 after merging next through #786: measured 555.7 KB, the four
+// telemetry axes and `framework rules` included. Same ~2 % headroom.
 const budgetKB = pkg.bundleBudgetKB ?? 500;
 const budgetBytes = budgetKB * 1024;
 

@@ -95,6 +95,15 @@ const NO_KNOWN_PROJECT = "no known project";
 const NO_KNOWN_MODEL = "no known model";
 // Not "no agent": the main thread is where a session starts, not an absence.
 const MAIN_THREAD = "the main thread";
+// And not the main thread either: a tool that never names an agent has said nothing about
+// which one ran, so a row labelled "the main thread" would state a fact nothing observed.
+const AGENT_NOT_STATED = "the tool names no agent";
+
+/** What a row that names no agent is called, by which of the two silences it is. */
+export function agentRowLabel(row: CostReport["byAgents"][number]): string {
+  if (row.agent !== undefined) return row.agent;
+  return row.attribution === "main-thread" ? MAIN_THREAD : AGENT_NOT_STATED;
+}
 
 // A prompt id is a uuid, wider than `LABEL_WIDTH`, and `padTo` never truncates - so the
 // column is its own width rather than colliding with the one every named label shares.
@@ -398,7 +407,7 @@ function printAgents(output: CLIOutput, report: CostReport, basis: Basis): void 
   output.print("");
   output.print(`  by agent    ${basis.label}`);
   for (const row of report.byAgents) {
-    const name = row.agent ?? MAIN_THREAD;
+    const name = agentRowLabel(row);
     const share = shareOf(row.totals, basis.of, basis.useCost);
     output.print(
       `    ${padTo(name, LABEL_WIDTH)}${share}   ${figureFor(row.totals, basis.useCost)}`

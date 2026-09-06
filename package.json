@@ -24,10 +24,10 @@
     "sdlc-automation",
     "prompt-engineering"
   ],
+  "packageManager": "pnpm@12.3.4",
   "engines": {
     "node": ">=22.12"
   },
-  "packageManager": "pnpm@10.14.0",
   "scripts": {
     "prepare": "lefthook install || true",
     "test:changed": "node scripts/test-changed.mjs",

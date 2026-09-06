@@ -259,7 +259,7 @@ describe("RestoreAllUseCase — plugin materialization", () => {
       ScriptedPrompter.answer.checkbox([".vscode/keybindings.json"]),
     ]);
     const useCase = makeRestoreAllUseCase(deps, reader, prompter);
-    await useCase.execute(PROJECT_ROOT, true, true);
+    await useCase.execute(PROJECT_ROOT, false, true);
 
     expect(deps.fs.getFile(pluginFile)).toBe("CORRUPTED CONTENT");
   });
@@ -296,5 +296,67 @@ describe("RestoreAllUseCase — plugin materialization", () => {
 
     expect(deps.fs.getFile(claudePluginFile)).not.toBe("CORRUPTED CLAUDE");
     expect(deps.fs.getFile(codexPluginFile)).not.toBe("CORRUPTED CODEX");
+  });
+});
+
+describe("RestoreAllUseCase — consent to overwrite", () => {
+  type RestoreOptions = Parameters<RestoreUseCase["execute"]>[0];
+
+  /** Records what RestoreAllUseCase asks the restore to do, without doing it. */
+  function recordAsks(restoreUseCase: RestoreUseCase): RestoreOptions[] {
+    const seen: RestoreOptions[] = [];
+    restoreUseCase.execute = async (options: RestoreOptions) => {
+      seen.push(options);
+      return {
+        tools: [],
+        totalRestored: 0,
+        totalKept: 0,
+        totalPluginFilesRestored: 0,
+        restoredPluginNames: [],
+        unrestorable: [],
+      };
+    };
+    return seen;
+  }
+
+  async function askedWith(interactive: boolean, force: boolean): Promise<RestoreOptions> {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "claude");
+    const prompter = new OverwritePrompter();
+    const statusUseCase = new StatusUseCase(
+      deps.fs,
+      deps.manifestRepo,
+      deps.hasher,
+      new DetectPluginDriftUseCase(deps.fs)
+    );
+    const restoreUseCase = new RestoreUseCase(
+      deps.fs,
+      deps.manifestRepo,
+      deps.hasher,
+      deps.logger,
+      new FakePlatform("linux"),
+      prompter
+    );
+    const seen = recordAsks(restoreUseCase);
+    await new RestoreAllUseCase(deps.manifestRepo, prompter, statusUseCase, restoreUseCase).execute(
+      PROJECT_ROOT,
+      interactive,
+      force
+    );
+    const asked = seen[0];
+    expect(asked).toBeDefined();
+    return asked as RestoreOptions;
+  }
+
+  it("carries --force through to the restore it delegates to", async () => {
+    expect((await askedWith(false, true)).force).toBe(true);
+  });
+
+  it("does not overwrite without consent when neither --force nor a TTY is there", async () => {
+    expect((await askedWith(false, false)).force).toBe(false);
+  });
+
+  it("treats the interactive file selection as the consent, so nothing is asked twice", async () => {
+    expect((await askedWith(true, false)).force).toBe(true);
   });
 });

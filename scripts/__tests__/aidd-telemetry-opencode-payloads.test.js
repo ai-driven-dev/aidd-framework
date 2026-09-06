@@ -30,15 +30,123 @@ function loadFixture(name) {
 // `opencode-plugin.js` as CommonJS and choke on its `export` syntax. OpenCode's own loader
 // does not consult that field at all - the extension is the only thing that differs from
 // what ships.
-let journalCallForPromise;
-async function journalCallFor() {
-  if (!journalCallForPromise) {
+let pluginModulePromise;
+async function pluginModule() {
+  if (!pluginModulePromise) {
     const twin = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "aidd-opencode-payloads-")), "opencode-plugin.mjs");
     fs.copyFileSync(PLUGIN_SOURCE, twin);
-    journalCallForPromise = import(pathToFileURL(twin).href).then((mod) => mod.journalCallFor);
+    pluginModulePromise = import(pathToFileURL(twin).href);
   }
-  return journalCallForPromise;
+  return pluginModulePromise;
 }
+
+async function journalCallFor() {
+  return (await pluginModule()).AiddTelemetry.journalCallFor;
+}
+
+async function journalCallsFor() {
+  return (await pluginModule()).AiddTelemetry.journalCallsFor;
+}
+
+// OpenCode loads every function-valued named export of a file in `plugin/` as a plugin
+// factory of its own. Measured live against opencode 1.14.20 in a freshly installed
+// project: a second such export returning `null` killed `opencode run` with
+// `TypeError: null is not an object (evaluating 'S.auth')` before any session started, so
+// installing this framework made the tool it measures unusable. A non-function export is
+// ignored by that same loader, which is why the spawn-free seam this file needs rides on
+// the plugin function as a property instead of standing beside it as a second export.
+test("the plugin file exports one plugin factory, never a second one OpenCode would call", async () => {
+  const exported = await pluginModule();
+  const factories = Object.keys(exported).filter((name) => typeof exported[name] === "function");
+  assert.deepEqual(factories, ["AiddTelemetry"]);
+});
+
+// `opencode run` is always a session OpenCode never announced: measured, `session.created`
+// is published on its own bus and never reaches a plugin's event hook (plugins/aidd-telemetry
+// /README.md, "OpenCode misses a server process's first session"). Without these four cases the
+// journal receives a turn-end for a run file that was never created, drops it, and every
+// OpenCode session reads back as nothing at all - while the tool is declared covered.
+test("session.idle for a session nobody announced opens it first, so the journal has a run file to write into", async () => {
+  const calls = await journalCallsFor();
+  const idle = loadFixture("opencode-session-idle.json");
+
+  const produced = calls(idle, new Map(), "/home/user/fallback");
+
+  assert.deepEqual(
+    produced.map((call) => call.script),
+    ["session-start", "turn-end"],
+  );
+  assert.deepEqual(
+    produced.map((call) => call.payload.cwd),
+    ["/home/user/fallback", "/home/user/fallback"],
+  );
+  assert.equal(detectHost(produced[0].payload), "opencode");
+});
+
+test("a task declaration in a session nobody announced opens it first too, never arriving before its own run file", async () => {
+  const calls = await journalCallsFor();
+  const part = loadFixture("opencode-tool-part-completed.json");
+
+  const produced = calls(part, new Map(), "/home/user/probe/project-opencode-task");
+
+  assert.deepEqual(
+    produced.map((call) => call.script),
+    ["session-start", "tool-used"],
+  );
+  assert.equal(produced[0].payload.session_id, produced[1].payload.session_id);
+});
+
+test("a session already announced is never opened a second time", async () => {
+  const calls = await journalCallsFor();
+  const sessionDirectories = new Map();
+
+  calls(loadFixture("opencode-session-created.json"), sessionDirectories, "/home/user/fallback");
+  const produced = calls(
+    loadFixture("opencode-session-idle.json"),
+    sessionDirectories,
+    "/home/user/fallback",
+  );
+
+  assert.deepEqual(
+    produced.map((call) => call.script),
+    ["turn-end"],
+  );
+});
+
+test("a session OpenCode did announce produces its one session-start, never a doubled one", async () => {
+  const calls = await journalCallsFor();
+
+  const produced = calls(
+    loadFixture("opencode-session-created.json"),
+    new Map(),
+    "/home/user/fallback",
+  );
+
+  assert.deepEqual(
+    produced.map((call) => call.script),
+    ["session-start"],
+  );
+});
+
+test("a second session.idle on one already-opened session adds no second session-start", async () => {
+  const calls = await journalCallsFor();
+  const idle = loadFixture("opencode-session-idle.json");
+  const sessionDirectories = new Map();
+
+  calls(idle, sessionDirectories, "/home/user/fallback");
+  const produced = calls(idle, sessionDirectories, "/home/user/fallback");
+
+  assert.deepEqual(
+    produced.map((call) => call.script),
+    ["turn-end"],
+  );
+});
+
+test("an event this plugin does not act on opens no session either", async () => {
+  const calls = await journalCallsFor();
+
+  assert.deepEqual(calls({ type: "message.updated", properties: {} }, new Map(), "/x"), []);
+});
 
 test("session.idle, captured live, turns into a turn-end call the journal recognises as opencode", async () => {
   const builder = await journalCallFor();

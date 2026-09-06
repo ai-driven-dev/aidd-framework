@@ -1,6 +1,7 @@
 import type { TelemetryRouteSupply } from "../../../kernel/measurement.js";
 import type { AiToolId } from "../../../kernel/tool.js";
 import type {
+  AgentAttributionSource,
   CostReport,
   CostReportEmptySelection,
   CostReportFilters,
@@ -8,6 +9,7 @@ import type {
   CostTotals,
   PersonIdentityUnusableCause,
 } from "./cost-report.js";
+import type { FlowAttributionSource } from "./flow-attribution.js";
 import type { PersonResolution } from "./person-resolution.js";
 import type { StepAttributionSource } from "./step-attribution.js";
 import type { TaskAttributionSource, TaskUnattributedReason } from "./task-attribution.js";
@@ -17,6 +19,13 @@ import type { TaskAttributionSource, TaskUnattributedReason } from "./task-attri
  * A version exists so a consumer can refuse rather than guess — the same reason
  * `sink_schema_version` exists on a stored line. Adding a field a consumer may ignore is
  * not a bump; changing what an existing field means is.
+ *
+ * Bumped to 15: `by_person`'s `resolution` gains a fourth value, `this-machine`: the record
+ * carried no identifier of its own and this machine has declared an identity. `person_id`
+ * is written when a record is stored, so whether one carries it depended on when the
+ * identity was declared relative to when the record was read, never on the work. Sound
+ * because the sink has one writer and every line carries `provenance: "local-read"`.
+ * A consumer that switches on `resolution` meets a value it did not know.
  *
  * Bumped to 14: `by_task` and `by_backlog`'s `reason` gains a fifth value,
  * `precedes-journal` — a record whose moment predates the earliest moment its session's
@@ -29,11 +38,11 @@ import type { TaskAttributionSource, TaskUnattributedReason } from "./task-attri
  *
  * Bumped to 13: `by_prompt` is a new top-level breakdown, and a consumer summing every
  * breakdown's `requests` against `totals.requests` to check nothing was dropped now has one
- * more to include. It is the only breakdown complete by construction: every other depends on
- * a capture that may not have happened, this one on a field the transcript reader already
- * resolves for every usage line. Measured 2026-09-04 on the built binary - 1073 of 1073
- * records of one real session carried a `prompt_id`, its 972 subagent records included,
- * across 12 distinct prompts.
+ * more to include. It is the only breakdown no host limit can empty: every other depends on
+ * a capture that may not have happened, this one on a field the transcript reader resolves
+ * for itself. That is not the same as complete, and `CostReportPromptRow` carries the
+ * measurement — 845 of 30,714 records of this machine's own sink carry no `prompt_id`, all
+ * but one of them stored by a reader that predates the resolution.
  *
  * Bumped to 12: `by_task`'s `attribution` stops being always `"declared"`. A record no
  * declaration covers, in a session whose journal witnessed it and that wrote into exactly
@@ -111,7 +120,7 @@ import type { TaskAttributionSource, TaskUnattributedReason } from "./task-attri
  * `by_project`'s `project` to optional back when that row was added.
  *
  * Bumped to 2: `by_project` and `by_day` are new top-level breakdowns. */
-export const COST_REPORT_ENVELOPE_VERSION = 14;
+export const COST_REPORT_ENVELOPE_VERSION = 15;
 
 /** Money as whole micro-dollars, the way the report carries it: an integer, so a consumer
  * summing several reports gets the same answer this one did. Divide by 1,000,000 for
@@ -144,6 +153,10 @@ export interface CostReportEnvelopeRouteSupply {
   readonly token_counters: boolean;
   readonly amount: boolean;
   readonly tool_stated_step: boolean;
+  /** The route names the agent a record belongs to, and so also says when one is the main
+   * thread's own. Without it `by_agent` reads this tool's records as stating no agent, never
+   * as the main thread. */
+  readonly agent_name: boolean;
 }
 
 export interface CostReportEnvelopeCapability {
@@ -212,11 +225,14 @@ export interface CostReportEnvelopeBacklogRow {
   readonly totals: CostReportEnvelopeTotals;
 }
 
-/** One agent's figures — see `CostReportAgentRow`. `agent` is absent on the main thread's
- * own row, never on "no agent": a session starts there, so it carries a row rather than an
- * absence. */
+/** One agent's figures — see `CostReportAgentRow`. `agent` names it and is present exactly
+ * when `attribution` is `tool-stated`. The two rows that name none are different facts and
+ * never merged: `main-thread` is a tool that names agents saying this record belongs to
+ * none of them, `not-stated` is a tool whose route never names one, where reading a main
+ * thread would assert something nothing observed. */
 export interface CostReportEnvelopeAgentRow {
   readonly agent?: string;
+  readonly attribution: AgentAttributionSource;
   readonly totals: CostReportEnvelopeTotals;
 }
 
@@ -229,12 +245,14 @@ export interface CostReportEnvelopePromptRow {
   readonly totals: CostReportEnvelopeTotals;
 }
 
-/** One orchestrated run's figures — see `CostReportFlowRow`. `flow` names the orchestrating
- * skill and `started_at` when it opened, together telling apart two rows that share a name:
- * the same skill run twice in one session is two rows, never merged into one. Both are
- * absent on the one row for work that fell in no flow interval at all. */
+/** `attribution` says how this flow came to be known, the same three-way shape `by_step`
+ * carries: `journal-interval` for a flow the journal opened and closed, `tool-stated` for
+ * one only a record's own tool named, `unattributed` for the row of work that joined
+ * neither. A `tool-stated` row carries no `started_at` - it is a bucket drawn from however
+ * many runs of that skill the tool named, and a name is not a run. */
 export interface CostReportEnvelopeFlowRow {
   readonly flow?: string;
+  readonly attribution: FlowAttributionSource;
   readonly started_at?: string;
   readonly totals: CostReportEnvelopeTotals;
 }
@@ -335,6 +353,7 @@ function supply(from: TelemetryRouteSupply | null): CostReportEnvelopeRouteSuppl
         token_counters: from.tokenCounters,
         amount: from.amount,
         tool_stated_step: from.toolStatedStep,
+        agent_name: from.agentName,
       };
 }
 
@@ -412,7 +431,11 @@ function backlogRow(row: CostReport["byBacklog"][number]): CostReportEnvelopeBac
 }
 
 function agentRow(row: CostReport["byAgents"][number]): CostReportEnvelopeAgentRow {
-  return { ...(row.agent === undefined ? {} : { agent: row.agent }), totals: totals(row.totals) };
+  return {
+    ...(row.agent === undefined ? {} : { agent: row.agent }),
+    attribution: row.attribution,
+    totals: totals(row.totals),
+  };
 }
 
 function promptRow(row: CostReport["byPrompts"][number]): CostReportEnvelopePromptRow {
@@ -426,6 +449,7 @@ function promptRow(row: CostReport["byPrompts"][number]): CostReportEnvelopeProm
 function flowRow(row: CostReport["byFlows"][number]): CostReportEnvelopeFlowRow {
   return {
     ...(row.flow === undefined ? {} : { flow: row.flow }),
+    attribution: row.attribution,
     ...(row.startedAt === undefined ? {} : { started_at: row.startedAt }),
     totals: totals(row.totals),
   };

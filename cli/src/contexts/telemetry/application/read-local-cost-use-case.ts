@@ -513,7 +513,22 @@ export class ReadLocalCostUseCase {
    * same turn (`isLocalReadTurnCorrection`), the one case this match used to refuse
    * outright. The correction lands as a second line, never an edit: the sink is
    * append-only, and `cost-report.ts`'s `collapseSupersededTurns` is what later reconciles
-   * the two readings into one. */
+   * the two readings into one.
+   *
+   * **A correction is a larger counter, never a field the stored record lacks — so a
+   * record's field set is fixed the first time its turn is seen.** A reader that later
+   * learns to resolve something the earlier one could not names nothing already stored: the
+   * turn matches, the counters have not grown, and the candidate is dropped. Measured
+   * 2026-09-05 on a live sink: 844 records carry no `prompt_id` for exactly this reason,
+   * 2.75% of 30,714, and `CostReportPromptRow` states it where the figure is read.
+   *
+   * Left as it is, deliberately. Enriching would mean appending a line whose counters equal
+   * one already stored, which `collapseSupersededTurns` picks between by counter weight and
+   * then by serialized content — so the merge would have to learn a preference it does not
+   * have, to close a gap re-reading could barely close anyway: of the 811 measured, 720
+   * name a request no transcript on disk still holds. Roughly 90 records in 30,714 is the
+   * whole prize. Revisit this the day a reader learns a field that matters more than a
+   * prompt id, and that arithmetic changes. */
   private async storeNewCandidates(
     tool: AiToolId,
     sessionId: string,

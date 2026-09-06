@@ -37,7 +37,7 @@
   {
     "invocation": "aidd framework",
     "exitCode": 0,
-    "help": "Usage: aidd framework [options] [command]\n\nManage the framework's lifecycle on installed tools: install, update, remove\n\nOptions:\n  -h, --help         display help for command\n\nCommands:\n  install [options]  Install a tool's runtime configuration from bundled assets\n                     — acts on the framework alone (see `setup`, which\n                     bootstraps the whole project)\n  remove [options]   Remove a tool's generated configuration files — removes the\n                     framework only (see `clean`, which removes all of AIDD)\n  update [options]   Re-install tool configs from bundled CLI assets, moving to\n                     a new version (all installed tools if --tool is omitted;\n                     see `marketplace refresh`, which re-fetches catalogs\n                     instead)\n  help [command]     display help for command"
+    "help": "Usage: aidd framework [options] [command]\n\nManage the framework's lifecycle on installed tools: install, update, remove\n\nOptions:\n  -h, --help         display help for command\n\nCommands:\n  install [options]  Install a tool's runtime configuration from bundled assets\n                     — acts on the framework alone (see `setup`, which\n                     bootstraps the whole project)\n  remove [options]   Remove a tool's generated configuration files — removes the\n                     framework only (see `clean`, which removes all of AIDD)\n  update [options]   Re-install tool configs from bundled CLI assets, moving to\n                     a new version (all installed tools if --tool is omitted;\n                     see `marketplace refresh`, which re-fetches catalogs\n                     instead)\n  rules [options]    List the rules installed in this project, across every AI\n                     tool\n  help [command]     display help for command"
   },
   {
     "invocation": "aidd framework install",
@@ -48,6 +48,11 @@
     "invocation": "aidd framework remove",
     "exitCode": 0,
     "help": "Usage: aidd framework remove [options]\n\nRemove a tool's generated configuration files — removes the framework only (see\n`clean`, which removes all of AIDD)\n\nOptions:\n  --tool <tool>  AI or IDE tool ID\n  -h, --help     display help for command"
+  },
+  {
+    "invocation": "aidd framework rules",
+    "exitCode": 0,
+    "help": "Usage: aidd framework rules [options]\n\nList the rules installed in this project, across every AI tool\n\nOptions:\n  --json      Print the inventory as JSON\n  -h, --help  display help for command"
   },
   {
     "invocation": "aidd framework update",

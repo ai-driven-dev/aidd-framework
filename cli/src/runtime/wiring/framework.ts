@@ -33,6 +33,7 @@ import { InstallIdeConfigUseCase } from "../../contexts/framework/application/in
 import { InstallIdeToolUseCase } from "../../contexts/framework/application/install/install-ide-tool-use-case.js";
 import { InstallRuntimeConfigUseCase } from "../../contexts/framework/application/install/install-runtime-config-use-case.js";
 import { PostInstallPipelineUseCase } from "../../contexts/framework/application/install/post-install-pipeline-use-case.js";
+import { ListInstalledRulesUseCase } from "../../contexts/framework/application/list-installed-rules-use-case.js";
 import { PluginAddUseCase } from "../../contexts/framework/application/plugin/plugin-add-use-case.js";
 import { PluginInstallFromMarketplaceUseCase } from "../../contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.js";
 import { PluginInstallUseCase } from "../../contexts/framework/application/plugin/plugin-install-use-case.js";
@@ -138,6 +139,7 @@ interface Deps extends TelemetryDeps {
   updateIdeToolsUseCase: UpdateIdeToolsUseCase;
   cleanUseCase: CleanUseCase;
   doctorAllUseCase: DoctorAllUseCase;
+  listInstalledRulesUseCase: ListInstalledRulesUseCase;
   checkUpdateUseCase: CheckUpdateUseCase;
 }
 
@@ -424,6 +426,7 @@ export async function createDeps(
   );
   const cleanUseCase = new CleanUseCase(fs, manifestRepo, logger, gitignoreUseCase, prompter);
   const doctorAllUseCase = new DoctorAllUseCase(doctorUseCase);
+  const listInstalledRulesUseCase = new ListInstalledRulesUseCase(fs);
   const checkUpdateUseCase = new CheckUpdateUseCase(cliUpdater, currentVersionProvider, logger, fs);
   const telemetry = wireTelemetry({
     fs,
@@ -476,6 +479,7 @@ export async function createDeps(
     updateIdeToolsUseCase,
     cleanUseCase,
     doctorAllUseCase,
+    listInstalledRulesUseCase,
     checkUpdateUseCase,
   };
   _cache.set(projectRoot, deps);

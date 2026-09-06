@@ -44,18 +44,50 @@ describe("resolvePerson", () => {
     expect(resolved.identities).toEqual(["nobody-claimed-this"]);
   });
 
-  it("resolves nothing at all as none, not unresolved", () => {
+  // The determinism fix. `person_id` is stamped when a record is stored, so whether a
+  // record carries one depends on when the identity was declared relative to when that
+  // record was read - not on the work. The sink has exactly one writer and every line in it
+  // is `local-read`, so a record that named nobody was read by this machine's own reader,
+  // and this machine has said who that is.
+  it("names an unstamped record after this machine's own declared identity", () => {
     const resolved = resolvePerson(identityWithAlsoMe(), undefined);
+
+    expect(resolved.resolution).toBe("this-machine");
+    expect(resolved.personId).toBe("person-a");
+    expect(resolved.displayName).toBe("Ada");
+  });
+
+  // Same evidence a mapped row carries, for the same reason: a person line must be
+  // traceable back to what produced it without a second lookup.
+  it("carries this identity's own identifiers as the evidence behind that row", () => {
+    const resolved = resolvePerson(identityWithAlsoMe(), undefined);
+
+    expect(resolved.identities).toEqual(["person-a", "claude-machine-1", "codex-machine-2"]);
+  });
+
+  it("resolves nothing at all as none when no identity was ever declared", () => {
+    const resolved = resolvePerson(null, undefined);
 
     expect(resolved.resolution).toBe("none");
     expect(resolved.identities).toEqual([]);
   });
 
-  it("distinguishes none from unresolved", () => {
-    const none = resolvePerson(identityWithAlsoMe(), undefined);
+  // The fallback must never overrule what a record actually said. An identifier this
+  // identity does not claim stays unresolved, and one it does claim stays mapped.
+  it("never lets the fallback overrule an identifier the record carried", () => {
+    const unresolved = resolvePerson(identityWithAlsoMe(), "nobody-claimed-this");
+    const mapped = resolvePerson(identityWithAlsoMe(), "claude-machine-1");
+
+    expect(unresolved.resolution).toBe("unresolved");
+    expect(mapped.resolution).toBe("mapped");
+  });
+
+  it("distinguishes none, this-machine and unresolved from one another", () => {
+    const none = resolvePerson(null, undefined);
+    const thisMachine = resolvePerson(identityWithAlsoMe(), undefined);
     const unresolved = resolvePerson(identityWithAlsoMe(), "nobody-claimed-this");
 
-    expect(none.resolution).not.toBe(unresolved.resolution);
+    expect(new Set([none.resolution, thisMachine.resolution, unresolved.resolution]).size).toBe(3);
   });
 
   it("two identifiers nobody added stay distinct, never merged into one bucket", () => {

@@ -53,7 +53,9 @@ const BASELINE: readonly { readonly path: string; readonly count: number }[] = [
   // Telemetry's own vocabulary: what a record is, how a report is shaped, and the five
   // attribution rules that decide whose a figure is. They are one subject, and splitting
   // them by shape would file `cost-report.ts` away from the envelope it fills.
-  { path: "src/contexts/telemetry/domain", count: 19 },
+  // Twenty since `skill-name.ts`: the one place that says when two spellings name the same
+  // skill, read by step and flow attribution alike.
+  { path: "src/contexts/telemetry/domain", count: 20 },
   // Twelve ports because measurement reads twelve different things it does not own — a
   // sink, a journal, an identity, a backlog, per-tool cost, a host registry, hook trust,
   // this project's installed plugins, its ignore file, its version control. One port per

@@ -109,6 +109,19 @@ Default flow: `01 → 02 → (03 → 01 loop if continue) → 04`. Stop conditio
 - If a sub-flow aborts, surface the exit state; do not retry by switching sub-flows.
 - For batch invocations (e.g. multiple ready issues), the workflow re-invokes the skill once per item; the router does not loop.
 
+## Say when this orchestration is over
+
+Once the sub-flow you committed to has run its last action, and only then, run:
+
+```shell
+echo "aidd:step-end aidd-orchestrator:00-async-dev"
+```
+
+No host reports when an orchestration finished. A skill call's own result comes back in a
+tenth of a second, which is the dispatch and not the completion, so a measurement that never
+hears this ends the run at the next pause — and an orchestration is mostly pauses. Everything
+it drove afterwards then reads as work that belonged to nothing.
+
 ## References
 
 - `references/routing.md` - full decision tree, signal precedence, conflict resolution.

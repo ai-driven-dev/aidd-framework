@@ -30,10 +30,14 @@ async function runSyncAction(
 
     const interactive = !cmdOptions.force && process.stdout.isTTY;
     const result = await deps.restoreAllUseCase.execute(projectRoot, cmdOptions.force, interactive);
+    // A run that errored synced nothing, and reporting "nothing to sync" would call that the
+    // healthy state. Nothing was synced because it failed.
+    if (result.errors.length > 0) process.exitCode = 1;
 
     for (const e of result.errors) output.warn(`[${e.scope}] ${e.message}`);
 
     if (
+      result.errors.length === 0 &&
       result.totalRestored === 0 &&
       result.pluginNamesRestored.length === 0 &&
       result.unrestorable.length === 0

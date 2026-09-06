@@ -9,7 +9,7 @@ import {
 } from "../../../kernel/errors.js";
 import type { PluginSourceGitHub } from "../../../kernel/source.js";
 import type { TokenProvider } from "../../../runtime/auth/ports/token-provider.js";
-import type { HttpClient, HttpGet } from "../../../runtime/http/http-client.js";
+import type { HttpGet } from "../../../runtime/http/http-client.js";
 import type { RawCatalogFetcher } from "../domain/ports/raw-catalog-fetcher.js";
 
 const GITHUB_API_BASE = "https://api.github.com";

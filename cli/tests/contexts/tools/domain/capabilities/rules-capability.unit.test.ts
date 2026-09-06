@@ -17,6 +17,44 @@ describe("RulesCapability", () => {
     });
   });
 
+  // Where a rule *lands* is not `buildOutputPath` — that answers where the framework's own
+  // source form goes. An installed tree holds the converted file, and the one thing that
+  // knows its shape is `buildInstallPath`, which is a closure per tool: a template for
+  // three of them, `toMdc` for Cursor, a delegated handler for Copilot. Asking it with a
+  // sentinel keeps the answer where the knowledge is, instead of a reader parsing a path
+  // string back apart and becoming a second copy of it.
+  describe("installedLocation", () => {
+    it("answers the directory and the extension an installed rule actually carries", () => {
+      const cap = new RulesCapability({
+        ...params,
+        buildInstallPath: (fileName) => `.claude/rules/${fileName.replace(".claude.md", ".md")}`,
+      });
+
+      expect(cap.installedLocation()).toEqual({ directory: ".claude/rules/", extension: ".md" });
+    });
+
+    it("reads an extension of several segments, which is what Copilot installs", () => {
+      const cap = new RulesCapability({
+        ...params,
+        buildInstallPath: (fileName) =>
+          `.github/instructions/${fileName.replace(".claude.md", ".instructions.md")}`,
+      });
+
+      expect(cap.installedLocation()).toEqual({
+        directory: ".github/instructions/",
+        extension: ".instructions.md",
+      });
+    });
+
+    // A tool free to answer `null` for a name it will not install is free to answer `null`
+    // here, and a caller scans nothing rather than guessing a directory.
+    it("answers nothing when the tool installs no rule for the name it is asked about", () => {
+      const cap = new RulesCapability({ ...params, buildInstallPath: () => null });
+
+      expect(cap.installedLocation()).toBeNull();
+    });
+  });
+
   describe("accepts", () => {
     it("returns true when path starts with directory", () => {
       const cap = new RulesCapability(params);

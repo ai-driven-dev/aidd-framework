@@ -3,10 +3,7 @@ import "../../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { MarketplaceTrustStore } from "../../../../../src/contexts/distribution/domain/ports/marketplace-trust-store.js";
-import type {
-  PluginAdd,
-  PluginAddUseCase,
-} from "../../../../../src/contexts/framework/application/plugin/plugin-add-use-case.js";
+import type { PluginAdd } from "../../../../../src/contexts/framework/application/plugin/plugin-add-use-case.js";
 import type { PluginInstallFromMarketplace } from "../../../../../src/contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.js";
 import { PluginInstallUseCase } from "../../../../../src/contexts/framework/application/plugin/plugin-install-use-case.js";
 import {
@@ -15,10 +12,7 @@ import {
   TrustDeniedError,
 } from "../../../../../src/kernel/errors.js";
 import type { Prompter } from "../../../../../src/kernel/ports/prompter.js";
-import type {
-  PluginPick,
-  PluginPickUseCase,
-} from "../../../../../src/presentation/prompts/plugin-pick-use-case.js";
+import type { PluginPick } from "../../../../../src/presentation/prompts/plugin-pick-use-case.js";
 import { InMemoryManifestRepository } from "../../../../helpers/ports/in-memory-manifest-repository.js";
 
 const PLUGIN_FIXTURE = join(process.cwd(), "tests/fixtures/plugins/claude-format/sample-plugin");

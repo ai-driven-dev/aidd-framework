@@ -5,6 +5,7 @@ import { mapCopilotEventsToSinkRecords } from "../../../../../src/contexts/telem
 
 const SESSION = "33333333-3333-4333-8333-333333333333";
 const EMPTY_SESSION = "44444444-4444-4444-8444-444444444444";
+const CACHED_SESSION = "55555555-5555-4555-8555-555555555555";
 
 // Both fixtures are real, redacted excerpts of a captured `@github/copilot@1.0.80` file —
 // system.message, user.message, assistant.message and every reasoning field stripped, per
@@ -17,6 +18,7 @@ function loadFixture(relativePath: string): string {
 
 const FULL_PATH = `.copilot/session-state/${SESSION}/events.jsonl`;
 const EMPTY_PATH = `.copilot/session-state/${EMPTY_SESSION}/events.jsonl`;
+const CACHED_PATH = `.copilot/session-state/${CACHED_SESSION}/events.jsonl`;
 
 describe("mapCopilotEventsToSinkRecords", () => {
   it("yields one kind: session record, from session.shutdown's own tokenDetails", () => {
@@ -69,6 +71,26 @@ describe("mapCopilotEventsToSinkRecords", () => {
     const [record] = mapCopilotEventsToSinkRecords(loadFixture(FULL_PATH), SESSION);
 
     expect(record?.input_tokens).not.toBe(21080);
+  });
+
+  it("reads the four counters disjoint when the cached prompt is large, the case left open", () => {
+    // Measured live, @github/copilot@1.0.82, 2026-09-06: 9 (tokenDetails.input) + 42038
+    // (cache_read) + 21404 (cache_write) = 63451 = modelMetrics.<model>.usage.inputTokens,
+    // and Copilot's own terminal line for that run read `↑ 63.5k (42.0k cached, 21.4k
+    // written)`. This is the capture copilot.ts asked for by name: at cache_read 0, "input
+    // excludes the cached prompt" and "input already includes it" produce the same number
+    // and cannot be told apart. At 42038 they cannot be confused - an input that included
+    // the cached prompt would read 63451, not 9.
+    const [record] = mapCopilotEventsToSinkRecords(loadFixture(CACHED_PATH), CACHED_SESSION);
+
+    expect(record?.input_tokens).toBe(9);
+    expect(record?.cache_read_tokens).toBe(42038);
+    expect(record?.cache_creation_tokens).toBe(21404);
+    expect(
+      (record?.input_tokens ?? 0) +
+        (record?.cache_read_tokens ?? 0) +
+        (record?.cache_creation_tokens ?? 0)
+    ).toBe(63451);
   });
 
   it("never carries cost_usd — totalPremiumRequests is a multiplier, not a currency", () => {

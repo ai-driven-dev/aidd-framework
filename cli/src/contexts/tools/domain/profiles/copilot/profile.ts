@@ -219,21 +219,19 @@ export const copilot: AiTool<
   displayName: "GitHub Copilot",
   telemetryLocalRead: {
     kind: "declared",
-    supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
-    // The exclusivity of `input` against `cache_read` is NOT established. The only capture
-    // this repository holds (tests/fixtures/local-cost/.copilot/.../events.jsonl) reports
-    // `cache_read: 0`, so "input excludes the cached prompt" and "input already includes it"
-    // produce the same number and cannot be told apart from it. Exclusivity against
-    // `cache_write` is measured (10 + 21070), which is what makes only this one open.
-    // It matters because the report adds the four counters as disjoint: if `input` turns out
-    // to include `cache_read`, a Copilot session's total is over-counted by the cached share.
-    // Closing it takes one capture of a session with a non-zero `cache_read` — see #654's
-    // sibling work and plugins/aidd-telemetry/README.md.
+    supplies: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: false },
+    // The exclusivity of `input` against `cache_read` is measured, on the capture the
+    // earlier comment here asked for by name: a session with a non-zero `cache_read`
+    // (1.0.82, 2026-09-06, tests/fixtures/local-cost/.copilot/session-state/55555555-…).
+    // 9 (`input`) + 42038 (`cache_read`) + 21404 (`cache_write`) = 63451, exactly
+    // `modelMetrics.<model>.usage.inputTokens`, so the four counters this reader stores are
+    // disjoint and the report is right to add them. It mattered because an `input` that
+    // included `cache_read` would have over-counted every Copilot session by its cached
+    // share — 42038 of 63451 in this one.
     limitation:
       "Its own file names outputTokens per turn, but session.shutdown carries all four " +
-      "counters for the whole session — a session total, never a sum of requests. Whether " +
-      "its input count excludes the cached prompt is unconfirmed: the only session captured " +
-      "read back zero cache, which cannot tell the two apart.",
+      "counters for the whole session — a session total, never a sum of requests. Its four " +
+      "counters are measured disjoint, cached prompt included.",
   },
   telemetryTaskAttributable: true,
   telemetryJournalHost: "copilot",

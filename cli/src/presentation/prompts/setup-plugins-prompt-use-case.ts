@@ -1,12 +1,9 @@
-import type {
-  ResolveMarketplace,
-  ResolveMarketplaceUseCase,
-} from "../../contexts/distribution/application/resolve-marketplace-use-case.js";
+import type { ResolveMarketplace } from "../../contexts/distribution/application/resolve-marketplace-use-case.js";
 import type { PluginCatalogEntry } from "../../contexts/distribution/domain/catalog.js";
 import type { MarketplaceRegistry } from "../../contexts/distribution/domain/ports/marketplace-registry.js";
 import type { PluginInstallFromMarketplace } from "../../contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.js";
 import type { PluginInstallMode } from "../../contexts/framework/domain/setup-flow.js";
-import type { PluginPick, PluginPickUseCase } from "./plugin-pick-use-case.js";
+import type { PluginPick } from "./plugin-pick-use-case.js";
 export interface SetupPluginsPromptOptions {
   projectRoot: string;
   mode: PluginInstallMode;

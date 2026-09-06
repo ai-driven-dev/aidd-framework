@@ -8,7 +8,7 @@ import {
 } from "../../kernel/errors.js";
 import type { Logger } from "../../kernel/ports/logger.js";
 import type { TokenProvider } from "../auth/ports/token-provider.js";
-import type { HttpClient, HttpGet } from "../http/http-client.js";
+import type { HttpGet } from "../http/http-client.js";
 import type { CliRelease, SelfUpdater } from "./self-updater.js";
 
 // This package moved into the framework repository, and release-please tags it per

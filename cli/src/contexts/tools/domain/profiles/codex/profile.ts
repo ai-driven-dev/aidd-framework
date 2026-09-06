@@ -139,7 +139,7 @@ export const codex: AiTool<
     transcript: CODEX_ROLLOUT_LOCATION,
     // Complete counters per turn, no currency anywhere in a rollout, and no field naming a
     // running skill - so a step here can only ever come from a run journal interval.
-    supplies: { tokenCounters: true, amount: false, toolStatedStep: false },
+    supplies: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: false },
   },
   telemetryTaskAttributable: true,
   telemetryJournalHost: "codex",

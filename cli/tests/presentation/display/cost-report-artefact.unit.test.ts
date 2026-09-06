@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import "../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import {
   buildCostReport,
   type CostReportInput,
@@ -68,6 +69,22 @@ function onePersonMapping(): PersonIdentity {
 }
 
 describe("buildCostReportArtefact", () => {
+  // The row a declared identity now names retroactively. Rendered as that person, never as
+  // "nobody opted in": `personLabel` used to fall through to the no-identifier label for
+  // every resolution it did not name, so a value added to `PersonResolution` reached a
+  // reader as its opposite without the compiler saying a word.
+  it("names a row this machine's identity claims after that person, not as nobody", () => {
+    const envelope = envelopeOf({
+      records: [request({ turn_id: "a", event_timestamp: "2026-08-17T10:00:00Z" })],
+      identity: onePersonMapping(),
+    });
+
+    const artefact = buildCostReportArtefact(envelope, "person");
+
+    expect(artefact).toContain("Ada");
+    expect(artefact).not.toContain("nobody opted in");
+  });
+
   it("lists person among the known axes", () => {
     expect(ARTEFACT_AXES).toContain("person");
     expect(isArtefactAxis("person")).toBe(true);
@@ -146,9 +163,11 @@ describe("buildCostReportArtefact", () => {
     expect(unresolvedLines).toHaveLength(2);
   });
 
+  // No identity declared on this machine: only then is "nobody opted in" the truth for a
+  // record that carried no identifier. With one declared, that same record is this
+  // machine's own person - the case the test above pins.
   it("labels the no-identifier row distinctly from an unresolved one", () => {
     const envelope = envelopeOf({
-      identity: onePersonMapping(),
       records: [request({ turn_id: "a" }), request({ turn_id: "b", person_id: "a-stranger" })],
     });
 
@@ -298,6 +317,62 @@ describe("buildCostReportArtefact — by step, two rows sharing one name", () =>
   });
 });
 
+describe("buildCostReportArtefact — the agent axis names which silence a row is", () => {
+  const NAMES_AGENTS = {
+    localRead: { tokenCounters: true, amount: false, toolStatedStep: false, agentName: true },
+    export: null,
+    journalAttributable: false,
+    taskAttributable: false,
+  } as const;
+
+  // Two rows carry no agent name and mean opposite things. A table that printed "the main
+  // thread" for both would state, of a tool that never names an agent, a fact nothing
+  // observed — the reading this axis gave every Codex, Copilot and OpenCode record.
+  it("prints the main thread and a tool that names no agent as different rows", () => {
+    const envelope = envelopeOf({
+      declaredTools: [
+        { tool: "claude", coverage: "covered", capability: NAMES_AGENTS },
+        { tool: "codex", coverage: "covered", capability: NO_CAPABILITY },
+      ],
+      records: [
+        request({ input_tokens: 10 }),
+        request({ tool: "codex", vendor_id: "s-codex", input_tokens: 10 }),
+      ],
+    });
+
+    const artefact = buildCostReportArtefact(envelope, "agent");
+
+    expect(artefact).toContain("| the main thread |");
+    expect(artefact).toContain("| the tool names no agent |");
+  });
+
+  it("prints the same two labels in the terminal rendering", () => {
+    const report = buildCostReport({
+      fromDay: "2026-08-17",
+      toDay: "2026-08-21",
+      journals: [],
+      undatedRecords: 0,
+      unreadableLines: 0,
+      measurementEnabled: true,
+      declaredTools: [
+        { tool: "claude", coverage: "covered", capability: NAMES_AGENTS },
+        { tool: "codex", coverage: "covered", capability: NO_CAPABILITY },
+      ],
+      records: [
+        request({ input_tokens: 10 }),
+        request({ tool: "codex", vendor_id: "s-codex", input_tokens: 10 }),
+      ],
+    });
+    const output = new CapturingOutput();
+
+    printCostReport(output, report);
+
+    const printed = output.lines.join("\n");
+    expect(printed).toContain("the main thread");
+    expect(printed).toContain("the tool names no agent");
+  });
+});
+
 describe("buildCostReportArtefact — the flow axis states its own limits with the figures", () => {
   const FLOW_JOURNAL = [
     {
@@ -310,6 +385,7 @@ describe("buildCostReportArtefact — the flow axis states its own limits with t
           skill: "aidd-orchestrator:01-sdlc",
           startMs: Date.parse("2026-08-17T10:00:00Z"),
           endMs: Date.parse("2026-08-17T11:00:00Z"),
+          closedBy: "boundary" as const,
         },
       ],
     },
@@ -351,6 +427,35 @@ describe("buildCostReportArtefact — the flow axis states its own limits with t
     const artefact = buildCostReportArtefact(noFlow, "flow");
     expect(artefact).not.toContain("counted inside it");
     expect(artefact).not.toContain("opens a flow of its own");
+  });
+
+  // A limit is a statement about a mechanism that ran. A period whose only flow came from a
+  // record's own tool never walked a step sequence, so the two limits of that walk describe
+  // nothing that happened here and must not be printed.
+  it("states no journal limit for a period whose only flow its own tool named", () => {
+    const statedOnly = envelopeOf({
+      records: [
+        request({
+          event_timestamp: "2026-08-17T10:30:00Z",
+          input_tokens: 10,
+          step_attribution: "tool-stated",
+          step: "aidd-orchestrator:01-sdlc",
+        }),
+      ],
+      journals: [],
+    });
+
+    const artefact = buildCostReportArtefact(statedOnly, "flow");
+
+    expect(artefact).toContain("is every run of that skill at once");
+    expect(artefact).not.toContain("counted inside it");
+    expect(artefact).not.toContain("opens a flow of its own");
+  });
+
+  it("states no tool-stated limit for a period whose flows the journal all witnessed", () => {
+    expect(buildCostReportArtefact(withOneFlow(), "flow")).not.toContain(
+      "is every run of that skill at once"
+    );
   });
 
   it("states them on the flow axis alone, never on every axis", () => {

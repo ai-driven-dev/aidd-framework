@@ -164,8 +164,8 @@ test("every field the cost skill names by name resolves on the object the script
   // while bringing the skill's own version paragraph up from `8` to `11` - it had gone three
   // bumps stale, so the paragraph named neither `by_agent` nor `prompt-matched` nor the
   // fourth no-task reason a row can now carry. 18 -> 19 when 03-report.md named `by_prompt`,
-  // the breakdown by the prompt that caused the work - the one axis complete by construction,
-  // since every record the reader stores already carries the turn it came from.
+  // the breakdown by the prompt that caused the work - the one axis no host limit can empty,
+  // since the reader resolves the turn for itself rather than waiting on a capture.
   assert.equal(claims.size, 19, "expected exactly nineteen field references in the cost skill");
 
   // Fields the envelope carries only under some condition, so a fixture cannot show them all
@@ -222,9 +222,17 @@ test("the plugin README gives every partly-measurable tool its reason, not just 
     assert.ok(readme.includes(tool), `${tool} is named`);
     assert.ok(readme.includes(reason), `${tool}'s reason, not just its name`);
   }
+  // OpenCode's limit shrank rather than vanished: the plugin now opens a session OpenCode
+  // never announced, so a run is journalled and readable - but a session it never announced
+  // is journalled under the plugin's own directory, which is only right when the server
+  // serves one. Both halves are pinned: the fact, and what it still costs.
   assert.ok(
-    readme.includes("OpenCode misses a server process's first session"),
-    "OpenCode's own remaining limit is named, not silently dropped once it could declare a task"
+    readme.includes("OpenCode never announces a session"),
+    "OpenCode's unannounced session is named, not silently dropped once it could declare a task"
+  );
+  assert.ok(
+    readme.includes("journalled under the plugin's own init-time directory"),
+    "what an unannounced session still costs is named, not left as a solved problem"
   );
 });
 

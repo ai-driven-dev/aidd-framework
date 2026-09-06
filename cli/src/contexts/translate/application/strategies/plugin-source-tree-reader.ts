@@ -1,5 +1,4 @@
 import { join, relative } from "node:path";
-import { InvalidSourceMarketplaceError } from "../../../../kernel/errors.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import {
   PLUGIN_AGENT_INPUT_EXT,

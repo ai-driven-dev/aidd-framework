@@ -44,7 +44,7 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
       transcript: CLAUDE_CODE_TRANSCRIPT_LOCATION,
       // The mirror image of the export: the transcript names the running skill exactly, on
       // the same line as the counters, and carries no amount at all.
-      supplies: { tokenCounters: true, amount: false, toolStatedStep: true },
+      supplies: { tokenCounters: true, amount: false, toolStatedStep: true, agentName: true },
     },
     telemetryTaskAttributable: true,
     telemetryJournalHost: "claude-code",

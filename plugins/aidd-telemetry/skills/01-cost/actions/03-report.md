@@ -91,19 +91,24 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    than that.
 2. **Ask, as one axis or as the whole object.**
    - One axis: `aidd telemetry report --axis <axis> --from 2026-08-01 --to 2026-08-31`.
-   - Everything: `aidd telemetry report --from 2026-08-01 --to 2026-08-31 --json`, reading the shape from [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md).
+   - Everything: `aidd telemetry report --from 2026-08-01 --to 2026-08-31 --json`, reading the shape from the report contract, `aidd_docs/product/cost-report-contract.md` in the framework repository.
    - The figure will be kept or compared: give `--from` and `--to`, since `--days` resolves against today and two identical calls on two days cover two different periods.
-3. **Refuse an unknown shape.** `cost_report_version` is `14` today, read from the `--json`
+3. **Refuse an unknown shape.** `cost_report_version` is `15` today, read from the `--json`
    path - the `--axis` path prints text the script already built from that same object, so
-   there is no separate version to check there. The bump from `13` to `14` did not add a
+   there is no separate version to check there. The bump from `14` to `15` did not add a
+   breakdown: `by_person`'s `resolution` gained a fourth value, `this-machine`, for a record
+   that named nobody on a machine that has declared an identity. Report such a row as that
+   person - declaring an identity names past work too, not only what follows. The bump
+   from `13` to `14` did not add a
    breakdown: the reasons a `by_task` or `by_backlog` row can carry gained a fifth,
    `precedes-journal`, for a record older than everything its own session's journal
    witnessed. Report it as what it is - work billed before that session opened a journal,
    which a resumed transcript carries - never as the flow declaring its task late. The bump
    from `12` to `13` added `by_prompt`
    to the top-level breakdowns: the prompt that caused the work, the one breakdown no host
-   limit can leave empty, since every record the reader stores already carries the turn it
-   came from. The bump from `11` to `12` did not add a
+   limit can leave empty, since the reader resolves the turn for itself rather than waiting
+   on a capture. Not the same as complete - a record stored before that resolution shipped
+   never gains one, so the row naming no prompt is a real quantity to read, never noise. The bump from `11` to `12` did not add a
    breakdown either: `by_task`'s `attribution` stopped being always `declared`, so one task
    can now hold two rows - one for what a declaration covered, one for what only a written
    file names. The bump from `10` to `11` did not add a
@@ -111,13 +116,17 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    gained a fourth, `"no-journal"`, which says no usable run journal reached that record's
    session - a fact about the read, never the claim that the session declared no task. The
    bump from `9` to `10` added `by_agent` to the top-level breakdowns: which agent ran,
-   which on Claude Code is where most of the spend is. The bump from `8` to `9` added a
+   which on Claude Code is where most of the spend is. Read its `attribution` before
+   reading a row that names no agent: `main-thread` is a tool that names agents saying this
+   record belongs to none of them, `not-stated` is a tool whose route never names one -
+   every Codex, Copilot and OpenCode record - and calling the second a main thread would
+   state a fact nothing observed. The bump from `8` to `9` added a
    fourth value to `attribution`, `prompt-matched`. The bump from `7` to `8` added `by_flow`
    to the top-level breakdowns: which orchestrated run the journal's own step sequence
-   already names (see [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md)),
+   already names (see the report contract, `aidd_docs/product/cost-report-contract.md`),
    nothing newly captured for it. The bump from `6` to `7` added `by_backlog`
    to the top-level breakdowns: every task's records regrouped by what its own folder
-   declares (see [cost-report-contract.md](../../../../../aidd_docs/product/cost-report-contract.md)),
+   declares (see the report contract, `aidd_docs/product/cost-report-contract.md`),
    never a second notion of which task a record belongs to. The bump from `5` to `6` did
    not add a breakdown: what `by_task` gives for a record that fell in no declared
    interval can now be more than one row, each carrying `reason` - naming which distinct
@@ -142,11 +151,15 @@ A breakdown the object leaves empty is a section left out, never a table of zero
      item - "issue #661 cost X", never "this task cost X". Two tasks declaring the same
      item are already merged into one row; nothing here re-merges anything.
    - `by_flow` answers "what did this orchestrated run cost" - unrelated to task or
-     backlog, and read from the journal's own step sequence with nothing new captured for
-     it. Two runs of the *same* orchestrating skill in one session are two rows, told apart
-     by when each opened - never merge them by name. A skill a person ran by hand while a
-     flow was open is counted inside it, since the journal cannot tell it from one the
-     orchestrator itself invoked - say so if it changes how a figure reads.
+     backlog, and read with nothing new captured for it. Two runs of the *same*
+     orchestrating skill in one session are two rows, told apart by when each opened -
+     never merge them by name. Read `attribution` before comparing two rows:
+     `journal-interval` is a run the journal opened and closed, `tool-stated` is every run
+     of that skill only the record's own tool named, in a session whose journal opened no
+     flow at all - it names no opening moment, because a name is not a run. A skill a
+     person ran by hand while a flow was open is counted inside it, since the journal
+     cannot tell it from one the orchestrator itself invoked - say so if it changes how a
+     figure reads.
 5. **Read `capability` before explaining an absent figure.** A tool that cannot supply a number and a session that consumed nothing look identical in the numbers.
 
    | False field | Means |
@@ -157,7 +170,7 @@ A breakdown the object leaves empty is a section left out, never a table of zero
    | `task_attributable` | a session on this tool cannot be traced to a task, so it is absent from a task report without having done nothing |
 
 6. **Keep `unattributed` as itself.** Nothing measured supports reading it as no step having run, and it is never a residual.
-7. **Say when the answer is partial.** A non-zero `read.undated_records` or `read.unreadable_lines` means the total is incomplete, and the reasons are in [the plugin README](../../../README.md). The `--axis` path already carries this in its own last lines; the `--json` path carries it in `read`.
+7. **Say when the answer is partial.** A non-zero `read.undated_records` or `read.unreadable_lines` means the total is incomplete, and the reasons are in this plugin's own README. The `--axis` path already carries this in its own last lines; the `--json` path carries it in `read`.
 8. **Say when this project's own switch is off.** `measurement_enabled: false` on the `--json` path (a "switch is off" line in the `--axis` header) means these figures are not scoped to this project — the sink they come from is scoped to this person, across every project they ever measured. Relay both facts together: the switch is off here, and the figures shown are real, from wherever they were measured. Never read `false` as "these numbers are made up" or drop them for it.
 
 ## Test

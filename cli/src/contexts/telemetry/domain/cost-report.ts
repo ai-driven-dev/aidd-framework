@@ -1,6 +1,7 @@
 import type { TelemetryRouteSupply } from "../../../kernel/measurement.js";
 import type { AiToolId } from "../../../kernel/tool.js";
-import type { FlowInterval } from "./flow-attribution.js";
+import type { FlowAttributionSource, FlowInterval } from "./flow-attribution.js";
+import { ORCHESTRATING_SKILLS } from "./flow-attribution.js";
 import { momentFallsWithin } from "./journal-intervals.js";
 import { type PersonResolution, type ResolvedPerson, resolvePerson } from "./person-resolution.js";
 import type { PersonIdentity } from "./ports/person-identity-reader.js";
@@ -77,26 +78,54 @@ export interface CostReportModelRow {
   readonly totals: CostTotals;
 }
 
-/** One agent's own share of a period, `agent` absent for the main thread.
+/** How a record's agent came to be known, so a row that names none says which of the two
+ * silences it is. `main-thread` is a measurement — the tool names agents and said this
+ * record belongs to none of them; `not-stated` is the absence of one, from a tool whose
+ * route never names an agent at all, and reading it as a main thread would assert a fact
+ * nothing observed. */
+export type AgentAttributionSource = "tool-stated" | "main-thread" | "not-stated";
+
+/** One agent's own share of a period, `agent` absent unless `attribution` is `tool-stated`.
  *
  * Where the spend actually is: measured on a live session, ten subagent files held 432M of
  * its 466M tokens, and every one of their lines names its agent where almost none names a
  * skill (100% against 2.7%). `by_step` reads a few percent not because the reader drops
- * anything but because the host names a skill on the main thread alone. */
+ * anything but because the host names a skill on the main thread alone.
+ *
+ * **The limit this axis still lives with.** A line marked as a subagent's that carries no
+ * agent name reads as the main thread, because nothing on the stored record separates the
+ * two. Measured 2026-09-05 across 1,852 transcripts: 157 of 122,637 subagent lines name no
+ * agent, 0.07%. Closing it means a new field on the record, which no record already stored
+ * could ever gain (see `storeNewCandidates`), so it is stated rather than captured. */
 export interface CostReportAgentRow {
   readonly agent?: string;
+  readonly attribution: AgentAttributionSource;
   readonly totals: CostTotals;
 }
 
 /** One prompt's own share of a period, `prompt` absent on the row for records that named
  * none.
  *
- * The one breakdown that is complete by construction. Every other depends on a capture that
- * may not have happened — a journal, an identity file, a declaration, a host that names a
- * skill. This one depends on a field the transcript reader already resolves for every usage
- * line by walking `parentUuid`: measured 2026-09-04 on the built binary, 1073 of 1073
- * records of one real session carried a `prompt_id`, its 972 subagent records included,
- * across 12 distinct prompts.
+ * The one breakdown no host limit can empty — never one that is complete. Every other
+ * depends on a capture that may not have happened — a journal, an identity file, a
+ * declaration, a host that names a skill. This one depends on a field the transcript reader
+ * resolves for itself, by walking `parentUuid` back to the line that named the prompt.
+ *
+ * The reader is very nearly complete and the sink it fills is not, and the difference is
+ * worth stating where the figure is read. Measured 2026-09-05 on this machine's own sink:
+ * 845 of 30,714 records carry no `prompt_id`, 2.75%. Exactly one of them was written by the
+ * current reader — an assistant line whose `parentUuid` chain reaches no line naming a
+ * prompt, out of 29,607 in that session. The other 844 were stored by earlier readers: 34
+ * before the CLI stamped a version at all, and 810 in one session before this resolution
+ * shipped.
+ *
+ * **Those 844 stay unnamed however often the sink is read again.** `storeNewCandidates`
+ * fixes a record's field set the first time it sees the turn, so a re-read that would now
+ * resolve the prompt stores nothing — the turn is already stored and its counters have not
+ * grown. Re-reading is not the repair either: of the 811 whose sessions were measured, 720
+ * name a request no transcript on disk still holds, so roughly 90 records in 30,714 are all
+ * a retroactive pass could ever recover. Which is why this states a limit rather than
+ * carrying machinery to close it.
  *
  * `startedAt` is the earliest moment in the group, and only a named prompt gets one: the
  * row for records that named no prompt is a bucket drawn from many turns, so a start moment
@@ -251,6 +280,7 @@ export interface CostReportBacklogRow {
  * neither can this breakdown. */
 export interface CostReportFlowRow {
   readonly flow?: string;
+  readonly attribution: FlowAttributionSource;
   readonly startedAt?: string;
   readonly totals: CostTotals;
 }
@@ -624,13 +654,42 @@ function projectKeyOf(record: TelemetrySinkRecord): ProjectKey {
 const NO_KNOWN_MODEL = Symbol("no known model");
 type ModelKey = string | typeof NO_KNOWN_MODEL;
 
-// The main thread's own row. A symbol for the same reason `NO_KNOWN_MODEL` is one: an agent
-// really can be named anything, so no string is safe to reserve.
-const NO_AGENT = Symbol("the main thread");
-type AgentKey = string | typeof NO_AGENT;
+// The main thread's own row, and the row for a tool that could never have named one. Symbols
+// for the same reason `NO_KNOWN_MODEL` is one: an agent really can be named anything, so no
+// string is safe to reserve.
+const MAIN_THREAD = Symbol("the main thread");
+const AGENT_NOT_STATED = Symbol("a tool whose route never names an agent");
+type AgentKey = string | typeof MAIN_THREAD | typeof AGENT_NOT_STATED;
 
-function agentKeyOf(record: TelemetrySinkRecord): AgentKey {
-  return record.agent_name === undefined ? NO_AGENT : record.agent_name;
+/** Which of the three rows a record joins. `agent_name` present is the tool's own statement
+ * and needs nothing else; absent means one of two different things, and only the tool's
+ * declaration tells them apart.
+ *
+ * This axis used to answer `NO_AGENT` for every record with no `agent_name`, whatever the
+ * tool. Only Claude Code's reader ever sets the field, so on Codex, Copilot and OpenCode
+ * every record was reported as the main thread — 100% of the axis, on no evidence. The
+ * declaration is read rather than the record because the record cannot carry the absence:
+ * a tool that never names an agent writes exactly what a main-thread line writes. */
+function agentKeyOf(
+  record: TelemetrySinkRecord,
+  namesAgents: (tool: AiToolId) => boolean
+): AgentKey {
+  if (record.agent_name !== undefined) return record.agent_name;
+  return namesAgents(record.tool) ? MAIN_THREAD : AGENT_NOT_STATED;
+}
+
+/** Whether a tool's own declared route names agents, answered from `declaredTools` alone.
+ * A tool with no declared local read supplies nothing, so it names no agent either — the
+ * same reading `NO_CAPABILITY` gives every other supply. */
+function agentNamingTools(
+  declaredTools: readonly CostReportToolDeclaration[]
+): (tool: AiToolId) => boolean {
+  const naming = new Set(
+    declaredTools
+      .filter((declaration) => declaration.capability.localRead?.agentName === true)
+      .map((declaration) => declaration.tool)
+  );
+  return (tool) => naming.has(tool);
 }
 
 // The row for what named no prompt. A symbol for the same reason `NO_AGENT` is one: a prompt
@@ -839,7 +898,7 @@ const OUTSIDE_EVERY_FLOW = Symbol("record falls outside every flow interval");
 // keeps them two rows without needing a synthesized composite string key. A record outside
 // every flow can never collide with one inside, since `OUTSIDE_EVERY_FLOW` is a symbol no
 // interval object can ever equal.
-type FlowRowKey = FlowInterval | typeof OUTSIDE_EVERY_FLOW;
+type FlowRowKey = FlowInterval | string | typeof OUTSIDE_EVERY_FLOW;
 
 /** Every session's own closed flow intervals, keyed by vendor id - the same shape
  * `allTaskIntervalsByVendorId` gives task intervals, one layer wider. */
@@ -868,7 +927,30 @@ function flowKeyOf(
   const interval = intervals.find((candidate) =>
     momentFallsWithin([candidate], record.event_timestamp)
   );
-  return interval ?? OUTSIDE_EVERY_FLOW;
+  return interval ?? flowTheToolNamed(record) ?? OUTSIDE_EVERY_FLOW;
+}
+
+/** The orchestrating skill a record's own tool named, for a record no interval covers -
+ * the skill name itself as the key, which no `FlowInterval` object and no symbol can ever
+ * equal, so the two row kinds never collide.
+ *
+ * Only `tool-stated`. A `journal-interval` step is an inference from a moment, and the
+ * intervals it was inferred from are the very ones just checked; a `prompt-matched` one
+ * names the step a prompt opened, which is a step and not an orchestration. Neither says a
+ * flow was orchestrated, and reading either as one would put work inside a flow on the
+ * strength of the reader's own guess.
+ *
+ * Why this capture exists at all: a session resumed after its context was compacted invokes
+ * nothing again, so no `step_start` hook fires and its journal opens no flow, while the
+ * transcript goes on stating the step on every record it produces. Measured on this
+ * machine - one such session, six `step_end` lines, no `step_start`, and 2,220 records in a
+ * 30-day period that `by_flow` placed outside every flow while `by_step` named the very
+ * skill they ran under. */
+function flowTheToolNamed(record: TelemetrySinkRecord): string | undefined {
+  if (record.step_attribution !== "tool-stated") return undefined;
+  return record.step !== undefined && ORCHESTRATING_SKILLS.has(record.step)
+    ? record.step
+    : undefined;
 }
 
 // A record with no identifier is its own row, keyed on a symbol the same way
@@ -1244,33 +1326,50 @@ function accumulateSessionRecord(groups: Groups, record: TelemetrySinkRecord): v
   }
 }
 
+/** Everything one record needs to be placed on every axis, resolved once per report rather
+ * than once per record. Gathered into a shape because the list had grown past what a
+ * positional signature reads as: nine parameters in a fixed order is a call nobody can check
+ * by eye, and every one of them is the same for every record in the run. */
+interface RecordContext {
+  readonly membership: TaskMembership | null;
+  readonly taskIntervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>;
+  readonly flowIntervalsByVendorId: ReadonlyMap<string, readonly FlowInterval[]>;
+  readonly journalsByVendorId: ReadonlyMap<string, CostReportSessionJournal>;
+  readonly identity: PersonIdentity | null;
+  readonly taskBacklogDeclarations: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration> | undefined;
+  readonly namesAgents: (tool: AiToolId) => boolean;
+}
+
 function accumulateRequestRecord(
   groups: Groups,
   record: TelemetrySinkRecord,
-  membership: TaskMembership | null,
-  taskIntervalsByVendorId: ReadonlyMap<string, readonly TaskInterval[]>,
-  flowIntervalsByVendorId: ReadonlyMap<string, readonly FlowInterval[]>,
-  journalsByVendorId: ReadonlyMap<string, CostReportSessionJournal>,
-  identity: PersonIdentity | null,
-  taskBacklogDeclarations: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration> | undefined
+  context: RecordContext
 ): void {
   groups.totals.add(record);
   addToStepGroup(groups.steps, record);
   accumulateInto(groups.attributions, record.step_attribution, record);
   accumulateInto(groups.tools, record.tool, record);
   accumulateInto(groups.models, modelKeyOf(record), record);
-  accumulateInto(groups.agents, agentKeyOf(record), record);
+  accumulateInto(groups.agents, agentKeyOf(record, context.namesAgents), record);
   addToPromptGroup(groups.prompts, record);
   accumulateInto(groups.projects, projectKeyOf(record), record);
-  const taskRow = taskRowOf(record, taskIntervalsByVendorId, journalsByVendorId);
+  const taskRow = taskRowOf(record, context.taskIntervalsByVendorId, context.journalsByVendorId);
   addToTaskGroup(groups.tasks, taskRow, record);
-  accumulateInto(groups.backlog, backlogKeyOf(taskRow, taskBacklogDeclarations), record);
-  accumulateInto(groups.flows, flowKeyOf(record, flowIntervalsByVendorId), record);
-  addToPersonGroup(groups.people, record, resolvePerson(identity, personRawIdOf(record)));
-  const day = telemetrySinkRecordDayKey(record);
-  if (day !== undefined && groups.days.has(day)) groups.days.get(day)?.add(record);
+  accumulateInto(groups.backlog, backlogKeyOf(taskRow, context.taskBacklogDeclarations), record);
+  accumulateInto(groups.flows, flowKeyOf(record, context.flowIntervalsByVendorId), record);
+  addToPersonGroup(groups.people, record, resolvePerson(context.identity, personRawIdOf(record)));
+  addToDayGroup(groups.days, record);
+  const { membership } = context;
   const attribution = membership === null ? undefined : taskAttributionOf(record, membership);
   if (attribution !== undefined) accumulateInto(groups.taskAttributions, attribution, record);
+}
+
+/** Only a day the period itself spans: `emptyGroups` seeded every one of them, so a record
+ * dated outside the period joins nothing rather than adding a day the report never claimed
+ * to cover. */
+function addToDayGroup(days: Map<string, TotalsAccumulator>, record: TelemetrySinkRecord): void {
+  const day = telemetrySinkRecordDayKey(record);
+  if (day !== undefined && days.has(day)) days.get(day)?.add(record);
 }
 
 function accumulate(
@@ -1280,27 +1379,22 @@ function accumulate(
   membership: TaskMembership | null,
   journals: readonly CostReportSessionJournal[],
   identity: PersonIdentity | null,
-  taskBacklogDeclarations: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration> | undefined
+  taskBacklogDeclarations: ReadonlyMap<TaskIdentity, TaskBacklogDeclaration> | undefined,
+  declaredTools: readonly CostReportToolDeclaration[]
 ): Groups {
   const groups = emptyGroups(fromDay, toDay);
-  const taskIntervalsByVendorId = allTaskIntervalsByVendorId(journals);
-  const flowIntervalsByVendorId = allFlowIntervalsByVendorId(journals);
-  const journalsByVendorId = new Map(journals.map((journal) => [journal.vendorId, journal]));
+  const context: RecordContext = {
+    membership,
+    taskIntervalsByVendorId: allTaskIntervalsByVendorId(journals),
+    flowIntervalsByVendorId: allFlowIntervalsByVendorId(journals),
+    journalsByVendorId: new Map(journals.map((journal) => [journal.vendorId, journal])),
+    identity,
+    taskBacklogDeclarations,
+    namesAgents: agentNamingTools(declaredTools),
+  };
   for (const record of records) {
-    if (record.kind === "session") {
-      accumulateSessionRecord(groups, record);
-      continue;
-    }
-    accumulateRequestRecord(
-      groups,
-      record,
-      membership,
-      taskIntervalsByVendorId,
-      flowIntervalsByVendorId,
-      journalsByVendorId,
-      identity,
-      taskBacklogDeclarations
-    );
+    if (record.kind === "session") accumulateSessionRecord(groups, record);
+    else accumulateRequestRecord(groups, record, context);
   }
   return groups;
 }
@@ -1477,11 +1571,19 @@ function flowRows(flows: ReadonlyMap<FlowRowKey, TotalsAccumulator>): readonly C
   let outsideEveryFlow: CostReportFlowRow | undefined;
   for (const [key, accumulator] of flows) {
     if (key === OUTSIDE_EVERY_FLOW) {
-      outsideEveryFlow = { totals: accumulator.build() };
+      outsideEveryFlow = { attribution: "unattributed", totals: accumulator.build() };
+      continue;
+    }
+    // A name is not a run. The tool-stated row is a bucket drawn from however many runs of
+    // that skill the tool named, so it carries no `startedAt` - the same reason the row for
+    // records that named no prompt carries none.
+    if (typeof key === "string") {
+      named.push({ flow: key, attribution: "tool-stated", totals: accumulator.build() });
       continue;
     }
     named.push({
       flow: key.skill,
+      attribution: "journal-interval",
       startedAt: isoSecondsFromMs(key.startMs),
       totals: accumulator.build(),
     });
@@ -1489,7 +1591,7 @@ function flowRows(flows: ReadonlyMap<FlowRowKey, TotalsAccumulator>): readonly C
   const sorted = bySize(
     named,
     (row) => row.totals,
-    (row) => `${row.flow ?? ""}@${row.startedAt ?? ""}`
+    (row) => `${row.flow ?? ""}@${row.attribution}@${row.startedAt ?? ""}`
   );
   return outsideEveryFlow === undefined ? sorted : [...sorted, outsideEveryFlow];
 }
@@ -1504,14 +1606,15 @@ function dayRows(days: ReadonlyMap<string, TotalsAccumulator>): readonly CostRep
 function agentRows(
   agents: ReadonlyMap<AgentKey, TotalsAccumulator>
 ): readonly CostReportAgentRow[] {
-  const rows: CostReportAgentRow[] = [...agents].map(([key, accumulator]) => ({
-    ...(key === NO_AGENT ? {} : { agent: key }),
-    totals: accumulator.build(),
-  }));
+  const rows: CostReportAgentRow[] = [...agents].map(([key, accumulator]) => {
+    if (key === MAIN_THREAD) return { attribution: "main-thread", totals: accumulator.build() };
+    if (key === AGENT_NOT_STATED) return { attribution: "not-stated", totals: accumulator.build() };
+    return { agent: key, attribution: "tool-stated", totals: accumulator.build() };
+  });
   return bySize(
     rows,
     (row) => row.totals,
-    (row) => row.agent ?? ""
+    (row) => `${row.agent ?? ""}@${row.attribution}`
   );
 }
 
@@ -1569,28 +1672,42 @@ function personRowOf(group: PersonGroup): CostReportPersonRow {
   };
 }
 
-/** Mapped people first, then every unplaced identity, then the one no-identifier row last -
- * `bySize` alone cannot give this order, since it sorts purely on weight and a large
- * unresolved row would otherwise outrank a small mapped one. Largest first within the
- * mapped group and within the unresolved group; the no-identifier row is never sorted
- * against either, since there is at most one. */
+/** The order every `by_person` breakdown is read in, strongest claim first: a person the
+ * record itself named, then the one this machine's identity claims for records that named
+ * nobody, then every unplaced identity, then the one no-identifier row.
+ *
+ * A `Record` over the whole union rather than a filter per group, because a filter per
+ * group silently *drops* whatever it does not name - which is what happened when
+ * `"this-machine"` was added on 2026-09-04: the rows existed, summed into no group, and
+ * vanished from the breakdown while the totals they belonged to stayed. This shape makes
+ * that a compile error. */
+const PERSON_ROW_ORDER: Record<PersonResolution, number> = {
+  mapped: 0,
+  "this-machine": 1,
+  unresolved: 2,
+  none: 3,
+};
+
+/** Grouped in `PERSON_ROW_ORDER`, largest first within each group - `bySize` alone cannot
+ * give this order, since it sorts purely on weight and a large unresolved row would
+ * otherwise outrank a small mapped one. Sorting inside the single-row groups
+ * (`"this-machine"`, `"none"`, at most one each) costs nothing and needs no exception. */
 function personRows(
   people: ReadonlyMap<PersonRowKey, PersonGroup>
 ): readonly CostReportPersonRow[] {
   const rows = [...people.values()].map(personRowOf);
   const keyOf = (row: CostReportPersonRow) => row.person ?? row.identities[0] ?? "";
-  const mapped = bySize(
-    rows.filter((row) => row.resolution === "mapped"),
-    (row) => row.totals,
-    keyOf
-  );
-  const unresolved = bySize(
-    rows.filter((row) => row.resolution === "unresolved"),
-    (row) => row.totals,
-    keyOf
-  );
-  const none = rows.filter((row) => row.resolution === "none");
-  return [...mapped, ...unresolved, ...none];
+  return Object.keys(PERSON_ROW_ORDER)
+    .sort(
+      (a, b) => PERSON_ROW_ORDER[a as PersonResolution] - PERSON_ROW_ORDER[b as PersonResolution]
+    )
+    .flatMap((resolution) =>
+      bySize(
+        rows.filter((row) => row.resolution === resolution),
+        (row) => row.totals,
+        keyOf
+      )
+    );
 }
 
 /** `task`, `filters` and `emptySelection` together - the selection this report answered,
@@ -1922,7 +2039,8 @@ export function buildCostReport(input: CostReportInput): CostReport {
     membership,
     input.journals,
     identity,
-    input.taskBacklogDeclarations
+    input.taskBacklogDeclarations,
+    input.declaredTools
   );
 
   return assembleCostReport(input, inScope, groups, membership, emptySelection);

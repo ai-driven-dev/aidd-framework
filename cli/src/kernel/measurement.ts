@@ -18,6 +18,12 @@ export interface TelemetryRouteSupply {
   /** The tool names the running step itself, on the record. An interval derived from the
    * run journal is not this — that is the framework's inference, not the tool's statement. */
   readonly toolStatedStep: boolean;
+  /** The tool names the agent a record belongs to, and so also says when a record is the
+   * main thread's own. Without it a record carrying no agent states nothing: `by_agent`
+   * cannot read it as the main thread, because the tool never had a main thread to
+   * distinguish. Only Claude Code's reader sets it today (`isSidechain` and
+   * `attributionAgent`, see `claude-code-transcript.ts`). */
+  readonly agentName: boolean;
 }
 
 /** Where a tool's own transcript files live, and how to recognise the one file (or files)

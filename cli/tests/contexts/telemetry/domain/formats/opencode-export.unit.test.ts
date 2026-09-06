@@ -15,6 +15,36 @@ function loadFixture(name: string): unknown {
 }
 
 describe("mapOpencodeExportToSinkRecords", () => {
+  // The comparison opencode-export.ts's own header named as missing: a large `cache.read`
+  // beside `input`, for a provider that is not Anthropic. Captured live 2026-09-06 from
+  // `opencode export --sanitize`, opencode 1.14.20, providerID "opencode", modelID
+  // "ling-3.0-flash-fin-free" - three billed turns of one session, cache genuinely
+  // exercised across them. `input` falls from 28242 to 269 as `cache.read` climbs from
+  // 640 to 28928: an `input` that already counted the cached tokens could not shrink that
+  // way. OpenCode's own `total` confirms it by arithmetic on every turn -
+  // `total == input + output + reasoning + cache.read + cache.write` - which only holds if
+  // the counters are disjoint.
+  it("reads a non-Anthropic provider's counters as disjoint, the comparison no capture held", () => {
+    const records = mapOpencodeExportToSinkRecords(
+      loadFixture("opencode-export-non-anthropic-cache.json"),
+      "ses_test_non_anthropic"
+    );
+
+    expect(
+      records.map((record) => ({
+        input: record.input_tokens,
+        output: record.output_tokens,
+        cacheRead: record.cache_read_tokens,
+        cacheCreation: record.cache_creation_tokens,
+      }))
+    ).toEqual([
+      { input: 28242, output: 193, cacheRead: 640, cacheCreation: 0 },
+      { input: 269, output: 137, cacheRead: 28928, cacheCreation: 0 },
+      { input: 196, output: 56, cacheRead: 29184, cacheCreation: 0 },
+    ]);
+    expect(records.every((record) => record.model === "ling-3.0-flash-fin-free")).toBe(true);
+  });
+
   it("yields one record per billed message, by value, under the stored field names", () => {
     const records = mapOpencodeExportToSinkRecords(loadFixture("opencode-export.json"), SESSION_ID);
 

@@ -1,4 +1,5 @@
 import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { Marketplace } from "../../../../src/contexts/distribution/domain/marketplace.js";
 import { MarketplaceSyncSettingsUseCase } from "../../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
@@ -59,18 +60,69 @@ function manifestWithPlugin(marketplace: string = MARKETPLACE): InMemoryManifest
 
 function buildSync(activator: FakeNativePluginActivator, pluginMarketplace?: string) {
   const registry = new InMemoryMarketplaceRegistry();
+  const fs = new InMemoryFileAdapter();
+  const manifestRepo = manifestWithPlugin(pluginMarketplace);
+  const hasher = new DeterministicHasher();
   return {
     registry,
+    fs,
+    manifestRepo,
+    hasher,
     useCase: new MarketplaceSyncSettingsUseCase(
-      new InMemoryFileAdapter(),
-      manifestWithPlugin(pluginMarketplace),
+      fs,
+      manifestRepo,
       registry,
-      new DeterministicHasher(),
+      hasher,
       new CapturingLogger(),
       new Map([["claude", activator]]),
       fakeEnsureBuiltMarketplace()
     ),
   };
+}
+
+const SETTINGS_PATH = ".claude/settings.json";
+
+/** `resolve`, exactly as `syncMarketplacesFile` does — not a `/`-joined literal. On Windows
+ * the production key is `C:\\test-project\\.claude\\settings.json`, and a hand-built POSIX
+ * path addresses a file the use case never wrote. */
+function settingsPathIn(projectRoot: string): string {
+  return resolve(projectRoot, SETTINGS_PATH);
+}
+
+/** What the host's own CLI does that this code cannot see: `claude plugin marketplace add`
+ * and `claude plugin enable` write their result into the very file `syncTool` just hashed.
+ * The fake shells out to nothing, so it stands in for that write directly. */
+class ActivatorThatWritesSettings extends FakeNativePluginActivator {
+  constructor(
+    private readonly fs: InMemoryFileAdapter,
+    private readonly settingsAbsolutePath: string
+  ) {
+    super({ available: true });
+  }
+
+  private readonly writes: Promise<void>[] = [];
+
+  async settled(): Promise<void> {
+    await Promise.all(this.writes);
+  }
+
+  private async appendHostState(): Promise<void> {
+    const before = await this.fs.readFile(this.settingsAbsolutePath).catch(() => "{}");
+    const json = JSON.parse(before) as Record<string, unknown>;
+    // Not a key this code writes: the point is content only the host could have put there.
+    json.installedPluginsBookkeeping = { [REF]: { installedAt: "2026-09-05T00:00:00Z" } };
+    await this.fs.writeFile(this.settingsAbsolutePath, JSON.stringify(json, null, 2));
+  }
+
+  override addMarketplace(source: string): void {
+    super.addMarketplace(source);
+    this.writes.push(this.appendHostState());
+  }
+
+  override enablePlugin(pluginRef: string): void {
+    super.enablePlugin(pluginRef);
+    this.writes.push(this.appendHostState());
+  }
 }
 
 describe("syncing settings registers the plugin with the host's own CLI", () => {
@@ -134,5 +186,93 @@ describe("syncing settings registers the plugin with the host's own CLI", () => 
     ]).entries[0];
 
     expect(entry?.answer).toBe("not-registered");
+  });
+});
+
+/**
+ * `syncTool` writes `.claude/settings.json`, hashes what it wrote, and the manifest is saved.
+ * Only then does `activateNativeTools` run the host's own CLI — which writes into that same
+ * file, because Claude Code declares no separate `enabledPluginsSettingsPath`.
+ *
+ * So the tracked hash describes content that no longer exists the moment activation
+ * succeeds. Nothing re-hashes it. `status` and `doctor` report a file the user never touched
+ * as drifted, for as long as the manifest stands, and `restore` would undo the host's own
+ * registration to get back to a state AIDD only ever held for the length of one function.
+ *
+ * The one case in this file that is about what the activation leaves behind rather than what
+ * it was driven with.
+ */
+describe("what native activation leaves behind is not reported as the user's drift", () => {
+  it("tracks a hash that still matches the settings file after the host CLI has written to it", async () => {
+    const registry = new InMemoryMarketplaceRegistry();
+    const fs = new InMemoryFileAdapter();
+    const manifestRepo = manifestWithPlugin();
+    const hasher = new DeterministicHasher();
+    const settingsAbsolutePath = settingsPathIn(PROJECT_ROOT);
+    const activator = new ActivatorThatWritesSettings(fs, settingsAbsolutePath);
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      manifestRepo,
+      registry,
+      hasher,
+      new CapturingLogger(),
+      new Map([["claude", activator]]),
+      fakeEnsureBuiltMarketplace()
+    );
+    await registry.save(PROJECT_ROOT, marketplace());
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+    // The port is synchronous and the host CLI's write is not, so let the writes the
+    // activator queued actually land before reading the file back.
+    await activator.settled();
+
+    const onDisk = await fs.readFile(settingsAbsolutePath);
+    const manifest = await manifestRepo.load();
+    const tracked = manifest?.getToolFiles("claude") ?? [];
+    const entry = tracked.find((file) => file.relativePath === SETTINGS_PATH);
+
+    expect(entry, "the settings file is tracked at all").toBeDefined();
+    expect(entry?.hash).toEqual(hasher.hash(onDisk));
+  });
+  /**
+   * The other half, and the one that keeps the repair honest. A tool whose CLI is not on the
+   * PATH wrote nothing, so a settings file that differs from its tracked hash differs because
+   * a person changed it — which is exactly the drift `status` exists to report and `restore`
+   * exists to undo. Re-hashing every tool after activation would bless that as ours and
+   * silently make the change permanent.
+   */
+  it("leaves a hash alone for a tool whose own CLI never ran", async () => {
+    const registry = new InMemoryMarketplaceRegistry();
+    const fs = new InMemoryFileAdapter();
+    const manifestRepo = manifestWithPlugin();
+    const hasher = new DeterministicHasher();
+    const settingsAbsolutePath = settingsPathIn(PROJECT_ROOT);
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      manifestRepo,
+      registry,
+      hasher,
+      new CapturingLogger(),
+      // Not available: the binary is not on the PATH, so nothing of the host's is written.
+      new Map([["claude", new FakeNativePluginActivator({ available: false })]]),
+      fakeEnsureBuiltMarketplace()
+    );
+    await registry.save(PROJECT_ROOT, marketplace());
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+    const hashAfterSync = (await manifestRepo.load())
+      ?.getToolFiles("claude")
+      .find((file) => file.relativePath === SETTINGS_PATH)?.hash;
+
+    // A person edits the file, then a second sync runs and changes nothing else.
+    const edited = `${await fs.readFile(settingsAbsolutePath)}\n`;
+    await fs.writeFile(settingsAbsolutePath, edited);
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    const tracked = (await manifestRepo.load())
+      ?.getToolFiles("claude")
+      .find((file) => file.relativePath === SETTINGS_PATH);
+    expect(hashAfterSync, "the settings file is tracked at all").toBeDefined();
+    expect(tracked?.hash).toEqual(hashAfterSync);
+    expect(tracked?.hash).not.toEqual(hasher.hash(edited));
   });
 });

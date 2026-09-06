@@ -1,5 +1,5 @@
 {
-  "cost_report_version": 14,
+  "cost_report_version": 15,
   "period": {
     "from_day": "2026-01-01",
     "to_day": "2026-01-31"
@@ -60,6 +60,7 @@
   ],
   "by_flow": [
     {
+      "attribution": "unattributed",
       "totals": {
         "requests": 4,
         "input_tokens": 935,
@@ -71,12 +72,23 @@
   ],
   "by_agent": [
     {
+      "attribution": "main-thread",
       "totals": {
-        "requests": 4,
-        "input_tokens": 935,
-        "output_tokens": 590,
-        "cache_read_tokens": 14100,
+        "requests": 3,
+        "input_tokens": 35,
+        "output_tokens": 550,
+        "cache_read_tokens": 12100,
         "cache_creation_tokens": 1000
+      }
+    },
+    {
+      "attribution": "not-stated",
+      "totals": {
+        "requests": 1,
+        "input_tokens": 900,
+        "output_tokens": 40,
+        "cache_read_tokens": 2000,
+        "cache_creation_tokens": 0
       }
     }
   ],
@@ -121,7 +133,8 @@
         "local_read": {
           "token_counters": true,
           "amount": false,
-          "tool_stated_step": true
+          "tool_stated_step": true,
+          "agent_name": true
         },
         "export": null,
         "journal_attributable": true,
@@ -152,12 +165,13 @@
     {
       "tool": "copilot",
       "coverage": "covered",
-      "reason": "Its own file names outputTokens per turn, but session.shutdown carries all four counters for the whole session \u2014 a session total, never a sum of requests. Whether its input count excludes the cached prompt is unconfirmed: the only session captured read back zero cache, which cannot tell the two apart.",
+      "reason": "Its own file names outputTokens per turn, but session.shutdown carries all four counters for the whole session \u2014 a session total, never a sum of requests. Its four counters are measured disjoint, cached prompt included.",
       "capability": {
         "local_read": {
           "token_counters": true,
           "amount": false,
-          "tool_stated_step": false
+          "tool_stated_step": false,
+          "agent_name": false
         },
         "export": null,
         "journal_attributable": true,
@@ -177,12 +191,13 @@
     {
       "tool": "opencode",
       "coverage": "covered",
-      "reason": "Its four counters are measured correct for the anthropic provider \u2014 not independently confirmed for any other provider OpenCode can route to.",
+      "reason": "Its four counters are measured disjoint for the anthropic provider and for one OpenAI-compatible provider whose cache was exercised \u2014 not confirmed for a provider that reports prompt tokens inclusive of the cached ones, which none captured here does.",
       "capability": {
         "local_read": {
           "token_counters": true,
           "amount": false,
-          "tool_stated_step": false
+          "tool_stated_step": false,
+          "agent_name": false
         },
         "export": null,
         "journal_attributable": true,
@@ -199,7 +214,8 @@
         "local_read": {
           "token_counters": true,
           "amount": false,
-          "tool_stated_step": false
+          "tool_stated_step": false,
+          "agent_name": false
         },
         "export": null,
         "journal_attributable": true,

@@ -4,6 +4,10 @@ import { isIdeToolId } from "../../contexts/tools/domain/registry.js";
 import type { AiToolId, IdeToolId, ToolId } from "../../kernel/tool.js";
 import { isAiToolId, VALID_TOOL_IDS } from "../../kernel/tool.js";
 import { createDeps } from "../../runtime/wiring/framework.js";
+import {
+  printInstalledRules,
+  printInstalledRulesJson,
+} from "../display/installed-rules-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import type { CLIOutput } from "../output.js";
 import { parseGlobalOptions } from "./global-options.js";
@@ -247,6 +251,23 @@ export function registerFrameworkCommand(program: Command): void {
           cmdOptions.tool as ToolId | undefined,
           cmdOptions
         );
+      } catch (error) {
+        errorHandler.handle(error);
+      }
+    });
+
+  framework
+    .command("rules")
+    .description("List the rules installed in this project, across every AI tool")
+    .option("--json", "Print the inventory as JSON")
+    .action(async (cmdOptions: { json?: boolean }) => {
+      const { verbose, output, projectRoot } = parseGlobalOptions(program);
+      const errorHandler = new ErrorHandler(output);
+      try {
+        const deps = await createDeps(projectRoot, { verbose }, output);
+        const { rules } = await deps.listInstalledRulesUseCase.execute({ projectRoot });
+        if (cmdOptions.json) printInstalledRulesJson(output, rules);
+        else printInstalledRules(output, rules);
       } catch (error) {
         errorHandler.handle(error);
       }

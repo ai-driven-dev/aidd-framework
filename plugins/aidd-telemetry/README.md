@@ -135,15 +135,20 @@ tokens; turning tokens into money is a separate service's job.
 - **Codex needs one interactive approval.** Its hook trust is per entry, and a headless run
   never sees the prompt — so a Codex session journals nothing until someone approves once,
   in an interactive session, and says nothing while it does not.
-- **OpenCode misses a server process's first session**, and `opencode run` is always a first
-  session. Measured, not asserted: one live `opencode 1.14.20` run (2026-08-31, started with
-  `--print-logs`) shows the plugin's own event hook firing for roughly 38 events of other
-  types, and its debug log shows `session.created` genuinely published on the bus after the
-  plugin loaded — yet it never reached the hook. Two further runs neither confirm nor refute
-  this: one without debug logging, one that captured no plugin events at all — see
-  `scripts/__tests__/fixtures/README.md`, "OpenCode's plugin events" for exactly what
-  each run shows. `session.idle` (the turn-end signal) is unaffected and reaches every
-  session.
+- **OpenCode never announces a session, so the plugin opens it.** Measured, not asserted:
+  one live `opencode 1.14.20` run (2026-08-31, started with `--print-logs`) shows the
+  plugin's own event hook firing for roughly 38 events of other types, and its debug log
+  shows `session.created` genuinely published on the bus after the plugin loaded — yet it
+  never reached the hook. Two further runs neither confirm nor refute this: one without
+  debug logging, one that captured no plugin events at all — see
+  `scripts/__tests__/fixtures/README.md`, "OpenCode's plugin events" for exactly what each
+  run shows. `session.idle` (the turn-end signal) is unaffected and reaches every session.
+  Since a session nobody announced would otherwise leave the journal with no run file — and
+  so drop the turn-end and every task declaration after it, for every `opencode run` there
+  has ever been — the first call a session produces opens it, carrying the directory that
+  call was already going to use. What is lost is only what `session.created` alone could
+  have said: on a server serving more than one directory, a session it never announced is
+  journalled under the plugin's own init-time directory rather than its own.
 - **A task is declared from a tool call's own arguments, on every host now.** Claude Code,
   Codex, Copilot and Cursor each hand their hook a tool call whose own arguments can name a
   file under a task folder — a `Read`, a `Bash` command line, an object keyed `path` — and

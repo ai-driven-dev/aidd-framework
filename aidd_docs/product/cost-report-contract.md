@@ -61,7 +61,7 @@ up, by what each task's folder declares. `by_flow` is a ninth, also with no filt
 own — see **`by_flow`** below — grouping by which orchestrated run the journal's own step
 sequence names, never a second capture. `by_agent` is a tenth, also with no filter of its
 own — see **`by_agent`** below — grouping by which agent ran, the main thread carrying its
-own row rather than an absence. `by_prompt` is an eleventh, also with no filter of its own —
+own row rather than an absence, and a tool that names no agent at all carrying a third. `by_prompt` is an eleventh, also with no filter of its own —
 see **`by_prompt`** below — grouping by the prompt that caused the work, the one breakdown
 no host limit can leave empty. `aidd telemetry report` also takes
 `--axis <name>` (`total`, `day`, `step`, `model`, `agent`, `prompt`, `task`, `backlog`,
@@ -131,7 +131,20 @@ real count is the ordinary case of reporting from a project whose switch never c
 work, never a contradiction (see "Attributing records to a task" for the same scope split
 elsewhere in this object).
 
-Every object carries `cost_report_version`, currently `14`.
+Every object carries `cost_report_version`, currently `15`.
+
+Bumped from `14` when `by_person`'s `resolution` gained a fourth value,
+**`"this-machine"`**: the record carried no identifier of its own, and this machine has
+declared an identity. It exists because `person_id` is written onto a record when the record
+is *stored*, so whether one carries it depends on when the identity was declared relative to
+when that record was read — never on the work. Measured on a live machine: 29,207 requests,
+every one read by that machine's own `aidd`, and `by_person` could name none of them; the
+same sink, the same identity file, answered differently depending on the order those two
+things happened in. Declaring an identity now names the whole history rather than only what
+follows. Sound because the sink has exactly one writer and every line it holds carries
+`provenance: "local-read"` — a record in it was read by this machine's own reader. A consumer
+that switched exhaustively on the three previous values must add this one; every row's
+`totals` still reconciles to the period total.
 
 Bumped from `13` when the reasons a `by_task` or `by_backlog` row can carry gained a
 fifth, **`"precedes-journal"`**: this record's moment is older than the earliest moment its
@@ -182,12 +195,13 @@ consumer that switched exhaustively on the three previous reasons must add this 
 row's `totals` still reconciles to the period total exactly as before.
 
 Bumped from `12` when **`by_prompt`** joined the top-level breakdowns. It is the only
-breakdown complete by construction: every other one depends on a capture that may not have
+breakdown no host limit can empty: every other one depends on a capture that may not have
 happened — a run journal, an identity file, a task declaration, a host that names the skill
-it is running — while this one depends on a field the transcript reader already resolves for
-every usage line by walking `parentUuid` back to the turn that caused it. Measured 2026-09-04
-on the built binary against one real session: 1073 of 1073 records carried a `prompt_id`, its
-972 subagent records included, across 12 distinct prompts. Nothing new is captured for it.
+it is running — while this one depends on a field the transcript reader resolves for itself,
+by walking `parentUuid` back to the turn that caused the work. That is not the same as
+complete: measured 2026-09-05 on one machine's sink, 845 of 30,714 records carry no
+`prompt_id`, and all but one of them were stored by a reader that predates the resolution —
+see **`by_prompt`** below. Nothing new is captured for it.
 A row carries `started_at`, the earliest moment in that prompt, because a prompt id alone is
 opaque — it is what a person greps for in their own transcript. The row for records that
 named no prompt carries neither `prompt` nor `started_at`, is placed last rather than ranked
@@ -201,9 +215,12 @@ is where the spend is: measured on a live session, ten subagent transcripts held
 subagent tokens) where almost none names a skill (2.7%). That is why `by_step` can read a
 few percent while a session's real cost sits elsewhere — the host names a skill on the main
 thread alone, and no reader can invent one. `by_agent` needs no new capture: `agent_name` was
-already on the record. A row with no `agent` is the main thread's own, never "no agent" — a
-session starts there. On every tool but Claude Code the field is never set at all, so that
-one row carries the whole period, which is the truth for a route that names no subagents.
+already on the record. Every row carries `attribution`, and it is what tells the two rows
+that name no agent apart: `main-thread` is a tool that names agents saying this record
+belongs to none of them — a session starts there, and it is never "no agent" — while
+`not-stated` is a tool whose route never names one. Only Claude Code's route does today, so
+on Codex, Copilot and OpenCode every record joins the `not-stated` row. It used to join the
+main thread's, which asserted of those tools a fact nothing observed.
 
 Bumped from `8` to `9` when `attribution` gained a fourth value, `prompt-matched`.
 
@@ -252,7 +269,7 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
 
 ```jsonc
 {
-  "cost_report_version": 14,
+  "cost_report_version": 15,
   "period": { "from_day": "2026-07-01", "to_day": "2026-07-31" },
   "measurement_enabled": true,                  // this project's own switch, right now — see Versioning
   "task": "2026_08/2026_08_21_cost-reporter",   // absent unless --task was given
@@ -263,13 +280,13 @@ one. Adding a field you may ignore is not a bump; changing what an existing fiel
   "active_time_s": 2820,                        // absent when no record carried it
   "by_step":    [{ "step": "aidd-dev:02-implement", "attribution": "journal-interval", "totals": {} }],
   "by_model":   [{ "model": "gpt-5.6-sol", "totals": {} }],  // a row with no "model" names none known
-  "by_agent":   [{ "agent": "aidd-dev:executor", "totals": {} }, { "totals": {} }],  // a row with no "agent" is the main thread's own, never "no agent"
+  "by_agent":   [{ "agent": "aidd-dev:executor", "attribution": "tool-stated", "totals": {} }, { "attribution": "main-thread", "totals": {} }, { "attribution": "not-stated", "totals": {} }],  // "main-thread" is a tool that names agents saying this is none of them; "not-stated" is a tool whose route never names one
   "by_prompt":  [{ "prompt": "a-prompt-id", "started_at": "2026-07-01T09:00:00Z", "totals": {} }, { "totals": {} }],  // one row per prompt, largest first; the last row, undated, is every record that named none
   "by_tool":    [{ "tool": "codex", "coverage": "covered", "reason": "…", "capability": {}, "totals": {}, "session_totals": {} }],  // session_totals absent unless the tool has one (Copilot, today)
   "by_project": [{ "project": "acme/widgets", "totals": {} }],   // a row with no `project` names none known
   "by_task":    [{ "task": "2026_08/2026_08_21_cost-reporter", "attribution": "declared", "totals": {} }, { "reason": "precedes-declaration", "totals": {} }],  // a row with no `task` carries `reason` instead, naming which of five facts applies; up to five such rows
   "by_backlog": [{ "backlog": "ai-driven-dev/framework#661", "totals": {} }, { "declaration": "none", "totals": {} }, { "declaration": "unreadable", "totals": {} }, { "reason": "precedes-declaration", "totals": {} }],  // a row with no `backlog` carries `declaration` (a known task naming none, or one whose declaration could not be read) or `reason` (a record in no task at all) — never both, never neither
-  "by_flow":    [{ "flow": "aidd-orchestrator:01-sdlc", "started_at": "2026-07-01T09:00:00Z", "totals": {} }, { "flow": "aidd-orchestrator:01-sdlc", "started_at": "2026-07-01T11:00:00Z", "totals": {} }, { "totals": {} }],  // two runs of the same skill are two rows, told apart by `started_at`; the last row is work that fell in no flow interval at all
+  "by_flow":    [{ "flow": "aidd-orchestrator:01-sdlc", "attribution": "journal-interval", "started_at": "2026-07-01T09:00:00Z", "totals": {} }, { "flow": "aidd-orchestrator:01-sdlc", "attribution": "journal-interval", "started_at": "2026-07-01T11:00:00Z", "totals": {} }, { "flow": "aidd-orchestrator:01-sdlc", "attribution": "tool-stated", "totals": {} }, { "attribution": "unattributed", "totals": {} }],  // two runs of the same skill are two rows, told apart by `started_at`; a `tool-stated` row is every run of that skill only the record's own tool named, so it carries no `started_at`; the last row is work that joined neither
   "by_day":     [{ "day": "2026-07-01", "totals": {} }],         // every day in the period, in order, gaps included
   "by_person":  [{ "resolution": "mapped", "person": "a-person-id", "identities": ["a-person-id", "a-machine-id"], "totals": {} }],  // mapped rows first, then every unplaced identity, then the one row for records carrying none
   "attribution": [{ "attribution": "tool-stated", "totals": {} }],
@@ -440,8 +457,10 @@ unrelated to a task: `aidd-orchestrator:01-sdlc` running end to end is one flow,
 tasks or backlog items it touched along the way. Nothing new is captured for it. Skill
 detection already writes a `step_start` line for any skill, orchestrating or not (the same
 lines `by_step` reads), so a flow is *read* from that sequence, never declared by a hook:
-one flow opens at an orchestrating skill's own `step_start` and closes at whichever of the
-next orchestrating `step_start` or a `turn_end` comes first.
+one flow opens at an orchestrating skill's own `step_start` and closes at a `step_end`
+naming that same skill, at the next orchestrating `step_start`, or — for a flow nothing ever
+closes — at the journal's own last witnessed moment. A `turn_end` is a pause, not a close: a
+flow spanning three prompts is exactly the case a `turn_end` used to cut short.
 
 **Which skills orchestrate is declared, once, never matched from a plugin string.** No
 skill's own frontmatter says it orchestrates, and more than one skill in this framework's
@@ -451,15 +470,34 @@ argument-stated name and a bare directory name — see that module's own doc com
 why both exist) — extending it for a project's own orchestrator is the one change adding a
 new one to this axis ever needs.
 
-A row's `flow` names the orchestrating skill; `started_at` names the moment it opened. Both
-are needed to tell two rows apart: **two orchestrated runs of the same skill in one session
-are two rows, never merged into one** — `by_flow` groups by the closed interval a record's
-own moment falls inside, not by the skill's name alone, the same distinction `by_step`
-already draws between a step reached by two different routes. A row with neither field is
-every record whose own moment fell in no flow interval at all — work before the first
-orchestrating step, or between one flow's `turn_end` and the next flow's own opening. There
-is no `reason` breakdown the way `by_task`'s remainder has one: a flow is read from the same
-sequence whichever way a record misses it, so there is only ever the one fact to state.
+A row's `flow` names the orchestrating skill, `attribution` says how that flow came to be
+known, and `started_at` names the moment it opened. All three tell two rows apart: **two
+orchestrated runs of the same skill in one session are two rows, never merged into one** —
+an `attribution: "journal-interval"` row groups by the closed interval a record's own moment
+falls inside, not by the skill's name alone, the same distinction `by_step` already draws
+between a step reached by two different routes. A row with no `flow` at all, carrying
+`attribution: "unattributed"`, is every record that joined neither an interval nor a stated
+flow. There is no `reason` breakdown the way `by_task`'s remainder has one: a flow is read
+from the same sequence whichever way a record misses it, so there is only ever the one fact
+to state.
+
+**A flow a record's own tool named is a flow.** A session resumed after its context was
+compacted invokes nothing again, so no `step_start` hook fires and its journal opens no flow
+— while the transcript goes on stating the step on every record it produces. A record no
+interval covers, whose own `step_attribution` is `tool-stated` and whose `step` names an
+orchestrating skill, joins a row for that skill carrying `attribution: "tool-stated"`. That
+row has no `started_at`: it is a bucket drawn from however many runs of that skill the tool
+named, and a name is not a run. Only the tool's own statement opens such a row — a
+`journal-interval` step is an inference from the very intervals already checked, and a
+`prompt-matched` one names a step rather than an orchestration.
+
+**An interval wins over a stated flow, and the reason is granularity, not strength.** Where
+a record falls inside an interval, that interval's row is the one it joins, even though its
+tool stated the same skill. Elsewhere the preference runs the other way — `withStepBackfill`
+prefers a tool-stated step over a journal-interval one — and the two are not in conflict,
+because they answer different questions. There the question is *which skill*, and the tool
+naming its own beats an inference from a moment. Here the question is *which run*, and only
+an interval can say.
 
 **A skill a person runs by hand while a flow is open counts inside it.** The journal cannot
 tell a hand-run skill from one the orchestrator itself invoked — both write the identical
@@ -480,7 +518,16 @@ turn that caused the work.
 | Row | Means |
 | --- | --- |
 | `prompt` and `started_at` | one prompt, and the earliest moment measured inside it |
-| neither field | every record whose tool cannot say which prompt caused it |
+| neither field | every record no prompt could be resolved for |
+
+**Read the second row as a real quantity, not a rounding error.** A sink accumulates across
+reader versions, and a record's fields are fixed the first time its turn is stored: a record
+written before this resolution shipped never gains a `prompt_id`, however often the sink is
+read again. Measured 2026-09-05 on one machine's sink of 30,714 records: 845 carry none —
+34 written before the CLI stamped a version, 810 by one session's reader before the
+resolution shipped, and exactly one by the current reader, an assistant line whose
+`parentUuid` chain reaches no line naming a prompt. Re-reading recovers little of it: 720 of
+those requests name no line any transcript on disk still holds.
 
 Ordered largest first, like every breakdown but `by_day`; the remainder row is placed last
 rather than ranked, because a bucket drawn from many turns has no size comparable to a single
@@ -495,20 +542,21 @@ always carries them all.
 never against a git author, an email or a hostname. That file describes exactly one person:
 its own `person_id`, how it was obtained (`origin`: `"minted"` here or `"adopted"` from
 another machine), and every identifier added onto it with `aidd telemetry identity link`
-(`also_me`). Each row's `resolution` is one of three:
+(`also_me`). Each row's `resolution` is one of four:
 
 | `resolution` | Means |
 | --- | --- |
 | `mapped` | The identifier is this machine's own person — its `person_id` or a member of `also_me`. `person` carries the canonical identifier, and `identities` carries every raw identifier behind the row, including that canonical one. |
 | `unresolved` | The identifier is real, but the identity file does not cover it. `identities` carries that one raw identifier; `person` is absent. |
-| `none` | The record carried no identifier at all — a different fact from `unresolved`: nobody opted in, rather than somebody did on a machine or tool this identity has not heard of. |
+| `this-machine` | The record carried no identifier of its own, and this machine has declared an identity. `person` and `identities` carry that identity exactly as a `mapped` row does; the two are kept apart because they are different facts — `mapped` is the record naming a person this identity claims, this is the identity claiming a record that named nobody. |
+| `none` | The record carried no identifier at all **and** no identity is declared — a different fact from `unresolved`: nobody opted in, rather than somebody did on a machine or tool this identity has not heard of. |
 
 **Two raw identifiers one person declared merge into one `mapped` row; two unplaced
 identifiers never merge into each other.** The identity file describes exactly one person,
 so there is no shape in which two people could claim one identifier in the first place —
-unlike a lookup table, nothing here can be edited into that state. Rows are ordered mapped
-first, then every unresolved identity, then the one `none` row last; largest first within
-the mapped and the unresolved groups.
+unlike a lookup table, nothing here can be edited into that state. Rows are ordered by how strong the claim is: `mapped`
+first, then the one `this-machine` row, then every unresolved identity, then the one `none`
+row last; largest first within each group.
 
 `by_person` sums to `totals.requests` exactly like every other breakdown — a damaged or
 undeclared identity changes how records are labelled, never how many are counted.
@@ -578,7 +626,7 @@ supply an amount and a session that cost nothing look identical in the numbers.
 
 ```jsonc
 "capability": {
-  "local_read": { "token_counters": true, "amount": false, "tool_stated_step": false },
+  "local_read": { "token_counters": true, "amount": false, "tool_stated_step": false, "agent_name": false },
   "export": null,
   "journal_attributable": true,
   "task_attributable": false
@@ -592,6 +640,7 @@ supply an amount and a session that cost nothing look identical in the numbers.
 | `token_counters` | That route yields the four counters. |
 | `amount` | That route yields a figure denominated in currency. Never a credit or a premium request. |
 | `tool_stated_step` | The tool names the running step itself. A journal interval is not this. |
+| `agent_name` | The route names the agent a record belongs to, and so also says when one is the main thread's own. Without it, `by_agent` reads this tool's records as `not-stated`, never as the main thread. |
 | `journal_attributable` | The run journal names this tool's sessions. **False means two things:** no step can come from an interval, *and* a read that sweeps the journal never reaches one of its sessions — so the tool can be perfectly readable and still report nothing until someone names a session by hand. |
 | `task_attributable` | A session on this tool can be traced to the task it worked on — declared, inferred, or both. False only where the journal hook never reaches a tool call for this host at all, since a declaration needs a tool call's own arguments to read; true for every declared host today, OpenCode included as of 2026-08-31 (`registry-conformance.unit.test.ts` keeps this tied to the journal hook's own dispatch rather than typed in twice by hand). |
 

@@ -139,6 +139,7 @@ describe("whether anything is declared to do the recording", () => {
             hooks: [
               {
                 type: "command",
+                // biome-ignore lint/suspicious/noTemplateCurlyInString: Claude Code resolves this placeholder, the settings file carries it verbatim
                 command: "node ${CLAUDE_PLUGIN_ROOT}/hooks/journal.cjs session-start",
               },
             ],

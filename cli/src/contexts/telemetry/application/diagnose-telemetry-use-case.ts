@@ -272,6 +272,7 @@ export class DiagnoseTelemetryUseCase {
       hookTrust,
       recorderDeclared: recorderDeclaration.declared,
       recorderDeclarationReadable: recorderDeclaration.unreadable.length === 0,
+      foreignSchemaVersions: await this.runJournalReader.listForeignSchemas(),
     };
   }
 

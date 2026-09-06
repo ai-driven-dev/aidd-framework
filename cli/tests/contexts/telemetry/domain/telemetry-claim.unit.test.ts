@@ -34,6 +34,9 @@ function evidence(overrides: Partial<TelemetryEvidence> = {}): TelemetryEvidence
     // Readable by default — a clean machine where the declaration itself was never in
     // question. A test for the "could not be read" branch sets this to `false` explicitly.
     recorderDeclarationReadable: true,
+    // Empty by default: every journal on disk states the schema this build reads, or states
+    // none. A test for the disagreement sets it explicitly.
+    foreignSchemaVersions: [],
     ...overrides,
   };
 }
@@ -102,6 +105,38 @@ describe("diagnoseTelemetryClaims — hook fired", () => {
     expect(hookFired?.reason).toBe("anchorless-run-file");
     expect(hookFired?.detail).not.toMatch(/nothing to evaluate/u);
     expect(hookFired?.detail).not.toMatch(/declared nowhere/u);
+  });
+
+  // A journal the reader refused for stating a schema it does not read leaves `journals`
+  // empty, which every other branch here reads as "no run file". Two of them would then be
+  // outright false about a file that demonstrably exists and whose header parsed perfectly:
+  // "declared nowhere" claims no file, and "none carry a readable session_start" blames a
+  // torn write. The version disagreement is the fact that is actually known.
+  it("names a journal written under another schema, never a torn write or a missing file", () => {
+    const result = diagnoseTelemetryClaims(
+      evidence({ currentSessionId: "s-1", foreignSchemaVersions: [3] })
+    );
+    const hookFired = claim(result, "hook-fired");
+    expect(hookFired?.verdict).toBe("fail");
+    expect(hookFired?.reason).toBe("journal-in-another-schema");
+    expect(hookFired?.detail).toContain("3");
+    expect(hookFired?.detail).not.toMatch(/declared nowhere/u);
+    expect(hookFired?.detail).not.toMatch(/none carry a readable session_start/u);
+  });
+
+  // Ahead of the anchorless reading, deliberately: a build that cannot read a journal's
+  // schema cannot tell whether its session_start is missing or merely shaped differently,
+  // so blaming a torn write would be asserting what it just said it cannot see.
+  it("prefers the schema disagreement over an anchorless file when both are present", () => {
+    const result = diagnoseTelemetryClaims(
+      evidence({
+        currentSessionId: "s-1",
+        journals: [journal({ vendorId: undefined })],
+        foreignSchemaVersions: [3],
+      })
+    );
+
+    expect(claim(result, "hook-fired")?.reason).toBe("journal-in-another-schema");
   });
 
   it("names this session as having left no run file when an older one exists but not its own", () => {
@@ -536,6 +571,11 @@ describe("the diagnostic skill's account of every no-run-file reason matches the
       verdict: "fail",
       phrase: "none carry a readable session_start",
       evidenceOverrides: { currentSessionId: "s-1", journals: [journal({ vendorId: undefined })] },
+    },
+    "journal-in-another-schema": {
+      verdict: "fail",
+      phrase: "written under a schema this build does not read",
+      evidenceOverrides: { currentSessionId: "s-1", foreignSchemaVersions: [3] },
     },
   };
 
