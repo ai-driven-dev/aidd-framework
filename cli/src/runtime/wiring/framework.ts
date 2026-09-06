@@ -430,7 +430,15 @@ export async function createDeps(
     currentVersionProvider,
     updateOneToolUseCase
   );
-  const cleanUseCase = new CleanUseCase(fs, manifestRepo, logger, gitignoreUseCase, prompter);
+  const cleanUseCase = new CleanUseCase(
+    fs,
+    manifestRepo,
+    logger,
+    gitignoreUseCase,
+    nativePluginActivators,
+    marketplaceRegistry,
+    prompter
+  );
   const doctorAllUseCase = new DoctorAllUseCase(doctorUseCase);
   const listInstalledRulesUseCase = new ListInstalledRulesUseCase(fs);
   const checkUpdateUseCase = new CheckUpdateUseCase(cliUpdater, currentVersionProvider, logger, fs);

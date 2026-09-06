@@ -45,6 +45,9 @@ class ThrowingWriteAdapter implements FileReader, FileWriter {
   isExecutable(path: string): Promise<boolean> {
     return this.inner.isExecutable(path);
   }
+  realpath(path: string): Promise<string> {
+    return this.inner.realpath(path);
+  }
   async writeFile(path: string, content: string): Promise<void> {
     if (path === this.failingPath) throw new Error(`disk full writing ${path}`);
     await this.inner.writeFile(path, content);

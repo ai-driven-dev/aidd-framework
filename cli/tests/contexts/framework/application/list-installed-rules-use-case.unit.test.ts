@@ -32,6 +32,7 @@ function readerOf(files: Readonly<Record<string, string>>): FileReader {
     fileExists: unused("fileExists"),
     readFileHash: unused("readFileHash"),
     isExecutable: unused("isExecutable"),
+    realpath: unused("realpath"),
   };
 }
 

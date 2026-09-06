@@ -24,4 +24,15 @@ export interface FileReader {
    * Behind the port rather than read from `node:fs` at a call site, so a substituted reader
    * cannot answer that a file exists while a real check on the same path throws. */
   isExecutable(path: string): Promise<boolean>;
+
+  /**
+   * Resolves every symlink and `..` segment in `path` to where it actually points.
+   * `clean` uses this before deleting a user-scope plugin's own files: a syntactic
+   * prefix match on the path as written down cannot tell a directory that turned into
+   * a symlink after install from one that never moved, and cannot tell a `..` a
+   * corrupted manifest entry carries from a path that never left its own tree — only a
+   * real resolution answers both. Throws (`code: "ENOENT"`) for a path that does not
+   * exist, same as `fs.realpath`; a caller checks `fileExists` first when that matters.
+   */
+  realpath(path: string): Promise<string>;
 }

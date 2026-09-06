@@ -53,6 +53,7 @@ function makeFsStub(store: Map<string, string> = new Map()): FileReader & FileWr
     deleteEmptyDirectories: async () => {},
     deleteDirectory: async () => {},
     isExecutable: async () => false,
+    realpath: async (path: string) => path,
     chmodExecutable: async () => {},
   };
 }

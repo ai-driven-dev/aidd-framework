@@ -474,8 +474,15 @@ if true; then
   section "clean"
   P_CLEAN=$(new_project)
   (cd "$P_CLEAN" && node "$CLI" setup --source local --path "$FRAMEWORK_FIXTURE" --ai claude --plugins none --yes >/dev/null 2>&1)
+  # Machine-local file install writes outside the manifest (never tracked, so a clean
+  # rejoining only tracked files used to leave it behind — measured in
+  # scope-native-clean-plan.md §1.2).
+  mkdir -p "$P_CLEAN/.claude" && echo '{}' > "$P_CLEAN/.claude/settings.local.json"
   run "clean --force" 0 "" "$P_CLEAN" -- clean --force
   [[ ! -d "$P_CLEAN/.aidd" ]] && ok ".aidd removed after clean" || bad ".aidd survived clean"
+  [[ ! -f "$P_CLEAN/.claude/settings.local.json" ]] \
+    && ok ".claude/settings.local.json removed after clean" \
+    || bad ".claude/settings.local.json survived clean"
 
   # ── telemetry ────────────────────────────────────────────────
   # The switch and everything it gates, against the real binary. HOME and

@@ -35,6 +35,7 @@ function makeFs(fileExists: boolean, diskHash: string): FileReader {
   return {
     fileExists: async () => fileExists,
     isExecutable: async () => false,
+    realpath: async (path: string) => path,
     readFileHash: async () => new FileHash(diskHash),
     readFile: async () => "",
     listDirectory: async () => [],

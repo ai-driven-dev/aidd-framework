@@ -8,6 +8,7 @@ function makeFs(existingPaths: string[]): FileReader {
   return {
     fileExists: async (path: string) => existingPaths.some((p) => path.endsWith(p)),
     isExecutable: async () => false,
+    realpath: async (path: string) => path,
     readFile: async () => "",
     readFileHash: async () => new FileHash("00000000000000000000000000000000"),
     listDirectory: async () => [],

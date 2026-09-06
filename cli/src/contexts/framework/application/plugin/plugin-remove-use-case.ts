@@ -1,9 +1,5 @@
 import { homedir as nodeHomedir } from "node:os";
 import { dirname, join } from "node:path";
-import {
-  cursorProjectHooksScriptDir,
-  unmergeCursorProjectHooksJson,
-} from "../../../../contexts/tools/domain/formats/cursor-hooks-project-merge.js";
 import { NativePluginCliError, PluginNotFoundError } from "../../../../kernel/errors.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
@@ -20,6 +16,7 @@ import {
 import type { Manifest } from "../../domain/manifest.js";
 import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
+import { removeProjectHooks } from "../shared/remove-project-hooks.js";
 import { loadPluginManifest } from "./plugin-helpers.js";
 import {
   isFrameworkPrimeFlatMcp,
@@ -67,7 +64,7 @@ export class PluginRemoveUseCase {
       this.removeNativeActivation(plugin, toolId);
       await this.deletePluginFiles(plugin.files, baseDir);
       await this.removeMcpEntries(plugin, toolId, projectRoot);
-      await this.removeProjectHooks(pluginName, toolId, projectRoot);
+      await removeProjectHooks(this.fs, pluginName, toolId, projectRoot);
       manifest.removePlugin(toolId, pluginName);
       removed = true;
     }
@@ -111,29 +108,6 @@ export class PluginRemoveUseCase {
         `${binary} plugin uninstall '${ref}' failed: ${error.message} — an entry for it may remain in ${binary}'s own plugin registry.`
       );
     }
-  }
-
-  // The install-time counterpart of ProjectHooksMaterializer: a plugin whose hooks
-  // were merged into the project's own .cursor/hooks.json (never tracked in
-  // Plugin.files — see mode-b-flat-materialization-translator.ts) needs its own
-  // unmerge, not a baseDir-relative file delete. Both destinations are recomputed
-  // from pluginName alone, exactly as install computed them — no extra state to keep
-  // in sync.
-  private async removeProjectHooks(
-    pluginName: string,
-    toolId: AiToolId,
-    projectRoot: string
-  ): Promise<void> {
-    const pluginsCap = resolvePluginsCapability(toolId);
-    if (pluginsCap?.hooksDestination !== "project") return;
-    const projectHooksRelativePath = pluginsCap.projectHooksRelativePath;
-    if (projectHooksRelativePath === null) return;
-    const hooksPath = join(projectRoot, projectHooksRelativePath);
-    const existing = await this.readExistingJson(hooksPath);
-    if (existing !== null) {
-      await this.fs.writeFile(hooksPath, unmergeCursorProjectHooksJson(existing, pluginName));
-    }
-    await this.fs.deleteDirectory(join(projectRoot, cursorProjectHooksScriptDir(pluginName)));
   }
 
   private async removeMcpEntries(

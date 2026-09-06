@@ -30,6 +30,9 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
 
   private readonly files = new Map<string, string>();
   private readonly hasher: Hasher;
+  /** Path → what it resolves to, for a test proving `realpath`-based containment
+   * without a real filesystem — see `setSymlink`. */
+  private readonly symlinks = new Map<string, string>();
 
   constructor(seed: Record<string, string> = {}, hasher?: Hasher) {
     this.hasher = hasher ?? new DefaultHasher();
@@ -98,6 +101,31 @@ export class InMemoryFileAdapter implements FileReader, FileWriter, FileMerger {
   async readFileHash(path: string): Promise<FileHash> {
     const content = await this.readFile(path);
     return this.hasher.hash(content);
+  }
+
+  /**
+   * Resolves through the longest matching registered symlink, same shape as a real
+   * `fs.realpath` walking a symlinked ancestor directory. Identity when nothing was
+   * declared for this path — most paths in a test are never symlinked.
+   */
+  async realpath(path: string): Promise<string> {
+    const key = norm(path);
+    let bestMatch: { link: string; target: string } | undefined;
+    for (const [link, target] of this.symlinks) {
+      if (key === link || key.startsWith(`${link}/`)) {
+        if (bestMatch === undefined || link.length > bestMatch.link.length) {
+          bestMatch = { link, target };
+        }
+      }
+    }
+    if (bestMatch === undefined) return key;
+    return bestMatch.target + key.slice(bestMatch.link.length);
+  }
+
+  /** Test-only: declares that `path` is a symlink resolving to `target`, so a test can
+   * prove `realpath`-based containment without touching a real filesystem. */
+  setSymlink(path: string, target: string): void {
+    this.symlinks.set(norm(path), norm(target));
   }
 
   async mergeJsonFile(path: string, content: string, strategy: MergeStrategy): Promise<void> {

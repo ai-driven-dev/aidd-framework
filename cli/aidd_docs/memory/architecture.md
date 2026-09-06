@@ -35,6 +35,7 @@ flowchart LR
 - The manifest reads one version only and refuses anything else, naming the fix. No migration chain: a domain entity carrying every past shape of its own JSON is a persistence concern.
 - As of v7, every installed plugin records its own `scope` (`project` | `user`) at install time; everything that later resolves its base directory reads that record, never the tool's current profile, which can disagree with what was true when the entry was written.
 - A launcher locates and runs an external binary; it never embeds that binary's code. `kanban` broke this and was unwired until it can meet it.
+- `clean` never deletes what a host's own CLI wrote to its own registry — it drives that CLI to undo it (`uninstallPlugin` then `removeMarketplace`, the same activator port `sync` and `plugin remove` use), and names a tool whose binary is absent rather than touching its registry by any other means. Nor does it delete under a user's home directory on a manifest's word alone: a user-scope plugin's own path must first resolve, through `realpath`, strictly inside the tool's declared user-scope directory — the one check that catches both a `..` segment a corrupted entry carries and a plugin directory that became a symlink after install.
 
 ## Gotchas
 

@@ -1,17 +1,24 @@
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/vscode/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/codex/profile.js";
+import { Marketplace } from "../../../../src/contexts/distribution/domain/marketplace.js";
 import { CleanUseCase } from "../../../../src/contexts/framework/application/clean-use-case.js";
 import { GitignoreUseCase } from "../../../../src/contexts/framework/application/gitignore-use-case.js";
 import { Manifest } from "../../../../src/contexts/framework/domain/manifest.js";
 import { InstalledPlugin } from "../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
+import { cursorProjectHooksScriptDir } from "../../../../src/contexts/tools/domain/formats/cursor-hooks-project-merge.js";
+import type { NativePluginActivator } from "../../../../src/contexts/tools/domain/ports/native-plugin-activator.js";
 import type { ToolId } from "../../../../src/kernel/tool.js";
 import { buildUnitDeps, initAndInstall } from "../../../helpers/ports/build-unit-deps.js";
 import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
+import { FakeNativePluginActivator } from "../../../helpers/ports/fake-native-plugin-activator.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryManifestRepository } from "../../../helpers/ports/in-memory-manifest-repository.js";
+import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-marketplace-registry.js";
 
 const PROJECT_ROOT = "/test-project";
 
@@ -275,4 +282,380 @@ describe("clean", () => {
       false
     );
   });
+
+  describe("undoing a host's own native registration", () => {
+    const BINARY = "codex";
+    const MARKETPLACE = "aidd-framework";
+    const REF = "aidd-context@aidd-framework";
+
+    function seedManifestWithNativeRegistrations(): Manifest {
+      const manifest = Manifest.create();
+      manifest.addTool("codex", "1.0.0", []);
+      manifest.setNativeRegistrations("codex", {
+        binary: BINARY,
+        marketplaces: [MARKETPLACE],
+        pluginRefs: [REF],
+      });
+      return manifest;
+    }
+
+    function seedMarketplaceRegistry(): InMemoryMarketplaceRegistry {
+      const registry = new InMemoryMarketplaceRegistry();
+      registry.save(
+        PROJECT_ROOT,
+        Marketplace.create({
+          name: MARKETPLACE,
+          source: { kind: "local", path: "/some/built/path" },
+          scope: "project",
+          addedAt: "2026-01-01T00:00:00.000Z",
+        })
+      );
+      return registry;
+    }
+
+    it("uninstalls the registered plugin ref and removes the marketplace it came from", async () => {
+      const manifest = seedManifestWithNativeRegistrations();
+      const fs = new InMemoryFileAdapter();
+      const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+      const activator = new FakeNativePluginActivator({ available: true });
+      const useCase = new CleanUseCase(
+        fs,
+        manifestRepo,
+        new CapturingLogger(),
+        new GitignoreUseCase(fs),
+        new Map([[BINARY, activator]]),
+        seedMarketplaceRegistry()
+      );
+
+      await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(activator.uninstalledPlugins).toEqual([REF]);
+      expect(activator.removedMarketplaces).toEqual([MARKETPLACE]);
+    });
+
+    it("warns and leaves the registration in place when the tool's CLI is not on PATH", async () => {
+      const manifest = seedManifestWithNativeRegistrations();
+      const fs = new InMemoryFileAdapter();
+      const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+      const activator = new FakeNativePluginActivator({ available: false });
+      const logger = new CapturingLogger();
+      const useCase = new CleanUseCase(
+        fs,
+        manifestRepo,
+        logger,
+        new GitignoreUseCase(fs),
+        new Map([[BINARY, activator]]),
+        seedMarketplaceRegistry()
+      );
+
+      await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(activator.uninstalledPlugins).toEqual([]);
+      expect(activator.removedMarketplaces).toEqual([]);
+      expect(logger.warnMessages).toContain(
+        "codex: registration left in place, the codex CLI is not on the PATH."
+      );
+    });
+
+    it("uninstalls the plugin ref before removing the marketplace, for the same tool", async () => {
+      const manifest = seedManifestWithNativeRegistrations();
+      const fs = new InMemoryFileAdapter();
+      const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+      const calls: string[] = [];
+      const activator = new OrderRecordingActivator(calls);
+      const useCase = new CleanUseCase(
+        fs,
+        manifestRepo,
+        new CapturingLogger(),
+        new GitignoreUseCase(fs),
+        new Map([[BINARY, activator]]),
+        seedMarketplaceRegistry()
+      );
+
+      await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(calls).toEqual([`uninstall:${REF}`, `removeMarketplace:${MARKETPLACE}`]);
+    });
+
+    it("undoes the native registration before the built marketplace tree it points at is deleted", async () => {
+      const manifest = seedManifestWithNativeRegistrations();
+      const fs = new InMemoryFileAdapter();
+      const builtPath = join(
+        PROJECT_ROOT,
+        ".aidd",
+        "cache",
+        "built",
+        MARKETPLACE,
+        BINARY,
+        "x.json"
+      );
+      await fs.writeFile(builtPath, "{}");
+      const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+      let builtTreeExistedAtRemoveMarketplace: boolean | null = null;
+      const activator = new AssertingActivator(async () => {
+        builtTreeExistedAtRemoveMarketplace = fs.has(builtPath);
+      });
+      const useCase = new CleanUseCase(
+        fs,
+        manifestRepo,
+        new CapturingLogger(),
+        new GitignoreUseCase(fs),
+        new Map([[BINARY, activator]]),
+        seedMarketplaceRegistry()
+      );
+
+      await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(builtTreeExistedAtRemoveMarketplace).toBe(true);
+    });
+
+    it("names the native registration a dry-run preview will undo, without touching it", async () => {
+      const manifest = seedManifestWithNativeRegistrations();
+      const fs = new InMemoryFileAdapter();
+      const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+      const activator = new FakeNativePluginActivator({ available: true });
+      const useCase = new CleanUseCase(
+        fs,
+        manifestRepo,
+        new CapturingLogger(),
+        new GitignoreUseCase(fs),
+        new Map([[BINARY, activator]]),
+        seedMarketplaceRegistry()
+      );
+
+      const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: false });
+
+      expect(result.dryRun).toBe(true);
+      expect(result.preview.nativeRegistrations).toEqual([
+        { toolId: "codex", binary: BINARY, marketplaceCount: 1, pluginRefCount: 1 },
+      ]);
+      expect(activator.uninstalledPlugins).toEqual([]);
+      expect(activator.removedMarketplaces).toEqual([]);
+    });
+  });
+
+  describe("machine-local files a tool's own materialization writes outside the manifest", () => {
+    it("removes .claude/settings.local.json, which install writes but the manifest never tracks", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude" as ToolId);
+      const settingsLocalPath = join(PROJECT_ROOT, ".claude", "settings.local.json");
+      await deps.fs.writeFile(settingsLocalPath, "{}");
+
+      const useCase = new CleanUseCase(
+        deps.fs,
+        deps.manifestRepo,
+        deps.logger,
+        deps.gitignoreUseCase
+      );
+      await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(deps.fs.has(settingsLocalPath)).toBe(false);
+    });
+
+    it("deletes .cursor/hooks.json entirely once unmerging leaves it empty, and its script directory", async () => {
+      const pluginName = "aidd-context";
+      const manifest = Manifest.create();
+      manifest.addTool("cursor", "1.0.0", []);
+      manifest.addPlugin(
+        "cursor",
+        InstalledPlugin.fromJSON({
+          name: pluginName,
+          source: { kind: "local", path: "/some/path" },
+          version: "1.0.0",
+          strict: false,
+          files: {},
+          scope: "project",
+        })
+      );
+      const fs = new InMemoryFileAdapter();
+      const hooksPath = join(PROJECT_ROOT, ".cursor", "hooks.json");
+      const scriptMarker = cursorProjectHooksScriptDir(pluginName);
+      await fs.writeFile(
+        hooksPath,
+        JSON.stringify({
+          version: 1,
+          hooks: { PreToolUse: [{ command: `./${scriptMarker}run.js` }] },
+        })
+      );
+      const scriptPath = join(PROJECT_ROOT, scriptMarker, "run.js");
+      await fs.writeFile(scriptPath, "// hook script");
+      const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+
+      const useCase = new CleanUseCase(
+        fs,
+        manifestRepo,
+        new CapturingLogger(),
+        new GitignoreUseCase(fs)
+      );
+      await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(fs.has(hooksPath)).toBe(false);
+      expect(fs.has(scriptPath)).toBe(false);
+    });
+
+    it("keeps .cursor/hooks.json when another plugin's entries remain in it", async () => {
+      const pluginName = "aidd-context";
+      const otherPluginName = "aidd-dev";
+      const manifest = Manifest.create();
+      manifest.addTool("cursor", "1.0.0", []);
+      manifest.addPlugin(
+        "cursor",
+        InstalledPlugin.fromJSON({
+          name: pluginName,
+          source: { kind: "local", path: "/some/path" },
+          version: "1.0.0",
+          strict: false,
+          files: {},
+          scope: "project",
+        })
+      );
+      const fs = new InMemoryFileAdapter();
+      const hooksPath = join(PROJECT_ROOT, ".cursor", "hooks.json");
+      const scriptMarker = cursorProjectHooksScriptDir(pluginName);
+      const otherScriptMarker = cursorProjectHooksScriptDir(otherPluginName);
+      await fs.writeFile(
+        hooksPath,
+        JSON.stringify({
+          version: 1,
+          hooks: {
+            PreToolUse: [
+              { command: `./${scriptMarker}run.js` },
+              { command: `./${otherScriptMarker}run.js` },
+            ],
+          },
+        })
+      );
+      const otherScriptPath = join(PROJECT_ROOT, otherScriptMarker, "run.js");
+      await fs.writeFile(
+        otherScriptPath,
+        "// hook script belonging to a plugin clean never tracked"
+      );
+      const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+
+      const useCase = new CleanUseCase(
+        fs,
+        manifestRepo,
+        new CapturingLogger(),
+        new GitignoreUseCase(fs)
+      );
+      await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      const remainingHooks = fs.getFile(hooksPath);
+      expect(remainingHooks).toBeDefined();
+      expect(remainingHooks).not.toContain(scriptMarker);
+      expect(remainingHooks).toContain(otherScriptMarker);
+      expect(fs.has(otherScriptPath)).toBe(true);
+    });
+  });
+
+  describe("user-scope containment for a plugin's own files", () => {
+    it("refuses to delete a manifest entry whose relative path escapes the user-scope directory via `..`, while still deleting its legitimate sibling", async () => {
+      const manifest = Manifest.create();
+      manifest.addTool("cursor", "1.0.0", []);
+      manifest.addPlugin(
+        "cursor",
+        InstalledPlugin.fromJSON({
+          name: "aidd-context",
+          source: { kind: "local", path: "/some/path" },
+          version: "1.0.0",
+          strict: false,
+          files: {
+            [PLUGIN_KEY]: "abc123abc123abc123abc123abc123ab",
+            "../../../.ssh/id_rsa": "def456def456def456def456def456de",
+          },
+          scope: "user",
+        })
+      );
+      const fs = new RecordingFileAdapter();
+      const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+      const logger = new CapturingLogger();
+      const useCase = new CleanUseCase(fs, manifestRepo, logger, new GitignoreUseCase(fs));
+
+      await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(
+        fs.deletedPaths.some((p) => p.endsWith(join(".cursor", "plugins", "local", PLUGIN_KEY)))
+      ).toBe(true);
+      expect(fs.deletedPaths.some((p) => p.includes(join(".ssh", "id_rsa")))).toBe(false);
+      expect(logger.warnMessages.some((m) => m.includes("id_rsa"))).toBe(true);
+    });
+
+    it("refuses to delete a plugin whose own directory is a symlink resolving outside the user-scope directory", async () => {
+      const manifest = Manifest.create();
+      manifest.addTool("cursor", "1.0.0", []);
+      manifest.addPlugin(
+        "cursor",
+        InstalledPlugin.fromJSON({
+          name: "aidd-context",
+          source: { kind: "local", path: "/some/path" },
+          version: "1.0.0",
+          strict: false,
+          files: { [PLUGIN_KEY]: "abc123abc123abc123abc123abc123ab" },
+          scope: "user",
+        })
+      );
+      const fs = new RecordingFileAdapter();
+      const boundary = join(homedir(), ".cursor", "plugins", "local");
+      fs.setSymlink(join(boundary, "aidd-context"), "/tmp/evil-aidd-context");
+      const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+      const logger = new CapturingLogger();
+      const useCase = new CleanUseCase(fs, manifestRepo, logger, new GitignoreUseCase(fs));
+
+      await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(fs.deletedPaths.some((p) => p.includes("evil"))).toBe(false);
+      expect(
+        fs.deletedPaths.some((p) => p.endsWith(join(".cursor", "plugins", "local", PLUGIN_KEY)))
+      ).toBe(false);
+      expect(logger.warnMessages.some((m) => m.includes(PLUGIN_KEY))).toBe(true);
+    });
+  });
 });
+
+/** Records `uninstallPlugin`/`removeMarketplace` calls in the order they happen, so a
+ * test can assert one came before the other without depending on `FakeNativePluginActivator`'s
+ * two separate arrays. */
+class OrderRecordingActivator implements NativePluginActivator {
+  constructor(private readonly calls: string[]) {}
+  isAvailable(): boolean {
+    return true;
+  }
+  addMarketplace(): void {}
+  enablesPlugins(): boolean {
+    return false;
+  }
+  removeMarketplace(name: string): void {
+    this.calls.push(`removeMarketplace:${name}`);
+  }
+  registrationState(): "live" | "dead" | "unknown" {
+    return "live";
+  }
+  upgradeMarketplaces(): void {}
+  enablePlugin(): void {}
+  uninstallPlugin(pluginRef: string): void {
+    this.calls.push(`uninstall:${pluginRef}`);
+  }
+}
+
+/** Runs `onRemoveMarketplace` at the exact moment `removeMarketplace` is called, so a test
+ * can inspect filesystem state as of that call — proving native undo happens before the
+ * built marketplace tree it depends on is deleted. */
+class AssertingActivator implements NativePluginActivator {
+  constructor(private readonly onRemoveMarketplace: () => void | Promise<void>) {}
+  isAvailable(): boolean {
+    return true;
+  }
+  addMarketplace(): void {}
+  enablesPlugins(): boolean {
+    return false;
+  }
+  removeMarketplace(): void {
+    void this.onRemoveMarketplace();
+  }
+  registrationState(): "live" | "dead" | "unknown" {
+    return "live";
+  }
+  upgradeMarketplaces(): void {}
+  enablePlugin(): void {}
+  uninstallPlugin(): void {}
+}

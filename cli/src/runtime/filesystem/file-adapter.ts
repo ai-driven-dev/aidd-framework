@@ -5,6 +5,7 @@ import {
   mkdir,
   readdir,
   readFile,
+  realpath,
   rm,
   rmdir,
   stat,
@@ -117,6 +118,10 @@ export class FileAdapter implements FileReader, FileWriter, FileMerger {
     } catch {
       return false;
     }
+  }
+
+  async realpath(path: string): Promise<string> {
+    return realpath(path);
   }
 
   async readFileHash(path: string): Promise<FileHash> {

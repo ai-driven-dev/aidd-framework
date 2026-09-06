@@ -15,6 +15,7 @@ import type { Hasher } from "../../../../src/kernel/ports/hasher.js";
 const noopFs: FileReader & FileWriter = {
   fileExists: async () => false,
   isExecutable: async () => false,
+  realpath: async (path: string) => path,
   readFileHash: async () => new FileHash("00000000000000000000000000000000"),
   readFile: async () => "",
   listDirectory: async () => [],

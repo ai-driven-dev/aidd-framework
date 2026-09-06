@@ -33,6 +33,11 @@ export function registerCleanCommand(program: Command): void {
             output.print(`  ${tool.toolId}: ${tool.fileCount} files`);
           }
           output.print("  manifest: .aidd/ (config.json, if present, is kept)");
+          for (const registration of result.preview.nativeRegistrations) {
+            output.print(
+              `  ${registration.toolId}: ${registration.binary} will be asked to unregister ${registration.pluginRefCount} plugin ref(s) and ${registration.marketplaceCount} marketplace(s)`
+            );
+          }
           const toolCount = result.preview.tools.length;
           if (process.stdout.isTTY) {
             output.print("No files removed.");
