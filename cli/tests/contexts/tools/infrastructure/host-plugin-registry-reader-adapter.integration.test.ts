@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { hostPluginRegistryReaders } from "../../../../src/contexts/telemetry/infrastructure/host-plugin-registry-reader-adapter.js";
+import { hostPluginRegistryReaders } from "../../../../src/contexts/tools/infrastructure/host-plugin-registry-reader-adapter.js";
 import type { AiToolId } from "../../../../src/kernel/tool.js";
 
 /**

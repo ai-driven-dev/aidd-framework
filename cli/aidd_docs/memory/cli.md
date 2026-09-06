@@ -23,6 +23,7 @@ Thirty-three leaf commands. Read them live — `aidd --help`, then each group's.
 - Text on stdout, errors on stderr (`src/presentation/output.ts`). Typed exceptions travel inward, caught at the command layer only (`src/presentation/error-handler.ts`).
 - The update-check hook is the one place that swallows: it must never fail the command a person asked for.
 - Exit codes: `0` ok; `1` on error, an unhealthy `doctor`, or a non-interactive guard.
+- `doctor`, for a tool whose plugins activate through its own CLI (claude, codex, copilot): compares `nativeRegistrations` against that host's own registry file, four answers — `registered` (no issue), `not-registered` and `registered-disabled` (`error`, gate `doctor` unhealthy, fix names `aidd sync` or `aidd framework install --tool <id>`), `unanswerable` (`info`, never gates — the normal state on a machine that has never run the tool's own binary).
 
 ## Distribution
 

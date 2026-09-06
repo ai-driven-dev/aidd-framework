@@ -57,13 +57,21 @@ async function runFullDoctor(
   output.print("IDE tools:");
   printScopeReport(output, statusResult.ideTools);
   output.print("Plugins:");
-  printPluginDrift(output, {
-    pluginDrift: statusResult.pluginDrift,
-    pluginNativeOnly: statusResult.pluginNativeOnly,
-  });
+  printPluginDrift(output, { pluginDrift: statusResult.pluginDrift });
+
+  // Printed before the health gate, and unconditionally: an `info` issue (an
+  // unanswerable native registration, most often) must survive a healthy run exactly
+  // as the drift section above does, never held back until something else fails.
+  // `printScopeIssues`/`printPluginIssues` are no-ops on an empty list, so a run with
+  // nothing to say here prints nothing extra.
+  if (pluginName === undefined) {
+    printScopeIssues(output, "AI", doctorResult.ai);
+    printScopeIssues(output, "IDE", doctorResult.ide);
+  }
+  printPluginIssues(output, doctorResult.pluginIssues);
 
   // Drift is informational here, same as the `status` it absorbs: it never gates the
-  // exit code. Only structural health issues (below) do — unchanged from before this
+  // exit code. Only structural health issues (above) do — unchanged from before this
   // command absorbed status, which is what keeps `status` and `doctor` effect-equivalent
   // on a project that is drifted but otherwise healthy.
   //
@@ -78,12 +86,6 @@ async function runFullDoctor(
     output.success("\nInstallation is healthy");
     return;
   }
-
-  if (pluginName === undefined) {
-    printScopeIssues(output, "AI", doctorResult.ai);
-    printScopeIssues(output, "IDE", doctorResult.ide);
-  }
-  printPluginIssues(output, doctorResult.pluginIssues);
   process.exit(1);
 }
 
@@ -114,10 +116,14 @@ async function runScopedDoctor(
   output.print("\nDrift:");
   printScopeReport(output, statusReport);
   output.print("Plugins:");
-  printPluginDrift(output, {
-    pluginDrift: statusReport.pluginDrift,
-    pluginNativeOnly: statusReport.pluginNativeOnly,
-  });
+  printPluginDrift(output, { pluginDrift: statusReport.pluginDrift });
+
+  // Printed unconditionally, before the health gate — see the comment on the unscoped
+  // path above.
+  if (pluginName === undefined) {
+    printScopeIssues(output, toolId, doctorReport);
+  }
+  printPluginIssues(output, doctorReport.pluginIssues);
 
   // Same plugin-scoped gate as the unscoped path above — see the comment there.
   const healthy =
@@ -126,11 +132,6 @@ async function runScopedDoctor(
     output.success("\nInstallation is healthy");
     return;
   }
-
-  if (pluginName === undefined) {
-    printScopeIssues(output, toolId, doctorReport);
-  }
-  printPluginIssues(output, doctorReport.pluginIssues);
   process.exit(1);
 }
 

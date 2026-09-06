@@ -50,22 +50,13 @@ interface PluginDriftLine {
   notInstalledOnMachine: boolean;
 }
 
-interface PluginNativeOnlyLine {
-  toolId: string;
-  binary: string;
-}
-
 export function printPluginDrift(
   output: CLIOutput,
-  report: { pluginDrift: PluginDriftLine[]; pluginNativeOnly?: PluginNativeOnlyLine[] }
+  report: { pluginDrift: PluginDriftLine[] }
 ): void {
-  const nativeOnly = report.pluginNativeOnly ?? [];
-  if (report.pluginDrift.length === 0 && nativeOnly.length === 0) {
+  if (report.pluginDrift.length === 0) {
     output.print("  (all in sync)");
     return;
-  }
-  for (const entry of nativeOnly) {
-    output.print(`  ${entry.toolId}: registered by ${entry.binary}, not verified here`);
   }
   const notInstalledTools = new Set(
     report.pluginDrift.filter((e) => e.notInstalledOnMachine).map((e) => e.toolId)

@@ -171,7 +171,8 @@ export function buildUpdateOneToolUseCase(
 
 export function buildDoctorUseCase(
   deps: Awaited<ReturnType<typeof buildUnitDeps>>,
-  authReader?: ConstructorParameters<typeof DoctorLayoutUseCase>[1]
+  authReader?: ConstructorParameters<typeof DoctorLayoutUseCase>[1],
+  hostRegistries?: ConstructorParameters<typeof DoctorRegistrationUseCase>[3]
 ): DoctorUseCase {
   return new DoctorUseCase(
     deps.manifestRepo,
@@ -180,7 +181,12 @@ export function buildDoctorUseCase(
     new DoctorPluginUseCase(new DetectPluginDriftUseCase(deps.fs)),
     new DoctorReferencesUseCase(deps.fs),
     new DoctorLayoutUseCase(deps.fs, authReader),
-    new DoctorRegistrationUseCase(deps.fs, deps.marketplaceRegistry)
+    new DoctorRegistrationUseCase(
+      deps.fs,
+      deps.marketplaceRegistry,
+      deps.nativePluginActivators,
+      hostRegistries
+    )
   );
 }
 

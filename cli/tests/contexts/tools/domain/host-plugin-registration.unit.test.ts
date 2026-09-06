@@ -1,14 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   buildHostRegistration,
-  type TelemetryHostRegistrationEvidence,
-} from "../../../../src/contexts/telemetry/domain/telemetry-setup.js";
+  type HostRegistrationEvidence,
+} from "../../../../src/contexts/tools/domain/host-plugin-registration.js";
 
 const REGISTRY = "/home/dev/.claude/plugins/installed_plugins.json";
 
-function evidence(
-  overrides: Partial<TelemetryHostRegistrationEvidence> = {}
-): TelemetryHostRegistrationEvidence {
+function evidence(overrides: Partial<HostRegistrationEvidence> = {}): HostRegistrationEvidence {
   return {
     tool: "claude",
     plugins: [{ name: "aidd-telemetry", marketplace: "aidd-framework" }],
@@ -17,7 +15,7 @@ function evidence(
   };
 }
 
-function only(input: TelemetryHostRegistrationEvidence) {
+function only(input: HostRegistrationEvidence) {
   const entry = buildHostRegistration([input]).entries[0];
   if (entry === undefined) throw new Error("expected exactly one entry");
   return entry;

@@ -73,6 +73,13 @@ function normalize(text: string): string {
       .replace(/\/[^\s",'\\]+\/\.aidd\/cache\/built/g, "<BUILT_CACHE>")
       .replace(/\/[^\s",'\\]+\/tests\/fixtures\/framework/g, "<FRAMEWORK_FIXTURE>")
       .replace(/\/[^\s",'\\]+\/aidd\/cli/g, "<ROOT>")
+      // The sandbox's relocated `$HOME`, created fresh per run under a random temp
+      // directory (`createTestEnv`'s own `fakeHome`) — a native registration's
+      // `unanswerable` message names the registry file it tried and failed to open,
+      // and that path lives under this same per-run directory. Left unnormalized,
+      // two captures of the identical run differ only by their own temp dir name,
+      // which is exactly the failure `golden-machine-independence.md` describes.
+      .replace(/\/[^\s",'\\]+\/aidd-e2e-[^/\s",'\\]+\/home\b/g, "<HOME>")
       // Version strings like 4.5.0 or 4.10.2 in manifest / stdout
       .replace(/\b\d+\.\d+\.\d+\b/g, "<VERSION>")
       // Windows line endings

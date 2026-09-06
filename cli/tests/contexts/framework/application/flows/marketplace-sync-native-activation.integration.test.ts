@@ -5,7 +5,7 @@ import { Marketplace } from "../../../../../src/contexts/distribution/domain/mar
 import { MarketplaceSyncSettingsUseCase } from "../../../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
 import { InstalledPlugin } from "../../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
-import { buildHostRegistration } from "../../../../../src/contexts/telemetry/domain/telemetry-setup.js";
+import { buildHostRegistration } from "../../../../../src/contexts/tools/domain/host-plugin-registration.js";
 import { CapturingLogger } from "../../../../helpers/ports/capturing-logger.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
 import { fakeEnsureBuiltMarketplace } from "../../../../helpers/ports/fake-ensure-built-marketplace.js";
@@ -24,7 +24,7 @@ import { InMemoryMarketplaceRegistry } from "../../../../helpers/ports/in-memory
  * nowhere, on the branch that shipped it.
  *
  * The pairing that matters is the ref. This file proves the activation is driven with the
- * same `<plugin>@<marketplace>` string `TelemetryHostRegistrationSetup` looks up, so the
+ * same `<plugin>@<marketplace>` string `buildHostRegistration` looks up, so the
  * two halves cannot drift into disagreeing about what to call one plugin — the failure the
  * diagnostic exists to report would otherwise become a failure it invents.
  */

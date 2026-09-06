@@ -54,14 +54,19 @@ export function hostPluginRegistryReaders(
  * That claim came from reading the first entry of the first key and generalising; read
  * across all 115 entries on the machine measured, they carry a seventh field the first one
  * did not — `projectPath` — on 100 of them, exactly the 99 at `scope: "project"` plus the
- * one at `"local"`. So the registry does say which project wants a ref, and `aidd` writes
- * every one of them at project scope: `native-plugin-cli-adapter.ts`'s own `PROJECT_SCOPE_ARGS`.
+ * one at `"local"`. So the registry can say which project wants a ref.
  *
- * Ignoring that would report a ref installed for another project as `registered` here, which
- * is the same unmeasured confidence this file refuses to extend to Copilot a few lines up. A
- * ref counts for this project when some entry is user-scoped — machine-wide by construction,
- * and those carry no `projectPath` — or names this project. Claude records no enabled flag
- * anywhere, so a ref that counts maps to `true`.
+ * **It does not for anything `aidd` itself installed.** A second, later measurement found
+ * all six of `aidd`'s own entries at `scope: "user"` — `native-plugin-cli-adapter.ts`'s
+ * `enablePlugin` calls no `scopeArgsFor`, that method's own caller is `addMarketplace` and
+ * `removeMarketplace` alone, so a plugin enable carries no scope argument and Claude
+ * defaults it to `"user"`, machine-wide. `countsForProject` below therefore answers `true`
+ * for a ref this machine's *other* project registered, never having asked this one's own
+ * `claude` to do anything — a ref counts wherever some entry is user-scoped, which every
+ * `aidd`-written one is. That is an honest answer, not a bug: the plugin genuinely is
+ * loaded for the `claude` binary this project also runs. What must not be claimed is that
+ * project scope discriminates here — only a `projectPath`-carrying entry, which `aidd`
+ * never writes, would.
  */
 class ClaudeInstalledPluginsReader implements HostPluginRegistryReader {
   constructor(private readonly path: string) {}

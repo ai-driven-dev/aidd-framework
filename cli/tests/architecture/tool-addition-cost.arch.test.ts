@@ -137,7 +137,7 @@ const BASELINE: readonly { readonly path: string; readonly named: number }[] = [
   // Called from the composition root and nowhere else; the three reader classes beside it
   // name no tool at all.
   {
-    path: "src/contexts/telemetry/infrastructure/host-plugin-registry-reader-adapter.ts",
+    path: "src/contexts/tools/infrastructure/host-plugin-registry-reader-adapter.ts",
     named: 3,
   },
   // An adapter for exactly one tool, naming the binary it shells out to. A tool named in

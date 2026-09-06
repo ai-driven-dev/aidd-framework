@@ -14,7 +14,6 @@ import type { TelemetrySink } from "../../contexts/telemetry/domain/ports/teleme
 import type { VersionControl } from "../../contexts/telemetry/domain/ports/version-control.js";
 import { CopilotCostReaderAdapter } from "../../contexts/telemetry/infrastructure/copilot-cost-reader-adapter.js";
 import { HookTrustReaderAdapter } from "../../contexts/telemetry/infrastructure/hook-trust-reader-adapter.js";
-import { hostPluginRegistryReaders } from "../../contexts/telemetry/infrastructure/host-plugin-registry-reader-adapter.js";
 import { OpencodeCostReaderAdapter } from "../../contexts/telemetry/infrastructure/opencode-cost-reader-adapter.js";
 import { PersonIdentityAdapter } from "../../contexts/telemetry/infrastructure/person-identity-adapter.js";
 import { RunJournalReaderAdapter } from "../../contexts/telemetry/infrastructure/run-journal-reader-adapter.js";
@@ -24,6 +23,7 @@ import { TelemetrySinkAdapter } from "../../contexts/telemetry/infrastructure/te
 import { TranscriptCostReaderAdapter } from "../../contexts/telemetry/infrastructure/transcript-cost-reader-adapter.js";
 import { CLAUDE_CODE_TRANSCRIPT_LOCATION } from "../../contexts/tools/domain/profiles/claude/claude-transcript-location.js";
 import { CODEX_ROLLOUT_LOCATION } from "../../contexts/tools/domain/profiles/codex/codex-transcript-location.js";
+import { hostPluginRegistryReaders } from "../../contexts/tools/infrastructure/host-plugin-registry-reader-adapter.js";
 import type { FileReader } from "../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../kernel/ports/file-writer.js";
 import type { Logger } from "../../kernel/ports/logger.js";

@@ -11,13 +11,13 @@ import type { TelemetryExportLeftover } from "../../contexts/telemetry/domain/te
 import type {
   TelemetryAllowedSetup,
   TelemetryCommitTrailerSetup,
-  TelemetryHostRegistrationAnswer,
   TelemetryHostRegistrationSetup,
   TelemetryIdentitySetup,
   TelemetryPluginVersionSetup,
   TelemetryRecorderDeclarationSetup,
   TelemetrySetup,
 } from "../../contexts/telemetry/domain/telemetry-setup.js";
+import type { HostRegistrationAnswer } from "../../contexts/tools/domain/host-plugin-registration.js";
 import type { CLIOutput } from "../output.js";
 
 const LABEL_WIDTH = 22;
@@ -119,7 +119,7 @@ function describeHostRegistration(registration: TelemetryHostRegistrationSetup):
   // Keyed on the answer type, not on `string`: a fifth answer then fails to compile here
   // rather than sorting silently last, which is how a new "will not load" state would end up
   // printed below the ones that are fine.
-  const rank: Record<TelemetryHostRegistrationAnswer, number> = {
+  const rank: Record<HostRegistrationAnswer, number> = {
     "not-registered": 0,
     "registered-disabled": 1,
     unanswerable: 2,

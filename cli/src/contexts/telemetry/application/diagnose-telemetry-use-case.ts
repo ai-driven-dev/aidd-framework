@@ -1,13 +1,14 @@
 import { describeError } from "../../../kernel/describe-error.js";
 import type { VersionReader } from "../../../kernel/ports/version-reader.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../kernel/tool.js";
+import { buildHostRegistration } from "../../tools/domain/host-plugin-registration.js";
+import type { HostPluginRegistryReader } from "../../tools/domain/ports/host-plugin-registry-reader.js";
 import { getAiToolConfig, resolvePluginsCapability } from "../../tools/domain/registry.js";
 import {
   SESSION_TRAILER_DELEGATE_FILE,
   SESSION_TRAILER_TOKEN,
 } from "../domain/formats/commit-session-trailer.js";
 import type { HookTrustReader } from "../domain/ports/hook-trust-reader.js";
-import type { HostPluginRegistryReader } from "../domain/ports/host-plugin-registry-reader.js";
 import type { InstalledPluginsReader } from "../domain/ports/installed-plugins-reader.js";
 import type { PersonIdentityStore } from "../domain/ports/person-identity-store.js";
 import type { RunJournal, RunJournalReader } from "../domain/ports/run-journal-reader.js";
@@ -31,7 +32,6 @@ import {
 } from "../domain/telemetry-claim.js";
 import type { TelemetryExportLeftover } from "../domain/telemetry-export-leftover.js";
 import {
-  buildHostRegistration,
   buildTelemetryAllowedSetup,
   type TelemetryHostRegistrationSetup,
   type TelemetryIdentitySetup,

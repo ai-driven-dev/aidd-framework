@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type {
-  TelemetryHostRegistrationEntry,
-  TelemetrySetup,
-} from "../../../src/contexts/telemetry/domain/telemetry-setup.js";
+import type { TelemetrySetup } from "../../../src/contexts/telemetry/domain/telemetry-setup.js";
+import type { HostRegistrationEntry } from "../../../src/contexts/tools/domain/host-plugin-registration.js";
 import { printTelemetryCheckReport } from "../../../src/presentation/display/telemetry-check-display.js";
 import { CLIOutput } from "../../../src/presentation/output.js";
 
@@ -245,10 +243,7 @@ describe("the row saying whether the host will load what aidd installed", () => 
 
   const REGISTRY = "/home/dev/.claude/plugins/installed_plugins.json";
 
-  function entry(
-    answer: TelemetryHostRegistrationEntry["answer"],
-    plugin: string
-  ): TelemetryHostRegistrationEntry {
+  function entry(answer: HostRegistrationEntry["answer"], plugin: string): HostRegistrationEntry {
     return { tool: "claude", plugin, answer, detail: REGISTRY };
   }
 

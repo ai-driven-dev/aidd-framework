@@ -263,8 +263,8 @@
   {
     "command": "doctor",
     "exitCode": 0,
-    "stdout": "\nAI tools:\n  claude (v5.2.2): 1 files, 0 merge files\n  cursor (v5.2.2): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v5.2.2): in sync\n  cursor (v5.2.2):\n    + .cursor/hooks/aidd-test/check.sh\n    + .cursor/hooks.json\n  0 modified, 0 deleted, 2 added\nIDE tools:\n  (none installed)\nPlugins:\n  claude: registered by claude, not verified here\n\nInstallation is healthy\n",
-    "stderr": "",
+    "stdout": "\nAI tools:\n  claude (v5.2.2): 1 files, 0 merge files\n  cursor (v5.2.2): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v5.2.2): in sync\n  cursor (v5.2.2):\n    + .cursor/hooks/aidd-test/check.sh\n    + .cursor/hooks.json\n  0 modified, 0 deleted, 2 added\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nAI:\n\nInstallation is healthy\n",
+    "stderr": "Warning:   <HOME>/.claude/plugins/installed_plugins.json could not be read — ENOENT\n    Fix: The plugin does not load until claude's own CLI has run and answered this.\n",
     "filesWritten": [],
     "manifest": {
       "version": 7,
@@ -331,8 +331,8 @@
   {
     "command": "doctor",
     "exitCode": 1,
-    "stdout": "\nAI tools:\n  claude (v5.2.2): 1 files, 0 merge files\n  cursor (v5.2.2): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v5.2.2):\n    ~ .claude/settings.json\n  1 modified, 0 deleted, 0 added\n  cursor (v5.2.2):\n    + .cursor/hooks/aidd-test/check.sh\n    + .cursor/hooks.json\n  0 modified, 0 deleted, 2 added\nIDE tools:\n  (none installed)\nPlugins:\n  claude: registered by claude, not verified here\n\nAI:\n",
-    "stderr": "Warning:   Modified tracked file: .claude/settings.json\n    Fix: Run `aidd sync --force` to revert to the framework version.\n",
+    "stdout": "\nAI tools:\n  claude (v5.2.2): 1 files, 0 merge files\n  cursor (v5.2.2): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v5.2.2):\n    ~ .claude/settings.json\n  1 modified, 0 deleted, 0 added\n  cursor (v5.2.2):\n    + .cursor/hooks/aidd-test/check.sh\n    + .cursor/hooks.json\n  0 modified, 0 deleted, 2 added\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nAI:\n",
+    "stderr": "Warning:   <HOME>/.claude/plugins/installed_plugins.json could not be read — ENOENT\n    Fix: The plugin does not load until claude's own CLI has run and answered this.\nWarning:   Modified tracked file: .claude/settings.json\n    Fix: Run `aidd sync --force` to revert to the framework version.\n",
     "filesWritten": [],
     "manifest": {
       "version": 7,
@@ -467,8 +467,8 @@
   {
     "command": "doctor",
     "exitCode": 0,
-    "stdout": "\nAI tools:\n  claude (v5.2.2): 1 files, 0 merge files\n  cursor (v5.2.2): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v5.2.2): in sync\n  cursor (v5.2.2):\n    + .cursor/hooks/aidd-test/check.sh\n    + .cursor/hooks.json\n  0 modified, 0 deleted, 2 added\nIDE tools:\n  (none installed)\nPlugins:\n  claude: registered by claude, not verified here\n\nInstallation is healthy\n",
-    "stderr": "",
+    "stdout": "\nAI tools:\n  claude (v5.2.2): 1 files, 0 merge files\n  cursor (v5.2.2): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v5.2.2): in sync\n  cursor (v5.2.2):\n    + .cursor/hooks/aidd-test/check.sh\n    + .cursor/hooks.json\n  0 modified, 0 deleted, 2 added\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nAI:\n\nInstallation is healthy\n",
+    "stderr": "Warning:   <HOME>/.claude/plugins/installed_plugins.json could not be read — ENOENT\n    Fix: The plugin does not load until claude's own CLI has run and answered this.\n",
     "filesWritten": [],
     "manifest": {
       "version": 7,

@@ -58,6 +58,7 @@ import type { ManifestRepository } from "../../contexts/framework/domain/ports/m
 import { ManifestRepositoryAdapter } from "../../contexts/framework/infrastructure/manifest-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "../../contexts/framework/infrastructure/plugin-distribution-reader-adapter.js";
 import type { FileMerger } from "../../contexts/tools/domain/ports/file-merger.js";
+import { hostPluginRegistryReaders } from "../../contexts/tools/infrastructure/host-plugin-registry-reader-adapter.js";
 import type { AssetProvider } from "../../kernel/ports/asset-provider.js";
 import type { FileReader } from "../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../kernel/ports/file-writer.js";
@@ -350,7 +351,12 @@ export async function createDeps(
     doctorPluginUseCase,
     doctorReferencesUseCase,
     doctorLayoutUseCase,
-    new DoctorRegistrationUseCase(fs, marketplaceRegistry, nativePluginActivators)
+    new DoctorRegistrationUseCase(
+      fs,
+      marketplaceRegistry,
+      nativePluginActivators,
+      hostPluginRegistryReaders()
+    )
   );
   const releaseResolver = new GitHubReleaseResolverAdapter(http, authReader);
   const setupMarketplaceSourceUseCase = new SetupMarketplaceSourceUseCase(

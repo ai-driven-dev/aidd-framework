@@ -37,6 +37,10 @@ const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
     "src/contexts/tools/domain/ports/file-merger.ts",
     "src/contexts/tools/domain/ports/native-plugin-activator.ts",
     "src/contexts/tools/domain/ports/schema-validator.ts",
+    "src/contexts/tools/domain/ports/host-plugin-registry-reader.ts",
+    // What a host's own plugin registry says about a plugin AIDD installed for it — the
+    // comparison `telemetry`'s diagnostic and `framework`'s `doctor` both need.
+    "src/contexts/tools/domain/host-plugin-registration.ts",
     // what a tool declares about plugins, read by whoever installs one for it — the
     // context has no application layer of its own since installing is framework work
     "src/contexts/tools/domain/capabilities/plugins-capability.ts",

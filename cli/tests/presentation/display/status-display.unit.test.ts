@@ -14,7 +14,7 @@ describe("printPluginDrift", () => {
   it("prints '(all in sync)' only when nothing was skipped and nothing drifted", () => {
     const output = new CapturingOutput(false);
 
-    printPluginDrift(output, { pluginDrift: [], pluginNativeOnly: [] });
+    printPluginDrift(output, { pluginDrift: [] });
 
     expect(output.lines).toEqual(["  (all in sync)"]);
   });
@@ -31,7 +31,6 @@ describe("printPluginDrift", () => {
           notInstalledOnMachine: true,
         },
       ],
-      pluginNativeOnly: [],
     });
 
     expect(output.lines).toEqual([
@@ -51,24 +50,8 @@ describe("printPluginDrift", () => {
           notInstalledOnMachine: false,
         },
       ],
-      pluginNativeOnly: [],
     });
 
     expect(output.lines).toEqual(["  plugin my-plugin (claude):", "    ~ commands/cmd.md"]);
-  });
-
-  // Mutation proof for item 3: drop the native-only check in the caller and this test
-  // goes red because the array feeding it would stay empty, printing "(all in sync)"
-  // for a tool whose plugin was never checked.
-  it("never reports '(all in sync)' for a native-activation tool with nothing tracked", () => {
-    const output = new CapturingOutput(false);
-
-    printPluginDrift(output, {
-      pluginDrift: [],
-      pluginNativeOnly: [{ toolId: "claude", binary: "claude" }],
-    });
-
-    expect(output.lines).toEqual(["  claude: registered by claude, not verified here"]);
-    expect(output.lines).not.toContain("  (all in sync)");
   });
 });

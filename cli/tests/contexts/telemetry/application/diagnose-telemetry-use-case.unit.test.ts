@@ -9,7 +9,6 @@ import { InstalledPlugin } from "../../../../src/contexts/framework/domain/plugi
 import type { ManifestRepository } from "../../../../src/contexts/framework/domain/ports/manifest-repository.js";
 import { DiagnoseTelemetryUseCase } from "../../../../src/contexts/telemetry/application/diagnose-telemetry-use-case.js";
 import type { HookTrustReader } from "../../../../src/contexts/telemetry/domain/ports/hook-trust-reader.js";
-import type { HostPluginRegistryReader } from "../../../../src/contexts/telemetry/domain/ports/host-plugin-registry-reader.js";
 import type { RunJournal } from "../../../../src/contexts/telemetry/domain/ports/run-journal-reader.js";
 import type {
   LocalCostCandidateRecord,
@@ -18,6 +17,7 @@ import type {
 } from "../../../../src/contexts/telemetry/domain/ports/session-cost-reader.js";
 import type { VersionControl } from "../../../../src/contexts/telemetry/domain/ports/version-control.js";
 import type { TelemetryCodexHookTrust } from "../../../../src/contexts/telemetry/domain/telemetry-claim.js";
+import type { HostPluginRegistryReader } from "../../../../src/contexts/tools/domain/ports/host-plugin-registry-reader.js";
 import type { AiToolId } from "../../../../src/kernel/tool.js";
 import { installedPluginsFromManifest } from "../../../../src/runtime/wiring/installed-plugins-from-manifest.js";
 import { FakeCurrentVersion } from "../../../helpers/ports/fake-current-version.js";

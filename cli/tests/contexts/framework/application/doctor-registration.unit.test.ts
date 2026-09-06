@@ -2,10 +2,16 @@ import { describe, expect, it } from "vitest";
 import { Marketplace } from "../../../../src/contexts/distribution/domain/marketplace.js";
 import { DoctorRegistrationUseCase } from "../../../../src/contexts/framework/application/doctor/doctor-registration-use-case.js";
 import { Manifest } from "../../../../src/contexts/framework/domain/manifest.js";
-import type { ToolId } from "../../../../src/kernel/tool.js";
+import { InstalledPlugin } from "../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
+import type { AiToolId, ToolId } from "../../../../src/kernel/tool.js";
 import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
+import type {
+  HostPluginRegistryReader,
+  HostPluginRegistryReading,
+} from "../../../../src/contexts/tools/domain/ports/host-plugin-registry-reader.js";
+import { FakeHostPluginRegistryReader } from "../../../helpers/ports/fake-host-plugin-registry-reader.js";
 import { FakeNativePluginActivator } from "../../../helpers/ports/fake-native-plugin-activator.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-marketplace-registry.js";
@@ -79,5 +85,142 @@ describe("DoctorRegistrationUseCase", () => {
   // threw and took `plugin doctor` down with it. Caught by the smoke suite.
   it("stays silent, and does not throw, for a tool that declares no place at all", async () => {
     await expect(issuesFor(null, "copilot")).resolves.toEqual([]);
+  });
+});
+
+const REF = "aidd-context@aidd-framework";
+const REGISTRY_LOCATION = "/home/dev/.claude/plugins/installed_plugins.json";
+
+function manifestWithNativeRegistrations(
+  pluginRefs: string[],
+  marketplaces: string[] = ["aidd-framework"]
+): Manifest {
+  const manifest = Manifest.create();
+  manifest.addTool("claude", "test", []);
+  manifest.setNativeRegistrations("claude", { binary: "claude", marketplaces, pluginRefs });
+  return manifest;
+}
+
+function manifestWithPlugin(marketplace?: string): Manifest {
+  const manifest = Manifest.create();
+  manifest.addTool("claude", "test", []);
+  manifest.addPlugin(
+    "claude",
+    InstalledPlugin.fromMetadata(
+      marketplace === undefined ? "hand-copied" : "aidd-context",
+      "1.0.0",
+      { kind: "github", repo: "ai-driven-dev/framework" },
+      true,
+      "user",
+      marketplace
+    )
+  );
+  return manifest;
+}
+
+async function nativeIssuesFor(
+  manifest: Manifest,
+  reading: HostPluginRegistryReading | "unreachable"
+) {
+  const fs = new InMemoryFileAdapter();
+  const registry = new InMemoryMarketplaceRegistry();
+  const activators = new Map([
+    ["claude", new FakeNativePluginActivator({ available: true, enablesPlugins: true })],
+  ]);
+  const hostRegistries = new Map<AiToolId, HostPluginRegistryReader>();
+  if (reading !== "unreachable") {
+    hostRegistries.set("claude", new FakeHostPluginRegistryReader(reading));
+  }
+  return new DoctorRegistrationUseCase(fs, registry, activators, hostRegistries).execute({
+    manifest,
+    projectRoot: PROJECT_ROOT,
+    allowedIds: null,
+  });
+}
+
+describe("DoctorRegistrationUseCase — native registrations against the host's own registry", () => {
+  it("says nothing when the registry carries the expected ref, enabled", async () => {
+    const issues = await nativeIssuesFor(manifestWithNativeRegistrations([REF]), {
+      location: REGISTRY_LOCATION,
+      refs: new Map([[REF, true]]),
+    });
+
+    expect(issues).toEqual([]);
+  });
+
+  it("reports an error naming the ref and `aidd sync` when the registry lacks it", async () => {
+    const issues = await nativeIssuesFor(manifestWithNativeRegistrations([REF]), {
+      location: REGISTRY_LOCATION,
+      refs: new Map(),
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].severity).toBe("error");
+    expect(issues[0].message).toContain(REF);
+    expect(issues[0].message).toContain(REGISTRY_LOCATION);
+    expect(issues[0].fix).toContain("aidd sync");
+  });
+
+  it("reports an error naming `aidd framework install --tool claude` when the registry disabled it", async () => {
+    const issues = await nativeIssuesFor(manifestWithNativeRegistrations([REF]), {
+      location: REGISTRY_LOCATION,
+      refs: new Map([[REF, false]]),
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].severity).toBe("error");
+    expect(issues[0].message).toContain(REF);
+    expect(issues[0].message).toContain("disabled");
+    expect(issues[0].fix).toContain("aidd framework install --tool claude");
+  });
+
+  it("reports an info line, never an error, when nothing here can read the registry", async () => {
+    const issues = await nativeIssuesFor(manifestWithNativeRegistrations([REF]), "unreachable");
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].severity).toBe("info");
+  });
+
+  it("reports an info line when the registry file exists but could not be read", async () => {
+    const issues = await nativeIssuesFor(manifestWithNativeRegistrations([REF]), {
+      location: REGISTRY_LOCATION,
+      unreadable: "ENOENT",
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].severity).toBe("info");
+    expect(issues[0].message).toContain("ENOENT");
+  });
+
+  // `nativeRegistrations.marketplaces` names a marketplace the host registered with no
+  // plugin behind it — §2.2b's own justification for the field. Nothing here can be
+  // asked about a marketplace on its own, so this must stay silent, not invent a ref.
+  it("says nothing for a registered marketplace with no plugin ref to check", async () => {
+    const issues = await nativeIssuesFor(manifestWithNativeRegistrations([], ["aidd-framework"]), {
+      location: REGISTRY_LOCATION,
+      refs: new Map(),
+    });
+
+    expect(issues).toEqual([]);
+  });
+
+  it("falls back to the manifest's own plugins when nativeRegistrations was never recorded", async () => {
+    const issues = await nativeIssuesFor(manifestWithPlugin("aidd-framework"), {
+      location: REGISTRY_LOCATION,
+      refs: new Map(),
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].message).toContain(REF);
+  });
+
+  it("is unanswerable, not an error, for a fallback plugin recording no marketplace", async () => {
+    const issues = await nativeIssuesFor(manifestWithPlugin(undefined), {
+      location: REGISTRY_LOCATION,
+      refs: new Map(),
+    });
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].severity).toBe("info");
   });
 });

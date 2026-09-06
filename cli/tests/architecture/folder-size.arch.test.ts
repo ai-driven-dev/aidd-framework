@@ -60,7 +60,7 @@ const BASELINE: readonly { readonly path: string; readonly count: number }[] = [
   // sink, a journal, an identity, a backlog, per-tool cost, a host registry, hook trust,
   // this project's installed plugins, its ignore file, its version control. One port per
   // question asked; collapsing any two would be a port that answers two.
-  { path: "src/contexts/telemetry/domain/ports", count: 12 },
+  { path: "src/contexts/telemetry/domain/ports", count: 11 },
 ];
 
 /** Direct `.ts` files per parent directory — a subfolder counts toward itself, not its parent. */
