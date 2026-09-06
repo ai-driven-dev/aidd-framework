@@ -41,7 +41,7 @@ Auto-generated index of skills, agents, references and assets shipped by the `ai
 | `actions` | [02-message.md](skills/01-commit/actions/02-message.md) | - |
 | `actions` | [03-commit.md](skills/01-commit/actions/03-commit.md) | - |
 | `assets` | [commit-template.md](skills/01-commit/assets/commit-template.md) | `VCS commit message template` |
-| `-` | [SKILL.md](skills/01-commit/SKILL.md) | `Create an atomic git commit with a conventional message, optionally pushing. Use when the user wants to commit changes, optionally pushing the branch. Not for amending, rebasing, opening a pull request, or tagging a release.` |
+| `-` | [SKILL.md](skills/01-commit/SKILL.md) | `Create atomic conventional commits; safely retry scoped hook fixes; optionally push. Use when the user wants to commit changes, optionally pushing the branch. Not for amending, rebasing, opening a pull request, or tagging a release.` |
 
 #### `skills/02-pull-request`
 

@@ -17,7 +17,7 @@ Covers all external artifact creation: repo init, commits, pull/merge requests, 
 | Bracket ID | Skill | Description |
 |---|---|---|
 | [3.0] | [repo-init](skills/00-repo-init/SKILL.md) | Initialize a repo: git init, default branch, bootstrap commit, CONTRIBUTING.md, optional remote. |
-| [3.1] | [commit](skills/01-commit/SKILL.md) | Create a git commit with proper conventional message format. |
+| [3.1] | [commit](skills/01-commit/SKILL.md) | Commit atomically; safely retry scoped hook fixes. |
 | [3.2] | [pull-request](skills/02-pull-request/SKILL.md) | Create PR (GitHub) or MR (GitLab) with filled template. |
 | [3.3] | [release-tag](skills/03-release-tag/SKILL.md) | Create and push a semantic version git tag with release notes. |
 | [3.4] | [issue-create](skills/04-issue-create/SKILL.md) | Create issues in the configured ticketing tool. |

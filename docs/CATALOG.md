@@ -83,13 +83,13 @@ Meta-cognition: brainstorm, challenge, blind-spot scan, fact-check.
 
 Version-control workflows: repo init, commit, pull/merge request, release tag, issue.
 
-| Skill             | Role                                                                            | Actions                 |
-| ----------------- | ------------------------------------------------------------------------------- | ----------------------- |
-| `00-repo-init`    | Initialize a repo: git init, default branch, bootstrap commit, optional remote  | `01-init`, `02-publish` |
-| `01-commit`       | Create an atomic conventional commit                                            | `01-commit`             |
-| `02-pull-request` | Create a draft pull or merge request                                            | `01-pull-request`       |
-| `03-release-tag`  | Cut a semver release with annotated tag and notes                              | `01-release-tag`        |
-| `04-issue-create` | Create an issue in the configured ticketing tool                               | `01-issue-create`       |
+| Skill             | Role                                                                           | Actions                                 |
+| ----------------- | ------------------------------------------------------------------------------ | --------------------------------------- |
+| `00-repo-init`    | Initialize a repo: git init, default branch, bootstrap commit, optional remote | `01-init`, `02-publish`                 |
+| `01-commit`       | Commit atomically; safely retry scoped hook fixes                              | `01-collect`, `02-message`, `03-commit` |
+| `02-pull-request` | Create a draft pull or merge request                                           | `01-pull-request`                       |
+| `03-release-tag`  | Cut a semver release with annotated tag and notes                              | `01-release-tag`                        |
+| `04-issue-create` | Create an issue in the configured ticketing tool                               | `01-issue-create`                       |
 
 ## 🎼 aidd-orchestrator
 
