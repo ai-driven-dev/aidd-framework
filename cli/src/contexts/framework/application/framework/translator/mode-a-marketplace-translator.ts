@@ -4,6 +4,7 @@ import type { PluginDistribution } from "../../../../translate/domain/plugin-dis
 import type { ReadonlySkipList } from "../../../../translate/domain/plugin-translation-skip.js";
 import type { Manifest } from "../../../domain/manifest.js";
 import { InstalledPlugin } from "../../../domain/plugins/installed-plugin.js";
+import { resolveScopeForInstall } from "../../plugin/plugin-target-resolution.js";
 import type { PluginTranslator } from "./plugin-translator.js";
 
 /**
@@ -32,7 +33,14 @@ export class ModeAMarketplaceTranslator implements PluginTranslator {
   ): Promise<{ skipped: ReadonlySkipList }> {
     manifest.addPlugin(
       toolId,
-      InstalledPlugin.fromDistribution(dist, source, [], new Map(), marketplace)
+      InstalledPlugin.fromDistribution(
+        dist,
+        source,
+        [],
+        resolveScopeForInstall(toolId),
+        new Map(),
+        marketplace
+      )
     );
     return { skipped: [] };
   }

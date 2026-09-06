@@ -18,7 +18,7 @@ import {
   isPluginFileAtDesiredState,
   materializeViaTranslator,
 } from "../plugin/plugin-helpers.js";
-import { resolvePluginBaseDir } from "../plugin/plugin-target-resolution.js";
+import { resolveBaseDirFromRecord } from "../plugin/plugin-target-resolution.js";
 import type { EnsureBuiltMarketplace } from "./ensure-built-marketplace-use-case.js";
 
 interface ApplyPluginFilesOptions {
@@ -83,7 +83,12 @@ export class ApplyPluginFilesUseCase {
     // equivalent). Scoped to the manifest's own keys under the plugin's base dir — never
     // a directory scan — so it cannot touch files the plugin never wrote.
     if (translator.mode === "marketplace" && this.builtDeps !== undefined) {
-      const baseDir = resolvePluginBaseDir(toolId, projectRoot, this.builtDeps.homedir);
+      const baseDir = resolveBaseDirFromRecord(
+        plugin.scope,
+        toolId,
+        projectRoot,
+        this.builtDeps.homedir
+      );
       await deleteOldFiles(plugin.files, baseDir, this.fs);
     }
     return materializeViaTranslator(translator, dist, toolId, plugin, projectRoot, manifest);

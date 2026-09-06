@@ -49,6 +49,7 @@ function claudeManifestWithNativePlugin(): Manifest {
       version: "1.0.0",
       strict: false,
       files: {},
+      scope: "project",
     })
   );
   return manifest;
@@ -84,6 +85,7 @@ describe("StatusUseCase — native-activation tools carry nothing this CLI can v
         version: "1.0.0",
         strict: false,
         files: { "aidd-test/a.md": "00000000000000000000000000000000" },
+        scope: "user",
       })
     );
     const useCase = new StatusUseCase(

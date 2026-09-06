@@ -52,6 +52,7 @@ function manifestWithPlugin(marketplace: string = MARKETPLACE): InMemoryManifest
       "1.0.0",
       { kind: "github", repo: "ai-driven-dev/framework" },
       true,
+      "project",
       marketplace
     )
   );
@@ -186,6 +187,40 @@ describe("syncing settings registers the plugin with the host's own CLI", () => 
     ]).entries[0];
 
     expect(entry?.answer).toBe("not-registered");
+  });
+});
+
+/**
+ * The manifest's own record of what a tool's CLI was asked to register — what `doctor`
+ * later compares against the host's real registry, and `clean` undoes through the same
+ * binary. Written only for a tool this run actually activated, mirroring the rule
+ * `recordWhatActivationWrote` already holds for the settings-file hash.
+ */
+describe("nativeRegistrations reflects what the host's own CLI was asked to register", () => {
+  it("records binary, marketplaces and pluginRefs after a successful activation", async () => {
+    const activator = new FakeNativePluginActivator({ available: true });
+    const { useCase, registry, manifestRepo } = buildSync(activator);
+    await registry.save(PROJECT_ROOT, marketplace());
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    const reloaded = await manifestRepo.load();
+    expect(reloaded?.getNativeRegistrations("claude")).toEqual({
+      binary: "claude",
+      marketplaces: [MARKETPLACE],
+      pluginRefs: [REF],
+    });
+  });
+
+  it("records nothing when the host CLI is not available", async () => {
+    const activator = new FakeNativePluginActivator({ available: false });
+    const { useCase, registry, manifestRepo } = buildSync(activator);
+    await registry.save(PROJECT_ROOT, marketplace());
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    const reloaded = await manifestRepo.load();
+    expect(reloaded?.getNativeRegistrations("claude")).toBeUndefined();
   });
 });
 

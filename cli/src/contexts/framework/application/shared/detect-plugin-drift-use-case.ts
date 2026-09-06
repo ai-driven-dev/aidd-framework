@@ -2,9 +2,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { AiToolId, ToolId } from "../../../../kernel/tool.js";
-import { resolvePluginsCapability } from "../../../tools/domain/registry.js";
 import type { Manifest } from "../../domain/manifest.js";
-import { resolvePluginBaseDir } from "../plugin/plugin-target-resolution.js";
+import { resolveBaseDirFromRecord } from "../plugin/plugin-target-resolution.js";
 
 export type PluginFileDriftKind = "missing" | "hash-mismatch";
 
@@ -51,14 +50,13 @@ export class DetectPluginDriftUseCase {
       const toolId = id as AiToolId;
       const plugins = manifest.getPlugins(toolId);
       const targets = pluginName ? plugins.filter((p) => p.name === pluginName) : plugins;
-      const baseDir = resolvePluginBaseDir(toolId, projectRoot, homedir);
-      const installScope = resolvePluginsCapability(toolId)?.installScope;
       for (const plugin of targets) {
+        const baseDir = resolveBaseDirFromRecord(plugin.scope, toolId, projectRoot, homedir);
         const files = await this.driftedFiles(plugin.files, baseDir);
         if (files.length === 0) continue;
         const allMissing =
           files.length === plugin.files.size && files.every((f) => f.kind === "missing");
-        if (allMissing && installScope === "user") {
+        if (allMissing && plugin.scope === "user") {
           drifts.push({ toolId, pluginName: plugin.name, files: [], notInstalledOnMachine: true });
         } else {
           drifts.push({ toolId, pluginName: plugin.name, files, notInstalledOnMachine: false });

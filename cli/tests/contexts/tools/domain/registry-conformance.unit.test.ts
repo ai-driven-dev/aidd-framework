@@ -17,6 +17,7 @@ import {
   isAiTool,
   journalHostToAiToolId,
   machineLocalFilesOf,
+  projectHooksFileOf,
 } from "../../../../src/contexts/tools/domain/registry.js";
 import {
   buildTargetModesOf,
@@ -379,6 +380,28 @@ describe("machineLocalFilesOf()", () => {
         expect(relativePath.startsWith(config.directory), `${toolId}: ${relativePath}`).toBe(true);
       }
     }
+  });
+
+  it("returns claude's .claude/settings.local.json", () => {
+    expect(machineLocalFilesOf("claude")).toContain(".claude/settings.local.json");
+  });
+
+  // .cursor/hooks.json is deliberately absent here: its content is project-relative
+  // and shareable (verified in cursor-hooks-project-merge.ts), unlike the absolute-path
+  // content this function exists to keep out of the gitignore `aiddGitignoreEntries`
+  // builds from it. `projectHooksFileOf` carries that file instead.
+  it("does not carry cursor's project hooks file", () => {
+    expect(machineLocalFilesOf("cursor")).not.toContain(".cursor/hooks.json");
+  });
+});
+
+describe("projectHooksFileOf()", () => {
+  it("returns .cursor/hooks.json for cursor", () => {
+    expect(projectHooksFileOf("cursor")).toBe(".cursor/hooks.json");
+  });
+
+  it("returns undefined for a tool with nothing merged into a project hooks file", () => {
+    expect(projectHooksFileOf("claude")).toBeUndefined();
   });
 });
 

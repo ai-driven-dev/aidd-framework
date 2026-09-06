@@ -14,6 +14,7 @@ function makeManifestWithPlugin(): Manifest {
     version: "1.0.0",
     strict: false,
     files: {},
+    scope: "project",
   });
   manifest.addPlugin("claude", plugin);
   return manifest;

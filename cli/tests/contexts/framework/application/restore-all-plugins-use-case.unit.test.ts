@@ -45,13 +45,17 @@ const emptyDistributionReader: PluginDistributionReader = {
     }),
 };
 
-function nativePlugin(files: Record<string, string> = {}): InstalledPlugin {
+function nativePlugin(
+  files: Record<string, string> = {},
+  scope: "project" | "user" = "project"
+): InstalledPlugin {
   return InstalledPlugin.fromJSON({
     name: "aidd-test",
     source: { kind: "local", path: "/some/path" },
     version: "1.0.0",
     strict: false,
     files,
+    scope,
   });
 }
 
@@ -80,7 +84,10 @@ describe("RestoreAllPluginsUseCase — native-activation tools", () => {
   it("does not name a tool whose plugin files are actually tracked", async () => {
     const manifest = Manifest.create();
     manifest.addTool("cursor", "1.0.0", []);
-    manifest.addPlugin("cursor", nativePlugin({ "a/one.md": "00000000000000000000000000000000" }));
+    manifest.addPlugin(
+      "cursor",
+      nativePlugin({ "a/one.md": "00000000000000000000000000000000" }, "user")
+    );
     const useCase = new RestoreAllPluginsUseCase(
       noopFs,
       noopHasher,

@@ -21,6 +21,7 @@ function cursorManifestWithFiles(files: Record<string, string>): Manifest {
       version: "1.0.0",
       strict: false,
       files,
+      scope: "user",
     })
   );
   return manifest;
@@ -78,12 +79,81 @@ describe("DetectPluginDriftUseCase — user-scope tool never installed on this m
         version: "1.0.0",
         strict: false,
         files: { "a/one.md": HASH_A, "a/two.md": HASH_B },
+        scope: "project",
       })
     );
     const fs = makeFs(new Set(["one.md", "two.md"]));
     const useCase = new DetectPluginDriftUseCase(fs);
 
     const drifts = await useCase.execute({ manifest, projectRoot: "/proj", toolIds: ["claude"] });
+
+    expect(drifts).toHaveLength(1);
+    expect(drifts[0].notInstalledOnMachine).toBe(false);
+    expect(drifts[0].files).toHaveLength(2);
+  });
+});
+
+describe("DetectPluginDriftUseCase — the manifest's recorded scope wins over the profile", () => {
+  it("checks a cursor plugin under projectRoot, not ~/.cursor/plugins/local, when scope: project disagrees with cursor's profile", async () => {
+    const manifest = Manifest.create();
+    manifest.addTool("cursor", "1.0.0", []);
+    manifest.addPlugin(
+      "cursor",
+      InstalledPlugin.fromJSON({
+        name: "aidd-test",
+        source: { kind: "local", path: "/some/path" },
+        version: "1.0.0",
+        strict: false,
+        files: { "a/one.md": HASH_A },
+        // Disagrees with cursor's own profile, which declares installScope "user".
+        scope: "project",
+      })
+    );
+    const checkedPaths: string[] = [];
+    const fs: FileReader = {
+      fileExists: async (p: string) => {
+        checkedPaths.push(p);
+        return true;
+      },
+      isExecutable: async () => false,
+      readFileHash: async () => new FileHash(HASH_A),
+      readFile: async () => "",
+      listDirectory: async () => [],
+      listFilesRecursive: async () => [],
+    };
+    const useCase = new DetectPluginDriftUseCase(fs);
+
+    const drifts = await useCase.execute({ manifest, projectRoot: "/proj", toolIds: ["cursor"] });
+
+    expect(drifts).toHaveLength(0);
+    expect(checkedPaths).toContain("/proj/a/one.md");
+    expect(checkedPaths.some((p) => p.includes(".cursor"))).toBe(false);
+  });
+
+  // The `notInstalledOnMachine` collapse exists for a user-scope tool's plugin directory,
+  // which a fresh machine simply has not populated yet — not for a project-scope one,
+  // where every file missing is ordinary drift a person can act on file by file. A
+  // cursor entry recorded `scope: "project"` must read as the second case, even though
+  // cursor's own profile says "user": the manifest's own record is what "not on this
+  // machine" is measuring.
+  it("reports real per-file drift, not a collapsed not-installed entry, for a cursor plugin recorded scope: project", async () => {
+    const manifest = Manifest.create();
+    manifest.addTool("cursor", "1.0.0", []);
+    manifest.addPlugin(
+      "cursor",
+      InstalledPlugin.fromJSON({
+        name: "aidd-test",
+        source: { kind: "local", path: "/some/path" },
+        version: "1.0.0",
+        strict: false,
+        files: { "a/one.md": HASH_A, "a/two.md": HASH_B },
+        scope: "project",
+      })
+    );
+    const fs = makeFs(new Set(["one.md", "two.md"]));
+    const useCase = new DetectPluginDriftUseCase(fs);
+
+    const drifts = await useCase.execute({ manifest, projectRoot: "/proj", toolIds: ["cursor"] });
 
     expect(drifts).toHaveLength(1);
     expect(drifts[0].notInstalledOnMachine).toBe(false);

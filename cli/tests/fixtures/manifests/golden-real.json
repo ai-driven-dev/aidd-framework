@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "tools": {
     "claude": {
       "toolId": "claude",
@@ -21,6 +21,7 @@
           "version": "1.0.0",
           "strict": false,
           "files": {},
+          "scope": "project",
           "marketplace": "aidd-framework"
         }
       ]

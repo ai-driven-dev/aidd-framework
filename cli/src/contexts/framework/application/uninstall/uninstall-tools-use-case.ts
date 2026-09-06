@@ -102,7 +102,7 @@ export class UninstallToolsUseCase {
   ): Promise<void> {
     if (!isAiToolId(toolId)) return;
     for (const plugin of manifest.getPlugins(toolId)) {
-      await deletePluginFilesForTool(plugin.files, toolId, projectRoot, this.fs);
+      await deletePluginFilesForTool(plugin.files, plugin.scope, toolId, projectRoot, this.fs);
     }
   }
 

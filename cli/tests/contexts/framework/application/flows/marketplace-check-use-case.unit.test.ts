@@ -81,6 +81,7 @@ describe("MarketplaceCheckUseCase", () => {
         version: "1.0.0",
         strict: false,
         files: {},
+        scope: "project",
         marketplace: "awesome",
       })
     );

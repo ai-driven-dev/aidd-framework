@@ -13,7 +13,7 @@ async function seedManifest(projectDir: string): Promise<void> {
   await mkdir(join(projectDir, AIDD_DIR), { recursive: true });
   await writeFile(
     join(projectDir, AIDD_DIR, "manifest.json"),
-    JSON.stringify({ version: 6, tools: {}, marketplaces: {} }),
+    JSON.stringify({ version: 7, tools: {}, marketplaces: {} }),
     "utf-8"
   );
 }

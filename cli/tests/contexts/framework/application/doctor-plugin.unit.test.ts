@@ -34,6 +34,7 @@ function makeManifest(pluginFileHash: string): Manifest {
       version: "1.0.0",
       strict: false,
       files: { [PLUGIN_FILE]: pluginFileHash },
+      scope: "project",
     })
   );
   return manifest;
@@ -142,6 +143,7 @@ describe("DoctorUseCase — plugin integrity", () => {
           version: "1.0.0",
           strict: false,
           files: { "a/one.md": EXPECTED_HASH, "a/two.md": EXPECTED_HASH },
+          scope: "user",
         })
       );
       const fs = makeFs(false, EXPECTED_HASH);
@@ -170,6 +172,7 @@ describe("DoctorUseCase — plugin integrity", () => {
           version: "1.0.0",
           strict: false,
           files: { [userScopeRelPath]: EXPECTED_HASH },
+          scope: "user",
         })
       );
       const checkedPaths: string[] = [];

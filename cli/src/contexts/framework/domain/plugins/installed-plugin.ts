@@ -1,4 +1,8 @@
-import { InvalidPluginNameError, InvalidPluginVersionError } from "../../../../kernel/errors.js";
+import {
+  InvalidPluginNameError,
+  InvalidPluginVersionError,
+  MalformedPluginScopeError,
+} from "../../../../kernel/errors.js";
 import type { InstallationFile } from "../../../../kernel/file.js";
 import { isSemver } from "../../../../kernel/semver.js";
 import {
@@ -7,8 +11,17 @@ import {
   serializePluginSource,
 } from "../../../../kernel/source.js";
 import type { PluginDistribution } from "../../../translate/domain/plugin-distribution.js";
+import { type InstallScope, isInstallScope } from "../install-scope.js";
 
 export const PLUGIN_NAME_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/** What a plugin's `files` keys are relative to: the project root, or the tool's
+ * user-scope plugins directory. Recorded once, at install, and read by everything
+ * that resolves a plugin's files afterward — never re-derived from a tool's current
+ * profile, which can disagree with what was true when the entry was written. Same value
+ * domain as `InstallScope` (the CLI's `--scope` flag), aliased here so this field's own
+ * name stays about what it records rather than about the flag that requested it. */
+export type PluginScope = InstallScope;
 
 export function parsePluginSpec(arg: string): { name: string; version?: string } {
   const at = arg.lastIndexOf("@");
@@ -55,6 +68,9 @@ export interface PluginEntryData {
   version: string;
   strict: boolean;
   files: Record<string, string>;
+  /** What `files` is relative to. Mandatory: a default here would guess exactly what
+   * this field exists to stop guessing. */
+  scope: PluginScope;
   componentPaths?: Record<string, string>;
   mcpEntries?: Record<string, string>;
   marketplace?: string;
@@ -66,6 +82,7 @@ export class InstalledPlugin {
   readonly version: string;
   readonly strict: boolean;
   readonly files: PathHashMap;
+  readonly scope: PluginScope;
   readonly componentPaths: ComponentPathMap;
   readonly mcpEntries: McpDigestMap;
   readonly marketplace?: string;
@@ -76,6 +93,7 @@ export class InstalledPlugin {
     version: string;
     strict: boolean;
     files: PathHashMap;
+    scope: PluginScope;
     componentPaths: ComponentPathMap;
     mcpEntries: McpDigestMap;
     marketplace?: string;
@@ -85,6 +103,7 @@ export class InstalledPlugin {
     this.version = params.version;
     this.strict = params.strict;
     this.files = params.files;
+    this.scope = params.scope;
     this.componentPaths = params.componentPaths;
     this.mcpEntries = params.mcpEntries;
     this.marketplace = params.marketplace;
@@ -95,6 +114,7 @@ export class InstalledPlugin {
     version: string,
     source: PluginSource,
     strict: boolean,
+    scope: PluginScope,
     marketplace?: string
   ): InstalledPlugin {
     const data: PluginEntryData = {
@@ -103,6 +123,7 @@ export class InstalledPlugin {
       version,
       strict,
       files: {},
+      scope,
     };
     if (marketplace !== undefined) data.marketplace = marketplace;
     return InstalledPlugin.fromJSON(data);
@@ -118,6 +139,7 @@ export class InstalledPlugin {
       version: plugin.version,
       strict: plugin.strict,
       files: plugin.files,
+      scope: plugin.scope,
       componentPaths: plugin.componentPaths,
       mcpEntries: asMcpDigestMap(mcpEntries),
       marketplace: plugin.marketplace,
@@ -128,6 +150,7 @@ export class InstalledPlugin {
     dist: PluginDistribution,
     source: PluginSource,
     files: InstallationFile[],
+    scope: PluginScope,
     componentPaths?: ReadonlyMap<string, string>,
     marketplace?: string
   ): InstalledPlugin {
@@ -145,6 +168,7 @@ export class InstalledPlugin {
       version: dist.manifest.version,
       strict: dist.manifest.strict ?? false,
       files: filesRecord,
+      scope,
       componentPaths: componentPathsRecord,
     };
     if (marketplace !== undefined) data.marketplace = marketplace;
@@ -156,10 +180,18 @@ export class InstalledPlugin {
     source: PluginSource,
     files: InstallationFile[],
     mcpEntries: ReadonlyMap<string, string>,
+    scope: PluginScope,
     componentPaths?: ReadonlyMap<string, string>,
     marketplace?: string
   ): InstalledPlugin {
-    const base = InstalledPlugin.fromDistribution(dist, source, files, componentPaths, marketplace);
+    const base = InstalledPlugin.fromDistribution(
+      dist,
+      source,
+      files,
+      scope,
+      componentPaths,
+      marketplace
+    );
     return InstalledPlugin.withMcpEntries(base, mcpEntries);
   }
 
@@ -169,6 +201,9 @@ export class InstalledPlugin {
     }
     if (!isSemver(data.version)) {
       throw new InvalidPluginVersionError(data.version);
+    }
+    if (!isInstallScope(data.scope)) {
+      throw new MalformedPluginScopeError(data.name, data.scope);
     }
     const source = parsePluginSource(data.source);
     const files = new Map(Object.entries(data.files));
@@ -180,6 +215,7 @@ export class InstalledPlugin {
       version: data.version,
       strict: data.strict,
       files: asPathHashMap(files),
+      scope: data.scope,
       componentPaths: asComponentPathMap(componentPaths),
       mcpEntries: asMcpDigestMap(mcpEntries),
       marketplace: data.marketplace,
@@ -193,6 +229,7 @@ export class InstalledPlugin {
       version: this.version,
       strict: this.strict,
       files: mapToRecord(this.files),
+      scope: this.scope,
     };
     if (this.componentPaths.size > 0) data.componentPaths = mapToRecord(this.componentPaths);
     if (this.mcpEntries.size > 0) data.mcpEntries = mapToRecord(this.mcpEntries);
@@ -211,6 +248,7 @@ export class InstalledPlugin {
       version: v,
       strict: this.strict,
       files: this.files,
+      scope: this.scope,
       componentPaths: this.componentPaths,
       mcpEntries: this.mcpEntries,
       marketplace: this.marketplace,
@@ -224,6 +262,7 @@ export class InstalledPlugin {
       version: this.version,
       strict: this.strict,
       files: asPathHashMap(f),
+      scope: this.scope,
       componentPaths: this.componentPaths,
       mcpEntries: this.mcpEntries,
       marketplace: this.marketplace,

@@ -28,7 +28,7 @@ import type { PluginTranslator } from "../framework/translator/plugin-translator
 import { resolvePluginTranslator } from "../framework/translator/resolve-plugin-translator.js";
 import type { EnsureBuiltMarketplace } from "../shared/ensure-built-marketplace-use-case.js";
 import { loadPluginManifest, writePluginFiles } from "./plugin-helpers.js";
-import { resolvePluginToolIds } from "./plugin-target-resolution.js";
+import { resolvePluginToolIds, resolveScopeForInstall } from "./plugin-target-resolution.js";
 
 export interface PluginAddOptions {
   source: PluginSource;
@@ -125,6 +125,7 @@ export class PluginAddUseCase implements PluginAdd {
           version,
           source,
           pluginMetadata.strict,
+          resolveScopeForInstall(toolId),
           marketplace
         )
       );
@@ -330,7 +331,14 @@ export class PluginAddUseCase implements PluginAdd {
     await writePluginFiles(files, projectRoot, this.fs);
     manifest.addPlugin(
       toolId,
-      InstalledPlugin.fromDistribution(dist, source, files, componentPaths, marketplace)
+      InstalledPlugin.fromDistribution(
+        dist,
+        source,
+        files,
+        resolveScopeForInstall(toolId),
+        componentPaths,
+        marketplace
+      )
     );
     return { skipped, notices };
   }

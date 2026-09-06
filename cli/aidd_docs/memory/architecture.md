@@ -33,6 +33,7 @@ flowchart LR
 - Claude's registration is driven at `--scope local`, so the file this CLI hashes keeps a single writer.
 - Two file regimes: what this CLI owns is regenerated from source; what it co-owns with a person is merged, and conflicts reported. Confusing them is where accidental complexity comes from.
 - The manifest reads one version only and refuses anything else, naming the fix. No migration chain: a domain entity carrying every past shape of its own JSON is a persistence concern.
+- As of v7, every installed plugin records its own `scope` (`project` | `user`) at install time; everything that later resolves its base directory reads that record, never the tool's current profile, which can disagree with what was true when the entry was written.
 - A launcher locates and runs an external binary; it never embeds that binary's code. `kanban` broke this and was unwired until it can meet it.
 
 ## Gotchas

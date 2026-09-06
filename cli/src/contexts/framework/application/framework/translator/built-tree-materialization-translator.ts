@@ -25,7 +25,10 @@ import type { ReadonlySkipList } from "../../../../translate/domain/plugin-trans
 import type { Manifest } from "../../../domain/manifest.js";
 import { InstalledPlugin } from "../../../domain/plugins/installed-plugin.js";
 import { isPluginFileAtDesiredState } from "../../plugin/plugin-helpers.js";
-import { resolvePluginBaseDir } from "../../plugin/plugin-target-resolution.js";
+import {
+  resolveBaseDirFromRecord,
+  resolveScopeForInstall,
+} from "../../plugin/plugin-target-resolution.js";
 import type { EnsureBuiltMarketplace } from "../../shared/ensure-built-marketplace-use-case.js";
 import { ModeBFlatMaterializationTranslator } from "./mode-b-flat-materialization-translator.js";
 import type { PluginTranslator } from "./plugin-translator.js";
@@ -92,12 +95,15 @@ export class BuiltTreeMaterializationTranslator implements PluginTranslator {
     const files = deliversHooksToProject
       ? withoutHooksPrefix(builtFiles, dist.manifest.name)
       : builtFiles;
+    const scope = resolveScopeForInstall(toolId);
     const baseDir =
-      mode === "flat" ? projectRoot : resolvePluginBaseDir(toolId, projectRoot, this.homedir);
+      mode === "flat"
+        ? projectRoot
+        : resolveBaseDirFromRecord(scope, toolId, projectRoot, this.homedir);
     const written = await this.writeChangedFiles(files, baseDir);
     manifest.addPlugin(
       toolId,
-      InstalledPlugin.fromDistribution(dist, source, files, new Map(), marketplace)
+      InstalledPlugin.fromDistribution(dist, source, files, scope, new Map(), marketplace)
     );
     return { skipped: hooksSkips, written };
   }

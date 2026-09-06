@@ -15,6 +15,12 @@ import {
   toMergeFileEntryData,
 } from "./merge-files.js";
 import {
+  type NativeRegistrations,
+  type NativeRegistrationsData,
+  parseNativeRegistrations,
+  toNativeRegistrationsData,
+} from "./native-registrations.js";
+import {
   parseTrackedFiles,
   type TrackedFile,
   type TrackedFileData,
@@ -33,6 +39,9 @@ export interface ToolEntry {
   readonly mergeFiles: readonly MergeFileEntry[];
   readonly excludedMcp: readonly McpExclusion[];
   readonly plugins: readonly InstalledPlugin[];
+  /** What this tool's own CLI was asked to register, or `undefined` for a tool with
+   * no `nativeActivation` — see {@link NativeRegistrations}. */
+  readonly nativeRegistrations?: NativeRegistrations;
 }
 
 export interface ToolEntryData {
@@ -42,6 +51,7 @@ export interface ToolEntryData {
   mergeFiles?: MergeFileEntryData[];
   excludedMcp?: McpExclusionData[];
   plugins?: PluginEntryData[];
+  nativeRegistrations?: NativeRegistrationsData;
 }
 
 export function createToolEntry(params: {
@@ -100,6 +110,9 @@ export function serializeToolEntry(entry: ToolEntry): ToolEntryData {
     mergeFiles: toMergeFileEntryData(entry.mergeFiles),
     ...(entry.excludedMcp.length > 0 && { excludedMcp: toMcpExclusionData(entry.excludedMcp) }),
     ...(entry.plugins.length > 0 && { plugins: entry.plugins.map((p) => p.toJSON()) }),
+    ...(entry.nativeRegistrations !== undefined && {
+      nativeRegistrations: toNativeRegistrationsData(entry.nativeRegistrations),
+    }),
   };
 }
 
@@ -111,5 +124,6 @@ export function parseToolEntry(toolId: ToolId, data: ToolEntryData): ToolEntry {
     mergeFiles: parseMergeFileEntries(data.mergeFiles ?? []),
     excludedMcp: parseMcpExclusionData(data.excludedMcp ?? []),
     plugins: (data.plugins ?? []).map((p) => InstalledPlugin.fromJSON(p)),
+    nativeRegistrations: parseNativeRegistrations(data.nativeRegistrations),
   };
 }

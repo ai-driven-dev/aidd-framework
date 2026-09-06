@@ -131,7 +131,13 @@ export class CleanUseCase {
   ): Promise<number> {
     let count = 0;
     for (const plugin of manifest.getPlugins(toolId)) {
-      const deleted = await deletePluginFilesForTool(plugin.files, toolId, projectRoot, this.fs);
+      const deleted = await deletePluginFilesForTool(
+        plugin.files,
+        plugin.scope,
+        toolId,
+        projectRoot,
+        this.fs
+      );
       count += deleted.length;
     }
     return count;

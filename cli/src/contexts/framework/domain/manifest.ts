@@ -1,9 +1,11 @@
 import { InvalidManifestDataError, ToolNotInManifestError } from "../../../kernel/errors.js";
 import type { FileHash, InstallationFile } from "../../../kernel/file.js";
 import type { MergeFileEntry } from "../../../kernel/merge.js";
+import { AIDD_DIR, MANIFEST_FILENAME } from "../../../kernel/paths.js";
 import type { ToolId } from "../../../kernel/tool.js";
 import type { McpExclusion } from "../../tools/domain/mcp-exclusion.js";
 import { addExclusions, removeExclusions } from "./manifest/mcp-exclusions.js";
+import type { NativeRegistrations } from "./manifest/native-registrations.js";
 import {
   addPluginToEntry,
   createToolEntry,
@@ -21,22 +23,9 @@ import {
 } from "./manifest-serialization.js";
 import type { InstalledPlugin } from "./plugins/installed-plugin.js";
 
-// The last published CLI whose manifest migrations could still read a pre-v6 document.
-// v6 shipped 2026-05-09 (commit 273573fc) in 4.1.0-beta.25; 5.2.2 is the last version
-// published before this guard replaced the migration chain (5.2.2 is the newest `cli-v*`
-// tag, and its manifest.ts still carries migrateV1toV2…migrateV5toV6 verbatim from 5.2.1).
-// Named here so the refusal below can tell a user stuck on an old manifest exactly what
-// to run first: downgrade, run it once to upgrade the manifest on disk, then update the
-// CLI again.
-const LAST_MIGRATING_CLI_VERSION = "5.2.2";
-
-// `update` alone is not enough: a locally modified tracked file makes it throw
-// InputRequiredError in non-interactive mode before it ever reaches the save that
-// would persist the migrated v6 manifest, leaving the user exactly as stuck as before.
-// `--force` removes that branch — verified empirically against 5.2.1 (plain manifest,
-// modified-tracked-file manifest, and a zero-tool manifest all re-save as v6); 5.2.2 is
-// byte-identical to 5.2.1 at this file, so the same verification holds for it.
-const RECOVERY_COMMAND = "update --force";
+// Where a stuck-on-an-old-version manifest lives, named in the refusal below so a
+// person can act on it without hunting for the path themselves.
+const MANIFEST_PATH_HINT = `${AIDD_DIR}/${MANIFEST_FILENAME}`;
 
 export class Manifest {
   private readonly _tools: Map<ToolId, ToolEntry>;
@@ -187,6 +176,16 @@ export class Manifest {
     this._tools.set(toolId, updatePluginInEntry(entry, plugin));
   }
 
+  getNativeRegistrations(toolId: ToolId): NativeRegistrations | undefined {
+    return this._tools.get(toolId)?.nativeRegistrations;
+  }
+
+  setNativeRegistrations(toolId: ToolId, registrations: NativeRegistrations): void {
+    const entry = this._tools.get(toolId);
+    if (!entry) throw new ToolNotInManifestError(toolId);
+    this._tools.set(toolId, { ...entry, nativeRegistrations: registrations });
+  }
+
   isFileTracked(relativePath: string): boolean {
     for (const entry of this._tools.values()) {
       if (isFileTrackedInEntry(entry, relativePath)) return true;
@@ -211,7 +210,7 @@ export class Manifest {
   // --- Serialization ---
 
   toJSON(): ManifestData {
-    return { version: MANIFEST_VERSION as 6, tools: serializeManifestTools(this._tools) };
+    return { version: MANIFEST_VERSION as 7, tools: serializeManifestTools(this._tools) };
   }
 
   static fromJSON(data: unknown): Manifest {
@@ -224,11 +223,18 @@ export class Manifest {
     return new Manifest({ tools });
   }
 
-  // This CLI reads exactly MANIFEST_VERSION: the migration chain that used to carry older
-  // documents forward was removed once no supported CLI could still be behind v6 (see
-  // LAST_MIGRATING_CLI_VERSION). A refusal alone would strand a user who self-updated before
-  // opening an old project, so the two failure branches each name the fix: too old names the
-  // last CLI able to migrate the manifest forward; too new means this CLI itself is behind.
+  // This CLI reads exactly MANIFEST_VERSION and refuses every other one, naming a fix for
+  // each side. Too new means this CLI itself is behind, so `aidd update` is a real answer.
+  //
+  // Too old has no such answer: v6 to v7 was not a freebie like v6 itself was (the v6 cutover
+  // only stopped accepting formats an already-published CLI, 5.2.2, could still migrate to and
+  // re-save — see the deleted migration chain this replaced). v7 requires data — a mandatory
+  // `scope` per plugin — that no published CLI has ever written, so no version number can be
+  // named here that would actually get a stuck user unstuck: `ManifestRepositoryAdapter.load()`
+  // calls `fromJSON` before any command reaches a save, so `setup`, `framework install` and
+  // every other write path refuse an old document exactly as this method does, before they
+  // ever get a chance to overwrite it. The only correction that does not first pass back
+  // through this same guard is deleting the document outright, so that is what is named.
   private static assertSupportedVersion(raw: Record<string, unknown>): void {
     const version = raw.version;
     if (version === MANIFEST_VERSION) return;
@@ -239,8 +245,8 @@ export class Manifest {
     }
     throw new InvalidManifestDataError(
       `manifest version ${String(version)} predates version ${MANIFEST_VERSION}, the only one this CLI reads. ` +
-        `Run \`npx @ai-driven-dev/cli@${LAST_MIGRATING_CLI_VERSION} ${RECOVERY_COMMAND}\` once in this project ` +
-        `to upgrade the manifest (overwrites locally modified tracked files), then update the CLI again.`
+        `No published CLI can write this version: delete ${MANIFEST_PATH_HINT} in this project, then run ` +
+        "`aidd setup` to reinstall the framework."
     );
   }
 }

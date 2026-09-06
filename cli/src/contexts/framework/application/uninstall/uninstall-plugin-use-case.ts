@@ -52,6 +52,7 @@ export class UninstallPluginUseCase {
       if (plugin === undefined) continue;
       const deletedFiles = await deletePluginFilesForTool(
         plugin.files,
+        plugin.scope,
         toolId,
         projectRoot,
         this.fs

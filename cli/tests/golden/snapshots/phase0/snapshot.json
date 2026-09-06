@@ -20,7 +20,7 @@
       ".gitignore"
     ],
     "manifest": {
-      "version": 6,
+      "version": 7,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -43,7 +43,7 @@
     "stderr": "",
     "filesWritten": [],
     "manifest": {
-      "version": 6,
+      "version": 7,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -66,7 +66,7 @@
     "stderr": "",
     "filesWritten": [],
     "manifest": {
-      "version": 6,
+      "version": 7,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -89,7 +89,7 @@
     "stderr": "",
     "filesWritten": [],
     "manifest": {
-      "version": 6,
+      "version": 7,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -112,7 +112,7 @@
     "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\n",
     "filesWritten": [],
     "manifest": {
-      "version": 6,
+      "version": 7,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -134,6 +134,7 @@
               "version": "<VERSION>",
               "strict": false,
               "files": {},
+              "scope": "project",
               "marketplace": "aidd-framework"
             }
           ]
@@ -148,7 +149,7 @@
     "stderr": "",
     "filesWritten": [],
     "manifest": {
-      "version": 6,
+      "version": 7,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -170,6 +171,7 @@
               "version": "<VERSION>",
               "strict": false,
               "files": {},
+              "scope": "project",
               "marketplace": "aidd-framework"
             }
           ]
@@ -197,7 +199,7 @@
       ".cursor/settings.json"
     ],
     "manifest": {
-      "version": 6,
+      "version": 7,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -219,6 +221,7 @@
               "version": "<VERSION>",
               "strict": false,
               "files": {},
+              "scope": "project",
               "marketplace": "aidd-framework"
             }
           ]
@@ -249,6 +252,7 @@
                 "aidd-test/skills/commit/SKILL.md": "01c4b6a281146776eb7304577c56bb79",
                 "aidd-test/skills/hello.md": "f00ea16a97341b9314df0da073633624"
               },
+              "scope": "user",
               "marketplace": "aidd-framework"
             }
           ]
@@ -263,7 +267,7 @@
     "stderr": "",
     "filesWritten": [],
     "manifest": {
-      "version": 6,
+      "version": 7,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -285,6 +289,7 @@
               "version": "<VERSION>",
               "strict": false,
               "files": {},
+              "scope": "project",
               "marketplace": "aidd-framework"
             }
           ]
@@ -315,6 +320,7 @@
                 "aidd-test/skills/commit/SKILL.md": "01c4b6a281146776eb7304577c56bb79",
                 "aidd-test/skills/hello.md": "f00ea16a97341b9314df0da073633624"
               },
+              "scope": "user",
               "marketplace": "aidd-framework"
             }
           ]
@@ -329,7 +335,7 @@
     "stderr": "Warning:   Modified tracked file: .claude/settings.json\n    Fix: Run `aidd sync --force` to revert to the framework version.\n",
     "filesWritten": [],
     "manifest": {
-      "version": 6,
+      "version": 7,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -351,6 +357,7 @@
               "version": "<VERSION>",
               "strict": false,
               "files": {},
+              "scope": "project",
               "marketplace": "aidd-framework"
             }
           ]
@@ -381,6 +388,7 @@
                 "aidd-test/skills/commit/SKILL.md": "01c4b6a281146776eb7304577c56bb79",
                 "aidd-test/skills/hello.md": "f00ea16a97341b9314df0da073633624"
               },
+              "scope": "user",
               "marketplace": "aidd-framework"
             }
           ]
@@ -395,7 +403,7 @@
     "stderr": "Warning: claude: plugins are registered by the claude CLI, not by this file tree; run `aidd framework install --tool claude` to register them.\n",
     "filesWritten": [],
     "manifest": {
-      "version": 6,
+      "version": 7,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -417,6 +425,7 @@
               "version": "<VERSION>",
               "strict": false,
               "files": {},
+              "scope": "project",
               "marketplace": "aidd-framework"
             }
           ]
@@ -447,6 +456,7 @@
                 "aidd-test/skills/commit/SKILL.md": "01c4b6a281146776eb7304577c56bb79",
                 "aidd-test/skills/hello.md": "f00ea16a97341b9314df0da073633624"
               },
+              "scope": "user",
               "marketplace": "aidd-framework"
             }
           ]
@@ -461,7 +471,7 @@
     "stderr": "",
     "filesWritten": [],
     "manifest": {
-      "version": 6,
+      "version": 7,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -483,6 +493,7 @@
               "version": "<VERSION>",
               "strict": false,
               "files": {},
+              "scope": "project",
               "marketplace": "aidd-framework"
             }
           ]
@@ -513,6 +524,7 @@
                 "aidd-test/skills/commit/SKILL.md": "01c4b6a281146776eb7304577c56bb79",
                 "aidd-test/skills/hello.md": "f00ea16a97341b9314df0da073633624"
               },
+              "scope": "user",
               "marketplace": "aidd-framework"
             }
           ]
@@ -527,7 +539,7 @@
     "stderr": "Warning: claude CLI not found on PATH — 'aidd-test@aidd-framework' was not uninstalled from claude's own plugin registry and may still be enabled there.\nWarning: claude CLI not found on PATH — skipping native plugin activation.\n",
     "filesWritten": [],
     "manifest": {
-      "version": 6,
+      "version": 7,
       "tools": {
         "claude": {
           "toolId": "claude",

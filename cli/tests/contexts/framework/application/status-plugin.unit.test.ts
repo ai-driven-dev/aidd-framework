@@ -25,6 +25,7 @@ function makeManifest(pluginFileHash: string): Manifest {
       version: "1.0.0",
       strict: false,
       files: { [PLUGIN_FILE]: pluginFileHash },
+      scope: "project",
     })
   );
   return manifest;

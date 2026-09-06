@@ -36,6 +36,7 @@ describe("UninstallToolsUseCase — cursor plugin file (user-scope)", () => {
         version: "1.0.0",
         strict: false,
         files: { [PLUGIN_KEY]: "abc123abc123abc123abc123abc123ab" },
+        scope: "user",
       })
     );
 

@@ -27,6 +27,7 @@ function makeManifest(pluginFileHash: string): Manifest {
       version: "1.0.0",
       strict: false,
       files: { [PLUGIN_KEY]: pluginFileHash },
+      scope: "user",
     })
   );
   return manifest;
@@ -117,6 +118,7 @@ describe("StatusUseCase — cursor plugin drift (user-scope)", () => {
           version: "1.0.0",
           strict: false,
           files: { "aidd-context/a.md": EXPECTED_HASH, "aidd-context/b.md": EXPECTED_HASH },
+          scope: "user",
         })
       );
       const fs = makeFs(false, EXPECTED_HASH);

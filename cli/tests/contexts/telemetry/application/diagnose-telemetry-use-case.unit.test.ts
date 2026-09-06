@@ -497,6 +497,7 @@ function manifestWithClaudePlugin(marketplace?: string): InMemoryManifestReposit
       "1.0.0",
       { kind: "github", repo: "ai-driven-dev/framework" },
       true,
+      "project",
       marketplace
     )
   );

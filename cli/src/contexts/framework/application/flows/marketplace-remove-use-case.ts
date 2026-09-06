@@ -76,7 +76,7 @@ export class MarketplaceRemoveUseCase {
     projectRoot: string
   ): Promise<number> {
     for (const { toolId, plugin } of orphans) {
-      await deletePluginFilesForTool(plugin.files, toolId, projectRoot, this.fs);
+      await deletePluginFilesForTool(plugin.files, plugin.scope, toolId, projectRoot, this.fs);
       manifest.removePlugin(toolId, plugin.name);
     }
     await this.manifestRepo.save(manifest);

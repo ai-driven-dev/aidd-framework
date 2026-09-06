@@ -20,6 +20,7 @@ function makeMockPlugin(name: string, marketplace = "aidd"): InstalledPlugin {
     version: "1.0.0",
     strict: false,
     files: {},
+    scope: "project",
     marketplace,
   });
 }
@@ -31,6 +32,7 @@ function makeMockOrphanPlugin(name: string): InstalledPlugin {
     version: "1.0.0",
     strict: false,
     files: {},
+    scope: "project",
   });
 }
 

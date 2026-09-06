@@ -75,6 +75,7 @@ describe("MarketplaceRemoveUseCase", () => {
       version: "1.0.0",
       strict: false,
       files: { ".claude/plugins/sample/CLAUDE.md": "0123456789abcdef0123456789abcdef" },
+      scope: "project",
       marketplace: "awesome",
     });
     manifest.addPlugin("claude", plugin);
@@ -119,6 +120,7 @@ describe("MarketplaceRemoveUseCase", () => {
         version: "1.0.0",
         strict: false,
         files: { [pluginKey]: "0123456789abcdef0123456789abcdef" },
+        scope: "user",
         marketplace: "awesome",
       })
     );
@@ -145,5 +147,49 @@ describe("MarketplaceRemoveUseCase", () => {
       fs.deletedPaths.some((p) => p.endsWith(join(".cursor", "plugins", "local", pluginKey)))
     ).toBe(true);
     expect(fs.deletedPaths).not.toContain(join(PROJECT_ROOT, pluginKey));
+  });
+
+  it("removes a cursor orphan's file under projectRoot, not ~/.cursor/plugins/local, when the manifest says scope: project", async () => {
+    const { registry, manifestRepo, fs } = buildUseCase();
+    const useCase = new MarketplaceRemoveUseCase(fs, manifestRepo, registry, new KeepPrompter());
+    const manifest = Manifest.create();
+    manifest.addTool("cursor", "1.0.0", []);
+    const pluginKey = "aidd-context/commands/hello.md";
+    manifest.addPlugin(
+      "cursor",
+      InstalledPlugin.fromJSON({
+        name: "aidd-context",
+        source: { kind: "github", repo: "owner/aidd-context" },
+        version: "1.0.0",
+        strict: false,
+        files: { [pluginKey]: "0123456789abcdef0123456789abcdef" },
+        // Disagrees with cursor's own profile, which declares installScope "user".
+        scope: "project",
+        marketplace: "awesome",
+      })
+    );
+    await manifestRepo.save(manifest);
+
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: "awesome",
+        source: { kind: "github", repo: "owner/awesome" },
+        scope: "project",
+        addedAt: "2026-04-29T10:00:00.000Z",
+      })
+    );
+
+    const result = await useCase.execute({
+      name: "awesome",
+      projectRoot: PROJECT_ROOT,
+      autoConfirm: true,
+    });
+
+    expect(result.removedPluginCount).toBe(1);
+    expect(fs.deletedPaths).toContain(join(PROJECT_ROOT, pluginKey));
+    expect(fs.deletedPaths.some((p) => p.includes(join(".cursor", "plugins", "local")))).toBe(
+      false
+    );
   });
 });

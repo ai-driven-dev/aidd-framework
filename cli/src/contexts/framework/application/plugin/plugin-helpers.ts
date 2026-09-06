@@ -8,10 +8,10 @@ import type { Hasher } from "../../../../kernel/ports/hasher.js";
 import type { AiToolId } from "../../../../kernel/tool.js";
 import type { PluginDistribution } from "../../../translate/domain/plugin-distribution.js";
 import type { Manifest } from "../../domain/manifest.js";
-import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
+import type { InstalledPlugin, PluginScope } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { PluginTranslator } from "../framework/translator/plugin-translator.js";
-import { resolvePluginBaseDir } from "./plugin-target-resolution.js";
+import { resolveBaseDirFromRecord } from "./plugin-target-resolution.js";
 
 export async function loadPluginManifest(manifestRepo: ManifestRepository): Promise<Manifest> {
   const manifest = await manifestRepo.load();
@@ -40,8 +40,8 @@ export async function deleteOldFiles(
 }
 
 /**
- * Deletes a plugin's tracked files from the base directory its own tool actually
- * installs to — `projectRoot` for a project-scope tool, the resolved user-scope plugins
+ * Deletes a plugin's tracked files from the base directory its manifest entry actually
+ * recorded — `projectRoot` for a project-scope entry, the resolved user-scope plugins
  * dir (e.g. `~/.cursor/plugins/local`) otherwise. Every plugin-file removal path
  * (`clean`, `plugin remove`, `uninstall`, `marketplace remove`) must resolve the base
  * dir this way, or a user-scope tool's files are never actually removed and instead a
@@ -49,11 +49,12 @@ export async function deleteOldFiles(
  */
 export async function deletePluginFilesForTool(
   files: ReadonlyMap<string, string>,
+  scope: PluginScope,
   toolId: AiToolId,
   projectRoot: string,
   fs: FileWriter
 ): Promise<string[]> {
-  const baseDir = resolvePluginBaseDir(toolId, projectRoot, nodeHomedir);
+  const baseDir = resolveBaseDirFromRecord(scope, toolId, projectRoot, nodeHomedir);
   const deleted: string[] = [];
   for (const relativePath of files.keys()) {
     const fullPath = join(baseDir, relativePath);

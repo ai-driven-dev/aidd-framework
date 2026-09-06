@@ -23,7 +23,7 @@ import {
   materializeViaTranslator,
   writePluginFiles,
 } from "./plugin-helpers.js";
-import { resolvePluginBaseDir, resolvePluginToolIds } from "./plugin-target-resolution.js";
+import { resolveBaseDirFromRecord, resolvePluginToolIds } from "./plugin-target-resolution.js";
 
 export interface PluginUpdateOptions {
   pluginNames?: string[];
@@ -103,7 +103,7 @@ export class PluginUpdateUseCase {
     projectRoot: string,
     manifest: Manifest
   ): Promise<void> {
-    const baseDir = resolvePluginBaseDir(toolId, projectRoot, nodeHomedir);
+    const baseDir = resolveBaseDirFromRecord(plugin.scope, toolId, projectRoot, nodeHomedir);
     await deleteOldFiles(plugin.files, baseDir, this.fs);
     const toolConfig = getToolConfig(toolId);
     const translator = this.resolveTranslator(toolConfig);
@@ -117,7 +117,7 @@ export class PluginUpdateUseCase {
     await writePluginFiles(newFiles, baseDir, this.fs);
     manifest.updatePlugin(
       toolId,
-      InstalledPlugin.fromDistribution(dist, plugin.source, newFiles, componentPaths)
+      InstalledPlugin.fromDistribution(dist, plugin.source, newFiles, plugin.scope, componentPaths)
     );
   }
 

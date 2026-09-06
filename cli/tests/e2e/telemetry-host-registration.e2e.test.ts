@@ -26,6 +26,7 @@ function pluginEntry(name: string, marketplace?: string) {
     version: "1.0.0",
     strict: true,
     files: {},
+    scope: "project",
     ...(marketplace === undefined ? {} : { marketplace }),
   };
 }
@@ -47,7 +48,7 @@ describe("check says whether the host will load what aidd installed", () => {
     await writeFile(
       join(projectDir, ".aidd", "manifest.json"),
       JSON.stringify({
-        version: 6,
+        version: 7,
         tools: {
           claude: {
             files: [],

@@ -19,7 +19,7 @@ What this package is, the problem it solves, and its domain language.
 | ---- | ------- |
 | Framework | the canonical set of agents, commands, rules, skills, templates |
 | Distribution | what one tool gets: the framework rewritten to that tool's conventions |
-| Manifest | `.aidd/manifest.json`, every installed file with its hash |
+| Manifest | `.aidd/manifest.json`, every installed file with its hash; each plugin also carries the `scope` (`project` \| `user`) its files were installed at |
 | Drift | an installed file changed since it was written |
 | Plugin | capability files grouped under one name, installed per tool from a marketplace |
 | Marketplace | where plugins come from, registered per project or per machine |

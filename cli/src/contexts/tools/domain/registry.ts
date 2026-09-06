@@ -153,6 +153,22 @@ export function machineLocalFilesOf(toolId: ToolId): readonly string[] {
 }
 
 /**
+ * The project's own hooks file a plugin's hooks are merged into, for a tool declaring
+ * `hooksDestination: "project"` — `.cursor/hooks.json` for Cursor — or `undefined` for a
+ * tool with nothing merged there.
+ *
+ * Deliberately not folded into `machineLocalFilesOf`: every entry that file names a
+ * project-relative path (`.cursor/hooks/<plugin>/...`, verified in
+ * `cursor-hooks-project-merge.ts`'s own doc comment), copied into the project and
+ * shareable, unlike the absolute-path machine-local content `machineLocalFilesOf`
+ * exists to keep out of git. `aiddGitignoreEntries` reads `machineLocalFilesOf` for
+ * exactly that reason; folding this in would gitignore a file that belongs in the repo.
+ */
+export function projectHooksFileOf(toolId: ToolId): string | undefined {
+  return resolvePluginsCapability(toolId)?.projectHooksRelativePath ?? undefined;
+}
+
+/**
  * A tool's plugin capability, or `null` when it declares none.
  *
  * Here rather than beside one of its callers: it reads nothing but this registry, and its

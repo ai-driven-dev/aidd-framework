@@ -224,6 +224,7 @@ describe("clean", () => {
         version: "1.0.0",
         strict: false,
         files: { [PLUGIN_KEY]: "abc123abc123abc123abc123abc123ab" },
+        scope: "user",
       })
     );
 
@@ -241,5 +242,37 @@ describe("clean", () => {
       fs.deletedPaths.some((p) => p.endsWith(join(".cursor", "plugins", "local", PLUGIN_KEY)))
     ).toBe(true);
     expect(fs.deletedPaths).not.toContain(join(PROJECT_ROOT, PLUGIN_KEY));
+  });
+
+  it("deletes a cursor plugin's file under projectRoot, not ~/.cursor/plugins/local, when the manifest says scope: project", async () => {
+    const manifest = Manifest.create();
+    manifest.addTool("cursor", "1.0.0", []);
+    manifest.addPlugin(
+      "cursor",
+      InstalledPlugin.fromJSON({
+        name: "aidd-context",
+        source: { kind: "local", path: "/some/path" },
+        version: "1.0.0",
+        strict: false,
+        files: { [PLUGIN_KEY]: "abc123abc123abc123abc123abc123ab" },
+        // Disagrees with cursor's own profile, which declares installScope "user".
+        scope: "project",
+      })
+    );
+
+    const fs = new RecordingFileAdapter();
+    const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+    const useCase = new CleanUseCase(
+      fs,
+      manifestRepo,
+      new CapturingLogger(),
+      new GitignoreUseCase(fs)
+    );
+    await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+    expect(fs.deletedPaths).toContain(join(PROJECT_ROOT, PLUGIN_KEY));
+    expect(fs.deletedPaths.some((p) => p.includes(join(".cursor", "plugins", "local")))).toBe(
+      false
+    );
   });
 });

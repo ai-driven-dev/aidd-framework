@@ -25,6 +25,7 @@ const makePlugin = (name = "my-plugin") =>
     version: "1.0.0",
     strict: false,
     files: { [`.claude/plugins/${name}/README.md`]: "c".repeat(32) },
+    scope: "project",
   });
 
 describe("plugin serialization round-trip", () => {

@@ -23,7 +23,7 @@ import type { ManifestRepository } from "../../domain/ports/manifest-repository.
 import { loadPluginManifest } from "./plugin-helpers.js";
 import {
   isFrameworkPrimeFlatMcp,
-  resolvePluginBaseDir,
+  resolveBaseDirFromRecord,
   resolvePluginToolIds,
 } from "./plugin-target-resolution.js";
 
@@ -63,7 +63,7 @@ export class PluginRemoveUseCase {
       const plugins = manifest.getPlugins(toolId);
       const plugin = plugins.find((p) => p.name === pluginName);
       if (plugin === undefined) continue;
-      const baseDir = resolvePluginBaseDir(toolId, projectRoot, nodeHomedir);
+      const baseDir = resolveBaseDirFromRecord(plugin.scope, toolId, projectRoot, nodeHomedir);
       this.removeNativeActivation(plugin, toolId);
       await this.deletePluginFiles(plugin.files, baseDir);
       await this.removeMcpEntries(plugin, toolId, projectRoot);

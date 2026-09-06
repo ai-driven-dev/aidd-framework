@@ -334,6 +334,14 @@ export class PluginsCapability {
     return projectRoot;
   }
 
+  /** The absolute user-scope plugins directory this capability declares, or `null` when
+   * it declares none — independent of this capability's own `installScope`. A caller
+   * resolving a *recorded* scope (which may disagree with the profile's current
+   * `installScope`) still needs the directory that scope means. */
+  userPluginsBaseDir(homedir: string): string | null {
+    return this._userPluginsDir?.(homedir) ?? null;
+  }
+
   pluginOutputDir(pluginName: string): string | null {
     if (this.mode !== "native" || this.pluginsDir === null) return null;
     return `${this.pluginsDir}${pluginName}/`;

@@ -8,6 +8,7 @@ import {
 import {
   InvalidPluginNameError,
   InvalidPluginVersionError,
+  MalformedPluginScopeError,
 } from "../../../../../src/kernel/errors.js";
 
 const makePluginData = (overrides: Partial<PluginEntryData> = {}): PluginEntryData => ({
@@ -16,6 +17,7 @@ const makePluginData = (overrides: Partial<PluginEntryData> = {}): PluginEntryDa
   version: "1.0.0",
   strict: false,
   files: { ".claude/plugins/my-plugin/CLAUDE.md": "abc123" },
+  scope: "project",
   ...overrides,
 });
 
@@ -52,6 +54,27 @@ describe("InstalledPlugin", () => {
       );
     });
 
+    it("throws MalformedPluginScopeError, naming the plugin, when scope is missing", () => {
+      const data = makePluginData();
+      // Proving the runtime guard a missing field trips, which a type-level `Omit`
+      // cannot construct as invalid data.
+      delete (data as { scope?: unknown }).scope;
+      expect(() => InstalledPlugin.fromJSON(data)).toThrow(MalformedPluginScopeError);
+      expect(() => InstalledPlugin.fromJSON(data)).toThrow(/my-plugin/);
+    });
+
+    it("throws MalformedPluginScopeError when scope is neither project nor user", () => {
+      // A value the type forbids, written the way a hand-edited file would carry it.
+      const data = makePluginData();
+      (data as { scope: string }).scope = "global";
+      expect(() => InstalledPlugin.fromJSON(data)).toThrow(MalformedPluginScopeError);
+    });
+
+    it("accepts scope: user", () => {
+      const plugin = InstalledPlugin.fromJSON(makePluginData({ scope: "user" }));
+      expect(plugin.scope).toBe("user");
+    });
+
     it("accepts single-segment names", () => {
       const plugin = InstalledPlugin.fromJSON(makePluginData({ name: "plugin" }));
       expect(plugin.name).toBe("plugin");
@@ -73,6 +96,15 @@ describe("InstalledPlugin", () => {
       const data = makePluginData();
       const plugin = InstalledPlugin.fromJSON(data);
       expect(plugin.toJSON()).toEqual(data);
+    });
+
+    it("round-trips scope, project and user alike", () => {
+      expect(InstalledPlugin.fromJSON(makePluginData({ scope: "project" })).toJSON().scope).toBe(
+        "project"
+      );
+      expect(InstalledPlugin.fromJSON(makePluginData({ scope: "user" })).toJSON().scope).toBe(
+        "user"
+      );
     });
   });
 
@@ -102,6 +134,7 @@ describe("InstalledPlugin", () => {
       expect(updated.name).toBe(plugin.name);
       expect(updated.strict).toBe(plugin.strict);
       expect(updated.files).toBe(plugin.files);
+      expect(updated.scope).toBe(plugin.scope);
     });
   });
 
@@ -119,6 +152,7 @@ describe("InstalledPlugin", () => {
       const updated = plugin.withFiles(new Map());
       expect(updated.name).toBe(plugin.name);
       expect(updated.version).toBe(plugin.version);
+      expect(updated.scope).toBe(plugin.scope);
     });
   });
 

@@ -22,7 +22,7 @@ import { describe, expect, it } from "vitest";
 import { createTestEnv, runCli } from "./helpers.js";
 
 const AIDD_DIR = ".aidd";
-const EMPTY_MANIFEST = { version: 6, tools: {} };
+const EMPTY_MANIFEST = { version: 7, tools: {} };
 
 async function seedManifest(projectDir: string): Promise<void> {
   await mkdir(join(projectDir, AIDD_DIR), { recursive: true });

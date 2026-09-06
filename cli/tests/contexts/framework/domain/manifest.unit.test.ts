@@ -190,10 +190,10 @@ describe("Manifest", () => {
       expect(restoredMerge[0].entries.playwright.value).toBe(`aabb11${"0".repeat(26)}`);
     });
 
-    it("toJSON produces version 6", () => {
+    it("toJSON produces version 7", () => {
       const manifest = Manifest.create();
       manifest.addTool("claude" as ToolId, "3.0.0", claudeFiles);
-      expect(manifest.toJSON().version).toBe(6);
+      expect(manifest.toJSON().version).toBe(7);
     });
   });
 
@@ -304,33 +304,37 @@ describe("Manifest", () => {
   });
 
   describe("version guard", () => {
-    it("v6 manifest loads without error", () => {
+    it("v7 manifest loads without error", () => {
       const manifest = Manifest.create();
       manifest.addTool("copilot" as ToolId, "1.0.0", []);
       const json = manifest.toJSON();
-      expect(json.version).toBe(6);
+      expect(json.version).toBe(7);
       expect(() => Manifest.fromJSON(json)).not.toThrow();
     });
 
-    it("v6 round-trip is stable", () => {
+    it("v7 round-trip is stable", () => {
       const manifest = Manifest.create();
       manifest.addTool("claude" as ToolId, "3.0.0", claudeFiles);
       const restored = Manifest.fromJSON(manifest.toJSON());
-      expect(restored.toJSON().version).toBe(6);
+      expect(restored.toJSON().version).toBe(7);
     });
 
-    // The command matters as much as the version: plain `update` throws InputRequiredError
-    // on a locally modified tracked file in non-interactive mode before it ever saves,
-    // which would leave the user exactly as stuck as the refusal they're trying to fix.
-    // `--force` is the verified-reliable path (see RECOVERY_COMMAND in manifest.ts), so a
-    // bare /update/ match isn't enough — pin the literal invocation.
-    const RECOVERY_INVOCATION = /npx @ai-driven-dev\/cli@5\.2\.2 update --force/;
+    // v7 introduced data (a mandatory `scope` per plugin) that no published CLI has ever
+    // written, so — unlike the v6 cutover — there is no already-published version to name
+    // that could actually migrate a stuck document forward: every write path loads the
+    // manifest through this same guard before it ever reaches a save
+    // (`ManifestRepositoryAdapter.load()`), so naming a command that reads the old
+    // document first would just refuse it again. The only correction that does not loop
+    // back through this guard is deleting the document and reinstalling from scratch.
+    const RECOVERY_INVOCATION = /delete \.aidd\/manifest\.json.*aidd setup/;
 
-    it("rejects a version below 6 and names the last CLI able to migrate it", () => {
-      const v5 = { version: 5, tools: {} };
-      expect(() => Manifest.fromJSON(v5)).toThrow(RECOVERY_INVOCATION);
-      // A refusal that never says "come back" is the impasse this guard exists to avoid.
-      expect(() => Manifest.fromJSON(v5)).toThrow(/update the CLI again/);
+    it("rejects a version below 7 and names the file to delete, not a command to migrate it", () => {
+      const v6 = { version: 6, tools: {} };
+      expect(() => Manifest.fromJSON(v6)).toThrow(RECOVERY_INVOCATION);
+      // The literal string this guard used to send a stuck user toward — a CLI that
+      // itself only ever wrote v6 and would refuse the resulting document all over
+      // again. Naming it here would recreate the very loop this guard now avoids.
+      expect(() => Manifest.fromJSON(v6)).not.toThrow(/update --force/);
     });
 
     it("v0 manifest throws, naming the recovery invocation", () => {
@@ -339,31 +343,81 @@ describe("Manifest", () => {
       expect(() => Manifest.fromJSON(v0)).toThrow(RECOVERY_INVOCATION);
     });
 
-    it("rejects a version above 6 by pointing at update, not a downgrade", () => {
+    it("rejects a version above 7 by pointing at update, not a downgrade", () => {
       const v99 = { version: 99, tools: {} };
       expect(() => Manifest.fromJSON(v99)).toThrow(/version/);
       expect(() => Manifest.fromJSON(v99)).toThrow(/aidd update/);
-      expect(() => Manifest.fromJSON(v99)).not.toThrow(/5\.2\.2/);
+      expect(() => Manifest.fromJSON(v99)).not.toThrow(RECOVERY_INVOCATION);
     });
   });
 
   describe("malformed tool entry", () => {
     it("throws an instructive, typed error naming the field when files is missing", () => {
-      const data = { version: 6, tools: { claude: { toolId: "claude", version: "1.0.0" } } };
+      const data = { version: 7, tools: { claude: { toolId: "claude", version: "1.0.0" } } };
       expect(() => Manifest.fromJSON(data)).toThrow(/tools\.claude\.files/);
     });
 
     it("throws an instructive, typed error naming the field when files is the wrong type", () => {
       const data = {
-        version: 6,
+        version: 7,
         tools: { claude: { toolId: "claude", version: "1.0.0", files: "nope" } },
       };
       expect(() => Manifest.fromJSON(data)).toThrow(/tools\.claude\.files/);
     });
 
     it("throws an instructive, typed error when a tool entry is not an object", () => {
-      const data = { version: 6, tools: { claude: "nope" } };
+      const data = { version: 7, tools: { claude: "nope" } };
       expect(() => Manifest.fromJSON(data)).toThrow(/tools\.claude/);
+    });
+
+    // `scope` is mandatory in v7: a default here would guess exactly what the field
+    // exists to stop guessing. Naming the plugin, not just "scope", is what lets a
+    // person find the offending entry in a manifest that may carry several.
+    it("rejects a v7 plugin entry carrying no scope, naming the plugin", () => {
+      const data = {
+        version: 7,
+        tools: {
+          claude: {
+            toolId: "claude",
+            version: "1.0.0",
+            files: [],
+            plugins: [
+              {
+                name: "aidd-context",
+                source: { kind: "local", path: "/fixture" },
+                version: "1.0.0",
+                strict: false,
+                files: {},
+              },
+            ],
+          },
+        },
+      };
+      expect(() => Manifest.fromJSON(data)).toThrow(/aidd-context/);
+    });
+
+    it("rejects a v7 plugin entry whose scope is neither project nor user", () => {
+      const data = {
+        version: 7,
+        tools: {
+          claude: {
+            toolId: "claude",
+            version: "1.0.0",
+            files: [],
+            plugins: [
+              {
+                name: "aidd-context",
+                source: { kind: "local", path: "/fixture" },
+                version: "1.0.0",
+                strict: false,
+                files: {},
+                scope: "global",
+              },
+            ],
+          },
+        },
+      };
+      expect(() => Manifest.fromJSON(data)).toThrow(/aidd-context/);
     });
   });
 

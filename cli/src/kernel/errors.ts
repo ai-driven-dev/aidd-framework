@@ -160,6 +160,28 @@ export class InvalidPluginVersionError extends Error {
   }
 }
 
+// Not `InvalidPluginScopeError`: that name is already the CLI-facing "this tool does not
+// support the scope you asked for" error (`install-scope.ts`). This one is a manifest
+// integrity failure — the recorded `scope` field itself is missing or not one of the two
+// values it may hold — a different failure with a different fix.
+export class MalformedPluginScopeError extends Error {
+  constructor(pluginName: string, scope: unknown) {
+    super(
+      `Plugin "${pluginName}" carries an invalid scope: ${JSON.stringify(scope)}. Expected "project" or "user".`
+    );
+    this.name = "MalformedPluginScopeError";
+  }
+}
+
+export class UnresolvableUserScopeError extends Error {
+  constructor(toolId: string) {
+    super(
+      `Manifest records a user-scope plugin for "${toolId}", but this tool's profile declares no user-scope plugins directory. Refusing to guess a base directory rather than silently resolving under the project root.`
+    );
+    this.name = "UnresolvableUserScopeError";
+  }
+}
+
 export class InvalidPluginManifestError extends Error {
   constructor(detail?: string) {
     super(detail ? `Invalid plugin manifest: ${detail}` : "Invalid plugin manifest.");

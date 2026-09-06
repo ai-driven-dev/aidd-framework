@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 7,
   "tools": {
     "claude": {
       "toolId": "claude",
@@ -43,6 +43,7 @@
           "files": {
             "commands/foo.md": "11111111111111111111111111111111"
           },
+          "scope": "project",
           "componentPaths": {
             "commands/foo.md": "commands/foo.md"
           },

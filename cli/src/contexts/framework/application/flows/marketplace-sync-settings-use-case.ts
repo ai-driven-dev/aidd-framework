@@ -11,12 +11,21 @@ import type { MarketplaceSettings } from "../../../tools/domain/marketplace-sett
 import type { NativePluginActivator } from "../../../tools/domain/ports/native-plugin-activator.js";
 import { nativeActivationOf, resolvePluginsCapability } from "../../../tools/domain/registry.js";
 import type { FrameworkBuildTarget } from "../../../translate/domain/build-target.js";
+import type { NativeRegistrations } from "../../domain/manifest/native-registrations.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { EnsureBuiltMarketplace } from "../shared/ensure-built-marketplace-use-case.js";
 
 export interface MarketplaceSyncSettingsOptions {
   projectRoot: string;
+}
+
+/** What one tool's own CLI actually registered, once its `activateTool` run finished —
+ * the state `nativeRegistrations` records, and `doctor` later compares to the host's
+ * real registry. */
+interface ActivationOutcome {
+  marketplaces: readonly string[];
+  pluginRefs: readonly string[];
 }
 
 /** Syncing marketplace settings into the tools that read them, as its callers need it. */
@@ -49,25 +58,29 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     }
     if (anyToolUpdated) await this.manifestRepo.save(manifest);
     const activated = await this.activateNativeTools(projectRoot, manifest, marketplaces);
-    if (await this.recordWhatActivationWrote(projectRoot, manifest, activated))
-      await this.manifestRepo.save(manifest);
+    const wroteHashes = await this.recordWhatActivationWrote(projectRoot, manifest, [
+      ...activated.keys(),
+    ]);
+    const wroteRegistrations = this.recordNativeRegistrations(manifest, activated);
+    if (wroteHashes || wroteRegistrations) await this.manifestRepo.save(manifest);
   }
 
-  /** Answers the tools whose own CLI actually ran — never every installed tool. A tool whose
-   * binary is absent, or that has no native activation at all, wrote nothing, so a settings
-   * file that differs for it differs because a person changed it. Blessing that as ours is
-   * the one thing this must not do. */
+  /** Answers the tools whose own CLI actually ran, keyed to what it was asked to
+   * register — never every installed tool. A tool whose binary is absent, or that has
+   * no native activation at all, wrote nothing, so a settings file that differs for it
+   * differs because a person changed it. Blessing that as ours is the one thing this
+   * must not do. */
   private async activateNativeTools(
     projectRoot: string,
     manifest: Manifest,
     marketplaces: readonly Marketplace[]
-  ): Promise<readonly ToolId[]> {
-    const activated: ToolId[] = [];
+  ): Promise<ReadonlyMap<ToolId, ActivationOutcome>> {
+    const activated = new Map<ToolId, ActivationOutcome>();
     for (const toolId of manifest.getInstalledToolIds()) {
       const binary = this.nativeActivationBinary(toolId);
       const activator = binary === undefined ? undefined : this.activators.get(binary);
       if (binary === undefined || activator === undefined) continue;
-      const ran = await this.activateTool(
+      const outcome = await this.activateTool(
         toolId,
         binary,
         activator,
@@ -75,9 +88,35 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
         manifest,
         marketplaces
       );
-      if (ran) activated.push(toolId);
+      if (outcome !== null) activated.set(toolId, outcome);
     }
     return activated;
+  }
+
+  /** Writes the manifest's own record of what each tool's CLI was asked to register —
+   * the state `doctor` later compares against the host's real registry, and `clean`
+   * undoes through the same binary. Only for a tool this run actually activated: a
+   * tool whose CLI never ran gets no `nativeRegistrations` write, the same rule
+   * `recordWhatActivationWrote` already holds for the settings-file hash. */
+  private recordNativeRegistrations(
+    manifest: Manifest,
+    activated: ReadonlyMap<ToolId, ActivationOutcome>
+  ): boolean {
+    let changed = false;
+    for (const [toolId, outcome] of activated) {
+      const binary = this.nativeActivationBinary(toolId);
+      if (binary === undefined) continue;
+      const registrations: NativeRegistrations = {
+        binary,
+        marketplaces: outcome.marketplaces,
+        pluginRefs: outcome.pluginRefs,
+      };
+      const existing = manifest.getNativeRegistrations(toolId);
+      if (nativeRegistrationsEqual(existing, registrations)) continue;
+      manifest.setNativeRegistrations(toolId, registrations);
+      changed = true;
+    }
+    return changed;
   }
 
   /**
@@ -124,8 +163,9 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     return nativeActivationOf(toolId)?.binary;
   }
 
-  /** True when this tool's own CLI was actually driven — the only case in which the settings
-   * file may have been written by anything but this code. */
+  /** Runs this tool's own CLI, returning what it was asked to register, or `null` when
+   * the binary is not on PATH — the only case in which the settings file may have been
+   * written by anything but this code, and in which nothing was actually registered. */
   private async activateTool(
     toolId: ToolId,
     binary: string,
@@ -133,10 +173,10 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     projectRoot: string,
     manifest: Manifest,
     marketplaces: readonly Marketplace[]
-  ): Promise<boolean> {
+  ): Promise<ActivationOutcome | null> {
     if (!activator.isAvailable()) {
       this.logger.warn(`${binary} CLI not found on PATH — skipping native plugin activation.`);
-      return false;
+      return null;
     }
     // Every known marketplace, never only the ones a plugin points at — declaring a
     // marketplace and installing a plugin from it are two acts, and a person does the first
@@ -151,13 +191,15 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     // must warn and let the others through, never abort the whole activation.
     for (const marketplace of marketplaces)
       await this.registerMarketplace(activator, toolId, marketplace, projectRoot);
-    if (!activator.enablesPlugins()) return true;
+    const registeredMarketplaces = marketplaces.map((m) => m.name);
+    if (!activator.enablesPlugins())
+      return { marketplaces: registeredMarketplaces, pluginRefs: [] };
     this.bestEffort(() => activator.upgradeMarketplaces(), "upgrade marketplaces");
     const refs = this.pluginRefsToEnable(toolId, manifest, marketplaces);
     for (const ref of refs) {
       this.bestEffort(() => activator.enablePlugin(ref), `enable plugin '${ref}'`);
     }
-    return true;
+    return { marketplaces: registeredMarketplaces, pluginRefs: refs };
   }
 
   private bestEffort(action: () => void, label: string): void {
@@ -416,4 +458,24 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     }
     return {};
   }
+}
+
+/** Whether two recorded registrations are the same fact, order included — both sides
+ * are built from the same marketplace/plugin iteration order each run, so a real
+ * difference is the only reason this returns false. Keeps a no-op sync from rewriting
+ * the manifest on every run. */
+function nativeRegistrationsEqual(
+  a: NativeRegistrations | undefined,
+  b: NativeRegistrations
+): boolean {
+  if (a === undefined) return false;
+  return (
+    a.binary === b.binary &&
+    arraysEqual(a.marketplaces, b.marketplaces) &&
+    arraysEqual(a.pluginRefs, b.pluginRefs)
+  );
+}
+
+function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
 }

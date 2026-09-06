@@ -17,11 +17,12 @@ import type {
   ReadonlySkipList,
 } from "../../../../translate/domain/plugin-translation-skip.js";
 import type { Manifest } from "../../../domain/manifest.js";
-import { InstalledPlugin } from "../../../domain/plugins/installed-plugin.js";
+import { InstalledPlugin, type PluginScope } from "../../../domain/plugins/installed-plugin.js";
 import { writePluginFiles } from "../../plugin/plugin-helpers.js";
 import {
   isFrameworkPrimeFlatMcp,
-  resolvePluginBaseDirForCapability,
+  resolveBaseDirFromRecord,
+  resolveScopeForInstall,
 } from "../../plugin/plugin-target-resolution.js";
 import type { PluginTranslator } from "./plugin-translator.js";
 import { ProjectHooksMaterializer, withoutHooks } from "./project-hooks-materializer.js";
@@ -69,6 +70,7 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
       ctx.componentPaths,
       marketplace,
       ctx.baseDir,
+      ctx.scope,
       manifest
     );
     return { skipped: allSkipped };
@@ -84,6 +86,7 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
     componentPaths: ReadonlyMap<string, string>;
     skipped: ReadonlySkipList;
     baseDir: string;
+    scope: PluginScope;
   } | null {
     const toolConfig = getToolConfig(toolId);
     if (!isAiTool(toolConfig)) return null;
@@ -96,8 +99,9 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
     const { files, componentPaths, skipped } = new PluginContentTranslator(
       this.hasher
     ).translateWithComponentPaths(distForNative, toolConfig);
-    const baseDir = resolvePluginBaseDirForCapability(pluginsCap, projectRoot, this.homedir);
-    return { caps, files, componentPaths, skipped, baseDir };
+    const scope = resolveScopeForInstall(toolId);
+    const baseDir = resolveBaseDirFromRecord(scope, toolId, projectRoot, this.homedir);
+    return { caps, files, componentPaths, skipped, baseDir, scope };
   }
 
   private async resolveMcp(
@@ -124,6 +128,7 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
     componentPaths: ReadonlyMap<string, string>,
     marketplace: string | undefined,
     baseDir: string,
+    scope: PluginScope,
     manifest: Manifest
   ): Promise<void> {
     if (files.length > 0) await writePluginFiles(files, baseDir, this.fs);
@@ -132,6 +137,7 @@ export class ModeBFlatMaterializationTranslator implements PluginTranslator {
       source,
       files,
       mcpEntries,
+      scope,
       componentPaths,
       marketplace
     );
