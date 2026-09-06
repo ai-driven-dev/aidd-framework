@@ -20,7 +20,9 @@ import type { FileReader } from "../../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../../kernel/ports/file-writer.js";
 import type { ArtifactContract, ToolBuildContract } from "../../build-contract.js";
 import { buildOpencodeFlatConfig } from "../../formats/opencode-mcp-merge.js";
+import { generateOpencodeHooksBridge } from "./opencode-hooks-bridge.js";
 import {
+  makeOpencodeHooksBridgePath,
   OPENCODE_FLAT_HOOKS_DIR,
   OPENCODE_HOOKS_DIR,
   OPENCODE_PLUGIN_ENTRY_BASENAME,
@@ -115,6 +117,11 @@ function buildOpencodeFlatHooksArtifact(): ArtifactContract {
     source: { kind: "hooksBundle", jsonPath: "hooks/hooks.json", scriptDir: "hooks" },
     path: makeOpencodeFlatHooksPath(),
     skipHooksJson: true,
+    hooksBridge: {
+      generate: generateOpencodeHooksBridge,
+      path: makeOpencodeHooksBridgePath,
+      skipIfSourceHas: OPENCODE_PLUGIN_ENTRY_BASENAME,
+    },
   };
 }
 

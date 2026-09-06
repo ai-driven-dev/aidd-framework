@@ -79,10 +79,26 @@ export type ArtifactContract =
        * for a tool that writes no hooks.json at all, because nothing on that tool's
        * side reads one. OpenCode is the one case today: its scripts are delivered
        * (namespaced per plugin, or renamed flat for its own plugin module — see
-       * opencode/opencode-paths.ts) but nothing triggers them yet. Wiring an event
-       * bridge that runs them is separate, later work.
+       * opencode/opencode-paths.ts). What triggers them is `hooksBridge`, when the
+       * contract provides one: a translation, not a second skip.
        */
       readonly skipHooksJson?: boolean;
+      /**
+       * A generated event bridge, for a tool with no hooks.json of its own and no other
+       * way to trigger a plugin's declared hooks (OpenCode today — see
+       * opencode/opencode-hooks-bridge.ts). Read only when `skipHooksJson` is also true.
+       */
+      readonly hooksBridge?: {
+        /** Raw (unrewritten) hooks.json content + plugin name -> the generated bridge
+         * module's full text, or `null` when nothing in it named a mapped event. */
+        readonly generate: (rawHooksJson: string, plugin: string) => string | null;
+        /** Output path for the generated bridge module. */
+        readonly path: (plugin: string) => string;
+        /** A hooks/ file whose presence in this plugin's own source means the plugin
+         * ships its own bridge already — generate nothing for it (aidd-telemetry's
+         * opencode-plugin.js, see opencode-paths.ts's OPENCODE_PLUGIN_ENTRY_BASENAME). */
+        readonly skipIfSourceHas: string;
+      };
     };
 
 /**

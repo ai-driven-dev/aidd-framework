@@ -77,3 +77,20 @@ describe("PluginAddUseCase OpenCode hooks install (Phase 7)", () => {
     expect(capturingLogger.warnMessages).toEqual([]);
   });
 });
+
+// Lot B (opencode-and-scope.md): `plugin install`/`setup` reach OpenCode through
+// ContentTranslator, never through FlatBuildStrategy (that one only runs for `translate`).
+// Without flatHooksBridge wired into ContentTranslator too, a plugin installed this way
+// carries a namespaced script nothing ever triggers — the exact gap `pnpm smoke` caught
+// (".opencode/plugin/ missing" after `setup --plugins recommended`, aidd-context's own
+// SessionStart hook installed with no bridge for it).
+describe("PluginAddUseCase OpenCode event bridge (Lot B)", () => {
+  it("generates .opencode/plugin/<plugin>-hooks.js for a plugin's mapped hook", async () => {
+    const { deps } = await installSamplePlugin();
+
+    const writtenPaths = deps.fs.listUnder(PROJECT_ROOT);
+    expect(writtenPaths).toContain(
+      posix.join(PROJECT_ROOT, ".opencode", "plugin", "sample-plugin-hooks.js")
+    );
+  });
+});

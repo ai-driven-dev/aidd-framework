@@ -31,6 +31,8 @@ const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 // telemetry axes and `framework rules` included. Same ~2 % headroom.
 // #787, the registry guard next raised its own line 601 -> 603 for, lands here at
 // 556.2 KB: inside the headroom, no raise.
+// 578 was set 2026-09-06 when OpenCode's hooks bridge landed: measured 566.8 KB, +7.3 KB
+// for the template of the module it generates per plugin. Same ~2 % headroom.
 const budgetKB = pkg.bundleBudgetKB ?? 500;
 const budgetBytes = budgetKB * 1024;
 

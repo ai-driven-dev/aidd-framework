@@ -1,0 +1,115 @@
+/**
+ * Guard for opencode-and-scope.md, Lot B — the generated event bridge, against the real
+ * built binary. Proves three things a unit or an integration test cannot, because each
+ * needs the actual translate output tree:
+ *
+ *   (a) `.opencode/plugin/<plugin>-hooks.js` exists, imports cleanly in a child process
+ *       with a live, non-empty argv (the same shape a real host provides — see
+ *       opencode-flat-hooks-loader-guard.e2e.test.ts, whose own guard this file leaves
+ *       untouched), and the child survives.
+ *   (b) importing it alone spawns nothing — only calling the exported factory, then
+ *       firing an event, does.
+ *   (c) calling the factory and then `event({ type: "session.idle" })` really spawns the
+ *       fixture's own Stop script, which writes a marker file this test can see.
+ *
+ * The fixture plugin (`aidd-test`) is extended here, at test run time, in a private copy
+ * of the source tree — never in the checked-in fixture, which several other suites already
+ * share (flat-build-strategy.hooks.integration.test.ts among them).
+ */
+import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+import { promisify } from "node:util";
+import { describe, expect, it } from "vitest";
+import { createTestEnv, FRAMEWORK_PATH, runCli } from "./helpers.js";
+
+const execFileAsync = promisify(execFile);
+
+const STOP_SCRIPT = 'require("node:fs").writeFileSync("marker.txt", "spawned");\n';
+
+// Built rather than written as a literal "${CLAUDE_PLUGIN_ROOT}" string — biome reads a
+// plain string holding "${...}" as a forgotten template literal (see
+// flat-build-strategy.hooks.integration.test.ts's own CLAUDE_ROOT_VAR).
+const ROOT = "$" + "{CLAUDE_PLUGIN_ROOT}";
+
+const IMPORT_ONLY_HARNESS =
+  'import(process.argv[2]).then(() => { console.log("HOST ALIVE"); process.exit(0); })' +
+  ".catch((err) => { console.error(String(err)); process.exit(1); });\n";
+
+async function waitForFile(path: string, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (existsSync(path)) return true;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return existsSync(path);
+}
+
+describe("opencode's generated event bridge, against the real build", () => {
+  it("imports safely with a live argv, spawns nothing on import, and spawns the Stop script on session.idle", async () => {
+    const { tempDir, projectDir, fakeHome, cleanup } = await createTestEnv("oc-hooks-bridge");
+    try {
+      const sourceDir = join(tempDir, "source");
+      await cp(FRAMEWORK_PATH, sourceDir, { recursive: true });
+
+      const hooksDir = join(sourceDir, "plugins", "aidd-test", "hooks");
+      await writeFile(join(hooksDir, "marker.js"), STOP_SCRIPT, "utf-8");
+      await writeFile(
+        join(hooksDir, "hooks.json"),
+        JSON.stringify({
+          hooks: {
+            PreToolUse: [{ hooks: [{ type: "command", command: `${ROOT}/hooks/check.sh` }] }],
+            Stop: [{ hooks: [{ type: "command", command: `node ${ROOT}/hooks/marker.js` }] }],
+          },
+        }),
+        "utf-8"
+      );
+
+      const outDir = join(tempDir, "dist");
+      await mkdir(outDir, { recursive: true });
+      const build = await runCli(
+        ["translate", sourceDir, "--to", "opencode", "--as", "flat", "--out", outDir],
+        projectDir,
+        fakeHome
+      );
+      expect(build.exitCode).toBe(0);
+
+      const bridgePath = join(outDir, ".opencode", "plugin", "aidd-test-hooks.js");
+      expect(existsSync(bridgePath)).toBe(true);
+
+      // (a) imports cleanly with a live, non-empty argv, and never spawns on import alone.
+      const harnessPath = join(tempDir, "import-only.mjs");
+      await writeFile(harnessPath, IMPORT_ONLY_HARNESS, "utf-8");
+      const { stdout } = await execFileAsync(
+        process.execPath,
+        [harnessPath, pathToFileURL(bridgePath).href, "some-non-empty-argv"],
+        { cwd: outDir, timeout: 5000 }
+      );
+      expect(stdout).toContain("HOST ALIVE");
+      expect(existsSync(join(outDir, "marker.txt"))).toBe(false);
+
+      // (b)/(c) calling the factory, then firing session.idle, spawns the Stop script —
+      // a real child process, not the mapping alone: run this step in its own child too,
+      // so the marker file lands relative to a cwd this test controls.
+      const driverPath = join(tempDir, "drive-session-idle.mjs");
+      await writeFile(
+        driverPath,
+        `const mod = await import(${JSON.stringify(pathToFileURL(bridgePath).href)});
+         const factories = Object.keys(mod).filter((k) => typeof mod[k] === "function");
+         const hooks = await mod[factories[0]]({ directory: process.argv[2] });
+         await hooks.event({ event: { type: "session.idle", properties: { sessionID: "s1" } } });
+        `,
+        "utf-8"
+      );
+      await execFileAsync(process.execPath, [driverPath, outDir], { timeout: 5000 });
+
+      const markerWritten = await waitForFile(join(outDir, "marker.txt"), 4000);
+      expect(markerWritten).toBe(true);
+      expect(await readFile(join(outDir, "marker.txt"), "utf-8")).toBe("spawned");
+    } finally {
+      await cleanup();
+    }
+  });
+});

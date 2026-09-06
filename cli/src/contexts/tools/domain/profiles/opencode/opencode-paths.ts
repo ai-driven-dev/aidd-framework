@@ -27,3 +27,14 @@ export const OPENCODE_HOOKS_DIR = `${OPENCODE_DIRECTORY}hooks/`;
  * external bridge must be told to run. See `OPENCODE_FLAT_HOOKS_DIR`.
  */
 export const OPENCODE_PLUGIN_ENTRY_BASENAME = "opencode-plugin.js";
+
+/**
+ * Where a plugin's generated event bridge lands — flat, in the directory the loader
+ * scans, renamed per plugin the same way `OPENCODE_PLUGIN_ENTRY_BASENAME` already is, so
+ * two plugins each getting one cannot collide. Read by both flat-materialization routes
+ * (`build.ts`'s `hooksBridge.path`, `plugins-capability.ts`'s `flatHooksBridge.path`), so
+ * the path is a single fact rather than two definitions that could drift apart.
+ */
+export function makeOpencodeHooksBridgePath(plugin: string): string {
+  return `${OPENCODE_FLAT_HOOKS_DIR}${plugin}-hooks.js`;
+}

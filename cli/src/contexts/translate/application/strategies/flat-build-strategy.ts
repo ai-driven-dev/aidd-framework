@@ -1,4 +1,4 @@
-import { basename, join, relative } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import { FlatTargetExistsError, OutDirNotDirectoryError } from "../../../../kernel/errors.js";
 import { parseFrontmatter, serializeFrontmatter } from "../../../../kernel/markdown.js";
 import { rewriteClaudeRootInJson } from "../../../../kernel/materialization/claude-root-path-rewrite.js";
@@ -83,7 +83,7 @@ export class FlatBuildStrategy implements BuildOutputStrategy {
     const hooksSrc = join(pluginSrc, PLUGIN_HOOKS_RELATIVE);
     if (!(await this.fs.fileExists(hooksSrc))) return 0;
     const jsonCount = artifact.skipHooksJson
-      ? 0
+      ? await this.writeHooksBridgeIfDeclared(artifact, pluginName, hooksSrc)
       : await this.writeFlatHooksJson(artifact, pluginName, hooksSrc);
     const scriptCount = await this.writeFlatHooksScripts(artifact, pluginName, pluginSrc);
     return jsonCount + scriptCount;
@@ -191,6 +191,29 @@ export class FlatBuildStrategy implements BuildOutputStrategy {
       return this.writeMergedHooksJson(artifact, pluginName, raw);
     }
     return this.writeRewrittenHooksJson(artifact, pluginName, raw);
+  }
+
+  // OpenCode reads no hooks.json (artifact.skipHooksJson) - a plugin's declared hooks have
+  // no trigger there unless a generated bridge replaces the manifest a native host would
+  // read. Raw content only: the bridge resolves its own scripts from its own
+  // `import.meta.url`, never from an outDir-relative path this strategy would otherwise
+  // rewrite for it.
+  private async writeHooksBridgeIfDeclared(
+    artifact: Extract<ArtifactContract, { supported: true }>,
+    pluginName: string,
+    hooksSrc: string
+  ): Promise<number> {
+    const bridge = artifact.hooksBridge;
+    if (!bridge) return 0;
+    const skipEntry = join(dirname(hooksSrc), bridge.skipIfSourceHas);
+    if (await this.fs.fileExists(skipEntry)) return 0;
+    const raw = await this.fs.readFile(hooksSrc);
+    const generated = bridge.generate(raw, pluginName);
+    if (generated === null) return 0;
+    const destPath = join(this.absOut, bridge.path(pluginName));
+    await this.checkCollision(destPath, pluginName);
+    await this.fs.writeFile(destPath, generated);
+    return 1;
   }
 
   private async writeMergedHooksJson(

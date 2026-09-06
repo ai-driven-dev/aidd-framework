@@ -331,6 +331,29 @@ if true; then
     && ok "cursor user-scope plugin file present under \$HOME" \
     || bad "cursor user-scope plugin file missing: $cursor_plugin_file"
 
+  # opencode-and-scope.md, Lot B: a plugin's hooks now trigger through a generated
+  # bridge under .opencode/plugin/ (the directory OpenCode's own loader imports
+  # in-process — nothing but a real plugin module belongs there), while every hook
+  # script itself is namespaced under .opencode/hooks/<plugin>/ instead. This counts
+  # non-.js files rather than picking one, so it never depends on find's own order.
+  # $FRAMEWORK_FIXTURE's own plugin ships only a PreToolUse hook — a mapped event
+  # (SessionStart/Stop/PostToolUse) generates no bridge for it, matching production's
+  # aidd-context — so .opencode/plugin/ existing at all is not asserted, only what it
+  # holds when it does.
+  oc_plugin_dir="$BASE/.opencode/plugin"
+  oc_hooks_dir="$BASE/.opencode/hooks"
+  if [[ -d "$oc_plugin_dir" ]]; then
+    non_js=$(find "$oc_plugin_dir" -maxdepth 1 -type f ! -name '*.js' | wc -l | tr -d ' ')
+    [[ "$non_js" == "0" ]] \
+      && ok "opencode .opencode/plugin/ holds only .js modules" \
+      || bad "opencode .opencode/plugin/ holds $non_js non-.js file(s)"
+  else
+    ok "opencode .opencode/plugin/ absent (this fixture's plugin maps no bridged event)"
+  fi
+  [[ -d "$oc_hooks_dir" && -n "$(ls -A "$oc_hooks_dir" 2>/dev/null)" ]] \
+    && ok "opencode .opencode/hooks/ populated" \
+    || bad "opencode .opencode/hooks/ missing or empty"
+
   section "global read-only commands (no crash)"
   # doctor exits 1 by design when it finds drift/issues (e.g. framework-shipped broken
   # references on a fresh --ai all install); 0 or 1 are both non-crash here, and

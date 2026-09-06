@@ -2,6 +2,7 @@ import { InstallationFile } from "../../../kernel/file.js";
 import { parseFrontmatter, serializeFrontmatter } from "../../../kernel/markdown.js";
 import { flatHooksPathWithLoaderEntry } from "../../../kernel/materialization/flat-paths.js";
 import type { Hasher } from "../../../kernel/ports/hasher.js";
+import type { FlatHooksBridge } from "../../tools/domain/capabilities/plugins-capability.js";
 import type {
   AiTool,
   HasAgents,
@@ -278,9 +279,9 @@ export class PluginContentTranslator {
   // flatHooksDir — unless it is that loader's own plugin module (flatHooksLoaderEntry),
   // which is delivered flat and renamed instead. See flatHooksPathWithLoaderEntry.
   private flatHooksFiles(dist: PluginDistribution, tool: AiTool<HasPlugins>): InstallationFile[] {
-    const { flatHooksDir, flatHooksLoaderEntry } = tool.capabilities.plugins;
+    const { flatHooksDir, flatHooksLoaderEntry, flatHooksBridge } = tool.capabilities.plugins;
     if (flatHooksDir === null) return [];
-    return dist.components.hooks
+    const scripts = dist.components.hooks
       .filter((file) => file.relativePath !== `${PLUGIN_HOOKS_DIR}/hooks.json`)
       .map((file) =>
         this.makeFile(
@@ -293,6 +294,30 @@ export class PluginContentTranslator {
           file.content
         )
       );
+    const bridge = this.flatHooksBridgeFile(dist, flatHooksBridge);
+    return bridge === null ? scripts : [...scripts, bridge];
+  }
+
+  // The install-time counterpart of FlatBuildStrategy's own writeHooksBridgeIfDeclared:
+  // `setup`/`plugin install` reach OpenCode through this translator, never through the
+  // build strategy, so without this a plugin's hooks trigger on OpenCode only for a tree
+  // `translate` produced, not one `setup` installed into a project directly.
+  private flatHooksBridgeFile(
+    dist: PluginDistribution,
+    bridge: FlatHooksBridge | null
+  ): InstallationFile | null {
+    if (bridge === null) return null;
+    const manifestFile = dist.components.hooks.find(
+      (f) => f.relativePath === `${PLUGIN_HOOKS_DIR}/hooks.json`
+    );
+    if (manifestFile === undefined) return null;
+    const hasOwnBridge = dist.components.hooks.some(
+      (f) => basename(f.relativePath) === bridge.skipIfSourceHas
+    );
+    if (hasOwnBridge) return null;
+    const generated = bridge.generate(manifestFile.content, dist.manifest.name);
+    if (generated === null) return null;
+    return this.makeFile(bridge.path(dist.manifest.name), generated);
   }
 
   private collectHooksSkips(dist: PluginDistribution, tool: AiTool<HasPlugins>): ReadonlySkipList {

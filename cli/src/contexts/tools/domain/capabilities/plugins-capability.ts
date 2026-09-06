@@ -136,6 +136,23 @@ export interface NativePluginsParams {
  * loader scans a directory for — `flatHooksDir` names that directory, relative to the
  * project root. See {@link HooksSupport} for the shape of the "no" case.
  */
+/**
+ * A generated event bridge, for a flat loader that scans no "hooks" family and reads no
+ * hooks.json of its own — OpenCode today. Read by both flat-materialization routes
+ * (`translate`'s `FlatBuildStrategy` and `setup`/`plugin install`'s `ContentTranslator`), so
+ * one plugin looks the same on OpenCode whichever route installed it.
+ */
+export interface FlatHooksBridge {
+  /** Raw (unrewritten) hooks.json content + plugin name -> the generated bridge module's
+   * full text, or `null` when nothing in it named an event the bridge maps. */
+  readonly generate: (rawHooksJson: string, plugin: string) => string | null;
+  /** Output path for the generated bridge module, relative to the project root. */
+  readonly path: (plugin: string) => string;
+  /** A hooks/ file whose presence in this plugin's own source means it ships its own
+   * bridge already — generate nothing for it. */
+  readonly skipIfSourceHas: string;
+}
+
 export type FlatHooksSupport =
   | {
       acceptsHooks: true;
@@ -147,6 +164,9 @@ export type FlatHooksSupport =
        * {@link FlatHooksLoaderEntry}.
        */
       flatHooksLoaderEntry?: FlatHooksLoaderEntry;
+      /** See {@link FlatHooksBridge}. Omit when this loader triggers a plugin's hooks
+       * some other way. */
+      flatHooksBridge?: FlatHooksBridge;
     }
   | { acceptsHooks: false; hooksUnsupportedReason: string };
 
@@ -208,6 +228,8 @@ export class PluginsCapability {
   /** The flat loader's own plugin module, or `null` when this capability declares
    * none. See {@link FlatHooksSupport.flatHooksLoaderEntry}. */
   readonly flatHooksLoaderEntry: FlatHooksLoaderEntry | null;
+  /** See {@link FlatHooksBridge}, or `null` when this capability declares none. */
+  readonly flatHooksBridge: FlatHooksBridge | null;
   readonly marketplaceSettings: MarketplaceSettings | null;
   /** Native CLI-driven plugin activation declaration, or `null` when not applicable. */
   readonly nativeActivation: NativeActivation | null;
@@ -251,6 +273,7 @@ export class PluginsCapability {
       this.projectHooksRelativePath = params.projectHooksRelativePath ?? null;
       this.flatHooksDir = null;
       this.flatHooksLoaderEntry = null;
+      this.flatHooksBridge = null;
       this.marketplaceSettings = params.marketplaceSettings ?? null;
       this.nativeActivation = params.nativeActivation ?? null;
       this._userPluginsDir = params.userPluginsDir;
@@ -264,6 +287,7 @@ export class PluginsCapability {
       this.flatHooksLoaderEntry = params.acceptsHooks
         ? (params.flatHooksLoaderEntry ?? null)
         : null;
+      this.flatHooksBridge = params.acceptsHooks ? (params.flatHooksBridge ?? null) : null;
       this.hooksTrustNotice = null;
       this.pluginRootToken = null;
       this.acceptsMcp = false;
@@ -283,6 +307,7 @@ export class PluginsCapability {
       this.hooksUnsupportedReason = params.hooksUnsupportedReason;
       this.flatHooksDir = null;
       this.flatHooksLoaderEntry = null;
+      this.flatHooksBridge = null;
       this.hooksTrustNotice = null;
       this.pluginRootToken = null;
       this.acceptsMcp = false;

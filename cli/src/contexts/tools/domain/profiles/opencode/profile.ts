@@ -23,7 +23,9 @@ import {
 } from "../../formats/command.js";
 import { registerTool } from "../../registry.js";
 import { buildOpencodeFlatContract, transformMcpToOpencode } from "./build.js";
+import { generateOpencodeHooksBridge } from "./opencode-hooks-bridge.js";
 import {
+  makeOpencodeHooksBridgePath,
   OPENCODE_DIRECTORY,
   OPENCODE_FLAT_HOOKS_DIR,
   OPENCODE_HOOKS_DIR,
@@ -127,6 +129,11 @@ export const opencode: AiTool<
       flatHooksLoaderEntry: {
         dir: OPENCODE_FLAT_HOOKS_DIR,
         baseName: OPENCODE_PLUGIN_ENTRY_BASENAME,
+      },
+      flatHooksBridge: {
+        generate: generateOpencodeHooksBridge,
+        path: makeOpencodeHooksBridgePath,
+        skipIfSourceHas: OPENCODE_PLUGIN_ENTRY_BASENAME,
       },
     }),
   },
