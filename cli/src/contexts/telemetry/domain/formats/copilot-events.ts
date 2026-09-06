@@ -1,4 +1,4 @@
-import type { LocalCostCandidateRecord } from "../../../telemetry/domain/ports/session-cost-reader.js";
+import type { LocalCostCandidateRecord } from "../ports/session-cost-reader.js";
 
 // Measured 2026-08-21/22 against real files on `@github/copilot@1.0.80`:
 // ~/.copilot/session-state/<id>/events.jsonl. `session.shutdown` fires once, at the end of

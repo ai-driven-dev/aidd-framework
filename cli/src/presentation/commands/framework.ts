@@ -194,7 +194,7 @@ async function runFrameworkUpdate(
 export function registerFrameworkCommand(program: Command): void {
   const framework = program
     .command("framework")
-    .description("Manage the framework's lifecycle on installed tools: install, update, remove");
+    .description("Manage the framework's lifecycle on installed tools");
 
   framework
     .command("install")

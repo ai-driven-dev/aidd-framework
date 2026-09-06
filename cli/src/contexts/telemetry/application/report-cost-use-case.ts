@@ -531,8 +531,9 @@ export class ReportCostUseCase {
   private warnAboutFailures(sessionId: string, result: ReadLocalCostResult): void {
     // A missing logger cannot be allowed to swallow the failures this exists to surface —
     // that is the rule this method is named for, applied to itself. Production always wires
-    // one (`runtime/wiring/telemetry.ts`); a caller that does not gets the same sentences on stderr rather than
-    // silence, because a report that quietly drops unreadable sessions reads as low spend.
+    // one (`runtime/wiring/telemetry.ts`); a caller that does not gets the same sentences on
+    // stderr rather than silence, because a report that quietly drops unreadable sessions
+    // reads as low spend.
     const say =
       this.logger?.warn.bind(this.logger) ?? ((line: string) => process.stderr.write(`${line}\n`));
     for (const report of result.toolReports) {

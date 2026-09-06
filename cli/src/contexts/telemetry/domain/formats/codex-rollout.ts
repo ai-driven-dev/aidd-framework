@@ -1,7 +1,7 @@
 import type {
   LocalCostCandidateRecord,
   TranscriptLineAccumulator,
-} from "../../../telemetry/domain/ports/session-cost-reader.js";
+} from "../ports/session-cost-reader.js";
 
 // Measured 2026-08-20 against two real rollouts on Codex CLI 0.145.0-alpha.27:
 // ~/.codex/sessions/2026/07/29/rollout-*-019fae6f-....jsonl (a resumed session, where

@@ -25,6 +25,7 @@ import {
   distributionProbesOf,
   marketplaceProbes,
 } from "../../../../src/contexts/translate/domain/plugin-format.js";
+import type { TelemetryLocalRead } from "../../../../src/kernel/measurement.js";
 import { AI_TOOL_IDS, type ToolId } from "../../../../src/kernel/tool.js";
 import { journalHost } from "../../../helpers/telemetry-journal-hook.js";
 
@@ -123,10 +124,11 @@ describe("AiTool contract conformance", () => {
     });
 
     // Same shape guard for local-read: the type system requires `telemetryLocalRead` to
-    // exist, but not that its `kind` is one of the three this union defines.
-    it("declares its local-read shape as declared, unmeasured, or explicitly unsupported", () => {
+    // exist, but not that its `kind` is one of the two this union defines.
+    it("declares its local-read shape as declared or explicitly unsupported", () => {
+      const kinds: readonly TelemetryLocalRead["kind"][] = ["declared", "unsupported"];
       expect(
-        ["declared", "unmeasured", "unsupported"],
+        kinds,
         `${toolId} declares an unrecognized telemetryLocalRead kind: ${tool.telemetryLocalRead.kind}`
       ).toContain(tool.telemetryLocalRead.kind);
       if (tool.telemetryLocalRead.kind === "unsupported") {
@@ -146,10 +148,7 @@ describe("AiTool contract conformance", () => {
 // #697: read via TranscriptCostReaderAdapter and copilot-events.ts, at session rather than
 // request granularity - see copilot-events.unit.test.ts for the measurement.
 describe("telemetryLocalRead — exact declarations, phase 2 of local-cost-read", () => {
-  const EXPECTED: Record<
-    string,
-    { kind: "declared" | "unmeasured" | "unsupported"; reason?: string }
-  > = {
+  const EXPECTED: Record<string, { kind: TelemetryLocalRead["kind"]; reason?: string }> = {
     claude: { kind: "declared" },
     codex: { kind: "declared" },
     opencode: { kind: "declared" },

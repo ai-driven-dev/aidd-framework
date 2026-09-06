@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { UnreadableMarketplaceRegistryError } from "../../../kernel/errors.js";
 import { AIDD_DIR, AIDD_MARKETPLACES_FILENAME } from "../../../kernel/paths.js";
 import type { MarketplaceScope } from "../../../kernel/scope.js";
 import { userConfigDir } from "../../../runtime/user-config-dir.js";
@@ -18,11 +19,8 @@ interface RegistryFile {
  * a silent empty read would not merely hide the marketplaces a person registered - it would
  * delete them on the very next write. A file that is simply absent is a different answer and
  * keeps its own: no file, no marketplaces, nothing to lose. */
-function unreadable(path: string, reason: string): Error {
-  return new Error(
-    `Cannot read the marketplace registry at ${path}: ${reason}. Repair the file, or ` +
-      `delete it to start from an empty registry.`
-  );
+function unreadable(path: string, reason: string): never {
+  throw new UnreadableMarketplaceRegistryError(path, reason);
 }
 
 /** The registry's own list, or the reason the file cannot supply one. */
@@ -31,10 +29,10 @@ function registryEntries(raw: string, path: string): MarketplaceData[] {
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
-    throw unreadable(path, error instanceof Error ? error.message : "it is not valid JSON");
+    unreadable(path, error instanceof Error ? error.message : "it is not valid JSON");
   }
   const entries = (parsed as Partial<RegistryFile> | null)?.marketplaces;
-  if (!Array.isArray(entries)) throw unreadable(path, "it carries no `marketplaces` list");
+  if (!Array.isArray(entries)) unreadable(path, "it carries no `marketplaces` list");
   return entries;
 }
 

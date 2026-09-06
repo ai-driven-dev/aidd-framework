@@ -23,10 +23,11 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-// Mirrors `manifestDir` in cli/src/application/use-cases/framework/strategies/tool-contracts.ts,
-// name for name. Not a shared import: this plugin is copied verbatim into user projects and
-// can require nothing from `cli/`, the same reason `sanitizePathSegment` is duplicated in
-// `repo.cjs`. `aidd-telemetry-plugin-version.test.js` pins the two lists to each other.
+// Mirrors the manifest directory each tool's own profile declares, under
+// cli/src/contexts/tools/domain/profiles/*/profile.ts. Not a shared import: this plugin is
+// copied verbatim into user projects and can require nothing from `cli/`, the same reason
+// `sanitizePathSegment` is duplicated in `repo.cjs`. `aidd-telemetry-plugin-version.test.js`
+// reads every profile's declared path and pins this list to that reading.
 const MANIFEST_DIRS = Object.freeze([
   ".claude-plugin",
   ".cursor-plugin",

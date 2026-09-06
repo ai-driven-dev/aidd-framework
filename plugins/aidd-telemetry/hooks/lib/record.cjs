@@ -101,9 +101,7 @@ const SCHEMA_VERSION = 2;
 // hooks/lib/tools/<host>.cjs states it, measured or explicitly null; this is that fact
 // gathered into the one shape buildSessionStartLine below already expects.
 const VENDOR_FIELD_BY_HOST = Object.freeze(
-  Object.fromEntries(
-    Object.entries(TOOLS_BY_HOST).map(([host, tool]) => [host, tool.vendorField])
-  )
+  Object.fromEntries(Object.entries(TOOLS_BY_HOST).map(([host, tool]) => [host, tool.vendorField]))
 );
 
 // codexSessionIdFromTranscriptPath and readSessionId(host, payload) live in
@@ -205,9 +203,9 @@ function buildStepEndLine({ at, skill }) {
 // path, so this session is on that task from here. No end on this line either, and for the
 // same reason step_start carries none - closing is the reader's derivation, from whichever
 // turn_end or later task_declared comes next (see buildTaskIntervals in the CLI's own
-// cli/src/domain/models/task-attribution.ts, which is where that walk lives now). path is
-// repository-relative like file_written's, never a task_id: the derivation belongs to the
-// reader.
+// cli/src/contexts/telemetry/domain/task-attribution.ts, which is where that walk lives
+// now). path is repository-relative like file_written's, never a task_id: the derivation
+// belongs to the reader.
 function buildTaskDeclaredLine({ at, path: declaredPath }) {
   return { type: "task_declared", at, path: declaredPath };
 }
@@ -292,7 +290,8 @@ function handleUnrecognisedPayload(payload) {
   // falls back: a hook always runs inside the project it measures, which is a fact about
   // where this process runs, not a guess about the payload. Which of the two produced a
   // given marker is not recorded, since it does not change the answer.
-  const cwd = payload && typeof payload.cwd === "string" && payload.cwd ? payload.cwd : process.cwd();
+  const cwd =
+    payload && typeof payload.cwd === "string" && payload.cwd ? payload.cwd : process.cwd();
   const target = resolveRunsDir(cwd);
   if (!target) return;
 

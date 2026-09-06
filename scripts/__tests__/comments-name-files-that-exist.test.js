@@ -57,7 +57,9 @@ const NOT_A_REPOSITORY_FILE = Object.freeze({
     "tests/helpers/vitest-text-loader.js",
   ],
   "cli/tests/architecture/earned-sharing.arch.test.ts": ["shared/resolve-marketplace/x.ts"],
-  "cli/tests/contexts/framework/application/doctor-use-case.unit.test.ts": ["@.claude/rules/test.md"],
+  "cli/tests/contexts/framework/application/doctor-use-case.unit.test.ts": [
+    "@.claude/rules/test.md",
+  ],
   // A seam artefact one plugin writes into a reader's own project and another reads back —
   // named here as the shape of that seam, never as a file this repository holds.
   "docs/ARCHITECTURE.md": ["INSTALL.md"],
@@ -66,22 +68,18 @@ const NOT_A_REPOSITORY_FILE = Object.freeze({
     "dist/cli.js",
     "aidd_docs/tasks/2026_08/2026_08_21_probe-task/notes.md",
   ],
-});
-
-/**
- * A bare mention the `BARE_SOURCE_TOKEN` sweep newly reaches, genuinely stale — not
- * deliberate history, not a fixture path, just a comment the pre-context-split layout left
- * behind — sitting in a file outside this change's own scope. Listed here with the same
- * shape as the other two allowlists, so fixing the comment (a one-line change, in a file
- * this pass does not touch) is what shrinks it, exactly like `NAMED_AS_HISTORY` above.
- */
-const KNOWN_STALE_BARE_MENTION = Object.freeze({
-  "plugins/aidd-telemetry/hooks/lib/plugin-version.cjs": [
-    "cli/src/application/use-cases/framework/strategies/tool-contracts.ts",
+  // A sample written path fed to a payload or a fixture: illustrative, not a claim that
+  // `cli/src/index.ts` exists. Tightening the basename fallback for a rooted token (below)
+  // newly reaches these; the file the token names is out of this pass's scope, and these
+  // four never intended to name a real one in the first place.
+  "cli/tests/contexts/telemetry/infrastructure/run-journal-task-declared.integration.test.ts": [
+    "cli/src/index.ts",
   ],
-  "scripts/__tests__/aidd-telemetry-task-declaration.test.js": [
-    "cli/src/domain/tools/ai/opencode.ts",
+  "cli/tests/contexts/telemetry/infrastructure/run-journal-reader-adapter.integration.test.ts": [
+    "cli/src/index.ts",
   ],
+  "cli/tests/contexts/telemetry/domain/cost-report.unit.test.ts": ["cli/src/index.ts"],
+  "cli/tests/contexts/telemetry/domain/task-identity.unit.test.ts": ["cli/src/index.ts"],
 });
 
 const SOURCE_FILE_TOKEN = /^[\w./@-]+\.(?:ts|cjs|js|md)$/u;
@@ -100,7 +98,11 @@ function trackedFiles() {
 }
 
 function findFiles(command) {
-  return cp.execSync(command, { cwd: ROOT, encoding: "utf8" }).trim().split(/\r?\n/).filter(Boolean);
+  return cp
+    .execSync(command, { cwd: ROOT, encoding: "utf8" })
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean);
 }
 
 function scannedFiles() {
@@ -128,15 +130,27 @@ function scannedFiles() {
 function allowed(file, token) {
   return (
     (NAMED_AS_HISTORY[file] ?? []).includes(token) ||
-    (NOT_A_REPOSITORY_FILE[file] ?? []).includes(token) ||
-    (KNOWN_STALE_BARE_MENTION[file] ?? []).includes(token)
+    (NOT_A_REPOSITORY_FILE[file] ?? []).includes(token)
   );
 }
 
+/** A token spelled out from the repository root: it claims to be the whole path, not a
+ * shorthand, so the basename fallback below must not excuse it. Mirrors the prefix
+ * `BARE_SOURCE_TOKEN` requires — the one shape a stale mention can take while still reading
+ * as unambiguous. */
+const ROOTED_TOKEN = /^cli\/(?:src|tests)\//u;
+
 /** Every way a token could legitimately name something real: the exact tracked path, a path
- * relative to the file doing the naming, one relative to `cli/`, or a bare basename that
- * belongs to some tracked file. The last is deliberately generous — a comment saying
- * `repo.cjs` names a real file without spelling out where it sits. */
+ * relative to the file doing the naming, one relative to `cli/`, or — for a token that is
+ * not itself rooted at `cli/src/` or `cli/tests/` — a bare basename that belongs to some
+ * tracked file.
+ *
+ * That last check is deliberately generous: `repo.cjs` and `hooks/opencode-plugin.js` both
+ * name a real file by less than its full path, and a reader recognises them anyway. But it
+ * must not run for a token already spelled as a full repository path — `cli/src/domain/
+ * models/x.ts` naming basename `x.ts` would pass just because some unrelated tracked file
+ * happens to be called that today, which is the blind spot this comment used to leave open.
+ * A rooted token that fails every check above it names nothing real, full stop. */
 function namesSomethingReal(token, file, tracked, basenames) {
   if (tracked.has(token)) return true;
   const relativeToNamer = path.posix.normalize(path.posix.join(path.posix.dirname(file), token));
@@ -145,6 +159,7 @@ function namesSomethingReal(token, file, tracked, basenames) {
   // Shared with script-tests-name-cli-files-that-exist.test.js: a real file this repository
   // holds, whether or not `git ls-files` has caught up with it yet.
   if (repositoryPathExists(token)) return true;
+  if (ROOTED_TOKEN.test(token)) return false;
   return basenames.has(path.basename(token));
 }
 
@@ -210,12 +225,12 @@ describe("a comment about the hooks names .cjs where the file is .cjs", () => {
   });
 });
 
-/** This file's own path: excluded from the scan below. The three allowlists it defines
- * carry, as literal string values, the very tokens this rule exists to flag — a stale
- * `KNOWN_STALE_BARE_MENTION` entry names the dead path it excuses, verbatim, so the lookup
- * can match it; that is a catalog entry, not this file claiming the path is real, the same
- * distinction `errors-that-are-thrown.arch.test.ts` draws by excluding `kernel/errors.ts`
- * from its own search for a class that throws itself. */
+/** This file's own path: excluded from the scan below. The two allowlists it defines carry,
+ * as literal string values, the very tokens this rule exists to flag — a
+ * `NOT_A_REPOSITORY_FILE` entry names the illustrative path it excuses, verbatim, so the
+ * lookup can match it; that is a catalog entry, not this file claiming the path is real, the
+ * same distinction `errors-that-are-thrown.arch.test.ts` draws by excluding
+ * `kernel/errors.ts` from its own search for a class that throws itself. */
 const SELF = "scripts/__tests__/comments-name-files-that-exist.test.js";
 
 describe("a comment that names a source file names one that exists", () => {
@@ -255,12 +270,10 @@ describe("a comment that names a source file names one that exists", () => {
     const basenames = new Set([...tracked].map((file) => path.basename(file)));
     const stale = [];
 
-    for (const list of [NAMED_AS_HISTORY, KNOWN_STALE_BARE_MENTION]) {
-      for (const [file, tokens] of Object.entries(list)) {
-        for (const token of tokens) {
-          if (namesSomethingReal(token, file, tracked, basenames)) {
-            stale.push(`${file} is allowed to name \`${token}\`, but that file exists again`);
-          }
+    for (const [file, tokens] of Object.entries(NAMED_AS_HISTORY)) {
+      for (const token of tokens) {
+        if (namesSomethingReal(token, file, tracked, basenames)) {
+          stale.push(`${file} is allowed to name \`${token}\`, but that file exists again`);
         }
       }
     }
@@ -271,21 +284,19 @@ describe("a comment that names a source file names one that exists", () => {
   it("lists no allowance for a file that stopped naming it", () => {
     const unused = [];
 
-    for (const list of [NAMED_AS_HISTORY, NOT_A_REPOSITORY_FILE]) {
-      for (const [file, tokens] of Object.entries(list)) {
-        const text = fs.readFileSync(path.join(ROOT, file), "utf8");
-        for (const token of tokens) {
-          if (!text.includes(`\`${token}\``)) {
-            unused.push(`${file} no longer names \`${token}\` - drop it from the list`);
-          }
+    for (const [file, tokens] of Object.entries(NAMED_AS_HISTORY)) {
+      const text = fs.readFileSync(path.join(ROOT, file), "utf8");
+      for (const token of tokens) {
+        if (!text.includes(`\`${token}\``)) {
+          unused.push(`${file} no longer names \`${token}\` - drop it from the list`);
         }
       }
     }
 
-    // KNOWN_STALE_BARE_MENTION allows tokens that are never backtick-wrapped in the first
-    // place - the whole reason BARE_SOURCE_TOKEN exists - so it is checked without the
-    // backtick wrapper the loop above requires.
-    for (const [file, tokens] of Object.entries(KNOWN_STALE_BARE_MENTION)) {
+    // NOT_A_REPOSITORY_FILE allows tokens that need not be backtick-wrapped: a fixture's
+    // illustrative path sits inside a string literal, not behind a documentation backtick.
+    // Checked by plain substring instead of the backtick wrapper NAMED_AS_HISTORY needs.
+    for (const [file, tokens] of Object.entries(NOT_A_REPOSITORY_FILE)) {
       const text = fs.readFileSync(path.join(ROOT, file), "utf8");
       for (const token of tokens) {
         if (!text.includes(token)) {

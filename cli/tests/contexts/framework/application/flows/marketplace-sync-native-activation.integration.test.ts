@@ -1,18 +1,18 @@
-import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { Marketplace } from "../../../../src/contexts/distribution/domain/marketplace.js";
-import { MarketplaceSyncSettingsUseCase } from "../../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
-import { Manifest } from "../../../../src/contexts/framework/domain/manifest.js";
-import { InstalledPlugin } from "../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
-import { buildHostRegistration } from "../../../../src/contexts/telemetry/domain/telemetry-setup.js";
-import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
-import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
-import { fakeEnsureBuiltMarketplace } from "../../../helpers/ports/fake-ensure-built-marketplace.js";
-import { FakeNativePluginActivator } from "../../../helpers/ports/fake-native-plugin-activator.js";
-import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
-import { InMemoryManifestRepository } from "../../../helpers/ports/in-memory-manifest-repository.js";
-import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-marketplace-registry.js";
+import { Marketplace } from "../../../../../src/contexts/distribution/domain/marketplace.js";
+import { MarketplaceSyncSettingsUseCase } from "../../../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
+import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
+import { InstalledPlugin } from "../../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
+import { buildHostRegistration } from "../../../../../src/contexts/telemetry/domain/telemetry-setup.js";
+import { CapturingLogger } from "../../../../helpers/ports/capturing-logger.js";
+import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
+import { fakeEnsureBuiltMarketplace } from "../../../../helpers/ports/fake-ensure-built-marketplace.js";
+import { FakeNativePluginActivator } from "../../../../helpers/ports/fake-native-plugin-activator.js";
+import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
+import { InMemoryManifestRepository } from "../../../../helpers/ports/in-memory-manifest-repository.js";
+import { InMemoryMarketplaceRegistry } from "../../../../helpers/ports/in-memory-marketplace-registry.js";
 
 /**
  * The seam #703 is about, from the writing side.
@@ -190,9 +190,44 @@ describe("syncing settings registers the plugin with the host's own CLI", () => 
 });
 
 /**
+ * Declaring a marketplace and installing a plugin from it are two acts, and a person
+ * does the first alone all the time — `activateTool` registers every known marketplace
+ * regardless of whether the manifest names a plugin for it. Nothing above exercises a
+ * manifest with zero plugins: `buildSync` always installs one, so a guard reintroduced
+ * at the top of `activateTool` (`if (refs.length === 0) return false;`) would still pass
+ * every test in this file. This is the one that catches it.
+ */
+describe("registering a marketplace does not wait for a plugin to point at it", () => {
+  it("registers every known marketplace even when the manifest declares no plugin", async () => {
+    const activator = new FakeNativePluginActivator({ available: true });
+    const registry = new InMemoryMarketplaceRegistry();
+    const fs = new InMemoryFileAdapter();
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    const manifestRepo = new InMemoryManifestRepository(manifest);
+    const hasher = new DeterministicHasher();
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      manifestRepo,
+      registry,
+      hasher,
+      new CapturingLogger(),
+      new Map([["claude", activator]]),
+      fakeEnsureBuiltMarketplace()
+    );
+    await registry.save(PROJECT_ROOT, marketplace());
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(activator.addedMarketplaces).not.toEqual([]);
+  });
+});
+
+/**
  * `syncTool` writes `.claude/settings.json`, hashes what it wrote, and the manifest is saved.
  * Only then does `activateNativeTools` run the host's own CLI — which writes into that same
- * file, because Claude Code declares no separate `enabledPluginsSettingsPath`.
+ * file, because Claude Code declares one `settingsPath` for both marketplaces and enabled
+ * plugins.
  *
  * So the tracked hash describes content that no longer exists the moment activation
  * succeeds. Nothing re-hashes it. `status` and `doctor` report a file the user never touched

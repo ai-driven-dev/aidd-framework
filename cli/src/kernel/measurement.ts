@@ -1,8 +1,8 @@
-/** What a route was **measured to supply**, not what it might. Three facts, because a
- * consumer reading a report has to tell four things apart that all look like a missing
+/** What a route was **measured to supply**, not what it might. Four facts, because a
+ * consumer reading a report has to tell five things apart that all look like a missing
  * number: a tool that supplies no counters at all, one that supplies counters but no
- * amount, one that supplies an amount, and one whose figures carry the step the tool
- * itself named.
+ * amount, one that supplies an amount, one whose figures carry the step the tool itself
+ * named, and one whose figures carry the agent a record belongs to.
  *
  * Declared per route rather than per tool: local read is the only route this system can
  * still produce, but different tools' local reads still differ in what they carry.

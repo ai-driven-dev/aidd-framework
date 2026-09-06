@@ -114,12 +114,7 @@ export async function hasToolSignals(
  * Read from the profile so the set of driven tools is data, not a hand-kept list.
  */
 export function nativeActivationOf(toolId: ToolId): NativeActivation | undefined {
-  const config = getToolConfig(toolId);
-  if (config === undefined || !isAiTool(config)) return undefined;
-  const caps = config.capabilities as {
-    plugins?: { nativeActivation?: NativeActivation | null };
-  };
-  return caps.plugins?.nativeActivation ?? undefined;
+  return resolvePluginsCapability(toolId)?.nativeActivation ?? undefined;
 }
 
 /**
@@ -158,12 +153,7 @@ export function buildContractFor(
  * the gitignore should treat them as something the user added.
  */
 export function machineLocalFilesOf(toolId: ToolId): readonly string[] {
-  const config = getToolConfig(toolId);
-  if (config === undefined || !isAiTool(config)) return [];
-  const caps = config.capabilities as {
-    plugins?: { marketplaceSettings?: { marketplacesSettingsPath?: string | null } | null };
-  };
-  const path = caps.plugins?.marketplaceSettings?.marketplacesSettingsPath;
+  const path = resolvePluginsCapability(toolId)?.marketplaceSettings?.marketplacesSettingsPath;
   // `null` means the tool has nowhere machine-local to write, so there is no such file
   // to keep out of `status` or the gitignore either.
   return typeof path === "string" ? [path] : [];
@@ -177,7 +167,7 @@ export function machineLocalFilesOf(toolId: ToolId): readonly string[] {
  * diagnostic. A use case reaching into a hooks materializer to ask what a tool declares is a
  * placement the layering gate happens to permit and the project's own rule does not.
  */
-export function resolvePluginsCapability(toolId: AiToolId): PluginsCapability | null {
+export function resolvePluginsCapability(toolId: ToolId): PluginsCapability | null {
   const toolConfig = getToolConfig(toolId);
   if (!isAiTool(toolConfig)) return null;
   const caps = toolConfig.capabilities as Record<string, unknown>;

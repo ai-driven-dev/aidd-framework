@@ -25,7 +25,7 @@ export type StepAttributionSource =
   | "journal-interval"
   | "unattributed";
 
-/** Strongest first, and fixed: a consumer reading a report should find the three in the
+/** Strongest first, and fixed: a consumer reading a report should find the four in the
  * same order every time, whatever the records happened to contain. Ordering them by how
  * much of a period each accounted for would make the order itself a measurement, which is
  * the one thing a stable contract must not do. */
@@ -90,22 +90,21 @@ export interface StepInterval extends ClosedInterval {
  * carry its own `timed`/`parseableBoundaries` pair and its own closer scan, which is how it
  * came to disagree with the two walks reading the same journal beside it.
  *
- * Any `step_start` opens an interval - unlike `buildFlowIntervals`, which opens one only
- * for a skill declared to orchestrate. A `step_end` naming that same skill closes it, by
- * `namesTheSameSkill` and never `===`: the host that opened the step may have written the
- * skill's bare directory name while the end the skill echoes carries its plugin. A
- * `step_end` naming a *different* skill is never a closer, which is the fault naming the
- * skill exists to prevent. Every other line - a `turn_end`, a `file_written`, a
+ * A `step_start` opens an interval only when its own skill does not orchestrate
+ * (`!ORCHESTRATING_SKILLS.has(boundary.skill)`) - an orchestrating skill's interval is
+ * `buildFlowIntervals`'s to open, not this walk's. A `step_end` naming that same skill
+ * closes it, by `namesTheSameSkill` and never `===`: the host that opened the step may have
+ * written the skill's bare directory name while the end the skill echoes carries its
+ * plugin. A `step_end` naming a *different* skill is never a closer, which is the fault
+ * naming the skill exists to prevent. The next `step_start`, whatever skill it names, also
+ * closes whichever plain step was open - two ordinary skills in a row are a sequence, so
+ * the second ends the first. Every other line - a `turn_end`, a `file_written`, a
  * `task_declared` - neither opens nor closes one, and only ever contributes its own moment
  * toward the journal's last witnessed one.
  *
  * Two runs of the very same skill in one session yield two distinct intervals, never one
  * merged by name, exactly as the boundaries dictate; nothing here decides which record
  * falls into which, that is `attributeMoment`'s job. */
-/** Every step a session opened that does not orchestrate - each closed by its own
- * `step_end`, by the next `step_start` whatever that one is, or by the journal's own last
- * witnessed moment. Two ordinary skills in a row are a sequence, so the second ends the
- * first; that reading is unchanged. */
 function buildInvokedStepIntervals(
   journal: RunJournal,
   periodEndMs: number | undefined
@@ -162,10 +161,6 @@ export function buildStepIntervals(
   ];
 }
 
-/** Where a record's own moment falls inside one interval, that interval's skill is the
- * attribution, marked as derived. A record with no moment, or one earlier than every
- * interval, is unattributed — never folded into the first step, which would assume work
- * began the instant a marker happened to be written rather than sometime before it. */
 /** The most specific interval a moment falls in: the latest to have opened, and among
  * equals the first to close. An invoked step and the orchestration around it both contain
  * the moment, and both claims are true - the inner one is the one that says more, and the
@@ -234,6 +229,10 @@ function answersFor(
   return innermostOf(covering.filter((interval) => !enclosedByAnotherUnclosed(covering, interval)));
 }
 
+/** Where a record's own moment falls inside one interval, that interval's skill is the
+ * attribution, marked as derived. A record with no moment, or one earlier than every
+ * interval, is unattributed — never folded into the first step, which would assume work
+ * began the instant a marker happened to be written rather than sometime before it. */
 export function attributeMoment(
   intervals: readonly StepInterval[],
   momentIso: string | undefined

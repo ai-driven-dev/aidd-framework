@@ -1,12 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { accessSync, constants } from "node:fs";
 import { delimiter, join } from "node:path";
-import { mapOpencodeExportToSinkRecords } from "../../../contexts/telemetry/domain/formats/opencode-export.js";
 import { OpencodeExportError } from "../../../kernel/errors.js";
+import { mapOpencodeExportToSinkRecords } from "../domain/formats/opencode-export.js";
 import type {
   LocalCostReadResult,
   SessionCostReader,
-} from "../../telemetry/domain/ports/session-cost-reader.js";
+} from "../domain/ports/session-cost-reader.js";
 
 const BINARY = "opencode";
 // A local export of one session's own files — not a network call — so a generous budget

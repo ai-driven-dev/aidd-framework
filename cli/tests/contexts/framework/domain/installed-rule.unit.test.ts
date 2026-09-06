@@ -76,4 +76,19 @@ describe("toInstalledRule — one installed file, read as a rule", () => {
 
     expect(rule.paths).toEqual(["src/**", "tests/**"]);
   });
+
+  /** A rule converted between tools can carry the same glob under two of the three field
+   * names at once. `SCOPE_FIELDS.flatMap` concatenates without deduplicating, so the same
+   * glob would otherwise come out twice in `InstalledRule.paths` — the list the skill reads
+   * as JSON. */
+  it("states a glob carried under two field names only once", () => {
+    const rule = toInstalledRule(
+      "cursor",
+      ".cursor/rules/a.mdc",
+      ".mdc",
+      '---\npaths:\n  - "src/**"\nglobs:\n  - "src/**"\n---\n'
+    );
+
+    expect(rule.paths).toEqual(["src/**"]);
+  });
 });

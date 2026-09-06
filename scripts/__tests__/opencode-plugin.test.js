@@ -6,10 +6,13 @@ const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const test = require("node:test");
 
-const PLUGIN_SOURCE = path.resolve(__dirname, "../../plugins/aidd-telemetry/hooks/opencode-plugin.js");
+const PLUGIN_SOURCE = path.resolve(
+  __dirname,
+  "../../plugins/aidd-telemetry/hooks/opencode-plugin.js"
+);
 
 const CLEAN_ENV = Object.fromEntries(
-  Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_")),
+  Object.entries(process.env).filter(([k]) => !k.startsWith("GIT_"))
 );
 
 // Removed when the file finishes, not left behind: a suite that seeds a repository per run
@@ -38,14 +41,16 @@ function makeInstalledRepo() {
   fs.mkdirSync(path.join(repo, ".aidd"), { recursive: true });
   fs.writeFileSync(
     path.join(repo, ".aidd", "config.json"),
-    JSON.stringify({ telemetry: { enabled: true, endpoint: "http://127.0.0.1:4318" } }),
+    JSON.stringify({ telemetry: { enabled: true, endpoint: "http://127.0.0.1:4318" } })
   );
   const pluginDir = path.join(repo, ".opencode", "plugin");
   fs.mkdirSync(pluginDir, { recursive: true });
   const hooksSrc = path.dirname(PLUGIN_SOURCE);
   for (const entry of fs.readdirSync(hooksSrc, { withFileTypes: true })) {
     if (entry.name === "hooks.json") continue;
-    fs.cpSync(path.join(hooksSrc, entry.name), path.join(pluginDir, entry.name), { recursive: true });
+    fs.cpSync(path.join(hooksSrc, entry.name), path.join(pluginDir, entry.name), {
+      recursive: true,
+    });
   }
   // A byte-identical `.mjs` twin, for these tests alone.
   //
@@ -80,7 +85,7 @@ function readRunLines(repo) {
       .readFileSync(path.join(dir, f), "utf8")
       .split("\n")
       .filter(Boolean)
-      .map((l) => JSON.parse(l)),
+      .map((l) => JSON.parse(l))
   );
 }
 
@@ -127,6 +132,19 @@ test("opencode-plugin.js: session.idle writes turn_end for the session session.c
   const lines = readRunLines(repo);
   assert.deepEqual(
     lines.map((l) => l.type),
-    ["session_start", "turn_end"],
+    ["session_start", "turn_end"]
   );
+});
+
+test("opencode-plugin.js: an event whose own shape breaks journal call resolution never reaches OpenCode as a thrown error", async () => {
+  const { repo, esmTwin } = makeInstalledRepo();
+  const mod = await import(pathToFileURL(esmTwin).href);
+
+  const hooks = await mod.AiddTelemetry({ directory: repo });
+
+  // `event: null` is not a shape any fixture or the SDK's own types describe - exactly the
+  // kind of malformed input the plugin's own event handler must swallow rather than throw
+  // into OpenCode's in-process event loop.
+  await assert.doesNotReject(hooks.event({ event: null }));
+  assert.deepEqual(readRunLines(repo), [], "a swallowed error must write no journal line either");
 });

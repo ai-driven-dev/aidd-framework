@@ -1,4 +1,3 @@
-import type { VersionControl } from "../../../contexts/telemetry/domain/ports/version-control.js";
 import { describeError } from "../../../kernel/describe-error.js";
 import type { VersionReader } from "../../../kernel/ports/version-reader.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../kernel/tool.js";
@@ -15,6 +14,7 @@ import type { RunJournal, RunJournalReader } from "../domain/ports/run-journal-r
 import type { SessionCostReader } from "../domain/ports/session-cost-reader.js";
 import type { TelemetryEvidenceReader } from "../domain/ports/telemetry-evidence-reader.js";
 import type { TelemetrySink } from "../domain/ports/telemetry-sink.js";
+import type { VersionControl } from "../domain/ports/version-control.js";
 import { resolveSessionAnchor } from "../domain/session-anchor.js";
 import {
   attributeMoment,
@@ -283,7 +283,10 @@ export class DiagnoseTelemetryUseCase {
       return "measurement is off — nothing to check until it is turned on";
     }
     if (!(await this.git.isRepository(options.projectRoot))) {
-      return "not a git repository — the hook has nowhere to write here, not a hook that failed to fire";
+      return (
+        "not a git repository — the hook has nowhere to write here, not a hook that failed " +
+        "to fire"
+      );
     }
     return null;
   }

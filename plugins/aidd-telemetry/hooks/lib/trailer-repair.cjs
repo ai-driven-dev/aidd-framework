@@ -25,9 +25,9 @@ const path = require("node:path");
  */
 
 /** The delegate's filename and the line that calls it. Both are the CLI's
- * (`cli/src/domain/formats/commit-session-trailer.ts`), and both are spelled again here
- * because this file is zero-dependency CommonJS shipped into a person's repository and
- * cannot import from a TypeScript program that may not be installed.
+ * (`cli/src/contexts/telemetry/domain/formats/commit-session-trailer.ts`), and both are
+ * spelled again here because this file is zero-dependency CommonJS shipped into a person's
+ * repository and cannot import from a TypeScript program that may not be installed.
  *
  * The duplication is real and it is guarded the way this plugin's other cross-language
  * literal is: a test spawns this hook, reads the file it repaired, and compares it against

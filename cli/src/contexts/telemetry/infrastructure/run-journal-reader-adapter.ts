@@ -147,10 +147,10 @@ function parseSessionStart(parsed: RawJournalLine): RunJournalSessionStart | nul
   };
 }
 
-/** Every header field a journal may state and may omit — each absent rather than defaulted,
- * the same rule `parseWorktree` above already follows: a field the writer left out is one
- * this reader has nothing to say about, and a default would be an answer nobody wrote. Split
- * out of `parseSessionStart` so that function stays under the line-count limit. */
+/** Every optional header field a journal may state, isolated from the required ones
+ * `parseSessionStart` reads itself — each absent rather than defaulted, the same rule
+ * `parseWorktree` above already follows: a field the writer left out is one this reader has
+ * nothing to say about, and a default would be an answer nobody wrote. */
 function headerExtras(parsed: RawJournalLine): Partial<RunJournalSessionStart> {
   const projectId = asString(parsed.project_id);
   const projectRemote = asString(parsed.project_remote);

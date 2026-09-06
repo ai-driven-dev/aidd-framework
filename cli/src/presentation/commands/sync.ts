@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { NoManifestError } from "../../kernel/errors.js";
+import { NoManifestError, SyncFailedError } from "../../kernel/errors.js";
 import type { ToolId } from "../../kernel/tool.js";
 import { createDeps } from "../../runtime/wiring/framework.js";
 import { printUnrestorable } from "../display/restore-display.js";
@@ -30,9 +30,6 @@ async function runSyncAction(
 
     const interactive = !cmdOptions.force && process.stdout.isTTY;
     const result = await deps.restoreAllUseCase.execute(projectRoot, cmdOptions.force, interactive);
-    // A run that errored synced nothing, and reporting "nothing to sync" would call that the
-    // healthy state. Nothing was synced because it failed.
-    if (result.errors.length > 0) process.exitCode = 1;
 
     for (const e of result.errors) output.warn(`[${e.scope}] ${e.message}`);
 
@@ -52,6 +49,10 @@ async function runSyncAction(
       output.success(`Restored plugins: ${result.pluginNamesRestored.join(", ")}`);
     }
     printUnrestorable(output, result.unrestorable);
+    // A run that errored synced nothing for that scope, and reporting success would call
+    // that the healthy state. `errorHandler` is what turns this into a non-zero exit; the
+    // detail already reached the user through the warnings above.
+    if (result.errors.length > 0) throw new SyncFailedError(result.errors);
   } catch (error) {
     errorHandler.handle(error);
   }

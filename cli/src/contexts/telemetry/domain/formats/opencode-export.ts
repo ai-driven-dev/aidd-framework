@@ -1,4 +1,4 @@
-import type { LocalCostCandidateRecord } from "../../../telemetry/domain/ports/session-cost-reader.js";
+import type { LocalCostCandidateRecord } from "../ports/session-cost-reader.js";
 
 // Measured 2026-08-20 on opencode 1.14.20, providerID "anthropic": `opencode export
 // <sessionID> --sanitize` answers `{info, messages}` on stdout, and a counted message's own

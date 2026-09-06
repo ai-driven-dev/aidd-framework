@@ -4,10 +4,10 @@ The `aidd` command-line tool: its commands, inputs, and distribution.
 
 ## Commands
 
-Twenty-nine leaf commands. Read them live — `aidd --help`, then each group's. `scripts/smoke-tools.sh` exercises every one and fails when its list drifts from the binary's.
+Thirty-three leaf commands. Read them live — `aidd --help`, then each group's. `scripts/smoke-tools.sh` exercises every one and fails when its list drifts from the binary's.
 
 - `setup`, `doctor`, `sync`, `clean` — bring a project to a correct state, then keep it there
-- `framework install | update | remove` — the framework's lifecycle on a tool, chosen by `--tool <id>`
+- `framework install | update | remove | rules` — the framework's lifecycle on a tool, chosen by `--tool <id>`
 - `plugin install | list | remove | search | update`
 - `marketplace add | list | remove | refresh | check`
 - `auth login | logout | status`

@@ -75,7 +75,11 @@ const RENAMED_WRAPPER_CASE_BY_HOST = Object.keys(TASK_DECLARED_FIXTURE_BY_HOST);
 for (const host of RENAMED_WRAPPER_CASE_BY_HOST) {
   test(`${host}: renaming the ${WRAPPER_KEY} wrapper the path lives in turns the declaration reader red`, () => {
     const payload = loadFixture(TASK_DECLARED_FIXTURE_BY_HOST[host]);
-    assert.equal(declaredTaskPath(payload), TASK_RELATIVE_PATH, "sanity: the un-mutated fixture still declares");
+    assert.equal(
+      declaredTaskPath(payload),
+      TASK_RELATIVE_PATH,
+      "sanity: the un-mutated fixture still declares"
+    );
 
     payload.arguments = payload[WRAPPER_KEY];
     delete payload[WRAPPER_KEY];
@@ -89,7 +93,8 @@ for (const host of RENAMED_WRAPPER_CASE_BY_HOST) {
 // `event` hook - see fixtures/README.md's "OpenCode's tool part" for what was run, what
 // arrived, and what did not. hooks/opencode-plugin.js's `declaredTaskCallFor` joins one the
 // same way every other host's hook already does, asserted above through
-// TASK_DECLARED_FIXTURE_BY_HOST like every other host. cli/src/domain/tools/ai/opencode.ts's
-// telemetryTaskAttributable flips to true for the same reason, and
+// TASK_DECLARED_FIXTURE_BY_HOST like every other host.
+// cli/src/contexts/tools/domain/profiles/opencode/profile.ts's telemetryTaskAttributable
+// flips to true for the same reason, and
 // registry-conformance.unit.test.ts keeps it tied to the journal hook's own tool-used
 // dispatch rather than typed in twice by hand.

@@ -16,9 +16,8 @@ export interface MarketplaceSettings {
   settingsKey: string;
   enabledPluginsKey?: string;
   /**
-   * Where the tool keeps its registered marketplaces, for the two readers that still
-   * need to know: `doctor`, which checks the tool actually wrote one, and the eviction
-   * that takes a stale entry out of the shared file.
+   * Where the tool keeps its registered marketplaces, for the one reader that still
+   * needs to know: `doctor`, which checks the tool actually wrote one.
    *
    * - a path — a file of its own, which the tool writes and this CLI neither commits nor
    *   hashes: the entries name built trees by absolute path, so they describe one machine.

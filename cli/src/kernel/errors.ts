@@ -272,10 +272,36 @@ export class NoMarketplacesRegisteredError extends Error {
   }
 }
 
+/** The registry file exists but cannot be read as one is never read as an empty registry:
+ * `save()` reads this same list, appends to it and writes the whole file back, so a silent
+ * empty read would not merely hide the marketplaces a person registered, it would delete
+ * them on the very next write. Modeled on `UnreadableIdentityFileError`, the same situation
+ * for the other user-config file this CLI shares with whoever edits it. */
+export class UnreadableMarketplaceRegistryError extends Error {
+  constructor(path: string, reason: string) {
+    super(
+      `Cannot read the marketplace registry at ${path}: ${reason}. Repair the file, or ` +
+        `delete it to start from an empty registry.`
+    );
+    this.name = "UnreadableMarketplaceRegistryError";
+  }
+}
+
 export class InteractiveOnlyError extends Error {
   constructor(action: string) {
     super(`'${action}' requires an interactive terminal.`);
     this.name = "InteractiveOnlyError";
+  }
+}
+
+/** `sync` restoring one scope out of several and failing another is not a silent partial
+ * success: each failure already reached the user through its own `output.warn` line, so
+ * this names only the scopes, not the messages again, and lets `errorHandler` be the one
+ * place that turns a failed sync into a non-zero exit. */
+export class SyncFailedError extends Error {
+  constructor(errors: readonly { scope: string; message: string }[]) {
+    super(`Sync failed for: ${errors.map((e) => e.scope).join(", ")}. See the warnings above.`);
+    this.name = "SyncFailedError";
   }
 }
 
@@ -597,7 +623,7 @@ export class TelemetrySinkUnwritableError extends Error {
 
 /** A write or a delete against the identity file failed for a reason other than the file
  * simply not being there — permission denied, a full disk, and the like. Distinct from
- * `UnreadableIdentityFileError` (domain/errors.ts): that one names a read that could not
+ * `UnreadableIdentityFileError`, above: that one names a read that could not
  * come back, this one a write or a forget that could not go out. */
 export class IdentityWriteError extends Error {
   /** `action` names what the person was doing, because the sentence reaches them: someone

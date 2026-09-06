@@ -80,6 +80,13 @@ jobs:
               cli/*|kanban/*|scripts/__tests__/*|README.md)
                 relevant=true
                 ;;
+              # This file. A change to how the suite runs - a worker pool, an exclusion, a
+              # step order - is a change nothing else here matches, so without this the
+              # workflow that decides whether the suite passes never runs on the commit
+              # that changed it, and lands unverified.
+              .github/workflows/cli-ci.yml)
+                relevant=true
+                ;;
               plugins/aidd-telemetry/*)
                 case "$f" in
                   *.md) ;; # prose only, covered by validate.yml instead

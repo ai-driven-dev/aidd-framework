@@ -507,7 +507,7 @@ describe("the diagnostic skill states the claims the command prints, in the numb
  *    outright.
  *
  * The account map itself is keyed by `NoRunFileReason`, `noRunFileClaim`'s own exhaustive
- * reason union: adding a fifth branch there without adding a fifth entry here is a
+ * reason union: adding a sixth branch there without adding a sixth entry here is a
  * compile error (`Record<NoRunFileReason, …>` is exhaustive), not a runtime maybe.
  */
 describe("the diagnostic skill's account of every no-run-file reason matches the command's own reasons", () => {

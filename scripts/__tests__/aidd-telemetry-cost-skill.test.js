@@ -28,7 +28,7 @@ test("the cost skill reads the object, never the text meant for a person", () =>
   assert.ok(everything.includes("--json"), "must ask for the machine-readable output");
   assert.ok(
     everything.includes("cost_report_version"),
-    "must refuse a version it does not know, which means naming the field",
+    "must refuse a version it does not know, which means naming the field"
   );
 });
 
@@ -45,10 +45,7 @@ test("the cost skill says when a total is partial", () => {
 
 test("the cost skill prefers an absolute period for a figure that will be kept", () => {
   assert.ok(everything.includes("--from"), "must know the absolute flags");
-  assert.ok(
-    everything.includes("resolves against today"),
-    "must say why --days cannot be cited",
-  );
+  assert.ok(everything.includes("resolves against today"), "must say why --days cannot be cited");
 });
 
 // The previous guard here was a list of six forbidden substrings ("reduce(", "sum(",
@@ -97,7 +94,7 @@ test("every report invocation asks for the object or a derived artefact, never t
     const tokens = flags.split(/\s+/u);
     assert.ok(
       tokens.includes("--json") || tokens.includes("--axis"),
-      `"report ${flags}" names neither --json nor --axis, so it would print the human table`,
+      `"report ${flags}" names neither --json nor --axis, so it would print the human table`
     );
   }
 });
@@ -112,8 +109,8 @@ function realEnvelope() {
   return JSON.parse(
     fs.readFileSync(
       path.resolve(__dirname, "../../cli/tests/fixtures/cli-owns-read/expected-envelope.json"),
-      "utf8",
-    ),
+      "utf8"
+    )
   );
 }
 
@@ -193,7 +190,7 @@ test("the cost skill refuses to invent a figure when its script is absent", () =
   assert.ok(everything.includes("show no figure"), "must state that no figure is shown");
   assert.ok(
     everything.includes("cannot be found"),
-    "must name the unresolvable script as the reason",
+    "must name the unresolvable script as the reason"
   );
 });
 
@@ -273,7 +270,7 @@ test("the init skill owns turning measurement on, and asks first", () => {
 test("the cost skill defers enabling to init rather than doing it itself", () => {
   assert.ok(
     !/telemetry-switch/u.test(everything),
-    "reporting must not turn measurement on behind the user's back",
+    "reporting must not turn measurement on behind the user's back"
   );
 });
 
@@ -281,7 +278,9 @@ test("the cost skill defers enabling to init rather than doing it itself", () =>
 // skill breaks the day a host installs one of them and not the other.
 test("no skill reaches into another skill's directory", () => {
   const skills = ["00-init", "01-cost", "02-check"];
-  const pairs = skills.flatMap((own) => skills.filter((other) => other !== own).map((other) => [own, other]));
+  const pairs = skills.flatMap((own) =>
+    skills.filter((other) => other !== own).map((other) => [own, other])
+  );
   for (const [own, other] of pairs) {
     const dir = path.join(pluginDir, "skills", own);
     const text = fs
@@ -316,7 +315,7 @@ test("the check skill calls the CLI, never a script of its own", () => {
 test("the cost skill names the envelope version the CLI actually emits", () => {
   const envelopeSource = fs.readFileSync(
     path.resolve(__dirname, "../../cli/src/contexts/telemetry/domain/cost-report-envelope.ts"),
-    "utf8",
+    "utf8"
   );
   const emitted = /COST_REPORT_ENVELOPE_VERSION = (\d+)/u.exec(envelopeSource)?.[1];
   const named = /`cost_report_version` is `(\d+)` today/u.exec(everything)?.[1];
@@ -334,7 +333,7 @@ test("the cost skill states the shape of its answer", () => {
   assert.ok(report.includes("| Sessions |"), "a headline table");
   assert.ok(
     report.includes("never a table of zeroes"),
-    "must say an empty breakdown is left out rather than filled with zeroes",
+    "must say an empty breakdown is left out rather than filled with zeroes"
   );
 });
 
@@ -361,14 +360,15 @@ test("the cost skill offers its axes in the language of a question", () => {
 // so the next one cannot ship unoffered.
 test("the cost skill offers every axis the binary accepts, in both places it names them", () => {
   const artefactSource = read(
-    path.resolve(__dirname, "../../cli/src/presentation/display/cost-report-artefact.ts"),
+    path.resolve(__dirname, "../../cli/src/presentation/display/cost-report-artefact.ts")
   );
   const declared = /export const ARTEFACT_AXES = \[([^\]]+)\]/u.exec(artefactSource)?.[1] ?? "";
   const axes = [...declared.matchAll(/"([a-z]+)"/gu)].map((match) => match[1]);
   assert.ok(axes.length > 1, "must have read the axis list from the artefact module itself");
 
   const axisFlagEnum = /--axis <([^>]+)>/u.exec(everything)?.[1].split("|") ?? [];
-  const questionTable = /\| The question sounds like \| Axis \| Artefact \|[\s\S]*?\n\n/u.exec(skill)?.[0] ?? "";
+  const questionTable =
+    /\| The question sounds like \| Axis \| Artefact \|[\s\S]*?\n\n/u.exec(skill)?.[0] ?? "";
   // Both directions: an axis the binary accepts must be offered, and one the skill offers
   // must exist - the second is not covered elsewhere, since the e2e that runs every command
   // the skill names expands this enumeration to its first alternative alone.
@@ -377,7 +377,7 @@ test("the cost skill offers every axis the binary accepts, in both places it nam
     assert.ok(axisFlagEnum.includes(axis), `must list "${axis}" among the --axis choices`);
     assert.ok(
       new RegExp(`\\|[^|\\n]*\\b${axis}\\b[^|\\n]*\\|`, "u").test(questionTable),
-      `must map a question to the "${axis}" axis in SKILL.md's own table`,
+      `must map a question to the "${axis}" axis in SKILL.md's own table`
     );
   }
 });
@@ -394,7 +394,7 @@ test("reads a Windows checkout the same way it reads a POSIX one", () => {
     assert.equal(asRead, skill, "must hand back the same text a POSIX checkout would");
     assert.ok(
       /\| The question sounds like \| Axis \| Artefact \|[\s\S]*?\n\n/u.test(asRead),
-      "the axis table must still be found in a file checked out with CRLF endings",
+      "the axis table must still be found in a file checked out with CRLF endings"
     );
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });
@@ -413,11 +413,11 @@ test("the cost skill answers per person through the person axis, not as unanswer
     // old "none - unanswerable" row, so a substring match on the phrase alone would still
     // pass on fully reverted docs.
     everything.includes("| per person, who spent, which teammate | person |"),
-    "must map the per-person question to the person axis in SKILL.md's own table",
+    "must map the per-person question to the person axis in SKILL.md's own table"
   );
   assert.ok(
     !/unanswerable/iu.test(everything),
-    "must not still claim per-person cannot be answered",
+    "must not still claim per-person cannot be answered"
   );
 });
 
@@ -432,12 +432,13 @@ test("the cost skill writes an artefact to a file when a file is what was asked 
   assert.ok(everything.includes("Write it to a file"), "must say when it writes rather than shows");
   assert.ok(everything.includes("Show it inline"), "must say when it shows rather than writes");
   assert.ok(
-    /states its period and (its )?axis/u.test(everything) || everything.includes("period and its axis"),
-    "an artefact must name the period and axis it came from",
+    /states its period and (its )?axis/u.test(everything) ||
+      everything.includes("period and its axis"),
+    "an artefact must name the period and axis it came from"
   );
 });
 
-// Mirrors cli/tests/domain/models/cost-report.unit.test.ts's "a still-open local-read
+// Mirrors cli/tests/contexts/telemetry/domain/cost-report.unit.test.ts's "a still-open local-read
 // turn is superseded, never doubled" — the plugin's own `build()` must answer the same
 // way the CLI's `buildCostReport` does, since both read the same day files (phase-1,
 // "A turn read while it runs is not the last word").

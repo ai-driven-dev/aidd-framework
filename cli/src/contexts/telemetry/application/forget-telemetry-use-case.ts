@@ -1,9 +1,9 @@
-import type { VersionControl } from "../../../contexts/telemetry/domain/ports/version-control.js";
 import { errorMessage } from "../../../kernel/describe-error.js";
 import { RUNS_ENTRY } from "../../../kernel/paths.js";
 import type { PersonIdentityStore } from "../domain/ports/person-identity-store.js";
 import type { RunJournalStore } from "../domain/ports/run-journal-reader.js";
 import type { TelemetrySink } from "../domain/ports/telemetry-sink.js";
+import type { VersionControl } from "../domain/ports/version-control.js";
 import type {
   TelemetryHistoryReading,
   TelemetryMachineIdentityRemoval,

@@ -9,8 +9,8 @@ const { skillNameFromSkillFileRead } = require("./skill-detection.cjs");
 // A Codex rollout is named `rollout-<timestamp>-<uuid>.jsonl`, and that trailing uuid is
 // the identity both sides of this system join on: the hook writes it as `vendor_id` (see
 // `readSessionId` below) and the reader resolves a session by it (CODEX_ROLLOUT_LOCATION in
-// cli/src/domain/formats/codex-rollout.ts, whose `matches` compares `-<uuid>.jsonl`). The
-// join is filename to filename, and holds by construction.
+// cli/src/contexts/telemetry/domain/formats/codex-rollout.ts, whose `matches` compares
+// `-<uuid>.jsonl`). The join is filename to filename, and holds by construction.
 //
 // It is NOT read as `session_meta.id`, and an earlier version of this comment said it was -
 // "measured across every rollout on disk". Re-measured 2026-09-01 over 418 rollouts, that

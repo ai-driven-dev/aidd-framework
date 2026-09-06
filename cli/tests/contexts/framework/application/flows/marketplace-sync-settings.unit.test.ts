@@ -82,11 +82,11 @@ async function sync(setup: SyncSetup = {}) {
     new Map([["claude", activator]]),
     setup.ensureBuilt ?? fakeEnsureBuiltMarketplace()
   );
-  const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+  await useCase.execute({ projectRoot: PROJECT_ROOT });
   const written = (await fs.fileExists(SHARED_SETTINGS))
     ? (JSON.parse(await fs.readFile(SHARED_SETTINGS)) as Record<string, unknown>)
     : undefined;
-  return { result, written, logger, fs, activator };
+  return { written, logger, fs, activator };
 }
 
 /**
@@ -99,9 +99,8 @@ async function sync(setup: SyncSetup = {}) {
  */
 describe("the settings file a user also edits", () => {
   it("writes the enabled plugin into a file that did not exist", async () => {
-    const { result, written } = await sync();
+    const { written } = await sync();
 
-    expect(result.updatedTools).toContain("claude");
     expect(written?.enabledPlugins).toEqual({ "aidd-context@aidd-framework": true });
   });
 
@@ -132,11 +131,10 @@ describe("the settings file a user also edits", () => {
 
   it("warns and carries on when the file is not valid JSON", async () => {
     // A trailing comma in a hand-edited file must not fail `setup`, `sync` and `update`.
-    const { result, written, logger } = await sync({
+    const { written, logger } = await sync({
       settings: '{ "enabledPlugins": { "a@b": true }, }',
     });
 
-    expect(result.updatedTools).toContain("claude");
     expect(logger.warnMessages.some((w) => w.includes("malformed JSON"))).toBe(true);
     expect(written?.enabledPlugins).toEqual({ "aidd-context@aidd-framework": true });
   });
@@ -186,12 +184,11 @@ describe("a marketplace that will not build", () => {
   });
 
   it("still syncs the tool, rather than letting one bad source stop the rest", async () => {
-    const { result, written } = await sync({
+    const { written } = await sync({
       marketplaceNames: ["aidd-framework", "broken"],
       ensureBuilt: failingBuild("broken"),
     });
 
-    expect(result.updatedTools).toContain("claude");
     expect(written?.enabledPlugins).toEqual({ "aidd-context@aidd-framework": true });
   });
 });

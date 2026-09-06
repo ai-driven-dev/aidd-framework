@@ -36,6 +36,15 @@ describe("the smoke harness never runs against the real user home", () => {
     const unsorted = [...harness.matchAll(/find [^\n|]*\|[ \t]*head\b/gu)].map((m) => m[0]);
 
     expect(unsorted).toEqual([]);
+
+    // The fixed order comes from `tracked_file`'s own `.sort()`. Nothing above catches its
+    // removal: neither line calls `find`, so a case would fall back to manifest order
+    // silently. This is the assertion that would go red.
+    expect(harness).toMatch(/relativePath\)\)\.sort\(\)/u);
+
+    // Two functions reading the manifest to pick a file is two sources of truth for the
+    // same question. `tracked_file` must be the only one left.
+    expect(harness.match(/manifest\.json/gu)?.length ?? 0).toBe(1);
   });
 
   // Ordering is the whole guard: the token is resolved through `gh`, which reads the real

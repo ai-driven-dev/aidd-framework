@@ -1,5 +1,6 @@
 import { NoManifestError } from "../../../../kernel/errors.js";
 import type { Prompter } from "../../../../kernel/ports/prompter.js";
+import type { Manifest } from "../../domain/manifest.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { RestoreUseCase } from "../restore/restore-use-case.js";
 import type { StatusUseCase } from "../status-use-case.js";
@@ -51,12 +52,12 @@ export class RestoreAllUseCase {
     };
   }
 
-  private resolveVersion(manifest: ReturnType<typeof Object.create>): string {
+  private resolveVersion(manifest: Manifest): string {
     return (
       manifest
         .getInstalledToolIds()
-        .map((id: string) => manifest.getToolVersion(id))
-        .find((v: string | undefined) => v !== undefined) ?? "unknown"
+        .map((id) => manifest.getToolVersion(id))
+        .find((v) => v !== undefined) ?? "unknown"
     );
   }
 

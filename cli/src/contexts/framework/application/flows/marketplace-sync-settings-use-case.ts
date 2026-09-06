@@ -9,7 +9,7 @@ import type { Marketplace } from "../../../distribution/domain/marketplace.js";
 import type { MarketplaceRegistry } from "../../../distribution/domain/ports/marketplace-registry.js";
 import type { MarketplaceSettings } from "../../../tools/domain/marketplace-settings.js";
 import type { NativePluginActivator } from "../../../tools/domain/ports/native-plugin-activator.js";
-import { getToolConfig, isAiTool } from "../../../tools/domain/registry.js";
+import { nativeActivationOf, resolvePluginsCapability } from "../../../tools/domain/registry.js";
 import type { FrameworkBuildTarget } from "../../../translate/domain/build-target.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
@@ -19,14 +19,9 @@ export interface MarketplaceSyncSettingsOptions {
   projectRoot: string;
 }
 
-export interface MarketplaceSyncSettingsResult {
-  updatedTools: string[];
-}
-
-// Upserts local marketplace entries (absolute path may change); never removes entries; skips non-local if already present.
 /** Syncing marketplace settings into the tools that read them, as its callers need it. */
 export interface MarketplaceSyncSettings {
-  execute(options: MarketplaceSyncSettingsOptions): Promise<MarketplaceSyncSettingsResult>;
+  execute(options: MarketplaceSyncSettingsOptions): Promise<void>;
 }
 
 export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
@@ -41,23 +36,21 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     private readonly ensureBuilt: EnsureBuiltMarketplace
   ) {}
 
-  async execute(options: MarketplaceSyncSettingsOptions): Promise<MarketplaceSyncSettingsResult> {
+  async execute(options: MarketplaceSyncSettingsOptions): Promise<void> {
     const { projectRoot } = options;
     const [manifest, marketplaces] = await Promise.all([
       this.manifestRepo.load().catch(() => null),
       this.marketplaceRegistry.list(projectRoot),
     ]);
-    if (manifest === null || marketplaces.length === 0) return { updatedTools: [] };
-    const updatedTools: string[] = [];
+    if (manifest === null || marketplaces.length === 0) return;
+    let anyToolUpdated = false;
     for (const toolId of manifest.getInstalledToolIds()) {
-      const updated = await this.syncTool(toolId, projectRoot, manifest, marketplaces);
-      if (updated) updatedTools.push(toolId);
+      if (await this.syncTool(toolId, projectRoot, manifest, marketplaces)) anyToolUpdated = true;
     }
-    if (updatedTools.length > 0) await this.manifestRepo.save(manifest);
+    if (anyToolUpdated) await this.manifestRepo.save(manifest);
     const activated = await this.activateNativeTools(projectRoot, manifest, marketplaces);
     if (await this.recordWhatActivationWrote(projectRoot, manifest, activated))
       await this.manifestRepo.save(manifest);
-    return { updatedTools };
   }
 
   /** Answers the tools whose own CLI actually ran — never every installed tool. A tool whose
@@ -89,11 +82,12 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
 
   /**
    * The host's own CLI writes its registration into the very file `syncTool` had just
-   * hashed — Claude Code declares no separate `enabledPluginsSettingsPath`, so both halves
-   * land in `.claude/settings.json`. The tracked hash then described content that no longer
-   * existed, and nothing re-read it: `status` and `doctor` reported a file the person never
-   * touched as drifted for as long as the manifest stood, and `restore` would have undone
-   * the host's own registration to reach a state AIDD held for the length of one function.
+   * hashed — Claude Code declares one `settingsPath` for both marketplaces and enabled
+   * plugins, so both halves land in `.claude/settings.json`. The tracked hash then described
+   * content that no longer existed, and nothing re-read it: `status` and `doctor` reported
+   * a file the person never touched as drifted for as long as the manifest stood, and
+   * `restore` would have undone the host's own registration to reach a state AIDD held for
+   * the length of one function.
    *
    * Re-read rather than re-derive, and only for a tool whose CLI actually ran: what is
    * stored is what is on disk after the write, which is the observation, not a guess at
@@ -123,21 +117,11 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
   }
 
   private marketplaceSettingsOf(toolId: ToolId): MarketplaceSettings | undefined {
-    const toolConfig = getToolConfig(toolId);
-    if (toolConfig === undefined || !isAiTool(toolConfig)) return undefined;
-    const caps = toolConfig.capabilities as {
-      plugins?: { marketplaceSettings: MarketplaceSettings | null };
-    };
-    return caps.plugins?.marketplaceSettings ?? undefined;
+    return resolvePluginsCapability(toolId)?.marketplaceSettings ?? undefined;
   }
 
   private nativeActivationBinary(toolId: ToolId): string | undefined {
-    const toolConfig = getToolConfig(toolId);
-    if (toolConfig === undefined || !isAiTool(toolConfig)) return undefined;
-    const caps = toolConfig.capabilities as {
-      plugins?: { nativeActivation?: { binary: string } | null };
-    };
-    return caps.plugins?.nativeActivation?.binary ?? undefined;
+    return nativeActivationOf(toolId)?.binary;
   }
 
   /** True when this tool's own CLI was actually driven — the only case in which the settings
@@ -150,6 +134,10 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     manifest: Manifest,
     marketplaces: readonly Marketplace[]
   ): Promise<boolean> {
+    if (!activator.isAvailable()) {
+      this.logger.warn(`${binary} CLI not found on PATH — skipping native plugin activation.`);
+      return false;
+    }
     // Every known marketplace, never only the ones a plugin points at — declaring a
     // marketplace and installing a plugin from it are two acts, and a person does the first
     // alone all the time. This used to narrow to the plugins' own marketplaces for a tool
@@ -158,17 +146,14 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     // a project with two registered marketplaces and no plugin told it about neither.
     // `execute` already returned early when `marketplaces` is empty (see above), so there
     // is nothing left to guard here.
-    const refs = this.pluginRefsToEnable(toolId, manifest, marketplaces);
-    if (!activator.isAvailable()) {
-      this.logger.warn(`${binary} CLI not found on PATH — skipping native plugin activation.`);
-      return false;
-    }
+    //
     // Each step is independently best-effort: one failing plugin or marketplace
     // must warn and let the others through, never abort the whole activation.
     for (const marketplace of marketplaces)
       await this.registerMarketplace(activator, toolId, marketplace, projectRoot);
     if (!activator.enablesPlugins()) return true;
     this.bestEffort(() => activator.upgradeMarketplaces(), "upgrade marketplaces");
+    const refs = this.pluginRefsToEnable(toolId, manifest, marketplaces);
     for (const ref of refs) {
       this.bestEffort(() => activator.enablePlugin(ref), `enable plugin '${ref}'`);
     }
@@ -293,19 +278,9 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     manifest: Manifest,
     marketplaces: readonly Marketplace[]
   ): Promise<boolean> {
-    const toolConfig = getToolConfig(toolId);
-    if (toolConfig === undefined || !isAiTool(toolConfig)) return false;
-    const caps = toolConfig.capabilities as {
-      plugins?: { marketplaceSettings: MarketplaceSettings | null };
-    };
-    if (!("plugins" in caps) || caps.plugins?.marketplaceSettings == null) return false;
-    return this.syncToolSettings(
-      toolId,
-      projectRoot,
-      manifest,
-      marketplaces,
-      caps.plugins.marketplaceSettings
-    );
+    const marketplaceSettings = resolvePluginsCapability(toolId)?.marketplaceSettings;
+    if (marketplaceSettings == null) return false;
+    return this.syncToolSettings(toolId, projectRoot, manifest, marketplaces, marketplaceSettings);
   }
 
   private async syncToolSettings(

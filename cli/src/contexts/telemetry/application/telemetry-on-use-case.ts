@@ -1,4 +1,3 @@
-import type { VersionControl } from "../../../contexts/telemetry/domain/ports/version-control.js";
 import { TelemetryProjectScopeRequiresYesError } from "../../../kernel/errors.js";
 import { RUNS_ENTRY } from "../../../kernel/paths.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
@@ -11,6 +10,7 @@ import {
 } from "../domain/formats/commit-session-trailer.js";
 import type { IgnoreEntries } from "../domain/ports/ignore-entries.js";
 import type { TelemetrySink } from "../domain/ports/telemetry-sink.js";
+import type { VersionControl } from "../domain/ports/version-control.js";
 import {
   buildTelemetrySwitchFile,
   parseTelemetrySwitchFile,

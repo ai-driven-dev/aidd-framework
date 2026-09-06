@@ -47,7 +47,9 @@ describe("every backlog declaration in this repository is one the report can rea
         (field) => typeof parsed[field] !== "string" || parsed[field] === ""
       );
       if (missing.length > 0) {
-        unreadable.push(`${file} is missing ${missing.join(", ")} (has ${Object.keys(parsed).join(", ")})`);
+        unreadable.push(
+          `${file} is missing ${missing.join(", ")} (has ${Object.keys(parsed).join(", ")})`
+        );
       }
     }
 
@@ -75,6 +77,25 @@ describe("every backlog declaration in this repository is one the report can rea
       for (const field of REQUIRED_FIELDS) {
         assert.ok(text.includes(`"${field}"`), `${action} must teach the field "${field}"`);
       }
+    }
+  });
+
+  /** The original bug was a writer/reader disagreement — two skills wrote `writtenAt` while
+   * the reader looked for `written_at` — and the check above only pins the writer's side.
+   * Pinning `REQUIRED_FIELDS` against what the skills teach, without ever reading the
+   * reader's own source, would have stayed green through the exact defect this file exists
+   * to catch: nothing here proves the two sides still agree, only that one side is stable.
+   * This reads `TaskBacklogAdapter.read`'s own field access, in `cli/` across the boundary
+   * this file's header explains it does not import across, and closes that gap. */
+  it("is the shape the reader in cli/ actually reads, not just the shape skills teach", () => {
+    const READER_FILE = "cli/src/contexts/telemetry/infrastructure/task-backlog-adapter.ts";
+    const text = fs.readFileSync(path.join(ROOT, READER_FILE), "utf8");
+
+    for (const field of REQUIRED_FIELDS) {
+      assert.ok(
+        text.includes(`parsed.${field}`),
+        `${READER_FILE} must read \`parsed.${field}\`, the same field the skills teach`
+      );
     }
   });
 });

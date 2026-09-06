@@ -1493,13 +1493,6 @@ function taskRows(tasks: ReadonlyMap<string, TaskGroup>): readonly CostReportTas
   return [...sorted, ...reasonRows];
 }
 
-/** Every backlog item a task declared, largest first, then the two rows for a known task
- * that named none or could not be read, then one row per reason a record fell in no task at
- * all - `TASK_UNATTRIBUTED_REASONS`' own fixed order, the same tail convention `taskRows`
- * uses. Two tasks declaring the same item merge here by construction: `backlogKeyOf` keys
- * both on the identical `backlog` string, so `accumulateInto` folds them into one
- * accumulator before this ever runs - never a second merge step that could disagree with
- * how every other axis already reconciles. */
 interface BacklogGroups {
   readonly named: readonly CostReportBacklogRow[];
   readonly byReason: ReadonlyMap<TaskUnattributedReason, CostReportBacklogRow>;
@@ -1507,8 +1500,8 @@ interface BacklogGroups {
   readonly unreadable: CostReportBacklogRow | undefined;
 }
 
-// Split from `backlogRows` purely to stay under this codebase's own line-per-function limit
-// - one pass classifying every key into the four shapes a row can be, nothing sorted yet.
+// One pass classifying every backlog key into the four shapes a row can be - named,
+// unattributed-by-reason, declared none, or unreadable - nothing sorted yet.
 function classifyBacklogGroups(
   backlog: ReadonlyMap<BacklogRowKey, TotalsAccumulator>
 ): BacklogGroups {
@@ -1530,6 +1523,13 @@ function classifyBacklogGroups(
   return { named, byReason, none, unreadable };
 }
 
+/** Every backlog item a task declared, largest first, then the two rows for a known task
+ * that named none or could not be read, then one row per reason a record fell in no task at
+ * all - `TASK_UNATTRIBUTED_REASONS`' own fixed order, the same tail convention `taskRows`
+ * uses. Two tasks declaring the same item merge here by construction: `backlogKeyOf` keys
+ * both on the identical `backlog` string, so `accumulateInto` folds them into one
+ * accumulator before this ever runs - never a second merge step that could disagree with
+ * how every other axis already reconciles. */
 function backlogRows(
   backlog: ReadonlyMap<BacklogRowKey, TotalsAccumulator>
 ): readonly CostReportBacklogRow[] {

@@ -423,6 +423,30 @@ describe("ReadLocalCostUseCase", () => {
     expect(cursor?.reason).toContain("token count");
   });
 
+  it("reports an unsupported tool's not-covered reason as exactly what it declared, nothing invented", async () => {
+    const cursorLocalRead = getAiToolConfig("cursor").telemetryLocalRead;
+    if (cursorLocalRead.kind !== "unsupported") {
+      throw new Error("cursor is expected to declare an unsupported local read for this test");
+    }
+    const sink = new InMemoryTelemetrySink();
+    const useCase = new ReadLocalCostUseCase(
+      sink,
+      new Map(),
+      NULL_RUN_JOURNAL_READER,
+      NULL_PERSON_IDENTITY_READER,
+      TELEMETRY_EVIDENCE_READER
+    );
+
+    const result = await useCase.execute({
+      projectRoot: PROJECT_ROOT,
+      env: {},
+      sessionId: SESSION_ID,
+    });
+
+    const cursor = result.toolReports.find((r) => r.tool === "cursor");
+    expect(cursor?.reason).toBe(cursorLocalRead.reason);
+  });
+
   it("distinguishes not-covered from covered-and-empty", async () => {
     declareClaudeReadable();
     const sink = new InMemoryTelemetrySink();

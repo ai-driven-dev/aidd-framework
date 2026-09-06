@@ -1,4 +1,3 @@
-import { CODEX_ROLLOUT_LOCATION } from "../../../../../contexts/tools/domain/profiles/codex/codex-transcript-location.js";
 import { AgentsCapability } from "../../capabilities/agents-capability.js";
 import { CommandsCapability } from "../../capabilities/commands-capability.js";
 import { CONFIG_MCP } from "../../capabilities/config-refs.js";
@@ -30,6 +29,7 @@ import {
   mergeCodexConfigToml,
   stripCodexSkillFrontmatter,
 } from "./build.js";
+import { CODEX_ROLLOUT_LOCATION } from "./codex-transcript-location.js";
 
 const DIRECTORY = ".codex/";
 const TOOL_SUFFIX = ".codex.md";

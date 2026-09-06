@@ -1,7 +1,7 @@
 import { errorMessage } from "../../../kernel/describe-error.js";
 import type {
-  TelemetryLocalRead,
   TelemetryLocalReadDeclared,
+  TelemetryLocalReadUnsupported,
 } from "../../../kernel/measurement.js";
 import type { Logger } from "../../../kernel/ports/logger.js";
 import type { VersionReader } from "../../../kernel/ports/version-reader.js";
@@ -248,14 +248,14 @@ function mergeOneTool(
 }
 
 /** Nothing here can read this tool at all, with the reason its declaration gives. */
-function notCovered(tool: AiToolId, localRead: TelemetryLocalRead): LocalCostToolReport {
+function notCovered(tool: AiToolId, localRead: TelemetryLocalReadUnsupported): LocalCostToolReport {
   return {
     tool,
     status: "not-covered",
     recordsFound: 0,
     recordsStored: 0,
     sessionsFailed: 0,
-    ...(localRead.kind === "unsupported" ? { reason: localRead.reason } : {}),
+    reason: localRead.reason,
   };
 }
 
@@ -287,7 +287,8 @@ function mergeToolReports(
 }
 
 const REFUSED_REASON =
-  "measurement is refused — AIDD_TELEMETRY=0 or the project switch is off; nothing read, nothing stored";
+  "measurement is refused — AIDD_TELEMETRY=0 or the project switch is off; nothing read, " +
+  "nothing stored";
 
 /** Reads what every locally-readable tool's own files hold for one session, normalises it
  * into the stored shape, and appends what is not already there. Which tools are readable
@@ -303,13 +304,14 @@ export class ReadLocalCostUseCase {
     private readonly telemetryEvidenceReader: TelemetryEvidenceReader,
     /** The CLI's own version, stamped on every record this sweep stores
      * (`stampProvenanceAndTool`) - read through the same port `current-version-adapter.ts`
-     * already resolves it through, never a second way. Production wiring (`runtime/wiring/telemetry.ts`)
-     * always supplies the real adapter; that guarantee is not just asserted here, it is
-     * enforced - `telemetry-multi-tool.e2e.test.ts` runs the real built binary through
-     * `runtime/wiring/telemetry.ts` and fails if a stored record ever lacks `cli_version`. Optional on this
-     * constructor only so a caller exercising a concern this field is not about (most unit
-     * tests) does not have to invent a version to reach it - absent, this simply omits the
-     * field from what gets stored, never guesses at a value. */
+     * already resolves it through, never a second way. Production wiring
+     * (`runtime/wiring/telemetry.ts`) always supplies the real adapter; that guarantee is not
+     * just asserted here, it is enforced - `telemetry-multi-tool.e2e.test.ts` runs the real
+     * built binary through `runtime/wiring/telemetry.ts` and fails if a stored record ever
+     * lacks `cli_version`. Optional on this constructor only so a caller exercising a concern
+     * this field is not about (most unit tests) does not have to invent a version to reach
+     * it - absent, this simply omits the field from what gets stored, never guesses at a
+     * value. */
     private readonly versionReader?: VersionReader,
     /** Only the retention prune below writes here, and only to warn. Optional because a
      * caller that does not care about housekeeping warnings should not have to invent a

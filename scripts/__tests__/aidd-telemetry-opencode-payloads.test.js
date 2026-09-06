@@ -16,7 +16,7 @@ const { detectHost } = require("../../plugins/aidd-telemetry/hooks/lib/host.cjs"
 
 const PLUGIN_SOURCE = path.resolve(
   __dirname,
-  "../../plugins/aidd-telemetry/hooks/opencode-plugin.js",
+  "../../plugins/aidd-telemetry/hooks/opencode-plugin.js"
 );
 const fixturesDir = path.join(__dirname, "fixtures");
 
@@ -33,7 +33,10 @@ function loadFixture(name) {
 let pluginModulePromise;
 async function pluginModule() {
   if (!pluginModulePromise) {
-    const twin = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "aidd-opencode-payloads-")), "opencode-plugin.mjs");
+    const twin = path.join(
+      fs.mkdtempSync(path.join(os.tmpdir(), "aidd-opencode-payloads-")),
+      "opencode-plugin.mjs"
+    );
     fs.copyFileSync(PLUGIN_SOURCE, twin);
     pluginModulePromise = import(pathToFileURL(twin).href);
   }
@@ -74,11 +77,11 @@ test("session.idle for a session nobody announced opens it first, so the journal
 
   assert.deepEqual(
     produced.map((call) => call.script),
-    ["session-start", "turn-end"],
+    ["session-start", "turn-end"]
   );
   assert.deepEqual(
     produced.map((call) => call.payload.cwd),
-    ["/home/user/fallback", "/home/user/fallback"],
+    ["/home/user/fallback", "/home/user/fallback"]
   );
   assert.equal(detectHost(produced[0].payload), "opencode");
 });
@@ -91,7 +94,7 @@ test("a task declaration in a session nobody announced opens it first too, never
 
   assert.deepEqual(
     produced.map((call) => call.script),
-    ["session-start", "tool-used"],
+    ["session-start", "tool-used"]
   );
   assert.equal(produced[0].payload.session_id, produced[1].payload.session_id);
 });
@@ -104,12 +107,12 @@ test("a session already announced is never opened a second time", async () => {
   const produced = calls(
     loadFixture("opencode-session-idle.json"),
     sessionDirectories,
-    "/home/user/fallback",
+    "/home/user/fallback"
   );
 
   assert.deepEqual(
     produced.map((call) => call.script),
-    ["turn-end"],
+    ["turn-end"]
   );
 });
 
@@ -119,12 +122,12 @@ test("a session OpenCode did announce produces its one session-start, never a do
   const produced = calls(
     loadFixture("opencode-session-created.json"),
     new Map(),
-    "/home/user/fallback",
+    "/home/user/fallback"
   );
 
   assert.deepEqual(
     produced.map((call) => call.script),
-    ["session-start"],
+    ["session-start"]
   );
 });
 
@@ -138,7 +141,7 @@ test("a second session.idle on one already-opened session adds no second session
 
   assert.deepEqual(
     produced.map((call) => call.script),
-    ["turn-end"],
+    ["turn-end"]
   );
 });
 
@@ -146,6 +149,31 @@ test("an event this plugin does not act on opens no session either", async () =>
   const calls = await journalCallsFor();
 
   assert.deepEqual(calls({ type: "message.updated", properties: {} }, new Map(), "/x"), []);
+});
+
+// OpenCode's own bus carries event types this plugin never dispatches on - `server.connected`
+// among them - and none of them are guaranteed to carry a `properties` object at all. Sessions
+// id resolution runs before the per-type dispatch that would otherwise ignore such an event, so
+// it alone decides whether an unrecognised, propertyless event ever reaches the journal or
+// crashes OpenCode's own in-process event loop first.
+test("an event with no properties at all does not crash resolving its session id", async () => {
+  const calls = await journalCallsFor();
+
+  assert.deepEqual(calls({ type: "server.connected" }, new Map(), "/x"), []);
+});
+
+// Measured live (see opencode-plugin.js's own comment on `session.created`): the field this
+// reads is real, but nothing guarantees OpenCode always fills `properties.info` before firing
+// it - an empty `properties` object must resolve to an undefined session id, not throw.
+test("session.created with an empty properties object does not crash, it opens an unnamed session", async () => {
+  const calls = await journalCallsFor();
+
+  const produced = calls({ type: "session.created", properties: {} }, new Map(), "/x");
+
+  assert.deepEqual(
+    produced.map((call) => call.script),
+    ["session-start"]
+  );
 });
 
 test("session.idle, captured live, turns into a turn-end call the journal recognises as opencode", async () => {
@@ -224,12 +252,12 @@ test("a second session.created on one server keeps its own directory, never over
   const firstIdle = builder(
     { type: "session.idle", properties: { sessionID: first.properties.info.id } },
     sessionDirectories,
-    "/home/user/fallback",
+    "/home/user/fallback"
   );
   const secondIdle = builder(
     { type: "session.idle", properties: { sessionID: second.properties.info.id } },
     sessionDirectories,
-    "/home/user/fallback",
+    "/home/user/fallback"
   );
 
   assert.equal(firstCall.payload.cwd, first.properties.info.directory);

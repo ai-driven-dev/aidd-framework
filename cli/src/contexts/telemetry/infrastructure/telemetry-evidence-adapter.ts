@@ -1,12 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { cursorProjectHooksScriptDir } from "../../../contexts/tools/domain/formats/cursor-hooks-project-merge.js";
 import { genericFlatHooksScriptPath } from "../../../kernel/materialization/flat-paths.js";
 import { AIDD_DIR, MANIFEST_FILENAME, resolvedRunsDir } from "../../../kernel/paths.js";
 import { resolveHomeDir } from "../../../kernel/reading/home-dir.js";
 import { isErrnoException } from "../../../kernel/reading/json-file.js";
 import { asPlainObject } from "../../../kernel/reading/plain-object.js";
 import { AI_TOOL_IDS } from "../../../kernel/tool.js";
+import { cursorProjectHooksScriptDir } from "../../tools/domain/formats/cursor-hooks-project-merge.js";
 import { hookCommandsForEvent } from "../../tools/domain/formats/flat-hooks-merge.js";
 import { CLAUDE_PLUGIN_ROOT_TOKEN } from "../../tools/domain/formats/plugin-root-token.js";
 import type { MarketplaceSettings } from "../../tools/domain/marketplace-settings.js";

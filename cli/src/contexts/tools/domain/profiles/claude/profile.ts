@@ -1,4 +1,3 @@
-import { CLAUDE_CODE_TRANSCRIPT_LOCATION } from "../../../../../contexts/tools/domain/profiles/claude/claude-transcript-location.js";
 import { AgentsCapability } from "../../capabilities/agents-capability.js";
 import { CommandsCapability } from "../../capabilities/commands-capability.js";
 import { CONFIG_MCP } from "../../capabilities/config-refs.js";
@@ -20,6 +19,7 @@ import { CLAUDE_PLUGIN_ROOT_TOKEN } from "../../formats/plugin-root-token.js";
 import { claudeStyleMarketplaceKey } from "../../marketplace-entry.js";
 import { registerTool } from "../../registry.js";
 import { buildClaudeContract, buildClaudeFlatContract } from "./build.js";
+import { CLAUDE_CODE_TRANSCRIPT_LOCATION } from "./claude-transcript-location.js";
 
 const DIRECTORY = ".claude/";
 const TOOL_SUFFIX = ".claude.md";

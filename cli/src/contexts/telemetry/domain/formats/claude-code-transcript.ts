@@ -1,7 +1,7 @@
 import type {
   LocalCostCandidateRecord,
   TranscriptLineAccumulator,
-} from "../../../telemetry/domain/ports/session-cost-reader.js";
+} from "../ports/session-cost-reader.js";
 
 // Measured 2026-08-20 against two real files: a main transcript line from
 // ~/.claude/projects/*/*.jsonl (Claude Code 2.1.229) and a subagent's own line from

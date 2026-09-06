@@ -68,7 +68,7 @@ export function pluginReadmes(): string[] {
  * The `@/` alias `tsconfig.json` defines resolves to `src/`. Nothing in `src/` uses it today;
  * it is handled so that using it does not silently take a file out of every rule's sight.
  */
-const INTERNAL_IMPORT = /(?:from|import)\s*\(?\s*["'](\.[^"']+|@\/[^"']+)["']/g;
+export const INTERNAL_IMPORT = /(?:from|import)\s*\(?\s*["'](\.[^"']+|@\/[^"']+)["']/g;
 
 /** Where a specifier one file names another points, relative to the cli package root. */
 function resolveImportTarget(file: string, specifier: string): string {

@@ -27,16 +27,9 @@ export type TelemetryClaimId =
 export type TelemetryClaimVerdict = "ok" | "fail" | "unknown";
 
 /**
- * The closed set of reasons a claim can land on a verdict. One claim's `fail` can have
- * several distinct causes — "no run file" and "untrusted hook" both fail `hook-fired`, and
- * collapsing them into one reading is exactly what a diagnostic exists to prevent — so the
- * reason, not the verdict alone, is what a caller must switch on to tell them apart.
- */
-
-/**
  * The reasons `noRunFileClaim` can land the first claim on — one absence, told apart by
  * what is actually known about it, never guessed from the absence alone. Its own union so
- * a fifth cause can only ever be added by extending this type: `TelemetryClaimReason`
+ * a sixth cause can only ever be added by extending this type: `TelemetryClaimReason`
  * composes it in, so a new member here forces every exhaustive `Record` keyed on it
  * (the diagnostic skill's own drift guard, `telemetry-claim.unit.test.ts`) to name an
  * account for it or fail to compile — the same failure mode this cluster exists to
@@ -49,6 +42,12 @@ export type NoRunFileReason =
   | "anchorless-run-file"
   | "journal-in-another-schema";
 
+/**
+ * The closed set of reasons a claim can land on a verdict. One claim's `fail` can have
+ * several distinct causes — "no run file" and "untrusted hook" both fail `hook-fired`, and
+ * collapsing them into one reading is exactly what a diagnostic exists to prevent — so the
+ * reason, not the verdict alone, is what a caller must switch on to tell them apart.
+ */
 export type TelemetryClaimReason =
   | "session-anchored"
   | "untrusted-codex-hook"
@@ -184,7 +183,7 @@ function unreadableTrustSuffix(hookTrust: TelemetryCodexHookTrust | undefined): 
 // anywhere this build reads has nothing that could have written a run file, which is a
 // failure worth naming; a recorder that IS declared may simply not have run yet — that is
 // nothing to evaluate, never a failure, and its detail says so without promising the
-// declaration will actually fire (`native-plugin-cli-adapter.ts` records the one measured case
+// declaration will actually fire (`telemetry-setup.ts` records the one measured case
 // where a headless run silently drops a declared entry as orphaned).
 function recorderDeclaredNotYetFiredClaim(runsDirLabel: string): TelemetryClaim {
   return {

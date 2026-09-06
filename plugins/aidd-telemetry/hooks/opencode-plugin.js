@@ -28,10 +28,17 @@ const JOURNAL_SCRIPT = fileURLToPath(new URL("./journal.cjs", import.meta.url));
 
 // Never `process.execPath`: OpenCode ships as its own standalone binary, so that path names
 // `opencode` itself, not a Node runtime that can run journal.cjs.
+//
+// `timeout` bounds the block this same call already pays for, measured below at
+// `mightDeclareATask` - that measurement is of the common case, not a guarantee, and this
+// runs in-process rather than as a host-spawned hook OpenCode expects to wait on. A
+// `journal.cjs` that hangs must not freeze OpenCode's own event loop with it; a killed run is
+// one missed measurement, the same trade its own `main()` makes exiting 0 on any error.
 function runJournal(event, payload) {
   spawnSync("node", [JOURNAL_SCRIPT, event], {
     input: JSON.stringify(payload),
     encoding: "utf8",
+    timeout: 5000,
   });
 }
 
@@ -129,8 +136,8 @@ function declaredTaskCallFor(event, sessionDirectories, fallbackDirectory) {
  * to that loader, and a non-function export would have been ignored by it too. */
 function journalCallFor(event, sessionDirectories, fallbackDirectory) {
   if (event.type === "session.created") {
-    const sessionId = event.properties.info.id;
-    const cwd = event.properties.info.directory;
+    const sessionId = event.properties?.info?.id;
+    const cwd = event.properties?.info?.directory;
     sessionDirectories.set(sessionId, cwd);
     return { script: "session-start", payload: { tool: "opencode", session_id: sessionId, cwd } };
   }
@@ -145,10 +152,13 @@ function journalCallFor(event, sessionDirectories, fallbackDirectory) {
   return null;
 }
 
-/** The session id an event names, whichever field its own type carries it in. */
+/** The session id an event names, whichever field its own type carries it in. Nothing on
+ * OpenCode's own bus guarantees `properties` is ever set - an event type this plugin does
+ * not otherwise act on (`server.connected`, say) is read here before any per-type dispatch
+ * would have skipped it, so a missing field must resolve to `undefined`, never throw. */
 function sessionIdOf(event) {
-  if (event.type === "session.created") return event.properties.info.id;
-  return event.properties.sessionID;
+  if (event.type === "session.created") return event.properties?.info?.id;
+  return event.properties?.sessionID;
 }
 
 /** Every journal call one OpenCode event produces, in the order the journal must receive
@@ -182,8 +192,17 @@ function journalCallsFor(event, sessionDirectories, fallbackDirectory) {
 
 export const AiddTelemetry = async (input) => ({
   event: async ({ event }) => {
-    for (const call of journalCallsFor(event, directoryBySessionId, input.directory)) {
-      runJournal(call.script, call.payload);
+    // The same rule journal.cjs's own main() states, applied where OpenCode calls this
+    // in-process instead of spawning it: a measurement layer that breaks a session is worse
+    // than one that misses one. Whatever throws here is this plugin's own fault - a shape
+    // `journalCallsFor` did not expect, a failed spawn - never the person's, and OpenCode's
+    // event loop must not see it.
+    try {
+      for (const call of journalCallsFor(event, directoryBySessionId, input.directory)) {
+        runJournal(call.script, call.payload);
+      }
+    } catch {
+      // Silent on purpose - see above.
     }
   },
 });

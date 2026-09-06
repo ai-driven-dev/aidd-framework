@@ -46,7 +46,7 @@ function globsIn(value: unknown): readonly string[] {
 }
 
 function scopeOf(frontmatter: Record<string, unknown>): readonly string[] {
-  return SCOPE_FIELDS.flatMap((field) => globsIn(frontmatter[field]));
+  return [...new Set(SCOPE_FIELDS.flatMap((field) => globsIn(frontmatter[field])))];
 }
 
 /** The installed extension, whole. Trimming at the last dot would leave `.instructions`

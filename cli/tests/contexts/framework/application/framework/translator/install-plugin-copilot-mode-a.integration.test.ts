@@ -76,9 +76,8 @@ describe("install copilot plugin via Mode A (integration)", () => {
       new Map(),
       fakeEnsureBuiltMarketplace()
     );
-    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
 
-    expect(result.updatedTools).toContain("copilot");
     const settingsPath = resolve(PROJECT_ROOT, ".github/copilot/settings.json");
     const settings = JSON.parse(await fs.readFile(settingsPath)) as Record<string, unknown>;
 

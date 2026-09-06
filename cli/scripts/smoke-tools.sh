@@ -17,8 +17,9 @@
 #
 # Phase 18 moved the surface: `ai`/`ide` folded into `--tool`, `status`/`ai doctor`/
 # `ide doctor`/`plugin doctor` folded into `doctor`, `restore` renamed `sync`,
-# `self-update` renamed `update`, `framework build` renamed `translate`. 32 leaf
-# commands today — this file's ALL_COMMANDS below is the same count `derived_leaves`
+# `self-update` renamed `update`, `framework build` renamed `translate`; `framework rules`
+# joined later. 33 leaf commands today — this file's ALL_COMMANDS below is the same count
+# `derived_leaves`
 # reads live off the built binary, `telemetry identity`'s four verbs (`use`/`off`/
 # `link`/`unlink`) included as their own leaves rather than folded into one.
 #
@@ -114,13 +115,13 @@ run() {
 }
 
 new_project() { local p; p=$(mktemp -d "$TMPROOT/proj.XXXXXX"); (cd "$p" && git init -q); echo "$p"; }
-# Only the marketplaces catalog — NOT the per-target built-marketplace cache
-# (.aidd/cache/built/.../marketplace.json), which also matches a bare *marketplace.json glob.
-# `find` answers in directory order, which is neither sorted nor the same on two machines.
-# Every case below damages the file this returns, so an unsorted pick runs a different case
-# on every run - and a case nobody can name is a case nobody can debug.
+# Deterministic pick from an unsorted listing: sort, then take the first line.
 first_file() { LC_ALL=C sort | head -1; }
 
+# Only the marketplaces catalog — NOT the per-target built-marketplace cache
+# (.aidd/cache/built/.../marketplace.json), which also matches a bare *marketplace.json glob.
+# `find` answers in directory order, which is neither sorted nor the same on two machines,
+# so the result goes through `first_file` rather than being trusted raw.
 cache_catalog() { find "$1/.aidd/cache/marketplaces" -path "*marketplace.json" 2>/dev/null | first_file; }
 
 # The drift every restore case writes, and the string its check looks for again afterwards.
@@ -128,12 +129,12 @@ cache_catalog() { find "$1/.aidd/cache/marketplaces" -path "*marketplace.json" 2
 # appended one could only ever assert an exit code.
 DRIFT_MARK="SMOKE_DRIFT"
 
-# A restore that exits 0 having restored nothing is the exact failure #762 fixed in the
-# command. The exit code is checked by `run`; this is what checks the repair.
-# The file a case damages: the first regular file the manifest tracks, in a fixed order,
-# for one tool or for all of them. Reading the manifest rather than `find`ing a `.md`
-# survives a tool whose content its own CLI registers and whose project directory holds
-# nothing but settings; a tracked settings file drifts and is repaired the same way.
+# The file a case damages: the first regular file the manifest tracks, in a fixed order
+# (the `.sort()` below), for one tool or for all of them. Every case that drifts a file
+# reads its target from here, never from `find`, so the pick is the same on every machine.
+# Reading the manifest rather than `find`ing a `.md` survives a tool whose content its own
+# CLI registers and whose project directory holds nothing but settings; a tracked settings
+# file drifts and is repaired the same way.
 tracked_file() {
   node -e '
     const manifest = JSON.parse(require("fs").readFileSync(process.argv[1], "utf-8"));
@@ -143,6 +144,8 @@ tracked_file() {
   ' "$1/.aidd/manifest.json" "${2:-}"
 }
 
+# A restore that exits 0 having restored nothing is the exact failure #762 fixed in the
+# command. The exit code is checked by `run`; this is what checks the repair.
 repaired() {
   local name="$1" file="$2"
   if [[ -z "$file" ]]; then bad "$name (nothing was drifted to repair)"; return 1; fi
@@ -338,7 +341,7 @@ if true; then
   run "framework update (all)" 0 "" "$BASE" -- framework update
   run "framework rules" 0 "" "$BASE" -- framework rules
   run "framework rules --json" 0 "" "$BASE" -- framework rules --json
-    d=$(tracked_file "$BASE" cursor)
+  d=$(tracked_file "$BASE" cursor)
   [[ -n "$d" ]] && d="$BASE/$d" && printf '\n%s\n' "$DRIFT_MARK" >> "$d"
   run "sync --tool cursor" 0 "" "$BASE" -- sync --tool cursor --force
   repaired "sync --tool cursor" "$d"
@@ -388,32 +391,52 @@ if true; then
   # `update` (bare) is self-update now and never touches project files — the
   # project-wide sweep this guards lives at `framework update` since phase 18.
   section "framework update conflict guard (#286) — modified file blocks, --force overwrites"
-  # Pick the FIRST manifest-tracked file for a tool (any extension) — deterministic,
-  # unlike a `.md` find heuristic which is empty with --plugins none.
-  first_tracked() {
-    node -e 'const m=require(process.argv[1]);const f=(m.tools?.[process.argv[2]]?.files||[])[0];process.stdout.write(f?f.relativePath:"")' \
-      "$1/.aidd/manifest.json" "$2" 2>/dev/null
-  }
   P_GUARD=$(new_project)
   (cd "$P_GUARD" && node "$CLI" setup --source local --path "$FRAMEWORK_FIXTURE" --ai claude --ide vscode --plugins none --yes >/dev/null 2>&1)
-  gc=$(first_tracked "$P_GUARD" claude)
+  # The blocking half runs outside `run()`: the drift plant that precedes a repair must sit
+  # directly above the run that repairs it, or `repaired` cannot be told which run to trust
+  # (the isolation test pairs the two by source position). The blocking command still gets
+  # its own exit-code and message assertions, plus the one thing `repaired` cannot check
+  # before a repair happens - that the file is still drifted, not silently cleaned.
+  gc=$(tracked_file "$P_GUARD" claude)
   if [[ -z "$gc" ]]; then
     bad "no tracked claude file in manifest (#286 guard)"
   else
-    printf '\nUSER EDIT\n' >> "$P_GUARD/$gc"
-    run "framework update (all, modified, non-TTY) → exit 1, demands --force" 1 "force" "$P_GUARD" -- framework update
+    gcf="$P_GUARD/$gc"
+    printf '\n%s\n' "$DRIFT_MARK" >> "$gcf"
+    out=$(cd "$P_GUARD" && node "$CLI" framework update 2>&1); rc=$?
+    if [[ "$rc" -eq 1 && "$out" == *"force"* ]] && grep -qF -- "$DRIFT_MARK" "$gcf"; then
+      ok "framework update (all, modified, non-TTY) blocks, file intact"
+    else
+      bad "framework update (all, modified, non-TTY) did not block cleanly (exit $rc)" "$out"
+    fi
     run "framework update --force overwrites modified file" 0 "" "$P_GUARD" -- framework update --force
-    printf '\nUSER EDIT 2\n' >> "$P_GUARD/$gc"
-    run "framework update --tool claude (modified, non-TTY) → exit 1, demands --force" 1 "force" "$P_GUARD" -- framework update --tool claude
+    repaired "framework update --force overwrites modified file" "$gcf"
+
+    printf '\n%s\n' "$DRIFT_MARK" >> "$gcf"
+    out=$(cd "$P_GUARD" && node "$CLI" framework update --tool claude 2>&1); rc=$?
+    if [[ "$rc" -eq 1 && "$out" == *"force"* ]] && grep -qF -- "$DRIFT_MARK" "$gcf"; then
+      ok "framework update --tool claude (modified, non-TTY) blocks, file intact"
+    else
+      bad "framework update --tool claude (modified, non-TTY) did not block cleanly (exit $rc)" "$out"
+    fi
     run "framework update --tool claude --force overwrites modified file" 0 "" "$P_GUARD" -- framework update --tool claude --force
+    repaired "framework update --tool claude --force overwrites modified file" "$gcf"
   fi
-  gv=$(first_tracked "$P_GUARD" vscode)
+  gv=$(tracked_file "$P_GUARD" vscode)
   if [[ -z "$gv" ]]; then
     skip "framework update --tool vscode guard (no tracked vscode file in manifest)"
   else
-    printf '\n; user edit\n' >> "$P_GUARD/$gv"
-    run "framework update --tool vscode (modified, non-TTY) → exit 1, demands --force" 1 "force" "$P_GUARD" -- framework update --tool vscode
+    gvf="$P_GUARD/$gv"
+    printf '\n%s\n' "$DRIFT_MARK" >> "$gvf"
+    out=$(cd "$P_GUARD" && node "$CLI" framework update --tool vscode 2>&1); rc=$?
+    if [[ "$rc" -eq 1 && "$out" == *"force"* ]] && grep -qF -- "$DRIFT_MARK" "$gvf"; then
+      ok "framework update --tool vscode (modified, non-TTY) blocks, file intact"
+    else
+      bad "framework update --tool vscode (modified, non-TTY) did not block cleanly (exit $rc)" "$out"
+    fi
     run "framework update --tool vscode --force overwrites modified file" 0 "" "$P_GUARD" -- framework update --tool vscode --force
+    repaired "framework update --tool vscode --force overwrites modified file" "$gvf"
   fi
 
   section "clean"

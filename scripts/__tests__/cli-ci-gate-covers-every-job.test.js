@@ -46,3 +46,18 @@ test("both branch rulesets require the cli/gate check by its exact job name", ()
     );
   }
 });
+
+// The filter decides whether the suite runs at all. A change to the workflow itself is a
+// change nothing else in the filter matches, so unless the filter names its own file, the
+// commit that changes how the suite runs is the one commit the suite never runs on.
+test("the changes filter names the workflow file itself as relevant", () => {
+  const changes = cliCiWorkflow().jobs.changes;
+  const script = changes.steps.map((step) => step.run ?? "").join("\n");
+  const ownPath = ".github/workflows/cli-ci.yml";
+
+  assert.match(
+    script,
+    new RegExp(`^\\s*${ownPath.replace(/[.]/g, "\\.")}\\)\\s*$`, "m"),
+    `${ownPath} must be a case of the relevance filter, on its own line`
+  );
+});

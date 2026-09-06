@@ -19,7 +19,11 @@ function gitEnv() {
 function getRepoRoot(cwd) {
   if (typeof cwd !== "string" || !cwd) return null;
   try {
-    const result = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8", env: gitEnv() });
+    const result = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd,
+      encoding: "utf8",
+      env: gitEnv(),
+    });
     if (result.status !== 0) return null;
     const root = result.stdout.trim();
     return root || null;
@@ -130,7 +134,9 @@ function revParse(cwd, options) {
     env: gitEnv(),
   });
   if (result.status !== 0) return null;
-  return String(result.stdout).split("\n").map((part) => part.trim());
+  return String(result.stdout)
+    .split("\n")
+    .map((part) => part.trim());
 }
 
 // `aidd framework build` copies hooks/ verbatim with no install step, so JSON.parse is
@@ -151,9 +157,9 @@ function readTelemetryConfig(repoRoot) {
 //
 // Only the literal string "0" counts as a refusal. Unset or empty is not a choice this
 // variable can express - it never turns measurement on by itself, and it never overrides an
-// enabled project. `cli/src/domain/models/telemetry-switch.ts`'s `personRefusesTelemetry`
-// mirrors this exactly, so the hook and the CLI can never disagree about whether a person
-// has refused.
+// enabled project. `cli/src/contexts/telemetry/domain/telemetry-switch.ts`'s
+// `personRefusesTelemetry` mirrors this exactly, so the hook and the CLI can never disagree
+// about whether a person has refused.
 const TELEMETRY_REFUSAL_VARIABLE = "AIDD_TELEMETRY";
 
 function personRefusesTelemetry() {
@@ -209,11 +215,7 @@ function sanitizePathSegment(segment) {
 }
 
 function sanitizeProjectId(projectId) {
-  return projectId
-    .split("/")
-    .filter(Boolean)
-    .map(sanitizePathSegment)
-    .join("/");
+  return projectId.split("/").filter(Boolean).map(sanitizePathSegment).join("/");
 }
 
 // Split from deriveProjectId so a caller holding remoteUrl pays one git shellout, not two.

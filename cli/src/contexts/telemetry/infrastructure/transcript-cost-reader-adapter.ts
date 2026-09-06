@@ -9,7 +9,7 @@ import type {
   LocalCostReadResult,
   SessionCostReader,
   TranscriptLineAccumulator,
-} from "../../telemetry/domain/ports/session-cost-reader.js";
+} from "../domain/ports/session-cost-reader.js";
 
 async function* walk(dir: string): AsyncGenerator<string> {
   let entries: Dirent[];

@@ -1,4 +1,3 @@
-import type { VersionControl } from "../../../contexts/telemetry/domain/ports/version-control.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";
 import type { Logger } from "../../../kernel/ports/logger.js";
@@ -7,6 +6,7 @@ import {
   SESSION_TRAILER_TOKEN,
 } from "../domain/formats/commit-session-trailer.js";
 import type { TelemetryEvidenceReader } from "../domain/ports/telemetry-evidence-reader.js";
+import type { VersionControl } from "../domain/ports/version-control.js";
 import {
   buildTelemetrySwitchFile,
   parseTelemetrySwitchFile,

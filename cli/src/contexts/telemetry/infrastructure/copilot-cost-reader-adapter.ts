@@ -1,10 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { mapCopilotEventsToSinkRecords } from "../../../contexts/telemetry/domain/formats/copilot-events.js";
+import { mapCopilotEventsToSinkRecords } from "../domain/formats/copilot-events.js";
 import type {
   LocalCostReadResult,
   SessionCostReader,
-} from "../../telemetry/domain/ports/session-cost-reader.js";
+} from "../domain/ports/session-cost-reader.js";
 
 /**
  * Reads one Copilot session's own `~/.copilot/session-state/<id>/events.jsonl` directly,
