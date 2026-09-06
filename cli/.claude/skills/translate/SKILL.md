@@ -13,9 +13,10 @@ description: >
 # Translate
 
 `translate` is the core: it turns the canonical, Claude-format framework source into
-target-native content for every tool at once. It is the only context with an outbound edge to
-another context (`translate → tools`) — everything it reaches in `tools` is that context's
-declared public surface (`AiTool<C>`, `Has*`, the capability contracts), never an internal file.
+target-native content for every tool at once. Its one outbound edge is `translate → tools`,
+and everything it reaches there is that context's declared public surface (`AiTool<C>`,
+`Has*`, the capability contracts), never an internal file. The other edges are in
+`.claude/rules/00-architecture/0-contexts.md`.
 
 ## What goes in
 
@@ -38,7 +39,7 @@ transform that is *aware* of which target it is producing for.
 ## How
 
 - `PluginContentTranslator` takes one plugin's canonical files and one tool's `AiTool<C>`, and
-  calls the tool's own `rewriteContent`/`reverseRewriteContent` — it does not reimplement a
+  calls the tool's own `rewriteContent` — it does not reimplement a
   tool's rewrite logic, it invokes what `tools` declared. See the `tools` skill's
   `references/content-rewrite.md` for the round-trip contract those functions must satisfy.
 - `FrameworkBuildUseCase` (`aidd translate`) reads a `ToolBuildContract` per target and mode from

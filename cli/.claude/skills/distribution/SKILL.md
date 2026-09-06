@@ -21,7 +21,7 @@ plugin's own content and how it gets translated are someone else's job once it h
 | Concept | Location |
 |---|---|
 | A marketplace registration (name, source, scope, staleness) | `domain/marketplace.ts`, `domain/marketplace-source-mode.ts` |
-| A cached catalog fetch | `domain/marketplace-cache-entry.ts` |
+| A cached catalog fetch | `domain/ports/marketplace-cache.ts` |
 | The plugin catalog shape | `domain/catalog.ts` (the Claude-shaped parser lives here too) |
 | A reader for a non-Claude catalog shape | `domain/catalog-parsers/` |
 | A port this context's callers hold | `domain/ports/` — registry, cache, trust-store, catalog-repository, fetcher, raw-catalog-fetcher |

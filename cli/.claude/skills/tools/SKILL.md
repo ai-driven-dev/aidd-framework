@@ -33,20 +33,15 @@ reaches out to fetch or install anything itself.
 | Catalog/manifest shaping shared by ≥2 tools' build contracts | `domain/marketplace-catalog.ts` |
 | A port only `tools` needs | `domain/ports/` |
 | A tool's own plugin-CLI driver | `infrastructure/` |
-| Installing a tool's config onto a project | `application/` (install-ai-tool, install-ide-tool, install-config, uninstall-tools) |
 
 ## How
 
-- `AiTool<C>` fields: `kind`, `toolId`, `directory`, `toolSuffix`, `signalDir` (scanned for
-  `name: aidd:` signals, `null` if none), `capabilities`, `rewriteContent`/`reverseRewriteContent`,
-  `detectUserFileSectionKey`, optional `requiredIdeIds`, `configOutputPaths`, `buildContracts`.
+- `AiTool<C>` fields: read `domain/contracts.ts`. A list copied here aged at every field.
 - `Has*` interfaces live in `contracts.ts`, alphabetical, always `readonly`, never optional —
   a tool either includes `Has<Name>` in its `C` intersection or does not have the field at all.
   Guard presence with `"name" in tool.capabilities`, never `instanceof`.
-- `rewriteContent`/`reverseRewriteContent` must be an exact round-trip:
-  `reverseRewriteContent(rewriteContent(x, docsDir), docsDir) === x`. Compose the shared
-  `baseRewriteContent`/`baseReverseRewriteContent` helpers first, tool-specific transforms after
-  (reverse order on the way back). See `references/content-rewrite.md`.
+- `rewriteContent(content)` is one way, per tool, with no reverse and no shared base helper.
+  See `references/content-rewrite.md`.
 - A capability class ends in `Capability`, takes one params object, all fields `readonly`, throws
   `CapabilityConfigError` (from `kernel/errors.ts`) on an invalid combination, carries no
   application/infrastructure imports. See `references/capability-conventions.md`.
@@ -70,7 +65,7 @@ module is invisible to `translate` and `framework` until it is added there; ther
 ## How it's tested
 
 - `tests/contexts/tools/` mirrors `src/contexts/tools/` — one profile's `profile.ts`/`build.ts`
-  gets a unit test asserting the `AiTool<C>` type is satisfied and the round-trip holds.
+  gets a unit test asserting the `AiTool<C>` type is satisfied and each rewrite rule holds.
 - `tests/architecture/tool-addition-cost.arch.test.ts` ratchets how many files outside a new
   tool's own directory must change to add it — keep new tool-specific logic inside the profile.
 - See the `test` skill for tier conventions; capability/format round-trip tests are unit-tier.

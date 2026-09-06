@@ -2,24 +2,22 @@
 
 ## Post-install pipeline
 
-**Rule**: any use-case writing framework files AND updating the manifest delegates to
-`PostInstallPipelineUseCase`. Never replicate its steps inline.
+**Rule**: a use case that installs framework files ends with `PostInstallPipelineUseCase`,
+never with its steps inline. A use case that only changes the manifest saves it directly.
 
-**Steps, in order**: `manifestRepo.save()` (persist the updated manifest), then
-`GitignoreUseCase.execute()` (update `.gitignore` with tracked framework paths).
+**Steps, in order**: `manifestRepo.save()`, then `GitignoreUseCase.execute()` with
+`.aidd/cache/`, every installed tool's machine-local files, and `aidd_docs/runs/`.
 
 ```typescript
 import { PostInstallPipelineUseCase } from "../install/post-install-pipeline-use-case.js";
 
-await new PostInstallPipelineUseCase(this.fs, this.manifestRepo).execute({
+await new PostInstallPipelineUseCase(this.manifestRepo, this.gitignoreUseCase).execute({
   projectRoot: options.projectRoot,
   manifest: options.manifest,
 });
 ```
 
-Forbidden: calling `manifestRepo.save()` in isolation outside the pipeline; calling
-`GitignoreUseCase` directly from a feature use-case. `InitUseCase` calls the pipeline directly
-(no skipped steps) — the only documented exception, noted inline in that file.
+The source is `install/post-install-pipeline-use-case.ts`; read it before citing a step.
 
 ## Shared use-cases
 

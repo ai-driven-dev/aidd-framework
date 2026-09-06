@@ -30,7 +30,7 @@ export class WidgetsCapability {
   message format `"<ClassName>: <reason>"`.
 - No business logic — the class models configuration, not behavior decisions.
 - No imports from a context's `application/` or `infrastructure/`.
-- One capability per file: `<kebab-name>-capability.ts` in `domain/capabilities/`.
+- One capability per file: `<kebab-name>-capability.ts` in `domain/capabilities/`. `config-refs.ts` is the one shared helper there, not a capability.
 
 ## Has* interface pairing
 

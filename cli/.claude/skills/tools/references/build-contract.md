@@ -70,5 +70,5 @@ object — a tool with no native marketplace omits `marketplace`.
 `mode-orchestrator(contract)` map) by iterating every registered tool id and reading
 `buildContractFor(id, mode)` off its profile — there is no per-tool row to hand-add. A tool with
 no `<tool>:marketplace` contract falls through to the existing "Unsupported target/mode" error.
-The tool id must still be added to the `FrameworkBuildTarget` union in `translate`, since that
-names which targets exist at all, independent of which contracts they declare.
+The tool id must still be added to `AiToolId` in `kernel/tool.ts`, which `FrameworkBuildTarget`
+aliases: that names which targets exist at all, independent of which contracts they declare.

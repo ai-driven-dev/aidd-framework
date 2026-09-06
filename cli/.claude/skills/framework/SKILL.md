@@ -39,9 +39,9 @@ job that needs all three.
   never catches its own errors except the three carve-outs (global aggregate-error loops,
   cache/network fallback, typed-throw translation) — see
   `.claude/rules/00-architecture/0-use-case.md` and `0-orchestration.md`.
-- Any use-case writing framework files **and** updating the manifest delegates to
-  `PostInstallPipelineUseCase` — never call `manifestRepo.save()` in isolation. `InitUseCase` is
-  the one documented exception, noted inline in that file. See `references/post-install-pipeline.md`.
+- A use case that installs framework files saves the manifest and updates `.gitignore`
+  through `PostInstallPipelineUseCase`. A use case that only changes the manifest (plugin
+  add/remove, marketplace sync, restore) saves it directly. See `references/post-install-pipeline.md`.
 - Before writing any framework file: check `fs.fileExists(path) && !manifest.isFileTracked(path)`.
   If both are true, skip the write, warn, and never add it to the manifest — never overwrite a
   user-owned file. See `references/manifest.md`.
@@ -50,15 +50,11 @@ job that needs all three.
   return it in the result — never let one tool's failure abort the whole run.
 - A capability-guard sub-use-case (`install-agents-use-case.ts` and its siblings) checks
   `"name" in caps` before dispatching to a narrowed sub-use-case in `install/` — see
-  `references/capability-sub-use-cases.md`. These five files reach directly into `tools`'
+  `references/post-install-pipeline.md`, section "Capability sub-use-cases". These five files reach directly into `tools`'
   capability classes rather than through a declared public module; that reach is a tracked,
   shrinking exception in `context-boundary.arch.test.ts`, not a pattern to add to.
-- **Launchers locate and execute, never embed.** There is no launcher in the CLI today.
-  The kanban command was one in shape only — it deep-imported kanban's source, so the CLI
-  carried kanban's four interface packages for every user of a hidden command, and it was
-  unwired. Any new launcher (a telemetry or governance CLI, say) spawns its target as a
-  subprocess from the start, and the binary it spawns owns its own output and configuration.
-  Embedding is what made kanban's command cost 24 MB; do not repeat it.
+- **A launcher spawns its target, never imports it.** The decision and its cost are in
+  `aidd_docs/memory/architecture.md`.
 
 ## Public surface
 

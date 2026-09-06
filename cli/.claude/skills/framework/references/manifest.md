@@ -16,9 +16,8 @@
 
 ## Saving
 
-- Always save via `PostInstallPipelineUseCase` — see `references/post-install-pipeline.md`
-- Exception: `InitUseCase` may call the pipeline directly (documented inline in that file)
-- Never call `manifestRepo.save()` in isolation outside the pipeline
+- Installing files: save through `PostInstallPipelineUseCase`, which also updates `.gitignore` — see `references/post-install-pipeline.md`
+- Changing only the manifest (plugin add/remove, marketplace sync, restore): `manifestRepo.save()` directly
 
 ## Merge file tracking
 
