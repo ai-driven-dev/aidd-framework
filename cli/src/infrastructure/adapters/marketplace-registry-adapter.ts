@@ -16,6 +16,31 @@ interface RegistryFile {
   marketplaces: MarketplaceData[];
 }
 
+/** A registry file that exists but cannot be read as one is never read as an empty
+ * registry. `save()` reads this same list, appends to it and writes the whole file back, so
+ * a silent empty read would not merely hide the marketplaces a person registered - it would
+ * delete them on the very next write. A file that is simply absent is a different answer and
+ * keeps its own: no file, no marketplaces, nothing to lose. */
+function unreadable(path: string, reason: string): Error {
+  return new Error(
+    `Cannot read the marketplace registry at ${path}: ${reason}. Repair the file, or ` +
+      `delete it to start from an empty registry.`
+  );
+}
+
+/** The registry's own list, or the reason the file cannot supply one. */
+function registryEntries(raw: string, path: string): MarketplaceData[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw unreadable(path, error instanceof Error ? error.message : "it is not valid JSON");
+  }
+  const entries = (parsed as Partial<RegistryFile> | null)?.marketplaces;
+  if (!Array.isArray(entries)) throw unreadable(path, "it carries no \`marketplaces\` list");
+  return entries;
+}
+
 export class MarketplaceRegistryAdapter implements MarketplaceRegistry {
   async list(projectRoot: string): Promise<readonly Marketplace[]> {
     const project = await this.read(this.projectPath(projectRoot), "project");
@@ -85,8 +110,7 @@ export class MarketplaceRegistryAdapter implements MarketplaceRegistry {
     } catch {
       return [];
     }
-    const parsed = JSON.parse(raw) as RegistryFile;
-    return parsed.marketplaces.map((m) => Marketplace.fromJSON({ ...m, scope }));
+    return registryEntries(raw, path).map((m) => Marketplace.fromJSON({ ...m, scope }));
   }
 
   private async write(path: string, entries: readonly Marketplace[]): Promise<void> {

@@ -24,6 +24,11 @@ const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 // display and the subcommand. It deletes 198 lines from a plugin, which the bundle does
 // not carry either way - the trade is a plugin script that had drifted for bytes that are
 // measured. Same 2.2 KB headroom as the three raises before it.
+// 603 was set when a marketplace registry that cannot be read began saying so: measured
+// 600.7 -> 601.2 KB, +0.5 KB for one guard and the sentence it prints. The smallest raise so
+// far, for the smallest change - and the one that showed the budget had 0.3 KB of headroom
+// left, which is less than a correctness fix costs. Same 2.2 KB headroom as the four raises
+// before it.
 const budgetKB = pkg.bundleBudgetKB ?? 500;
 const budgetBytes = budgetKB * 1024;
 
