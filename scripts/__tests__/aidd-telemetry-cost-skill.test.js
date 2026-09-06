@@ -222,9 +222,17 @@ test("the plugin README gives every partly-measurable tool its reason, not just 
     assert.ok(readme.includes(tool), `${tool} is named`);
     assert.ok(readme.includes(reason), `${tool}'s reason, not just its name`);
   }
+  // OpenCode's limit shrank rather than vanished: the plugin now opens a session OpenCode
+  // never announced, so a run is journalled and readable - but a session it never announced
+  // is journalled under the plugin's own directory, which is only right when the server
+  // serves one. Both halves are pinned: the fact, and what it still costs.
   assert.ok(
-    readme.includes("OpenCode misses a server process's first session"),
-    "OpenCode's own remaining limit is named, not silently dropped once it could declare a task"
+    readme.includes("OpenCode never announces a session"),
+    "OpenCode's unannounced session is named, not silently dropped once it could declare a task"
+  );
+  assert.ok(
+    readme.includes("journalled under the plugin's own init-time directory"),
+    "what an unannounced session still costs is named, not left as a solved problem"
   );
 });
 
