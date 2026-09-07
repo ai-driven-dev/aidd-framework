@@ -54,6 +54,13 @@ interface CommandEntry {
    * and writes nothing there, so recording an empty list for every other entry would
    * only pad the snapshot with a fact that never changes. */
   userConfigFiles?: string[];
+  /** The user-scope manifest's own content, captured only alongside `userConfigFiles` —
+   * that array names `manifest.json` by filename alone, never what it holds, so a
+   * `--scope user` run registering the wrong tool or the wrong version there would
+   * pass this snapshot unnoticed. Short and deterministic: a `--scope user` install
+   * records an empty file list per tool (`SetupMachineScopeUseCase.registerUserScopeTools`),
+   * so unlike the project manifest this needs no per-file hash recomputation. */
+  userManifest?: unknown;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,8 +95,14 @@ function normalize(text: string): string {
       // two captures of the identical run differ only by their own temp dir name,
       // which is exactly the failure `golden-machine-independence.md` describes.
       .replace(/\/[^\s",'\\]+\/aidd-e2e-[^/\s",'\\]+\/home\b/g, "<HOME>")
-      // Version strings like 4.5.0 or 4.10.2 in manifest / stdout
-      .replace(/\b\d+\.\d+\.\d+\b/g, "<VERSION>")
+      // Version strings like 4.5.0 or 4.10.2 in manifest / stdout — a leading `\b` used
+      // to gate this, and it silently missed every `v<semver>` cell ("claude (v5.2.2)"):
+      // `\b` requires a non-word character right before the digits, and "v" is a word
+      // character itself, so there is no boundary between "v" and "5" for `\b\d` to
+      // match. `(?<!\d)` asks the narrower, correct question — not preceded by another
+      // digit, which still refuses to clip "5.2.2" out of the middle of "15.2.2" — and
+      // says nothing about what kind of character, if any, comes before that.
+      .replace(/(?<!\d)\d+\.\d+\.\d+\b/g, "<VERSION>")
       // Windows line endings
       .replace(/\r\n/g, "\n")
   );
@@ -123,6 +136,10 @@ function normalizeEntry(entry: CommandEntry): CommandEntry {
     filesWritten: entry.filesWritten.map(normalize).sort(),
     manifest: entry.manifest === null ? null : normalizeManifest(entry.manifest),
     userConfigFiles: entry.userConfigFiles?.map(normalize).sort(),
+    userManifest:
+      entry.userManifest === null || entry.userManifest === undefined
+        ? entry.userManifest
+        : normalizeManifest(entry.userManifest),
   };
 }
 
@@ -136,6 +153,20 @@ function normalizeSnapshot(entries: CommandEntry[]): CommandEntry[] {
 
 async function readManifest(projectDir: string): Promise<unknown> {
   const manifestPath = join(projectDir, ".aidd", "manifest.json");
+  try {
+    const raw = await readFile(manifestPath, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** The `--scope user` manifest's own content, `userConfigDir()/manifest.json` —
+ * captured directly, unlike `readManifest`'s project counterpart, since a `--scope
+ * user` install records an empty file list per tool and so needs no per-file hash
+ * recomputation to stay machine-independent. */
+async function readUserManifest(fakeHome: string): Promise<unknown> {
+  const manifestPath = join(fakeHome, ".config", "aidd", "manifest.json");
   try {
     const raw = await readFile(manifestPath, "utf-8");
     return JSON.parse(raw);
@@ -220,6 +251,7 @@ async function captureCommand(
   const userConfigFiles = options?.captureUserConfig
     ? await listFiles(join(fakeHome, ".config", "aidd"))
     : undefined;
+  const userManifest = options?.captureUserConfig ? await readUserManifest(fakeHome) : undefined;
 
   return {
     command: args.join(" "),
@@ -229,6 +261,7 @@ async function captureCommand(
     filesWritten,
     manifest,
     userConfigFiles,
+    userManifest,
   };
 }
 
@@ -295,6 +328,31 @@ async function captureMatrix(projectDir: string, fakeHome: string): Promise<Comm
     "none",
     "--yes",
   ]);
+
+  // --scope user: registers the shared source and native activation machine-wide.
+  // `filesWritten` (the project-directory diff `captureCommand` already takes) is the
+  // proof that lands in this snapshot: it must read `[]`, the same full-directory-delta
+  // assertion `cli/tests/e2e/setup-scope-user.e2e.test.ts` makes against `git status --porcelain`.
+  // `captureUserConfig` is what shows the other half — `manifest.json` newly present
+  // under `userConfigDir()`, alongside the already-registered `marketplaces.json`.
+  await capture(
+    [
+      "setup",
+      "--source",
+      "local",
+      "--path",
+      FRAMEWORK_FIXTURE,
+      "--ai",
+      "claude",
+      "--plugins",
+      "none",
+      "--yes",
+      "--scope",
+      "user",
+    ],
+    { captureUserConfig: true }
+  );
+  await capture(["doctor", "--scope", "user"]);
 
   // Read-only views of a freshly set up project.
   await capture(["doctor"]);

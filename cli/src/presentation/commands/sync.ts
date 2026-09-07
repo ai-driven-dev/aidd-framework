@@ -1,16 +1,62 @@
 import type { Command } from "commander";
-import { NoManifestError, SyncFailedError } from "../../kernel/errors.js";
+import {
+  NoManifestError,
+  SyncFailedError,
+  UserScopeFilterUnsupportedError,
+} from "../../kernel/errors.js";
 import type { ToolId } from "../../kernel/tool.js";
 import { createDeps } from "../../runtime/wiring/framework.js";
 import { printNativeActivation, printUnrestorable } from "../display/restore-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import type { CLIOutput } from "../output.js";
-import { parseGlobalOptions } from "./global-options.js";
+import { parseGlobalOptions, parseScopeFlag } from "./global-options.js";
 
 interface SyncCmdOptions {
   force: boolean;
   tool?: string;
   plugin?: string;
+  scope?: string;
+}
+
+/**
+ * `--scope user` has no project-scope tracked files to restore — a user-scope install
+ * writes nothing under any project — so this skips `restoreAllUseCase` entirely and
+ * drives only what a user-scope install actually has: the shared marketplace's own
+ * native activation, read from and written to `deps.userManifestRepo`, never this
+ * project's own `.aidd/manifest.json`.
+ */
+async function runUserScopeSync(
+  deps: Awaited<ReturnType<typeof createDeps>>,
+  output: CLIOutput,
+  projectRoot: string,
+  fileArgs: string[],
+  cmdOptions: SyncCmdOptions
+): Promise<void> {
+  // Neither has a user-scope counterpart: no plugin is tracked there yet, and a
+  // user-scope manifest entry carries no files to narrow by name. Refused rather than
+  // silently read and discarded.
+  if (cmdOptions.plugin !== undefined) {
+    throw new UserScopeFilterUnsupportedError("--plugin", "sync --plugin <name>");
+  }
+  if (fileArgs.length > 0) {
+    throw new UserScopeFilterUnsupportedError("a file argument", "sync <files...>");
+  }
+  const toolIds = cmdOptions.tool !== undefined ? [cmdOptions.tool as ToolId] : undefined;
+  const activation = await deps.marketplaceSyncSettingsUseCase.execute({
+    projectRoot,
+    scope: "user",
+    manifestRepo: deps.userManifestRepo,
+    toolIds,
+    recreateFrameworkIfMissing: true,
+  });
+  printNativeActivation(output, activation.binaryMissing);
+  for (const e of activation.errors) output.warn(`[${e.scope}] ${e.message}`);
+  if (activation.errors.length > 0) throw new SyncFailedError(activation.errors);
+  if (activation.activated.length === 0) {
+    output.success("Nothing to sync — no tool is registered at user scope yet.");
+  } else {
+    output.success(`Synced native activation for: ${activation.activated.join(", ")}`);
+  }
 }
 
 async function runSyncAction(
@@ -22,6 +68,12 @@ async function runSyncAction(
   const errorHandler = new ErrorHandler(output);
   try {
     const deps = await createDeps(projectRoot, { verbose }, output);
+    const scope = parseScopeFlag(cmdOptions.scope, output) ?? "project";
+
+    if (scope === "user") {
+      await runUserScopeSync(deps, output, projectRoot, fileArgs, cmdOptions);
+      return;
+    }
 
     if (cmdOptions.tool !== undefined) {
       await runScopedSync(deps, output, projectRoot, fileArgs, cmdOptions);
@@ -126,6 +178,11 @@ export function registerSyncCommand(program: Command): void {
     .option("-f, --force", "Sync without prompting", false)
     .option("--tool <tool>", "Limit sync to a specific tool")
     .option("--plugin <name>", "Limit sync to a specific plugin")
+    .option(
+      "--scope <scope>",
+      "project (default) resolves this project's own manifest; user resolves the " +
+        "machine-wide manifest --scope user setup wrote, restoring no project files"
+    )
     .action(async (fileArgs: string[], cmdOptions: SyncCmdOptions) => {
       await runSyncAction(program, fileArgs, cmdOptions);
     });

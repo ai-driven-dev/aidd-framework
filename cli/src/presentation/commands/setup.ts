@@ -10,7 +10,7 @@ import { createDeps } from "../../runtime/wiring/framework.js";
 import { displayInstall, printNextSteps, printWelcomeBanner } from "../display/setup-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import type { CLIOutput } from "../output.js";
-import { parseGlobalOptions } from "./global-options.js";
+import { parseGlobalOptions, parseScopeFlag } from "./global-options.js";
 import { reportSyncActivation } from "./sync-native-activation.js";
 
 interface SetupCmdOptions {
@@ -22,6 +22,7 @@ interface SetupCmdOptions {
   plugins?: string;
   yes?: boolean;
   defaultMarketplace?: boolean;
+  scope?: string;
 }
 
 function parseSourceFlag(
@@ -104,11 +105,17 @@ export function registerSetupCommand(program: Command): void {
       "Skip auto-registering aidd-framework (no source prompt, no plugin install)"
     )
     .option("--yes", "Accept defaults without prompting")
+    .option(
+      "--scope <scope>",
+      "project (default) installs into this project alone; user registers the shared " +
+        "framework source and native activation machine-wide, writing nothing under this project"
+    )
     .action(async (cmdOptions: SetupCmdOptions) => {
       const { verbose, output, projectRoot } = parseGlobalOptions(program);
       const errorHandler = new ErrorHandler(output);
 
       const source = parseSourceFlag(cmdOptions, output);
+      const scope = parseScopeFlag(cmdOptions.scope, output);
       const toolIds = parseToolIds(cmdOptions, errorHandler);
       if (toolIds === null) return;
 
@@ -138,6 +145,7 @@ export function registerSetupCommand(program: Command): void {
         interactive,
         force: false,
         registerDefaultMarketplace,
+        scope,
       });
 
       if (interactive) printWelcomeBanner(output);
@@ -148,19 +156,14 @@ export function registerSetupCommand(program: Command): void {
         const result = await new SetupUseCase(
           deps.fs,
           deps.manifestRepo,
-          deps.setupMarketplaceSourceUseCase,
-          deps.marketplaceRegisterFrameworkUseCase,
-          deps.marketplaceRefreshUseCase,
+          deps.setupMarketplaceRegistration,
           deps.marketplaceSyncSettingsUseCase,
           deps.setupToolsUseCase,
           deps.setupPluginsPromptUseCase,
           deps.currentVersionProvider,
-          deps.logger,
-          deps.authReader,
           deps.setupToolsPromptUseCase,
           deps.projectContextDetector,
-          deps.releaseResolver,
-          deps.userSourceReferences
+          deps.setupMachineScopeUseCase
         ).execute(flow);
 
         if (interactive && result.context !== undefined) {

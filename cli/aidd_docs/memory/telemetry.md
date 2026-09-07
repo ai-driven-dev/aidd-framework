@@ -77,8 +77,12 @@ for the boundary that governs a future hosted destination.
 ## Gotchas
 
 - `AIDD_RUNS_DIR` and `AIDD_TELEMETRY_DIR`/`AIDD_USER_CONFIG_DIR` answer different questions —
-  where the journal lives versus where the figures do — and only `AIDD_USER_CONFIG_DIR` also
-  moves `auth.json`. Read `plugins/aidd-telemetry/README.md` ("Share `AIDD_TELEMETRY_DIR`,
-  never `AIDD_USER_CONFIG_DIR`") before pointing anyone at either.
+  where the journal lives versus where the figures do. `AIDD_USER_CONFIG_DIR` moves more than
+  telemetry's own root: `auth.json`, the shared `aidd-framework` marketplace registration
+  (`marketplaces.json` and its `cache/built/`), the machine's own project-reference
+  registry (`references.json`), and the `--scope user` manifest (`manifest.json`) all move
+  with it too — see `cli.md`. Read
+  `plugins/aidd-telemetry/README.md` ("Share `AIDD_TELEMETRY_DIR`, never
+  `AIDD_USER_CONFIG_DIR`") before pointing anyone at either.
 - A relocated `HOME` does not relocate a real `codex` binary if `CODEX_HOME` is set on that
   machine — see `testing.md`'s sandboxing gotcha.

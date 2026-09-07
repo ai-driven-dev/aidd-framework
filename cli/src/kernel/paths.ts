@@ -178,6 +178,15 @@ export function pathsOverlap(a: string, b: string): boolean {
   return pathContainsOrEquals(a, b) || pathContainsOrEquals(b, a);
 }
 
+/**
+ * Where the user-scope manifest lives: directly under `userConfigDir()`, never nested
+ * under an `.aidd/` segment — there is no project to hold one, and `marketplaces.json`
+ * and `references.json` already sit at this same root with no such nesting either.
+ */
+export function userManifestPath(userConfigDir: string): string {
+  return join(userConfigDir, MANIFEST_FILENAME);
+}
+
 /** The manifest's filename, in the domain because two adapters name that file and a
  * diagnostic prints both. `telemetry-evidence-adapter.ts` scans it for a declaration while
  * `manifest-repository-adapter.ts` loads and validates it, and `aidd telemetry check` prints

@@ -17,6 +17,7 @@ import { PluginRemoveUseCase } from "../../../../../src/contexts/framework/appli
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
 import { PluginDistribution } from "../../../../../src/contexts/translate/domain/plugin-distribution.js";
 import { CapturingLogger } from "../../../../helpers/ports/capturing-logger.js";
+import { FakeHostPluginRegistryReader } from "../../../../helpers/ports/fake-host-plugin-registry-reader.js";
 import { FakeNativePluginActivator } from "../../../../helpers/ports/fake-native-plugin-activator.js";
 import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryManifestRepository } from "../../../../helpers/ports/in-memory-manifest-repository.js";
@@ -160,5 +161,72 @@ describe("PluginRemoveUseCase undoes native activation", () => {
 
     expect(activator.uninstalledPlugins).toEqual([]);
     expect(logger.warnMessages).toEqual([]);
+  });
+
+  // The same regression `clean` had: before scope threading existed, `enablePlugin`
+  // carried no scope argument, so a real `claude` binary registered every plugin at
+  // its own implicit default, `"user"`, regardless of what the manifest went on to
+  // record for the plugin's own files (`"project"`, mode A's own install scope for
+  // claude). `uninstallViaActivator` used to try `"project"` only, which a real
+  // `claude` binary refuses outright for an entry registered at a different scope.
+  it("falls back to the other scope when the manifest's own scope does not match what was actually registered", async () => {
+    const activator = new FakeNativePluginActivator({
+      available: true,
+      installedAtScope: new Map([[REF, "user"]]),
+    });
+    const logger = new CapturingLogger();
+    const { removeUseCase, manifestRepo } = buildRemoveUseCase(activator, logger);
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    await installViaModeA(manifest);
+    await manifestRepo.save(manifest);
+
+    await removeUseCase.execute({
+      pluginName: PLUGIN_NAME,
+      toolIds: ["claude"],
+      projectRoot: PROJECT_ROOT,
+    });
+
+    expect(activator.uninstalledPlugins).toEqual([REF]);
+    expect(activator.uninstalledPluginScopes).toEqual(["project", "user"]);
+    expect(logger.warnMessages).toEqual([]);
+  });
+
+  it("uninstalls at the scope the host's own registry names directly, one attempt", async () => {
+    const activator = new FakeNativePluginActivator({
+      available: true,
+      installedAtScope: new Map([[REF, "user"]]),
+    });
+    const logger = new CapturingLogger();
+    const fs = new InMemoryFileAdapter();
+    const manifestRepo = new InMemoryManifestRepository();
+    const removeUseCase = new PluginRemoveUseCase(
+      fs,
+      manifestRepo,
+      logger,
+      new Map([["claude", activator]]),
+      new Map([
+        [
+          "claude",
+          new FakeHostPluginRegistryReader({
+            location: "/registry",
+            refs: new Map([[REF, { enabled: true, scope: "user" }]]),
+          }),
+        ],
+      ])
+    );
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    await installViaModeA(manifest);
+    await manifestRepo.save(manifest);
+
+    await removeUseCase.execute({
+      pluginName: PLUGIN_NAME,
+      toolIds: ["claude"],
+      projectRoot: PROJECT_ROOT,
+    });
+
+    expect(activator.uninstalledPlugins).toEqual([REF]);
+    expect(activator.uninstalledPluginScopes).toEqual(["user"]);
   });
 });

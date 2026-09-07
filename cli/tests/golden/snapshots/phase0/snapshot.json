@@ -23,9 +23,80 @@
     }
   },
   {
+    "command": "setup --source local --path <FRAMEWORK_FIXTURE> --ai claude --plugins none --yes --scope user",
+    "exitCode": 0,
+    "stdout": "Fetching marketplace 'aidd-framework'...\nProject initialized.\n",
+    "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\n",
+    "filesWritten": [],
+    "manifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".claude/settings.json",
+              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
+            }
+          ],
+          "mergeFiles": []
+        }
+      }
+    },
+    "userConfigFiles": [
+      "cache/built/<VERSION>/aidd-framework/claude/.build-version",
+      "cache/built/<VERSION>/aidd-framework/claude/.claude-plugin/marketplace.json",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/.claude-plugin/plugin.json",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/.mcp.json",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/agents/code-reviewer.md",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/hooks/check.sh",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/hooks/hooks.json",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/skills/commit/SKILL.md",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/skills/hello.md",
+      "manifest.json",
+      "marketplaces.json",
+      "references.json"
+    ],
+    "userManifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [],
+          "mergeFiles": []
+        }
+      }
+    }
+  },
+  {
+    "command": "doctor --scope user",
+    "exitCode": 0,
+    "stdout": "User-scope tools:\n  claude (v<VERSION>): expects activation in <HOME>/.claude/settings.json\n\nUser-scope installation is healthy\n",
+    "stderr": "",
+    "filesWritten": [],
+    "manifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [
+            {
+              "relativePath": ".claude/settings.json",
+              "hash": "0e55cf920e5a903c80a10fa7034d48c2"
+            }
+          ],
+          "mergeFiles": []
+        }
+      }
+    }
+  },
+  {
     "command": "doctor",
     "exitCode": 0,
-    "stdout": "\nAI tools:\n  claude (v5.2.2): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v5.2.2): in sync\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nInstallation is healthy\n",
+    "stdout": "\nAI tools:\n  claude (v<VERSION>): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v<VERSION>): in sync\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nInstallation is healthy\n",
     "stderr": "",
     "filesWritten": [],
     "manifest": {
@@ -48,7 +119,7 @@
   {
     "command": "marketplace list",
     "exitCode": 0,
-    "stdout": "aidd-framework v0.1.0 [user]\n",
+    "stdout": "aidd-framework v<VERSION> [user]\n",
     "stderr": "",
     "filesWritten": [],
     "manifest": {
@@ -240,7 +311,7 @@
   {
     "command": "doctor",
     "exitCode": 0,
-    "stdout": "\nAI tools:\n  claude (v5.2.2): 1 files, 0 merge files\n  cursor (v5.2.2): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v5.2.2): in sync\n  cursor (v5.2.2):\n    + .cursor/hooks/aidd-test/check.sh\n    + .cursor/hooks.json\n  0 modified, 0 deleted, 2 added\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nAI:\n\nInstallation is healthy\n",
+    "stdout": "\nAI tools:\n  claude (v<VERSION>): 1 files, 0 merge files\n  cursor (v<VERSION>): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v<VERSION>): in sync\n  cursor (v<VERSION>):\n    + .cursor/hooks/aidd-test/check.sh\n    + .cursor/hooks.json\n  0 modified, 0 deleted, 2 added\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nAI:\n\nInstallation is healthy\n",
     "stderr": "Warning:   <HOME>/.claude/plugins/installed_plugins.json could not be read — ENOENT\n    Fix: The plugin does not load until claude's own CLI has run and answered this.\n",
     "filesWritten": [],
     "manifest": {
@@ -308,7 +379,7 @@
   {
     "command": "doctor",
     "exitCode": 1,
-    "stdout": "\nAI tools:\n  claude (v5.2.2): 1 files, 0 merge files\n  cursor (v5.2.2): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v5.2.2):\n    ~ .claude/settings.json\n  1 modified, 0 deleted, 0 added\n  cursor (v5.2.2):\n    + .cursor/hooks/aidd-test/check.sh\n    + .cursor/hooks.json\n  0 modified, 0 deleted, 2 added\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nAI:\n",
+    "stdout": "\nAI tools:\n  claude (v<VERSION>): 1 files, 0 merge files\n  cursor (v<VERSION>): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v<VERSION>):\n    ~ .claude/settings.json\n  1 modified, 0 deleted, 0 added\n  cursor (v<VERSION>):\n    + .cursor/hooks/aidd-test/check.sh\n    + .cursor/hooks.json\n  0 modified, 0 deleted, 2 added\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nAI:\n",
     "stderr": "Warning:   <HOME>/.claude/plugins/installed_plugins.json could not be read — ENOENT\n    Fix: The plugin does not load until claude's own CLI has run and answered this.\nWarning:   Modified tracked file: .claude/settings.json\n    Fix: Run `aidd sync --force` to revert to the framework version.\n",
     "filesWritten": [],
     "manifest": {
@@ -444,7 +515,7 @@
   {
     "command": "doctor",
     "exitCode": 0,
-    "stdout": "\nAI tools:\n  claude (v5.2.2): 1 files, 0 merge files\n  cursor (v5.2.2): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v5.2.2): in sync\n  cursor (v5.2.2):\n    + .cursor/hooks/aidd-test/check.sh\n    + .cursor/hooks.json\n  0 modified, 0 deleted, 2 added\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nAI:\n\nInstallation is healthy\n",
+    "stdout": "\nAI tools:\n  claude (v<VERSION>): 1 files, 0 merge files\n  cursor (v<VERSION>): 1 files, 0 merge files\n\nDrift:\nAI tools:\n  claude (v<VERSION>): in sync\n  cursor (v<VERSION>):\n    + .cursor/hooks/aidd-test/check.sh\n    + .cursor/hooks.json\n  0 modified, 0 deleted, 2 added\nIDE tools:\n  (none installed)\nPlugins:\n  (all in sync)\n\nAI:\n\nInstallation is healthy\n",
     "stderr": "Warning:   <HOME>/.claude/plugins/installed_plugins.json could not be read — ENOENT\n    Fix: The plugin does not load until claude's own CLI has run and answered this.\n",
     "filesWritten": [],
     "manifest": {
@@ -569,9 +640,21 @@
       "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/hooks/hooks.json",
       "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/skills/commit/SKILL.md",
       "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/skills/hello.md",
+      "manifest.json",
       "marketplaces.json",
       "references.json"
-    ]
+    ],
+    "userManifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [],
+          "mergeFiles": []
+        }
+      }
+    }
   },
   {
     "command": "doctor",

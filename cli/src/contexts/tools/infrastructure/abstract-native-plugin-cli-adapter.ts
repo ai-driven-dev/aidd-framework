@@ -55,8 +55,8 @@ export abstract class AbstractNativePluginCliAdapter implements NativePluginActi
   abstract enablesPlugins(): boolean;
   abstract registrationState(name: string): "live" | "dead" | "unknown";
   abstract upgradeMarketplaces(): void;
-  abstract enablePlugin(pluginRef: string): void;
-  abstract uninstallPlugin(pluginRef: string): void;
+  abstract enablePlugin(pluginRef: string, scope?: MarketplaceScope): void;
+  abstract uninstallPlugin(pluginRef: string, scope?: MarketplaceScope): void;
 
   /** Runs a command purely for its exit code; never throws. */
   protected succeeds(args: readonly string[]): boolean {

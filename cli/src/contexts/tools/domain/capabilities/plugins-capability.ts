@@ -113,6 +113,21 @@ export interface NativeActivation {
    * the one check both share.
    */
   pluginCacheDir?: (homedir: string) => string;
+  /**
+   * Resolver for this tool's own user-scope settings/registry file — never written by
+   * aidd itself, always by the tool's own CLI, and read by nothing today but a
+   * diagnostic naming it (`aidd doctor --scope user`, `clean --scope user` once it
+   * lands). Declared only for a tool whose profile also declares `NativeActivation`:
+   * claude (`~/.claude/settings.json`), codex (`$CODEX_HOME/config.toml`, falling back
+   * to `~/.codex/config.toml` — a relocated `HOME` does not relocate a real `codex`
+   * binary once `CODEX_HOME` is set on that machine, `testing.md`'s own sandboxing
+   * gotcha) and copilot (`~/.copilot/settings.json`) — all three measured against the
+   * real binary in a relocated `HOME`. opencode and cursor declare no `NativeActivation`
+   * at all (opencode has no native marketplace concept in flat mode; cursor writes
+   * every plugin's files straight into a user-scope directory with no separate
+   * activation step), so neither gets a line here.
+   */
+  userSettingsPath?: (homedir: string) => string;
 }
 
 export interface NativePluginsParams {

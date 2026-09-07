@@ -16,10 +16,12 @@ import type { FileWriter } from "../../../kernel/ports/file-writer.js";
 import type { Logger } from "../../../kernel/ports/logger.js";
 import type { Prompter } from "../../../kernel/ports/prompter.js";
 import { resolveHomeDir } from "../../../kernel/reading/home-dir.js";
+import type { MarketplaceScope } from "../../../kernel/scope.js";
 import type { AiToolId, ToolId } from "../../../kernel/tool.js";
 import { isAiToolId } from "../../../kernel/tool.js";
 import type { MarketplaceRegistry } from "../../distribution/domain/ports/marketplace-registry.js";
 import type { HostMarketplaceRegistryReader } from "../../tools/domain/ports/host-marketplace-registry-reader.js";
+import type { HostPluginRegistryReader } from "../../tools/domain/ports/host-plugin-registry-reader.js";
 import type { NativePluginActivator } from "../../tools/domain/ports/native-plugin-activator.js";
 import {
   machineLocalFilesOf,
@@ -41,6 +43,7 @@ import {
   resolveCacheCandidate,
 } from "./shared/purge-declared-cache.js";
 import { removeProjectHooks } from "./shared/remove-project-hooks.js";
+import { resolveUninstallScopeOrder } from "./shared/resolve-uninstall-scope.js";
 import {
   frameworkSourceIsShared,
   resolveProjectRootForReferences,
@@ -137,7 +140,16 @@ export class CleanUseCase {
     private readonly homeDir: () => string = resolveHomeDir,
     /** The registry of projects referencing the shared machine-scope source. Absent for
      * every caller that predates this, which skips the decrement entirely. */
-    private readonly userSourceReferences?: UserSourceReferences
+    private readonly userSourceReferences?: UserSourceReferences,
+    /** Host plugin registry readers keyed by `AiToolId`, the same map
+     * `DoctorRegistrationUseCase` reads — consulted before uninstalling a ref so the
+     * scope asked for is the one the host actually registered it at, never a guess.
+     * Absent for every caller that predates this, which falls back to the manifest's
+     * own recorded scope (see `resolveUninstallScopeOrder`). */
+    private readonly hostPluginRegistries: ReadonlyMap<
+      AiToolId,
+      HostPluginRegistryReader
+    > = new Map()
   ) {}
 
   async execute(options: CleanOptions): Promise<CleanResult> {
@@ -227,6 +239,7 @@ export class CleanUseCase {
       const registrations = manifest.getNativeRegistrations(toolId);
       if (registrations === undefined) continue;
       const removedHostNames = await this.undoToolNativeRegistrations(
+        manifest,
         toolId,
         registrations,
         projectRoot,
@@ -239,6 +252,7 @@ export class CleanUseCase {
   }
 
   private async undoToolNativeRegistrations(
+    manifest: Manifest,
     toolId: ToolId,
     registrations: NativeRegistrations,
     projectRoot: string,
@@ -258,7 +272,15 @@ export class CleanUseCase {
     // declares `forceRemoveArgs`, so Claude and Codex can refuse to remove a
     // marketplace that still has plugins installed from it.
     for (const ref of registrations.pluginRefs) {
-      this.bestEffort(() => activator.uninstallPlugin(ref), `${binary} plugin uninstall '${ref}'`);
+      await this.uninstallPluginRef(
+        activator,
+        binary,
+        toolId,
+        ref,
+        projectRoot,
+        manifest,
+        registrations
+      );
     }
     const removedHostNames = new Set<string>();
     for (const { alias, hostName } of registrations.marketplaces) {
@@ -411,6 +433,63 @@ export class CleanUseCase {
       this.logger.warn(`${label} failed: ${error.message}`);
       return false;
     }
+  }
+
+  /**
+   * Uninstalls one plugin ref at the scope it was actually registered at — never a
+   * default, and never the manifest's own recorded scope alone: `resolveUninstallScopeOrder`
+   * asks the host's own registry first, and only falls back to the manifest's scope,
+   * then the other one, when that registry has nothing to say. A real `claude` binary
+   * refuses a mismatched-scope uninstall outright, so the fallback list is tried in
+   * order until one succeeds; best-effort throughout, same as every other native undo
+   * here — a plugin this run cannot get the host to forget is named, not thrown.
+   */
+  private async uninstallPluginRef(
+    activator: NativePluginActivator,
+    binary: string,
+    toolId: ToolId,
+    ref: string,
+    projectRoot: string,
+    manifest: Manifest,
+    registrations: NativeRegistrations
+  ): Promise<void> {
+    const reader = isAiToolId(toolId) ? this.hostPluginRegistries.get(toolId) : undefined;
+    const manifestScope = this.manifestScopeForRef(manifest, toolId, registrations, ref);
+    const order = await resolveUninstallScopeOrder(reader, ref, projectRoot, manifestScope);
+    let lastMessage = "";
+    for (const scope of order) {
+      try {
+        activator.uninstallPlugin(ref, scope);
+        return;
+      } catch (error) {
+        if (!(error instanceof NativePluginCliError)) throw error;
+        lastMessage = error.message;
+      }
+    }
+    this.logger.warn(`${binary} plugin uninstall '${ref}' failed: ${lastMessage}`);
+  }
+
+  /** The scope this project's own manifest recorded for the plugin behind `ref` —
+   * `"project"` when nothing in the manifest names it, the same default `uninstallPlugin`
+   * itself falls back to. `ref` is `<plugin>@<hostName>`, so matching it back to a
+   * manifest entry (keyed by `plugin.marketplace`, this project's own alias) goes
+   * through `registrations.marketplaces`, the one place both names are recorded
+   * together (see `pluginRefsToEnable`'s own doc in `marketplace-sync-settings-use-case.ts`). */
+  private manifestScopeForRef(
+    manifest: Manifest,
+    toolId: ToolId,
+    registrations: NativeRegistrations,
+    ref: string
+  ): MarketplaceScope {
+    for (const plugin of manifest.getPlugins(toolId)) {
+      if (plugin.marketplace == null) continue;
+      const hostName = registrations.marketplaces.find(
+        (m) => m.alias === plugin.marketplace
+      )?.hostName;
+      if (hostName === undefined) continue;
+      if (`${plugin.name}@${hostName}` === ref) return plugin.scope;
+    }
+    return "project";
   }
 
   // ── A host's own plugin cache, purged only under a declared, proven-safe path ──

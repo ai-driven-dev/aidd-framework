@@ -508,7 +508,10 @@ function registryCarrying(
   refs: readonly string[]
 ): ReadonlyMap<AiToolId, HostPluginRegistryReader> {
   const reader: HostPluginRegistryReader = {
-    read: async () => ({ location: REGISTRY, refs: new Map(refs.map((ref) => [ref, true])) }),
+    read: async () => ({
+      location: REGISTRY,
+      refs: new Map(refs.map((ref) => [ref, { enabled: true }])),
+    }),
   };
   return new Map<AiToolId, HostPluginRegistryReader>([["claude", reader]]);
 }

@@ -24,8 +24,30 @@ import {
 import type { InstalledPlugin } from "./plugins/installed-plugin.js";
 
 // Where a stuck-on-an-old-version manifest lives, named in the refusal below so a
-// person can act on it without hunting for the path themselves.
+// person can act on it without hunting for the path themselves. The project-scope
+// default: a caller reading the user-scope manifest passes its own `ManifestFileContext`
+// instead, so the refusal names the file actually on disk rather than this one.
 const MANIFEST_PATH_HINT = `${AIDD_DIR}/${MANIFEST_FILENAME}`;
+const DEFAULT_CONTEXT: ManifestFileContext = {
+  path: MANIFEST_PATH_HINT,
+  location: "in this project",
+  reinstallCommand: "aidd setup",
+};
+
+/**
+ * What a version-refusal message names: the file on disk, in words fitting the sentence
+ * it lands in (`"in this project"`, `"for this machine"`), and the command that
+ * reinstalls once it is gone. The one thing that differs between the project manifest
+ * and the user-scope one — `UserManifestRepositoryAdapter` passes its own before ever
+ * reaching this guard, so the message sent to a `--scope user` user names
+ * `userConfigDir()/manifest.json` and `aidd setup --scope user`, never the project's own
+ * path and command.
+ */
+export interface ManifestFileContext {
+  readonly path: string;
+  readonly location: string;
+  readonly reinstallCommand: string;
+}
 
 export class Manifest {
   private readonly _tools: Map<ToolId, ToolEntry>;
@@ -213,12 +235,12 @@ export class Manifest {
     return { version: MANIFEST_VERSION as 8, tools: serializeManifestTools(this._tools) };
   }
 
-  static fromJSON(data: unknown): Manifest {
+  static fromJSON(data: unknown, context: ManifestFileContext = DEFAULT_CONTEXT): Manifest {
     if (data === null || typeof data !== "object") {
       throw new InvalidManifestDataError("expected an object.");
     }
     const raw = data as Record<string, unknown>;
-    Manifest.assertSupportedVersion(raw);
+    Manifest.assertSupportedVersion(raw, context);
     const tools = parseManifestTools(raw);
     return new Manifest({ tools });
   }
@@ -242,7 +264,10 @@ export class Manifest {
   // document outright, so that is what is named. The message itself says which: a v6
   // document names 5.2.2 as the CLI that actually wrote it, since one did; v7 and below
   // say no published CLI can, since none ever did.
-  private static assertSupportedVersion(raw: Record<string, unknown>): void {
+  private static assertSupportedVersion(
+    raw: Record<string, unknown>,
+    context: ManifestFileContext
+  ): void {
     const version = raw.version;
     if (version === MANIFEST_VERSION) return;
     if (typeof version === "number" && version > MANIFEST_VERSION) {
@@ -256,6 +281,9 @@ export class Manifest {
     // `clean --force` can still be run against this project before the manifest naming
     // what it registered is gone. A v7 document has no such CLI: 5.2.2 refuses it too
     // ("Unsupported manifest version: 7"), so naming it there would be a false remedy.
+    // The v6 remedy is written for the project manifest specifically — a v6 document is
+    // one `ManifestRepositoryAdapter` ever produced, never `UserManifestRepositoryAdapter`
+    // (which did not exist yet), so `context.location` is always "in this project" here.
     const remedy =
       version === 6
         ? "5.2.2, a published CLI, wrote this version. Before deleting it, run " +
@@ -265,8 +293,8 @@ export class Manifest {
         : "No published CLI can write this version: delete";
     throw new InvalidManifestDataError(
       `manifest version ${String(version)} predates version ${MANIFEST_VERSION}, the only one this CLI reads. ` +
-        `${remedy} ${MANIFEST_PATH_HINT} in this project, then run ` +
-        "`aidd setup` to reinstall the framework."
+        `${remedy} ${context.path} ${context.location}, then run ` +
+        `\`${context.reinstallCommand}\` to reinstall the framework.`
     );
   }
 }

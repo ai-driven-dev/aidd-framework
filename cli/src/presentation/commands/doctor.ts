@@ -1,5 +1,7 @@
 import type { Command } from "commander";
 import type { DoctorReport } from "../../contexts/framework/domain/doctor.js";
+import { userMachineLocalFilesOf } from "../../contexts/tools/domain/registry.js";
+import { UserScopeFilterUnsupportedError } from "../../kernel/errors.js";
 import type { ToolCategory, ToolId } from "../../kernel/tool.js";
 import { isAiToolId } from "../../kernel/tool.js";
 import { createDeps } from "../../runtime/wiring/framework.js";
@@ -7,7 +9,7 @@ import { printPluginIssues, printScopeIssues } from "../display/doctor-display.j
 import { printPluginDrift, printScopeReport } from "../display/status-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import type { CLIOutput } from "../output.js";
-import { parseGlobalOptions } from "./global-options.js";
+import { parseGlobalOptions, parseScopeFlag } from "./global-options.js";
 
 type Deps = Awaited<ReturnType<typeof createDeps>>;
 
@@ -135,9 +137,57 @@ async function runScopedDoctor(
   process.exit(1);
 }
 
+/**
+ * `--scope user` has no tracked files, merge files or layout to check — a user-scope
+ * install writes nothing under any project — so this runs `doctorRegistrationUseCase`
+ * alone against the user manifest, the one check that is never project-file-shaped:
+ * it compares `nativeRegistrations` to a host's own registry file, exactly as it does
+ * for the project-scope path, just fed a different manifest.
+ */
+async function runUserScopeDoctor(
+  deps: Deps,
+  output: CLIOutput,
+  projectRoot: string,
+  cmdOptions: DoctorCmdOptions
+): Promise<void> {
+  // No plugin is tracked at user scope yet — there is nothing `--plugin` could narrow —
+  // so it is refused rather than silently read and discarded.
+  if (cmdOptions.plugin !== undefined) {
+    throw new UserScopeFilterUnsupportedError("--plugin", "doctor --plugin <name>");
+  }
+  const manifest = await deps.userManifestRepo.load();
+  if (manifest === null) {
+    output.success("Nothing registered at user scope yet — run `aidd setup --scope user` first.");
+    return;
+  }
+  const toolId = cmdOptions.tool as ToolId | undefined;
+  const toolIds = toolId === undefined ? manifest.getInstalledToolIds() : [toolId];
+  output.print("User-scope tools:");
+  for (const id of toolIds) {
+    const version = manifest.getToolVersion(id) ?? "unknown";
+    const settingsPaths = userMachineLocalFilesOf(id, deps.homedir());
+    const settings = settingsPaths.length > 0 ? settingsPaths[0] : "no user-scope settings file";
+    output.print(`  ${id} (v${version}): expects activation in ${settings}`);
+  }
+  const allowedIds = toolId === undefined ? null : new Set([toolId]);
+  const issues = await deps.doctorRegistrationUseCase.execute({
+    manifest,
+    projectRoot,
+    allowedIds,
+  });
+  printScopeIssues(output, "User scope", { issues });
+  const healthy = issues.every((i) => i.severity !== "error");
+  if (healthy) {
+    output.success("\nUser-scope installation is healthy");
+    return;
+  }
+  process.exit(1);
+}
+
 interface DoctorCmdOptions {
   tool?: string;
   plugin?: string;
+  scope?: string;
 }
 
 export function registerDoctorCommand(program: Command): void {
@@ -148,12 +198,20 @@ export function registerDoctorCommand(program: Command): void {
     )
     .option("--tool <tool>", "Limit to a specific AI or IDE tool")
     .option("--plugin <name>", "Limit plugin checks to a specific plugin")
+    .option(
+      "--scope <scope>",
+      "project (default) checks this project's own manifest; user checks the " +
+        "machine-wide manifest --scope user setup wrote"
+    )
     .action(async (cmdOptions: DoctorCmdOptions) => {
       const { verbose, output, projectRoot } = parseGlobalOptions(program);
       const errorHandler = new ErrorHandler(output);
       try {
         const deps = await createDeps(projectRoot, { verbose }, output);
-        if (cmdOptions.tool !== undefined) {
+        const scope = parseScopeFlag(cmdOptions.scope, output) ?? "project";
+        if (scope === "user") {
+          await runUserScopeDoctor(deps, output, projectRoot, cmdOptions);
+        } else if (cmdOptions.tool !== undefined) {
           await runScopedDoctor(
             deps,
             output,

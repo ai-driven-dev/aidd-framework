@@ -309,14 +309,14 @@ export class DoctorRegistrationUseCase {
         });
         continue;
       }
-      const enabled = answered.refs.get(item.ref);
-      if (enabled === undefined) {
+      const entry = answered.refs.get(item.ref);
+      if (entry === undefined) {
         issues.push({
           severity: "error",
           message: `${toolId}'s registry (${answered.location}) does not carry ${item.ref}`,
           fix: "Run `aidd sync` to re-register it.",
         });
-      } else if (!enabled) {
+      } else if (!entry.enabled) {
         issues.push({
           severity: "error",
           message: `${toolId}'s registry (${answered.location}) carries ${item.ref} and records it disabled`,

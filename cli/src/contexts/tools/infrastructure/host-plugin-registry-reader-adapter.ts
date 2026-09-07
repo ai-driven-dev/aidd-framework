@@ -2,8 +2,10 @@ import { readFile, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { describeError } from "../../../kernel/describe-error.js";
 import { resolveHomeDir } from "../../../kernel/reading/home-dir.js";
+import type { MarketplaceScope } from "../../../kernel/scope.js";
 import type { AiToolId } from "../../../kernel/tool.js";
 import type {
+  HostPluginRegistryEntry,
   HostPluginRegistryReader,
   HostPluginRegistryReading,
 } from "../domain/ports/host-plugin-registry-reader.js";
@@ -56,17 +58,17 @@ export function hostPluginRegistryReaders(
  * did not — `projectPath` — on 100 of them, exactly the 99 at `scope: "project"` plus the
  * one at `"local"`. So the registry can say which project wants a ref.
  *
- * **It does not for anything `aidd` itself installed.** A second, later measurement found
- * all six of `aidd`'s own entries at `scope: "user"` — `native-plugin-cli-adapter.ts`'s
- * `enablePlugin` calls no `scopeArgsFor`, that method's own caller is `addMarketplace` and
- * `removeMarketplace` alone, so a plugin enable carries no scope argument and Claude
- * defaults it to `"user"`, machine-wide. `countsForProject` below therefore answers `true`
- * for a ref this machine's *other* project registered, never having asked this one's own
- * `claude` to do anything — a ref counts wherever some entry is user-scoped, which every
- * `aidd`-written one is. That is an honest answer, not a bug: the plugin genuinely is
- * loaded for the `claude` binary this project also runs. What must not be claimed is that
- * project scope discriminates here — only a `projectPath`-carrying entry, which `aidd`
- * never writes, would.
+ * **It now does for what `aidd` installs, and did not before.** A second, later
+ * measurement found all six of `aidd`'s own entries at `scope: "user"` —
+ * `native-plugin-cli-adapter.ts`'s `enablePlugin` called no `scopeArgsFor` at all, so a
+ * plugin enable carried no scope argument and Claude defaulted it to `"user"`,
+ * machine-wide, no matter which project asked. `enablePlugin` now defaults to
+ * `"project"` (`--scope local` for claude) unless a caller asks for `"user"` — measured
+ * against the real binary: `installed_plugins.json` then carries `scope: "local"` plus a
+ * `projectPath` naming the very project that installed it. `countsForProject` below
+ * already reads exactly that shape (`entry.projectPath` matched against `here`), so
+ * nothing in this file had to change for it to now discriminate correctly instead of
+ * answering `true` for every project on the machine.
  */
 class ClaudeInstalledPluginsReader implements HostPluginRegistryReader {
   constructor(private readonly path: string) {}
@@ -84,10 +86,11 @@ class ClaudeInstalledPluginsReader implements HostPluginRegistryReader {
       if (plugins === undefined || typeof plugins !== "object") {
         return { location: this.path, unreadable: "no `plugins` object" };
       }
-      const refs = new Map<string, boolean>();
+      const refs = new Map<string, HostPluginRegistryEntry>();
       const here = await resolvedPath(projectRoot);
       for (const [ref, entries] of Object.entries(plugins)) {
-        if (await countsForProject(entries, here)) refs.set(ref, true);
+        const scope = await scopeForProject(entries, here);
+        if (scope !== null) refs.set(ref, { enabled: true, scope });
       }
       return { location: this.path, refs };
     } catch (error) {
@@ -158,7 +161,7 @@ class CopilotSettingsPluginsReader implements HostPluginRegistryReader {
       if (enabled === undefined) return { location: this.path, refs: new Map() };
       return {
         location: this.path,
-        refs: new Map(Object.entries(enabled).map(([ref, on]) => [ref, on !== false])),
+        refs: new Map(Object.entries(enabled).map(([ref, on]) => [ref, { enabled: on !== false }])),
       };
     } catch (error) {
       return { location: this.path, unreadable: describeError(error) };
@@ -196,14 +199,14 @@ const CODEX_MULTILINE_DELIMITER = /"""|'''/gu;
  * table without one is a shape it does not produce, and between "the host listed this
  * plugin" and "the host listed it and said nothing", the listing is the fact.
  */
-function scanCodexPluginTables(content: string): ReadonlyMap<string, boolean> {
-  const refs = new Map<string, boolean>();
+function scanCodexPluginTables(content: string): ReadonlyMap<string, HostPluginRegistryEntry> {
+  const refs = new Map<string, HostPluginRegistryEntry>();
   const lines = outsideMultilineStrings(content.split("\n"));
   for (const [index, line] of lines.entries()) {
     if (line === null) continue;
     const ref = CODEX_PLUGIN_HEADER.exec(line.trim())?.[1];
     if (ref === undefined || refs.has(ref)) continue;
-    refs.set(ref, enabledInTableBody(lines, index + 1));
+    refs.set(ref, { enabled: enabledInTableBody(lines, index + 1) });
   }
   return refs;
 }
@@ -254,18 +257,24 @@ interface ClaudeEntry {
 /** A user-scoped entry applies everywhere and carries no `projectPath`; any other scope
  * applies to the project it names. An entry with neither is not evidence of anything and is
  * ignored rather than counted, which is the same refusal to guess the rest of this file
- * makes. */
-async function countsForProject(
+ * makes. `null` when nothing here answers for `projectRoot` at all.
+ *
+ * A user-scope entry wins over a project-path match regardless of which one this ref's
+ * array lists first: it applies to every project on the machine, this one included, so
+ * ordering must not decide which scope a caller reads back — a `clean` or `plugin
+ * remove` reading this to choose an uninstall's own scope needs the answer that is true,
+ * not the one that happened to sort first in `installed_plugins.json`. */
+async function scopeForProject(
   entries: readonly ClaudeEntry[],
   projectRoot: string
-): Promise<boolean> {
-  if (!Array.isArray(entries)) return false;
+): Promise<MarketplaceScope | null> {
+  if (!Array.isArray(entries)) return null;
+  if (entries.some((entry) => entry.scope === "user")) return "user";
   for (const entry of entries) {
-    if (entry.scope === "user") return true;
     if (entry.projectPath === undefined) continue;
-    if ((await resolvedPath(entry.projectPath)) === projectRoot) return true;
+    if ((await resolvedPath(entry.projectPath)) === projectRoot) return "project";
   }
-  return false;
+  return null;
 }
 
 /**

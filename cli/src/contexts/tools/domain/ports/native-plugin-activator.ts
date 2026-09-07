@@ -28,12 +28,27 @@ export interface NativePluginActivator {
   registrationState(name: string): "live" | "dead" | "unknown";
   /** Refreshes marketplace snapshots so plugin installs pick up new versions. No-op when unsupported. */
   upgradeMarketplaces(): void;
-  /** Installs and enables a plugin referenced as `<plugin>@<marketplace>`. Idempotent. */
-  enablePlugin(pluginRef: string): void;
+  /**
+   * Installs and enables a plugin referenced as `<plugin>@<marketplace>`. Idempotent.
+   *
+   * `scope` carries the same `MarketplaceScope` `addMarketplace`/`removeMarketplace`
+   * already take, but answers a different question: not where the marketplace
+   * registration itself lives (always `"user"` for the shared framework source), but
+   * at what scope *this* plugin gets enabled — `"project"` by default, mapping to
+   * claude's own `--scope local` so the enablement stays bound to this project, never
+   * silently landing at claude's own implicit `"user"` default the way an omitted
+   * `--scope` measurably does — before this parameter existed, `enablePlugin` passed
+   * no scope argument at all, so a real `claude` binary always chose its own default,
+   * `"user"`, machine-wide, regardless of which scope `aidd` itself ran at. A tool
+   * whose profile declares no `scopeArgs` (codex, copilot) ignores this entirely.
+   */
+  enablePlugin(pluginRef: string, scope?: MarketplaceScope): void;
   /**
    * Uninstalls a plugin referenced as `<plugin>@<marketplace>` — the removal
    * counterpart of {@link enablePlugin}. May throw when the plugin is already
-   * absent from the tool's own registry; callers wrap it best-effort.
+   * absent from the tool's own registry; callers wrap it best-effort. `scope` must
+   * match the scope the plugin was enabled at — a real `claude` binary refuses a
+   * mismatched-scope uninstall outright (measured), rather than silently missing it.
    */
-  uninstallPlugin(pluginRef: string): void;
+  uninstallPlugin(pluginRef: string, scope?: MarketplaceScope): void;
 }

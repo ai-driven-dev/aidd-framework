@@ -43,6 +43,7 @@ import { PluginSearchUseCase } from "../../contexts/framework/application/plugin
 import { PluginUpdateUseCase } from "../../contexts/framework/application/plugin/plugin-update-use-case.js";
 import { RestoreUseCase } from "../../contexts/framework/application/restore/restore-use-case.js";
 import { ProjectContextDetectorUseCase } from "../../contexts/framework/application/setup/project-context-detector-use-case.js";
+import { SetupMachineScopeUseCase } from "../../contexts/framework/application/setup/setup-machine-scope-use-case.js";
 import { SetupMarketplaceSourceUseCase } from "../../contexts/framework/application/setup/setup-marketplace-source-use-case.js";
 import { SetupToolsUseCase } from "../../contexts/framework/application/setup/setup-tools-use-case.js";
 import { DetectPluginDriftUseCase } from "../../contexts/framework/application/shared/detect-plugin-drift-use-case.js";
@@ -50,6 +51,7 @@ import {
   EnsureBuiltMarketplaceUseCase,
   type FrameworkBuildFor,
 } from "../../contexts/framework/application/shared/ensure-built-marketplace-use-case.js";
+import { SetupMarketplaceRegistrationUseCase } from "../../contexts/framework/application/shared/setup-marketplace-registration-use-case.js";
 import { StatusUseCase } from "../../contexts/framework/application/status-use-case.js";
 import { UninstallIdeUseCase } from "../../contexts/framework/application/uninstall/uninstall-ide-use-case.js";
 import { UninstallToolsUseCase } from "../../contexts/framework/application/uninstall/uninstall-tools-use-case.js";
@@ -58,6 +60,7 @@ import type { ManifestRepository } from "../../contexts/framework/domain/ports/m
 import type { UserSourceReferences } from "../../contexts/framework/domain/ports/user-source-references.js";
 import { ManifestRepositoryAdapter } from "../../contexts/framework/infrastructure/manifest-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "../../contexts/framework/infrastructure/plugin-distribution-reader-adapter.js";
+import { UserManifestRepositoryAdapter } from "../../contexts/framework/infrastructure/user-manifest-repository-adapter.js";
 import { UserSourceReferencesAdapter } from "../../contexts/framework/infrastructure/user-source-references-adapter.js";
 import type { FileMerger } from "../../contexts/tools/domain/ports/file-merger.js";
 import { hostPluginRegistryReaders } from "../../contexts/tools/infrastructure/host-plugin-registry-reader-adapter.js";
@@ -104,6 +107,13 @@ interface GlobalOptions {
 interface Deps extends TelemetryDeps {
   fs: FileReader & FileWriter & FileMerger;
   manifestRepo: ManifestRepository;
+  /** `--scope user`'s own manifest repository — `userConfigDir()/manifest.json`,
+   * never nested under a project's `.aidd/`. See `SetupMachineScopeUseCase`. */
+  userManifestRepo: ManifestRepository;
+  /** The one resolver for the OS home directory presentation ever calls — never
+   * `os.homedir()` directly, so a test can point it elsewhere the same way every use
+   * case's own injected `homedir` already can. */
+  homedir: () => string;
   logger: Logger;
   currentVersionProvider: VersionReader;
   prompter: Prompter;
@@ -127,12 +137,17 @@ interface Deps extends TelemetryDeps {
   pluginInstallUseCase: PluginInstallUseCase;
   marketplaceSyncSettingsUseCase: MarketplaceSyncSettingsUseCase;
   doctorUseCase: DoctorUseCase;
+  /** The registration check alone, reused directly by `doctor --scope user` — see
+   * where it is constructed for why the same instance serves both scopes. */
+  doctorRegistrationUseCase: DoctorRegistrationUseCase;
   releaseResolver: LatestReleaseResolver;
   setupMarketplaceSourceUseCase: SetupMarketplaceSourceUseCase;
   setupToolsUseCase: SetupToolsUseCase;
   setupPluginsPromptUseCase: SetupPluginsPromptUseCase;
   setupToolsPromptUseCase: SetupToolsPromptUseCase;
   projectContextDetector: ProjectContextDetectorUseCase;
+  setupMarketplaceRegistration: SetupMarketplaceRegistrationUseCase;
+  setupMachineScopeUseCase: SetupMachineScopeUseCase;
   selfUpdateUseCase: SelfUpdateUseCase;
   statusUseCase: StatusUseCase;
   restoreUseCase: RestoreUseCase;
@@ -171,6 +186,7 @@ export async function createDeps(
   const fs = new FileAdapter(hasher, logger);
   const pluginDistributionReader = new PluginDistributionReaderAdapter(fs);
   const manifestRepo = new ManifestRepositoryAdapter(projectRoot);
+  const userManifestRepo = new UserManifestRepositoryAdapter(userConfigDir);
   const http = new HttpClient();
   const authStorage = new AuthStorage();
   const ghCliAdapter = new GhCliAdapter();
@@ -194,6 +210,10 @@ export async function createDeps(
     ? new InquirerPrompterAdapter()
     : new SilentPrompterAdapter();
   const { nativePluginActivators, hostMarketplaceRegistries } = wireTools();
+  // Read once, reused everywhere a use case needs to know what a host's own plugin
+  // registry says: removal (to uninstall at the scope actually registered), clean (the
+  // same), and doctor's own registration check.
+  const hostPluginRegistries = hostPluginRegistryReaders();
   const {
     pluginFetcher,
     marketplaceRegistry,
@@ -207,7 +227,8 @@ export async function createDeps(
     fs,
     manifestRepo,
     logger,
-    nativePluginActivators
+    nativePluginActivators,
+    hostPluginRegistries
   );
   const pluginListUseCase = new PluginListUseCase(manifestRepo);
   const marketplaceRemoveUseCase = new MarketplaceRemoveUseCase(
@@ -353,6 +374,18 @@ export async function createDeps(
   const doctorPluginUseCase = new DoctorPluginUseCase(detectPluginDriftUseCase);
   const doctorReferencesUseCase = new DoctorReferencesUseCase(fs);
   const doctorLayoutUseCase = new DoctorLayoutUseCase(fs, authReader);
+  // Named so `doctor --scope user` can reuse this same instance directly — the check
+  // itself takes `manifest`/`projectRoot`/`allowedIds` per call, never a fixed
+  // manifest repository, so nothing about it is project-scope-specific.
+  const doctorRegistrationUseCase = new DoctorRegistrationUseCase(
+    fs,
+    marketplaceRegistry,
+    nativePluginActivators,
+    hostPluginRegistries,
+    hostMarketplaceRegistries,
+    userConfigDir,
+    currentVersionProvider
+  );
   const doctorUseCase = new DoctorUseCase(
     manifestRepo,
     doctorTrackedFilesUseCase,
@@ -360,15 +393,7 @@ export async function createDeps(
     doctorPluginUseCase,
     doctorReferencesUseCase,
     doctorLayoutUseCase,
-    new DoctorRegistrationUseCase(
-      fs,
-      marketplaceRegistry,
-      nativePluginActivators,
-      hostPluginRegistryReaders(),
-      hostMarketplaceRegistries,
-      userConfigDir,
-      currentVersionProvider
-    )
+    doctorRegistrationUseCase
   );
   const releaseResolver = new GitHubReleaseResolverAdapter(http, authReader);
   const setupMarketplaceSourceUseCase = new SetupMarketplaceSourceUseCase(
@@ -388,6 +413,23 @@ export async function createDeps(
   );
   const setupToolsPromptUseCase = new SetupToolsPromptUseCase(prompter);
   const projectContextDetector = new ProjectContextDetectorUseCase(fs);
+  const setupMarketplaceRegistration = new SetupMarketplaceRegistrationUseCase(
+    fs,
+    setupMarketplaceSourceUseCase,
+    marketplaceRegisterFrameworkUseCase,
+    marketplaceRefreshUseCase,
+    currentVersionProvider,
+    logger,
+    authReader,
+    releaseResolver,
+    userSourceReferences
+  );
+  const setupMachineScopeUseCase = new SetupMachineScopeUseCase(
+    userManifestRepo,
+    setupMarketplaceRegistration,
+    marketplaceSyncSettingsUseCase,
+    currentVersionProvider
+  );
   const statusUseCase = new StatusUseCase(fs, manifestRepo, hasher, detectPluginDriftUseCase);
   // Lets restore re-materialize cursor/opencode plugins via the build pipeline,
   // matching what install wrote (otherwise restore rewrites raw content → drift).
@@ -452,7 +494,8 @@ export async function createDeps(
     prompter,
     hostMarketplaceRegistries,
     undefined,
-    userSourceReferences
+    userSourceReferences,
+    hostPluginRegistries
   );
   const doctorAllUseCase = new DoctorAllUseCase(doctorUseCase);
   const listInstalledRulesUseCase = new ListInstalledRulesUseCase(fs);
@@ -470,6 +513,8 @@ export async function createDeps(
     ...telemetry,
     fs,
     manifestRepo,
+    userManifestRepo,
+    homedir,
     logger,
     currentVersionProvider,
     prompter,
@@ -493,12 +538,15 @@ export async function createDeps(
     pluginInstallUseCase,
     marketplaceSyncSettingsUseCase,
     doctorUseCase,
+    doctorRegistrationUseCase,
     releaseResolver,
     setupMarketplaceSourceUseCase,
     setupToolsUseCase,
     setupPluginsPromptUseCase,
     setupToolsPromptUseCase,
     projectContextDetector,
+    setupMarketplaceRegistration,
+    setupMachineScopeUseCase,
     selfUpdateUseCase,
     statusUseCase,
     restoreUseCase,

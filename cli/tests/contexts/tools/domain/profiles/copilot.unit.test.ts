@@ -330,4 +330,13 @@ describe("a reference to another framework file, installed for Copilot", () => {
       expect(rewrite(content)).toBe(content);
     });
   });
+
+  describe("capabilities.plugins", () => {
+    it("declares where copilot's own user-scope settings file lives, for --scope user", () => {
+      const activation = copilot.capabilities.plugins.nativeActivation;
+      expect(activation?.userSettingsPath?.("/home/tester")).toBe(
+        "/home/tester/.copilot/settings.json"
+      );
+    });
+  });
 });

@@ -206,6 +206,11 @@ export const codex: AiTool<
         // there is no registry to reread — which is why `clean` proves this leftover
         // safe to remove by its own emptiness instead, never by a registry read.
         pluginCacheDir: (h) => join(h, ".codex", "plugins", "cache"),
+        // `$CODEX_HOME/config.toml` when set — a real codex binary reads there
+        // regardless of a relocated `HOME` (testing.md's own sandboxing gotcha) —
+        // falling back to `~/.codex/config.toml` otherwise. Never written by aidd;
+        // named here for a diagnostic alone.
+        userSettingsPath: (h) => join(process.env.CODEX_HOME || join(h, ".codex"), "config.toml"),
       },
     }),
   },

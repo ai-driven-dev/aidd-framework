@@ -123,6 +123,19 @@ export function frameworkBuildModeFor(toolId: ToolId): FrameworkBuildMode {
 }
 
 /**
+ * Whether `--scope user` has anywhere to point this tool at all: either it drives its
+ * own CLI machine-wide (`NativeActivation`, claude/codex/copilot), or it installs a
+ * plugin's files straight into a user-scope directory (`installScope: "user"`, cursor).
+ * `false` for a tool whose plugins capability declares neither — opencode today, whose
+ * flat mode has no user-scope directory to write into and no CLI to drive.
+ */
+export function supportsUserScopeActivation(toolId: ToolId): boolean {
+  const capability = resolvePluginsCapability(toolId);
+  if (capability === null) return false;
+  return capability.nativeActivation !== null || capability.installScope === "user";
+}
+
+/**
  * The tool's declared build contract for one framework-build mode, or undefined when
  * the tool does not support that mode (e.g. opencode has no marketplace mode). Read
  * from the profile so `runtime/wiring/framework.ts` can derive its build registry by iterating the
@@ -135,6 +148,19 @@ export function buildContractFor(
   const config = getToolConfig(toolId);
   if (config === undefined || !isAiTool(config)) return undefined;
   return config.buildContracts?.[mode];
+}
+
+/**
+ * A tool's own user-scope settings/registry file, absolute under `homedir` — never
+ * written by aidd, read only by `doctor --scope user`'s own display, which names it
+ * rather than diffing it. Declared here rather than guessed at the call site, the same
+ * reasoning `machineLocalFilesOf` already carries for the project-relative case. Empty
+ * for a tool whose profile declares no `NativeActivation.userSettingsPath` — opencode
+ * and cursor today.
+ */
+export function userMachineLocalFilesOf(toolId: ToolId, homedir: string): readonly string[] {
+  const path = nativeActivationOf(toolId)?.userSettingsPath?.(homedir);
+  return path === undefined ? [] : [path];
 }
 
 /**

@@ -54,11 +54,11 @@ export class NativePluginCliAdapter extends AbstractNativePluginCliAdapter {
     this.run(["plugin", "marketplace", verb], `marketplace ${verb}`);
   }
 
-  enablePlugin(pluginRef: string): void {
+  enablePlugin(pluginRef: string, scope: MarketplaceScope = "project"): void {
     const verb = this.shape.enableVerb;
     if (verb === undefined) return;
     this.run(
-      ["plugin", verb, pluginRef, ...(this.shape.pluginArgs ?? [])],
+      ["plugin", verb, pluginRef, ...(this.shape.pluginArgs ?? []), ...this.scopeArgsFor(scope)],
       `plugin ${verb} ${pluginRef}`
     );
   }
@@ -66,13 +66,13 @@ export class NativePluginCliAdapter extends AbstractNativePluginCliAdapter {
   /**
    * Undoes what `enablePlugin` did. The same trailing arguments travel here on purpose: a
    * tool that installed at one scope and uninstalls at its default would silently miss the
-   * entry it wrote.
+   * entry it wrote — `scope` must match what `enablePlugin` was called with.
    */
-  uninstallPlugin(pluginRef: string): void {
+  uninstallPlugin(pluginRef: string, scope: MarketplaceScope = "project"): void {
     const verb = this.shape.disableVerb;
     if (verb === undefined) return;
     this.run(
-      ["plugin", verb, pluginRef, ...(this.shape.pluginArgs ?? [])],
+      ["plugin", verb, pluginRef, ...(this.shape.pluginArgs ?? []), ...this.scopeArgsFor(scope)],
       `plugin ${verb} ${pluginRef}`
     );
   }

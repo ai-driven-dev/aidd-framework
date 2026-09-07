@@ -161,7 +161,7 @@ describe("syncing settings registers the plugin with the host's own CLI", () => 
       {
         tool: "claude",
         plugins: [{ name: PLUGIN, marketplace: MARKETPLACE }],
-        reading: { location: "/registry", refs: new Map([[REF, true]]) },
+        reading: { location: "/registry", refs: new Map([[REF, { enabled: true }]]) },
       },
     ]);
     expect(asked.entries[0]?.ref).toBe(activator.enabledPlugins[0]);
@@ -506,7 +506,7 @@ describe("what doctor tells a person to run becomes true once sync has run", () 
     async read(): Promise<HostPluginRegistryReading> {
       return {
         location: "/home/dev/.claude/plugins/installed_plugins.json",
-        refs: new Map(this.activator.enabledPlugins.map((ref) => [ref, true])),
+        refs: new Map(this.activator.enabledPlugins.map((ref) => [ref, { enabled: true }])),
       };
     }
   }

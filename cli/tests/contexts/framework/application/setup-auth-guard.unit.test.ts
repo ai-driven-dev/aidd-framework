@@ -12,6 +12,7 @@ import type { PluginInstallFromMarketplace } from "../../../../src/contexts/fram
 import { SetupMarketplaceSourceUseCase } from "../../../../src/contexts/framework/application/setup/setup-marketplace-source-use-case.js";
 import { SetupToolsUseCase } from "../../../../src/contexts/framework/application/setup/setup-tools-use-case.js";
 import { SetupUseCase } from "../../../../src/contexts/framework/application/setup-use-case.js";
+import { SetupMarketplaceRegistrationUseCase } from "../../../../src/contexts/framework/application/shared/setup-marketplace-registration-use-case.js";
 import { SetupFlow } from "../../../../src/contexts/framework/domain/setup-flow.js";
 import { CatalogFetchAuthError } from "../../../../src/kernel/errors.js";
 import type { PluginPick } from "../../../../src/presentation/prompts/plugin-pick-use-case.js";
@@ -103,21 +104,24 @@ async function buildSetupUseCase(tokenProvider: TokenProvider, isRepoPublic = fa
     new InMemoryMarketplaceRegistry(),
     makeNoOpResolveMarketplace()
   );
-  return new SetupUseCase(
+  const setupMarketplaceRegistration = new SetupMarketplaceRegistrationUseCase(
     deps.fs,
-    deps.manifestRepo,
     setupMarketplaceSourceUseCase,
     makeNoOpRegisterFramework(),
     makeNoOpRefresh(),
-    makeNoOpSyncSettings(),
-    setupToolsUseCase,
-    setupPluginsPromptUseCase,
     deps.currentVersionProvider,
     deps.logger,
     tokenProvider,
-    undefined,
-    undefined,
     makeReleaseResolver(isRepoPublic)
+  );
+  return new SetupUseCase(
+    deps.fs,
+    deps.manifestRepo,
+    setupMarketplaceRegistration,
+    makeNoOpSyncSettings(),
+    setupToolsUseCase,
+    setupPluginsPromptUseCase,
+    deps.currentVersionProvider
   );
 }
 

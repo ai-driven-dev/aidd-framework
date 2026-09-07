@@ -9,6 +9,7 @@ import type { PluginInstallFromMarketplace } from "../../../../src/contexts/fram
 import { SetupMarketplaceSourceUseCase } from "../../../../src/contexts/framework/application/setup/setup-marketplace-source-use-case.js";
 import { SetupToolsUseCase } from "../../../../src/contexts/framework/application/setup/setup-tools-use-case.js";
 import { SetupUseCase } from "../../../../src/contexts/framework/application/setup-use-case.js";
+import { SetupMarketplaceRegistrationUseCase } from "../../../../src/contexts/framework/application/shared/setup-marketplace-registration-use-case.js";
 import { SetupFlow } from "../../../../src/contexts/framework/domain/setup-flow.js";
 import type { ToolId } from "../../../../src/kernel/tool.js";
 import { SetupPluginsPromptUseCase } from "../../../../src/presentation/prompts/setup-plugins-prompt-use-case.js";
@@ -107,17 +108,22 @@ async function buildUseCaseWithConflict() {
     new Map([["claude", hostReader]])
   );
 
-  const useCase = new SetupUseCase(
+  const setupMarketplaceRegistration = new SetupMarketplaceRegistrationUseCase(
     deps.fs,
-    deps.manifestRepo,
     setupMarketplaceSourceUseCase,
     makeNoOpMarketplaceRegisterFramework(),
     makeNoOpMarketplaceRefresh(),
+    deps.currentVersionProvider,
+    deps.logger
+  );
+  const useCase = new SetupUseCase(
+    deps.fs,
+    deps.manifestRepo,
+    setupMarketplaceRegistration,
     marketplaceSyncSettingsUseCase,
     setupToolsUseCase,
     setupPluginsPromptUseCase,
-    deps.currentVersionProvider,
-    deps.logger
+    deps.currentVersionProvider
   );
   return { useCase, activator };
 }

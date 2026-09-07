@@ -1,23 +1,11 @@
-import { CatalogFetchAuthError } from "../../../kernel/errors.js";
+import { UserScopeUnavailableError } from "../../../kernel/errors.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";
-import type { Logger } from "../../../kernel/ports/logger.js";
 import type { VersionReader } from "../../../kernel/ports/version-reader.js";
-import type { PluginSource } from "../../../kernel/source.js";
 import type { AiToolId, IdeToolId } from "../../../kernel/tool.js";
 import type { SetupPluginsPromptUseCase } from "../../../presentation/prompts/setup-plugins-prompt-use-case.js";
 import type { SetupToolsPromptUseCase } from "../../../presentation/prompts/setup-tools-prompt-use-case.js";
-import type { TokenProvider } from "../../../runtime/auth/ports/token-provider.js";
-import type { LatestReleaseResolver } from "../../../runtime/self-update/latest-release-resolver.js";
-import type { MarketplaceRefresh } from "../../distribution/application/marketplace-refresh-use-case.js";
-import type {
-  MarketplaceRegisterFramework,
-  MarketplaceRegisterFrameworkOptions,
-} from "../../distribution/application/marketplace-register-framework-use-case.js";
-import { FRAMEWORK_MARKETPLACE_NAME } from "../../distribution/domain/marketplace.js";
-import type { MarketplaceSourceMode } from "../../distribution/domain/marketplace-source-mode.js";
 import type { ManifestRepository } from "../domain/ports/manifest-repository.js";
-import type { UserSourceReferences } from "../domain/ports/user-source-references.js";
 import type { ProjectContext } from "../domain/project-context.js";
 import type { SetupFlow } from "../domain/setup-flow.js";
 import type {
@@ -26,13 +14,9 @@ import type {
 } from "./flows/marketplace-sync-settings-use-case.js";
 import { InitUseCase } from "./init-use-case.js";
 import type { ProjectContextDetectorUseCase } from "./setup/project-context-detector-use-case.js";
-import type { SetupMarketplaceSourceUseCase } from "./setup/setup-marketplace-source-use-case.js";
+import type { SetupMachineScopeUseCase } from "./setup/setup-machine-scope-use-case.js";
 import type { SetupToolsResult, SetupToolsUseCase } from "./setup/setup-tools-use-case.js";
-import {
-  frameworkSourceIsShared,
-  resolveProjectRootForReferences,
-  toleratingUnreadableSourceReferences,
-} from "./shared/shared-source-reference-support.js";
+import type { SetupMarketplaceRegistrationUseCase } from "./shared/setup-marketplace-registration-use-case.js";
 
 export type SetupResult =
   | {
@@ -52,42 +36,38 @@ export class SetupUseCase {
   constructor(
     private readonly fs: FileReader & FileWriter,
     private readonly manifestRepo: ManifestRepository,
-    private readonly setupMarketplaceSourceUseCase: SetupMarketplaceSourceUseCase,
-    private readonly marketplaceRegisterFrameworkUseCase: MarketplaceRegisterFramework,
-    private readonly marketplaceRefreshUseCase: MarketplaceRefresh,
+    private readonly setupMarketplaceRegistration: SetupMarketplaceRegistrationUseCase,
     private readonly marketplaceSyncSettingsUseCase: MarketplaceSyncSettings,
     private readonly setupToolsUseCase: SetupToolsUseCase,
     private readonly setupPluginsPromptUseCase: SetupPluginsPromptUseCase,
     private readonly currentVersionProvider: VersionReader,
-    /** Warns when `references.json` cannot be made sense of — the same recovery this
-     * error already names, printed rather than left to abort `setup` for a file that
-     * gates nothing it depends on. */
-    private readonly logger: Logger,
-    private readonly tokenProvider?: TokenProvider,
     private readonly setupToolsPromptUseCase?: SetupToolsPromptUseCase,
     private readonly projectContextDetector?: ProjectContextDetectorUseCase,
-    private readonly releaseResolver?: LatestReleaseResolver,
-    /** The registry of projects referencing the shared machine-scope source — absent for
-     * every caller that predates it, which skips recording a reference rather than
-     * guessing one. */
-    private readonly userSourceReferences?: UserSourceReferences
+    /** Handles `flow.scope === "user"` entirely — absent for every caller that
+     * predates `--scope user`, in which case `execute` refuses a request it has
+     * nothing to serve. */
+    private readonly setupMachineScopeUseCase?: SetupMachineScopeUseCase
   ) {}
 
   async execute(flow: SetupFlow): Promise<SetupResult> {
+    if (flow.scope === "user") return this.runMachineScope(flow);
     const context = await this.detectContext(flow);
     // Resolved before initManifest: a non-interactive run with no --source must reject
     // before it ever writes .aidd/manifest.json or touches .gitignore, not after.
-    const source = flow.registerDefaultMarketplace ? await this.resolveSource(flow) : null;
+    const source = await this.setupMarketplaceRegistration.resolveSourceIfNeeded(flow);
     const isNew = await this.initManifest(flow);
-    if (source !== null) {
-      await this.guardRemoteAuth(source);
-      await this.registerMarketplace(flow, source);
-      await this.refreshCatalog(flow);
-    }
+    await this.setupMarketplaceRegistration.registerIfPresent(flow, source);
     const install = await this.installTools(flow, context);
     if (flow.registerDefaultMarketplace) await this.promptPlugins(flow);
     const activation = await this.syncSettings(flow);
     return this.buildResult(isNew, install, activation, context);
+  }
+
+  private async runMachineScope(flow: SetupFlow): Promise<SetupResult> {
+    if (this.setupMachineScopeUseCase === undefined) {
+      throw new UserScopeUnavailableError();
+    }
+    return this.setupMachineScopeUseCase.execute(flow);
   }
 
   private async detectContext(flow: SetupFlow): Promise<ProjectContext | undefined> {
@@ -99,14 +79,6 @@ export class SetupUseCase {
     return this.marketplaceSyncSettingsUseCase.execute({ projectRoot: flow.projectRoot });
   }
 
-  private async resolveSource(flow: SetupFlow): Promise<MarketplaceSourceMode> {
-    return this.setupMarketplaceSourceUseCase.execute({
-      projectRoot: flow.projectRoot,
-      sourceFromCli: flow.source,
-      interactive: flow.interactive,
-    });
-  }
-
   private async initManifest(flow: SetupFlow): Promise<boolean> {
     const existing = await this.manifestRepo.load();
     if (existing !== null) return false;
@@ -115,65 +87,6 @@ export class SetupUseCase {
       force: false,
     });
     return true;
-  }
-
-  // Auth is only required to fetch a PRIVATE framework. A token can reach either;
-  // without one, allow public repos through and gate only private/unreachable ones.
-  private async guardRemoteAuth(source: MarketplaceSourceMode): Promise<void> {
-    if (source.kind !== "remote") return;
-    if (this.tokenProvider === undefined) return;
-    const token = await this.tokenProvider.resolve();
-    if (token !== null) return;
-    if (
-      this.releaseResolver !== undefined &&
-      (await this.releaseResolver.isRepoPublic(source.repo))
-    ) {
-      return;
-    }
-    throw new CatalogFetchAuthError(`https://github.com/${source.repo}`);
-  }
-
-  private async registerMarketplace(flow: SetupFlow, source: MarketplaceSourceMode): Promise<void> {
-    const opts = this.buildRegisterOptions(flow, source);
-    const result = await this.marketplaceRegisterFrameworkUseCase.execute(opts);
-    // The same name-and-scope predicate `sync` and `clean` apply before touching
-    // `references.json` — `MarketplaceRegisterFrameworkUseCase` only ever registers
-    // the framework marketplace, so this is always true today, but a future change to
-    // that use case must not silently start writing a reference for a registration
-    // that is no longer the shared one.
-    if (frameworkSourceIsShared(FRAMEWORK_MARKETPLACE_NAME, result.scope)) {
-      await this.recordSharedSourceReference(flow.projectRoot);
-    }
-  }
-
-  // Written every time this runs, not only the first: another project on this machine
-  // may have registered the shared source before this one ever did, in which case this
-  // project's own reference is still missing until now.
-  private async recordSharedSourceReference(projectRoot: string): Promise<void> {
-    if (this.userSourceReferences === undefined) return;
-    const userSourceReferences = this.userSourceReferences;
-    await toleratingUnreadableSourceReferences(this.logger, undefined, async () => {
-      const resolvedRoot = await resolveProjectRootForReferences(this.fs, projectRoot);
-      await userSourceReferences.addReference(this.currentVersionProvider.get(), resolvedRoot);
-    });
-  }
-
-  private buildRegisterOptions(
-    flow: SetupFlow,
-    source: MarketplaceSourceMode
-  ): MarketplaceRegisterFrameworkOptions {
-    const pluginSource = this.toPluginSource(source);
-    return { projectRoot: flow.projectRoot, pluginSource, force: true };
-  }
-
-  private toPluginSource(source: MarketplaceSourceMode): PluginSource {
-    if (source.kind === "local") return { kind: "local", path: source.path };
-    return { kind: "github", repo: source.repo, ref: source.ref };
-  }
-
-  private async refreshCatalog(flow: SetupFlow): Promise<void> {
-    if (process.env.AIDD_SKIP_MARKETPLACE_REFRESH === "1") return;
-    await this.marketplaceRefreshUseCase.execute({ projectRoot: flow.projectRoot });
   }
 
   private async installTools(

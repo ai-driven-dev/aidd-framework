@@ -1,5 +1,6 @@
 import type { NativePluginActivator } from "../../../src/contexts/tools/domain/ports/native-plugin-activator.js";
 import { NativePluginCliError } from "../../../src/kernel/errors.js";
+import type { MarketplaceScope } from "../../../src/kernel/scope.js";
 
 /**
  * Records native plugin CLI activation calls instead of shelling out.
@@ -12,6 +13,10 @@ import { NativePluginCliError } from "../../../src/kernel/errors.js";
  * i.e. an `add` that failed for a reason other than a different-source conflict).
  * `failOnUninstall` makes `uninstallPlugin` throw for the listed refs (simulates the
  * plugin already being absent from the tool's own registry).
+ * `installedAtScope` makes `uninstallPlugin` throw for a ref whose recorded scope
+ * disagrees with the one the call carries — a real `claude` binary refuses a
+ * mismatched-scope uninstall outright (measured; see `native-plugin-activator.ts`),
+ * rather than silently missing an entry it wrote at a different scope.
  * `crashOnAddMarketplace` makes `addMarketplace` throw a plain `Error` rather than a
  * `NativePluginCliError` — the one failure shape a real adapter never produces (every
  * throw in `AbstractNativePluginCliAdapter.run` is that class), used to simulate a bug
@@ -24,6 +29,11 @@ export class FakeNativePluginActivator implements NativePluginActivator {
   readonly forcedRemovals: boolean[] = [];
   readonly enabledPlugins: string[] = [];
   readonly uninstalledPlugins: string[] = [];
+  /** The scope each `enablePlugin`/`uninstallPlugin` call actually carried, in call
+   * order — for a test that cares which scope was requested, never guessed from the
+   * ref alone. */
+  readonly enabledPluginScopes: MarketplaceScope[] = [];
+  readonly uninstalledPluginScopes: MarketplaceScope[] = [];
   upgradeCount = 0;
   private readonly failOnPlugins: ReadonlySet<string>;
   private readonly conflictOnAdd: boolean;
@@ -32,6 +42,7 @@ export class FakeNativePluginActivator implements NativePluginActivator {
   private readonly state: "live" | "dead" | "unknown";
   private readonly failOnUninstall: ReadonlySet<string>;
   private readonly crashOnAddMarketplace: boolean;
+  private readonly installedAtScope: ReadonlyMap<string, MarketplaceScope>;
 
   constructor(
     options: {
@@ -45,6 +56,7 @@ export class FakeNativePluginActivator implements NativePluginActivator {
       registrationState?: "live" | "dead" | "unknown";
       failOnUninstall?: readonly string[];
       crashOnAddMarketplace?: boolean;
+      installedAtScope?: ReadonlyMap<string, MarketplaceScope>;
     } = {}
   ) {
     this.available = options.available ?? false;
@@ -55,6 +67,7 @@ export class FakeNativePluginActivator implements NativePluginActivator {
     this.state = options.registrationState ?? "unknown";
     this.failOnUninstall = new Set(options.failOnUninstall ?? []);
     this.crashOnAddMarketplace = options.crashOnAddMarketplace ?? false;
+    this.installedAtScope = options.installedAtScope ?? new Map();
   }
 
   registrationState(): "live" | "dead" | "unknown" {
@@ -95,16 +108,24 @@ export class FakeNativePluginActivator implements NativePluginActivator {
     this.upgradeCount += 1;
   }
 
-  enablePlugin(pluginRef: string): void {
+  enablePlugin(pluginRef: string, scope: MarketplaceScope = "project"): void {
+    this.enabledPluginScopes.push(scope);
     if (this.failOnPlugins.has(pluginRef)) {
       throw new NativePluginCliError(`plugin \`${pluginRef}\` was not found in marketplace`);
     }
     this.enabledPlugins.push(pluginRef);
   }
 
-  uninstallPlugin(pluginRef: string): void {
+  uninstallPlugin(pluginRef: string, scope: MarketplaceScope = "project"): void {
+    this.uninstalledPluginScopes.push(scope);
     if (this.failOnUninstall.has(pluginRef)) {
       throw new NativePluginCliError(`plugin \`${pluginRef}\` is not installed`);
+    }
+    const installedScope = this.installedAtScope.get(pluginRef);
+    if (installedScope !== undefined && installedScope !== scope) {
+      throw new NativePluginCliError(
+        `plugin \`${pluginRef}\` is not installed at scope '${scope}'`
+      );
     }
     this.uninstalledPlugins.push(pluginRef);
   }

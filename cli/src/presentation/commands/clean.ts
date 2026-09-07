@@ -9,6 +9,9 @@ export function registerCleanCommand(program: Command): void {
     .description(
       "Remove all AIDD-managed files from the project — retires every part of AIDD; see `framework remove`, which removes the framework only"
     )
+    // No `--scope user` yet, unlike `setup`/`doctor`/`sync`: purging the shared,
+    // machine-scope source and its user manifest needs a whitelist-checked delete
+    // under the user's home directory this command does not have yet — lot 5.
     .option("--force", "Confirm file removal (skip dry-run)", false)
     .action(async (cmdOptions: { force: boolean }) => {
       const { verbose, output, projectRoot } = parseGlobalOptions(program);

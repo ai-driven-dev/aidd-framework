@@ -18,6 +18,7 @@ import {
   journalHostToAiToolId,
   machineLocalFilesOf,
   projectHooksFileOf,
+  userMachineLocalFilesOf,
 } from "../../../../src/contexts/tools/domain/registry.js";
 import {
   buildTargetModesOf,
@@ -392,6 +393,18 @@ describe("machineLocalFilesOf()", () => {
   // builds from it. `projectHooksFileOf` carries that file instead.
   it("does not carry cursor's project hooks file", () => {
     expect(machineLocalFilesOf("cursor")).not.toContain(".cursor/hooks.json");
+  });
+});
+
+describe("userMachineLocalFilesOf()", () => {
+  it("returns claude's user-scope settings file, absolute under the given homedir", () => {
+    expect(userMachineLocalFilesOf("claude", "/home/tester")).toEqual([
+      "/home/tester/.claude/settings.json",
+    ]);
+  });
+
+  it("returns nothing for a tool whose profile declares no userSettingsPath", () => {
+    expect(userMachineLocalFilesOf("cursor", "/home/tester")).toEqual([]);
   });
 });
 

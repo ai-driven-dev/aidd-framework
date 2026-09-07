@@ -76,4 +76,61 @@ describe("E2E: sync recreates a machine-scope registration a fresh clone never c
       await clone.cleanup();
     }
   });
+
+  it("a second project's own setup on a machine that already registered the source adds its own reference, never replacing the first", async () => {
+    const first = await createTestEnv("machine-scope-shared-home-first");
+    const second = await createTestEnv("machine-scope-shared-home-second");
+    try {
+      // Both projects share one machine — one `fakeHome`, never `second.fakeHome` — so
+      // the second project's own `setup` finds the shared source already registered by
+      // the first, the case a fresh `references.json` reference count must still see as
+      // two, not as one project silently replacing the other's claim.
+      const firstSetup = await runCli(
+        [
+          "setup",
+          "--source",
+          "local",
+          "--path",
+          FRAMEWORK_REAL_PATH,
+          "--ai",
+          "claude",
+          "--plugins",
+          "none",
+          "--yes",
+        ],
+        first.projectDir,
+        first.fakeHome
+      );
+      expect(firstSetup.exitCode).toBe(0);
+
+      const secondSetup = await runCli(
+        [
+          "setup",
+          "--source",
+          "local",
+          "--path",
+          FRAMEWORK_REAL_PATH,
+          "--ai",
+          "claude",
+          "--plugins",
+          "none",
+          "--yes",
+        ],
+        second.projectDir,
+        first.fakeHome
+      );
+      expect(secondSetup.exitCode).toBe(0);
+
+      const references = await readJson(join(first.fakeHome, ".config", "aidd", "references.json"));
+      const allProjectRoots = Object.values(references).flat() as string[];
+      const firstRoot = await realpath(first.projectDir);
+      const secondRoot = await realpath(second.projectDir);
+      expect(allProjectRoots).toContain(firstRoot);
+      expect(allProjectRoots).toContain(secondRoot);
+      expect(allProjectRoots).toHaveLength(2);
+    } finally {
+      await first.cleanup();
+      await second.cleanup();
+    }
+  });
 });

@@ -58,6 +58,16 @@ const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 // carried (a `git worktree` for that one number was judged not worth the added git state
 // against the no-stash rule this pass runs under). 610 leaves ~2.0 % headroom over the
 // measured 597.95 KB.
+// 625 was set 2026-09-07 when `--scope user` landed on `setup`, `doctor` and `sync`: a
+// user-scope manifest repository, the per-tool scope threaded through native plugin
+// enable/uninstall, and the three commands' own `--scope` option and branch. Measured
+// 612.56 KB — this raise covers two lots' own delta together, not one: 610 was set at
+// `ed3963fe`, before the machine-scope-migration commit (`073863be`) 610's own entry
+// describes ever landed, so the 610 -> 625 gap is the sum of that lot's 597.95 KB and
+// this one's 612.56 KB, never this lot's own delta in isolation. No control build
+// separates the two, for the same reason 610's own entry gives; a future raise from
+// 625 is the number to measure a next lot's own delta against. 625 leaves ~2.0 %
+// headroom over the measured 612.56 KB.
 const budgetKB = pkg.bundleBudgetKB ?? 500;
 const budgetBytes = budgetKB * 1024;
 

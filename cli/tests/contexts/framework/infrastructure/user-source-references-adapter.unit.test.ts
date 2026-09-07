@@ -167,4 +167,14 @@ describe("the shared source's own project references", () => {
       UnreadableUserSourceReferencesError
     );
   });
+
+  it("throws when a version's own entry is not a list of project paths", async () => {
+    const fs = new InMemoryFileAdapter();
+    fs.setFile(REFERENCES_PATH, JSON.stringify({ "1.0.0": "/project-a" }));
+    const refs = adapter(fs);
+
+    await expect(refs.countReferencesForProject("/project-a")).rejects.toThrow(
+      UnreadableUserSourceReferencesError
+    );
+  });
 });

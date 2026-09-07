@@ -10,7 +10,10 @@ function evidence(overrides: Partial<HostRegistrationEvidence> = {}): HostRegist
   return {
     tool: "claude",
     plugins: [{ name: "aidd-telemetry", marketplace: "aidd-framework" }],
-    reading: { location: REGISTRY, refs: new Map([["aidd-telemetry@aidd-framework", true]]) },
+    reading: {
+      location: REGISTRY,
+      refs: new Map([["aidd-telemetry@aidd-framework", { enabled: true }]]),
+    },
     ...overrides,
   };
 }
@@ -41,7 +44,7 @@ describe("what a host's own registry says about a plugin AIDD installed", () => 
   it("tells a disabled registration from an absent one", () => {
     const reading = {
       location: REGISTRY,
-      refs: new Map([["aidd-telemetry@aidd-framework", false]]),
+      refs: new Map([["aidd-telemetry@aidd-framework", { enabled: false }]]),
     };
 
     expect(only(evidence({ reading })).answer).toBe("registered-disabled");

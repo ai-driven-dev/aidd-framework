@@ -1,5 +1,8 @@
 import type { AiToolId } from "../../../kernel/tool.js";
-import type { HostPluginRegistryReading } from "./ports/host-plugin-registry-reader.js";
+import type {
+  HostPluginRegistryEntry,
+  HostPluginRegistryReading,
+} from "./ports/host-plugin-registry-reader.js";
 
 /**
  * Whether a host will actually load a plugin AIDD installed for it — the comparison
@@ -125,14 +128,14 @@ function answerForRef(
 ): { answer: HostRegistrationAnswer; detail: string } {
   const answered = answeredRegistry(tool, reading, declaresNativeActivation);
   if ("detail" in answered) return answered;
-  const enabled = answered.refs.get(ref);
-  if (enabled === undefined) {
+  const entry = answered.refs.get(ref);
+  if (entry === undefined) {
     return {
       answer: "not-registered",
       detail: `${answered.location} does not carry ${ref} — ${tool} will drop the declaration as orphaned`,
     };
   }
-  if (!enabled) {
+  if (!entry.enabled) {
     return {
       answer: "registered-disabled",
       detail: `${answered.location} carries ${ref} and records it disabled`,
@@ -160,7 +163,7 @@ export function answeredRegistry(
   reading: HostPluginRegistryReading | undefined,
   declaresNativeActivation: boolean | undefined
 ):
-  | { readonly refs: ReadonlyMap<string, boolean>; readonly location: string }
+  | { readonly refs: ReadonlyMap<string, HostPluginRegistryEntry>; readonly location: string }
   | { readonly answer: "unanswerable"; readonly detail: string } {
   if (reading === undefined) {
     return {

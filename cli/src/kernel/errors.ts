@@ -458,6 +458,69 @@ export class InvalidSetupToolIdError extends Error {
   }
 }
 
+export class UserScopeUnavailableError extends Error {
+  constructor() {
+    super(
+      "--scope user is not wired for this command yet — no user-scope manifest " +
+        "repository was provided at construction."
+    );
+    this.name = "UserScopeUnavailableError";
+  }
+}
+
+export class UserScopeIdeToolsError extends Error {
+  constructor(ideTools: readonly string[]) {
+    super(
+      `--scope user installs no project files, so an IDE tool (${ideTools.join(", ")}) has ` +
+        "nothing to install at user scope. Drop --ide, or run `aidd setup --ide <ids>` " +
+        "separately at project scope."
+    );
+    this.name = "UserScopeIdeToolsError";
+  }
+}
+
+export class UserScopeUnsupportedAiToolsError extends Error {
+  constructor(aiTools: readonly string[]) {
+    super(
+      `--scope user drives native activation machine-wide, and ${aiTools.join(", ")} declares ` +
+        "no user-scope settings this CLI can point at. Drop it from --ai, or run " +
+        "`aidd setup --ai <ids>` separately at project scope."
+    );
+    this.name = "UserScopeUnsupportedAiToolsError";
+  }
+}
+
+export class UserScopeNoToolsError extends Error {
+  constructor() {
+    super(
+      "--scope user with no --ai registers the shared source for no tool at all. Pass " +
+        "`--ai <ids>` naming which tool to activate machine-wide."
+    );
+    this.name = "UserScopeNoToolsError";
+  }
+}
+
+export class UserScopePluginModeError extends Error {
+  constructor() {
+    super(
+      "--scope user has no manifest entry a plugin can be recorded against yet, so " +
+        "--plugins has nothing to enable. Drop --plugins, or run `aidd plugin install` " +
+        "separately at project scope."
+    );
+    this.name = "UserScopePluginModeError";
+  }
+}
+
+export class UserScopeFilterUnsupportedError extends Error {
+  constructor(flag: string, command: string) {
+    super(
+      `--scope user tracks nothing ${flag} can narrow — it names every requested tool, ` +
+        `not one plugin or one file. Drop ${flag}, or run \`aidd ${command}\` at project scope.`
+    );
+    this.name = "UserScopeFilterUnsupportedError";
+  }
+}
+
 export class InvalidPluginModeConfigError extends Error {
   constructor(message: string) {
     super(message);

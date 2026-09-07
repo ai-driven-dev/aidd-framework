@@ -13,9 +13,10 @@ import { InstalledPlugin } from "../../../../src/contexts/framework/domain/plugi
 import { UserSourceReferencesAdapter } from "../../../../src/contexts/framework/infrastructure/user-source-references-adapter.js";
 import { cursorProjectHooksScriptDir } from "../../../../src/contexts/tools/domain/formats/cursor-hooks-project-merge.js";
 import type { NativePluginActivator } from "../../../../src/contexts/tools/domain/ports/native-plugin-activator.js";
-import type { ToolId } from "../../../../src/kernel/tool.js";
+import type { AiToolId, ToolId } from "../../../../src/kernel/tool.js";
 import { buildUnitDeps, initAndInstall } from "../../../helpers/ports/build-unit-deps.js";
 import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
+import { FakeHostPluginRegistryReader } from "../../../helpers/ports/fake-host-plugin-registry-reader.js";
 import { FakeNativePluginActivator } from "../../../helpers/ports/fake-native-plugin-activator.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryManifestRepository } from "../../../helpers/ports/in-memory-manifest-repository.js";
@@ -377,6 +378,115 @@ describe("clean", () => {
       expect(message).toBeDefined();
       expect(message).toContain("userConfigDir()/marketplaces.json");
       expect(message).toContain(join(HOME, ".codex", "plugins", "cache", MARKETPLACE));
+    });
+
+    describe("uninstalling at the scope a plugin was actually registered at", () => {
+      const CLAUDE_BINARY = "claude";
+      const CLAUDE_MARKETPLACE = "aidd-framework";
+      const CLAUDE_REF = "aidd-context@aidd-framework";
+
+      function seedClaudeManifest(pluginScope: "project" | "user"): Manifest {
+        const manifest = Manifest.create();
+        manifest.addTool("claude", "1.0.0", []);
+        manifest.addPlugin(
+          "claude",
+          InstalledPlugin.fromMetadata(
+            "aidd-context",
+            "1.0.0",
+            { kind: "github", repo: "ai-driven-dev/framework" },
+            true,
+            pluginScope,
+            CLAUDE_MARKETPLACE
+          )
+        );
+        manifest.setNativeRegistrations("claude", {
+          binary: CLAUDE_BINARY,
+          marketplaces: [{ alias: CLAUDE_MARKETPLACE, hostName: CLAUDE_MARKETPLACE }],
+          pluginRefs: [CLAUDE_REF],
+        });
+        return manifest;
+      }
+
+      function seedClaudeMarketplaceRegistry(): InMemoryMarketplaceRegistry {
+        const registry = new InMemoryMarketplaceRegistry();
+        registry.save(
+          PROJECT_ROOT,
+          Marketplace.create({
+            name: CLAUDE_MARKETPLACE,
+            source: { kind: "local", path: "/some/built/path" },
+            scope: "project",
+            addedAt: "2026-01-01T00:00:00.000Z",
+          })
+        );
+        return registry;
+      }
+
+      // The regression itself: before scope threading existed, `enablePlugin` carried
+      // no scope argument at all, so a real `claude` binary always registered at its
+      // own implicit default, `"user"`, regardless of what the manifest recorded for
+      // the plugin's own files (`"project"`, since claude's files always install to
+      // the project). `clean`'s default-scope uninstall used to try `"project"` only,
+      // which a real `claude` binary refuses outright for an entry registered at a
+      // different scope — the plugin survived every `clean` run silently.
+      it("falls back to the other scope when the manifest's own scope does not match what was actually registered, with no host registry to ask", async () => {
+        const manifest = seedClaudeManifest("project");
+        const fs = new InMemoryFileAdapter();
+        const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+        const activator = new FakeNativePluginActivator({
+          available: true,
+          installedAtScope: new Map([[CLAUDE_REF, "user"]]),
+        });
+        const useCase = new CleanUseCase(
+          fs,
+          manifestRepo,
+          new CapturingLogger(),
+          new GitignoreUseCase(fs),
+          new Map([[CLAUDE_BINARY, activator]]),
+          seedClaudeMarketplaceRegistry()
+        );
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(activator.uninstalledPlugins).toEqual([CLAUDE_REF]);
+        expect(activator.uninstalledPluginScopes).toEqual(["project", "user"]);
+      });
+
+      it("uninstalls at the scope the host's own registry names directly, one attempt, when it answers for this ref", async () => {
+        const manifest = seedClaudeManifest("project");
+        const fs = new InMemoryFileAdapter();
+        const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+        const activator = new FakeNativePluginActivator({
+          available: true,
+          installedAtScope: new Map([[CLAUDE_REF, "user"]]),
+        });
+        const hostPluginRegistries = new Map<AiToolId, FakeHostPluginRegistryReader>([
+          [
+            "claude",
+            new FakeHostPluginRegistryReader({
+              location: "/registry",
+              refs: new Map([[CLAUDE_REF, { enabled: true, scope: "user" }]]),
+            }),
+          ],
+        ]);
+        const useCase = new CleanUseCase(
+          fs,
+          manifestRepo,
+          new CapturingLogger(),
+          new GitignoreUseCase(fs),
+          new Map([[CLAUDE_BINARY, activator]]),
+          seedClaudeMarketplaceRegistry(),
+          undefined,
+          new Map(),
+          undefined,
+          undefined,
+          hostPluginRegistries
+        );
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(activator.uninstalledPlugins).toEqual([CLAUDE_REF]);
+        expect(activator.uninstalledPluginScopes).toEqual(["user"]);
+      });
     });
 
     describe("this project's own reference to the shared source", () => {

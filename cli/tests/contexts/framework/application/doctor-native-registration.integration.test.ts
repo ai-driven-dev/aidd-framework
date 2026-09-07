@@ -61,8 +61,8 @@ describe("doctor represents what claude's own registry answers", () => {
         new FakeHostPluginRegistryReader({
           location: REGISTRY_LOCATION,
           refs: new Map([
-            [CONTEXT_REF, true],
-            [DEV_REF, true],
+            [CONTEXT_REF, { enabled: true }],
+            [DEV_REF, { enabled: true }],
           ]),
         }),
       ],

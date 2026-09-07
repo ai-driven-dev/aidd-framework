@@ -52,8 +52,11 @@ describe("Claude Code's own installed_plugins.json", () => {
 
     const reading = await readerFor("claude").read(PROJECT);
 
-    expect(reading.refs?.get("aidd-telemetry@aidd-framework")).toBe(true);
-    expect(reading.refs?.get("aidd-dev@aidd-framework")).toBe(true);
+    expect(reading.refs?.get("aidd-telemetry@aidd-framework")).toEqual({
+      enabled: true,
+      scope: "project",
+    });
+    expect(reading.refs?.get("aidd-dev@aidd-framework")).toEqual({ enabled: true, scope: "user" });
   });
 
   /**
@@ -183,8 +186,8 @@ describe("Codex's own config.toml", () => {
 
     const reading = await readerFor("codex").read(PROJECT);
 
-    expect(reading.refs?.get("aidd-telemetry@aidd-framework")).toBe(true);
-    expect(reading.refs?.get("aidd-dev@aidd-framework")).toBe(false);
+    expect(reading.refs?.get("aidd-telemetry@aidd-framework")).toEqual({ enabled: true });
+    expect(reading.refs?.get("aidd-dev@aidd-framework")).toEqual({ enabled: false });
     expect(reading.refs?.size).toBe(2);
   });
 
@@ -200,7 +203,7 @@ describe("Codex's own config.toml", () => {
 
     expect(
       (await readerFor("codex").read(PROJECT)).refs?.get("aidd-telemetry@aidd-framework")
-    ).toBe(true);
+    ).toEqual({ enabled: true });
   });
 
   /**
@@ -219,7 +222,7 @@ describe("Codex's own config.toml", () => {
 
     expect(
       (await readerFor("codex").read(PROJECT)).refs?.get("aidd-telemetry@aidd-framework")
-    ).toBe(false);
+    ).toEqual({ enabled: false });
   });
 
   // The mirror failure: a header carrying its own trailing comment matched nothing, so a
@@ -232,7 +235,7 @@ describe("Codex's own config.toml", () => {
 
     expect(
       (await readerFor("codex").read(PROJECT)).refs?.get("aidd-telemetry@aidd-framework")
-    ).toBe(true);
+    ).toEqual({ enabled: true });
   });
 
   /**
@@ -256,7 +259,7 @@ describe("Codex's own config.toml", () => {
 
     expect(
       (await readerFor("codex").read(PROJECT)).refs?.get("aidd-telemetry@aidd-framework")
-    ).toBe(false);
+    ).toEqual({ enabled: false });
   });
 
   // A string that opens and closes on one line leaves the scanner outside it, so the tables
@@ -269,7 +272,7 @@ describe("Codex's own config.toml", () => {
 
     expect(
       (await readerFor("codex").read(PROJECT)).refs?.get("aidd-telemetry@aidd-framework")
-    ).toBe(false);
+    ).toEqual({ enabled: false });
   });
 
   // `enabled` belongs to the table it sits under, never to the one before it.
@@ -278,8 +281,8 @@ describe("Codex's own config.toml", () => {
 
     const refs = (await readerFor("codex").read(PROJECT)).refs;
 
-    expect(refs?.get("a@m")).toBe(true);
-    expect(refs?.get("b@m")).toBe(false);
+    expect(refs?.get("a@m")).toEqual({ enabled: true });
+    expect(refs?.get("b@m")).toEqual({ enabled: false });
   });
 
   it("says it could not read an absent config, and carries no refs", async () => {
@@ -310,7 +313,7 @@ describe("Copilot's own settings.json", () => {
 
     expect(
       (await readerFor("copilot").read(PROJECT)).refs?.get("aidd-telemetry@aidd-framework")
-    ).toBe(true);
+    ).toEqual({ enabled: true });
   });
 
   // `copilot plugin uninstall` writes `false` and keeps the key — measured, and it makes
@@ -323,7 +326,7 @@ describe("Copilot's own settings.json", () => {
 
     expect(
       (await readerFor("copilot").read(PROJECT)).refs?.get("aidd-telemetry@aidd-framework")
-    ).toBe(false);
+    ).toEqual({ enabled: false });
   });
 
   // A settings file exists from the first `copilot` run and gains `enabledPlugins` only on

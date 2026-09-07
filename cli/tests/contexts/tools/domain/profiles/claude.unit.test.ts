@@ -141,5 +141,12 @@ describe("claude", () => {
         join("/home/tester", ".claude", "plugins", "cache")
       );
     });
+
+    it("declares where claude's own user-scope settings file lives, for --scope user", () => {
+      const activation = claude.capabilities.plugins.nativeActivation;
+      expect(activation?.userSettingsPath?.("/home/tester")).toBe(
+        join("/home/tester", ".claude", "settings.json")
+      );
+    });
   });
 });

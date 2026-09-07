@@ -11,9 +11,12 @@ import {
 import { MarketplaceSourceMode } from "../../../../src/contexts/distribution/domain/marketplace-source-mode.js";
 import type { MarketplaceSyncSettings } from "../../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
 import type { PluginInstallFromMarketplace } from "../../../../src/contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.js";
+import { SetupMachineScopeUseCase } from "../../../../src/contexts/framework/application/setup/setup-machine-scope-use-case.js";
 import { SetupMarketplaceSourceUseCase } from "../../../../src/contexts/framework/application/setup/setup-marketplace-source-use-case.js";
 import { SetupToolsUseCase } from "../../../../src/contexts/framework/application/setup/setup-tools-use-case.js";
 import { SetupUseCase } from "../../../../src/contexts/framework/application/setup-use-case.js";
+import { SetupMarketplaceRegistrationUseCase } from "../../../../src/contexts/framework/application/shared/setup-marketplace-registration-use-case.js";
+import type { ManifestRepository } from "../../../../src/contexts/framework/domain/ports/manifest-repository.js";
 import type { UserSourceReferences } from "../../../../src/contexts/framework/domain/ports/user-source-references.js";
 import { SetupFlow } from "../../../../src/contexts/framework/domain/setup-flow.js";
 import { UserSourceReferencesAdapter } from "../../../../src/contexts/framework/infrastructure/user-source-references-adapter.js";
@@ -31,6 +34,7 @@ import {
 } from "../../../helpers/ports/build-unit-deps.js";
 import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
+import { InMemoryManifestRepository } from "../../../helpers/ports/in-memory-manifest-repository.js";
 import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-marketplace-registry.js";
 import { OverwritePrompter, ScriptedPrompter } from "../../../helpers/ports/scripted-prompter.js";
 
@@ -116,7 +120,13 @@ function makeRecordingUserSourceReferences(): UserSourceReferences & {
 async function buildUseCase(
   setupToolsPromptUseCase?: SetupToolsPromptUseCase,
   userSourceReferences?: UserSourceReferences,
-  logger?: Logger
+  logger?: Logger,
+  options?: {
+    userManifestRepo?: ManifestRepository;
+    marketplaceSyncSettingsUseCase?: MarketplaceSyncSettings & {
+      execute: ReturnType<typeof vi.fn>;
+    };
+  }
 ) {
   const deps = await buildUnitDeps(PROJECT_ROOT);
   const prompter = new OverwritePrompter();
@@ -137,27 +147,52 @@ async function buildUseCase(
   );
   const marketplaceRegisterFramework = makeNoOpMarketplaceRegisterFramework();
   const marketplaceRefresh = makeNoOpMarketplaceRefresh();
-  const useCase = new SetupUseCase(
+  const marketplaceSyncSettingsUseCase =
+    options?.marketplaceSyncSettingsUseCase ?? makeNoOpMarketplaceSyncSettings();
+  const setupMarketplaceRegistration = new SetupMarketplaceRegistrationUseCase(
     deps.fs,
-    deps.manifestRepo,
     setupMarketplaceSourceUseCase,
     marketplaceRegisterFramework,
     marketplaceRefresh,
-    makeNoOpMarketplaceSyncSettings(),
-    setupToolsUseCase,
-    setupPluginsPromptUseCase,
     deps.currentVersionProvider,
     logger ?? deps.logger,
-    undefined,
-    setupToolsPromptUseCase,
     undefined,
     undefined,
     userSourceReferences
   );
-  return { useCase, deps, marketplaceRegisterFramework, marketplaceRefresh };
+  const setupMachineScopeUseCase =
+    options?.userManifestRepo === undefined
+      ? undefined
+      : new SetupMachineScopeUseCase(
+          options.userManifestRepo,
+          setupMarketplaceRegistration,
+          marketplaceSyncSettingsUseCase,
+          deps.currentVersionProvider
+        );
+  const useCase = new SetupUseCase(
+    deps.fs,
+    deps.manifestRepo,
+    setupMarketplaceRegistration,
+    marketplaceSyncSettingsUseCase,
+    setupToolsUseCase,
+    setupPluginsPromptUseCase,
+    deps.currentVersionProvider,
+    setupToolsPromptUseCase,
+    undefined,
+    setupMachineScopeUseCase
+  );
+  return {
+    useCase,
+    deps,
+    marketplaceRegisterFramework,
+    marketplaceRefresh,
+    marketplaceSyncSettingsUseCase,
+  };
 }
 
-function remoteFlow(opts: Partial<{ aiTools: ToolId[]; ideTools: ToolId[] }> = {}): SetupFlow {
+function remoteFlow(
+  opts: Partial<{ aiTools: ToolId[]; ideTools: ToolId[]; scope: "project" | "user" }> = {}
+): SetupFlow {
   return new SetupFlow({
     projectRoot: PROJECT_ROOT,
     source: MarketplaceSourceMode.remote(),
@@ -165,6 +200,7 @@ function remoteFlow(opts: Partial<{ aiTools: ToolId[]; ideTools: ToolId[] }> = {
     ideTools: opts.ideTools ?? [],
     pluginMode: "none",
     interactive: false,
+    scope: opts.scope,
   });
 }
 
@@ -462,5 +498,71 @@ describe("setup interactive tool selection", () => {
     if (result.kind === "initialized") {
       expect(result.install.results).toHaveLength(0);
     }
+  });
+});
+
+describe("setup --scope user", () => {
+  it("writes nothing at all under projectRoot — full directory delta, not a list", async () => {
+    const userManifestRepo = new InMemoryManifestRepository();
+    const { useCase, deps } = await buildUseCase(undefined, undefined, undefined, {
+      userManifestRepo,
+    });
+
+    await useCase.execute(remoteFlow({ aiTools: ["claude" as ToolId], scope: "user" }));
+
+    expect(deps.fs.listUnder(PROJECT_ROOT)).toEqual([]);
+  });
+
+  it("writes the user manifest, never this project's own .aidd/manifest.json", async () => {
+    const userManifestRepo = new InMemoryManifestRepository();
+    const { useCase, deps } = await buildUseCase(undefined, undefined, undefined, {
+      userManifestRepo,
+    });
+
+    await useCase.execute(remoteFlow({ aiTools: ["claude" as ToolId], scope: "user" }));
+
+    expect(userManifestRepo.getCurrent()?.getInstalledToolIds()).toContain("claude");
+    expect(await deps.manifestRepo.load()).toBeNull();
+  });
+
+  it("calls marketplace sync settings with scope user and the user manifest repo", async () => {
+    const userManifestRepo = new InMemoryManifestRepository();
+    const marketplaceSyncSettingsUseCase =
+      makeNoOpMarketplaceSyncSettings() as MarketplaceSyncSettings & {
+        execute: ReturnType<typeof vi.fn>;
+      };
+    const { useCase } = await buildUseCase(undefined, undefined, undefined, {
+      userManifestRepo,
+      marketplaceSyncSettingsUseCase,
+    });
+
+    await useCase.execute(remoteFlow({ aiTools: ["claude" as ToolId], scope: "user" }));
+
+    expect(marketplaceSyncSettingsUseCase.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: "user", manifestRepo: userManifestRepo })
+    );
+  });
+
+  it("never installs framework files nor prompts for plugins — no project delivery at all", async () => {
+    const userManifestRepo = new InMemoryManifestRepository();
+    const { useCase } = await buildUseCase(undefined, undefined, undefined, { userManifestRepo });
+
+    const result = await useCase.execute(
+      remoteFlow({ aiTools: ["claude" as ToolId], scope: "user" })
+    );
+
+    expect(result.install.results).toEqual([]);
+  });
+
+  it("records no shared-source reference — there is no project-scope manifest for a later clean to ever decrement", async () => {
+    const userManifestRepo = new InMemoryManifestRepository();
+    const userSourceReferences = makeRecordingUserSourceReferences();
+    const { useCase } = await buildUseCase(undefined, userSourceReferences, undefined, {
+      userManifestRepo,
+    });
+
+    await useCase.execute(remoteFlow({ aiTools: ["claude" as ToolId], scope: "user" }));
+
+    expect(userSourceReferences.added).toEqual([]);
   });
 });

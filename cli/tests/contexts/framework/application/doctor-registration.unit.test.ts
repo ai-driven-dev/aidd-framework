@@ -160,7 +160,7 @@ describe("DoctorRegistrationUseCase — native registrations against the host's 
   it("says nothing when the registry carries the expected ref, enabled", async () => {
     const issues = await nativeIssuesFor(manifestWithNativeRegistrations([REF]), {
       location: REGISTRY_LOCATION,
-      refs: new Map([[REF, true]]),
+      refs: new Map([[REF, { enabled: true }]]),
     });
 
     expect(issues).toEqual([]);
@@ -182,7 +182,7 @@ describe("DoctorRegistrationUseCase — native registrations against the host's 
   it("reports an error naming `aidd framework install --tool claude` when the registry disabled it", async () => {
     const issues = await nativeIssuesFor(manifestWithNativeRegistrations([REF]), {
       location: REGISTRY_LOCATION,
-      refs: new Map([[REF, false]]),
+      refs: new Map([[REF, { enabled: false }]]),
     });
 
     expect(issues).toHaveLength(1);

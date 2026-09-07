@@ -6,6 +6,7 @@ import {
   pathsOverlap,
   samePathSegment,
   userBuiltMarketplaceDir,
+  userManifestPath,
 } from "../../../../src/kernel/paths.js";
 
 // A build refuses to write into the tree it reads from, and the cache-rebuild path takes a
@@ -70,6 +71,12 @@ describe("userBuiltMarketplaceDir()", () => {
     expect(v1).not.toBe(v2);
     expect(pathContainsOrEquals(v1, v2)).toBe(false);
     expect(pathContainsOrEquals(v2, v1)).toBe(false);
+  });
+});
+
+describe("userManifestPath()", () => {
+  it("names manifest.json directly under the user config dir, no .aidd nesting", () => {
+    expect(userManifestPath("/user-cache")).toBe("/user-cache/manifest.json");
   });
 });
 

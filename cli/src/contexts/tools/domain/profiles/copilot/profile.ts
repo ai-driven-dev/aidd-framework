@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { GITKEEP_FILE } from "../../../../../kernel/file.js";
 import { DOCS_DIR } from "../../../../../kernel/paths.js";
 import { AgentsCapability } from "../../capabilities/agents-capability.js";
@@ -324,6 +325,10 @@ export const copilot: AiTool<
         disableVerb: "uninstall",
         sourceCheckVerb: "update",
         forceRemoveArgs: ["--force"],
+        // Where `copilot plugin marketplace add`/`install` land — measured against the
+        // real binary in a relocated HOME. Never written by aidd; named here for a
+        // diagnostic alone.
+        userSettingsPath: (h) => join(h, ".copilot", "settings.json"),
       },
       // VS Code Copilot reads this file, not the `copilot` CLI — measured: `copilot
       // plugin marketplace add` writes ~/.copilot/settings.json and leaves this one

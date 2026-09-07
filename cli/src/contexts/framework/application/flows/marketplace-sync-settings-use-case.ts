@@ -9,6 +9,7 @@ import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
 import type { Logger } from "../../../../kernel/ports/logger.js";
 import type { VersionReader } from "../../../../kernel/ports/version-reader.js";
+import type { MarketplaceScope } from "../../../../kernel/scope.js";
 import { type AiToolId, isAiToolId, type ToolId } from "../../../../kernel/tool.js";
 import type { MarketplaceRegisterFramework } from "../../../distribution/application/marketplace-register-framework-use-case.js";
 import type { Marketplace } from "../../../distribution/domain/marketplace.js";
@@ -62,6 +63,32 @@ export interface MarketplaceSyncSettingsOptions {
    * state, not merely reading it back — the rest read a person's own registry as it
    * is. Absent (the default) keeps that read-only behaviour for everyone but `sync`. */
   recreateFrameworkIfMissing?: boolean;
+  /**
+   * The scope this run activates plugins at — `"project"` (the default) maps claude's
+   * own native calls to `--scope local`, bound to this project; `"user"` to
+   * `--scope user`, machine-wide. Answers a different question than a marketplace's own
+   * `scope` (always `"user"` for the shared framework source): not where the
+   * registration lives, but at what scope *this* run's own plugin enablement happens.
+   * `setup --scope user` and `sync --scope user` are the only callers that ever pass
+   * `"user"`; every other caller keeps today's default.
+   *
+   * `"user"` also skips writing this project's own settings files entirely
+   * (`syncTool`) — a user-scope run's whole point is that nothing lands under
+   * `projectRoot`, so there is nothing here for a project file to mirror.
+   */
+  scope?: MarketplaceScope;
+  /**
+   * Overrides the manifest this run reads and writes, in place of the one this use
+   * case was constructed with. `setup --scope user`/`sync --scope user` are the only
+   * callers that ever pass one — the manifest they load and save is the user-scope
+   * manifest under `userConfigDir()`, never this project's own `.aidd/manifest.json`,
+   * and this use case is otherwise wired once per project root with a fixed
+   * `ManifestRepository`. A second, constant `ManifestRepository` injected alongside
+   * the first would answer a question this use case never asks at construction time —
+   * which manifest — so a per-call option is the right shape on its own terms, not a
+   * dodge of anything this file's own collaborator count is measured by.
+   */
+  manifestRepo?: ManifestRepository;
 }
 
 /** What one tool's own CLI actually registered, once its `activateTool` run finished —
@@ -153,8 +180,10 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
 
   async execute(options: MarketplaceSyncSettingsOptions): Promise<MarketplaceSyncSettingsResult> {
     const { projectRoot } = options;
+    const manifestRepo = options.manifestRepo ?? this.manifestRepo;
+    const scope = options.scope ?? "project";
     const [manifest, initialMarketplaces] = await Promise.all([
-      this.manifestRepo.load().catch(() => null),
+      manifestRepo.load().catch(() => null),
       this.marketplaceRegistry.list(projectRoot),
     ]);
     if (manifest === null) return EMPTY_RESULT;
@@ -162,19 +191,33 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
       ? await this.ensureFrameworkRegistered(projectRoot, initialMarketplaces)
       : initialMarketplaces;
     if (marketplaces.length === 0) return EMPTY_RESULT;
-    await this.recordSharedSourceReference(projectRoot, marketplaces);
+    // A user-scope run has no project-scope manifest for a later `clean` to ever
+    // decrement this claim from — same reasoning as `SetupUseCase.registerMarketplace`'s
+    // own guard, restated here because `sync --scope user` reaches this `execute` too,
+    // never through that guard.
+    if (scope !== "user") await this.recordSharedSourceReference(projectRoot, marketplaces);
     const toolIds = this.selectToolIds(manifest, options.toolIds);
     let anyToolUpdated = false;
-    for (const toolId of toolIds) {
-      if (await this.syncTool(toolId, projectRoot, manifest, marketplaces)) anyToolUpdated = true;
+    // A user-scope run's whole point is that nothing lands under `projectRoot` — there
+    // is no project settings file for a user-scope activation to mirror into.
+    if (scope === "project") {
+      for (const toolId of toolIds) {
+        if (await this.syncTool(toolId, projectRoot, manifest, marketplaces)) anyToolUpdated = true;
+      }
     }
-    if (anyToolUpdated) await this.manifestRepo.save(manifest);
-    const activation = await this.activateNativeTools(projectRoot, manifest, marketplaces, toolIds);
+    if (anyToolUpdated) await manifestRepo.save(manifest);
+    const activation = await this.activateNativeTools(
+      projectRoot,
+      manifest,
+      marketplaces,
+      toolIds,
+      scope
+    );
     const wroteHashes = await this.recordWhatActivationWrote(projectRoot, manifest, [
       ...activation.outcomes.keys(),
     ]);
     const wroteRegistrations = this.recordNativeRegistrations(manifest, activation.outcomes);
-    if (wroteHashes || wroteRegistrations) await this.manifestRepo.save(manifest);
+    if (wroteHashes || wroteRegistrations) await manifestRepo.save(manifest);
     return {
       activated: [...activation.outcomes.keys()],
       binaryMissing: activation.binaryMissing,
@@ -254,7 +297,8 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     projectRoot: string,
     manifest: Manifest,
     marketplaces: readonly Marketplace[],
-    toolIds: readonly ToolId[]
+    toolIds: readonly ToolId[],
+    scope: MarketplaceScope
   ): Promise<ActivationRun> {
     const outcomes = new Map<ToolId, ActivationOutcome>();
     const binaryMissing: { toolId: ToolId; binary: string }[] = [];
@@ -276,7 +320,8 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
           projectRoot,
           manifest,
           marketplaces,
-          warnings
+          warnings,
+          scope
         );
         outcomes.set(toolId, outcome);
       } catch (error) {
@@ -366,7 +411,8 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     projectRoot: string,
     manifest: Manifest,
     marketplaces: readonly Marketplace[],
-    warnings: string[]
+    warnings: string[],
+    scope: MarketplaceScope
   ): Promise<ActivationOutcome> {
     // Every known marketplace, never only the ones a plugin points at — declaring a
     // marketplace and installing a plugin from it are two acts, and a person does the first
@@ -396,7 +442,7 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     const hostNameByAlias = new Map(registeredMarketplaces.map((m) => [m.alias, m.hostName]));
     const refs = this.pluginRefsToEnable(toolId, manifest, marketplaces, hostNameByAlias);
     for (const ref of refs) {
-      this.bestEffort(() => activator.enablePlugin(ref), `enable plugin '${ref}'`, warnings);
+      this.bestEffort(() => activator.enablePlugin(ref, scope), `enable plugin '${ref}'`, warnings);
     }
     return { marketplaces: registeredMarketplaces, pluginRefs: refs };
   }

@@ -5,9 +5,11 @@ import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Logger } from "../../../../kernel/ports/logger.js";
 import { resolveHomeDir } from "../../../../kernel/reading/home-dir.js";
+import type { MarketplaceScope } from "../../../../kernel/scope.js";
 import type { AiToolId } from "../../../../kernel/tool.js";
 import type { McpCapability } from "../../../tools/domain/capabilities/mcp-capability.js";
 import { unmergeOpencodeMcp } from "../../../tools/domain/formats/opencode-mcp-merge.js";
+import type { HostPluginRegistryReader } from "../../../tools/domain/ports/host-plugin-registry-reader.js";
 import type { NativePluginActivator } from "../../../tools/domain/ports/native-plugin-activator.js";
 import {
   getToolConfig,
@@ -20,6 +22,7 @@ import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import { resolveCacheCandidate } from "../shared/purge-declared-cache.js";
 import { removeProjectHooks } from "../shared/remove-project-hooks.js";
+import { resolveUninstallScopeOrder } from "../shared/resolve-uninstall-scope.js";
 import { loadPluginManifest } from "./plugin-helpers.js";
 import {
   isFrameworkPrimeFlatMcp,
@@ -40,7 +43,15 @@ export class PluginRemoveUseCase {
     private readonly logger: Logger,
     /** Native plugin CLI activators keyed by `NativeActivation.binary`, mirroring the map
      * `MarketplaceSyncSettingsUseCase` installs through (see runtime/wiring/framework.ts). */
-    private readonly activators: ReadonlyMap<string, NativePluginActivator>
+    private readonly activators: ReadonlyMap<string, NativePluginActivator>,
+    /** Host plugin registry readers keyed by `AiToolId`, the same map `CleanUseCase`
+     * consults before uninstalling a ref — the scope asked for is the one the host
+     * actually registered it at, never a guess. Absent for every caller that predates
+     * this, which falls back to the manifest's own recorded scope. */
+    private readonly hostPluginRegistries: ReadonlyMap<
+      AiToolId,
+      HostPluginRegistryReader
+    > = new Map()
   ) {}
 
   async execute(options: PluginRemoveOptions): Promise<void> {
@@ -64,7 +75,7 @@ export class PluginRemoveUseCase {
       const plugin = plugins.find((p) => p.name === pluginName);
       if (plugin === undefined) continue;
       const baseDir = resolveBaseDirFromRecord(plugin.scope, toolId, projectRoot, nodeHomedir);
-      const confirmed = this.removeNativeActivation(plugin, toolId);
+      const confirmed = await this.removeNativeActivation(plugin, toolId, projectRoot);
       if (confirmed !== undefined)
         await this.purgeCachedPlugin(manifest, toolId, plugin, confirmed);
       await this.deletePluginFiles(plugin.files, baseDir);
@@ -90,36 +101,64 @@ export class PluginRemoveUseCase {
   // never activated this way) — `purgeCachedPlugin` then has nothing to gate on either,
   // since a plugin this CLI never asked a host to enable left no cache to purge. `true`
   // or `false` otherwise: whether the host's own CLI confirmed the uninstall.
-  private removeNativeActivation(plugin: InstalledPlugin, toolId: AiToolId): boolean | undefined {
+  private async removeNativeActivation(
+    plugin: InstalledPlugin,
+    toolId: AiToolId,
+    projectRoot: string
+  ): Promise<boolean | undefined> {
     const nativeActivation = resolvePluginsCapability(toolId)?.nativeActivation;
     if (nativeActivation == null || plugin.marketplace === undefined) return undefined;
     const activator = this.activators.get(nativeActivation.binary);
     if (activator === undefined) return undefined;
     const ref = `${plugin.name}@${plugin.marketplace}`;
-    return this.uninstallViaActivator(activator, nativeActivation.binary, ref);
+    return this.uninstallViaActivator(
+      activator,
+      nativeActivation.binary,
+      ref,
+      toolId,
+      plugin.scope,
+      projectRoot
+    );
   }
 
-  private uninstallViaActivator(
+  /**
+   * Tries every scope `resolveUninstallScopeOrder` names, in order, stopping at the
+   * first the host's own CLI accepts — a real `claude` binary refuses a
+   * mismatched-scope uninstall outright, so a manifest whose recorded scope disagrees
+   * with what was actually registered (the state a plugin enabled before scope
+   * threading existed is still in) gets a second, corrective attempt rather than
+   * silently leaving the entry behind.
+   */
+  private async uninstallViaActivator(
     activator: NativePluginActivator,
     binary: string,
-    ref: string
-  ): boolean {
+    ref: string,
+    toolId: AiToolId,
+    manifestScope: MarketplaceScope,
+    projectRoot: string
+  ): Promise<boolean> {
     if (!activator.isAvailable()) {
       this.logger.warn(
         `${binary} CLI not found on PATH — '${ref}' was not uninstalled from ${binary}'s own plugin registry and may still be enabled there.`
       );
       return false;
     }
-    try {
-      activator.uninstallPlugin(ref);
-      return true;
-    } catch (error) {
-      if (!(error instanceof NativePluginCliError)) throw error;
-      this.logger.warn(
-        `${binary} plugin uninstall '${ref}' failed: ${error.message} — an entry for it may remain in ${binary}'s own plugin registry.`
-      );
-      return false;
+    const reader = this.hostPluginRegistries.get(toolId);
+    const order = await resolveUninstallScopeOrder(reader, ref, projectRoot, manifestScope);
+    let lastMessage = "";
+    for (const scope of order) {
+      try {
+        activator.uninstallPlugin(ref, scope);
+        return true;
+      } catch (error) {
+        if (!(error instanceof NativePluginCliError)) throw error;
+        lastMessage = error.message;
+      }
     }
+    this.logger.warn(
+      `${binary} plugin uninstall '${ref}' failed: ${lastMessage} — an entry for it may remain in ${binary}'s own plugin registry.`
+    );
+    return false;
   }
 
   /**
