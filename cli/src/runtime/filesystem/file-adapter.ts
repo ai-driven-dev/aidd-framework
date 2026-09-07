@@ -9,7 +9,6 @@ import {
   rm,
   rmdir,
   stat,
-  writeFile,
 } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import type { FileMerger } from "../../contexts/tools/domain/ports/file-merger.js";
@@ -25,6 +24,7 @@ import type { FileWriter } from "../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../kernel/ports/hasher.js";
 import type { Logger } from "../../kernel/ports/logger.js";
 import { stripJsonComments } from "../../kernel/reading/jsonc.js";
+import { atomicWriteFile } from "./atomic-write.js";
 
 export class FileAdapter implements FileReader, FileWriter, FileMerger {
   async isExecutable(path: string): Promise<boolean> {
@@ -43,7 +43,7 @@ export class FileAdapter implements FileReader, FileWriter, FileMerger {
 
   async writeFile(path: string, content: string): Promise<void> {
     await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, content, "utf-8");
+    await atomicWriteFile(path, content);
   }
 
   async deleteFile(path: string): Promise<void> {

@@ -8,7 +8,9 @@ import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
 import type { Logger } from "../../../../kernel/ports/logger.js";
+import type { VersionReader } from "../../../../kernel/ports/version-reader.js";
 import { type AiToolId, isAiToolId, type ToolId } from "../../../../kernel/tool.js";
+import type { MarketplaceRegisterFramework } from "../../../distribution/application/marketplace-register-framework-use-case.js";
 import type { Marketplace } from "../../../distribution/domain/marketplace.js";
 import type { MarketplaceRegistry } from "../../../distribution/domain/ports/marketplace-registry.js";
 import type { MarketplaceSettings } from "../../../tools/domain/marketplace-settings.js";
@@ -27,6 +29,7 @@ import type {
 } from "../../domain/manifest/native-registrations.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
+import type { UserSourceReferences } from "../../domain/ports/user-source-references.js";
 import type { EnsureBuiltMarketplace } from "../shared/ensure-built-marketplace-use-case.js";
 import {
   hostMarketplaceSourceConflict,
@@ -37,6 +40,11 @@ import {
   marketplaceCatalogProbePath,
   readMarketplaceCatalogIdentity,
 } from "../shared/read-marketplace-catalog-identity.js";
+import {
+  frameworkSourceIsShared,
+  resolveProjectRootForReferences,
+  toleratingUnreadableSourceReferences,
+} from "../shared/shared-source-reference-support.js";
 
 export interface MarketplaceSyncSettingsOptions {
   projectRoot: string;
@@ -44,6 +52,16 @@ export interface MarketplaceSyncSettingsOptions {
    * `sync --tool <id>` needs so fixing one tool's registration does not silently
    * re-drive every other installed tool's CLI too. Every installed tool when absent. */
   toolIds?: readonly ToolId[];
+  /** Re-registers the framework marketplace when this run finds none at all — `sync.ts`
+   * alone sets this, never `plugin install | remove | update` or `marketplace add |
+   * remove | refresh`, which drive this same `execute` through `syncNativeActivation`
+   * without it. This flag's own placement must fall strictly between the two checks
+   * around it: `execute` already returned above for no manifest at all, before this is
+   * even read, and below this an empty registry is read exactly as found, never
+   * silently repopulated. `sync` is the one command whose job is repairing a project's
+   * state, not merely reading it back — the rest read a person's own registry as it
+   * is. Absent (the default) keeps that read-only behaviour for everyone but `sync`. */
+  recreateFrameworkIfMissing?: boolean;
 }
 
 /** What one tool's own CLI actually registered, once its `activateTool` run finished —
@@ -122,16 +140,29 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
      * unlike `DoctorRegistrationUseCase`: the version a drift is decided against comes
      * from `builtDir` itself, already built by `ensureBuilt` before this ever runs,
      * rather than a path recomputed without one. */
-    private readonly userCacheRoot: () => string = () => ""
+    private readonly userCacheRoot: () => string = () => "",
+    /** Re-registers the shared machine-scope source when this run finds no marketplace
+     * at all — the fix for a clone whose committed manifest predates this machine's own
+     * copy of the registry (`userConfigDir()`, never inside the project). Absent for
+     * every caller that predates this, which keeps the old silent no-op instead of
+     * guessing what to register. */
+    private readonly marketplaceRegisterFrameworkUseCase?: MarketplaceRegisterFramework,
+    private readonly userSourceReferences?: UserSourceReferences,
+    private readonly currentVersionProvider?: VersionReader
   ) {}
 
   async execute(options: MarketplaceSyncSettingsOptions): Promise<MarketplaceSyncSettingsResult> {
     const { projectRoot } = options;
-    const [manifest, marketplaces] = await Promise.all([
+    const [manifest, initialMarketplaces] = await Promise.all([
       this.manifestRepo.load().catch(() => null),
       this.marketplaceRegistry.list(projectRoot),
     ]);
-    if (manifest === null || marketplaces.length === 0) return EMPTY_RESULT;
+    if (manifest === null) return EMPTY_RESULT;
+    const marketplaces = options.recreateFrameworkIfMissing
+      ? await this.ensureFrameworkRegistered(projectRoot, initialMarketplaces)
+      : initialMarketplaces;
+    if (marketplaces.length === 0) return EMPTY_RESULT;
+    await this.recordSharedSourceReference(projectRoot, marketplaces);
     const toolIds = this.selectToolIds(manifest, options.toolIds);
     let anyToolUpdated = false;
     for (const toolId of toolIds) {
@@ -150,6 +181,57 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
       warnings: activation.warnings,
       errors: activation.errors,
     };
+  }
+
+  /**
+   * A clone whose committed manifest predates this machine's own copy of the shared
+   * registry finds `marketplaces` empty on its very first `sync`: the registry lives
+   * under `userConfigDir()`, never inside the project, so nothing about a fresh clone
+   * carries it. Silently doing nothing here used to be indistinguishable from "nothing
+   * to sync". Recreating the one entry almost every project relies on, the framework's
+   * own marketplace, is exactly what `setup`'s own auto-register already does by
+   * default — a bare `sync` now matches it instead of leaving the project inert until
+   * someone remembers to run `setup` again.
+   *
+   * Only ever called when `options.recreateFrameworkIfMissing` is set — every other
+   * caller of `execute` reaching an empty registry (`marketplace add | remove |
+   * refresh`, `plugin install | remove | update`) is reading a person's own deliberate
+   * choice to have no marketplace at all, not a fresh clone's missing copy, and must
+   * see that choice reflected back, not silently overwritten.
+   */
+  private async ensureFrameworkRegistered(
+    projectRoot: string,
+    marketplaces: readonly Marketplace[]
+  ): Promise<readonly Marketplace[]> {
+    if (marketplaces.length > 0) return marketplaces;
+    if (this.marketplaceRegisterFrameworkUseCase === undefined) return marketplaces;
+    await this.marketplaceRegisterFrameworkUseCase.execute({ projectRoot });
+    return this.marketplaceRegistry.list(projectRoot);
+  }
+
+  /**
+   * Refreshed on every run that finds the shared source registered, never only the run
+   * that had to recreate it above — another project on this machine having already
+   * registered it is the ordinary case, not the exception, and this project's own
+   * reference is still missing the first time its own `sync` (or `setup`) runs here.
+   * What a `clean --scope user` (not yet built) will read before it purges anything the
+   * machine-scope entry owns.
+   */
+  private async recordSharedSourceReference(
+    projectRoot: string,
+    marketplaces: readonly Marketplace[]
+  ): Promise<void> {
+    if (this.userSourceReferences === undefined || this.currentVersionProvider === undefined) {
+      return;
+    }
+    const framework = marketplaces.find((m) => frameworkSourceIsShared(m.name, m.scope));
+    if (framework === undefined) return;
+    const userSourceReferences = this.userSourceReferences;
+    const currentVersionProvider = this.currentVersionProvider;
+    await toleratingUnreadableSourceReferences(this.logger, undefined, async () => {
+      const resolvedRoot = await resolveProjectRootForReferences(this.fs, projectRoot);
+      await userSourceReferences.addReference(currentVersionProvider.get(), resolvedRoot);
+    });
   }
 
   /** Every installed tool, narrowed to `toolIds` when the caller named one — what

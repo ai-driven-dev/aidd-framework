@@ -193,7 +193,10 @@ export const BASELINE: readonly {
   // Three implementations and one port: the http client, the git token injection and the
   // user-config directory are concrete, so this edge is a real dependency on runtime and
   // not a misplaced contract. It resolves by inverting them into ports this context holds.
-  { edge: "distribution->runtime", imports: 5, files: 3 },
+  // A sixth import joined this lot: `marketplace-registry-adapter.ts` now writes through
+  // the same `atomicWriteFile` the file adapter uses, so two concurrent `aidd setup` runs
+  // never see a torn `marketplaces.json` — the same file count, one more import.
+  { edge: "distribution->runtime", imports: 6, files: 3 },
   // Three framework orchestrators still name the prompt classes they are handed. Type-only
   // imports with unchanged signatures — inverting them into a port is a design change, not
   // the move phase 16 was. Recorded so it is measured rather than remembered.

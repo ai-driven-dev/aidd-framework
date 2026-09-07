@@ -68,7 +68,7 @@ function makeNoOpResolveMarketplace(): ResolveMarketplace {
 }
 
 function makeNoOpRegisterFramework(): MarketplaceRegisterFramework {
-  return { execute: vi.fn().mockResolvedValue({ registered: false }) };
+  return { execute: vi.fn().mockResolvedValue({ registered: false, scope: "user" }) };
 }
 
 function makeNoOpRefresh(): MarketplaceRefresh {
@@ -113,6 +113,7 @@ async function buildSetupUseCase(tokenProvider: TokenProvider, isRepoPublic = fa
     setupToolsUseCase,
     setupPluginsPromptUseCase,
     deps.currentVersionProvider,
+    deps.logger,
     tokenProvider,
     undefined,
     undefined,

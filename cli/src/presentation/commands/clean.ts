@@ -41,6 +41,12 @@ export function registerCleanCommand(program: Command): void {
               output.print(`    cache to purge once unregistered: ${cachePath}`);
             }
           }
+          if (result.preview.sharedSourceReferenceCount !== undefined) {
+            const count = result.preview.sharedSourceReferenceCount;
+            output.print(
+              `  aidd-framework: shared source, referenced by ${count} ${count === 1 ? "project" : "projects"} on this machine`
+            );
+          }
           const toolCount = result.preview.tools.length;
           if (process.stdout.isTTY) {
             output.print("No files removed.");

@@ -55,8 +55,10 @@ import { UninstallIdeUseCase } from "../../contexts/framework/application/uninst
 import { UninstallToolsUseCase } from "../../contexts/framework/application/uninstall/uninstall-tools-use-case.js";
 import { UninstallUseCase } from "../../contexts/framework/application/uninstall/uninstall-use-case.js";
 import type { ManifestRepository } from "../../contexts/framework/domain/ports/manifest-repository.js";
+import type { UserSourceReferences } from "../../contexts/framework/domain/ports/user-source-references.js";
 import { ManifestRepositoryAdapter } from "../../contexts/framework/infrastructure/manifest-repository-adapter.js";
 import { PluginDistributionReaderAdapter } from "../../contexts/framework/infrastructure/plugin-distribution-reader-adapter.js";
+import { UserSourceReferencesAdapter } from "../../contexts/framework/infrastructure/user-source-references-adapter.js";
 import type { FileMerger } from "../../contexts/tools/domain/ports/file-merger.js";
 import { hostPluginRegistryReaders } from "../../contexts/tools/infrastructure/host-plugin-registry-reader-adapter.js";
 import type { AssetProvider } from "../../kernel/ports/asset-provider.js";
@@ -115,6 +117,7 @@ interface Deps extends TelemetryDeps {
   marketplaceRemoveUseCase: MarketplaceRemoveUseCase;
   marketplaceRefreshUseCase: MarketplaceRefreshUseCase;
   marketplaceCheckUseCase: MarketplaceCheckUseCase;
+  userSourceReferences: UserSourceReferences;
   installAiToolUseCase: InstallAiToolUseCase;
   installIdeToolUseCase: InstallIdeToolUseCase;
   uninstallIdeUseCase: UninstallIdeUseCase;
@@ -257,6 +260,7 @@ export async function createDeps(
     currentVersionProvider,
     userConfigDir
   );
+  const userSourceReferences = new UserSourceReferencesAdapter(fs, userConfigDir);
   const marketplaceSyncSettingsUseCase = new MarketplaceSyncSettingsUseCase(
     fs,
     manifestRepo,
@@ -266,7 +270,10 @@ export async function createDeps(
     nativePluginActivators,
     ensureBuiltMarketplaceUseCase,
     hostMarketplaceRegistries,
-    userConfigDir
+    userConfigDir,
+    marketplaceRegisterFrameworkUseCase,
+    userSourceReferences,
+    currentVersionProvider
   );
   const pluginAddUseCase = new PluginAddUseCase(
     fs,
@@ -443,7 +450,9 @@ export async function createDeps(
     nativePluginActivators,
     marketplaceRegistry,
     prompter,
-    hostMarketplaceRegistries
+    hostMarketplaceRegistries,
+    undefined,
+    userSourceReferences
   );
   const doctorAllUseCase = new DoctorAllUseCase(doctorUseCase);
   const listInstalledRulesUseCase = new ListInstalledRulesUseCase(fs);
@@ -474,6 +483,7 @@ export async function createDeps(
     marketplaceRemoveUseCase,
     marketplaceRefreshUseCase,
     marketplaceCheckUseCase,
+    userSourceReferences,
     installAiToolUseCase,
     installIdeToolUseCase,
     uninstallIdeUseCase,

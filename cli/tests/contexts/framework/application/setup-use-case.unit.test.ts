@@ -14,7 +14,10 @@ import type { PluginInstallFromMarketplace } from "../../../../src/contexts/fram
 import { SetupMarketplaceSourceUseCase } from "../../../../src/contexts/framework/application/setup/setup-marketplace-source-use-case.js";
 import { SetupToolsUseCase } from "../../../../src/contexts/framework/application/setup/setup-tools-use-case.js";
 import { SetupUseCase } from "../../../../src/contexts/framework/application/setup-use-case.js";
+import type { UserSourceReferences } from "../../../../src/contexts/framework/domain/ports/user-source-references.js";
 import { SetupFlow } from "../../../../src/contexts/framework/domain/setup-flow.js";
+import { UserSourceReferencesAdapter } from "../../../../src/contexts/framework/infrastructure/user-source-references-adapter.js";
+import type { Logger } from "../../../../src/kernel/ports/logger.js";
 import type { ToolId } from "../../../../src/kernel/tool.js";
 import { AI_TOOL_IDS, IDE_TOOL_IDS } from "../../../../src/kernel/tool.js";
 import type { PluginPick } from "../../../../src/presentation/prompts/plugin-pick-use-case.js";
@@ -26,6 +29,8 @@ import {
   initAndInstall,
   initProject,
 } from "../../../helpers/ports/build-unit-deps.js";
+import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
+import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-marketplace-registry.js";
 import { OverwritePrompter, ScriptedPrompter } from "../../../helpers/ports/scripted-prompter.js";
 
@@ -41,7 +46,7 @@ type RegisterFrameworkMock = MarketplaceRegisterFramework & { execute: ReturnTyp
 type RefreshMock = MarketplaceRefresh & { execute: ReturnType<typeof vi.fn> };
 
 function makeNoOpMarketplaceRegisterFramework(): RegisterFrameworkMock {
-  const execute = vi.fn().mockResolvedValue({ registered: false });
+  const execute = vi.fn().mockResolvedValue({ registered: false, scope: "user" });
   return { execute };
 }
 
@@ -94,7 +99,25 @@ const CATALOG_ENTRY: PluginCatalogEntry = {
   strict: false,
 };
 
-async function buildUseCase(setupToolsPromptUseCase?: SetupToolsPromptUseCase) {
+function makeRecordingUserSourceReferences(): UserSourceReferences & {
+  added: Array<{ version: string; projectRoot: string }>;
+} {
+  const added: Array<{ version: string; projectRoot: string }> = [];
+  return {
+    added,
+    addReference: vi.fn(async (version: string, projectRoot: string) => {
+      added.push({ version, projectRoot });
+    }),
+    removeReference: vi.fn(async () => ({ remainingCount: 0 })),
+    countReferencesForProject: vi.fn(async () => 0),
+  };
+}
+
+async function buildUseCase(
+  setupToolsPromptUseCase?: SetupToolsPromptUseCase,
+  userSourceReferences?: UserSourceReferences,
+  logger?: Logger
+) {
   const deps = await buildUnitDeps(PROJECT_ROOT);
   const prompter = new OverwritePrompter();
   const setupMarketplaceSourceUseCase = new SetupMarketplaceSourceUseCase(
@@ -124,8 +147,12 @@ async function buildUseCase(setupToolsPromptUseCase?: SetupToolsPromptUseCase) {
     setupToolsUseCase,
     setupPluginsPromptUseCase,
     deps.currentVersionProvider,
+    logger ?? deps.logger,
     undefined,
-    setupToolsPromptUseCase
+    setupToolsPromptUseCase,
+    undefined,
+    undefined,
+    userSourceReferences
   );
   return { useCase, deps, marketplaceRegisterFramework, marketplaceRefresh };
 }
@@ -274,6 +301,58 @@ describe("setup without TTY", () => {
         const claudeResult = result.install.results.find((r) => r.toolId === "claude");
         expect(claudeResult).toBeDefined();
       }
+    });
+  });
+
+  describe("this project's own reference to the shared source", () => {
+    it("records it after registering the framework marketplace by default", async () => {
+      const userSourceReferences = makeRecordingUserSourceReferences();
+      const { useCase, deps } = await buildUseCase(undefined, userSourceReferences);
+
+      await useCase.execute(remoteFlow({ aiTools: ["claude" as ToolId] }));
+
+      expect(userSourceReferences.added).toEqual([
+        { version: deps.currentVersionProvider.get(), projectRoot: PROJECT_ROOT },
+      ]);
+    });
+
+    it("records no reference when default marketplace registration is opted out", async () => {
+      const userSourceReferences = makeRecordingUserSourceReferences();
+      const { useCase } = await buildUseCase(undefined, userSourceReferences);
+
+      await useCase.execute(
+        new SetupFlow({
+          projectRoot: PROJECT_ROOT,
+          source: MarketplaceSourceMode.remote(),
+          aiTools: ["claude" as ToolId],
+          ideTools: [],
+          pluginMode: "none",
+          interactive: false,
+          registerDefaultMarketplace: false,
+        })
+      );
+
+      expect(userSourceReferences.added).toEqual([]);
+    });
+
+    // Bloquant found in review: `references.json` is a help, not an authority — a
+    // corrupted copy must never block `setup`, which does not depend on it. The
+    // adapter's own fs is independent of the project's own `deps.fs`: what matters here
+    // is only that `references.json` itself cannot be parsed.
+    it("warns and still completes setup when references.json is corrupted", async () => {
+      const logger = new CapturingLogger();
+      const referencesFs = new InMemoryFileAdapter();
+      referencesFs.setFile("/fake-home/.config/aidd/references.json", "not json");
+      const userSourceReferences = new UserSourceReferencesAdapter(
+        referencesFs,
+        () => "/fake-home/.config/aidd"
+      );
+      const { useCase } = await buildUseCase(undefined, userSourceReferences, logger);
+
+      const result = await useCase.execute(remoteFlow({ aiTools: ["claude" as ToolId] }));
+
+      expect(result.kind).toBe("initialized");
+      expect(logger.warnMessages.some((m) => m.includes("references.json"))).toBe(true);
     });
   });
 

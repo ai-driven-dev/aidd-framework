@@ -55,7 +55,10 @@ async function runSyncAction(
     // into the settings file restoration just regenerated, and `sync` needs the
     // regenerated file on disk before that CLI touches it, not a file restoration is
     // about to overwrite underneath it.
-    const activation = await deps.marketplaceSyncSettingsUseCase.execute({ projectRoot });
+    const activation = await deps.marketplaceSyncSettingsUseCase.execute({
+      projectRoot,
+      recreateFrameworkIfMissing: true,
+    });
     printNativeActivation(output, activation.binaryMissing);
     for (const e of activation.errors) output.warn(`[${e.scope}] ${e.message}`);
 
@@ -106,6 +109,7 @@ async function runScopedSync(
   const activation = await deps.marketplaceSyncSettingsUseCase.execute({
     projectRoot,
     toolIds: [toolId],
+    recreateFrameworkIfMissing: true,
   });
   printNativeActivation(output, activation.binaryMissing);
   for (const e of activation.errors) output.warn(`[${e.scope}] ${e.message}`);

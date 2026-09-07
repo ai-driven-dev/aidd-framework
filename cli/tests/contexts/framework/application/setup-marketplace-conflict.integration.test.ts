@@ -32,7 +32,7 @@ function makeNoOpLatestResolver(): LatestReleaseResolver {
 }
 
 function makeNoOpMarketplaceRegisterFramework(): MarketplaceRegisterFramework {
-  return { execute: vi.fn().mockResolvedValue({ registered: false }) };
+  return { execute: vi.fn().mockResolvedValue({ registered: false, scope: "user" }) };
 }
 
 function makeNoOpMarketplaceRefresh(): MarketplaceRefresh {
@@ -116,7 +116,8 @@ async function buildUseCaseWithConflict() {
     marketplaceSyncSettingsUseCase,
     setupToolsUseCase,
     setupPluginsPromptUseCase,
-    deps.currentVersionProvider
+    deps.currentVersionProvider,
+    deps.logger
   );
   return { useCase, activator };
 }

@@ -33,6 +33,7 @@ import { aiddGitignoreEntries } from "../domain/manifest-gitignore-entries.js";
 import type { InstalledPlugin } from "../domain/plugins/installed-plugin.js";
 import { isStrictlyWithinUserScope } from "../domain/plugins/user-scope-containment.js";
 import type { ManifestRepository } from "../domain/ports/manifest-repository.js";
+import type { UserSourceReferences } from "../domain/ports/user-source-references.js";
 import type { GitignoreUseCase } from "./gitignore-use-case.js";
 import { deletePluginFilesForTool } from "./plugin/plugin-helpers.js";
 import {
@@ -40,6 +41,20 @@ import {
   resolveCacheCandidate,
 } from "./shared/purge-declared-cache.js";
 import { removeProjectHooks } from "./shared/remove-project-hooks.js";
+import {
+  frameworkSourceIsShared,
+  resolveProjectRootForReferences,
+  toleratingUnreadableSourceReferences,
+} from "./shared/shared-source-reference-support.js";
+
+/** What dropping this project's own reference to the shared source found — `undefined`
+ * when there was nothing to drop (the port is absent, or this project's own registry
+ * never held the shared entry). Threaded through the whole native-undo pass so every
+ * tool's own "left registered" warning can report the same, already-computed count
+ * rather than each recomputing (and each decrementing) it on its own. */
+interface SharedSourceReferenceOutcome {
+  readonly remainingCount: number;
+}
 
 interface CleanOptions {
   projectRoot: string;
@@ -65,6 +80,11 @@ interface CleanPreview {
      * only known once the host's own CLI has actually run. */
     cachePaths: readonly string[];
   }>;
+  /** How many projects on this machine — this one included, nothing decremented yet —
+   * currently reference the shared source, read the same way `--force` will right
+   * before it drops this project's own claim. `undefined` when this project's own
+   * registry never held the shared entry, or the port was never wired in. */
+  sharedSourceReferenceCount?: number;
 }
 
 interface CleanResult {
@@ -114,7 +134,10 @@ export class CleanUseCase {
      * `hostMarketplaceRegistries` readers were built from (see
      * `host-marketplace-registry-reader-adapter.ts`), or a `HOME` override reaches one
      * half of a post-condition and not the other. */
-    private readonly homeDir: () => string = resolveHomeDir
+    private readonly homeDir: () => string = resolveHomeDir,
+    /** The registry of projects referencing the shared machine-scope source. Absent for
+     * every caller that predates this, which skips the decrement entirely. */
+    private readonly userSourceReferences?: UserSourceReferences
   ) {}
 
   async execute(options: CleanOptions): Promise<CleanResult> {
@@ -124,15 +147,25 @@ export class CleanUseCase {
       return { dryRun: false, manifestFound: false, preview: emptyPreview, fileCount: 0 };
     }
     const home = this.homeDir();
-    const preview = this.buildPreview(manifest, home);
+    const preview = await this.buildPreview(manifest, home, options.projectRoot);
     const dryRunResult = await this.confirmOrDryRun(options, preview);
     if (dryRunResult !== null) return dryRunResult;
+    // Decremented exactly once per run, before the per-tool loop below: the shared
+    // source's reference count is a project-level fact, not a per-tool one, and claude,
+    // codex and copilot can each carry their own `aidd-framework` ref — decrementing
+    // inside that loop would drop this project's own claim once per tool instead of once.
+    const sharedSourceOutcome = await this.dropSharedSourceReference(options.projectRoot);
     // Undoing a host's own registration must happen before any of the rest: the tool's
     // CLI resolves the marketplace name against the built tree this project recorded,
     // and that tree lives under .aidd/cache/ — which removeAiddState deletes next.
     // Deleting it first leaves the host's own registry pointing at a source that no
     // longer exists, which the host may then refuse to unregister at all.
-    const undone = await this.undoNativeRegistrations(manifest, options.projectRoot, home);
+    const undone = await this.undoNativeRegistrations(
+      manifest,
+      options.projectRoot,
+      home,
+      sharedSourceOutcome
+    );
     // Purging a host's own plugin cache is the next step, never before this: it is only
     // ever safe once undoNativeRegistrations has actually asked that host to forget the
     // name (see purgeNativeCaches's own post-conditions).
@@ -186,7 +219,8 @@ export class CleanUseCase {
   private async undoNativeRegistrations(
     manifest: Manifest,
     projectRoot: string,
-    home: string
+    home: string,
+    sharedSourceOutcome: SharedSourceReferenceOutcome | undefined
   ): Promise<ReadonlyMap<ToolId, UndoneRegistration>> {
     const undone = new Map<ToolId, UndoneRegistration>();
     for (const toolId of manifest.getInstalledToolIds()) {
@@ -196,7 +230,8 @@ export class CleanUseCase {
         toolId,
         registrations,
         projectRoot,
-        home
+        home,
+        sharedSourceOutcome
       );
       if (removedHostNames !== undefined) undone.set(toolId, { registrations, removedHostNames });
     }
@@ -207,7 +242,8 @@ export class CleanUseCase {
     toolId: ToolId,
     registrations: NativeRegistrations,
     projectRoot: string,
-    home: string
+    home: string,
+    sharedSourceOutcome: SharedSourceReferenceOutcome | undefined
   ): Promise<ReadonlySet<string> | undefined> {
     const { binary } = registrations;
     const activator = this.activators.get(binary);
@@ -233,7 +269,8 @@ export class CleanUseCase {
         hostName,
         projectRoot,
         toolId,
-        home
+        home,
+        sharedSourceOutcome
       );
       if (removed) removedHostNames.add(hostName);
     }
@@ -255,7 +292,8 @@ export class CleanUseCase {
     hostName: string,
     projectRoot: string,
     toolId: ToolId,
-    home: string
+    home: string,
+    sharedSourceOutcome: SharedSourceReferenceOutcome | undefined
   ): Promise<boolean> {
     const marketplaces = (await this.marketplaceRegistry?.list(projectRoot)) ?? [];
     const marketplace = marketplaces.find((m) => m.name === alias);
@@ -268,10 +306,10 @@ export class CleanUseCase {
     if (marketplace.scope === "user") {
       // Machine-scope: every project on this machine shares this one registration, so
       // a single project's `clean` must never unregister it — doing so would silently
-      // break every other project too. A future reference count will let this project
-      // drop its own claim without touching the shared entry (its own plugin refs are
-      // still uninstalled just before this call); until then it is left registered.
-      // There is no machine-scope `aidd clean` yet to remove it deliberately.
+      // break every other project too. This project's own claim on it is dropped
+      // separately, once per run (`dropSharedSourceReference`, its own plugin refs
+      // already uninstalled just before this call) — the host's own registration is
+      // left in place regardless of what that drop found.
       //
       // Three things survive this, not one: the host's own registration (named
       // above), the `userConfigDir()/marketplaces.json` entry
@@ -282,7 +320,7 @@ export class CleanUseCase {
       // `describeSurvivingCachePaths` announces for a binary that is off `PATH`.
       this.logger.warn(
         `${binary}: '${hostName}' is shared by every project on this machine — left registered. ` +
-          `Its entry survives at userConfigDir()/marketplaces.json${this.describeSurvivingCachePath(toolId, hostName, home)}.`
+          this.describeSharedSourceSurvival(toolId, hostName, home, sharedSourceOutcome)
       );
       return false;
     }
@@ -290,6 +328,47 @@ export class CleanUseCase {
       () => activator.removeMarketplace(hostName, marketplace.scope),
       `${binary} marketplace remove '${hostName}'`
     );
+  }
+
+  /** Decrements this project's own claim on the shared source exactly once per `clean`
+   * run — independent of how many tools' own registrations name it, since the count in
+   * `references.json` is per project, never per tool. Never reads a "current" CLI
+   * version to decide which key to touch: `removeReference` finds the project wherever
+   * it is recorded, so a self-update between the `sync` that wrote the reference and
+   * this `clean` cannot strand it under a version key nobody ever asks about again.
+   * `undefined` when the port was never wired in, or this project's own registry never
+   * held the shared entry to begin with. */
+  private async dropSharedSourceReference(
+    projectRoot: string
+  ): Promise<SharedSourceReferenceOutcome | undefined> {
+    if (this.userSourceReferences === undefined) return undefined;
+    const marketplaces = (await this.marketplaceRegistry?.list(projectRoot)) ?? [];
+    const shared = marketplaces.find((m) => frameworkSourceIsShared(m.name, m.scope));
+    if (shared === undefined) return undefined;
+    const userSourceReferences = this.userSourceReferences;
+    return toleratingUnreadableSourceReferences(this.logger, undefined, async () => {
+      const resolvedRoot = await resolveProjectRootForReferences(this.fs, projectRoot);
+      return userSourceReferences.removeReference(resolvedRoot);
+    });
+  }
+
+  /** What survives a shared registration this run left in place, plus — once this
+   * project's own reference has actually been dropped — either how many other projects
+   * still claim it, or, once none do, that nothing removes it yet: purging the source
+   * itself is a machine-scope decision, not this project's own `clean` to make. */
+  private describeSharedSourceSurvival(
+    toolId: ToolId,
+    hostName: string,
+    home: string,
+    outcome: SharedSourceReferenceOutcome | undefined
+  ): string {
+    const base = `Its entry survives at userConfigDir()/marketplaces.json${this.describeSurvivingCachePath(toolId, hostName, home)}.`;
+    if (outcome === undefined) return base;
+    if (outcome.remainingCount > 0) {
+      const plural = outcome.remainingCount === 1 ? "project" : "projects";
+      return `${base} Still referenced by ${outcome.remainingCount} other ${plural} on this machine.`;
+    }
+    return `${base} No project on this machine still references it — nothing removes it yet, that is what a machine-scope \`aidd clean\` will do once it lands.`;
   }
 
   /** One marketplace's own surviving cache path, the single-`hostName` counterpart to
@@ -501,14 +580,37 @@ export class CleanUseCase {
     return count;
   }
 
-  private buildPreview(manifest: Manifest, home: string): CleanPreview {
+  private async buildPreview(
+    manifest: Manifest,
+    home: string,
+    projectRoot: string
+  ): Promise<CleanPreview> {
     const tools = manifest.getInstalledToolIds().map((toolId) => ({
       toolId,
       fileCount: manifest.getToolFiles(toolId).length + manifest.getMergeFiles(toolId).length,
     }));
     const totalFileCount = tools.reduce((s, t) => s + t.fileCount, 0);
     const nativeRegistrations = this.previewNativeRegistrations(manifest, home);
-    return { tools, totalFileCount, nativeRegistrations };
+    const sharedSourceReferenceCount = await this.previewSharedSourceReferenceCount(projectRoot);
+    return { tools, totalFileCount, nativeRegistrations, sharedSourceReferenceCount };
+  }
+
+  /** Read-only counterpart to `dropSharedSourceReference`: names the same count a
+   * `--force` run is about to act on, without decrementing anything — a dry-run must
+   * never write, and this project's own reference is still counted here since nothing
+   * has dropped it yet. */
+  private async previewSharedSourceReferenceCount(
+    projectRoot: string
+  ): Promise<number | undefined> {
+    if (this.userSourceReferences === undefined) return undefined;
+    const marketplaces = (await this.marketplaceRegistry?.list(projectRoot)) ?? [];
+    const shared = marketplaces.find((m) => frameworkSourceIsShared(m.name, m.scope));
+    if (shared === undefined) return undefined;
+    const userSourceReferences = this.userSourceReferences;
+    return toleratingUnreadableSourceReferences(this.logger, undefined, async () => {
+      const resolvedRoot = await resolveProjectRootForReferences(this.fs, projectRoot);
+      return userSourceReferences.countReferencesForProject(resolvedRoot);
+    });
   }
 
   private previewNativeRegistrations(

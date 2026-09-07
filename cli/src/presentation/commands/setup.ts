@@ -155,10 +155,12 @@ export function registerSetupCommand(program: Command): void {
           deps.setupToolsUseCase,
           deps.setupPluginsPromptUseCase,
           deps.currentVersionProvider,
+          deps.logger,
           deps.authReader,
           deps.setupToolsPromptUseCase,
           deps.projectContextDetector,
-          deps.releaseResolver
+          deps.releaseResolver,
+          deps.userSourceReferences
         ).execute(flow);
 
         if (interactive && result.context !== undefined) {

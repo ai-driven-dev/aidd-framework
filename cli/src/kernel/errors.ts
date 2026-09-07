@@ -309,6 +309,20 @@ export class UnreadableMarketplaceRegistryError extends Error {
   }
 }
 
+/** Modeled on `UnreadableMarketplaceRegistryError`: `references.json` is written by
+ * appending to whatever it already holds, one version key at a time, so a silent empty
+ * read on a corrupted file would delete every other project's own reference on the very
+ * next write, not merely the one this run cares about. */
+export class UnreadableUserSourceReferencesError extends Error {
+  constructor(path: string, reason: string) {
+    super(
+      `Cannot read the shared-source reference registry at ${path}: ${reason}. Repair the ` +
+        `file, or delete it to start from an empty registry.`
+    );
+    this.name = "UnreadableUserSourceReferencesError";
+  }
+}
+
 export class InteractiveOnlyError extends Error {
   constructor(action: string) {
     super(`'${action}' requires an interactive terminal.`);

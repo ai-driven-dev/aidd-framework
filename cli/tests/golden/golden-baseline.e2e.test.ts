@@ -46,6 +46,14 @@ interface CommandEntry {
   stderr: string;
   filesWritten: string[];
   manifest: unknown;
+  /** What sits under `userConfigDir()` right after this command — captured only for
+   * `clean --force`, the one project-scope command whose effect on the *shared*,
+   * machine-scope tree (`cache/built/`, `marketplaces.json`, `references.json`)
+   * `filesWritten` cannot see at all: that tree lives under the sandbox's fake $HOME,
+   * never under `projectDir`. Absent everywhere else — a project-scope command reads
+   * and writes nothing there, so recording an empty list for every other entry would
+   * only pad the snapshot with a fact that never changes. */
+  userConfigFiles?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +122,7 @@ function normalizeEntry(entry: CommandEntry): CommandEntry {
     stderr: normalize(entry.stderr),
     filesWritten: entry.filesWritten.map(normalize).sort(),
     manifest: entry.manifest === null ? null : normalizeManifest(entry.manifest),
+    userConfigFiles: entry.userConfigFiles?.map(normalize).sort(),
   };
 }
 
@@ -193,11 +202,14 @@ function normalizeFileContent(content: string, relativePath: string): string {
   return normalize(relativePath.endsWith(".json") ? content.replace(/\\\\/g, "\\") : content);
 }
 
-/** Run a command and return a single CommandEntry (raw, not normalized). */
+/** Run a command and return a single CommandEntry (raw, not normalized).
+ * `captureUserConfig` also lists what sits under `userConfigDir()` right after —
+ * see `CommandEntry.userConfigFiles` for why only one command in the matrix asks. */
 async function captureCommand(
   args: string[],
   projectDir: string,
-  fakeHome: string
+  fakeHome: string,
+  options?: { captureUserConfig?: boolean }
 ): Promise<CommandEntry> {
   const before = await listFiles(projectDir);
   const { stdout, stderr, exitCode } = await runCli(args, projectDir, fakeHome);
@@ -205,6 +217,9 @@ async function captureCommand(
   const filesWritten = after.filter((f) => !before.includes(f)).sort();
   const rawManifest = await readManifest(projectDir);
   const manifest = await normalizeManifestHashes(rawManifest, projectDir);
+  const userConfigFiles = options?.captureUserConfig
+    ? await listFiles(join(fakeHome, ".config", "aidd"))
+    : undefined;
 
   return {
     command: args.join(" "),
@@ -213,6 +228,7 @@ async function captureCommand(
     stderr,
     filesWritten,
     manifest,
+    userConfigFiles,
   };
 }
 
@@ -259,8 +275,11 @@ async function drift(projectDir: string, relativePath: string): Promise<void> {
  */
 async function captureMatrix(projectDir: string, fakeHome: string): Promise<CommandEntry[]> {
   const entries: CommandEntry[] = [];
-  const capture = async (args: string[]): Promise<void> => {
-    entries.push(await captureCommand(args, projectDir, fakeHome));
+  const capture = async (
+    args: string[],
+    options?: { captureUserConfig?: boolean }
+  ): Promise<void> => {
+    entries.push(await captureCommand(args, projectDir, fakeHome, options));
   };
 
   // Fresh project, from the local fixture: claude only, no plugins.
@@ -302,8 +321,12 @@ async function captureMatrix(projectDir: string, fakeHome: string): Promise<Comm
 
   await capture(["plugin", "remove", "aidd-test"]);
 
-  // Terminal: removes every AIDD file, then a read of the empty project.
-  await capture(["clean", "--force"]);
+  // Terminal: removes every AIDD file, then a read of the empty project. Only this
+  // step also lists userConfigDir(): a project-scope `clean` never registers or
+  // unregisters at the shared, machine-scope entry (architecture.md), and this is
+  // where that survives on record — the built cache tree, the marketplaces.json
+  // entry, and this project's own now-decremented reference.
+  await capture(["clean", "--force"], { captureUserConfig: true });
   await capture(["doctor"]);
 
   return entries;

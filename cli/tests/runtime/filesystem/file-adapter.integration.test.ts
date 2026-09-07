@@ -1,7 +1,13 @@
-import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, rename: vi.fn(actual.rename) };
+});
+
 import { FileAdapter } from "../../../src/runtime/filesystem/file-adapter.js";
 import { HasherAdapter } from "../../../src/runtime/filesystem/hasher-adapter.js";
 
@@ -32,6 +38,25 @@ describe("FileAdapter", () => {
       await fs.writeFile(path, "nested");
       const content = await readFile(path, "utf-8");
       expect(content).toBe("nested");
+    });
+
+    // A crash mid-write must never leave a truncated file at `path`: two concurrent
+    // `aidd setup` runs on the same machine both write `references.json`, by design.
+    // `rename` is the one POSIX-atomic step that makes that safe — writing straight
+    // to `path` is not. What is checkable in-process is that the mechanism is the
+    // one actually used, not merely that the end state happens to look right.
+    it("writes through a temporary file and renames it into place", async () => {
+      const path = join(tempDir, "atomic.txt");
+      await writeFile(path, "old content", "utf-8");
+      vi.mocked(rename).mockClear();
+
+      await fs.writeFile(path, "new content");
+
+      expect(rename).toHaveBeenCalledTimes(1);
+      const [renamedFrom, renamedTo] = vi.mocked(rename).mock.calls[0] as [string, string];
+      expect(renamedTo).toBe(path);
+      expect(renamedFrom).not.toBe(path);
+      expect(await readFile(path, "utf-8")).toBe("new content");
     });
   });
 

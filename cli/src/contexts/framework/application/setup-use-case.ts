@@ -1,6 +1,7 @@
 import { CatalogFetchAuthError } from "../../../kernel/errors.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";
+import type { Logger } from "../../../kernel/ports/logger.js";
 import type { VersionReader } from "../../../kernel/ports/version-reader.js";
 import type { PluginSource } from "../../../kernel/source.js";
 import type { AiToolId, IdeToolId } from "../../../kernel/tool.js";
@@ -13,8 +14,10 @@ import type {
   MarketplaceRegisterFramework,
   MarketplaceRegisterFrameworkOptions,
 } from "../../distribution/application/marketplace-register-framework-use-case.js";
+import { FRAMEWORK_MARKETPLACE_NAME } from "../../distribution/domain/marketplace.js";
 import type { MarketplaceSourceMode } from "../../distribution/domain/marketplace-source-mode.js";
 import type { ManifestRepository } from "../domain/ports/manifest-repository.js";
+import type { UserSourceReferences } from "../domain/ports/user-source-references.js";
 import type { ProjectContext } from "../domain/project-context.js";
 import type { SetupFlow } from "../domain/setup-flow.js";
 import type {
@@ -25,6 +28,11 @@ import { InitUseCase } from "./init-use-case.js";
 import type { ProjectContextDetectorUseCase } from "./setup/project-context-detector-use-case.js";
 import type { SetupMarketplaceSourceUseCase } from "./setup/setup-marketplace-source-use-case.js";
 import type { SetupToolsResult, SetupToolsUseCase } from "./setup/setup-tools-use-case.js";
+import {
+  frameworkSourceIsShared,
+  resolveProjectRootForReferences,
+  toleratingUnreadableSourceReferences,
+} from "./shared/shared-source-reference-support.js";
 
 export type SetupResult =
   | {
@@ -51,10 +59,18 @@ export class SetupUseCase {
     private readonly setupToolsUseCase: SetupToolsUseCase,
     private readonly setupPluginsPromptUseCase: SetupPluginsPromptUseCase,
     private readonly currentVersionProvider: VersionReader,
+    /** Warns when `references.json` cannot be made sense of — the same recovery this
+     * error already names, printed rather than left to abort `setup` for a file that
+     * gates nothing it depends on. */
+    private readonly logger: Logger,
     private readonly tokenProvider?: TokenProvider,
     private readonly setupToolsPromptUseCase?: SetupToolsPromptUseCase,
     private readonly projectContextDetector?: ProjectContextDetectorUseCase,
-    private readonly releaseResolver?: LatestReleaseResolver
+    private readonly releaseResolver?: LatestReleaseResolver,
+    /** The registry of projects referencing the shared machine-scope source — absent for
+     * every caller that predates it, which skips recording a reference rather than
+     * guessing one. */
+    private readonly userSourceReferences?: UserSourceReferences
   ) {}
 
   async execute(flow: SetupFlow): Promise<SetupResult> {
@@ -119,7 +135,27 @@ export class SetupUseCase {
 
   private async registerMarketplace(flow: SetupFlow, source: MarketplaceSourceMode): Promise<void> {
     const opts = this.buildRegisterOptions(flow, source);
-    await this.marketplaceRegisterFrameworkUseCase.execute(opts);
+    const result = await this.marketplaceRegisterFrameworkUseCase.execute(opts);
+    // The same name-and-scope predicate `sync` and `clean` apply before touching
+    // `references.json` — `MarketplaceRegisterFrameworkUseCase` only ever registers
+    // the framework marketplace, so this is always true today, but a future change to
+    // that use case must not silently start writing a reference for a registration
+    // that is no longer the shared one.
+    if (frameworkSourceIsShared(FRAMEWORK_MARKETPLACE_NAME, result.scope)) {
+      await this.recordSharedSourceReference(flow.projectRoot);
+    }
+  }
+
+  // Written every time this runs, not only the first: another project on this machine
+  // may have registered the shared source before this one ever did, in which case this
+  // project's own reference is still missing until now.
+  private async recordSharedSourceReference(projectRoot: string): Promise<void> {
+    if (this.userSourceReferences === undefined) return;
+    const userSourceReferences = this.userSourceReferences;
+    await toleratingUnreadableSourceReferences(this.logger, undefined, async () => {
+      const resolvedRoot = await resolveProjectRootForReferences(this.fs, projectRoot);
+      await userSourceReferences.addReference(this.currentVersionProvider.get(), resolvedRoot);
+    });
   }
 
   private buildRegisterOptions(

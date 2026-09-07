@@ -6,6 +6,11 @@ export const AIDD_CONFIG_FILENAME = "config.json";
 /** The project-scope marketplace registry, named once: `MarketplaceRegistryAdapter` writes
  * it and `CleanUseCase` removes it, and a second spelling is how one of them forgets. */
 export const AIDD_MARKETPLACES_FILENAME = "marketplaces.json";
+/** The registry of projects that reference the shared machine-scope source, named once
+ * for the same reason as `AIDD_MARKETPLACES_FILENAME`: `UserSourceReferencesAdapter`
+ * writes it, and a future machine-scope `clean` purges it — a second spelling is how one
+ * of them would forget the other. */
+export const USER_SOURCE_REFERENCES_FILENAME = "references.json";
 export const DOCS_DIR = "aidd_docs" as const;
 export const RUNS_SUBDIR = "runs" as const;
 export const PLUGIN_CACHE_SUBDIR = join(AIDD_DIR, "plugin-cache");

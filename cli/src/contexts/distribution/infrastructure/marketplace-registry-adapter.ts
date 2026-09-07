@@ -1,8 +1,9 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { UnreadableMarketplaceRegistryError } from "../../../kernel/errors.js";
 import { AIDD_DIR, AIDD_MARKETPLACES_FILENAME } from "../../../kernel/paths.js";
 import type { MarketplaceScope } from "../../../kernel/scope.js";
+import { atomicWriteFile } from "../../../runtime/filesystem/atomic-write.js";
 import { userConfigDir } from "../../../runtime/user-config-dir.js";
 import { Marketplace, type MarketplaceData } from "../domain/marketplace.js";
 import type { MarketplaceRegistry } from "../domain/ports/marketplace-registry.js";
@@ -112,6 +113,6 @@ export class MarketplaceRegistryAdapter implements MarketplaceRegistry {
       version: SCHEMA_VERSION,
       marketplaces: entries.map((m) => m.toJSON()),
     };
-    await writeFile(path, JSON.stringify(file, null, 2), "utf-8");
+    await atomicWriteFile(path, JSON.stringify(file, null, 2));
   }
 }

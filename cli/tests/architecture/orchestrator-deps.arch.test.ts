@@ -32,6 +32,17 @@ const BASELINE: readonly { readonly path: string; readonly injected: number }[] 
   // detection and an optional release resolver. `setup` is the command that brings a
   // project from nothing to correct, so it necessarily names each stage. It resolves by
   // splitting the flow in two — marketplace groundwork, then tools and plugins.
+  //
+  // Also injected today, and deliberately absent from this count: `fs`, `manifestRepo`,
+  // `currentVersionProvider`, `logger`, `tokenProvider` and `userSourceReferences` — a
+  // plain port, not another use case this one orchestrates. `injectedUseCaseCount` only
+  // ever counts a type imported from a module suffixed `*-use-case.js`, or a name
+  // containing `UseCase`, on purpose: a port is a dependency this use case reads or
+  // writes through, never a step it delegates to
+  // and waits on, which is the depth this ratchet measures. `UserSourceReferences` used
+  // to sit under `application/machine-scope/`, a name close enough to a use case that
+  // its absence from this count read as a gap; moved to `domain/ports/`, alongside every
+  // other port this file already carries uncounted, it is exactly what it always was.
   { path: "src/contexts/framework/application/setup-use-case.ts", injected: 9 },
   // Five section generators reached via `new XUseCase(...)` inside a switch on content
   // section name (agents, commands, rules, skills) plus the config generator called from

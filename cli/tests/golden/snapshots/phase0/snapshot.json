@@ -549,7 +549,29 @@
     "stdout": "Removing claude files...\nRemoving cursor files...\nCleaned all AIDD files (2 files removed)\n",
     "stderr": "",
     "filesWritten": [],
-    "manifest": null
+    "manifest": null,
+    "userConfigFiles": [
+      "cache/built/<VERSION>/aidd-framework/claude/.build-version",
+      "cache/built/<VERSION>/aidd-framework/claude/.claude-plugin/marketplace.json",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/.claude-plugin/plugin.json",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/.mcp.json",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/agents/code-reviewer.md",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/hooks/check.sh",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/hooks/hooks.json",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/skills/commit/SKILL.md",
+      "cache/built/<VERSION>/aidd-framework/claude/plugins/aidd-test/skills/hello.md",
+      "cache/built/<VERSION>/aidd-framework/cursor/.build-version",
+      "cache/built/<VERSION>/aidd-framework/cursor/.cursor-plugin/marketplace.json",
+      "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/.cursor-plugin/plugin.json",
+      "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/.mcp.json",
+      "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/agents/code-reviewer.md",
+      "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/hooks/check.sh",
+      "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/hooks/hooks.json",
+      "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/skills/commit/SKILL.md",
+      "cache/built/<VERSION>/aidd-framework/cursor/plugins/aidd-test/skills/hello.md",
+      "marketplaces.json",
+      "references.json"
+    ]
   },
   {
     "command": "doctor",

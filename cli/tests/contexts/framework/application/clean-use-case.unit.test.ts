@@ -10,6 +10,7 @@ import { CleanUseCase } from "../../../../src/contexts/framework/application/cle
 import { GitignoreUseCase } from "../../../../src/contexts/framework/application/gitignore-use-case.js";
 import { Manifest } from "../../../../src/contexts/framework/domain/manifest.js";
 import { InstalledPlugin } from "../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
+import { UserSourceReferencesAdapter } from "../../../../src/contexts/framework/infrastructure/user-source-references-adapter.js";
 import { cursorProjectHooksScriptDir } from "../../../../src/contexts/tools/domain/formats/cursor-hooks-project-merge.js";
 import type { NativePluginActivator } from "../../../../src/contexts/tools/domain/ports/native-plugin-activator.js";
 import type { ToolId } from "../../../../src/kernel/tool.js";
@@ -376,6 +377,364 @@ describe("clean", () => {
       expect(message).toBeDefined();
       expect(message).toContain("userConfigDir()/marketplaces.json");
       expect(message).toContain(join(HOME, ".codex", "plugins", "cache", MARKETPLACE));
+    });
+
+    describe("this project's own reference to the shared source", () => {
+      const OTHER_PROJECT_ROOT = "/other-project";
+
+      function seedReferences(
+        fs: InMemoryFileAdapter,
+        projectRoots: readonly string[]
+      ): UserSourceReferencesAdapter {
+        for (const root of projectRoots) fs.setFile(join(root, "marker"), "");
+        return new UserSourceReferencesAdapter(fs, () => "/fake-home/.config/aidd");
+      }
+
+      it("drops its own claim but leaves the shared marketplace registered — the other project still sees it", async () => {
+        const manifest = seedManifestWithNativeRegistrations();
+        const fs = new InMemoryFileAdapter();
+        const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+        const activator = new FakeNativePluginActivator({ available: true });
+        const registry = new InMemoryMarketplaceRegistry();
+        await registry.save(
+          PROJECT_ROOT,
+          Marketplace.create({
+            name: MARKETPLACE,
+            source: { kind: "local", path: "/shared/built/path" },
+            scope: "user",
+            addedAt: "2026-01-01T00:00:00.000Z",
+          })
+        );
+        const userSourceReferences = seedReferences(fs, [PROJECT_ROOT, OTHER_PROJECT_ROOT]);
+        await userSourceReferences.addReference("1.0.0", PROJECT_ROOT);
+        await userSourceReferences.addReference("1.0.0", OTHER_PROJECT_ROOT);
+        const useCase = new CleanUseCase(
+          fs,
+          manifestRepo,
+          new CapturingLogger(),
+          new GitignoreUseCase(fs),
+          new Map([[BINARY, activator]]),
+          registry,
+          undefined,
+          new Map(),
+          () => "/fake-home",
+          userSourceReferences
+        );
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        // The host-side guard already in place: the shared marketplace is never
+        // unregistered from claude/codex/copilot by a single project's own `clean`.
+        expect(activator.removedMarketplaces).toEqual([]);
+        // The project-side bookkeeping this lot adds: only this project's own claim
+        // is dropped, and the other project — reading the very same registry — still
+        // finds the marketplace registered.
+        expect(await userSourceReferences.countReferencesForProject(OTHER_PROJECT_ROOT)).toBe(1);
+        expect((await registry.list(OTHER_PROJECT_ROOT)).map((m) => m.name)).toContain(MARKETPLACE);
+      });
+
+      it("names how many other projects still reference the source", async () => {
+        const manifest = seedManifestWithNativeRegistrations();
+        const fs = new InMemoryFileAdapter();
+        const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+        const activator = new FakeNativePluginActivator({ available: true });
+        const registry = new InMemoryMarketplaceRegistry();
+        await registry.save(
+          PROJECT_ROOT,
+          Marketplace.create({
+            name: MARKETPLACE,
+            source: { kind: "local", path: "/shared/built/path" },
+            scope: "user",
+            addedAt: "2026-01-01T00:00:00.000Z",
+          })
+        );
+        const userSourceReferences = seedReferences(fs, [PROJECT_ROOT, OTHER_PROJECT_ROOT]);
+        await userSourceReferences.addReference("1.0.0", PROJECT_ROOT);
+        await userSourceReferences.addReference("1.0.0", OTHER_PROJECT_ROOT);
+        const logger = new CapturingLogger();
+        const useCase = new CleanUseCase(
+          fs,
+          manifestRepo,
+          logger,
+          new GitignoreUseCase(fs),
+          new Map([[BINARY, activator]]),
+          registry,
+          undefined,
+          new Map(),
+          () => "/fake-home",
+          userSourceReferences
+        );
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        const message = logger.warnMessages.find((m) => m.includes("shared by every project"));
+        expect(message).toBeDefined();
+        expect(message).toContain("Still referenced by 1 other project on this machine.");
+      });
+
+      // Decision 4: the singular case above pins "1 other project"; nothing pinned the
+      // plural until now, and a verb-agreement bug hides exactly there ("2 ... reference"
+      // reads fine only because English rarely conjugates a plural verb visibly — the
+      // passive phrasing sidesteps the question for either count).
+      it("names the plural correctly when more than one other project still references the source", async () => {
+        const manifest = seedManifestWithNativeRegistrations();
+        const fs = new InMemoryFileAdapter();
+        const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+        const activator = new FakeNativePluginActivator({ available: true });
+        const registry = new InMemoryMarketplaceRegistry();
+        await registry.save(
+          PROJECT_ROOT,
+          Marketplace.create({
+            name: MARKETPLACE,
+            source: { kind: "local", path: "/shared/built/path" },
+            scope: "user",
+            addedAt: "2026-01-01T00:00:00.000Z",
+          })
+        );
+        const THIRD_PROJECT_ROOT = "/third-project";
+        const userSourceReferences = seedReferences(fs, [
+          PROJECT_ROOT,
+          OTHER_PROJECT_ROOT,
+          THIRD_PROJECT_ROOT,
+        ]);
+        await userSourceReferences.addReference("1.0.0", PROJECT_ROOT);
+        await userSourceReferences.addReference("1.0.0", OTHER_PROJECT_ROOT);
+        await userSourceReferences.addReference("1.0.0", THIRD_PROJECT_ROOT);
+        const logger = new CapturingLogger();
+        const useCase = new CleanUseCase(
+          fs,
+          manifestRepo,
+          logger,
+          new GitignoreUseCase(fs),
+          new Map([[BINARY, activator]]),
+          registry,
+          undefined,
+          new Map(),
+          () => "/fake-home",
+          userSourceReferences
+        );
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        const message = logger.warnMessages.find((m) => m.includes("shared by every project"));
+        expect(message).toBeDefined();
+        expect(message).toContain("Still referenced by 2 other projects on this machine.");
+      });
+
+      it("names that nothing removes the source yet once this was the last reference", async () => {
+        const manifest = seedManifestWithNativeRegistrations();
+        const fs = new InMemoryFileAdapter();
+        const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+        const activator = new FakeNativePluginActivator({ available: true });
+        const registry = new InMemoryMarketplaceRegistry();
+        await registry.save(
+          PROJECT_ROOT,
+          Marketplace.create({
+            name: MARKETPLACE,
+            source: { kind: "local", path: "/shared/built/path" },
+            scope: "user",
+            addedAt: "2026-01-01T00:00:00.000Z",
+          })
+        );
+        const userSourceReferences = seedReferences(fs, [PROJECT_ROOT]);
+        await userSourceReferences.addReference("1.0.0", PROJECT_ROOT);
+        const logger = new CapturingLogger();
+        const useCase = new CleanUseCase(
+          fs,
+          manifestRepo,
+          logger,
+          new GitignoreUseCase(fs),
+          new Map([[BINARY, activator]]),
+          registry,
+          undefined,
+          new Map(),
+          () => "/fake-home",
+          userSourceReferences
+        );
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        const message = logger.warnMessages.find((m) => m.includes("shared by every project"));
+        expect(message).toBeDefined();
+        expect(message).toContain("No project on this machine still references it");
+        expect(message).toContain("aidd clean");
+        expect(await userSourceReferences.countReferencesForProject(PROJECT_ROOT)).toBeUndefined();
+      });
+
+      it("names the still-live reference count in a dry-run, without dropping anything", async () => {
+        const manifest = seedManifestWithNativeRegistrations();
+        const fs = new InMemoryFileAdapter();
+        const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+        const activator = new FakeNativePluginActivator({ available: true });
+        const registry = new InMemoryMarketplaceRegistry();
+        await registry.save(
+          PROJECT_ROOT,
+          Marketplace.create({
+            name: MARKETPLACE,
+            source: { kind: "local", path: "/shared/built/path" },
+            scope: "user",
+            addedAt: "2026-01-01T00:00:00.000Z",
+          })
+        );
+        const userSourceReferences = seedReferences(fs, [PROJECT_ROOT, OTHER_PROJECT_ROOT]);
+        await userSourceReferences.addReference("1.0.0", PROJECT_ROOT);
+        await userSourceReferences.addReference("1.0.0", OTHER_PROJECT_ROOT);
+        const useCase = new CleanUseCase(
+          fs,
+          manifestRepo,
+          new CapturingLogger(),
+          new GitignoreUseCase(fs),
+          new Map([[BINARY, activator]]),
+          registry,
+          undefined,
+          new Map(),
+          () => "/fake-home",
+          userSourceReferences
+        );
+
+        const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: false });
+
+        expect(result.dryRun).toBe(true);
+        expect(result.preview.sharedSourceReferenceCount).toBe(2);
+        // A dry-run must never write: both projects still hold their reference.
+        expect(await userSourceReferences.countReferencesForProject(PROJECT_ROOT)).toBe(2);
+      });
+
+      // Bloquant found in review: `clean` used to ask a `VersionReader` for "the current
+      // CLI version" and decrement that key — wrong whenever the running binary has
+      // self-updated since the `sync` that wrote the reference (the ordinary case, not
+      // an edge case), since the reference sits under the *older* version it was
+      // recorded at. `CleanUseCase` no longer has a version reader to ask at all: this
+      // seeds the reference under an old build's version key with no "current version"
+      // wired in anywhere, and proves `clean` still finds and drops it.
+      it("drops this project's reference even though it was recorded under an older CLI version", async () => {
+        const manifest = seedManifestWithNativeRegistrations();
+        const fs = new InMemoryFileAdapter();
+        const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+        const activator = new FakeNativePluginActivator({ available: true });
+        const registry = new InMemoryMarketplaceRegistry();
+        await registry.save(
+          PROJECT_ROOT,
+          Marketplace.create({
+            name: MARKETPLACE,
+            source: { kind: "local", path: "/shared/built/path" },
+            scope: "user",
+            addedAt: "2026-01-01T00:00:00.000Z",
+          })
+        );
+        const userSourceReferences = seedReferences(fs, [PROJECT_ROOT, OTHER_PROJECT_ROOT]);
+        // Both projects registered while the CLI was still at 0.9.0 — the machine may
+        // since have self-updated any number of times, and this use case has no way
+        // to know or care what version is "current" today.
+        await userSourceReferences.addReference("0.9.0", PROJECT_ROOT);
+        await userSourceReferences.addReference("0.9.0", OTHER_PROJECT_ROOT);
+        const logger = new CapturingLogger();
+        const useCase = new CleanUseCase(
+          fs,
+          manifestRepo,
+          logger,
+          new GitignoreUseCase(fs),
+          new Map([[BINARY, activator]]),
+          registry,
+          undefined,
+          new Map(),
+          () => "/fake-home",
+          userSourceReferences
+        );
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(await userSourceReferences.countReferencesForProject(PROJECT_ROOT)).toBeUndefined();
+        expect(await userSourceReferences.countReferencesForProject(OTHER_PROJECT_ROOT)).toBe(1);
+        const message = logger.warnMessages.find((m) => m.includes("shared by every project"));
+        expect(message).toBeDefined();
+        expect(message).toContain("Still referenced by 1 other project on this machine.");
+      });
+
+      // Bloquant found in review: `references.json` is a help, not an authority — a
+      // corrupted copy must never block the destructive command that does not depend
+      // on it. Before the guard, both the dry-run preview and the `--force` drop threw
+      // `UnreadableUserSourceReferencesError` straight out of `execute`.
+      it("warns and still previews a dry-run when references.json is corrupted", async () => {
+        const manifest = seedManifestWithNativeRegistrations();
+        const fs = new InMemoryFileAdapter();
+        const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+        const activator = new FakeNativePluginActivator({ available: true });
+        const registry = new InMemoryMarketplaceRegistry();
+        await registry.save(
+          PROJECT_ROOT,
+          Marketplace.create({
+            name: MARKETPLACE,
+            source: { kind: "local", path: "/shared/built/path" },
+            scope: "user",
+            addedAt: "2026-01-01T00:00:00.000Z",
+          })
+        );
+        fs.setFile("/fake-home/.config/aidd/references.json", "not json");
+        const userSourceReferences = new UserSourceReferencesAdapter(
+          fs,
+          () => "/fake-home/.config/aidd"
+        );
+        const logger = new CapturingLogger();
+        const useCase = new CleanUseCase(
+          fs,
+          manifestRepo,
+          logger,
+          new GitignoreUseCase(fs),
+          new Map([[BINARY, activator]]),
+          registry,
+          undefined,
+          new Map(),
+          () => "/fake-home",
+          userSourceReferences
+        );
+
+        const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: false });
+
+        expect(result.dryRun).toBe(true);
+        expect(result.preview.sharedSourceReferenceCount).toBeUndefined();
+        expect(logger.warnMessages.some((m) => m.includes("references.json"))).toBe(true);
+      });
+
+      it("warns and still drops the rest when --force runs against a corrupted references.json", async () => {
+        const manifest = seedManifestWithNativeRegistrations();
+        const fs = new InMemoryFileAdapter();
+        const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+        const activator = new FakeNativePluginActivator({ available: true });
+        const registry = new InMemoryMarketplaceRegistry();
+        await registry.save(
+          PROJECT_ROOT,
+          Marketplace.create({
+            name: MARKETPLACE,
+            source: { kind: "local", path: "/shared/built/path" },
+            scope: "user",
+            addedAt: "2026-01-01T00:00:00.000Z",
+          })
+        );
+        fs.setFile("/fake-home/.config/aidd/references.json", "not json");
+        const userSourceReferences = new UserSourceReferencesAdapter(
+          fs,
+          () => "/fake-home/.config/aidd"
+        );
+        const logger = new CapturingLogger();
+        const useCase = new CleanUseCase(
+          fs,
+          manifestRepo,
+          logger,
+          new GitignoreUseCase(fs),
+          new Map([[BINARY, activator]]),
+          registry,
+          undefined,
+          new Map(),
+          () => "/fake-home",
+          userSourceReferences
+        );
+
+        const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(result.dryRun).toBe(false);
+        expect(logger.warnMessages.some((m) => m.includes("references.json"))).toBe(true);
+      });
     });
 
     it("warns and leaves the registration in place when the tool's CLI is not on PATH", async () => {
