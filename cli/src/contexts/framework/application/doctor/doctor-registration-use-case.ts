@@ -1,6 +1,7 @@
 import { join, resolve } from "node:path";
 import { builtMarketplaceDir, userBuiltMarketplaceDir } from "../../../../kernel/paths.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
+import type { VersionReader } from "../../../../kernel/ports/version-reader.js";
 import { type AiToolId, isAiToolId, type ToolId } from "../../../../kernel/tool.js";
 import type { Marketplace } from "../../../distribution/domain/marketplace.js";
 import type { MarketplaceRegistry } from "../../../distribution/domain/ports/marketplace-registry.js";
@@ -19,7 +20,12 @@ import type { NativePluginActivator } from "../../../tools/domain/ports/native-p
 import { getToolConfig, isAiTool, nativeActivationOf } from "../../../tools/domain/registry.js";
 import type { DoctorIssue } from "../../domain/doctor.js";
 import type { Manifest } from "../../domain/manifest.js";
-import { hostMarketplaceSourceConflict } from "../shared/host-marketplace-source-conflict.js";
+import {
+  type HostMarketplaceSourceCheck,
+  hostMarketplaceSourceConflict,
+  isDriftFound,
+  type MarketplaceSourceDriftFound,
+} from "../shared/host-marketplace-source-conflict.js";
 import { readMarketplaceCatalogIdentity } from "../shared/read-marketplace-catalog-identity.js";
 
 export interface DoctorRegistrationOptions {
@@ -73,10 +79,17 @@ export class DoctorRegistrationUseCase {
     > = new Map(),
     /** Root of a user-scope marketplace's built tree, mirroring
      * `EnsureBuiltMarketplaceUseCase`'s own `userCacheRoot` — needed here to recompute
-     * the same path that use case would build, without running a build. Defaults to an
-     * empty root: exercised only for a user-scope marketplace, which every real caller
-     * wires a real one for. */
-    private readonly userCacheRoot: () => string = () => ""
+     * the same path that use case would build, without running a build. No default: a
+     * caller with nothing real to pass here would silently recompute a path this run
+     * never built (see `currentVersion`'s own note). */
+    private readonly userCacheRoot: () => string,
+    /** This run's own CLI version, mirroring `EnsureBuiltMarketplaceUseCase`'s own
+     * `version` — the shared source is one directory per version, so recomputing the
+     * expected path needs the same version that use case would build with. No
+     * default: an empty version used to collapse `join(…, "", …)` to the pre-version
+     * path shape, which is a different, wrong path silently recomputed rather than a
+     * failure — every real caller already wires a real reader. */
+    private readonly currentVersion: VersionReader
   ) {}
 
   async execute(options: DoctorRegistrationOptions): Promise<DoctorIssue[]> {
@@ -132,23 +145,57 @@ export class DoctorRegistrationUseCase {
         // is aidd's own build location, not a host-facing lookup. `hostMarketplaceSourceConflict`
         // is the one place that keying happens, shared with the sync-time guard, so this
         // pass cannot key its lookup by anything else.
-        const conflict = await hostMarketplaceSourceConflict(
+        //
+        // The drift context is handed to every `aidd-framework` entry regardless of
+        // its own recorded `scope`: an unmigrated project-scope registration is
+        // exactly the "still points at this project's own pre-migration cache" case
+        // this decides, and it can only ever be reached from that real state.
+        const check: HostMarketplaceSourceCheck = await hostMarketplaceSourceConflict(
           this.fs,
           toolId,
           reader,
           requestedSource,
-          requestedIdentity
+          requestedIdentity,
+          {
+            userCacheRoot: this.userCacheRoot(),
+            projectRoot,
+            marketplaceName: marketplace.name,
+            target: toolId,
+          }
         );
-        if (conflict === undefined) continue;
-        const diff = pluginSetDifference(conflict.registeredIdentity, conflict.requestedIdentity);
+        if (check === undefined) continue;
+        if (isDriftFound(check)) {
+          issues.push(this.driftIssue(toolId, check));
+          continue;
+        }
+        const diff = pluginSetDifference(check.registeredIdentity, check.requestedIdentity);
         issues.push({
           severity: "error",
-          message: `${toolId}'s marketplace registry (${conflict.location}) carries '${conflict.name}' from a different catalog (${conflict.registeredSource}) than this project's own (${conflict.requestedSource}) — plugins ${describePluginDiff(diff)}`,
-          fix: `Run \`claude plugin marketplace remove ${conflict.name}\`, then \`aidd sync\` to re-register it for this project — or rename this project's marketplace if it is meant to point elsewhere.`,
+          message: `${toolId}'s marketplace registry (${check.location}) carries '${check.name}' from a different catalog (${check.registeredSource}) than this project's own (${check.requestedSource}) — plugins ${describePluginDiff(diff)}`,
+          fix: `Run \`claude plugin marketplace remove ${check.name}\`, then \`aidd sync\` to re-register it for this project — or rename this project's marketplace if it is meant to point elsewhere.`,
         });
       }
     }
     return issues;
+  }
+
+  /** Renders the two drift cases `marketplaceSourceDrift` can decide from the path
+   * alone — both `warning`, never `error`: neither is a fault this project caused,
+   * and neither blocks anything the way a genuine different-catalog conflict does. */
+  private driftIssue(toolId: AiToolId, found: MarketplaceSourceDriftFound): DoctorIssue {
+    const { drift } = found;
+    if (drift.kind === "version-behind") {
+      return {
+        severity: "warning",
+        message: `${toolId}'s marketplace registry (${found.location}) already carries a newer aidd-framework build, ${drift.registeredVersion}, than this run's own ${drift.requestedVersion}`,
+        fix: "Run `aidd update` to bring this project's CLI to at least the version the host already follows.",
+      };
+    }
+    return {
+      severity: "warning",
+      message: `${toolId}'s marketplace registry (${found.location}) still carries '${found.name}' from this project's own pre-migration cache (${found.registeredSource})`,
+      fix: "Run `aidd sync` to move it to the shared, machine-scope source.",
+    };
   }
 
   /** Where this project's build of `marketplace` for `toolId` would land, resolved —
@@ -161,7 +208,12 @@ export class DoctorRegistrationUseCase {
   ): Promise<string | undefined> {
     const raw =
       marketplace.scope === "user"
-        ? userBuiltMarketplaceDir(this.userCacheRoot(), marketplace.name, toolId)
+        ? userBuiltMarketplaceDir(
+            this.userCacheRoot(),
+            this.currentVersion.get(),
+            marketplace.name,
+            toolId
+          )
         : builtMarketplaceDir(projectRoot, marketplace.name, toolId);
     try {
       return await this.fs.realpath(resolve(raw));

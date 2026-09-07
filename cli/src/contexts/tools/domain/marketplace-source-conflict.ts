@@ -23,6 +23,13 @@ export interface MarketplaceCatalogIdentity {
  * `claude plugin marketplace add`'s silent overwrite (measured: exit 0, no prompt,
  * `installLocation` simply replaced), narrowed to the case that overwrite actually
  * breaks: a name that used to mean one plugin set now silently means another.
+ *
+ * A version or migration drift is a separate question, decided from the path's own
+ * segments before this is ever computed — `cli/src/contexts/framework/domain/marketplace-source-drift.ts`'s
+ * `marketplaceSourceDrift`, which this module does not call: that fact is a story
+ * about aidd's own migration, not about a host's registry, and a caller that wants
+ * it decides it first and never calls this function at all when it finds one (see
+ * `contexts/framework/application/shared/host-marketplace-source-conflict.ts`).
  */
 export interface MarketplaceSourceConflict {
   readonly name: string;
@@ -30,9 +37,7 @@ export interface MarketplaceSourceConflict {
   readonly registeredSource: string;
   /** What this project is about to ask the host to register it as instead. */
   readonly requestedSource: string;
-  /** The catalog identity read at `registeredSource`. */
   readonly registeredIdentity: MarketplaceCatalogIdentity;
-  /** The catalog identity read at `requestedSource`. */
   readonly requestedIdentity: MarketplaceCatalogIdentity;
   /** The file the reading came from, so the message names something a person can open. */
   readonly location: string;

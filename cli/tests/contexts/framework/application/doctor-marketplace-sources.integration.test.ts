@@ -4,11 +4,16 @@ import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { Marketplace } from "../../../../src/contexts/distribution/domain/marketplace.js";
 import { DoctorRegistrationUseCase } from "../../../../src/contexts/framework/application/doctor/doctor-registration-use-case.js";
 import { Manifest } from "../../../../src/contexts/framework/domain/manifest.js";
-import { builtMarketplaceDir } from "../../../../src/kernel/paths.js";
+import { builtMarketplaceDir, userBuiltMarketplaceDir } from "../../../../src/kernel/paths.js";
 import type { FileReader } from "../../../../src/kernel/ports/file-reader.js";
+import type { VersionReader } from "../../../../src/kernel/ports/version-reader.js";
 import { FakeHostMarketplaceRegistryReader } from "../../../helpers/ports/fake-host-marketplace-registry-reader.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-marketplace-registry.js";
+
+function fakeVersion(value: string): VersionReader {
+  return { get: () => value };
+}
 
 const PROJECT_ROOT = "/project";
 const NAME = "probe-mkt";
@@ -101,7 +106,9 @@ async function issuesFor(
     registry,
     new Map(),
     new Map(),
-    new Map([["claude", hostReader]])
+    new Map([["claude", hostReader]]),
+    () => "/user-cache",
+    fakeVersion("1.0.0")
   );
   const issues = await useCase.execute({ manifest, projectRoot: PROJECT_ROOT, allowedIds: null });
   // Not filtered by `NAME` (this project's own local alias): a conflict message names
@@ -292,11 +299,101 @@ describe("DoctorRegistrationUseCase — marketplace source conflicts", () => {
       registry,
       new Map(),
       new Map(),
-      new Map([["claude", hostReader]])
+      new Map([["claude", hostReader]]),
+      () => "/user-cache",
+      fakeVersion("1.0.0")
     );
 
     await useCase.execute({ manifest, projectRoot: PROJECT_ROOT, allowedIds: null });
 
     expect(hostReader.reads).toBe(2);
+  });
+});
+
+describe("DoctorRegistrationUseCase — user-scope marketplace source drift", () => {
+  const USER_CACHE_ROOT = "/user-cache";
+  const CURRENT_VERSION = "2.0.0";
+
+  function sharedPath(version: string): string {
+    return resolve(userBuiltMarketplaceDir(USER_CACHE_ROOT, version, NAME, "claude"));
+  }
+
+  async function driftIssuesFor(hostReader: FakeHostMarketplaceRegistryReader) {
+    const fs = new InMemoryFileAdapter({
+      [`${sharedPath(CURRENT_VERSION)}/${CATALOG_RELATIVE}`]: JSON.stringify({
+        name: NAME,
+        plugins: [],
+      }),
+    });
+    const registry = new InMemoryMarketplaceRegistry();
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: NAME,
+        source: { kind: "local", path: "/source" },
+        scope: "user",
+        addedAt: "2026-01-01T00:00:00Z",
+      })
+    );
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    const useCase = new DoctorRegistrationUseCase(
+      fs,
+      registry,
+      new Map(),
+      new Map(),
+      new Map([["claude", hostReader]]),
+      () => USER_CACHE_ROOT,
+      fakeVersion(CURRENT_VERSION)
+    );
+    return useCase.execute({ manifest, projectRoot: PROJECT_ROOT, allowedIds: null });
+  }
+
+  it("warns naming both versions when the host already follows a newer aidd version than this run", async () => {
+    const hostReader = new FakeHostMarketplaceRegistryReader({
+      location: REGISTRY_LOCATION,
+      entries: new Map([[NAME, sharedPath("3.0.0")]]),
+    });
+
+    const issues = await driftIssuesFor(hostReader);
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.severity).toBe("warning");
+    expect(issues[0]?.message).toContain("3.0.0");
+    expect(issues[0]?.message).toContain(CURRENT_VERSION);
+    expect(issues[0]?.fix).toContain("aidd update");
+  });
+
+  it("warns naming `aidd sync` when the host still points at this project's own pre-migration cache", async () => {
+    const projectCache = resolve(builtMarketplaceDir(PROJECT_ROOT, NAME, "claude"));
+    const hostReader = new FakeHostMarketplaceRegistryReader({
+      location: REGISTRY_LOCATION,
+      entries: new Map([[NAME, projectCache]]),
+    });
+
+    const issues = await driftIssuesFor(hostReader);
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.severity).toBe("warning");
+    expect(issues[0]?.message).toContain(projectCache);
+    expect(issues[0]?.fix).toContain("aidd sync");
+  });
+
+  it("says nothing when the host already follows this exact shared version", async () => {
+    const hostReader = new FakeHostMarketplaceRegistryReader({
+      location: REGISTRY_LOCATION,
+      entries: new Map([[NAME, sharedPath(CURRENT_VERSION)]]),
+    });
+
+    expect(await driftIssuesFor(hostReader)).toEqual([]);
+  });
+
+  it("says nothing when this project's own version is ahead of the host's — the host follows on the next sync", async () => {
+    const hostReader = new FakeHostMarketplaceRegistryReader({
+      location: REGISTRY_LOCATION,
+      entries: new Map([[NAME, sharedPath("1.0.0")]]),
+    });
+
+    expect(await driftIssuesFor(hostReader)).toEqual([]);
   });
 });

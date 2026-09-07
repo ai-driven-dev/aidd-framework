@@ -519,7 +519,10 @@ describe("what doctor tells a person to run becomes true once sync has run", () 
       fs,
       registry,
       new Map([["claude", activator]]),
-      new Map([["claude", new RegistryBoundToActivator(activator)]])
+      new Map([["claude", new RegistryBoundToActivator(activator)]]),
+      new Map(),
+      () => "/user-cache",
+      { get: () => "1.0.0" }
     );
     // `buildSync` seeds the repository with a manifest already carrying a plugin, and
     // `MarketplaceSyncSettingsUseCase.execute` mutates that same instance in place rather

@@ -1,8 +1,14 @@
-import { MarketplaceNotFoundError } from "../../../../kernel/errors.js";
+import {
+  InvalidMarketplaceNameError,
+  MarketplaceNotFoundError,
+} from "../../../../kernel/errors.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Prompter } from "../../../../kernel/ports/prompter.js";
 import { AI_TOOL_IDS, type AiToolId } from "../../../../kernel/tool.js";
-import type { Marketplace } from "../../../distribution/domain/marketplace.js";
+import {
+  FRAMEWORK_MARKETPLACE_NAME,
+  type Marketplace,
+} from "../../../distribution/domain/marketplace.js";
 import type { MarketplaceRegistry } from "../../../distribution/domain/ports/marketplace-registry.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
@@ -35,6 +41,16 @@ export class MarketplaceRemoveUseCase {
   ) {}
 
   async execute(options: MarketplaceRemoveOptions): Promise<MarketplaceRemoveResult> {
+    // Machine-scope, shared by every project on this machine (`architecture.md`):
+    // removing it here would orphan the host's own registration for every other
+    // project, with no confirmation and no way back short of `aidd setup` running
+    // again. Nothing today retires it deliberately — it is removed with the
+    // framework itself, by `aidd clean`, once machine scope lands there.
+    if (options.name === FRAMEWORK_MARKETPLACE_NAME) {
+      throw new InvalidMarketplaceNameError(
+        `"${FRAMEWORK_MARKETPLACE_NAME}" is shared by every project on this machine and is not removed with \`aidd marketplace remove\` — it is removed with the framework itself, by \`aidd clean\`, once machine scope lands there.`
+      );
+    }
     const marketplace = await this.findOrThrow(options.projectRoot, options.name);
     const manifest = await this.manifestRepo.load();
     const orphans = manifest ? this.collectOrphans(manifest, options.name) : [];

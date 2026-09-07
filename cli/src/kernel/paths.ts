@@ -49,13 +49,111 @@ export function builtMarketplaceDir(
  * Where a user-scope marketplace's built tree lives: under the CLI's own user
  * directory, which is already the `.aidd` of the user, so the layout below it repeats
  * the project one without repeating the `.aidd` segment.
+ *
+ * The CLI version sits before the marketplace name, not after: a purge of one
+ * version is then a single `rm -rf` on a directory this CLI alone owns, and two
+ * projects on two different CLI versions never resolve to the same directory — the
+ * one shape that lets a second project coexist with a first without one silently
+ * repointing the host away from the other (measured against the real `claude`,
+ * `codex` and `copilot` binaries: only a version-carrying path makes that safe).
  */
 export function userBuiltMarketplaceDir(
   userConfigDir: string,
+  cliVersion: string,
   marketplaceName: string,
   target: string
 ): string {
-  return join(userConfigDir, "cache", "built", marketplaceName, target);
+  return join(userConfigDir, "cache", "built", cliVersion, marketplaceName, target);
+}
+
+/** What `userBuiltMarketplaceDir` encoded into a path, read back. */
+export interface UserBuiltMarketplaceLocation {
+  readonly version: string;
+  readonly marketplaceName: string;
+  readonly target: string;
+}
+
+/**
+ * The inverse of `userBuiltMarketplaceDir`: whether `path` has exactly that shape
+ * under `userConfigDir`, and if so, the version/name/target it carries — `undefined`
+ * for anything else, foreign path included.
+ *
+ * This is how a host's registered source is told apart from a request for a
+ * different version of aidd's own shared build without opening anything: the fact
+ * lives in the path's own segments, decided structurally, never guessed from a
+ * catalog's declared name or plugin set.
+ */
+export function parseUserBuiltMarketplaceDir(
+  userConfigDir: string,
+  path: string,
+  platform: string = process.platform
+): UserBuiltMarketplaceLocation | undefined {
+  const segments = segmentsUnder(join(userConfigDir, "cache", "built"), path, platform);
+  if (segments === undefined || segments.length !== 3) return undefined;
+  const [version, marketplaceName, target] = segments;
+  return { version, marketplaceName, target };
+}
+
+/** What `builtMarketplaceDir` encoded into a path, read back. */
+export interface BuiltMarketplaceLocation {
+  readonly marketplaceName: string;
+  readonly target: string;
+}
+
+/**
+ * The inverse of `builtMarketplaceDir`, mirroring `parseUserBuiltMarketplaceDir` for
+ * the project-scope shape — decidable the same way, from the path's own segments.
+ */
+export function parseBuiltMarketplaceDir(
+  projectRoot: string,
+  path: string,
+  platform: string = process.platform
+): BuiltMarketplaceLocation | undefined {
+  const segments = segmentsUnder(join(projectRoot, BUILT_CACHE_SUBDIR), path, platform);
+  if (segments === undefined || segments.length !== 2) return undefined;
+  const [marketplaceName, target] = segments;
+  return { marketplaceName, target };
+}
+
+/** The path segments of `path` past `base`, or `undefined` when `path` does not sit
+ * under `base` at all — the shared string mechanics behind both parsers above, so
+ * the separator-normalisation rule lives in one place, the same as
+ * `pathContainsOrEquals`. Compares spelling (folded by `platform` for the containment
+ * test only — the segments returned keep their original casing); does not resolve
+ * either side. A trailing separator on `base` is tolerated: a real directory string
+ * carrying one is not a corrupted path. */
+function segmentsUnder(base: string, path: string, platform: string): string[] | undefined {
+  const normalizedBase = stripTrailingSeparator(base.replace(/\\/g, "/"));
+  const normalizedPath = stripTrailingSeparator(path.replace(/\\/g, "/"));
+  const compareBase = foldCase(normalizedBase, platform);
+  const comparePath = foldCase(normalizedPath, platform);
+  if (!comparePath.startsWith(`${compareBase}/`)) return undefined;
+  const remainder = normalizedPath.slice(normalizedBase.length + 1);
+  if (remainder.length === 0) return undefined;
+  return remainder.split("/");
+}
+
+function stripTrailingSeparator(p: string): string {
+  return p.length > 1 && p.endsWith("/") ? p.slice(0, -1) : p;
+}
+
+function foldCase(p: string, platform: string): string {
+  return platform === "win32" ? p.toLowerCase() : p;
+}
+
+/** Whether two path segments name the same thing, folded the same way a case-insensitive
+ * platform's own filesystem would: identical spelling everywhere but win32, where the
+ * comparison is case-insensitive — the same rule `segmentsUnder` applies to containment,
+ * named here for a caller comparing an already-extracted segment (a marketplace name, a
+ * build target) rather than a whole path. `platform` is passed explicitly, never read
+ * from `process.platform` directly, so a test can exercise the win32 branch on any OS —
+ * the same testable shape `mcp-exclusion.ts`'s `transformFor` already uses. */
+export function samePathSegment(
+  a: string,
+  b: string,
+  platform: string = process.platform
+): boolean {
+  return platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
 }
 
 // One directory is the other, or contains it. Two callers guard on this - a build refusing

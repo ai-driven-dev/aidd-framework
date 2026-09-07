@@ -44,7 +44,15 @@ async function issuesFor(
   const activators = new Map([
     ["claude", new FakeNativePluginActivator({ available: toolInstalled, enablesPlugins: false })],
   ]);
-  return new DoctorRegistrationUseCase(fs, registry, activators).execute({
+  return new DoctorRegistrationUseCase(
+    fs,
+    registry,
+    activators,
+    new Map(),
+    new Map(),
+    () => "/user-cache",
+    { get: () => "1.0.0" }
+  ).execute({
     manifest,
     projectRoot: PROJECT_ROOT,
     allowedIds: null,
@@ -133,7 +141,15 @@ async function nativeIssuesFor(
   if (reading !== "unreachable") {
     hostRegistries.set("claude", new FakeHostPluginRegistryReader(reading));
   }
-  return new DoctorRegistrationUseCase(fs, registry, activators, hostRegistries).execute({
+  return new DoctorRegistrationUseCase(
+    fs,
+    registry,
+    activators,
+    hostRegistries,
+    new Map(),
+    () => "/user-cache",
+    { get: () => "1.0.0" }
+  ).execute({
     manifest,
     projectRoot: PROJECT_ROOT,
     allowedIds: null,

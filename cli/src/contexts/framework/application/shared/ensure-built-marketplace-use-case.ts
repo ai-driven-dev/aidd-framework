@@ -74,7 +74,12 @@ export class EnsureBuiltMarketplaceUseCase implements EnsureBuiltMarketplace {
     // diverge from the path that gets checked. Both scopes need it, not just the project one.
     const builtDir = resolve(
       options.marketplace.scope === "user"
-        ? userBuiltMarketplaceDir(this.userCacheRoot(), options.marketplace.name, options.target)
+        ? userBuiltMarketplaceDir(
+            this.userCacheRoot(),
+            this.version.get(),
+            options.marketplace.name,
+            options.target
+          )
         : builtMarketplaceDir(options.projectRoot, options.marketplace.name, options.target)
     );
     const resolved = await this.resolveMarketplace.execute({

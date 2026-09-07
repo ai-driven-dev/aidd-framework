@@ -28,7 +28,11 @@ import type {
 import type { Manifest } from "../../domain/manifest.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { EnsureBuiltMarketplace } from "../shared/ensure-built-marketplace-use-case.js";
-import { hostMarketplaceSourceConflict } from "../shared/host-marketplace-source-conflict.js";
+import {
+  hostMarketplaceSourceConflict,
+  isDriftFound,
+  type MarketplaceSourceDriftFound,
+} from "../shared/host-marketplace-source-conflict.js";
 import {
   marketplaceCatalogProbePath,
   readMarketplaceCatalogIdentity,
@@ -110,7 +114,15 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     private readonly hostMarketplaceRegistries: ReadonlyMap<
       AiToolId,
       HostMarketplaceRegistryReader
-    > = new Map()
+    > = new Map(),
+    /** Root of a user-scope marketplace's built tree, mirroring
+     * `EnsureBuiltMarketplaceUseCase`'s own `userCacheRoot` — `guardAgainstConflict`
+     * needs it to decide a version/migration drift the same way `doctor`'s own
+     * `checkMarketplaceSources` does. No separate CLI-version reader is needed here,
+     * unlike `DoctorRegistrationUseCase`: the version a drift is decided against comes
+     * from `builtDir` itself, already built by `ensureBuilt` before this ever runs,
+     * rather than a path recomputed without one. */
+    private readonly userCacheRoot: () => string = () => ""
   ) {}
 
   async execute(options: MarketplaceSyncSettingsOptions): Promise<MarketplaceSyncSettingsResult> {
@@ -370,7 +382,15 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
       );
     }
     const hostName = requestedIdentity.name;
-    await this.guardAgainstConflict(toolId, builtDir, requestedIdentity);
+    const decision = await this.guardAgainstConflict(
+      toolId,
+      builtDir,
+      requestedIdentity,
+      marketplace,
+      projectRoot,
+      warnings
+    );
+    if (decision === "skip") return hostName;
     try {
       activator.addMarketplace(builtDir, marketplace.scope);
     } catch (error) {
@@ -414,33 +434,78 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
    * reached through a different, resolved path (two projects, one shared build) is
    * not a conflict either: only a genuinely different catalog under the same name
    * refuses.
+   *
+   * A version/migration drift is decided first, from the path alone, the same
+   * context `doctor`'s own `checkMarketplaceSources` builds — computed for every
+   * `aidd-framework` entry regardless of its own recorded `scope`, since it is the
+   * rollback refusal itself that must hold on that state:
+   *
+   * - the host already follows a *newer* build of aidd's own shared source
+   *   (`version-behind`) — this run must never repoint it backward, so it writes
+   *   nothing and returns `"skip"`, warning rather than throwing: this is not this
+   *   project's fault, and every other tool this run touches must still proceed.
+   * - the host still points at this project's own pre-migration cache
+   *   (`unmigrated-project-source`) — this run's own build is the newer, shared
+   *   source, so it proceeds exactly as an unguarded call would: `addMarketplace`
+   *   moves the host onto it, which is the migration itself completing.
+   * - no drift at all — a genuine different-catalog conflict throws, as before.
    */
   private async guardAgainstConflict(
     toolId: ToolId,
     builtDir: string,
-    requestedIdentity: MarketplaceCatalogIdentity
-  ): Promise<void> {
-    if (!isAiToolId(toolId)) return;
-    if (nativeActivationOf(toolId)?.marketplaceRegistry === undefined) return;
+    requestedIdentity: MarketplaceCatalogIdentity,
+    marketplace: Marketplace,
+    projectRoot: string,
+    warnings: string[]
+  ): Promise<"proceed" | "skip"> {
+    if (!isAiToolId(toolId)) return "proceed";
+    if (nativeActivationOf(toolId)?.marketplaceRegistry === undefined) return "proceed";
     const reader = this.hostMarketplaceRegistries.get(toolId);
-    if (reader === undefined) return;
+    if (reader === undefined) return "proceed";
     const requestedSource = await this.fs.realpath(builtDir).catch(() => builtDir);
-    const conflict = await hostMarketplaceSourceConflict(
+    const check = await hostMarketplaceSourceConflict(
       this.fs,
       toolId,
       reader,
       requestedSource,
-      requestedIdentity
+      requestedIdentity,
+      {
+        userCacheRoot: this.userCacheRoot(),
+        projectRoot,
+        marketplaceName: marketplace.name,
+        target: toolId,
+      }
     );
-    if (conflict === undefined) return;
-    const diff = pluginSetDifference(conflict.registeredIdentity, conflict.requestedIdentity);
+    if (check === undefined) return "proceed";
+    if (isDriftFound(check)) return this.decideOnDrift(toolId, check, warnings);
+    const diff = pluginSetDifference(check.registeredIdentity, check.requestedIdentity);
     throw new MarketplaceSourceConflictError(
-      `Marketplace '${conflict.name}' is already registered from a different catalog: ` +
-        `${conflict.registeredSource} differs from the one requested, ${conflict.requestedSource} ` +
-        `— plugins ${describePluginDiff(diff)}, per ${conflict.location}. ` +
-        `Run \`claude plugin marketplace remove ${conflict.name}\`, then \`aidd sync\` again ` +
+      `Marketplace '${check.name}' is already registered from a different catalog: ` +
+        `${check.registeredSource} differs from the one requested, ${check.requestedSource} ` +
+        `— plugins ${describePluginDiff(diff)}, per ${check.location}. ` +
+        `Run \`claude plugin marketplace remove ${check.name}\`, then \`aidd sync\` again ` +
         `to re-register it for this project.`
     );
+  }
+
+  /** The rollback refusal itself: a host already following a newer build never gets
+   * written backward. Warned, not thrown — this is not a bug in this project's own
+   * request, and a caller iterating several tools must still proceed to the rest. */
+  private decideOnDrift(
+    toolId: ToolId,
+    found: MarketplaceSourceDriftFound,
+    warnings: string[]
+  ): "proceed" | "skip" {
+    if (found.drift.kind !== "version-behind") return "proceed";
+    const { registeredVersion, requestedVersion } = found.drift;
+    const message =
+      `${toolId}'s marketplace registry (${found.location}) already carries a newer ` +
+      `aidd-framework build, ${registeredVersion}, than this run's own ${requestedVersion} — ` +
+      "not registering this run's build over it. Run `aidd update` to bring this project's " +
+      "CLI to at least the version the host already follows.";
+    this.logger.warn(message);
+    warnings.push(message);
+    return "skip";
   }
 
   // `add` refused, which for a global registry means the name is already held. Whose

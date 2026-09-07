@@ -73,7 +73,15 @@ function makeDoctorUseCase(fs: FileReader, manifest: Manifest): DoctorUseCase {
     new DoctorPluginUseCase(new DetectPluginDriftUseCase(fs)),
     new DoctorReferencesUseCase(fs),
     new DoctorLayoutUseCase(fs),
-    new DoctorRegistrationUseCase(fs, new InMemoryMarketplaceRegistry())
+    new DoctorRegistrationUseCase(
+      fs,
+      new InMemoryMarketplaceRegistry(),
+      new Map(),
+      new Map(),
+      new Map(),
+      () => "/user-cache",
+      { get: () => "1.0.0" }
+    )
   );
 }
 

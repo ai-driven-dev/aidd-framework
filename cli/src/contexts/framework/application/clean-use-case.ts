@@ -231,7 +231,9 @@ export class CleanUseCase {
         binary,
         alias,
         hostName,
-        projectRoot
+        projectRoot,
+        toolId,
+        home
       );
       if (removed) removedHostNames.add(hostName);
     }
@@ -251,7 +253,9 @@ export class CleanUseCase {
     binary: string,
     alias: string,
     hostName: string,
-    projectRoot: string
+    projectRoot: string,
+    toolId: ToolId,
+    home: string
   ): Promise<boolean> {
     const marketplaces = (await this.marketplaceRegistry?.list(projectRoot)) ?? [];
     const marketplace = marketplaces.find((m) => m.name === alias);
@@ -261,10 +265,41 @@ export class CleanUseCase {
       );
       return false;
     }
+    if (marketplace.scope === "user") {
+      // Machine-scope: every project on this machine shares this one registration, so
+      // a single project's `clean` must never unregister it — doing so would silently
+      // break every other project too. A future reference count will let this project
+      // drop its own claim without touching the shared entry (its own plugin refs are
+      // still uninstalled just before this call); until then it is left registered.
+      // There is no machine-scope `aidd clean` yet to remove it deliberately.
+      //
+      // Three things survive this, not one: the host's own registration (named
+      // above), the `userConfigDir()/marketplaces.json` entry
+      // `MarketplaceRegisterFrameworkUseCase` wrote (this project's own registry
+      // never held it to begin with, once machine-scope migration has run — nothing
+      // here to delete), and this tool's own plugin cache — named by its absolute
+      // path when this tool's profile declares one, the same fact
+      // `describeSurvivingCachePaths` announces for a binary that is off `PATH`.
+      this.logger.warn(
+        `${binary}: '${hostName}' is shared by every project on this machine — left registered. ` +
+          `Its entry survives at userConfigDir()/marketplaces.json${this.describeSurvivingCachePath(toolId, hostName, home)}.`
+      );
+      return false;
+    }
     return this.bestEffort(
       () => activator.removeMarketplace(hostName, marketplace.scope),
       `${binary} marketplace remove '${hostName}'`
     );
+  }
+
+  /** One marketplace's own surviving cache path, the single-`hostName` counterpart to
+   * `describeSurvivingCachePaths` — empty for a tool whose profile declares no
+   * `NativeActivation.pluginCacheDir` (copilot). */
+  private describeSurvivingCachePath(toolId: ToolId, hostName: string, home: string): string {
+    if (!isAiToolId(toolId)) return "";
+    const cacheRoot = nativeActivationOf(toolId)?.pluginCacheDir?.(home);
+    if (cacheRoot === undefined) return "";
+    return `, and its cache at: ${join(cacheRoot, hostName)}`;
   }
 
   /** Named for the "not on the PATH" warning: `clean` never even reaches

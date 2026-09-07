@@ -234,7 +234,13 @@ fi
 section "marketplace add/list/remove (local source)"
 P_MKT=$(new_project)
 MKT_SRC="$TMPROOT/mkt-src"; mkdir -p "$MKT_SRC/.claude-plugin"
-printf '%s' '{"name":"local-mkt","version":"1.0.0","plugins":[]}' > "$MKT_SRC/.claude-plugin/marketplace.json"
+# `owner` is required by the real claude binary's own marketplace schema — absent here,
+# every native registration against this fixture silently failed (best-effort, so aidd's
+# own exit code stayed 0) and was masked by aidd-framework's own project-scope local
+# registration landing in the same `.claude/settings.local.json`. Machine-scope
+# aidd-framework (`aidd-framework`'s scope is now `user`, so it no longer writes there)
+# stopped masking it, surfacing this fixture's own pre-existing defect.
+printf '%s' '{"name":"local-mkt","owner":{"name":"smoke"},"version":"1.0.0","plugins":[]}' > "$MKT_SRC/.claude-plugin/marketplace.json"
 (cd "$P_MKT" && node "$CLI" setup --source local --path "$FRAMEWORK_FIXTURE" --ai claude --plugins none --yes >/dev/null 2>&1)
 run "marketplace add (local)" 0 "" "$P_MKT" -- marketplace add local "$MKT_SRC" --yes
 run "marketplace list" 0 "" "$P_MKT" -- marketplace list
@@ -275,12 +281,18 @@ fi
 if command -v claude >/dev/null 2>&1; then
   claude_local="$P_SCOPE/.claude/settings.local.json"
   claude_home="$HOME/.claude/settings.json"
-  if [[ -f "$claude_local" ]] && grep -q "extraKnownMarketplaces" "$claude_local"; then
+  # Names the marketplace itself rather than the generic `extraKnownMarketplaces` key,
+  # which any declaration at all would satisfy, this one included by accident. Keyed by
+  # `local-mkt`, the catalog's own declared name — measured against a real run: this
+  # file is written keyed by `hostName`, never `scoped`, aidd's own local alias for this
+  # entry (`marketplace-entry.ts`'s `claudeStyleMarketplaceKey`, the same fact
+  # `nativeRegistrations` records `hostName` for elsewhere).
+  if [[ -f "$claude_local" ]] && grep -q '"local-mkt"' "$claude_local"; then
     ok "claude declares the project marketplace at local scope"
   else
     bad "claude has no local-scope declaration in $claude_local"
   fi
-  if [[ -f "$claude_home" ]] && grep -q "user-mkt" "$claude_home"; then
+  if [[ -f "$claude_home" ]] && grep -q '"user-mkt"' "$claude_home"; then
     ok "claude declares the user marketplace in the home settings"
   else
     bad "claude wrote no user-scope declaration in $claude_home"
@@ -288,10 +300,16 @@ if command -v claude >/dev/null 2>&1; then
   # Match the marketplace NAME only. The path would match too, but for the wrong
   # reason: a user-scope marketplace is built inside the project that registered it,
   # so the home settings legitimately name that project's directory.
-  if grep -q '"local-mkt"' "$claude_home" 2>/dev/null; then
-    bad "a project-scope registration leaked into the home settings"
-  else
+  #
+  # Requires `"user-mkt"` present as well as `"local-mkt"` absent: a negative grep
+  # alone passes vacuously against a $claude_home that never got written at all (a
+  # native registration that silently failed end to end), which would report a leak
+  # was avoided when nothing was ever proven registered in the first place.
+  if [[ -f "$claude_home" ]] && grep -q '"user-mkt"' "$claude_home" \
+    && ! grep -q '"local-mkt"' "$claude_home"; then
     ok "the project registration stayed out of the home settings"
+  else
+    bad "a project-scope registration leaked into the home settings, or $claude_home was never written"
   fi
 else
   skip "claude scope placement (binary not installed)"

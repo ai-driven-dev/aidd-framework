@@ -47,6 +47,17 @@ const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 // refuses every second sync. 595 leaves ~1.8 % headroom over the 584.55 KB this guard
 // landed at — tighter than the usual ~2 %, on purpose, rather than padding past what was
 // actually measured; 577.18 KB is the baseline the next raise measures against.
+// 610 was set 2026-09-07 when the machine-scope migration completed and the rollback
+// refusal landed: `MarketplaceRegisterFrameworkUseCase` retiring a pre-existing
+// project-scope entry, `marketplaceSourceDrift` moved to `contexts/framework/domain` and
+// wired into both the read side (`doctor`) and the write side (`sync`'s own
+// `registerMarketplace`, which now refuses to repoint a host backward rather than only
+// reporting it after the fact), `marketplace remove`'s reserved-name guard, and the
+// `realpath` normalisation the drift comparison needed on every path it takes. Measured
+// 597.95 KB, no control build isolating this lot's own delta from what 595 already
+// carried (a `git worktree` for that one number was judged not worth the added git state
+// against the no-stash rule this pass runs under). 610 leaves ~2.0 % headroom over the
+// measured 597.95 KB.
 const budgetKB = pkg.bundleBudgetKB ?? 500;
 const budgetBytes = budgetKB * 1024;
 

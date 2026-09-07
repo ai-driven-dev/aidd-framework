@@ -265,7 +265,8 @@ export async function createDeps(
     logger,
     nativePluginActivators,
     ensureBuiltMarketplaceUseCase,
-    hostMarketplaceRegistries
+    hostMarketplaceRegistries,
+    userConfigDir
   );
   const pluginAddUseCase = new PluginAddUseCase(
     fs,
@@ -358,7 +359,8 @@ export async function createDeps(
       nativePluginActivators,
       hostPluginRegistryReaders(),
       hostMarketplaceRegistries,
-      userConfigDir
+      userConfigDir,
+      currentVersionProvider
     )
   );
   const releaseResolver = new GitHubReleaseResolverAdapter(http, authReader);

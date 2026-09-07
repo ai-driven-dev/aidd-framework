@@ -18,7 +18,9 @@ describe("MarketplaceRegisterFrameworkUseCase", () => {
     expect(result.registered).toBe(true);
     const list = await registry.list(PROJECT_ROOT);
     expect(list[0]?.name).toBe(FRAMEWORK_MARKETPLACE_NAME);
-    expect(list[0]?.scope).toBe("project");
+    // Machine scope: the framework entry is shared by every project on this machine,
+    // never tied to the one that happened to run `setup` first.
+    expect(list[0]?.scope).toBe("user");
     expect(list[0]?.source.kind).toBe("github");
     if (list[0]?.source.kind === "github") {
       expect(list[0]?.source.repo).toBe("ai-driven-dev/framework");

@@ -115,7 +115,14 @@ exit 0
       const tools = manifest.tools as Record<string, unknown>;
       expect(tools).toHaveProperty("claude");
 
-      const mktRaw = await readFile(join(projectDir, AIDD_DIR, "marketplaces.json"), "utf-8");
+      // The framework marketplace is machine-scope, not project-scope: every project on
+      // this machine shares one registration, so it lives under the user config dir
+      // (here, the sandboxed `fakeHome/.config/aidd`), never under the project's own
+      // `.aidd/`.
+      const mktRaw = await readFile(
+        join(fakeHome, ".config", "aidd", "marketplaces.json"),
+        "utf-8"
+      );
       const marketplaces = JSON.parse(mktRaw) as {
         marketplaces: Array<{ name: string; source: { kind: string; path: string } }>;
       };

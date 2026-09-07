@@ -333,6 +333,51 @@ describe("clean", () => {
       expect(activator.removedMarketplaces).toEqual([MARKETPLACE]);
     });
 
+    it("leaves a machine-scope marketplace registered — every other project on this machine shares it — while still uninstalling this project's own plugin ref", async () => {
+      const manifest = seedManifestWithNativeRegistrations();
+      const fs = new InMemoryFileAdapter();
+      const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+      const activator = new FakeNativePluginActivator({ available: true });
+      const registry = new InMemoryMarketplaceRegistry();
+      registry.save(
+        PROJECT_ROOT,
+        Marketplace.create({
+          name: MARKETPLACE,
+          source: { kind: "local", path: "/shared/built/path" },
+          scope: "user",
+          addedAt: "2026-01-01T00:00:00.000Z",
+        })
+      );
+      const logger = new CapturingLogger();
+      const HOME = "/fake-home";
+      const useCase = new CleanUseCase(
+        fs,
+        manifestRepo,
+        logger,
+        new GitignoreUseCase(fs),
+        new Map([[BINARY, activator]]),
+        registry,
+        undefined,
+        new Map(),
+        () => HOME
+      );
+
+      await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(activator.uninstalledPlugins).toEqual([REF]);
+      expect(activator.removedMarketplaces).toEqual([]);
+      // Bloquant/dette 9: the message used to name only one of the three things that
+      // actually survive — the host's own registration. `userConfigDir()/marketplaces.json`
+      // (the entry `MarketplaceRegisterFrameworkUseCase` wrote) and the tool's own
+      // plugin cache both survive it too, and neither was named.
+      const message = logger.warnMessages.find(
+        (m) => m.includes(MARKETPLACE) && m.includes("shared by every project")
+      );
+      expect(message).toBeDefined();
+      expect(message).toContain("userConfigDir()/marketplaces.json");
+      expect(message).toContain(join(HOME, ".codex", "plugins", "cache", MARKETPLACE));
+    });
+
     it("warns and leaves the registration in place when the tool's CLI is not on PATH", async () => {
       const manifest = seedManifestWithNativeRegistrations();
       const fs = new InMemoryFileAdapter();

@@ -4,21 +4,7 @@
     "exitCode": 0,
     "stdout": "Fetching marketplace 'aidd-framework'...\nProject initialized.\nInstalled claude (1 files)\n",
     "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\n",
-    "filesWritten": [
-      ".aidd/cache/built/aidd-framework/claude/.build-version",
-      ".aidd/cache/built/aidd-framework/claude/.claude-plugin/marketplace.json",
-      ".aidd/cache/built/aidd-framework/claude/plugins/aidd-test/.claude-plugin/plugin.json",
-      ".aidd/cache/built/aidd-framework/claude/plugins/aidd-test/.mcp.json",
-      ".aidd/cache/built/aidd-framework/claude/plugins/aidd-test/agents/code-reviewer.md",
-      ".aidd/cache/built/aidd-framework/claude/plugins/aidd-test/hooks/check.sh",
-      ".aidd/cache/built/aidd-framework/claude/plugins/aidd-test/hooks/hooks.json",
-      ".aidd/cache/built/aidd-framework/claude/plugins/aidd-test/skills/commit/SKILL.md",
-      ".aidd/cache/built/aidd-framework/claude/plugins/aidd-test/skills/hello.md",
-      ".aidd/manifest.json",
-      ".aidd/marketplaces.json",
-      ".claude/settings.json",
-      ".gitignore"
-    ],
+    "filesWritten": [".aidd/manifest.json", ".claude/settings.json", ".gitignore"],
     "manifest": {
       "version": 8,
       "tools": {
@@ -62,7 +48,7 @@
   {
     "command": "marketplace list",
     "exitCode": 0,
-    "stdout": "aidd-framework v0.1.0 [project]\n",
+    "stdout": "aidd-framework v0.1.0 [user]\n",
     "stderr": "",
     "filesWritten": [],
     "manifest": {
@@ -185,15 +171,6 @@
     "stdout": "Installed cursor (1 files)\n",
     "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\n",
     "filesWritten": [
-      ".aidd/cache/built/aidd-framework/cursor/.build-version",
-      ".aidd/cache/built/aidd-framework/cursor/.cursor-plugin/marketplace.json",
-      ".aidd/cache/built/aidd-framework/cursor/plugins/aidd-test/.cursor-plugin/plugin.json",
-      ".aidd/cache/built/aidd-framework/cursor/plugins/aidd-test/.mcp.json",
-      ".aidd/cache/built/aidd-framework/cursor/plugins/aidd-test/agents/code-reviewer.md",
-      ".aidd/cache/built/aidd-framework/cursor/plugins/aidd-test/hooks/check.sh",
-      ".aidd/cache/built/aidd-framework/cursor/plugins/aidd-test/hooks/hooks.json",
-      ".aidd/cache/built/aidd-framework/cursor/plugins/aidd-test/skills/commit/SKILL.md",
-      ".aidd/cache/built/aidd-framework/cursor/plugins/aidd-test/skills/hello.md",
       ".cursor/hooks.json",
       ".cursor/hooks/aidd-test/check.sh",
       ".cursor/settings.json"

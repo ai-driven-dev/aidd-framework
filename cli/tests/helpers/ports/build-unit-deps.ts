@@ -185,7 +185,10 @@ export function buildDoctorUseCase(
       deps.fs,
       deps.marketplaceRegistry,
       deps.nativePluginActivators,
-      hostRegistries
+      hostRegistries,
+      new Map(),
+      () => "/user-cache",
+      { get: () => "1.0.0" }
     )
   );
 }

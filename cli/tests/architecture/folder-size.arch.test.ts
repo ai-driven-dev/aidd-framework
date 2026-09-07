@@ -74,6 +74,11 @@ const BASELINE: readonly { readonly path: string; readonly count: number }[] = [
   // file is not, and moving one of them out to make room would be exactly the shuffle this
   // rule refuses.
   { path: "src/contexts/tools/domain", count: 11 },
+
+  // `cli/src/contexts/framework/domain/marketplace-source-drift.ts` joined: deciding a version/migration drift is a
+  // fact about aidd's own migration, which belongs in `framework`, not `tools`
+  // (bloquant 12, `architecture.md`'s "concern decides placement" rule).
+  { path: "src/contexts/framework/domain", count: 11 },
 ];
 
 /** Direct `.ts` files per parent directory — a subfolder counts toward itself, not its parent. */

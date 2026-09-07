@@ -2,11 +2,17 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import "../../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
-import { Marketplace } from "../../../../../src/contexts/distribution/domain/marketplace.js";
+import {
+  FRAMEWORK_MARKETPLACE_NAME,
+  Marketplace,
+} from "../../../../../src/contexts/distribution/domain/marketplace.js";
 import { MarketplaceRemoveUseCase } from "../../../../../src/contexts/framework/application/flows/marketplace-remove-use-case.js";
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
 import { InstalledPlugin } from "../../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
-import { MarketplaceNotFoundError } from "../../../../../src/kernel/errors.js";
+import {
+  InvalidMarketplaceNameError,
+  MarketplaceNotFoundError,
+} from "../../../../../src/kernel/errors.js";
 import { DeterministicHasher } from "../../../../helpers/ports/deterministic-hasher.js";
 import { InMemoryFileAdapter } from "../../../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryManifestRepository } from "../../../../helpers/ports/in-memory-manifest-repository.js";
@@ -191,5 +197,35 @@ describe("MarketplaceRemoveUseCase", () => {
     expect(fs.deletedPaths.some((p) => p.includes(join(".cursor", "plugins", "local")))).toBe(
       false
     );
+  });
+
+  // Bloquant 4: `aidd-framework` is machine-scope, shared by every project — removing
+  // it from one project's own `marketplace remove` would silently orphan the host's
+  // own registration for every other project on the machine, with no confirmation.
+  // `marketplace add` already refuses this reserved name (`InvalidMarketplaceNameError`
+  // in `marketplace-add-use-case.ts`); `remove` gets the symmetric guard.
+  it("refuses to remove the reserved aidd-framework marketplace, leaving the registry untouched", async () => {
+    const { useCase, registry } = buildUseCase();
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: FRAMEWORK_MARKETPLACE_NAME,
+        source: { kind: "local", path: "." },
+        scope: "user",
+        addedAt: "2026-04-29T10:00:00.000Z",
+      })
+    );
+
+    await expect(
+      useCase.execute({
+        name: FRAMEWORK_MARKETPLACE_NAME,
+        projectRoot: PROJECT_ROOT,
+        autoConfirm: true,
+      })
+    ).rejects.toThrow(InvalidMarketplaceNameError);
+
+    const list = await registry.list(PROJECT_ROOT);
+    expect(list).toHaveLength(1);
+    expect(list[0]?.name).toBe(FRAMEWORK_MARKETPLACE_NAME);
   });
 });

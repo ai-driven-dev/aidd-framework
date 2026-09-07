@@ -435,5 +435,43 @@ describe("outDir invariant for the cache-rebuild build path", () => {
 
     expect(result.builtDir.startsWith("/user-cache")).toBe(true);
     expect(result.builtDir.startsWith(PROJECT)).toBe(false);
+    expect(result.builtDir).toContain("/5.0.0/");
+  });
+
+  // The shared source is one per CLI version: a purge of one version must never take
+  // another version's registration with it. Two projects on two different CLI
+  // versions building the same user-scope marketplace must land in disjoint trees.
+  it("builds two different CLI versions of a user-scope marketplace into disjoint directories", async () => {
+    const memFs = new InMemoryFileAdapter();
+    const capturing: FrameworkBuildFor = (_t, _m, outDir) =>
+      ({
+        execute: async () => {
+          await memFs.writeFile(join(outDir, ".claude-plugin/marketplace.json"), "{}");
+          return { outDir, plugins: [], totalFiles: 1 };
+        },
+      }) satisfies FrameworkBuild;
+
+    const buildAt = async (version: string) => {
+      const uc = new EnsureBuiltMarketplaceUseCase(
+        memFs,
+        fakeResolve("/src/framework", "1.0.0"),
+        capturing,
+        fakeVersion(version),
+        () => "/user-cache"
+      );
+      return uc.execute({
+        projectRoot: PROJECT,
+        marketplace: makeUserMarketplace(),
+        target: "claude",
+        mode: "marketplace",
+      });
+    };
+
+    const v1 = await buildAt("1.0.0");
+    const v2 = await buildAt("2.0.0");
+
+    expect(v1.builtDir).not.toBe(v2.builtDir);
+    expect(v2.builtDir.startsWith(v1.builtDir)).toBe(false);
+    expect(v1.builtDir.startsWith(v2.builtDir)).toBe(false);
   });
 });
