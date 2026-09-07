@@ -45,7 +45,9 @@ class ClaudeKnownMarketplacesReader implements HostMarketplaceRegistryReader {
     try {
       content = await readFile(this.path, "utf8");
     } catch (error) {
-      return { location: this.path, unreadable: describeError(error) };
+      const described = describeError(error);
+      if (described === "ENOENT") return { location: this.path, absent: true };
+      return { location: this.path, unreadable: described };
     }
     let parsed: unknown;
     try {

@@ -138,6 +138,11 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
           // Declared here alone: neither codex nor copilot needs it (see the field's
           // own doc), which is what keeps that guard claude-only by declaration.
           marketplaceRegistry: (h) => join(h, ".claude", "plugins", "known_marketplaces.json"),
+          // Root of claude's own plugin cache. `clean` composes `<root>/<hostName>` and
+          // purges only once a fresh read of `marketplaceRegistry` above no longer names
+          // it — claude marks an orphaned tree `.orphaned_at` but never deletes it itself
+          // (measured against the real binary in a relocated HOME).
+          pluginCacheDir: (h) => join(h, ".claude", "plugins", "cache"),
         },
         marketplaceSettings: {
           settingsPath: ".claude/settings.json",

@@ -91,6 +91,28 @@ export interface NativeActivation {
    * in that guard.
    */
   marketplaceRegistry?: (homedir: string) => string;
+  /**
+   * Resolver for the root of this tool's own plugin cache, given a homedir string — a
+   * **root**, not a per-marketplace path, the same shape `marketplaceRegistry` and
+   * `userPluginsDir` already take. Declared only where the host's own CLI is measured
+   * to leave something behind under it after `clean` has driven `uninstallPlugin` then
+   * `removeMarketplace` for every ref and marketplace it recorded:
+   *
+   * - claude leaves the built tree in full — `uninstallPlugin`/`removeMarketplace` mark
+   *   it `.orphaned_at` but never delete it (measured 2026-09-03/07, reproduced against
+   *   the real `claude` binary in a relocated `HOME`);
+   * - codex's own `plugin remove` does delete the tree's *content*, but not the empty
+   *   `cache/<hostName>/` shell left holding it — the residue that reached the real
+   *   `$HOME` on every `smoke:real` run before this field existed. Copilot never
+   *   copies anything (measured), so it declares neither this nor `marketplaceRegistry`.
+   *
+   * `clean` reads this declaration alone; it invents no path for a tool that omits it.
+   * The two hosts above differ in what proves their leftover safe to remove — see
+   * `CleanUseCase.purgeOneMarketplaceCache` — but neither is ever removed on the
+   * manifest's word alone: containment against this very root, through `realpath`, is
+   * the one check both share.
+   */
+  pluginCacheDir?: (homedir: string) => string;
 }
 
 export interface NativePluginsParams {

@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   mergeCodexConfigToml,
@@ -137,13 +138,27 @@ describe("codex", () => {
   });
 
   describe("capabilities.plugins", () => {
-    it("declares native codex CLI activation, with the verbs codex uses", () => {
-      expect(codex.capabilities.plugins.nativeActivation).toEqual({
+    it("declares native codex CLI activation, with the verbs codex uses, and nothing else", () => {
+      const activation = codex.capabilities.plugins.nativeActivation;
+      // Exhaustive, not `toMatchObject`: a field added to codex's own nativeActivation
+      // by mistake must fail this test, not escape it silently — `marketplaceRegistry`
+      // stays absent by never being listed here, `pluginCacheDir` is pinned separately
+      // below and stood in for by `expect.any(Function)` since its own reference
+      // never matches an object literal's.
+      expect(activation).toEqual({
         binary: "codex",
         upgradeVerb: "upgrade",
         enableVerb: "add",
         disableVerb: "remove",
+        pluginCacheDir: expect.any(Function),
       });
+    });
+
+    it("declares its own plugin cache root, so clean can purge the empty shell codex leaves behind", () => {
+      const pluginCacheDir = codex.capabilities.plugins.nativeActivation?.pluginCacheDir;
+      expect(pluginCacheDir?.("/home/tester")).toBe(
+        join("/home/tester", ".codex", "plugins", "cache")
+      );
     });
 
     it("does not write a project-local marketplace settings file", () => {

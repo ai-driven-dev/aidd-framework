@@ -440,7 +440,8 @@ export async function createDeps(
     gitignoreUseCase,
     nativePluginActivators,
     marketplaceRegistry,
-    prompter
+    prompter,
+    hostMarketplaceRegistries
   );
   const doctorAllUseCase = new DoctorAllUseCase(doctorUseCase);
   const listInstalledRulesUseCase = new ListInstalledRulesUseCase(fs);

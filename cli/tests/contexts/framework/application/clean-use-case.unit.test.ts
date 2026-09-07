@@ -352,9 +352,17 @@ describe("clean", () => {
 
       expect(activator.uninstalledPlugins).toEqual([]);
       expect(activator.removedMarketplaces).toEqual([]);
-      expect(logger.warnMessages).toContain(
-        "codex: registration left in place, the codex CLI is not on the PATH."
-      );
+      // The cache `purgeNativeCaches` never even gets to consider — this tool's
+      // absent binary means `undone` never carries it — must still be named, the
+      // same absolute path the dry-run preview would have announced.
+      const survivingCache = join(homedir(), ".codex", "plugins", "cache", MARKETPLACE);
+      expect(
+        logger.warnMessages.some(
+          (m) =>
+            m.startsWith("codex: registration left in place, the codex CLI is not on the PATH.") &&
+            m.includes(survivingCache)
+        )
+      ).toBe(true);
     });
 
     it("uninstalls the plugin ref before removing the marketplace, for the same tool", async () => {
@@ -427,7 +435,13 @@ describe("clean", () => {
 
       expect(result.dryRun).toBe(true);
       expect(result.preview.nativeRegistrations).toEqual([
-        { toolId: "codex", binary: BINARY, marketplaceCount: 1, pluginRefCount: 1 },
+        {
+          toolId: "codex",
+          binary: BINARY,
+          marketplaceCount: 1,
+          pluginRefCount: 1,
+          cachePaths: [join(homedir(), ".codex", "plugins", "cache", MARKETPLACE)],
+        },
       ]);
       expect(activator.uninstalledPlugins).toEqual([]);
       expect(activator.removedMarketplaces).toEqual([]);

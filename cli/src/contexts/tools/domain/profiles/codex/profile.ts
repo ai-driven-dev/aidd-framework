@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { AgentsCapability } from "../../capabilities/agents-capability.js";
 import { CommandsCapability } from "../../capabilities/commands-capability.js";
 import { CONFIG_MCP } from "../../capabilities/config-refs.js";
@@ -197,6 +198,14 @@ export const codex: AiTool<
         upgradeVerb: "upgrade",
         enableVerb: "add",
         disableVerb: "remove",
+        // Codex's own `plugin remove` deletes a marketplace's cached content but leaves
+        // the now-empty `cache/<hostName>/` shell behind (measured against the real
+        // binary in a relocated HOME; this is the residue `smoke:real` left in the real
+        // `$HOME` on every run before this field existed). No `marketplaceRegistry` is
+        // declared here — codex refuses a re-add from a different source itself, so
+        // there is no registry to reread — which is why `clean` proves this leftover
+        // safe to remove by its own emptiness instead, never by a registry read.
+        pluginCacheDir: (h) => join(h, ".codex", "plugins", "cache"),
       },
     }),
   },

@@ -30,9 +30,18 @@ export interface HostMarketplaceRegistryReading {
    * `HostPluginRegistryReading.refs` draws for the same reason.
    */
   readonly entries?: ReadonlyMap<string, string>;
-  /** Why the registry could not be read, when it could not: absent, unreadable, or
-   * holding something this reader will not pretend to understand. Present exactly when
-   * `entries` is absent. */
+  /**
+   * `true` when the registry file itself does not exist — nothing has ever named a
+   * marketplace there, so a consumer proving a cache safe to purge may treat this the
+   * same as an empty registry. Distinct from `unreadable`: a file that exists but
+   * could not be opened or parsed proves nothing, while one that never existed proves
+   * the opposite of something being held. Never set together with `unreadable`.
+   */
+  readonly absent?: true;
+  /** Why the registry could not be read, when it exists but reading or parsing it
+   * failed — permission denied, malformed content, or a shape this reader will not
+   * pretend to understand. Present exactly when `entries` and `absent` are both
+   * absent. */
   readonly unreadable?: string;
 }
 

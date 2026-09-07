@@ -37,6 +37,9 @@ export function registerCleanCommand(program: Command): void {
             output.print(
               `  ${registration.toolId}: ${registration.binary} will be asked to unregister ${registration.pluginRefCount} plugin ref(s) and ${registration.marketplaceCount} marketplace(s)`
             );
+            for (const cachePath of registration.cachePaths) {
+              output.print(`    cache to purge once unregistered: ${cachePath}`);
+            }
           }
           const toolCount = result.preview.tools.length;
           if (process.stdout.isTTY) {

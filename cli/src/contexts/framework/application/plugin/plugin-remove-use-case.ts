@@ -4,6 +4,7 @@ import { NativePluginCliError, PluginNotFoundError } from "../../../../kernel/er
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Logger } from "../../../../kernel/ports/logger.js";
+import { resolveHomeDir } from "../../../../kernel/reading/home-dir.js";
 import type { AiToolId } from "../../../../kernel/tool.js";
 import type { McpCapability } from "../../../tools/domain/capabilities/mcp-capability.js";
 import { unmergeOpencodeMcp } from "../../../tools/domain/formats/opencode-mcp-merge.js";
@@ -11,11 +12,13 @@ import type { NativePluginActivator } from "../../../tools/domain/ports/native-p
 import {
   getToolConfig,
   isAiTool,
+  nativeActivationOf,
   resolvePluginsCapability,
 } from "../../../tools/domain/registry.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
+import { resolveCacheCandidate } from "../shared/purge-declared-cache.js";
 import { removeProjectHooks } from "../shared/remove-project-hooks.js";
 import { loadPluginManifest } from "./plugin-helpers.js";
 import {
@@ -61,7 +64,9 @@ export class PluginRemoveUseCase {
       const plugin = plugins.find((p) => p.name === pluginName);
       if (plugin === undefined) continue;
       const baseDir = resolveBaseDirFromRecord(plugin.scope, toolId, projectRoot, nodeHomedir);
-      this.removeNativeActivation(plugin, toolId);
+      const confirmed = this.removeNativeActivation(plugin, toolId);
+      if (confirmed !== undefined)
+        await this.purgeCachedPlugin(manifest, toolId, plugin, confirmed);
       await this.deletePluginFiles(plugin.files, baseDir);
       await this.removeMcpEntries(plugin, toolId, projectRoot);
       await removeProjectHooks(this.fs, pluginName, toolId, projectRoot);
@@ -80,34 +85,82 @@ export class PluginRemoveUseCase {
   // MarketplaceSyncSettingsUseCase.pluginRefsToEnable's `marketplace == null` skip), so there
   // is nothing to undo. Best-effort: a host that can't be reached must warn by name with what
   // is left behind, never fail the whole removal silently.
-  private removeNativeActivation(plugin: InstalledPlugin, toolId: AiToolId): void {
+  //
+  // Returns `undefined` when there was nothing to undo at all (no native activation, or
+  // never activated this way) — `purgeCachedPlugin` then has nothing to gate on either,
+  // since a plugin this CLI never asked a host to enable left no cache to purge. `true`
+  // or `false` otherwise: whether the host's own CLI confirmed the uninstall.
+  private removeNativeActivation(plugin: InstalledPlugin, toolId: AiToolId): boolean | undefined {
     const nativeActivation = resolvePluginsCapability(toolId)?.nativeActivation;
-    if (nativeActivation == null || plugin.marketplace === undefined) return;
+    if (nativeActivation == null || plugin.marketplace === undefined) return undefined;
     const activator = this.activators.get(nativeActivation.binary);
-    if (activator === undefined) return;
+    if (activator === undefined) return undefined;
     const ref = `${plugin.name}@${plugin.marketplace}`;
-    this.uninstallViaActivator(activator, nativeActivation.binary, ref);
+    return this.uninstallViaActivator(activator, nativeActivation.binary, ref);
   }
 
   private uninstallViaActivator(
     activator: NativePluginActivator,
     binary: string,
     ref: string
-  ): void {
+  ): boolean {
     if (!activator.isAvailable()) {
       this.logger.warn(
         `${binary} CLI not found on PATH — '${ref}' was not uninstalled from ${binary}'s own plugin registry and may still be enabled there.`
       );
-      return;
+      return false;
     }
     try {
       activator.uninstallPlugin(ref);
+      return true;
     } catch (error) {
       if (!(error instanceof NativePluginCliError)) throw error;
       this.logger.warn(
         `${binary} plugin uninstall '${ref}' failed: ${error.message} — an entry for it may remain in ${binary}'s own plugin registry.`
       );
+      return false;
     }
+  }
+
+  /**
+   * `cache/<hostName>/<plugin>/` under the same declared-root-plus-`realpath`-
+   * containment whitelist `clean`'s own marketplace-level purge shares
+   * (`cli/src/contexts/framework/application/shared/purge-declared-cache.ts`) — but never gated on emptiness the way that one is:
+   * this directory holds exactly the content this removal is asking the host to
+   * forget, not a leftover shell another project's install could still hold, so once
+   * `confirmed` says the host's own CLI actually uninstalled the ref, the whole
+   * subtree goes. `hostName` comes from this tool's own `NativeRegistrations`, keyed
+   * by `plugin.marketplace` (this project's own alias) — never the alias itself,
+   * which a host never learns (see `CleanUseCase.undoMarketplaceRegistration`).
+   */
+  private async purgeCachedPlugin(
+    manifest: Manifest,
+    toolId: AiToolId,
+    plugin: InstalledPlugin,
+    confirmed: boolean
+  ): Promise<void> {
+    if (plugin.marketplace === undefined) return;
+    const cacheRoot = nativeActivationOf(toolId)?.pluginCacheDir?.(resolveHomeDir());
+    if (cacheRoot === undefined) return;
+    const hostName = manifest
+      .getNativeRegistrations(toolId)
+      ?.marketplaces.find((m) => m.alias === plugin.marketplace)?.hostName;
+    if (hostName === undefined) return;
+    const label = `${toolId}: cache for '${plugin.name}'`;
+    const candidate = await resolveCacheCandidate(
+      this.fs,
+      this.logger,
+      cacheRoot,
+      join(hostName, plugin.name),
+      label
+    );
+    if (candidate === null) return;
+    if (!confirmed) {
+      this.logger.warn(`${label} left in place, its own removal was not confirmed: ${candidate}`);
+      return;
+    }
+    await this.fs.deleteDirectory(candidate);
+    this.logger.info(`${label} purged: ${candidate}`);
   }
 
   private async removeMcpEntries(

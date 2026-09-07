@@ -46,9 +46,14 @@ export interface MarketplaceSourceConflict {
  * Pure: both identities must already be read (from each source's own `marketplace.json`)
  * by the caller — this function only compares values. Rules, in order:
  *
- * - a registry that could not be read (`entries` absent) answers no conflict. Unknown
- *   is never a zero: a caller that cannot ask the host must not invent an answer for
- *   it, the same rule {@link answeredRegistry} already holds for a plugin ref.
+ * - a registry with no entries at all answers no conflict, whichever of the two ways
+ *   `entries` came back absent: the file has never existed (`reading.absent`) or it
+ *   exists but could not be read or parsed (`reading.unreadable`). This function does
+ *   not need to tell the two apart — both are "unknown", and unknown is never a zero:
+ *   a caller that cannot ask the host must not invent an answer for it, the same rule
+ *   {@link answeredRegistry} already holds for a plugin ref. `clean`'s own cache purge
+ *   is the one caller that does tell them apart, because its two answers differ:
+ *   nothing ever named there is safe to purge, something unread is not.
  * - a name absent from the registry answers no conflict — nothing is held yet.
  * - a registered source whose own catalog could not be read (`registeredIdentity`
  *   absent) answers no conflict: a dead entry, most often a directory that no longer

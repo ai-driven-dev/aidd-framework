@@ -250,13 +250,22 @@ export class Manifest {
         `manifest version ${version} was written by a newer CLI than this one. Run \`aidd update\` to update this CLI, then try again.`
       );
     }
-    const provenance =
+    // A v6 document is also the one case this method's own guard admits a remedy
+    // richer than deletion for: 5.2.2's own manifest reader accepts exactly its native
+    // version, 6 — measured against the published tag (`git show cli-v5.2.2`) — so its
+    // `clean --force` can still be run against this project before the manifest naming
+    // what it registered is gone. A v7 document has no such CLI: 5.2.2 refuses it too
+    // ("Unsupported manifest version: 7"), so naming it there would be a false remedy.
+    const remedy =
       version === 6
-        ? "5.2.2, a published CLI, wrote this version"
-        : "No published CLI can write this version";
+        ? "5.2.2, a published CLI, wrote this version. Before deleting it, run " +
+          "`npx @ai-driven-dev/cli@5.2.2 clean --force` in this project so it unregisters " +
+          "what it registered and clears its own cache — once the manifest naming those " +
+          "is gone, nothing can drive that anymore. Then delete"
+        : "No published CLI can write this version: delete";
     throw new InvalidManifestDataError(
       `manifest version ${String(version)} predates version ${MANIFEST_VERSION}, the only one this CLI reads. ` +
-        `${provenance}: delete ${MANIFEST_PATH_HINT} in this project, then run ` +
+        `${remedy} ${MANIFEST_PATH_HINT} in this project, then run ` +
         "`aidd setup` to reinstall the framework."
     );
   }

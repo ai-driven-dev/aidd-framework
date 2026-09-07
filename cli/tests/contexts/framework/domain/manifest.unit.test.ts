@@ -352,6 +352,33 @@ describe("Manifest", () => {
       expect(() => Manifest.fromJSON(v6)).not.toThrow(/No published CLI can write this version/);
     });
 
+    // 5.2.2's own manifest reader accepts exactly version 6, its native version — so its
+    // `clean --force` can still unregister a host's native registrations before the
+    // manifest naming them is deleted. Named before the deletion, never after: once the
+    // manifest is gone, nothing can drive that CLI's own unregistration anymore.
+    it("names `clean --force` on 5.2.2 before naming the deletion, for a version 6 manifest", () => {
+      const v6 = { version: 6, tools: {} };
+      let message = "";
+      try {
+        Manifest.fromJSON(v6);
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error);
+      }
+      expect(message).toContain("npx @ai-driven-dev/cli@5.2.2 clean --force");
+      const cleanIndex = message.indexOf("clean --force");
+      const deleteIndex = message.indexOf("delete .aidd/manifest.json");
+      expect(cleanIndex).toBeGreaterThan(-1);
+      expect(deleteIndex).toBeGreaterThan(cleanIndex);
+    });
+
+    // A v7 document has no such CLI: 5.2.2 itself refuses to read anything past its own
+    // native version 6, so naming its `clean` here would send a stuck user to a command
+    // that cannot even open the file.
+    it("never names 5.2.2's clean for a version 7 manifest, which that CLI cannot read either", () => {
+      const v7 = { version: 7, tools: {} };
+      expect(() => Manifest.fromJSON(v7)).not.toThrow(/5\.2\.2/);
+    });
+
     it("v0 manifest throws, naming the recovery invocation", () => {
       const v0 = { version: 0, tools: {} };
       expect(() => Manifest.fromJSON(v0)).toThrow(/version/);

@@ -81,11 +81,25 @@ describe("Claude Code's own known_marketplaces.json", () => {
     expect(reading.entries?.get("probe-mkt")).toBe(realTarget);
   });
 
-  it("says it could not read an absent registry, and carries no entries at all", async () => {
+  it("says a registry that has never existed is absent, never unreadable", async () => {
     const reading = await reader().read();
 
     expect(reading.entries).toBeUndefined();
-    expect(reading.unreadable).toBe("ENOENT");
+    expect(reading.absent).toBe(true);
+    expect(reading.unreadable).toBeUndefined();
+  });
+
+  it("says a registry path it cannot read for any other reason is unreadable, never absent", async () => {
+    // A directory where the registry file should be: ENOENT never fires, some other
+    // I/O error does (EISDIR) — the shape ENOENT-only handling would wrongly report
+    // as absent, purging a cache `clean` has no proof is safe to.
+    await mkdir(registryPath(), { recursive: true });
+
+    const reading = await reader().read();
+
+    expect(reading.entries).toBeUndefined();
+    expect(reading.absent).toBeUndefined();
+    expect(reading.unreadable).toBeDefined();
   });
 
   it("reads an empty registry as an empty answer, not as unreadable", async () => {

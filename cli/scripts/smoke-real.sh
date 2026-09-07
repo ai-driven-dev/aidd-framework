@@ -48,6 +48,11 @@ MODE="allow-existing"
 
 AI_TOOLS=(claude codex copilot opencode cursor)
 declare -A PRESENT=()
+# Set to "present" right after `plugin install`, once each host's own cache directory
+# is proven to exist — `set -u` is on, so these must exist before `cleanup`'s trap can
+# read them even on an early failure that never reaches that point.
+CLAUDE_CACHE_BEFORE=""
+CODEX_CACHE_BEFORE=""
 
 PASS=0; FAIL=0; SKIP=0
 FAILURES=()
@@ -218,12 +223,50 @@ cleanup() {
         ok "claude: known_marketplaces.json carries no trace of $UPSTREAM_NAME"
       fi
     fi
+    # Measured (aidd_docs/memory/architecture.md): `claude plugin uninstall` +
+    # `marketplace remove` leave the built tree under cache/$MKT/ in full, marked
+    # `.orphaned_at`, never deleted by claude itself — `clean` now purges it once the
+    # check above proves known_marketplaces.json no longer names it. This is checked
+    # against `CLAUDE_CACHE_BEFORE`, captured right after `plugin install` below,
+    # never a bare `[[ -d ]]` here alone: an absent directory proves nothing on its
+    # own unless this run is also the one that watched it appear first.
+    if [[ "$CLAUDE_CACHE_BEFORE" != "present" ]]; then
+      bad "claude: plugins/cache/$MKT was never proven present before clean ran"
+    elif [[ -d "$HOME/.claude/plugins/cache/$MKT" ]]; then
+      bad "claude: plugins/cache/$MKT still exists after clean"
+    else
+      ok "claude: plugins/cache/$MKT is gone after clean, having been proven present before"
+    fi
+    # Phase C2's alias-divergence registration again, this time its cache: the same
+    # `pluginCacheDir` root a plugin install populates, but here reached through
+    # `marketplace add` alone (no plugin ever installed under this name), so this
+    # asserts absence-after only — a "before" claim this script has not measured.
+    if [[ -n "${UPSTREAM_NAME:-}" ]]; then
+      if [[ -d "$HOME/.claude/plugins/cache/$UPSTREAM_NAME" ]]; then
+        bad "claude: plugins/cache/$UPSTREAM_NAME still exists after clean"
+      else
+        ok "claude: plugins/cache/$UPSTREAM_NAME carries no trace after clean"
+      fi
+    fi
   fi
   if [[ -n "${PRESENT[codex]:-}" ]]; then
     if grep -qF "\"$REF\"" "$HOME/.codex/config.toml" 2>/dev/null; then
       bad "codex: config.toml still names $REF after clean"
     else
       ok "codex: config.toml carries no trace of $REF"
+    fi
+    # Measured: `codex plugin remove` deletes a marketplace's cached content but
+    # leaves the now-empty cache/$MKT/ shell behind — the residue that reached this
+    # real $HOME on every smoke:real run before `clean` learned to purge an empty one.
+    # Same non-vacuity guard as claude's above: `CODEX_CACHE_BEFORE` is captured right
+    # after `plugin install`, so an absent directory here is proven gone, not merely
+    # never populated.
+    if [[ "$CODEX_CACHE_BEFORE" != "present" ]]; then
+      bad "codex: plugins/cache/$MKT was never proven present before clean ran"
+    elif [[ -d "$HOME/.codex/plugins/cache/$MKT" ]]; then
+      bad "codex: plugins/cache/$MKT still exists after clean"
+    else
+      ok "codex: plugins/cache/$MKT is gone after clean, having been proven present before"
     fi
   fi
   if [[ -n "${PRESENT[copilot]:-}" ]]; then
@@ -291,6 +334,29 @@ if [[ -n "${PRESENT[cursor]:-}" ]]; then
   [[ -f "$HOME/.cursor/plugins/local/$MKT/.cursor-plugin/plugin.json" ]] \
     && ok "cursor: ~/.cursor/plugins/local/$MKT/.cursor-plugin/plugin.json exists" \
     || bad "cursor: ~/.cursor/plugins/local/$MKT/.cursor-plugin/plugin.json missing"
+fi
+
+# `cleanup`'s own cache/$MKT checks below are otherwise vacuous: an absent directory
+# after `clean` proves nothing unless this run also watched it exist first. Path
+# fragments here (`.claude/plugins/cache`, `.codex/plugins/cache`) are the same ones
+# `claude/profile.ts` and `codex/profile.ts` declare as `NativeActivation.pluginCacheDir`
+# — pinned to that source by `scripts/__tests__/smoke-real-plugin-cache-path-parity.test.js`,
+# since this script cannot call into the built CLI to read the path back out.
+if [[ -n "${PRESENT[claude]:-}" ]]; then
+  if [[ -d "$HOME/.claude/plugins/cache/$MKT" ]]; then
+    CLAUDE_CACHE_BEFORE="present"
+    ok "claude: plugins/cache/$MKT exists before clean"
+  else
+    bad "claude: plugins/cache/$MKT does not exist after plugin install"
+  fi
+fi
+if [[ -n "${PRESENT[codex]:-}" ]]; then
+  if [[ -d "$HOME/.codex/plugins/cache/$MKT" ]]; then
+    CODEX_CACHE_BEFORE="present"
+    ok "codex: plugins/cache/$MKT exists before clean"
+  else
+    bad "codex: plugins/cache/$MKT does not exist after plugin install"
+  fi
 fi
 
 # Checks the one thing this run put in doctor's hands: whether it names $REF as an

@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { claude } from "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 
@@ -126,6 +127,18 @@ describe("claude", () => {
     it("pluginOutputDir returns correct path for a plugin name", () => {
       expect(claude.capabilities.plugins.pluginOutputDir("my-plugin")).toBe(
         ".claude/plugins/my-plugin/"
+      );
+    });
+
+    // The unit-level pinning codex's own nativeActivation already gets — claude's was
+    // covered only indirectly, by the `join` an integration test recomposes.
+    it("declares its own marketplace registry and plugin cache root, for clean's own purge", () => {
+      const activation = claude.capabilities.plugins.nativeActivation;
+      expect(activation?.marketplaceRegistry?.("/home/tester")).toBe(
+        join("/home/tester", ".claude", "plugins", "known_marketplaces.json")
+      );
+      expect(activation?.pluginCacheDir?.("/home/tester")).toBe(
+        join("/home/tester", ".claude", "plugins", "cache")
       );
     });
   });

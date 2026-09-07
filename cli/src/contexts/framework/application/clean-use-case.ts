@@ -1,4 +1,3 @@
-import { homedir as nodeHomedir } from "node:os";
 import { dirname, join } from "node:path";
 import { NativePluginCliError } from "../../../kernel/errors.js";
 import {
@@ -16,12 +15,15 @@ import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";
 import type { Logger } from "../../../kernel/ports/logger.js";
 import type { Prompter } from "../../../kernel/ports/prompter.js";
+import { resolveHomeDir } from "../../../kernel/reading/home-dir.js";
 import type { AiToolId, ToolId } from "../../../kernel/tool.js";
 import { isAiToolId } from "../../../kernel/tool.js";
 import type { MarketplaceRegistry } from "../../distribution/domain/ports/marketplace-registry.js";
+import type { HostMarketplaceRegistryReader } from "../../tools/domain/ports/host-marketplace-registry-reader.js";
 import type { NativePluginActivator } from "../../tools/domain/ports/native-plugin-activator.js";
 import {
   machineLocalFilesOf,
+  nativeActivationOf,
   projectHooksFileOf,
   resolvePluginsCapability,
 } from "../../tools/domain/registry.js";
@@ -33,6 +35,10 @@ import { isStrictlyWithinUserScope } from "../domain/plugins/user-scope-containm
 import type { ManifestRepository } from "../domain/ports/manifest-repository.js";
 import type { GitignoreUseCase } from "./gitignore-use-case.js";
 import { deletePluginFilesForTool } from "./plugin/plugin-helpers.js";
+import {
+  purgeCacheIfEmptyAndConfirmed,
+  resolveCacheCandidate,
+} from "./shared/purge-declared-cache.js";
 import { removeProjectHooks } from "./shared/remove-project-hooks.js";
 
 interface CleanOptions {
@@ -52,6 +58,12 @@ interface CleanPreview {
     binary: string;
     marketplaceCount: number;
     pluginRefCount: number;
+    /** Absolute cache paths a `--force` run will attempt to purge, once undoing this
+     * registration actually frees each name — empty for a tool whose profile declares
+     * no `NativeActivation.pluginCacheDir`. A dry-run announcement, not a guarantee:
+     * whether a path is still there to purge, and whether it turns out safe to, is
+     * only known once the host's own CLI has actually run. */
+    cachePaths: readonly string[];
   }>;
 }
 
@@ -60,6 +72,15 @@ interface CleanResult {
   manifestFound: boolean;
   preview: CleanPreview;
   fileCount: number;
+}
+
+/** What `undoNativeRegistrations` learned about one tool's registrations: the full
+ * record the manifest carried, and which `hostName`s `removeMarketplace` itself
+ * confirmed the host forgot — a strict subset of `registrations.marketplaces` whenever
+ * the host refused one. See `purgeNativeCaches`. */
+interface UndoneRegistration {
+  registrations: NativeRegistrations;
+  removedHostNames: ReadonlySet<string>;
 }
 
 export class CleanUseCase {
@@ -75,7 +96,25 @@ export class CleanUseCase {
     /** Resolves a registered marketplace's own scope, needed to undo a native
      * registration at the same scope it was added at (see `undoNativeRegistrations`). */
     private readonly marketplaceRegistry?: MarketplaceRegistry,
-    private readonly prompter?: Prompter
+    private readonly prompter?: Prompter,
+    /** Readers of a host's own marketplace registry, keyed by `AiToolId` — the same map
+     * `MarketplaceSyncSettingsUseCase` reads, reused here as `purgeNativeCaches`'s own
+     * post-condition. Absent for a tool whose profile declares no `marketplaceRegistry`
+     * (codex): `purgeOneMarketplaceCache` then proves its leftover safe to remove by its
+     * own emptiness instead of a registry read. Defaults to empty for every existing
+     * caller that predates this guard. */
+    private readonly hostMarketplaceRegistries: ReadonlyMap<
+      AiToolId,
+      HostMarketplaceRegistryReader
+    > = new Map(),
+    /** The one resolver for the OS home directory this use case ever calls —
+     * `resolveHomeDir()` by default, never `os.homedir()` directly. `purgeNativeCaches`
+     * composes its cache root from this, and `filesSafeToDelete` its user-scope
+     * containment boundary: both must read the same `HOME` the caller's own
+     * `hostMarketplaceRegistries` readers were built from (see
+     * `host-marketplace-registry-reader-adapter.ts`), or a `HOME` override reaches one
+     * half of a post-condition and not the other. */
+    private readonly homeDir: () => string = resolveHomeDir
   ) {}
 
   async execute(options: CleanOptions): Promise<CleanResult> {
@@ -84,7 +123,8 @@ export class CleanUseCase {
       const emptyPreview: CleanPreview = { tools: [], totalFileCount: 0, nativeRegistrations: [] };
       return { dryRun: false, manifestFound: false, preview: emptyPreview, fileCount: 0 };
     }
-    const preview = this.buildPreview(manifest);
+    const home = this.homeDir();
+    const preview = this.buildPreview(manifest, home);
     const dryRunResult = await this.confirmOrDryRun(options, preview);
     if (dryRunResult !== null) return dryRunResult;
     // Undoing a host's own registration must happen before any of the rest: the tool's
@@ -92,7 +132,11 @@ export class CleanUseCase {
     // and that tree lives under .aidd/cache/ — which removeAiddState deletes next.
     // Deleting it first leaves the host's own registry pointing at a source that no
     // longer exists, which the host may then refuse to unregister at all.
-    await this.undoNativeRegistrations(manifest, options.projectRoot);
+    const undone = await this.undoNativeRegistrations(manifest, options.projectRoot, home);
+    // Purging a host's own plugin cache is the next step, never before this: it is only
+    // ever safe once undoNativeRegistrations has actually asked that host to forget the
+    // name (see purgeNativeCaches's own post-conditions).
+    await this.purgeNativeCaches(home, undone);
     let deleted = await this.deleteAllToolFiles(manifest, options.projectRoot);
     deleted += await this.deleteMachineLocalFiles(manifest, options.projectRoot);
     await this.removeAiddState(options.projectRoot);
@@ -131,26 +175,48 @@ export class CleanUseCase {
    * — absent for a tool with no `nativeActivation`, or one whose CLI never ran), drives
    * that same CLI to undo it. Never a direct edit of the host's own registry file: that
    * file is the host's to write, and `clean` has no more title to it than `plugin
-   * remove` does. */
-  private async undoNativeRegistrations(manifest: Manifest, projectRoot: string): Promise<void> {
+   * remove` does.
+   *
+   * Returns, per tool the activator actually ran for — never one whose binary was
+   * absent — both its full registrations and the `hostName`s `removeMarketplace`
+   * itself confirmed removed. The two are not the same set: a marketplace ref the host
+   * refused to drop is still in `registrations.marketplaces`, but absent from
+   * `removedHostNames`, which is what `purgeNativeCaches`'s codex branch gates its own
+   * purge on (see `purgeOneMarketplaceCache`). */
+  private async undoNativeRegistrations(
+    manifest: Manifest,
+    projectRoot: string,
+    home: string
+  ): Promise<ReadonlyMap<ToolId, UndoneRegistration>> {
+    const undone = new Map<ToolId, UndoneRegistration>();
     for (const toolId of manifest.getInstalledToolIds()) {
       const registrations = manifest.getNativeRegistrations(toolId);
       if (registrations === undefined) continue;
-      await this.undoToolNativeRegistrations(registrations, projectRoot);
+      const removedHostNames = await this.undoToolNativeRegistrations(
+        toolId,
+        registrations,
+        projectRoot,
+        home
+      );
+      if (removedHostNames !== undefined) undone.set(toolId, { registrations, removedHostNames });
     }
+    return undone;
   }
 
   private async undoToolNativeRegistrations(
+    toolId: ToolId,
     registrations: NativeRegistrations,
-    projectRoot: string
-  ): Promise<void> {
+    projectRoot: string,
+    home: string
+  ): Promise<ReadonlySet<string> | undefined> {
     const { binary } = registrations;
     const activator = this.activators.get(binary);
     if (activator === undefined || !activator.isAvailable()) {
       this.logger.warn(
-        `${binary}: registration left in place, the ${binary} CLI is not on the PATH.`
+        `${binary}: registration left in place, the ${binary} CLI is not on the PATH.` +
+          this.describeSurvivingCachePaths(toolId, registrations, home)
       );
-      return;
+      return undefined;
     }
     // Every plugin ref uninstalled before any marketplace is removed: only Copilot
     // declares `forceRemoveArgs`, so Claude and Codex can refuse to remove a
@@ -158,9 +224,18 @@ export class CleanUseCase {
     for (const ref of registrations.pluginRefs) {
       this.bestEffort(() => activator.uninstallPlugin(ref), `${binary} plugin uninstall '${ref}'`);
     }
+    const removedHostNames = new Set<string>();
     for (const { alias, hostName } of registrations.marketplaces) {
-      await this.undoMarketplaceRegistration(activator, binary, alias, hostName, projectRoot);
+      const removed = await this.undoMarketplaceRegistration(
+        activator,
+        binary,
+        alias,
+        hostName,
+        projectRoot
+      );
+      if (removed) removedHostNames.add(hostName);
     }
+    return removedHostNames;
   }
 
   // `alias` resolves this project's own registry entry, the only place its `scope` is
@@ -177,28 +252,173 @@ export class CleanUseCase {
     alias: string,
     hostName: string,
     projectRoot: string
-  ): Promise<void> {
+  ): Promise<boolean> {
     const marketplaces = (await this.marketplaceRegistry?.list(projectRoot)) ?? [];
     const marketplace = marketplaces.find((m) => m.name === alias);
     if (marketplace === undefined) {
       this.logger.warn(
         `${binary}: '${alias}' is no longer a registered marketplace here, so its scope cannot be resolved — its ${binary} registration was left in place.`
       );
-      return;
+      return false;
     }
-    this.bestEffort(
+    return this.bestEffort(
       () => activator.removeMarketplace(hostName, marketplace.scope),
       `${binary} marketplace remove '${hostName}'`
     );
   }
 
-  private bestEffort(action: () => void, label: string): void {
+  /** Named for the "not on the PATH" warning: `clean` never even reaches
+   * `purgeNativeCaches` for a tool whose binary is absent, so the cache it would have
+   * purged survives silently unless this names it too — the same absolute paths the
+   * dry-run preview already announces (`previewNativeRegistrations`). Empty for a tool
+   * whose profile declares no `NativeActivation.pluginCacheDir`. */
+  private describeSurvivingCachePaths(
+    toolId: ToolId,
+    registrations: NativeRegistrations,
+    home: string
+  ): string {
+    if (!isAiToolId(toolId)) return "";
+    const cacheRoot = nativeActivationOf(toolId)?.pluginCacheDir?.(home);
+    if (cacheRoot === undefined) return "";
+    const paths = registrations.marketplaces.map((m) => join(cacheRoot, m.hostName));
+    if (paths.length === 0) return "";
+    return ` Its cache survives at: ${paths.join(", ")}.`;
+  }
+
+  /** Returns whether `action` actually ran to completion — `undoMarketplaceRegistration`
+   * needs that answer, not just the swallowed exception, to know which `hostName`s a
+   * cache purge may later trust as confirmed gone from the host. */
+  private bestEffort(action: () => void, label: string): boolean {
     try {
       action();
+      return true;
     } catch (error) {
       if (!(error instanceof NativePluginCliError)) throw error;
       this.logger.warn(`${label} failed: ${error.message}`);
+      return false;
     }
+  }
+
+  // ── A host's own plugin cache, purged only under a declared, proven-safe path ──
+
+  /** For every tool `undoNativeRegistrations` actually drove — never one whose binary
+   * was absent, that map holds only the tools it ran for — purges the cache its profile
+   * declares, one marketplace at a time. A tool whose profile declares no
+   * `NativeActivation.pluginCacheDir` is not looked at: `clean` invents no cache path
+   * for a tool that never named one. */
+  private async purgeNativeCaches(
+    home: string,
+    undone: ReadonlyMap<ToolId, UndoneRegistration>
+  ): Promise<void> {
+    for (const [toolId, { registrations, removedHostNames }] of undone) {
+      if (!isAiToolId(toolId)) continue;
+      const cacheRoot = nativeActivationOf(toolId)?.pluginCacheDir?.(home);
+      if (cacheRoot === undefined) continue;
+      for (const { hostName } of registrations.marketplaces) {
+        await this.purgeOneMarketplaceCache(
+          toolId,
+          registrations.binary,
+          cacheRoot,
+          hostName,
+          removedHostNames.has(hostName)
+        );
+      }
+    }
+  }
+
+  /**
+   * `~/.claude/plugins/cache/<hostName>/` and its like are indexed by a name that is
+   * global to the machine, not to this project — a name `clean` just watched its own
+   * `undoMarketplaceRegistration` ask the host to forget, but that another project's
+   * install of the same catalog could still hold. Containment alone
+   * (`isStrictlyWithinUserScope`, both sides through `realpath`) proves the path cannot
+   * escape the declared cache root; it does not prove this project still owns what sits
+   * inside it. Two ways to prove that, one per declaration:
+   *
+   * - a profile declaring `marketplaceRegistry` (claude) is reread after the undo above:
+   *   the name gone from that registry is the host's own admission nothing there
+   *   resolves any more, and only then is the tree removed, in full;
+   * - a profile declaring `pluginCacheDir` alone, no `marketplaceRegistry` (codex),
+   *   drives a host that already deletes a marketplace's cached content on its own
+   *   `plugin remove` — measured, it leaves only the now-empty directory shell behind.
+   *   Its own emptiness is *one* of the two proofs there, cheaper than a registry this
+   *   host offers no way to reread — but emptiness alone proves no data would be lost,
+   *   never that this project is the one who emptied it. The other proof is
+   *   `removed`: whether `removeMarketplace` itself confirmed the host actually forgot
+   *   this `hostName` (see `undoToolNativeRegistrations`). Both are required.
+   *
+   * Either way, a path that fails containment, a registry that still names the tenant,
+   * or a removal this run never confirmed is left in place and named — never removed
+   * on the manifest's word alone.
+   */
+  private async purgeOneMarketplaceCache(
+    toolId: AiToolId,
+    binary: string,
+    cacheRoot: string,
+    hostName: string,
+    removed: boolean
+  ): Promise<void> {
+    const candidate = await resolveCacheCandidate(
+      this.fs,
+      this.logger,
+      cacheRoot,
+      hostName,
+      `${binary}: cache path for '${hostName}'`
+    );
+    if (candidate === null) return;
+    const reader = this.hostMarketplaceRegistries.get(toolId);
+    if (reader === undefined) {
+      await purgeCacheIfEmptyAndConfirmed(
+        this.fs,
+        this.logger,
+        candidate,
+        removed,
+        `${binary}: cache for '${hostName}'`
+      );
+      return;
+    }
+    await this.purgeOnceRegistryClears(reader, candidate, binary, hostName);
+  }
+
+  /**
+   * Fail-closed: a purge happens on exactly two answers — the registry never existed
+   * (`absent`, nothing was ever named there) or it exists and no longer names this
+   * `hostName`. Anything else — still naming it, or the registry itself could not be
+   * read or parsed (`unreadable`) — keeps the cache and names why, never guessing a
+   * purge is safe from a reading this reader will not vouch for.
+   */
+  private async purgeOnceRegistryClears(
+    reader: HostMarketplaceRegistryReader,
+    candidate: string,
+    binary: string,
+    hostName: string
+  ): Promise<void> {
+    const reading = await reader.read();
+    if (reading.absent === true) {
+      await this.purgeCache(candidate, binary, hostName);
+      return;
+    }
+    if (reading.entries !== undefined) {
+      if (reading.entries.has(hostName)) {
+        this.logger.warn(
+          `${binary}: cache for '${hostName}' left in place, ${reading.location} still names it: ${candidate}`
+        );
+        return;
+      }
+      await this.purgeCache(candidate, binary, hostName);
+      return;
+    }
+    this.logger.warn(
+      `${binary}: plugin cache left in place, its registry could not be read: ${reading.location}`
+    );
+  }
+
+  /** The one place `clean` actually deletes a cache directory, so the `--force` line
+   * announcing it — the post-condition the dry-run's own "cache to purge once
+   * unregistered" preview only forecasts — is printed from exactly one call site. */
+  private async purgeCache(candidate: string, binary: string, hostName: string): Promise<void> {
+    await this.fs.deleteDirectory(candidate);
+    this.logger.info(`${binary}: cache for '${hostName}' purged: ${candidate}`);
   }
 
   // ── Machine-local files a tool's own materialization writes, outside the manifest ──
@@ -246,26 +466,36 @@ export class CleanUseCase {
     return count;
   }
 
-  private buildPreview(manifest: Manifest): CleanPreview {
+  private buildPreview(manifest: Manifest, home: string): CleanPreview {
     const tools = manifest.getInstalledToolIds().map((toolId) => ({
       toolId,
       fileCount: manifest.getToolFiles(toolId).length + manifest.getMergeFiles(toolId).length,
     }));
     const totalFileCount = tools.reduce((s, t) => s + t.fileCount, 0);
-    const nativeRegistrations = this.previewNativeRegistrations(manifest);
+    const nativeRegistrations = this.previewNativeRegistrations(manifest, home);
     return { tools, totalFileCount, nativeRegistrations };
   }
 
-  private previewNativeRegistrations(manifest: Manifest): CleanPreview["nativeRegistrations"] {
+  private previewNativeRegistrations(
+    manifest: Manifest,
+    home: string
+  ): CleanPreview["nativeRegistrations"] {
     const preview: CleanPreview["nativeRegistrations"] = [];
     for (const toolId of manifest.getInstalledToolIds()) {
       const registrations = manifest.getNativeRegistrations(toolId);
       if (registrations === undefined) continue;
+      const cacheRoot = isAiToolId(toolId)
+        ? nativeActivationOf(toolId)?.pluginCacheDir?.(home)
+        : undefined;
       preview.push({
         toolId,
         binary: registrations.binary,
         marketplaceCount: registrations.marketplaces.length,
         pluginRefCount: registrations.pluginRefs.length,
+        cachePaths:
+          cacheRoot === undefined
+            ? []
+            : registrations.marketplaces.map((m) => join(cacheRoot, m.hostName)),
       });
     }
     return preview;
@@ -332,7 +562,7 @@ export class CleanUseCase {
     toolId: AiToolId
   ): Promise<ReadonlyMap<string, string>> {
     if (plugin.scope !== "user") return plugin.files;
-    const boundary = resolvePluginsCapability(toolId)?.userPluginsBaseDir(nodeHomedir());
+    const boundary = resolvePluginsCapability(toolId)?.userPluginsBaseDir(this.homeDir());
     if (boundary === null || boundary === undefined) return new Map();
     const resolvedBoundary = await this.tryRealpath(boundary);
     if (resolvedBoundary === null) return new Map();
