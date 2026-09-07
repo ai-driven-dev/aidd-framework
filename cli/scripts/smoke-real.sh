@@ -185,7 +185,10 @@ copilot_ref_enabled() {
 
 # --- Cleanup runs no matter what happens, and is the only place `clean` is called ---
 cleanup() {
-  local rc=$?
+  # Captured under its own name: the helpers called below assign `rc=` themselves, and
+  # bash's dynamic scoping would let them overwrite a local named the same, so the
+  # script would exit with whatever the last helper measured rather than its own status.
+  local entry_rc=$?
   section "cleanup"
   if [[ -d "$PROJ/.aidd" ]]; then
     run "clean --force" 0 "" "$PROJ" -- node "$CLI" clean --force
@@ -293,7 +296,7 @@ cleanup() {
   fi
   echo "Full command output was logged to: $LOGFILE (not removed — inspect or delete it yourself)"
   [[ "$FAIL" -gt 0 ]] && exit 1
-  exit "$rc"
+  exit "$entry_rc"
 }
 trap cleanup EXIT
 
@@ -482,6 +485,13 @@ if [[ -n "${PRESENT[claude]:-}" ]]; then
     bad "sync --tool claude exited $sync_rc but did not name $MKT" "$(cat "$sync_out")"
   fi
   rm -f "$sync_out"
+
+  # Leave the project as Phase B left it: with the conflicting catalog still declared,
+  # every later activation of this project (Phase C2's `marketplace add`, the trap's
+  # `clean`) would re-run into the same refusal, and the phase would be measuring its
+  # own residue rather than the capability it names.
+  run "marketplace remove $MKT-conflict (restores the project's state)" 0 "" "$PROJ" -- \
+    node "$CLI" marketplace remove "$MKT-conflict" --yes
 else
   skip "sync refuses a different catalog under the same name (claude not installed)"
 fi
@@ -502,9 +512,9 @@ if [[ -n "${PRESENT[claude]:-}" ]]; then
     const [dir, name] = process.argv.slice(1);
     const mktPath = `${dir}/.claude-plugin/marketplace.json`;
     const mktJson = JSON.parse(fs.readFileSync(mktPath, "utf8"));
+    // Only the declared catalog name diverges from the alias. The plugin keeps its name
+    // and its directory, which the source resolver reads literally as plugins/<name>.
     mktJson.name = name;
-    mktJson.plugins[0].name = name;
-    mktJson.plugins[0].source = `./plugins/${mktJson.plugins[0].source.split("/").pop()}`;
     fs.writeFileSync(mktPath, JSON.stringify(mktJson));
   ' "$MKT3_FIXTURE" "$UPSTREAM_NAME"
 
