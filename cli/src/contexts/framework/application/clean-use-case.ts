@@ -158,28 +158,37 @@ export class CleanUseCase {
     for (const ref of registrations.pluginRefs) {
       this.bestEffort(() => activator.uninstallPlugin(ref), `${binary} plugin uninstall '${ref}'`);
     }
-    for (const name of registrations.marketplaces) {
-      await this.undoMarketplaceRegistration(activator, binary, name, projectRoot);
+    for (const { alias, hostName } of registrations.marketplaces) {
+      await this.undoMarketplaceRegistration(activator, binary, alias, hostName, projectRoot);
     }
   }
 
+  // `alias` resolves this project's own registry entry, the only place its `scope` is
+  // recorded; `hostName` is what actually reaches the host's own CLI
+  // (`claude plugin marketplace remove <hostName>`), since a host only ever knows a
+  // registration by its catalog's own declared name, never by whatever local alias this
+  // project chose for it. The two differ whenever a project registers a marketplace
+  // under an alias its catalog does not declare itself under, a supported capability —
+  // passing `alias` to the host-facing call here would ask it to remove a name it never
+  // held.
   private async undoMarketplaceRegistration(
     activator: NativePluginActivator,
     binary: string,
-    name: string,
+    alias: string,
+    hostName: string,
     projectRoot: string
   ): Promise<void> {
     const marketplaces = (await this.marketplaceRegistry?.list(projectRoot)) ?? [];
-    const marketplace = marketplaces.find((m) => m.name === name);
+    const marketplace = marketplaces.find((m) => m.name === alias);
     if (marketplace === undefined) {
       this.logger.warn(
-        `${binary}: '${name}' is no longer a registered marketplace here, so its scope cannot be resolved — its ${binary} registration was left in place.`
+        `${binary}: '${alias}' is no longer a registered marketplace here, so its scope cannot be resolved — its ${binary} registration was left in place.`
       );
       return;
     }
     this.bestEffort(
-      () => activator.removeMarketplace(name, marketplace.scope),
-      `${binary} marketplace remove '${name}'`
+      () => activator.removeMarketplace(hostName, marketplace.scope),
+      `${binary} marketplace remove '${hostName}'`
     );
   }
 

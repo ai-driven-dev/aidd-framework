@@ -472,6 +472,42 @@ export class NativePluginCliError extends Error {
   }
 }
 
+/**
+ * A host's own marketplace registry already holds this catalog's declared name,
+ * pointed at a genuinely *different* catalog — a different plugin set, or a different
+ * declared name at that source — so driving the host's CLI to register it would
+ * silently steal or mislabel that name. Message-only, matching every sibling in this
+ * catalog: the registered and requested sources differ, and folding both into fields
+ * shared across cases would misname one of them. A project's own local alias
+ * diverging from what its catalog declares itself is a supported capability, never a
+ * refusal here — see `architecture.md`. The structured facts behind a real conflict
+ * live in `cli/src/contexts/tools/domain/marketplace-source-conflict.ts`'s own
+ * `MarketplaceSourceConflict`, consumed directly by `doctor` — this class only carries
+ * the message a person reads when `aidd sync` refuses.
+ */
+export class MarketplaceSourceConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MarketplaceSourceConflictError";
+  }
+}
+
+/** `MarketplaceSyncSettingsUseCase.registerMarketplace` just built this catalog itself
+ * and found nothing readable at the exact path its own tool profile probes — the
+ * catalog's own declared name is what a host-facing registration must be keyed by, and
+ * this CLI has no other fact to key it by. Registering nothing and naming the file
+ * beats writing this project's own local alias in its place: a manifest that guessed
+ * would go on claiming a `hostName` the host was never asked to hold. */
+export class UnreadableBuiltCatalogError extends Error {
+  constructor(path: string) {
+    super(
+      `Cannot read the marketplace catalog this project just built, at ${path} — nothing was ` +
+        "registered for it. Run `aidd sync` again once the source is fixed."
+    );
+    this.name = "UnreadableBuiltCatalogError";
+  }
+}
+
 export class HttpError extends Error {
   constructor(
     readonly statusCode: number,

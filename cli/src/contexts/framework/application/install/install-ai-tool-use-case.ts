@@ -3,7 +3,10 @@ import type { AiToolId } from "../../../../kernel/tool.js";
 import { Manifest } from "../../domain/manifest.js";
 import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
-import type { MarketplaceSyncSettings } from "../flows/marketplace-sync-settings-use-case.js";
+import type {
+  MarketplaceSyncSettings,
+  MarketplaceSyncSettingsResult,
+} from "../flows/marketplace-sync-settings-use-case.js";
 import type { PluginInstallFromMarketplace } from "../plugin/plugin-install-from-marketplace-use-case.js";
 import type {
   InstallRuntimeConfigResult,
@@ -22,6 +25,11 @@ export interface InstallAiToolResult {
   runtimeResult: InstallRuntimeConfigResult;
   propagatedPlugins: string[];
   propagationWarnings: string[];
+  /** What native activation did while re-registering the plugins this run propagated —
+   * `undefined` when nothing was propagated, so activation never ran. A refusal in here
+   * (`errors`) used to be thrown away entirely: `framework install --tool <id>` exited 0
+   * with a plugin silently never re-registered on the new tool. */
+  activation?: MarketplaceSyncSettingsResult;
 }
 
 export class InstallAiToolUseCase {
@@ -68,10 +76,16 @@ export class InstallAiToolUseCase {
     for (const plugin of plugins) {
       await this.propagatePlugin(plugin, toolId, projectRoot, propagated, warnings);
     }
-    if (propagated.length > 0) {
-      await this.marketplaceSyncSettings.execute({ projectRoot });
-    }
-    return { runtimeResult, propagatedPlugins: propagated, propagationWarnings: warnings };
+    const activation =
+      propagated.length > 0
+        ? await this.marketplaceSyncSettings.execute({ projectRoot })
+        : undefined;
+    return {
+      runtimeResult,
+      propagatedPlugins: propagated,
+      propagationWarnings: warnings,
+      activation,
+    };
   }
 
   private collectUniquePlugins(

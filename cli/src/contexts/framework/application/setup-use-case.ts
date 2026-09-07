@@ -17,15 +17,28 @@ import type { MarketplaceSourceMode } from "../../distribution/domain/marketplac
 import type { ManifestRepository } from "../domain/ports/manifest-repository.js";
 import type { ProjectContext } from "../domain/project-context.js";
 import type { SetupFlow } from "../domain/setup-flow.js";
-import type { MarketplaceSyncSettings } from "./flows/marketplace-sync-settings-use-case.js";
+import type {
+  MarketplaceSyncSettings,
+  MarketplaceSyncSettingsResult,
+} from "./flows/marketplace-sync-settings-use-case.js";
 import { InitUseCase } from "./init-use-case.js";
 import type { ProjectContextDetectorUseCase } from "./setup/project-context-detector-use-case.js";
 import type { SetupMarketplaceSourceUseCase } from "./setup/setup-marketplace-source-use-case.js";
 import type { SetupToolsResult, SetupToolsUseCase } from "./setup/setup-tools-use-case.js";
 
 export type SetupResult =
-  | { kind: "initialized"; install: SetupToolsResult; context?: ProjectContext }
-  | { kind: "up-to-date"; install: SetupToolsResult; context?: ProjectContext };
+  | {
+      kind: "initialized";
+      install: SetupToolsResult;
+      activation: MarketplaceSyncSettingsResult;
+      context?: ProjectContext;
+    }
+  | {
+      kind: "up-to-date";
+      install: SetupToolsResult;
+      activation: MarketplaceSyncSettingsResult;
+      context?: ProjectContext;
+    };
 
 export class SetupUseCase {
   constructor(
@@ -57,8 +70,8 @@ export class SetupUseCase {
     }
     const install = await this.installTools(flow, context);
     if (flow.registerDefaultMarketplace) await this.promptPlugins(flow);
-    await this.syncSettings(flow);
-    return this.buildResult(isNew, install, context);
+    const activation = await this.syncSettings(flow);
+    return this.buildResult(isNew, install, activation, context);
   }
 
   private async detectContext(flow: SetupFlow): Promise<ProjectContext | undefined> {
@@ -66,8 +79,8 @@ export class SetupUseCase {
     return this.projectContextDetector.execute({ projectRoot: flow.projectRoot });
   }
 
-  private async syncSettings(flow: SetupFlow): Promise<void> {
-    await this.marketplaceSyncSettingsUseCase.execute({ projectRoot: flow.projectRoot });
+  private async syncSettings(flow: SetupFlow): Promise<MarketplaceSyncSettingsResult> {
+    return this.marketplaceSyncSettingsUseCase.execute({ projectRoot: flow.projectRoot });
   }
 
   private async resolveSource(flow: SetupFlow): Promise<MarketplaceSourceMode> {
@@ -169,9 +182,10 @@ export class SetupUseCase {
   private buildResult(
     isNew: boolean,
     install: SetupToolsResult,
+    activation: MarketplaceSyncSettingsResult,
     context: ProjectContext | undefined
   ): SetupResult {
-    if (isNew) return { kind: "initialized", install, context };
-    return { kind: "up-to-date", install, context };
+    if (isNew) return { kind: "initialized", install, activation, context };
+    return { kind: "up-to-date", install, activation, context };
   }
 }

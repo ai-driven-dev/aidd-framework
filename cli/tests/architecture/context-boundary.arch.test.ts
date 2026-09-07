@@ -41,6 +41,11 @@ const PUBLIC_MODULES: Readonly<Record<string, readonly string[]>> = {
     // What a host's own plugin registry says about a plugin AIDD installed for it — the
     // comparison `telemetry`'s diagnostic and `framework`'s `doctor` both need.
     "src/contexts/tools/domain/host-plugin-registration.ts",
+    "src/contexts/tools/domain/ports/host-marketplace-registry-reader.ts",
+    // Whether a marketplace name a host's registry already holds is pointed at a
+    // different source — the sync-time guard and `doctor`'s own conflict check both
+    // need this same comparison.
+    "src/contexts/tools/domain/marketplace-source-conflict.ts",
     // what a tool declares about plugins, read by whoever installs one for it — the
     // context has no application layer of its own since installing is framework work
     "src/contexts/tools/domain/capabilities/plugins-capability.ts",

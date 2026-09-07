@@ -210,7 +210,7 @@ export class Manifest {
   // --- Serialization ---
 
   toJSON(): ManifestData {
-    return { version: MANIFEST_VERSION as 7, tools: serializeManifestTools(this._tools) };
+    return { version: MANIFEST_VERSION as 8, tools: serializeManifestTools(this._tools) };
   }
 
   static fromJSON(data: unknown): Manifest {
@@ -228,13 +228,20 @@ export class Manifest {
   //
   // Too old has no such answer: v6 to v7 was not a freebie like v6 itself was (the v6 cutover
   // only stopped accepting formats an already-published CLI, 5.2.2, could still migrate to and
-  // re-save — see the deleted migration chain this replaced). v7 requires data — a mandatory
-  // `scope` per plugin — that no published CLI has ever written, so no version number can be
-  // named here that would actually get a stuck user unstuck: `ManifestRepositoryAdapter.load()`
-  // calls `fromJSON` before any command reaches a save, so `setup`, `framework install` and
-  // every other write path refuse an old document exactly as this method does, before they
-  // ever get a chance to overwrite it. The only correction that does not first pass back
-  // through this same guard is deleting the document outright, so that is what is named.
+  // re-save — see the deleted migration chain this replaced), and v7 to v8 is the same kind of
+  // cutover again. v7 required data — a mandatory `scope` per plugin — that no published CLI
+  // had ever written; v8 changes what `nativeRegistrations.marketplaces` holds per entry — the
+  // host's own registered name beside aidd's own local alias, not the alias alone, once a
+  // project's alias is free to differ from what its catalog declares itself (the divergence
+  // this CLI used to refuse outright — see `architecture.md`). No published CLI has ever
+  // written that pair either, so no version number can be named here that would actually get a
+  // stuck user unstuck: `ManifestRepositoryAdapter.load()` calls `fromJSON` before any command
+  // reaches a save, so `setup`, `framework install` and every other write path refuse an old
+  // document exactly as this method does, before they ever get a chance to overwrite it. The
+  // only correction that does not first pass back through this same guard is deleting the
+  // document outright, so that is what is named. The message itself says which: a v6
+  // document names 5.2.2 as the CLI that actually wrote it, since one did; v7 and below
+  // say no published CLI can, since none ever did.
   private static assertSupportedVersion(raw: Record<string, unknown>): void {
     const version = raw.version;
     if (version === MANIFEST_VERSION) return;
@@ -243,9 +250,13 @@ export class Manifest {
         `manifest version ${version} was written by a newer CLI than this one. Run \`aidd update\` to update this CLI, then try again.`
       );
     }
+    const provenance =
+      version === 6
+        ? "5.2.2, a published CLI, wrote this version"
+        : "No published CLI can write this version";
     throw new InvalidManifestDataError(
       `manifest version ${String(version)} predates version ${MANIFEST_VERSION}, the only one this CLI reads. ` +
-        `No published CLI can write this version: delete ${MANIFEST_PATH_HINT} in this project, then run ` +
+        `${provenance}: delete ${MANIFEST_PATH_HINT} in this project, then run ` +
         "`aidd setup` to reinstall the framework."
     );
   }

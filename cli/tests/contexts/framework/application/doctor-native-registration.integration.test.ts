@@ -15,7 +15,7 @@ async function manifestWithTwoNativePlugins(): Promise<Manifest> {
   manifest.addTool("claude", "test", []);
   manifest.setNativeRegistrations("claude", {
     binary: "claude",
-    marketplaces: ["aidd-framework"],
+    marketplaces: [{ alias: "aidd-framework", hostName: "aidd-framework" }],
     pluginRefs: [CONTEXT_REF, DEV_REF],
   });
   return manifest;

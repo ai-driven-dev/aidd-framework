@@ -17,6 +17,17 @@ import { InMemoryMarketplaceRegistry } from "../../../../../helpers/ports/in-mem
 const PROJECT_ROOT = "/test-project";
 const MARKETPLACE_NAME = "aidd-framework";
 
+/** A readable catalog at the path the default `fakeEnsureBuiltMarketplace()` resolves
+ * "claude" to — a real build always leaves one there, so a fixture standing in for one
+ * must too, now that an unreadable catalog is a hard failure rather than a silent fall
+ * back to this project's own local alias (`UnreadableBuiltCatalogError`). */
+async function seedBuiltCatalog(fs: InMemoryFileAdapter, name = MARKETPLACE_NAME): Promise<void> {
+  await fs.writeFile(
+    "/built/claude/.claude-plugin/marketplace.json",
+    JSON.stringify({ name, version: "1.0.0", plugins: [] })
+  );
+}
+
 function buildDist(name = "aidd-context"): PluginDistribution {
   return new PluginDistribution({
     manifest: { name, version: "1.0.0" },
@@ -36,6 +47,7 @@ function buildDist(name = "aidd-context"): PluginDistribution {
 describe("install claude plugin via Mode A (integration)", () => {
   it("leaves the registration to claude and keeps only what it owns", async () => {
     const fs = new InMemoryFileAdapter();
+    await seedBuiltCatalog(fs);
     const hasher = new DeterministicHasher();
     const manifestRepo = new InMemoryManifestRepository();
     const registry = new InMemoryMarketplaceRegistry();
@@ -112,6 +124,7 @@ describe("install claude plugin via Mode A (integration)", () => {
 
   it("takes a registration left in the shared file by an older install out of it", async () => {
     const fs = new InMemoryFileAdapter();
+    await seedBuiltCatalog(fs);
     const hasher = new DeterministicHasher();
     const manifestRepo = new InMemoryManifestRepository();
     const registry = new InMemoryMarketplaceRegistry();

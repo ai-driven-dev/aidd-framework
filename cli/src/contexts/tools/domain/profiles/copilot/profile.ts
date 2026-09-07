@@ -212,7 +212,15 @@ export const copilot: AiTool<
   toolId: "copilot",
   distributionProbes: {
     manifest: [".plugin/plugin.json", ".github/plugin/plugin.json", "plugin.json"],
-    marketplace: [".github/plugin/plugin.json"],
+    // `.github/plugin/plugin.json` is the manifest's own second-choice location, not
+    // a marketplace catalog at all — `build.ts`'s own `OUTPUT_MARKETPLACE_RELATIVE`
+    // is `.plugin/marketplace.json`, which is where a real build actually leaves one.
+    // Wrong until `readMarketplaceCatalogIdentity` first tried to read it for real
+    // (measured: a fresh `.aidd/cache/built/.../.plugin/marketplace.json` exists,
+    // `.github/plugin/plugin.json` does not) — every earlier caller of this field
+    // tolerated an unreadable catalog by falling back to this project's own local
+    // alias, so nothing had noticed the path itself was never right.
+    marketplace: [".plugin/marketplace.json"],
   },
   directory: DIRECTORY,
   toolSuffix: TOOL_SUFFIX,

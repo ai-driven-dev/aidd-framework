@@ -1,20 +1,38 @@
 import { resolve } from "node:path";
-import { NativePluginCliError } from "../../../../kernel/errors.js";
+import {
+  MarketplaceSourceConflictError,
+  NativePluginCliError,
+  UnreadableBuiltCatalogError,
+} from "../../../../kernel/errors.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
 import type { Logger } from "../../../../kernel/ports/logger.js";
-import type { ToolId } from "../../../../kernel/tool.js";
+import { type AiToolId, isAiToolId, type ToolId } from "../../../../kernel/tool.js";
 import type { Marketplace } from "../../../distribution/domain/marketplace.js";
 import type { MarketplaceRegistry } from "../../../distribution/domain/ports/marketplace-registry.js";
 import type { MarketplaceSettings } from "../../../tools/domain/marketplace-settings.js";
+import {
+  describePluginDiff,
+  type MarketplaceCatalogIdentity,
+  pluginSetDifference,
+} from "../../../tools/domain/marketplace-source-conflict.js";
+import type { HostMarketplaceRegistryReader } from "../../../tools/domain/ports/host-marketplace-registry-reader.js";
 import type { NativePluginActivator } from "../../../tools/domain/ports/native-plugin-activator.js";
 import { nativeActivationOf, resolvePluginsCapability } from "../../../tools/domain/registry.js";
 import type { FrameworkBuildTarget } from "../../../translate/domain/build-target.js";
-import type { NativeRegistrations } from "../../domain/manifest/native-registrations.js";
+import type {
+  NativeMarketplaceRegistration,
+  NativeRegistrations,
+} from "../../domain/manifest/native-registrations.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
 import type { EnsureBuiltMarketplace } from "../shared/ensure-built-marketplace-use-case.js";
+import { hostMarketplaceSourceConflict } from "../shared/host-marketplace-source-conflict.js";
+import {
+  marketplaceCatalogProbePath,
+  readMarketplaceCatalogIdentity,
+} from "../shared/read-marketplace-catalog-identity.js";
 
 export interface MarketplaceSyncSettingsOptions {
   projectRoot: string;
@@ -28,7 +46,7 @@ export interface MarketplaceSyncSettingsOptions {
  * the state `nativeRegistrations` records, and `doctor` later compares to the host's
  * real registry. */
 interface ActivationOutcome {
-  marketplaces: readonly string[];
+  marketplaces: readonly NativeMarketplaceRegistration[];
   pluginRefs: readonly string[];
 }
 
@@ -44,11 +62,13 @@ export interface MarketplaceSyncSettingsResult {
    * received, returned so a caller can act on it without capturing output. */
   warnings: readonly string[];
   /** A hard failure a tool's activation raised that is not the recoverable
-   * `NativePluginCliError` family — a real adapter never produces one (every failure it
-   * throws is that class), so this is a bug in the activator itself, not a fact about
-   * the tool. Returned rather than thrown: whether that makes the whole command fail is
-   * `sync.ts`'s decision, the same split `restoreAllUseCase` already holds for a
-   * restore failure. */
+   * `NativePluginCliError` family. Two shapes reach here: a bug in the activator itself
+   * (every failure a real adapter throws is a `NativePluginCliError`, so anything else
+   * it raises is that), and a deliberate refusal from the source-conflict guard in
+   * `registerMarketplace` — a `MarketplaceSourceConflictError` is not a bug either side
+   * produced, it is the guard doing exactly what it exists to do. Returned rather than
+   * thrown: whether that makes the whole command fail is `sync.ts`'s decision, the same
+   * split `restoreAllUseCase` already holds for a restore failure. */
   errors: readonly { scope: string; message: string }[];
 }
 
@@ -81,7 +101,16 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     private readonly logger: Logger,
     /** Native plugin CLI activators, keyed by the `binary` each profile declares. */
     private readonly activators: ReadonlyMap<string, NativePluginActivator>,
-    private readonly ensureBuilt: EnsureBuiltMarketplace
+    private readonly ensureBuilt: EnsureBuiltMarketplace,
+    /** Readers of a host's own marketplace registry, keyed by `AiToolId` — only a tool
+     * whose profile declares `NativeActivation.marketplaceRegistry` is ever looked up
+     * here (see `guardAgainstConflict`), so a tool absent from this map still syncs
+     * exactly as before. Defaults to empty for every existing caller that predates
+     * this guard. */
+    private readonly hostMarketplaceRegistries: ReadonlyMap<
+      AiToolId,
+      HostMarketplaceRegistryReader
+    > = new Map()
   ) {}
 
   async execute(options: MarketplaceSyncSettingsOptions): Promise<MarketplaceSyncSettingsResult> {
@@ -256,13 +285,22 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     //
     // Each step is independently best-effort: one failing plugin or marketplace
     // must warn and let the others through, never abort the whole activation.
-    for (const marketplace of marketplaces)
-      await this.registerMarketplace(activator, toolId, marketplace, projectRoot, warnings);
-    const registeredMarketplaces = marketplaces.map((m) => m.name);
+    const registeredMarketplaces: NativeMarketplaceRegistration[] = [];
+    for (const marketplace of marketplaces) {
+      const hostName = await this.registerMarketplace(
+        activator,
+        toolId,
+        marketplace,
+        projectRoot,
+        warnings
+      );
+      registeredMarketplaces.push({ alias: marketplace.name, hostName });
+    }
     if (!activator.enablesPlugins())
       return { marketplaces: registeredMarketplaces, pluginRefs: [] };
     this.bestEffort(() => activator.upgradeMarketplaces(), "upgrade marketplaces", warnings);
-    const refs = this.pluginRefsToEnable(toolId, manifest, marketplaces);
+    const hostNameByAlias = new Map(registeredMarketplaces.map((m) => [m.alias, m.hostName]));
+    const refs = this.pluginRefsToEnable(toolId, manifest, marketplaces, hostNameByAlias);
     for (const ref of refs) {
       this.bestEffort(() => activator.enablePlugin(ref), `enable plugin '${ref}'`, warnings);
     }
@@ -280,41 +318,129 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     }
   }
 
-  /** The `<plugin>@<marketplace>` refs this tool's own CLI is asked to enable — every
+  /** The `<plugin>@<hostName>` refs this tool's own CLI is asked to enable — every
    * recorded plugin whose marketplace this project still knows, and nothing else. Which
-   * marketplaces get registered is a separate question, answered by the registry itself. */
+   * marketplaces get registered is a separate question, answered by the registry itself.
+   *
+   * Keyed by `hostName`, not `plugin.marketplace` (aidd's own alias): this ref is a
+   * host-facing call (`claude plugin install <ref>`), and the host resolves the
+   * marketplace half of it against its own registry, which knows this catalog only by
+   * the name it declares itself — never by whatever local alias this project chose.
+   * `hostNameByAlias` carries one entry per marketplace `activateTool` iterated,
+   * `registerMarketplace`'s own alias fallback included, so the lookup below is
+   * defensive rather than a real gap — nothing in `marketplaces` is ever missing from
+   * it. */
   private pluginRefsToEnable(
     toolId: ToolId,
     manifest: Manifest,
-    marketplaces: readonly Marketplace[]
+    marketplaces: readonly Marketplace[],
+    hostNameByAlias: ReadonlyMap<string, string>
   ): string[] {
     const byName = new Map(marketplaces.map((m) => [m.name, m]));
     const refs: string[] = [];
     for (const plugin of manifest.getPlugins(toolId)) {
       const marketplace = plugin.marketplace == null ? undefined : byName.get(plugin.marketplace);
       if (marketplace === undefined) continue;
-      refs.push(`${plugin.name}@${marketplace.name}`);
+      const hostName = hostNameByAlias.get(marketplace.name);
+      if (hostName === undefined) continue;
+      refs.push(`${plugin.name}@${hostName}`);
     }
     return refs;
   }
 
   // Native tools must read the BUILT (transformed) tree, not the raw Claude-format
-  // source.
+  // source. Returns the name this project's own registration is actually known by once
+  // this call returns — always the host's own catalog name, never this project's local
+  // alias: a catalog this project just built and cannot read back is not registered at
+  // all (see the throw below), so by the time this returns, `hostName` is always a fact
+  // read from the catalog itself.
   private async registerMarketplace(
     activator: NativePluginActivator,
     toolId: ToolId,
     marketplace: Marketplace,
     projectRoot: string,
     warnings: string[]
-  ): Promise<void> {
+  ): Promise<string> {
     const builtDir = await this.buildForTool(toolId, marketplace, projectRoot);
-    if (builtDir === null) return;
+    if (builtDir === null) return marketplace.name;
+    const requestedIdentity = await readMarketplaceCatalogIdentity(this.fs, toolId, builtDir);
+    if (requestedIdentity === undefined) {
+      throw new UnreadableBuiltCatalogError(
+        marketplaceCatalogProbePath(toolId, builtDir) ?? builtDir
+      );
+    }
+    const hostName = requestedIdentity.name;
+    await this.guardAgainstConflict(toolId, builtDir, requestedIdentity);
     try {
       activator.addMarketplace(builtDir, marketplace.scope);
     } catch (error) {
       if (!(error instanceof NativePluginCliError)) throw error;
-      this.reclaimOrReport(activator, marketplace, builtDir, error, warnings);
+      this.reclaimOrReport(activator, marketplace, hostName, builtDir, error, warnings);
     }
+    return hostName;
+  }
+
+  /**
+   * Refuses to drive `addMarketplace` where doing so would silently replace a
+   * *different catalog* a host's own registry already holds under this name —
+   * measured against the real `claude` binary: `plugin marketplace add` derives the
+   * registered name from the source's own catalog, never from an argument, and
+   * re-adding the same name from a different tree replaces `installLocation` with no
+   * prompt and no error.
+   *
+   * This project's own local alias for a marketplace is deliberately not compared
+   * against the catalog's own declared name here: a project choosing a local alias its
+   * catalog does not declare itself under is a supported capability (`smoke-tools.sh`'s
+   * own `local`/`scoped`/`userscoped` fixtures exercise exactly that), never a fault —
+   * the host registers, and this guard reads the host's registry, by the *catalog's*
+   * name throughout, never aidd's alias. See `native-registrations.ts` for where that
+   * distinction is carried forward into what this run records.
+   *
+   * Gated on `NativeActivation.marketplaceRegistry` being declared at all, which
+   * today only claude's profile does — codex refuses that re-add itself, copilot
+   * refuses every re-add — so this never reads a registry for either of them, and
+   * carries no `if (toolId === "claude")` anywhere to say so.
+   *
+   * Thrown rather than collected as a best-effort warning: a conflict is not a
+   * recoverable `NativePluginCliError`, and letting `addMarketplace` run anyway is
+   * exactly the silent overwrite this guard exists to stop.
+   *
+   * The registry lookup itself is `hostMarketplaceSourceConflict`, shared with
+   * `DoctorRegistrationUseCase`'s own `checkMarketplaceSources` pass — both key it by
+   * `requestedIdentity.name` alone, in the one place that keying happens, so the two
+   * cannot drift onto different keys.
+   *
+   * The host's registry already holding this name pointed at the *same* catalog
+   * reached through a different, resolved path (two projects, one shared build) is
+   * not a conflict either: only a genuinely different catalog under the same name
+   * refuses.
+   */
+  private async guardAgainstConflict(
+    toolId: ToolId,
+    builtDir: string,
+    requestedIdentity: MarketplaceCatalogIdentity
+  ): Promise<void> {
+    if (!isAiToolId(toolId)) return;
+    if (nativeActivationOf(toolId)?.marketplaceRegistry === undefined) return;
+    const reader = this.hostMarketplaceRegistries.get(toolId);
+    if (reader === undefined) return;
+    const requestedSource = await this.fs.realpath(builtDir).catch(() => builtDir);
+    const conflict = await hostMarketplaceSourceConflict(
+      this.fs,
+      toolId,
+      reader,
+      requestedSource,
+      requestedIdentity
+    );
+    if (conflict === undefined) return;
+    const diff = pluginSetDifference(conflict.registeredIdentity, conflict.requestedIdentity);
+    throw new MarketplaceSourceConflictError(
+      `Marketplace '${conflict.name}' is already registered from a different catalog: ` +
+        `${conflict.registeredSource} differs from the one requested, ${conflict.requestedSource} ` +
+        `— plugins ${describePluginDiff(diff)}, per ${conflict.location}. ` +
+        `Run \`claude plugin marketplace remove ${conflict.name}\`, then \`aidd sync\` again ` +
+        `to re-register it for this project.`
+    );
   }
 
   // `add` refused, which for a global registry means the name is already held. Whose
@@ -323,31 +449,39 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
   // otherwise steal the name from each other on every sync, uninstalling each other's
   // plugins. One whose source is gone belongs to nobody, and holding it hostage breaks
   // every project that comes after.
+  //
+  // `hostName`, never `marketplace.name`, drives every one of the host-facing calls
+  // below: `registrationState`/`removeMarketplace` ask and act on the name the host's
+  // own CLI actually knows a registration by, which is the catalog's own declared name,
+  // not this project's local alias for it. Asking about the alias instead would answer
+  // "dead" for a perfectly live registration whenever the two differ, and then force-
+  // remove a name the host never held — exactly the bug this project's own
+  // `local`/`scoped`/`userscoped` smoke fixtures would have hit.
   private reclaimOrReport(
     activator: NativePluginActivator,
     marketplace: Marketplace,
+    hostName: string,
     builtDir: string,
     addError: NativePluginCliError,
     warnings: string[]
   ): void {
-    const name = marketplace.name;
-    if (activator.registrationState(name) !== "dead") {
-      const message = `Native plugin activation — register marketplace '${name}' skipped: ${addError.message}`;
+    if (activator.registrationState(hostName) !== "dead") {
+      const message = `Native plugin activation — register marketplace '${hostName}' skipped: ${addError.message}`;
       this.logger.warn(message);
       warnings.push(message);
       return;
     }
-    const reclaimMessage = `Marketplace '${name}' was registered to a directory that no longer exists; re-registering it for this project. Plugins installed from it are removed and the ones this CLI manages are put back.`;
+    const reclaimMessage = `Marketplace '${hostName}' was registered to a directory that no longer exists; re-registering it for this project. Plugins installed from it are removed and the ones this CLI manages are put back.`;
     this.logger.warn(reclaimMessage);
     warnings.push(reclaimMessage);
     this.bestEffort(
-      () => activator.removeMarketplace(name, marketplace.scope, { force: true }),
-      `unregister stale marketplace '${name}'`,
+      () => activator.removeMarketplace(hostName, marketplace.scope, { force: true }),
+      `unregister stale marketplace '${hostName}'`,
       warnings
     );
     this.bestEffort(
       () => activator.addMarketplace(builtDir, marketplace.scope),
-      `register marketplace '${name}'`,
+      `register marketplace '${hostName}'`,
       warnings
     );
   }
@@ -544,8 +678,20 @@ function nativeRegistrationsEqual(
   if (a === undefined) return false;
   return (
     a.binary === b.binary &&
-    arraysEqual(a.marketplaces, b.marketplaces) &&
+    marketplaceRegistrationsEqual(a.marketplaces, b.marketplaces) &&
     arraysEqual(a.pluginRefs, b.pluginRefs)
+  );
+}
+
+function marketplaceRegistrationsEqual(
+  a: readonly NativeMarketplaceRegistration[],
+  b: readonly NativeMarketplaceRegistration[]
+): boolean {
+  return (
+    a.length === b.length &&
+    a.every(
+      (value, index) => value.alias === b[index]?.alias && value.hostName === b[index]?.hostName
+    )
   );
 }
 

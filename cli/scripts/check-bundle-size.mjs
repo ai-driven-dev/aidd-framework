@@ -33,6 +33,20 @@ const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 // 556.2 KB: inside the headroom, no raise.
 // 578 was set 2026-09-06 when OpenCode's hooks bridge landed: measured 566.8 KB, +7.3 KB
 // for the template of the module it generates per plugin. Same ~2 % headroom.
+// 595 was set 2026-09-07 when the marketplace source-conflict guard landed, replacing an
+// earlier compare by resolved path alone that would have refused two projects sharing one
+// build. Measured with a control build of the same tree at HEAD, the 18 files this guard
+// touches reverted to their pre-guard content: 577.18 KB without it, 584.55 KB with it, a
+// +7.4 KB delta — checked for an accidental heavy import first (none: every new file reads
+// `node:fs/promises` and `node:path` only), so the delta is what it looks like, the two
+// new readers, the pure comparison, the sync-time and doctor-time checks it now shares
+// through `read-marketplace-catalog-identity.ts`, the kernel error, and the extracted
+// `sync-native-activation.ts` three more command call sites now share. A same-day
+// correction then narrowed what "conflict" means further, to a catalog's declared name
+// plus its plugin set — never its version, so a same-name, same-plugins upgrade no longer
+// refuses every second sync. 595 leaves ~1.8 % headroom over the 584.55 KB this guard
+// landed at — tighter than the usual ~2 %, on purpose, rather than padding past what was
+// actually measured; 577.18 KB is the baseline the next raise measures against.
 const budgetKB = pkg.bundleBudgetKB ?? 500;
 const budgetBytes = budgetKB * 1024;
 

@@ -138,6 +138,36 @@ describe("InstallAiToolUseCase", () => {
       expect(syncSettingsMock.execute).toHaveBeenCalledWith({ projectRoot: PROJECT_ROOT });
     });
 
+    it("surfaces the sync's own errors in its result rather than discarding them", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      await addPlugin(deps, "claude", makeMockPlugin("my-plugin"));
+
+      const conflictError = { scope: "opencode", message: "different catalog" };
+      const { useCase } = buildUseCase(
+        deps,
+        {},
+        {
+          execute: vi.fn().mockResolvedValue({
+            activated: [],
+            binaryMissing: [],
+            warnings: [],
+            errors: [conflictError],
+          }),
+        }
+      );
+
+      const result = await useCase.execute({
+        toolId: "opencode",
+        projectRoot: PROJECT_ROOT,
+        force: false,
+        version: VERSION,
+        propagatePlugins: true,
+      });
+
+      expect(result.activation?.errors).toEqual([conflictError]);
+    });
+
     it("skips propagation and sync when --no-plugins flag is set", async () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);
       await initAndInstall(deps, PROJECT_ROOT, "claude");

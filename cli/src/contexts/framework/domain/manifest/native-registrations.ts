@@ -1,18 +1,25 @@
-// ── NativeRegistrations ─────────────────────────────────────────────────────
-// What a tool's own CLI was asked to register, for the one tool whose plugins load
-// through it: the marketplace names and `<plugin>@<marketplace>` refs `doctor` compares
-// against the host's real registry, and `clean` undoes through the same binary. Absent
-// for a tool with no `nativeActivation` — there is nothing for its own CLI to have done.
+/** One marketplace registration a tool's own CLI was asked to make — aidd's own local
+ * name for it (`alias`, what this project's registry and `clean`'s own registry lookup
+ * key it by) beside what the host actually registered it under (`hostName`, the
+ * catalog's own declared name, what every host-facing call — `plugin marketplace
+ * remove`, the source-conflict guard's registry lookup — must use instead). The two
+ * differ whenever a project chooses a local alias its catalog does not declare itself
+ * under, a supported capability since v8: before it, aidd refused that divergence
+ * outright, so the two were always equal and one string carried both jobs. */
+export interface NativeMarketplaceRegistration {
+  readonly alias: string;
+  readonly hostName: string;
+}
 
 export interface NativeRegistrations {
   readonly binary: string;
-  readonly marketplaces: readonly string[];
+  readonly marketplaces: readonly NativeMarketplaceRegistration[];
   readonly pluginRefs: readonly string[];
 }
 
 export interface NativeRegistrationsData {
   binary: string;
-  marketplaces: string[];
+  marketplaces: NativeMarketplaceRegistration[];
   pluginRefs: string[];
 }
 
@@ -21,7 +28,7 @@ export function toNativeRegistrationsData(
 ): NativeRegistrationsData {
   return {
     binary: registrations.binary,
-    marketplaces: [...registrations.marketplaces],
+    marketplaces: registrations.marketplaces.map((m) => ({ ...m })),
     pluginRefs: [...registrations.pluginRefs],
   };
 }
@@ -32,7 +39,7 @@ export function parseNativeRegistrations(
   if (data === undefined) return undefined;
   return {
     binary: data.binary,
-    marketplaces: [...data.marketplaces],
+    marketplaces: data.marketplaces.map((m) => ({ alias: m.alias, hostName: m.hostName })),
     pluginRefs: [...data.pluginRefs],
   };
 }

@@ -1,9 +1,16 @@
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { builtMarketplaceDir, userBuiltMarketplaceDir } from "../../../../kernel/paths.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import { type AiToolId, isAiToolId, type ToolId } from "../../../../kernel/tool.js";
+import type { Marketplace } from "../../../distribution/domain/marketplace.js";
 import type { MarketplaceRegistry } from "../../../distribution/domain/ports/marketplace-registry.js";
 import { answeredRegistry } from "../../../tools/domain/host-plugin-registration.js";
 import type { MarketplaceSettings } from "../../../tools/domain/marketplace-settings.js";
+import {
+  describePluginDiff,
+  pluginSetDifference,
+} from "../../../tools/domain/marketplace-source-conflict.js";
+import type { HostMarketplaceRegistryReader } from "../../../tools/domain/ports/host-marketplace-registry-reader.js";
 import type {
   HostPluginRegistryReader,
   HostPluginRegistryReading,
@@ -12,6 +19,8 @@ import type { NativePluginActivator } from "../../../tools/domain/ports/native-p
 import { getToolConfig, isAiTool, nativeActivationOf } from "../../../tools/domain/registry.js";
 import type { DoctorIssue } from "../../domain/doctor.js";
 import type { Manifest } from "../../domain/manifest.js";
+import { hostMarketplaceSourceConflict } from "../shared/host-marketplace-source-conflict.js";
+import { readMarketplaceCatalogIdentity } from "../shared/read-marketplace-catalog-identity.js";
 
 export interface DoctorRegistrationOptions {
   manifest: Manifest;
@@ -53,26 +62,120 @@ export class DoctorRegistrationUseCase {
     private readonly activators: ReadonlyMap<string, NativePluginActivator> = new Map(),
     /** Host plugin registry readers keyed by `AiToolId`, one per tool whose own CLI
      * activates plugins. */
-    private readonly hostRegistries: ReadonlyMap<AiToolId, HostPluginRegistryReader> = new Map()
+    private readonly hostRegistries: ReadonlyMap<AiToolId, HostPluginRegistryReader> = new Map(),
+    /** Host marketplace registry readers keyed by `AiToolId` — see `checkMarketplaceSources`,
+     * the pass that reads them. Only a tool whose profile declares
+     * `NativeActivation.marketplaceRegistry` is ever looked up here, the same gate the
+     * sync-time guard in `MarketplaceSyncSettingsUseCase` uses. */
+    private readonly hostMarketplaceRegistries: ReadonlyMap<
+      AiToolId,
+      HostMarketplaceRegistryReader
+    > = new Map(),
+    /** Root of a user-scope marketplace's built tree, mirroring
+     * `EnsureBuiltMarketplaceUseCase`'s own `userCacheRoot` — needed here to recompute
+     * the same path that use case would build, without running a build. Defaults to an
+     * empty root: exercised only for a user-scope marketplace, which every real caller
+     * wires a real one for. */
+    private readonly userCacheRoot: () => string = () => ""
   ) {}
 
   async execute(options: DoctorRegistrationOptions): Promise<DoctorIssue[]> {
     return [
       ...(await this.checkDeclaredMarketplaces(options)),
       ...(await this.checkNativeRegistrations(options)),
+      ...(await this.checkMarketplaceSources(options)),
     ];
+  }
+
+  /**
+   * Whether a host's own marketplace registry already holds this project's marketplace
+   * name pointed at a source other than the one this project would register — the
+   * doctor-side half of the sync-time guard in `MarketplaceSyncSettingsUseCase`, so a
+   * conflict is visible even between two `sync` runs, not only at the moment one fails.
+   *
+   * The expected source is **recomputed**, never stored: `builtMarketplaceDir` /
+   * `userBuiltMarketplaceDir` are the same pure functions `EnsureBuiltMarketplaceUseCase`
+   * calls to decide where it builds, so re-evaluating them here with the same inputs is
+   * not a guess at that path, it is the same path. Nothing here triggers a build.
+   *
+   * Gated on `NativeActivation.marketplaceRegistry` being declared, same as the sync-time
+   * guard — claude only, today — and silent on an unreadable registry, same as the pure
+   * `marketplaceSourceConflict` it calls: unanswerable is not a fault to report, unlike
+   * `checkNativeRegistrations`'s own `unanswerable` branch, which is `info`. A source that
+   * has never been built (nothing resolves at the computed path) is silent for the same
+   * reason — reporting a conflict against a path nothing has ever pointed at would invent
+   * the exact false positive this whole guard exists to prevent.
+   */
+  private async checkMarketplaceSources(
+    options: DoctorRegistrationOptions
+  ): Promise<DoctorIssue[]> {
+    const { projectRoot } = options;
+    const issues: DoctorIssue[] = [];
+    for await (const { toolId, expected } of this.retainedToolsWithExpectedMarketplaces(options)) {
+      if (!isAiToolId(toolId)) continue;
+      if (nativeActivationOf(toolId)?.marketplaceRegistry === undefined) continue;
+      const reader = this.hostMarketplaceRegistries.get(toolId);
+      if (reader === undefined) continue;
+      for (const marketplace of expected) {
+        const requestedSource = await this.resolvedBuiltDir(projectRoot, marketplace, toolId);
+        if (requestedSource === undefined) continue;
+        const requestedIdentity = await readMarketplaceCatalogIdentity(
+          this.fs,
+          toolId,
+          requestedSource
+        );
+        if (requestedIdentity === undefined) continue;
+        // Keyed by the catalog's own declared name, never `marketplace.name` (aidd's
+        // local alias): the host's registry only ever holds an entry under the name its
+        // own catalog declares, whatever alias this project chose for it — the same
+        // fact `resolvedBuiltDir` just above stays keyed by alias for, since that path
+        // is aidd's own build location, not a host-facing lookup. `hostMarketplaceSourceConflict`
+        // is the one place that keying happens, shared with the sync-time guard, so this
+        // pass cannot key its lookup by anything else.
+        const conflict = await hostMarketplaceSourceConflict(
+          this.fs,
+          toolId,
+          reader,
+          requestedSource,
+          requestedIdentity
+        );
+        if (conflict === undefined) continue;
+        const diff = pluginSetDifference(conflict.registeredIdentity, conflict.requestedIdentity);
+        issues.push({
+          severity: "error",
+          message: `${toolId}'s marketplace registry (${conflict.location}) carries '${conflict.name}' from a different catalog (${conflict.registeredSource}) than this project's own (${conflict.requestedSource}) — plugins ${describePluginDiff(diff)}`,
+          fix: `Run \`claude plugin marketplace remove ${conflict.name}\`, then \`aidd sync\` to re-register it for this project — or rename this project's marketplace if it is meant to point elsewhere.`,
+        });
+      }
+    }
+    return issues;
+  }
+
+  /** Where this project's build of `marketplace` for `toolId` would land, resolved —
+   * `undefined` when nothing resolves there, which means either it was never built or
+   * it no longer exists, neither of which is a fact this check may turn into a conflict. */
+  private async resolvedBuiltDir(
+    projectRoot: string,
+    marketplace: Marketplace,
+    toolId: AiToolId
+  ): Promise<string | undefined> {
+    const raw =
+      marketplace.scope === "user"
+        ? userBuiltMarketplaceDir(this.userCacheRoot(), marketplace.name, toolId)
+        : builtMarketplaceDir(projectRoot, marketplace.name, toolId);
+    try {
+      return await this.fs.realpath(resolve(raw));
+    } catch {
+      return undefined;
+    }
   }
 
   private async checkDeclaredMarketplaces(
     options: DoctorRegistrationOptions
   ): Promise<DoctorIssue[]> {
-    const { manifest, projectRoot, allowedIds } = options;
-    const expected = await this.registry.list(projectRoot);
-    if (expected.length === 0) return [];
-
+    const { projectRoot } = options;
     const issues: DoctorIssue[] = [];
-    for (const toolId of manifest.getInstalledToolIds()) {
-      if (allowedIds && !allowedIds.has(toolId)) continue;
+    for await (const { toolId, expected } of this.retainedToolsWithExpectedMarketplaces(options)) {
       const settings = this.untrackedSettingsOf(toolId);
       if (settings === undefined) continue;
       // A tool that writes its own registration cannot have written one while its
@@ -97,8 +200,7 @@ export class DoctorRegistrationUseCase {
   ): Promise<DoctorIssue[]> {
     const { manifest, projectRoot, allowedIds } = options;
     const issues: DoctorIssue[] = [];
-    for (const toolId of manifest.getInstalledToolIds()) {
-      if (allowedIds && !allowedIds.has(toolId)) continue;
+    for (const toolId of this.retainedToolIds(manifest, allowedIds)) {
       if (!isAiToolId(toolId)) continue;
       if (nativeActivationOf(toolId) === undefined) continue;
       const expected = this.expectedNativeRegistrations(manifest, toolId);
@@ -211,5 +313,31 @@ export class DoctorRegistrationUseCase {
     const activation = nativeActivationOf(toolId);
     if (activation === undefined) return true;
     return this.activators.get(activation.binary)?.isAvailable() ?? false;
+  }
+
+  /** The manifest's own installed tools, narrowed to `allowedIds` when a caller named
+   * one — the one preamble all three passes open with, so `--tool <id>` narrows every
+   * one of them the same way instead of three copies free to drift apart. */
+  private *retainedToolIds(manifest: Manifest, allowedIds: Set<string> | null): Generator<ToolId> {
+    for (const toolId of manifest.getInstalledToolIds()) {
+      if (allowedIds && !allowedIds.has(toolId)) continue;
+      yield toolId;
+    }
+  }
+
+  /** `retainedToolIds`, paired with the registered marketplaces — the preamble
+   * `checkMarketplaceSources` and `checkDeclaredMarketplaces` both open with, since
+   * both need one tool at a time *and* the full marketplace list on every iteration.
+   * Yields nothing at all when no marketplace is registered, which is the "no
+   * issues" answer both passes already gave that case on their own. */
+  private async *retainedToolsWithExpectedMarketplaces(
+    options: DoctorRegistrationOptions
+  ): AsyncGenerator<{ toolId: ToolId; expected: readonly Marketplace[] }> {
+    const { manifest, projectRoot, allowedIds } = options;
+    const expected = await this.registry.list(projectRoot);
+    if (expected.length === 0) return;
+    for (const toolId of this.retainedToolIds(manifest, allowedIds)) {
+      yield { toolId, expected };
+    }
   }
 }

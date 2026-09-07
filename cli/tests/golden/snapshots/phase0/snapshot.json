@@ -20,7 +20,7 @@
       ".gitignore"
     ],
     "manifest": {
-      "version": 7,
+      "version": 8,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -43,7 +43,7 @@
     "stderr": "",
     "filesWritten": [],
     "manifest": {
-      "version": 7,
+      "version": 8,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -66,7 +66,7 @@
     "stderr": "",
     "filesWritten": [],
     "manifest": {
-      "version": 7,
+      "version": 8,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -89,7 +89,7 @@
     "stderr": "",
     "filesWritten": [],
     "manifest": {
-      "version": 7,
+      "version": 8,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -112,7 +112,7 @@
     "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\n",
     "filesWritten": [],
     "manifest": {
-      "version": 7,
+      "version": 8,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -149,7 +149,7 @@
     "stderr": "",
     "filesWritten": [],
     "manifest": {
-      "version": 7,
+      "version": 8,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -199,7 +199,7 @@
       ".cursor/settings.json"
     ],
     "manifest": {
-      "version": 7,
+      "version": 8,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -267,7 +267,7 @@
     "stderr": "Warning:   <HOME>/.claude/plugins/installed_plugins.json could not be read — ENOENT\n    Fix: The plugin does not load until claude's own CLI has run and answered this.\n",
     "filesWritten": [],
     "manifest": {
-      "version": 7,
+      "version": 8,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -335,7 +335,7 @@
     "stderr": "Warning:   <HOME>/.claude/plugins/installed_plugins.json could not be read — ENOENT\n    Fix: The plugin does not load until claude's own CLI has run and answered this.\nWarning:   Modified tracked file: .claude/settings.json\n    Fix: Run `aidd sync --force` to revert to the framework version.\n",
     "filesWritten": [],
     "manifest": {
-      "version": 7,
+      "version": 8,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -403,7 +403,7 @@
     "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\nWarning: claude: the plugin will not load until the claude CLI has run.\n",
     "filesWritten": [],
     "manifest": {
-      "version": 7,
+      "version": 8,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -471,7 +471,7 @@
     "stderr": "Warning:   <HOME>/.claude/plugins/installed_plugins.json could not be read — ENOENT\n    Fix: The plugin does not load until claude's own CLI has run and answered this.\n",
     "filesWritten": [],
     "manifest": {
-      "version": 7,
+      "version": 8,
       "tools": {
         "claude": {
           "toolId": "claude",
@@ -539,7 +539,7 @@
     "stderr": "Warning: claude CLI not found on PATH — 'aidd-test@aidd-framework' was not uninstalled from claude's own plugin registry and may still be enabled there.\nWarning: claude CLI not found on PATH — skipping native plugin activation.\n",
     "filesWritten": [],
     "manifest": {
-      "version": 7,
+      "version": 8,
       "tools": {
         "claude": {
           "toolId": "claude",

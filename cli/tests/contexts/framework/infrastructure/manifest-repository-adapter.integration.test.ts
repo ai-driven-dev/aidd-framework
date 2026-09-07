@@ -51,13 +51,13 @@ describe("ManifestRepositoryAdapter", () => {
       expect(loaded?.getInstalledToolIds()).toHaveLength(0);
     });
 
-    it("manifest version is 7 after roundtrip", async () => {
+    it("manifest version is 8 after roundtrip", async () => {
       const manifest = Manifest.create();
       await adapter.save(manifest);
 
       const loaded = await adapter.load();
       const json = loaded?.toJSON();
-      expect(json?.version).toBe(7);
+      expect(json?.version).toBe(8);
       expect("marketplaces" in (json ?? {})).toBe(false);
       expect("docsDir" in (json ?? {})).toBe(false);
     });

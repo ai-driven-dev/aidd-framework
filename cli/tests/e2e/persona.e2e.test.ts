@@ -111,7 +111,7 @@ exit 0
 
       const raw = await readFile(join(projectDir, AIDD_DIR, "manifest.json"), "utf-8");
       const manifest = JSON.parse(raw) as Record<string, unknown>;
-      expect(manifest.version).toBe(7);
+      expect(manifest.version).toBe(8);
       const tools = manifest.tools as Record<string, unknown>;
       expect(tools).toHaveProperty("claude");
 
@@ -232,7 +232,7 @@ exit 0
       await writeFile(
         join(projectDir, AIDD_DIR, "manifest.json"),
         JSON.stringify({
-          version: 7,
+          version: 8,
           tools: {
             claude: {
               toolId: "claude",

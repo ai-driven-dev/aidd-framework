@@ -5,6 +5,7 @@ import { createDeps, createMenuDeps } from "../../runtime/wiring/framework.js";
 import { ErrorHandler } from "../error-handler.js";
 import { parseGlobalOptions } from "./global-options.js";
 import { spawnCliCommand } from "./spawn-cli-command.js";
+import { syncNativeActivation } from "./sync-native-activation.js";
 
 export function registerPluginCommand(program: Command): void {
   const plugin = program.command("plugin").description("Manage plugins for AI tools");
@@ -40,7 +41,7 @@ export function registerPluginCommand(program: Command): void {
           toolIds: parseToolOption(cmdOptions.tool),
           projectRoot,
         });
-        await deps.marketplaceSyncSettingsUseCase.execute({ projectRoot });
+        await syncNativeActivation(deps, output, projectRoot);
         output.success(`Plugin '${name}' removed.`);
       } catch (error) {
         errorHandler.handle(error);
@@ -108,7 +109,7 @@ export function registerPluginCommand(program: Command): void {
             yes: cmdOptions.yes,
             scope,
           });
-          await deps.marketplaceSyncSettingsUseCase.execute({ projectRoot });
+          await syncNativeActivation(deps, output, projectRoot);
           if (result.kind === "picked") {
             if (result.installed.length === 0) {
               output.info("No plugins selected.");
@@ -171,7 +172,7 @@ export function registerPluginCommand(program: Command): void {
           toolIds: parseToolOption(cmdOptions.tool),
           projectRoot,
         });
-        await deps.marketplaceSyncSettingsUseCase.execute({ projectRoot });
+        await syncNativeActivation(deps, output, projectRoot);
         if (updated.length === 0) {
           output.success("All plugins are up to date.");
         } else {

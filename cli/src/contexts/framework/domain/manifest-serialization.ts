@@ -8,10 +8,10 @@ import {
   type ToolEntryData,
 } from "./manifest/tool-entry.js";
 
-export const MANIFEST_VERSION = 7;
+export const MANIFEST_VERSION = 8;
 
 export interface ManifestData {
-  version: 7;
+  version: 8;
   tools: Record<string, ToolEntryData>;
 }
 

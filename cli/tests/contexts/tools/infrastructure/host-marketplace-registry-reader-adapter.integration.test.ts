@@ -1,0 +1,108 @@
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+// hostMarketplaceRegistryReaders iterates every AI_TOOL_IDS entry, so every profile
+// must be registered here — not just claude's, whose reader this file exercises.
+import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/codex/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/opencode/profile.js";
+import { nativeActivationOf } from "../../../../src/contexts/tools/domain/registry.js";
+import { hostMarketplaceRegistryReaders } from "../../../../src/contexts/tools/infrastructure/host-marketplace-registry-reader-adapter.js";
+
+let home: string;
+
+beforeEach(async () => {
+  // realpath'd once here so every raw target built under `home` below is already the
+  // same string the reader's own realpath call will produce — macOS aliases its own
+  // tmpdir under a symlink (`/var` -> `/private/var`), so skipping this makes every
+  // fixture path disagree with itself before the reader even runs.
+  home = await realpath(await mkdtemp(join(tmpdir(), "aidd-host-marketplace-registry-")));
+});
+
+afterEach(async () => {
+  await rm(home, { recursive: true, force: true });
+});
+
+/** Read off claude's own profile, never a literal — a hard-coded copy here is exactly
+ * what let this path drift from `profile.ts`'s own `marketplaceRegistry` unnoticed. */
+function registryPath(): string {
+  const resolver = nativeActivationOf("claude")?.marketplaceRegistry;
+  if (resolver === undefined) throw new Error("claude's profile declares no marketplaceRegistry");
+  return resolver(home);
+}
+
+async function write(content: string): Promise<void> {
+  const path = registryPath();
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, content, "utf8");
+}
+
+function reader() {
+  const found = hostMarketplaceRegistryReaders(home).get("claude");
+  if (found === undefined) throw new Error("no reader declared for claude");
+  return found;
+}
+
+describe("Claude Code's own known_marketplaces.json", () => {
+  it("reads the name and the installLocation it resolves to", async () => {
+    const target = join(home, "srcA");
+    await mkdir(target, { recursive: true });
+    await write(
+      JSON.stringify({
+        "probe-mkt": {
+          source: { source: "directory", path: target },
+          installLocation: target,
+          lastUpdated: "2026-09-07T00:00:00.000Z",
+        },
+      })
+    );
+
+    const reading = await reader().read();
+
+    expect(reading.entries?.get("probe-mkt")).toBe(target);
+  });
+
+  it("resolves an installLocation reached through a symlink to its real target", async () => {
+    const realTarget = join(home, "real-src");
+    const linked = join(home, "linked-src");
+    await mkdir(realTarget, { recursive: true });
+    await symlink(realTarget, linked);
+    await write(
+      JSON.stringify({ "probe-mkt": { source: {}, installLocation: linked, lastUpdated: "x" } })
+    );
+
+    const reading = await reader().read();
+
+    // Two writes of "the same" directory, one straight and one through the link,
+    // must compare equal once both go through realpath — the /var -> /private/var lesson.
+    expect(reading.entries?.get("probe-mkt")).toBe(realTarget);
+  });
+
+  it("says it could not read an absent registry, and carries no entries at all", async () => {
+    const reading = await reader().read();
+
+    expect(reading.entries).toBeUndefined();
+    expect(reading.unreadable).toBe("ENOENT");
+  });
+
+  it("reads an empty registry as an empty answer, not as unreadable", async () => {
+    await write(JSON.stringify({}));
+
+    const reading = await reader().read();
+
+    expect(reading.entries?.size).toBe(0);
+    expect(reading.unreadable).toBeUndefined();
+  });
+
+  it("reads malformed JSON as unreadable, never as carrying no marketplaces", async () => {
+    await write("// managed automatically\n{ not json");
+
+    const reading = await reader().read();
+
+    expect(reading.entries).toBeUndefined();
+    expect(reading.unreadable).toBeDefined();
+  });
+});

@@ -45,9 +45,25 @@ interface SyncSetup {
   readonly failOnPlugins?: readonly string[];
 }
 
+/** A readable catalog at the path the default `fakeEnsureBuiltMarketplace()` resolves
+ * "claude" to — a real build always leaves one there, so a fixture standing in for one
+ * must too, now that an unreadable catalog is a hard failure (`UnreadableBuiltCatalogError`)
+ * rather than a silent fall back to this project's own local alias. Every marketplace this
+ * file registers shares the one physical built dir the default resolver gives "claude",
+ * so one seeded catalog, named for whichever marketplace a case cares about, covers them. */
+function seededBuiltCatalog(name = "aidd-framework"): InMemoryFileAdapter {
+  return new InMemoryFileAdapter({
+    "/built/claude/.claude-plugin/marketplace.json": JSON.stringify({
+      name,
+      version: "1.0.0",
+      plugins: [],
+    }),
+  });
+}
+
 async function sync(setup: SyncSetup = {}) {
   const names = setup.marketplaceNames ?? ["aidd-framework"];
-  const fs = new InMemoryFileAdapter();
+  const fs = seededBuiltCatalog(names[0]);
   const manifestRepo = new InMemoryManifestRepository();
   const registry = new InMemoryMarketplaceRegistry();
   const logger = new CapturingLogger();
@@ -301,7 +317,7 @@ describe("what execute reports about activation", () => {
  * registration would silently re-drive every other tool's CLI too. */
 describe("toolIds narrows which tool's CLI is driven", () => {
   it("never calls the activator of a tool not named in toolIds", async () => {
-    const fs = new InMemoryFileAdapter();
+    const fs = seededBuiltCatalog();
     const manifestRepo = new InMemoryManifestRepository();
     const registry = new InMemoryMarketplaceRegistry();
     const manifest = Manifest.create();

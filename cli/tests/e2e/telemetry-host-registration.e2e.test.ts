@@ -48,7 +48,7 @@ describe("check says whether the host will load what aidd installed", () => {
     await writeFile(
       join(projectDir, ".aidd", "manifest.json"),
       JSON.stringify({
-        version: 7,
+        version: 8,
         tools: {
           claude: {
             files: [],

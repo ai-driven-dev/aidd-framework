@@ -11,6 +11,7 @@ import {
 import { ErrorHandler } from "../error-handler.js";
 import type { CLIOutput } from "../output.js";
 import { parseGlobalOptions } from "./global-options.js";
+import { reportSyncActivation } from "./sync-native-activation.js";
 
 type Deps = Awaited<ReturnType<typeof createDeps>>;
 
@@ -61,6 +62,7 @@ async function installAiTool(
   for (const w of result.runtimeResult.warnings) output.warn(w);
   for (const w of result.propagationWarnings) output.warn(w);
   output.success(`Installed ${toolId} (${result.runtimeResult.fileCount} files)`);
+  if (result.activation !== undefined) reportSyncActivation(output, result.activation);
 }
 
 async function installIdeTool(

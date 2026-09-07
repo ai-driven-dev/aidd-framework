@@ -293,7 +293,7 @@ describe("clean", () => {
       manifest.addTool("codex", "1.0.0", []);
       manifest.setNativeRegistrations("codex", {
         binary: BINARY,
-        marketplaces: [MARKETPLACE],
+        marketplaces: [{ alias: MARKETPLACE, hostName: MARKETPLACE }],
         pluginRefs: [REF],
       });
       return manifest;
@@ -431,6 +431,44 @@ describe("clean", () => {
       ]);
       expect(activator.uninstalledPlugins).toEqual([]);
       expect(activator.removedMarketplaces).toEqual([]);
+    });
+
+    it("removes the marketplace under its catalog's own host name, not this project's local alias for it", async () => {
+      const ALIAS = "userscoped";
+      const HOST_NAME = "user-mkt";
+      const manifest = Manifest.create();
+      manifest.addTool("codex", "1.0.0", []);
+      manifest.setNativeRegistrations("codex", {
+        binary: BINARY,
+        marketplaces: [{ alias: ALIAS, hostName: HOST_NAME }],
+        pluginRefs: [],
+      });
+      const fs = new InMemoryFileAdapter();
+      const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+      const activator = new FakeNativePluginActivator({ available: true });
+      const registry = new InMemoryMarketplaceRegistry();
+      registry.save(
+        PROJECT_ROOT,
+        Marketplace.create({
+          name: ALIAS,
+          source: { kind: "local", path: "/some/built/path" },
+          scope: "project",
+          addedAt: "2026-01-01T00:00:00.000Z",
+        })
+      );
+      const useCase = new CleanUseCase(
+        fs,
+        manifestRepo,
+        new CapturingLogger(),
+        new GitignoreUseCase(fs),
+        new Map([[BINARY, activator]]),
+        registry
+      );
+
+      await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(activator.removedMarketplaces).toEqual([HOST_NAME]);
+      expect(activator.removedMarketplaces).not.toContain(ALIAS);
     });
   });
 

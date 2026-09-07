@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { AgentsCapability } from "../../capabilities/agents-capability.js";
 import { CommandsCapability } from "../../capabilities/commands-capability.js";
 import { CONFIG_MCP } from "../../capabilities/config-refs.js";
@@ -132,6 +133,11 @@ export const claude: AiTool<HasAgents & HasSkills & HasCommands & HasRules & Has
           // `--yes` gates a prune confirmation these calls never request, but a headless
           // stdin has no terminal to answer any prompt at all.
           pluginArgs: ["--yes"],
+          // Root of claude's own marketplace registry — read by the sync guard that
+          // refuses a name-stealing re-add before driving `marketplace add` at all.
+          // Declared here alone: neither codex nor copilot needs it (see the field's
+          // own doc), which is what keeps that guard claude-only by declaration.
+          marketplaceRegistry: (h) => join(h, ".claude", "plugins", "known_marketplaces.json"),
         },
         marketplaceSettings: {
           settingsPath: ".claude/settings.json",

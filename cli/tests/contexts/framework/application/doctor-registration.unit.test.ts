@@ -93,7 +93,9 @@ const REGISTRY_LOCATION = "/home/dev/.claude/plugins/installed_plugins.json";
 
 function manifestWithNativeRegistrations(
   pluginRefs: string[],
-  marketplaces: string[] = ["aidd-framework"]
+  marketplaces: { alias: string; hostName: string }[] = [
+    { alias: "aidd-framework", hostName: "aidd-framework" },
+  ]
 ): Manifest {
   const manifest = Manifest.create();
   manifest.addTool("claude", "test", []);
@@ -196,10 +198,16 @@ describe("DoctorRegistrationUseCase — native registrations against the host's 
   // plugin behind it — §2.2b's own justification for the field. Nothing here can be
   // asked about a marketplace on its own, so this must stay silent, not invent a ref.
   it("says nothing for a registered marketplace with no plugin ref to check", async () => {
-    const issues = await nativeIssuesFor(manifestWithNativeRegistrations([], ["aidd-framework"]), {
-      location: REGISTRY_LOCATION,
-      refs: new Map(),
-    });
+    const issues = await nativeIssuesFor(
+      manifestWithNativeRegistrations(
+        [],
+        [{ alias: "aidd-framework", hostName: "aidd-framework" }]
+      ),
+      {
+        location: REGISTRY_LOCATION,
+        refs: new Map(),
+      }
+    );
 
     expect(issues).toEqual([]);
   });

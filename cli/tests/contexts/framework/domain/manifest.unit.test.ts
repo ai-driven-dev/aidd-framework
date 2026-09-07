@@ -193,7 +193,7 @@ describe("Manifest", () => {
     it("toJSON produces version 7", () => {
       const manifest = Manifest.create();
       manifest.addTool("claude" as ToolId, "3.0.0", claudeFiles);
-      expect(manifest.toJSON().version).toBe(7);
+      expect(manifest.toJSON().version).toBe(8);
     });
   });
 
@@ -304,37 +304,52 @@ describe("Manifest", () => {
   });
 
   describe("version guard", () => {
-    it("v7 manifest loads without error", () => {
+    it("v8 manifest loads without error", () => {
       const manifest = Manifest.create();
       manifest.addTool("copilot" as ToolId, "1.0.0", []);
       const json = manifest.toJSON();
-      expect(json.version).toBe(7);
+      expect(json.version).toBe(8);
       expect(() => Manifest.fromJSON(json)).not.toThrow();
     });
 
-    it("v7 round-trip is stable", () => {
+    it("v8 round-trip is stable", () => {
       const manifest = Manifest.create();
       manifest.addTool("claude" as ToolId, "3.0.0", claudeFiles);
       const restored = Manifest.fromJSON(manifest.toJSON());
-      expect(restored.toJSON().version).toBe(7);
+      expect(restored.toJSON().version).toBe(8);
     });
 
-    // v7 introduced data (a mandatory `scope` per plugin) that no published CLI has ever
-    // written, so — unlike the v6 cutover — there is no already-published version to name
-    // that could actually migrate a stuck document forward: every write path loads the
+    // v8 changed what `nativeRegistrations.marketplaces` holds per entry: the host's own
+    // registered name beside aidd's own local alias, not the alias alone — no published
+    // CLI has ever written that pair, so — unlike the v6 cutover, which some already-
+    // published CLI could still migrate forward — there is no already-published version to
+    // name that could actually migrate a stuck v7 document. Every write path loads the
     // manifest through this same guard before it ever reaches a save
     // (`ManifestRepositoryAdapter.load()`), so naming a command that reads the old
     // document first would just refuse it again. The only correction that does not loop
     // back through this guard is deleting the document and reinstalling from scratch.
     const RECOVERY_INVOCATION = /delete \.aidd\/manifest\.json.*aidd setup/;
 
-    it("rejects a version below 7 and names the file to delete, not a command to migrate it", () => {
+    it("rejects a version below 8 and names the file to delete, not a command to migrate it", () => {
+      const v7 = { version: 7, tools: {} };
+      expect(() => Manifest.fromJSON(v7)).toThrow(RECOVERY_INVOCATION);
+      // The literal string this guard used to send a stuck user toward — a CLI that
+      // itself only ever wrote v7 and would refuse the resulting document all over
+      // again. Naming it here would recreate the very loop this guard now avoids.
+      expect(() => Manifest.fromJSON(v7)).not.toThrow(/update --force/);
+      // v7 was never published — no CLI has ever written it, unlike v6 below.
+      expect(() => Manifest.fromJSON(v7)).toThrow(/No published CLI can write this version/);
+    });
+
+    // 5.2.2 is a published CLI that migrated a v5 document to v6 and re-saved it, so a
+    // v6 document on disk today is not evidence of nothing: "no published CLI can write
+    // this version" is simply false for v6, the one version the message must not say it
+    // for.
+    it("names 5.2.2 for a version 6 manifest, since that published CLI actually wrote it", () => {
       const v6 = { version: 6, tools: {} };
       expect(() => Manifest.fromJSON(v6)).toThrow(RECOVERY_INVOCATION);
-      // The literal string this guard used to send a stuck user toward — a CLI that
-      // itself only ever wrote v6 and would refuse the resulting document all over
-      // again. Naming it here would recreate the very loop this guard now avoids.
-      expect(() => Manifest.fromJSON(v6)).not.toThrow(/update --force/);
+      expect(() => Manifest.fromJSON(v6)).toThrow(/5\.2\.2/);
+      expect(() => Manifest.fromJSON(v6)).not.toThrow(/No published CLI can write this version/);
     });
 
     it("v0 manifest throws, naming the recovery invocation", () => {
@@ -343,7 +358,7 @@ describe("Manifest", () => {
       expect(() => Manifest.fromJSON(v0)).toThrow(RECOVERY_INVOCATION);
     });
 
-    it("rejects a version above 7 by pointing at update, not a downgrade", () => {
+    it("rejects a version above 8 by pointing at update, not a downgrade", () => {
       const v99 = { version: 99, tools: {} };
       expect(() => Manifest.fromJSON(v99)).toThrow(/version/);
       expect(() => Manifest.fromJSON(v99)).toThrow(/aidd update/);
@@ -353,29 +368,29 @@ describe("Manifest", () => {
 
   describe("malformed tool entry", () => {
     it("throws an instructive, typed error naming the field when files is missing", () => {
-      const data = { version: 7, tools: { claude: { toolId: "claude", version: "1.0.0" } } };
+      const data = { version: 8, tools: { claude: { toolId: "claude", version: "1.0.0" } } };
       expect(() => Manifest.fromJSON(data)).toThrow(/tools\.claude\.files/);
     });
 
     it("throws an instructive, typed error naming the field when files is the wrong type", () => {
       const data = {
-        version: 7,
+        version: 8,
         tools: { claude: { toolId: "claude", version: "1.0.0", files: "nope" } },
       };
       expect(() => Manifest.fromJSON(data)).toThrow(/tools\.claude\.files/);
     });
 
     it("throws an instructive, typed error when a tool entry is not an object", () => {
-      const data = { version: 7, tools: { claude: "nope" } };
+      const data = { version: 8, tools: { claude: "nope" } };
       expect(() => Manifest.fromJSON(data)).toThrow(/tools\.claude/);
     });
 
-    // `scope` is mandatory in v7: a default here would guess exactly what the field
+    // `scope` is mandatory since v7, still mandatory in v8: a default here would guess exactly what the field
     // exists to stop guessing. Naming the plugin, not just "scope", is what lets a
     // person find the offending entry in a manifest that may carry several.
-    it("rejects a v7 plugin entry carrying no scope, naming the plugin", () => {
+    it("rejects a v8 plugin entry carrying no scope, naming the plugin", () => {
       const data = {
-        version: 7,
+        version: 8,
         tools: {
           claude: {
             toolId: "claude",
@@ -396,9 +411,9 @@ describe("Manifest", () => {
       expect(() => Manifest.fromJSON(data)).toThrow(/aidd-context/);
     });
 
-    it("rejects a v7 plugin entry whose scope is neither project nor user", () => {
+    it("rejects a v8 plugin entry whose scope is neither project nor user", () => {
       const data = {
-        version: 7,
+        version: 8,
         tools: {
           claude: {
             toolId: "claude",

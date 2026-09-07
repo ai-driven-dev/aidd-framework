@@ -5,6 +5,7 @@ import { createDeps, createMenuDeps } from "../../runtime/wiring/framework.js";
 import { ErrorHandler } from "../error-handler.js";
 import { parseGlobalOptions } from "./global-options.js";
 import { spawnCliCommand } from "./spawn-cli-command.js";
+import { syncNativeActivation } from "./sync-native-activation.js";
 
 export function registerMarketplaceCommand(program: Command): void {
   const marketplace = program.command("marketplace").description("Manage plugin marketplaces");
@@ -73,7 +74,7 @@ export function registerMarketplaceCommand(program: Command): void {
             autoTrust: cmdOptions.yes ?? false,
             overwrite: cmdOptions.overwrite ?? false,
           });
-          await deps.marketplaceSyncSettingsUseCase.execute({ projectRoot });
+          await syncNativeActivation(deps, output, projectRoot);
           output.success(`Marketplace '${result.marketplace.name}' registered.`);
         } catch (error) {
           errorHandler.handle(error);
@@ -119,7 +120,7 @@ export function registerMarketplaceCommand(program: Command): void {
           projectRoot,
           autoConfirm: cmdOptions.yes ?? false,
         });
-        await deps.marketplaceSyncSettingsUseCase.execute({ projectRoot });
+        await syncNativeActivation(deps, output, projectRoot);
         output.success(
           `Marketplace '${result.marketplace.name}' removed (${result.removedPluginCount} plugin(s) cleaned up).`
         );
@@ -144,7 +145,7 @@ export function registerMarketplaceCommand(program: Command): void {
           name,
           force: cmdOptions.force,
         });
-        await deps.marketplaceSyncSettingsUseCase.execute({ projectRoot });
+        await syncNativeActivation(deps, output, projectRoot);
         for (const r of results)
           output.print(`${r.name}: ${r.status}${r.error ? ` (${r.error})` : ""}`);
         if (failedCount > 0) process.exit(1);

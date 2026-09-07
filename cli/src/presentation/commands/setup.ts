@@ -11,6 +11,7 @@ import { displayInstall, printNextSteps, printWelcomeBanner } from "../display/s
 import { ErrorHandler } from "../error-handler.js";
 import type { CLIOutput } from "../output.js";
 import { parseGlobalOptions } from "./global-options.js";
+import { reportSyncActivation } from "./sync-native-activation.js";
 
 interface SetupCmdOptions {
   source?: "remote" | "local";
@@ -176,6 +177,7 @@ export function registerSetupCommand(program: Command): void {
           }
         }
         if (interactive) printNextSteps(output, result.install.results.length > 0);
+        reportSyncActivation(output, result.activation);
       } catch (error) {
         errorHandler.handle(error);
       }

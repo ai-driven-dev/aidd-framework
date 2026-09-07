@@ -77,6 +77,20 @@ export interface NativeActivation {
    * requests, but a headless stdin has no terminal to answer any prompt at all.
    */
   pluginArgs?: readonly string[];
+  /**
+   * Resolver for the root of this tool's own marketplace registry, given a homedir
+   * string — a **root**, not a per-marketplace path, the same shape `userPluginsDir`
+   * already takes. Declared only where the host itself derives a marketplace's
+   * registered name from its source's own catalog and silently overwrites a
+   * same-named entry from a different source — measured against Claude Code alone:
+   * `claude plugin marketplace add <dir>` reads `name` from the source's
+   * `marketplace.json`, and re-adding the same name from elsewhere replaces
+   * `installLocation` with no prompt and no error. Codex refuses that re-add itself;
+   * Copilot refuses every re-add. Absence of this field is what keeps the sync guard
+   * that reads it claude-only, without a single `if (toolId === "claude")` anywhere
+   * in that guard.
+   */
+  marketplaceRegistry?: (homedir: string) => string;
 }
 
 export interface NativePluginsParams {

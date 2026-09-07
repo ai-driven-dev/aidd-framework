@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 import { createTestEnv, runCli } from "./helpers.js";
 
 const AIDD_DIR = ".aidd";
-const EMPTY_MANIFEST = { version: 7, tools: {} };
+const EMPTY_MANIFEST = { version: 8, tools: {} };
 const PLUGIN_FIXTURE = resolve(process.cwd(), "tests/fixtures/plugins/claude-format/sample-plugin");
 
 async function seedManifest(projectDir: string): Promise<void> {

@@ -36,11 +36,15 @@ const MAX_FILES_PER_FOLDER = 10;
  */
 const BASELINE: readonly { readonly path: string; readonly count: number }[] = [
   // Twelve files carry the command surface — eleven register a command on the program,
-  // `menu.ts` runs the interactive loop — plus `global-options.ts` and `spawn-cli-command.ts`,
-  // whose importers all live in this folder. That is the flattest mapping there is from the
-  // CLI's surface to its source. Moving the two helpers out would leave twelve: still over
-  // the limit, and clearer about nothing. `telemetry.ts` is the eleventh command.
-  { path: "src/presentation/commands", count: 14 },
+  // `menu.ts` runs the interactive loop — plus three helpers whose importers all live in
+  // this folder: `global-options.ts`, `spawn-cli-command.ts`, and
+  // `cli/src/presentation/commands/sync-native-activation.ts`, which `plugin.ts` and
+  // `marketplace.ts` both drive after their own use case to read and surface what it
+  // returns, the same shape `sync.ts` already held on its own before either needed it.
+  // That is the flattest mapping there is from the CLI's surface to its source. Moving
+  // the three helpers out would leave twelve: still over the limit, and clearer about
+  // nothing. `telemetry.ts` is the eleventh command.
+  { path: "src/presentation/commands", count: 15 },
   // Eleven, and staying there. The kernel gained `measurement.ts` — what a tool declares
   // about being measured, declared by tools and read by telemetry — and the five file
   // helpers that came with it are already grouped under `reading/`. What is left is eleven
@@ -61,6 +65,15 @@ const BASELINE: readonly { readonly path: string; readonly count: number }[] = [
   // this project's installed plugins, its ignore file, its version control. One port per
   // question asked; collapsing any two would be a port that answers two.
   { path: "src/contexts/telemetry/domain/ports", count: 11 },
+  // Eleven since `cli/src/contexts/tools/domain/marketplace-source-conflict.ts`: whether
+  // a marketplace name a host's own registry already holds is pointed at a different,
+  // resolved source — pure, and read by both the sync-time guard and `doctor`'s own
+  // conflict check, the same relationship `host-plugin-registration.ts` already has to
+  // `doctor` and `telemetry`. No existing grouping here fits it: `marketplace-catalog.ts`,
+  // `marketplace-entry.ts` and `marketplace-settings.ts` are each a tool-build concern this
+  // file is not, and moving one of them out to make room would be exactly the shuffle this
+  // rule refuses.
+  { path: "src/contexts/tools/domain", count: 11 },
 ];
 
 /** Direct `.ts` files per parent directory — a subfolder counts toward itself, not its parent. */

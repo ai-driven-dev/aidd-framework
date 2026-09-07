@@ -17,6 +17,18 @@ import { InMemoryMarketplaceRegistry } from "../../../../../helpers/ports/in-mem
 const PROJECT_ROOT = "/test-project";
 const MARKETPLACE_NAME = "aidd-framework";
 
+/** A readable catalog at the path the default `fakeEnsureBuiltMarketplace()` resolves
+ * "copilot" to, at copilot's own `distributionProbes.marketplace` relative path — a real
+ * build always leaves one there, so a fixture standing in for one must too, now that an
+ * unreadable catalog is a hard failure rather than a silent fall back to this project's
+ * own local alias (`UnreadableBuiltCatalogError`). */
+async function seedBuiltCatalog(fs: InMemoryFileAdapter, name = MARKETPLACE_NAME): Promise<void> {
+  await fs.writeFile(
+    "/built/copilot/.plugin/marketplace.json",
+    JSON.stringify({ name, version: "1.0.0", plugins: [] })
+  );
+}
+
 async function seedCopilotPlugin(
   manifestRepo: InMemoryManifestRepository,
   registry: InMemoryMarketplaceRegistry
@@ -94,6 +106,7 @@ describe("install copilot plugin via Mode A (integration)", () => {
 
   it("drives the copilot CLI activator and still writes the settings file", async () => {
     const fs = new InMemoryFileAdapter();
+    await seedBuiltCatalog(fs);
     const manifestRepo = new InMemoryManifestRepository();
     const registry = new InMemoryMarketplaceRegistry();
     const activator = new FakeNativePluginActivator({ available: true });
@@ -120,6 +133,7 @@ describe("install copilot plugin via Mode A (integration)", () => {
 
   it("takes the name back when whoever held it is gone", async () => {
     const fs = new InMemoryFileAdapter();
+    await seedBuiltCatalog(fs);
     const manifestRepo = new InMemoryManifestRepository();
     const registry = new InMemoryMarketplaceRegistry();
     // The name is held, and the tool reports its source no longer resolves: nobody
@@ -151,6 +165,7 @@ describe("install copilot plugin via Mode A (integration)", () => {
 
   it("leaves a name alone while it still resolves, whoever holds it", async () => {
     const fs = new InMemoryFileAdapter();
+    await seedBuiltCatalog(fs);
     const manifestRepo = new InMemoryManifestRepository();
     const registry = new InMemoryMarketplaceRegistry();
     // Held, and the source resolves: another project is alive behind it. Taking the
@@ -179,6 +194,7 @@ describe("install copilot plugin via Mode A (integration)", () => {
 
   it("says nothing about taking a name back when it cannot tell who holds it", async () => {
     const fs = new InMemoryFileAdapter();
+    await seedBuiltCatalog(fs);
     const manifestRepo = new InMemoryManifestRepository();
     const registry = new InMemoryMarketplaceRegistry();
     // The tool offers no way to tell a dead registration from a live one, which must

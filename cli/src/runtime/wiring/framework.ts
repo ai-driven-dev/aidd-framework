@@ -190,7 +190,7 @@ export async function createDeps(
   const prompter = process.stdout.isTTY
     ? new InquirerPrompterAdapter()
     : new SilentPrompterAdapter();
-  const { nativePluginActivators } = wireTools();
+  const { nativePluginActivators, hostMarketplaceRegistries } = wireTools();
   const {
     pluginFetcher,
     marketplaceRegistry,
@@ -264,7 +264,8 @@ export async function createDeps(
     hasher,
     logger,
     nativePluginActivators,
-    ensureBuiltMarketplaceUseCase
+    ensureBuiltMarketplaceUseCase,
+    hostMarketplaceRegistries
   );
   const pluginAddUseCase = new PluginAddUseCase(
     fs,
@@ -355,7 +356,9 @@ export async function createDeps(
       fs,
       marketplaceRegistry,
       nativePluginActivators,
-      hostPluginRegistryReaders()
+      hostPluginRegistryReaders(),
+      hostMarketplaceRegistries,
+      userConfigDir
     )
   );
   const releaseResolver = new GitHubReleaseResolverAdapter(http, authReader);

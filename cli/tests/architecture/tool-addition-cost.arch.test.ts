@@ -140,6 +140,10 @@ const BASELINE: readonly { readonly path: string; readonly named: number }[] = [
     path: "src/contexts/tools/infrastructure/host-plugin-registry-reader-adapter.ts",
     named: 3,
   },
+  // host-marketplace-registry-reader-adapter.ts used to name "claude" here, as its
+  // marketplace-registry sibling of the entry above — it now iterates AI_TOOL_IDS and
+  // reads `NativeActivation.marketplaceRegistry` off each tool's own profile instead,
+  // so no literal survives here for this ratchet to admit.
   // An adapter for exactly one tool, naming the binary it shells out to. A tool named in
   // its own adapter is not a list a new tool joins — a new tool brings its own adapter.
   { path: "src/contexts/telemetry/infrastructure/opencode-cost-reader-adapter.ts", named: 1 },

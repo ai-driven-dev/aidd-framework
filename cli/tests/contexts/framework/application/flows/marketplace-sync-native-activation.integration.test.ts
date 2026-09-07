@@ -64,9 +64,24 @@ function manifestWithPlugin(marketplace: string = MARKETPLACE): InMemoryManifest
   return new InMemoryManifestRepository(manifest);
 }
 
+/** What `readMarketplaceCatalogIdentity` reads back for the one marketplace `marketplace()`
+ * registers, built to the one directory `fakeEnsureBuiltMarketplace()`'s default resolves
+ * "claude" to — a real build always leaves a readable catalog there, so a fixture standing
+ * in for one must too, now that an unreadable catalog is a hard failure rather than a
+ * silent fall back to this project's own local alias (see `UnreadableBuiltCatalogError`). */
+function seededBuiltCatalog(): InMemoryFileAdapter {
+  return new InMemoryFileAdapter({
+    "/built/claude/.claude-plugin/marketplace.json": JSON.stringify({
+      name: MARKETPLACE,
+      version: "1.0.0",
+      plugins: [{ name: PLUGIN }],
+    }),
+  });
+}
+
 function buildSync(activator: FakeNativePluginActivator, pluginMarketplace?: string) {
   const registry = new InMemoryMarketplaceRegistry();
-  const fs = new InMemoryFileAdapter();
+  const fs = seededBuiltCatalog();
   const manifestRepo = manifestWithPlugin(pluginMarketplace);
   const hasher = new DeterministicHasher();
   return {
@@ -212,7 +227,7 @@ describe("nativeRegistrations reflects what the host's own CLI was asked to regi
     const reloaded = await manifestRepo.load();
     expect(reloaded?.getNativeRegistrations("claude")).toEqual({
       binary: "claude",
-      marketplaces: [MARKETPLACE],
+      marketplaces: [{ alias: MARKETPLACE, hostName: MARKETPLACE }],
       pluginRefs: [REF],
     });
   });
@@ -241,7 +256,7 @@ describe("nativeRegistrations reflects what the host's own CLI was asked to regi
     const staleManifest = await manifestRepo.load();
     staleManifest?.setNativeRegistrations("claude", {
       binary: "claude",
-      marketplaces: [MARKETPLACE],
+      marketplaces: [{ alias: MARKETPLACE, hostName: MARKETPLACE }],
       pluginRefs: [REF],
     });
     if (staleManifest) await manifestRepo.save(staleManifest);
@@ -253,8 +268,53 @@ describe("nativeRegistrations reflects what the host's own CLI was asked to regi
     const reloaded = await manifestRepo.load();
     expect(reloaded?.getNativeRegistrations("claude")).toEqual({
       binary: "claude",
-      marketplaces: [MARKETPLACE],
+      marketplaces: [{ alias: MARKETPLACE, hostName: MARKETPLACE }],
       pluginRefs: [REF],
+    });
+  });
+
+  /**
+   * The coordinator's own scenario: this project's local alias for a marketplace
+   * (`MARKETPLACE`, what its own registry and `manifestWithPlugin` both key it by) is
+   * free to differ from what the catalog it builds actually declares itself as — a
+   * supported capability, never a fault, since v8. `claude` only ever knows the
+   * marketplace by its catalog's own name, so the ref driven through `enablePlugin`
+   * and the name recorded in `nativeRegistrations` must both follow the catalog, never
+   * the alias.
+   */
+  it("drives the host CLI and records the catalog's own name when this project's local alias differs from it", async () => {
+    const CATALOG_NAME = "aidd-framework-catalog";
+    const activator = new FakeNativePluginActivator({ available: true });
+    const registry = new InMemoryMarketplaceRegistry();
+    const fs = new InMemoryFileAdapter({
+      "/built/claude/.claude-plugin/marketplace.json": JSON.stringify({
+        name: CATALOG_NAME,
+        version: "1.0.0",
+        plugins: [],
+      }),
+    });
+    const manifestRepo = manifestWithPlugin();
+    const hasher = new DeterministicHasher();
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      manifestRepo,
+      registry,
+      hasher,
+      new CapturingLogger(),
+      new Map([["claude", activator]]),
+      fakeEnsureBuiltMarketplace()
+    );
+    await registry.save(PROJECT_ROOT, marketplace());
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(activator.enabledPlugins).toEqual([`${PLUGIN}@${CATALOG_NAME}`]);
+    expect(activator.enabledPlugins).not.toContain(REF);
+    const reloaded = await manifestRepo.load();
+    expect(reloaded?.getNativeRegistrations("claude")).toEqual({
+      binary: "claude",
+      marketplaces: [{ alias: MARKETPLACE, hostName: CATALOG_NAME }],
+      pluginRefs: [`${PLUGIN}@${CATALOG_NAME}`],
     });
   });
 });
@@ -271,7 +331,7 @@ describe("registering a marketplace does not wait for a plugin to point at it", 
   it("registers every known marketplace even when the manifest declares no plugin", async () => {
     const activator = new FakeNativePluginActivator({ available: true });
     const registry = new InMemoryMarketplaceRegistry();
-    const fs = new InMemoryFileAdapter();
+    const fs = seededBuiltCatalog();
     const manifest = Manifest.create();
     manifest.addTool("claude", "test", []);
     const manifestRepo = new InMemoryManifestRepository(manifest);
@@ -310,7 +370,7 @@ describe("registering a marketplace does not wait for a plugin to point at it", 
 describe("what native activation leaves behind is not reported as the user's drift", () => {
   it("tracks a hash that still matches the settings file after the host CLI has written to it", async () => {
     const registry = new InMemoryMarketplaceRegistry();
-    const fs = new InMemoryFileAdapter();
+    const fs = seededBuiltCatalog();
     const manifestRepo = manifestWithPlugin();
     const hasher = new DeterministicHasher();
     const settingsAbsolutePath = settingsPathIn(PROJECT_ROOT);
@@ -379,6 +439,53 @@ describe("what native activation leaves behind is not reported as the user's dri
     expect(hashAfterSync, "the settings file is tracked at all").toBeDefined();
     expect(tracked?.hash).toEqual(hashAfterSync);
     expect(tracked?.hash).not.toEqual(hasher.hash(edited));
+  });
+});
+
+/**
+ * `reclaimOrReport` fires when the host's own `add` refuses a name already held — dead
+ * or live decides whether this project may reclaim it. Both the check and the reclaim
+ * itself are host-facing calls, so both must ask about, and act on, the catalog's own
+ * name, never this project's local alias for it: asking about the alias would answer
+ * "dead" for a registration the host actually holds live under its catalog's name, and
+ * then force-remove a name the host never held.
+ */
+describe("reclaiming a dead registration asks and acts on the host's own name", () => {
+  it("checks and removes the catalog's own name, not this project's local alias, before re-adding", async () => {
+    const CATALOG_NAME = "aidd-framework-catalog";
+    const activator = new FakeNativePluginActivator({
+      available: true,
+      conflictOnAdd: true,
+      registrationState: "dead",
+    });
+    const registry = new InMemoryMarketplaceRegistry();
+    const fs = new InMemoryFileAdapter({
+      "/built/claude/.claude-plugin/marketplace.json": JSON.stringify({
+        name: CATALOG_NAME,
+        version: "1.0.0",
+        plugins: [],
+      }),
+    });
+    const manifestRepo = manifestWithPlugin();
+    const hasher = new DeterministicHasher();
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      manifestRepo,
+      registry,
+      hasher,
+      new CapturingLogger(),
+      new Map([["claude", activator]]),
+      fakeEnsureBuiltMarketplace()
+    );
+    await registry.save(PROJECT_ROOT, marketplace());
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(activator.removedMarketplaces).toEqual([CATALOG_NAME]);
+    expect(activator.removedMarketplaces).not.toContain(MARKETPLACE);
+    // The reclaim's second `addMarketplace` succeeded once `removedMarketplaces` was
+    // non-empty (the fake's own `conflictOnAdd` bypass), so activation still finished.
+    expect(activator.addedMarketplaces).not.toEqual([]);
   });
 });
 

@@ -21,6 +21,18 @@ import { InMemoryMarketplaceRegistry } from "../../../../../helpers/ports/in-mem
 const PROJECT_ROOT = "/test-project";
 const MARKETPLACE_NAME = "aidd-framework";
 
+/** A readable catalog at the path the default `fakeEnsureBuiltMarketplace()` resolves
+ * "codex" to, at codex's own `distributionProbes.marketplace` relative path — a real
+ * build always leaves one there, so a fixture standing in for one must too, now that an
+ * unreadable catalog is a hard failure rather than a silent fall back to this project's
+ * own local alias (`UnreadableBuiltCatalogError`). */
+async function seedBuiltCatalog(fs: InMemoryFileAdapter, name = MARKETPLACE_NAME): Promise<void> {
+  await fs.writeFile(
+    "/built/codex/.agents/plugins/marketplace.json",
+    JSON.stringify({ name, version: "1.0.0", plugins: [] })
+  );
+}
+
 function buildDist(name = "aidd-context"): PluginDistribution {
   return new PluginDistribution({
     manifest: { name, version: "1.0.0" },
@@ -96,6 +108,7 @@ async function seedTwoCodexPlugins(
 describe("install codex plugin via Mode A (integration)", () => {
   it("drives the codex CLI and writes no project-local config.json", async () => {
     const fs = new InMemoryFileAdapter();
+    await seedBuiltCatalog(fs);
     const hasher = new DeterministicHasher();
     const manifestRepo = new InMemoryManifestRepository();
     const registry = new InMemoryMarketplaceRegistry();
@@ -124,6 +137,7 @@ describe("install codex plugin via Mode A (integration)", () => {
 
   it("builds a github marketplace locally and registers the built tree", async () => {
     const fs = new InMemoryFileAdapter();
+    await seedBuiltCatalog(fs);
     const manifestRepo = new InMemoryManifestRepository();
     const registry = new InMemoryMarketplaceRegistry();
     const activator = new FakeNativePluginActivator({ available: true });
@@ -149,6 +163,7 @@ describe("install codex plugin via Mode A (integration)", () => {
 
   it("enables the remaining plugins when one plugin fails (per-plugin best-effort)", async () => {
     const fs = new InMemoryFileAdapter();
+    await seedBuiltCatalog(fs);
     const manifestRepo = new InMemoryManifestRepository();
     const registry = new InMemoryMarketplaceRegistry();
     const logger = new CapturingLogger();

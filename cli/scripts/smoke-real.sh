@@ -208,6 +208,16 @@ cleanup() {
     else
       ok "claude: known_marketplaces.json carries no trace of $MKT"
     fi
+    # Phase C2's alias-divergence registration: `activateTool` registers every known
+    # marketplace regardless of whether a plugin points at it, so `clean --force`
+    # above already had nativeRegistrations naming this hostName to unregister too.
+    if [[ -n "${UPSTREAM_NAME:-}" ]]; then
+      if grep -qF "\"$UPSTREAM_NAME\"" "$HOME/.claude/plugins/known_marketplaces.json" 2>/dev/null; then
+        bad "claude: known_marketplaces.json still carries $UPSTREAM_NAME after clean"
+      else
+        ok "claude: known_marketplaces.json carries no trace of $UPSTREAM_NAME"
+      fi
+    fi
   fi
   if [[ -n "${PRESENT[codex]:-}" ]]; then
     if grep -qF "\"$REF\"" "$HOME/.codex/config.toml" 2>/dev/null; then
@@ -363,6 +373,84 @@ if [[ -n "${PRESENT[opencode]:-}" ]]; then
   rm -f "$run_out"
 else
   skip "opencode bridge check (opencode not installed)"
+fi
+
+# --- Phase C1: the guard refuses a genuinely different catalog under the same name ---
+# Identity is a catalog's own declared name plus its plugin set, never a resolved path
+# and never the version (`marketplace-source-conflict.ts`) — so the fixture built here
+# still declares itself `$MKT` (the same catalog name Phase B already registered
+# natively), but drops the one plugin the original fixture carries, leaving a
+# genuinely different plugin set under the same name. Registered locally under a fresh
+# alias, `$MKT-conflict`, so `marketplace add` itself succeeds at writing this
+# project's own registry entry — the refusal this phase measures comes from `sync`
+# re-driving native activation afterward, the same guard `aidd marketplace add` already
+# ran into once and that every later `sync` must refuse identically, not only the add
+# that happened to trip over it first.
+if [[ -n "${PRESENT[claude]:-}" ]]; then
+  section "sync refuses a different catalog registered under the same name ($MKT, fewer plugins)"
+  MKT2_FIXTURE="$TMPROOT/fixture-conflict"
+  cp -R "$DERIVED_FIXTURE" "$MKT2_FIXTURE"
+  node -e '
+    const fs = require("node:fs");
+    const dir = process.argv[1];
+    const mktPath = `${dir}/.claude-plugin/marketplace.json`;
+    const mktJson = JSON.parse(fs.readFileSync(mktPath, "utf8"));
+    mktJson.plugins = [];
+    fs.writeFileSync(mktPath, JSON.stringify(mktJson));
+  ' "$MKT2_FIXTURE"
+
+  add_out=$(mktemp)
+  ( cd "$PROJ" && exec perl -e 'alarm shift; exec @ARGV' "$CMD_TIMEOUT" node "$CLI" marketplace add "$MKT-conflict" "$MKT2_FIXTURE" --scope project --yes ) </dev/null >"$add_out" 2>&1
+  cat "$add_out" >> "$LOGFILE"
+  rm -f "$add_out"
+
+  sync_out=$(mktemp)
+  ( cd "$PROJ" && exec perl -e 'alarm shift; exec @ARGV' "$CMD_TIMEOUT" node "$CLI" sync --tool claude ) </dev/null >"$sync_out" 2>&1
+  sync_rc=$?
+  cat "$sync_out" >> "$LOGFILE"
+  if [[ "$sync_rc" -eq 0 ]]; then
+    bad "sync --tool claude (expected non-zero: different catalog under the same name never refused)" "$(cat "$sync_out")"
+  elif grep -qF "$MKT" "$sync_out"; then
+    ok "sync --tool claude refuses, naming the conflicting catalog $MKT"
+  else
+    bad "sync --tool claude exited $sync_rc but did not name $MKT" "$(cat "$sync_out")"
+  fi
+  rm -f "$sync_out"
+else
+  skip "sync refuses a different catalog under the same name (claude not installed)"
+fi
+
+# --- Phase C2: this project's own local alias is free to differ from what its ------
+# catalog declares itself under — a supported capability, never a fault. A brand-new
+# catalog name here, never registered by this run before, so nothing in Phase C1 can
+# make this one collide: the point is that the alias (`$MKT-alias`) and the catalog's
+# own declared name (`$MKT-upstream`) are simply different strings, and `marketplace
+# add` still succeeds.
+if [[ -n "${PRESENT[claude]:-}" ]]; then
+  section "marketplace add registers freely when the local alias differs from the catalog's own name"
+  MKT3_FIXTURE="$TMPROOT/fixture-alias"
+  cp -R "$DERIVED_FIXTURE" "$MKT3_FIXTURE"
+  UPSTREAM_NAME="$MKT-upstream"
+  node -e '
+    const fs = require("node:fs");
+    const [dir, name] = process.argv.slice(1);
+    const mktPath = `${dir}/.claude-plugin/marketplace.json`;
+    const mktJson = JSON.parse(fs.readFileSync(mktPath, "utf8"));
+    mktJson.name = name;
+    mktJson.plugins[0].name = name;
+    mktJson.plugins[0].source = `./plugins/${mktJson.plugins[0].source.split("/").pop()}`;
+    fs.writeFileSync(mktPath, JSON.stringify(mktJson));
+  ' "$MKT3_FIXTURE" "$UPSTREAM_NAME"
+
+  run "marketplace add $MKT-alias (catalog declares $UPSTREAM_NAME)" 0 "" "$PROJ" -- \
+    node "$CLI" marketplace add "$MKT-alias" "$MKT3_FIXTURE" --scope project --yes
+
+  # `activateTool` registers every known marketplace, plugin or not (see
+  # `marketplace-sync-settings-use-case.ts`), so `clean --force` in the trap below
+  # already knows to unregister $UPSTREAM_NAME through nativeRegistrations — no
+  # separate teardown needed here.
+else
+  skip "marketplace add alias-divergence capability (claude not installed)"
 fi
 
 exit 0
