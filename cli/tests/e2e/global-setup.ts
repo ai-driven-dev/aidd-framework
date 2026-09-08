@@ -29,7 +29,10 @@ declare module "vitest" {
 
 const execFileAsync = promisify(execFile);
 const CLI_ROOT = resolve(import.meta.dirname, "..", "..");
-const TSUP_BIN = join(CLI_ROOT, "node_modules", ".bin", "tsup");
+// tsup's own entry, run through this very node: the `.bin/tsup` shim is an extensionless
+// shell script that Windows cannot spawn without a shell, and a shell is what this setup
+// exists to avoid.
+const TSUP_ENTRY = join(CLI_ROOT, "node_modules", "tsup", "dist", "cli-default.js");
 /** Gitignored: one directory per run, removed on teardown. */
 const BUILD_ROOT = join(CLI_ROOT, ".e2e-build");
 
@@ -37,7 +40,7 @@ export default async function setup(project: TestProject): Promise<() => Promise
   await mkdir(BUILD_ROOT, { recursive: true });
   const outDir = await mkdtemp(join(BUILD_ROOT, "run-"));
 
-  await execFileAsync(TSUP_BIN, [], {
+  await execFileAsync(process.execPath, [TSUP_ENTRY], {
     cwd: CLI_ROOT,
     env: { ...process.env, AIDD_BUILD_OUT_DIR: outDir },
   });
