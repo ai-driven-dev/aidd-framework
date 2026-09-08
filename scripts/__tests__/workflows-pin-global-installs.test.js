@@ -89,7 +89,9 @@ test("no workflow installs a global npm package unpinned (bare or @latest)", () 
 
   const violations = [];
   for (const name of files) {
-    const relPath = path.join(".github/workflows", name);
+    // Reported and allowlisted in POSIX form on every platform: a Windows checkout would
+    // otherwise spell the same file with backslashes and match no allowlist entry.
+    const relPath = path.posix.join(".github/workflows", name);
     const absPath = path.join(workflowsDir, name);
     const scripts = collectRunScripts(absPath);
 
