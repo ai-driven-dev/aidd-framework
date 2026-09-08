@@ -73,18 +73,23 @@ function snapshotDirectory(dir) {
       shot[entry.name] = { directory: true };
       continue;
     }
-    // Read the entry rather than re-ask whether it is still there: `readdirSync` above
-    // already answered that, and anything between the two answers is a race. An entry that
-    // vanished in between is simply absent from this snapshot, which is exactly what the
-    // comparison already reports for an entry present on one side only.
+    // One open, then size, mode and bytes all read through that same descriptor: asking
+    // the path twice (a stat, then a read) leaves a window in which the entry can change
+    // between the two answers. An entry that vanished since `readdirSync` listed it is
+    // simply absent from this snapshot, which is exactly what the comparison already
+    // reports for an entry present on one side only.
     let stat;
     let bytes;
+    let fd;
     try {
-      stat = fs.statSync(full);
-      bytes = fs.readFileSync(full);
+      fd = fs.openSync(full, "r");
+      stat = fs.fstatSync(fd);
+      bytes = fs.readFileSync(fd);
     } catch (err) {
       if (err.code === "ENOENT") continue;
       throw err;
+    } finally {
+      if (fd !== undefined) fs.closeSync(fd);
     }
     shot[entry.name] = {
       size: stat.size,
