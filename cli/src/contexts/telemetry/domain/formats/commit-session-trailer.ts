@@ -1,3 +1,5 @@
+import type { HookManager } from "../telemetry-setup.js";
+
 /**
  * The one link between a commit and the session that produced it.
  *
@@ -86,6 +88,73 @@ export const SESSION_TRAILER_HOOK_HEADER = "#!/bin/sh";
  * spelling, whatever the platform. */
 export function sessionTrailerHookLine(delegatePath: string): string {
   return `sh "${delegatePath.replace(/\\/gu, "/")}" "$@"`;
+}
+
+/** How the delegate is called when lefthook or husky owns `prepare-commit-msg` and this CLI
+ * therefore never appends anything to it. Both forms resolve the delegate the same way,
+ * against `$(git rev-parse --git-common-dir)/hooks/<file>` rather than any path baked in at
+ * write time — the one thing that makes it survive being carried into a repository this CLI
+ * did not write, on a machine whose checkout lives somewhere else entirely. The `[ -f
+ * "$delegate" ]` guard is what keeps a later `aidd telemetry off` — which deletes only the
+ * script, never these hand-added lines — from leaving every commit calling a file that no
+ * longer exists. */
+function delegateLookup(delegateFile: string): string {
+  return `delegate="$(git rev-parse --git-common-dir)/hooks/${delegateFile}"`;
+}
+
+/** The job to hand-add to `lefthook.yml`, in the exact shape lefthook itself expects: `{1}`
+ * and `{2}` are lefthook's own placeholders for the message-file and source arguments git
+ * passes a `prepare-commit-msg` hook — the counterpart of `"$@"` in a plain shell hook. */
+export function sessionTrailerLefthookJob(delegateFile: string): string {
+  return `prepare-commit-msg:
+  commands:
+    aidd-session-trailer:
+      run: |
+        ${delegateLookup(delegateFile)}
+        if [ -f "$delegate" ]; then sh "$delegate" {1} {2}; fi`;
+}
+
+/** The line to hand-add to `.husky/prepare-commit-msg`. Husky's own hook is a plain shell
+ * script, so `"$@"` forwards git's three arguments exactly the way `sessionTrailerHookLine`
+ * does for a hook this CLI owns outright. */
+export function sessionTrailerHuskyLine(delegateFile: string): string {
+  return `${delegateLookup(delegateFile)}
+[ -f "$delegate" ] && sh "$delegate" "$@"`;
+}
+
+/** How to introduce the printed job or line to a person adding it by hand.
+ *
+ * Lefthook's own job is a top-level `prepare-commit-msg:` key
+ * (`sessionTrailerLefthookJob`), not a line — a `lefthook.yml` that already carries one gets
+ * a duplicate YAML key if "add this job to lefthook.yml" is followed literally. Naming the
+ * key it goes under, rather than the file alone, is what keeps that instruction true whether
+ * or not the file already has one. Husky's own hook is a plain script with no such structure,
+ * so a line is still a line there. */
+export function sessionTrailerManagerInstruction(manager: HookManager, targetFile: string): string {
+  return manager === "lefthook"
+    ? `add this command under \`prepare-commit-msg:\` in ${targetFile}`
+    : `add this line to ${targetFile}`;
+}
+
+/** Where the job or line above goes, and what it is, for one manager — the one place both
+ * `telemetry on` and `telemetry check` read this from, so the file named and the snippet
+ * printed can never drift apart from each other. */
+export function sessionTrailerManagerSnippet(
+  manager: HookManager,
+  delegateFile: string
+): { readonly manager: HookManager; readonly targetFile: string; readonly snippet: string } {
+  if (manager === "lefthook") {
+    return {
+      manager,
+      targetFile: "lefthook.yml",
+      snippet: sessionTrailerLefthookJob(delegateFile),
+    };
+  }
+  return {
+    manager,
+    targetFile: ".husky/prepare-commit-msg",
+    snippet: sessionTrailerHuskyLine(delegateFile),
+  };
 }
 
 /**

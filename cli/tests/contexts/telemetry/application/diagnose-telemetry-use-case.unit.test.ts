@@ -41,8 +41,8 @@ class StubHookTrustReader implements HookTrustReader {
 
 function versionControl(isRepository: boolean): VersionControl {
   return {
-    installCommitMessageDelegate: async () => false,
-    removeCommitMessageDelegate: async () => false,
+    installCommitMessageDelegate: async () => ({ lineAdded: false }),
+    removeCommitMessageDelegate: async () => ({ removed: false }),
     listTrackedFiles: async () => [],
     isRepository: async () => isRepository,
     readCommitTrailerSetup: async () => ({

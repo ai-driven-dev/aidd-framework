@@ -522,6 +522,43 @@ if true; then
   run "telemetry off" 0 "" "$P_TEL" -- telemetry off
   run "telemetry forget --yes" 0 "" "$P_TEL" -- telemetry forget --yes
 
+  # A repository lefthook owns regenerates prepare-commit-msg from lefthook.yml on every
+  # install, wiping any line `telemetry on` would otherwise append. It must print the job to
+  # add by hand instead of a false "commits will carry a trailer" promise — hermetic, a
+  # marker file is all detection reads, never a real lefthook binary. Same leaf command
+  # ("telemetry on") the cell above already covers, so leaf-command coverage stays honest.
+  P_TEL_LEFTHOOK=$(new_project)
+  cat > "$P_TEL_LEFTHOOK/lefthook.yml" <<'LEFTHOOK_YML'
+pre-commit:
+  commands:
+    example:
+      run: echo hi
+LEFTHOOK_YML
+  run "telemetry on --yes (lefthook-owned hook)" 0 "prepare-commit-msg:" "$P_TEL_LEFTHOOK" -- telemetry on --yes
+
+  # B-B1 (lot 9 review): `on` writes the delegate to the common git dir once a manager owns
+  # prepare-commit-msg, ignoring core.hooksPath — husky routes that setting under `.husky/`.
+  # `off` used to resolve through the core.hooksPath-following path instead, so under this
+  # exact divergence it found nothing to delete and reported nothing removed. Real built
+  # binary, real `git config core.hooksPath`, no fake lefthook/husky binary needed since
+  # detection reads a root marker only.
+  P_TEL_HUSKY=$(new_project)
+  mkdir -p "$P_TEL_HUSKY/.husky"
+  cat > "$P_TEL_HUSKY/.husky/prepare-commit-msg" <<'HUSKY_HOOK'
+#!/bin/sh
+echo husky-owned
+HUSKY_HOOK
+  chmod +x "$P_TEL_HUSKY/.husky/prepare-commit-msg"
+  (cd "$P_TEL_HUSKY" && git config core.hooksPath .husky)
+  run "telemetry on --yes (husky core.hooksPath)" 0 "husky" "$P_TEL_HUSKY" -- telemetry on --yes
+  [[ -f "$P_TEL_HUSKY/.git/hooks/aidd-session-trailer.sh" ]] \
+    && ok "telemetry on writes the delegate to the common hooks dir under husky" \
+    || bad "delegate missing from .git/hooks under husky's core.hooksPath"
+  run "telemetry off (husky core.hooksPath)" 0 "" "$P_TEL_HUSKY" -- telemetry off
+  [[ ! -f "$P_TEL_HUSKY/.git/hooks/aidd-session-trailer.sh" ]] \
+    && ok "telemetry off removes the delegate even when core.hooksPath diverges" \
+    || bad "delegate survived telemetry off under husky's core.hooksPath"
+
 fi
 
 # ════════════════════════════════════════════════════════════════

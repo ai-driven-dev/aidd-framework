@@ -181,7 +181,15 @@ describe("clean --scope user", () => {
       const info = logger.infoMessages.find((m) => m.includes("No host registration"));
       expect(info).toBeDefined();
       expect(info).toContain("/project-a");
-      expect(info).toContain("aidd clean");
+      // Lot 9, item D2: names both removal commands, in order — dropping the
+      // per-project `aidd clean` half (leaving only `aidd clean --scope user`) must
+      // fail this, not just a bare `.toContain("aidd clean")`, which that longer
+      // command also satisfies as a substring.
+      expect(info).toContain("`aidd clean`");
+      expect(info).toContain("`aidd clean --scope user`");
+      expect(info?.indexOf("`aidd clean`")).toBeLessThan(
+        info?.indexOf("`aidd clean --scope user`") ?? -1
+      );
     });
   });
 

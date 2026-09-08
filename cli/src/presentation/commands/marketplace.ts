@@ -74,7 +74,7 @@ export function registerMarketplaceCommand(program: Command): void {
             autoTrust: cmdOptions.yes ?? false,
             overwrite: cmdOptions.overwrite ?? false,
           });
-          await syncNativeActivation(deps, output, projectRoot);
+          await syncNativeActivation(deps, output, projectRoot, [result.marketplace.name]);
           output.success(`Marketplace '${result.marketplace.name}' registered.`);
         } catch (error) {
           errorHandler.handle(error);

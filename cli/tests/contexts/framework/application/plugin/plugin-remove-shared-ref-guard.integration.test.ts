@@ -35,7 +35,7 @@ const USER_CONFIG_DIR = "/fake-home/.config/aidd";
 const PLUGIN_NAME = "aidd-vcs";
 const REF = `${PLUGIN_NAME}@${FRAMEWORK_MARKETPLACE_NAME}`;
 
-function seedManifest(): Manifest {
+function seedManifest(marketplaceAlias: string = FRAMEWORK_MARKETPLACE_NAME): Manifest {
   const manifest = Manifest.create();
   manifest.addTool("codex", "1.0.0", []);
   manifest.addPlugin(
@@ -47,18 +47,20 @@ function seedManifest(): Manifest {
       strict: true,
       files: {},
       scope: "project",
-      marketplace: FRAMEWORK_MARKETPLACE_NAME,
+      marketplace: marketplaceAlias,
     })
   );
   return manifest;
 }
 
-function seedSharedMarketplaceRegistry(): InMemoryMarketplaceRegistry {
+function seedSharedMarketplaceRegistry(
+  marketplaceAlias: string = FRAMEWORK_MARKETPLACE_NAME
+): InMemoryMarketplaceRegistry {
   const registry = new InMemoryMarketplaceRegistry();
   registry.save(
     PROJECT_ROOT,
     Marketplace.create({
-      name: FRAMEWORK_MARKETPLACE_NAME,
+      name: marketplaceAlias,
       source: { kind: "local", path: "/some/built/path" },
       scope: "user",
       addedAt: "2026-01-01T00:00:00.000Z",
@@ -81,12 +83,14 @@ function seedReferences(fs: InMemoryFileAdapter, roots: readonly string[]): void
 function buildUseCase(
   fs: InMemoryFileAdapter,
   activator: FakeNativePluginActivator,
-  logger: CapturingLogger
+  logger: CapturingLogger,
+  manifest: Manifest = seedManifest(),
+  marketplaceRegistry: InMemoryMarketplaceRegistry = seedSharedMarketplaceRegistry()
 ): {
   removeUseCase: PluginRemoveUseCase;
   manifestRepo: InMemoryManifestRepository;
 } {
-  const manifestRepo = new InMemoryManifestRepository(seedManifest(), PROJECT_ROOT);
+  const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
   const userSourceReferences = new UserSourceReferencesAdapter(fs, () => USER_CONFIG_DIR);
   const removeUseCase = new PluginRemoveUseCase(
     fs,
@@ -95,7 +99,7 @@ function buildUseCase(
     new Map([["codex", activator]]),
     new Map(),
     userSourceReferences,
-    seedSharedMarketplaceRegistry()
+    marketplaceRegistry
   );
   return { removeUseCase, manifestRepo };
 }
@@ -140,5 +144,58 @@ describe("plugin remove guards a ref another project on this machine still needs
     });
 
     expect(activator.uninstalledPlugins).toContain(REF);
+  });
+
+  // Lot 9, item A: both the host call and this guard must address the host by
+  // `hostName`, read the same way. `refAnotherProjectStillNeeds` matches `ref`'s
+  // suffix against `sharedSourceHostName` — moving the ref to `hostName` while
+  // leaving `sharedSourceHostName` the alias would silently stop guarding anything,
+  // which is exactly the mutation this test pins.
+  it("guards by the host's own ref when this project's alias diverges from the catalog's declared name", async () => {
+    // The alias for the shared framework source is always the reserved
+    // `FRAMEWORK_MARKETPLACE_NAME` (`frameworkSourceIsShared` gates the guard on it) —
+    // the divergence under test is between that alias and what the catalog itself
+    // declares (`hostName`), the same divergence `nativeRegistrations` exists to record.
+    const HOST_NAME = "upstream";
+    const HOST_REF = `${PLUGIN_NAME}@${HOST_NAME}`;
+    const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
+    seedReferences(fs, [OTHER_PROJECT]);
+    const activator = new FakeNativePluginActivator({ available: true });
+    const logger = new CapturingLogger();
+    const manifest = seedManifest();
+    manifest.setNativeRegistrations("codex", {
+      binary: "codex",
+      marketplaces: [{ alias: FRAMEWORK_MARKETPLACE_NAME, hostName: HOST_NAME }],
+      pluginRefs: [],
+    });
+    const { removeUseCase } = buildUseCase(fs, activator, logger, manifest);
+
+    await removeUseCase.execute({
+      pluginName: PLUGIN_NAME,
+      toolIds: ["codex"],
+      projectRoot: PROJECT_ROOT,
+    });
+
+    expect(activator.uninstalledPlugins).not.toContain(HOST_REF);
+    expect(
+      logger.warnMessages.some((m) => m.includes("left enabled") && m.includes(HOST_REF))
+    ).toBe(true);
+  });
+
+  it("uninstalls by the alias ref and logs no warning when this tool has no native registrations at all", async () => {
+    const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
+    seedReferences(fs, []);
+    const activator = new FakeNativePluginActivator({ available: true });
+    const logger = new CapturingLogger();
+    const { removeUseCase } = buildUseCase(fs, activator, logger);
+
+    await removeUseCase.execute({
+      pluginName: PLUGIN_NAME,
+      toolIds: ["codex"],
+      projectRoot: PROJECT_ROOT,
+    });
+
+    expect(activator.uninstalledPlugins).toContain(REF);
+    expect(logger.warnMessages).toEqual([]);
   });
 });

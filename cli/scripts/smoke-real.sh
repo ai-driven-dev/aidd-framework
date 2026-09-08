@@ -744,6 +744,31 @@ if [[ -n "${PRESENT[claude]:-}" ]]; then
   run "marketplace add $MKT-alias (catalog declares $UPSTREAM_NAME)" 0 "" "$PROJ" -- \
     node "$CLI" marketplace add "$MKT-alias" "$MKT3_FIXTURE" --scope project --yes
 
+  # Lot 9, item C: `marketplace add` now narrows the sync it re-drives to the
+  # marketplace it just registered ($MKT-alias) alone — the real-binary confirmation
+  # that `recordNativeRegistrations`'s keyed replacement, not a plain replace, is what
+  # actually shipped. A plain replace would have wiped $MKT's own nativeRegistrations
+  # entry (registered earlier in this run, untouched by this add) the moment this add
+  # ran — but that entry lives in *this project's own* `.aidd/manifest.json`, never in
+  # claude's registry: nothing here ever asks claude to remove $MKT, so
+  # known_marketplaces.json still names it whether the merge is keyed or a plain
+  # replace, and grepping it (the earlier version of this check) confirmed nothing.
+  # The manifest is the only artifact a plain replace would have actually corrupted.
+  if node -e '
+    const fs = require("node:fs");
+    const [proj, mkt] = process.argv.slice(1);
+    const manifest = JSON.parse(fs.readFileSync(proj + "/.aidd/manifest.json", "utf8"));
+    const marketplaces = manifest.tools && manifest.tools.claude && manifest.tools.claude.nativeRegistrations
+      ? manifest.tools.claude.nativeRegistrations.marketplaces
+      : [];
+    const carries = marketplaces.some(function (m) { return m.alias === mkt || m.hostName === mkt; });
+    process.exit(carries ? 0 : 1);
+  ' "$PROJ" "$MKT"; then
+    ok "claude: .aidd/manifest.json still carries $MKT's nativeRegistrations after the narrowed $MKT-alias add"
+  else
+    bad "claude: .aidd/manifest.json lost $MKT's nativeRegistrations after a marketplace add narrowed to $MKT-alias"
+  fi
+
   # `activateTool` registers every known marketplace, plugin or not (see
   # `marketplace-sync-settings-use-case.ts`), so `clean --force` in the trap below
   # already knows to unregister $UPSTREAM_NAME through nativeRegistrations — no

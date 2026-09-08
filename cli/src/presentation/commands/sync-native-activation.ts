@@ -23,9 +23,17 @@ interface SyncActivationOutcome {
 export async function syncNativeActivation(
   deps: Awaited<ReturnType<typeof createDeps>>,
   output: CLIOutput,
-  projectRoot: string
+  projectRoot: string,
+  /** Narrows activation to these marketplaces alone — `marketplace add` passes the
+   * name it just registered; `plugin install --from <market>` passes that flag's own
+   * value. Every other caller omits this and re-drives every registered marketplace,
+   * unchanged. */
+  marketplaceNames?: readonly string[]
 ): Promise<void> {
-  const activation = await deps.marketplaceSyncSettingsUseCase.execute({ projectRoot });
+  const activation = await deps.marketplaceSyncSettingsUseCase.execute({
+    projectRoot,
+    marketplaceNames,
+  });
   reportSyncActivation(output, activation);
 }
 

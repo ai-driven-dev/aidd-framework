@@ -2,7 +2,10 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { TelemetryOffUseCase } from "../../../../src/contexts/telemetry/application/telemetry-off-use-case.js";
 import { SESSION_TRAILER_TOKEN } from "../../../../src/contexts/telemetry/domain/formats/commit-session-trailer.js";
-import type { VersionControl } from "../../../../src/contexts/telemetry/domain/ports/version-control.js";
+import type {
+  CommitMessageDelegateRemoval,
+  VersionControl,
+} from "../../../../src/contexts/telemetry/domain/ports/version-control.js";
 import { noGit } from "../../../contexts/framework/application/helpers.js";
 import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
 import { DeterministicHasher } from "../../../helpers/ports/deterministic-hasher.js";
@@ -122,7 +125,7 @@ describe("TelemetryOffUseCase — names a leftover export it cannot clear", () =
 });
 
 describe("TelemetryOffUseCase — taking back what on installed", () => {
-  function buildWith(removed: boolean, seed: Record<string, string> = {}) {
+  function buildWith(result: CommitMessageDelegateRemoval, seed: Record<string, string> = {}) {
     const fs = new InMemoryFileAdapter(seed, new DeterministicHasher());
     const logger = new CapturingLogger();
     const asked: string[] = [];
@@ -130,7 +133,7 @@ describe("TelemetryOffUseCase — taking back what on installed", () => {
       ...noGit,
       removeCommitMessageDelegate: async (_root, delegateFile) => {
         asked.push(delegateFile);
-        return removed;
+        return result;
       },
     };
     const evidence = new StubTelemetryEvidenceReader();
@@ -138,7 +141,7 @@ describe("TelemetryOffUseCase — taking back what on installed", () => {
   }
 
   it("asks git to remove the delegate, whatever the switch's previous state was", async () => {
-    const { asked, useCase } = buildWith(true);
+    const { asked, useCase } = buildWith({ removed: true });
 
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
@@ -146,7 +149,7 @@ describe("TelemetryOffUseCase — taking back what on installed", () => {
   });
 
   it("says new commits carry nothing, and that the old ones keep theirs", async () => {
-    const { logger, useCase } = buildWith(true);
+    const { logger, useCase } = buildWith({ removed: true });
 
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
@@ -156,10 +159,41 @@ describe("TelemetryOffUseCase — taking back what on installed", () => {
   });
 
   it("says nothing when there was nothing installed to take back", async () => {
-    const { logger, useCase } = buildWith(false);
+    const { logger, useCase } = buildWith({ removed: false });
 
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
     expect(logger.allMessages.join("\n")).not.toContain(SESSION_TRAILER_TOKEN);
+  });
+
+  // B-B1: a manager's own hand-added job outlives the delegate script `off` just deleted —
+  // that config is committed and shared, not this CLI's to edit on the way out any more than
+  // on the way in. Silence here would leave a person reading `lefthook.yml` believing a line
+  // that looks live is still doing something.
+  it("names the manager job left behind, and says its guard now makes it a no-op", async () => {
+    const { logger, useCase } = buildWith({
+      removed: true,
+      hookManager: "lefthook",
+      managerCallsDelegate: true,
+    });
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    const said = logger.allMessages.join("\n");
+    expect(said).toContain("lefthook.yml");
+    expect(said).toContain("still calls the delegate");
+    expect(said).toMatch(/\[ -f \]|no-op|runs nothing/u);
+  });
+
+  it("says nothing about a manager job when its own config never called the delegate", async () => {
+    const { logger, useCase } = buildWith({
+      removed: true,
+      hookManager: "lefthook",
+      managerCallsDelegate: false,
+    });
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(logger.allMessages.join("\n")).not.toContain("still calls the delegate");
   });
 });

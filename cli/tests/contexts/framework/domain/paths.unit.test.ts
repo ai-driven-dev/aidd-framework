@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  dedupePathSegments,
   parseBuiltMarketplaceDir,
   parseBuiltMarketplaceDirAtAnyRoot,
   parseUserBuiltMarketplaceDir,
@@ -167,6 +168,16 @@ describe("samePathSegment()", () => {
 
   it("compares case-insensitively on win32", () => {
     expect(samePathSegment("aidd-framework", "AIDD-FRAMEWORK", "win32")).toBe(true);
+  });
+});
+
+describe("dedupePathSegments()", () => {
+  it("collapses a win32 case-only spelling difference, keeping the first spelling", () => {
+    expect(dedupePathSegments(["/A/proj", "/a/proj"], "win32")).toEqual(["/A/proj"]);
+  });
+
+  it("keeps both spellings on a case-sensitive platform", () => {
+    expect(dedupePathSegments(["/A/proj", "/a/proj"], "linux")).toEqual(["/A/proj", "/a/proj"]);
   });
 });
 

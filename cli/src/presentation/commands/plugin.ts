@@ -109,7 +109,12 @@ export function registerPluginCommand(program: Command): void {
             yes: cmdOptions.yes,
             scope,
           });
-          await syncNativeActivation(deps, output, projectRoot);
+          await syncNativeActivation(
+            deps,
+            output,
+            projectRoot,
+            cmdOptions.from !== undefined ? [cmdOptions.from] : undefined
+          );
           if (result.kind === "picked") {
             if (result.installed.length === 0) {
               output.info("No plugins selected.");

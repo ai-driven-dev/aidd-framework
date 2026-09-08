@@ -86,3 +86,5 @@ for the boundary that governs a future hosted destination.
   `AIDD_USER_CONFIG_DIR`") before pointing anyone at either.
 - A relocated `HOME` does not relocate a real `codex` binary if `CODEX_HOME` is set on that
   machine — see `testing.md`'s sandboxing gotcha.
+- A generated `prepare-commit-msg` (lefthook, husky) never calls the delegate until the
+  printed job is added by hand; `on` and `check` both name it, neither edits those files.

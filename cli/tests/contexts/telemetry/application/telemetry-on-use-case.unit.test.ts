@@ -186,13 +186,13 @@ describe("TelemetryOnUseCase — making commits joinable to the session that mad
   /** Records what the use case asked git to do, so the unit tier can hold the decision
    * (install, then say so) apart from the mechanics of writing a hook, which the adapter's
    * own integration suite proves against real repositories. */
-  function recordingGit(installed: boolean) {
+  function recordingGit(lineAdded: boolean) {
     const calls: { delegateFile: string; script: string }[] = [];
     const git: VersionControl = {
       ...noGit,
       installCommitMessageDelegate: async (_root, delegateFile, script) => {
         calls.push({ delegateFile, script });
-        return installed;
+        return { lineAdded };
       },
     };
     return { calls, git };

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { Marketplace } from "../../../../../src/contexts/distribution/domain/marketplace.js";
 import { DoctorRegistrationUseCase } from "../../../../../src/contexts/framework/application/doctor/doctor-registration-use-case.js";
 import { MarketplaceSyncSettingsUseCase } from "../../../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
+import type { EnsureBuiltMarketplace } from "../../../../../src/contexts/framework/application/shared/ensure-built-marketplace-use-case.js";
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
 import { InstalledPlugin } from "../../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
 import { buildHostRegistration } from "../../../../../src/contexts/tools/domain/host-plugin-registration.js";
@@ -551,5 +552,189 @@ describe("what doctor tells a person to run becomes true once sync has run", () 
       allowedIds: null,
     });
     expect(after.filter((issue) => issue.severity === "error")).toEqual([]);
+  });
+});
+
+/**
+ * Lot 9 review, C-B1: `recordNativeRegistrations`'s keyed merge must apply only to a
+ * `marketplaceNames`-narrowed run. An unnarrowed `sync`/`setup` has to fall back to the
+ * pre-lot whole-entry replace — otherwise a recorded ref whose `hostName` the registry no
+ * longer carries (an upstream catalog rename, a marketplace nobody re-added) is retained
+ * forever, since `setNativeRegistrations` is called from nowhere else in the tree.
+ */
+describe("an unnarrowed run replaces the whole recorded entry (lot 9 review C-B1)", () => {
+  const LIVE_MARKETPLACE = "market-live";
+  const LIVE_PLUGIN = "plugin-live";
+
+  function liveMarketplace(): Marketplace {
+    return Marketplace.create({
+      name: LIVE_MARKETPLACE,
+      source: { kind: "github", repo: "ai-driven-dev/framework" },
+      scope: "project",
+      addedAt: "2026-09-02T00:00:00Z",
+    });
+  }
+
+  function buildLiveSync(activator: FakeNativePluginActivator) {
+    const registry = new InMemoryMarketplaceRegistry();
+    const fs = new InMemoryFileAdapter({
+      "/built/claude/.claude-plugin/marketplace.json": JSON.stringify({
+        name: LIVE_MARKETPLACE,
+        version: "1.0.0",
+        plugins: [{ name: LIVE_PLUGIN }],
+      }),
+    });
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    manifest.addPlugin(
+      "claude",
+      InstalledPlugin.fromMetadata(
+        LIVE_PLUGIN,
+        "1.0.0",
+        { kind: "github", repo: "ai-driven-dev/framework" },
+        true,
+        "project",
+        LIVE_MARKETPLACE
+      )
+    );
+    const manifestRepo = new InMemoryManifestRepository(manifest);
+    const hasher = new DeterministicHasher();
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      manifestRepo,
+      registry,
+      hasher,
+      new CapturingLogger(),
+      new Map([["claude", activator]]),
+      fakeEnsureBuiltMarketplace()
+    );
+    return { useCase, registry, manifestRepo };
+  }
+
+  it("drops a recorded ref whose hostName the registry no longer carries", async () => {
+    const activator = new FakeNativePluginActivator({ available: true });
+    const { useCase, registry, manifestRepo } = buildLiveSync(activator);
+    await registry.save(PROJECT_ROOT, liveMarketplace());
+    const staleManifest = await manifestRepo.load();
+    staleManifest?.setNativeRegistrations("claude", {
+      binary: "claude",
+      marketplaces: [{ alias: "market-dead", hostName: "host-dead" }],
+      pluginRefs: ["plugin-dead@host-dead"],
+    });
+    if (staleManifest) await manifestRepo.save(staleManifest);
+
+    // Unnarrowed — no `marketplaceNames`, the shape `sync` and `setup` both run.
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    const recorded = (await manifestRepo.load())?.getNativeRegistrations("claude");
+    expect(recorded?.pluginRefs).not.toContain("plugin-dead@host-dead");
+    expect(recorded?.marketplaces).not.toContainEqual({
+      alias: "market-dead",
+      hostName: "host-dead",
+    });
+  });
+});
+
+/**
+ * Lot 9 review, C-B2: two of this project's own local aliases can resolve to the same
+ * `hostName` (a supported capability, not a conflict — see `architecture.md`'s "aidd
+ * refuses what claude would accept" bullet). `retainedMarketplaces` filters by alias,
+ * `retainedRefs` filtered by hostName alone before this fix — so a narrowed run on one
+ * alias silently dropped every ref at the shared hostName, including the untouched
+ * alias's own.
+ */
+describe("a narrowed run preserves another alias's refs at a shared hostName (lot 9 review C-B2)", () => {
+  const SHARED_HOST_NAME = "shared-catalog";
+  const ALIAS_X = "alias-x";
+  const ALIAS_Y = "alias-y";
+  const PLUGIN_X = "plugin-x";
+  const PLUGIN_Y = "plugin-y";
+
+  function ensureBuiltKeyedByMarketplace(): EnsureBuiltMarketplace {
+    return {
+      execute: async (options) => ({
+        builtDir: `/built/by-alias/${options.marketplace.name}`,
+        version: "test",
+        rebuilt: true,
+      }),
+    };
+  }
+
+  function aliasMarketplace(alias: string): Marketplace {
+    return Marketplace.create({
+      name: alias,
+      source: { kind: "github", repo: "ai-driven-dev/framework" },
+      scope: "project",
+      addedAt: "2026-09-02T00:00:00Z",
+    });
+  }
+
+  it("keeps the retained alias's own refs after a run narrowed to the other one", async () => {
+    const activator = new FakeNativePluginActivator({ available: true });
+    const registry = new InMemoryMarketplaceRegistry();
+    const fs = new InMemoryFileAdapter({
+      [`/built/by-alias/${ALIAS_X}/.claude-plugin/marketplace.json`]: JSON.stringify({
+        name: SHARED_HOST_NAME,
+        version: "1.0.0",
+        plugins: [{ name: PLUGIN_X }],
+      }),
+      [`/built/by-alias/${ALIAS_Y}/.claude-plugin/marketplace.json`]: JSON.stringify({
+        name: SHARED_HOST_NAME,
+        version: "1.0.0",
+        plugins: [{ name: PLUGIN_Y }],
+      }),
+    });
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    manifest.addPlugin(
+      "claude",
+      InstalledPlugin.fromMetadata(
+        PLUGIN_X,
+        "1.0.0",
+        { kind: "github", repo: "ai-driven-dev/framework" },
+        true,
+        "project",
+        ALIAS_X
+      )
+    );
+    manifest.addPlugin(
+      "claude",
+      InstalledPlugin.fromMetadata(
+        PLUGIN_Y,
+        "1.0.0",
+        { kind: "github", repo: "ai-driven-dev/framework" },
+        true,
+        "project",
+        ALIAS_Y
+      )
+    );
+    const manifestRepo = new InMemoryManifestRepository(manifest);
+    const hasher = new DeterministicHasher();
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      manifestRepo,
+      registry,
+      hasher,
+      new CapturingLogger(),
+      new Map([["claude", activator]]),
+      ensureBuiltKeyedByMarketplace()
+    );
+    await registry.save(PROJECT_ROOT, aliasMarketplace(ALIAS_X));
+    await registry.save(PROJECT_ROOT, aliasMarketplace(ALIAS_Y));
+
+    // First, an unnarrowed run registers both aliases — the state a real project reaches
+    // after two `marketplace add` calls against the same catalog under two local names.
+    await useCase.execute({ projectRoot: PROJECT_ROOT });
+    const beforeNarrow = (await manifestRepo.load())?.getNativeRegistrations("claude");
+    expect(beforeNarrow?.pluginRefs, "both refs recorded before the narrowed run").toEqual(
+      expect.arrayContaining([`${PLUGIN_X}@${SHARED_HOST_NAME}`, `${PLUGIN_Y}@${SHARED_HOST_NAME}`])
+    );
+
+    // Then a run narrowed to X alone — what `marketplace add alias-x <source>` re-drives.
+    await useCase.execute({ projectRoot: PROJECT_ROOT, marketplaceNames: [ALIAS_X] });
+
+    const recorded = (await manifestRepo.load())?.getNativeRegistrations("claude");
+    expect(recorded?.pluginRefs).toContain(`${PLUGIN_Y}@${SHARED_HOST_NAME}`);
+    expect(recorded?.marketplaces).toContainEqual({ alias: ALIAS_Y, hostName: SHARED_HOST_NAME });
   });
 });

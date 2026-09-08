@@ -212,3 +212,123 @@ describe("what check reads about the commit trailer", () => {
     expect((await read()).hookExecutable).toBeUndefined();
   });
 });
+
+/**
+ * Whether lefthook or husky owns `prepare-commit-msg` here — decided from a root **marker
+ * file**, never from the hook's own contents. A manager regenerates the hook from its own
+ * config on every install, so anything read from the hook itself is already stale by the
+ * time this runs; the marker is what survives that.
+ */
+describe("which manager owns prepare-commit-msg, read from the repository root", () => {
+  it("names lefthook from lefthook.yml alone, before lefthook has ever generated a hook", async () => {
+    await writeFile(join(dir, "lefthook.yml"), "prepare-commit-msg:\n  commands: {}\n");
+
+    const setup = await read();
+
+    expect(setup.hookManager).toBe("lefthook");
+    expect(setup.callSite).toBe("no-hook-file");
+  });
+
+  it("names lefthook even once a hook file exists, never reading that file to decide", async () => {
+    await writeFile(join(dir, "lefthook.yml"), "prepare-commit-msg:\n  commands: {}\n");
+    const hookPath = join(await hooksDir(), "prepare-commit-msg");
+    // What lefthook itself regenerates on every install — no aidd trailer line survives it,
+    // and nothing in these bytes names lefthook by word either, so a reader that decided
+    // from the hook's own contents would have nothing here to key off.
+    await writeFile(hookPath, "#!/bin/sh\nexit 0\n");
+
+    expect((await read()).hookManager).toBe("lefthook");
+  });
+
+  it("names husky from a .husky directory at the root", async () => {
+    await mkdir(join(dir, ".husky"), { recursive: true });
+
+    expect((await read()).hookManager).toBe("husky");
+  });
+
+  it("names neither manager when no marker sits at the root", async () => {
+    expect((await read()).hookManager).toBeUndefined();
+  });
+});
+
+/**
+ * The discriminating case: this repository's own `lefthook.yml` job, inlined as a literal
+ * rather than read off disk at test time. It calls the delegate through
+ * `$(git rev-parse --git-common-dir)/hooks/aidd-session-trailer.sh` — the dynamic form, never
+ * the absolute-path `sessionTrailerHookLine` form `callSite` looks for — so a marker-only
+ * design reports `callSite: "missing"` and would print "add this job" in the one repository
+ * that already added it.
+ */
+const REAL_LEFTHOOK_PREPARE_COMMIT_MSG_JOB = `prepare-commit-msg:
+  commands:
+    aidd-session-trailer:
+      run: |
+        delegate="$(git rev-parse --git-common-dir)/hooks/aidd-session-trailer.sh"
+        if [ -f "$delegate" ]; then sh "$delegate" {1} {2}; fi
+`;
+
+describe("whether the manager's own config already calls the delegate", () => {
+  it("reports not wired when lefthook.yml exists but names no job for it", async () => {
+    await writeFile(join(dir, "lefthook.yml"), "commit-msg:\n  commands: {}\n");
+
+    expect((await read()).managerCallsDelegate).toBe(false);
+  });
+
+  it("reports wired against this repository's own lefthook.yml job", async () => {
+    await writeFile(join(dir, "lefthook.yml"), REAL_LEFTHOOK_PREPARE_COMMIT_MSG_JOB);
+
+    const setup = await read();
+
+    expect(setup.hookManager).toBe("lefthook");
+    expect(setup.managerCallsDelegate).toBe(true);
+  });
+
+  it("reports wired from .husky/prepare-commit-msg the same way", async () => {
+    await mkdir(join(dir, ".husky"), { recursive: true });
+    await writeFile(
+      join(dir, ".husky", "prepare-commit-msg"),
+      'delegate="$(git rev-parse --git-common-dir)/hooks/aidd-session-trailer.sh"\n' +
+        '[ -f "$delegate" ] && sh "$delegate" "$@"\n'
+    );
+
+    expect((await read()).managerCallsDelegate).toBe(true);
+  });
+});
+
+/**
+ * B-S2: `on` writes the delegate to `$(git rev-parse --git-common-dir)/hooks` once a manager
+ * owns `prepare-commit-msg` — husky moves `core.hooksPath` under `.husky/`. Before this fix
+ * `readCommitTrailerSetup` still checked the delegate's presence under `resolveHooksDir`,
+ * which *follows* `core.hooksPath`: under husky `delegate` read `"absent"` however many times
+ * `on` actually ran, so `describeTrailerCount`'s "every part in place yet zero commits carry
+ * it" finding — the one this field exists to surface — could never fire there.
+ */
+describe("reading the delegate's own state under a manager that moves core.hooksPath", () => {
+  it("finds the delegate in the common git dir, not wherever core.hooksPath points", async () => {
+    await mkdir(join(dir, ".husky"), { recursive: true });
+    run(["config", "core.hooksPath", ".husky"]);
+    const commonHooks = join(dir, ".git", "hooks");
+    await mkdir(commonHooks, { recursive: true });
+    const delegatePath = join(commonHooks, SESSION_TRAILER_DELEGATE_FILE);
+    await writeFile(delegatePath, "#!/bin/sh\nexit 0\n");
+    await chmod(delegatePath, 0o755);
+
+    const setup = await read();
+
+    expect(setup.hookManager).toBe("husky");
+    expect(setup.delegate).toBe("executable");
+  });
+
+  it("reports the delegate not-executable rather than absent, under the same divergence", async () => {
+    if (!REMOVING_THE_BIT_MEANS_SOMETHING) return;
+    await mkdir(join(dir, ".husky"), { recursive: true });
+    run(["config", "core.hooksPath", ".husky"]);
+    const commonHooks = join(dir, ".git", "hooks");
+    await mkdir(commonHooks, { recursive: true });
+    const delegatePath = join(commonHooks, SESSION_TRAILER_DELEGATE_FILE);
+    await writeFile(delegatePath, "#!/bin/sh\nexit 0\n");
+    await chmod(delegatePath, 0o644);
+
+    expect((await read()).delegate).toBe("not-executable");
+  });
+});

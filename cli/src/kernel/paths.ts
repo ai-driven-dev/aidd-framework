@@ -219,6 +219,24 @@ export function samePathSegment(
   return platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
 }
 
+/** `roots` with every entry `samePathSegment` would call a duplicate of an earlier one
+ * collapsed away, the first spelling encountered kept — a plain `Set` compares by exact
+ * string equality only, so on win32 two entries differing only in case (the same
+ * directory a case-insensitive filesystem never told apart) survived as two. Named once
+ * so a caller that needs this dedup — `UserSourceReferencesAdapter.listAllReferencingProjects`
+ * today — asks for it rather than reimplementing the comparison `samePathSegment` already
+ * owns. */
+export function dedupePathSegments(
+  roots: readonly string[],
+  platform: string = process.platform
+): string[] {
+  const deduped: string[] = [];
+  for (const root of roots) {
+    if (!deduped.some((seen) => samePathSegment(seen, root, platform))) deduped.push(root);
+  }
+  return deduped;
+}
+
 // One directory is the other, or contains it. Two callers guard on this - a build refusing
 // to write into the tree it reads from, and the cache-rebuild path deciding whether it
 // needs the temp-dir detour - and each spelled the comparison itself with a hardcoded "/",

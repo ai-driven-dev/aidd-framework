@@ -4,6 +4,7 @@ import type { Logger } from "../../../kernel/ports/logger.js";
 import {
   SESSION_TRAILER_DELEGATE_FILE,
   SESSION_TRAILER_TOKEN,
+  sessionTrailerManagerSnippet,
 } from "../domain/formats/commit-session-trailer.js";
 import type { TelemetryEvidenceReader } from "../domain/ports/telemetry-evidence-reader.js";
 import type { VersionControl } from "../domain/ports/version-control.js";
@@ -51,17 +52,38 @@ export class TelemetryOffUseCase {
    * state a person running `off` a second time is trying to get out of.
    *
    * Commits already written keep the trailer they were written with. Nothing here rewrites
-   * history, the same rule `identity off` follows for records already stored. */
+   * history, the same rule `identity off` follows for records already stored.
+   *
+   * Under a manager whose own config already calls the delegate (B-B1), removing the
+   * delegate script does not remove the hand-added job or line that called it — that file is
+   * committed, shared config this CLI is never allowed to write, on the way out any more than
+   * on the way in. Left silent, a person reading `lefthook.yml` afterward would see a line
+   * that looks live and have no reason to doubt it; named here instead, with the one fact
+   * that makes it harmless: its own `[ -f "$delegate" ]` guard is now false, so it runs
+   * nothing. */
   private async stopTrailingCommits(projectRoot: string): Promise<void> {
-    const removed = await this.git.removeCommitMessageDelegate(
+    const result = await this.git.removeCommitMessageDelegate(
       projectRoot,
       SESSION_TRAILER_DELEGATE_FILE
     );
-    if (!removed) return;
-    this.logger.info(
-      `New commits will carry no ${SESSION_TRAILER_TOKEN} trailer. Commits already made ` +
-        "keep theirs — nothing here rewrites history."
-    );
+    if (result.removed) {
+      this.logger.info(
+        `New commits will carry no ${SESSION_TRAILER_TOKEN} trailer. Commits already made ` +
+          "keep theirs — nothing here rewrites history."
+      );
+    }
+    if (result.hookManager !== undefined && result.managerCallsDelegate === true) {
+      const { targetFile } = sessionTrailerManagerSnippet(
+        result.hookManager,
+        SESSION_TRAILER_DELEGATE_FILE
+      );
+      this.logger.info(
+        `${targetFile} still calls the delegate this just removed — that file is not this ` +
+          "CLI's to edit, so the job is left in place. Its own `[ -f ]` guard now finds " +
+          "nothing there, so it runs nothing; delete it from " +
+          `${targetFile} by hand if you want it gone too.`
+      );
+    }
   }
 
   /** Names what `off` cannot touch: a tool's own settings file, still carrying a key

@@ -11,7 +11,7 @@
  * completes the removal while naming what it could not clean up.
  */
 import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ModeAMarketplaceTranslator } from "../../../../../src/contexts/framework/application/framework/translator/mode-a-marketplace-translator.js";
 import { PluginRemoveUseCase } from "../../../../../src/contexts/framework/application/plugin/plugin-remove-use-case.js";
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
@@ -190,6 +190,151 @@ describe("PluginRemoveUseCase undoes native activation", () => {
     expect(activator.uninstalledPlugins).toEqual([REF]);
     expect(activator.uninstalledPluginScopes).toEqual(["project", "user"]);
     expect(logger.warnMessages).toEqual([]);
+  });
+
+  // Lot 9, item A: the host call must address the host by `hostName`, read from this
+  // tool's own `nativeRegistrations` the same way `purgeCachedPlugin` already reads it
+  // — never by `plugin.marketplace`, this project's own local alias, which a host never
+  // learns. Before the fix, `ref` was always built from `plugin.marketplace`.
+  it("uses the host's own name for the marketplace, read from this tool's own native registrations", async () => {
+    const activator = new FakeNativePluginActivator({ available: true });
+    const logger = new CapturingLogger();
+    const { removeUseCase, manifestRepo } = buildRemoveUseCase(activator, logger);
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    await new ModeAMarketplaceTranslator().addPlugin(
+      buildDist(),
+      "claude",
+      { kind: "local", path: "/plugin-source" },
+      PROJECT_ROOT,
+      manifest,
+      "local"
+    );
+    manifest.setNativeRegistrations("claude", {
+      binary: "claude",
+      marketplaces: [{ alias: "local", hostName: "upstream" }],
+      pluginRefs: [],
+    });
+    await manifestRepo.save(manifest);
+
+    await removeUseCase.execute({
+      pluginName: PLUGIN_NAME,
+      toolIds: ["claude"],
+      projectRoot: PROJECT_ROOT,
+    });
+
+    expect(activator.uninstalledPlugins).toEqual([`${PLUGIN_NAME}@upstream`]);
+  });
+
+  it("resolves the host's own registry by the hostName-keyed ref, not the alias", async () => {
+    const hostRef = `${PLUGIN_NAME}@upstream`;
+    const activator = new FakeNativePluginActivator({
+      available: true,
+      installedAtScope: new Map([[hostRef, "user"]]),
+    });
+    const logger = new CapturingLogger();
+    const fs = new InMemoryFileAdapter();
+    const manifestRepo = new InMemoryManifestRepository();
+    const removeUseCase = new PluginRemoveUseCase(
+      fs,
+      manifestRepo,
+      logger,
+      new Map([["claude", activator]]),
+      new Map([
+        [
+          "claude",
+          new FakeHostPluginRegistryReader({
+            location: "/registry",
+            refs: new Map([[hostRef, { enabled: true, scope: "user" }]]),
+          }),
+        ],
+      ])
+    );
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    await new ModeAMarketplaceTranslator().addPlugin(
+      buildDist(),
+      "claude",
+      { kind: "local", path: "/plugin-source" },
+      PROJECT_ROOT,
+      manifest,
+      "local"
+    );
+    manifest.setNativeRegistrations("claude", {
+      binary: "claude",
+      marketplaces: [{ alias: "local", hostName: "upstream" }],
+      pluginRefs: [],
+    });
+    await manifestRepo.save(manifest);
+
+    await removeUseCase.execute({
+      pluginName: PLUGIN_NAME,
+      toolIds: ["claude"],
+      projectRoot: PROJECT_ROOT,
+    });
+
+    expect(activator.uninstalledPlugins).toEqual([hostRef]);
+    expect(activator.uninstalledPluginScopes).toEqual(["user"]);
+  });
+
+  it("warns naming the alias when this tool's own native registrations exist but name no entry for it", async () => {
+    const activator = new FakeNativePluginActivator({ available: true });
+    const logger = new CapturingLogger();
+    const { removeUseCase, manifestRepo } = buildRemoveUseCase(activator, logger);
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    await installViaModeA(manifest);
+    manifest.setNativeRegistrations("claude", {
+      binary: "claude",
+      marketplaces: [{ alias: "some-other-marketplace", hostName: "other" }],
+      pluginRefs: [],
+    });
+    await manifestRepo.save(manifest);
+
+    await removeUseCase.execute({
+      pluginName: PLUGIN_NAME,
+      toolIds: ["claude"],
+      projectRoot: PROJECT_ROOT,
+    });
+
+    expect(activator.uninstalledPlugins).toEqual([REF]);
+    expect(logger.warnMessages.some((m) => m.includes(MARKETPLACE_NAME))).toBe(true);
+  });
+
+  /**
+   * Lot 9 review, A-N1: `removeNativeActivation` used to call
+   * `manifest.getNativeRegistrations(toolId)` twice for the same decision — once through
+   * `hostNameFor` to resolve the host's own name, once more to ask whether a registration
+   * exists at all (the warn-gate above). One read into a local, branched on once, says
+   * the same thing once. `purgeCachedPlugin`'s own read is a separate decision (whether
+   * to purge a cache, made after the uninstall itself), so it still reads once on its
+   * own — the fixture below reaches it too, so the count pins both call sites at once:
+   * 1 (removeNativeActivation) + 1 (purgeCachedPlugin) = 2, not the pre-fix 3.
+   */
+  it("reads this tool's own native registrations once per decision, not twice for the warn gate", async () => {
+    const activator = new FakeNativePluginActivator({ available: true });
+    const logger = new CapturingLogger();
+    const { removeUseCase, manifestRepo } = buildRemoveUseCase(activator, logger);
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    await installViaModeA(manifest);
+    manifest.setNativeRegistrations("claude", {
+      binary: "claude",
+      marketplaces: [{ alias: "some-other-marketplace", hostName: "other" }],
+      pluginRefs: [],
+    });
+    await manifestRepo.save(manifest);
+    const stored = await manifestRepo.load();
+    if (stored === null) throw new Error("unreachable — just saved");
+    const spy = vi.spyOn(stored, "getNativeRegistrations");
+
+    await removeUseCase.execute({
+      pluginName: PLUGIN_NAME,
+      toolIds: ["claude"],
+      projectRoot: PROJECT_ROOT,
+    });
+
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 
   it("uninstalls at the scope the host's own registry names directly, one attempt", async () => {

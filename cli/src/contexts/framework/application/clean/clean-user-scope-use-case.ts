@@ -22,7 +22,10 @@ import {
   purgeAllNativeCaches,
   type UndoneToolRegistrations,
 } from "../shared/purge-native-marketplace-cache.js";
-import { toleratingUnreadableSourceReferences } from "../shared/shared-source-reference-support.js";
+import {
+  describeFullRemovalInstruction,
+  toleratingUnreadableSourceReferences,
+} from "../shared/shared-source-reference-support.js";
 import { userScopeFilesSafeToDelete } from "../shared/user-scope-plugin-files.js";
 
 export interface CleanUserScopeOptions {
@@ -160,15 +163,14 @@ export class CleanUserScopeUseCase {
    * registration exists for steps (1)-(3) to undo, and, when this machine's own
    * `references.json` still lists other projects, that they must each run their own
    * `aidd clean` first — their hosts still resolve the shared source this run is about
-   * to purge. */
+   * to purge. Ends with the same full-removal instruction `plugin remove`'s own guard
+   * message states, extracted once into `describeFullRemovalInstruction` so the two
+   * never drift onto a second spelling of the same two commands. */
   private describeNoUserRegistration(preview: CleanUserScopePreview): string {
     const base = "No host registration was undone: nothing was registered at user scope.";
     if (preview.referencingProjects.length === 0) return base;
     const projects = preview.referencingProjects.join(", ");
-    return (
-      `${base} ${projects} still resolve the shared source through their own host; run ` +
-      "`aidd clean` in each of them before `aidd clean --scope user`."
-    );
+    return `${base} ${projects} still resolve the shared source through their own host; ${describeFullRemovalInstruction()}`;
   }
 
   private async listBuiltVersions(): Promise<readonly string[]> {

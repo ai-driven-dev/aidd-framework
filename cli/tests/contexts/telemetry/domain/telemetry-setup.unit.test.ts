@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildTelemetryAllowedSetup } from "../../../../src/contexts/telemetry/domain/telemetry-setup.js";
+import {
+  buildTelemetryAllowedSetup,
+  detectHookManager,
+} from "../../../../src/contexts/telemetry/domain/telemetry-setup.js";
 
 const SWITCH_PATH = "/repo/.aidd/config.json";
 
@@ -62,5 +65,35 @@ describe("buildTelemetryAllowedSetup — whose choice this was", () => {
       { AIDD_TELEMETRY: "" }
     );
     expect(setup.decidedBy).toBe("project-switch");
+  });
+});
+
+/**
+ * From root marker files alone, never from the hook's own contents — a manager regenerates
+ * `prepare-commit-msg` from its own config on every install, so anything read from the hook
+ * by the time this runs has already been overwritten.
+ */
+describe("detectHookManager — which manager owns prepare-commit-msg, from the root alone", () => {
+  it("reads lefthook.yml as lefthook", () => {
+    expect(detectHookManager(["lefthook.yml"])).toBe("lefthook");
+  });
+
+  it("reads every dot-prefixed and .yaml spelling lefthook itself accepts", () => {
+    expect(detectHookManager([".lefthook.yaml"])).toBe("lefthook");
+    expect(detectHookManager(["lefthook.yaml"])).toBe("lefthook");
+    expect(detectHookManager([".lefthook.yml"])).toBe("lefthook");
+  });
+
+  it("reads .husky as husky", () => {
+    expect(detectHookManager([".husky"])).toBe("husky");
+  });
+
+  it("prefers lefthook when both markers are present — a deterministic, documented tie-break", () => {
+    expect(detectHookManager(["lefthook.yml", ".husky"])).toBe("lefthook");
+  });
+
+  it("names neither manager when no marker is present", () => {
+    expect(detectHookManager([])).toBeUndefined();
+    expect(detectHookManager(["package.json", "README.md"])).toBeUndefined();
   });
 });

@@ -57,7 +57,7 @@ describe("installing the trailer hook where git will actually run it", () => {
     );
 
     const hooks = join(repo, ".git", "hooks");
-    expect(installed).toBe(true);
+    expect(installed).toEqual({ lineAdded: true });
     expect(readFileSync(join(hooks, "prepare-commit-msg"), "utf8")).toContain(
       sessionTrailerHookLine(join(hooks, SESSION_TRAILER_DELEGATE_FILE))
     );
@@ -132,8 +132,8 @@ describe("installing the trailer hook where git will actually run it", () => {
     );
 
     const content = readFileSync(join(repo, ".git", "hooks", "prepare-commit-msg"), "utf8");
-    expect(first).toBe(true);
-    expect(second).toBe(false);
+    expect(first).toEqual({ lineAdded: true });
+    expect(second).toEqual({ lineAdded: false });
     expect(content.split("aidd-session-trailer.sh").length - 1).toBe(1);
   });
 
@@ -147,7 +147,76 @@ describe("installing the trailer hook where git will actually run it", () => {
         SESSION_TRAILER_DELEGATE_FILE,
         sessionTrailerDelegateScript()
       )
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ lineAdded: false });
+  });
+
+  // B-N5: a lefthook marker outside a git repository has no
+  // `$(git rev-parse --git-common-dir)` for a hand-added job to ever resolve against —
+  // reporting `hookManager` there would have a caller print a job that can never run.
+  it("names no manager outside a repository, even with a lefthook marker at the root", async () => {
+    const notARepo = mkdtempSync(join(tmpdir(), "aidd-trailer-lefthook-nogit-"));
+    created.push(notARepo);
+    writeFileSync(join(notARepo, "lefthook.yml"), "prepare-commit-msg:\n  commands: {}\n");
+
+    await expect(
+      adapter().installCommitMessageDelegate(
+        notARepo,
+        SESSION_TRAILER_DELEGATE_FILE,
+        sessionTrailerDelegateScript()
+      )
+    ).resolves.toEqual({ lineAdded: false });
+  });
+});
+
+/**
+ * Neither `lefthook.yml` nor `.husky/*` is ever written by this CLI — both are committed,
+ * shared files, and an automatic append would reach every clone through a commit nobody
+ * reviewed. The delegate script still has to land where the printed job resolves it,
+ * `$(git rev-parse --git-common-dir)/hooks`, which a husky repository's own
+ * `core.hooksPath` does *not* point at — that divergence is exactly what would leave the
+ * printed job's `[ -f "$delegate" ]` guard false forever if the script went anywhere else.
+ */
+describe("installing where lefthook or husky already owns prepare-commit-msg", () => {
+  it("reports the manager, writes no line, and touches nothing lefthook owns", async () => {
+    const repo = makeRepo("lefthook-owned");
+    writeFileSync(join(repo, "lefthook.yml"), "prepare-commit-msg:\n  commands: {}\n");
+
+    const result = await adapter().installCommitMessageDelegate(
+      repo,
+      SESSION_TRAILER_DELEGATE_FILE,
+      sessionTrailerDelegateScript()
+    );
+
+    expect(result).toEqual({
+      hookManager: "lefthook",
+      managerCallsDelegate: false,
+      lineAdded: false,
+    });
+    expect(existsSync(join(repo, ".git", "hooks", "prepare-commit-msg"))).toBe(false);
+    expect(readFileSync(join(repo, "lefthook.yml"), "utf8")).toBe(
+      "prepare-commit-msg:\n  commands: {}\n"
+    );
+    expect(existsSync(join(repo, ".git", "hooks", SESSION_TRAILER_DELEGATE_FILE))).toBe(true);
+  });
+
+  it("writes the delegate to the common git dir, never to husky's own core.hooksPath", async () => {
+    const repo = makeRepo("husky-owned");
+    mkdirSync(join(repo, ".husky"), { recursive: true });
+    writeFileSync(join(repo, ".husky", "prepare-commit-msg"), "#!/bin/sh\necho theirs\n");
+    git(repo, "config", "core.hooksPath", ".husky");
+
+    const result = await adapter().installCommitMessageDelegate(
+      repo,
+      SESSION_TRAILER_DELEGATE_FILE,
+      sessionTrailerDelegateScript()
+    );
+
+    expect(result).toEqual({ hookManager: "husky", managerCallsDelegate: false, lineAdded: false });
+    expect(readFileSync(join(repo, ".husky", "prepare-commit-msg"), "utf8")).toBe(
+      "#!/bin/sh\necho theirs\n"
+    );
+    expect(existsSync(join(repo, ".husky", SESSION_TRAILER_DELEGATE_FILE))).toBe(false);
+    expect(existsSync(join(repo, ".git", "hooks", SESSION_TRAILER_DELEGATE_FILE))).toBe(true);
   });
 });
 
@@ -166,7 +235,7 @@ describe("removing it again", () => {
     );
 
     const hooks = join(repo, ".git", "hooks");
-    expect(removed).toBe(true);
+    expect(removed).toEqual({ removed: true });
     expect(readFileSync(join(hooks, "prepare-commit-msg"), "utf8")).not.toContain(
       SESSION_TRAILER_DELEGATE_FILE
     );
@@ -196,7 +265,41 @@ describe("removing it again", () => {
 
     await expect(
       adapter().removeCommitMessageDelegate(repo, SESSION_TRAILER_DELEGATE_FILE)
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ removed: false });
+  });
+
+  /**
+   * B-B1: `on` writes the delegate to `$(git rev-parse --git-common-dir)/hooks`, ignoring
+   * `core.hooksPath`, once a manager owns `prepare-commit-msg` — husky routes that setting
+   * under `.husky/`. Before this fix `off` still resolved through `resolveHooksDir`, which
+   * *follows* `core.hooksPath`: under husky the two land in different directories, so `off`
+   * found nothing to delete and reported it removed nothing. Mutation: make
+   * `removeCommitMessageDelegate` resolve through `--git-path hooks` again (ignoring the
+   * manager) and this goes red.
+   */
+  it("removes the delegate on and off agree on, even where husky moves core.hooksPath", async () => {
+    const repo = makeRepo("husky-remove");
+    mkdirSync(join(repo, ".husky"), { recursive: true });
+    writeFileSync(join(repo, ".husky", "prepare-commit-msg"), "#!/bin/sh\necho theirs\n");
+    git(repo, "config", "core.hooksPath", ".husky");
+    await adapter().installCommitMessageDelegate(
+      repo,
+      SESSION_TRAILER_DELEGATE_FILE,
+      sessionTrailerDelegateScript()
+    );
+    expect(existsSync(join(repo, ".git", "hooks", SESSION_TRAILER_DELEGATE_FILE))).toBe(true);
+
+    const removed = await adapter().removeCommitMessageDelegate(
+      repo,
+      SESSION_TRAILER_DELEGATE_FILE
+    );
+
+    expect(removed).toEqual({ removed: true, hookManager: "husky", managerCallsDelegate: false });
+    expect(existsSync(join(repo, ".git", "hooks", SESSION_TRAILER_DELEGATE_FILE))).toBe(false);
+    // husky's own hook file is not aidd's to touch, on the way in or on the way out.
+    expect(readFileSync(join(repo, ".husky", "prepare-commit-msg"), "utf8")).toBe(
+      "#!/bin/sh\necho theirs\n"
+    );
   });
 });
 

@@ -379,6 +379,97 @@ describe("the row saying whether commits carry their session", () => {
   });
 
   /**
+   * `hookManager` — read from a root marker file, never from the hook's own contents — is
+   * what makes naming the tool honest, unlike `hookHasOtherContent` above. The two facts are
+   * independent: a hand-written hook sets the second without the first, and stays unnamed.
+   */
+  describe("where lefthook or husky owns prepare-commit-msg", () => {
+    it("names lefthook and prints the job to add, when its config does not call the delegate", () => {
+      const text = report({
+        delegate: "absent",
+        callSite: "missing",
+        hookHasOtherContent: true,
+        hooksDir: "/repo/.git/hooks",
+        hookManager: "lefthook",
+        managerCallsDelegate: false,
+      });
+
+      expect(text).toContain("lefthook");
+      expect(text).toContain("prepare-commit-msg:");
+      expect(text).toContain("add this command under `prepare-commit-msg:`");
+      expect(text).not.toContain("does not call it");
+    });
+
+    it("names husky and prints the line to add, when its config does not call the delegate", () => {
+      const text = report({
+        delegate: "absent",
+        callSite: "missing",
+        hookHasOtherContent: true,
+        hooksDir: "/repo/.git/hooks",
+        hookManager: "husky",
+        managerCallsDelegate: false,
+      });
+
+      expect(text).toContain("husky");
+      expect(text).toContain(".husky/prepare-commit-msg");
+      expect(text).toContain("add this line to .husky/prepare-commit-msg");
+      expect(text).not.toContain("does not call it");
+    });
+
+    // The discriminating case for `check`: `callSite: "missing"` here describes the
+    // absolute-path line this CLI would otherwise look for, which a manager never calls the
+    // delegate through — it must not read as a fault once the manager's own config does.
+    it("reports the chain wired through the manager and prints no job, once its config already calls the delegate", () => {
+      const text = report({
+        delegate: "executable",
+        callSite: "missing",
+        hookHasOtherContent: true,
+        hooksDir: "/repo/.git/hooks",
+        hookManager: "lefthook",
+        managerCallsDelegate: true,
+      });
+
+      expect(text).toContain("wired through lefthook");
+      expect(text).not.toContain("does not call it");
+      expect(text).not.toContain("add this command");
+      expect(text).not.toContain("prepare-commit-msg:");
+    });
+
+    // B-S1: the manager's own config calling the delegate is not the same fact as the
+    // delegate actually being there to call. A checkout where `lefthook.yml` names the job
+    // but `telemetry on` was never run must not read as "wired" — that is exactly the state
+    // this repository itself is in until someone runs it.
+    it("does not report wired when nothing was ever installed to answer the call", () => {
+      const text = report({
+        delegate: "absent",
+        callSite: "missing",
+        hookHasOtherContent: false,
+        hooksDir: "/repo/.git/hooks",
+        hookManager: "lefthook",
+        managerCallsDelegate: true,
+      });
+
+      expect(text).not.toContain("wired through lefthook's own prepare-commit-msg");
+      expect(text).toContain("nothing installed to write it");
+      expect(text).toContain("aidd telemetry on");
+    });
+
+    it("says the script is not executable rather than wired, when it cannot run", () => {
+      const text = report({
+        delegate: "not-executable",
+        callSite: "missing",
+        hookHasOtherContent: false,
+        hooksDir: "/repo/.git/hooks",
+        hookManager: "husky",
+        managerCallsDelegate: true,
+      });
+
+      expect(text).not.toContain("wired through husky's own prepare-commit-msg");
+      expect(text).toContain("not executable");
+    });
+  });
+
+  /**
    * A commit no session made carries no trailer by design, and merges are skipped outright.
    * So a number below the total is not a fault, and a bare "4 of 20" reads like one. The
    * qualifier appears exactly when it could mislead — some carrying, every part in place.

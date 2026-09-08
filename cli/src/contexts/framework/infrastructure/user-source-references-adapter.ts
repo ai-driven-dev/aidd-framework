@@ -1,6 +1,10 @@
 import { dirname, join } from "node:path";
 import { UnreadableUserSourceReferencesError } from "../../../kernel/errors.js";
-import { samePathSegment, USER_SOURCE_REFERENCES_FILENAME } from "../../../kernel/paths.js";
+import {
+  dedupePathSegments,
+  samePathSegment,
+  USER_SOURCE_REFERENCES_FILENAME,
+} from "../../../kernel/paths.js";
 import type { FileReader } from "../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../kernel/ports/file-writer.js";
 import type { UserSourceReferences } from "../domain/ports/user-source-references.js";
@@ -70,12 +74,11 @@ export class UserSourceReferencesAdapter implements UserSourceReferences {
 
   async listAllReferencingProjects(): Promise<readonly string[]> {
     const references = await this.readAll();
-    const seen = new Set<string>();
-    for (const roots of Object.values(references)) {
-      for (const root of roots) seen.add(root);
-    }
+    const allRoots: string[] = [];
+    for (const roots of Object.values(references)) allRoots.push(...roots);
+    const deduped = dedupePathSegments(allRoots);
     const existing: string[] = [];
-    for (const root of seen) {
+    for (const root of deduped) {
       if (await this.fs.fileExists(root)) existing.push(root);
     }
     return existing;

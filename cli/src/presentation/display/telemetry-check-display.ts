@@ -2,6 +2,11 @@ import type {
   DiagnoseTelemetryResult,
   DiagnoseTelemetryUncoveredTool,
 } from "../../contexts/telemetry/application/diagnose-telemetry-use-case.js";
+import {
+  SESSION_TRAILER_DELEGATE_FILE,
+  sessionTrailerManagerInstruction,
+  sessionTrailerManagerSnippet,
+} from "../../contexts/telemetry/domain/formats/commit-session-trailer.js";
 import type {
   TelemetryClaim,
   TelemetryClaimId,
@@ -157,6 +162,13 @@ function describeCommitTrailer(trailer: TelemetryCommitTrailerSetup): string {
     return `${describeTrailerCount(trailer)} — git could not say where it runs hooks from`;
   }
 
+  // Named now, because the name comes from a marker file at the repository root rather than
+  // from reading the hook, and because there is a job to print that changes what a person
+  // does: `callSite: "missing"` here is not a fault, it is the ordinary shape of a manager
+  // calling the delegate through its own config rather than through the absolute-path line
+  // this CLI would otherwise look for.
+  if (trailer.hookManager !== undefined) return describeManagedCommitTrailer(trailer);
+
   const parts: string[] = [];
   if (trailer.delegate === "absent") parts.push("nothing installed to write it");
   if (trailer.delegate === "not-executable") {
@@ -174,6 +186,39 @@ function describeCommitTrailer(trailer: TelemetryCommitTrailerSetup): string {
   return `${describeTrailerCount(trailer)}${parts.length === 0 ? "" : ` — ${parts.join("; ")}`}\n    hooks run from ${trailer.hooksDir}`;
 }
 
+/** The row for a repository lefthook or husky owns. Wired — that manager's own config
+ * already calls the delegate — reports the chain through the manager and prints nothing
+ * else: there is no job to add. Not wired names the manager and prints the job to add,
+ * which is the one actionable fact `telemetry on` also prints. Neither case ever reads
+ * `callSite: "missing"` as a fault: that field describes the absolute-path line this CLI
+ * would otherwise look for, which a manager never calls the delegate through. */
+function describeManagedCommitTrailer(trailer: TelemetryCommitTrailerSetup): string {
+  const manager = trailer.hookManager;
+  if (manager === undefined) throw new Error("describeManagedCommitTrailer needs a manager");
+  const count = describeTrailerCount(trailer);
+  if (trailer.managerCallsDelegate === true) {
+    // The manager's own config calling the delegate is only half the chain — the delegate
+    // still has to be there, and executable, for the call to do anything. Reporting "wired"
+    // from `managerCallsDelegate` alone would call this repository healthy on a checkout
+    // where `telemetry on` was never run (B-S1): the config names the job, nothing answers
+    // it, and a person reading "wired" has no reason left to run the one command that fixes
+    // it.
+    if (trailer.delegate !== "executable") {
+      const state =
+        trailer.delegate === "absent"
+          ? "nothing installed to write it"
+          : "its script is not executable, so git will not run it";
+      return `${count} — wired through ${manager}, but ${state}; run \`aidd telemetry on\`\n    hooks run from ${trailer.hooksDir}`;
+    }
+    return `${count} — wired through ${manager}'s own prepare-commit-msg\n    hooks run from ${trailer.hooksDir}`;
+  }
+  const { targetFile, snippet } = sessionTrailerManagerSnippet(
+    manager,
+    SESSION_TRAILER_DELEGATE_FILE
+  );
+  return `${count} — ${manager} owns prepare-commit-msg here; ${sessionTrailerManagerInstruction(manager, targetFile)}:\n${snippet}\n    hooks run from ${trailer.hooksDir}`;
+}
+
 /** The count, and what it is not.
  *
  * A commit no session made carries no trailer, by design — the delegate writes nothing
@@ -184,7 +229,9 @@ function describeTrailerCount(trailer: TelemetryCommitTrailerSetup): string {
   const carried = trailer.recentlyCarrying;
   if (carried === undefined) return "no commit history to read";
   const count = `${carried.carrying} of the last ${carried.examined} commits carry it`;
-  const everyPartWorks = trailer.delegate === "executable" && trailer.callSite === "present";
+  const everyPartWorks =
+    trailer.delegate === "executable" &&
+    (trailer.callSite === "present" || trailer.managerCallsDelegate === true);
   // `carrying > 0` and not `>= 0`: zero with every part in place is the finding this whole
   // row exists to surface, and excusing it as by-design is the one thing that must not
   // happen. The docstring above says "some", and this is what makes that true.

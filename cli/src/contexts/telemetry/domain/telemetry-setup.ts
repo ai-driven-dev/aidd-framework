@@ -203,6 +203,18 @@ export interface TelemetryCommitTrailerSetup {
    * `.git/hooks` assumed, because `core.hooksPath` pointing elsewhere is exactly the
    * configuration under which everything else here would describe the wrong directory. */
   readonly hooksDir?: string;
+  /** Which tool regenerates `prepare-commit-msg` and wipes anything appended to it, read
+   * from **marker files at the repository root** — never from the hook's own contents,
+   * which a regeneration has already overwritten by the time anything reads it. `undefined`
+   * means neither was found, which is the ordinary case this whole feature does not change:
+   * the CLI still owns the hook and appends its own line to it. */
+  readonly hookManager?: HookManager;
+  /** Whether that manager's own config already calls the delegate — `lefthook.yml` or
+   * `.husky/prepare-commit-msg` grepped for `SESSION_TRAILER_DELEGATE_FILE`. Present only
+   * when `hookManager` is, the same "a fact that only makes sense alongside another" shape
+   * `unreadable` uses above. `false` is not a fault by itself: it is the ordinary state of a
+   * repository nobody has wired up yet, which is exactly what the printed job fixes. */
+  readonly managerCallsDelegate?: boolean;
   /** Why there is no `hooksDir`, when there is none. Two causes, never one sentence: a
    * project outside git has no hook to carry anything, which is a fact about the project;
    * a repository whose git could not answer is a reading that failed, and saying "no
@@ -229,4 +241,47 @@ export interface TelemetryCommitTrailerSetup {
    * person can check, and zero out of twenty in a repository that has been measuring for a
    * week is the whole finding. Absent when history could not be read at all. */
   readonly recentlyCarrying?: { readonly carrying: number; readonly examined: number };
+}
+
+/** The two tools this build knows to regenerate `prepare-commit-msg` out from under
+ * whatever the CLI appended to it. */
+export type HookManager = "lefthook" | "husky";
+
+/** Root marker names that mean lefthook owns this repository's hooks — every spelling
+ * lefthook itself accepts for its own config file, in the order it looks for them. */
+export const LEFTHOOK_MARKER_NAMES = [
+  "lefthook.yml",
+  "lefthook.yaml",
+  ".lefthook.yml",
+  ".lefthook.yaml",
+] as const;
+
+/** The root marker that means husky owns this repository's hooks. */
+export const HUSKY_MARKER_NAME = ".husky";
+
+/** Every root entry name this build checks for, in one place — the set a caller probes for
+ * existence before calling `detectHookManager`, so the two never drift apart. */
+export const HOOK_MANAGER_MARKER_NAMES: readonly string[] = [
+  ...LEFTHOOK_MARKER_NAMES,
+  HUSKY_MARKER_NAME,
+];
+
+/**
+ * Which manager, if either, owns `prepare-commit-msg` here — decided from root **marker
+ * files alone**, never from the hook's own contents. A manager regenerates the hook file
+ * from its own config on every install, so by the time anything reads the hook the append
+ * this CLI made is already gone; the marker is the only fact that survives that.
+ *
+ * Pure and total: given the same list of names present at the repository root, this answers
+ * the same way regardless of what filesystem or platform is asking, which is what makes the
+ * decision itself testable apart from the adapter that lists the root.
+ *
+ * Lefthook wins the tie when both are present — an unmeasured configuration, kept
+ * deterministic rather than guessed at differently each run. */
+export function detectHookManager(rootEntryNames: readonly string[]): HookManager | undefined {
+  if (rootEntryNames.some((name) => (LEFTHOOK_MARKER_NAMES as readonly string[]).includes(name))) {
+    return "lefthook";
+  }
+  if (rootEntryNames.includes(HUSKY_MARKER_NAME)) return "husky";
+  return undefined;
 }

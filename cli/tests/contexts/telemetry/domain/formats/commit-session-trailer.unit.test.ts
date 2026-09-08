@@ -4,6 +4,9 @@ import {
   SESSION_TRAILER_TOKEN,
   sessionTrailerDelegateScript,
   sessionTrailerHookLine,
+  sessionTrailerHuskyLine,
+  sessionTrailerLefthookJob,
+  sessionTrailerManagerSnippet,
 } from "../../../../../src/contexts/telemetry/domain/formats/commit-session-trailer.js";
 
 describe("the line added to a repository's own prepare-commit-msg", () => {
@@ -87,5 +90,65 @@ describe("the delegate a commit's message actually passes through", () => {
 describe("what the delegate is called on disk", () => {
   it("is named for what it does, and is a shell script", () => {
     expect(SESSION_TRAILER_DELEGATE_FILE).toBe("aidd-session-trailer.sh");
+  });
+});
+
+/**
+ * The job/line printed for a hand-add when lefthook or husky owns `prepare-commit-msg` and
+ * regenerates it, wiping anything this CLI appended. Neither snippet may carry an absolute
+ * path — these files are committed and shared across machines, and a path baked in at write
+ * time on one contributor's disk would name nothing on anyone else's.
+ */
+describe("the job printed for a repository lefthook already owns", () => {
+  const job = sessionTrailerLefthookJob(SESSION_TRAILER_DELEGATE_FILE);
+
+  it("is the prepare-commit-msg job, keyed the way lefthook.yml expects", () => {
+    expect(job).toContain("prepare-commit-msg:");
+  });
+
+  it("forwards the message-file and source arguments with lefthook's own placeholders", () => {
+    expect(job).toContain("{1} {2}");
+  });
+
+  it("only calls the delegate when it is actually there", () => {
+    expect(job).toContain("[ -f");
+  });
+
+  it("carries no absolute path — resolved fresh against this machine's own git dir instead", () => {
+    expect(job).not.toMatch(/\/(Users|home)\//u);
+    expect(job).toContain("$(git rev-parse --git-common-dir)");
+  });
+});
+
+describe("the line printed for a repository husky already owns", () => {
+  const line = sessionTrailerHuskyLine(SESSION_TRAILER_DELEGATE_FILE);
+
+  it("forwards git's own arguments the way a plain hook does", () => {
+    expect(line).toContain('"$@"');
+  });
+
+  it("only calls the delegate when it is actually there", () => {
+    expect(line).toContain("[ -f");
+  });
+
+  it("carries no absolute path either", () => {
+    expect(line).not.toMatch(/\/(Users|home)\//u);
+    expect(line).toContain("$(git rev-parse --git-common-dir)");
+  });
+});
+
+describe("sessionTrailerManagerSnippet — one place naming both the file and its snippet", () => {
+  it("names lefthook.yml for lefthook, carrying the same job", () => {
+    const result = sessionTrailerManagerSnippet("lefthook", SESSION_TRAILER_DELEGATE_FILE);
+
+    expect(result.targetFile).toBe("lefthook.yml");
+    expect(result.snippet).toBe(sessionTrailerLefthookJob(SESSION_TRAILER_DELEGATE_FILE));
+  });
+
+  it("names .husky/prepare-commit-msg for husky, carrying the same line", () => {
+    const result = sessionTrailerManagerSnippet("husky", SESSION_TRAILER_DELEGATE_FILE);
+
+    expect(result.targetFile).toBe(".husky/prepare-commit-msg");
+    expect(result.snippet).toBe(sessionTrailerHuskyLine(SESSION_TRAILER_DELEGATE_FILE));
   });
 });

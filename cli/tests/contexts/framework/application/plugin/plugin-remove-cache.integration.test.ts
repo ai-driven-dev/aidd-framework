@@ -25,7 +25,10 @@ const PROJECT_ROOT = "/test-project";
 const ALIAS = "my-local-alias";
 const HOST_NAME = "upstream-catalog-name";
 const PLUGIN_NAME = "aidd-telemetry";
-const REF = `${PLUGIN_NAME}@${ALIAS}`;
+// The host call addresses the host by `hostName`, read from this tool's own
+// `nativeRegistrations` (lot 9, item A) — never by `ALIAS`, this project's own local
+// key, which a host never learns.
+const REF = `${PLUGIN_NAME}@${HOST_NAME}`;
 const CLAUDE_CACHE_ROOT = join(homedir(), ".claude", "plugins", "cache");
 
 function buildDist(): PluginDistribution {

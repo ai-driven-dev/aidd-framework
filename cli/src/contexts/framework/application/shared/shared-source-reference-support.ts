@@ -44,12 +44,29 @@ export function refAnotherProjectStillNeeds(input: {
 }
 
 /**
+ * The instruction for fully removing the shared source, once a message has already
+ * named which other projects still need it — `aidd clean` in each of them, then `aidd
+ * clean --scope user` for the machine. First written inline in
+ * `CleanUserScopeUseCase.describeNoUserRegistration`; extracted here so `plugin
+ * remove`'s own guard message (`describeGuardedPluginRefMessage`) states the same
+ * instruction rather than authoring a second spelling of it. Each command name stays
+ * whole inside this one string literal — `errors-that-instruct.arch.test.ts` reads
+ * every string and template literal under `application/` and checks each command it
+ * names against the ones the CLI declares.
+ */
+export function describeFullRemovalInstruction(): string {
+  return "full removal is `aidd clean` in each of them, then `aidd clean --scope user`.";
+}
+
+/**
  * The message both `clean` and `plugin remove` warn with instead of ever uninstalling
  * `ref`, once `refAnotherProjectStillNeeds` says it is guarded — the two callers
  * differ only in how they resolve `binary`, `ref` and `otherProjects` (see each
  * caller's own `describeGuardedPluginRef`), never in the sentence itself. Names every
- * project in `otherProjects`, singular/plural correct, and points at the one command
- * that does remove the shared source for the machine.
+ * project in `otherProjects`, singular/plural correct, states the one fact once —
+ * those projects still reference the shared source, which is why it stays — rather
+ * than restating it as a second, redundant clause, and ends with the same
+ * full-removal instruction `clean --scope user`'s own no-registration report states.
  */
 export function describeGuardedPluginRefMessage(input: {
   binary: string;
@@ -62,7 +79,7 @@ export function describeGuardedPluginRefMessage(input: {
   return (
     `${binary}: '${ref}' left enabled — ${binary} enables a plugin machine-wide, and ` +
     `${otherProjects.length} other ${plural} still ${verb} the shared source: ` +
-    `${otherProjects.join(", ")}. \`aidd clean --scope user\` is what removes it for the machine.`
+    `${otherProjects.join(", ")} — which is why it stays; ${describeFullRemovalInstruction()}`
   );
 }
 

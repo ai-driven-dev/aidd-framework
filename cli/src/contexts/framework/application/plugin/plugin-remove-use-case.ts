@@ -19,6 +19,7 @@ import {
   pluginEnablementIsMachineGlobal,
   resolvePluginsCapability,
 } from "../../../tools/domain/registry.js";
+import type { NativeRegistrations } from "../../domain/manifest/native-registrations.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
@@ -97,7 +98,7 @@ export class PluginRemoveUseCase {
       const plugin = plugins.find((p) => p.name === pluginName);
       if (plugin === undefined) continue;
       const baseDir = resolveBaseDirFromRecord(plugin.scope, toolId, projectRoot, nodeHomedir);
-      const confirmed = await this.removeNativeActivation(plugin, toolId, projectRoot);
+      const confirmed = await this.removeNativeActivation(plugin, toolId, projectRoot, manifest);
       if (confirmed !== undefined)
         await this.purgeCachedPlugin(manifest, toolId, plugin, confirmed);
       await this.deletePluginFiles(plugin.files, baseDir);
@@ -126,18 +127,29 @@ export class PluginRemoveUseCase {
   private async removeNativeActivation(
     plugin: InstalledPlugin,
     toolId: AiToolId,
-    projectRoot: string
+    projectRoot: string,
+    manifest: Manifest
   ): Promise<boolean | undefined> {
     const nativeActivation = resolvePluginsCapability(toolId)?.nativeActivation;
     if (nativeActivation == null || plugin.marketplace === undefined) return undefined;
     const activator = this.activators.get(nativeActivation.binary);
     if (activator === undefined) return undefined;
-    const ref = `${plugin.name}@${plugin.marketplace}`;
+    const alias = plugin.marketplace;
+    const registrations = manifest.getNativeRegistrations(toolId);
+    const registeredHostName = this.hostNameFor(registrations, alias);
+    if (registeredHostName === undefined && registrations !== undefined) {
+      this.logger.warn(
+        `${toolId}: this tool's own native registrations name no entry for '${alias}' — uninstalling '${plugin.name}@${alias}' by that alias rather than the host's own name for it.`
+      );
+    }
+    const hostName = registeredHostName ?? alias;
+    const ref = `${plugin.name}@${hostName}`;
     const guardMessage = await this.describeGuardedPluginRef(
       nativeActivation.binary,
       toolId,
       ref,
-      plugin.marketplace,
+      alias,
+      hostName,
       projectRoot
     );
     if (guardMessage !== undefined) {
@@ -154,6 +166,23 @@ export class PluginRemoveUseCase {
     );
   }
 
+  /** The host's own name for `alias`, found in an already-read `NativeRegistrations` —
+   * the one private lookup `removeNativeActivation` and `purgeCachedPlugin` both need,
+   * written once so a host-facing call and the cache it purges never disagree about
+   * where to find the fact. Takes the registrations already read rather than reading
+   * them itself: `removeNativeActivation` needs that same read a second time, to tell
+   * "no native registrations at all" apart from "registered, but not under this alias"
+   * for its own warn gate, and reading `manifest.getNativeRegistrations(toolId)` twice
+   * for that one decision would say the same thing twice. `alias` is aidd's own key into
+   * this project's marketplace registry, never what a host learns; `undefined` when
+   * `registrations` is absent, or registered but naming no entry for `alias`. */
+  private hostNameFor(
+    registrations: NativeRegistrations | undefined,
+    alias: string
+  ): string | undefined {
+    return registrations?.marketplaces.find((m) => m.alias === alias)?.hostName;
+  }
+
   /**
    * The same guard `CleanUseCase` applies before uninstalling a ref, applied here for
    * the same reason: a ref enabled through the shared, machine-scope source at a host
@@ -168,22 +197,22 @@ export class PluginRemoveUseCase {
    * and guard a ref nothing else needs. `undefined` when nothing guards this ref, the
    * ordinary case that still uninstalls it.
    *
-   * `ref` here is built as `${plugin.name}@${plugin.marketplace}` — this project's own
-   * *alias* for the marketplace, not its catalog-declared `hostName` (the two can
-   * diverge, see `cli.md`'s own gotcha on that). `refAnotherProjectStillNeeds` matches
-   * `ref`'s suffix against `sharedSourceHostName`, so this call passes `marketplaceAlias`
-   * for that parameter to match — unlike `CleanUseCase.describeGuardedPluginRef`, which
-   * passes the real `hostName` because its own `ref`s come from
-   * `registrations.pluginRefs`, already keyed by `hostName`. A project whose local alias
-   * diverges from its catalog's declared name is therefore not covered by this guard —
-   * a pre-existing gap in `removeNativeActivation`'s alias handling, out of this lot's
-   * scope.
+   * `ref` here is built as `${plugin.name}@${hostName}`, the host's own name for the
+   * marketplace (read by `removeNativeActivation` through `hostNameFor`, falling back
+   * to the alias only when no registration named one) — never `plugin.marketplace`
+   * alone, which a host never learns. `marketplaceAlias` is still the *key* the project's
+   * own marketplace registry is read by (that registry is keyed by alias, not by what a
+   * host calls it), and `hostName` is what `refAnotherProjectStillNeeds` matches `ref`'s
+   * suffix against: both sides of the guard must move together, or a ref moved to
+   * `hostName` while this parameter still carried the alias would silently stop
+   * guarding anything.
    */
   private async describeGuardedPluginRef(
     binary: string,
     toolId: AiToolId,
     ref: string,
     marketplaceAlias: string,
+    hostName: string,
     projectRoot: string
   ): Promise<string | undefined> {
     if (this.userSourceReferences === undefined) return undefined;
@@ -206,7 +235,7 @@ export class PluginRemoveUseCase {
     );
     const guarded = refAnotherProjectStillNeeds({
       ref,
-      sharedSourceHostName: marketplaceAlias,
+      sharedSourceHostName: hostName,
       enablementIsMachineGlobal: pluginEnablementIsMachineGlobal(toolId),
       otherProjects,
     });
@@ -274,9 +303,7 @@ export class PluginRemoveUseCase {
     if (plugin.marketplace === undefined) return;
     const cacheRoot = nativeActivationOf(toolId)?.pluginCacheDir?.(resolveHomeDir());
     if (cacheRoot === undefined) return;
-    const hostName = manifest
-      .getNativeRegistrations(toolId)
-      ?.marketplaces.find((m) => m.alias === plugin.marketplace)?.hostName;
+    const hostName = this.hostNameFor(manifest.getNativeRegistrations(toolId), plugin.marketplace);
     if (hostName === undefined) return;
     const label = `${toolId}: cache for '${plugin.name}'`;
     const candidate = await resolveCacheCandidate(

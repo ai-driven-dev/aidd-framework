@@ -94,6 +94,19 @@ export interface MarketplaceSyncSettingsOptions {
    * dodge of anything this file's own collaborator count is measured by.
    */
   manifestRepo?: ManifestRepository;
+  /**
+   * Narrows the settings sync and native activation to the marketplaces named here —
+   * what `marketplace add <name>` and `plugin install --from <name>` need so re-driving
+   * activation for the marketplace they just acted on does not also re-drive every
+   * other registered one. Absent (the default) activates every marketplace `sync`,
+   * `setup`, `marketplace remove | refresh` and `plugin remove | update` still need.
+   *
+   * A name matching nothing resolves to zero marketplaces, which the very next check
+   * (`marketplaces.length === 0`) already treats as `EMPTY_RESULT` — never a fallback to
+   * every marketplace, since that would silently re-drive activation for marketplaces
+   * this run was never told about.
+   */
+  marketplaceNames?: readonly string[];
 }
 
 /** What one tool's own CLI actually registered, once its `activateTool` run finished —
@@ -195,9 +208,13 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
       this.marketplaceRegistry.list(projectRoot),
     ]);
     if (manifest === null) return EMPTY_RESULT;
-    const marketplaces = options.recreateFrameworkIfMissing
+    const recreatedMarketplaces = options.recreateFrameworkIfMissing
       ? await this.ensureFrameworkRegistered(projectRoot, initialMarketplaces)
       : initialMarketplaces;
+    const marketplaces =
+      options.marketplaceNames === undefined
+        ? recreatedMarketplaces
+        : recreatedMarketplaces.filter((m) => options.marketplaceNames?.includes(m.name));
     if (marketplaces.length === 0) return EMPTY_RESULT;
     // A user-scope run has no project-scope manifest for a later `clean` to ever
     // decrement this claim from — same reasoning as `SetupUseCase.registerMarketplace`'s
@@ -224,7 +241,11 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     const wroteHashes = await this.recordWhatActivationWrote(projectRoot, manifest, [
       ...activation.outcomes.keys(),
     ]);
-    const wroteRegistrations = this.recordNativeRegistrations(manifest, activation.outcomes);
+    const wroteRegistrations = this.recordNativeRegistrations(
+      manifest,
+      activation.outcomes,
+      options.marketplaceNames !== undefined
+    );
     if (wroteHashes || wroteRegistrations) await manifestRepo.save(manifest);
     if (options.recreateFrameworkIfMissing === true && scope === "project") {
       await this.purgeStaleProjectCache(projectRoot, marketplaces, activation);
@@ -432,21 +453,58 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
    * the state `doctor` later compares against the host's real registry, and `clean`
    * undoes through the same binary. Only for a tool this run actually activated: a
    * tool whose CLI never ran gets no `nativeRegistrations` write, the same rule
-   * `recordWhatActivationWrote` already holds for the settings-file hash. */
+   * `recordWhatActivationWrote` already holds for the settings-file hash.
+   *
+   * The keyed merge below applies only when `narrowed` is true — a
+   * `marketplaceNames`-scoped run (`marketplace add`, `plugin install --from`), where
+   * `outcome` carries only the one marketplace this run touched, so an existing entry
+   * for every other marketplace must survive untouched: the record `clean`, `doctor`
+   * and `hostNameFor` all read, and a narrowed run erasing it would strand a later
+   * `clean` unable to unregister what this run never asked about. An unnarrowed run
+   * (`sync`, `setup`) instead does the old whole-entry replace: `outcome` there already
+   * carries every marketplace this project knows, so anything not in it is a dead
+   * registration — a marketplace this project no longer registers, or one whose
+   * `hostName` an upstream catalog rename changed on this very run — and must not
+   * survive, since `setNativeRegistrations` is called from nowhere else in the tree to
+   * ever drop it later.
+   *
+   * `pluginRefs` merges by the `@<hostName>` suffix the touched marketplaces own, but
+   * only for a hostName no *retained* marketplace still owns: two of this project's
+   * own local aliases are free to resolve to the same `hostName` (a supported
+   * capability, never a conflict — see `architecture.md`'s bullet on what this CLI
+   * refuses that a host's own CLI would silently accept), so filtering by hostName
+   * alone would drop the untouched alias's own refs too. A ref both sides happen to
+   * carry (the touched alias's own, replayed by this run) is deduplicated rather than
+   * doubled. */
   private recordNativeRegistrations(
     manifest: Manifest,
-    activated: ReadonlyMap<ToolId, ActivationOutcome>
+    activated: ReadonlyMap<ToolId, ActivationOutcome>,
+    narrowed: boolean
   ): boolean {
     let changed = false;
     for (const [toolId, outcome] of activated) {
       const binary = this.nativeActivationBinary(toolId);
       if (binary === undefined) continue;
+      const existing = manifest.getNativeRegistrations(toolId);
+      const touchedAliases = new Set(outcome.marketplaces.map((m) => m.alias));
+      const touchedHostNames = new Set(outcome.marketplaces.map((m) => m.hostName));
+      const retainedMarketplaces = narrowed
+        ? (existing?.marketplaces ?? []).filter((m) => !touchedAliases.has(m.alias))
+        : [];
+      const retainedHostNames = new Set(retainedMarketplaces.map((m) => m.hostName));
+      const retainedRefs = narrowed
+        ? (existing?.pluginRefs ?? []).filter(
+            (ref) =>
+              ![...touchedHostNames].some(
+                (hostName) => !retainedHostNames.has(hostName) && ref.endsWith(`@${hostName}`)
+              )
+          )
+        : [];
       const registrations: NativeRegistrations = {
         binary,
-        marketplaces: outcome.marketplaces,
-        pluginRefs: outcome.pluginRefs,
+        marketplaces: [...retainedMarketplaces, ...outcome.marketplaces],
+        pluginRefs: [...new Set([...retainedRefs, ...outcome.pluginRefs])],
       };
-      const existing = manifest.getNativeRegistrations(toolId);
       if (nativeRegistrationsEqual(existing, registrations)) continue;
       manifest.setNativeRegistrations(toolId, registrations);
       changed = true;

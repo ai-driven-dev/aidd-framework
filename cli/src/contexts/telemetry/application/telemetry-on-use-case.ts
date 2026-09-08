@@ -7,10 +7,13 @@ import {
   SESSION_TRAILER_DELEGATE_FILE,
   SESSION_TRAILER_TOKEN,
   sessionTrailerDelegateScript,
+  sessionTrailerManagerInstruction,
+  sessionTrailerManagerSnippet,
 } from "../domain/formats/commit-session-trailer.js";
 import type { IgnoreEntries } from "../domain/ports/ignore-entries.js";
 import type { TelemetrySink } from "../domain/ports/telemetry-sink.js";
 import type { VersionControl } from "../domain/ports/version-control.js";
+import type { HookManager } from "../domain/telemetry-setup.js";
 import {
   buildTelemetrySwitchFile,
   parseTelemetrySwitchFile,
@@ -108,16 +111,42 @@ export class TelemetryOnUseCase {
    * will read, and a person who did not expect it must be able to find the sentence that
    * told them, and the command that undoes it. */
   private async makeCommitsJoinable(projectRoot: string): Promise<void> {
-    const installed = await this.git.installCommitMessageDelegate(
+    const install = await this.git.installCommitMessageDelegate(
       projectRoot,
       SESSION_TRAILER_DELEGATE_FILE,
       sessionTrailerDelegateScript()
     );
-    if (!installed) return;
+    if (install.hookManager !== undefined) {
+      this.reportManagedHook(install.hookManager, install.managerCallsDelegate === true);
+      return;
+    }
+    if (!install.lineAdded) return;
     this.logger.info(
       `Commits made by an AI session will carry an ${SESSION_TRAILER_TOKEN} trailer, so what ` +
         "a session cost can be read per commit. A commit no session made carries nothing. " +
         "`aidd telemetry off` removes it."
+    );
+  }
+
+  /** `prepare-commit-msg` here is committed, shared config a manager owns, not a file this
+   * CLI may append to — an automatic append would reach every clone through a commit nobody
+   * reviewed. Lefthook is observed to regenerate it from that config on every install
+   * (this repository's own `lefthook.yml` documents it); husky, believed to do the same for
+   * the same reason, is not separately measured. Either way nothing is appended, and nothing
+   * is promised until the printed job is added by hand. Already wired through the manager is
+   * reported nowhere here on purpose: the ordinary trailer promise above already covers that
+   * outcome, and printing a second sentence for a chain that already works would be news
+   * about nothing. */
+  private reportManagedHook(manager: HookManager, wired: boolean): void {
+    if (wired) return;
+    const { targetFile, snippet } = sessionTrailerManagerSnippet(
+      manager,
+      SESSION_TRAILER_DELEGATE_FILE
+    );
+    this.logger.info(
+      `${manager} owns prepare-commit-msg here, so nothing was appended to it. Commits will ` +
+        `not carry an ${SESSION_TRAILER_TOKEN} trailer until you ` +
+        `${sessionTrailerManagerInstruction(manager, targetFile)}:\n\n${snippet}\n`
     );
   }
 

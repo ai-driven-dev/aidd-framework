@@ -32,8 +32,8 @@ import { CurrentVersionAdapter } from "../../../../src/runtime/self-update/curre
 export const linuxPlatform: Platform = { current: () => "linux" };
 export const win32Platform: Platform = { current: () => "win32" };
 export const noGit: VersionControl = {
-  installCommitMessageDelegate: async () => false,
-  removeCommitMessageDelegate: async () => false,
+  installCommitMessageDelegate: async () => ({ lineAdded: false }),
+  removeCommitMessageDelegate: async () => ({ removed: false }),
   listTrackedFiles: async () => [],
   isRepository: async () => false,
   hasHistoryFor: async () => false,
