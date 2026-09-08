@@ -7,6 +7,7 @@ import type { Logger } from "../../../../kernel/ports/logger.js";
 import { resolveHomeDir } from "../../../../kernel/reading/home-dir.js";
 import type { MarketplaceScope } from "../../../../kernel/scope.js";
 import type { AiToolId } from "../../../../kernel/tool.js";
+import type { MarketplaceRegistry } from "../../../distribution/domain/ports/marketplace-registry.js";
 import type { McpCapability } from "../../../tools/domain/capabilities/mcp-capability.js";
 import { unmergeOpencodeMcp } from "../../../tools/domain/formats/opencode-mcp-merge.js";
 import type { HostPluginRegistryReader } from "../../../tools/domain/ports/host-plugin-registry-reader.js";
@@ -15,14 +16,24 @@ import {
   getToolConfig,
   isAiTool,
   nativeActivationOf,
+  pluginEnablementIsMachineGlobal,
   resolvePluginsCapability,
 } from "../../../tools/domain/registry.js";
 import type { Manifest } from "../../domain/manifest.js";
 import type { InstalledPlugin } from "../../domain/plugins/installed-plugin.js";
 import type { ManifestRepository } from "../../domain/ports/manifest-repository.js";
+import type { UserSourceReferences } from "../../domain/ports/user-source-references.js";
 import { resolveCacheCandidate } from "../shared/purge-declared-cache.js";
 import { removeProjectHooks } from "../shared/remove-project-hooks.js";
 import { resolveUninstallScopeOrder } from "../shared/resolve-uninstall-scope.js";
+import {
+  describeGuardedPluginRefMessage,
+  frameworkSourceIsShared,
+  otherProjectsReferencing,
+  refAnotherProjectStillNeeds,
+  resolveProjectRootForReferences,
+  toleratingUnreadableSourceReferences,
+} from "../shared/shared-source-reference-support.js";
 import { loadPluginManifest } from "./plugin-helpers.js";
 import {
   isFrameworkPrimeFlatMcp,
@@ -51,7 +62,18 @@ export class PluginRemoveUseCase {
     private readonly hostPluginRegistries: ReadonlyMap<
       AiToolId,
       HostPluginRegistryReader
-    > = new Map()
+    > = new Map(),
+    /** The registry of projects referencing the shared machine-scope source — the same
+     * port `CleanUseCase` reads, needed here for the same guard: uninstalling a ref a
+     * host enables machine-wide (codex, copilot) would disable it for another project
+     * on this machine too. Absent for every caller that predates this, which skips the
+     * guard entirely and uninstalls as it always did. */
+    private readonly userSourceReferences?: UserSourceReferences,
+    /** Resolves the scope this project's own registry recorded for `plugin.marketplace`
+     * — the one fact `frameworkSourceIsShared` needs (`scope === "user"`) and a plugin
+     * record does not carry on its own. Absent for every caller that predates this,
+     * which treats every marketplace as not shared, same effect as above. */
+    private readonly marketplaceRegistry?: MarketplaceRegistry
   ) {}
 
   async execute(options: PluginRemoveOptions): Promise<void> {
@@ -111,6 +133,17 @@ export class PluginRemoveUseCase {
     const activator = this.activators.get(nativeActivation.binary);
     if (activator === undefined) return undefined;
     const ref = `${plugin.name}@${plugin.marketplace}`;
+    const guardMessage = await this.describeGuardedPluginRef(
+      nativeActivation.binary,
+      toolId,
+      ref,
+      plugin.marketplace,
+      projectRoot
+    );
+    if (guardMessage !== undefined) {
+      this.logger.warn(guardMessage);
+      return undefined;
+    }
     return this.uninstallViaActivator(
       activator,
       nativeActivation.binary,
@@ -119,6 +152,66 @@ export class PluginRemoveUseCase {
       plugin.scope,
       projectRoot
     );
+  }
+
+  /**
+   * The same guard `CleanUseCase` applies before uninstalling a ref, applied here for
+   * the same reason: a ref enabled through the shared, machine-scope source at a host
+   * that enables a plugin machine-wide (no `scopeArgs` — codex, copilot) must survive
+   * a `plugin remove` run in one project while another project on this machine still
+   * references that source — uninstalling it here would disable it there too.
+   *
+   * `plugin remove` never decrements `references.json` the way `clean` does (it has
+   * no claim of its own to drop), so this project's own root is still in the list
+   * `listAllReferencingProjects` returns and must be subtracted by hand — otherwise a
+   * project holding the *only* reference would read itself back as "another project"
+   * and guard a ref nothing else needs. `undefined` when nothing guards this ref, the
+   * ordinary case that still uninstalls it.
+   *
+   * `ref` here is built as `${plugin.name}@${plugin.marketplace}` — this project's own
+   * *alias* for the marketplace, not its catalog-declared `hostName` (the two can
+   * diverge, see `cli.md`'s own gotcha on that). `refAnotherProjectStillNeeds` matches
+   * `ref`'s suffix against `sharedSourceHostName`, so this call passes `marketplaceAlias`
+   * for that parameter to match — unlike `CleanUseCase.describeGuardedPluginRef`, which
+   * passes the real `hostName` because its own `ref`s come from
+   * `registrations.pluginRefs`, already keyed by `hostName`. A project whose local alias
+   * diverges from its catalog's declared name is therefore not covered by this guard —
+   * a pre-existing gap in `removeNativeActivation`'s alias handling, out of this lot's
+   * scope.
+   */
+  private async describeGuardedPluginRef(
+    binary: string,
+    toolId: AiToolId,
+    ref: string,
+    marketplaceAlias: string,
+    projectRoot: string
+  ): Promise<string | undefined> {
+    if (this.userSourceReferences === undefined) return undefined;
+    const marketplaces = (await this.marketplaceRegistry?.list(projectRoot)) ?? [];
+    const marketplace = marketplaces.find((m) => m.name === marketplaceAlias);
+    if (
+      marketplace === undefined ||
+      !frameworkSourceIsShared(marketplace.name, marketplace.scope)
+    ) {
+      return undefined;
+    }
+    const userSourceReferences = this.userSourceReferences;
+    const otherProjects = await toleratingUnreadableSourceReferences(
+      this.logger,
+      [] as readonly string[],
+      async () => {
+        const ownRoot = await resolveProjectRootForReferences(this.fs, projectRoot);
+        return otherProjectsReferencing(userSourceReferences, ownRoot);
+      }
+    );
+    const guarded = refAnotherProjectStillNeeds({
+      ref,
+      sharedSourceHostName: marketplaceAlias,
+      enablementIsMachineGlobal: pluginEnablementIsMachineGlobal(toolId),
+      otherProjects,
+    });
+    if (!guarded) return undefined;
+    return describeGuardedPluginRefMessage({ binary, ref, otherProjects });
   }
 
   /**

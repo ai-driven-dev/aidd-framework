@@ -539,7 +539,9 @@ describe("clean", () => {
         // The project-side bookkeeping this lot adds: only this project's own claim
         // is dropped, and the other project — reading the very same registry — still
         // finds the marketplace registered.
-        expect(await userSourceReferences.countReferencesForProject(OTHER_PROJECT_ROOT)).toBe(1);
+        expect(await userSourceReferences.listAllReferencingProjects()).toContain(
+          OTHER_PROJECT_ROOT
+        );
         expect((await registry.list(OTHER_PROJECT_ROOT)).map((m) => m.name)).toContain(MARKETPLACE);
       });
 
@@ -668,10 +670,10 @@ describe("clean", () => {
         expect(message).toBeDefined();
         expect(message).toContain("No project on this machine still references it");
         expect(message).toContain("aidd clean");
-        expect(await userSourceReferences.countReferencesForProject(PROJECT_ROOT)).toBeUndefined();
+        expect(await userSourceReferences.listAllReferencingProjects()).not.toContain(PROJECT_ROOT);
       });
 
-      it("names the still-live reference count in a dry-run, without dropping anything", async () => {
+      it("names the other project still referencing the shared source in a dry-run, without dropping anything", async () => {
         const manifest = seedManifestWithNativeRegistrations();
         const fs = new InMemoryFileAdapter();
         const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
@@ -705,9 +707,54 @@ describe("clean", () => {
         const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: false });
 
         expect(result.dryRun).toBe(true);
-        expect(result.preview.sharedSourceReferenceCount).toBe(2);
+        expect(result.preview.sharedSourceOtherProjects).toEqual([OTHER_PROJECT_ROOT]);
         // A dry-run must never write: both projects still hold their reference.
-        expect(await userSourceReferences.countReferencesForProject(PROJECT_ROOT)).toBe(2);
+        expect(await userSourceReferences.listAllReferencingProjects()).toEqual(
+          expect.arrayContaining([PROJECT_ROOT, OTHER_PROJECT_ROOT])
+        );
+      });
+
+      // S2 (lot 8 review): the preview used to read `countReferencesForProject`, scoped
+      // to this project's own version key alone — with the two projects synced under
+      // two different CLI versions, the other project's own claim, recorded under a
+      // key this project never touches, would never be counted at all.
+      // `listAllReferencingProjects()` reads across every key, matching what the guard
+      // and the survival warning both already act on.
+      it("names the other project in a dry-run even when the two projects were recorded under different CLI versions", async () => {
+        const manifest = seedManifestWithNativeRegistrations();
+        const fs = new InMemoryFileAdapter();
+        const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+        const activator = new FakeNativePluginActivator({ available: true });
+        const registry = new InMemoryMarketplaceRegistry();
+        await registry.save(
+          PROJECT_ROOT,
+          Marketplace.create({
+            name: MARKETPLACE,
+            source: { kind: "local", path: "/shared/built/path" },
+            scope: "user",
+            addedAt: "2026-01-01T00:00:00.000Z",
+          })
+        );
+        const userSourceReferences = seedReferences(fs, [PROJECT_ROOT, OTHER_PROJECT_ROOT]);
+        await userSourceReferences.addReference("1.0.0", PROJECT_ROOT);
+        await userSourceReferences.addReference("2.0.0", OTHER_PROJECT_ROOT);
+        const useCase = new CleanUseCase(
+          fs,
+          manifestRepo,
+          new CapturingLogger(),
+          new GitignoreUseCase(fs),
+          new Map([[BINARY, activator]]),
+          registry,
+          undefined,
+          new Map(),
+          () => "/fake-home",
+          userSourceReferences
+        );
+
+        const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: false });
+
+        expect(result.dryRun).toBe(true);
+        expect(result.preview.sharedSourceOtherProjects).toEqual([OTHER_PROJECT_ROOT]);
       });
 
       // Bloquant found in review: `clean` used to ask a `VersionReader` for "the current
@@ -754,8 +801,10 @@ describe("clean", () => {
 
         await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
 
-        expect(await userSourceReferences.countReferencesForProject(PROJECT_ROOT)).toBeUndefined();
-        expect(await userSourceReferences.countReferencesForProject(OTHER_PROJECT_ROOT)).toBe(1);
+        expect(await userSourceReferences.listAllReferencingProjects()).not.toContain(PROJECT_ROOT);
+        expect(await userSourceReferences.listAllReferencingProjects()).toContain(
+          OTHER_PROJECT_ROOT
+        );
         const message = logger.warnMessages.find((m) => m.includes("shared by every project"));
         expect(message).toBeDefined();
         expect(message).toContain("Still referenced by 1 other project on this machine.");
@@ -802,7 +851,7 @@ describe("clean", () => {
         const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: false });
 
         expect(result.dryRun).toBe(true);
-        expect(result.preview.sharedSourceReferenceCount).toBeUndefined();
+        expect(result.preview.sharedSourceOtherProjects).toBeUndefined();
         expect(logger.warnMessages.some((m) => m.includes("references.json"))).toBe(true);
       });
 

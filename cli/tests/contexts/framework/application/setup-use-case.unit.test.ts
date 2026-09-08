@@ -112,8 +112,7 @@ function makeRecordingUserSourceReferences(): UserSourceReferences & {
     addReference: vi.fn(async (version: string, projectRoot: string) => {
       added.push({ version, projectRoot });
     }),
-    removeReference: vi.fn(async () => ({ remainingCount: 0 })),
-    countReferencesForProject: vi.fn(async () => 0),
+    removeReference: vi.fn(async () => undefined),
     listAllReferencingProjects: vi.fn(async () => []),
   };
 }

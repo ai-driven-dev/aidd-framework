@@ -26,6 +26,7 @@ import type { NativePluginActivator } from "../../tools/domain/ports/native-plug
 import {
   machineLocalFilesOf,
   nativeActivationOf,
+  pluginEnablementIsMachineGlobal,
   projectHooksFileOf,
 } from "../../tools/domain/registry.js";
 import type { NativeRegistrations } from "../domain/manifest/native-registrations.js";
@@ -44,19 +45,40 @@ import {
 import { removeProjectHooks } from "./shared/remove-project-hooks.js";
 import { resolveUninstallScopeOrder } from "./shared/resolve-uninstall-scope.js";
 import {
+  describeGuardedPluginRefMessage,
   frameworkSourceIsShared,
+  otherProjectsReferencing,
+  refAnotherProjectStillNeeds,
   resolveProjectRootForReferences,
   toleratingUnreadableSourceReferences,
 } from "./shared/shared-source-reference-support.js";
 import { userScopeFilesSafeToDelete } from "./shared/user-scope-plugin-files.js";
 
 /** What dropping this project's own reference to the shared source found — `undefined`
- * when there was nothing to drop (the port is absent, or this project's own registry
- * never held the shared entry). Threaded through the whole native-undo pass so every
- * tool's own "left registered" warning can report the same, already-computed count
- * rather than each recomputing (and each decrementing) it on its own. */
+ * only when there is nothing to guard on at all: the port is absent, or this project
+ * has no shared, machine-scope marketplace registered locally. Threaded through the
+ * whole native-undo pass so every tool's own "left registered" warning, and the
+ * per-ref guard below, read the same already-computed fact rather than each
+ * recomputing (and each decrementing) it on its own.
+ *
+ * `otherProjects` is read from `listAllReferencingProjects()` — every project this
+ * file still names, across every version key, deduplicated and filtered by
+ * existence — always, regardless of whether `removeReference` found this project's
+ * own root to drop. A project whose own `references.json` entry was lost (deleted by
+ * hand, or recorded under a path a later `realpath` no longer matches) still has
+ * other projects' own claims to guard on, exactly the read
+ * `plugin-remove-use-case.ts`'s own `describeGuardedPluginRef` makes for the same
+ * reason, since it never has a claim of its own to drop at all. `resolvedRoot` is
+ * subtracted by hand either way, the same way `plugin-remove-use-case.ts` does, since
+ * `listAllReferencingProjects()` has no "except this one" parameter of its own.
+ *
+ * `alias` is this project's own local name for the shared source (`frameworkSourceIsShared`
+ * matches it, always `FRAMEWORK_MARKETPLACE_NAME`), resolved per tool into that tool's
+ * own `hostName` via `NativeRegistrations.marketplaces` — never the alias itself, which
+ * a host never learns. */
 interface SharedSourceReferenceOutcome {
-  readonly remainingCount: number;
+  readonly alias: string;
+  readonly otherProjects: readonly string[];
 }
 
 interface CleanOptions {
@@ -83,11 +105,12 @@ interface CleanPreview {
      * only known once the host's own CLI has actually run. */
     cachePaths: readonly string[];
   }>;
-  /** How many projects on this machine — this one included, nothing decremented yet —
-   * currently reference the shared source, read the same way `--force` will right
-   * before it drops this project's own claim. `undefined` when this project's own
-   * registry never held the shared entry, or the port was never wired in. */
-  sharedSourceReferenceCount?: number;
+  /** The *other* projects on this machine that reference the shared source — the same
+   * list the guard and the survival warning both act on (every version key, this
+   * project's own root excluded, a dead root dropped), read before `--force` would
+   * drop this project's own claim, never after. `undefined` when the port was never
+   * wired in, or no shared, machine-scope marketplace is registered locally. */
+  sharedSourceOtherProjects?: readonly string[];
 }
 
 interface CleanResult {
@@ -274,7 +297,8 @@ export class CleanUseCase {
         ref,
         projectRoot,
         manifest,
-        registrations
+        registrations,
+        sharedSourceOutcome
       );
     }
     const removedHostNames = new Set<string>();
@@ -354,11 +378,45 @@ export class CleanUseCase {
    * version to decide which key to touch: `removeReference` finds the project wherever
    * it is recorded, so a self-update between the `sync` that wrote the reference and
    * this `clean` cannot strand it under a version key nobody ever asks about again.
-   * `undefined` when the port was never wired in, or this project's own registry never
-   * held the shared entry to begin with. */
+   * `undefined` only when the port was never wired in, or no shared, machine-scope
+   * marketplace is registered locally at all — never merely because this project's
+   * own claim was already missing, which still leaves other projects' own claims
+   * worth guarding on (see `SharedSourceReferenceOutcome`'s own doc). */
   private async dropSharedSourceReference(
     projectRoot: string
   ): Promise<SharedSourceReferenceOutcome | undefined> {
+    return this.withSharedSourceClaims(
+      projectRoot,
+      async (userSourceReferences, alias, resolvedRoot) => {
+        // A no-op when this project's own registry never held the shared entry to begin
+        // with (deleted by hand, or recorded under a path a later `realpath` no longer
+        // matches) — which must never collapse into "no other projects": another
+        // project's own claim is a fact worth guarding on regardless of whether this
+        // project ever had one of its own, so `otherProjects` is always read from
+        // `listAllReferencingProjects()`, the same way `plugin-remove-use-case.ts`'s own
+        // `describeGuardedPluginRef` does when it has no claim of its own to drop at all.
+        await userSourceReferences.removeReference(resolvedRoot);
+        const otherProjects = await otherProjectsReferencing(userSourceReferences, resolvedRoot);
+        return { alias, otherProjects };
+      }
+    );
+  }
+
+  /** Shared preamble behind `dropSharedSourceReference` and
+   * `previewSharedSourceOtherProjects`: resolves whether a shared, machine-scope
+   * registration exists to act on at all (`undefined` when the port was never wired
+   * in, or none is registered locally), then resolves `projectRoot` through
+   * `resolveProjectRootForReferences` before handing `action` the shared alias and
+   * the resolved root. `action` alone decides whether the run only reads
+   * (`previewSharedSourceOtherProjects`) or also writes (`dropSharedSourceReference`). */
+  private async withSharedSourceClaims<T>(
+    projectRoot: string,
+    action: (
+      userSourceReferences: UserSourceReferences,
+      sharedAlias: string,
+      resolvedRoot: string
+    ) => Promise<T>
+  ): Promise<T | undefined> {
     if (this.userSourceReferences === undefined) return undefined;
     const marketplaces = (await this.marketplaceRegistry?.list(projectRoot)) ?? [];
     const shared = marketplaces.find((m) => frameworkSourceIsShared(m.name, m.scope));
@@ -366,14 +424,16 @@ export class CleanUseCase {
     const userSourceReferences = this.userSourceReferences;
     return toleratingUnreadableSourceReferences(this.logger, undefined, async () => {
       const resolvedRoot = await resolveProjectRootForReferences(this.fs, projectRoot);
-      return userSourceReferences.removeReference(resolvedRoot);
+      return action(userSourceReferences, shared.name, resolvedRoot);
     });
   }
 
-  /** What survives a shared registration this run left in place, plus — once this
-   * project's own reference has actually been dropped — either how many other projects
-   * still claim it, or, once none do, that nothing removes it yet: purging the source
-   * itself is a machine-scope decision, not this project's own `clean` to make. */
+  /** What survives a shared registration this run left in place, plus which other
+   * projects (`otherProjectsReferencing`) still claim the shared source this run just
+   * dropped this project's own reference to — empty when none do, and reported either
+   * way whether or not this project itself ever held a claim to begin with: purging
+   * the source itself is a machine-scope decision, not this project's own `clean` to
+   * make. */
   private describeSharedSourceSurvival(
     toolId: ToolId,
     hostName: string,
@@ -382,11 +442,12 @@ export class CleanUseCase {
   ): string {
     const base = `Its entry survives at userConfigDir()/marketplaces.json${this.describeSurvivingCachePath(toolId, hostName, home)}.`;
     if (outcome === undefined) return base;
-    if (outcome.remainingCount > 0) {
-      const plural = outcome.remainingCount === 1 ? "project" : "projects";
-      return `${base} Still referenced by ${outcome.remainingCount} other ${plural} on this machine.`;
+    const { otherProjects } = outcome;
+    if (otherProjects.length > 0) {
+      const plural = otherProjects.length === 1 ? "project" : "projects";
+      return `${base} Still referenced by ${otherProjects.length} other ${plural} on this machine.`;
     }
-    return `${base} No project on this machine still references it — nothing removes it yet, that is what a machine-scope \`aidd clean\` will do once it lands.`;
+    return `${base} No project on this machine still references it — \`aidd clean --scope user\` is what purges it for the machine.`;
   }
 
   /** One marketplace's own surviving cache path, the single-`hostName` counterpart to
@@ -433,8 +494,20 @@ export class CleanUseCase {
     ref: string,
     projectRoot: string,
     manifest: Manifest,
-    registrations: NativeRegistrations
+    registrations: NativeRegistrations,
+    sharedSourceOutcome: SharedSourceReferenceOutcome | undefined
   ): Promise<void> {
+    const guardMessage = this.describeGuardedPluginRef(
+      binary,
+      toolId,
+      ref,
+      registrations,
+      sharedSourceOutcome
+    );
+    if (guardMessage !== undefined) {
+      this.logger.warn(guardMessage);
+      return;
+    }
     const reader = isAiToolId(toolId) ? this.hostPluginRegistries.get(toolId) : undefined;
     const manifestScope = this.manifestScopeForRef(manifest, toolId, registrations, ref);
     const order = await resolveUninstallScopeOrder(reader, ref, projectRoot, manifestScope);
@@ -449,6 +522,34 @@ export class CleanUseCase {
       }
     }
     this.logger.warn(`${binary} plugin uninstall '${ref}' failed: ${lastMessage}`);
+  }
+
+  /** `undefined` when nothing guards `ref` — the ordinary case that still uninstalls
+   * it. Otherwise the message to warn with instead of ever calling `uninstallPlugin`:
+   * this host enables a plugin for the whole machine (no `scopeArgs` — codex,
+   * copilot), `ref` came from the shared source, and another project on this machine
+   * still references it — uninstalling it here would disable it there too. Named
+   * projects, the same fact `aidd clean --scope user`'s own confirmation prompt
+   * names, so a person reading this warning already knows what removes it for good. */
+  private describeGuardedPluginRef(
+    binary: string,
+    toolId: ToolId,
+    ref: string,
+    registrations: NativeRegistrations,
+    sharedSourceOutcome: SharedSourceReferenceOutcome | undefined
+  ): string | undefined {
+    const hostName = registrations.marketplaces.find(
+      (m) => m.alias === sharedSourceOutcome?.alias
+    )?.hostName;
+    const otherProjects = sharedSourceOutcome?.otherProjects ?? [];
+    const guarded = refAnotherProjectStillNeeds({
+      ref,
+      sharedSourceHostName: hostName,
+      enablementIsMachineGlobal: pluginEnablementIsMachineGlobal(toolId),
+      otherProjects,
+    });
+    if (!guarded) return undefined;
+    return describeGuardedPluginRefMessage({ binary, ref, otherProjects });
   }
 
   /** The scope this project's own manifest recorded for the plugin behind `ref` —
@@ -542,26 +643,23 @@ export class CleanUseCase {
     }));
     const totalFileCount = tools.reduce((s, t) => s + t.fileCount, 0);
     const nativeRegistrations = this.previewNativeRegistrations(manifest, home);
-    const sharedSourceReferenceCount = await this.previewSharedSourceReferenceCount(projectRoot);
-    return { tools, totalFileCount, nativeRegistrations, sharedSourceReferenceCount };
+    const sharedSourceOtherProjects = await this.previewSharedSourceOtherProjects(projectRoot);
+    return { tools, totalFileCount, nativeRegistrations, sharedSourceOtherProjects };
   }
 
-  /** Read-only counterpart to `dropSharedSourceReference`: names the same count a
-   * `--force` run is about to act on, without decrementing anything — a dry-run must
-   * never write, and this project's own reference is still counted here since nothing
-   * has dropped it yet. */
-  private async previewSharedSourceReferenceCount(
+  /** Read-only counterpart to `dropSharedSourceReference`: names the same "other
+   * projects" list the guard and the survival warning both act on, without dropping
+   * anything — a dry-run must never write. Reads `listAllReferencingProjects()`
+   * across every version key, this project's own root excluded — the same reason
+   * `dropSharedSourceReference` reads it this way (see its own doc) — so two projects
+   * synced under two different CLI versions see the same "other projects" fact from
+   * `aidd clean` as from `aidd clean --force`. */
+  private async previewSharedSourceOtherProjects(
     projectRoot: string
-  ): Promise<number | undefined> {
-    if (this.userSourceReferences === undefined) return undefined;
-    const marketplaces = (await this.marketplaceRegistry?.list(projectRoot)) ?? [];
-    const shared = marketplaces.find((m) => frameworkSourceIsShared(m.name, m.scope));
-    if (shared === undefined) return undefined;
-    const userSourceReferences = this.userSourceReferences;
-    return toleratingUnreadableSourceReferences(this.logger, undefined, async () => {
-      const resolvedRoot = await resolveProjectRootForReferences(this.fs, projectRoot);
-      return userSourceReferences.countReferencesForProject(resolvedRoot);
-    });
+  ): Promise<readonly string[] | undefined> {
+    return this.withSharedSourceClaims(projectRoot, (userSourceReferences, _alias, resolvedRoot) =>
+      otherProjectsReferencing(userSourceReferences, resolvedRoot)
+    );
   }
 
   private previewNativeRegistrations(

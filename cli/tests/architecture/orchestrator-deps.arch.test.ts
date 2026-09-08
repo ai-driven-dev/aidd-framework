@@ -118,9 +118,12 @@ const BASELINE: readonly { readonly path: string; readonly injected: number }[] 
     injected: 5,
   },
   { path: "src/contexts/translate/application/translate-source.ts", injected: 5 },
-  // fs, manifestRepo, logger, activators, plus the same `hostPluginRegistries` addition
-  // `clean-use-case.ts` carries, for the same reason.
-  { path: "src/contexts/framework/application/plugin/plugin-remove-use-case.ts", injected: 5 },
+  // 7: fs, manifestRepo, logger, activators, `hostPluginRegistries` (same reason
+  // `clean-use-case.ts` carries it), plus `userSourceReferences` and
+  // `marketplaceRegistry` — the shared-source guard `clean` already applies before
+  // uninstalling a ref, applied here too so `plugin remove` in one project cannot
+  // disable a plugin another project on the same machine still needs.
+  { path: "src/contexts/framework/application/plugin/plugin-remove-use-case.ts", injected: 7 },
 ];
 
 /**

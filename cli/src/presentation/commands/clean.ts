@@ -48,11 +48,10 @@ async function runProjectScopeClean(
         output.print(`    cache to purge once unregistered: ${cachePath}`);
       }
     }
-    if (result.preview.sharedSourceReferenceCount !== undefined) {
-      const count = result.preview.sharedSourceReferenceCount;
-      output.print(
-        `  aidd-framework: shared source, referenced by ${count} ${count === 1 ? "project" : "projects"} on this machine`
-      );
+    if (result.preview.sharedSourceOtherProjects !== undefined) {
+      const otherProjects = result.preview.sharedSourceOtherProjects;
+      const projects = otherProjects.length > 0 ? otherProjects.join(", ") : "no other project";
+      output.print(`  aidd-framework: shared source, still referenced by: ${projects}`);
     }
     const toolCount = result.preview.tools.length;
     if (process.stdout.isTTY) {

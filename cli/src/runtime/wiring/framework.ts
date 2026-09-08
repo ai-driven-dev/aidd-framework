@@ -216,6 +216,10 @@ export async function createDeps(
   // registry says: removal (to uninstall at the scope actually registered), clean (the
   // same), and doctor's own registration check.
   const hostPluginRegistries = hostPluginRegistryReaders();
+  // Built here, ahead of every use case that reads a shared-source claim
+  // (`pluginRemoveUseCase` first, `cleanUseCase` further below): depends only on `fs`
+  // and `userConfigDir`, neither of which distribution's own wiring produces.
+  const userSourceReferences = new UserSourceReferencesAdapter(fs, userConfigDir);
   const {
     pluginFetcher,
     marketplaceRegistry,
@@ -230,7 +234,9 @@ export async function createDeps(
     manifestRepo,
     logger,
     nativePluginActivators,
-    hostPluginRegistries
+    hostPluginRegistries,
+    userSourceReferences,
+    marketplaceRegistry
   );
   const pluginListUseCase = new PluginListUseCase(manifestRepo);
   const marketplaceRemoveUseCase = new MarketplaceRemoveUseCase(
@@ -283,7 +289,6 @@ export async function createDeps(
     currentVersionProvider,
     userConfigDir
   );
-  const userSourceReferences = new UserSourceReferencesAdapter(fs, userConfigDir);
   const marketplaceSyncSettingsUseCase = new MarketplaceSyncSettingsUseCase(
     fs,
     manifestRepo,

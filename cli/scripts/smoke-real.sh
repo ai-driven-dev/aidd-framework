@@ -415,6 +415,15 @@ cleanup() {
       fi
     fi
   fi
+  # This whole block is the shared-ref guard's negative control: $MKT is a unique
+  # per-run name, never the reserved `aidd-framework` one, so `references.json` never
+  # tracks it and no other project on this machine can ever reference it — a
+  # non-shared source is expected to be torn down in full at every host, codex
+  # included, exactly what these checks assert. The guarded path (this project's own
+  # ref left enabled because another project still references the *shared* source at
+  # a host that enables a plugin machine-wide) is covered elsewhere:
+  # `clean-shared-ref-guard.integration.test.ts` and
+  # `tests/e2e/clean-shared-ref-codex.e2e.test.ts`, never here.
   if [[ -n "${PRESENT[codex]:-}" ]]; then
     if grep -qF "\"$REF\"" "$HOME/.codex/config.toml" 2>/dev/null; then
       bad "codex: config.toml still names $REF after clean"

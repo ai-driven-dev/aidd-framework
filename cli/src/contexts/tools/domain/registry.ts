@@ -123,6 +123,21 @@ export function frameworkBuildModeFor(toolId: ToolId): FrameworkBuildMode {
 }
 
 /**
+ * Whether this tool enables a plugin for the whole machine rather than for one
+ * project alone — a tool declaring no `NativeActivation.scopeArgs` at all (codex,
+ * copilot) has nothing to tell `enablePlugin`/`uninstallPlugin` which scope to ask
+ * for, so its own CLI always acts machine-wide regardless of which scope `aidd`
+ * itself ran at. Read from the profile, never a `toolId === "codex"` branch: a tool
+ * declares, a context reads (`architecture.md`). Also `true` for a tool with no
+ * native activation at all, since `nativeActivationOf` then answers `undefined` too —
+ * never asked in practice, since a caller only reaches for this once it already knows
+ * the ref came from a tool that has one.
+ */
+export function pluginEnablementIsMachineGlobal(toolId: ToolId): boolean {
+  return nativeActivationOf(toolId)?.scopeArgs === undefined;
+}
+
+/**
  * Whether `--scope user` has anywhere to point this tool at all: either it drives its
  * own CLI machine-wide (`NativeActivation`, claude/codex/copilot), or it installs a
  * plugin's files straight into a user-scope directory (`installScope: "user"`, cursor).

@@ -71,7 +71,7 @@ describe("the shared source's own reference, recorded by sync", () => {
 
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
-    expect(await userSourceReferences.countReferencesForProject(PROJECT_ROOT)).toBe(1);
+    expect(await userSourceReferences.listAllReferencingProjects()).toContain(PROJECT_ROOT);
   });
 
   // Bloquant found in review: `references.json` is a help, not an authority — a
@@ -146,7 +146,7 @@ describe("the shared source's own reference, recorded by sync", () => {
 
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
-    expect(await userSourceReferences.countReferencesForProject(PROJECT_ROOT)).toBeUndefined();
+    expect(await userSourceReferences.listAllReferencingProjects()).not.toContain(PROJECT_ROOT);
   });
 
   // Finding 11: a clone whose committed manifest predates this machine's own copy of
@@ -191,7 +191,7 @@ describe("the shared source's own reference, recorded by sync", () => {
     expect((await registry.list(PROJECT_ROOT)).map((m) => m.name)).toContain(
       FRAMEWORK_MARKETPLACE_NAME
     );
-    expect(await userSourceReferences.countReferencesForProject(PROJECT_ROOT)).toBe(1);
+    expect(await userSourceReferences.listAllReferencingProjects()).toContain(PROJECT_ROOT);
   });
 
   it("stays a silent no-op when no recreate use case was wired in", async () => {

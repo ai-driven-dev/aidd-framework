@@ -25,13 +25,11 @@ export interface UserSourceReferences {
    * version, since the running CLI's own current version is not necessarily the one
    * this project last registered under (a self-update between `sync` and `clean` would
    * make them differ, and `addReference`'s own invariant already guarantees there is at
-   * most one to find). Reports how many other still-existing projects remain under that
-   * same version; `undefined` when `projectRoot` held no reference at all. */
-  removeReference(projectRoot: string): Promise<{ remainingCount: number } | undefined>;
-
-  /** The same count `removeReference` would report, without dropping anything — what a
-   * dry-run names before acting. `undefined` when `projectRoot` holds no reference. */
-  countReferencesForProject(projectRoot: string): Promise<number | undefined>;
+   * most one to find). A no-op when `projectRoot` held no reference at all: every
+   * caller reads "who else still references the shared source" from
+   * `listAllReferencingProjects()` afterward, never from this method's own return —
+   * see that method's doc for why. */
+  removeReference(projectRoot: string): Promise<void>;
 
   /** Every project this file still names as referencing the shared source, across
    * every version key at once — deduplicated, and, same as every other read here, a

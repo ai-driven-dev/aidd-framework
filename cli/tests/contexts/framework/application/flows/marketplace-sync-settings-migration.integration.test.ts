@@ -62,8 +62,7 @@ function noSourceReferences(
     addReference: async (version, projectRoot) => {
       added.push({ version, projectRoot });
     },
-    removeReference: async () => ({ remainingCount: 0 }),
-    countReferencesForProject: async () => 0,
+    removeReference: async () => undefined,
     listAllReferencingProjects: async () => [],
   };
 }

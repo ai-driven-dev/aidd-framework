@@ -221,8 +221,7 @@ describe("MarketplaceSyncSettingsUseCase — the activation scope a caller asks 
       addReference: async (version, projectRoot) => {
         added.push({ version, projectRoot });
       },
-      removeReference: async () => ({ remainingCount: 0 }),
-      countReferencesForProject: async () => 0,
+      removeReference: async () => undefined,
       listAllReferencingProjects: async () => [],
     };
     const useCase = new MarketplaceSyncSettingsUseCase(
@@ -254,8 +253,7 @@ describe("MarketplaceSyncSettingsUseCase — the activation scope a caller asks 
       addReference: async (version, projectRoot) => {
         added.push({ version, projectRoot });
       },
-      removeReference: async () => ({ remainingCount: 0 }),
-      countReferencesForProject: async () => 0,
+      removeReference: async () => undefined,
       listAllReferencingProjects: async () => [],
     };
     const useCase = new MarketplaceSyncSettingsUseCase(

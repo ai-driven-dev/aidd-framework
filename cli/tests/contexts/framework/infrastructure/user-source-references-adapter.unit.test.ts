@@ -18,7 +18,7 @@ function markExisting(fs: InMemoryFileAdapter, root: string): void {
 }
 
 describe("the shared source's own project references", () => {
-  it("counts two projects added under the same version", async () => {
+  it("adds two projects under the same version", async () => {
     const fs = new InMemoryFileAdapter();
     markExisting(fs, "/project-a");
     markExisting(fs, "/project-b");
@@ -27,7 +27,8 @@ describe("the shared source's own project references", () => {
     await refs.addReference("1.0.0", "/project-a");
     await refs.addReference("1.0.0", "/project-b");
 
-    expect(await refs.countReferencesForProject("/project-a")).toBe(2);
+    const written = JSON.parse(fs.getFile(REFERENCES_PATH) ?? "{}") as Record<string, string[]>;
+    expect(written["1.0.0"]).toEqual(["/project-a", "/project-b"]);
   });
 
   it("adding the same project twice changes nothing", async () => {
@@ -38,7 +39,8 @@ describe("the shared source's own project references", () => {
     await refs.addReference("1.0.0", "/project-a");
     await refs.addReference("1.0.0", "/project-a");
 
-    expect(await refs.countReferencesForProject("/project-a")).toBe(1);
+    const written = JSON.parse(fs.getFile(REFERENCES_PATH) ?? "{}") as Record<string, string[]>;
+    expect(written).toEqual({ "1.0.0": ["/project-a"] });
   });
 
   it("gives two CLI versions two separate keys", async () => {
@@ -52,8 +54,8 @@ describe("the shared source's own project references", () => {
 
     const written = JSON.parse(fs.getFile(REFERENCES_PATH) ?? "{}") as Record<string, string[]>;
     expect(Object.keys(written).sort()).toEqual(["1.0.0", "2.0.0"]);
-    expect(await refs.countReferencesForProject("/project-a")).toBe(1);
-    expect(await refs.countReferencesForProject("/project-b")).toBe(1);
+    expect(written["1.0.0"]).toEqual(["/project-a"]);
+    expect(written["2.0.0"]).toEqual(["/project-b"]);
   });
 
   // A help, not an authority: a project a person deleted with `rm -rf` decrements
@@ -64,7 +66,7 @@ describe("the shared source's own project references", () => {
 
     await refs.addReference("1.0.0", "/gone");
 
-    expect(await refs.countReferencesForProject("/gone")).toBe(0);
+    expect(await refs.listAllReferencingProjects()).toEqual([]);
   });
 
   // A help, not an authority, all the way to the file itself: a vanished project's own
@@ -105,7 +107,7 @@ describe("the shared source's own project references", () => {
   });
 
   describe("removeReference", () => {
-    it("drops this project's own claim, wherever it is recorded, and reports how many others remain", async () => {
+    it("drops this project's own claim, wherever it is recorded, leaving every other one", async () => {
       const fs = new InMemoryFileAdapter();
       markExisting(fs, "/project-a");
       markExisting(fs, "/project-b");
@@ -115,24 +117,10 @@ describe("the shared source's own project references", () => {
       await refs.addReference("1.0.0", "/project-a");
       await refs.addReference("1.0.0", "/project-b");
 
-      const outcome = await refs.removeReference("/project-a");
+      await refs.removeReference("/project-a");
 
-      expect(outcome).toEqual({ remainingCount: 1 });
-      expect(await refs.countReferencesForProject("/project-b")).toBe(1);
-    });
-
-    it("ignores a vanished project when deciding whether this was the last reference", async () => {
-      const fs = new InMemoryFileAdapter();
-      markExisting(fs, "/project-a");
-      // /project-b is never marked existing: it still names a reference, but its own
-      // directory is gone, the same as a person having `rm -rf`'d it.
-      const refs = adapter(fs);
-      await refs.addReference("1.0.0", "/project-a");
-      await refs.addReference("1.0.0", "/project-b");
-
-      const outcome = await refs.removeReference("/project-a");
-
-      expect(outcome).toEqual({ remainingCount: 0 });
+      const written = JSON.parse(fs.getFile(REFERENCES_PATH) ?? "{}") as Record<string, string[]>;
+      expect(written["1.0.0"]).toEqual(["/project-b"]);
     });
 
     it("removes the version key entirely once its last reference is gone", async () => {
@@ -147,14 +135,15 @@ describe("the shared source's own project references", () => {
       expect(written).toEqual({});
     });
 
-    it("reports undefined for a project that never held a reference", async () => {
+    it("does nothing when this project never held a reference", async () => {
       const fs = new InMemoryFileAdapter();
       markExisting(fs, "/project-a");
       const refs = adapter(fs);
 
-      const outcome = await refs.removeReference("/project-a");
-
-      expect(outcome).toBeUndefined();
+      await expect(refs.removeReference("/project-a")).resolves.toBeUndefined();
+      // Never found a claim to drop, so it never had a reason to write at all —
+      // the file this project's own `setup` or `sync` never ran stays absent.
+      expect(fs.getFile(REFERENCES_PATH)).toBeUndefined();
     });
   });
 
@@ -163,7 +152,7 @@ describe("the shared source's own project references", () => {
     fs.setFile(REFERENCES_PATH, "not json");
     const refs = adapter(fs);
 
-    await expect(refs.countReferencesForProject("/project-a")).rejects.toThrow(
+    await expect(refs.listAllReferencingProjects()).rejects.toThrow(
       UnreadableUserSourceReferencesError
     );
   });
@@ -173,7 +162,7 @@ describe("the shared source's own project references", () => {
     fs.setFile(REFERENCES_PATH, JSON.stringify({ "1.0.0": "/project-a" }));
     const refs = adapter(fs);
 
-    await expect(refs.countReferencesForProject("/project-a")).rejects.toThrow(
+    await expect(refs.listAllReferencingProjects()).rejects.toThrow(
       UnreadableUserSourceReferencesError
     );
   });

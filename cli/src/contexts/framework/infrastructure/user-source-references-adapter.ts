@@ -56,24 +56,16 @@ export class UserSourceReferencesAdapter implements UserSourceReferences {
     await this.write(next, projectRoot);
   }
 
-  async removeReference(projectRoot: string): Promise<{ remainingCount: number } | undefined> {
+  async removeReference(projectRoot: string): Promise<void> {
     const references = await this.readAll();
     const found = findVersionFor(references, projectRoot);
-    if (found === undefined) return undefined;
+    if (found === undefined) return;
     const [version, roots] = found;
     const remaining = roots.filter((root) => !samePathSegment(root, projectRoot));
     const next = { ...references };
     if (remaining.length > 0) next[version] = remaining;
     else delete next[version];
     await this.write(next);
-    return { remainingCount: await this.countExisting(remaining) };
-  }
-
-  async countReferencesForProject(projectRoot: string): Promise<number | undefined> {
-    const references = await this.readAll();
-    const found = findVersionFor(references, projectRoot);
-    if (found === undefined) return undefined;
-    return this.countExisting(found[1]);
   }
 
   async listAllReferencingProjects(): Promise<readonly string[]> {
@@ -89,14 +81,6 @@ export class UserSourceReferencesAdapter implements UserSourceReferences {
     return existing;
   }
 
-  private async countExisting(projectRoots: readonly string[]): Promise<number> {
-    let count = 0;
-    for (const root of projectRoots) {
-      if (await this.fs.fileExists(root)) count++;
-    }
-    return count;
-  }
-
   private get path(): string {
     return join(this.userConfigDir(), USER_SOURCE_REFERENCES_FILENAME);
   }
@@ -110,8 +94,9 @@ export class UserSourceReferencesAdapter implements UserSourceReferences {
 
   /** Every write is the one place a `projectRoot` that has stopped existing is purged
    * from the file entirely, not merely ignored at read time: a read already treats a
-   * vanished project as if it were not there (`countExisting`), but until this the file
-   * itself never shrank, so it grew forever and every read kept `stat`-ing dead paths.
+   * vanished project as if it were not there (`listAllReferencingProjects`'s own
+   * `fileExists` filter), but until this the file itself never shrank, so it grew
+   * forever and every read kept `stat`-ing dead paths.
    * Pruned here, once, rather than at every call site that happens to write, because the
    * file is already fully in hand by the time any caller reaches this. `protectedRoot`
    * is never pruned regardless of its own existence — `addReference` passes the root it

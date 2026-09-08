@@ -1,8 +1,10 @@
 import { UnreadableUserSourceReferencesError } from "../../../../kernel/errors.js";
+import { samePathSegment } from "../../../../kernel/paths.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { Logger } from "../../../../kernel/ports/logger.js";
 import type { MarketplaceScope } from "../../../../kernel/scope.js";
 import { FRAMEWORK_MARKETPLACE_NAME } from "../../../distribution/domain/marketplace.js";
+import type { UserSourceReferences } from "../../domain/ports/user-source-references.js";
 
 /** Whether a registration is the one shared, machine-scope source every project's own
  * `references.json` claim tracks — the reserved name at scope `"user"`, checked
@@ -12,6 +14,75 @@ import { FRAMEWORK_MARKETPLACE_NAME } from "../../../distribution/domain/marketp
  * it entirely. */
 export function frameworkSourceIsShared(name: string, scope: MarketplaceScope): boolean {
   return name === FRAMEWORK_MARKETPLACE_NAME && scope === "user";
+}
+
+/**
+ * Whether uninstalling `ref` here would take away a plugin another project on this
+ * machine still needs — the guard `clean` and `plugin remove` both apply before
+ * driving a host's own CLI to uninstall a ref, never after.
+ *
+ * True exactly when all four hold: `sharedSourceHostName` is defined (this run
+ * resolved the shared source's own hostName for this tool at all); `ref` actually
+ * came from that source (`ref.endsWith(`@${sharedSourceHostName}`)`, never the
+ * project's own local alias, which a host never learns); this host enables a plugin
+ * for the whole machine rather than this project alone
+ * (`enablementIsMachineGlobal` — codex, copilot); and at least one other project
+ * still references the shared source. Any one of the four failing means uninstalling
+ * `ref` here cannot break another project, so it proceeds as it always did.
+ */
+export function refAnotherProjectStillNeeds(input: {
+  ref: string;
+  sharedSourceHostName: string | undefined;
+  enablementIsMachineGlobal: boolean;
+  otherProjects: readonly string[];
+}): boolean {
+  const { ref, sharedSourceHostName, enablementIsMachineGlobal, otherProjects } = input;
+  if (sharedSourceHostName === undefined) return false;
+  if (!ref.endsWith(`@${sharedSourceHostName}`)) return false;
+  if (!enablementIsMachineGlobal) return false;
+  return otherProjects.length > 0;
+}
+
+/**
+ * The message both `clean` and `plugin remove` warn with instead of ever uninstalling
+ * `ref`, once `refAnotherProjectStillNeeds` says it is guarded — the two callers
+ * differ only in how they resolve `binary`, `ref` and `otherProjects` (see each
+ * caller's own `describeGuardedPluginRef`), never in the sentence itself. Names every
+ * project in `otherProjects`, singular/plural correct, and points at the one command
+ * that does remove the shared source for the machine.
+ */
+export function describeGuardedPluginRefMessage(input: {
+  binary: string;
+  ref: string;
+  otherProjects: readonly string[];
+}): string {
+  const { binary, ref, otherProjects } = input;
+  const plural = otherProjects.length === 1 ? "project" : "projects";
+  const verb = otherProjects.length === 1 ? "references" : "reference";
+  return (
+    `${binary}: '${ref}' left enabled — ${binary} enables a plugin machine-wide, and ` +
+    `${otherProjects.length} other ${plural} still ${verb} the shared source: ` +
+    `${otherProjects.join(", ")}. \`aidd clean --scope user\` is what removes it for the machine.`
+  );
+}
+
+/**
+ * Every project this file still names as referencing the shared source, minus
+ * `ownRoot` — the one denominator `clean`'s guard, its survival warning, its
+ * dry-run preview, and `plugin remove`'s own guard all read, so a project that
+ * never had a claim of its own to drop (or already dropped it) still reads the
+ * same "other projects" fact a project that just dropped one does. `ownRoot`
+ * must already be resolved (`resolveProjectRootForReferences`) — this does not
+ * resolve it itself, since a caller occasionally already has it in hand from an
+ * earlier step in the same run.
+ */
+export async function otherProjectsReferencing(
+  userSourceReferences: UserSourceReferences,
+  ownRoot: string
+): Promise<readonly string[]> {
+  return (await userSourceReferences.listAllReferencingProjects()).filter(
+    (root) => !samePathSegment(root, ownRoot)
+  );
 }
 
 /**
