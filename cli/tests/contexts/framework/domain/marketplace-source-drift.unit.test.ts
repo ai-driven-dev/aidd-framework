@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { marketplaceSourceDrift } from "../../../../src/contexts/framework/domain/marketplace-source-drift.js";
 import { userBuiltMarketplaceDir } from "../../../../src/kernel/paths.js";
@@ -67,13 +68,20 @@ describe("marketplaceSourceDrift — deciding purely from the path's own segment
   });
 
   it("is an unmigrated-foreign-project-source drift when the registered path is another project's pre-migration cache", () => {
-    const registered = "/other-project/.aidd/cache/built/aidd-framework/claude";
+    const registered = join(
+      "/other-project",
+      ".aidd",
+      "cache",
+      "built",
+      "aidd-framework",
+      "claude"
+    );
 
     const drift = marketplaceSourceDrift(registered, sharedPath("1.0.0"), DRIFT_CONTEXT);
 
     expect(drift).toEqual({
       kind: "unmigrated-foreign-project-source",
-      projectRoot: "/other-project",
+      projectRoot: join("/other-project"),
     });
   });
 

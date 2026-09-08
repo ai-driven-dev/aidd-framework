@@ -99,7 +99,10 @@ describe("TelemetryOnUseCase — the switch alone", () => {
 
   it("a gitignore write that fails leaves the switch unwritten, never enabled: true over a half-finished setup", async () => {
     const inner = new InMemoryFileAdapter({}, new DeterministicHasher());
-    const fs = new ThrowingWriteAdapter(inner, join(PROJECT_ROOT, ".gitignore"));
+    // Matches GitignoreUseCase's own construction (`${projectRoot}/.gitignore`, a literal
+    // "/" join since git always speaks forward slashes) — not `join()`, which would key this
+    // in-memory adapter's failing path differently from the one the use case actually writes.
+    const fs = new ThrowingWriteAdapter(inner, `${PROJECT_ROOT}/.gitignore`);
     const logger = new CapturingLogger();
     const useCase = new TelemetryOnUseCase(
       fs,

@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 // Side-effect imports: registering every shipped tool is what makes this suite meaningful.
 // A tool missing here would silently escape conformance, so the list must stay complete.
@@ -399,7 +400,7 @@ describe("machineLocalFilesOf()", () => {
 describe("userMachineLocalFilesOf()", () => {
   it("returns claude's user-scope settings file, absolute under the given homedir", () => {
     expect(userMachineLocalFilesOf("claude", "/home/tester")).toEqual([
-      "/home/tester/.claude/settings.json",
+      join("/home/tester", ".claude", "settings.json"),
     ]);
   });
 

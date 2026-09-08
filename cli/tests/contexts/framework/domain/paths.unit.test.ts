@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   dedupePathSegments,
@@ -63,7 +64,7 @@ describe("pathsOverlap()", () => {
 describe("userBuiltMarketplaceDir()", () => {
   it("places the version segment before the marketplace name", () => {
     expect(userBuiltMarketplaceDir("/user-cache", "5.0.0", "aidd-framework", "claude")).toBe(
-      "/user-cache/cache/built/5.0.0/aidd-framework/claude"
+      join("/user-cache", "cache", "built", "5.0.0", "aidd-framework", "claude")
     );
   });
 
@@ -82,14 +83,14 @@ describe("userBuiltCacheRoot()", () => {
     const root = userBuiltCacheRoot("/user-cache");
     const versioned = userBuiltMarketplaceDir("/user-cache", "5.0.0", "aidd-framework", "claude");
 
-    expect(root).toBe("/user-cache/cache/built");
+    expect(root).toBe(join("/user-cache", "cache", "built"));
     expect(pathContainsOrEquals(root, versioned)).toBe(true);
   });
 });
 
 describe("userManifestPath()", () => {
   it("names manifest.json directly under the user config dir, no .aidd nesting", () => {
-    expect(userManifestPath("/user-cache")).toBe("/user-cache/manifest.json");
+    expect(userManifestPath("/user-cache")).toBe(join("/user-cache", "manifest.json"));
   });
 });
 
@@ -155,15 +156,16 @@ describe("parseUserBuiltMarketplaceDir()", () => {
     expect(
       parseUserBuiltMarketplaceDir(
         "/User-Cache",
-        "/user-cache/cache/built/5.0.0/aidd-framework/claude"
+        "/user-cache/cache/built/5.0.0/aidd-framework/claude",
+        "linux"
       )
     ).toBeUndefined();
   });
 });
 
 describe("samePathSegment()", () => {
-  it("compares case-sensitively by default", () => {
-    expect(samePathSegment("aidd-framework", "AIDD-FRAMEWORK")).toBe(false);
+  it("compares case-sensitively on a case-sensitive platform", () => {
+    expect(samePathSegment("aidd-framework", "AIDD-FRAMEWORK", "linux")).toBe(false);
   });
 
   it("compares case-insensitively on win32", () => {
@@ -201,7 +203,10 @@ describe("parseBuiltMarketplaceDir()", () => {
 describe("parseBuiltMarketplaceDirAtAnyRoot()", () => {
   it("reads back the project root alongside the name and target, with no root known in advance", () => {
     expect(
-      parseBuiltMarketplaceDirAtAnyRoot("/other-project/.aidd/cache/built/aidd-framework/claude")
+      parseBuiltMarketplaceDirAtAnyRoot(
+        "/other-project/.aidd/cache/built/aidd-framework/claude",
+        "linux"
+      )
     ).toEqual({
       projectRoot: "/other-project",
       marketplaceName: "aidd-framework",
@@ -212,7 +217,8 @@ describe("parseBuiltMarketplaceDirAtAnyRoot()", () => {
   it("reads back a nested project root", () => {
     expect(
       parseBuiltMarketplaceDirAtAnyRoot(
-        "/work/repos/other-project/.aidd/cache/built/aidd-framework/codex"
+        "/work/repos/other-project/.aidd/cache/built/aidd-framework/codex",
+        "linux"
       )
     ).toEqual({
       projectRoot: "/work/repos/other-project",

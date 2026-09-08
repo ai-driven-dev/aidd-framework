@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { copilot } from "../../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
 
@@ -335,7 +336,7 @@ describe("a reference to another framework file, installed for Copilot", () => {
     it("declares where copilot's own user-scope settings file lives, for --scope user", () => {
       const activation = copilot.capabilities.plugins.nativeActivation;
       expect(activation?.userSettingsPath?.("/home/tester")).toBe(
-        "/home/tester/.copilot/settings.json"
+        join("/home/tester", ".copilot", "settings.json")
       );
     });
   });

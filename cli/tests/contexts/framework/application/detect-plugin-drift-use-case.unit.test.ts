@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 import { describe, expect, it } from "vitest";
@@ -128,7 +129,7 @@ describe("DetectPluginDriftUseCase — the manifest's recorded scope wins over t
     const drifts = await useCase.execute({ manifest, projectRoot: "/proj", toolIds: ["cursor"] });
 
     expect(drifts).toHaveLength(0);
-    expect(checkedPaths).toContain("/proj/a/one.md");
+    expect(checkedPaths).toContain(join("/proj", "a", "one.md"));
     expect(checkedPaths.some((p) => p.includes(".cursor"))).toBe(false);
   });
 

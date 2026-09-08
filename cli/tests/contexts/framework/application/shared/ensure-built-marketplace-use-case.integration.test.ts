@@ -1,5 +1,5 @@
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import type {
   ResolveMarketplace,
@@ -99,7 +99,9 @@ function fakeVersion(value: string): VersionReader {
 
 describe("builtMarketplaceDir", () => {
   it("places the per-target tree under .aidd/cache/built/<mkt>/<target>", () => {
-    expect(builtMarketplaceDir("/p", "aidd", "codex")).toBe("/p/.aidd/cache/built/aidd/codex");
+    expect(builtMarketplaceDir("/p", "aidd", "codex")).toBe(
+      join("/p", ".aidd", "cache", "built", "aidd", "codex")
+    );
   });
 });
 
@@ -433,9 +435,9 @@ describe("outDir invariant for the cache-rebuild build path", () => {
       mode: "marketplace",
     });
 
-    expect(result.builtDir.startsWith("/user-cache")).toBe(true);
+    expect(result.builtDir.startsWith(join("/user-cache"))).toBe(true);
     expect(result.builtDir.startsWith(PROJECT)).toBe(false);
-    expect(result.builtDir).toContain("/5.0.0/");
+    expect(result.builtDir).toContain(`${sep}5.0.0${sep}`);
   });
 
   // The shared source is one per CLI version: a purge of one version must never take

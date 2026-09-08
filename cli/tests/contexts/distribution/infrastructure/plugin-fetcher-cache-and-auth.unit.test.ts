@@ -8,6 +8,7 @@
  *
  * `simple-git` and `execFile` are stubbed so every clone is observed, never run.
  */
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 const mockEnvFn = vi.fn().mockReturnThis();
@@ -89,13 +90,13 @@ describe("where a fetched source lands in the cache", () => {
 
       await adapter().fetch(source, CACHE);
 
-      expect(clonedInto()).toBe(`${CACHE}/github-acme-widgets-v2`);
+      expect(clonedInto()).toBe(join(CACHE, "github-acme-widgets-v2"));
     });
 
     it("keys an unpinned repo on HEAD, not on an empty ref", async () => {
       await adapter().fetch({ kind: "github", repo: "acme/widgets" }, CACHE);
 
-      expect(clonedInto()).toBe(`${CACHE}/github-acme-widgets-HEAD`);
+      expect(clonedInto()).toBe(join(CACHE, "github-acme-widgets-HEAD"));
     });
 
     it("is handed back from the cache instead of cloned a second time", async () => {
@@ -106,7 +107,7 @@ describe("where a fetched source lands in the cache", () => {
       const result = await fetcher.fetch({ kind: "github", repo: "acme/widgets" }, CACHE);
 
       expect(mockCloneFn).not.toHaveBeenCalled();
-      expect(result).toBe(`${CACHE}/github-acme-widgets-HEAD`);
+      expect(result).toBe(join(CACHE, "github-acme-widgets-HEAD"));
     });
   });
 
@@ -114,13 +115,13 @@ describe("where a fetched source lands in the cache", () => {
     it("encodes the url and marks it HEAD when no ref is pinned", async () => {
       await adapter().fetch({ kind: "url", url: "https://example.com/repo.git" }, CACHE);
 
-      expect(clonedInto()).toBe(`${CACHE}/https___example_com_repo_git-HEAD`);
+      expect(clonedInto()).toBe(join(CACHE, "https___example_com_repo_git-HEAD"));
     });
 
     it("appends the pinned ref, so a pin does not reuse the unpinned tree", async () => {
       await adapter().fetch({ kind: "url", url: "https://example.com/repo.git", ref: "v1" }, CACHE);
 
-      expect(clonedInto()).toBe(`${CACHE}/https___example_com_repo_git-v1`);
+      expect(clonedInto()).toBe(join(CACHE, "https___example_com_repo_git-v1"));
     });
 
     it("truncates the key at 64 characters, the documented path-length guard", async () => {
@@ -147,10 +148,10 @@ describe("where a fetched source lands in the cache", () => {
         CACHE
       );
 
-      const dir = `${CACHE}/https___example_com_mono_git-subdir-packages_one-main`;
+      const dir = join(CACHE, "https___example_com_mono_git-subdir-packages_one-main");
       expect(clonedInto()).toBe(dir);
       expect(result, "the caller wants the subdirectory, not the clone root").toBe(
-        `${dir}/packages/one`
+        join(dir, "packages", "one")
       );
     });
   });
@@ -162,7 +163,7 @@ describe("where a fetched source lands in the cache", () => {
       await adapter().fetch({ kind: "url", url }, CACHE);
 
       expect(clonedInto(), "a secret must not become a filename").not.toContain("ghp_SECRET");
-      expect(clonedInto()).toBe(`${CACHE}/https___example_com_private_git-HEAD`);
+      expect(clonedInto()).toBe(join(CACHE, "https___example_com_private_git-HEAD"));
     });
 
     it("still hands the credential to git, which is what it is for", async () => {
@@ -343,7 +344,7 @@ describe("what the user is told when a clone fails", () => {
 });
 
 describe("a tree already in the cache", () => {
-  const dir = `${CACHE}/https___example_com_mono_git-subdir-packages_one-HEAD`;
+  const dir = join(CACHE, "https___example_com_mono_git-subdir-packages_one-HEAD");
   const source: PluginSource = {
     kind: "git-subdir",
     url: "https://example.com/mono.git",
@@ -363,7 +364,7 @@ describe("a tree already in the cache", () => {
     const result = await fetcher.fetch(source, CACHE);
 
     expect(mockCloneFn, "a cached tree is the whole point of the cache").not.toHaveBeenCalled();
-    expect(result).toBe(`${dir}/packages/one`);
+    expect(result).toBe(join(dir, "packages", "one"));
   });
 
   it("is kept when the caller passes no options at all", async () => {
@@ -396,7 +397,7 @@ describe("an npm package already installed in the cache", () => {
       await lastFs.fileExists(`${CACHE}/node_modules/@acme/plugin/package.json`),
       "the stale install is wiped, not installed over"
     ).toBe(false);
-    expect(result).toBe(`${CACHE}/node_modules/@acme/plugin`);
+    expect(result).toBe(join(CACHE, "node_modules", "@acme", "plugin"));
     expect(mockExecFile, "the reinstall still happens after the wipe").toHaveBeenCalledTimes(1);
   });
 
