@@ -30,6 +30,24 @@ jobs:
           configFile: commitlint.config.cjs
           commitDepth: 1
 
+      # `commitDepth: 1` above only lints the PR's head commit — not the subject a squash
+      # merge actually gives `next`, which GitHub defaults to the PR title. A PR with an
+      # invalid title but a conventional head commit passes the step above and then lands
+      # an unlintable commit anyway. Lints the title itself, through the same config, so
+      # the squash subject is checked before merge rather than after.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: github.event_name == 'pull_request'
+        with:
+          node-version: "22"
+      - name: Lint the PR title (the subject a squash merge will actually use)
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile --ignore-scripts
+          printf '%s' "$PR_TITLE" | pnpm exec commitlint --config commitlint.config.cjs
+
   release-please:
     name: Release Please
     runs-on: ubuntu-latest
@@ -136,15 +154,15 @@ jobs:
       # (+opencode, which is flat-only). Mirrors the CLI golden snapshot matrix.
       matrix:
         include:
-          - { tool: claude, mode: marketplace, flag: "" }
-          - { tool: cursor, mode: marketplace, flag: "" }
-          - { tool: copilot, mode: marketplace, flag: "" }
-          - { tool: codex, mode: marketplace, flag: "" }
-          - { tool: claude, mode: flat, flag: "--flat" }
-          - { tool: cursor, mode: flat, flag: "--flat" }
-          - { tool: copilot, mode: flat, flag: "--flat" }
-          - { tool: codex, mode: flat, flag: "--flat" }
-          - { tool: opencode, mode: flat, flag: "--flat" }
+          - { tool: claude, mode: marketplace }
+          - { tool: cursor, mode: marketplace }
+          - { tool: copilot, mode: marketplace }
+          - { tool: codex, mode: marketplace }
+          - { tool: claude, mode: flat }
+          - { tool: cursor, mode: flat }
+          - { tool: copilot, mode: flat }
+          - { tool: codex, mode: flat }
+          - { tool: opencode, mode: flat }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -152,9 +170,19 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Install pnpm
+        run: corepack enable
+
+      # Build the exact CLI this release is publishing, from this run's own checkout —
+      # no version pin at all, so nothing here can go stale the way the old
+      # `@ai-driven-dev/cli@5.1.1 framework build` pin did (that command no longer
+      # exists: `translate` replaced `framework build` and takes `--as`, not `--flat`).
+      # A published-version pin would still need bumping by hand on every CLI release;
+      # building from source removes that maintenance edge entirely.
+      - run: cd cli && pnpm install --frozen-lockfile
+      - run: cd cli && pnpm build
+
       - name: Build the target-native distribution
-        # Pin the CLI version: a future CLI release must not silently change
-        # framework dist output. Bump deliberately alongside a framework change.
         run: |
           VERSION="${{ needs.release-please.outputs.version }}"
           NAME="aidd-framework-${{ matrix.tool }}-${{ matrix.mode }}-${VERSION}"
@@ -162,8 +190,8 @@ jobs:
           # path contains the other. Stage under RUNNER_TEMP, not the repo tree.
           OUT="${RUNNER_TEMP}/dist/${{ matrix.tool }}/${{ matrix.mode }}"
           mkdir -p "$OUT"
-          npx --yes @ai-driven-dev/cli@5.1.1 framework build \
-            --source . --target ${{ matrix.tool }} --out "$OUT" ${{ matrix.flag }}
+          node cli/dist/cli.js translate . \
+            --to ${{ matrix.tool }} --out "$OUT" --as ${{ matrix.mode }}
           STAGE="$(mktemp -d)/${NAME}"
           mkdir -p "$STAGE"
           cp -R "$OUT"/. "$STAGE"/
@@ -290,7 +318,10 @@ jobs:
           registry-url: "https://registry.npmjs.org"
       - name: Publish to npm
         working-directory: cli
+        # Pinned, not @latest: this is the release path, and an npm release breaking
+        # here breaks publishing. 11.19.1 is the newest 11.x as of this pin — bump by
+        # hand; the guard test below refuses `@latest` in this file if it regresses.
         run: |
           rm -f .npmrc
-          npm install -g npm@latest
+          npm install -g npm@11.19.1
           npm publish --access public

@@ -23,6 +23,17 @@ jobs:
     env:
       LEFTHOOK_CHILD: "1"
       CI: "true"
+      # cli-ci.yml already owns these three as its cli-lint, cli-typecheck and
+      # cli-architecture jobs. Running them again here doubles cli lint/typecheck/
+      # architecture cost on every PR for no extra coverage — cli-ci.yml's jobs are
+      # unconditional, not bypassable the way local lefthook is, so nothing goes
+      # unguarded by dropping them from this invocation. cli-type-honesty is deliberately
+      # NOT excluded: cli-ci.yml runs no job for it, so this is its only CI coverage —
+      # excluding it here would silently stop gating any PR that skips local lefthook
+      # (--no-verify, a fork PR, a web edit), which is exactly what this workflow exists
+      # to catch. Everything else pre-commit owns stays too, including cli-knip/cli-test
+      # (pre-push commands, never part of this `pre-commit` invocation regardless).
+      LEFTHOOK_EXCLUDE: "cli-biome,cli-architecture,cli-typecheck"
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

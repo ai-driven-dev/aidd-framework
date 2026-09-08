@@ -54,7 +54,7 @@ Config: `release-please-config.json`, ten packages. Manifest: `.release-please-m
 
 ## Gotchas
 
-- `build-per-tool` calls the CLI at a **frozen** version, `@ai-driven-dev/cli@5.1.1`. The command it calls, `framework build`, no longer exists in the CLI; bumping the pin means rewriting the job.
+- `build-per-tool` builds the CLI from this run's own checkout (`cd cli && pnpm install && pnpm build`, then `node cli/dist/cli.js translate`) rather than pinning a published version — no version to bump, and nothing can go stale the way the old `@ai-driven-dev/cli@5.1.1 framework build` pin did once `framework build` was replaced by `translate`.
 
 ## Monitoring
 
