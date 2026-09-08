@@ -49,8 +49,11 @@ function stubAssetProvider(): AssetProvider {
 
 function makeIsDirectory(memFs: InMemoryFileAdapter): (path: string) => Promise<boolean> {
   return async (path: string): Promise<boolean> => {
-    if (memFs.has(path)) return false;
-    const prefix = path.endsWith("/") ? path : `${path}/`;
+    // The adapter keys every entry with forward slashes whatever the platform joined
+    // with, so the directory asked about is spelled the same way before the prefix test.
+    const key = path.replace(/\\/g, "/");
+    if (memFs.has(key)) return false;
+    const prefix = key.endsWith("/") ? key : `${key}/`;
     return memFs.listAll().some((k) => k.startsWith(prefix));
   };
 }
@@ -407,12 +410,12 @@ describe("outDir invariant for the cache-rebuild build path", () => {
     const cacheRoot = resolve(join(PROJECT, BUILT_CACHE_SUBDIR));
     const tmpRoot = tmpdir();
     for (const outDir of capturedOutDirs) {
-      const underCache = outDir === cacheRoot || outDir.startsWith(`${cacheRoot}/`);
-      const underTmp = outDir === tmpRoot || outDir.startsWith(`${tmpRoot}/`);
+      const underCache = outDir === cacheRoot || outDir.startsWith(`${cacheRoot}${sep}`);
+      const underTmp = outDir === tmpRoot || outDir.startsWith(`${tmpRoot}${sep}`);
       expect(underCache || underTmp).toBe(true);
     }
     // The dogfood call specifically must have gone through the temp dir, not the cache.
-    expect(capturedOutDirs[1]?.startsWith(`${tmpRoot}/`)).toBe(true);
+    expect(capturedOutDirs[1]?.startsWith(`${tmpRoot}${sep}`)).toBe(true);
   });
 
   // A user-scope marketplace is declared once for every project, so building it inside
