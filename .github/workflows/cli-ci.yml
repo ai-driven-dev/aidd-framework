@@ -371,6 +371,18 @@ jobs:
           node -e "const p=require('./scripts/__tests__/fixtures/claude-code-session-start.json'); p.cwd=process.cwd(); require('fs').writeFileSync('payload.json', JSON.stringify(p));"
           node plugins/aidd-telemetry/hooks/journal.cjs session-start < payload.json
           node plugins/aidd-telemetry/hooks/journal.cjs turn-end < payload.json
+      # `aidd telemetry check`'s "tool files readable" claim reads `sessionFound: false` as
+      # a fact worth failing on (see telemetry-claim.ts), and nothing in this chain has ever
+      # placed a transcript for the session the step above just journalled - the claude
+      # reader (`claude-transcript-location.ts`) has nowhere to find `ffde6fda-…`. Copied
+      # from an existing local-cost fixture with its own session id rewritten to match, into
+      # the exact directory `CLAUDE_CODE_TRANSCRIPT_LOCATION.root` declares under this
+      # process's own home: `resolveHomeDir()` reads `$HOME` first, which Git Bash on this
+      # runner already sets, so reading it here mirrors the read path instead of guessing at
+      # `$USERPROFILE`.
+      - name: Chain - place the transcript where claude keeps it
+        run: |
+          node -e "const fs=require('fs'),os=require('os'),path=require('path');const homeDir=process.env.HOME||os.homedir();const sessionId='ffde6fda-14a8-4b32-8110-be1f1d13eebf';const src='cli/tests/fixtures/local-cost/.claude/projects/fake-project/22222222-2222-4222-8222-222222222222.jsonl';const dir=path.join(homeDir,'.claude','projects','fake-project');fs.mkdirSync(dir,{recursive:true});const content=fs.readFileSync(src,'utf8').split('22222222-2222-4222-8222-222222222222').join(sessionId);fs.writeFileSync(path.join(dir,sessionId+'.jsonl'),content);"
       - name: Chain - the journal stays private and git add -A still works
         run: |
           git add -A
