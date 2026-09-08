@@ -177,4 +177,36 @@ describe("the shared source's own project references", () => {
       UnreadableUserSourceReferencesError
     );
   });
+
+  describe("listAllReferencingProjects", () => {
+    it("lists existing projects across every version key, deduplicated", async () => {
+      const fs = new InMemoryFileAdapter();
+      markExisting(fs, "/project-a");
+      markExisting(fs, "/project-b");
+      const refs = adapter(fs);
+      await refs.addReference("1.0.0", "/project-a");
+      await refs.addReference("2.0.0", "/project-b");
+
+      expect([...(await refs.listAllReferencingProjects())].sort()).toEqual([
+        "/project-a",
+        "/project-b",
+      ]);
+    });
+
+    it("leaves out a project whose own root no longer exists", async () => {
+      const fs = new InMemoryFileAdapter();
+      markExisting(fs, "/project-a");
+      const refs = adapter(fs);
+      await refs.addReference("1.0.0", "/project-a");
+      await refs.addReference("1.0.0", "/gone");
+
+      expect(await refs.listAllReferencingProjects()).toEqual(["/project-a"]);
+    });
+
+    it("is empty when the file has never been written", async () => {
+      const refs = adapter();
+
+      expect(await refs.listAllReferencingProjects()).toEqual([]);
+    });
+  });
 });

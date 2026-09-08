@@ -448,7 +448,7 @@
     "command": "sync --force",
     "exitCode": 0,
     "stdout": "Checking claude for files to restore...\nChecking cursor for files to restore...\nRestored 1 file(s), kept 0 file(s)\n",
-    "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\nWarning: claude: the plugin will not load until the claude CLI has run.\n",
+    "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\nWarning: This project's own pre-migration framework cache kept: a requested tool's CLI was not on PATH this run, so its own registration may still point at it — run `aidd sync` again once every tool's CLI is on PATH.\nWarning: claude: the plugin will not load until the claude CLI has run.\n",
     "filesWritten": [],
     "manifest": {
       "version": 8,
@@ -709,6 +709,44 @@
     "exitCode": 1,
     "stdout": "",
     "stderr": "Error: Invalid plugin manifest: catalog at \"<FRAMEWORK_FIXTURE>/marketplace-malformed/.claude-plugin/marketplace.json\" is malformed (not valid JSON). Fix or re-create the marketplace catalog file.\n",
+    "filesWritten": [],
+    "manifest": null
+  },
+  {
+    "command": "[user-scope-clean] setup --source local --path <FRAMEWORK_FIXTURE> --ai claude --plugins none --yes --scope user",
+    "exitCode": 0,
+    "stdout": "Fetching marketplace 'aidd-framework'...\nProject initialized.\n",
+    "stderr": "Warning: claude CLI not found on PATH — skipping native plugin activation.\n",
+    "filesWritten": [],
+    "manifest": null,
+    "userConfigFiles": ["manifest.json", "marketplaces.json"],
+    "userManifest": {
+      "version": 8,
+      "tools": {
+        "claude": {
+          "toolId": "claude",
+          "version": "<VERSION>",
+          "files": [],
+          "mergeFiles": []
+        }
+      }
+    }
+  },
+  {
+    "command": "[user-scope-clean] clean --scope user --force",
+    "exitCode": 0,
+    "stdout": "Cleaned the shared aidd-framework source for this machine\n",
+    "stderr": "",
+    "filesWritten": [],
+    "manifest": null,
+    "userConfigFiles": ["marketplaces.json"],
+    "userManifest": null
+  },
+  {
+    "command": "[user-scope-clean] doctor --scope user",
+    "exitCode": 0,
+    "stdout": "Nothing registered at user scope yet — run `aidd setup --scope user` first.\n",
+    "stderr": "",
     "filesWritten": [],
     "manifest": null
   }

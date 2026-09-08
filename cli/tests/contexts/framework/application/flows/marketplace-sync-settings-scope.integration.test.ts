@@ -223,6 +223,7 @@ describe("MarketplaceSyncSettingsUseCase — the activation scope a caller asks 
       },
       removeReference: async () => ({ remainingCount: 0 }),
       countReferencesForProject: async () => 0,
+      listAllReferencingProjects: async () => [],
     };
     const useCase = new MarketplaceSyncSettingsUseCase(
       seededBuiltCatalog(),
@@ -255,6 +256,7 @@ describe("MarketplaceSyncSettingsUseCase — the activation scope a caller asks 
       },
       removeReference: async () => ({ remainingCount: 0 }),
       countReferencesForProject: async () => 0,
+      listAllReferencingProjects: async () => [],
     };
     const useCase = new MarketplaceSyncSettingsUseCase(
       seededBuiltCatalog(),

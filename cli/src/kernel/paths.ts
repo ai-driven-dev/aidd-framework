@@ -50,6 +50,15 @@ export function builtMarketplaceDir(
   return join(projectRoot, BUILT_CACHE_SUBDIR, marketplaceName, target);
 }
 
+/** The directory every version's own built tree sits under — `clean --scope user`'s
+ * whole-source purge target, one `rm -rf` on a directory `userBuiltMarketplaceDir`
+ * always nests three segments beneath. Named once so a version-scoped path and the
+ * root that holds every version stay in sync by construction, never two separate
+ * `join` calls a future edit could drift apart. */
+export function userBuiltCacheRoot(userConfigDir: string): string {
+  return join(userConfigDir, "cache", "built");
+}
+
 /**
  * Where a user-scope marketplace's built tree lives: under the CLI's own user
  * directory, which is already the `.aidd` of the user, so the layout below it repeats
@@ -68,7 +77,7 @@ export function userBuiltMarketplaceDir(
   marketplaceName: string,
   target: string
 ): string {
-  return join(userConfigDir, "cache", "built", cliVersion, marketplaceName, target);
+  return join(userBuiltCacheRoot(userConfigDir), cliVersion, marketplaceName, target);
 }
 
 /** What `userBuiltMarketplaceDir` encoded into a path, read back. */
@@ -93,7 +102,7 @@ export function parseUserBuiltMarketplaceDir(
   path: string,
   platform: string = process.platform
 ): UserBuiltMarketplaceLocation | undefined {
-  const segments = segmentsUnder(join(userConfigDir, "cache", "built"), path, platform);
+  const segments = segmentsUnder(userBuiltCacheRoot(userConfigDir), path, platform);
   if (segments === undefined || segments.length !== 3) return undefined;
   const [version, marketplaceName, target] = segments;
   return { version, marketplaceName, target };
@@ -118,6 +127,55 @@ export function parseBuiltMarketplaceDir(
   if (segments === undefined || segments.length !== 2) return undefined;
   const [marketplaceName, target] = segments;
   return { marketplaceName, target };
+}
+
+/** What `parseBuiltMarketplaceDirAtAnyRoot` read back — `builtMarketplaceDir`'s own
+ * shape, plus the project root that produced it, since that root is exactly what
+ * `parseBuiltMarketplaceDir` needs handed to it and `parseBuiltMarketplaceDirAtAnyRoot`
+ * exists to find without one. */
+export interface AnyProjectBuiltMarketplaceLocation extends BuiltMarketplaceLocation {
+  readonly projectRoot: string;
+}
+
+/**
+ * The inverse of `builtMarketplaceDir` when the project root itself is not known in
+ * advance — recognises a *foreign* project's own pre-migration cache, the one shape
+ * `parseBuiltMarketplaceDir` cannot answer for without already being handed the root
+ * it is trying to discover. `undefined` for anything that is not exactly
+ * `<root>/.aidd/cache/built/<marketplaceName>/<target>`, root included: a marker with
+ * nothing before it names no project and is refused the same way an empty remainder
+ * already is elsewhere in this file.
+ *
+ * Segment-by-segment, like `segmentsUnder`, never index arithmetic over a
+ * case-folded string: folding a string for a win32 comparison is not guaranteed to
+ * preserve its length, so an offset found in the folded string is not safe to slice
+ * out of the original one.
+ *
+ * `projectRoot` is rejoined with `platform`'s own separator, never a hardcoded `/`:
+ * every other writer of `references.json` records a `realpath` result, which is
+ * backslash-separated on win32, and `samePathSegment`'s own case-folding compares
+ * spelling, never separators — a forward-slash root here would never equal that
+ * writer's, and the two would never be recognised as the same project again.
+ */
+export function parseBuiltMarketplaceDirAtAnyRoot(
+  path: string,
+  platform: string = process.platform
+): AnyProjectBuiltMarketplaceLocation | undefined {
+  const segments = stripTrailingSeparator(path.replace(/\\/g, "/")).split("/");
+  const marker = BUILT_CACHE_SUBDIR.replace(/\\/g, "/").split("/");
+  const markerStart = segments.length - marker.length - 2;
+  if (markerStart < 1) return undefined;
+  const candidateMarker = segments.slice(markerStart, markerStart + marker.length);
+  const markerMatches = candidateMarker.every(
+    (segment, index) =>
+      marker[index] !== undefined && samePathSegment(segment, marker[index], platform)
+  );
+  if (!markerMatches) return undefined;
+  const projectRoot = segments.slice(0, markerStart).join(platform === "win32" ? "\\" : "/");
+  if (projectRoot.length === 0) return undefined;
+  const [marketplaceName, target] = segments.slice(markerStart + marker.length);
+  if (marketplaceName === undefined || target === undefined) return undefined;
+  return { projectRoot, marketplaceName, target };
 }
 
 /** The path segments of `path` past `base`, or `undefined` when `path` does not sit

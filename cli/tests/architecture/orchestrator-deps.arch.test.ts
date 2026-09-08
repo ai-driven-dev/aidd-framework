@@ -55,6 +55,14 @@ const BASELINE: readonly { readonly path: string; readonly injected: number }[] 
   // reader per `AiToolId`, consulted before uninstalling a ref so the scope asked for
   // is the one the host actually registered it at (see `resolveUninstallScopeOrder`).
   { path: "src/contexts/framework/application/clean-use-case.ts", injected: 11 },
+  // The machine-scope counterpart of `clean-use-case.ts`, same shape and same reason:
+  // fs, the user manifest repository, logger, the marketplace registry, the user
+  // config dir resolver, activators, host marketplace registries, homedir, the shared
+  // source references port and the prompter.
+  {
+    path: "src/contexts/framework/application/clean/clean-user-scope-use-case.ts",
+    injected: 10,
+  },
   { path: "src/contexts/telemetry/application/diagnose-telemetry-use-case.ts", injected: 10 },
   {
     path: "src/contexts/framework/application/restore/restore-tool-files-use-case.ts",

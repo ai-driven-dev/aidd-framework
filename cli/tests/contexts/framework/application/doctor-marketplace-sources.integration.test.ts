@@ -379,6 +379,25 @@ describe("DoctorRegistrationUseCase — user-scope marketplace source drift", ()
     expect(issues[0]?.fix).toContain("aidd sync");
   });
 
+  it("warns naming `aidd sync` when the host still points at another project's pre-migration cache", async () => {
+    const foreignProjectCache = resolve(builtMarketplaceDir("/other-project", NAME, "claude"));
+    const hostReader = new FakeHostMarketplaceRegistryReader({
+      location: REGISTRY_LOCATION,
+      entries: new Map([[NAME, foreignProjectCache]]),
+    });
+
+    const issues = await driftIssuesFor(hostReader);
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.severity).toBe("warning");
+    expect(issues[0]?.message).toContain(foreignProjectCache);
+    // Never the wording pinned for *this* project's own cache above — a project
+    // reading its own pre-migration path back would be told the wrong story.
+    expect(issues[0]?.message).not.toContain("this project's own pre-migration cache");
+    expect(issues[0]?.message).toContain("another project's pre-migration cache");
+    expect(issues[0]?.fix).toContain("aidd sync");
+  });
+
   it("says nothing when the host already follows this exact shared version", async () => {
     const hostReader = new FakeHostMarketplaceRegistryReader({
       location: REGISTRY_LOCATION,

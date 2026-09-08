@@ -9,6 +9,7 @@ import { MarketplaceAddUseCase } from "../../contexts/distribution/application/m
 import type { MarketplaceListUseCase } from "../../contexts/distribution/application/marketplace-list-use-case.js";
 import type { MarketplaceRefreshUseCase } from "../../contexts/distribution/application/marketplace-refresh-use-case.js";
 import type { MarketplaceRegisterFrameworkUseCase } from "../../contexts/distribution/application/marketplace-register-framework-use-case.js";
+import { CleanUserScopeUseCase } from "../../contexts/framework/application/clean/clean-user-scope-use-case.js";
 import { CleanUseCase } from "../../contexts/framework/application/clean-use-case.js";
 import { DoctorLayoutUseCase } from "../../contexts/framework/application/doctor/doctor-layout-use-case.js";
 import { DoctorMergeFilesUseCase } from "../../contexts/framework/application/doctor/doctor-merge-files-use-case.js";
@@ -157,6 +158,7 @@ interface Deps extends TelemetryDeps {
   updateAiToolsUseCase: UpdateAiToolsUseCase;
   updateIdeToolsUseCase: UpdateIdeToolsUseCase;
   cleanUseCase: CleanUseCase;
+  cleanUserScopeUseCase: CleanUserScopeUseCase;
   doctorAllUseCase: DoctorAllUseCase;
   listInstalledRulesUseCase: ListInstalledRulesUseCase;
   checkUpdateUseCase: CheckUpdateUseCase;
@@ -497,6 +499,18 @@ export async function createDeps(
     userSourceReferences,
     hostPluginRegistries
   );
+  const cleanUserScopeUseCase = new CleanUserScopeUseCase(
+    fs,
+    userManifestRepo,
+    logger,
+    marketplaceRegistry,
+    userConfigDir,
+    nativePluginActivators,
+    hostMarketplaceRegistries,
+    homedir,
+    userSourceReferences,
+    prompter
+  );
   const doctorAllUseCase = new DoctorAllUseCase(doctorUseCase);
   const listInstalledRulesUseCase = new ListInstalledRulesUseCase(fs);
   const checkUpdateUseCase = new CheckUpdateUseCase(cliUpdater, currentVersionProvider, logger, fs);
@@ -556,6 +570,7 @@ export async function createDeps(
     updateAiToolsUseCase,
     updateIdeToolsUseCase,
     cleanUseCase,
+    cleanUserScopeUseCase,
     doctorAllUseCase,
     listInstalledRulesUseCase,
     checkUpdateUseCase,

@@ -27,21 +27,20 @@ import {
   machineLocalFilesOf,
   nativeActivationOf,
   projectHooksFileOf,
-  resolvePluginsCapability,
 } from "../../tools/domain/registry.js";
 import type { NativeRegistrations } from "../domain/manifest/native-registrations.js";
 import type { Manifest } from "../domain/manifest.js";
 import { aiddGitignoreEntries } from "../domain/manifest-gitignore-entries.js";
 import type { InstalledPlugin } from "../domain/plugins/installed-plugin.js";
-import { isStrictlyWithinUserScope } from "../domain/plugins/user-scope-containment.js";
 import type { ManifestRepository } from "../domain/ports/manifest-repository.js";
 import type { UserSourceReferences } from "../domain/ports/user-source-references.js";
 import type { GitignoreUseCase } from "./gitignore-use-case.js";
 import { deletePluginFilesForTool } from "./plugin/plugin-helpers.js";
+import { bestEffortNativeCall } from "./shared/best-effort-native-call.js";
 import {
-  purgeCacheIfEmptyAndConfirmed,
-  resolveCacheCandidate,
-} from "./shared/purge-declared-cache.js";
+  purgeAllNativeCaches,
+  type UndoneToolRegistrations,
+} from "./shared/purge-native-marketplace-cache.js";
 import { removeProjectHooks } from "./shared/remove-project-hooks.js";
 import { resolveUninstallScopeOrder } from "./shared/resolve-uninstall-scope.js";
 import {
@@ -49,6 +48,7 @@ import {
   resolveProjectRootForReferences,
   toleratingUnreadableSourceReferences,
 } from "./shared/shared-source-reference-support.js";
+import { userScopeFilesSafeToDelete } from "./shared/user-scope-plugin-files.js";
 
 /** What dropping this project's own reference to the shared source found — `undefined`
  * when there was nothing to drop (the port is absent, or this project's own registry
@@ -97,14 +97,9 @@ interface CleanResult {
   fileCount: number;
 }
 
-/** What `undoNativeRegistrations` learned about one tool's registrations: the full
- * record the manifest carried, and which `hostName`s `removeMarketplace` itself
- * confirmed the host forgot — a strict subset of `registrations.marketplaces` whenever
- * the host refused one. See `purgeNativeCaches`. */
-interface UndoneRegistration {
-  registrations: NativeRegistrations;
-  removedHostNames: ReadonlySet<string>;
-}
+/** What `undoNativeRegistrations` learned about one tool's registrations — the same
+ * shape `purgeAllNativeCaches` (shared with `CleanUserScopeUseCase`) reads. */
+type UndoneRegistration = UndoneToolRegistrations;
 
 export class CleanUseCase {
   constructor(
@@ -346,7 +341,8 @@ export class CleanUseCase {
       );
       return false;
     }
-    return this.bestEffort(
+    return bestEffortNativeCall(
+      this.logger,
       () => activator.removeMarketplace(hostName, marketplace.scope),
       `${binary} marketplace remove '${hostName}'`
     );
@@ -421,20 +417,6 @@ export class CleanUseCase {
     return ` Its cache survives at: ${paths.join(", ")}.`;
   }
 
-  /** Returns whether `action` actually ran to completion — `undoMarketplaceRegistration`
-   * needs that answer, not just the swallowed exception, to know which `hostName`s a
-   * cache purge may later trust as confirmed gone from the host. */
-  private bestEffort(action: () => void, label: string): boolean {
-    try {
-      action();
-      return true;
-    } catch (error) {
-      if (!(error instanceof NativePluginCliError)) throw error;
-      this.logger.warn(`${label} failed: ${error.message}`);
-      return false;
-    }
-  }
-
   /**
    * Uninstalls one plugin ref at the scope it was actually registered at — never a
    * default, and never the manifest's own recorded scope alone: `resolveUninstallScopeOrder`
@@ -496,122 +478,12 @@ export class CleanUseCase {
 
   /** For every tool `undoNativeRegistrations` actually drove — never one whose binary
    * was absent, that map holds only the tools it ran for — purges the cache its profile
-   * declares, one marketplace at a time. A tool whose profile declares no
-   * `NativeActivation.pluginCacheDir` is not looked at: `clean` invents no cache path
-   * for a tool that never named one. */
+   * declares. Delegates to `purgeAllNativeCaches`, shared with `CleanUserScopeUseCase`. */
   private async purgeNativeCaches(
     home: string,
     undone: ReadonlyMap<ToolId, UndoneRegistration>
   ): Promise<void> {
-    for (const [toolId, { registrations, removedHostNames }] of undone) {
-      if (!isAiToolId(toolId)) continue;
-      const cacheRoot = nativeActivationOf(toolId)?.pluginCacheDir?.(home);
-      if (cacheRoot === undefined) continue;
-      for (const { hostName } of registrations.marketplaces) {
-        await this.purgeOneMarketplaceCache(
-          toolId,
-          registrations.binary,
-          cacheRoot,
-          hostName,
-          removedHostNames.has(hostName)
-        );
-      }
-    }
-  }
-
-  /**
-   * `~/.claude/plugins/cache/<hostName>/` and its like are indexed by a name that is
-   * global to the machine, not to this project — a name `clean` just watched its own
-   * `undoMarketplaceRegistration` ask the host to forget, but that another project's
-   * install of the same catalog could still hold. Containment alone
-   * (`isStrictlyWithinUserScope`, both sides through `realpath`) proves the path cannot
-   * escape the declared cache root; it does not prove this project still owns what sits
-   * inside it. Two ways to prove that, one per declaration:
-   *
-   * - a profile declaring `marketplaceRegistry` (claude) is reread after the undo above:
-   *   the name gone from that registry is the host's own admission nothing there
-   *   resolves any more, and only then is the tree removed, in full;
-   * - a profile declaring `pluginCacheDir` alone, no `marketplaceRegistry` (codex),
-   *   drives a host that already deletes a marketplace's cached content on its own
-   *   `plugin remove` — measured, it leaves only the now-empty directory shell behind.
-   *   Its own emptiness is *one* of the two proofs there, cheaper than a registry this
-   *   host offers no way to reread — but emptiness alone proves no data would be lost,
-   *   never that this project is the one who emptied it. The other proof is
-   *   `removed`: whether `removeMarketplace` itself confirmed the host actually forgot
-   *   this `hostName` (see `undoToolNativeRegistrations`). Both are required.
-   *
-   * Either way, a path that fails containment, a registry that still names the tenant,
-   * or a removal this run never confirmed is left in place and named — never removed
-   * on the manifest's word alone.
-   */
-  private async purgeOneMarketplaceCache(
-    toolId: AiToolId,
-    binary: string,
-    cacheRoot: string,
-    hostName: string,
-    removed: boolean
-  ): Promise<void> {
-    const candidate = await resolveCacheCandidate(
-      this.fs,
-      this.logger,
-      cacheRoot,
-      hostName,
-      `${binary}: cache path for '${hostName}'`
-    );
-    if (candidate === null) return;
-    const reader = this.hostMarketplaceRegistries.get(toolId);
-    if (reader === undefined) {
-      await purgeCacheIfEmptyAndConfirmed(
-        this.fs,
-        this.logger,
-        candidate,
-        removed,
-        `${binary}: cache for '${hostName}'`
-      );
-      return;
-    }
-    await this.purgeOnceRegistryClears(reader, candidate, binary, hostName);
-  }
-
-  /**
-   * Fail-closed: a purge happens on exactly two answers — the registry never existed
-   * (`absent`, nothing was ever named there) or it exists and no longer names this
-   * `hostName`. Anything else — still naming it, or the registry itself could not be
-   * read or parsed (`unreadable`) — keeps the cache and names why, never guessing a
-   * purge is safe from a reading this reader will not vouch for.
-   */
-  private async purgeOnceRegistryClears(
-    reader: HostMarketplaceRegistryReader,
-    candidate: string,
-    binary: string,
-    hostName: string
-  ): Promise<void> {
-    const reading = await reader.read();
-    if (reading.absent === true) {
-      await this.purgeCache(candidate, binary, hostName);
-      return;
-    }
-    if (reading.entries !== undefined) {
-      if (reading.entries.has(hostName)) {
-        this.logger.warn(
-          `${binary}: cache for '${hostName}' left in place, ${reading.location} still names it: ${candidate}`
-        );
-        return;
-      }
-      await this.purgeCache(candidate, binary, hostName);
-      return;
-    }
-    this.logger.warn(
-      `${binary}: plugin cache left in place, its registry could not be read: ${reading.location}`
-    );
-  }
-
-  /** The one place `clean` actually deletes a cache directory, so the `--force` line
-   * announcing it — the post-condition the dry-run's own "cache to purge once
-   * unregistered" preview only forecasts — is printed from exactly one call site. */
-  private async purgeCache(candidate: string, binary: string, hostName: string): Promise<void> {
-    await this.fs.deleteDirectory(candidate);
-    this.logger.info(`${binary}: cache for '${hostName}' purged: ${candidate}`);
+    await purgeAllNativeCaches(this.fs, this.logger, home, this.hostMarketplaceRegistries, undone);
   }
 
   // ── Machine-local files a tool's own materialization writes, outside the manifest ──
@@ -763,49 +635,17 @@ export class CleanUseCase {
     return count;
   }
 
-  /**
-   * For a project-scope plugin, every tracked file is safe: it lives under
-   * `projectRoot`, which `clean` is already trusted with. For a user-scope plugin
-   * (Cursor's `~/.cursor/plugins/local/<plugin>`), a file is safe only once its real,
-   * resolved location — after every symlink and `..` segment is followed — still sits
-   * strictly inside the tool's own declared user-scope directory. A `..` segment a
-   * corrupted manifest entry carries, or a plugin directory that became a symlink after
-   * install, both fail this and are left in place with a name and a reason rather than
-   * silently deleted or silently kept.
-   */
+  /** For a project-scope plugin, every tracked file is safe: it lives under
+   * `projectRoot`, which `clean` is already trusted with. A user-scope plugin's own
+   * files are checked by `userScopeFilesSafeToDelete`, shared with
+   * `CleanUserScopeUseCase` — see its own doc comment for why a raw path comparison
+   * would miss both a `..` segment and a symlink escape. */
   private async filesSafeToDelete(
     plugin: InstalledPlugin,
     toolId: AiToolId
   ): Promise<ReadonlyMap<string, string>> {
     if (plugin.scope !== "user") return plugin.files;
-    const boundary = resolvePluginsCapability(toolId)?.userPluginsBaseDir(this.homeDir());
-    if (boundary === null || boundary === undefined) return new Map();
-    const resolvedBoundary = await this.tryRealpath(boundary);
-    if (resolvedBoundary === null) return new Map();
-    const allowed = new Map<string, string>();
-    for (const [relativePath, hash] of plugin.files) {
-      const resolvedCandidate = await this.tryRealpath(join(boundary, relativePath));
-      if (
-        resolvedCandidate !== null &&
-        isStrictlyWithinUserScope(resolvedCandidate, resolvedBoundary)
-      ) {
-        allowed.set(relativePath, hash);
-        continue;
-      }
-      this.logger.warn(
-        `${toolId}: '${plugin.name}' file '${relativePath}' does not resolve inside ${boundary}; left in place.`
-      );
-    }
-    return allowed;
-  }
-
-  private async tryRealpath(path: string): Promise<string | null> {
-    try {
-      return await this.fs.realpath(path);
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
-      throw err;
-    }
+    return userScopeFilesSafeToDelete(this.fs, this.logger, plugin, toolId, this.homeDir());
   }
 
   private async cleanMergeFileKeys(

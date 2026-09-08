@@ -32,4 +32,12 @@ export interface UserSourceReferences {
   /** The same count `removeReference` would report, without dropping anything — what a
    * dry-run names before acting. `undefined` when `projectRoot` holds no reference. */
   countReferencesForProject(projectRoot: string): Promise<number | undefined>;
+
+  /** Every project this file still names as referencing the shared source, across
+   * every version key at once — deduplicated, and, same as every other read here, a
+   * `projectRoot` that no longer exists is left out rather than counted as still live.
+   * What `clean --scope user`'s own confirmation names before it purges the source out
+   * from under every project this lists: the one read with no single `projectRoot` of
+   * its own to key off, unlike every other method on this port. */
+  listAllReferencingProjects(): Promise<readonly string[]>;
 }

@@ -66,6 +66,17 @@ describe("marketplaceSourceDrift — deciding purely from the path's own segment
     expect(drift).toEqual({ kind: "unmigrated-project-source" });
   });
 
+  it("is an unmigrated-foreign-project-source drift when the registered path is another project's pre-migration cache", () => {
+    const registered = "/other-project/.aidd/cache/built/aidd-framework/claude";
+
+    const drift = marketplaceSourceDrift(registered, sharedPath("1.0.0"), DRIFT_CONTEXT);
+
+    expect(drift).toEqual({
+      kind: "unmigrated-foreign-project-source",
+      projectRoot: "/other-project",
+    });
+  });
+
   it("is undefined when the requested path is not the shared user-scope shape at all", () => {
     expect(
       marketplaceSourceDrift(sharedPath("2.0.0"), "/some/other/path", DRIFT_CONTEXT)

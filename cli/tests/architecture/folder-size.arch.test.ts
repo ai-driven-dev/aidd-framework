@@ -79,6 +79,20 @@ const BASELINE: readonly { readonly path: string; readonly count: number }[] = [
   // fact about aidd's own migration, which belongs in `framework`, not `tools`
   // (bloquant 12, `architecture.md`'s "concern decides placement" rule).
   { path: "src/contexts/framework/domain", count: 11 },
+
+  // Thirteen since `best-effort-native-call.ts`, `purge-native-marketplace-cache.ts`
+  // and `user-scope-plugin-files.ts` joined `purge-declared-cache.ts`: all four have
+  // callers in exactly two areas, `clean-use-case.ts` (project scope) and
+  // `clean/clean-user-scope-use-case.ts` (machine scope), which is what
+  // `earned-sharing.arch.test.ts` means by earned — a `clean/`-only home passed that
+  // rule by sitting outside the directory it judges, not by satisfying it. No existing
+  // grouping here fits three native-cache/host-CLI helpers: `apply-plugin-files-use-case.ts`
+  // and `ensure-built-marketplace-use-case.ts` are file-materialization use cases,
+  // `resolve-uninstall-scope.ts` and `remove-project-hooks.ts` are `plugin remove`'s own
+  // steps, `shared-source-reference-support.ts` and `host-marketplace-source-conflict.ts`
+  // read a different port each — moving one out to make room would be exactly the
+  // shuffle this rule refuses.
+  { path: "src/contexts/framework/application/shared", count: 13 },
 ];
 
 /** Direct `.ts` files per parent directory — a subfolder counts toward itself, not its parent. */

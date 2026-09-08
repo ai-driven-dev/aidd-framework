@@ -1,5 +1,6 @@
 import {
   parseBuiltMarketplaceDir,
+  parseBuiltMarketplaceDirAtAnyRoot,
   parseUserBuiltMarketplaceDir,
   samePathSegment,
 } from "../../../kernel/paths.js";
@@ -33,6 +34,17 @@ export type MarketplaceSourceDrift =
       /** The host still points at this project's own pre-migration, per-project
        * cache rather than the shared, machine-scope one `requestedSource` names. */
       readonly kind: "unmigrated-project-source";
+    }
+  | {
+      /** The host still points at *another* project's own pre-migration, per-project
+       * cache — the same shape as `unmigrated-project-source`, but for a project this
+       * run does not own, discovered from the registered path's own segments alone
+       * (`kernel/paths.ts`'s `parseBuiltMarketplaceDirAtAnyRoot`). A caller that can
+       * write `references.json` uses `projectRoot` to record that project's own claim
+       * on the shared source too, since migrating the host's registration away from
+       * its cache is exactly what this run's own build is about to do. */
+      readonly kind: "unmigrated-foreign-project-source";
+      readonly projectRoot: string;
     };
 
 /**
@@ -90,6 +102,18 @@ export function marketplaceSourceDrift(
     samePathSegment(registeredProject.target, context.target)
   ) {
     return { kind: "unmigrated-project-source" };
+  }
+  const registeredForeign = parseBuiltMarketplaceDirAtAnyRoot(registeredSource);
+  if (
+    registeredForeign !== undefined &&
+    samePathSegment(registeredForeign.marketplaceName, context.marketplaceName) &&
+    samePathSegment(registeredForeign.target, context.target) &&
+    !samePathSegment(registeredForeign.projectRoot, context.projectRoot)
+  ) {
+    return {
+      kind: "unmigrated-foreign-project-source",
+      projectRoot: registeredForeign.projectRoot,
+    };
   }
   return undefined;
 }

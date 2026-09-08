@@ -391,6 +391,53 @@ async function captureMatrix(projectDir: string, fakeHome: string): Promise<Comm
 }
 
 /**
+ * `clean --scope user`, in a project of its own: a plain `setup` already registers
+ * `aidd-framework` at user scope too (architecture.md — the shared entry is always
+ * scope `"user"`, project-scope `setup` included), so running this inside the main
+ * matrix would purge the very entry every step after the first `setup` call in it
+ * still depends on. `captureUserConfig` on both commands is what shows the shared
+ * source's own lifecycle: `manifest.json` and the `aidd-framework` entry appearing,
+ * then gone — `cache/built/` never appears in this sandbox at all, the same absent-
+ * binary reason `clean-scope-user.e2e.test.ts` seeds a fixture for; a golden capture
+ * asserts the shape a real round-trip leaves, not that one happened.
+ */
+async function captureUserScopeClean(
+  projectDir: string,
+  fakeHome: string
+): Promise<CommandEntry[]> {
+  const entries: CommandEntry[] = [];
+  const capture = async (
+    args: string[],
+    options?: { captureUserConfig?: boolean }
+  ): Promise<void> => {
+    const entry = await captureCommand(args, projectDir, fakeHome, options);
+    entries.push({ ...entry, command: `[user-scope-clean] ${entry.command}` });
+  };
+
+  await capture(
+    [
+      "setup",
+      "--source",
+      "local",
+      "--path",
+      FRAMEWORK_FIXTURE,
+      "--ai",
+      "claude",
+      "--plugins",
+      "none",
+      "--yes",
+      "--scope",
+      "user",
+    ],
+    { captureUserConfig: true }
+  );
+  await capture(["clean", "--scope", "user", "--force"], { captureUserConfig: true });
+  await capture(["doctor", "--scope", "user"]);
+
+  return entries;
+}
+
+/**
  * Error paths, in a project of their own because `clean --force` ends the main one.
  * Each entry is prefixed so both scenarios can share one snapshot file.
  */
@@ -428,11 +475,17 @@ async function captureErrors(projectDir: string, fakeHome: string): Promise<Comm
 async function captureAll(projectDir: string, fakeHome: string): Promise<CommandEntry[]> {
   const main = await captureMatrix(projectDir, fakeHome);
   const errorEnv = await createTestEnv("golden-errors");
+  const userScopeCleanEnv = await createTestEnv("golden-user-scope-clean");
   try {
     const errors = await captureErrors(errorEnv.projectDir, errorEnv.fakeHome);
-    return [...main, ...errors];
+    const userScopeClean = await captureUserScopeClean(
+      userScopeCleanEnv.projectDir,
+      userScopeCleanEnv.fakeHome
+    );
+    return [...main, ...errors, ...userScopeClean];
   } finally {
     await errorEnv.cleanup();
+    await userScopeCleanEnv.cleanup();
   }
 }
 

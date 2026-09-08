@@ -76,6 +76,19 @@ export class UserSourceReferencesAdapter implements UserSourceReferences {
     return this.countExisting(found[1]);
   }
 
+  async listAllReferencingProjects(): Promise<readonly string[]> {
+    const references = await this.readAll();
+    const seen = new Set<string>();
+    for (const roots of Object.values(references)) {
+      for (const root of roots) seen.add(root);
+    }
+    const existing: string[] = [];
+    for (const root of seen) {
+      if (await this.fs.fileExists(root)) existing.push(root);
+    }
+    return existing;
+  }
+
   private async countExisting(projectRoots: readonly string[]): Promise<number> {
     let count = 0;
     for (const root of projectRoots) {

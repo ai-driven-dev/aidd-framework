@@ -13,6 +13,7 @@ src/
 │   │   └── infrastructure/
 │   ├── framework/    # the installation record and everything done to a project
 │   │   ├── application/
+│   │   │   ├── clean/
 │   │   │   ├── doctor/
 │   │   │   ├── flows/
 │   │   │   ├── framework/

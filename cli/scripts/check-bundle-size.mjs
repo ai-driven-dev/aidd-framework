@@ -68,6 +68,14 @@ const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 // separates the two, for the same reason 610's own entry gives; a future raise from
 // 625 is the number to measure a next lot's own delta against. 625 leaves ~2.0 %
 // headroom over the measured 612.56 KB.
+// 641 was set 2026-09-07 with two lots landing together in the same worktree: `clean
+// --scope user` (the machine-scope purge, its whitelist and confirmation) and `sync`
+// migrating a project installed before the shared source existed (the foreign-project
+// drift kind, codex/copilot's own reclaim of the reserved name, and the stale-cache
+// purge). Measured 628.26 KB — same reasoning as 610 and 625 before it: no control
+// build isolates either lot's own delta from the other's, since both changed in the
+// same working tree at once; a future raise from 641 is the number to measure the next
+// lot's own delta against. 641 leaves ~2.0 % headroom over the measured 628.26 KB.
 const budgetKB = pkg.bundleBudgetKB ?? 500;
 const budgetBytes = budgetKB * 1024;
 

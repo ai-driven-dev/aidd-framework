@@ -27,7 +27,7 @@
   {
     "invocation": "aidd clean",
     "exitCode": 0,
-    "help": "Usage: aidd clean [options]\n\nRemove all AIDD-managed files from the project — retires every part of AIDD; see\n`framework remove`, which removes the framework only\n\nOptions:\n  --force     Confirm file removal (skip dry-run) (default: false)\n  -h, --help  display help for command"
+    "help": "Usage: aidd clean [options]\n\nRemove all AIDD-managed files from the project — retires every part of AIDD; see\n`framework remove`, which removes the framework only\n\nOptions:\n  --force          Confirm file removal (skip dry-run) (default: false)\n  --scope <scope>  project (default) cleans this project alone; user undoes the\n                   machine-wide registration setup --scope user wrote and purges\n                   the shared source itself\n  -h, --help       display help for command"
   },
   {
     "invocation": "aidd doctor",

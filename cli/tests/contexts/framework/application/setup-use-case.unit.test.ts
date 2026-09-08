@@ -114,6 +114,7 @@ function makeRecordingUserSourceReferences(): UserSourceReferences & {
     }),
     removeReference: vi.fn(async () => ({ remainingCount: 0 })),
     countReferencesForProject: vi.fn(async () => 0),
+    listAllReferencingProjects: vi.fn(async () => []),
   };
 }
 

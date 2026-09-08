@@ -3,7 +3,10 @@ import { builtMarketplaceDir, userBuiltMarketplaceDir } from "../../../../kernel
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { VersionReader } from "../../../../kernel/ports/version-reader.js";
 import { type AiToolId, isAiToolId, type ToolId } from "../../../../kernel/tool.js";
-import type { Marketplace } from "../../../distribution/domain/marketplace.js";
+import {
+  FRAMEWORK_MARKETPLACE_NAME,
+  type Marketplace,
+} from "../../../distribution/domain/marketplace.js";
 import type { MarketplaceRegistry } from "../../../distribution/domain/ports/marketplace-registry.js";
 import { answeredRegistry } from "../../../tools/domain/host-plugin-registration.js";
 import type { MarketplaceSettings } from "../../../tools/domain/marketplace-settings.js";
@@ -191,6 +194,13 @@ export class DoctorRegistrationUseCase {
         fix: "Run `aidd update` to bring this project's CLI to at least the version the host already follows.",
       };
     }
+    if (drift.kind === "unmigrated-foreign-project-source") {
+      return {
+        severity: "warning",
+        message: `${toolId}'s marketplace registry (${found.location}) still carries '${found.name}' from another project's pre-migration cache (${found.registeredSource})`,
+        fix: "Run `aidd sync` to move it to the shared, machine-scope source.",
+      };
+    }
     return {
       severity: "warning",
       message: `${toolId}'s marketplace registry (${found.location}) still carries '${found.name}' from this project's own pre-migration cache (${found.registeredSource})`,
@@ -198,16 +208,28 @@ export class DoctorRegistrationUseCase {
     };
   }
 
-  /** Where this project's build of `marketplace` for `toolId` would land, resolved —
+  /**
+   * Where this project's build of `marketplace` for `toolId` would land, resolved —
    * `undefined` when nothing resolves there, which means either it was never built or
-   * it no longer exists, neither of which is a fact this check may turn into a conflict. */
+   * it no longer exists, neither of which is a fact this check may turn into a conflict.
+   *
+   * The reserved framework name always resolves to the shared, machine-scope path,
+   * never the project-scope one — even when the registry itself still records
+   * `scope: "project"`, the exact pre-migration state `aidd sync` has not yet fixed.
+   * A project-scope record for this one name is not a fact to honour here: honouring
+   * it would compute the project path as "expected", which the host's own registration
+   * already matches for a project that has never run `setup`/`sync` since the shared
+   * source existed — and doctor would report nothing wrong at all, in the one state it
+   * most needs to name. Every other marketplace still resolves by its own recorded
+   * `scope`, unaffected.
+   */
   private async resolvedBuiltDir(
     projectRoot: string,
     marketplace: Marketplace,
     toolId: AiToolId
   ): Promise<string | undefined> {
     const raw =
-      marketplace.scope === "user"
+      marketplace.scope === "user" || marketplace.name === FRAMEWORK_MARKETPLACE_NAME
         ? userBuiltMarketplaceDir(
             this.userCacheRoot(),
             this.currentVersion.get(),

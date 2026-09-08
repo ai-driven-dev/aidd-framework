@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   parseBuiltMarketplaceDir,
+  parseBuiltMarketplaceDirAtAnyRoot,
   parseUserBuiltMarketplaceDir,
   pathContainsOrEquals,
   pathsOverlap,
   samePathSegment,
+  userBuiltCacheRoot,
   userBuiltMarketplaceDir,
   userManifestPath,
 } from "../../../../src/kernel/paths.js";
@@ -71,6 +73,16 @@ describe("userBuiltMarketplaceDir()", () => {
     expect(v1).not.toBe(v2);
     expect(pathContainsOrEquals(v1, v2)).toBe(false);
     expect(pathContainsOrEquals(v2, v1)).toBe(false);
+  });
+});
+
+describe("userBuiltCacheRoot()", () => {
+  it("is the parent every version directory sits under, one join above the version", () => {
+    const root = userBuiltCacheRoot("/user-cache");
+    const versioned = userBuiltMarketplaceDir("/user-cache", "5.0.0", "aidd-framework", "claude");
+
+    expect(root).toBe("/user-cache/cache/built");
+    expect(pathContainsOrEquals(root, versioned)).toBe(true);
   });
 });
 
@@ -172,5 +184,83 @@ describe("parseBuiltMarketplaceDir()", () => {
     expect(
       parseBuiltMarketplaceDir("/proj", "/other/.aidd/cache/built/aidd-framework/claude")
     ).toBeUndefined();
+  });
+});
+
+describe("parseBuiltMarketplaceDirAtAnyRoot()", () => {
+  it("reads back the project root alongside the name and target, with no root known in advance", () => {
+    expect(
+      parseBuiltMarketplaceDirAtAnyRoot("/other-project/.aidd/cache/built/aidd-framework/claude")
+    ).toEqual({
+      projectRoot: "/other-project",
+      marketplaceName: "aidd-framework",
+      target: "claude",
+    });
+  });
+
+  it("reads back a nested project root", () => {
+    expect(
+      parseBuiltMarketplaceDirAtAnyRoot(
+        "/work/repos/other-project/.aidd/cache/built/aidd-framework/codex"
+      )
+    ).toEqual({
+      projectRoot: "/work/repos/other-project",
+      marketplaceName: "aidd-framework",
+      target: "codex",
+    });
+  });
+
+  it("is undefined for a path that never carries the built-cache shape at all", () => {
+    expect(parseBuiltMarketplaceDirAtAnyRoot("/completely/unrelated/src")).toBeUndefined();
+  });
+
+  it("is undefined for a path with nothing before the marker — no project root to report", () => {
+    expect(
+      parseBuiltMarketplaceDirAtAnyRoot("/.aidd/cache/built/aidd-framework/claude")
+    ).toBeUndefined();
+  });
+
+  it("compares the marker's own segments case-insensitively on win32", () => {
+    expect(
+      parseBuiltMarketplaceDirAtAnyRoot(
+        "C:\\other-project\\.AIDD\\CACHE\\BUILT\\aidd-framework\\claude",
+        "win32"
+      )
+    ).toEqual({
+      projectRoot: "C:\\other-project",
+      marketplaceName: "aidd-framework",
+      target: "claude",
+    });
+  });
+
+  // Every other writer of `references.json` records a `realpath` result, which is
+  // backslash-separated on win32 — a forward-slash `projectRoot` here would never
+  // compare equal to one of those (`samePathSegment` folds case, never separators),
+  // so a foreign project's own claim on the shared source would never be recognised
+  // as the same project twice (#lot-6-S5).
+  it("keeps the platform's own separator in the returned project root on win32", () => {
+    expect(
+      parseBuiltMarketplaceDirAtAnyRoot(
+        "C:\\proj\\.aidd\\cache\\built\\aidd-framework\\claude",
+        "win32"
+      )
+    ).toEqual({
+      projectRoot: "C:\\proj",
+      marketplaceName: "aidd-framework",
+      target: "claude",
+    });
+  });
+
+  it("reads back a nested win32 project root with backslashes throughout", () => {
+    expect(
+      parseBuiltMarketplaceDirAtAnyRoot(
+        "C:\\work\\repos\\other-project\\.aidd\\cache\\built\\aidd-framework\\codex",
+        "win32"
+      )
+    ).toEqual({
+      projectRoot: "C:\\work\\repos\\other-project",
+      marketplaceName: "aidd-framework",
+      target: "codex",
+    });
   });
 });

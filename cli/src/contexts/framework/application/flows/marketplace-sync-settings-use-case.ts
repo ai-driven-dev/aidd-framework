@@ -1,9 +1,10 @@
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import {
   MarketplaceSourceConflictError,
   NativePluginCliError,
   UnreadableBuiltCatalogError,
 } from "../../../../kernel/errors.js";
+import { BUILT_CACHE_SUBDIR } from "../../../../kernel/paths.js";
 import type { FileReader } from "../../../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../../../kernel/ports/file-writer.js";
 import type { Hasher } from "../../../../kernel/ports/hasher.js";
@@ -12,7 +13,10 @@ import type { VersionReader } from "../../../../kernel/ports/version-reader.js";
 import type { MarketplaceScope } from "../../../../kernel/scope.js";
 import { type AiToolId, isAiToolId, type ToolId } from "../../../../kernel/tool.js";
 import type { MarketplaceRegisterFramework } from "../../../distribution/application/marketplace-register-framework-use-case.js";
-import type { Marketplace } from "../../../distribution/domain/marketplace.js";
+import {
+  FRAMEWORK_MARKETPLACE_NAME,
+  type Marketplace,
+} from "../../../distribution/domain/marketplace.js";
 import type { MarketplaceRegistry } from "../../../distribution/domain/ports/marketplace-registry.js";
 import type { MarketplaceSettings } from "../../../tools/domain/marketplace-settings.js";
 import {
@@ -37,6 +41,7 @@ import {
   isDriftFound,
   type MarketplaceSourceDriftFound,
 } from "../shared/host-marketplace-source-conflict.js";
+import { resolveCacheCandidate } from "../shared/purge-declared-cache.js";
 import {
   marketplaceCatalogProbePath,
   readMarketplaceCatalogIdentity,
@@ -97,6 +102,9 @@ export interface MarketplaceSyncSettingsOptions {
 interface ActivationOutcome {
   marketplaces: readonly NativeMarketplaceRegistration[];
   pluginRefs: readonly string[];
+  /** A marketplace whose build failed was warned about and left unregistered this run —
+   * the host's own registration for it is wherever it was before. */
+  buildFailed: boolean;
 }
 
 /** What activation did, per tool — the fact `execute` used to throw away by returning
@@ -218,6 +226,9 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     ]);
     const wroteRegistrations = this.recordNativeRegistrations(manifest, activation.outcomes);
     if (wroteHashes || wroteRegistrations) await manifestRepo.save(manifest);
+    if (options.recreateFrameworkIfMissing === true && scope === "project") {
+      await this.purgeStaleProjectCache(projectRoot, marketplaces, activation);
+    }
     return {
       activated: [...activation.outcomes.keys()],
       binaryMissing: activation.binaryMissing,
@@ -241,15 +252,87 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
    * refresh`, `plugin install | remove | update`) is reading a person's own deliberate
    * choice to have no marketplace at all, not a fresh clone's missing copy, and must
    * see that choice reflected back, not silently overwritten.
+   *
+   * Also the one place `sync` migrates a project installed *before* the shared source
+   * existed: a project-scope `aidd-framework` entry is retired to the machine-scope
+   * one the same way `setup` already does on every run
+   * (`SetupMarketplaceRegistrationUseCase`), rather than only when the registry is
+   * empty outright. Its own `pluginSource` is carried forward from the entry being
+   * migrated — never left to `MarketplaceRegisterFrameworkUseCase`'s own default,
+   * which is `{ kind: "local", path: "." }` and would silently replace a project
+   * installed from GitHub or a custom path with the wrong source.
    */
   private async ensureFrameworkRegistered(
     projectRoot: string,
     marketplaces: readonly Marketplace[]
   ): Promise<readonly Marketplace[]> {
-    if (marketplaces.length > 0) return marketplaces;
+    const framework = marketplaces.find((m) => m.name === FRAMEWORK_MARKETPLACE_NAME);
+    if (marketplaces.length > 0 && framework?.scope !== "project") return marketplaces;
     if (this.marketplaceRegisterFrameworkUseCase === undefined) return marketplaces;
-    await this.marketplaceRegisterFrameworkUseCase.execute({ projectRoot });
+    await this.marketplaceRegisterFrameworkUseCase.execute({
+      projectRoot,
+      pluginSource: framework?.source,
+    });
     return this.marketplaceRegistry.list(projectRoot);
+  }
+
+  /**
+   * Deletes this project's own `.aidd/cache/built/aidd-framework/` once the shared
+   * source has taken its place — the last step of the migration `ensureFrameworkRegistered`
+   * starts, never run before every tool's own native activation has had a chance to
+   * read the tree it is unregistering from (a host's own CLI needs that tree to still
+   * exist to resolve what it is undoing, `aidd_docs/memory/cli.md`'s own measured
+   * fact about `clean`'s ordering, which applies here for the same reason).
+   *
+   * Gated on `activateNativeTools` reporting no `errors` at all, on every requested
+   * tool's own registration having actually been driven this run — a binary off `PATH`
+   * (`binaryMissing`) or a build that failed (`ActivationOutcome.buildFailed`) both leave
+   * a host registry that may still name this project's own pre-migration tree, and
+   * purging it out from under that dangling registration is exactly the hazard this
+   * gate exists to avoid — and on the framework marketplace resolving to the shared,
+   * machine-scope source at the end of this run. `guardAgainstConflict`'s own
+   * `version-behind` skip is not such a gap: that host already follows a newer shared
+   * build, which is never this project's cache.
+   *
+   * `resolveCacheCandidate` is the same whitelist `clean`'s own cache purge uses:
+   * `realpath` both sides, refuse anything that does not resolve strictly inside
+   * `projectRoot`. A symlinked or corrupted path is left in place and named, never
+   * followed.
+   */
+  private async purgeStaleProjectCache(
+    projectRoot: string,
+    marketplaces: readonly Marketplace[],
+    activation: ActivationRun
+  ): Promise<void> {
+    if (activation.errors.length > 0) return;
+    const framework = marketplaces.find((m) => frameworkSourceIsShared(m.name, m.scope));
+    if (framework === undefined) return;
+    if (activation.binaryMissing.length > 0) {
+      this.logger.warn(
+        "This project's own pre-migration framework cache kept: a requested tool's CLI " +
+          "was not on PATH this run, so its own registration may still point at it — run " +
+          "`aidd sync` again once every tool's CLI is on PATH."
+      );
+      return;
+    }
+    if ([...activation.outcomes.values()].some((outcome) => outcome.buildFailed)) {
+      this.logger.warn(
+        "This project's own pre-migration framework cache kept: a requested tool's build " +
+          "failed this run, so its own registration may still point at it — fix the build " +
+          "warning above, then run `aidd sync` again."
+      );
+      return;
+    }
+    const candidate = await resolveCacheCandidate(
+      this.fs,
+      this.logger,
+      projectRoot,
+      join(BUILT_CACHE_SUBDIR, FRAMEWORK_MARKETPLACE_NAME),
+      "This project's own pre-migration framework cache"
+    );
+    if (candidate === null) return;
+    await this.fs.deleteDirectory(candidate);
+    this.logger.info(`This project's own pre-migration framework cache purged: ${candidate}`);
   }
 
   /**
@@ -269,10 +352,24 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     }
     const framework = marketplaces.find((m) => frameworkSourceIsShared(m.name, m.scope));
     if (framework === undefined) return;
+    await this.recordReferenceForRoot(projectRoot);
+  }
+
+  /**
+   * The one write both `recordSharedSourceReference` (this project's own claim) and
+   * `decideOnDrift` (a foreign project's claim, discovered from the host's own
+   * registered path when it still names *another* project's pre-migration cache) make
+   * against `references.json` — extracted so the two do not carry two separately
+   * written copies of the same resolve-then-add sequence.
+   */
+  private async recordReferenceForRoot(root: string): Promise<void> {
+    if (this.userSourceReferences === undefined || this.currentVersionProvider === undefined) {
+      return;
+    }
     const userSourceReferences = this.userSourceReferences;
     const currentVersionProvider = this.currentVersionProvider;
     await toleratingUnreadableSourceReferences(this.logger, undefined, async () => {
-      const resolvedRoot = await resolveProjectRootForReferences(this.fs, projectRoot);
+      const resolvedRoot = await resolveProjectRootForReferences(this.fs, root);
       await userSourceReferences.addReference(currentVersionProvider.get(), resolvedRoot);
     });
   }
@@ -426,25 +523,27 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     // Each step is independently best-effort: one failing plugin or marketplace
     // must warn and let the others through, never abort the whole activation.
     const registeredMarketplaces: NativeMarketplaceRegistration[] = [];
+    let buildFailed = false;
     for (const marketplace of marketplaces) {
-      const hostName = await this.registerMarketplace(
+      const registration = await this.registerMarketplace(
         activator,
         toolId,
         marketplace,
         projectRoot,
         warnings
       );
-      registeredMarketplaces.push({ alias: marketplace.name, hostName });
+      if (!registration.registered) buildFailed = true;
+      registeredMarketplaces.push({ alias: marketplace.name, hostName: registration.hostName });
     }
     if (!activator.enablesPlugins())
-      return { marketplaces: registeredMarketplaces, pluginRefs: [] };
+      return { marketplaces: registeredMarketplaces, pluginRefs: [], buildFailed };
     this.bestEffort(() => activator.upgradeMarketplaces(), "upgrade marketplaces", warnings);
     const hostNameByAlias = new Map(registeredMarketplaces.map((m) => [m.alias, m.hostName]));
     const refs = this.pluginRefsToEnable(toolId, manifest, marketplaces, hostNameByAlias);
     for (const ref of refs) {
       this.bestEffort(() => activator.enablePlugin(ref, scope), `enable plugin '${ref}'`, warnings);
     }
-    return { marketplaces: registeredMarketplaces, pluginRefs: refs };
+    return { marketplaces: registeredMarketplaces, pluginRefs: refs, buildFailed };
   }
 
   private bestEffort(action: () => void, label: string, warnings: string[]): void {
@@ -500,9 +599,9 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     marketplace: Marketplace,
     projectRoot: string,
     warnings: string[]
-  ): Promise<string> {
+  ): Promise<{ hostName: string; registered: boolean }> {
     const builtDir = await this.buildForTool(toolId, marketplace, projectRoot);
-    if (builtDir === null) return marketplace.name;
+    if (builtDir === null) return { hostName: marketplace.name, registered: false };
     const requestedIdentity = await readMarketplaceCatalogIdentity(this.fs, toolId, builtDir);
     if (requestedIdentity === undefined) {
       throw new UnreadableBuiltCatalogError(
@@ -518,14 +617,16 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
       projectRoot,
       warnings
     );
-    if (decision === "skip") return hostName;
+    // A "skip" is a host already following a newer shared build than this run's own —
+    // registered, and never on this project's pre-migration cache, so it counts as such.
+    if (decision === "skip") return { hostName, registered: true };
     try {
       activator.addMarketplace(builtDir, marketplace.scope);
     } catch (error) {
       if (!(error instanceof NativePluginCliError)) throw error;
-      this.reclaimOrReport(activator, marketplace, hostName, builtDir, error, warnings);
+      this.reclaimOrReport(toolId, activator, marketplace, hostName, builtDir, error, warnings);
     }
-    return hostName;
+    return { hostName, registered: true };
   }
 
   /**
@@ -605,7 +706,7 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
       }
     );
     if (check === undefined) return "proceed";
-    if (isDriftFound(check)) return this.decideOnDrift(toolId, check, warnings);
+    if (isDriftFound(check)) return await this.decideOnDrift(toolId, check, warnings);
     const diff = pluginSetDifference(check.registeredIdentity, check.requestedIdentity);
     throw new MarketplaceSourceConflictError(
       `Marketplace '${check.name}' is already registered from a different catalog: ` +
@@ -616,14 +717,39 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     );
   }
 
-  /** The rollback refusal itself: a host already following a newer build never gets
+  /**
+   * The rollback refusal itself: a host already following a newer build never gets
    * written backward. Warned, not thrown — this is not a bug in this project's own
-   * request, and a caller iterating several tools must still proceed to the rest. */
-  private decideOnDrift(
+   * request, and a caller iterating several tools must still proceed to the rest.
+   *
+   * The one other drift `guardAgainstConflict` ever hands here, a host still tracking
+   * *another* project's own pre-migration cache, is not a refusal at all: this run's
+   * build is the shared source that other project has not migrated to yet, so
+   * `addMarketplace` below proceeds exactly as an unguarded call would (claude
+   * silently repoints, the migration itself completing) — the one thing this method
+   * adds for it is recording that other project's own claim on the shared source
+   * (`references.json`), alongside this project's own, since neither project has lost
+   * anything the host will still resolve for it. Never for `version-behind`: a rollback
+   * this run refuses to write is not a claim this run may extend into either.
+   *
+   * That other project's own root is recorded only once it is proven still to exist:
+   * `resolveProjectRootForReferences` falls back to the path as given on `ENOENT` so a
+   * later `clean` can still drop a reference to a project removed after the fact, but
+   * that fallback is not a reason to add one here — a root nobody can find any more
+   * would be recorded solely to be pruned again on the very next write, which grows
+   * `references.json` with a dead entry for no gain.
+   */
+  private async decideOnDrift(
     toolId: ToolId,
     found: MarketplaceSourceDriftFound,
     warnings: string[]
-  ): "proceed" | "skip" {
+  ): Promise<"proceed" | "skip"> {
+    if (found.drift.kind === "unmigrated-foreign-project-source") {
+      if (await this.fs.fileExists(found.drift.projectRoot)) {
+        await this.recordReferenceForRoot(found.drift.projectRoot);
+      }
+      return "proceed";
+    }
     if (found.drift.kind !== "version-behind") return "proceed";
     const { registeredVersion, requestedVersion } = found.drift;
     const message =
@@ -650,7 +776,20 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
   // "dead" for a perfectly live registration whenever the two differ, and then force-
   // remove a name the host never held — exactly the bug this project's own
   // `local`/`scoped`/`userscoped` smoke fixtures would have hit.
+  //
+  // A second, narrower door into the same reclaim: the reserved framework name, at
+  // its own shared (`"user"`) scope, on a tool `guardAgainstConflict` never even asked
+  // — codex declares no `sourceCheckVerb` at all (`registrationState` always answers
+  // `"unknown"`), copilot's own `sourceCheckVerb` answers `"live"` for any name that is
+  // simply registered, migrated or not — so the `!== "dead"` branch above never fires
+  // for either, and a project installed before the shared source existed would stay
+  // stuck on its own pre-migration registration forever. Safe specifically *because*
+  // it is this reserved name: every registration under it is this CLI's own packaged
+  // catalog, never a person's unrelated marketplace, so reclaiming it on any refusal
+  // — not only a proven-dead one — cannot take a name away from somebody else's
+  // project the way doing this for an arbitrary marketplace would.
   private reclaimOrReport(
+    toolId: ToolId,
     activator: NativePluginActivator,
     marketplace: Marketplace,
     hostName: string,
@@ -658,13 +797,21 @@ export class MarketplaceSyncSettingsUseCase implements MarketplaceSyncSettings {
     addError: NativePluginCliError,
     warnings: string[]
   ): void {
-    if (activator.registrationState(hostName) !== "dead") {
+    const state = activator.registrationState(hostName);
+    const isUnguardedFrameworkMarketplace =
+      marketplace.name === FRAMEWORK_MARKETPLACE_NAME &&
+      marketplace.scope === "user" &&
+      (!isAiToolId(toolId) || nativeActivationOf(toolId)?.marketplaceRegistry === undefined);
+    if (state !== "dead" && !isUnguardedFrameworkMarketplace) {
       const message = `Native plugin activation — register marketplace '${hostName}' skipped: ${addError.message}`;
       this.logger.warn(message);
       warnings.push(message);
       return;
     }
-    const reclaimMessage = `Marketplace '${hostName}' was registered to a directory that no longer exists; re-registering it for this project. Plugins installed from it are removed and the ones this CLI manages are put back.`;
+    const reclaimMessage =
+      state === "dead"
+        ? `Marketplace '${hostName}' was registered to a directory that no longer exists; re-registering it for this project. Plugins installed from it are removed and the ones this CLI manages are put back.`
+        : `Marketplace '${hostName}' is registered from a different source and ${toolId} refuses to overwrite it in place; removing and re-registering it from the shared, machine-scope build. Plugins installed from it are removed and the ones this CLI manages are put back.`;
     this.logger.warn(reclaimMessage);
     warnings.push(reclaimMessage);
     this.bestEffort(
