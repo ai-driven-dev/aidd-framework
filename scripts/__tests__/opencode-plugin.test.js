@@ -96,7 +96,7 @@ test("opencode-plugin.js: runJournal spawns journal.cjs by an absolute filesyste
   // resolves it as a bare module specifier relative to its own cwd and dies with
   // MODULE_NOT_FOUND. journal.cjs silently never ran; no error surfaced anywhere
   // because journal.cjs's own "exit 0 no matter what" contract hid the spawn failure.
-  const { repo, pluginDir, esmTwin } = makeInstalledRepo();
+  const { repo, esmTwin } = makeInstalledRepo();
   const mod = await import(pathToFileURL(esmTwin).href);
 
   const hooks = await mod.AiddTelemetry({ directory: repo });
@@ -115,7 +115,7 @@ test("opencode-plugin.js: runJournal spawns journal.cjs by an absolute filesyste
 });
 
 test("opencode-plugin.js: session.idle writes turn_end for the session session.created named", async () => {
-  const { repo, pluginDir, esmTwin } = makeInstalledRepo();
+  const { repo, esmTwin } = makeInstalledRepo();
   const mod = await import(pathToFileURL(esmTwin).href);
 
   const hooks = await mod.AiddTelemetry({ directory: repo });

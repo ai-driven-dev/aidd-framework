@@ -12,9 +12,7 @@ const CLEAN_ENV = Object.fromEntries(
 );
 
 const {
-  pluginVersion,
   readManifestVersion,
-  versionBesideTheHooks,
   versionFromAiddManifest,
   MANIFEST_DIRS,
   PLUGIN_NAME,

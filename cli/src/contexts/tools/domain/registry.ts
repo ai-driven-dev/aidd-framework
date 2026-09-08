@@ -161,7 +161,7 @@ export function buildContractFor(
   mode: FrameworkBuildMode
 ): (() => ToolBuildContract) | undefined {
   const config = getToolConfig(toolId);
-  if (config === undefined || !isAiTool(config)) return undefined;
+  if (!isAiTool(config)) return undefined;
   return config.buildContracts?.[mode];
 }
 

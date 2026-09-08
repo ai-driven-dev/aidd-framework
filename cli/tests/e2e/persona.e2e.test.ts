@@ -8,7 +8,7 @@
  */
 
 import { execFile } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -30,10 +30,8 @@ async function runInteractive(
   fakeHome: string,
   script: string
 ): Promise<{ stdout: string; exitCode: number }> {
-  const scriptPath = join(
-    tmpdir(),
-    `aidd-expect-${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2)}.exp`
-  );
+  const scriptDir = await mkdtemp(join(tmpdir(), "aidd-expect-"));
+  const scriptPath = join(scriptDir, "interaction.exp");
   const fullScript = `
 set timeout 15
 set env(HOME) "${fakeHome}"
@@ -51,7 +49,7 @@ ${script}
     const e = err as { stdout?: string; stderr?: string; code?: number };
     return { stdout: (e.stdout ?? "") + (e.stderr ?? ""), exitCode: e.code ?? 1 };
   } finally {
-    await execFileAsync("rm", ["-f", scriptPath]).catch(() => undefined);
+    await rm(scriptDir, { recursive: true, force: true });
   }
 }
 

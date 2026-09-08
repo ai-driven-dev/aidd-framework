@@ -57,7 +57,7 @@ test("the changes filter names the workflow file itself as relevant", () => {
 
   assert.match(
     script,
-    new RegExp(`^\\s*${ownPath.replace(/[.]/g, "\\.")}\\)\\s*$`, "m"),
+    new RegExp(`^\\s*${ownPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\)\\s*$`, "m"),
     `${ownPath} must be a case of the relevance filter, on its own line`
   );
 });

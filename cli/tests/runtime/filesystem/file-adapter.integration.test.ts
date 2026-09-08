@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,8 +16,7 @@ describe("FileAdapter", () => {
   let fs: FileAdapter;
 
   beforeEach(async () => {
-    tempDir = join(tmpdir(), `fs-adapter-test-${Date.now()}`);
-    await mkdir(tempDir, { recursive: true });
+    tempDir = await mkdtemp(join(tmpdir(), "aidd-fs-adapter-"));
     fs = new FileAdapter(new HasherAdapter());
   });
 

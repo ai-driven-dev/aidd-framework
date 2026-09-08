@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { AuthStorageError } from "../../kernel/errors.js";
@@ -39,7 +39,12 @@ export class AuthStorage {
     await writeFile(path, JSON.stringify(config, null, 2), "utf-8");
     if (process.platform === "win32") {
       try {
-        execSync(`icacls "${path}" /inheritance:r /grant:r "%USERNAME%:(R,W)"`, {
+        // An argument list, never a command line: `path` is composed from `AIDD_USER_CONFIG_DIR`,
+        // `USERPROFILE` or a `projectRoot`, and a command line would let any of them close the
+        // quoting and append a second command. The account is read here rather than left as
+        // `%USERNAME%`, which only `cmd.exe` would have expanded — without a shell it would
+        // reach icacls as that literal string and grant nobody anything.
+        execFileSync("icacls", [path, "/inheritance:r", "/grant:r", `${windowsAccount()}:(R,W)`], {
           stdio: ["ignore", "ignore", "pipe"],
         });
       } catch (err) {
@@ -88,6 +93,16 @@ export class AuthStorage {
         : this.userConfigPath();
     await this.write(path, config);
   }
+}
+
+/** The account icacls grants to. Absent, the grant would name nobody, so it fails here
+ * rather than leaving a credential file with inheritance stripped and no grant at all. */
+function windowsAccount(): string {
+  const account = process.env.USERNAME;
+  if (account === undefined || account === "") {
+    throw new AuthStorageError("USERNAME is not set, so no account can be granted access");
+  }
+  return account;
 }
 
 function isAuthConfig(value: unknown): value is AuthConfig {

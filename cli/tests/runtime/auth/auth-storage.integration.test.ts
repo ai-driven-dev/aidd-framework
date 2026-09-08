@@ -1,9 +1,36 @@
+import { execFileSync } from "node:child_process";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return { ...actual, execFileSync: vi.fn() };
+});
+
 import { AuthStorage } from "../../../src/runtime/auth/auth-storage.js";
 import { makeAuthConfig } from "../../helpers/auth.js";
+
+/**
+ * `process.platform` is a plain value property, so it is redefined rather than spied on.
+ * The win32 branch is the only one that shells out, and no CI runner this suite runs on
+ * is Windows, so it would otherwise never be exercised at all. `USERNAME` comes with it:
+ * every Windows session has one and no POSIX one does.
+ */
+async function asWin32<T>(run: () => Promise<T>, account = "tester"): Promise<T> {
+  const platform = Object.getOwnPropertyDescriptor(process, "platform");
+  const username = process.env.USERNAME;
+  Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+  process.env.USERNAME = account;
+  try {
+    return await run();
+  } finally {
+    if (platform !== undefined) Object.defineProperty(process, "platform", platform);
+    if (username === undefined) delete process.env.USERNAME;
+    else process.env.USERNAME = username;
+  }
+}
 
 describe("AuthStorage", () => {
   let tempDir: string;
@@ -62,6 +89,55 @@ describe("AuthStorage", () => {
       await storage.write(path, makeAuthConfig({ token: "ghp_secret" }));
       const stats = await stat(path);
       expect(stats.mode & 0o777).toBe(0o600);
+    });
+
+    it("restricts the file on win32 through an icacls argument list, never a shell command line", async () => {
+      const path = join(tempDir, "auth.json");
+      vi.mocked(execFileSync).mockClear();
+
+      await asWin32(() => storage.write(path, makeAuthConfig({ token: "ghp_win" })));
+
+      expect(execFileSync).toHaveBeenCalledTimes(1);
+      const [command, args] = vi.mocked(execFileSync).mock.calls[0] ?? [];
+      expect(command).toBe("icacls");
+      expect(args).toEqual([path, "/inheritance:r", "/grant:r", expect.stringContaining(":(R,W)")]);
+    });
+
+    it("names the account from the environment, not the %USERNAME% only a shell would expand", async () => {
+      vi.mocked(execFileSync).mockClear();
+
+      await asWin32(
+        () => storage.write(join(tempDir, "auth.json"), makeAuthConfig({ token: "ghp_win" })),
+        "Ada Lovelace"
+      );
+
+      const args = vi.mocked(execFileSync).mock.calls[0]?.[1];
+      expect(args).toContain("Ada Lovelace:(R,W)");
+    });
+
+    it("refuses to leave inheritance stripped with no grant when the session names no account", async () => {
+      const platform = Object.getOwnPropertyDescriptor(process, "platform");
+      const username = process.env.USERNAME;
+      Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+      delete process.env.USERNAME;
+      try {
+        await expect(
+          storage.write(join(tempDir, "auth.json"), makeAuthConfig({ token: "ghp_win" }))
+        ).rejects.toThrow(/USERNAME/);
+      } finally {
+        if (platform !== undefined) Object.defineProperty(process, "platform", platform);
+        if (username !== undefined) process.env.USERNAME = username;
+      }
+    });
+
+    it("passes a path carrying shell metacharacters as one verbatim argument", async () => {
+      const path = join(tempDir, 'a" & echo pwned & "b.json');
+      vi.mocked(execFileSync).mockClear();
+
+      await asWin32(() => storage.write(path, makeAuthConfig({ token: "ghp_win" })));
+
+      const args = vi.mocked(execFileSync).mock.calls[0]?.[1];
+      expect(args?.[0]).toBe(path);
     });
 
     it("written file can be read back", async () => {

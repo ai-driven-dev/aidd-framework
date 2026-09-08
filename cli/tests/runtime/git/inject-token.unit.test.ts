@@ -35,4 +35,32 @@ describe("injectTokenIntoUrl", () => {
       "https://tk@example.com/owner/repo.git"
     );
   });
+
+  it("matches a known forge on a subdomain of it", () => {
+    expect(injectTokenIntoUrl("https://gist.github.com/owner/repo.git", "tk")).toBe(
+      "https://x-access-token:tk@gist.github.com/owner/repo.git"
+    );
+  });
+
+  it("does not treat a known host appearing in the path as that host", () => {
+    expect(injectTokenIntoUrl("https://evil.example/github.com/owner/repo.git", "tk")).toBe(
+      "https://tk@evil.example/github.com/owner/repo.git"
+    );
+  });
+
+  it("does not treat a host merely ending in a known host's name as that host", () => {
+    expect(injectTokenIntoUrl("https://notgithub.com/owner/repo.git", "tk")).toBe(
+      "https://tk@notgithub.com/owner/repo.git"
+    );
+  });
+
+  it("does not treat a known host in the query string as that host", () => {
+    expect(injectTokenIntoUrl("https://example.com/repo.git?from=gitlab.com", "tk")).toBe(
+      "https://tk@example.com/repo.git?from=gitlab.com"
+    );
+  });
+
+  it("leaves a string that is not a parseable URL untouched", () => {
+    expect(injectTokenIntoUrl("https://", "tk")).toBe("https://");
+  });
 });

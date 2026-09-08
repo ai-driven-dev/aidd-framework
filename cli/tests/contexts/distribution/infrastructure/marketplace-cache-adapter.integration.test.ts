@@ -1,4 +1,4 @@
-import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -11,7 +11,7 @@ describe("MarketplaceCacheAdapter", () => {
   let adapter: MarketplaceCacheAdapter;
 
   beforeEach(async () => {
-    projectRoot = join(tmpdir(), `marketplace-cache-test-${Date.now()}`);
+    projectRoot = await mkdtemp(join(tmpdir(), "aidd-marketplace-cache-"));
     cacheRoot = join(projectRoot, MARKETPLACE_CACHE_SUBDIR);
     await mkdir(cacheRoot, { recursive: true });
     adapter = new MarketplaceCacheAdapter(projectRoot);

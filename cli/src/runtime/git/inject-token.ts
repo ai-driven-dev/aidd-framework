@@ -1,22 +1,41 @@
 interface HostMatcher {
-  match: (url: string) => boolean;
+  /** The forge's registered domain. Matched against the URL's own host, never its text. */
+  host: string;
   authPrefix: string;
 }
 
 const HOST_MATCHERS: readonly HostMatcher[] = [
-  { match: (u) => u.includes("github.com"), authPrefix: "x-access-token:" },
-  { match: (u) => u.includes("gitlab.com"), authPrefix: "oauth2:" },
-  { match: (u) => u.includes("bitbucket.org"), authPrefix: "x-token-auth:" },
-  { match: (u) => u.includes("dev.azure.com"), authPrefix: ":" },
+  { host: "github.com", authPrefix: "x-access-token:" },
+  { host: "gitlab.com", authPrefix: "oauth2:" },
+  { host: "bitbucket.org", authPrefix: "x-token-auth:" },
+  { host: "dev.azure.com", authPrefix: ":" },
 ];
+
+/**
+ * The host a URL actually addresses, or `null` when the string is not a parseable URL.
+ * Substring-matching the whole URL text answered a different question — `https://
+ * evil.example/github.com/x` and `https://notgithub.com/x` both contain `github.com`,
+ * and both would have been handed a GitHub-shaped credential.
+ */
+function hostnameOf(url: string): string | null {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function matcherFor(hostname: string): HostMatcher | undefined {
+  return HOST_MATCHERS.find((m) => hostname === m.host || hostname.endsWith(`.${m.host}`));
+}
 
 export function injectTokenIntoUrl(url: string, token: string | undefined): string {
   if (!token || !url.startsWith("https://")) return url;
-  const matcher = HOST_MATCHERS.find((m) => m.match(url));
-  if (matcher === undefined) {
-    return url.replace("https://", `https://${token}@`);
-  }
-  return url.replace("https://", `https://${matcher.authPrefix}${token}@`);
+  const hostname = hostnameOf(url);
+  if (hostname === null) return url;
+  const matcher = matcherFor(hostname);
+  const authPrefix = matcher?.authPrefix ?? "";
+  return url.replace("https://", `https://${authPrefix}${token}@`);
 }
 
 /**

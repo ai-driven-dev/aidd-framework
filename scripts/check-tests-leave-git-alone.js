@@ -73,13 +73,25 @@ function snapshotDirectory(dir) {
       shot[entry.name] = { directory: true };
       continue;
     }
-    const stat = fs.statSync(full);
+    // Read the entry rather than re-ask whether it is still there: `readdirSync` above
+    // already answered that, and anything between the two answers is a race. An entry that
+    // vanished in between is simply absent from this snapshot, which is exactly what the
+    // comparison already reports for an entry present on one side only.
+    let stat;
+    let bytes;
+    try {
+      stat = fs.statSync(full);
+      bytes = fs.readFileSync(full);
+    } catch (err) {
+      if (err.code === "ENOENT") continue;
+      throw err;
+    }
     shot[entry.name] = {
       size: stat.size,
       mode: stat.mode & 0o777,
       // The hash, not the size alone: the leak that prompted this replaced a hook with a
       // stub, and two different scripts can be the same length.
-      hash: createHash("sha256").update(fs.readFileSync(full)).digest("hex").slice(0, 16),
+      hash: createHash("sha256").update(bytes).digest("hex").slice(0, 16),
     };
   }
   return shot;

@@ -30,6 +30,7 @@ The checks that must pass for code here to count as done. The repository's own h
 ## In CI only
 
 - `pnpm test:coverage` against the thresholds in `vitest.config.ts`, `pnpm smoke`, `pnpm build` with its bundle budget, `pnpm jscpd` — plus `cli-typecheck`, `cli-lint`, `cli-architecture`, `cli-knip`, `kanban-checks` and a Windows run. Every one of them is fanned into one required check, `cli / gate` (`.github/workflows/cli-ci.yml`), which the branch rulesets enforce (`.github/rulesets/main.json`, `next.json`) — so all of them are blocking on a `cli/` pull request, through that one check.
+- CodeQL (`.github/workflows/codeql.yml`) analyses this package on every pull request against `main` and `next`, outside `cli / gate` and blocking nothing — its findings are read from the Security tab, per pull request, and answered there.
 
 ## Behavior
 

@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -11,8 +11,7 @@ describe("UserManifestRepositoryAdapter", () => {
   let adapter: UserManifestRepositoryAdapter;
 
   beforeEach(async () => {
-    userConfigDir = join(tmpdir(), `user-manifest-repo-test-${Date.now()}`);
-    await mkdir(userConfigDir, { recursive: true });
+    userConfigDir = await mkdtemp(join(tmpdir(), "aidd-user-manifest-repo-"));
     adapter = new UserManifestRepositoryAdapter(() => userConfigDir);
   });
 

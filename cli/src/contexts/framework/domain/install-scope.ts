@@ -20,7 +20,7 @@ export function parseInstallScope(value: string | undefined): InstallScope | und
 
 export function getToolSupportedScope(toolId: AiToolId): InstallScope {
   const tool = getToolConfig(toolId);
-  if (tool === undefined || !isAiTool(tool)) return "project";
+  if (!isAiTool(tool)) return "project";
   const caps = tool.capabilities as Record<string, unknown>;
   const plugins = caps.plugins as { installScope?: InstallScope } | undefined;
   return plugins?.installScope ?? "project";

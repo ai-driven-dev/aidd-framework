@@ -353,7 +353,7 @@ export class DoctorRegistrationUseCase {
     toolId: ToolId
   ): (MarketplaceSettings & { marketplacesSettingsPath: string }) | undefined {
     const config = getToolConfig(toolId);
-    if (config === undefined || !isAiTool(config)) return undefined;
+    if (!isAiTool(config)) return undefined;
     const caps = config.capabilities as {
       plugins?: { marketplaceSettings?: MarketplaceSettings | null };
     };
