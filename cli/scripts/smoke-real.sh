@@ -274,6 +274,67 @@ copilot_ref_enabled() {
   ' "$HOME/.copilot/settings.json" "${1:-$REF}"
 }
 
+# `aidd clean` never writes a host registry by hand, by design (architecture.md) — this
+# script may, because the two keys below are exactly this run's own unique names
+# ($REF, $REF_USER), never a string a real install could hold. Removes only a key whose
+# value is the disabled `false` copilot's own uninstall convention leaves behind; a key
+# still `true` means cleanup failed upstream and is left alone, reported `bad`.
+copilot_purge_disabled_run_keys() {
+  if [[ -z "${PRESENT[copilot]:-}" ]]; then
+    skip "copilot: purge disabled run keys (copilot not installed)"
+    return
+  fi
+  local settings="$HOME/.copilot/settings.json"
+  if [[ ! -f "$settings" ]]; then
+    skip "copilot: purge disabled run keys (no settings.json)"
+    return
+  fi
+  local out
+  out=$(node -e '
+    const fs = require("node:fs");
+    const [file, ref1, ref2] = process.argv.slice(1);
+    const raw = fs.readFileSync(file, "utf8");
+    const hadTrailingNewline = raw.endsWith("\n");
+    const indentMatch = raw.match(/^\{\r?\n( +)"/);
+    const indent = indentMatch ? indentMatch[1].length : 2;
+    const settings = JSON.parse(raw);
+    const enabled = settings.enabledPlugins;
+    const lines = [];
+    let changed = false;
+    if (enabled && typeof enabled === "object") {
+      for (const key of [ref1, ref2]) {
+        if (!(key in enabled)) continue;
+        if (enabled[key] === false) {
+          delete enabled[key];
+          changed = true;
+          lines.push(`removed ${key}`);
+        } else if (enabled[key] === true) {
+          lines.push(`bad ${key}`);
+        }
+      }
+    }
+    if (changed) {
+      const updated = JSON.stringify(settings, null, indent) + (hadTrailingNewline ? "\n" : "");
+      const tmp = `${file}.tmp-${process.pid}`;
+      fs.writeFileSync(tmp, updated);
+      fs.renameSync(tmp, file);
+    }
+    for (const line of lines) console.log(line);
+  ' "$settings" "$REF" "$REF_USER")
+
+  if [[ -z "$out" ]]; then
+    skip "copilot: purge disabled run keys ($REF / $REF_USER not present in enabledPlugins)"
+    return
+  fi
+  while IFS=' ' read -r status key; do
+    [[ -z "$status" ]] && continue
+    case "$status" in
+      removed) ok "copilot: removed disabled key $key from enabledPlugins" ;;
+      bad) bad "copilot: $key is still enabled (true) in enabledPlugins — cleanup failed upstream" ;;
+    esac
+  done <<< "$out"
+}
+
 # --- Cleanup runs no matter what happens, and is the only place `clean` is called ---
 cleanup() {
   # Captured under its own name: the helpers called below assign `rc=` themselves, and
@@ -413,6 +474,7 @@ cleanup() {
       && bad "copilot: settings.json still enables $REF_USER after clean --scope user" \
       || ok "copilot: settings.json no longer enables $REF_USER"
   fi
+  copilot_purge_disabled_run_keys
   if [[ -n "${PRESENT[cursor]:-}" ]]; then
     [[ -e "$HOME/.cursor/plugins/local/$MKT_USER" ]] \
       && bad "cursor: ~/.cursor/plugins/local/$MKT_USER still exists after clean --scope user" \
