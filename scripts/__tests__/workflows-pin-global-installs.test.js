@@ -7,12 +7,9 @@ const yaml = require("js-yaml");
 const root = path.resolve(__dirname, "../..");
 const workflowsDir = path.join(root, ".github/workflows");
 
-const MARKER = "# unpinned on purpose:";
-
-// Named here, not by loosening the rule, because the line itself carries no
-// `# unpinned on purpose:` marker yet and cli-ci.yml is owned by another change right
-// now — this suite must not edit it. Move this entry's reason onto the line as a
-// marker comment the next time cli-ci.yml is touched, and drop the entry.
+// The one way to declare a deliberate exception. A comment on the workflow line cannot
+// carry it: a `run:` written as a plain scalar loses its `# …` tail to the YAML parser
+// before this suite ever sees the script, so a marker there would be invisible here.
 const ALLOWLIST = [
   {
     file: ".github/workflows/cli-ci.yml",
@@ -97,11 +94,10 @@ test("no workflow installs a global npm package unpinned (bare or @latest)", () 
 
     for (const script of scripts) {
       for (const finding of findUnpinnedGlobalInstalls(script)) {
-        const hasMarker = finding.line.includes(MARKER);
         const allowed = ALLOWLIST.some(
           (entry) => entry.file === relPath && entry.pattern.test(finding.line)
         );
-        if (!hasMarker && !allowed) {
+        if (!allowed) {
           violations.push(`${relPath}: ${finding.line.trim()}`);
         }
       }
@@ -111,8 +107,8 @@ test("no workflow installs a global npm package unpinned (bare or @latest)", () 
   assert.deepEqual(
     violations,
     [],
-    `unpinned global npm install(s) found (pin an exact version, or mark deliberate ` +
-      `with "${MARKER}" on the same line):\n${violations.join("\n")}`
+    `unpinned global npm install(s) found (pin an exact version, or declare the ` +
+      `exception in this suite's ALLOWLIST with its reason):\n${violations.join("\n")}`
   );
 });
 

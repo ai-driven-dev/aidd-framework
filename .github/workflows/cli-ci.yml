@@ -277,7 +277,7 @@ jobs:
       # configured and none are needed: it points Claude Code at a dead address with a fake
       # key, and the session id is minted before any of that matters.
       - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code # unpinned on purpose: this probe exists to meet the claude-code people install today; a pin would measure yesterday
+        run: npm install -g @anthropic-ai/claude-code # floats on purpose, declared in scripts/__tests__/workflows-pin-global-installs.test.js
       # Re-checks what #632 measured once, by running a session: that the identifier a hook
       # receives is the one the export carries. Everything in this layer joins on that, and a
       # tool update can break it with nothing else turning red. Exit 2 means the probe could
