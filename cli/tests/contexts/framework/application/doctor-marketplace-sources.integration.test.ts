@@ -15,7 +15,13 @@ function fakeVersion(value: string): VersionReader {
   return { get: () => value };
 }
 
-const PROJECT_ROOT = "/project";
+// resolve(): checkMarketplaceSources hands this straight to marketplaceSourceDrift as
+// context.projectRoot, compared there against an already-resolved registered/requested
+// source (see resolvedBuiltDir's own resolve(raw) call) — a drive-less literal here would
+// make parseBuiltMarketplaceDir miss the base compare on win32 and fall through to
+// parseBuiltMarketplaceDirAtAnyRoot, misclassifying this project's own pre-migration
+// cache as a foreign one.
+const PROJECT_ROOT = resolve("/project");
 const NAME = "probe-mkt";
 const CATALOG_RELATIVE = ".claude-plugin/marketplace.json";
 const REGISTRY_LOCATION = "/home/.claude/plugins/known_marketplaces.json";
@@ -311,7 +317,11 @@ describe("DoctorRegistrationUseCase — marketplace source conflicts", () => {
 });
 
 describe("DoctorRegistrationUseCase — user-scope marketplace source drift", () => {
-  const USER_CACHE_ROOT = "/user-cache";
+  // resolve(): fed as-is into hostMarketplaceSourceConflict's driftContext.userCacheRoot,
+  // compared there against an already-resolved requested/registered source — a drive-less
+  // literal here misses parseUserBuiltMarketplaceDir's base compare on win32 and every
+  // drift decision below returns undefined before ever reaching its own logic.
+  const USER_CACHE_ROOT = resolve("/user-cache");
   const CURRENT_VERSION = "2.0.0";
 
   function sharedPath(version: string): string {

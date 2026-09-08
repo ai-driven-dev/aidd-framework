@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import "../../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import { describe, expect, it } from "vitest";
@@ -247,7 +248,10 @@ describe("when the catalog this project just built cannot be read back", () => {
 
     expect(activator.addedMarketplaces).toEqual([]);
     expect(result.errors).toHaveLength(1);
-    expect(result.errors[0]?.message).toContain(`${builtDir}/${catalogRelative}`);
+    // join(), matching marketplaceCatalogProbePath's own join(dir, catalogRelative): on
+    // win32 that produces a backslash-joined path, which a forward-slash template literal
+    // would never find inside the thrown message.
+    expect(result.errors[0]?.message).toContain(join(builtDir, catalogRelative));
     // Never written as `hostName` — a manifest that guessed the alias would go on
     // claiming a registration the host was never asked to hold.
     const reloaded = await manifestRepo.load();

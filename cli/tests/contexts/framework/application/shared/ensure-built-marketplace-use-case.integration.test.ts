@@ -143,7 +143,11 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
   });
 
   it("does not rebuild a published source when the sentinel matches (cliVer:catalogVer)", async () => {
-    const builtDir = builtMarketplaceDir(PROJECT, "aidd-framework", "codex");
+    // resolve(), matching what EnsureBuiltMarketplaceUseCase.execute() itself computes
+    // for builtDir (see its own comment): on win32 a drive-less PROJECT would otherwise
+    // seed a key the in-memory fs never looks up under, since the code's own builtDir is
+    // resolved with a drive letter.
+    const builtDir = resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "codex"));
     fs.setFile(join(builtDir, ".build-version"), "5.0.0:1.0.0");
     const uc = new EnsureBuiltMarketplaceUseCase(
       fs,
@@ -261,7 +265,7 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
       target: "codex",
       mode: "marketplace",
     });
-    expect(r.builtDir).toBe(builtMarketplaceDir(PROJECT, "aidd-framework", "codex"));
+    expect(r.builtDir).toBe(resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "codex")));
     expect(fs.getFile(join(r.builtDir, "plugins/aidd-vcs/SKILL.md"))).toBe("built content");
     // temp dir cleaned up
     expect(fs.listUnder(tmpdir()).length).toBe(0);
@@ -296,7 +300,10 @@ describe("force behavior at the cache-rebuild path", () => {
     const memFs = new InMemoryFileAdapter();
     await seedFromDirectory(memFs, FIXTURE_DIR, { useAbsolutePaths: true });
 
-    const builtDir = builtMarketplaceDir(PROJECT, "aidd-framework", "copilot");
+    // resolve(): the seeded "stale cache" file must sit at the same key
+    // EnsureBuiltMarketplaceUseCase's own resolved builtDir will pass as outDir, or the
+    // in-memory fs's own `isDirectory`/`fileExists` prefix check never finds it on win32.
+    const builtDir = resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "copilot"));
     const agentPath = `${builtDir}/.github/agents/${PLUGIN}-code-reviewer.agent.md`;
     memFs.setFile(agentPath, "stale cache content from a previous build");
 
@@ -395,7 +402,9 @@ describe("outDir invariant for the cache-rebuild build path", () => {
     });
 
     expect(capturedOutDirs).toHaveLength(2);
-    const cacheRoot = join(PROJECT, BUILT_CACHE_SUBDIR);
+    // resolve(): the direct-path outDir the code passes is itself resolved (drive letter
+    // on win32), so the cache root it is compared against must be built the same way.
+    const cacheRoot = resolve(join(PROJECT, BUILT_CACHE_SUBDIR));
     const tmpRoot = tmpdir();
     for (const outDir of capturedOutDirs) {
       const underCache = outDir === cacheRoot || outDir.startsWith(`${cacheRoot}/`);
@@ -435,7 +444,9 @@ describe("outDir invariant for the cache-rebuild build path", () => {
       mode: "marketplace",
     });
 
-    expect(result.builtDir.startsWith(join("/user-cache"))).toBe(true);
+    // resolve(): result.builtDir comes back resolved (drive letter on win32), so the
+    // prefix it is checked against needs the same treatment.
+    expect(result.builtDir.startsWith(resolve(join("/user-cache")))).toBe(true);
     expect(result.builtDir.startsWith(PROJECT)).toBe(false);
     expect(result.builtDir).toContain(`${sep}5.0.0${sep}`);
   });

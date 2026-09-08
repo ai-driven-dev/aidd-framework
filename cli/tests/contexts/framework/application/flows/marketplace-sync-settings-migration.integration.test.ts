@@ -710,12 +710,18 @@ describe("MarketplaceSyncSettingsUseCase + DoctorRegistrationUseCase — the ful
     const PROJECT_B = "/project-b";
     const REGISTRY_LOCATION = "/home/.claude/plugins/known_marketplaces.json";
     const CURRENT_VERSION = "2.0.0";
-    const USER_CACHE_ROOT = "/user-cache";
-    const sharedBuiltDir = userBuiltMarketplaceDir(
-      USER_CACHE_ROOT,
-      CURRENT_VERSION,
-      FRAMEWORK_MARKETPLACE_NAME,
-      "claude"
+    // resolve(): both doctor's own resolvedBuiltDir() and the sync guard's realpath(builtDir)
+    // compare against an already-resolved path (drive letter on win32) — leaving these
+    // drive-less would seed the catalog, and compare userCacheRoot, under a key neither
+    // code path ever looks up under.
+    const USER_CACHE_ROOT = resolve("/user-cache");
+    const sharedBuiltDir = resolve(
+      userBuiltMarketplaceDir(
+        USER_CACHE_ROOT,
+        CURRENT_VERSION,
+        FRAMEWORK_MARKETPLACE_NAME,
+        "claude"
+      )
     );
     const preMigrationCache = resolve(
       builtMarketplaceDir(PROJECT_A, FRAMEWORK_MARKETPLACE_NAME, "claude")

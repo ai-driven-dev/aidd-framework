@@ -131,7 +131,12 @@ describe("AuthStorage", () => {
     });
 
     it("passes a path carrying shell metacharacters as one verbatim argument", async () => {
-      const path = join(tempDir, 'a" & echo pwned & "b.json');
+      // `"` is illegal in an NTFS filename — `storage.write` really writes this file to
+      // disk before the (mocked) icacls call, so it must stay legal on every filesystem
+      // this suite runs on. `&`, the space, `;` and `$` are all NTFS-legal and still prove
+      // the point: `execFileSync` receives this as one array element, never concatenated
+      // into a shell string a real shell would split on them.
+      const path = join(tempDir, "a & echo pwned; $HOME & b.json");
       vi.mocked(execFileSync).mockClear();
 
       await asWin32(() => storage.write(path, makeAuthConfig({ token: "ghp_win" })));

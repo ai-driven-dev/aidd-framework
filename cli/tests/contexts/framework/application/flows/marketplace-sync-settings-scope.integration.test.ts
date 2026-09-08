@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import { describe, expect, it } from "vitest";
 import { Marketplace } from "../../../../../src/contexts/distribution/domain/marketplace.js";
@@ -161,7 +162,10 @@ describe("MarketplaceSyncSettingsUseCase — the activation scope a caller asks 
 
     await useCase.execute({ projectRoot: PROJECT_ROOT, scope: "user" });
 
-    expect(fs.listUnder(PROJECT_ROOT)).toEqual([]);
+    // resolve(): a project-scope write lands at resolve(projectRoot, settingsPath) — a
+    // drive letter on win32 — so checking the drive-less literal PROJECT_ROOT would stay
+    // empty even if a regression started writing there, proving nothing on that platform.
+    expect(fs.listUnder(resolve(PROJECT_ROOT))).toEqual([]);
   });
 
   it("writes .claude/settings.json for that same fixture at project scope — proof the fixture is not inert", async () => {
@@ -181,7 +185,10 @@ describe("MarketplaceSyncSettingsUseCase — the activation scope a caller asks 
 
     await useCase.execute({ projectRoot: PROJECT_ROOT });
 
-    const written = await fs.readFile(`${PROJECT_ROOT}/.claude/settings.json`);
+    // resolve(): the use case writes at resolve(projectRoot, settings.settingsPath), which
+    // carries a drive letter on win32 — a forward-slash template literal never matches
+    // that key.
+    const written = await fs.readFile(resolve(PROJECT_ROOT, ".claude", "settings.json"));
     expect(written).toContain("aidd-telemetry");
   });
 

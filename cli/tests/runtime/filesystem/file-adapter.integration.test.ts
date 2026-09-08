@@ -126,8 +126,11 @@ describe("FileAdapter", () => {
 
       const files = await fs.listDirectory(tempDir);
       expect(files).toContain("a.txt");
-      expect(files).toContain(join("sub", "b.txt"));
-      expect(files).toContain(join("sub", "deep", "c.txt"));
+      // FileAdapter.listDirectory() deliberately normalizes every relative path to "/"
+      // (see its own `.split(sep).join("/")`) — this is what a manifest, read on every
+      // platform, stores — so the expectation is the POSIX literal, never join().
+      expect(files).toContain("sub/b.txt");
+      expect(files).toContain("sub/deep/c.txt");
     });
   });
 
