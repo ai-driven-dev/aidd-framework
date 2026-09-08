@@ -277,7 +277,7 @@ jobs:
       # configured and none are needed: it points Claude Code at a dead address with a fake
       # key, and the session id is minted before any of that matters.
       - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code
+        run: npm install -g @anthropic-ai/claude-code # unpinned on purpose: this probe exists to meet the claude-code people install today; a pin would measure yesterday
       # Re-checks what #632 measured once, by running a session: that the identifier a hook
       # receives is the one the export carries. Everything in this layer joins on that, and a
       # tool update can break it with nothing else turning red. Exit 2 means the probe could
@@ -428,9 +428,12 @@ jobs:
       - name: Chain - diagnose, through the command every skill's own markdown names
         run: |
           aidd --version
-          # This step's whole value depends on `telemetry check` exiting non-zero on FAIL,
-          # not just printing it — nothing here inspects the output.
-          aidd telemetry check
+          # This step's whole value depends on `telemetry check` exiting non-zero on FAIL.
+          # A gated run (measurement off, no repository) judges nothing and exits 0, so the
+          # one row the chain above exists to make true is asserted too: the transcript
+          # placed for the journalled session was actually read.
+          aidd telemetry check | tee telemetry-check.out
+          grep -E "tool files readable +ok" telemetry-check.out
       - run: cd cli && pnpm test:unit
       - run: cd cli && pnpm test:integration
       # Every e2e but the two named below — and one of them is why this step matters most:
