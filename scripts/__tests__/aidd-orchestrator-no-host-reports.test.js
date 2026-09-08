@@ -23,7 +23,8 @@ const ORCHESTRATING_SKILLS = [
 const PARAGRAPH_START = "No host reports when an orchestration finished.";
 
 function sharedExplanation(file) {
-  const text = fs.readFileSync(path.join(ROOT, file), "utf8");
+  // A Windows checkout may carry CRLF; the comparison is about words, never line endings.
+  const text = fs.readFileSync(path.join(ROOT, file), "utf8").replace(/\r\n/g, "\n");
   const start = text.indexOf(PARAGRAPH_START);
   assert.ok(start !== -1, `${file} no longer carries the shared "No host reports" explanation`);
   const end = text.indexOf("\n\n", start);

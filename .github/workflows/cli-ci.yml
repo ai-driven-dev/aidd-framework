@@ -380,6 +380,10 @@ jobs:
       # every assertion and destroys an install nothing can restore — `.git` is in no
       # history. The wrapper passes the suite's own exit code through untouched, the same
       # guard lefthook.yml's `scripts-tests` hook runs locally.
+      # The suite itself reads workflow and manifest YAML through the repository's own
+      # devDependencies (`js-yaml`), so the root install has to precede it; the chain
+      # steps above stay ahead of any install on purpose.
+      - run: pnpm install --frozen-lockfile
       - name: Plugin suite
         run: node scripts/check-tests-leave-git-alone.js -- node --test 'scripts/__tests__/**/*.test.js'
 

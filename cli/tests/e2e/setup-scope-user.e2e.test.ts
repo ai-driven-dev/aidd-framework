@@ -6,6 +6,9 @@ import { describe, expect, it } from "vitest";
 import { environmentWithoutGitVariables } from "../../src/runtime/git/git-environment.js";
 import { createTestEnv, gitInit, runCli } from "./helpers.js";
 
+// CI runners carry no git identity; a commit made by a test brings its own.
+const GIT_TEST_IDENTITY = ["-c", "user.email=t@t.com", "-c", "user.name=t"];
+
 const execFileAsync = promisify(execFile);
 const FRAMEWORK_REAL_PATH = resolve(process.cwd(), "tests/fixtures/framework-real");
 
@@ -29,7 +32,7 @@ describe("E2E: setup --scope user writes nothing under the project", () => {
       // A commit so `git status --porcelain` starts clean — otherwise every file in a
       // freshly `git init`ed, never-committed directory reads as untracked regardless
       // of what `setup` did or did not write.
-      await execFileAsync("git", ["commit", "--allow-empty", "-m", "empty"], {
+      await execFileAsync("git", [...GIT_TEST_IDENTITY, "commit", "--allow-empty", "-m", "empty"], {
         cwd: projectDir,
         env: environmentWithoutGitVariables(process.env),
       });
@@ -98,7 +101,7 @@ describe("E2E: setup --scope user writes nothing under the project", () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("scope-user-flags");
     try {
       await gitInit(projectDir);
-      await execFileAsync("git", ["commit", "--allow-empty", "-m", "empty"], {
+      await execFileAsync("git", [...GIT_TEST_IDENTITY, "commit", "--allow-empty", "-m", "empty"], {
         cwd: projectDir,
         env: environmentWithoutGitVariables(process.env),
       });
@@ -169,7 +172,7 @@ describe("E2E: setup --scope user writes nothing under the project", () => {
     const { projectDir, fakeHome, cleanup } = await createTestEnv("scope-user-nothing-yet");
     try {
       await gitInit(projectDir);
-      await execFileAsync("git", ["commit", "--allow-empty", "-m", "empty"], {
+      await execFileAsync("git", [...GIT_TEST_IDENTITY, "commit", "--allow-empty", "-m", "empty"], {
         cwd: projectDir,
         env: environmentWithoutGitVariables(process.env),
       });
