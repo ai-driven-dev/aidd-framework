@@ -468,6 +468,53 @@ if [[ -n "${PRESENT[cursor]:-}" ]]; then
     || bad "cursor: ~/.cursor/plugins/local/$MKT/.cursor-plugin/plugin.json missing"
 fi
 
+section "each host lists what the catalog ships"
+# A registry naming $REF proves a path was recorded; a host listing the plugin's components
+# proves it loaded the build. Expectations are read from the fixture itself, so a fixture
+# change moves them. Claude's inventory never counts `agents/` (0 on a plugin shipping two,
+# measured 2026-09-09), so agents are not asserted. Cursor and opencode expose no inventory
+# command: the file checks above are all this run can prove for them.
+FIXTURE_PLUGIN="$DERIVED_FIXTURE/plugins/$MKT"
+IFS=$'\t' read -r FIXTURE_SKILLS FIXTURE_HOOKS FIXTURE_MCP FIXTURE_VERSION < <(node -e '
+  const fs = require("node:fs");
+  const dir = process.argv[1];
+  const json = (file) => JSON.parse(fs.readFileSync(`${dir}/${file}`, "utf8"));
+  const skills = fs.readdirSync(`${dir}/skills`, { withFileTypes: true })
+    .filter((e) => e.isDirectory()).map((e) => e.name).sort();
+  const hooks = Object.keys(json("hooks/hooks.json").hooks);
+  const mcp = Object.keys(json(".mcp.json").mcpServers);
+  const line = (names) => `(${names.length})  ${names.join(", ")}`;
+  process.stdout.write([line(skills), line(hooks), line(mcp), json(".claude-plugin/plugin.json").version].join("\t"));
+' "$FIXTURE_PLUGIN")
+
+# host_says <argv...>: one call to a host's own binary, its answer returned and logged.
+host_says() {
+  local out
+  out=$( ( cd "$PROJ" && exec perl -e 'alarm shift; exec @ARGV' "$CMD_TIMEOUT" "$@" ) </dev/null 2>&1 )
+  printf '%s\n' "$out" >> "$LOGFILE"
+  printf '%s\n' "$out"
+}
+# lists <name> <expected fragment> <answer>: the fragment, fixed-string, anywhere in the answer.
+lists() {
+  local name="$1" expect="$2" answer="$3"
+  grep -qF -- "$expect" <<<"$answer" && ok "$name" || bad "$name (missing '$expect')" "$answer"
+}
+if [[ -n "${PRESENT[claude]:-}" ]]; then
+  answer=$(host_says claude plugin details "$REF")
+  lists "claude: plugin details lists the skills $FIXTURE_SKILLS" "Skills $FIXTURE_SKILLS" "$answer"
+  lists "claude: plugin details lists the hook events $FIXTURE_HOOKS" "Hooks $FIXTURE_HOOKS" "$answer"
+  lists "claude: plugin details lists the MCP servers $FIXTURE_MCP" "MCP servers $FIXTURE_MCP" "$answer"
+fi
+if [[ -n "${PRESENT[codex]:-}" ]]; then
+  answer=$(host_says codex plugin list)
+  grep -qE -- "^$REF +installed, enabled +$FIXTURE_VERSION" <<<"$answer" \
+    && ok "codex: plugin list marks $REF installed, enabled, $FIXTURE_VERSION" \
+    || bad "codex: plugin list does not mark $REF installed, enabled, $FIXTURE_VERSION" "$answer"
+fi
+if [[ -n "${PRESENT[copilot]:-}" ]]; then
+  lists "copilot: plugin list marks $REF v$FIXTURE_VERSION enabled" "$REF (v$FIXTURE_VERSION) (enabled)" "$(host_says copilot plugin list)"
+fi
+
 # Without this, `cleanup`'s cache checks are vacuous: an absent directory after `clean` proves
 # nothing unless this run watched it exist first. The path fragments below are literals of what
 # each profile declares as `NativeActivation.pluginCacheDir`, since this script cannot read it

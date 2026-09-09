@@ -285,6 +285,10 @@ jobs:
       # means the probe could not form an opinion, rather than blaming the tool.
       - name: Probe the identifier join
         run: node scripts/probe-identifier-join.cjs
+      # The golden snapshots pin what a claude build contains; only the host can say it loads.
+      # Its `plugin validate` exits 0 either way, so the script reads the verdict from its text.
+      - name: Claude Code accepts the translated marketplace
+        run: node scripts/check-claude-accepts-build.cjs
 
   cli-jscpd:
     name: cli / JSCPD (duplication)

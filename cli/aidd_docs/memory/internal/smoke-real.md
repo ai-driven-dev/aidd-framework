@@ -25,6 +25,7 @@
 
 1. Files-only `setup`.
 2. Native registration and `plugin install` under the project-scope name.
+   Then each host's own inventory: `claude plugin details` lists the fixture's skills, hook events and MCP servers (never its agents: Claude counts none, measured 2026-09-09), `codex plugin list` marks it installed and enabled, `copilot plugin list` enabled. Cursor and opencode expose no inventory command.
 3. `doctor`.
 4. A host-side `claude plugin uninstall --scope local`, then the `sync --force` that repairs it.
 5. Opencode's bridge.
