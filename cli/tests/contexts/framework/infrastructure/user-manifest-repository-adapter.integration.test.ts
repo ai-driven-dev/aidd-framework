@@ -47,6 +47,15 @@ describe("UserManifestRepositoryAdapter", () => {
       await expect(adapter.load()).rejects.not.toThrow(/\.aidd\/manifest\.json/);
       await expect(adapter.load()).rejects.not.toThrow(/in this project/);
     });
+
+    it("names this machine as where the refused manifest lives", async () => {
+      const manifestPath = join(userConfigDir, "manifest.json");
+      await writeFile(manifestPath, '{"version": 7, "tools": {}}');
+
+      await expect(adapter.load()).rejects.toThrow(
+        `delete ${manifestPath} for this machine, then run \`aidd setup --scope user\` to reinstall the framework.`
+      );
+    });
   });
 
   describe("save() + load() roundtrip", () => {
