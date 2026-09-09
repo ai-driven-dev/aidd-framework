@@ -84,7 +84,7 @@ describe("validate-json", () => {
   });
 
   it("names a marketplace plugin listed twice and a source that is not there", async () => {
-    const plugin = { name: "dup", version: "1.0.0", source: "./plugins/dup", description: "d", strict: true, recommended: false };
+    const plugin = { name: "dup", version: "1.0.0", source: "./plugins/dup", description: "d", strict: true, metadata: { recommended: false } };
     const root = tree({
       ".claude-plugin/marketplace.json": { name: "m", version: "1.0.0", description: "d", owner: { name: "o" }, plugins: [plugin, plugin] },
     });

@@ -56,7 +56,7 @@ describe("claude-marketplace-manifest.json schema", () => {
               description: "Dev plugin",
               version: "1.0.0",
               strict: true,
-              recommended: true,
+              metadata: { recommended: true },
             },
           ],
         })

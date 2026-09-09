@@ -15,7 +15,12 @@ import type { FileWriter } from "../../../kernel/ports/file-writer.js";
 import type { PluginPresence } from "./build-contract.js";
 
 type SrcEntry =
-  | { version?: string; description?: string; strict?: boolean; recommended?: boolean }
+  | {
+      version?: string;
+      description?: string;
+      strict?: boolean;
+      metadata?: { recommended?: boolean };
+    }
   | undefined;
 
 /** Marketplace-mode agent transform shared by claude and copilot: the frontmatter is kept
@@ -91,7 +96,12 @@ export function buildClaudeStyleCatalogEntry(
     version,
   };
   if (typeof srcEntry?.strict === "boolean") entry.strict = srcEntry.strict;
-  if (typeof srcEntry?.recommended === "boolean") entry.recommended = srcEntry.recommended;
+  const metadata = srcEntry?.metadata;
+  const recommended =
+    metadata !== null && typeof metadata === "object"
+      ? (metadata as { recommended?: unknown }).recommended
+      : undefined;
+  if (typeof recommended === "boolean") entry.metadata = { recommended };
   return entry;
 }
 

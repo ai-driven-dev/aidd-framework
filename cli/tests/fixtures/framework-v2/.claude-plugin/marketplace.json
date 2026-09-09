@@ -10,7 +10,7 @@
       "source": "./plugins/aidd-test",
       "description": "Test plugin",
       "strict": true,
-      "recommended": true
+      "metadata": { "recommended": true }
     }
   ]
 }
