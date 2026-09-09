@@ -1,6 +1,89 @@
 import type { CLIOutput } from "../output.js";
+import { printPluginDrift, printScopeReport } from "./status-display.js";
 
 type PluginIssue = { pluginName: string; toolId: string; issue: string; filePath?: string };
+
+interface ScopeDriftReport {
+  tools: {
+    toolId: string;
+    version: string;
+    drifted: { status: string; relativePath: string }[];
+  }[];
+}
+
+interface PluginDriftReport {
+  pluginDrift: {
+    pluginName: string;
+    toolId: string;
+    driftedFiles: string[];
+    notInstalledOnMachine: boolean;
+  }[];
+}
+
+/** Which tools are equipped and how much they carry, independent of health and drift, which
+ * are reported separately. Versions come from the status report already fetched for drift. */
+export function printInventory(
+  output: CLIOutput,
+  label: string,
+  doctorReport: {
+    readonly toolHealth: readonly {
+      readonly toolId: string;
+      readonly fileCount: number;
+      readonly mergeFileCount: number;
+    }[];
+  } | null,
+  statusTools: readonly { toolId: string; version: string }[]
+): void {
+  const health = doctorReport?.toolHealth ?? [];
+  if (health.length === 0) return;
+  output.print(`\n${label} tools:`);
+  for (const h of health) {
+    const version = statusTools.find((t) => t.toolId === h.toolId)?.version ?? "unknown";
+    output.print(
+      `  ${h.toolId} (v${version}): ${h.fileCount} files, ${h.mergeFileCount} merge files`
+    );
+  }
+}
+
+export function printReportErrors(
+  output: CLIOutput,
+  errors: readonly { scope: string; message: string }[]
+): void {
+  for (const e of errors) output.warn(`[${e.scope}] ${e.message}`);
+}
+
+export function printAllToolsDrift(
+  output: CLIOutput,
+  status: { aiTools: ScopeDriftReport; ideTools: ScopeDriftReport } & PluginDriftReport
+): void {
+  output.print("\nDrift:");
+  output.print("AI tools:");
+  printScopeReport(output, status.aiTools);
+  output.print("IDE tools:");
+  printScopeReport(output, status.ideTools);
+  output.print("Plugins:");
+  printPluginDrift(output, { pluginDrift: status.pluginDrift });
+}
+
+export function printToolDrift(
+  output: CLIOutput,
+  status: ScopeDriftReport & PluginDriftReport
+): void {
+  output.print("\nDrift:");
+  printScopeReport(output, status);
+  output.print("Plugins:");
+  printPluginDrift(output, { pluginDrift: status.pluginDrift });
+}
+
+export function printUserScopeTools(
+  output: CLIOutput,
+  tools: readonly { toolId: string; version: string; settings: string }[]
+): void {
+  output.print("User-scope tools:");
+  for (const tool of tools) {
+    output.print(`  ${tool.toolId} (v${tool.version}): expects activation in ${tool.settings}`);
+  }
+}
 
 export function printScopeIssues(
   output: CLIOutput,

@@ -1,14 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { printNativeActivation } from "../../../src/presentation/display/restore-display.js";
-import { CLIOutput } from "../../../src/presentation/output.js";
-
-class CapturingOutput extends CLIOutput {
-  readonly lines: string[] = [];
-
-  override warn(message: string): void {
-    this.lines.push(message);
-  }
-}
+import { CapturingOutput } from "../../helpers/ports/capturing-output.js";
 
 describe("printNativeActivation", () => {
   it("prints nothing when every tool's CLI ran", () => {

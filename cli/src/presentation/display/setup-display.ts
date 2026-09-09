@@ -1,9 +1,21 @@
-import type { ToolInstallResult } from "../../contexts/framework/application/setup/setup-tools-use-case.js";
 import type { CLIOutput } from "../output.js";
 
-export function displayInstall(
+interface ToolInstallOutcome {
+  readonly toolId: string;
+  readonly fileCount: number;
+  readonly files: readonly { readonly relativePath: string }[];
+  readonly skipped: boolean;
+  readonly warnings: readonly string[];
+}
+
+interface SetupOutcome {
+  readonly kind: "initialized" | "up-to-date";
+  readonly install: { readonly results: readonly ToolInstallOutcome[] };
+}
+
+function displayInstall(
   output: CLIOutput,
-  results: readonly ToolInstallResult[],
+  results: readonly ToolInstallOutcome[],
   verbose: boolean
 ): void {
   const skipped = results.filter((r) => r.skipped);
@@ -22,6 +34,25 @@ export function displayInstall(
     const total = installed.reduce((s, r) => s + r.fileCount, 0);
     output.success(`Installed ${installed.map((r) => r.toolId).join(", ")} (${total} files)`);
   }
+}
+
+export function printSetupOutcome(output: CLIOutput, result: SetupOutcome, verbose: boolean): void {
+  switch (result.kind) {
+    case "initialized": {
+      output.success("Project initialized.");
+      displayInstall(output, result.install.results, verbose);
+      break;
+    }
+    case "up-to-date": {
+      output.info("Project is up to date.");
+      displayInstall(output, result.install.results, verbose);
+      break;
+    }
+  }
+}
+
+export function printDetectedContext(output: CLIOutput, description: string): void {
+  output.info(`Detected: ${description}.`);
 }
 
 export function printWelcomeBanner(output: CLIOutput): void {

@@ -6,7 +6,12 @@ import {
 } from "../../kernel/errors.js";
 import type { ToolId } from "../../kernel/tool.js";
 import { createDeps } from "../../runtime/wiring/framework.js";
-import { printNativeActivation, printUnrestorable } from "../display/restore-display.js";
+import {
+  printActivationOutcome,
+  printRestoreOutcome,
+  printToolRestoreOutcome,
+  printUserScopeSyncOutcome,
+} from "../display/sync-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import type { CLIOutput } from "../output.js";
 import { parseGlobalOptions, parseScopeFlag } from "./global-options.js";
@@ -44,14 +49,9 @@ async function runUserScopeSync(
     toolIds,
     recreateFrameworkIfMissing: true,
   });
-  printNativeActivation(output, activation.binaryMissing);
-  for (const e of activation.errors) output.warn(`[${e.scope}] ${e.message}`);
+  printActivationOutcome(output, activation);
   if (activation.errors.length > 0) throw new SyncFailedError(activation.errors);
-  if (activation.activated.length === 0) {
-    output.success("Nothing to sync — no tool is registered at user scope yet.");
-  } else {
-    output.success(`Synced native activation for: ${activation.activated.join(", ")}`);
-  }
+  printUserScopeSyncOutcome(output, activation.activated);
 }
 
 async function runSyncAction(
@@ -77,26 +77,7 @@ async function runSyncAction(
 
     const interactive = !cmdOptions.force && process.stdout.isTTY;
     const result = await deps.restoreAllUseCase.execute(projectRoot, cmdOptions.force, interactive);
-    for (const e of result.errors) output.warn(`[${e.scope}] ${e.message}`);
-
-    const nothingToRestore =
-      result.errors.length === 0 &&
-      result.totalRestored === 0 &&
-      result.pluginNamesRestored.length === 0 &&
-      result.unrestorable.length === 0;
-    if (nothingToRestore) {
-      output.success("Nothing to restore — all files are unmodified.");
-    } else {
-      if (result.totalRestored > 0) {
-        output.success(
-          `Restored ${result.totalRestored} file(s), kept ${result.totalKept} file(s)`
-        );
-      }
-      if (result.pluginNamesRestored.length > 0) {
-        output.success(`Restored plugins: ${result.pluginNamesRestored.join(", ")}`);
-      }
-      printUnrestorable(output, result.unrestorable);
-    }
+    printRestoreOutcome(output, result);
 
     // After restoration, never before: activation drives the host CLI that writes into the
     // settings file restoration regenerates, which must be on disk before that CLI runs.
@@ -104,8 +85,7 @@ async function runSyncAction(
       projectRoot,
       recreateFrameworkIfMissing: true,
     });
-    printNativeActivation(output, activation.binaryMissing);
-    for (const e of activation.errors) output.warn(`[${e.scope}] ${e.message}`);
+    printActivationOutcome(output, activation);
 
     // A run that errored synced nothing for that scope, so reporting success would name the
     // unhealthy state healthy. `errorHandler` turns this into the non-zero exit.
@@ -137,15 +117,7 @@ async function runScopedSync(
     manifest,
     pluginName: cmdOptions.plugin,
   });
-  const nothingDone = result.tools.every((t) => t.nothingToRestore);
-  if (nothingDone) {
-    output.success("Nothing to restore — all files are unmodified.");
-  } else {
-    output.success(
-      `Restored ${result.totalRestored} ${result.totalRestored === 1 ? "file" : "files"}, kept ${result.totalKept} ${result.totalKept === 1 ? "file" : "files"}`
-    );
-    printUnrestorable(output, result.unrestorable);
-  }
+  printToolRestoreOutcome(output, result);
 
   // Same order as the full sync, narrowed to this one tool so fixing it re-drives no other
   // installed tool's activation.
@@ -154,8 +126,7 @@ async function runScopedSync(
     toolIds: [toolId],
     recreateFrameworkIfMissing: true,
   });
-  printNativeActivation(output, activation.binaryMissing);
-  for (const e of activation.errors) output.warn(`[${e.scope}] ${e.message}`);
+  printActivationOutcome(output, activation);
   if (activation.errors.length > 0) throw new SyncFailedError(activation.errors);
 }
 

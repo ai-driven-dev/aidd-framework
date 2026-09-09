@@ -7,7 +7,12 @@ import { assertToolIdsMatchCategory } from "../../contexts/tools/domain/registry
 import type { ToolId } from "../../kernel/tool.js";
 import { AI_TOOL_IDS, IDE_TOOL_IDS } from "../../kernel/tool.js";
 import { createDeps } from "../../runtime/wiring/framework.js";
-import { displayInstall, printNextSteps, printWelcomeBanner } from "../display/setup-display.js";
+import {
+  printDetectedContext,
+  printNextSteps,
+  printSetupOutcome,
+  printWelcomeBanner,
+} from "../display/setup-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import type { CLIOutput } from "../output.js";
 import { parseGlobalOptions, parseScopeFlag } from "./global-options.js";
@@ -25,7 +30,7 @@ interface SetupCmdOptions {
   scope?: string;
 }
 
-function parseSourceFlag(
+export function parseSourceFlag(
   cmdOptions: SetupCmdOptions,
   output: CLIOutput
 ): MarketplaceSourceMode | undefined {
@@ -40,7 +45,7 @@ function parseSourceFlag(
   return MarketplaceSourceMode.remote(undefined, cmdOptions.release);
 }
 
-function expandAllKeyword(raw: string | undefined, all: readonly ToolId[]): ToolId[] {
+export function expandAllKeyword(raw: string | undefined, all: readonly ToolId[]): ToolId[] {
   if (raw === undefined) return [];
   if (raw.trim() === "all") return [...all];
   return raw
@@ -49,7 +54,7 @@ function expandAllKeyword(raw: string | undefined, all: readonly ToolId[]): Tool
     .filter(Boolean) as ToolId[];
 }
 
-function parseToolIds(
+export function parseToolIds(
   cmdOptions: SetupCmdOptions,
   errorHandler: ErrorHandler
 ): { aiTools: ToolId[]; ideTools: ToolId[] } | null {
@@ -69,7 +74,7 @@ function parseToolIds(
 
 type PluginsMode = "interactive" | "all" | "recommended" | "named" | "none";
 
-function parsePluginsFlag(
+export function parsePluginsFlag(
   raw: string | undefined,
   interactive: boolean
 ): { mode: PluginsMode; names: string[] } {
@@ -167,20 +172,9 @@ export function registerSetupCommand(program: Command): void {
         ).execute(flow);
 
         if (interactive && result.context !== undefined) {
-          output.info(`Detected: ${result.context.describe()}.`);
+          printDetectedContext(output, result.context.describe());
         }
-        switch (result.kind) {
-          case "initialized": {
-            output.success("Project initialized.");
-            displayInstall(output, result.install.results, verbose);
-            break;
-          }
-          case "up-to-date": {
-            output.info("Project is up to date.");
-            displayInstall(output, result.install.results, verbose);
-            break;
-          }
-        }
+        printSetupOutcome(output, result, verbose);
         if (interactive) printNextSteps(output, result.install.results.length > 0);
         reportSyncActivation(output, result.activation);
       } catch (error) {

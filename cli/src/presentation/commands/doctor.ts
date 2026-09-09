@@ -5,8 +5,15 @@ import { UserScopeFilterUnsupportedError } from "../../kernel/errors.js";
 import type { ToolCategory, ToolId } from "../../kernel/tool.js";
 import { isAiToolId } from "../../kernel/tool.js";
 import { createDeps } from "../../runtime/wiring/framework.js";
-import { printPluginIssues, printScopeIssues } from "../display/doctor-display.js";
-import { printPluginDrift, printScopeReport } from "../display/status-display.js";
+import {
+  printAllToolsDrift,
+  printInventory,
+  printPluginIssues,
+  printReportErrors,
+  printScopeIssues,
+  printToolDrift,
+  printUserScopeTools,
+} from "../display/doctor-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import type { CLIOutput } from "../output.js";
 import { parseGlobalOptions, parseScopeFlag } from "./global-options.js";
@@ -17,25 +24,6 @@ function categoryOf(toolId: ToolId): ToolCategory {
   return isAiToolId(toolId) ? "ai" : "ide";
 }
 
-/** Which tools are equipped and how much they carry, independent of health and drift, which
- * are reported separately. Versions come from the status report already fetched for drift. */
-function printInventory(
-  output: CLIOutput,
-  label: string,
-  doctorReport: DoctorReport | null,
-  statusTools: readonly { toolId: string; version: string }[]
-): void {
-  const health = doctorReport?.toolHealth ?? [];
-  if (health.length === 0) return;
-  output.print(`\n${label} tools:`);
-  for (const h of health) {
-    const version = statusTools.find((t) => t.toolId === h.toolId)?.version ?? "unknown";
-    output.print(
-      `  ${h.toolId} (v${version}): ${h.fileCount} files, ${h.mergeFileCount} merge files`
-    );
-  }
-}
-
 async function runFullDoctor(
   deps: Deps,
   output: CLIOutput,
@@ -44,18 +32,12 @@ async function runFullDoctor(
 ): Promise<void> {
   const doctorResult = await deps.doctorAllUseCase.execute(projectRoot, pluginName);
   const statusResult = await deps.statusAllUseCase.execute(projectRoot);
-  for (const e of doctorResult.errors) output.warn(`[${e.scope}] ${e.message}`);
+  printReportErrors(output, doctorResult.errors);
 
   printInventory(output, "AI", doctorResult.ai, statusResult.aiTools.tools);
   printInventory(output, "IDE", doctorResult.ide, statusResult.ideTools.tools);
 
-  output.print("\nDrift:");
-  output.print("AI tools:");
-  printScopeReport(output, statusResult.aiTools);
-  output.print("IDE tools:");
-  printScopeReport(output, statusResult.ideTools);
-  output.print("Plugins:");
-  printPluginDrift(output, { pluginDrift: statusResult.pluginDrift });
+  printAllToolsDrift(output, statusResult);
 
   // Before the health gate and unconditional: an `info` issue must survive a healthy run,
   // never be held back until something else fails.
@@ -100,10 +82,7 @@ async function runScopedDoctor(
   };
   printInventory(output, toolId, scopedReport, statusReport.tools);
 
-  output.print("\nDrift:");
-  printScopeReport(output, statusReport);
-  output.print("Plugins:");
-  printPluginDrift(output, { pluginDrift: statusReport.pluginDrift });
+  printToolDrift(output, statusReport);
 
   // Unconditional, before the health gate — see the unscoped path above.
   if (pluginName === undefined) {
@@ -142,13 +121,17 @@ async function runUserScopeDoctor(
   }
   const toolId = cmdOptions.tool as ToolId | undefined;
   const toolIds = toolId === undefined ? manifest.getInstalledToolIds() : [toolId];
-  output.print("User-scope tools:");
-  for (const id of toolIds) {
-    const version = manifest.getToolVersion(id) ?? "unknown";
-    const settingsPaths = userMachineLocalFilesOf(id, deps.homedir());
-    const settings = settingsPaths.length > 0 ? settingsPaths[0] : "no user-scope settings file";
-    output.print(`  ${id} (v${version}): expects activation in ${settings}`);
-  }
+  printUserScopeTools(
+    output,
+    toolIds.map((id) => {
+      const settingsPaths = userMachineLocalFilesOf(id, deps.homedir());
+      return {
+        toolId: id,
+        version: manifest.getToolVersion(id) ?? "unknown",
+        settings: settingsPaths.length > 0 ? settingsPaths[0] : "no user-scope settings file",
+      };
+    })
+  );
   const allowedIds = toolId === undefined ? null : new Set([toolId]);
   const issues = await deps.doctorRegistrationUseCase.execute({
     manifest,
