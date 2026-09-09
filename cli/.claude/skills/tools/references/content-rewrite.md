@@ -50,8 +50,9 @@ A profile whose `rewriteContent` is the identity is indistinguishable from a pro
 forgot to implement it — until a placeholder reaches a user's file verbatim. That is not
 hypothetical: the rewriting was deleted once on the reasoning that no current plugin emits
 placeholders, and it broke `plugin install --tool copilot` while nine build captures and the
-golden matrix all stayed green. The golden froze `claude`, whose rewrite is the identity, and
-the translate path never calls `rewriteContent` for the marketplace mode.
+golden matrix all stayed green. The golden froze a rewrite that emits no placeholder to catch — `claude`'s own
+`rewriteContent` does rewrite its numbered command directories — and the translate path never
+calls `rewriteContent` for the marketplace mode.
 
 So: **prove a rewrite on the install path, with a fixture that contains the placeholder.**
 A build comparison cannot see this.

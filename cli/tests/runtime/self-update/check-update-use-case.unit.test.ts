@@ -1,4 +1,3 @@
-import { homedir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { FileHash } from "../../../src/kernel/file.js";
@@ -8,6 +7,7 @@ import type { Logger } from "../../../src/kernel/ports/logger.js";
 import type { VersionReader } from "../../../src/kernel/ports/version-reader.js";
 import { CheckUpdateUseCase } from "../../../src/runtime/self-update/check-update-use-case.js";
 import type { SelfUpdater } from "../../../src/runtime/self-update/self-updater.js";
+import { userConfigDir } from "../../../src/runtime/user-config-dir.js";
 
 const TTL_24H = 24 * 60 * 60 * 1000;
 
@@ -60,7 +60,7 @@ function makeFsStub(store: Map<string, string> = new Map()): FileReader & FileWr
 }
 
 function seedCache(store: Map<string, string>, latest: string, ageMs = 0): void {
-  const dir = process.env.AIDD_USER_CONFIG_DIR ?? join(homedir(), ".config", "aidd");
+  const dir = userConfigDir();
   store.set(
     join(dir, "update-check.json"),
     JSON.stringify({ checkedAt: Date.now() - ageMs, latest })
@@ -148,5 +148,30 @@ describe("refresh (online piggyback path)", () => {
     const written = [...store.values()].find((v) => v.includes('"latest"'));
     expect(written).toBeDefined();
     expect(JSON.parse(written as string).latest).toBe("2.0.0");
+  });
+});
+
+describe("where the cache lands", () => {
+  it("follows XDG_CONFIG_HOME when set, the way every other machine-local file does", async () => {
+    const saved = { xdg: process.env.XDG_CONFIG_HOME, aidd: process.env.AIDD_USER_CONFIG_DIR };
+    process.env.XDG_CONFIG_HOME = "/xdg-config";
+    delete process.env.AIDD_USER_CONFIG_DIR;
+    try {
+      const store = new Map<string, string>();
+      const { logger } = makeLogger();
+      await new CheckUpdateUseCase(
+        makeSelfUpdater("2.0.0"),
+        makeVersionReader("1.0.0"),
+        logger,
+        makeFsStub(store)
+      ).refresh();
+      expect([...store.keys()]).toContain(
+        join("/xdg-config", "aidd", "cache", "update-check.json")
+      );
+    } finally {
+      if (saved.xdg === undefined) delete process.env.XDG_CONFIG_HOME;
+      else process.env.XDG_CONFIG_HOME = saved.xdg;
+      if (saved.aidd !== undefined) process.env.AIDD_USER_CONFIG_DIR = saved.aidd;
+    }
   });
 });

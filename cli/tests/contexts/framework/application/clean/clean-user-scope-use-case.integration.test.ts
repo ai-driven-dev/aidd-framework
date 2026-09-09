@@ -281,6 +281,37 @@ describe("clean --scope user", () => {
       expect(remaining).toContain("other-marketplace");
     });
 
+    it("deletes the update-check cache too, so nothing is left to keep the cache/ shell alive", async () => {
+      const fs = new RecordingFileAdapter();
+      fs.setFile(
+        join(USER_CONFIG_DIR, "cache", "built", "1.0.0", "aidd-framework", "claude", "x"),
+        "1"
+      );
+      // Written by `check-update-use-case.ts` on any online command, into the same
+      // `cache/` directory `cache/built/` sits in — the one occupant that used to
+      // survive a machine-scope clean and keep the shell around it non-empty.
+      fs.setFile(join(USER_CONFIG_DIR, "cache", "update-check.json"), '{"latest":"9.9.9"}');
+      // And where an older CLI wrote the same cache, before it moved under `cache/`.
+      fs.setFile(join(USER_CONFIG_DIR, "update-check.json"), '{"latest":"8.0.0"}');
+      const useCase = new CleanUserScopeUseCase(
+        fs,
+        new InMemoryManifestRepository(Manifest.create()),
+        new CapturingLogger(),
+        new InMemoryMarketplaceRegistry(),
+        () => USER_CONFIG_DIR
+      );
+
+      await useCase.execute({ projectRoot: "/wherever", force: true });
+
+      expect(fs.order).toContain(
+        `deleteFile:${join(USER_CONFIG_DIR, "cache", "update-check.json")}`
+      );
+      expect(await fs.fileExists(join(USER_CONFIG_DIR, "cache", "update-check.json"))).toBe(false);
+      expect(fs.order).toContain(`deleteFile:${join(USER_CONFIG_DIR, "update-check.json")}`);
+      // Nothing else sat beside it, so the shell itself goes with it.
+      expect(fs.order).toContain(`deleteDirectory:${join(USER_CONFIG_DIR, "cache")}`);
+    });
+
     it("never deletes userConfigDir() itself, even when references.json resolves back to it through a symlink", async () => {
       const fs = new RecordingFileAdapter();
       fs.setFile(join(USER_CONFIG_DIR, "marker"), "1");

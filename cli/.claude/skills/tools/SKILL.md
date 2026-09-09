@@ -37,7 +37,7 @@ install anything itself.
 ## How
 
 - `AiTool<C>` fields: read `domain/contracts.ts`. A list copied here aged at every field.
-- `Has*` interfaces live in `contracts.ts`, alphabetical, always `readonly`, never optional —
+- `Has*` interfaces live in `contracts.ts`, always `readonly`, never optional —
   a tool either includes `Has<Name>` in its `C` intersection or does not have the field at all.
   Guard presence with `"name" in tool.capabilities`, never `instanceof`.
 - `rewriteContent(content)` is one way, per tool, with no reverse and no shared base helper.

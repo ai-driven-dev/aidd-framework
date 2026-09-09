@@ -36,8 +36,10 @@ field to the contract — never a branch in an orchestrator.
 | `merge?` / `mergeDest?` / `mcpServersKey?` | for config-file kinds (mcp) merging into one shared file rather than a per-plugin write; reuse an existing merge helper, never reimplement |
 | `hooksMerge?` / `hooksMergeDest?` | for tools whose hooks register into one shared file rather than a per-plugin write |
 
-Contract-level: `manifestDir` / `marketplaceRelative` / `synthesizeManifest` (marketplace mode;
-`null` when the tool has no native marketplace) and an optional `emitConfigArtifact(builtPlugins, outDir)`.
+Contract-level: `manifestFileRelative` / `synthesizeManifest` / `manifestSchemaName`
+(marketplace mode; each `null` when the tool has no native manifest), the optional
+`pluginRootToken`, and an optional `emitConfigArtifact(builtPlugins, outDir, …)`. Read
+`contexts/tools/domain/build-contract.ts` for the live field list.
 
 ## Reuse, never reinvent
 
@@ -62,7 +64,8 @@ server of the same name would collide. The prefix is mandatory for every tool.
 ## Where the contract lives, and how it reaches the pipeline
 
 Each tool's contract(s) live in `contexts/tools/domain/profiles/<tool>/build.ts`, exporting
-`build<Tool>Contract()` (marketplace) and/or `build<Tool>FlatContract()` (flat). The profile
+`build<Tool>Contract()` or `build<Tool>MarketplaceContract()` (marketplace — copilot uses the
+second spelling) and/or `build<Tool>FlatContract()` (flat). The profile
 declares which modes it supports via `buildContracts: { marketplace?, flat? }` on the `AiTool`
 object — a tool with no native marketplace omits `marketplace`.
 

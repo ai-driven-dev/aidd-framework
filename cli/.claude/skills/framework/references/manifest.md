@@ -4,8 +4,9 @@
 
 - Tracks every installed framework file with its MD5 hash
 - Persisted at `.aidd/manifest.json`
-- Single source of truth for installed state — version guard reads v6 only on load, refusing an
-  older manifest by naming the last CLI able to migrate it forward, and a newer one by naming
+- Single source of truth for installed state — the version guard reads `MANIFEST_VERSION`
+  (`contexts/framework/domain/manifest-serialization.ts`) and nothing else on load, refusing an older manifest by
+  naming what to do with the document (no CLI migrates one forward), and a newer one by naming
   self-update
 
 ## Write guard (applies to any use-case writing framework files)
@@ -22,7 +23,7 @@
 ## Merge file tracking
 
 - Merge config files are tracked in `ToolEntry.mergeFiles` (not in `files`)
-- `isFileTracked()` checks both `files` and `mergeFiles`
+- `isFileTracked()` checks three sources: `files`, `mergeFiles`, and each installed plugin's own `isFileTracked` (`domain/manifest/tool-entry.ts`'s `isFileTrackedInEntry`)
 - Uninstall and clean must delete merge files alongside regular files
 
 ## Delegation to its members

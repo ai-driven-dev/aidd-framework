@@ -77,7 +77,7 @@ export AIDD_TOKEN=<YOUR_TOKEN>
 
 ### Token resolution order
 
-`AIDD_TOKEN` env → project `.aidd/auth.json` → user `~/.config/aidd/auth.json` → `gh auth token` (only if stored config uses `method: "gh"`)
+`AIDD_TOKEN` env → project `.aidd/auth.json` → user `~/.config/aidd/auth.json`. A stored config declaring `method: "external"` resolves `gh auth token` at whichever of those two levels it was found, never as a trailing fallback after both.
 
 ### Storage levels
 
@@ -136,10 +136,11 @@ aidd setup --ai all --ide all --yes
 
 ### Brownfield (existing project)
 
-This CLI reads manifest schema v6 only. If `aidd doctor` (or any command) refuses to load
-the manifest, run `npx @ai-driven-dev/cli@5.2.1 update --force` once — the last version able
-to migrate an older manifest forward — then update the CLI again. `--force` matters: a plain
-`update` skips the save when a tracked file was hand-edited.
+This CLI reads manifest schema v8 only (`MANIFEST_VERSION`), and nothing migrates an older
+one forward. If `aidd doctor` (or any command) refuses to load the manifest, the refusal
+message itself names the remedy for the version it found: delete the manifest and reinstall,
+except for a v6 document, where it first names `npx @ai-driven-dev/cli@5.2.2 clean --force`
+so the CLI that wrote it can unregister what it registered before that record disappears.
 
 ```bash
 aidd doctor
@@ -208,19 +209,19 @@ aidd framework remove --tool vscode        # remove VS Code integration only
 | Command                          | Description                                                                          | Key options                                                       |
 | --------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
 | `aidd auth`                       | Manage authentication (login, logout, status)                                        | `--token`, `--gh`, `--level`                                      |
-| `aidd setup`                      | Bootstrap a project: init manifest + register marketplace + install runtime config   | `--source`, `--path`, `--release`, `--ai`, `--ide`, `--plugins`, `--yes` |
-| `aidd doctor`                     | Detected/equipped tools, plugins, drift, and problems — across all tools or one      | `--tool`, `--plugin`                                              |
-| `aidd sync [files...]`            | Rewrite owned files from what is already there, driven by the manifest               | `--force`, `--tool`, `--plugin`                                   |
+| `aidd setup`                      | Bootstrap a project: init manifest + register marketplace + install runtime config   | `--source`, `--path`, `--release`, `--ai`, `--ide`, `--plugins`, `--no-default-marketplace`, `--yes`, `--scope` |
+| `aidd doctor`                     | Detected/equipped tools, plugins, drift, and problems — across all tools or one      | `--tool`, `--plugin`, `--scope` |
+| `aidd sync [files...]`            | Rewrite owned files from what is already there, driven by the manifest               | `--force`, `--tool`, `--plugin`, `--scope` |
 | `aidd translate <source>`         | Convert an arbitrary source into a target-native plugin tree — records nothing       | `--to`, `--out`, `--as`, `--force`                                |
 | `aidd update` (alias `upgrade`)   | Update the CLI itself to the latest version                                          | `--check`, `--dry-run`, `--force`                                 |
-| `aidd clean`                      | Remove all AIDD files — dry-run without `--force`                                    | `--force`                                                         |
+| `aidd clean`                      | Remove all AIDD files — dry-run without `--force`                                    | `--force`, `--scope` |
 | `aidd framework install`          | Install a tool's runtime configuration from bundled assets                           | `--tool`, `--force`, `--no-plugins`                               |
 | `aidd framework update`           | Re-install tool configs from bundled CLI assets (all installed tools if `--tool` is omitted) | `--tool`, `--force`                                        |
 | `aidd framework remove`           | Remove a tool's generated configuration files                                        | `--tool`                                                          |
 | `aidd plugin`                     | Manage plugins for AI tools                                                          | `remove`, `list`, `install`, `search`, `update`                   |
 | `aidd marketplace`                | Manage plugin marketplaces                                                           | `add`, `list`, `remove`, `refresh`, `check`                       |
 
-`--tool` is the single scope flag across `doctor`, `sync`, and every `framework`/`plugin` subcommand — it takes one AI or IDE tool ID (`claude`, `cursor`, `copilot`, `codex`, `opencode`, `vscode`); omit it to act on every installed tool.
+`--tool` selects the tool across `doctor`, `sync`, and every `framework`/`plugin` subcommand — it takes one AI or IDE tool ID (`claude`, `cursor`, `copilot`, `codex`, `opencode`, `vscode`); omit it to act on every installed tool. `--scope <project|user>` is the other dimension, on `setup`, `doctor`, `sync` and `clean`: this project alone (the default), or the machine-wide registration `setup --scope user` writes. `plugin search` scopes by `--marketplace` instead.
 
 ### `aidd auth`
 
@@ -346,7 +347,7 @@ Registers and manages plugin marketplaces — sources that publish plugin catalo
 
 ```bash
 aidd marketplace add acme owner/aidd-plugins    # register a marketplace (project scope)
-aidd marketplace add acme owner/aidd-plugins --user  # register at user scope
+aidd marketplace add acme owner/aidd-plugins --scope user  # register at user scope
 aidd marketplace add acme owner/aidd-plugins --yes   # skip trust + cleanup prompts
 aidd marketplace add acme owner/aidd-plugins --overwrite  # replace existing entry
 aidd marketplace list                           # list registered marketplaces
@@ -382,7 +383,7 @@ Marketplace registration and plugin enable state are written to per-tool setting
 | Claude Code | `.claude/settings.json` |
 | Cursor | `.cursor/settings.json` |
 | GitHub Copilot | `.github/copilot/settings.json` |
-| Codex | `.codex/config.json` |
+| Codex | `.codex/config.toml` |
 | OpenCode | `opencode.json` (project root) |
 
 > **GitHub Copilot — workspace recommendations only.** Per [VS Code docs](https://code.visualstudio.com/docs/copilot/customization/agent-plugins), `.github/copilot/settings.json` registers marketplaces as **team recommendations**, not auto-activated. On first chat in the workspace VS Code shows a notification — the user must accept it (or filter Extensions by `@agentPlugins @recommended` and enable manually) before plugins load. To skip the per-project click, add the marketplace to the user-level setting `chat.plugins.marketplaces` (application-scoped, not writable from workspace). See [End-to-end: distribute a framework to Copilot](#end-to-end-distribute-a-framework-to-copilot-marketplace) for the full flow.
@@ -476,7 +477,7 @@ aidd translate ./framework --to opencode --out ./dist/aidd-framework-opencode-fl
 
 ### Manifest schema upgrades
 
-There is no `aidd migrate` command, and no automatic migration: this CLI reads manifest schema v6 only. A manifest below v6 is refused with a message naming the last CLI able to migrate it — `npx @ai-driven-dev/cli@5.2.1 update --force` — run once to upgrade the manifest on disk, then update the CLI again. A manifest above v6 (written by a newer CLI) is refused with a message pointing at `aidd update` instead.
+There is no `aidd migrate` command, and no automatic migration: this CLI reads manifest schema v8 only — `MANIFEST_VERSION`, the one number the loader accepts. A manifest above 8 (written by a newer CLI) is refused with a message pointing at `aidd update`. A manifest below 8 is refused too, and its message names what to do with the document rather than a CLI that would migrate it, because none does: delete it and reinstall the framework. One older shape gets a richer remedy — v6, the only pre-8 version a published CLI ever wrote (5.2.2) — where the message first names `npx @ai-driven-dev/cli@5.2.2 clean --force`, so that CLI can unregister what it registered while the manifest recording it still exists.
 
 ### `aidd clean`
 
@@ -487,6 +488,7 @@ files only.
 ```bash
 aidd clean                      # dry-run: shows what will be removed
 aidd clean --force              # actual removal
+aidd clean --scope user --force # purge the machine-wide registration and the shared source
 ```
 
 ### `aidd update`
@@ -519,6 +521,9 @@ aidd update --verbose           # detailed logs
 | -------------- | ----------------------------------------------------------------------- |
 | `AIDD_TOKEN`   | GitHub token — takes precedence over stored credentials (needed for private marketplaces only) |
 | `AIDD_VERBOSE` | Verbose mode (`true`/`false`)                                           |
+| `AIDD_USER_CONFIG_DIR` | Relocates the user config directory and everything under it — the full list of what moves is in `aidd_docs/memory/cli.md` |
+| `AIDD_TELEMETRY_DIR` | Relocates the telemetry records directory alone — the one to share with a team, see `aidd_docs/memory/telemetry.md` |
+| `AIDD_RUNS_DIR` | Relocates the run journal, normally at the git root above the project — see `aidd_docs/memory/telemetry.md` |
 
 ---
 

@@ -21,7 +21,7 @@ paths:
 ## Names
 
 - `kebab-case.ts` for every source file. An adapter file ends in `-adapter.ts`, a use case in
-  `-use-case.ts`, and a port file matches its interface (`file-system.ts` for `FileSystem`).
+  `-use-case.ts`, and a port file matches its interface (`file-merger.ts` for `FileMerger`).
   These suffixes are not decoration: the ratchets read them, so a misnamed file is a file no
   rule can see.
 - `camelCase` for values and methods, `PascalCase` for classes, interfaces and types,

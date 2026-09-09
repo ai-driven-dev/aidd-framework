@@ -10,7 +10,7 @@
 #
 # --- Why this cannot reuse the naming scheme the design assumed ------------------
 # `setup`'s auto-register always names the marketplace "aidd-framework"
-# (`domain/marketplace.ts`'s FRAMEWORK_MARKETPLACE_NAME) — it does not read the name
+# (`contexts/distribution/domain/marketplace.ts`'s FRAMEWORK_MARKETPLACE_NAME) — it does not read the name
 # from the source's own marketplace.json, and there is no flag to override it.
 # Measured on this machine: `aidd-framework` is already registered, permanently, at
 # every one of the five hosts (real daily-driver installs). Worse, measured directly
@@ -39,12 +39,17 @@
 # --- Why `HOME` is real but `AIDD_USER_CONFIG_DIR` is not -----------------------
 # Machine scope (`--scope user`) reads and writes `userConfigDir()`, which on a real
 # daily driver holds this person's own `marketplaces.json`, `references.json`,
-# `auth.json`, `identity.json` and `telemetry/`. Every phase below would otherwise
-# register into, and later purge from, that live directory — and `clean --scope user`'s
-# whitelist deletes `cache/built/` in full and `references.json` outright, which is not
-# a thing to point at somebody's real profile. `AIDD_USER_CONFIG_DIR` relocates exactly
-# those five things and nothing else (`aidd_docs/memory/cli.md`'s distribution bullet),
-# so it is exported once, script-wide, before the first `aidd` call. `HOME` stays real:
+# `auth.json`, `manifest.json`, `cache/` and `telemetry/`. Every phase below would
+# otherwise register into, and later purge from, that live directory — and
+# `clean --scope user`'s whitelist deletes `cache/built/` in full, the self-update
+# `cache/update-check.json` beside it, the `cache/` shell they leave behind, and
+# `references.json` outright, which is not a thing to point at somebody's real profile.
+# `AIDD_USER_CONFIG_DIR` relocates all of those (`aidd_docs/memory/cli.md`'s
+# distribution bullet carries the full list, including the telemetry sink's own legacy
+# fallback). It does NOT relocate `identity.json`: `resolveAiddConfigDir()`
+# (`kernel/reading/home-dir.ts`) refuses this variable on purpose, so identity is read
+# from and written to the real profile even here. The variable is exported once,
+# script-wide, before the first `aidd` call. `HOME` stays real:
 # reaching claude/codex/copilot/cursor's own registries is the whole point of this
 # script, and none of them lives under `userConfigDir()`.
 #

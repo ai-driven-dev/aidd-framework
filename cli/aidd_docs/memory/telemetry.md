@@ -65,11 +65,13 @@ for the boundary that governs a future hosted destination.
   `amount`, `toolStatedStep`, `agentName`), an optional `TranscriptLocation`, and an optional
   `limitation`; `unsupported` carries only a `reason`.
 - `telemetry → tools` is the one allowed edge (`0-contexts.md`); `tools` never imports
-  `telemetry` back. Along it, `telemetry`'s `infrastructure/`/`application/` reuse five of
-  `tools`' own public modules — `registry.ts`, `marketplace-settings.ts`, and the
-  `plugin-root-token`/`flat-hooks-merge`/`cursor-hooks-project-merge` format helpers — none of
-  it measurement-specific, which is why that vocabulary lives in `kernel/measurement.ts`
-  instead of in `tools` itself (`architecture.md`).
+  `telemetry` back. Along it, `telemetry` reuses seven of `tools`' own public modules — this
+  page is their one home: `registry.ts`, `marketplace-settings.ts`, `host-plugin-registration.ts`,
+  `ports/host-plugin-registry-reader.ts`, and the
+  `plugin-root-token`/`flat-hooks-merge`/`cursor-hooks-project-merge` format helpers. The
+  importers are not confined to `infrastructure/` and `application/` either: `domain/telemetry-setup.ts`
+  reaches across the edge too. None of it is measurement-specific, which is why that vocabulary
+  lives in `kernel/measurement.ts` instead of in `tools` itself (`architecture.md`).
 - Declared: `claude`, `codex`, `copilot`, `opencode` — each in its own
   `contexts/tools/domain/profiles/<name>/profile.ts`. Explicitly `unsupported`: `cursor`.
   Silent, no telemetry field at all: `vscode`.
@@ -77,11 +79,9 @@ for the boundary that governs a future hosted destination.
 ## Gotchas
 
 - `AIDD_RUNS_DIR` and `AIDD_TELEMETRY_DIR`/`AIDD_USER_CONFIG_DIR` answer different questions —
-  where the journal lives versus where the figures do. `AIDD_USER_CONFIG_DIR` moves more than
-  telemetry's own root: `auth.json`, the shared `aidd-framework` marketplace registration
-  (`marketplaces.json` and its `cache/built/`), the machine's own project-reference
-  registry (`references.json`), and the `--scope user` manifest (`manifest.json`) all move
-  with it too — see `cli.md`. Read
+  where the journal lives versus where the figures do. `AIDD_USER_CONFIG_DIR` moves far more
+  than telemetry's own root, and it takes the sink with it only as a legacy fallback, when
+  `AIDD_TELEMETRY_DIR` is unset; `cli.md` carries the full list of what else moves. Read
   `plugins/aidd-telemetry/README.md` ("Share `AIDD_TELEMETRY_DIR`, never
   `AIDD_USER_CONFIG_DIR`") before pointing anyone at either.
 - A relocated `HOME` does not relocate a real `codex` binary if `CODEX_HOME` is set on that

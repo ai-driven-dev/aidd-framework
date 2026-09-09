@@ -42,6 +42,19 @@ async function listFilesUnder(dir: string): Promise<string[]> {
   return results;
 }
 
+/** Whether a directory is still there at all — `listFilesUnder` answers `[]` for an
+ * empty one and for a removed one alike, so proving a shell was removed needs its own
+ * question. */
+async function directoryExists(dir: string): Promise<boolean> {
+  try {
+    await readdir(dir);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
+}
+
 async function readJson(path: string): Promise<Record<string, unknown>> {
   return JSON.parse(await readFile(path, "utf-8")) as Record<string, unknown>;
 }
@@ -112,11 +125,20 @@ describe("E2E: clean --scope user purges the shared source", () => {
       const builtDir = join(userConfigDir, "cache", "built", "9.9.9", "aidd-framework", "claude");
       await mkdir(builtDir, { recursive: true });
       await writeFile(join(builtDir, "marker.json"), "{}", "utf-8");
+      // The self-update check cache, which any online command writes beside `built/`.
+      // It is aidd's own file, so the whitelist takes it too — and only then is the
+      // `cache/` shell around both actually empty enough to go with them.
+      await writeFile(
+        join(userConfigDir, "cache", "update-check.json"),
+        '{"checkedAt":0,"latest":"9.9.9"}',
+        "utf-8"
+      );
 
       const before = (await listFilesUnder(userConfigDir)).sort();
       expect(before).toContain(
         join("cache", "built", "9.9.9", "aidd-framework", "claude", "marker.json")
       );
+      expect(before).toContain(join("cache", "update-check.json"));
 
       const cleanResult = await runCli(
         ["clean", "--scope", "user", "--force"],
@@ -148,6 +170,10 @@ describe("E2E: clean --scope user purges the shared source", () => {
       expect(afterNames).not.toContain("aidd-framework");
       expect(afterNames).toContain("other-marketplace");
       expect(await readFile(telemetryFile, "utf-8")).toBe('{"kind":"session"}\n');
+      // `listFilesUnder` sees files, never an empty directory, so the shell itself has
+      // to be asked for by name: nothing of aidd's was left under `cache/`, so `cache/`
+      // is gone too rather than surviving as an empty husk.
+      expect(await directoryExists(join(userConfigDir, "cache"))).toBe(false);
     } finally {
       await cleanup();
     }
@@ -203,6 +229,7 @@ describe("E2E: clean --scope user purges the shared source", () => {
       const after = (await listFilesUnder(userConfigDir)).sort();
       expect(after).not.toContain("references.json");
       expect(after.some((f) => f.startsWith("cache"))).toBe(false);
+      expect(await directoryExists(join(userConfigDir, "cache"))).toBe(false);
       const afterMarketplaces = await readJson(join(userConfigDir, "marketplaces.json"));
       const afterNames = (afterMarketplaces.marketplaces as Array<{ name: string }>).map(
         (m) => m.name

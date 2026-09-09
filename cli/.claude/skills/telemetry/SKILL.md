@@ -54,8 +54,10 @@ says where new code goes and what it must not do.
 ## Public surface
 
 `tests/architecture/context-boundary.arch.test.ts` holds the list (`PUBLIC_MODULES.telemetry`):
-the use cases the `telemetry` command drives, and the shapes a rendered answer is made of.
-Nothing else, and no adapter. Rendering happens in `presentation/display/`, never here.
+the use cases the `telemetry` command drives, the shapes a rendered answer is made of, the
+commit-trailer format the git adapter writes, and the two ports a caller wires a concrete
+adapter into (`domain/ports/telemetry-sink.ts`, `domain/ports/version-control.ts`). Nothing
+else, and no adapter. Rendering happens in `presentation/display/`, never here.
 
 ## How it's tested
 

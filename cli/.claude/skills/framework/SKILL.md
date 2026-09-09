@@ -3,8 +3,8 @@ name: framework
 description: >
   Owns the installation record and everything done to a project, under
   src/contexts/framework/ — the manifest aggregate, and the setup/install/restore/uninstall/doctor
-  orchestration built on top of it. This is the only context allowed to reach `translate`,
-  `tools`, and `distribution`. Use when adding a use-case that touches the manifest, a
+  orchestration built on top of it. This is the only context allowed to reach `translate` and
+  `distribution`; `tools` is reachable from `telemetry` too. Use when adding a use-case that touches the manifest, a
   setup/doctor/sync/uninstall flow, a new top-level CLI orchestration, or a launcher that runs an
   external binary (kanban-shaped). Do NOT use for a tool's own profile or capability classes —
   use `tools`. Do NOT use for the translation pipeline — use `translate`. Do NOT use for where
@@ -16,20 +16,20 @@ description: >
 `framework` is what is posed on a project and the record of it: the manifest that tracks every
 installed file, and every flow that reads or changes that record — setup, doctor, sync (restore),
 uninstall, plugin install/update/remove, and the global chain orchestrators. It is the one
-context the dependency chain lets reach every other context (`framework → translate → tools →
-kernel`, plus `framework → distribution`), because assembling what goes on disk is exactly the
-job that needs all three.
+context the dependency chain lets reach every other context but `telemetry` (`framework →
+translate → tools → kernel`, plus `framework → distribution`), because assembling what goes on
+disk is exactly the job that needs all three.
 
 ## What goes in
 
 | Concept | Location |
 |---|---|
-| The manifest aggregate and its members | `domain/manifest.ts`, `domain/manifest/` (tool-entry, tracked-files, merge-files, mcp-exclusions) |
+| The manifest aggregate and its members | `domain/manifest.ts`, `domain/manifest/` (tool-entry, tracked-files, merge-files, mcp-exclusions, native-registrations) |
 | A plugin's declared state | `domain/plugins/` (installed-plugin, source-resolver, requested-version-policy) |
 | The diagnosis shape | `domain/doctor.ts` |
 | Setup orchestration state | `domain/setup-flow.ts` |
-| A port only `framework` needs | `domain/ports/` (manifest-repository, plugin-distribution-reader) |
-| A top-level flow's orchestrator | `application/` root, or a feature subdirectory (`doctor/`, `restore/`, `setup/`, `uninstall/`, `plugin/`, `global/`, `install/`, `flows/`) |
+| A port only `framework` needs | `domain/ports/` (manifest-repository, plugin-distribution-reader, user-source-references) |
+| A top-level flow's orchestrator | `application/` root, or a feature subdirectory (`clean/`, `doctor/`, `flows/`, `framework/`, `global/`, `install/`, `plugin/`, `restore/`, `setup/`, `uninstall/`) |
 | Logic needed by ≥2 top-level use-cases | `application/shared/` — never called from a command |
 | The manifest-repository and plugin-distribution-reader adapters | `infrastructure/` |
 

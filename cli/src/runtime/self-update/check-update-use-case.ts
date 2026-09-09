@@ -1,10 +1,10 @@
-import { homedir } from "node:os";
 import { join } from "node:path";
 import type { FileReader } from "../../kernel/ports/file-reader.js";
 import type { FileWriter } from "../../kernel/ports/file-writer.js";
 import type { Logger } from "../../kernel/ports/logger.js";
 import type { VersionReader } from "../../kernel/ports/version-reader.js";
 import { compareSemver, isSemver } from "../../kernel/semver.js";
+import { userConfigDir } from "../user-config-dir.js";
 import type { SelfUpdater } from "./self-updater.js";
 
 interface CachedCheck {
@@ -16,15 +16,14 @@ function isOutdated(version: string, latest: string): boolean {
   return isSemver(version) && compareSemver(version, latest) < 0;
 }
 
-function resolveConfigDir(): string {
-  return process.env.AIDD_USER_CONFIG_DIR ?? join(homedir(), ".config", "aidd");
-}
-
 /** Where this cache is written: under `cache/`, beside every other disposable thing, rather
  * than loose among the files a person chose. Nothing here is a choice — it is the last
  * version seen and when, refetched whenever it is missing. */
 function resolveCachePath(): string {
-  return join(resolveConfigDir(), "cache", "update-check.json");
+  // The same resolution every other machine-local file uses (`AIDD_USER_CONFIG_DIR`, then
+  // `XDG_CONFIG_HOME`, then the home default): the file a machine-scope `clean` purges must
+  // be the file this writes, whatever the machine's own configuration says.
+  return join(userConfigDir(), "cache", "update-check.json");
 }
 
 /** Where it used to be written, read when the current path holds nothing. A cache that
@@ -32,7 +31,7 @@ function resolveCachePath(): string {
  * harmless, and still worth not doing to every existing install at once. Never written to,
  * so the old file simply stops being touched and can be deleted by hand. */
 function legacyCachePath(): string {
-  return join(resolveConfigDir(), "update-check.json");
+  return join(userConfigDir(), "update-check.json");
 }
 
 export class CheckUpdateUseCase {

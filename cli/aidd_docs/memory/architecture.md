@@ -10,24 +10,41 @@ The macro shape of this package: the stack, how the pieces fit, and the decision
 
 ## How it fits together
 
+Every edge below is a real import direction, not an intention: the five inter-context arrows
+are exactly `ALLOWED` in `tests/architecture/helpers.ts`, which `context-graph.arch.test.ts`
+fails the build over. `presentation` and `runtime` compose every context, and every context
+reaches the kernel. Edges running the other way exist and are debt, recorded with their
+measured weight as `BASELINE` in that same file — read them there, they are deliberately not
+drawn here.
+
 ```mermaid
 flowchart LR
-    Presentation["presentation"] --> Framework["framework"]
-    Framework --> Translate["translate"]
-    Framework --> Distribution["distribution"]
-    Framework --> Tools["tools"]
-    Translate --> Tools
-    Telemetry["telemetry"] --> Tools
-    Tools --> Kernel["kernel"]
-    Distribution --> Kernel
-    Runtime["runtime"] --> Framework
+    Presentation["presentation"] --> Distribution["distribution"]
+    Presentation --> Framework["framework"]
+    Presentation --> Telemetry["telemetry"]
+    Presentation --> Tools["tools"]
+    Presentation --> Translate["translate"]
+    Runtime["runtime"] --> Distribution
+    Runtime --> Framework
     Runtime --> Telemetry
+    Runtime --> Tools
+    Runtime --> Translate
+    Framework --> Translate
+    Framework --> Distribution
+    Framework --> Tools
+    Translate --> Tools
+    Telemetry --> Tools
+    Distribution --> Kernel["kernel"]
+    Framework --> Kernel
+    Telemetry --> Kernel
+    Tools --> Kernel
+    Translate --> Kernel
 ```
 
 ## Key decisions
 
 - Organised by bounded context, never by layer. The allowed edges, the kernel's rule and the no-reach-inside rule are enforced by `tests/architecture/`, stated in `.claude/rules/00-architecture/0-contexts.md`.
-- A tool declares, a context reads. What a tool says about being measured lives in `kernel/measurement.ts`, not in `tools` itself, so `tools` has nothing of `telemetry`'s to import back — the edge runs one way, `telemetry → tools`, and `telemetry` does reuse ordinary `tools` config/capability modules along it (`registry.ts`, `marketplace-settings.ts`, three format helpers), unrelated to measurement.
+- A tool declares, a context reads. What a tool says about being measured lives in `kernel/measurement.ts`, not in `tools` itself, so `tools` has nothing of `telemetry`'s to import back — the edge runs one way, `telemetry → tools`, and `telemetry` does reuse ordinary `tools` config/capability modules along it, unrelated to measurement — `telemetry.md` names which ones and from which layers.
 - Telemetry reaches no context but `tools`, and no context reaches into it. What it needs elsewhere it declares as its own port, satisfied at the composition root.
 - Some tools' project config is inert: Codex, Copilot and Claude only load a plugin once their own CLI has registered it. Which ones is a per-tool fact, verified against the real tool, never inferred.
 - Claude's registration is driven at `--scope local`, so the file this CLI hashes keeps a single writer.

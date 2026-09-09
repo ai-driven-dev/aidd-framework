@@ -34,9 +34,10 @@ plugin's own content and how it gets translated are someone else's job once it h
   `framework` — `tests/architecture/context-graph.arch.test.ts` enforces the chain
   (`framework → distribution`, plus everything to `kernel`) and fails the build the moment a new
   edge appears. If a change seems to need one, the orchestration belongs to the caller
-  (`framework`), not here — see that test's own baseline comment for the one documented
-  exception (`marketplace add --overwrite` removing before adding), which is framework work that
-  has not yet been moved out.
+  (`framework`), not here — see `BASELINE` in `tests/architecture/helpers.ts` for the one
+  documented exception, `distribution->framework`, and the comment there that explains it
+  (`marketplace add --overwrite` removing before adding), which is framework work that has not
+  yet been moved out.
 - A port here follows the port/adapter rule in `.claude/rules/00-architecture/`: interface only, ≤5
   methods, no `null` in the return type unless "not found" is genuinely a normal domain state
   (documented per-port, not assumed).

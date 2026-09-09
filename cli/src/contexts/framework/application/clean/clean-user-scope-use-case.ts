@@ -87,8 +87,9 @@ export interface CleanUserScopeResult {
  * only writer, the same rule `CleanUseCase` already holds for its own settings files.
  *
  * Only then (5) does a strict whitelist delete what remains: `userConfigDir()`'s own
- * `cache/built/` (every version, not just this run's own, plus its own now-empty
- * `cache/` shell) and `references.json` — both re-resolved through
+ * `cache/built/` (every version, not just this run's own), the self-update
+ * `cache/update-check.json` beside it, the now-empty `cache/` shell both leave behind,
+ * and `references.json` — each re-resolved through
  * `resolveCacheCandidate`'s own `realpath` + containment check, the same one
  * `CleanUseCase` already trusts for the same reason — and `manifest.json` and the
  * `aidd-framework` entry alone from `marketplaces.json`, neither of which gets that
@@ -317,7 +318,22 @@ export class CleanUserScopeUseCase {
     await this.purgeWhitelistedPath("cache/built", "cache/built", (candidate) =>
       this.fs.deleteDirectory(candidate)
     );
+    // The self-update check cache (`runtime/self-update/check-update-use-case.ts`), written
+    // into the same `cache/` directory on any online command. Nothing else purged it, so it
+    // outlived a machine-scope clean and kept the shell below non-empty — the one occupant
+    // that made "leaves nothing of aidd's on the machine" false in the ordinary case.
+    await this.purgeWhitelistedPath(
+      "cache/update-check.json",
+      "cache/update-check.json",
+      (candidate) => this.fs.deleteFile(candidate)
+    );
     await this.purgeEmptyCacheShell();
+    // Where the same cache used to be written before it moved under `cache/`; the reader
+    // still falls back to it, an older CLI on this machine may still write it, and it is
+    // aidd's own file — so it leaves with the rest rather than outliving the clean.
+    await this.purgeWhitelistedPath("update-check.json", "update-check.json", (candidate) =>
+      this.fs.deleteFile(candidate)
+    );
     await this.purgeWhitelistedPath(
       USER_SOURCE_REFERENCES_FILENAME,
       USER_SOURCE_REFERENCES_FILENAME,
@@ -329,9 +345,10 @@ export class CleanUserScopeUseCase {
     await this.marketplaceRegistry.delete(projectRoot, FRAMEWORK_MARKETPLACE_NAME, "user");
   }
 
-  /** `cache/built/` was this whitelist's only occupant of `userConfigDir()/cache/`;
-   * once it is gone the shell around it is nothing but an empty directory nobody else
-   * writes to. Removed only once proven empty, under the same containment as every
+  /** `cache/built/` and `cache/update-check.json` are this whitelist's only occupants of
+   * `userConfigDir()/cache/`; once both are gone the shell around them is nothing but an
+   * empty directory nobody else writes to. Removed only once proven empty, under the same
+   * containment as every
    * other candidate here — never assumed from having just purged its only child,
    * since a future writer under `cache/` would make that assumption stale silently. */
   private async purgeEmptyCacheShell(): Promise<void> {

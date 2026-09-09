@@ -20,6 +20,7 @@ The list below is refreshed automatically by the memory hook. Do not edit it by 
 - [deployment.md](deployment.md)
 - [ecosystem.md](ecosystem.md)
 - [project-brief.md](project-brief.md)
+- [telemetry.md](telemetry.md)
 - [testing.md](testing.md)
 - [vcs.md](vcs.md)
 
