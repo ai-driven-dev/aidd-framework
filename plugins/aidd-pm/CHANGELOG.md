@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.5.0](https://github.com/ai-driven-dev/framework/compare/aidd-pm-v2.4.2...aidd-pm-v2.5.0) (2026-09-09)
+
+
+### Features
+
+* **framework:** measurement that works on five tools, each proven by a session that ran ([#706](https://github.com/ai-driven-dev/framework/issues/706)) ([627408f](https://github.com/ai-driven-dev/framework/commit/627408fba964b30d22b57fc99241083da1e0f294))
+
+
+### Miscellaneous
+
+* back-merge main into next (conflicts) ([#641](https://github.com/ai-driven-dev/framework/issues/641)) ([7d2d390](https://github.com/ai-driven-dev/framework/commit/7d2d390057c2e93f5160f068d038adf306405a17))
+
 ## [2.4.2](https://github.com/ai-driven-dev/framework/compare/aidd-pm-v2.4.1...aidd-pm-v2.4.2) (2026-08-14)
 
 
