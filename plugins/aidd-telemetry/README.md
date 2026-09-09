@@ -164,9 +164,9 @@ and turning tokens into money is a separate service's job.
 
 - **Nothing leaves the machine.** Every code path that once could, the export writer, its
   endpoint, the server it talked to, is deleted. Everything measured is read back from
-  where it was written. On a machine that ran an older version's `aidd telemetry endpoint`,
-  `aidd telemetry check` and `aidd telemetry off` both detect the settings file it left
-  and name what to remove by hand.
+  where it was written. On a machine where an older version once configured an export
+  endpoint, `aidd telemetry check` and `aidd telemetry off` both detect the settings file
+  it left and name what to remove by hand.
 - **No prompt, no code, no diff.** The stored shape is an allowlist, field by field, in
   [the record contract](../../aidd_docs/product/metrics-contract.md).
 - **The switch is a file you commit or do not**, per project (`.aidd/config.json`). Once

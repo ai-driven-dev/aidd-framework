@@ -26,6 +26,11 @@ The list below is refreshed automatically by the memory hook. Do not edit it by 
 
 Read on demand:
 
+- [internal/smoke-real.md](internal/smoke-real.md)
+- [internal/decisions/clean-drives-the-host-cli.md](internal/decisions/clean-drives-the-host-cli.md)
+- [internal/decisions/framework-source-is-machine-scope.md](internal/decisions/framework-source-is-machine-scope.md)
+- [internal/decisions/marketplace-identity-is-name-plus-plugins.md](internal/decisions/marketplace-identity-is-name-plus-plugins.md)
+- [internal/decisions/plugin-enablement-carries-its-scope.md](internal/decisions/plugin-enablement-carries-its-scope.md)
 - [internal/decisions/self-update-version-source-npm.md](internal/decisions/self-update-version-source-npm.md)
 <!-- files:end -->
 
