@@ -8,16 +8,10 @@ describe("EnvironmentAdapter", () => {
     delete process.env[VARIABLE];
   });
 
-  it("reads a variable set after it was constructed", () => {
+  it("reads a variable the process set after the adapter was constructed", () => {
     const environment = new EnvironmentAdapter();
     process.env[VARIABLE] = "later";
 
     expect(environment.get(VARIABLE)).toBe("later");
-  });
-
-  it("writes a variable the process itself then sees", () => {
-    new EnvironmentAdapter().set(VARIABLE, "written");
-
-    expect(process.env[VARIABLE]).toBe("written");
   });
 });

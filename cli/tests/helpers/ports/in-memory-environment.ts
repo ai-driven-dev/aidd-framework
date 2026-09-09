@@ -10,8 +10,4 @@ export class InMemoryEnvironment implements Environment {
   get(name: string): string | undefined {
     return this.values.get(name);
   }
-
-  set(name: string, value: string): void {
-    this.values.set(name, value);
-  }
 }

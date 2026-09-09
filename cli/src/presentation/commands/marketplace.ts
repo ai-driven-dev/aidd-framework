@@ -67,9 +67,8 @@ export function registerMarketplaceCommand(program: Command): void {
           process.exit(1);
         }
         try {
-          if (cmdOptions.token) process.env.AIDD_TOKEN = cmdOptions.token;
           const scope: MarketplaceScope = cmdOptions.scope === "user" ? "user" : "project";
-          const deps = await createDeps(projectRoot, { verbose }, output);
+          const deps = await createDeps(projectRoot, { verbose, token: cmdOptions.token }, output);
           const name = nameArg ?? (await deps.prompter.input("Marketplace name:"));
           const rawSource = sourceArg ?? (await deps.prompter.input("Source (path or user/repo):"));
           const source = parsePluginSourceShorthand(rawSource);

@@ -55,6 +55,35 @@ function withEnv<T>(vars: Record<string, string | undefined>, fn: () => T): T {
 }
 
 describe("AuthReaderAdapter", () => {
+  describe("a token given on the command line (path 0)", () => {
+    it("comes before AIDD_TOKEN and before anything stored", async () => {
+      const storage = makeStorage({
+        projectConfig: {
+          version: 1,
+          method: "stored",
+          level: "project",
+          token: "project-token",
+          createdAt: "2026-03-20T00:00:00.000Z",
+        },
+      });
+      const reader = new AuthReaderAdapter(storage, "/project", undefined, undefined, "flag-token");
+      const result = await withEnv({ AIDD_TOKEN: "env-token" }, () => reader.resolve());
+      expect(result).toBe("flag-token");
+    });
+
+    it("is not consulted when none was given, so AIDD_TOKEN keeps its place", async () => {
+      const reader = new AuthReaderAdapter(
+        makeStorage(),
+        "/project",
+        undefined,
+        undefined,
+        undefined
+      );
+      const result = await withEnv({ AIDD_TOKEN: "env-token" }, () => reader.resolve());
+      expect(result).toBe("env-token");
+    });
+  });
+
   describe("AIDD_TOKEN env var (path 1)", () => {
     it("returns env token immediately", async () => {
       const storage = makeStorage();

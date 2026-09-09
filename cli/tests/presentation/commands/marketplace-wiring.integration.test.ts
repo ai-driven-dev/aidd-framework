@@ -38,7 +38,6 @@ const PROJECT_ROOT = process.cwd();
 
 let written: string[] = [];
 let errors: string[] = [];
-let tokenBefore: string | undefined;
 
 function pretendTerminal(isTTY: boolean): void {
   Object.defineProperty(process.stdout, "isTTY", { value: isTTY, configurable: true });
@@ -48,7 +47,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   written = [];
   errors = [];
-  tokenBefore = process.env.AIDD_TOKEN;
   pretendTerminal(false);
   vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
     written.push(String(chunk));
@@ -77,8 +75,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
-  if (tokenBefore === undefined) delete process.env.AIDD_TOKEN;
-  else process.env.AIDD_TOKEN = tokenBefore;
   process.exitCode = undefined;
 });
 
@@ -148,10 +144,15 @@ describe("aidd marketplace add", () => {
     );
   });
 
-  it("puts the given token where the fetch will read it", async () => {
+  it("hands the given token to the composition root, where every fetcher reads it", async () => {
     await run("add", "market-b", "/some/source", "--token", "ghp_x");
 
-    expect(process.env.AIDD_TOKEN).toBe("ghp_x");
+    expect(vi.mocked(createDeps)).toHaveBeenCalledWith(
+      PROJECT_ROOT,
+      { verbose: false, token: "ghp_x" },
+      expect.anything()
+    );
+    expect(process.env.AIDD_TOKEN).not.toBe("ghp_x");
   });
 
   it("asks for the name and the source it was not given, on a terminal", async () => {
@@ -192,12 +193,14 @@ describe("aidd marketplace add", () => {
   });
 });
 
-it("leaves the token environment alone when none was given", async () => {
-  delete process.env.AIDD_TOKEN;
-
+it("hands no token when none was given", async () => {
   await run("add", "market-b", "/some/source");
 
-  expect(process.env.AIDD_TOKEN).toBeUndefined();
+  expect(vi.mocked(createDeps)).toHaveBeenCalledWith(
+    PROJECT_ROOT,
+    { verbose: false, token: undefined },
+    expect.anything()
+  );
 });
 
 it("names a failed registration on stderr and fails the process", async () => {

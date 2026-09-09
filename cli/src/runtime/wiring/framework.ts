@@ -105,6 +105,7 @@ import { createFrameworkBuildUseCase } from "./translate.js";
 
 interface GlobalOptions {
   verbose: boolean;
+  token?: string;
 }
 
 interface Deps extends TelemetryDeps {
@@ -182,7 +183,8 @@ export async function createDeps(
   options: GlobalOptions,
   output?: CLIOutput
 ): Promise<Deps> {
-  const cached = _cache.get(projectRoot);
+  const cacheKey = `${projectRoot}\u0000${options.token ?? ""}`;
+  const cached = _cache.get(cacheKey);
   if (cached !== undefined) return cached;
   const hasher = new HasherAdapter();
   const logger = output ?? new CLIOutput(options.verbose);
@@ -193,7 +195,13 @@ export async function createDeps(
   const http = new HttpClient();
   const authStorage = new AuthStorage();
   const ghCliAdapter = new GhCliAdapter();
-  const authReader = new AuthReaderAdapter(authStorage, projectRoot, logger, ghCliAdapter);
+  const authReader = new AuthReaderAdapter(
+    authStorage,
+    projectRoot,
+    logger,
+    ghCliAdapter,
+    options.token
+  );
   const credentialStore = new AuthProviderAdapter(
     authStorage,
     new Map([["gh", ghCliAdapter]]),
@@ -358,8 +366,7 @@ export async function createDeps(
     pluginInstallFromMarketplaceUseCase,
     manifestRepo,
     marketplaceTrustStore,
-    prompter,
-    environment
+    prompter
   );
   const installAiToolUseCase = new InstallAiToolUseCase(
     installRuntimeConfigUseCase,
@@ -575,6 +582,6 @@ export async function createDeps(
     listInstalledRulesUseCase,
     checkUpdateUseCase,
   };
-  _cache.set(projectRoot, deps);
+  _cache.set(cacheKey, deps);
   return deps;
 }
