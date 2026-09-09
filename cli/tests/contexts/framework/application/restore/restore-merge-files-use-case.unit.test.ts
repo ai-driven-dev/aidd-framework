@@ -372,3 +372,71 @@ describe("RestoreMergeFilesUseCase", () => {
     });
   });
 });
+
+describe("RestoreMergeFilesUseCase — the entries it hands back", () => {
+  const distContent = JSON.stringify({ a: "framework-a" });
+
+  function distMapFor(deps: Awaited<ReturnType<typeof buildDeps>>) {
+    return new Map([
+      [
+        "settings.json",
+        new InstallationFile({
+          relativePath: "settings.json",
+          content: distContent,
+          hash: deps.hasher.hash(distContent),
+          mergeStrategy: "framework-prime",
+        }),
+      ],
+    ]);
+  }
+
+  it("re-reads the entries of a restored merge file from what landed on disk", async () => {
+    const deps = await buildDeps();
+    const useCase = new RestoreMergeFilesUseCase(deps.fs, deps.hasher, new OverwritePrompter());
+
+    const result = await useCase.execute({
+      mergeFiles: [
+        {
+          relativePath: "settings.json",
+          sectionKey: null,
+          entries: { a: deps.hasher.hash(JSON.stringify("original-a")) },
+        },
+      ],
+      distMap: distMapFor(deps),
+      projectRoot: PROJECT_ROOT,
+      force: true,
+      interactive: false,
+      fileFilter: null,
+    });
+
+    expect(result?.updatedMergeFiles).toStrictEqual([
+      {
+        relativePath: "settings.json",
+        sectionKey: null,
+        entries: { a: deps.hasher.hash(JSON.stringify("framework-a")) },
+      },
+    ]);
+  });
+
+  it("hands back a kept merge file's entries exactly as they were tracked", async () => {
+    const deps = await buildDeps();
+    await deps.fs.writeFile(join(PROJECT_ROOT, "settings.json"), JSON.stringify({ a: "disk" }));
+    const tracked: MergeFileEntry = {
+      relativePath: "settings.json",
+      sectionKey: null,
+      entries: { a: deps.hasher.hash(JSON.stringify("original-a")) },
+    };
+    const useCase = new RestoreMergeFilesUseCase(deps.fs, deps.hasher, new KeepPrompter());
+
+    const result = await useCase.execute({
+      mergeFiles: [tracked],
+      distMap: distMapFor(deps),
+      projectRoot: PROJECT_ROOT,
+      force: false,
+      interactive: true,
+      fileFilter: null,
+    });
+
+    expect(result?.updatedMergeFiles).toStrictEqual([tracked]);
+  });
+});

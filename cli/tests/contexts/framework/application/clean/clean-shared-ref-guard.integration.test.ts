@@ -189,6 +189,32 @@ describe("clean guards a ref another project on this machine still needs", () =>
     expect(activator.uninstalledPlugins).toContain("plugin-b@other-mkt");
   });
 
+  it("still disables a ref from another marketplace when that marketplace is recorded before the shared source", async () => {
+    const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
+    seedReferences(fs, [OTHER_PROJECT]);
+    const activator = new FakeNativePluginActivator({ available: true });
+
+    const useCase = buildUseCase({
+      fs,
+      manifest: seedManifest(
+        "codex",
+        [
+          { alias: "other-mkt", hostName: "other-mkt" },
+          { alias: "aidd-framework", hostName: "aidd-framework" },
+        ],
+        ["plugin-b@other-mkt", "aidd-vcs@aidd-framework"]
+      ),
+      activator,
+      binary: "codex",
+      logger: new CapturingLogger(),
+      aiddMarketplaceRegistry: seedSharedMarketplaceRegistry(),
+    });
+
+    await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+    expect(activator.uninstalledPlugins).toStrictEqual(["plugin-b@other-mkt"]);
+  });
+
   it("disables codex's ref when no claim was ever recorded for this project, and no other project references it either", async () => {
     const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
     // No references.json at all: no claim of this project's own to drop, and nothing else

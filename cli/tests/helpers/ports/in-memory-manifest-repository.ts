@@ -5,6 +5,7 @@ export class InMemoryManifestRepository implements ManifestRepository {
   /** Derived from the root the test drives the use case with, never a fixed literal: a
    * double naming a fictional file lets a diagnostic go wrong with every test still green. */
   readonly path: string;
+  saveCount = 0;
   private manifest: Manifest | null;
 
   constructor(seed: Manifest | null = null, projectRoot = "/test-project") {
@@ -17,6 +18,7 @@ export class InMemoryManifestRepository implements ManifestRepository {
   }
 
   async save(manifest: Manifest): Promise<void> {
+    this.saveCount += 1;
     this.manifest = manifest;
   }
 

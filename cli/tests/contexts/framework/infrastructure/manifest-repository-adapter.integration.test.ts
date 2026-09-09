@@ -38,6 +38,16 @@ describe("ManifestRepositoryAdapter", () => {
 
       await expect(adapter.load()).rejects.toThrow(manifestPath);
     });
+
+    it("rejects a refused manifest version naming this project as where it lives and `aidd setup` as the fix", async () => {
+      const manifestPath = join(tempDir, ".aidd", "manifest.json");
+      await mkdir(join(tempDir, ".aidd"), { recursive: true });
+      await writeFile(manifestPath, '{"version": 7, "tools": {}}');
+
+      await expect(adapter.load()).rejects.toThrow(
+        `delete ${manifestPath} in this project, then run \`aidd setup\` to reinstall the framework.`
+      );
+    });
   });
 
   describe("save() + load() roundtrip", () => {

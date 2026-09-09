@@ -9,26 +9,79 @@ import {
   DuplicatePluginError,
   MissingPluginMetadataError,
 } from "../../../../../src/kernel/errors.js";
+import type { Logger } from "../../../../../src/kernel/ports/logger.js";
 import { buildUnitDeps, initAndInstall } from "../../../../helpers/ports/build-unit-deps.js";
+import { CapturingLogger } from "../../../../helpers/ports/capturing-logger.js";
 import { fakeEnsureBuiltMarketplace } from "../../../../helpers/ports/fake-ensure-built-marketplace.js";
 import { InMemoryMarketplaceRegistry } from "../../../../helpers/ports/in-memory-marketplace-registry.js";
 import { seedFromDirectory } from "../../../../helpers/ports/seed-from-directory.js";
 
 const PLUGIN_FIXTURE = join(process.cwd(), "tests/fixtures/plugins/claude-format/sample-plugin");
+const EXTRA_PLUGIN_FIXTURE = join(
+  process.cwd(),
+  "tests/fixtures/plugins/claude-format/extra-plugin"
+);
 const PROJECT_ROOT = "/test-project";
+const GREET_PATH = join(PROJECT_ROOT, ".claude/plugins/sample-plugin/commands/greet.md");
+const GITHUB_SOURCE = {
+  kind: "git-subdir" as const,
+  url: "https://github.com/ai-driven-dev/framework.git",
+  path: "plugins/sample-plugin",
+};
 
-async function makeUseCase(deps: Awaited<ReturnType<typeof buildUnitDeps>>) {
-  await seedFromDirectory(deps.fs, PLUGIN_FIXTURE, { useAbsolutePaths: true });
+type Deps = Awaited<ReturnType<typeof buildUnitDeps>>;
+
+class RefusingMarketplaceRegistry extends InMemoryMarketplaceRegistry {
+  override async list(): Promise<readonly Marketplace[]> {
+    throw new Error("the registry was consulted");
+  }
+}
+
+function buildAddUseCase(
+  deps: Deps,
+  registry: InMemoryMarketplaceRegistry = deps.marketplaceRegistry,
+  logger: Logger = deps.logger
+): PluginAddUseCase {
   return new PluginAddUseCase(
     deps.fs,
     deps.manifestRepo,
     deps.pluginFetcher,
     new PluginDistributionReaderAdapter(deps.fs),
     deps.hasher,
-    deps.logger,
-    deps.marketplaceRegistry,
+    logger,
+    registry,
     fakeEnsureBuiltMarketplace()
   );
+}
+
+async function makeUseCase(deps: Deps) {
+  await seedFromDirectory(deps.fs, PLUGIN_FIXTURE, { useAbsolutePaths: true });
+  return buildAddUseCase(deps);
+}
+
+async function saveMarketplace(
+  registry: InMemoryMarketplaceRegistry,
+  name: string,
+  source: { kind: "github"; repo: string } | { kind: "local"; path: string }
+): Promise<void> {
+  await registry.save(
+    PROJECT_ROOT,
+    Marketplace.create({ name, source, scope: "project", addedAt: "2026-05-01T00:00:00.000Z" })
+  );
+}
+
+function localAdd(toolId: "claude" | "opencode", path = PLUGIN_FIXTURE, replace?: boolean) {
+  return {
+    source: { kind: "local" as const, path },
+    toolIds: [toolId],
+    projectRoot: PROJECT_ROOT,
+    interactive: false,
+    replace,
+  };
+}
+
+function pluginNames(deps: Deps, toolId: "claude" | "opencode" | "codex"): string[] {
+  return (deps.manifestRepo.getCurrent()?.getPlugins(toolId) ?? []).map((p) => p.name).sort();
 }
 
 describe("PluginAddUseCase", () => {
@@ -593,6 +646,250 @@ describe("PluginAddUseCase", () => {
       const manifest = await deps.manifestRepo.load();
       const plugins = manifest?.getPlugins("claude") ?? [];
       expect(plugins.find((p) => p.name === "zero-plugin")).toBeUndefined();
+    });
+  });
+
+  describe("marketplace resolution", () => {
+    it("resolves the named marketplace rather than the first registered one", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      await seedFromDirectory(deps.fs, PLUGIN_FIXTURE, { useAbsolutePaths: true });
+      const registry = new InMemoryMarketplaceRegistry();
+      await saveMarketplace(registry, "aidd-framework", {
+        kind: "github",
+        repo: "ai-driven-dev/framework",
+      });
+      await saveMarketplace(registry, "local-mkt", { kind: "local", path: "/mkt-source" });
+
+      await buildAddUseCase(deps, registry).execute({
+        ...localAdd("claude"),
+        marketplace: "local-mkt",
+      });
+
+      const installed = deps.manifestRepo
+        .getCurrent()
+        ?.getPlugins("claude")
+        .find((p) => p.name === "sample-plugin");
+      expect(installed?.marketplace).toBe("local-mkt");
+    });
+
+    it("treats a marketplace name the registry does not list as a local marketplace", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      const useCase = await makeUseCase(deps);
+
+      await useCase.execute({ ...localAdd("claude"), marketplace: "ghost" });
+
+      const installed = deps.manifestRepo
+        .getCurrent()
+        ?.getPlugins("claude")
+        .find((p) => p.name === "sample-plugin");
+      expect(installed?.marketplace).toBe("ghost");
+    });
+
+    it("never consults the registry for a local add without a marketplace", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      await seedFromDirectory(deps.fs, PLUGIN_FIXTURE, { useAbsolutePaths: true });
+
+      await buildAddUseCase(deps, new RefusingMarketplaceRegistry()).execute(localAdd("claude"));
+
+      expect(deps.fs.has(GREET_PATH)).toBe(true);
+    });
+  });
+
+  describe("github marketplace re-registration", () => {
+    async function registerTwice(deps: Deps, replace: boolean | undefined): Promise<void> {
+      const registry = new InMemoryMarketplaceRegistry();
+      await saveMarketplace(registry, "aidd-framework", {
+        kind: "github",
+        repo: "ai-driven-dev/framework",
+      });
+      const useCase = buildAddUseCase(deps, registry);
+      const options = {
+        source: GITHUB_SOURCE,
+        toolIds: ["codex" as const],
+        projectRoot: PROJECT_ROOT,
+        marketplace: "aidd-framework",
+        interactive: false,
+        pluginMetadata: { name: "sample-plugin", version: "1.0.0", strict: false },
+      };
+      await useCase.execute(options);
+      await useCase.execute({ ...options, replace });
+    }
+
+    it("re-registers the plugin when replace is requested", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "codex");
+
+      await registerTwice(deps, true);
+
+      expect(pluginNames(deps, "codex")).toStrictEqual(["sample-plugin"]);
+    });
+
+    it("refuses a second registration without replace", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "codex");
+
+      await expect(registerTwice(deps, undefined)).rejects.toThrow(DuplicatePluginError);
+    });
+
+    it("fetches the distribution once for a flat tool when the catalog omits the version", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "opencode");
+      deps.fs.setFile("/built/opencode/.opencode/skills/sample-plugin/demo/SKILL.md", "# Demo");
+      await seedFromDirectory(deps.fs, PLUGIN_FIXTURE, { useAbsolutePaths: true });
+      deps.pluginFetcher.register(GITHUB_SOURCE, PLUGIN_FIXTURE);
+      const registry = new InMemoryMarketplaceRegistry();
+      await saveMarketplace(registry, "aidd-framework", {
+        kind: "github",
+        repo: "ai-driven-dev/framework",
+      });
+      const fetchSpy = vi.spyOn(deps.pluginFetcher, "fetch");
+
+      await buildAddUseCase(deps, registry).execute({
+        source: GITHUB_SOURCE,
+        toolIds: ["opencode"],
+        projectRoot: PROJECT_ROOT,
+        marketplace: "aidd-framework",
+        interactive: false,
+        pluginMetadata: { name: "sample-plugin", strict: false },
+      });
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("duplicate and replace for a local add", () => {
+    it("re-adds an installed plugin in place when replace is requested", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      const useCase = await makeUseCase(deps);
+      await useCase.execute(localAdd("claude"));
+
+      await useCase.execute(localAdd("claude", PLUGIN_FIXTURE, true));
+
+      expect(pluginNames(deps, "claude")).toStrictEqual(["sample-plugin"]);
+    });
+
+    it("leaves another installed plugin registered when replacing", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      const useCase = await makeUseCase(deps);
+      await seedFromDirectory(deps.fs, EXTRA_PLUGIN_FIXTURE, { useAbsolutePaths: true });
+      await useCase.execute(localAdd("claude"));
+
+      await useCase.execute(localAdd("claude", EXTRA_PLUGIN_FIXTURE, true));
+
+      expect(pluginNames(deps, "claude")).toStrictEqual(["extra-plugin", "sample-plugin"]);
+    });
+
+    it("accepts a second plugin with a different name", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      const useCase = await makeUseCase(deps);
+      await seedFromDirectory(deps.fs, EXTRA_PLUGIN_FIXTURE, { useAbsolutePaths: true });
+      await useCase.execute(localAdd("claude"));
+
+      await useCase.execute(localAdd("claude", EXTRA_PLUGIN_FIXTURE));
+
+      expect(pluginNames(deps, "claude")).toStrictEqual(["extra-plugin", "sample-plugin"]);
+    });
+
+    it("leaves the installed files untouched when refusing a duplicate", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      const useCase = await makeUseCase(deps);
+      await useCase.execute(localAdd("claude"));
+      const installedContent = deps.fs.getFile(GREET_PATH);
+      deps.fs.setFile(
+        "/alt/sample-plugin/.claude-plugin/plugin.json",
+        JSON.stringify({ name: "sample-plugin", version: "1.0.0" })
+      );
+      deps.fs.setFile("/alt/sample-plugin/commands/greet.md", "# Changed greeting");
+
+      await expect(useCase.execute(localAdd("claude", "/alt/sample-plugin"))).rejects.toThrow(
+        DuplicatePluginError
+      );
+
+      expect(deps.fs.getFile(GREET_PATH)).toBe(installedContent);
+    });
+  });
+
+  describe("required version", () => {
+    it("accepts a required version equal to the plugin's own", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      const useCase = await makeUseCase(deps);
+
+      await useCase.execute({ ...localAdd("claude"), requiredVersion: "1.0.0" });
+
+      expect(pluginNames(deps, "claude")).toStrictEqual(["sample-plugin"]);
+    });
+  });
+
+  describe("native tool from a local marketplace", () => {
+    it("registers a claude plugin from a local marketplace without writing its files", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      await seedFromDirectory(deps.fs, PLUGIN_FIXTURE, { useAbsolutePaths: true });
+      const registry = new InMemoryMarketplaceRegistry();
+      await saveMarketplace(registry, "local-mkt", { kind: "local", path: "/mkt-source" });
+
+      await buildAddUseCase(deps, registry).execute({
+        ...localAdd("claude"),
+        marketplace: "local-mkt",
+      });
+
+      const installed = deps.manifestRepo
+        .getCurrent()
+        ?.getPlugins("claude")
+        .find((p) => p.name === "sample-plugin");
+      expect([
+        installed?.marketplace,
+        installed?.files.size,
+        deps.fs.has(GREET_PATH),
+      ]).toStrictEqual(["local-mkt", 0, false]);
+    });
+
+    it("materializes a plugin a local marketplace catalogs from github", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      await seedFromDirectory(deps.fs, PLUGIN_FIXTURE, { useAbsolutePaths: true });
+      deps.pluginFetcher.register(GITHUB_SOURCE, PLUGIN_FIXTURE);
+      const registry = new InMemoryMarketplaceRegistry();
+      await saveMarketplace(registry, "local-mkt", { kind: "local", path: "/mkt-source" });
+
+      await buildAddUseCase(deps, registry).execute({
+        source: GITHUB_SOURCE,
+        toolIds: ["claude"],
+        projectRoot: PROJECT_ROOT,
+        marketplace: "local-mkt",
+        interactive: false,
+      });
+
+      const installed = deps.manifestRepo
+        .getCurrent()
+        ?.getPlugins("claude")
+        .find((p) => p.name === "sample-plugin");
+      expect([
+        installed?.marketplace,
+        installed?.files.has(".claude/plugins/sample-plugin/commands/greet.md"),
+        deps.fs.has(GREET_PATH),
+      ]).toStrictEqual(["local-mkt", true, true]);
+    });
+  });
+
+  describe("install notices", () => {
+    it("logs no install notice for a flat add", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "opencode");
+      await seedFromDirectory(deps.fs, PLUGIN_FIXTURE, { useAbsolutePaths: true });
+      const logger = new CapturingLogger();
+
+      await buildAddUseCase(deps, deps.marketplaceRegistry, logger).execute(localAdd("opencode"));
+
+      expect(logger.infoMessages).toStrictEqual([]);
     });
   });
 });

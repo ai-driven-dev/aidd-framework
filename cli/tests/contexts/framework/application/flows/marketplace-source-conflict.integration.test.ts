@@ -42,13 +42,25 @@ interface Setup {
   /** Skips writing at the built dir this project just "built" to, standing in for a build that
    * reported success but left nothing readable where its own tool profile probes. */
   readonly omitRequestedCatalog?: boolean;
+  readonly fs?: InMemoryFileAdapter;
+}
+
+class RealpathRefusingFileAdapter extends InMemoryFileAdapter {
+  constructor(private readonly refused: string) {
+    super();
+  }
+
+  override async realpath(path: string): Promise<string> {
+    if (path === this.refused) throw Object.assign(new Error("EACCES"), { code: "EACCES" });
+    return super.realpath(path);
+  }
 }
 
 async function sync(setup: Setup = {}) {
   const toolId = setup.toolId ?? "claude";
   const aiddName = setup.aiddName ?? "probe-mkt";
   const catalogName = setup.catalogName ?? aiddName;
-  const fs = new InMemoryFileAdapter();
+  const fs = setup.fs ?? new InMemoryFileAdapter();
   const manifestRepo = new InMemoryManifestRepository();
   const registry = new InMemoryMarketplaceRegistry();
   const logger = new CapturingLogger();
@@ -229,6 +241,42 @@ describe("the sync guard against a marketplace name a host already holds", () =>
     expect(hostReader.reads).toBe(0);
     expect(activator.addedMarketplaces).toEqual(["/built/codex"]);
     expect(result.errors).toEqual([]);
+  });
+
+  it("names both sources, the plugin difference, the registry file and the commands to run, in the refusal", async () => {
+    const hostReader = new FakeHostMarketplaceRegistryReader({
+      location: REGISTRY_LOCATION,
+      entries: new Map([["probe-mkt", "/other/src"]]),
+    });
+
+    const { result } = await sync({
+      hostReader,
+      requestedPluginNames: ["sample-plugin"],
+      registeredCatalog: { path: "/other/src", pluginNames: ["different-plugin"] },
+    });
+
+    expect(result.errors).toStrictEqual([
+      {
+        scope: "claude",
+        message:
+          "Marketplace 'probe-mkt' is already registered from a different catalog: /other/src differs from the one requested, /built/claude — plugins differ (+sample-plugin, -different-plugin), per /home/.claude/plugins/known_marketplaces.json. Run `claude plugin marketplace remove probe-mkt`, then `aidd sync` again to re-register it for this project.",
+      },
+    ]);
+  });
+
+  it("registers from the built path as given when that path cannot be resolved", async () => {
+    const hostReader = new FakeHostMarketplaceRegistryReader({
+      location: REGISTRY_LOCATION,
+      entries: new Map([["probe-mkt", "/built/claude"]]),
+    });
+
+    const { result, activator } = await sync({
+      hostReader,
+      fs: new RealpathRefusingFileAdapter("/built/claude"),
+    });
+
+    expect(result.errors).toStrictEqual([]);
+    expect(activator.addedMarketplaces).toStrictEqual(["/built/claude"]);
   });
 });
 

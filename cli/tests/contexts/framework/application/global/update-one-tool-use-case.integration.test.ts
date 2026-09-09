@@ -136,6 +136,35 @@ describe("UpdateOneToolUseCase integration", () => {
     });
   });
 
+  describe("installer skipped the tool", () => {
+    it("answers null with no error recorded", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      vi.spyOn(deps.installRuntimeConfigUseCase, "execute").mockResolvedValue({
+        toolId: "claude",
+        fileCount: 0,
+        files: [],
+        skipped: true,
+        warnings: [],
+      });
+
+      const useCase = buildUseCase(deps, buildFakePrompter("keep"));
+      const errors: Parameters<typeof useCase.execute>[4] = [];
+
+      const result = await useCase.execute(
+        "claude",
+        await loadManifest(deps),
+        PROJECT_ROOT,
+        "test",
+        errors,
+        { userForce: false, interactive: false, bulkState: new BulkConflictState() }
+      );
+
+      expect(result).toBeNull();
+      expect(errors).toStrictEqual([]);
+    });
+  });
+
   describe("install failure", () => {
     it("reports the failure and returns null instead of throwing", async () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);

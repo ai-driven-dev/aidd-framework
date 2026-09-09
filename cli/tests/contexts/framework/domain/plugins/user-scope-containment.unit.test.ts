@@ -28,6 +28,10 @@ describe("isStrictlyWithinUserScope", () => {
     expect(isStrictlyWithinUserScope(BOUNDARY, BOUNDARY)).toBe(false);
   });
 
+  it("rejects the boundary directory spelled with a trailing separator", () => {
+    expect(isStrictlyWithinUserScope(`${BOUNDARY}/`, BOUNDARY)).toBe(false);
+  });
+
   it("rejects a path that merely starts with the boundary's characters without a separator", () => {
     // Textually starts with BOUNDARY but is a sibling directory, not something inside it —
     // a naive `startsWith` would wrongly accept this.

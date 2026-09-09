@@ -46,6 +46,51 @@ describe("SetupFlow", () => {
       expect(flow.projectRoot).toBe(ROOT);
       expect(flow.aiTools).toEqual(["claude"]);
     });
+
+    it("accepts mode 'named' once a plugin is named, carrying the names through", () => {
+      const flow = makeFlow({ pluginMode: "named", pluginNames: ["my-plugin"] });
+
+      expect(flow.pluginMode).toBe("named");
+      expect(flow.pluginNames).toStrictEqual(["my-plugin"]);
+    });
+
+    it("says what mode 'named' needs when no plugin is named", () => {
+      expect(() => makeFlow({ pluginMode: "named", pluginNames: [] })).toThrow(
+        'Plugin mode "named" requires at least one plugin name.'
+      );
+    });
+
+    it("names the mode that was given when names arrive under another mode", () => {
+      expect(() => makeFlow({ pluginMode: "all", pluginNames: ["my-plugin"] })).toThrow(
+        'Plugin names provided but mode is "all" (expected "named").'
+      );
+    });
+  });
+
+  describe("defaults for what a caller leaves unsaid", () => {
+    it("installs no plugin", () => {
+      expect(makeFlow().pluginMode).toBe("none");
+    });
+
+    it("names no plugin", () => {
+      expect(makeFlow().pluginNames).toStrictEqual([]);
+    });
+
+    it("is not interactive", () => {
+      expect(makeFlow().interactive).toBe(false);
+    });
+
+    it("does not force", () => {
+      expect(makeFlow().force).toBe(false);
+    });
+
+    it("carries a plugin mode through when one is given", () => {
+      expect(makeFlow({ pluginMode: "all" }).pluginMode).toBe("all");
+    });
+
+    it("carries force through when asked", () => {
+      expect(makeFlow({ force: true }).force).toBe(true);
+    });
   });
 
   describe("scope", () => {
@@ -69,6 +114,10 @@ describe("SetupFlow", () => {
 
     it("refuses --scope user with no --ai — nothing would be registered for any tool", () => {
       expect(() => makeFlow({ scope: "user", aiTools: [] })).toThrow(UserScopeNoToolsError);
+    });
+
+    it("refuses --scope user when --ai is left unsaid, the same as an empty one", () => {
+      expect(() => makeFlow({ scope: "user" })).toThrow(UserScopeNoToolsError);
     });
 
     it("refuses an AI tool with no user-scope activation at --scope user (opencode)", () => {

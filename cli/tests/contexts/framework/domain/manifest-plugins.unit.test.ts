@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { Manifest } from "../../../../src/contexts/framework/domain/manifest.js";
 import { InstalledPlugin } from "../../../../src/contexts/framework/domain/plugins/installed-plugin.js";
-import { DuplicatePluginError, PluginNotFoundError } from "../../../../src/kernel/errors.js";
+import {
+  DuplicatePluginError,
+  PluginNotFoundError,
+  ToolNotInManifestError,
+} from "../../../../src/kernel/errors.js";
 import { FileHash, InstallationFile } from "../../../../src/kernel/file.js";
 import type { ToolId } from "../../../../src/kernel/tool.js";
 
@@ -98,6 +102,46 @@ describe("isFileTracked() with plugins", () => {
   it("returns false for an untracked file not in any plugin", () => {
     const manifest = makeManifest();
     expect(manifest.isFileTracked(".claude/plugins/unknown/README.md")).toBe(false);
+  });
+});
+
+describe("updatePlugin()", () => {
+  it("replaces only the plugin of that name", () => {
+    const manifest = makeManifest();
+    manifest.addPlugin(CLAUDE, makePlugin("other"));
+    manifest.addPlugin(CLAUDE, makePlugin("target"));
+
+    manifest.updatePlugin(CLAUDE, makePlugin("target").withVersion("2.0.0"));
+
+    expect(manifest.getPlugins(CLAUDE).map((p) => [p.name, p.version])).toStrictEqual([
+      ["other", "1.0.0"],
+      ["target", "2.0.0"],
+    ]);
+  });
+
+  it("throws PluginNotFoundError when plugin does not exist", () => {
+    const manifest = makeManifest();
+    expect(() => manifest.updatePlugin(CLAUDE, makePlugin("ghost"))).toThrow(PluginNotFoundError);
+  });
+});
+
+describe("a tool that is not installed", () => {
+  const ABSENT = "codex" as ToolId;
+
+  it("has no plugins", () => {
+    expect(makeManifest().getPlugins(ABSENT)).toStrictEqual([]);
+  });
+
+  it("refuses a plugin, naming the tool", () => {
+    expect(() => makeManifest().addPlugin(ABSENT, makePlugin())).toThrow(ToolNotInManifestError);
+  });
+
+  it("refuses a plugin removal, naming the tool", () => {
+    expect(() => makeManifest().removePlugin(ABSENT, "my-plugin")).toThrow(ToolNotInManifestError);
+  });
+
+  it("refuses a plugin update, naming the tool", () => {
+    expect(() => makeManifest().updatePlugin(ABSENT, makePlugin())).toThrow(ToolNotInManifestError);
   });
 });
 

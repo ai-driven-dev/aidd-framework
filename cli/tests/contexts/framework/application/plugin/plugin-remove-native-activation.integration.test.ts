@@ -350,4 +350,69 @@ describe("PluginRemoveUseCase undoes native activation", () => {
     expect(activator.uninstalledPlugins).toEqual([REF]);
     expect(activator.uninstalledPluginScopes).toEqual(["user"]);
   });
+
+  it("logs nothing when this tool's own native registrations name the alias", async () => {
+    const activator = new FakeNativePluginActivator({ available: true });
+    const logger = new CapturingLogger();
+    const { removeUseCase, manifestRepo } = buildRemoveUseCase(activator, logger);
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    await installViaModeA(manifest);
+    manifest.setNativeRegistrations("claude", {
+      binary: "claude",
+      marketplaces: [{ alias: MARKETPLACE_NAME, hostName: "upstream" }],
+      pluginRefs: [],
+    });
+    await manifestRepo.save(manifest);
+
+    await removeUseCase.execute({
+      pluginName: PLUGIN_NAME,
+      toolIds: ["claude"],
+      projectRoot: PROJECT_ROOT,
+    });
+
+    expect(activator.uninstalledPlugins).toStrictEqual([`${PLUGIN_NAME}@upstream`]);
+    expect(logger.warnMessages).toStrictEqual([]);
+  });
+
+  it("names the host, the ref and the host's answer when the host CLI refuses the uninstall", async () => {
+    const activator = new FakeNativePluginActivator({
+      available: true,
+      failOnUninstall: [REF],
+    });
+    const logger = new CapturingLogger();
+    const { removeUseCase, manifestRepo } = buildRemoveUseCase(activator, logger);
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    await installViaModeA(manifest);
+    await manifestRepo.save(manifest);
+
+    await removeUseCase.execute({
+      pluginName: PLUGIN_NAME,
+      toolIds: ["claude"],
+      projectRoot: PROJECT_ROOT,
+    });
+
+    expect(logger.warnMessages).toStrictEqual([
+      `claude plugin uninstall '${REF}' failed: plugin \`${REF}\` is not installed — an entry for it may remain in claude's own plugin registry.`,
+    ]);
+  });
+
+  it("propagates a failure that is not the host CLI refusing", async () => {
+    const activator = new FakeNativePluginActivator({ available: true, crashOnUninstall: true });
+    const logger = new CapturingLogger();
+    const { removeUseCase, manifestRepo } = buildRemoveUseCase(activator, logger);
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    await installViaModeA(manifest);
+    await manifestRepo.save(manifest);
+
+    await expect(
+      removeUseCase.execute({
+        pluginName: PLUGIN_NAME,
+        toolIds: ["claude"],
+        projectRoot: PROJECT_ROOT,
+      })
+    ).rejects.toThrow("activator crashed uninstalling a plugin");
+  });
 });

@@ -2,7 +2,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { PluginAddUseCase } from "../../../../src/contexts/framework/application/plugin/plugin-add-use-case.js";
 import { RestoreUseCase } from "../../../../src/contexts/framework/application/restore/restore-use-case.js";
+import { Manifest } from "../../../../src/contexts/framework/domain/manifest.js";
 import { PluginDistributionReaderAdapter } from "../../../../src/contexts/framework/infrastructure/plugin-distribution-reader-adapter.js";
+import { InstallationFile } from "../../../../src/kernel/file.js";
 import {
   buildUnitDeps,
   FIXTURE_DIR,
@@ -12,7 +14,11 @@ import {
 } from "../../../helpers/ports/build-unit-deps.js";
 import { fakeEnsureBuiltMarketplace } from "../../../helpers/ports/fake-ensure-built-marketplace.js";
 import { FakePlatform } from "../../../helpers/ports/fake-platform.js";
-import { KeepPrompter, OverwritePrompter } from "../../../helpers/ports/scripted-prompter.js";
+import {
+  KeepPrompter,
+  OverwritePrompter,
+  ScriptedPrompter,
+} from "../../../helpers/ports/scripted-prompter.js";
 import { seedFromDirectory } from "../../../helpers/ports/seed-from-directory.js";
 
 const PROJECT_ROOT = "/test-project";
@@ -474,5 +480,255 @@ describe("restore", () => {
       const vscodeTool = result.tools.find((t) => t.toolId === "vscode");
       expect(vscodeTool?.nothingToRestore).toBe(true);
     });
+  });
+});
+
+function withoutPluginSources(deps: Awaited<ReturnType<typeof buildUnitDeps>>): RestoreUseCase {
+  return new RestoreUseCase(
+    deps.fs,
+    deps.manifestRepo,
+    deps.hasher,
+    deps.logger,
+    new FakePlatform("linux"),
+    new OverwritePrompter()
+  );
+}
+
+function withFetcherOnly(deps: Awaited<ReturnType<typeof buildUnitDeps>>): RestoreUseCase {
+  return new RestoreUseCase(
+    deps.fs,
+    deps.manifestRepo,
+    deps.hasher,
+    deps.logger,
+    new FakePlatform("linux"),
+    new OverwritePrompter(),
+    deps.pluginFetcher
+  );
+}
+
+async function loadedManifest(deps: Awaited<ReturnType<typeof buildUnitDeps>>): Promise<Manifest> {
+  const manifest = await deps.manifestRepo.load();
+  if (manifest === null) throw new Error("the project must be initialized first");
+  return manifest;
+}
+
+describe("restore — consent to overwrite", () => {
+  it("refuses to overwrite a modified file when neither force nor a TTY was given", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "vscode");
+    await deps.fs.writeFile(join(PROJECT_ROOT, ".vscode/keybindings.json"), "[]");
+
+    await expect(
+      makeRestoreUseCase(deps).execute({
+        frameworkPath: FIXTURE_DIR,
+        version: "test",
+        projectRoot: PROJECT_ROOT,
+      })
+    ).rejects.toThrow("--force");
+  });
+});
+
+describe("restore — plugin sources", () => {
+  const PLUGIN_FILE = join(PROJECT_ROOT, ".claude/plugins/sample-plugin/commands/greet.md");
+
+  async function claudeWithCorruptedPlugin() {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "claude");
+    await installPlugin(deps, "claude");
+    await deps.fs.writeFile(PLUGIN_FILE, "CORRUPTED");
+    return deps;
+  }
+
+  it("leaves plugin files alone when no plugin source is wired", async () => {
+    const deps = await claudeWithCorruptedPlugin();
+
+    const result = await withoutPluginSources(deps).execute({
+      frameworkPath: FIXTURE_DIR,
+      version: "test",
+      projectRoot: PROJECT_ROOT,
+      force: true,
+    });
+
+    expect(result.totalPluginFilesRestored).toBe(0);
+    expect(result.restoredPluginNames).toStrictEqual([]);
+    expect(result.nativeOnlyToolIds).toStrictEqual([]);
+    expect(deps.fs.getFile(PLUGIN_FILE)).toBe("CORRUPTED");
+  });
+
+  it("leaves plugin files alone when only the fetcher is wired", async () => {
+    const deps = await claudeWithCorruptedPlugin();
+
+    const result = await withFetcherOnly(deps).execute({
+      frameworkPath: FIXTURE_DIR,
+      version: "test",
+      projectRoot: PROJECT_ROOT,
+      force: true,
+    });
+
+    expect(result.totalPluginFilesRestored).toBe(0);
+    expect(deps.fs.getFile(PLUGIN_FILE)).toBe("CORRUPTED");
+  });
+});
+
+describe("restore — persisting the manifest", () => {
+  it("persists the manifest it was handed once one tool restored a file, even when another had nothing to restore", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initProject(deps, PROJECT_ROOT);
+    await installTool(deps, PROJECT_ROOT, "vscode");
+    await installTool(deps, PROJECT_ROOT, "cursor");
+    const handed = Manifest.fromJSON((await loadedManifest(deps)).toJSON());
+    await deps.fs.writeFile(join(PROJECT_ROOT, ".vscode/keybindings.json"), "[]");
+
+    await makeRestoreUseCase(deps).execute({
+      frameworkPath: FIXTURE_DIR,
+      version: "test",
+      projectRoot: PROJECT_ROOT,
+      force: true,
+      manifest: handed,
+    });
+
+    expect(deps.manifestRepo.getCurrent()).toBe(handed);
+  });
+
+  it("does not persist anything when no file drifted", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "vscode");
+    const stored = await loadedManifest(deps);
+    const handed = Manifest.fromJSON(stored.toJSON());
+
+    await makeRestoreUseCase(deps).execute({
+      frameworkPath: FIXTURE_DIR,
+      version: "test",
+      projectRoot: PROJECT_ROOT,
+      force: true,
+      manifest: handed,
+    });
+
+    expect(deps.manifestRepo.getCurrent()).toBe(stored);
+  });
+
+  it("persists the manifest when only a plugin file was restored", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "claude");
+    await installPlugin(deps, "claude");
+    const handed = Manifest.fromJSON((await loadedManifest(deps)).toJSON());
+    await deps.fs.writeFile(
+      join(PROJECT_ROOT, ".claude/plugins/sample-plugin/commands/greet.md"),
+      "CORRUPTED"
+    );
+
+    await makeRestoreUseCase(deps).execute({
+      frameworkPath: FIXTURE_DIR,
+      version: "test",
+      projectRoot: PROJECT_ROOT,
+      force: true,
+      manifest: handed,
+    });
+
+    expect(deps.manifestRepo.getCurrent()).toBe(handed);
+  });
+});
+
+describe("restore — totals", () => {
+  it("counts the files restored and kept across a tool's sections", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "vscode");
+    await deps.fs.writeFile(join(PROJECT_ROOT, ".vscode/keybindings.json"), "[]");
+    await deps.fs.writeFile(join(PROJECT_ROOT, ".vscode/settings.json"), '{"editor.tabSize": 3}');
+    const prompter = new ScriptedPrompter([
+      ScriptedPrompter.answer.conflict("overwrite"),
+      ScriptedPrompter.answer.conflict("keep"),
+    ]);
+
+    const result = await makeRestoreUseCase(deps, prompter).execute({
+      frameworkPath: FIXTURE_DIR,
+      version: "test",
+      projectRoot: PROJECT_ROOT,
+      interactive: true,
+    });
+
+    expect(result.totalRestored).toBe(1);
+    expect(result.totalKept).toBe(1);
+    expect(result.unrestorable).toStrictEqual([]);
+  });
+});
+
+describe("restore — the framework path", () => {
+  it("reads only the config files the framework path actually holds", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "vscode");
+    const keybindings = join(PROJECT_ROOT, ".vscode/keybindings.json");
+    await deps.fs.writeFile("/partial-framework/config/vscode/keybindings.json", "[]");
+    await deps.fs.deleteFile(keybindings);
+
+    await makeRestoreUseCase(deps).execute({
+      frameworkPath: "/partial-framework",
+      version: "test",
+      projectRoot: PROJECT_ROOT,
+      force: true,
+    });
+
+    expect(deps.fs.getFile(keybindings)).toBe("[]");
+  });
+});
+
+describe("restore — the file selection", () => {
+  const RUN = ".claude/hooks/run.js";
+  const OTHER = ".claude/hooks/other.js";
+
+  async function claudeTrackingGhosts() {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initAndInstall(deps, PROJECT_ROOT, "claude");
+    const manifest = await loadedManifest(deps);
+    const ghosts = [RUN, OTHER].map(
+      (relativePath) =>
+        new InstallationFile({ relativePath, content: "", hash: deps.hasher.hash(relativePath) })
+    );
+    manifest.addTool("claude", "test", ghosts, [...manifest.getMergeFiles("claude")]);
+    return deps;
+  }
+
+  async function unrestorableFor(
+    deps: Awaited<ReturnType<typeof buildUnitDeps>>,
+    files: string[]
+  ): Promise<string[]> {
+    const result = await makeRestoreUseCase(deps).execute({
+      frameworkPath: FIXTURE_DIR,
+      version: "test",
+      projectRoot: PROJECT_ROOT,
+      force: true,
+      files,
+    });
+    return result.unrestorable;
+  }
+
+  it("admits only the file named exactly", async () => {
+    const deps = await claudeTrackingGhosts();
+    expect(await unrestorableFor(deps, [RUN])).toStrictEqual([RUN]);
+  });
+
+  it("admits a file when any entry of the selection names it", async () => {
+    const deps = await claudeTrackingGhosts();
+    expect(await unrestorableFor(deps, ["nothing.md", RUN])).toStrictEqual([RUN]);
+  });
+
+  it("admits every file under a directory named without a trailing slash", async () => {
+    const deps = await claudeTrackingGhosts();
+    expect(await unrestorableFor(deps, [".claude/hooks"])).toStrictEqual([RUN, OTHER]);
+  });
+
+  it("admits every file under a directory named with a trailing slash", async () => {
+    const deps = await claudeTrackingGhosts();
+    expect(await unrestorableFor(deps, [".claude/hooks/"])).toStrictEqual([RUN, OTHER]);
+  });
+
+  it("matches a directory only as a whole path segment", async () => {
+    const deps = await claudeTrackingGhosts();
+    expect(await unrestorableFor(deps, [".claude/hook"])).toStrictEqual([]);
+  });
+
+  it("treats an empty selection as no selection at all", async () => {
+    const deps = await claudeTrackingGhosts();
+    expect(await unrestorableFor(deps, [])).toStrictEqual([RUN, OTHER]);
   });
 });

@@ -1,10 +1,11 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { UserSourceReferencesAdapter } from "../../../../src/contexts/framework/infrastructure/user-source-references-adapter.js";
 import { UnreadableUserSourceReferencesError } from "../../../../src/kernel/errors.js";
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
 
 const USER_CONFIG_DIR = "/fake-home/.config/aidd";
-const REFERENCES_PATH = `${USER_CONFIG_DIR}/references.json`;
+const REFERENCES_PATH = join(USER_CONFIG_DIR, "references.json");
 
 function adapter(fs: InMemoryFileAdapter = new InMemoryFileAdapter()): UserSourceReferencesAdapter {
   return new UserSourceReferencesAdapter(fs, () => USER_CONFIG_DIR);
@@ -90,6 +91,55 @@ describe("the shared source's own project references", () => {
 
   // Nothing here asks which version is "current", only where the project is recorded, so a CLI
   // self-update between the `sync` that wrote the reference and this read cannot strand it.
+  it("re-adding a project already recorded under its version leaves the file untouched, even a vanished neighbour", async () => {
+    const fs = new InMemoryFileAdapter();
+    markExisting(fs, "/project-a");
+    markExisting(fs, "/project-b");
+    const refs = adapter(fs);
+    await refs.addReference("1.0.0", "/project-a");
+    await refs.addReference("1.0.0", "/project-b");
+    await fs.deleteFile("/project-b/marker");
+
+    await refs.addReference("1.0.0", "/project-a");
+
+    expect(JSON.parse(fs.getFile(REFERENCES_PATH) ?? "{}")).toStrictEqual({
+      "1.0.0": ["/project-a", "/project-b"],
+    });
+  });
+
+  it("a project recorded under two versions ends up recorded once, under the version asked", async () => {
+    const fs = new InMemoryFileAdapter();
+    markExisting(fs, "/project-a");
+    markExisting(fs, "/project-z");
+    fs.setFile(
+      REFERENCES_PATH,
+      JSON.stringify({ "1.0.0": ["/project-a"], "2.0.0": ["/project-a", "/project-z"] })
+    );
+    const refs = adapter(fs);
+
+    await refs.addReference("1.0.0", "/project-a");
+
+    expect(JSON.parse(fs.getFile(REFERENCES_PATH) ?? "{}")).toStrictEqual({
+      "1.0.0": ["/project-a"],
+      "2.0.0": ["/project-z"],
+    });
+  });
+
+  it("a version whose every project vanished disappears from the file at the next write", async () => {
+    const fs = new InMemoryFileAdapter();
+    markExisting(fs, "/project-a");
+    const refs = adapter(fs);
+    await refs.addReference("1.0.0", "/project-a");
+    await fs.deleteFile("/project-a/marker");
+    markExisting(fs, "/project-b");
+
+    await refs.addReference("2.0.0", "/project-b");
+
+    expect(JSON.parse(fs.getFile(REFERENCES_PATH) ?? "{}")).toStrictEqual({
+      "2.0.0": ["/project-b"],
+    });
+  });
+
   it("adding the same project under a new version drops its claim on the old one", async () => {
     const fs = new InMemoryFileAdapter();
     markExisting(fs, "/project-a");
@@ -131,6 +181,21 @@ describe("the shared source's own project references", () => {
       expect(written).toEqual({});
     });
 
+    it("drops a claim recorded under a later version, leaving the earlier version's projects", async () => {
+      const fs = new InMemoryFileAdapter();
+      markExisting(fs, "/project-a");
+      markExisting(fs, "/project-b");
+      const refs = adapter(fs);
+      await refs.addReference("1.0.0", "/project-a");
+      await refs.addReference("2.0.0", "/project-b");
+
+      await refs.removeReference("/project-b");
+
+      expect(JSON.parse(fs.getFile(REFERENCES_PATH) ?? "{}")).toStrictEqual({
+        "1.0.0": ["/project-a"],
+      });
+    });
+
     it("does nothing when this project never held a reference", async () => {
       const fs = new InMemoryFileAdapter();
       markExisting(fs, "/project-a");
@@ -161,6 +226,45 @@ describe("the shared source's own project references", () => {
     await expect(refs.listAllReferencingProjects()).rejects.toThrow(
       UnreadableUserSourceReferencesError
     );
+  });
+
+  describe("a file it cannot read", () => {
+    it("names the parser's own reason for unparsable JSON", async () => {
+      const fs = new InMemoryFileAdapter();
+      fs.setFile(REFERENCES_PATH, "not json");
+      const refs = adapter(fs);
+
+      await expect(refs.listAllReferencingProjects()).rejects.toThrow(
+        `registry at ${REFERENCES_PATH}: Unexpected token`
+      );
+    });
+
+    it.each([
+      ["null", "null"],
+      ["a list", "[]"],
+      ["a string", '"/project-a"'],
+    ])("names a top level that is %s rather than a version-keyed object", async (_shape, raw) => {
+      const fs = new InMemoryFileAdapter();
+      fs.setFile(REFERENCES_PATH, raw);
+      const refs = adapter(fs);
+
+      await expect(refs.listAllReferencingProjects()).rejects.toThrow(
+        new UnreadableUserSourceReferencesError(REFERENCES_PATH, "it is not a version-keyed object")
+      );
+    });
+
+    it("names the version whose entry mixes a non-path in", async () => {
+      const fs = new InMemoryFileAdapter();
+      fs.setFile(REFERENCES_PATH, JSON.stringify({ "1.0.0": ["/project-a", 5] }));
+      const refs = adapter(fs);
+
+      await expect(refs.listAllReferencingProjects()).rejects.toThrow(
+        new UnreadableUserSourceReferencesError(
+          REFERENCES_PATH,
+          'its "1.0.0" entry is not a list of project paths'
+        )
+      );
+    });
   });
 
   describe("listAllReferencingProjects", () => {

@@ -133,3 +133,62 @@ describe("BuiltTreeMaterializationTranslator — opencode (integration)", () => 
     expect(fs.has(`${PROJECT_ROOT}/.opencode/plugin/other-plugin.js`)).toBe(false);
   });
 });
+
+describe("BuiltTreeMaterializationTranslator — what the opencode flat tree never yields", () => {
+  async function installFrom(
+    fs: InMemoryFileAdapter,
+    distribution: PluginDistribution
+  ): Promise<{ skipped: readonly unknown[] }> {
+    const manifest = Manifest.create();
+    manifest.addTool("opencode", "test", []);
+    const translator = new BuiltTreeMaterializationTranslator(
+      fs,
+      new DeterministicHasher(),
+      () => "/home/u",
+      fakeEnsureBuiltMarketplace(),
+      await makeRegistry()
+    );
+    return translator.addPlugin(
+      distribution,
+      "opencode",
+      { kind: "local", path: "/plugin-source" },
+      PROJECT_ROOT,
+      manifest,
+      "aidd-framework"
+    );
+  }
+
+  it("reports no skip for a tool that keeps hooks inside its own plugin tree", async () => {
+    const fs = new InMemoryFileAdapter();
+    fs.setFile(`${BUILT}/.opencode/agents/aidd-vcs-helper.md`, "agent body");
+
+    const result = await installFrom(fs, dist());
+
+    expect(result.skipped).toStrictEqual([]);
+  });
+
+  it("ignores built files outside .opencode and entries sitting directly under it", async () => {
+    const fs = new InMemoryFileAdapter();
+    fs.setFile(`${BUILT}/other/agents/aidd-vcs-helper.md`, "not opencode");
+    fs.setFile(`${BUILT}/.opencode/aidd-vcs-readme.md`, "too shallow");
+    fs.setFile(`${BUILT}/.opencode/agents/aidd-vcs-helper.md`, "agent body");
+
+    await installFrom(fs, dist());
+
+    expect(fs.listUnder(PROJECT_ROOT)).toStrictEqual([
+      `${PROJECT_ROOT}/.opencode/agents/aidd-vcs-helper.md`,
+    ]);
+  });
+
+  it("never copies the plugin's own hooks manifest, even when the built tree carries one", async () => {
+    const fs = new InMemoryFileAdapter();
+    fs.setFile(`${BUILT}/.opencode/hooks/aidd-vcs/hooks.json`, "{}");
+    fs.setFile(`${BUILT}/.opencode/hooks/aidd-vcs/journal.cjs`, "// journal");
+
+    await installFrom(fs, distWithHooks());
+
+    expect(fs.listUnder(PROJECT_ROOT)).toStrictEqual([
+      `${PROJECT_ROOT}/.opencode/hooks/aidd-vcs/journal.cjs`,
+    ]);
+  });
+});

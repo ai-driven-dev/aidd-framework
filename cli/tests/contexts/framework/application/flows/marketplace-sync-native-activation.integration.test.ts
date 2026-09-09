@@ -632,3 +632,66 @@ describe("a narrowed run preserves another alias's refs at a shared hostName (lo
     expect(recorded?.marketplaces).toContainEqual({ alias: ALIAS_Y, hostName: SHARED_HOST_NAME });
   });
 });
+
+describe("what reclaiming a dead registration says", () => {
+  const CATALOG_NAME = "aidd-framework-catalog";
+  const RECLAIM =
+    "Marketplace 'aidd-framework-catalog' was registered to a directory that no longer exists; re-registering it for this project. Plugins installed from it are removed and the ones this CLI manages are put back.";
+
+  function reclaimSync(activator: FakeNativePluginActivator) {
+    const registry = new InMemoryMarketplaceRegistry();
+    const fs = new InMemoryFileAdapter({
+      "/built/claude/.claude-plugin/marketplace.json": JSON.stringify({
+        name: CATALOG_NAME,
+        version: "1.0.0",
+        plugins: [],
+      }),
+    });
+    const logger = new CapturingLogger();
+    const useCase = new MarketplaceSyncSettingsUseCase(
+      fs,
+      manifestWithPlugin(),
+      registry,
+      new DeterministicHasher(),
+      logger,
+      new Map([["claude", activator]]),
+      fakeEnsureBuiltMarketplace()
+    );
+    return { useCase, registry, logger };
+  }
+
+  it("names the vanished directory's own registration in the one warning it gives", async () => {
+    const activator = new FakeNativePluginActivator({
+      available: true,
+      conflictOnAdd: true,
+      registrationState: "dead",
+    });
+    const { useCase, registry, logger } = reclaimSync(activator);
+    await registry.save(PROJECT_ROOT, marketplace());
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(result.warnings).toStrictEqual([RECLAIM]);
+    expect(logger.warnMessages).toStrictEqual([RECLAIM]);
+  });
+
+  it("warns for each reclaim step the host's CLI refused, naming the step and the reason", async () => {
+    const activator = new FakeNativePluginActivator({
+      available: true,
+      conflictOnAdd: true,
+      throwOnRemove: true,
+      registrationState: "dead",
+    });
+    const { useCase, registry } = reclaimSync(activator);
+    await registry.save(PROJECT_ROOT, marketplace());
+
+    const result = await useCase.execute({ projectRoot: PROJECT_ROOT });
+
+    expect(result.warnings).toStrictEqual([
+      RECLAIM,
+      "Native plugin activation — unregister stale marketplace 'aidd-framework-catalog' skipped: marketplace remove aidd-framework-catalog failed: 'aidd-framework-catalog' is not configured or installed",
+      "Native plugin activation — register marketplace 'aidd-framework-catalog' skipped: marketplace is already added from a different source; remove it before adding this source",
+    ]);
+    expect(result.errors).toStrictEqual([]);
+  });
+});

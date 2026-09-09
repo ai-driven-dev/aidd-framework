@@ -289,6 +289,156 @@ describe("EnsureBuiltMarketplaceUseCase", () => {
     await uc.execute(opts);
     expect(builds).toBe(1);
   });
+
+  it("memoizes per target: a second target of the same marketplace builds again", async () => {
+    const uc = new EnsureBuiltMarketplaceUseCase(
+      fs,
+      fakeResolve("/src/framework", "1.0.0"),
+      buildFor,
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
+    );
+    const codex = await uc.execute({
+      projectRoot: PROJECT,
+      marketplace: makeMarketplace(),
+      target: "codex",
+      mode: "marketplace",
+    });
+    const cursor = await uc.execute({
+      projectRoot: PROJECT,
+      marketplace: makeMarketplace(),
+      target: "cursor",
+      mode: "marketplace",
+    });
+    expect(builds).toBe(2);
+    expect(codex.builtDir).not.toBe(cursor.builtDir);
+  });
+
+  it("reports the catalog version it built", async () => {
+    const uc = new EnsureBuiltMarketplaceUseCase(
+      fs,
+      fakeResolve("/src/framework", "1.0.0"),
+      buildFor,
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
+    );
+    const r = await uc.execute({
+      projectRoot: PROJECT,
+      marketplace: makeMarketplace(),
+      target: "codex",
+      mode: "marketplace",
+    });
+    expect(r.version).toBe("1.0.0");
+  });
+
+  it("reports a catalog without a version as unversioned", async () => {
+    const uc = new EnsureBuiltMarketplaceUseCase(
+      fs,
+      fakeResolve("/src/framework", undefined),
+      buildFor,
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
+    );
+    const r = await uc.execute({
+      projectRoot: PROJECT,
+      marketplace: makeMarketplace(),
+      target: "codex",
+      mode: "marketplace",
+    });
+    expect(r.version).toBe("unversioned");
+  });
+
+  it("asks the resolver for exactly the marketplace, project and refresh flag it was given", async () => {
+    const asked: ResolveMarketplaceOptions[] = [];
+    const recordingResolve: ResolveMarketplace = {
+      execute: async (options) => {
+        asked.push(options);
+        return { marketplace: options.marketplace, localPath: "/src/framework", catalog: null };
+      },
+    };
+    const uc = new EnsureBuiltMarketplaceUseCase(
+      fs,
+      recordingResolve,
+      buildFor,
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
+    );
+    const marketplace = makeMarketplace();
+    await uc.execute({ projectRoot: PROJECT, marketplace, target: "codex", mode: "marketplace" });
+    expect(asked).toStrictEqual([{ marketplace, projectRoot: PROJECT, forceRefresh: undefined }]);
+  });
+
+  it("refuses a target and mode pair no build exists for", async () => {
+    const uc = new EnsureBuiltMarketplaceUseCase(
+      fs,
+      fakeResolve("/src/framework", "1.0.0"),
+      () => undefined,
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
+    );
+    await expect(
+      uc.execute({
+        projectRoot: PROJECT,
+        marketplace: makeMarketplace(),
+        target: "codex",
+        mode: "marketplace",
+      })
+    ).rejects.toThrow("No framework build for target 'codex' mode 'marketplace'.");
+  });
+});
+
+describe("EnsureBuiltMarketplaceUseCase — when a published source's sentinel can be believed", () => {
+  let fs: InMemoryFileAdapter;
+  let builds: number;
+  let buildFor: FrameworkBuildFor;
+  const builtDir = resolve(builtMarketplaceDir(PROJECT, "aidd-framework", "codex"));
+
+  beforeEach(() => {
+    fs = new InMemoryFileAdapter();
+    builds = 0;
+    buildFor = (_target, _mode, outDir) =>
+      ({
+        execute: async () => {
+          builds += 1;
+          await fs.writeFile(join(outDir, "plugins/aidd-vcs/SKILL.md"), "built content");
+          return { outDir, plugins: [], totalFiles: 1 };
+        },
+      }) satisfies FrameworkBuild;
+  });
+
+  async function ensure(catalogVersion: string | undefined): Promise<boolean> {
+    const uc = new EnsureBuiltMarketplaceUseCase(
+      fs,
+      fakeResolve("/src/framework", catalogVersion),
+      buildFor,
+      fakeVersion("5.0.0"),
+      () => "/user-cache"
+    );
+    const r = await uc.execute({
+      projectRoot: PROJECT,
+      marketplace: makeRemoteMarketplace(),
+      target: "codex",
+      mode: "marketplace",
+    });
+    return r.rebuilt;
+  }
+
+  it("rebuilds when no sentinel was ever written", async () => {
+    expect(await ensure("1.0.0")).toBe(true);
+    expect(builds).toBe(1);
+  });
+
+  it("rebuilds when the sentinel names another CLI version", async () => {
+    fs.setFile(join(builtDir, ".build-version"), "4.0.0:1.0.0");
+    expect(await ensure("1.0.0")).toBe(true);
+    expect(builds).toBe(1);
+  });
+
+  it("rebuilds a catalog without a version even when the sentinel says unversioned too", async () => {
+    fs.setFile(join(builtDir, ".build-version"), "5.0.0:unversioned");
+    expect(await ensure(undefined)).toBe(true);
+    expect(builds).toBe(1);
+  });
 });
 
 // outDir here is always builtMarketplaceDir(), an aidd-owned disposable cache, so a collision

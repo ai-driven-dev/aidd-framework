@@ -17,6 +17,10 @@ describe("isFileReference", () => {
     expect(isFileReference("docs/")).toBe(false);
   });
 
+  it("treats an absolute path whose last segment has an extension as a file", () => {
+    expect(isFileReference("/docs/guide.md")).toBe(true);
+  });
+
   it("returns false for paths with no extension in last segment", () => {
     expect(isFileReference("src/utils/helper")).toBe(false);
     expect(isFileReference("justadirectory")).toBe(false);
@@ -66,5 +70,19 @@ describe("extractMarkdownLinkTargets", () => {
     const refs = extractMarkdownLinkTargets(content);
     expect(refs).not.toContain("https://example.com");
     expect(refs).toContain("docs/local.md");
+  });
+});
+
+describe("code fences that hide references", () => {
+  it("ignores a reference inside a fence whose language is a single letter", () => {
+    const content = "```c\n// @docs/ignored.md\n```\n@docs/visible.md";
+
+    expect(extractAtReferences(content)).toStrictEqual(["docs/visible.md"]);
+  });
+
+  it("ignores a reference inside a fence carrying attributes after its language", () => {
+    const content = "```ts title=example.ts\n// @docs/ignored.md\n```\n@docs/visible.md";
+
+    expect(extractAtReferences(content)).toStrictEqual(["docs/visible.md"]);
   });
 });

@@ -75,6 +75,17 @@ describe("toInstalledRule — one installed file, read as a rule", () => {
     expect(rule.paths).toEqual(["src/**", "tests/**"]);
   });
 
+  it("drops the empty entries a stray or trailing comma leaves in a scope", () => {
+    const rule = toInstalledRule(
+      "cursor",
+      ".cursor/rules/a.mdc",
+      ".mdc",
+      '---\nglobs: "src/**,, tests/**,"\n---\n'
+    );
+
+    expect(rule.paths).toStrictEqual(["src/**", "tests/**"]);
+  });
+
   /** `SCOPE_FIELDS.flatMap` concatenates without deduplicating, so a glob carried under two
    * field names at once would come out twice in `InstalledRule.paths`. */
   it("states a glob carried under two field names only once", () => {

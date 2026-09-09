@@ -307,3 +307,37 @@ describe("RestoreRegularFilesUseCase", () => {
     expect(deps.fs.getFile(join(PROJECT_ROOT, "a.md"))).toBe("disk modified content");
   });
 });
+
+describe("RestoreRegularFilesUseCase — the files it hands back", () => {
+  it("hands back a restored file under its new hash and with no content", async () => {
+    const deps = await buildDeps();
+    const useCase = new RestoreRegularFilesUseCase(deps.fs, new OverwritePrompter());
+    const distMap = new Map([
+      [
+        "a.md",
+        new InstallationFile({
+          relativePath: "a.md",
+          content: "framework content",
+          hash: deps.hasher.hash("framework content"),
+        }),
+      ],
+    ]);
+
+    const result = await useCase.execute({
+      manifestFiles: [{ relativePath: "a.md", hash: deps.hasher.hash("original content") }],
+      distMap,
+      projectRoot: PROJECT_ROOT,
+      force: true,
+      interactive: false,
+      fileFilter: null,
+    });
+
+    expect(result?.updatedFiles).toStrictEqual([
+      new InstallationFile({
+        relativePath: "a.md",
+        content: "",
+        hash: deps.hasher.hash("framework content"),
+      }),
+    ]);
+  });
+});

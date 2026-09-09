@@ -140,6 +140,36 @@ describe("DoctorUseCase — plugin integrity", () => {
     });
   });
 
+  describe("when narrowed to a set of tools", () => {
+    it("ignores the plugins of a tool outside the set", async () => {
+      const fs = makeFs(false, EXPECTED_HASH);
+      const useCase = new DoctorPluginUseCase(new DetectPluginDriftUseCase(fs));
+
+      const issues = await useCase.execute({
+        manifest: makeManifest(EXPECTED_HASH),
+        projectRoot: "/proj",
+        allowedIds: new Set(["cursor"]),
+      });
+
+      expect(issues).toStrictEqual([]);
+    });
+
+    it("still checks the plugins of a tool inside the set", async () => {
+      const fs = makeFs(false, EXPECTED_HASH);
+      const useCase = new DoctorPluginUseCase(new DetectPluginDriftUseCase(fs));
+
+      const issues = await useCase.execute({
+        manifest: makeManifest(EXPECTED_HASH),
+        projectRoot: "/proj",
+        allowedIds: new Set(["claude"]),
+      });
+
+      expect(issues).toStrictEqual([
+        { toolId: "claude", pluginName: "my-plugin", issue: "missing", filePath: PLUGIN_FILE },
+      ]);
+    });
+  });
+
   describe("when a user-scope plugin was never installed on this machine", () => {
     it("reports one not-installed-on-machine issue, not one 'missing' issue per file", async () => {
       const manifest = Manifest.create();

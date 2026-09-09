@@ -62,6 +62,22 @@ describe("ProjectContextDetectorUseCase", () => {
     expect(ctx.hasFramework).toBe(false);
   });
 
+  it("reads a project holding only unrelated files as an unknown stack", async () => {
+    const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
+    await fs.writeFile(join(PROJECT_ROOT, "README.md"), "# hello");
+    const detector = new ProjectContextDetectorUseCase(fs);
+    const ctx = await detector.execute({ projectRoot: PROJECT_ROOT });
+    expect(ctx.stack).toBe("unknown");
+  });
+
+  it("does not read a package.json without a workspaces field as a monorepo", async () => {
+    const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
+    await fs.writeFile(join(PROJECT_ROOT, "package.json"), JSON.stringify({ name: "solo" }));
+    const detector = new ProjectContextDetectorUseCase(fs);
+    const ctx = await detector.execute({ projectRoot: PROJECT_ROOT });
+    expect(ctx.isMonorepo).toBe(false);
+  });
+
   it("describe returns hyphen-readable summary", async () => {
     const fs = new InMemoryFileAdapter({}, new DeterministicHasher());
     await fs.writeFile(join(PROJECT_ROOT, "tsconfig.json"), "{}");

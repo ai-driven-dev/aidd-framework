@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveUninstallScopeOrder } from "../../../../../src/contexts/framework/application/shared/resolve-uninstall-scope.js";
 import type { HostPluginRegistryReader } from "../../../../../src/contexts/tools/domain/ports/host-plugin-registry-reader.js";
+import { FakeHostPluginRegistryReader } from "../../../../helpers/ports/fake-host-plugin-registry-reader.js";
 
 const REF = "aidd-telemetry@aidd-framework";
 const PROJECT_ROOT = "/test-project";
@@ -40,5 +41,16 @@ describe("resolveUninstallScopeOrder", () => {
     const order = await resolveUninstallScopeOrder(reader, REF, PROJECT_ROOT, "project");
 
     expect(order).toEqual(["project", "user"]);
+  });
+
+  it("falls back when the host's registry could not be read at all", async () => {
+    const reader = new FakeHostPluginRegistryReader({
+      location: "/registry",
+      unreadable: "not valid JSON",
+    });
+
+    const order = await resolveUninstallScopeOrder(reader, REF, PROJECT_ROOT, "user");
+
+    expect(order).toStrictEqual(["user", "project"]);
   });
 });

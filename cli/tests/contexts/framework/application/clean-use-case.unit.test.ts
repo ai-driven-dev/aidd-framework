@@ -5,6 +5,7 @@ import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/vscode/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/codex/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
 import { Marketplace } from "../../../../src/contexts/distribution/domain/marketplace.js";
 import { CleanUseCase } from "../../../../src/contexts/framework/application/clean-use-case.js";
 import { GitignoreUseCase } from "../../../../src/contexts/framework/application/gitignore-use-case.js";
@@ -13,6 +14,7 @@ import { InstalledPlugin } from "../../../../src/contexts/framework/domain/plugi
 import { UserSourceReferencesAdapter } from "../../../../src/contexts/framework/infrastructure/user-source-references-adapter.js";
 import { cursorProjectHooksScriptDir } from "../../../../src/contexts/tools/domain/formats/cursor-hooks-project-merge.js";
 import type { NativePluginActivator } from "../../../../src/contexts/tools/domain/ports/native-plugin-activator.js";
+import { FileHash, InstallationFile } from "../../../../src/kernel/file.js";
 import type { AiToolId, ToolId } from "../../../../src/kernel/tool.js";
 import { buildUnitDeps, initAndInstall } from "../../../helpers/ports/build-unit-deps.js";
 import { CapturingLogger } from "../../../helpers/ports/capturing-logger.js";
@@ -21,6 +23,7 @@ import { FakeNativePluginActivator } from "../../../helpers/ports/fake-native-pl
 import { InMemoryFileAdapter } from "../../../helpers/ports/in-memory-file-adapter.js";
 import { InMemoryManifestRepository } from "../../../helpers/ports/in-memory-manifest-repository.js";
 import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-marketplace-registry.js";
+import { RecordingPrompter } from "../../../helpers/ports/recording-prompter.js";
 
 const PROJECT_ROOT = "/test-project";
 
@@ -1024,6 +1027,456 @@ describe("clean", () => {
       expect(activator.removedMarketplaces).toEqual([HOST_NAME]);
       expect(activator.removedMarketplaces).not.toContain(ALIAS);
     });
+
+    describe("what the host is told, word for word", () => {
+      const HOME = "/fake-home";
+      const CODEX_CACHE = join(HOME, ".codex", "plugins", "cache");
+
+      function buildUseCase(deps: {
+        manifest: Manifest;
+        fs: InMemoryFileAdapter;
+        logger: CapturingLogger;
+        activators: ReadonlyMap<string, NativePluginActivator>;
+        registry: InMemoryMarketplaceRegistry | undefined;
+      }): CleanUseCase {
+        return new CleanUseCase(
+          deps.fs,
+          new InMemoryManifestRepository(deps.manifest, PROJECT_ROOT),
+          deps.logger,
+          new GitignoreUseCase(deps.fs),
+          deps.activators,
+          deps.registry,
+          undefined,
+          new Map(),
+          () => HOME
+        );
+      }
+
+      it("names the absent binary alone when no activator is wired for it", async () => {
+        const fs = new InMemoryFileAdapter();
+        const logger = new CapturingLogger();
+        const useCase = buildUseCase({
+          manifest: seedManifestWithNativeRegistrations(),
+          fs,
+          logger,
+          activators: new Map(),
+          registry: seedMarketplaceRegistry(),
+        });
+
+        const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(result.manifestFound).toBe(true);
+        expect(logger.warnMessages).toStrictEqual([
+          `codex: registration left in place, the codex CLI is not on the PATH. Its cache survives at: ${join(CODEX_CACHE, MARKETPLACE)}.`,
+        ]);
+      });
+
+      it("leaves a registration in place when its alias is no longer registered here, still uninstalling the plugin ref", async () => {
+        const fs = new InMemoryFileAdapter();
+        fs.setFile(join(CODEX_CACHE, MARKETPLACE, "leftover.json"), "{}");
+        const logger = new CapturingLogger();
+        const activator = new FakeNativePluginActivator({ available: true });
+        const registry = new InMemoryMarketplaceRegistry();
+        await registry.save(
+          PROJECT_ROOT,
+          Marketplace.create({
+            name: "other-mkt",
+            source: { kind: "local", path: "/other/built/path" },
+            scope: "project",
+            addedAt: "2026-01-01T00:00:00.000Z",
+          })
+        );
+        const useCase = buildUseCase({
+          manifest: seedManifestWithNativeRegistrations(),
+          fs,
+          logger,
+          activators: new Map([[BINARY, activator]]),
+          registry,
+        });
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(activator.uninstalledPlugins).toStrictEqual([REF]);
+        expect(activator.removedMarketplaces).toStrictEqual([]);
+        expect(logger.warnMessages).toStrictEqual([
+          `codex: '${MARKETPLACE}' is no longer a registered marketplace here, so its scope cannot be resolved — its codex registration was left in place.`,
+          `codex: cache for '${MARKETPLACE}' left in place, its own removal was not confirmed: ${join(CODEX_CACHE, MARKETPLACE)}`,
+        ]);
+      });
+
+      it("leaves a registration in place when no marketplace registry is wired in at all", async () => {
+        const fs = new InMemoryFileAdapter();
+        const logger = new CapturingLogger();
+        const activator = new FakeNativePluginActivator({ available: true });
+        const useCase = buildUseCase({
+          manifest: seedManifestWithNativeRegistrations(),
+          fs,
+          logger,
+          activators: new Map([[BINARY, activator]]),
+          registry: undefined,
+        });
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(activator.removedMarketplaces).toStrictEqual([]);
+        expect(logger.warnMessages).toStrictEqual([
+          `codex: '${MARKETPLACE}' is no longer a registered marketplace here, so its scope cannot be resolved — its codex registration was left in place.`,
+          `codex: cache for '${MARKETPLACE}' left in place, its own removal was not confirmed: ${join(CODEX_CACHE, MARKETPLACE)}`,
+        ]);
+      });
+
+      it("names a refused marketplace removal by the host's own words", async () => {
+        const fs = new InMemoryFileAdapter();
+        const logger = new CapturingLogger();
+        const activator = new FakeNativePluginActivator({ available: true, throwOnRemove: true });
+        const useCase = buildUseCase({
+          manifest: seedManifestWithNativeRegistrations(),
+          fs,
+          logger,
+          activators: new Map([[BINARY, activator]]),
+          registry: seedMarketplaceRegistry(),
+        });
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(logger.warnMessages).toStrictEqual([
+          `codex marketplace remove '${MARKETPLACE}' failed: marketplace remove ${MARKETPLACE} failed: '${MARKETPLACE}' is not configured or installed`,
+          `codex: cache for '${MARKETPLACE}' left in place, its own removal was not confirmed: ${join(CODEX_CACHE, MARKETPLACE)}`,
+        ]);
+      });
+
+      it("names a refused plugin uninstall by the host's own words, after trying both scopes", async () => {
+        const fs = new InMemoryFileAdapter();
+        const logger = new CapturingLogger();
+        const activator = new FakeNativePluginActivator({
+          available: true,
+          failOnUninstall: [REF],
+        });
+        const useCase = buildUseCase({
+          manifest: seedManifestWithNativeRegistrations(),
+          fs,
+          logger,
+          activators: new Map([[BINARY, activator]]),
+          registry: seedMarketplaceRegistry(),
+        });
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(activator.uninstalledPluginScopes).toStrictEqual(["project", "user"]);
+        expect(logger.warnMessages).toStrictEqual([
+          `codex plugin uninstall '${REF}' failed: plugin \`${REF}\` is not installed`,
+        ]);
+      });
+
+      it("propagates an activator failure that is not the host refusing", async () => {
+        const fs = new InMemoryFileAdapter();
+        const useCase = buildUseCase({
+          manifest: seedManifestWithNativeRegistrations(),
+          fs,
+          logger: new CapturingLogger(),
+          activators: new Map([[BINARY, new CrashingUninstallActivator()]]),
+          registry: seedMarketplaceRegistry(),
+        });
+
+        await expect(useCase.execute({ projectRoot: PROJECT_ROOT, force: true })).rejects.toThrow(
+          "activator crashed uninstalling a plugin"
+        );
+      });
+
+      function seedSharedRegistry(): InMemoryMarketplaceRegistry {
+        const registry = new InMemoryMarketplaceRegistry();
+        registry.save(
+          PROJECT_ROOT,
+          Marketplace.create({
+            name: MARKETPLACE,
+            source: { kind: "local", path: "/shared/built/path" },
+            scope: "user",
+            addedAt: "2026-01-01T00:00:00.000Z",
+          })
+        );
+        return registry;
+      }
+
+      function seedRegistrations(toolId: ToolId, binary: string): Manifest {
+        const manifest = Manifest.create();
+        manifest.addTool(toolId, "1.0.0", []);
+        manifest.setNativeRegistrations(toolId, {
+          binary,
+          marketplaces: [{ alias: MARKETPLACE, hostName: MARKETPLACE }],
+          pluginRefs: [],
+        });
+        return manifest;
+      }
+
+      it("names no cache for a shared marketplace at a host whose profile declares no cache directory (copilot)", async () => {
+        const fs = new InMemoryFileAdapter();
+        const logger = new CapturingLogger();
+        const useCase = buildUseCase({
+          manifest: seedRegistrations("copilot", "copilot"),
+          fs,
+          logger,
+          activators: new Map([["copilot", new FakeNativePluginActivator({ available: true })]]),
+          registry: seedSharedRegistry(),
+        });
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(logger.warnMessages).toStrictEqual([
+          `copilot: '${MARKETPLACE}' is shared by every project on this machine — left registered. Its entry survives at userConfigDir()/marketplaces.json.`,
+        ]);
+      });
+
+      it("names no cache for a shared marketplace at a tool that drives no native CLI (cursor)", async () => {
+        const fs = new InMemoryFileAdapter();
+        const logger = new CapturingLogger();
+        const useCase = buildUseCase({
+          manifest: seedRegistrations("cursor", "cursor"),
+          fs,
+          logger,
+          activators: new Map([["cursor", new FakeNativePluginActivator({ available: true })]]),
+          registry: seedSharedRegistry(),
+        });
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(logger.warnMessages).toStrictEqual([
+          `cursor: '${MARKETPLACE}' is shared by every project on this machine — left registered. Its entry survives at userConfigDir()/marketplaces.json.`,
+        ]);
+      });
+
+      it("never treats a shared marketplace it left registered as one the host forgot, so its cache stays", async () => {
+        const fs = new InMemoryFileAdapter();
+        fs.setFile(join(CODEX_CACHE, MARKETPLACE, "leftover.json"), "{}");
+        const logger = new CapturingLogger();
+        const useCase = buildUseCase({
+          manifest: seedRegistrations("codex", BINARY),
+          fs,
+          logger,
+          activators: new Map([[BINARY, new FakeNativePluginActivator({ available: true })]]),
+          registry: seedSharedRegistry(),
+        });
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(fs.has(join(CODEX_CACHE, MARKETPLACE, "leftover.json"))).toBe(true);
+        expect(logger.warnMessages).toStrictEqual([
+          `codex: '${MARKETPLACE}' is shared by every project on this machine — left registered. Its entry survives at userConfigDir()/marketplaces.json, and its cache at: ${join(CODEX_CACHE, MARKETPLACE)}.`,
+          `codex: cache for '${MARKETPLACE}' left in place, its own removal was not confirmed: ${join(CODEX_CACHE, MARKETPLACE)}`,
+        ]);
+      });
+
+      it("names no surviving cache when the absent binary's profile declares no cache directory (copilot)", async () => {
+        const fs = new InMemoryFileAdapter();
+        const logger = new CapturingLogger();
+        const useCase = buildUseCase({
+          manifest: seedRegistrations("copilot", "copilot"),
+          fs,
+          logger,
+          activators: new Map(),
+          registry: seedSharedRegistry(),
+        });
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(logger.warnMessages).toStrictEqual([
+          "copilot: registration left in place, the copilot CLI is not on the PATH.",
+        ]);
+      });
+
+      it("names no surviving cache when the absent binary belongs to a tool that drives no native CLI (cursor)", async () => {
+        const fs = new InMemoryFileAdapter();
+        const logger = new CapturingLogger();
+        const useCase = buildUseCase({
+          manifest: seedRegistrations("cursor", "cursor"),
+          fs,
+          logger,
+          activators: new Map(),
+          registry: seedSharedRegistry(),
+        });
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(logger.warnMessages).toStrictEqual([
+          "cursor: registration left in place, the cursor CLI is not on the PATH.",
+        ]);
+      });
+
+      it("names no surviving cache when the absent binary registered no marketplace", async () => {
+        const manifest = Manifest.create();
+        manifest.addTool("codex", "1.0.0", []);
+        manifest.setNativeRegistrations("codex", {
+          binary: BINARY,
+          marketplaces: [],
+          pluginRefs: [REF],
+        });
+        const fs = new InMemoryFileAdapter();
+        const logger = new CapturingLogger();
+        const useCase = buildUseCase({
+          manifest,
+          fs,
+          logger,
+          activators: new Map(),
+          registry: seedMarketplaceRegistry(),
+        });
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(logger.warnMessages).toStrictEqual([
+          "codex: registration left in place, the codex CLI is not on the PATH.",
+        ]);
+      });
+
+      it("names every surviving cache of an absent binary, one path per marketplace", async () => {
+        const manifest = Manifest.create();
+        manifest.addTool("codex", "1.0.0", []);
+        manifest.setNativeRegistrations("codex", {
+          binary: BINARY,
+          marketplaces: [
+            { alias: "mkt-a", hostName: "mkt-a" },
+            { alias: "mkt-b", hostName: "mkt-b" },
+          ],
+          pluginRefs: [],
+        });
+        const fs = new InMemoryFileAdapter();
+        const logger = new CapturingLogger();
+        const useCase = buildUseCase({
+          manifest,
+          fs,
+          logger,
+          activators: new Map(),
+          registry: seedMarketplaceRegistry(),
+        });
+
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(logger.warnMessages).toStrictEqual([
+          `codex: registration left in place, the codex CLI is not on the PATH. Its cache survives at: ${join(CODEX_CACHE, "mkt-a")}, ${join(CODEX_CACHE, "mkt-b")}.`,
+        ]);
+      });
+    });
+
+    describe("the scope the manifest recorded for a plugin ref, at cursor, the one host admitting a user-scope record", () => {
+      const CURSOR_REF = "aidd-context@aidd-framework";
+
+      function seedCursorManifest(
+        marketplaces: ReadonlyArray<{ alias: string; hostName: string }>,
+        plugins: ReadonlyArray<{ name: string; scope: "project" | "user"; marketplace: string }>
+      ): Manifest {
+        const manifest = Manifest.create();
+        manifest.addTool("cursor", "1.0.0", []);
+        for (const plugin of plugins) {
+          manifest.addPlugin(
+            "cursor",
+            InstalledPlugin.fromMetadata(
+              plugin.name,
+              "1.0.0",
+              { kind: "github", repo: "ai-driven-dev/framework" },
+              true,
+              plugin.scope,
+              plugin.marketplace
+            )
+          );
+        }
+        manifest.setNativeRegistrations("cursor", {
+          binary: "cursor",
+          marketplaces: [...marketplaces],
+          pluginRefs: [CURSOR_REF],
+        });
+        return manifest;
+      }
+
+      async function uninstallScopesFor(manifest: Manifest): Promise<readonly string[]> {
+        const fs = new InMemoryFileAdapter();
+        const activator = new FakeNativePluginActivator({
+          available: true,
+          installedAtScope: new Map([[CURSOR_REF, "user"]]),
+        });
+        const useCase = new CleanUseCase(
+          fs,
+          new InMemoryManifestRepository(manifest, PROJECT_ROOT),
+          new CapturingLogger(),
+          new GitignoreUseCase(fs),
+          new Map([["cursor", activator]]),
+          seedMarketplaceRegistry()
+        );
+        await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+        return activator.uninstalledPluginScopes;
+      }
+
+      it("tries the user scope first when that is what the manifest recorded for the plugin behind the ref, found by its own alias among several", async () => {
+        const scopes = await uninstallScopesFor(
+          seedCursorManifest(
+            [
+              { alias: "other", hostName: "other-host" },
+              { alias: MARKETPLACE, hostName: MARKETPLACE },
+            ],
+            [
+              { name: "other-plugin", scope: "project", marketplace: MARKETPLACE },
+              { name: "aidd-context", scope: "user", marketplace: MARKETPLACE },
+            ]
+          )
+        );
+
+        expect(scopes).toStrictEqual(["user"]);
+      });
+
+      it("tries the project scope first when the plugin's alias matches no recorded marketplace", async () => {
+        const scopes = await uninstallScopesFor(
+          seedCursorManifest(
+            [{ alias: MARKETPLACE, hostName: MARKETPLACE }],
+            [{ name: "aidd-context", scope: "user", marketplace: "unknown-alias" }]
+          )
+        );
+
+        expect(scopes).toStrictEqual(["project", "user"]);
+      });
+
+      it("tries the project scope first when the manifest records no plugin at all for the ref", async () => {
+        const scopes = await uninstallScopesFor(
+          seedCursorManifest([{ alias: MARKETPLACE, hostName: MARKETPLACE }], [])
+        );
+
+        expect(scopes).toStrictEqual(["project", "user"]);
+      });
+    });
+
+    it("previews no shared-source fact when the references port is wired in but no marketplace registry is", async () => {
+      const fs = new InMemoryFileAdapter();
+      const useCase = new CleanUseCase(
+        fs,
+        new InMemoryManifestRepository(seedManifestWithNativeRegistrations(), PROJECT_ROOT),
+        new CapturingLogger(),
+        new GitignoreUseCase(fs),
+        new Map(),
+        undefined,
+        undefined,
+        new Map(),
+        () => "/fake-home",
+        new UserSourceReferencesAdapter(fs, () => "/fake-home/.config/aidd")
+      );
+
+      const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: false });
+
+      expect(result).toStrictEqual({
+        dryRun: true,
+        manifestFound: true,
+        preview: {
+          tools: [{ toolId: "codex", fileCount: 0 }],
+          totalFileCount: 0,
+          nativeRegistrations: [
+            {
+              toolId: "codex",
+              binary: BINARY,
+              marketplaceCount: 1,
+              pluginRefCount: 1,
+              cachePaths: [join("/fake-home", ".codex", "plugins", "cache", MARKETPLACE)],
+            },
+          ],
+          sharedSourceOtherProjects: undefined,
+        },
+        fileCount: 0,
+      });
+    });
   });
 
   describe("machine-local files a tool's own materialization writes outside the manifest", () => {
@@ -1202,7 +1655,451 @@ describe("clean", () => {
       expect(logger.warnMessages.some((m) => m.includes(PLUGIN_KEY))).toBe(true);
     });
   });
+
+  describe("without a manifest", () => {
+    it("reports nothing found and nothing to preview", async () => {
+      const fs = new InMemoryFileAdapter();
+      const useCase = new CleanUseCase(
+        fs,
+        new InMemoryManifestRepository(null, PROJECT_ROOT),
+        new CapturingLogger(),
+        new GitignoreUseCase(fs)
+      );
+
+      const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(result).toStrictEqual({
+        dryRun: false,
+        manifestFound: false,
+        preview: { tools: [], totalFileCount: 0, nativeRegistrations: [] },
+        fileCount: 0,
+      });
+    });
+  });
+
+  describe("confirming before removing anything", () => {
+    function buildConfirmingUseCase(
+      fs: InMemoryFileAdapter,
+      prompter: RecordingPrompter | undefined
+    ) {
+      return new CleanUseCase(
+        fs,
+        new InMemoryManifestRepository(seedTrackedFiles(fs, ["a.md"]), PROJECT_ROOT),
+        new CapturingLogger(),
+        new GitignoreUseCase(fs),
+        new Map(),
+        undefined,
+        prompter
+      );
+    }
+
+    it("asks its one question, word for word, and removes everything on yes", async () => {
+      const fs = new InMemoryFileAdapter();
+      const prompter = new RecordingPrompter(true);
+      const useCase = buildConfirmingUseCase(fs, prompter);
+
+      const result = await useCase.execute({
+        projectRoot: PROJECT_ROOT,
+        force: false,
+        interactive: true,
+      });
+
+      expect(prompter.confirmMessages).toStrictEqual(["Remove all AIDD files?"]);
+      expect(result).toStrictEqual({
+        dryRun: false,
+        manifestFound: true,
+        preview: previewOf([["claude", 1]]),
+        fileCount: 1,
+      });
+      expect(fs.has(join(PROJECT_ROOT, "a.md"))).toBe(false);
+    });
+
+    it("removes nothing on no and answers with the dry-run preview", async () => {
+      const fs = new InMemoryFileAdapter();
+      const useCase = buildConfirmingUseCase(fs, new RecordingPrompter(false));
+
+      const result = await useCase.execute({
+        projectRoot: PROJECT_ROOT,
+        force: false,
+        interactive: true,
+      });
+
+      expect(result).toStrictEqual({
+        dryRun: true,
+        manifestFound: true,
+        preview: previewOf([["claude", 1]]),
+        fileCount: 0,
+      });
+      expect(fs.has(join(PROJECT_ROOT, "a.md"))).toBe(true);
+    });
+
+    it("never asks outside an interactive run, even with a prompter wired in", async () => {
+      const fs = new InMemoryFileAdapter();
+      const prompter = new RecordingPrompter(true);
+      const useCase = buildConfirmingUseCase(fs, prompter);
+
+      const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: false });
+
+      expect(prompter.confirmMessages).toStrictEqual([]);
+      expect(result).toStrictEqual({
+        dryRun: true,
+        manifestFound: true,
+        preview: previewOf([["claude", 1]]),
+        fileCount: 0,
+      });
+    });
+
+    it("stays a dry-run in an interactive run with no prompter wired in", async () => {
+      const fs = new InMemoryFileAdapter();
+      const useCase = buildConfirmingUseCase(fs, undefined);
+
+      const result = await useCase.execute({
+        projectRoot: PROJECT_ROOT,
+        force: false,
+        interactive: true,
+      });
+
+      expect(result.dryRun).toBe(true);
+      expect(fs.has(join(PROJECT_ROOT, "a.md"))).toBe(true);
+    });
+  });
+
+  describe("what a dry-run previews", () => {
+    it("counts each tool's tracked and merged files, and totals them", async () => {
+      const fs = new InMemoryFileAdapter();
+      const manifest = seedTrackedFiles(fs, ["a.md", "b.md"]);
+      manifest.addTool(
+        "claude",
+        "1.0.0",
+        [fileEntry("a.md"), fileEntry("b.md")],
+        [{ relativePath: ".claude/settings.json", sectionKey: null, entries: { owned: hash() } }]
+      );
+      manifest.addTool("codex", "1.0.0", [fileEntry("c.md")]);
+      const useCase = new CleanUseCase(
+        fs,
+        new InMemoryManifestRepository(manifest, PROJECT_ROOT),
+        new CapturingLogger(),
+        new GitignoreUseCase(fs)
+      );
+
+      const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: false });
+
+      expect(result).toStrictEqual({
+        dryRun: true,
+        manifestFound: true,
+        preview: previewOf([
+          ["claude", 3],
+          ["codex", 1],
+        ]),
+        fileCount: 0,
+      });
+    });
+
+    it("announces no cache path for a host whose profile declares no cache directory (copilot)", async () => {
+      const manifest = Manifest.create();
+      manifest.addTool("copilot", "1.0.0", []);
+      manifest.setNativeRegistrations("copilot", {
+        binary: "copilot",
+        marketplaces: [{ alias: "aidd-framework", hostName: "aidd-framework" }],
+        pluginRefs: ["aidd-context@aidd-framework"],
+      });
+      const fs = new InMemoryFileAdapter();
+      const useCase = new CleanUseCase(
+        fs,
+        new InMemoryManifestRepository(manifest, PROJECT_ROOT),
+        new CapturingLogger(),
+        new GitignoreUseCase(fs)
+      );
+
+      const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: false });
+
+      expect(result.preview.nativeRegistrations).toStrictEqual([
+        {
+          toolId: "copilot",
+          binary: "copilot",
+          marketplaceCount: 1,
+          pluginRefCount: 1,
+          cachePaths: [],
+        },
+      ]);
+    });
+
+    it("announces no cache path for a tool that drives no native CLI (cursor)", async () => {
+      const manifest = Manifest.create();
+      manifest.addTool("cursor", "1.0.0", []);
+      manifest.setNativeRegistrations("cursor", {
+        binary: "cursor",
+        marketplaces: [{ alias: "aidd-framework", hostName: "aidd-framework" }],
+        pluginRefs: [],
+      });
+      const fs = new InMemoryFileAdapter();
+      const useCase = new CleanUseCase(
+        fs,
+        new InMemoryManifestRepository(manifest, PROJECT_ROOT),
+        new CapturingLogger(),
+        new GitignoreUseCase(fs)
+      );
+
+      const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: false });
+
+      expect(result.preview.nativeRegistrations).toStrictEqual([
+        {
+          toolId: "cursor",
+          binary: "cursor",
+          marketplaceCount: 1,
+          pluginRefCount: 0,
+          cachePaths: [],
+        },
+      ]);
+    });
+  });
+
+  describe("counting what was removed", () => {
+    function buildCountingUseCase(
+      fs: InMemoryFileAdapter,
+      manifest: Manifest,
+      logger = new CapturingLogger()
+    ) {
+      return new CleanUseCase(
+        fs,
+        new InMemoryManifestRepository(manifest, PROJECT_ROOT),
+        logger,
+        new GitignoreUseCase(fs)
+      );
+    }
+
+    it("counts every tracked file and names the tool being removed", async () => {
+      const fs = new InMemoryFileAdapter();
+      const logger = new CapturingLogger();
+      const useCase = buildCountingUseCase(fs, seedTrackedFiles(fs, ["a.md", "b.md"]), logger);
+
+      const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(result.fileCount).toBe(2);
+      expect(fs.has(join(PROJECT_ROOT, "a.md"))).toBe(false);
+      expect(fs.has(join(PROJECT_ROOT, "b.md"))).toBe(false);
+      expect(logger.infoMessages).toStrictEqual(["Removing claude files..."]);
+    });
+
+    it("counts the machine-local settings file a tool wrote outside the manifest", async () => {
+      const fs = new InMemoryFileAdapter();
+      fs.setFile(join(PROJECT_ROOT, ".claude", "settings.local.json"), "{}");
+      const useCase = buildCountingUseCase(fs, seedTrackedFiles(fs, ["a.md"]));
+
+      const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(result.fileCount).toBe(2);
+    });
+
+    it("does not count a machine-local settings file that was never written", async () => {
+      const fs = new InMemoryFileAdapter();
+      const useCase = buildCountingUseCase(fs, seedTrackedFiles(fs, ["a.md"]));
+
+      const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(result.fileCount).toBe(1);
+    });
+
+    it("counts the project hooks file a cursor plugin was unmerged from", async () => {
+      const pluginName = "aidd-context";
+      const manifest = Manifest.create();
+      manifest.addTool("cursor", "1.0.0", []);
+      manifest.addPlugin(
+        "cursor",
+        InstalledPlugin.fromMetadata(
+          pluginName,
+          "1.0.0",
+          { kind: "local", path: "/p" },
+          false,
+          "project"
+        )
+      );
+      const fs = new InMemoryFileAdapter();
+      const scriptMarker = cursorProjectHooksScriptDir(pluginName);
+      fs.setFile(
+        join(PROJECT_ROOT, ".cursor", "hooks.json"),
+        JSON.stringify({
+          version: 1,
+          hooks: { PreToolUse: [{ command: `./${scriptMarker}run.js` }] },
+        })
+      );
+      const useCase = buildCountingUseCase(fs, manifest);
+
+      const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(result.fileCount).toBe(1);
+    });
+
+    it("deletes a project-scope plugin's files from the project and counts them", async () => {
+      const manifest = Manifest.create();
+      manifest.addTool("claude", "1.0.0", []);
+      manifest.addPlugin(
+        "claude",
+        InstalledPlugin.fromMetadata(
+          "aidd-context",
+          "1.0.0",
+          { kind: "local", path: "/p" },
+          false,
+          "project"
+        ).withFiles(new Map([["skills/x.md", HASH]]))
+      );
+      const fs = new InMemoryFileAdapter();
+      fs.setFile(join(PROJECT_ROOT, "skills", "x.md"), "x");
+      const useCase = buildCountingUseCase(fs, manifest);
+
+      const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(fs.has(join(PROJECT_ROOT, "skills", "x.md"))).toBe(false);
+      expect(result.fileCount).toBe(1);
+    });
+
+    describe("a file merged into one the project shares", () => {
+      const MERGED = ".claude/settings.json";
+
+      function seedMerged(
+        fs: InMemoryFileAdapter,
+        content: string | null,
+        ownedKeys: string[]
+      ): Manifest {
+        const manifest = Manifest.create();
+        const entries: Record<string, FileHash> = {};
+        for (const key of ownedKeys) entries[key] = hash();
+        manifest.addTool(
+          "claude",
+          "1.0.0",
+          [],
+          [{ relativePath: MERGED, sectionKey: null, entries }]
+        );
+        if (content !== null) fs.setFile(join(PROJECT_ROOT, MERGED), content);
+        return manifest;
+      }
+
+      it("takes back only its own keys, leaving the project's, and counts the file once", async () => {
+        const fs = new InMemoryFileAdapter();
+        const useCase = buildCountingUseCase(
+          fs,
+          seedMerged(fs, '{"owned":1,"theirs":2}', ["owned"])
+        );
+
+        const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(fs.getFile(join(PROJECT_ROOT, MERGED))).toBe('{\n  "theirs": 2\n}');
+        expect(result.fileCount).toBe(1);
+      });
+
+      it("deletes the file once nothing but its own keys was in it", async () => {
+        const fs = new InMemoryFileAdapter();
+        const useCase = buildCountingUseCase(fs, seedMerged(fs, '{"owned":1}', ["owned"]));
+
+        const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(fs.has(join(PROJECT_ROOT, MERGED))).toBe(false);
+        expect(result.fileCount).toBe(1);
+      });
+
+      it("deletes a file it recorded whole, one with no keys of its own", async () => {
+        const fs = new InMemoryFileAdapter();
+        const useCase = buildCountingUseCase(fs, seedMerged(fs, '{"theirs":2}', []));
+
+        const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(fs.has(join(PROJECT_ROOT, MERGED))).toBe(false);
+        expect(result.fileCount).toBe(1);
+      });
+
+      it("skips a merged file already gone, without counting it", async () => {
+        const fs = new InMemoryFileAdapter();
+        const useCase = buildCountingUseCase(fs, seedMerged(fs, null, ["owned"]));
+
+        const result = await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+        expect(result.fileCount).toBe(0);
+      });
+    });
+  });
+
+  describe("what stays under .aidd/", () => {
+    it("says it kept config.json, by its path", async () => {
+      const fs = new InMemoryFileAdapter();
+      fs.setFile(join(PROJECT_ROOT, ".aidd", "config.json"), "{}");
+      const logger = new CapturingLogger();
+      const useCase = new CleanUseCase(
+        fs,
+        new InMemoryManifestRepository(seedTrackedFiles(fs, ["a.md"]), PROJECT_ROOT),
+        logger,
+        new GitignoreUseCase(fs)
+      );
+
+      await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(logger.infoMessages).toStrictEqual([
+        "Removing claude files...",
+        "Kept .aidd/config.json",
+      ]);
+    });
+
+    it("says nothing about config.json when another file is what keeps .aidd/ alive", async () => {
+      const fs = new InMemoryFileAdapter();
+      fs.setFile(join(PROJECT_ROOT, ".aidd", "auth.json"), "{}");
+      const logger = new CapturingLogger();
+      const useCase = new CleanUseCase(
+        fs,
+        new InMemoryManifestRepository(seedTrackedFiles(fs, ["a.md"]), PROJECT_ROOT),
+        logger,
+        new GitignoreUseCase(fs)
+      );
+
+      await useCase.execute({ projectRoot: PROJECT_ROOT, force: true });
+
+      expect(logger.infoMessages).toStrictEqual(["Removing claude files..."]);
+    });
+  });
 });
+
+const HASH = "abc123abc123abc123abc123abc123ab";
+
+function hash(): FileHash {
+  return new FileHash(HASH);
+}
+
+function fileEntry(relativePath: string): InstallationFile {
+  return new InstallationFile({ relativePath, content: "", hash: hash() });
+}
+
+function seedTrackedFiles(fs: InMemoryFileAdapter, paths: readonly string[]): Manifest {
+  const manifest = Manifest.create();
+  manifest.addTool("claude", "1.0.0", paths.map(fileEntry));
+  for (const path of paths) fs.setFile(join(PROJECT_ROOT, path), "x");
+  return manifest;
+}
+
+function previewOf(tools: ReadonlyArray<readonly [ToolId, number]>) {
+  return {
+    tools: tools.map(([toolId, fileCount]) => ({ toolId, fileCount })),
+    totalFileCount: tools.reduce((sum, [, fileCount]) => sum + fileCount, 0),
+    nativeRegistrations: [],
+    sharedSourceOtherProjects: undefined,
+  };
+}
+
+class CrashingUninstallActivator implements NativePluginActivator {
+  isAvailable(): boolean {
+    return true;
+  }
+  addMarketplace(): void {}
+  enablesPlugins(): boolean {
+    return false;
+  }
+  removeMarketplace(): void {}
+  registrationState(): "live" | "dead" | "unknown" {
+    return "live";
+  }
+  upgradeMarketplaces(): void {}
+  enablePlugin(): void {}
+  uninstallPlugin(): void {
+    throw new Error("activator crashed uninstalling a plugin");
+  }
+}
 
 /** Records `uninstallPlugin`/`removeMarketplace` calls in the order they happen, so a test
  * can assert one came before the other. */

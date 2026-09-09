@@ -6,6 +6,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import "../../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
 import { ModeAMarketplaceTranslator } from "../../../../../src/contexts/framework/application/framework/translator/mode-a-marketplace-translator.js";
 import { PluginRemoveUseCase } from "../../../../../src/contexts/framework/application/plugin/plugin-remove-use-case.js";
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
@@ -173,5 +174,86 @@ describe("PluginRemoveUseCase purges the plugin's own cache subtree", () => {
 
     expect(await fs.fileExists(witness)).toBe(true);
     expect(logger.warnMessages.some((m) => m.includes("does not resolve inside"))).toBe(true);
+  });
+
+  it("names the purged cache directory", async () => {
+    const fs = new InMemoryFileAdapter();
+    await fs.writeFile(
+      join(CLAUDE_CACHE_ROOT, HOST_NAME, PLUGIN_NAME, "1.0.0", "plugin.json"),
+      "{}"
+    );
+    const manifestRepo = new InMemoryManifestRepository(await seedManifest(), PROJECT_ROOT);
+    const logger = new CapturingLogger();
+    const removeUseCase = new PluginRemoveUseCase(
+      fs,
+      manifestRepo,
+      logger,
+      new Map([["claude", new FakeNativePluginActivator({ available: true })]])
+    );
+
+    await removeUseCase.execute({
+      pluginName: PLUGIN_NAME,
+      toolIds: ["claude"],
+      projectRoot: PROJECT_ROOT,
+    });
+
+    expect(logger.infoMessages).toStrictEqual([
+      `claude: cache for '${PLUGIN_NAME}' purged: ${join(CLAUDE_CACHE_ROOT, HOST_NAME, PLUGIN_NAME)}`,
+    ]);
+  });
+
+  it("leaves the cache alone, silently, when no activator drives this tool", async () => {
+    const fs = new InMemoryFileAdapter();
+    const cacheEntry = join(CLAUDE_CACHE_ROOT, HOST_NAME, PLUGIN_NAME, "1.0.0", "plugin.json");
+    await fs.writeFile(cacheEntry, "{}");
+    const manifestRepo = new InMemoryManifestRepository(await seedManifest(), PROJECT_ROOT);
+    const logger = new CapturingLogger();
+    const removeUseCase = new PluginRemoveUseCase(fs, manifestRepo, logger, new Map());
+
+    await removeUseCase.execute({
+      pluginName: PLUGIN_NAME,
+      toolIds: ["claude"],
+      projectRoot: PROJECT_ROOT,
+    });
+
+    expect(await fs.fileExists(cacheEntry)).toBe(true);
+    expect(logger.allMessages).toStrictEqual([]);
+  });
+
+  it("purges nothing, silently, for a host that declares no plugin cache directory", async () => {
+    const fs = new InMemoryFileAdapter();
+    const manifest = Manifest.create();
+    manifest.addTool("copilot", "test", []);
+    await new ModeAMarketplaceTranslator().addPlugin(
+      buildDist(),
+      "copilot",
+      { kind: "local", path: "/plugin-source" },
+      PROJECT_ROOT,
+      manifest,
+      ALIAS
+    );
+    manifest.setNativeRegistrations("copilot", {
+      binary: "copilot",
+      marketplaces: [{ alias: ALIAS, hostName: HOST_NAME }],
+      pluginRefs: [REF],
+    });
+    const manifestRepo = new InMemoryManifestRepository(manifest, PROJECT_ROOT);
+    const activator = new FakeNativePluginActivator({ available: true });
+    const logger = new CapturingLogger();
+    const removeUseCase = new PluginRemoveUseCase(
+      fs,
+      manifestRepo,
+      logger,
+      new Map([["copilot", activator]])
+    );
+
+    await removeUseCase.execute({
+      pluginName: PLUGIN_NAME,
+      toolIds: ["copilot"],
+      projectRoot: PROJECT_ROOT,
+    });
+
+    expect(activator.uninstalledPlugins).toStrictEqual([REF]);
+    expect(logger.allMessages).toStrictEqual([]);
   });
 });

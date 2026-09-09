@@ -100,3 +100,62 @@ describe("BuiltTreeMaterializationTranslator — cursor (integration)", () => {
     expect(result.skipped).toEqual([]);
   });
 });
+
+describe("BuiltTreeMaterializationTranslator — when no built tree applies (integration)", () => {
+  const COMMAND = "---\nname: aidd:01:hello\n---\n# Hello";
+
+  function distWithCommand(): PluginDistribution {
+    return new PluginDistribution({
+      manifest: { name: "sample-plugin", version: "1.0.0" },
+      format: "claude",
+      files: [{ relativePath: "commands/hello.md", content: COMMAND }],
+      components: {
+        commands: [{ relativePath: "commands/hello.md", content: COMMAND }],
+        agents: [],
+        rules: [],
+        skills: [],
+        hooks: [],
+        mcp: [],
+      },
+    });
+  }
+
+  async function install(marketplace: string | undefined): Promise<InMemoryFileAdapter> {
+    const fs = new InMemoryFileAdapter();
+    fs.setFile(`${BUILT}/plugins/sample-plugin/skills/demo/SKILL.md`, "built skill");
+    const manifest = Manifest.create();
+    manifest.addTool("cursor", "test", []);
+    const translator = new BuiltTreeMaterializationTranslator(
+      fs,
+      new DeterministicHasher(),
+      () => HOME,
+      fakeEnsureBuiltMarketplace(),
+      await makeRegistry()
+    );
+    await translator.addPlugin(
+      distWithCommand(),
+      "cursor",
+      { kind: "local", path: "/plugin-source" },
+      PROJECT_ROOT,
+      manifest,
+      marketplace
+    );
+    return fs;
+  }
+
+  it("materializes the distribution itself, never the built tree, when no marketplace is given", async () => {
+    const fs = await install(undefined);
+
+    expect(fs.listUnder(`${HOME}/.cursor/plugins/local`)).toStrictEqual([
+      `${HOME}/.cursor/plugins/local/sample-plugin/commands/hello.md`,
+    ]);
+  });
+
+  it("materializes the distribution itself when the named marketplace is not registered", async () => {
+    const fs = await install("unregistered-marketplace");
+
+    expect(fs.listUnder(`${HOME}/.cursor/plugins/local`)).toStrictEqual([
+      `${HOME}/.cursor/plugins/local/sample-plugin/commands/hello.md`,
+    ]);
+  });
+});
