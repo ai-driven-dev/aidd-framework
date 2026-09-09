@@ -157,7 +157,9 @@ export function createValidator({ root, loadSchema = fetchSchema }) {
       if (names.has(plugin.name)) fail(file, `duplicate plugin name: ${plugin.name}`);
       names.add(plugin.name);
       if (typeof plugin.strict !== "boolean") fail(file, `${label}.strict must be boolean`);
-      if (typeof plugin.recommended !== "boolean") fail(file, `${label}.recommended must be boolean`);
+      if (typeof plugin.metadata?.recommended !== "boolean") {
+        fail(file, `${label}.metadata.recommended must be boolean`);
+      }
       if (typeof plugin.source === "string") await pathExists(file, plugin.source, `${label}.source`, root);
     }
   }

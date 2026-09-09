@@ -14,14 +14,14 @@ const VALID_RAW = {
       name: "dev",
       source: { kind: "local", path: "./plugins/dev" },
       description: "Dev plugin",
-      recommended: true,
+      metadata: { recommended: true },
       strict: true,
     },
     {
       name: "pm",
       source: { kind: "github", repo: "ai-driven-dev/aidd-pm" },
       description: "PM plugin",
-      recommended: false,
+      metadata: { recommended: false },
       strict: false,
     },
   ],
@@ -90,6 +90,14 @@ describe("parsePluginCatalog", () => {
 
     it("defaults recommended to false when absent", () => {
       const raw = { plugins: [{ name: "x", source: { kind: "local", path: "./x" } }] };
+      const catalog = parsePluginCatalog(raw);
+      expect(catalog.plugins[0].recommended).toBe(false);
+    });
+
+    it("reads recommended under the entry's metadata alone, the one place Claude Code does not warn on", () => {
+      const raw = {
+        plugins: [{ name: "x", source: { kind: "local", path: "./x" }, recommended: true }],
+      };
       const catalog = parsePluginCatalog(raw);
       expect(catalog.plugins[0].recommended).toBe(false);
     });

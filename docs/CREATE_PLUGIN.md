@@ -15,7 +15,7 @@ Pick a name (lowercase, `aidd-<x>`). For the directory shape, `plugin.json`, and
 
 ## 📝 Register
 
-- **Marketplace** — append an entry to `.claude-plugin/marketplace.json`: `name`, `source` (required, `./plugins/aidd-<x>`), `strict: true`, `recommended: false` (keeps it off the curated install path until it stabilises).
+- **Marketplace** — append an entry to `.claude-plugin/marketplace.json`: `name`, `source` (required, `./plugins/aidd-<x>`), `strict: true`, `metadata: { "recommended": false }` (keeps it off the curated install path until it stabilises; under `metadata` because Claude Code warns on any other field of its own).
 - **Release** — add the package to `release-please-config.json` `packages` **and** `.release-please-manifest.json`, or it never versions.
 
 ## 🧪 Try locally

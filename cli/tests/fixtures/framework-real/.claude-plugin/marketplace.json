@@ -11,7 +11,7 @@
       "source": "./plugins/aidd-context",
       "description": "Knowledge production: project bootstrap, project init, context generation, mermaid diagrams, learn, discovery",
       "strict": true,
-      "recommended": true
+      "metadata": { "recommended": true }
     },
     {
       "name": "aidd-dev",
@@ -19,7 +19,7 @@
       "source": "./plugins/aidd-dev",
       "description": "Code transformation: SDLC orchestrator, plan, assert, audit, review, test, refactor, debug, for-sure. Hosts agents.",
       "strict": true,
-      "recommended": true
+      "metadata": { "recommended": true }
     },
     {
       "name": "aidd-vcs",
@@ -27,7 +27,7 @@
       "source": "./plugins/aidd-vcs",
       "description": "External artifacts: commit, pull-request, release-tag, issue-create",
       "strict": true,
-      "recommended": true
+      "metadata": { "recommended": true }
     },
     {
       "name": "aidd-pm",
@@ -35,7 +35,7 @@
       "source": "./plugins/aidd-pm",
       "description": "Product management (release candidate): ticket-info, user-stories-create, prd",
       "strict": true,
-      "recommended": true
+      "metadata": { "recommended": true }
     },
     {
       "name": "aidd-async-dev",
@@ -43,7 +43,7 @@
       "source": "./plugins/aidd-async-dev",
       "description": "Async development orchestration: turn ready issues into pull requests, then iterate on review feedback until a human takes over.",
       "strict": true,
-      "recommended": false
+      "metadata": { "recommended": false }
     },
     {
       "name": "aidd-refine",
@@ -51,7 +51,7 @@
       "source": "./plugins/aidd-refine",
       "description": "Meta-cognition: refine input through brainstorming, refine output through challenge and condensed communication mode.",
       "strict": true,
-      "recommended": true
+      "metadata": { "recommended": true }
     }
   ]
 }

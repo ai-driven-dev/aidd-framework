@@ -86,8 +86,8 @@ describe("PluginSearchUseCase", () => {
   it("filters by --recommended", async () => {
     const fs = new InMemoryFileAdapter();
     seedMarketplace(fs, MKT1_PATH, [
-      { name: "a", source: { kind: "github", repo: "x/y" }, recommended: true },
-      { name: "b", source: { kind: "github", repo: "x/y" }, recommended: false },
+      { name: "a", source: { kind: "github", repo: "x/y" }, metadata: { recommended: true } },
+      { name: "b", source: { kind: "github", repo: "x/y" }, metadata: { recommended: false } },
     ]);
     const registry = new InMemoryMarketplaceRegistry();
     await registry.save(

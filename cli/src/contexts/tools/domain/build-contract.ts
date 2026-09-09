@@ -142,7 +142,7 @@ export interface SourcePluginEntryRef {
   readonly version?: string;
   readonly description?: string;
   readonly strict?: boolean;
-  readonly recommended?: boolean;
+  readonly metadata?: { readonly recommended?: boolean };
   readonly [key: string]: unknown;
 }
 

@@ -12,56 +12,56 @@
       "source": "./plugins/aidd-context",
       "description": "Knowledge production: project bootstrap, project init, generation of context artifacts (skills, agents, rules, commands, hooks), mermaid diagrams, learn, discovery",
       "strict": true,
-      "recommended": true
+      "metadata": { "recommended": true }
     },
     {
       "name": "aidd-dev",
       "source": "./plugins/aidd-dev",
       "description": "Code transformation: plan, implement, assert, audit, review, test, refactor, debug, for-sure. Hosts engineering agents.",
       "strict": true,
-      "recommended": true
+      "metadata": { "recommended": true }
     },
     {
       "name": "aidd-vcs",
       "source": "./plugins/aidd-vcs",
       "description": "External artifacts: commit, pull-request, release-tag, issue-create",
       "strict": true,
-      "recommended": true
+      "metadata": { "recommended": true }
     },
     {
       "name": "aidd-pm",
       "source": "./plugins/aidd-pm",
       "description": "Product backlog artifacts, refinement, Product Briefs, Epics, User Stories, Tasks, Spikes, Defects, requirements, and specs.",
       "strict": true,
-      "recommended": true
+      "metadata": { "recommended": true }
     },
     {
       "name": "aidd-orchestrator",
       "source": "./plugins/aidd-orchestrator",
       "description": "Orchestration: synchronous SDLC pipeline, async issue-to-PR automation, and product backlog.",
       "strict": true,
-      "recommended": true
+      "metadata": { "recommended": true }
     },
     {
       "name": "aidd-refine",
       "source": "./plugins/aidd-refine",
       "description": "Meta-cognition: refine input through brainstorming, refine output through challenge, blind-spot scanning, and fact-checking.",
       "strict": true,
-      "recommended": true
+      "metadata": { "recommended": true }
     },
     {
       "name": "aidd-ui",
       "source": "./plugins/aidd-ui",
       "description": "ALPHA, not ready for use. UI and UX concern: design, review, and improve frontend interfaces.",
       "strict": true,
-      "recommended": false
+      "metadata": { "recommended": false }
     },
     {
       "name": "aidd-telemetry",
       "source": "./plugins/aidd-telemetry",
       "description": "Measurement: journals every session so a unit of work can be tied to what it cost. The hooks record on plain node; its three skills reach the `aidd` CLI to turn it on, answer and check.",
       "strict": true,
-      "recommended": false
+      "metadata": { "recommended": false }
     }
   ]
 }
