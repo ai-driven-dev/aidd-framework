@@ -148,6 +148,24 @@ describe("InstallSkillsUseCase", () => {
       expect(files[0].frameworkPath).toBe("skills/my-skill/SKILL.md");
     });
 
+    it("accepts the entry file however deep its skill directory nests", () => {
+      const { useCase } = buildUseCase();
+      const contentFiles = new Map([
+        [
+          "skills/group/my-skill/SKILL.md",
+          "---\nname: my-skill\ndescription: Deep\n---\n# Skill\n",
+        ],
+      ]);
+
+      const files = useCase.execute({
+        toolConfig: claude,
+        section: skillsSectionWithEntry,
+        contentFiles,
+      });
+
+      expect(files.map((f) => f.frameworkPath)).toStrictEqual(["skills/group/my-skill/SKILL.md"]);
+    });
+
     it("filters out non-SKILL.md files from subdirectory skills", () => {
       const { useCase } = buildUseCase();
       const contentFiles = new Map([

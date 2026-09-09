@@ -35,6 +35,21 @@ describe("ResolveUpdateDecisionUseCase", () => {
       ).rejects.toThrow(InputRequiredError);
     });
 
+    it("names --force as the way out", async () => {
+      const useCase = new ResolveUpdateDecisionUseCase(buildFakePrompter("overwrite"));
+
+      const run = useCase.execute({
+        relativePath: "some/file.md",
+        userForce: false,
+        interactive: false,
+        bulkState: new BulkConflictState(),
+      });
+
+      await expect(run).rejects.toThrow(
+        "Use --force to overwrite modified files in non-interactive mode."
+      );
+    });
+
     it("never calls prompter in non-TTY mode", async () => {
       const prompter = buildFakePrompter("overwrite");
       const useCase = new ResolveUpdateDecisionUseCase(prompter);
@@ -148,6 +163,20 @@ describe("ResolveUpdateDecisionUseCase", () => {
 
       expect(result).toBe(false);
       expect(prompter.resolveConflictBulk).not.toHaveBeenCalled();
+    });
+
+    it("records nothing for a single-file answer", async () => {
+      const useCase = new ResolveUpdateDecisionUseCase(buildFakePrompter("overwrite"));
+      const bulkState = new BulkConflictState();
+
+      await useCase.execute({
+        relativePath: "some/file.md",
+        userForce: false,
+        interactive: true,
+        bulkState,
+      });
+
+      expect(bulkState.get()).toBeNull();
     });
 
     it("records overwrite-all in bulkState when prompted", async () => {

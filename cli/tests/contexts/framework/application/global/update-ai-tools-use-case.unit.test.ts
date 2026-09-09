@@ -36,6 +36,21 @@ describe("UpdateAiToolsUseCase", () => {
     });
   });
 
+  describe("no toolArg", () => {
+    it("updates the installed AI tools and leaves an installed IDE alone", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initProject(deps, PROJECT_ROOT);
+      await installTool(deps, PROJECT_ROOT, "claude");
+      await installTool(deps, PROJECT_ROOT, "vscode");
+
+      const useCase = buildUseCase(deps, buildUpdateOneToolUseCase(deps));
+      const result = await useCase.execute({ projectRoot: PROJECT_ROOT, ...NO_FORCE_TTY });
+
+      expect(result.updatedTools.map((t) => t.toolId)).toStrictEqual(["claude"]);
+      expect(result.errors).toStrictEqual([]);
+    });
+  });
+
   describe("single toolArg", () => {
     it("updates only the specified tool when toolArg is provided", async () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);

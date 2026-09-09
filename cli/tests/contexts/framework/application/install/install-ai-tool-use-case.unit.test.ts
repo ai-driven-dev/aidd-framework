@@ -92,7 +92,99 @@ describe("InstallAiToolUseCase", () => {
     });
   });
 
+  describe("installed tools without plugins", () => {
+    it("runs no activation when nothing was propagated", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      const { useCase, syncSettingsMock } = buildUseCase(deps);
+
+      const result = await useCase.execute({
+        toolId: "opencode",
+        projectRoot: PROJECT_ROOT,
+        force: false,
+        version: VERSION,
+        propagatePlugins: true,
+      });
+
+      expect(syncSettingsMock.execute).not.toHaveBeenCalled();
+      expect(result).toStrictEqual({
+        runtimeResult: result.runtimeResult,
+        propagatedPlugins: [],
+        propagationWarnings: [],
+        activation: undefined,
+      });
+    });
+
+    it("propagates nothing when the manifest vanished right after the install", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      const loaded = await deps.manifestRepo.load();
+      vi.spyOn(deps.manifestRepo, "load").mockResolvedValueOnce(loaded).mockResolvedValueOnce(null);
+      const { useCase } = buildUseCase(deps);
+
+      const result = await useCase.execute({
+        toolId: "opencode",
+        projectRoot: PROJECT_ROOT,
+        force: false,
+        version: VERSION,
+        propagatePlugins: true,
+      });
+
+      expect(result).toStrictEqual({
+        runtimeResult: result.runtimeResult,
+        propagatedPlugins: [],
+        propagationWarnings: [],
+      });
+    });
+  });
+
   describe("manifest with plugins on another tool", () => {
+    it("propagates with the exact non-interactive replace request", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      await addPlugin(deps, "claude", makeMockPlugin("my-plugin"));
+      const { useCase, pluginInstallMock } = buildUseCase(deps);
+
+      await useCase.execute({
+        toolId: "opencode",
+        projectRoot: PROJECT_ROOT,
+        force: false,
+        version: VERSION,
+        propagatePlugins: true,
+      });
+
+      expect(pluginInstallMock.execute).toHaveBeenCalledWith({
+        pluginName: "my-plugin",
+        version: "1.0.0",
+        fromMarketplace: "aidd",
+        toolIds: ["opencode"],
+        projectRoot: PROJECT_ROOT,
+        interactive: false,
+        autoSelect: true,
+        replace: true,
+        requestedVersionPolicy: "prefer-catalog",
+      });
+    });
+
+    it("does not propagate the tool's own plugins back onto it on a forced reinstall", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      await installTool(deps, PROJECT_ROOT, "opencode");
+      await addPlugin(deps, "opencode", makeMockPlugin("own-plugin"));
+      const { useCase, pluginInstallMock } = buildUseCase(deps);
+
+      const result = await useCase.execute({
+        toolId: "opencode",
+        projectRoot: PROJECT_ROOT,
+        force: true,
+        version: VERSION,
+        propagatePlugins: true,
+      });
+
+      expect(result.propagatedPlugins).toStrictEqual([]);
+      expect(pluginInstallMock.execute).not.toHaveBeenCalled();
+    });
+
     it("propagates plugins from existing tools onto the new tool", async () => {
       const deps = await buildUnitDeps(PROJECT_ROOT);
       await initAndInstall(deps, PROJECT_ROOT, "claude");
@@ -232,6 +324,26 @@ describe("InstallAiToolUseCase", () => {
       expect(result.runtimeResult.skipped).toBe(true);
       expect(result.propagatedPlugins).toHaveLength(0);
       expect(pluginInstallMock.execute).not.toHaveBeenCalled();
+    });
+
+    it("answers the skipped install alone, with nothing propagated and no warning", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "opencode");
+      const { useCase } = buildUseCase(deps);
+
+      const result = await useCase.execute({
+        toolId: "opencode",
+        projectRoot: PROJECT_ROOT,
+        force: false,
+        version: VERSION,
+        propagatePlugins: true,
+      });
+
+      expect(result).toStrictEqual({
+        runtimeResult: { toolId: "opencode", fileCount: 0, files: [], skipped: true, warnings: [] },
+        propagatedPlugins: [],
+        propagationWarnings: [],
+      });
     });
   });
 

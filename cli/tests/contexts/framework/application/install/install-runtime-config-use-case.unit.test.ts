@@ -1,21 +1,30 @@
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { InstallRuntimeConfigUseCase } from "../../../../../src/contexts/framework/application/install/install-runtime-config-use-case.js";
 import { Manifest } from "../../../../../src/contexts/framework/domain/manifest.js";
+import { SettingsCapability } from "../../../../../src/contexts/tools/domain/capabilities/settings-capability.js";
+import { cursor } from "../../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
+import { registerTool } from "../../../../../src/contexts/tools/domain/registry.js";
+import { extractMergeEntries } from "../../../../../src/kernel/merge.js";
+import type { AssetProvider } from "../../../../../src/kernel/ports/asset-provider.js";
 import {
   buildUnitDeps,
   initProject,
   installTool,
 } from "../../../../helpers/ports/build-unit-deps.js";
+import { StubAssetProvider } from "../../../../helpers/ports/stub-asset-provider.js";
 
 const PROJECT_ROOT = "/test-project";
 
-function buildUseCase(deps: Awaited<ReturnType<typeof buildUnitDeps>>) {
+function buildUseCase(
+  deps: Awaited<ReturnType<typeof buildUnitDeps>>,
+  assets: AssetProvider = deps.assetProvider
+) {
   return new InstallRuntimeConfigUseCase(
     deps.fs,
     deps.hasher,
     deps.logger,
-    deps.assetProvider,
+    assets,
     deps.postInstallPipelineUseCase
   );
 }
@@ -64,8 +73,36 @@ describe("InstallRuntimeConfigUseCase", () => {
       version: "1.0.0",
     });
 
-    expect(result.skipped).toBe(true);
-    expect(result.fileCount).toBe(0);
+    expect(result).toStrictEqual({
+      toolId: "claude",
+      fileCount: 0,
+      files: [],
+      skipped: true,
+      warnings: [],
+    });
+  });
+
+  it("tracks a file the caller chose to skip under the hash it has on disk", async () => {
+    const deps = await buildUnitDeps(PROJECT_ROOT);
+    await initProject(deps, PROJECT_ROOT);
+    await installTool(deps, PROJECT_ROOT, "claude");
+    const userContent = '{"user": true}';
+    await deps.fs.writeFile(join(PROJECT_ROOT, ".claude/settings.json"), userContent);
+
+    const manifest = (await deps.manifestRepo.load()) ?? Manifest.create();
+    await buildUseCase(deps).execute({
+      toolId: "claude",
+      projectRoot: PROJECT_ROOT,
+      manifest,
+      force: true,
+      version: "1.0.0",
+      onBeforeWriteRegularFile: async () => "skip",
+    });
+
+    expect(deps.fs.getFile(join(PROJECT_ROOT, ".claude/settings.json"))).toBe(userContent);
+    expect(manifest.getToolFiles("claude")).toStrictEqual([
+      { relativePath: ".claude/settings.json", hash: deps.hasher.hash(userContent) },
+    ]);
   });
 
   it("overwrites existing tracked files when force is true", async () => {
@@ -157,6 +194,101 @@ describe("InstallRuntimeConfigUseCase", () => {
       const parsed = JSON.parse(content) as Record<string, unknown>;
       expect(parsed).toHaveProperty("github.copilot.enable");
       expect(parsed).toHaveProperty("chat.plugins.enabled", true);
+    });
+
+    it("records the merged settings file with a hash per top-level key", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initProject(deps, PROJECT_ROOT);
+      await installTool(deps, PROJECT_ROOT, "vscode");
+      const manifest = (await deps.manifestRepo.load()) ?? Manifest.create();
+
+      await buildUseCase(deps).execute({
+        toolId: "copilot",
+        projectRoot: PROJECT_ROOT,
+        manifest,
+        force: false,
+        version: "1.0.0",
+      });
+
+      const onDisk = deps.fs.getFile(join(PROJECT_ROOT, ".vscode/settings.json")) ?? "";
+      expect(manifest.getMergeFiles("copilot")).toStrictEqual([
+        {
+          relativePath: ".vscode/settings.json",
+          sectionKey: null,
+          entries: extractMergeEntries(onDisk, null, deps.hasher),
+        },
+      ]);
+    });
+  });
+
+  describe("static settings declared by the tool", () => {
+    const inline = new SettingsCapability({
+      outputPath: ".cursor/aidd-static.json",
+      mergeStrategy: "framework-prime",
+      staticContent: '{"static": true}',
+    });
+    const consumesOnly = new SettingsCapability({
+      outputPath: ".cursor/consumed.json",
+      mergeStrategy: "user-prime",
+      consumes: ["something"],
+    });
+    const fromAsset = new SettingsCapability({
+      outputPath: ".cursor/from-asset.json",
+      mergeStrategy: "framework-prime",
+      staticContentAssetFile: "static.json",
+    });
+
+    function registerCursorWith(settings: SettingsCapability[]): void {
+      registerTool({ ...cursor, capabilities: { ...cursor.capabilities, settings } });
+    }
+
+    afterEach(() => {
+      registerTool(cursor);
+    });
+
+    it("writes inline content and passes over a capability that only consumes", async () => {
+      registerCursorWith([inline, consumesOnly]);
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initProject(deps, PROJECT_ROOT);
+      const manifest = (await deps.manifestRepo.load()) ?? Manifest.create();
+
+      const result = await buildUseCase(deps).execute({
+        toolId: "cursor",
+        projectRoot: PROJECT_ROOT,
+        manifest,
+        force: false,
+        version: "1.0.0",
+      });
+
+      const written = deps.fs.getFile(join(PROJECT_ROOT, ".cursor/aidd-static.json")) ?? "";
+      expect(JSON.parse(written)).toStrictEqual({ static: true });
+      expect(deps.fs.has(join(PROJECT_ROOT, ".cursor/consumed.json"))).toBe(false);
+      expect(result.files.map((f) => f.relativePath)).toStrictEqual([
+        ".cursor/settings.json",
+        ".cursor/aidd-static.json",
+      ]);
+    });
+
+    it("writes an asset answered as text verbatim", async () => {
+      registerCursorWith([fromAsset]);
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initProject(deps, PROJECT_ROOT);
+      const manifest = (await deps.manifestRepo.load()) ?? Manifest.create();
+      const assets = new StubAssetProvider(
+        { "cursor/static.json": '{"fromAsset": true}' },
+        deps.assetProvider
+      );
+
+      await buildUseCase(deps, assets).execute({
+        toolId: "cursor",
+        projectRoot: PROJECT_ROOT,
+        manifest,
+        force: false,
+        version: "1.0.0",
+      });
+
+      const written = deps.fs.getFile(join(PROJECT_ROOT, ".cursor/from-asset.json")) ?? "";
+      expect(JSON.parse(written)).toStrictEqual({ fromAsset: true });
     });
   });
 });

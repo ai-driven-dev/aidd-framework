@@ -11,15 +11,19 @@ import {
 import { MarketplaceSourceMode } from "../../../../src/contexts/distribution/domain/marketplace-source-mode.js";
 import type { MarketplaceSyncSettings } from "../../../../src/contexts/framework/application/flows/marketplace-sync-settings-use-case.js";
 import type { PluginInstallFromMarketplace } from "../../../../src/contexts/framework/application/plugin/plugin-install-from-marketplace-use-case.js";
+import { ProjectContextDetectorUseCase } from "../../../../src/contexts/framework/application/setup/project-context-detector-use-case.js";
 import { SetupMachineScopeUseCase } from "../../../../src/contexts/framework/application/setup/setup-machine-scope-use-case.js";
 import { SetupMarketplaceSourceUseCase } from "../../../../src/contexts/framework/application/setup/setup-marketplace-source-use-case.js";
 import { SetupToolsUseCase } from "../../../../src/contexts/framework/application/setup/setup-tools-use-case.js";
 import { SetupUseCase } from "../../../../src/contexts/framework/application/setup-use-case.js";
 import { SetupMarketplaceRegistrationUseCase } from "../../../../src/contexts/framework/application/shared/setup-marketplace-registration-use-case.js";
+import { Manifest } from "../../../../src/contexts/framework/domain/manifest.js";
 import type { ManifestRepository } from "../../../../src/contexts/framework/domain/ports/manifest-repository.js";
 import type { UserSourceReferences } from "../../../../src/contexts/framework/domain/ports/user-source-references.js";
+import { ProjectContext } from "../../../../src/contexts/framework/domain/project-context.js";
 import { SetupFlow } from "../../../../src/contexts/framework/domain/setup-flow.js";
 import { UserSourceReferencesAdapter } from "../../../../src/contexts/framework/infrastructure/user-source-references-adapter.js";
+import { UserScopeUnavailableError } from "../../../../src/kernel/errors.js";
 import type { Logger } from "../../../../src/kernel/ports/logger.js";
 import type { ToolId } from "../../../../src/kernel/tool.js";
 import { AI_TOOL_IDS, IDE_TOOL_IDS } from "../../../../src/kernel/tool.js";
@@ -127,6 +131,7 @@ async function buildUseCase(
     marketplaceSyncSettingsUseCase?: MarketplaceSyncSettings & {
       execute: ReturnType<typeof vi.fn>;
     };
+    detectContext?: boolean;
   }
 ) {
   const deps = await buildUnitDeps(PROJECT_ROOT);
@@ -140,9 +145,10 @@ async function buildUseCase(
     deps.installRuntimeConfigUseCase,
     deps.installIdeConfigUseCase
   );
+  const pluginInstallFromMarketplace = makeNoOpPluginInstallFromMarketplace();
   const setupPluginsPromptUseCase = new SetupPluginsPromptUseCase(
     makeNoOpPluginPick(),
-    makeNoOpPluginInstallFromMarketplace(),
+    pluginInstallFromMarketplace,
     new InMemoryMarketplaceRegistry(),
     makeNoOpResolveMarketplace()
   );
@@ -180,7 +186,7 @@ async function buildUseCase(
     setupPluginsPromptUseCase,
     deps.currentVersionProvider,
     setupToolsPromptUseCase,
-    undefined,
+    options?.detectContext === true ? new ProjectContextDetectorUseCase(deps.fs) : undefined,
     setupMachineScopeUseCase
   );
   return {
@@ -189,6 +195,7 @@ async function buildUseCase(
     marketplaceRegisterFramework,
     marketplaceRefresh,
     marketplaceSyncSettingsUseCase,
+    pluginInstallFromMarketplace,
   };
 }
 
@@ -294,6 +301,58 @@ describe("setup without TTY", () => {
     const result = await useCase.execute(remoteFlow());
 
     expect(result.kind).toBe("up-to-date");
+  });
+
+  it("hands the detected project context back with the result", async () => {
+    const { useCase, deps } = await buildUseCase(undefined, undefined, undefined, {
+      detectContext: true,
+    });
+    deps.fs.setFile(join(PROJECT_ROOT, "tsconfig.json"), "{}");
+
+    const result = await useCase.execute(remoteFlow());
+
+    expect(result.context).toStrictEqual(
+      new ProjectContext({ stack: "typescript", isMonorepo: false, hasFramework: false })
+    );
+  });
+
+  describe("plugins named on the command line", () => {
+    function namedFlow(registerDefaultMarketplace: boolean): SetupFlow {
+      return new SetupFlow({
+        projectRoot: PROJECT_ROOT,
+        source: MarketplaceSourceMode.remote(),
+        aiTools: ["claude" as ToolId],
+        ideTools: [],
+        pluginMode: "named",
+        pluginNames: ["aidd-context"],
+        interactive: false,
+        registerDefaultMarketplace,
+      });
+    }
+
+    it("installs each named plugin on every tool once the framework marketplace is registered", async () => {
+      const { useCase, pluginInstallFromMarketplace } = await buildUseCase();
+
+      await useCase.execute(namedFlow(true));
+
+      expect(pluginInstallFromMarketplace.execute).toHaveBeenCalledTimes(1);
+      expect(pluginInstallFromMarketplace.execute).toHaveBeenCalledWith({
+        pluginName: "aidd-context",
+        toolIds: "all",
+        projectRoot: PROJECT_ROOT,
+        interactive: false,
+        autoSelect: true,
+        replace: true,
+      });
+    });
+
+    it("installs no plugin when the default marketplace is opted out", async () => {
+      const { useCase, pluginInstallFromMarketplace } = await buildUseCase();
+
+      await useCase.execute(namedFlow(false));
+
+      expect(pluginInstallFromMarketplace.execute).not.toHaveBeenCalled();
+    });
   });
 
   describe("default marketplace opt-out (#197)", () => {
@@ -502,6 +561,79 @@ describe("setup interactive tool selection", () => {
 });
 
 describe("setup --scope user", () => {
+  it("refuses when no machine-scope use case was wired", async () => {
+    const { useCase } = await buildUseCase();
+
+    await expect(
+      useCase.execute(remoteFlow({ aiTools: ["claude" as ToolId], scope: "user" }))
+    ).rejects.toThrow(UserScopeUnavailableError);
+  });
+
+  it("reports a first run as initialized, installing nothing", async () => {
+    const userManifestRepo = new InMemoryManifestRepository();
+    const { useCase } = await buildUseCase(undefined, undefined, undefined, { userManifestRepo });
+
+    const result = await useCase.execute(
+      remoteFlow({ aiTools: ["claude" as ToolId], scope: "user" })
+    );
+
+    expect(result).toStrictEqual({
+      kind: "initialized",
+      install: { results: [] },
+      activation: { updatedTools: [] },
+      context: undefined,
+    });
+  });
+
+  it("reports a repeat run as up-to-date", async () => {
+    const userManifestRepo = new InMemoryManifestRepository(Manifest.create());
+    const { useCase } = await buildUseCase(undefined, undefined, undefined, { userManifestRepo });
+
+    const result = await useCase.execute(
+      remoteFlow({ aiTools: ["claude" as ToolId], scope: "user" })
+    );
+
+    expect(result).toStrictEqual({
+      kind: "up-to-date",
+      install: { results: [] },
+      activation: { updatedTools: [] },
+      context: undefined,
+    });
+  });
+
+  it("keeps the tools an earlier run registered", async () => {
+    const seed = Manifest.create();
+    seed.addTool("codex", "9.9.9", []);
+    const userManifestRepo = new InMemoryManifestRepository(seed);
+    const { useCase } = await buildUseCase(undefined, undefined, undefined, { userManifestRepo });
+
+    await useCase.execute(remoteFlow({ aiTools: ["claude" as ToolId], scope: "user" }));
+
+    expect(userManifestRepo.getCurrent()?.getInstalledToolIds()).toStrictEqual(["codex", "claude"]);
+  });
+
+  it("registers a new tool with no files and saves the manifest once", async () => {
+    const userManifestRepo = new InMemoryManifestRepository(Manifest.create());
+    const { useCase } = await buildUseCase(undefined, undefined, undefined, { userManifestRepo });
+
+    await useCase.execute(remoteFlow({ aiTools: ["claude" as ToolId], scope: "user" }));
+
+    expect(userManifestRepo.getCurrent()?.getToolFiles("claude")).toStrictEqual([]);
+    expect(userManifestRepo.saveCount).toBe(1);
+  });
+
+  it("leaves an already-registered tool at its recorded version, saving nothing", async () => {
+    const seed = Manifest.create();
+    seed.addTool("claude", "9.9.9", []);
+    const userManifestRepo = new InMemoryManifestRepository(seed);
+    const { useCase } = await buildUseCase(undefined, undefined, undefined, { userManifestRepo });
+
+    await useCase.execute(remoteFlow({ aiTools: ["claude" as ToolId], scope: "user" }));
+
+    expect(userManifestRepo.getCurrent()?.getToolVersion("claude")).toBe("9.9.9");
+    expect(userManifestRepo.saveCount).toBe(0);
+  });
+
   it("writes nothing at all under projectRoot — full directory delta, not a list", async () => {
     const userManifestRepo = new InMemoryManifestRepository();
     const { useCase, deps } = await buildUseCase(undefined, undefined, undefined, {
