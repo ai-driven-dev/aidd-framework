@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   type NativePluginsParams,
@@ -72,11 +73,9 @@ describe("a tool's own files as a signal it is in use", () => {
       "/p/.cursor/commands/notes.txt": "name: aidd:plan",
     });
 
-    expect((await hasToolSignals(fs, getToolConfig("cursor"), "/p")).sort()).toStrictEqual([
-      ".cursor/commands/colon.md",
-      ".cursor/commands/quoted.md",
-      ".cursor/commands/tight.md",
-    ]);
+    expect((await hasToolSignals(fs, getToolConfig("cursor"), "/p")).sort()).toStrictEqual(
+      ["colon.md", "quoted.md", "tight.md"].map((file) => join(".cursor/commands", file))
+    );
   });
 });
 
