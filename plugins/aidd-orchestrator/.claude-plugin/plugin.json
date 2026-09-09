@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "aidd-orchestrator",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "description": "Orchestrates the synchronous SDLC pipeline, async issue-to-PR automation, and the product backlog.",
   "author": {
     "name": "AI-Driven Dev",

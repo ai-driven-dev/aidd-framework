@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.2](https://github.com/ai-driven-dev/framework/compare/aidd-vcs-v2.3.1...aidd-vcs-v2.3.2) (2026-09-09)
+
+
+### Miscellaneous
+
+* back-merge main into next (conflicts) ([#610](https://github.com/ai-driven-dev/framework/issues/610)) ([a923d56](https://github.com/ai-driven-dev/framework/commit/a923d5661bb63cccc53bad7e6744b27cbbdc0a05))
+
 ## [2.3.1](https://github.com/ai-driven-dev/framework/compare/aidd-vcs-v2.3.0...aidd-vcs-v2.3.1) (2026-08-07)
 
 

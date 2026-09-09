@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "aidd-telemetry",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Measurement. The hooks journal which skill served which task, on plain node with nothing installed; three skills reach the `aidd` CLI to turn it on, answer what a period or a task consumed, and check it is recording. Off unless you turn it on, and it computes no amount.",
   "author": {
     "name": "AI-Driven Dev",

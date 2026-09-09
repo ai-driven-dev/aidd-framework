@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.3.0](https://github.com/ai-driven-dev/framework/compare/aidd-orchestrator-v2.2.1...aidd-orchestrator-v2.3.0) (2026-09-09)
+
+
+### Features
+
+* **framework:** measurement that works on five tools, each proven by a session that ran ([#706](https://github.com/ai-driven-dev/framework/issues/706)) ([627408f](https://github.com/ai-driven-dev/framework/commit/627408fba964b30d22b57fc99241083da1e0f294))
+* **orchestrator:** an orchestration says when it is done ([#764](https://github.com/ai-driven-dev/framework/issues/764)) ([feddad9](https://github.com/ai-driven-dev/framework/commit/feddad95e138eedd8be935b8c01b65abe6485b4d))
+
+
+### Miscellaneous
+
+* back-merge main into next (conflicts) ([#610](https://github.com/ai-driven-dev/framework/issues/610)) ([a923d56](https://github.com/ai-driven-dev/framework/commit/a923d5661bb63cccc53bad7e6744b27cbbdc0a05))
+
 ## [2.2.1](https://github.com/ai-driven-dev/framework/compare/aidd-orchestrator-v2.2.0...aidd-orchestrator-v2.2.1) (2026-08-07)
 
 
