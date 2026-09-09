@@ -63,7 +63,42 @@ describe("StatusAllUseCase", () => {
 
     const result = await new StatusAllUseCase(useCase).execute(PROJECT_ROOT);
 
-    expect(result.pluginDrift).toEqual([]);
-    expect(result.errors.map((e) => e.scope)).toEqual(["ai"]);
+    expect(result).toStrictEqual({
+      aiTools: { tools: [], pluginDrift: [], inSync: true },
+      ideTools: report(),
+      pluginDrift: [],
+      errors: [{ scope: "ai", message: "ai scope exploded" }],
+    });
+  });
+
+  it("returns each scope's own report", async () => {
+    const aiReport = report({ tools: [{ toolId: "claude", version: "1", drifted: [] }] });
+    const ideReport = report({ tools: [{ toolId: "vscode", version: "1", drifted: [] }] });
+    const { useCase } = fakeStatus((o) => (o.category === "ai" ? aiReport : ideReport));
+
+    const result = await new StatusAllUseCase(useCase).execute(PROJECT_ROOT);
+
+    expect(result).toStrictEqual({
+      aiTools: aiReport,
+      ideTools: ideReport,
+      pluginDrift: [],
+      errors: [],
+    });
+  });
+
+  it("substitutes an empty in-sync report for the ide scope when it failed", async () => {
+    const { useCase } = fakeStatus((o) => {
+      if (o.category === "ide") throw new Error("ide scope exploded");
+      return report();
+    });
+
+    const result = await new StatusAllUseCase(useCase).execute(PROJECT_ROOT);
+
+    expect(result).toStrictEqual({
+      aiTools: report(),
+      ideTools: { tools: [], pluginDrift: [], inSync: true },
+      pluginDrift: [],
+      errors: [{ scope: "ide", message: "ide scope exploded" }],
+    });
   });
 });

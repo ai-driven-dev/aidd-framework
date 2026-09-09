@@ -4,11 +4,13 @@ import {
   extractAtReferences,
   extractMarkdownLinkTargets,
 } from "../../../../src/contexts/framework/domain/formats/markdown-references.js";
+import type { Manifest } from "../../../../src/contexts/framework/domain/manifest.js";
 import type { ToolId } from "../../../../src/kernel/tool.js";
 import {
   buildDoctorUseCase,
   buildUnitDeps,
   initAndInstall,
+  installTool,
 } from "../../../helpers/ports/build-unit-deps.js";
 
 const PROJECT_ROOT = "/test-project";
@@ -238,6 +240,65 @@ describe("doctor", () => {
         (i) => i.message.includes("merge file") || i.message.includes("key in")
       );
       expect(mergeIssues).toHaveLength(0);
+    });
+  });
+
+  describe("tool health", () => {
+    async function installedBothCategories() {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      await installTool(deps, PROJECT_ROOT, "vscode");
+      const manifest = await deps.manifestRepo.load();
+      if (manifest === null) throw new Error("manifest missing");
+      return { deps, manifest };
+    }
+
+    function healthOf(manifest: Manifest, toolId: ToolId) {
+      return {
+        toolId,
+        fileCount: manifest.getToolFiles(toolId).length,
+        mergeFileCount: manifest.getMergeFiles(toolId).length,
+      };
+    }
+
+    it("reports one entry per installed tool with its file and merge-file counts", async () => {
+      const { deps, manifest } = await installedBothCategories();
+
+      const report = await buildDoctorUseCase(deps).execute({ projectRoot: PROJECT_ROOT });
+
+      expect(report.toolHealth).toStrictEqual([
+        healthOf(manifest, "claude"),
+        healthOf(manifest, "vscode"),
+      ]);
+    });
+
+    it("narrows the entries to the requested category", async () => {
+      const { deps, manifest } = await installedBothCategories();
+
+      const report = await buildDoctorUseCase(deps).execute({
+        projectRoot: PROJECT_ROOT,
+        category: "ide",
+      });
+
+      expect(report.toolHealth).toStrictEqual([healthOf(manifest, "vscode")]);
+    });
+  });
+
+  describe("narrowed to a category", () => {
+    it("does not look for orphaned directories", async () => {
+      const deps = await buildUnitDeps(PROJECT_ROOT);
+      await initAndInstall(deps, PROJECT_ROOT, "claude");
+      await deps.fs.writeFile(
+        join(PROJECT_ROOT, ".cursor", "commands", "plan.md"),
+        "---\nname: aidd:03:plan\ndescription: Plan feature\n---\nContent here.\n"
+      );
+
+      const report = await buildDoctorUseCase(deps).execute({
+        projectRoot: PROJECT_ROOT,
+        category: "ai",
+      });
+
+      expect(report.issues).toStrictEqual([]);
     });
   });
 });

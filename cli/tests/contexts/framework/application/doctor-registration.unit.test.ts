@@ -7,6 +7,7 @@ import type { AiToolId, ToolId } from "../../../../src/kernel/tool.js";
 import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/cursor/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/vscode/profile.js";
 import type {
   HostPluginRegistryReader,
   HostPluginRegistryReading,
@@ -18,17 +19,24 @@ import { InMemoryMarketplaceRegistry } from "../../../helpers/ports/in-memory-ma
 
 const PROJECT_ROOT = "/project";
 const LOCAL_SETTINGS = `${PROJECT_ROOT}/.claude/settings.local.json`;
+const UNDECLARED = {
+  severity: "warning",
+  message: "claude no longer declares marketplace 'aidd-framework'",
+  fix: "Run `aidd marketplace refresh` to write it back to .claude/settings.local.json.",
+};
+
+function settingsDeclaring(names: string[]): string {
+  const entries = Object.fromEntries(names.map((name) => [name, { source: {} }]));
+  return JSON.stringify({ extraKnownMarketplaces: entries });
+}
 
 async function issuesFor(
-  registered: string[] | null,
-  toolId: ToolId = "claude",
-  toolInstalled = true
+  settings: string | null,
+  options: { toolId?: ToolId; toolInstalled?: boolean; allowedIds?: Set<string> | null } = {}
 ) {
+  const { toolId = "claude", toolInstalled = true, allowedIds = null } = options;
   const fs = new InMemoryFileAdapter();
-  if (registered !== null) {
-    const entries = Object.fromEntries(registered.map((name) => [name, { source: {} }]));
-    await fs.writeFile(LOCAL_SETTINGS, JSON.stringify({ extraKnownMarketplaces: entries }));
-  }
+  if (settings !== null) await fs.writeFile(LOCAL_SETTINGS, settings);
   const registry = new InMemoryMarketplaceRegistry();
   await registry.save(
     PROJECT_ROOT,
@@ -55,42 +63,66 @@ async function issuesFor(
   ).execute({
     manifest,
     projectRoot: PROJECT_ROOT,
-    allowedIds: null,
+    allowedIds,
   });
 }
 
 describe("DoctorRegistrationUseCase", () => {
   it("says nothing when the tool still declares the marketplace", async () => {
-    expect(await issuesFor(["aidd-framework"])).toEqual([]);
+    expect(await issuesFor(settingsDeclaring(["aidd-framework"]))).toStrictEqual([]);
+  });
+
+  it("accepts the array form of the declaration", async () => {
+    const settings = JSON.stringify({ extraKnownMarketplaces: ["aidd-framework"] });
+    expect(await issuesFor(settings)).toStrictEqual([]);
   });
 
   it("reports the marketplace the file no longer declares", async () => {
-    const issues = await issuesFor([]);
-    expect(issues).toHaveLength(1);
-    expect(issues[0].message).toContain("aidd-framework");
-    expect(issues[0].fix).toContain(".claude/settings.local.json");
+    expect(await issuesFor(settingsDeclaring([]))).toStrictEqual([UNDECLARED]);
   });
 
   it("reports it when the whole file is gone — nothing else would notice", async () => {
-    const issues = await issuesFor(null);
-    expect(issues).toHaveLength(1);
-    expect(issues[0].severity).toBe("warning");
+    expect(await issuesFor(null)).toStrictEqual([UNDECLARED]);
+  });
+
+  it("reports it when the file carries no declarations key at all", async () => {
+    expect(await issuesFor("{}")).toStrictEqual([UNDECLARED]);
+  });
+
+  it("reports it, without throwing, when the file holds a JSON null", async () => {
+    await expect(issuesFor("null")).resolves.toStrictEqual([UNDECLARED]);
   });
 
   // The registration is written by the tool itself, so it cannot exist while the tool does not:
   // reporting it missing would be reporting that something uninstalled is unconfigured.
   it("says nothing about a tool whose binary is out of reach", async () => {
-    expect(await issuesFor(null, "claude", false)).toEqual([]);
+    expect(await issuesFor(null, { toolInstalled: false })).toStrictEqual([]);
   });
 
   it("stays silent for a tool that keeps its registrations in a tracked file", async () => {
-    expect(await issuesFor(null, "cursor")).toEqual([]);
+    expect(await issuesFor(null, { toolId: "cursor" })).toStrictEqual([]);
   });
 
   // Copilot declares no place at all rather than a path, and a guard rejecting only `undefined`
   // lets `null` reach `join(root, null)`, which throws and takes `plugin doctor` down.
   it("stays silent, and does not throw, for a tool that declares no place at all", async () => {
-    await expect(issuesFor(null, "copilot")).resolves.toEqual([]);
+    await expect(issuesFor(null, { toolId: "copilot" })).resolves.toStrictEqual([]);
+  });
+
+  it("stays silent, and does not throw, for an IDE tool", async () => {
+    await expect(issuesFor(null, { toolId: "vscode" })).resolves.toStrictEqual([]);
+  });
+
+  describe("narrowed to a set of tools", () => {
+    it("ignores a tool outside the set", async () => {
+      expect(await issuesFor(null, { allowedIds: new Set(["cursor"]) })).toStrictEqual([]);
+    });
+
+    it("still reports a tool inside the set", async () => {
+      expect(await issuesFor(null, { allowedIds: new Set(["claude"]) })).toStrictEqual([
+        UNDECLARED,
+      ]);
+    });
   });
 });
 
@@ -109,11 +141,11 @@ function manifestWithNativeRegistrations(
   return manifest;
 }
 
-function manifestWithPlugin(marketplace?: string): Manifest {
+function manifestWithPlugin(marketplace?: string, toolId: AiToolId = "claude"): Manifest {
   const manifest = Manifest.create();
-  manifest.addTool("claude", "test", []);
+  manifest.addTool(toolId, "test", []);
   manifest.addPlugin(
-    "claude",
+    toolId,
     InstalledPlugin.fromMetadata(
       marketplace === undefined ? "hand-copied" : "aidd-context",
       "1.0.0",
@@ -190,11 +222,16 @@ describe("DoctorRegistrationUseCase — native registrations against the host's 
     expect(issues[0].fix).toContain("aidd framework install --tool claude");
   });
 
-  it("reports an info line, never an error, when nothing here can read the registry", async () => {
+  it("names the registry nobody has measured, never an error, when nothing here can read it", async () => {
     const issues = await nativeIssuesFor(manifestWithNativeRegistrations([REF]), "unreachable");
 
-    expect(issues).toHaveLength(1);
-    expect(issues[0].severity).toBe("info");
+    expect(issues).toStrictEqual([
+      {
+        severity: "info",
+        message: "claude keeps a plugin registry, and nothing here has established its shape",
+        fix: "The plugin does not load until claude's own CLI has run and answered this.",
+      },
+    ]);
   });
 
   it("reports an info line when the registry file exists but could not be read", async () => {
@@ -235,13 +272,28 @@ describe("DoctorRegistrationUseCase — native registrations against the host's 
     expect(issues[0].message).toContain(REF);
   });
 
-  it("is unanswerable, not an error, for a fallback plugin recording no marketplace", async () => {
+  it("names the plugin whose marketplace was never recorded, as unanswerable rather than an error", async () => {
     const issues = await nativeIssuesFor(manifestWithPlugin(undefined), {
       location: REGISTRY_LOCATION,
       refs: new Map(),
     });
 
-    expect(issues).toHaveLength(1);
-    expect(issues[0].severity).toBe("info");
+    expect(issues).toStrictEqual([
+      {
+        severity: "info",
+        message:
+          "AIDD records no marketplace for hand-copied (claude), so its registry cannot be asked",
+        fix: "claude will not load it until a marketplace is recorded for it.",
+      },
+    ]);
+  });
+
+  it("says nothing for a tool whose plugins are enabled by a file this CLI writes", async () => {
+    const issues = await nativeIssuesFor(manifestWithPlugin("aidd-framework", "cursor"), {
+      location: REGISTRY_LOCATION,
+      refs: new Map(),
+    });
+
+    expect(issues).toStrictEqual([]);
   });
 });

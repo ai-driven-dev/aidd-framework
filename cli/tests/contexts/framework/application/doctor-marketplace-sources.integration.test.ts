@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
+import "../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import { Marketplace } from "../../../../src/contexts/distribution/domain/marketplace.js";
 import { DoctorRegistrationUseCase } from "../../../../src/contexts/framework/application/doctor/doctor-registration-use-case.js";
 import { Manifest } from "../../../../src/contexts/framework/domain/manifest.js";
@@ -255,6 +256,78 @@ describe("DoctorRegistrationUseCase — marketplace source conflicts", () => {
     expect(await issuesFor(hostReader, { fs })).toEqual([]);
   });
 
+  it("reports nothing, and does not throw, when no reader exists for the tool's marketplace registry", async () => {
+    const fs = new InMemoryFileAdapter({
+      [`${expectedBuiltDir()}/${CATALOG_RELATIVE}`]: JSON.stringify({ name: NAME, plugins: [] }),
+    });
+    const registry = new InMemoryMarketplaceRegistry();
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: NAME,
+        source: { kind: "local", path: "/source" },
+        scope: "project",
+        addedAt: "2026-01-01T00:00:00Z",
+      })
+    );
+    const manifest = Manifest.create();
+    manifest.addTool("claude", "test", []);
+    const useCase = new DoctorRegistrationUseCase(
+      fs,
+      registry,
+      new Map(),
+      new Map(),
+      new Map(),
+      () => "/user-cache",
+      fakeVersion("1.0.0")
+    );
+
+    await expect(
+      useCase.execute({ manifest, projectRoot: PROJECT_ROOT, allowedIds: null })
+    ).resolves.toStrictEqual([]);
+  });
+
+  it("reports nothing for a tool whose profile declares no marketplace registry, whatever a reader would answer", async () => {
+    const codexCatalog = ".agents/plugins/marketplace.json";
+    const fs = new InMemoryFileAdapter({
+      [`${resolve(builtMarketplaceDir(PROJECT_ROOT, NAME, "codex"))}/${codexCatalog}`]:
+        JSON.stringify({ name: NAME, plugins: [{ name: "sample-plugin" }] }),
+      [`/other/src/${codexCatalog}`]: JSON.stringify({
+        name: NAME,
+        plugins: [{ name: "different-plugin" }],
+      }),
+    });
+    const registry = new InMemoryMarketplaceRegistry();
+    await registry.save(
+      PROJECT_ROOT,
+      Marketplace.create({
+        name: NAME,
+        source: { kind: "local", path: "/source" },
+        scope: "project",
+        addedAt: "2026-01-01T00:00:00Z",
+      })
+    );
+    const manifest = Manifest.create();
+    manifest.addTool("codex", "test", []);
+    const hostReader = new FakeHostMarketplaceRegistryReader({
+      location: REGISTRY_LOCATION,
+      entries: new Map([[NAME, "/other/src"]]),
+    });
+    const useCase = new DoctorRegistrationUseCase(
+      fs,
+      registry,
+      new Map(),
+      new Map(),
+      new Map([["codex", hostReader]]),
+      () => "/user-cache",
+      fakeVersion("1.0.0")
+    );
+
+    const issues = await useCase.execute({ manifest, projectRoot: PROJECT_ROOT, allowedIds: null });
+
+    expect(issues).toStrictEqual([]);
+  });
+
   it("reads the host registry once per marketplace, the same cadence the sync-time guard uses — not once per tool, reused across every marketplace that tool has", async () => {
     const SECOND_NAME = "probe-mkt-2";
     const hostReader = new FakeHostMarketplaceRegistryReader({
@@ -371,10 +444,13 @@ describe("DoctorRegistrationUseCase — user-scope marketplace source drift", ()
 
     const issues = await driftIssuesFor(hostReader);
 
-    expect(issues).toHaveLength(1);
-    expect(issues[0]?.severity).toBe("warning");
-    expect(issues[0]?.message).toContain(projectCache);
-    expect(issues[0]?.fix).toContain("aidd sync");
+    expect(issues).toStrictEqual([
+      {
+        severity: "warning",
+        message: `claude's marketplace registry (${REGISTRY_LOCATION}) still carries '${NAME}' from this project's own pre-migration cache (${projectCache})`,
+        fix: "Run `aidd sync` to move it to the shared, machine-scope source.",
+      },
+    ]);
   });
 
   it("warns naming `aidd sync` when the host still points at another project's pre-migration cache", async () => {
