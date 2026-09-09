@@ -66,7 +66,9 @@ describe("the codebase map matches the tree", () => {
     expect(undocumented, `${MAP} is silent about these directories`).toEqual([]);
     expect(invented, `${MAP} draws these directories and they do not exist`).toEqual([]);
   });
+});
 
+describe("the guard itself", () => {
   it("reads a path from the indentation, so the same name under two parents is two paths", () => {
     const block = [
       "src/",
@@ -88,7 +90,7 @@ describe("the codebase map matches the tree", () => {
     );
   });
 
-  it("names a real directory the map omits, and an invented one the map draws", () => {
+  it("names a real directory the map omits, an invented one it draws, nothing when they agree", () => {
     const real = new Set(["src/kernel", "src/contexts/tools/domain"]);
     const drawn = new Set(["src/kernel", "src/contexts/tools/application"]);
 
@@ -96,5 +98,6 @@ describe("the codebase map matches the tree", () => {
       undocumented: ["src/contexts/tools/domain"],
       invented: ["src/contexts/tools/application"],
     });
+    expect(disagreements(real, real)).toEqual({ undocumented: [], invented: [] });
   });
 });

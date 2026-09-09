@@ -143,7 +143,9 @@ describe("orchestrators depend on entry points, not on parts", () => {
       "an admitted orchestrator took on another collaborator — fix the count and its reason"
     ).toEqual(recorded);
   });
+});
 
+describe("the guard itself", () => {
   it("flags a constructor past the limit and clears one sitting at the limit", () => {
     const over = `constructor(
       ${Array.from({ length: MAX_INJECTED_USE_CASES + 1 }, (_, i) => `private readonly a${i}: FooUseCase,`).join("\n")}

@@ -55,7 +55,9 @@ describe("a context reaches its own interior directly, never by climbing out and
     expect(added, "a new import climbs out of its own context and back in").toEqual([]);
     expect(fixed, "fixed — remove these from BASELINE").toEqual([]);
   });
+});
 
+describe("the guard itself", () => {
   it("flags a specifier that climbs out of its context root and spells the context back out", () => {
     // From `contexts/acme/application/`, three `..` clear application, acme and contexts.
     expect(climbsOutAndReenters("../../../contexts/acme/domain/y.js", "acme", 4)).toBe(true);

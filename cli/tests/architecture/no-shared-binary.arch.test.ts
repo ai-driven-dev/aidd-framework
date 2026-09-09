@@ -38,7 +38,9 @@ describe("no test resolves a path into the shared dist/ build output", () => {
       "resolves into the shared dist/ — read cliPath() from tests/e2e/helpers.ts instead"
     ).toEqual([]);
   });
+});
 
+describe("the guard itself", () => {
   it("flags process.cwd() resolved into dist/, not an unrelated temp dist dir", () => {
     // Built from two pieces so this file's own text never carries the literal the rule
     // above forbids, which would trip it on itself.

@@ -15,9 +15,17 @@ import {
   weighedEdges,
 } from "./helpers.js";
 
+function forbiddenEdges(edges: readonly string[], allowed: ReadonlySet<string>): string[] {
+  return edges.filter((edge) => !allowed.has(edge));
+}
+
+function edgeBetween(importer: string, target: string): string {
+  return `${contextOf(importer)}->${contextOf(target)}`;
+}
+
 describe("the context graph has only the edges the plan allows", () => {
   it("no context reaches another the chain does not permit", () => {
-    const violations = edgesBetweenContexts(sourceFiles()).filter((edge) => !ALLOWED.has(edge));
+    const violations = forbiddenEdges(edgesBetweenContexts(sourceFiles()), ALLOWED);
 
     const { added, fixed } = expectRatchet(
       violations,
@@ -42,12 +50,28 @@ describe("the context graph has only the edges the plan allows", () => {
       "an admitted edge absorbed imports — a baselined edge is not a licence to grow"
     ).toEqual(recorded);
   });
+});
 
+describe("the guard itself", () => {
   it("names the edge it is given, and stays silent on one it allows", () => {
     expect(contextOf("src/contexts/tools/domain/registry.ts")).toBe("tools");
     expect(contextOf("src/kernel/tool.ts")).toBe("kernel");
     expect(contextOf("src/somewhere-that-is-no-layer/thing.ts")).toBe("outside");
     expect(ALLOWED.has("translate->tools")).toBe(true);
     expect(ALLOWED.has("tools->translate")).toBe(false);
+  });
+
+  it("reports a planted crossing the chain forbids and clears one it permits", () => {
+    const forbidden = edgeBetween(
+      "src/contexts/tools/domain/registry.ts",
+      "src/contexts/translate/domain/canon.ts"
+    );
+    const permitted = edgeBetween(
+      "src/contexts/translate/application/translate-source.ts",
+      "src/contexts/tools/domain/registry.ts"
+    );
+
+    expect(forbiddenEdges([forbidden, permitted], ALLOWED)).toEqual(["tools->translate"]);
+    expect(forbiddenEdges([permitted], ALLOWED)).toEqual([]);
   });
 });

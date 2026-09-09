@@ -66,7 +66,9 @@ describe("import rules still bite", () => {
       "pattern matches nothing under src/ — the rule it belongs to forbids nothing"
     ).toEqual([]);
   });
+});
 
+describe("the guard itself", () => {
   it("checks a real rule and flags a deleted one", () => {
     const paths = ["src/contexts/translate/domain/canon.ts", "src/runtime/wiring/translate.ts"];
     expect(matchesSomething(literalCore("**/runtime/**"), paths)).toBe(true);

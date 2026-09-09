@@ -43,29 +43,66 @@ function declaredMethods(file: string, source: string): string[] {
  * declaration, and both are closed by fixing the code rather than recording it. */
 const BASELINE: readonly string[] = [];
 
+function uncalledMethods(bodies: ReadonlyMap<string, string>, ports: readonly string[]): string[] {
+  const uncalled: string[] = [];
+  for (const port of ports) {
+    for (const declared of declaredMethods(port, bodies.get(port) ?? "")) {
+      const method = declared.slice(declared.lastIndexOf(".") + 1);
+      const called = [...bodies].some(
+        ([file, body]) => file !== port && new RegExp(`\\.${method}\\s*\\(`).test(body)
+      );
+      if (!called) uncalled.push(declared);
+    }
+  }
+  return uncalled.sort();
+}
+
 describe("a port declares nothing nobody calls", () => {
   it("every method a port declares is spelled as a call somewhere in src", () => {
     const bodies = new Map(
       sourceFiles().map((file) => [file, readFileSync(join(CLI_ROOT, file), "utf8")])
     );
 
-    const uncalled: string[] = [];
-    for (const port of portFiles()) {
-      for (const declared of declaredMethods(port, bodies.get(port) ?? "")) {
-        const method = declared.slice(declared.lastIndexOf(".") + 1);
-        const called = [...bodies].some(
-          ([file, body]) => file !== port && new RegExp(`\\.${method}\\s*\\(`).test(body)
-        );
-        if (!called) uncalled.push(declared);
-      }
-    }
+    const uncalled = uncalledMethods(bodies, portFiles());
 
-    const { added, fixed } = expectRatchet(uncalled.sort(), BASELINE);
+    const { added, fixed } = expectRatchet(uncalled, BASELINE);
     expect(
       added,
       "a port declares a method nothing calls — an adapter implementing it is not a caller"
     ).toEqual([]);
     expect(fixed, "fixed — remove these from BASELINE").toEqual([]);
+  });
+
+  it("finds the ports of this codebase, so the rule cannot pass by selecting nothing", () => {
+    expect(
+      portFiles().length,
+      "no port file found — the scope of this rule is stale"
+    ).toBeGreaterThan(10);
+  });
+});
+
+describe("the guard itself", () => {
+  it("names the port method nothing spells as a call, and clears the one a caller spells", () => {
+    const port = "src/kernel/ports/thing.ts";
+    const bodies = new Map([
+      [
+        port,
+        ["export interface Thing {", "  doIt(x: number): void;", "  gone(): void;", "}"].join("\n"),
+      ],
+      ["src/runtime/caller.ts", "thing.doIt(1);"],
+    ]);
+
+    expect(uncalledMethods(bodies, [port])).toEqual([`${port} :: Thing.gone`]);
+  });
+
+  it("does not read an adapter implementing a method as a caller of it", () => {
+    const port = "src/kernel/ports/thing.ts";
+    const bodies = new Map([
+      [port, ["export interface Thing {", "  doIt(x: number): void;", "}"].join("\n")],
+      ["src/runtime/thing-adapter.ts", "class ThingAdapter { doIt(x: number): void {} }"],
+    ]);
+
+    expect(uncalledMethods(bodies, [port])).toEqual([`${port} :: Thing.doIt`]);
   });
 
   it("reads a method off an interface block and ignores a property", () => {
@@ -79,12 +116,5 @@ describe("a port declares nothing nobody calls", () => {
     expect(declaredMethods("src/kernel/ports/thing.ts", source)).toEqual([
       "src/kernel/ports/thing.ts :: Thing.doIt",
     ]);
-  });
-
-  it("finds the ports of this codebase, so the rule cannot pass by selecting nothing", () => {
-    expect(
-      portFiles().length,
-      "no port file found — the scope of this rule is stale"
-    ).toBeGreaterThan(10);
   });
 });

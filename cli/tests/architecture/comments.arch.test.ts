@@ -20,8 +20,8 @@ const EXTERNAL_REFERENCE: readonly { readonly name: string; readonly pattern: Re
   { name: "pull request", pattern: /\bpull request\b|\bPR\s*#?\d/i },
 ];
 
-/** Comment lines under `src/` and `tests/` may only decrease; a raise needs the reason here. */
-const MAX_COMMENT_LINES = { src: 4474, tests: 2960 };
+/** Comment lines under `src/` and `tests/` may only decrease; a raise needs its reason here: tests/ 2960 to 2984, four guard files and their probes. */
+const MAX_COMMENT_LINES = { src: 4474, tests: 2984 };
 
 function testFiles(): string[] {
   const out: string[] = [];
@@ -38,11 +38,19 @@ function testFiles(): string[] {
   return out.sort();
 }
 
-function commentLines(file: string): { line: number; text: string }[] {
-  return read(file)
+function commentLinesIn(source: string): { line: number; text: string }[] {
+  return source
     .split("\n")
     .map((text, index) => ({ line: index + 1, text }))
     .filter(({ text }) => COMMENT_LINE.test(text) && !DIRECTIVE.test(text));
+}
+
+function commentLines(file: string): { line: number; text: string }[] {
+  return commentLinesIn(read(file));
+}
+
+function externalReferenceIn(text: string): string | null {
+  return EXTERNAL_REFERENCE.find(({ pattern }) => pattern.test(text))?.name ?? null;
 }
 
 describe("comments", () => {
@@ -50,8 +58,8 @@ describe("comments", () => {
     const offenders: string[] = [];
     for (const file of [...sourceFiles(), ...testFiles()]) {
       for (const { line, text } of commentLines(file)) {
-        const hit = EXTERNAL_REFERENCE.find(({ pattern }) => pattern.test(text));
-        if (hit) offenders.push(`${file}:${line} (${hit.name}): ${text.trim()}`);
+        const hit = externalReferenceIn(text);
+        if (hit) offenders.push(`${file}:${line} (${hit}): ${text.trim()}`);
       }
     }
     expect(offenders, "comments carrying an external reference").toEqual([]);
@@ -69,5 +77,26 @@ describe("comments", () => {
       tests,
       `comment lines under tests/ (baseline ${MAX_COMMENT_LINES.tests})`
     ).toBeLessThanOrEqual(MAX_COMMENT_LINES.tests);
+  });
+});
+
+describe("the guard itself", () => {
+  it("names the kind of reference a comment carries, and stays silent on one carrying none", () => {
+    expect(externalReferenceIn("  // closes #4242")).toBe("issue or pull request number");
+    expect(externalReferenceIn("  // measured on 2024-01-31")).toBe("date");
+    expect(externalReferenceIn("  // see https://example.test/x")).toBe("url");
+    expect(externalReferenceIn("  // the constraint, and what it costs")).toBeNull();
+  });
+
+  it("counts a comment line, skips code, and skips a line whose only job is a directive", () => {
+    const source = [
+      "  // a note",
+      "  /* a block opens",
+      "   * and continues",
+      "  const x = 1;",
+      "  // biome-ignore lint/style/noVar: reason",
+    ].join("\n");
+
+    expect(commentLinesIn(source).map(({ line }) => line)).toEqual([1, 2, 3]);
   });
 });

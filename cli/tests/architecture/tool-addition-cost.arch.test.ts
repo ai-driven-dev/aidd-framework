@@ -17,7 +17,6 @@ function toolIds(files: readonly string[]): string[] {
   return [...ids].sort();
 }
 
-/** The only places a tool identifier is allowed: its own profile, and the vocabulary. */
 function isAllowed(file: string, ids: readonly string[]): boolean {
   if (file === "src/kernel/tool.ts") return true;
   return ids.some((id) => file.startsWith(`src/contexts/tools/domain/profiles/${id}/`));
@@ -133,7 +132,9 @@ describe("a tool identifier stays inside its own profile", () => {
       recorded
     );
   });
+});
 
+describe("the guard itself", () => {
   it("derives the tools from the profiles, so a new one is subject to the rule at once", () => {
     const ids = toolIds(["src/contexts/tools/domain/profiles/frobnicator/profile.ts"]);
 

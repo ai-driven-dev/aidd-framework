@@ -38,7 +38,6 @@ function underSharedDirectory(file: string): boolean {
   return /\/shared\/[^/]+$/.test(file);
 }
 
-/** Over an explicit file list and importer map, so the rule is testable off the real tree. */
 function unearned(files: readonly string[], importers: Map<string, Set<string>>): string[] {
   return files.filter(underSharedDirectory).filter((file) => {
     const areas = new Set(
@@ -62,7 +61,9 @@ describe("shared modules are earned", () => {
     expect(added, "new shared module with fewer than two calling areas").toEqual([]);
     expect(fixed, "fixed — remove these from BASELINE").toEqual([]);
   });
+});
 
+describe("the guard itself", () => {
   it("flags a shared module called from one area and clears one called from two", () => {
     const lonely = "src/contexts/framework/application/shared/lonely.ts";
     const earned = "src/contexts/framework/application/shared/earned.ts";

@@ -83,7 +83,9 @@ describe("folders stay small enough to hold in mind", () => {
       "a baseline count drifted from the tree — fix the number and its reason"
     ).toEqual(recorded);
   });
+});
 
+describe("the guard itself", () => {
   it("fails the ratchet by name when a folder is pushed past the limit", () => {
     const files = [
       ...Array.from({ length: 11 }, (_, i) => `src/pile/f${i}.ts`),

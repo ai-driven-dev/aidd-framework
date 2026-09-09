@@ -114,29 +114,25 @@ function pnpmCallsAgainst(dir: string, body: readonly string[]): string[] {
   return calls;
 }
 
-function scriptCalls(files: readonly string[]): { file: string; script: string }[] {
-  const calls: { file: string; script: string }[] = [];
-  for (const file of files) {
-    const text = readFileSync(file, "utf8");
-    for (const body of runBodies(text)) {
-      for (const script of pnpmCallsAgainst("cli", body)) {
-        if (!PNPM_BUILTINS.has(script)) calls.push({ file, script });
-      }
+function undeclaredScriptCalls(text: string, declared: ReadonlySet<string>): string[] {
+  const missing: string[] = [];
+  for (const body of runBodies(text)) {
+    for (const script of pnpmCallsAgainst("cli", body)) {
+      if (!PNPM_BUILTINS.has(script) && !declared.has(script)) missing.push(script);
     }
   }
-  return calls;
+  return missing;
 }
 
-function foreignIncludes(): string[] {
-  const raw = readFileSync(join(CLI_ROOT, "tsconfig.json"), "utf8").replace(/\/\/[^\n]*/g, "");
-  const config = JSON.parse(raw) as { include?: string[] };
+function foreignIncludes(tsconfig: string): string[] {
+  const config = JSON.parse(tsconfig.replace(/\/\/[^\n]*/g, "")) as { include?: string[] };
   return (config.include ?? []).filter((pattern) => pattern.startsWith("../"));
 }
 
 describe("this package's program stops at this package", () => {
   it("compiles nothing outside cli/, so a CI job needs no sibling's dependencies", () => {
     expect(
-      foreignIncludes(),
+      foreignIncludes(readFileSync(join(CLI_ROOT, "tsconfig.json"), "utf8")),
       "tsconfig reaches outside the package — every job running tsc must then install that sibling's dependencies, and dropping one breaks CI while every local check stays green"
     ).toEqual([]);
   });
@@ -145,9 +141,12 @@ describe("this package's program stops at this package", () => {
 describe("the automation calls scripts this package still has", () => {
   it("every pnpm script CI and the hooks run against cli/ exists in its manifest", () => {
     const scripts = manifestScripts();
-    const missing = scriptCalls(automationFiles())
-      .filter((call) => !scripts.has(call.script))
-      .map((call) => `${call.file.replace(`${REPO_ROOT}/`, "")}: pnpm ${call.script}`)
+    const missing = automationFiles()
+      .flatMap((file) =>
+        undeclaredScriptCalls(readFileSync(file, "utf8"), scripts).map(
+          (script) => `${file.replace(`${REPO_ROOT}/`, "")}: pnpm ${script}`
+        )
+      )
       .sort();
 
     expect(missing, "an automation file runs a script cli/package.json no longer declares").toEqual(
@@ -156,11 +155,29 @@ describe("the automation calls scripts this package still has", () => {
   });
 
   it("finds a call in a workflow and ignores pnpm's own verbs", () => {
-    const sample = join(WORKFLOWS, "cli-ci.yml");
-    const found = scriptCalls([sample]).map((call) => call.script);
+    const found = undeclaredScriptCalls(
+      readFileSync(join(WORKFLOWS, "cli-ci.yml"), "utf8"),
+      new Set()
+    );
 
     expect(found, "the real workflow calls this package's scripts").toContain("knip");
     expect(found, "`pnpm install` is not a script").not.toContain("install");
+  });
+});
+
+describe("the guard itself", () => {
+  it("names a script the manifest lost and stays silent on one it still declares", () => {
+    const workflow = ["      - run: |", "          cd cli", "          pnpm gone", ""].join("\n");
+
+    expect(undeclaredScriptCalls(workflow, new Set(["knip"]))).toEqual(["gone"]);
+    expect(undeclaredScriptCalls(workflow, new Set(["gone"]))).toEqual([]);
+  });
+
+  it("reads an include reaching outside the package, and clears one that stays inside", () => {
+    expect(foreignIncludes('{ "include": ["../kanban/src/**/*.ts"] }')).toEqual([
+      "../kanban/src/**/*.ts",
+    ]);
+    expect(foreignIncludes('{ "include": ["src/**/*.ts"] } // a trailing note')).toEqual([]);
   });
 
   it("follows cd line by line inside a run: | block, past where the old regex stopped seeing", () => {

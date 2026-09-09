@@ -157,7 +157,6 @@ function isCompositionRoot(file: string): boolean {
   return file.startsWith("src/runtime/wiring/");
 }
 
-/** Over an explicit file list and importer map, so the rule is testable off the real tree. */
 function reachesIntoInterior(
   files: readonly string[],
   importers: ReadonlyMap<string, ReadonlySet<string>>,
@@ -207,7 +206,9 @@ describe("nothing imports a context's interior", () => {
       "a context with no entry above is skipped entirely by the rule, not held by it"
     ).toEqual(declared);
   });
+});
 
+describe("the guard itself", () => {
   it("skips a context silently when it has no declaration, which is why the check above exists", () => {
     const files = ["src/contexts/ghost/domain/inner.ts"];
     const importers = new Map([

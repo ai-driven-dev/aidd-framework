@@ -104,7 +104,9 @@ describe("every document that instructs names paths that exist", () => {
     expect(added, "an instructing document names a path that no longer exists").toEqual([]);
     expect(fixed, "fixed — remove these from BASELINE").toEqual([]);
   });
+});
 
+describe("the guard itself", () => {
   it("reads instructions and ignores illustrations", () => {
     const text = "Open `src/cli.ts`.\n\n```ts\n// src/domain/models/invented.ts\n```\n";
     expect(citedInProse(text)).toEqual(["src/cli.ts"]);

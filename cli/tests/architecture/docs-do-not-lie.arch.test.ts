@@ -66,7 +66,9 @@ describe("documented commands exist", () => {
     const missing = undeclaredCommands(readFromRepoRoot(doc), declared);
     expect(missing, `${doc} presents commands that do not exist`).toEqual([]);
   });
+});
 
+describe("the guard itself", () => {
   it("flags an undeclared command, a bad pair, and clears one marked gone, migrated, or registered", () => {
     const knownCommands = new Set(["init", "plugin", "plugin install"]);
 

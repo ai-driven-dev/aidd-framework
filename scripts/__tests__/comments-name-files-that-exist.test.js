@@ -39,6 +39,13 @@ const NOT_A_REPOSITORY_FILE = Object.freeze({
   "cli/tests/architecture/referenced-paths.arch.test.ts": [
     "kernel/gone.ts",
   ],
+  "scripts/__tests__/cli-type-honesty.test.js": [
+    "cli/src/honest.ts",
+    "cli/src/widened.ts",
+    "cli/src/silenced.ts",
+    "cli/tests/silenced.ts",
+    "cli/tests/.keep.ts",
+  ],
   "cli/tests/contexts/framework/application/doctor-use-case.unit.test.ts": [
     "@.claude/rules/test.md",
   ],

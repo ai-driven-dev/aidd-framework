@@ -94,6 +94,15 @@ function contextLayerIncludes(context: string, layer: Layer): string {
   return `src/contexts/${context}/${layer}/**/*.ts`;
 }
 
+function filesMatchedTwice(
+  files: readonly string[],
+  includes: readonly (readonly string[])[]
+): string[] {
+  return files.filter(
+    (file) => includes.filter((globs) => globs.some((glob) => matchesGlob(glob, file))).length > 1
+  );
+}
+
 describe("cli/biome.json forbids exactly the edges context-graph.arch.test.ts forbids", () => {
   const overrides = biomeOverrides().filter((override) => restrictedImportGroups(override));
   const contexts = contextNames();
@@ -108,15 +117,10 @@ describe("cli/biome.json forbids exactly the edges context-graph.arch.test.ts fo
   });
 
   it("at most one noRestrictedImports override matches any source file", () => {
-    const restrictedIncludes = overrides.map((override) => override.includes ?? []);
-    const matchedByMoreThanOne: string[] = [];
-
-    for (const file of sourceFiles()) {
-      const matches = restrictedIncludes.filter((globs) =>
-        globs.some((glob) => matchesGlob(glob, file))
-      );
-      if (matches.length > 1) matchedByMoreThanOne.push(file);
-    }
+    const matchedByMoreThanOne = filesMatchedTwice(
+      sourceFiles(),
+      overrides.map((override) => override.includes ?? [])
+    );
 
     expect(
       matchedByMoreThanOne,
@@ -152,6 +156,40 @@ describe("cli/biome.json forbids exactly the edges context-graph.arch.test.ts fo
     const groups = (restrictedImportGroups(override as BiomeOverride) ?? []).map(tokenOf);
     expect(new Set(groups)).toEqual(
       new Set(["domain", "application", "infrastructure", "presentation", "runtime"])
+    );
+  });
+});
+
+describe("the guard itself", () => {
+  const twoContexts = ["framework", "tools"];
+
+  it("names a file two overrides both match, and clears one only a single override reaches", () => {
+    const files = ["src/contexts/tools/domain/registry.ts", "src/kernel/tool.ts"];
+    const includes = [["src/contexts/**/*.ts"], ["src/contexts/tools/domain/**/*.ts"]];
+
+    expect(filesMatchedTwice(files, includes)).toEqual(["src/contexts/tools/domain/registry.ts"]);
+    expect(filesMatchedTwice(files, [includes[0] as string[]])).toEqual([]);
+  });
+
+  it("forbids a context the graph does not admit, and drops one it does", () => {
+    const noBaseline = new Map<string, ReadonlySet<string>>();
+
+    expect(
+      expectedForbidden("tools", "domain", twoContexts, noBaseline).has("framework"),
+      "tools->framework is no allowed edge"
+    ).toBe(true);
+    expect(
+      expectedForbidden("framework", "domain", twoContexts, noBaseline).has("tools"),
+      "framework->tools is one"
+    ).toBe(false);
+  });
+
+  it("drops a target the baseline already carries at that layer, and keeps it at another", () => {
+    const debt = new Map([["tools->framework", new Set(["domain"])]]);
+
+    expect(expectedForbidden("tools", "domain", twoContexts, debt).has("framework")).toBe(false);
+    expect(expectedForbidden("tools", "application", twoContexts, debt).has("framework")).toBe(
+      true
     );
   });
 });

@@ -50,7 +50,9 @@ describe("a message that instructs names a command that exists", () => {
     expect(added, "a message sends the user at a command the CLI does not declare").toEqual([]);
     expect(fixed, "fixed — remove these from BASELINE").toEqual([]);
   });
+});
 
+describe("the guard itself", () => {
   it("flags an instruction the CLI cannot honour, and passes one it can", () => {
     const declared = new Set(["marketplace", "marketplace add", "plugin", "setup"]);
     expect(unresolvedCommandMentions("Use `aidd marketplace add <x>` first.", declared)).toEqual(

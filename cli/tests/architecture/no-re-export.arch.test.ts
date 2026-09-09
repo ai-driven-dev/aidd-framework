@@ -27,7 +27,9 @@ describe("no module re-exports another module's symbol", () => {
     expect(added, "re-export — import the symbol from its source instead").toEqual([]);
     expect(fixed, "fixed — remove these from BASELINE").toEqual([]);
   });
+});
 
+describe("the guard itself", () => {
   it("flags both re-export forms and clears a plain import", () => {
     expect(reExports('export { thing } from "./thing.js";')).toBe(true);
     expect(reExports('import { thing } from "./thing.js";\nexport { thing };')).toBe(true);

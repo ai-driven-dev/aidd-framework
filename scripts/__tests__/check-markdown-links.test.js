@@ -204,6 +204,27 @@ test("repository scan ignores interrupted test temp directories", () => {
   }
 });
 
+test("repository scan ignores a mutation sandbox and an e2e build, which copy the tree", () => {
+  const sandboxes = [
+    path.join(root, "cli", ".stryker-tmp", "sandbox-probe"),
+    path.join(root, "cli", ".e2e-build", "run-probe"),
+  ];
+
+  try {
+    for (const dir of sandboxes) {
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "copied.md"), "[Missing](./missing.md)\n", "utf8");
+    }
+
+    const result = spawnSync(process.execPath, [script], { cwd: root, encoding: "utf8" });
+
+    assert.equal(result.status, 0, result.stdout);
+    assert.match(result.stdout, /✅ Links: 0 broken in \d+ files/u);
+  } finally {
+    for (const dir of sandboxes) fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("problemForTarget reports a fragment no heading in the target file answers", () => {
   const tempDir = fs.mkdtempSync(path.join(root, "scripts/__tests__/.tmp-check-markdown-links-"));
 

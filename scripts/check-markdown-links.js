@@ -17,7 +17,7 @@ Ignored / excluded forms:
   - Anchor-only links such as #usage
   - mailto: and tel: links
   - HTML angle-bracket links and HTML attributes
-  - .git and node_modules directories
+  - .git and node_modules directories, plus .stryker-tmp and .e2e-build, which copy the tree
   - Runtime variables, glob patterns, and bare words
   - cli/tests/fixtures/** (synthetic mock trees) and cli/aidd_docs/tasks/**
     (historical task records), always, on top of any --ignore given
@@ -35,7 +35,7 @@ Examples:
   | Reader reference | See [explore skill](plugins/aidd-context/skills/11-explore/SKILL.md). |
 `;
 
-const SKIPPED_DIRS = new Set([".git", "node_modules", "worktrees", ".specstory"]);
+const SKIPPED_DIRS = new Set([".git", "node_modules", "worktrees", ".specstory", ".stryker-tmp", ".e2e-build"]);
 const SKIPPED_DIR_PREFIXES = [".tmp-check-markdown-links-"];
 // Always ignored, never a --ignore convenience: both trees hold targets meant not to
 // resolve — synthetic mock references, and a historical record left as it was written.
