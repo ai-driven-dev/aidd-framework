@@ -241,19 +241,20 @@ describe("buildClaudeStyleCatalogEntry", () => {
     expect(entry.version).toBe("1.0.0");
   });
 
-  it("passes through strict and recommended when present", () => {
+  it("passes strict through, and recommended under metadata, where Claude Code does not warn", () => {
     const entry = buildClaudeStyleCatalogEntry("aidd-dev", "desc", "1.0.0", {
       strict: true,
-      recommended: false,
+      metadata: { recommended: false },
     });
     expect(entry.strict).toBe(true);
-    expect(entry.recommended).toBe(false);
+    expect(entry.metadata).toStrictEqual({ recommended: false });
+    expect(entry).not.toHaveProperty("recommended");
   });
 
-  it("omits strict and recommended when absent", () => {
+  it("omits strict and metadata when absent", () => {
     const entry = buildClaudeStyleCatalogEntry("aidd-dev", "desc", "1.0.0", undefined);
     expect(entry.strict).toBeUndefined();
-    expect(entry.recommended).toBeUndefined();
+    expect(entry.metadata).toBeUndefined();
   });
 
   it("only includes strict when it is boolean (not string/number)", () => {

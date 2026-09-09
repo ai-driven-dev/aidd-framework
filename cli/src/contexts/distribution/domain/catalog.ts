@@ -36,7 +36,7 @@ function parseEntry(raw: unknown, index: number): PluginCatalogEntry {
   const entry: PluginCatalogEntry = {
     name: obj.name,
     source,
-    recommended: typeof obj.recommended === "boolean" ? obj.recommended : false,
+    recommended: recommendedUnderMetadata(obj.metadata),
     strict: typeof obj.strict === "boolean" ? obj.strict : false,
   };
 
@@ -44,6 +44,12 @@ function parseEntry(raw: unknown, index: number): PluginCatalogEntry {
   if (typeof obj.version === "string") entry.version = obj.version;
 
   return entry;
+}
+
+function recommendedUnderMetadata(metadata: unknown): boolean {
+  if (metadata === null || typeof metadata !== "object") return false;
+  const { recommended } = metadata as Record<string, unknown>;
+  return typeof recommended === "boolean" ? recommended : false;
 }
 
 export function hasRelativePluginSources(catalog: PluginCatalog): boolean {

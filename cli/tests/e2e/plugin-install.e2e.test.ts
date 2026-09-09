@@ -149,7 +149,7 @@ describe.concurrent("E2E: aidd plugin marketplace", () => {
           source: { kind: "local", path: PLUGIN_FIXTURE },
           version: "1.0.0",
           description: "Sample",
-          recommended: true,
+          metadata: { recommended: true },
         },
       ]);
       await runCli(["marketplace", "add", "local", marketDir, "--yes"], projectDir, fakeHome);
