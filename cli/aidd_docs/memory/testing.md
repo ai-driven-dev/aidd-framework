@@ -11,7 +11,7 @@ How this package is tested: the layers, the tools, the conventions.
 ## Tools
 
 - `vitest`, `fast-check` for properties, `ink-testing-library` for terminal views.
-- `stryker` for mutation, on demand, never a gate.
+- `stryker` for mutation, per scope, a gate in CI on the scopes a change touches.
 - `knip`, `jscpd`, `biome`.
 
 ## Conventions
@@ -34,7 +34,8 @@ How this package is tested: the layers, the tools, the conventions.
 - `pnpm test` runs every project; `test:unit`, `test:integration`, `test:e2e`, `test:arch` select one.
 - `pnpm smoke` drives the real binary over the command matrix, hermetically. `pnpm smoke:full` adds the remote fetch.
 - `pnpm smoke:real` reaches real host registries: [`smoke-real.md`](internal/smoke-real.md).
-- `pnpm test:mutation:<scope>`; `mutation-scopes.json` declares coverage and exclusions.
+- `pnpm test:mutation:<scope>`; `mutation-scopes.json` declares each scope's glob and the floor its score must hold. `scripts/run-mutation.mjs` fails under the floor and keeps one incremental file per scope under `reports/mutation/<scope>/`; `--force` reruns every mutant. Raise a floor to the measured score after a run; never lower one without the reason in that file.
+- A unit or integration test reads the repository through `tests/helpers/repository-root.ts`, never by climbing `../` or `process.cwd()`: a mutation run copies `cli/` into a sandbox, where a relative climb lands nowhere (`tests-reach-the-repository-through-one-helper.arch.test.ts`).
 - Read counts live: a suite failing before producing a test contributes zero.
 
 ## Gotchas

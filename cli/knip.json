@@ -1,6 +1,6 @@
 {
   "entry": ["tests/**/*.test.ts", "vitest.mutation.config.ts"],
-  "ignore": ["tests/**/helpers.ts", "tests/helpers/**", "tests/fixtures/**"],
+  "ignore": ["tests/**/helpers.ts", "tests/helpers/**", "tests/fixtures/**", "scripts/**/*.d.mts"],
   "ignoreBinaries": ["icacls"],
   "ignoreExportsUsedInFile": true,
   "lefthook": {

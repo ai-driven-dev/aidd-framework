@@ -25,6 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.filter.outputs.relevant }}
+      mutation_scopes: ${{ steps.mutation.outputs.scopes }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -75,6 +76,28 @@ jobs:
           done < <(git diff --name-only "$BASE" "$HEAD")
 
           echo "relevant=$relevant" >> "$GITHUB_OUTPUT"
+
+      - name: Decide which mutation scopes a change can move
+        id: mutation
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          fi
+          if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]]; then
+            changed=""
+            all=true
+          else
+            changed="$(git diff --name-only "$BASE" "$HEAD")"
+            all=false
+          fi
+          scopes="$(ALL="$all" CHANGED="$changed" node cli/scripts/mutation-scopes-to-run.mjs)"
+          echo "mutation scopes: $scopes"
+          echo "scopes=$scopes" >> "$GITHUB_OUTPUT"
 
   cli-typecheck:
     name: cli / Typecheck
@@ -404,6 +427,46 @@ jobs:
   # Fan-in: every job above either ran and passed, or was skipped because `changes` found
   # nothing relevant. The one check the branch rulesets require — without it a pull request
   # merges with the real jobs red, because nothing names them.
+  cli-mutation:
+    name: cli / Mutation (${{ matrix.scope }})
+    needs: [changes]
+    if: needs.changes.outputs.mutation_scopes != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        scope: ${{ fromJSON(needs.changes.outputs.mutation_scopes) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install pnpm
+        run: corepack enable
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('cli/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+      - run: cd cli && pnpm install --frozen-lockfile
+      # The incremental file is what keeps a run to the mutants a change can move; the newest
+      # one this branch or its base saved is restored, and this run's is saved whatever the score.
+      - name: Restore this scope's incremental file
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: cli/reports/mutation/${{ matrix.scope }}/incremental.json
+          key: mutation-${{ matrix.scope }}-${{ github.run_id }}
+          restore-keys: mutation-${{ matrix.scope }}-
+      - run: cd cli && node scripts/run-mutation.mjs "${{ matrix.scope }}"
+      - name: Save this scope's incremental file
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: cli/reports/mutation/${{ matrix.scope }}/incremental.json
+          key: mutation-${{ matrix.scope }}-${{ github.run_id }}
+
   gate:
     name: cli / gate
     runs-on: ubuntu-latest
@@ -419,6 +482,7 @@ jobs:
       - cli-knip
       - identifier-join
       - cli-jscpd
+      - cli-mutation
       - kanban-checks
       - windows
     steps:
@@ -438,6 +502,7 @@ jobs:
             "${{ needs.cli-knip.result }}" \
             "${{ needs.identifier-join.result }}" \
             "${{ needs.cli-jscpd.result }}" \
+            "${{ needs.cli-mutation.result }}" \
             "${{ needs.kanban-checks.result }}" \
             "${{ needs.windows.result }}"; do
             if [[ "$result" == "failure" || "$result" == "cancelled" ]]; then

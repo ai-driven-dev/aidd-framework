@@ -1,47 +1,106 @@
 #!/usr/bin/env node
-/**
- * Stryker writes its reports to one path from the config, so scopes run in sequence would
- * leave only the last score behind; each is filed under `reports/mutation/<scope>/` instead.
- * The scope list lives in `mutation-scopes.json`, which the architecture test reads too.
- */
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const CLI_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const SCOPES = JSON.parse(readFileSync(join(CLI_ROOT, "mutation-scopes.json"), "utf8")).scopes;
 const REPORT_ROOT = join(CLI_ROOT, "reports", "mutation");
 
 /** The two paths stryker.conf.json writes, before they are filed by scope. */
 const WRITTEN_REPORTS = ["report.html", "mutation.json"];
 
-function usage(problem) {
-  console.error(`${problem}\n\nUsage: node scripts/run-mutation.mjs <scope>`);
-  console.error(`Scopes: ${Object.keys(SCOPES).join(", ")}`);
+function loadScopes(root = CLI_ROOT) {
+  return JSON.parse(readFileSync(join(root, "mutation-scopes.json"), "utf8")).scopes;
+}
+
+/** One incremental file per scope: what a run learned about `kernel` says nothing about
+ * `tools`, and a shared file would let one scope's result skip another's mutants. */
+export function strykerArgs(scope, scopes, { force = false } = {}) {
+  const declared = scopes[scope];
+  if (declared === undefined) {
+    throw new Error(`Unknown scope "${scope}". Scopes: ${Object.keys(scopes).join(", ")}`);
+  }
+  const args = [
+    "run",
+    "--mutate",
+    declared.mutate,
+    "--incremental",
+    "--incrementalFile",
+    `reports/mutation/${scope}/incremental.json`,
+  ];
+  if (force) args.push("--force");
+  return args;
+}
+
+/** Stryker's own score: killed and timed-out mutants over every mutant a test could reach,
+ * ignored ones left out. A report with no mutant scores nothing rather than 100. */
+export function scoreOf(report) {
+  let detected = 0;
+  let total = 0;
+  for (const file of Object.values(report.files ?? {})) {
+    for (const mutant of file.mutants) {
+      if (mutant.status === "Ignored") continue;
+      total += 1;
+      if (mutant.status === "Killed" || mutant.status === "Timeout") detected += 1;
+    }
+  }
+  return total === 0 ? 0 : (100 * detected) / total;
+}
+
+/** Below the declared floor is a failure the run itself raises; stryker's own `thresholds`
+ * would need a config file per scope to say the same thing. */
+export function breakVerdict(score, declared) {
+  if (score < declared.break) {
+    return `mutation score ${score.toFixed(1)} is below the ${declared.break} declared in mutation-scopes.json`;
+  }
+  return null;
+}
+
+function usage(problem, scopes) {
+  console.error(`${problem}\n\nUsage: node scripts/run-mutation.mjs <scope> [--force]`);
+  console.error(`Scopes: ${Object.keys(scopes).join(", ")}`);
   process.exit(1);
 }
 
-const scope = process.argv[2];
-if (scope === undefined) usage("No scope given.");
-if (!Object.hasOwn(SCOPES, scope)) usage(`Unknown scope "${scope}".`);
+function main() {
+  const scopes = loadScopes();
+  const [scope, ...flags] = process.argv.slice(2);
+  if (scope === undefined) usage("No scope given.", scopes);
+  if (!Object.hasOwn(scopes, scope)) usage(`Unknown scope "${scope}".`, scopes);
+  const force = flags.includes("--force");
 
-const result = spawnSync(
-  join(CLI_ROOT, "node_modules", ".bin", "stryker"),
-  ["run", "--mutate", SCOPES[scope]],
-  { cwd: CLI_ROOT, stdio: "inherit" }
-);
+  const scopeDir = join(REPORT_ROOT, scope);
+  mkdirSync(scopeDir, { recursive: true });
 
-// A sandbox survives an interrupted run and they grow to hundreds of megabytes, so they go
-// whether the run passed or not.
-rmSync(join(CLI_ROOT, ".stryker-tmp"), { recursive: true, force: true });
+  const result = spawnSync(
+    join(CLI_ROOT, "node_modules", ".bin", "stryker"),
+    strykerArgs(scope, scopes, { force }),
+    { cwd: CLI_ROOT, stdio: "inherit" }
+  );
 
-const scopeDir = join(REPORT_ROOT, scope);
-mkdirSync(scopeDir, { recursive: true });
-for (const name of WRITTEN_REPORTS) {
-  const written = join(REPORT_ROOT, name);
-  if (existsSync(written)) renameSync(written, join(scopeDir, name));
+  // A sandbox survives an interrupted run and they grow to hundreds of megabytes.
+  rmSync(join(CLI_ROOT, ".stryker-tmp"), { recursive: true, force: true });
+
+  for (const name of WRITTEN_REPORTS) {
+    const written = join(REPORT_ROOT, name);
+    if (existsSync(written)) renameSync(written, join(scopeDir, name));
+  }
+
+  if (result.status !== 0) process.exit(result.status ?? 1);
+
+  const report = JSON.parse(readFileSync(join(scopeDir, "mutation.json"), "utf8"));
+  const score = scoreOf(report);
+  const verdict = breakVerdict(score, scopes[scope]);
+  console.log(
+    `\nReport: reports/mutation/${scope}/ (score ${score.toFixed(1)}, floor ${scopes[scope].break})`
+  );
+  if (verdict !== null) {
+    console.error(verdict);
+    process.exit(1);
+  }
 }
 
-if (result.status !== 0) process.exit(result.status ?? 1);
-console.log(`\nReport: reports/mutation/${scope}/`);
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main();
+}

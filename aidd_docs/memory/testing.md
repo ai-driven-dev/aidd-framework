@@ -20,7 +20,7 @@ How the project is tested: the layers, the tools, and the conventions. Where tes
 | Tool | Use |
 | --- | --- |
 | vitest | `cli/`, `kanban/` |
-| stryker | mutation, on demand, never in CI |
+| stryker | mutation, per CLI scope, gated in `cli-ci.yml` on the scopes a change touches |
 | knip | dead code, before push and in `cli-ci.yml` |
 | `@playwright/cli` | browser QA evidence, pinned, never an app dependency |
 
