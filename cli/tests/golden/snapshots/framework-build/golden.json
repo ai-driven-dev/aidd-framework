@@ -597,7 +597,7 @@
     "plugins/aidd-async-dev/hooks/hooks.json": "78922a784ee78e9e50587e93628cd3b9d4dfbe49087adc4514e6781cea38cbb9",
     "plugins/aidd-async-dev/agents/async-orchestrator.md": "8b29ba73f27414e75c89c6453c0557212790d00d6becfadba363466999f2c9de",
     "plugins/aidd-async-dev/.claude-plugin/plugin.json": "04cce92dc7c10e8041807220c255005c0510abbbb0322176f2a8a254808e4466",
-    ".claude-plugin/marketplace.json": "d660f4eb03d90f2b2384c9ff61626d6ded7ede5664816681991ddebe622e099f"
+    ".claude-plugin/marketplace.json": "d197f330a5787647d58c7dc20253c8ef8b59c4dce115fdd7f12de45ccec7b18e"
   },
   "cursor": {
     "plugins/aidd-vcs/skills/04-issue-create/SKILL.md": "41fb7f904c88a07eb3ab94c6137c130166fa44069ed76322fc6eb78b81a7b5a4",
@@ -797,7 +797,7 @@
     "plugins/aidd-async-dev/hooks/hooks.json": "78922a784ee78e9e50587e93628cd3b9d4dfbe49087adc4514e6781cea38cbb9",
     "plugins/aidd-async-dev/agents/async-orchestrator.md": "8b29ba73f27414e75c89c6453c0557212790d00d6becfadba363466999f2c9de",
     "plugins/aidd-async-dev/.cursor-plugin/plugin.json": "8d9b5b5edc8ac5d51cdb24bc5605b30ed3149616bfbbcc69db45f35d477315d5",
-    ".cursor-plugin/marketplace.json": "d660f4eb03d90f2b2384c9ff61626d6ded7ede5664816681991ddebe622e099f"
+    ".cursor-plugin/marketplace.json": "d197f330a5787647d58c7dc20253c8ef8b59c4dce115fdd7f12de45ccec7b18e"
   },
   "claude:flat": {
     ".mcp.json": "1bbb467a5d737b5c65daf9fe8551c9ced50608a09f523d5d20baa9150f266f73",

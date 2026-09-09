@@ -95,7 +95,7 @@ describe("PluginPickUseCase", () => {
         name: "sample-plugin",
         source: { kind: "local", path: PLUGIN_FIXTURE },
         version: "1.0.0",
-        recommended: true,
+        metadata: { recommended: true },
       },
     ]);
     await registry.save(
@@ -170,7 +170,7 @@ describe("PluginPickUseCase", () => {
         source: { kind: "local", path: PLUGIN_FIXTURE },
         version: "1.0.0",
         description: "A sample plugin used in tests",
-        recommended: true,
+        metadata: { recommended: true },
         strict: true,
       },
     ]);
@@ -246,7 +246,7 @@ describe("PluginPickUseCase — what it asks, and when it asks nothing", () => {
         source: { kind: "local", path: PLUGIN_FIXTURE },
         version: "1.0.0",
         description: "A sample plugin used in tests",
-        recommended: true,
+        metadata: { recommended: true },
       },
       { name: "bare-plugin", source: { kind: "local", path: PLUGIN_FIXTURE }, version: "1.0.0" },
     ]);
@@ -274,7 +274,7 @@ describe("PluginPickUseCase — what it hands the installer", () => {
         name: "sample-plugin",
         source: { kind: "local", path: PLUGIN_FIXTURE },
         version: "1.0.0",
-        recommended: true,
+        metadata: { recommended: true },
         strict: true,
       },
     ]);
@@ -304,7 +304,7 @@ describe("PluginPickUseCase — what it hands the installer", () => {
         name: "sample-plugin",
         source: { kind: "local", path: PLUGIN_FIXTURE },
         version: "1.0.0",
-        recommended: true,
+        metadata: { recommended: true },
       },
     ]);
     await registerMarketplace(registry, "local", MKT_DIR);
