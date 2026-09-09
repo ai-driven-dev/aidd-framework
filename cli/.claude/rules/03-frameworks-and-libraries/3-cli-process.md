@@ -32,4 +32,4 @@ paths:
 - `1`: thrown error, unhealthy `doctor`, guard needing a TTY.
 - `errorHandler.handle` alone turns a domain failure into a code.
 - A command may exit on a pre-use-case refusal: missing flag, non-interactive guard.
-- Nothing under `contexts/`, `kernel/`, `runtime/` calls `process.exit`.
+- Nothing under `contexts/`, `kernel/`, `runtime/` calls `process.exit` (`biome-plugins/no-process-exit.grit`).

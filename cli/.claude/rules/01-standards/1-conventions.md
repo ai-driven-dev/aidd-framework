@@ -9,7 +9,7 @@ paths:
 
 ## Modules
 
-- Named exports only.
+- Named exports only; biome's `noDefaultExport` holds it under `src/` and `tests/`.
 - No barrel, no re-export (`no-re-export.arch.test.ts`; `tests/helpers/ports/` exempt).
 - Import from the defining module, relative, `.js` extension.
 - `import type` for a type-only import.

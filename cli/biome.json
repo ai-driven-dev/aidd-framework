@@ -20,7 +20,8 @@
       },
       "correctness": {
         "noUnresolvedImports": "error"
-      }
+      },
+      "style": {}
     }
   },
   "formatter": {
@@ -528,6 +529,20 @@
                 ]
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/kernel/**", "src/contexts/**", "src/runtime/**"],
+      "plugins": ["./biome-plugins/no-process-exit.grit"]
+    },
+    {
+      "includes": ["src/**", "tests/**", "!**/*.d.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDefaultExport": "error"
           }
         }
       }

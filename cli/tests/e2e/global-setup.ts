@@ -21,10 +21,11 @@ const CLI_ROOT = resolve(import.meta.dirname, "..", "..");
 const TSUP_ENTRY = join(CLI_ROOT, "node_modules", "tsup", "dist", "cli-default.js");
 /** Gitignored: one directory per run, removed on teardown. */
 const BUILD_ROOT = join(CLI_ROOT, ".e2e-build");
+let outDir: string | undefined;
 
-export default async function setup(project: TestProject): Promise<() => Promise<void>> {
+export async function setup(project: TestProject): Promise<void> {
   await mkdir(BUILD_ROOT, { recursive: true });
-  const outDir = await mkdtemp(join(BUILD_ROOT, "run-"));
+  outDir = await mkdtemp(join(BUILD_ROOT, "run-"));
 
   await execFileAsync(process.execPath, [TSUP_ENTRY], {
     cwd: CLI_ROOT,
@@ -32,8 +33,10 @@ export default async function setup(project: TestProject): Promise<() => Promise
   });
 
   project.provide("cliPath", join(outDir, "cli.js"));
+}
 
-  return async () => {
-    await rm(outDir, { recursive: true, force: true });
-  };
+export async function teardown(): Promise<void> {
+  const built = outDir;
+  if (built === undefined) return;
+  await rm(built, { recursive: true, force: true });
 }

@@ -13,6 +13,7 @@ paths:
 - It never returns a failure as a value.
 - An adapter catches only to type an I/O error (`kernel/errors.ts`).
 - Never `catch {}` into a default: unreadable is not absent.
+- An empty catch is a listed best effort or a failure (`catches-that-swallow.arch.test.ts`).
 - The command layer is the only catcher: `errorHandler.handle(error)`, exit 1.
 - The update-check hook is the one deliberate swallow.
 
