@@ -6,6 +6,7 @@ import { AuthLoginUseCase } from "../../runtime/auth/auth-login-use-case.js";
 import { AuthLogoutUseCase } from "../../runtime/auth/auth-logout-use-case.js";
 import { AuthStatusUseCase } from "../../runtime/auth/auth-status-use-case.js";
 import { createDeps } from "../../runtime/wiring/framework.js";
+import { printAuthenticated, printAuthStatus, printLogoutResult } from "../display/auth-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import { parseGlobalOptions } from "./global-options.js";
 
@@ -70,7 +71,7 @@ export function registerAuthCommand(program: Command): void {
           credential,
           level,
         });
-        output.success(`Authenticated as ${result.login} (${result.level})`);
+        printAuthenticated(output, result.login, result.level);
       } catch (error) {
         errorHandler.handle(error);
       }
@@ -86,19 +87,7 @@ export function registerAuthCommand(program: Command): void {
       try {
         const deps = await createDeps(projectRoot, { verbose }, output);
         const result = await new AuthLogoutUseCase(deps.credentialStore).execute();
-
-        if (!result.found) {
-          output.info("Not authenticated.");
-          return;
-        }
-
-        if (result.hint === "external-provider-cleanup") {
-          output.info(
-            "To fully logout, run the external provider's logout command (e.g. gh auth logout)."
-          );
-        }
-
-        output.success(`Logged out (${result.level})`);
+        printLogoutResult(output, result);
       } catch (error) {
         errorHandler.handle(error);
       }
@@ -114,11 +103,7 @@ export function registerAuthCommand(program: Command): void {
       try {
         const deps = await createDeps(projectRoot, { verbose }, output);
         const result = await new AuthStatusUseCase(deps.credentialStore).execute();
-        if (!result.authenticated) {
-          output.info("Not authenticated.");
-          return;
-        }
-        output.success(`Authenticated as ${result.login} (${result.level})`);
+        printAuthStatus(output, result);
       } catch (error) {
         errorHandler.handle(error);
       }

@@ -7,6 +7,7 @@ import {
 } from "../../contexts/translate/domain/build-target.js";
 import { createDeps } from "../../runtime/wiring/framework.js";
 import { createFrameworkBuildUseCase } from "../../runtime/wiring/translate.js";
+import { printTranslateResult } from "../display/translate-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import type { CLIOutput } from "../output.js";
 import { parseGlobalOptions } from "./global-options.js";
@@ -45,15 +46,11 @@ async function runTranslateCore(params: TranslateExecutionParams): Promise<void>
       target: params.target,
       mode: params.mode,
     });
-    if (params.mode === "flat") {
-      params.output.success(
-        `Flat-installed ${result.plugins.length} plugins, ${result.totalFiles} files written under ${result.outDir}`
-      );
-    } else {
-      params.output.success(
-        `Built ${result.plugins.length} plugins, ${result.totalFiles} files written to ${result.outDir}`
-      );
-    }
+    printTranslateResult(params.output, params.mode, {
+      pluginCount: result.plugins.length,
+      totalFiles: result.totalFiles,
+      outDir: result.outDir,
+    });
   } catch (error) {
     errorHandler.handle(error);
   }

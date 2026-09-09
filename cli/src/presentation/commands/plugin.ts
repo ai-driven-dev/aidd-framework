@@ -2,6 +2,13 @@ import type { Command } from "commander";
 import { parseInstallScope } from "../../contexts/framework/domain/install-scope.js";
 import { assertValidAiToolId, parseToolOption } from "../../kernel/tool.js";
 import { createDeps, createMenuDeps } from "../../runtime/wiring/framework.js";
+import {
+  printInstalledPlugins,
+  printPluginInstallOutcome,
+  printPluginRemoved,
+  printPluginSearchHits,
+  printPluginsUpdated,
+} from "../display/plugin-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import { parseGlobalOptions } from "./global-options.js";
 import { spawnCliCommand } from "./spawn-cli-command.js";
@@ -42,7 +49,7 @@ export function registerPluginCommand(program: Command): void {
           projectRoot,
         });
         await syncNativeActivation(deps, output, projectRoot);
-        output.success(`Plugin '${name}' removed.`);
+        printPluginRemoved(output, name);
       } catch (error) {
         errorHandler.handle(error);
       }
@@ -61,14 +68,7 @@ export function registerPluginCommand(program: Command): void {
         const result = await deps.pluginListUseCase.execute({
           toolIds: parseToolOption(cmdOptions.tool),
         });
-        let printed = false;
-        for (const [toolId, plugins] of result) {
-          if (plugins.length === 0) continue;
-          output.print(`${toolId}:`);
-          for (const p of plugins) output.print(`  ${p.name}@${p.version}`);
-          printed = true;
-        }
-        if (!printed) output.info("No plugins installed.");
+        printInstalledPlugins(output, result);
       } catch (error) {
         errorHandler.handle(error);
       }
@@ -115,19 +115,7 @@ export function registerPluginCommand(program: Command): void {
             projectRoot,
             cmdOptions.from !== undefined ? [cmdOptions.from] : undefined
           );
-          if (result.kind === "picked") {
-            if (result.installed.length === 0) {
-              output.info("No plugins selected.");
-            } else {
-              output.success(
-                `Installed ${result.installed.length} plugin(s): ${result.installed.join(", ")}`
-              );
-            }
-          } else if (result.kind === "local") {
-            output.success("Plugin added successfully.");
-          } else {
-            output.success(`Installed '${result.installed[0]}'.`);
-          }
+          printPluginInstallOutcome(output, result);
         } catch (error) {
           errorHandler.handle(error);
         }
@@ -150,13 +138,7 @@ export function registerPluginCommand(program: Command): void {
           marketplace: cmdOptions.marketplace,
           projectRoot,
         });
-        if (hits.length === 0) output.info("No matches.");
-        for (const h of hits) {
-          const flag = h.entry.recommended ? " (recommended)" : "";
-          output.print(
-            `${h.entry.name}@${h.entry.version ?? "?"} — ${h.entry.description ?? ""} — marketplace: ${h.marketplace.name}${flag}`
-          );
-        }
+        printPluginSearchHits(output, hits);
       } catch (error) {
         errorHandler.handle(error);
       }
@@ -178,11 +160,7 @@ export function registerPluginCommand(program: Command): void {
           projectRoot,
         });
         await syncNativeActivation(deps, output, projectRoot);
-        if (updated.length === 0) {
-          output.success("All plugins are up to date.");
-        } else {
-          output.success(`Updated: ${updated.join(", ")}.`);
-        }
+        printPluginsUpdated(output, updated);
       } catch (error) {
         errorHandler.handle(error);
       }

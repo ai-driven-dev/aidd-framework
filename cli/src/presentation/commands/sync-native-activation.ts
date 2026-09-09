@@ -1,5 +1,6 @@
 import { SyncFailedError } from "../../kernel/errors.js";
 import type { createDeps } from "../../runtime/wiring/framework.js";
+import { printScopedFailures } from "../display/framework-display.js";
 import type { CLIOutput } from "../output.js";
 
 /** Named structurally rather than imported: `marketplace-sync-settings-use-case.ts` is
@@ -30,6 +31,6 @@ export async function syncNativeActivation(
  * already ran `execute`: calling it a second time here would run every tool's own CLI twice
  * for one command. */
 export function reportSyncActivation(output: CLIOutput, activation: SyncActivationOutcome): void {
-  for (const e of activation.errors) output.warn(`[${e.scope}] ${e.message}`);
+  printScopedFailures(output, activation.errors);
   if (activation.errors.length > 0) throw new SyncFailedError(activation.errors);
 }

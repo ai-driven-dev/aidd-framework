@@ -5,6 +5,12 @@ import type { AiToolId, IdeToolId, ToolId } from "../../kernel/tool.js";
 import { isAiToolId, VALID_TOOL_IDS } from "../../kernel/tool.js";
 import { createDeps } from "../../runtime/wiring/framework.js";
 import {
+  printToolAlreadyInstalled,
+  printToolInstalled,
+  printToolRemoved,
+  printUpdateResult,
+} from "../display/framework-display.js";
+import {
   printInstalledRules,
   printInstalledRulesJson,
 } from "../display/installed-rules-display.js";
@@ -15,7 +21,7 @@ import { reportSyncActivation } from "./sync-native-activation.js";
 
 type Deps = Awaited<ReturnType<typeof createDeps>>;
 
-function assertKnownToolId(toolId: string): asserts toolId is ToolId {
+export function assertKnownToolId(toolId: string): asserts toolId is ToolId {
   if (!isAiToolId(toolId) && !isIdeToolId(toolId)) {
     throw new Error(`Unknown tool: ${toolId}. Valid tools: ${VALID_TOOL_IDS.join(", ")}`);
   }
@@ -52,12 +58,13 @@ async function installAiTool(
     propagatePlugins: cmdOptions.plugins,
   });
   if (result.runtimeResult.skipped) {
-    output.warn(`${toolId} is already installed. Use \`--force\` to reinstall.`);
+    printToolAlreadyInstalled(output, toolId);
     return;
   }
-  for (const w of result.runtimeResult.warnings) output.warn(w);
-  for (const w of result.propagationWarnings) output.warn(w);
-  output.success(`Installed ${toolId} (${result.runtimeResult.fileCount} files)`);
+  printToolInstalled(output, toolId, result.runtimeResult.fileCount, [
+    ...result.runtimeResult.warnings,
+    ...result.propagationWarnings,
+  ]);
   if (result.activation !== undefined) reportSyncActivation(output, result.activation);
 }
 
@@ -78,11 +85,10 @@ async function installIdeTool(
     version,
   });
   if (result.skipped) {
-    output.warn(`${result.toolId} is already installed. Use \`--force\` to reinstall.`);
+    printToolAlreadyInstalled(output, result.toolId);
     return;
   }
-  for (const w of result.warnings) output.warn(w);
-  output.success(`Installed ${result.toolId} (${result.fileCount} files)`);
+  printToolInstalled(output, result.toolId, result.fileCount, result.warnings);
 }
 
 async function runFrameworkRemove(
@@ -99,33 +105,11 @@ async function runFrameworkRemove(
       mcpFilter: [],
     });
     const totalFileCount = results.reduce((sum, r) => sum + r.fileCount, 0);
-    output.success(`Removed ${results[0].toolId} (${totalFileCount} files removed)`);
+    printToolRemoved(output, results[0].toolId, totalFileCount);
     return;
   }
   const result = await deps.uninstallIdeUseCase.execute({ toolId, projectRoot });
-  output.success(`Removed ${result.toolId} (${result.fileCount} files removed)`);
-}
-
-interface UpdatedTool {
-  toolId: ToolId;
-  fileCount: number;
-}
-interface UpdateErrors {
-  scope: string;
-  message: string;
-}
-
-function printUpdateResult(
-  output: CLIOutput,
-  updatedTools: readonly UpdatedTool[],
-  errors: readonly UpdateErrors[]
-): void {
-  if (updatedTools.length === 0 && errors.length === 0) {
-    output.info("No tools installed.");
-    return;
-  }
-  for (const t of updatedTools) output.success(`Updated ${t.toolId} (${t.fileCount} files)`);
-  for (const e of errors) output.warn(`[${e.scope}] ${e.message}`);
+  printToolRemoved(output, result.toolId, result.fileCount);
 }
 
 async function runFrameworkUpdate(

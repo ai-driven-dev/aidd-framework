@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { createDeps } from "../../runtime/wiring/framework.js";
+import { printSelfUpdateResult } from "../display/update-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import { parseGlobalOptions } from "./global-options.js";
 
@@ -25,28 +26,7 @@ async function runUpdateAction(program: Command, cmdOptions: UpdateCmdOptions): 
       force: cmdOptions.force,
     });
 
-    switch (result.kind) {
-      case "up-to-date":
-      case "check-current":
-        output.success(`Already up to date (${result.version})`);
-        break;
-      case "check-available":
-        output.info(
-          `New version available: ${result.latestVersion} (current: ${result.currentVersion})`
-        );
-        break;
-      case "dry-run":
-        output.info(`Would install @ai-driven-dev/cli@${result.latestVersion}`);
-        break;
-      case "updated": {
-        const binaryPart = result.binaryPath ? ` (${result.binaryPath})` : "";
-        output.success(`Successfully updated to version ${result.latestVersion}${binaryPart}`);
-        if (result.changelog) {
-          output.info(`\nChangelog:\n${result.changelog}`);
-        }
-        break;
-      }
-    }
+    printSelfUpdateResult(output, result);
   } catch (error) {
     errorHandler.handle(error);
   }

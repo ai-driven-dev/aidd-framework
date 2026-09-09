@@ -1,7 +1,14 @@
 import type { Command } from "commander";
 import type { MarketplaceScope } from "../../kernel/scope.js";
-import { describePluginSource, parsePluginSourceShorthand } from "../../kernel/source.js";
+import { parsePluginSourceShorthand } from "../../kernel/source.js";
 import { createDeps, createMenuDeps } from "../../runtime/wiring/framework.js";
+import {
+  printMarketplaceCheck,
+  printMarketplaceRegistered,
+  printMarketplaceRemoved,
+  printRefreshResults,
+  printRegisteredMarketplaces,
+} from "../display/marketplace-display.js";
 import { ErrorHandler } from "../error-handler.js";
 import { parseGlobalOptions } from "./global-options.js";
 import { spawnCliCommand } from "./spawn-cli-command.js";
@@ -75,7 +82,7 @@ export function registerMarketplaceCommand(program: Command): void {
             overwrite: cmdOptions.overwrite ?? false,
           });
           await syncNativeActivation(deps, output, projectRoot, [result.marketplace.name]);
-          output.success(`Marketplace '${result.marketplace.name}' registered.`);
+          printMarketplaceRegistered(output, result.marketplace.name);
         } catch (error) {
           errorHandler.handle(error);
         }
@@ -95,12 +102,7 @@ export function registerMarketplaceCommand(program: Command): void {
           projectRoot,
           withCatalogs: cmdOptions.plugins ?? false,
         });
-        if (marketplaces.length === 0) output.info("No marketplaces registered.");
-        for (const m of marketplaces) {
-          const ver = m.version !== undefined ? ` v${m.version}` : "";
-          output.print(`${m.name}${ver} [${m.scope}]`);
-          if (catalogs !== undefined) printCatalogEntries(m.name, catalogs, output);
-        }
+        printRegisteredMarketplaces(output, marketplaces, catalogs);
       } catch (error) {
         errorHandler.handle(error);
       }
@@ -121,9 +123,7 @@ export function registerMarketplaceCommand(program: Command): void {
           autoConfirm: cmdOptions.yes ?? false,
         });
         await syncNativeActivation(deps, output, projectRoot);
-        output.success(
-          `Marketplace '${result.marketplace.name}' removed (${result.removedPluginCount} plugin(s) cleaned up).`
-        );
+        printMarketplaceRemoved(output, result.marketplace.name, result.removedPluginCount);
       } catch (error) {
         errorHandler.handle(error);
       }
@@ -146,8 +146,7 @@ export function registerMarketplaceCommand(program: Command): void {
           force: cmdOptions.force,
         });
         await syncNativeActivation(deps, output, projectRoot);
-        for (const r of results)
-          output.print(`${r.name}: ${r.status}${r.error ? ` (${r.error})` : ""}`);
+        printRefreshResults(output, results);
         if (failedCount > 0) process.exit(1);
       } catch (error) {
         errorHandler.handle(error);
@@ -162,35 +161,10 @@ export function registerMarketplaceCommand(program: Command): void {
       const errorHandler = new ErrorHandler(output);
       try {
         const deps = await createDeps(projectRoot, { verbose }, output);
-        const { stale, upstreamRemoved, skipped } = await deps.marketplaceCheckUseCase.execute({
-          projectRoot,
-        });
-        for (const m of stale) output.print(`stale: ${m.name}`);
-        for (const r of upstreamRemoved)
-          output.print(`removed: ${r.marketplace}/${r.plugin} (${r.toolId})`);
-        for (const s of skipped) output.warn(`skipped: ${s.marketplace} — ${s.error}`);
-        if (stale.length === 0 && upstreamRemoved.length === 0 && skipped.length === 0)
-          output.success("All marketplaces fresh.");
+        const result = await deps.marketplaceCheckUseCase.execute({ projectRoot });
+        printMarketplaceCheck(output, result);
       } catch (error) {
         errorHandler.handle(error);
       }
     });
-}
-
-function printCatalogEntries(
-  marketplaceName: string,
-  catalogs: Map<string, import("../../contexts/distribution/domain/catalog.js").PluginCatalog>,
-  output: ReturnType<typeof parseGlobalOptions>["output"]
-): void {
-  const catalog = catalogs.get(marketplaceName);
-  if (catalog === undefined) {
-    output.warn(`  (could not fetch catalog for '${marketplaceName}')`);
-    return;
-  }
-  for (const e of catalog.plugins) {
-    const flag = e.recommended ? " (recommended)" : "";
-    output.print(
-      `  ${e.name}@${e.version ?? "?"} — ${e.description ?? ""} — ${describePluginSource(e.source)}${flag}`
-    );
-  }
 }
