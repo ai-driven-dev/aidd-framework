@@ -1,13 +1,14 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { REPOSITORY_ROOT } from "../helpers/repository-root.js";
 import { createTestEnv, gitInit, runCli } from "./helpers.js";
 
 /**
  * Holds `02-check`'s own markdown to what the CLI accepts: nothing else reads that markdown,
  * so a command it names that the CLI does not have would ship unnoticed.
  */
-const REPO_ROOT = resolve(process.cwd(), "..");
+const REPO_ROOT = REPOSITORY_ROOT;
 const SKILL_DIR = join(REPO_ROOT, "plugins", "aidd-telemetry", "skills", "02-check");
 
 /** Every `aidd telemetry …` command the skill's own markdown tells an agent to run. */

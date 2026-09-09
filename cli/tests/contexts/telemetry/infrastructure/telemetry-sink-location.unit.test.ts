@@ -1,6 +1,6 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   defaultConfigDir,
@@ -8,13 +8,13 @@ import {
 } from "../../../../src/contexts/telemetry/infrastructure/telemetry-sink-adapter.js";
 import { AuthStorage } from "../../../../src/runtime/auth/auth-storage.js";
 import { sandboxedEnv, sinkDirIn } from "../../../e2e/helpers.js";
+import { REPOSITORY_ROOT } from "../../../helpers/repository-root.js";
 
 /**
  * `defaultConfigDir` reads `process.platform` on every call, so faking it here pins the rule
  * on any machine. `%APPDATA%` is where a Windows application keeps this, `.config` is not.
  */
-const REPO_ROOT = resolve(process.cwd(), "..");
-const PLUGIN_README = join(REPO_ROOT, "plugins", "aidd-telemetry", "README.md");
+const PLUGIN_README = join(REPOSITORY_ROOT, "plugins", "aidd-telemetry", "README.md");
 
 function withPlatform<T>(platform: NodeJS.Platform, run: () => T): T {
   const original = Object.getOwnPropertyDescriptor(process, "platform");

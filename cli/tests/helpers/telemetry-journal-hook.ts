@@ -1,4 +1,9 @@
 import { createRequire } from "node:module";
+import { join } from "node:path";
+import { REPOSITORY_ROOT } from "./repository-root.js";
+
+const hookLib = (name: string): string =>
+  join(REPOSITORY_ROOT, "plugins", "aidd-telemetry", "hooks", "lib", name);
 
 /** The journal hook is zero-dependency CommonJS copied verbatim into user projects, so it ships
  * no types and production code cannot import it. Tests reach it here, declaring only the
@@ -14,9 +19,7 @@ interface JournalRepoModule {
   personRefusesTelemetry(): boolean;
 }
 
-export const journalRepo: JournalRepoModule = createRequire(import.meta.url)(
-  "../../../plugins/aidd-telemetry/hooks/lib/repo.cjs"
-);
+export const journalRepo: JournalRepoModule = createRequire(import.meta.url)(hookLib("repo.cjs"));
 
 /** The same reach into `record.cjs`, for the one derivation the reader side must agree with: a
  * Codex session's identity, taken from the rollout the hook is told the session writes. */
@@ -29,7 +32,7 @@ interface JournalRecordModule {
 }
 
 export const journalRecord: JournalRecordModule = createRequire(import.meta.url)(
-  "../../../plugins/aidd-telemetry/hooks/lib/record.cjs"
+  hookLib("record.cjs")
 );
 
 /** The hook's own list of the hosts it writes for, so a conformance test can compare it
@@ -38,9 +41,7 @@ interface JournalHostModule {
   DECLARED_HOSTS: ReadonlySet<string>;
 }
 
-export const journalHost: JournalHostModule = createRequire(import.meta.url)(
-  "../../../plugins/aidd-telemetry/hooks/lib/host.cjs"
-);
+export const journalHost: JournalHostModule = createRequire(import.meta.url)(hookLib("host.cjs"));
 
 /** The hook's file-writes module. `WRITTEN_PATH_EXTRACTOR_BY_HOST` is exposed so a test can
  * assert which hosts are covered rather than assume all of them are. */
@@ -55,7 +56,7 @@ interface JournalFileWritesModule {
 }
 
 export const journalFileWrites: JournalFileWritesModule = createRequire(import.meta.url)(
-  "../../../plugins/aidd-telemetry/hooks/lib/file-writes.cjs"
+  hookLib("file-writes.cjs")
 );
 
 /** The hook's declaration module: a task can be declared on any host `journal.cjs`'s
@@ -70,7 +71,7 @@ interface JournalTaskDeclaredModule {
 }
 
 export const journalTaskDeclared: JournalTaskDeclaredModule = createRequire(import.meta.url)(
-  "../../../plugins/aidd-telemetry/hooks/lib/task-declared.cjs"
+  hookLib("task-declared.cjs")
 );
 
 /** The hook's own trailer repair, exposed for the one thing the hook's own suite cannot prove:
@@ -84,5 +85,5 @@ interface JournalTrailerRepairModule {
 }
 
 export const journalTrailerRepair: JournalTrailerRepairModule = createRequire(import.meta.url)(
-  "../../../plugins/aidd-telemetry/hooks/lib/trailer-repair.cjs"
+  hookLib("trailer-repair.cjs")
 );

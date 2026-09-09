@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { REPOSITORY_ROOT } from "../../../helpers/repository-root.js";
 import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
@@ -22,12 +23,7 @@ import { AI_TOOL_IDS } from "../../../../src/kernel/tool.js";
  * An artefact is carried byte for byte: a path rewritten inside a program no longer parses.
  */
 function pluginFile(relativePath: string): string {
-  return readFileSync(
-    fileURLToPath(
-      new URL(`../../../../../plugins/aidd-telemetry/${relativePath}`, import.meta.url)
-    ),
-    "utf8"
-  );
+  return readFileSync(join(REPOSITORY_ROOT, "plugins", "aidd-telemetry", relativePath), "utf8");
 }
 
 const ARTEFACTS = [

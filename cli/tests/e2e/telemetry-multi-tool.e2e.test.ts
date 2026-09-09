@@ -1,14 +1,15 @@
 import { execFileSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { chmod, cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { delimiter, join, resolve } from "node:path";
+import { delimiter, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { REPOSITORY_ROOT } from "../helpers/repository-root.js";
 import { createTestEnv, gitInit, runCli, sinkDirIn } from "./helpers.js";
 
 /** Three readable tools through one report, from real captures: hook payloads replayed
  * through the journal hook itself, and a stand-in `opencode` on the path, since the reader
  * shells out and an e2e must not depend on the machine having that tool installed. */
-const REPO_ROOT = resolve(process.cwd(), "..");
+const REPO_ROOT = REPOSITORY_ROOT;
 const LOCAL_COST_FIXTURES = join(process.cwd(), "tests", "fixtures", "local-cost");
 const HOOK_FIXTURES = join(REPO_ROOT, "scripts", "__tests__", "fixtures");
 const JOURNAL_HOOK = join(REPO_ROOT, "plugins", "aidd-telemetry", "hooks", "journal.cjs");

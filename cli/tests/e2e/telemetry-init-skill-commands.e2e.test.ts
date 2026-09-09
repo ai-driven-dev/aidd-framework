@@ -1,11 +1,12 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { REPOSITORY_ROOT } from "../helpers/repository-root.js";
 import { createTestEnv, runCli } from "./helpers.js";
 
 /** `00-init`'s commands are stateful, so they are not run in the order the markdown walk
  * finds them: the most destructive runs only once nothing after it depends on what it removes. */
-const REPO_ROOT = resolve(process.cwd(), "..");
+const REPO_ROOT = REPOSITORY_ROOT;
 const SKILL_DIR = join(REPO_ROOT, "plugins", "aidd-telemetry", "skills", "00-init");
 const COST_LOCATE = join(
   REPO_ROOT,

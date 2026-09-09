@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
+import { REPOSITORY_ROOT } from "../../../helpers/repository-root.js";
 // Side-effect imports: the use-case resolves every AI tool's local-read declaration from
 // the registry, so every tool must be registered for the worked example to run at all.
 import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
@@ -22,9 +24,8 @@ const RECORD_MODEL_URL = new URL(
   "../../../../src/contexts/telemetry/domain/telemetry-sink-record.ts",
   import.meta.url
 );
-const CONTRACT_DOC_URL = new URL(
-  "../../../../../aidd_docs/product/metrics-contract.md",
-  import.meta.url
+const CONTRACT_DOC_URL = pathToFileURL(
+  join(REPOSITORY_ROOT, "aidd_docs", "product", "metrics-contract.md")
 );
 function readTextFile(url: URL): string {
   return readFileSync(fileURLToPath(url), "utf8");

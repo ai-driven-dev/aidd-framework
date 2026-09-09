@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { REPOSITORY_ROOT } from "../../../helpers/repository-root.js";
 import "../../../../src/contexts/tools/domain/profiles/claude/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/codex/profile.js";
 import "../../../../src/contexts/tools/domain/profiles/copilot/profile.js";
@@ -302,9 +304,7 @@ describe("toCostReportEnvelope", () => {
   // A bump is one edit; the contract naming the new version is a second one nothing forces.
   it("is the version the product contract names as current", () => {
     const contract = readFileSync(
-      fileURLToPath(
-        new URL("../../../../../aidd_docs/product/cost-report-contract.md", import.meta.url)
-      ),
+      join(REPOSITORY_ROOT, "aidd_docs", "product", "cost-report-contract.md"),
       "utf8"
     );
 

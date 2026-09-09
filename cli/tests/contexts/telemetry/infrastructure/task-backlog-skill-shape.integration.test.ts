@@ -1,13 +1,14 @@
 import { readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { TaskBacklogAdapter } from "../../../../src/contexts/telemetry/infrastructure/task-backlog-adapter.js";
+import { REPOSITORY_ROOT } from "../../../helpers/repository-root.js";
 
 /** Each skill's own fenced example is fed through the real adapter over a real temp folder,
  * never a stand-in parser, so a field renamed on either side fails here. */
-const REPO_ROOT = resolve(process.cwd(), "..");
+const REPO_ROOT = REPOSITORY_ROOT;
 const SPEC_SKILL_MD = join(
   REPO_ROOT,
   "plugins",

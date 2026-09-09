@@ -2,11 +2,12 @@ import { readdirSync, readFileSync } from "node:fs";
 import { cp, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { REPOSITORY_ROOT } from "../helpers/repository-root.js";
 import { createTestEnv, runCli } from "./helpers.js";
 
 /** Two different failures are guarded here: an answer that changed when the plugin's own copy
  * of the report was deleted, and a command the skill names that the CLI never accepts. */
-const REPO_ROOT = resolve(process.cwd(), "..");
+const REPO_ROOT = REPOSITORY_ROOT;
 const FIXTURE = resolve(process.cwd(), "tests/fixtures/cli-owns-read");
 const SKILL_DIR = join(REPO_ROOT, "plugins", "aidd-telemetry", "skills", "01-cost");
 const PERIOD = ["--from", "2026-01-01", "--to", "2026-01-31"];

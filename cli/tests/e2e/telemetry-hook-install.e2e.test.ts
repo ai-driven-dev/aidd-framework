@@ -1,13 +1,14 @@
 import { execFile } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
+import { REPOSITORY_ROOT } from "../helpers/repository-root.js";
 import { createTestEnv, gitInit, gitSetOriginRemote, runCli } from "./helpers.js";
 
 const execFileAsync = promisify(execFile);
-const REPO_ROOT = resolve(process.cwd(), "..");
+const REPO_ROOT = REPOSITORY_ROOT;
 const PLUGIN_SOURCE = join(REPO_ROOT, "plugins", "aidd-telemetry");
 const SESSION_FIXTURE = join(
   REPO_ROOT,

@@ -11,6 +11,7 @@ import {
   type TelemetryClaimVerdict,
   type TelemetryEvidence,
 } from "../../../../src/contexts/telemetry/domain/telemetry-claim.js";
+import { REPOSITORY_ROOT } from "../../../helpers/repository-root.js";
 
 const RUNS_DIR_LABEL = "aidd_docs/runs";
 
@@ -421,7 +422,7 @@ describe("diagnoseTelemetryClaims — the whole set", () => {
 // A shape change whose consumer is not updated in the same commit is how the cost skill was
 // halted twice, so this reads the skill's prose as text, the way a person or an agent would.
 describe("the diagnostic skill states the claims the command prints, in the number it prints them", () => {
-  const SKILL_DIR = resolve(process.cwd(), "..", "plugins", "aidd-telemetry", "skills", "02-check");
+  const SKILL_DIR = resolve(REPOSITORY_ROOT, "plugins", "aidd-telemetry", "skills", "02-check");
   const CLAIM_COUNT_FILES = [
     resolve(SKILL_DIR, "SKILL.md"),
     resolve(SKILL_DIR, "actions", "02-diagnose.md"),
@@ -474,8 +475,7 @@ describe("the diagnostic skill states the claims the command prints, in the numb
  * alone fails; a missing `NoRunFileReason` entry is a compile error. */
 describe("the diagnostic skill's account of every no-run-file reason matches the command's own reasons", () => {
   const DIAGNOSE_MD = resolve(
-    process.cwd(),
-    "..",
+    REPOSITORY_ROOT,
     "plugins",
     "aidd-telemetry",
     "skills",

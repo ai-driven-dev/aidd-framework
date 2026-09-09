@@ -4,13 +4,12 @@ import { execFileSync } from "node:child_process";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { generateOpencodeHooksBridge } from "../../../../../../src/contexts/tools/domain/profiles/opencode/opencode-hooks-bridge.js";
+import { REPOSITORY_ROOT } from "../../../../../helpers/repository-root.js";
 
-const FIXTURES_DIR = fileURLToPath(
-  new URL("../../../../../../../scripts/__tests__/fixtures/", import.meta.url)
-);
+const FIXTURES_DIR = join(REPOSITORY_ROOT, "scripts", "__tests__", "fixtures");
 
 async function loadFixture(name: string): Promise<unknown> {
   return JSON.parse(await readFile(join(FIXTURES_DIR, name), "utf8"));

@@ -1,17 +1,18 @@
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { COST_REPORT_ENVELOPE_VERSION } from "../../../../src/contexts/telemetry/domain/cost-report-envelope.js";
 import { STEP_ATTRIBUTION_SOURCES } from "../../../../src/contexts/telemetry/domain/step-attribution.js";
 import { TASK_UNATTRIBUTED_REASONS } from "../../../../src/contexts/telemetry/domain/task-attribution.js";
 import { ARTEFACT_AXES } from "../../../../src/presentation/display/cost-report-artefact.js";
+import { REPOSITORY_ROOT } from "../../../helpers/repository-root.js";
 
 // Never a hand-maintained list on either side: only the code's own exported values and the
 // document's own prose, both read fresh off disk.
 
-const CONTRACT_DOC_URL = new URL(
-  "../../../../../aidd_docs/product/cost-report-contract.md",
-  import.meta.url
+const CONTRACT_DOC_URL = pathToFileURL(
+  join(REPOSITORY_ROOT, "aidd_docs", "product", "cost-report-contract.md")
 );
 
 function contractText(): string {

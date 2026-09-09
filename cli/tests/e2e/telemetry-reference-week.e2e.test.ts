@@ -3,12 +3,13 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { REPOSITORY_ROOT } from "../helpers/repository-root.js";
 import { cliPath } from "./helpers.js";
 
 // The scenario lives in `scripts/lib/telemetry-reference-week.cjs`, shared with
 // `scripts/telemetry-reference-week.cjs`, so what the demo prints cannot drift from this.
 const week = createRequire(import.meta.url)(
-  "../../../scripts/lib/telemetry-reference-week.cjs"
+  join(REPOSITORY_ROOT, "scripts", "lib", "telemetry-reference-week.cjs")
 ) as ReferenceWeekModule;
 
 interface Totals {
@@ -254,7 +255,7 @@ describe("the week builds inside a git hook's own environment", () => {
   it("ignores a leaked GIT_DIR rather than resolving the real repository", () => {
     const root = mkdtempSync(join(tmpdir(), "aidd-reference-week-gitdir-"));
     const saved = process.env.GIT_DIR;
-    process.env.GIT_DIR = join(process.cwd(), "..", ".git");
+    process.env.GIT_DIR = join(REPOSITORY_ROOT, ".git");
     try {
       const built = week.buildReferenceWeek({ root, cliPath: cliPath() });
       const envelope = JSON.parse(week.reportReferenceWeek(built, ["--json"])) as Envelope;
