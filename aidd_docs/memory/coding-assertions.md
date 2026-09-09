@@ -26,7 +26,7 @@ Never state in a commit message or a report anything not just observed in output
 
 | Order | Command | Checks |
 | ----- | ------- | ------ |
-| 1 | `pnpm exec lefthook run pre-commit` | JSON and YAML validity, `scripts/` tests, skill frontmatter and argument hints, context imports and reference form, markdown links and the paths the prose names; `cli` lint, architecture, typecheck and type honesty when `cli/` changed. `cli` knip and the full `cli` suite are pre-push, not pre-commit — see below |
+| 1 | `pnpm exec lefthook run pre-commit` | JSON and YAML validity, `scripts/` tests, skill frontmatter and argument hints, context imports and reference form, markdown links, the paths the prose names and a sentence written in two documents (`scripts/check-doc-duplication.js`); `cli` lint, architecture, typecheck and type honesty when `cli/` changed. `cli` knip and the full `cli` suite are pre-push, not pre-commit — see below |
 | 2 | `pnpm exec commitlint --edit` | the message against `commitlint.config.cjs` |
 
 Same hook regenerates each plugin's `CATALOG.md`, the README counts and `docs/prompts-documentation.md`, and stages them.

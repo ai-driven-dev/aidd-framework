@@ -94,6 +94,15 @@ pre-commit:
         fi
         node scripts/check-referenced-paths.js
 
+    doc-duplication:
+      glob: "**/*.md"
+      run: |
+        if ! command -v node >/dev/null 2>&1; then
+          echo "ℹ️  node not available; skipping doc-duplication"
+          exit 0
+        fi
+        node scripts/check-doc-duplication.js
+
     markdown-links:
       glob: "**/*.md"
       run: |

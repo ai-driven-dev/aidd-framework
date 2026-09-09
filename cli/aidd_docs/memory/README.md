@@ -1,6 +1,6 @@
 # memory/ - Project Memory
 
-Structured context the AI assistant reads at the start of a session, so it does not rediscover the project each time.
+The `cli/` bank. What a memory bank is: [`aidd_docs/memory/README.md`](../../../aidd_docs/memory/README.md).
 
 ## How it loads
 
